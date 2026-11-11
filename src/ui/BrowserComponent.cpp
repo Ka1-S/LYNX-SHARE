@@ -1796,6 +1796,24 @@ private:
         }
     }
 
+    // FL's "Delete file..." on a Plugin database entry (round 190bf): to the recycle bin after asking; the plugin leaves
+    // the menus' folders and the picker (it stays installed), as when the file is deleted in the file manager
+    void deleteDatabaseEntry (const juce::File& entry)
+    {
+        auto safe = juce::Component::SafePointer<FileTree> (this);
+        juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::WarningIcon, tr ("Delete file"),
+                                            tr ("Move \"{0}\" to the recycle bin?", { entry.getFileName() }), tr ("Delete"), tr ("Cancel"), nullptr,
+                                            juce::ModalCallbackFunction::create ([safe, entry] (int result) {
+                                                if (result == 0 || safe == nullptr)
+                                                    return;
+                                                if (! entry.moveToTrash())
+                                                    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Delete file"),
+                                                                                            tr ("The file could not be deleted."));
+                                                quickpick::refreshPluginDatabase (safe->browser.engine, true);
+                                                safe->browser.rebuildTree();
+                                            }));
+    }
+
 public:
     void renamePlugin (const std::string& key, const juce::String& original)
     {
@@ -1817,7 +1835,35 @@ public:
         return true;
     }
 
+    // --snapshot (round 190bf): the menu a right-click on that row shows (the Plugin database's), without showing it
+    juce::PopupMenu menuForSnapshot (int row)
+    {
+        juce::PopupMenu out;
+        if (! juce::isPositiveAndBelow (row, (int) rows.size()))
+            return out;
+        captured = &out;
+        showMenu (*rows[(std::size_t) row]);
+        captured = nullptr;
+        return out;
+    }
+    int firstRowOfKind (bool plugin) const
+    {
+        for (int i = 0; i < (int) rows.size(); ++i)
+            if (rows[(std::size_t) i]->kind == (plugin ? Kind::plugin : Kind::plugins) && (plugin || rows[(std::size_t) i]->folderKind >= 0))
+                return i;
+        return -1;
+    }
+
 private:
+    juce::PopupMenu* captured = nullptr;
+    void present (juce::PopupMenu& menu)
+    {
+        if (captured != nullptr)
+            *captured = menu;
+        else
+            menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+    }
+
     void showMenu (Node& n)
     {
         auto& engine = browser.engine;
@@ -1883,13 +1929,28 @@ private:
                 });
                 menu.addSubMenu (tr ("Move to folder"), move);
             }
-            menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+            // FL's "System" group on an entry (round 190bf, fl190be q1-entry-menu.png): its file in the Plugin database
+            // folder (the Installed one for a plugin in no folder). FL's "Windows shell menu" is left out: LYNX has no
+            // shell context menu of its own.
+            {
+                const auto entry = n.pluginKey.empty() ? juce::File() : quickpick::pluginDatabaseEntry (n.pluginKey, (bool) n.generator);
+                const auto ok = entry.existsAsFile();
+                menu.addSectionHeader (tr ("System"));
+                menu.addItem (tr ("Open parent folder"), ok, false, [entry] { entry.getParentDirectory().startAsProcess(); });
+                menu.addItem (tr ("Locate file"), ok, false, [entry] { entry.revealToUser(); });
+                menu.addItem (tr ("Delete file..."), ok, false, [safe, entry] {
+                    if (safe != nullptr)
+                        safe->deleteDatabaseEntry (entry);
+                });
+            }
+            present (menu);
             return;
         }
         if (n.kind == Kind::project || n.kind == Kind::category || n.kind == Kind::plugins)
         {
             menu.addSectionHeader (n.label);
             expandItems();
+            juce::File databaseDir; // (a Plugin database folder: its place on disk)
             if (n.kind == Kind::plugins && n.folderKind >= 0) // round 166f (issue #16): the user's folders
                 addFolderItems (menu, n);
             if (n.kind == Kind::plugins)
@@ -1902,15 +1963,21 @@ private:
                     dir = quickpick::pluginDatabaseFolder (n.folderKind == 1, n.userFolder);
                 else if (n.parent != nullptr && n.parent->kind == Kind::plugins && n.parent->folderKind >= 0)
                     dir = dir.getChildFile ("Installed").getChildFile (n.parent->folderKind == 1 ? "Generators" : "Effects");
-                menu.addSeparator();
-                menu.addItem (tr ("Open in the file manager"), dir.isDirectory(), false, [dir] { dir.startAsProcess(); });
+                databaseDir = dir;
             }
             if ((n.kind == Kind::project || n.kind == Kind::plugins) && n.parent == nullptr && browser.tab == allTab) // round 163
             {
                 menu.addSeparator();
                 browser.addHideItem (menu, n.kind == Kind::project ? browserview::projectRootId : browserview::pluginsRootId, n.label);
             }
-            menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
+            if (n.kind == Kind::plugins)
+            {
+                // FL's "System" group at the end of a folder's menu (round 190bf, fl190be q1-folder-menu.png): "Open"
+                // (FL's "Windows shell menu" is left out: LYNX has no shell context menu of its own)
+                menu.addSectionHeader (tr ("System"));
+                menu.addItem (tr ("Open"), databaseDir.isDirectory(), false, [dir = databaseDir] { dir.startAsProcess(); });
+            }
+            present (menu);
             return;
         }
 
@@ -3719,6 +3786,16 @@ void BrowserComponent::resetViewForSnapshot()
     viewLoaded = false; // (read again: the snapshot's changes were never saved)
     prunedGeneration = 0;
     rebuildRoots();
+}
+
+std::vector<juce::PopupMenu> BrowserComponent::pluginDatabaseMenusForSnapshot()
+{
+    // a folder of the user's (else Effects / Generators) and the first plugin entry shown, as a right-click opens them
+    showPluginDatabaseForSnapshot();
+    std::vector<juce::PopupMenu> out;
+    out.push_back (tree->menuForSnapshot (tree->firstRowOfKind (false)));
+    out.push_back (tree->menuForSnapshot (tree->firstRowOfKind (true)));
+    return out;
 }
 
 void BrowserComponent::showPluginDatabaseForSnapshot()

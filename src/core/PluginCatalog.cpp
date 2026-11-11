@@ -359,6 +359,7 @@ void moveToFolder (Folders& folders, bool instruments, const std::string& key, c
     const auto clean = addFolder (folders, instruments, path);
     if (clean.empty()) folders.of.erase (key);
     else folders.of[key] = clean;
+    folders.top.erase (key); // (a choice made in LYNX: no longer a root entry)
 }
 
 std::vector<MenuFolder> menuTree (const Folders& folders, bool instruments, const std::vector<std::string>& keys)
@@ -399,6 +400,22 @@ std::vector<int> allItems (const std::vector<MenuFolder>& tree)
         const auto inner = allItems (f.sub);
         out.insert (out.end(), inner.begin(), inner.end());
         out.insert (out.end(), f.items.begin(), f.items.end());
+    }
+    return out;
+}
+
+std::vector<int> rootItems (const Folders& folders, bool instruments, const std::vector<std::string>& keys)
+{
+    std::vector<int> out;
+    const auto& set = folders.kind (instruments);
+    for (int i = 0; i < (int) keys.size(); ++i)
+    {
+        const auto& key = keys[(std::size_t) i];
+        if (! folders.top.count (key))
+            continue;
+        if (const auto it = folders.of.find (key); it != folders.of.end() && set.count (it->second))
+            continue;
+        out.push_back (i);
     }
     return out;
 }
@@ -516,6 +533,8 @@ Folders withDefaultCategories (const Folders& user, bool instruments, const std:
             continue; // the user's folder wins
         if (out.hidden.count (b.key))
             continue; // taken out of the database by the user (round 190ba)
+        if (out.top.count (b.key))
+            continue; // at the top of the database, in no folder (round 190bf)
         auto folder = flCategory (b.name, instruments, b.fruityPrefix || b.flPlugin);
         if (folder.empty())
             folder = b.flPlugin ? "Misc" : lynxCategory;

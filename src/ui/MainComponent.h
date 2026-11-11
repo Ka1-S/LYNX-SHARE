@@ -41,6 +41,10 @@
 namespace lynx
 {
 class GamepadInput;
+namespace folderwatch
+{
+class Watcher;
+}
 namespace gamepad
 {
 struct Changes;
@@ -680,6 +684,9 @@ private:
     juce::String projectName; // suggested name for export (also from an imported .flp)
     HeldNotes heldKeys; // notes the typing piano is playing (tag: the key code)
     bool wasForeground = true; // (the Plugin database folder is read again when LYNX comes back to the front: issue #104)
+    // round 190bf: the Plugin database folder's watcher (core/FolderWatcher.h); its thread only posts to this one
+    std::unique_ptr<folderwatch::Watcher> pluginDatabaseWatcher;
+    void readPluginDatabaseAgain();
     // Online Sessions P2 (round 169b): the live session (last: it ends, and tells the others, before anything goes)
     std::unique_ptr<LiveSessionManager> live;
 

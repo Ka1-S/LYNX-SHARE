@@ -63,7 +63,101 @@ std::string toUtf8 (const std::string& s)
     }
     return out;
 }
+
+// FL's text is UTF-8: a byte that is not part of a valid UTF-8 character becomes U+FFFD (the result is always UTF-8)
+std::string validUtf8OnlyText (const std::string& s)
+{
+    if (validUtf8 (s))
+        return s;
+    std::string out;
+    for (std::size_t i = 0; i < s.size();)
+    {
+        const auto c = (unsigned char) s[i];
+        const auto extra = c < 0x80 ? 0 : (c >> 5) == 0x6 ? 1 : (c >> 4) == 0xe ? 2 : (c >> 3) == 0x1e ? 3 : -1;
+        bool ok = extra >= 0 && i + (std::size_t) extra < s.size();
+        for (int k = 1; ok && k <= extra; ++k)
+            ok = ((unsigned char) s[i + (std::size_t) k] >> 6) == 0x2;
+        if (ok)
+        {
+            out.append (s, i, (std::size_t) extra + 1);
+            i += (std::size_t) extra + 1;
+        }
+        else
+        {
+            out += "\xef\xbf\xbd";
+            ++i;
+        }
+    }
+    return out;
+}
+
+bool isSeparator (char c) noexcept { return c == '\\' || c == '/'; }
+
+// "C:/a\\b/" -> "c:/a/b" (for comparing paths: separators unified, letter case ignored for ASCII, no trailing separator)
+std::string comparable (const std::string& path)
+{
+    std::string out;
+    for (const auto ch : path)
+    {
+        const auto c = isSeparator (ch) ? '/' : ch;
+        if (c == '/' && ! out.empty() && out.back() == '/')
+            continue;
+        out += (char) ((c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c);
+    }
+    while (out.size() > 1 && out.back() == '/')
+        out.pop_back();
+    return out;
+}
 } // namespace
+
+const char* const flFactoryToken = "%FLStudioFactoryData%";
+
+std::string expandFlSheetPath (const std::string& stored, const std::string& flFactoryData)
+{
+    const std::string token (flFactoryToken);
+    if (stored.size() < token.size() || comparable (stored.substr (0, token.size())) != comparable (token) || flFactoryData.empty())
+        return stored;
+    auto rest = stored.substr (token.size());
+    while (! rest.empty() && isSeparator (rest.front()))
+        rest.erase (rest.begin());
+    auto root = flFactoryData;
+    while (root.size() > 1 && isSeparator (root.back()))
+        root.pop_back();
+    // the root's own separator style (FL's backslashes become '/' under a POSIX root: macOS, Linux, a Wine prefix)
+    const auto posix = root.find ('\\') == std::string::npos && root.find ('/') != std::string::npos;
+    if (posix)
+        for (auto& c : rest)
+            if (c == '\\')
+                c = '/';
+    return rest.empty() ? root : root + (posix ? "/" : "\\") + rest;
+}
+
+std::string flSheetPath (const std::string& path, const std::string& flFactoryData)
+{
+    if (path.empty() || flFactoryData.empty())
+        return path;
+    const auto root = comparable (flFactoryData), file = comparable (path);
+    if (root.empty() || file.size() <= root.size() + 1 || file.compare (0, root.size(), root) != 0 || file[root.size()] != '/')
+        return path;
+    // the part of `path` that is the root (as comparable() reads it: doubled separators count once)
+    std::size_t at = 0, n = 0;
+    bool lastSlash = false;
+    while (at < path.size() && n < root.size())
+    {
+        const auto slash = isSeparator (path[at]);
+        if (! (slash && lastSlash))
+            ++n;
+        lastSlash = slash;
+        ++at;
+    }
+    auto rest = path.substr (at);
+    while (! rest.empty() && isSeparator (rest.front()))
+        rest.erase (rest.begin());
+    for (auto& c : rest)
+        if (c == '/')
+            c = '\\';
+    return std::string (flFactoryToken) + "\\" + rest;
+}
 
 const char* moveName (int move) noexcept
 {
@@ -99,6 +193,17 @@ std::vector<std::uint8_t> toState (const Settings& s)
     // (only when used, so the states of dancers without a sheet stay as they were)
     if (s.blend != Settings {}.blend)
         o << "blend=" << s.blend << "\n";
+    // FL's display options (round 190bf; only when changed, so the states of dancers made before stay as they were)
+    if (s.reflect != Settings {}.reflect)
+        o << "reflect=" << s.reflect << "\n";
+    if (! s.sync)
+        o << "sync=0\n";
+    if (! s.solid)
+        o << "solid=0\n";
+    if (! s.keepInFront)
+        o << "front=0\n";
+    if (! s.onDesktop)
+        o << "desktop=0\n";
     if (! s.sheet.empty())
     {
         auto path = s.sheet;
@@ -144,6 +249,16 @@ std::optional<Settings> fromState (const std::vector<std::uint8_t>& state)
             s.blend = num (value, 0.0f, 1.0f, Settings {}.blend);
         else if (key == "sheet")
             s.sheet = value;
+        else if (key == "reflect")
+            s.reflect = num (value, 0.0f, 1.0f, Settings {}.reflect);
+        else if (key == "sync")
+            s.sync = value != "0";
+        else if (key == "solid")
+            s.solid = value != "0";
+        else if (key == "front")
+            s.keepInFront = value != "0";
+        else if (key == "desktop")
+            s.onDesktop = value != "0";
         else if (key == "mirrored")
             s.mirrored = value != "0";
         else if (key == "visible")
@@ -162,7 +277,7 @@ std::optional<Settings> fromState (const std::vector<std::uint8_t>& state)
     return s;
 }
 
-std::optional<Settings> fromFl (const std::vector<std::uint8_t>& state)
+std::optional<Settings> fromFl (const std::vector<std::uint8_t>& state, const std::string& flFactoryData)
 {
     if (state.size() < 40)
         return std::nullopt;
@@ -187,6 +302,13 @@ std::optional<Settings> fromFl (const std::vector<std::uint8_t>& state)
     s.speed = std::clamp (v < 0 ? 1.0f / d : d, 0.125f, 4.0f);
     s.x = std::clamp ((int) i32 (24), -10000, 10000);
     s.y = std::clamp ((int) i32 (28), -10000, 10000);
+    // the display options (round 190bf): "Reflect" (0 … 256, FL's default 64), then the four switches in FL's order
+    // (Sync changes, Keep in front, On desktop, Solid; all on in a new Fruity Dance, fl190be dance.flp / dance2.flp)
+    s.reflect = std::clamp ((float) i32 (32) / 256.0f, 0.0f, 1.0f);
+    s.sync = state[36] != 0;
+    s.keepInFront = state[37] != 0;
+    s.onDesktop = state[38] != 0;
+    s.solid = state[39] != 0;
     // version 2: after the display options (an int and four flags, 8 bytes) the sheet's file: a length byte (255: an
     // int follows with the length), then the characters; control characters at the end are dropped. Empty = FL's own.
     if (version >= 2 && state.size() > 40)
@@ -205,13 +327,16 @@ std::optional<Settings> fromFl (const std::vector<std::uint8_t>& state)
             std::string path ((const char*) state.data() + at, length);
             while (! path.empty() && (unsigned char) path.back() < 0x20)
                 path.pop_back();
-            s.sheet = toUtf8 (path);
+            // FL writes UTF-8 (fl190be: "Dançé.png" as C3 A7 / C3 A9, the length counting bytes) and a file inside its
+            // own folder as %FLStudioFactoryData%\... (expanded with FL's folder; without one the path stays as it is,
+            // a file that cannot be found: LYNX's dancer stands in)
+            s.sheet = expandFlSheetPath (validUtf8OnlyText (path), flFactoryData);
         }
     }
     return s;
 }
 
-std::vector<std::uint8_t> toFl (const Settings& s)
+std::vector<std::uint8_t> toFl (const Settings& s, const std::string& flFactoryData)
 {
     std::vector<std::uint8_t> b;
     auto i32 = [&b] (std::int32_t v) {
@@ -228,11 +353,12 @@ std::vector<std::uint8_t> toFl (const Settings& s)
     i32 ((std::int32_t) std::lround (ratio >= 1.0f ? (ratio - 1.0f) * 32.0f : -(1.0f / ratio - 1.0f) * 32.0f));
     i32 (s.x);
     i32 (s.y);
-    // the display options as FL makes them: reflection 64; Sync changes, Keep in front, On desktop, Solid on
-    i32 (64);
-    for (int k = 0; k < 4; ++k)
-        b.push_back (1);
-    const auto length = s.sheet.size();
+    // the display options: Reflect (0 … 256), then Sync changes, Keep in front, On desktop, Solid
+    i32 ((std::int32_t) std::lround (std::clamp (s.reflect, 0.0f, 1.0f) * 256.0f));
+    for (const auto on : { s.sync, s.keepInFront, s.onDesktop, s.solid })
+        b.push_back (on ? 1 : 0);
+    const auto sheet = flSheetPath (s.sheet, flFactoryData);
+    const auto length = sheet.size();
     if (length < 0xff)
         b.push_back ((std::uint8_t) length);
     else
@@ -240,7 +366,7 @@ std::vector<std::uint8_t> toFl (const Settings& s)
         b.push_back (0xff);
         i32 ((std::int32_t) length);
     }
-    b.insert (b.end(), s.sheet.begin(), s.sheet.end());
+    b.insert (b.end(), sheet.begin(), sheet.end());
     return b;
 }
 
@@ -548,7 +674,7 @@ int SheetAnimator::rowFor (int rows, int move, bool playing) const noexcept
     return move == 0 ? freestyleRow : move - 1;
 }
 
-SheetFrame SheetAnimator::advance (double cycles, int rows, int move, bool mirrored, bool playing, float blend, bool held) noexcept
+SheetFrame SheetAnimator::advance (double cycles, int rows, int move, bool mirrored, bool playing, float blend, bool held, bool sync) noexcept
 {
     rows = std::clamp (rows, 1, maxMoves);
     if (drawnFor != rows)
@@ -561,6 +687,12 @@ SheetFrame SheetAnimator::advance (double cycles, int rows, int move, bool mirro
         shownRow = rowFor (rows, move, playing);
         shownMirrored = mirrored;
         draw (rows);
+    }
+    else if (! sync && std::clamp (move, 0, rows - 1) != 0)
+    {
+        // "Sync changes" off (FL: a move other than Freestyle shows at once, not at the next cycle's start)
+        shownRow = rowFor (rows, move, playing);
+        shownMirrored = mirrored;
     }
     lastPhase = phase;
 

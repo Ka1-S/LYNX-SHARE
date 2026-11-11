@@ -43,6 +43,7 @@
 #include "ui/WaveformView.h"
 #include "ui/QuickAddPalette.h"
 #include "ui/QuickPick.h"
+#include "core/FolderWatcher.h"
 #include "ui/PluginPickerView.h"
 #include "ui/PatcherEditor.h"
 #include "ui/ToolWindow.h"
@@ -159,7 +160,21 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     heldKeys.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on, true); });
     connectBrowser (browser);
     if (restoreUserSettings) // (issue #104: the Plugin database folder on disk; changes made in LYNX are written to it)
+    {
         quickpick::installPluginDatabase (engine);
+        // round 190bf: and a change made to it in the file manager shows in the Browser by itself, about a second
+        // later, as in FL (fl190be Q2); the menus and the picker read it when they next open
+        const auto root = quickpick::pluginDatabaseFolder();
+        auto safe = juce::Component::SafePointer<MainComponent> (this);
+        pluginDatabaseWatcher = std::make_unique<folderwatch::Watcher> (
+            std::vector<std::string> { root.getChildFile ("Effects").getFullPathName().toStdString(), root.getChildFile ("Generators").getFullPathName().toStdString() },
+            [safe] {
+                juce::MessageManager::callAsync ([safe] {
+                    if (safe != nullptr)
+                        safe->readPluginDatabaseAgain();
+                });
+            });
+    }
     addChildComponent (updateBar);
     updateBar.onVisibilityChanged = [this] { resized(); };
     if (restoreUserSettings) // (the real window: Update saves the project as on quit and reopens it)
@@ -5048,6 +5063,21 @@ void MainComponent::dumpAudioLog()
     });
 }
 
+void MainComponent::readPluginDatabaseAgain()
+{
+    // the Plugin database folder as it is on disk now (issue #104): the Browser is built again when it changed; open
+    // menus and an open Plugin picker stay as they are (FL, fl190be Q2 / Q4), the next ones read the new state
+    auto& host = engine.getPluginHost();
+    const auto folders = host.databaseFolders();
+    const auto names = host.pluginNames();
+    quickpick::markPluginDatabaseChanged();
+    quickpick::refreshPluginDatabase (engine, true);
+    const auto& now = host.databaseFolders();
+    if (now.of != folders.of || now.effects != folders.effects || now.generators != folders.generators || now.hidden != folders.hidden
+        || now.top != folders.top || host.pluginNames() != names)
+        browser.pluginDatabaseChanged();
+}
+
 void MainComponent::timerCallback()
 {
     const uitrace::Scope trace ("MainComponent timer", false);
@@ -5165,16 +5195,7 @@ void MainComponent::timerCallback()
     {
         wasForeground = foreground;
         if (foreground && persistent)
-        {
-            auto& host = engine.getPluginHost();
-            const auto folders = host.databaseFolders();
-            const auto names = host.pluginNames();
-            quickpick::refreshPluginDatabase (engine, true);
-            const auto& now = host.databaseFolders();
-            if (now.of != folders.of || now.effects != folders.effects || now.generators != folders.generators || now.hidden != folders.hidden
-                || host.pluginNames() != names)
-                browser.pluginDatabaseChanged();
-        }
+            readPluginDatabaseAgain();
     }
 
     auto& transport = engine.getTransport();

@@ -1016,13 +1016,14 @@ private:
     {
         styleLabel (formatLabel, tr ("File format"));
         styleCombo (formatBox);
+        formatBox.addItem (tr ("WAV 16-bit (the device's sample rate)"), 3); // (round 190bf: FL's Disk recording "16Bit int")
         formatBox.addItem (tr ("WAV 24-bit (the device's sample rate)"), 1);
         formatBox.addItem (tr ("WAV 32-bit float (the device's sample rate)"), 2);
         formatBox.onChange = [this] {
             if (updating)
                 return;
             auto s = engine.getRecordingSettings();
-            s.format = formatBox.getSelectedId() == 2 ? takes::SampleFormat::float32 : takes::SampleFormat::pcm24;
+            s.format = formatBox.getSelectedId() == 2 ? takes::SampleFormat::float32 : formatBox.getSelectedId() == 3 ? takes::SampleFormat::pcm16 : takes::SampleFormat::pcm24;
             engine.setRecordingSettings (s);
         };
         styleToggle (takeNames, tr ("Name takes after the track (\"Bass DI_Take3.wav\"); off: project, date and time as FL does"));
@@ -1096,7 +1097,7 @@ private:
     {
         const juce::ScopedValueSetter<bool> guard (updating, true);
         const auto& s = engine.getRecordingSettings();
-        formatBox.setSelectedId (s.format == takes::SampleFormat::float32 ? 2 : 1, juce::dontSendNotification);
+        formatBox.setSelectedId (s.format == takes::SampleFormat::float32 ? 2 : s.format == takes::SampleFormat::pcm16 ? 3 : 1, juce::dontSendNotification);
         takeNames.setToggleState (s.trackTakeNames, juce::dontSendNotification);
         useMeasured.setToggleState (s.useMeasured, juce::dontSendNotification);
         offsetSlider.setValue (s.manualOffset, juce::dontSendNotification);

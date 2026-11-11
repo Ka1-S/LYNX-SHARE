@@ -102,6 +102,14 @@ bool inUserFolder (AudioEngine& engine, const std::string& key);
 juce::File pluginDatabaseFolder();
 juce::File pluginDatabaseFolder (bool instruments, const std::string& userFolder);
 void refreshPluginDatabase (AudioEngine& engine, bool force = false);
+// Round 190bf: the entry file of a plugin in that folder (its place under Effects / Generators, else under Installed;
+// a missing file when it has none), for the Browser's "System" items; and "the folder changed on disk" (the folder
+// watcher, ui/MainComponent): the next plugin menu or picker reads it again (FL: menus and the picker that are already
+// open stay as they are, the next one shows the change).
+juce::File pluginDatabaseEntry (const std::string& key, bool instruments);
+void markPluginDatabaseChanged();
+// A radio item (FL's Categories / Simple / Tree, Disk recording's Format): a dot instead of a tick
+void addRadioItem (juce::PopupMenu& menu, const juce::String& text, bool selected, std::function<void()> action);
 void installPluginDatabase (AudioEngine& engine);
 
 // Adds `picks` at the top of `menu` under a header ("Renamed plugins: type the first character").

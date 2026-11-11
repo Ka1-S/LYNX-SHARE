@@ -7,6 +7,7 @@
 #include <set>
 #include <tuple>
 
+#include "engine/FlStudio.h"
 #include "engine/PluginHost.h"
 
 namespace lynx::flstudio
@@ -20,6 +21,8 @@ flpexport::Options optionsFor (PluginHost* host, flpexport::LynxOnly mode)
 {
     flpexport::Options o;
     o.lynxOnly = mode;
+    if (const auto fl = findFlStudio(); fl.installDir.isDirectory())
+        o.flFactoryData = fl.installDir.getFullPathName().toStdString();
     if (host != nullptr)
         o.pluginRecord = [host] (const PluginRef& ref, bool instrument) { return host->flWrapperRecord (ref, instrument); };
     o.sampleSeconds = [] (const std::string& path) {

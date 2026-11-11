@@ -389,6 +389,29 @@ std::shared_ptr<const Sheet> sheetFor (const std::string& path, SheetError* erro
     return c.sheet;
 }
 
+void drawReflection (juce::Graphics& g, juce::Point<float> feet, float depth, float opacity, const std::function<void (juce::Graphics&)>& figure)
+{
+    if (opacity <= 0.0f || depth <= 1.0f)
+        return;
+    // FL's "Reflect" (round 190bf): the figure mirrored at its feet, fading out downwards (bands of falling opacity)
+    constexpr int bands = 5;
+    for (int k = 0; k < bands; ++k)
+    {
+        juce::Graphics::ScopedSaveState save (g);
+        const auto band = juce::Rectangle<float> (feet.x - depth * 8.0f, feet.y + depth * (float) k / (float) bands, depth * 16.0f, depth / (float) bands);
+        g.reduceClipRegion (band.getSmallestIntegerContainer());
+        if (g.isClipEmpty())
+            continue;
+        g.beginTransparencyLayer (juce::jlimit (0.0f, 1.0f, opacity * (1.0f - ((float) k + 0.5f) / (float) bands)));
+        {
+            juce::Graphics::ScopedSaveState flip (g);
+            g.addTransform (juce::AffineTransform::scale (1.0f, -1.0f, feet.x, feet.y));
+            figure (g);
+        }
+        g.endTransparencyLayer();
+    }
+}
+
 juce::Rectangle<float> sheetBox (const Sheet& sheet, juce::Point<float> feet, float scale)
 {
     const auto w = (float) sheet.layout.frameWidth * scale, h = (float) sheet.layout.frameHeight * scale;
@@ -525,7 +548,9 @@ void DanceStage::syncWindow (Dancer& d, bool windows)
         w->setBounds (area);
         if (! nativechild::attach (*w, *this))
             return; // (the stage draws it meanwhile)
-        nativechild::addFloater (*w);
+        if (d.now.keepInFront) // FL's "Keep in front": kept in front of the panels and docked plugins
+            nativechild::addFloater (*w);
+        d.floating = d.now.keepInFront;
         nativechild::forwardUnusedKeys (*w);
         w->setVisible (true);
         d.window = std::move (w);
@@ -533,6 +558,16 @@ void DanceStage::syncWindow (Dancer& d, bool windows)
         return;
     }
     auto& w = *d.window;
+    if (d.floating != d.now.keepInFront)
+    {
+        // "Keep in front" off: an ordinary child window, which the panels and docked plugins may cover
+        if (d.now.keepInFront)
+            nativechild::addFloater (w);
+        else
+            nativechild::removeFloater (w);
+        d.floating = d.now.keepInFront;
+        nativechild::raiseOverlays();
+    }
     if (nativechild::boundsIn (w, *this) != area)
     {
         nativechild::place (w, *this, area);
@@ -587,9 +622,16 @@ juce::Rectangle<float> DanceStage::boxOf (const Dancer& d) const
 {
     const auto h = baseHeight * d.now.scale;
     const auto feet = juce::Point<float> ((float) d.now.x, (float) d.now.y);
-    if (d.sheet != nullptr)
-        return dancer::sheetBox (*d.sheet, feet, d.now.scale);
-    return dancer::reach (feet, h);
+    const auto box = d.sheet != nullptr ? dancer::sheetBox (*d.sheet, feet, d.now.scale) : dancer::reach (feet, h);
+    if (d.now.reflect <= 0.0f)
+        return box;
+    // (FL's "Reflect": the faded mirror image under the feet)
+    return box.getUnion ({ box.getX(), feet.y, box.getWidth(), reflectionDepth (d) + 2.0f });
+}
+
+float DanceStage::reflectionDepth (const Dancer& d)
+{
+    return 0.45f * (d.sheet != nullptr ? (float) d.sheet->layout.frameHeight * d.now.scale : baseHeight * d.now.scale);
 }
 
 void DanceStage::scan()
@@ -723,7 +765,7 @@ void DanceStage::timerCallback()
             // FL's rules: the row changes at a cycle's start, the first row while the song is stopped, the last one
             // while the dancer is held with the mouse
             const auto before = d.frame;
-            d.frame = d.animator.advance (cycles, d.sheet->layout.rows, d.now.move, d.now.mirrored, playing, d.now.blend, dragging == channel);
+            d.frame = d.animator.advance (cycles, d.sheet->layout.rows, d.now.move, d.now.mirrored, playing, d.now.blend, dragging == channel, d.now.sync);
             d.lastMove = d.now.move;
             d.blendStart = -1.0;
             const auto box = d.now.visible ? boxOf (d) : juce::Rectangle<float>();
@@ -735,13 +777,17 @@ void DanceStage::timerCallback()
                 invalidate (d, dirty);
             continue;
         }
-        const auto target = dance::pose (juce::jmin (d.now.move, dance::moveCount - 1), cycles, (std::uint32_t) channel * 7919u + 1u);
-        if (d.now.move != d.lastMove)
+        // FL's "Sync changes" (on: a new move starts with the next cycle; off: at once)
+        const auto cycleIndex = (std::int64_t) std::floor (cycles);
+        const auto cycleStarts = cycleIndex != d.lastCycle;
+        d.lastCycle = cycleIndex;
+        if (d.now.move != d.lastMove && (! d.now.sync || cycleStarts))
         {
             d.from = d.shown;
             d.blendStart = now;
             d.lastMove = d.now.move;
         }
+        const auto target = dance::pose (juce::jmin (d.lastMove, dance::moveCount - 1), cycles, (std::uint32_t) channel * 7919u + 1u);
         if (d.blendStart >= 0.0 && now - d.blendStart < blendMs)
             d.shown = dance::Pose::mix (d.from, target, smoothStep ((float) ((now - d.blendStart) / blendMs)));
         else
@@ -772,14 +818,20 @@ void DanceStage::paint (juce::Graphics& g)
 void DanceStage::drawDancer (juce::Graphics& g, const Dancer& d)
 {
     const juce::Point<float> feet ((float) d.now.x, (float) d.now.y);
-    if (d.sheet != nullptr)
-        dancer::drawSheet (g, *d.sheet, feet, d.now.scale, d.frame);
-    else
-        dancer::draw (g, feet, baseHeight * d.now.scale, d.shown, d.now.mirrored, juce::Colour (d.now.colour));
+    auto figure = [&d, feet] (juce::Graphics& gr) {
+        if (d.sheet != nullptr)
+            dancer::drawSheet (gr, *d.sheet, feet, d.now.scale, d.frame);
+        else
+            dancer::draw (gr, feet, baseHeight * d.now.scale, d.shown, d.now.mirrored, juce::Colour (d.now.colour));
+    };
+    dancer::drawReflection (g, feet, reflectionDepth (d), d.now.reflect, figure);
+    figure (g);
 }
 
 bool DanceStage::hits (const Dancer& d, juce::Point<float> p)
 {
+    if (! d.now.solid) // FL's "Solid" off ("Set window clickable"): the clicks go through the dancer
+        return false;
     if (d.sheet != nullptr)
         return dancer::sheetSolidAt (*d.sheet, { (float) d.now.x, (float) d.now.y }, d.now.scale, d.frame, p);
     return bodyBox (d).contains (p);
@@ -933,10 +985,34 @@ public:
         shownPose = dance::pose (juce::jmin (settings.move, dance::moveCount - 1), 0.3, (std::uint32_t) channel * 7919u + 1u);
         fillMoves();
         moveBox.onChange = [this] { change ([this] (dance::Settings& s) { s.move = moveBox.getSelectedId() - 1; }); };
-        mirrored.setButtonText (tr ("Mirrored"));
+        // FL's switches, with FL's names and in FL's order (round 190bf, fl190be q5-dance-editor-default.png): Visible,
+        // Mirror horizontally, then Sync changes, Solid, Keep in front, On desktop; their hints are FL's
+        mirrored.setButtonText (tr ("Mirror horizontally"));
+        mirrored.setTooltip (tr ("Mirror character horizontally"));
         mirrored.onClick = [this] { change ([this] (dance::Settings& s) { s.mirrored = mirrored.getToggleState(); }); };
-        shown.setButtonText (tr ("Show the dancer"));
+        shown.setButtonText (tr ("Visible"));
+        shown.setTooltip (tr ("Show the dancer"));
         shown.onClick = [this] { change ([this] (dance::Settings& s) { s.visible = shown.getToggleState(); }); };
+        sync.setButtonText (tr ("Sync changes"));
+        sync.setTooltip (tr ("Synchronize changes with song"));
+        sync.onClick = [this] { change ([this] (dance::Settings& s) { s.sync = sync.getToggleState(); }); };
+        solid.setButtonText (tr ("Solid"));
+        solid.setTooltip (tr ("Set window clickable"));
+        solid.onClick = [this] { change ([this] (dance::Settings& s) { s.solid = solid.getToggleState(); }); };
+        front.setButtonText (tr ("Keep in front"));
+        front.setTooltip (tr ("Keep window on top"));
+        front.onClick = [this] { change ([this] (dance::Settings& s) { s.keepInFront = front.getToggleState(); }); };
+        desktop.setButtonText (tr ("On desktop"));
+        desktop.setTooltip (tr ("Don't minimize window along with application") + "\n"
+                            + tr ("LYNX's dancers stay inside the main window: this setting is kept for FL Studio projects."));
+        desktop.onClick = [this] { change ([this] (dance::Settings& s) { s.onDesktop = desktop.getToggleState(); }); };
+        // FL's "Reflect" (0 … 256, default 64): the faded mirror image under the dancer
+        reflect.setRange (0.0, 1.0, 1.0 / 256.0);
+        reflect.setDoubleClickReturnValue (true, dance::Settings {}.reflect);
+        reflect.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v * 100.0)) + " %"; };
+        reflect.valueFromTextFunction = [] (const juce::String& t) { return t.getDoubleValue() / 100.0; };
+        reflect.setTooltip (tr ("Bevel size / reflection opacity"));
+        reflect.onValueChange = [this] { change ([this] (dance::Settings& s) { s.reflect = (float) reflect.getValue(); }); };
         size.setRange (0.25, 3.0, 0.01);
         size.setSkewFactorFromMidPoint (1.0);
         size.setDoubleClickReturnValue (true, 1.0);
@@ -954,7 +1030,7 @@ public:
         blend.valueFromTextFunction = [] (const juce::String& t) { return t.getDoubleValue() / 100.0; };
         blend.setTooltip (tr ("Motion blending"));
         blend.onValueChange = [this] { change ([this] (dance::Settings& s) { s.blend = (float) blend.getValue(); }); };
-        for (auto* s : { &size, &speed, &blend })
+        for (auto* s : { &size, &speed, &blend, &reflect })
         {
             s->setSliderStyle (juce::Slider::LinearHorizontal);
             s->setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 20);
@@ -997,10 +1073,11 @@ public:
                 s.move = juce::jmin (s.move, dance::moveCount - 1);
             });
         };
-        for (auto* c : std::initializer_list<juce::Component*> { &moveBox, &mirrored, &shown, &size, &speed, &blend, &colour, &place, &loadSheet, &ownDancer })
+        for (auto* c : std::initializer_list<juce::Component*> { &moveBox, &mirrored, &shown, &sync, &solid, &front, &desktop, &size, &speed, &blend,
+                                                                  &reflect, &colour, &place, &loadSheet, &ownDancer })
             addAndMakeVisible (c);
         load();
-        setSize (660, 404);
+        setSize (660, 450);
         startTimerHz (30);
     }
 
@@ -1011,22 +1088,27 @@ public:
         g.fillRoundedRectangle (stage.toFloat(), 6.0f);
         // a floor line
         g.setColour (theme::colour::border);
-        g.drawHorizontalLine (stage.getBottom() - 26, (float) stage.getX() + 12.0f, (float) stage.getRight() - 12.0f);
+        g.drawHorizontalLine (stage.getBottom() - 70, (float) stage.getX() + 12.0f, (float) stage.getRight() - 12.0f);
         {
             juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (stage);
-            const juce::Point<float> feet ((float) stage.getCentreX(), (float) stage.getBottom() - 26.0f);
+            const juce::Point<float> feet ((float) stage.getCentreX(), (float) stage.getBottom() - 70.0f);
+            // (with FL's faint reflection under it, as FL's own preview shows it)
             if (sheet != nullptr)
             {
                 // the frame as large as the stage takes (never enlarged)
                 const auto fit = juce::jmin (1.0f, ((float) stage.getWidth() - 16.0f) / (float) sheet->layout.frameWidth,
-                                             ((float) stage.getHeight() - 40.0f) / (float) sheet->layout.frameHeight);
-                dancer::drawSheet (g, *sheet, feet, fit, shownFrame);
+                                             ((float) stage.getHeight() - 84.0f) / (float) sheet->layout.frameHeight);
+                auto figure = [&] (juce::Graphics& gr) { dancer::drawSheet (gr, *sheet, feet, fit, shownFrame); };
+                dancer::drawReflection (g, feet, (float) sheet->layout.frameHeight * fit * 0.45f, settings.reflect, figure);
+                figure (g);
             }
             else
             {
-                const auto h = juce::jmin ((float) stage.getHeight() * 0.68f, 190.0f);
-                dancer::draw (g, feet, h, shownPose, settings.mirrored, juce::Colour (settings.colour));
+                const auto h = juce::jmin ((float) stage.getHeight() * 0.6f, 190.0f);
+                auto figure = [&] (juce::Graphics& gr) { dancer::draw (gr, feet, h, shownPose, settings.mirrored, juce::Colour (settings.colour)); };
+                dancer::drawReflection (g, feet, h * 0.45f, settings.reflect, figure);
+                figure (g);
             }
         }
         g.setColour (theme::colour::textPrimary);
@@ -1038,7 +1120,7 @@ public:
                               "place it, right-click it for its moves."),
                           header.translated (0, 22).withHeight (30), juce::Justification::topLeft, 2);
         for (const auto& [area, text] : { std::pair { moveLabel, tr ("Move") }, std::pair { sizeLabel, tr ("Size") }, std::pair { speedLabel, tr ("Speed") },
-                                          std::pair { blendLabel, tr ("Blend") } })
+                                          std::pair { blendLabel, tr ("Blend") }, std::pair { reflectLabel, tr ("Reflect") } })
         {
             g.setColour (theme::colour::textSecondary);
             g.drawText (text, area, juce::Justification::centredLeft);
@@ -1068,24 +1150,29 @@ public:
             moveBox.setBounds (r.removeFromLeft (180));
         }
         {
-            auto r = row();
-            sizeLabel = r.removeFromLeft (60);
-            size.setBounds (r);
-        }
-        {
-            auto r = row();
-            speedLabel = r.removeFromLeft (60);
-            speed.setBounds (r);
-        }
-        {
-            auto r = row();
-            blendLabel = r.removeFromLeft (60);
-            blend.setBounds (r);
-        }
-        {
-            auto r = row();
-            shown.setBounds (r.removeFromLeft (170));
-            mirrored.setBounds (r.removeFromLeft (140));
+            // FL's layout: the switches in one column, the sliders beside them (Blend, Speed, Reflect; LYNX's Size last)
+            auto block = area.removeFromTop (4 * 30 + 26);
+            area.removeFromTop (8);
+            auto switches = block.removeFromLeft (150);
+            block.removeFromLeft (8);
+            auto toggle = [&switches] (juce::Component& c) { c.setBounds (switches.removeFromTop (22)); switches.removeFromTop (1); };
+            toggle (shown);
+            toggle (mirrored);
+            switches.removeFromTop (8); // (FL's gap)
+            toggle (sync);
+            toggle (solid);
+            toggle (front);
+            toggle (desktop);
+            auto slider = [&block] (juce::Rectangle<int>& label, juce::Slider& s) {
+                auto r = block.removeFromTop (26);
+                block.removeFromTop (4);
+                label = r.removeFromLeft (52);
+                s.setBounds (r);
+            };
+            slider (blendLabel, blend);
+            slider (speedLabel, speed);
+            slider (reflectLabel, reflect);
+            slider (sizeLabel, size);
         }
         {
             auto r = row();
@@ -1168,6 +1255,11 @@ private:
         ownDancer.setEnabled (! settings.sheet.empty());
         mirrored.setToggleState (settings.mirrored, juce::dontSendNotification);
         shown.setToggleState (settings.visible, juce::dontSendNotification);
+        sync.setToggleState (settings.sync, juce::dontSendNotification);
+        solid.setToggleState (settings.solid, juce::dontSendNotification);
+        front.setToggleState (settings.keepInFront, juce::dontSendNotification);
+        desktop.setToggleState (settings.onDesktop, juce::dontSendNotification);
+        reflect.setValue (settings.reflect, juce::dontSendNotification);
         size.setValue (settings.scale, juce::dontSendNotification);
         speed.setValue (settings.speed, juce::dontSendNotification);
     }
@@ -1225,7 +1317,7 @@ private:
         const auto beats = clock.beats (engine);
         const auto cycles = beats * 0.5 * settings.speed;
         if (sheet != nullptr) // (the preview always dances the chosen move; on the stage FL's rules apply)
-            shownFrame = animator.advance (cycles, sheet->layout.rows, settings.move, settings.mirrored, true, settings.blend);
+            shownFrame = animator.advance (cycles, sheet->layout.rows, settings.move, settings.mirrored, true, settings.blend, false, settings.sync);
         else
             shownPose = dance::pose (juce::jmin (settings.move, dance::moveCount - 1), cycles, (std::uint32_t) channel * 7919u + 1u);
         repaint (stage);
@@ -1241,11 +1333,11 @@ private:
     dance::SheetFrame shownFrame;
     int sheetCheck = 0;
     juce::ComboBox moveBox;
-    juce::ToggleButton mirrored, shown;
-    juce::Slider size, speed, blend;
+    juce::ToggleButton mirrored, shown, sync, solid, front, desktop;
+    juce::Slider size, speed, blend, reflect;
     juce::TextButton colour, place, loadSheet, ownDancer;
     std::unique_ptr<juce::FileChooser> chooser;
-    juce::Rectangle<int> stage, header, moveLabel, sizeLabel, speedLabel, blendLabel, sheetName, keysArea;
+    juce::Rectangle<int> stage, header, moveLabel, sizeLabel, speedLabel, blendLabel, reflectLabel, sheetName, keysArea;
 };
 } // namespace
 

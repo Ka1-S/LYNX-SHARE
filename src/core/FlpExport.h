@@ -41,6 +41,9 @@ struct Options
     // sample's milliseconds
     std::function<double (const std::string&)> sampleSeconds;
     flp::WriteOptions write;
+    // FL's install folder (%FLStudioFactoryData%; "" = no FL here): a Fruity Dance sheet inside it is written as FL
+    // writes it (round 190bf)
+    std::string flFactoryData;
     int ppq = 0; // the file's PPQ (0 = 96 when the notes and clips fit it, else 960)
 };
 
