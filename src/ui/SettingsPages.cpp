@@ -1242,7 +1242,7 @@ public:
         addAndMakeVisible (type);
         status.setText (controllers.status, juce::dontSendNotification);
         status.setFont (theme::font (theme::type::small));
-        status.setColour (juce::Label::textColourId, theme::colour::textMuted);
+        status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
         status.setMinimumHorizontalScale (1.0f);
         addAndMakeVisible (status);
 
