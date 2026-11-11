@@ -289,7 +289,7 @@ TEST (fl190bf_disk_recording_formats)
         CHECK ((h[20] | h[21] << 8) == (format == SampleFormat::float32 ? 3 : 1) && (h[34] | h[35] << 8) == bits && (h[32] | h[33] << 8) == 2 * bits / 8);
         std::vector<std::vector<float>> back;
         double rate = 0.0;
-        CHECK (readWav (file, back, &rate) && rate == 48000.0 && back.size() == 2 && back[0].size() == 4800);
+        CHECK (lynx::takes::readWav (file, back, &rate) && rate == 48000.0 && back.size() == 2 && back[0].size() == 4800);
         float worst = 0.0f;
         for (std::size_t i = 0; i < 4800; ++i)
             if (i != 10)

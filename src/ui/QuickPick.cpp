@@ -550,28 +550,17 @@ void addFolderViewItems (juce::PopupMenu& menu, AudioEngine& engine)
 void addRadioItem (juce::PopupMenu& menu, const juce::String& text, bool selected, std::function<void()> action)
 {
     // FL's radio items (a dot, not a tick): a small circle drawn as the item's icon, filled when it is the one chosen
-    auto icon = std::make_unique<juce::DrawableComposite>();
-    constexpr float size = 14.0f;
+    // (a picture at twice the size, so it stays sharp at the menu's 14 px)
+    constexpr int px = 28;
+    juce::Image picture (juce::Image::ARGB, px, px, true);
     {
-        auto ring = std::make_unique<juce::DrawablePath>();
-        juce::Path p;
-        p.addEllipse (2.5f, 2.5f, size - 5.0f, size - 5.0f);
-        ring->setPath (p);
-        ring->setFill (juce::Colours::transparentBlack);
-        ring->setStrokeFill (selected ? theme::colour::accent : theme::colour::textSecondary);
-        ring->setStrokeType (juce::PathStrokeType (1.3f));
-        icon->addAndMakeVisible (ring.release());
+        juce::Graphics g (picture);
+        g.setColour (selected ? theme::colour::accent : theme::colour::textSecondary);
+        g.drawEllipse (juce::Rectangle<float> (4.0f, 4.0f, px - 8.0f, px - 8.0f), 2.4f);
+        if (selected)
+            g.fillEllipse (juce::Rectangle<float> (px * 0.5f - 5.5f, px * 0.5f - 5.5f, 11.0f, 11.0f));
     }
-    if (selected)
-    {
-        auto dot = std::make_unique<juce::DrawablePath>();
-        juce::Path p;
-        p.addEllipse (size * 0.5f - 2.6f, size * 0.5f - 2.6f, 5.2f, 5.2f);
-        dot->setPath (p);
-        dot->setFill (theme::colour::accent);
-        icon->addAndMakeVisible (dot.release());
-    }
-    icon->setBoundingBox (juce::Parallelogram<float> (juce::Rectangle<float> (size, size)));
+    auto icon = std::make_unique<juce::DrawableImage> (picture);
     juce::PopupMenu::Item item (text);
     item.setImage (std::move (icon));
     item.setAction (std::move (action));
