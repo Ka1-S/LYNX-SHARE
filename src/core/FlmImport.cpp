@@ -10,6 +10,7 @@
 
 #include "core/DirectWave.h"
 #include "core/FlmEffects.h"
+#include "core/MiniSynth.h"
 #include "core/MissingFiles.h"
 
 // FL Studio Mobile → LYNX, round 182c (docs/analise/FLM_FORMAT.md, REA_rodada182c.md §5). Times: FLM clips and events
@@ -293,6 +294,72 @@ bool directWaveProgram (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     return true;
 }
 
+// FLM's MiniSynth → LYNX's MiniSynth engine (F4). FLM's parameters 1…43 are the desktop plugin's 0…42, in the same
+// order (the two parameter-name tables, FLM_FORMAT §7.1 and REA_rodada41 §1.2; PROVEN-REA setter 0x1806af050 and
+// A/B inside FL, round 190n); FLM's 0 is the module's Enable. The
+// state is written the way the desktop plugin saves it ("SSLF" + its .flms preset: signature, HEAD with the name, DATA
+// "0rev" + 43 floats); the wave tables come from oscdata.dat, which FLM's resources and FL's MiniSynth folder share.
+bool miniSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
+{
+    const auto& o = ctx.options.common;
+    if (m.params.size() < 44 || ! o.fileExists)
+        return false;
+    std::vector<std::string> candidates;
+    if (! ctx.options.resourceRoot.empty())
+        candidates.push_back (joinPath (ctx.options.resourceRoot, "oscdata.dat"));
+    if (! o.roots.factoryData.empty())
+        candidates.push_back (joinPath (o.roots.factoryData, "Plugins/Fruity/Generators/Minisynth/oscdata.dat"));
+    std::string oscdata;
+    for (const auto& p : candidates)
+        if (o.fileExists (p))
+        {
+            oscdata = p;
+            break;
+        }
+    if (oscdata.empty())
+        return false;
+    std::vector<std::uint8_t> body { 0x99, 'F', 'L', 'S', 0x0D, 0x0A, 0x1A, 0x0A };
+    const auto u16 = [&body] (std::uint16_t v) { body.push_back ((std::uint8_t) v); body.push_back ((std::uint8_t) (v >> 8)); };
+    const auto u32 = [&body] (std::uint32_t v) { for (int k = 0; k < 4; ++k) body.push_back ((std::uint8_t) (v >> (8 * k))); };
+    const std::string name = "FL Studio Mobile";
+    body.insert (body.end(), { 'H', 'E', 'A', 'D' });
+    u32 ((std::uint32_t) (6 + 2 * name.size()));
+    u16 (1);
+    u16 (1);
+    u16 ((std::uint16_t) name.size());
+    for (const auto ch : name)
+        u16 ((std::uint16_t) (unsigned char) ch);
+    body.insert (body.end(), { 'D', 'A', 'T', 'A' });
+    u32 (4 + 43 * 4);
+    body.insert (body.end(), { '0', 'r', 'e', 'v' });
+    for (std::size_t i = 1; i <= 43; ++i)
+    {
+        std::uint32_t bits;
+        auto v = std::clamp (m.params[i], 0.0f, 1.0f);
+        // MW Dest has three steps in FLM (filter, LFO amount, OSC Mod) and two on the desktop (below 1 = filter,
+        // 1 = LFO amount); OSC Mod has no desktop twin, so its wheel amount goes to 0 (spec-minisynth-diff §3.2)
+        if (i == 4)
+            v = v >= 0.5f && v < 1.0f ? 1.0f : 0.0f;
+        if (i == 5 && m.params[4] >= 1.0f)
+            v = 0.0f;
+        std::memcpy (&bits, &v, 4);
+        u32 (bits);
+    }
+    std::vector<std::uint8_t> state { 'S', 'S', 'L', 'F' };
+    const auto size = (std::uint32_t) body.size();
+    for (int k = 0; k < 4; ++k)
+        state.push_back ((std::uint8_t) (size >> (8 * k)));
+    state.insert (state.end(), body.begin(), body.end());
+    if (! miniSynthStateUsable (state))
+        return false;
+    c.instrument = InstrumentKind::minisynth;
+    c.modelParams = { 1.0f }; // FLM's build of the engine: velocity as it is, balance pan, 5 voices (core/MiniSynth.h)
+    c.pluginState = std::move (state);
+    c.samplePath = oscdata;
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: MiniSynth");
+    return true;
+}
+
 // The channel playing a rack's first generator (F1: FLM's DW Sampler with one sample → a sampler, F3; any other
 // generator → the built-in synth, listed in the report until its engine is mapped, F4).
 ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channel& ch, int insert)
@@ -328,6 +395,8 @@ ChannelDef instrumentChannel (Ctx& ctx, const flm::Rack& rack, const flm::Channe
         return c;
     }
     if (gen->type == flm::module::dwSampler && directWaveProgram (ctx, *gen, c))
+        return c;
+    if (gen->type == flm::module::miniSynth && miniSynthState (ctx, *gen, c))
         return c;
     ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: " + moduleLabel (gen->type) + (gen->type == flm::module::dwSampler ? " (multisample)" : ""));
     return c;

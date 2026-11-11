@@ -8128,6 +8128,15 @@ countries: ru by kz
 "Send the time selection to the comp" = "Отправить выделение времени в комп"
 "Send the time selection of the take lane to its comp" = "Отправить выделение времени дорожки дубля в её комп"
 
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "Подключения"
+"Auto map outputs" = "Автоназначение выходов"
+"Assign all outputs incrementally" = "Назначить все выходы по порядку"
+"Set all inputs and outputs to their default values" = "Вернуть всем входам и выходам значения по умолчанию"
+"Refresh inputs and outputs (after a change in the plugin)" = "Обновить входы и выходы (после изменения в плагине)"
+"Mixer track offset for output {0}" = "Смещение дорожки микшера для выхода {0}"
+"Deactivate output {0}" = "Отключить выход {0}"
+"Activate output {0}" = "Включить выход {0}"
 # --- Game controller (round 184a, S16)
 "Game controller" = "Геймпад"
 "Use a game controller" = "Использовать геймпад"

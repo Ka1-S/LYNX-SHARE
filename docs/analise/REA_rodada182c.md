@@ -625,3 +625,67 @@ block). The Reverb kind has no LFO and runs once per block (identical output). T
 
 Not reproduced (INFERRED from the fit, not REA): whether FL or the rack wrapper makes the tick chunks. FLM's own app
 calls with its device buffer and voice-derived activity; LYNX follows the measurable host (FL).
+
+### F4 MiniSynth (rounds 182c / 190n, branch `feature/flm190n-minisynth`, 0.1.26)
+
+FLM's MiniSynth parameters 1…43 are FL's desktop MiniSynth parameters 0…42, in the same order (the two name tables,
+FLM_FORMAT §7.1 and REA_rodada41 §1.2; PROVEN-REA: CMiniSynth's setter 0x1806af050 forwards parameter n to the engine
+setter with n − 1). FLM's parameter 0 is the module's Enable. The importer writes the state the way the desktop plugin
+saves it ("SSLF" + .flms: HEAD with a name, DATA "0rev" + 43 floats). The engine's wave tables come from `oscdata.dat`,
+a file byte-identical in FLM's resources and in FL's Minisynth folder (checked with cmp).
+
+FLM runs **its own build of the same engine** (PROVEN-REA, CMiniSynth vft 0x180a057c8, engine call 0x1806a89a0; every
+formula of REA_rodada41 was re-read, the filter, envelopes, LFO, oscillators and effects are the same constant for
+constant). The differences, which LYNX's MiniSynth now has as its "FLM build" (`ChannelDef::modelParams = { 1 }`,
+`miniSynthIsFlm`; the desktop path is unchanged and renders bit-identically to before):
+
+| | Desktop MiniSynth | FLM's module | LYNX |
+|---|---|---|---|
+| velocity | MIDI byte from Init.Vol, / 127 | the note's velocity 0…1 as it is (slot 71, 0x1806ae9d0) | engine switch |
+| level / pan | host law A: centre 0.7071 per side | linear balance, centre 1 / 1 (+3.01 dB) (0x1806ab0a0) | engine switch |
+| voices | 99 (host max-polyphony event) | 5 | engine switch |
+| LFO → OSC Mod | m + 12·L | m + L, clamped to ±1 (0x1806aab90) | engine switch |
+| first note's glide | from key 0 | from its own key | engine switch |
+| effects' silence gate | "a voice was active" per engine call | per 32-sample block: the effects stop 0.5 s after the last voice | engine switch |
+| MW Dest | int(p): filter, LFO amount | int(2p): filter, LFO amount, OSC Mod | converted at import (OSC Mod → wheel amount 0) |
+
+Not modelled: FLM's per-voice pitch / pan / velocity offsets (slot 73, from FLM's event queue), the instant kill on a
+negative velocity, last-bit summation orders. OPEN: the scale of the velocity byte stored in a .flm note (the importer
+uses byte / 255, unchanged).
+
+**A/B inside FL (round 190n).** Projects made from FL's own render test `MiniSynth.flp` (only the state floats, the
+notes and, for the FLM side, the channel's plugin events from FL's `FL Studio Mobile Rack.fst` preset were changed),
+rendered with FL /R: FL Studio Mobile Rack holding one MiniSynth module against FL's MiniSynth with the same 43
+values, 10 settings, 7 notes (keys 36…72, a chord, an overlap, one note at velocity 50). MiniSynth draws random phases,
+drift and dither, so renders never null; the measure is the level per 125 ms window and the third-octave spectrum
+(mean differences in dB; `lvl / spec`). "LYNX" is LYNX's engine against FL's MiniSynth (the yardstick of what two
+renders of one patch give), "LYNX FLM build" is the engine with the switches above, driven with the velocity FLM's FL
+wrapper hands its module (int(41.362274·ln(10·Init.Vol + 1)) / 127, one MIDI step below the desktop's: PROVEN-REA
+0x180834b80), against the FLM render.
+
+| Setting | FLM vs FL MiniSynth | LYNX vs FL MiniSynth | LYNX FLM build vs FLM |
+|---|---|---|---|
+| D default | 0.35 / 0.13 | 0.24 / 0.13 | 0.23 / 0.27 |
+| S1 osc kind, filter freq / peak / kbd / vel | 0.28 / 0.65 | 0.19 / 0.17 | 0.34 / 0.35 |
+| S2 filter envelope (osc kind 5: random phase sets each note's level) | 2.86 / 2.34 | 3.76 / 1.66 | 2.08 / 2.01 |
+| S3 transpose, amp envelope | 0.15 / 0.15 | 0.17 / 0.10 | 0.18 / 0.20 |
+| S4 LFO | 0.16 / 0.10 | 0.13 / 0.23 | 0.21 / 0.44 |
+| S5 LEAD voices, slide, mod wheel | 1.72 / 0.49 | 1.29 / 0.36 | 1.45 / 0.30 |
+| S6 distortion | 5.74 / 4.66 | (harness: no channel level) | 0.10 / 0.41 |
+| S7 delay + chorus | 0.20 / 0.25 | 0.24 / 0.25 | 0.17 / 0.41 |
+| S8 phaser | 0.72 / 0.52 | 0.48 / 0.50 | 0.85 / 0.52 |
+| S9 noise, LFO → OSC Mod | 5.25 / 3.01 | 0.39 / 0.16 | 0.24 / 0.27 |
+
+Reading: the parameter order holds on every setting. FLM is 3.01 dB above FL's MiniSynth at the same channel level
+(the pan law); S1's 0.65 is the wrapper's velocity step acting through FLT Vel; S6 (the 3 dB reach the distortion)
+and S9 (LFO → OSC Mod depth) are the engine differences above, and LYNX's FLM build follows FLM on both. S2 and S5 are
+dominated by the random phases / the harness' note order (LYNX against FL's own MiniSynth scatters as much). The rack
+at its default volume (RPRM 0 = 0.853) is 0 dB, as F2's law says. Tools: /mnt/e/lynx-work/flm190n/ab (mkgen.py,
+render.sh, score2.py), tools/msr.cpp; REA spec /mnt/e/lynx-work/flm190n/rea/spec-minisynth-diff.md.
+
+Quality gate: the desktop engine renders the same bytes as before on 7 of the settings (old against new object); the
+FLM build costs the same per voice (branches on a flag). MiniSynth parameter automation lanes of a .flm are still
+listed, not imported (LYNX's MiniSynth takes no automation clips on its knobs from the renderer yet).
+
+**Best way?** FL: FLM-in-FL is the reference, matched. Ableton: no FLM import. Users: FLM users ask for desktop
+continuity of their MiniSynth patches (FL's own answer is the FLM plugin). Verdict: FLM-exact, no alternative proposed.
