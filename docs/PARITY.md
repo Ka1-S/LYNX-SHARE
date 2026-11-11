@@ -2321,3 +2321,10 @@ FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flag
 `docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on
 export, so a plugin detached in FL opens detached in LYNX and the other way round. LYNX's own instruments and effects
 have no Detached state: their imported flags are kept as they were.
+
+## Round 190as: "Find similar samples" in the Browser (FL's is FL Cloud's; LYNX's is local)
+
+| FL Studio 2026 | LYNX | | Note |
+|---|---|---|---|
+| Sounds tab (FL Cloud, online) › a sound's menu › Find similar samples: FL Cloud ranks its own catalogue ("tone and rhythm"); Loop Starter's channel menu › Find similar samples... opens the same query. No local analysis, no index, no settings (`REA_rodada190as.md` §1) | Browser › right-click an audio file › Find similar samples: the samples of the Browser's own folders, most similar first, with a percentage, in the results list; search box "Similar to <name>" | ⚠️ | LYNX's own measure on local files (`core/SampleSimilarity.*`); FL's ranking can't be compared offline. On FL's packs the 10 nearest files sit in the query's own class folder 56 % of the time (chance 2.9 %) |
+| FL Cloud's online library | — | ❌ | no FL Cloud in LYNX |
