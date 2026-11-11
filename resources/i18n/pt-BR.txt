@@ -9028,3 +9028,8 @@ countries: br
 "24Bit int" = "24 bits inteiro"
 "32Bit float" = "32 bits float"
 "WAV 16-bit (the device's sample rate)" = "WAV 16 bits (a taxa de amostragem do dispositivo)"
+"Clean|FET" = "Limpo|FET"
+"Levelling" = "Nivelamento"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Nivelamento: segura o nível em um limiar abaixo do teto com ataque lento, o teto segura o resto (desligado por padrão)"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Limiar do nivelamento: o nível mantido abaixo do teto (Off: sem nivelamento)"
+"Levelling attack: how much of a transient passes before the level is held" = "Ataque do nivelamento: quanto de um transiente passa antes de o nível ser segurado"

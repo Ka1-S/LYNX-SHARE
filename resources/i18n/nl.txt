@@ -8913,3 +8913,8 @@ countries: nl be
 "24Bit int" = "24 bit integer"
 "32Bit float" = "32 bit float"
 "WAV 16-bit (the device's sample rate)" = "WAV 16 bit (de samplefrequentie van het apparaat)"
+"Clean|FET" = "Clean|FET"
+"Levelling" = "Nivellering"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Nivellering: houdt het niveau met een trage attack op een drempel onder het plafond, het plafond vangt de rest op (standaard uit)"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Drempel van de nivellering: het niveau dat onder het plafond wordt gehouden (Off: geen nivellering)"
+"Levelling attack: how much of a transient passes before the level is held" = "Attack van de nivellering: hoeveel van een transiënt doorkomt voordat het niveau wordt vastgehouden"

@@ -8913,3 +8913,8 @@ countries: kr
 "24Bit int" = "24비트 정수"
 "32Bit float" = "32비트 부동소수점"
 "WAV 16-bit (the device's sample rate)" = "WAV 16비트(장치의 샘플 레이트)"
+"Clean|FET" = "클린|FET"
+"Levelling" = "레벨링"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "레벨링: 느린 어택으로 실링 아래의 스레숄드에 레벨을 유지하고 나머지는 실링이 잡습니다 (기본값은 꺼짐)"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "레벨링 스레숄드: 실링 아래에 유지되는 레벨 (Off: 레벨링 없음)"
+"Levelling attack: how much of a transient passes before the level is held" = "레벨링 어택: 레벨이 유지되기 전에 트랜지언트가 얼마나 통과하는지"

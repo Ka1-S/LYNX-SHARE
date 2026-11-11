@@ -8913,3 +8913,8 @@ countries: ru by kz
 "24Bit int" = "24 бит целое"
 "32Bit float" = "32 бит с плавающей точкой"
 "WAV 16-bit (the device's sample rate)" = "WAV 16 бит (частота дискретизации устройства)"
+"Clean|FET" = "Чисто|FET"
+"Levelling" = "Выравнивание"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Выравнивание: удерживает уровень на пороге ниже потолка с медленной атакой, остальное ловит потолок (по умолчанию выключено)"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Порог выравнивания: уровень, удерживаемый ниже потолка (Off: без выравнивания)"
+"Levelling attack: how much of a transient passes before the level is held" = "Атака выравнивания: какая часть транзиента проходит, прежде чем уровень удерживается"

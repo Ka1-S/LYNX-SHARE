@@ -8913,3 +8913,8 @@ countries: de at ch li lu
 "24Bit int" = "24 Bit Integer"
 "32Bit float" = "32 Bit Float"
 "WAV 16-bit (the device's sample rate)" = "WAV 16 Bit (die Abtastrate des Geräts)"
+"Clean|FET" = "Clean|FET"
+"Levelling" = "Pegelung"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Pegelung: hält den Pegel mit langsamem Attack an einem Schwellwert unter der Obergrenze, die Obergrenze fängt den Rest ab (standardmäßig aus)"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Pegelungs-Schwellwert: der unter der Obergrenze gehaltene Pegel (Off: keine Pegelung)"
+"Levelling attack: how much of a transient passes before the level is held" = "Pegelungs-Attack: wie viel von einer Transiente durchkommt, bevor der Pegel gehalten wird"
