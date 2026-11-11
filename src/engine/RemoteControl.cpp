@@ -16,6 +16,7 @@
 #include "engine/RemoteError.h"
 #include "engine/RemoteFileSecurity.h"
 #include "engine/RemoteProjectControl.h"
+#include "engine/RemoteNotes.h"
 #include "platform/Paths.h"
 #include <deque>
 
@@ -24,6 +25,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <juce_events/juce_events.h>
 
 #if JUCE_MAC || JUCE_LINUX || JUCE_BSD
@@ -41,7 +43,6 @@ namespace
 constexpr std::size_t maxMessage = 1024 * 1024;
 constexpr std::size_t maxHandshake = 1024;
 constexpr const char* protocol = "lynx-control/1";
-constexpr juce::int64 maxTick = 1000000000;
 using Field = std::pair<const char*, juce::var>;
 
 juce::var object (std::initializer_list<Field> fields)
@@ -97,45 +98,6 @@ int indexFor (const juce::var& args, std::size_t size)
 using remote_files::randomToken;
 using remote_files::writeDiscovery;
 
-juce::var noteValue (const Note& n)
-{
-    return object ({ { "start", (juce::int64) n.start }, { "length", (juce::int64) n.length },
-                     { "channel", n.channel }, { "key", n.key }, { "velocity", n.velocity },
-                     { "pan", n.pan }, { "muted", n.muted }, { "finePitch", n.finePitch },
-                     { "slide", n.slide }, { "porta", n.porta }, { "release", n.release },
-                     { "modX", n.modX }, { "modY", n.modY }, { "colour", n.colour }, { "group", n.group } });
-}
-
-Note parseNote (const juce::var& value, std::size_t channels)
-{
-    if (value.getDynamicObject() == nullptr)
-        invalid ("Every note must be an object");
-    for (const auto* field : { "start", "length", "channel", "key", "velocity", "pan", "muted", "finePitch",
-                              "slide", "porta", "release", "modX", "modY", "colour", "group" })
-        if (! value.hasProperty (field))
-            invalid (juce::String ("Every replacement note must include ") + field + "; read the complete notes first");
-    if (channels == 0)
-        invalid ("Cannot add a note without a channel");
-    Note n;
-    n.start = integer (value, "start", 0, maxTick);
-    n.length = integer (value, "length", 1, maxTick);
-    if (n.start > maxTick - n.length)
-        invalid ("Note end is outside its allowed range");
-    n.channel = (int) integer (value, "channel", 0, (juce::int64) channels - 1);
-    n.key = (int) integer (value, "key", 0, 127);
-    n.velocity = (float) number (value, "velocity", 0, 1);
-    if (value.hasProperty ("pan")) n.pan = (float) number (value, "pan", -1, 1);
-    if (value.hasProperty ("muted")) n.muted = boolean (value, "muted");
-    if (value.hasProperty ("finePitch")) n.finePitch = (float) number (value, "finePitch", -120, 120);
-    if (value.hasProperty ("slide")) n.slide = boolean (value, "slide");
-    if (value.hasProperty ("porta")) n.porta = boolean (value, "porta");
-    if (value.hasProperty ("release")) n.release = (float) number (value, "release", 0, 1);
-    if (value.hasProperty ("modX")) n.modX = (float) number (value, "modX", 0, 1);
-    if (value.hasProperty ("modY")) n.modY = (float) number (value, "modY", 0, 1);
-    if (value.hasProperty ("colour")) n.colour = (int) integer (value, "colour", 0, 15);
-    if (value.hasProperty ("group")) n.group = (int) integer (value, "group", 0, 2147483647);
-    return n;
-}
 } // namespace
 
 struct RemoteControl::Impl final : juce::Thread
@@ -268,7 +230,7 @@ struct RemoteControl::Impl final : juce::Thread
                 const auto limit = args.hasProperty ("limit") ? integer (args, "limit", 1, 256) : 256;
                 juce::Array<juce::var> notes;
                 for (auto i = offset; i < total && i - offset < limit; ++i)
-                    notes.add (noteValue (source[(std::size_t) i]));
+                    notes.add (remote_notes::toValue (source[(std::size_t) i]));
                 auto result = object ({ { "index", index }, { "notes", notes }, { "offset", offset }, { "totalNotes", total },
                                         { "revision", (juce::int64) engine.getSongStamp() } });
                 if (offset < total && total - offset > limit) result.getDynamicObject()->setProperty ("nextOffset", offset + limit);
@@ -380,7 +342,7 @@ struct RemoteControl::Impl final : juce::Thread
                 std::vector<Note> notes;
                 notes.reserve ((std::size_t) input->size());
                 for (const auto& value : *input)
-                    notes.push_back (parseNote (value, s.channels.size()));
+                    notes.push_back (remote_notes::fromValue (value, s.channels.size()));
                 const auto count = (int) notes.size();
                 engine.editSongRemoteTransaction ([index, notes = std::move (notes)] (Song& song) {
                     auto& pattern = song.patterns[(std::size_t) index];
@@ -455,11 +417,13 @@ struct RemoteControl::Impl final : juce::Thread
         catch (...) {}
     }
 
-    juce::var request (const juce::String& json)
+    juce::var request (std::string_view bytes)
     {
-        const auto utf8 = json.toRawUTF8();
-        if (! remote_json::withinNestingLimit (std::string_view (utf8, json.getNumBytesAsUTF8())))
-            return failure ("JSON nesting exceeds the control request limit");
+        // Validate the wire bytes before JUCE's permissive UTF-8 conversion can
+        // reinterpret an overlong encoding as a structural JSON delimiter.
+        if (! remote_json::withinNestingLimit (bytes))
+            return failure ("Request is invalid UTF-8 or exceeds the JSON nesting limit");
+        const auto json = juce::String::fromUTF8 (bytes.data(), (int) bytes.size());
         juce::var input;
         if (juce::JSON::parse (json, input).failed() || input.getDynamicObject() == nullptr)
             return failure ("Invalid JSON request");
@@ -502,7 +466,8 @@ struct RemoteControl::Impl final : juce::Thread
         const auto longOperation = work->op == "plugin.parameters_set" || work->op == "effect.load"
                                 || work->op == "history.undo" || work->op == "history.redo"
                                 || work->op == "channel.create" || work->op == "instrument.replace"
-                                || work->op == "project.read" || work->op == "project.edit" || work->op == "device.state";
+                                || work->op == "project.read" || work->op == "project.edit" || work->op == "device.state"
+                                || work->op == "playlist.edit";
         const auto deadline = juce::Time::getMillisecondCounterHiRes() + (longOperation ? 60000.0 : 5000.0);
         while (state->active && ! threadShouldExit() && juce::Time::getMillisecondCounterHiRes() < deadline)
             if (work->finished.wait (50))
@@ -614,7 +579,7 @@ struct RemoteControl::Impl final : juce::Thread
         }
         std::string line;
         auto response = readLine (socket, pending, line, maxMessage, juce::Time::getMillisecondCounterHiRes() + 2000.0)
-            ? request (juce::String::fromUTF8 (line.data(), (int) line.size()))
+            ? request (line)
             : failure ("Authenticated request exceeded its byte or time limit");
         if (juce::JSON::toString (response, true).getNumBytesAsUTF8() > maxMessage)
             response = failure ("Response exceeds 1 MiB; request a smaller collection");

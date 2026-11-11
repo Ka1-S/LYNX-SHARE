@@ -2957,6 +2957,12 @@ private:
                     if (i % 8 == 0) adapter.resetForExport();
                 }
                 audio.join();
+                // Contended audio callbacks may all have bypassed while state was held.
+                // Exercise a successful callback after release before checking coverage.
+                adapter.setParameter (0, 0.5f);
+                (void) adapter.parameterValue (0);
+                reset();
+                render();
                 require (stateOk && probe.blocks > 0 && probe.resets > 0 && probe.captures > 0 && probe.restores > 0,
                          "mock did not exercise processing, resets and hosted state access");
                 require (probe.parameterReads > 0 && probe.parameterWrites > 0,
@@ -2982,6 +2988,8 @@ private:
             }
             catch (const std::exception& e) { return "ERROR " + juce::String::fromUTF8 (e.what()); }
         }();
+
+        const auto hostedStateContentionResult = lynx::pluginStateContentionSelfTest();
 
         // recording from the PC keyboard: a one-beat note lands in the pattern, in a single undo step
         // (Blend on: this checks that the take joins the pattern's notes; a new install starts with Blend off)
@@ -3688,7 +3696,8 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK"
-                        && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK");
+                        && remoteHistoryResult.startsWith ("OK") && hostedStateLockResult.startsWith ("OK")
+                        && hostedStateContentionResult.startsWith ("OK");
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -3711,6 +3720,7 @@ private:
                << "mixer_basics=" << mixerBasics << "\n"
                << "remote_history=" << remoteHistoryResult << "\n"
                << "hosted_state_lock=" << hostedStateLockResult << "\n"
+               << "hosted_state_contention=" << hostedStateContentionResult << "\n"
                << "fonts=" << fontsResult << "\n"
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "cancel_recording=" << (cancelRecordOk ? "OK" : "ERROR") << "\n"
@@ -5447,7 +5457,7 @@ private:
                 s2 = s1;
                 s1 = s0;
             }
-            return std::sqrt (s1 * s1 + s2 * s2 - 2.0 * std::cos (w) * s1 * s2) * 2.0 / (double) juce::jmax<std::size_t> (1, x.size());
+            return std::sqrt (s1 * s1 + s2 * s2 - 2.0 * std::cos (w) * s1 * s2) * 2.0 / (double) std::max<std::size_t> (1, x.size());
         };
         if (! vst2)
             ok = false;

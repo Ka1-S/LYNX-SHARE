@@ -52,9 +52,10 @@ Q = HMAC(token, "lynx-control/1\nclient\n" + C + "\n" + S)
 There is no final newline in the signed message. Compare proofs in constant
 time. A client must verify `P` before sending `Q` or an operation. Handshake frames
 are limited to 1 KiB and depth 8 before JSON parsing. Operation frames are limited
-to 1 MiB and depth 64. The listener limits handshake time and validates nesting
-before the recursive parser. It does not accept older or client-specific
-protocols.
+to 1 MiB and depth 64. The listener limits handshake time and validates canonical
+UTF-8 and nesting before conversion or recursive parsing. Malformed, overlong,
+surrogate and out-of-range encodings are rejected. It does not accept older or
+client-specific protocols.
 
 ## Requests, results and edit guards
 
@@ -105,6 +106,16 @@ no credential.
   channels, mixer devices and nested devices. It captures live vendor state and
   requires stopped playback/recording. A vendor GUI may change opaque state
   without a native revision; use document/device hashes in addition to revisions.
+
+Every `pattern.notes` object contains `start`, `length`, `channel`, `key`,
+`velocity`, `pan`, `muted`, `finePitch`, `slide`, `porta`, `release`, `modX`,
+`modY`, `colour`, `group`, `chance`, `velocityRange`, `chanceGroup` and
+`chanceOne`. `pattern.replace_notes` requires all these fields, including
+default values, and rejects unsupported fields. Read the complete notes before
+replacing them so an edit retains expression it does not intend to change.
+`chance` is a probability in `0..1`, `velocityRange` is in `-1..1`,
+`chanceGroup` is a nonnegative integer, and `chanceOne` is a boolean. A true
+`chanceOne` flag is retained even when its chance group is currently zero.
 
 ## Read a complete project document
 
@@ -193,6 +204,15 @@ the document API. Separate typed requests are separate undo steps. Document
 transactions change project data, not settings, filesystem contents, plugin
 scans, saving or rendering.
 
+Document fields are explicitly allowlisted, including nested objects and
+collections. Replacing a parent object, collection or the root does not bypass
+the field policy. Project title, author, genre and comments are editable;
+`info.url`, `info.showOnOpen`, creation time and accumulated work time are
+read-only. Every changed object must contain only reviewed fields, including
+members that were left unchanged; wholly unchanged subtrees are preserved.
+New native save-format fields therefore require an API policy review before
+their containing object can be edited.
+
 Document edits can reuse only asset references already declared in the project,
 with the exact existing spelling. They cannot introduce new sample/zone paths,
 native engine data/DLL paths, effect sources, stand-in files, plugin loader IDs
@@ -210,14 +230,19 @@ image paths, HTML NoteBook page/launch addresses, and decoded native sample/wave
 resource references must retain a resource already declared in that same role.
 A sample reference cannot become a new page-launch address. VFX Script payloads
 may only preserve/reuse an exact pre-existing payload; document edits cannot add
-or change script code, including inside Patcher. Clearing/removing an existing
-hosted device's nonempty saved state in place is also refused. Use explicit
-catalog replacement when a fresh device instance is intended.
+or change script code, including inside Patcher. Hosted `plugin.state` and
+`substituteFor.state` are read-only at the existing device identity, including
+inside parallel branches, nested Patcher nodes and bus heads. Document edits
+cannot supply new nonempty blobs or copy them into another device slot. Channel
+UIDs preserve state when channels are reordered; nested devices and effects
+without UIDs retain their container-slot identity. Use typed parameter operations
+or the plugin editor to change a hosted device, and explicit catalog replacement
+when a fresh device instance is intended.
 
-The known native formats above are checked before a commit. Other opaque device
-state is not a portable parameter schema and cannot be universally inspected for
-embedded filenames. Restoring third-party state calls the corresponding device
-inside LYNX; that device may perform its own filesystem or network I/O. Remote
+The known native formats above are checked before a commit. Opaque hosted device
+state is not a portable parameter schema and remains read-only in `project.edit`.
+Restoring existing state through native history or the plugin editor calls the
+corresponding device inside LYNX; that device may perform its own filesystem or network I/O. Remote
 Control is not a sandbox for plugins or state blobs. Use only trusted clients and
 trusted device state even when explicit path fields are restricted.
 

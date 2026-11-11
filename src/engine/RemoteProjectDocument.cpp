@@ -16,56 +16,231 @@
 #include "core/WaveTraveller.h"
 #include <set>
 #include <tuple>
+#include <map>
 
 namespace lynx
 {
 namespace
 {
-void hostedStateClears (const juce::var& before, const juce::var& after)
+enum class DocumentShape
 {
-    // Clearing a vendor blob does not have a portable in-place reset meaning. Use the
-    // explicit catalog replacement operations for defaults, rather than silently keeping
-    // a running device's old state. This walk also covers branches, Patchers and bus heads.
-    std::map<juce::String, int> oldEmpty, newEmpty;
-    std::set<juce::String> saved;
-    const auto collect = [] (const juce::var& root, std::map<juce::String, int>& empty, std::set<juce::String>* nonempty) {
-        std::function<void (const juce::var&)> visit;
-        visit = [&] (const juce::var& value) {
+    data, readOnly, root, info, channel, plugin, origin, arp, misc, layer, synth, sampler, precomputed,
+    keyLabels, mixer, effect, branch, link, patcher, node, busHead, standIn, pattern, events, automation,
+    modulator, vca, video, videoTrack, videoClip, adr, adrSettings, cue, take, grid, scene, gridClip, arrangement
+};
+struct DocumentField
+{
+    DocumentShape shape = DocumentShape::data;
+    bool array = false;
+};
+using DocumentFields = std::map<juce::String, DocumentField>;
+const DocumentFields& editableDocumentFields (DocumentShape shape)
+{
+    // This is an API capability list, independent of the native file loader. Every changed
+    // object must contain only reviewed fields, even if an unreviewed member is unchanged;
+    // an entirely unchanged subtree is preserved. Parent/array replacement follows the same
+    // rule. New save-format fields therefore require review before their containing object
+    // is edited. Positional musical data is still validated by
+    // the exact native round trip and the reference/bounds checks below.
+    static const auto schemas = [] {
+        using S = DocumentShape;
+        std::map<S, DocumentFields> result;
+        const auto add = [&] (S owner, const char* names, S child = S::data, bool array = false) {
+            for (const auto& name : juce::StringArray::fromTokens (names, " ", ""))
+                result[owner].emplace (name, DocumentField { child, array });
+        };
+        add (S::root, "bpm beatsPerBar swing chanceSeed channelGroups masterPitch substitutesBypassed cleanMixer performanceMode "
+             "autoCrossfades compCrossfadeMs playTruncatedNotes fastDeclick panLaw autoPdc compensateAutomations timeSettings "
+             "scaleHighlight dataFolder currentPattern playlist patternBlocks blocks playlistTracks playlistTrackHeights "
+             "playlistTrackColours playlistTrackGroups playlistCompTracks playlistTrackLocks playlistTrackLanes "
+             "playlistTrackModes playlistTrackPerformance playlistTrackIcons currentArrangement mode loop arrangementUids midiLinks initialValues");
+        add (S::root, "format version savedBy projectId nextUid session clipFadesPerClip", S::readOnly);
+        add (S::root, "info", S::info);
+        add (S::root, "channels", S::channel, true);
+        add (S::root, "patterns", S::pattern, true);
+        add (S::root, "automations", S::automation, true);
+        add (S::root, "modulators", S::modulator, true);
+        add (S::root, "vcas", S::vca, true);
+        add (S::root, "mixer", S::mixer, true);
+        add (S::root, "video", S::video);
+        add (S::root, "adr", S::adr);
+        add (S::root, "clipGrid", S::grid);
+        add (S::root, "arrangements", S::arrangement, true);
+        add (S::info, "title author genre comments");
+        add (S::info, "url showOnOpen created workSeconds", S::readOnly);
+        add (S::channel, "name instrument volume pan muted ghostHidden soloLock sample controllerState pluginState modelParams zones "
+             "mixer maxPolyphony colour group swingMix arp cut keyRegion receiveFrom icon flWrapperFlags loopStarter uid");
+        add (S::channel, "plugin", S::plugin);
+        add (S::channel, "flOrigin", S::origin);
+        add (S::channel, "keyLabels", S::keyLabels);
+        add (S::channel, "arpFl", S::arp);
+        add (S::channel, "misc", S::misc);
+        add (S::channel, "layer", S::layer);
+        add (S::channel, "synthSettings", S::synth);
+        add (S::channel, "samplerSettings", S::sampler);
+        add (S::channel, "patcher", S::patcher);
+        add (S::channel, "standIns", S::standIn, true);
+        add (S::plugin, "id name state foreign fixedBuffers separateProcess threaded maxSizeBuffers allowSmartDisable hostMaxBuffer "
+             "midiInPort midiOutPort notifyRender latencyMs releaseVelocity sendBendRange bendRange modXAftertouch "
+             "allNotesOffOnStop resetOnFlush sendLoopPosition allowHostKeys hostKeysFirst bitSize detached outputs");
+        add (S::origin, "plugin state print");
+        add (S::arp, "chord chordSustain slide octaveRepeat");
+        add (S::misc, "shift gate fullPorta mono porta portaTime echo velocityTracking keyTracking pitchRange mainPitch rootNote addToKey fineTune");
+        add (S::layer, "children random crossfade sequential fade");
+        add (S::synth, "osc spectrum spectrumPhase spectrumDecay spectrumTarget adsr filter ladder chorus stereoTremolo vibratoCents "
+             "mono porta portaTime am ring keyTrack bands sweep sweepTime fm filterEnv pitchEnv lfo");
+        add (S::sampler, "pitch attack decay sustain release stretchBeats keepPitch stretchMethod flStretchMode flStretchPitch stretchPitch "
+             "warp region startOffset slices reverse cut porta portaTime filter gainDb useLoopPoints flVelocityLaw declickMode "
+             "flVolumeEnvelope flChannel filterEnv pitchEnv lfo");
+        add (S::sampler, "precomputed", S::precomputed);
+        add (S::precomputed, "removeDc normalize reversePolarity fadeStereo swapStereo pingPong fadeIn fadeOut crossfade trim "
+             "boost eq ringMix ringFreq stereoDelay cutoff resonance reverb reverbType pogo clip");
+        add (S::mixer, "name volume pan muted solo soloSources threaded separator folded dock toMaster masterLevel colour stereo "
+             "invertPhase swap input inputMono monitor recordSafe recordTo recordSource recordDryToo latencyMs latencyBypass "
+             "compensateMaster icon output outputMode eq eqBypassed sends lostSends");
+        add (S::mixer, "effects", S::effect, true);
+        add (S::mixer, "standIns", S::standIn, true);
+        add (S::effect, "kind on params sendSpan mix smartDisable row sidechain sidechain2 sendTransient sendSustain state sample preset abOther abB");
+        add (S::effect, "plugin substituteFor", S::plugin);
+        add (S::effect, "flOrigin", S::origin);
+        add (S::effect, "patcher", S::patcher);
+        add (S::effect, "branches", S::branch, true);
+        add (S::effect, "links", S::link, true);
+        add (S::branch, "gain");
+        add (S::branch, "chain", S::effect, true);
+        add (S::link, "branch source target param curve");
+        add (S::patcher, "wires io published outputTracks fromMidiPorts toMidiPorts fromNotesHidden surface surfaceAt");
+        add (S::patcher, "nodes", S::node, true);
+        add (S::node, "label x y paramIns paramOuts");
+        add (S::node, "channel", S::channel);
+        add (S::node, "effect", S::effect);
+        add (S::node, "busHeads", S::busHead, true);
+        add (S::busHead, "bus gain");
+        add (S::busHead, "head", S::effect);
+        add (S::standIn, "pattern loop path hash length plugin by");
+        add (S::pattern, "name uid length colour loopOn loopStarterGenre loopMode channelLoops markers notes");
+        add (S::pattern, "events", S::events, true);
+        add (S::events, "target events");
+        add (S::automation, "name uid target points source curve lfo lfoFl");
+        add (S::modulator, "name shape sync beats hz phase unipolar seed routes");
+        add (S::vca, "name colour level muted members parent");
+        add (S::video, "rate startTimecode rateFromVideo timecodeRuler burnIn");
+        add (S::video, "tracks", S::videoTrack, true);
+        add (S::videoTrack, "name muted height colour");
+        add (S::videoTrack, "clips", S::videoClip, true);
+        add (S::videoClip, "path start offset length duration uid");
+        add (S::adr, "current");
+        add (S::adr, "settings", S::adrSettings);
+        add (S::adr, "cues", S::cue, true);
+        add (S::adrSettings, "preRoll postRoll beeps beepFrequency streamer streamerLength streamerColour punch cycle guideInsert headphoneOutput recordInsert takeTrack");
+        add (S::cue, "id in out character line notes status selected comp compClips");
+        add (S::cue, "takes", S::take, true);
+        add (S::take, "number name clip rating circled note aligned");
+        add (S::grid, "quant backOnStop followActions");
+        add (S::grid, "scenes", S::scene, true);
+        add (S::grid, "clips", S::gridClip, true);
+        add (S::scene, "name colour tempo beatsPerBar");
+        add (S::gridClip, "scene name colour mode quant legato loop noStop follow clip");
+        add (S::arrangement, "name clips blocks loop markers");
+        return result;
+    }();
+    static const DocumentFields none;
+    const auto found = schemas.find (shape);
+    return found == schemas.end() ? none : found->second;
+}
+
+void editableDocument (const juce::var& before, const juce::var& after, DocumentField field = { DocumentShape::root })
+{
+    using S = DocumentShape;
+    if (remote_json::equal (before, after)) return;
+    if (field.shape == S::readOnly)
+        remote_json::invalid ("Project field is read-only through document edits");
+    if (field.array)
+    {
+        if (after.isVoid()) return;
+        const auto* list = after.getArray();
+        if (list == nullptr) remote_json::invalid ("Editable project collection must remain an array");
+        const auto* old = before.getArray();
+        for (int i = 0; i < list->size(); ++i)
+            editableDocument (old != nullptr && i < old->size() ? (*old)[i] : juce::var(), (*list)[i], { field.shape });
+        return;
+    }
+    if (field.shape == S::data)
+    {
+        if (after.getDynamicObject() != nullptr)
+            remote_json::invalid ("Project field does not allow editable object members");
+        if (const auto* list = after.getArray())
+            for (const auto& item : *list) editableDocument ({}, item, { S::data });
+        return;
+    }
+    if (! after.isVoid() && after.getDynamicObject() == nullptr)
+        remote_json::invalid ("Editable project object must remain an object");
+    const auto* old = before.getDynamicObject();
+    const auto* next = after.getDynamicObject();
+    if (field.shape == S::keyLabels)
+    {
+        if (next != nullptr)
+            for (const auto& property : next->getProperties())
+            {
+                const auto key = property.name.toString();
+                if (key != juce::String (key.getIntValue()) || key.getIntValue() < 0 || key.getIntValue() > 127 || ! property.value.isString())
+                    remote_json::invalid ("Editable key labels must name MIDI keys 0..127 and contain text");
+            }
+        return;
+    }
+    const auto& fields = editableDocumentFields (field.shape);
+    const auto check = [&] (const juce::Identifier& key) {
+        const auto found = fields.find (key.toString());
+        if (found == fields.end()) remote_json::invalid ("Project field is not on the editable document allowlist");
+        editableDocument (old != nullptr ? old->getProperty (key) : juce::var(),
+                          next != nullptr ? next->getProperty (key) : juce::var(), found->second);
+    };
+    if (next != nullptr) for (const auto& property : next->getProperties()) check (property.name);
+    if (old != nullptr) for (const auto& property : old->getProperties())
+        if (next == nullptr || ! next->hasProperty (property.name)) check (property.name);
+}
+
+void hostedStatePolicy (const juce::var& before, const juce::var& after)
+{
+    using Device = std::tuple<juce::String, juce::String, juce::String>;
+    std::map<juce::String, Device> known;
+    const auto visit = [] (const juce::var& root, const auto& device) {
+        std::function<void (const juce::var&, const juce::String&)> walk;
+        walk = [&] (const juce::var& value, const juce::String& path) {
             if (const auto* object = value.getDynamicObject())
             {
-                if (value["id"].isString())
+                for (const auto& property : object->getProperties())
                 {
-                    const auto key = value["id"].toString();
-                    if (value["state"].toString().isEmpty()) ++empty[key];
-                    else if (nonempty != nullptr) nonempty->insert (key);
+                    const auto key = property.name.toString();
+                    const auto childPath = path + "/" + key;
+                    if ((key == "plugin" || key == "substituteFor") && property.value.getDynamicObject() != nullptr)
+                        device (childPath, Device { property.value["id"].toString(), property.value["foreign"].toString(), property.value["state"].toString() });
+                    else walk (property.value, childPath);
                 }
-                for (const auto& property : object->getProperties()) visit (property.value);
             }
             else if (const auto* array = value.getArray())
-                for (const auto& item : *array) visit (item);
+                for (int i = 0; i < array->size(); ++i)
+                {
+                    const auto& item = (*array)[i];
+                    // Channel UIDs keep a device stable when top-level channels are reordered.
+                    // Unidentified nested devices/effects remain bound to their exact container slot.
+                    const auto key = item["uid"].isString() ? "uid:" + item["uid"].toString() : juce::String (i);
+                    walk (item, path + "/" + key);
+                }
         };
-        visit (root);
+        walk (root, {});
     };
-    collect (before, oldEmpty, &saved);
-    collect (after, newEmpty, nullptr);
-    for (const auto& key : saved)
-        if (newEmpty[key] > oldEmpty[key])
-            remote_json::invalid ("Project edits cannot clear hosted device state; use a catalog replacement operation to reset it");
-    std::function<void (const juce::var&, const juce::var&)> compare;
-    compare = [&] (const juce::var& old, const juce::var& next) {
-        if (const auto* object = old.getDynamicObject())
+    visit (before, [&] (const auto& path, const Device& device) { known.emplace (path, device); });
+    visit (after, [&] (const auto& path, const Device& device) {
+        const auto old = known.find (path);
+        if (old == known.end() || std::get<0> (old->second) != std::get<0> (device) || std::get<1> (old->second) != std::get<1> (device))
         {
-            if (next.getDynamicObject() == nullptr) return;
-            if (old["id"].isString() && old["state"].isString() && old["state"].toString().isNotEmpty()
-                && next["id"] == old["id"] && next["state"].toString().isEmpty())
-                remote_json::invalid ("Project edits cannot clear hosted device state; use a catalog replacement operation to reset it");
-            for (const auto& property : object->getProperties()) compare (property.value, next[property.name]);
+            if (std::get<2> (device).isNotEmpty())
+                remote_json::invalid ("Hosted plugin state is read-only; use a catalog replacement operation to create or reset a device");
         }
-        else if (const auto* array = old.getArray())
-            if (const auto* other = next.getArray())
-                for (int i = 0; i < std::min (array->size(), other->size()); ++i) compare ((*array)[i], (*other)[i]);
-    };
-    compare (before, after);
+        else if (std::get<2> (old->second) != std::get<2> (device))
+            remote_json::invalid ("Hosted plugin state is read-only; use native parameter operations or the plugin editor");
+    });
 }
 
 void references (Song& song)
@@ -293,10 +468,11 @@ Song stage (const Song& source, const juce::var& patch)
         remote_json::invalid ("Cannot decode the native project document");
     const auto candidate = remote_json::apply (before, patch);
     if (candidate.getDynamicObject() == nullptr) remote_json::invalid ("Project root must remain an object");
-    hostedStateClears (before, candidate);
+    hostedStatePolicy (before, candidate);
     for (const auto* key : { "format", "version", "projectId", "nextUid", "session" })
         if (before.hasProperty (key) != candidate.hasProperty (key) || ! remote_json::equal (before[key], candidate[key]))
             remote_json::invalid ("Project format, lineage and collaboration identity are read-only");
+    editableDocument (before, candidate);
     const auto json = juce::JSON::toString (candidate, true, 17);
     if (json.getNumBytesAsUTF8() > maxBytes) remote_json::invalid ("Edited project exceeds the 64 MiB remote API limit");
     juce::String error;

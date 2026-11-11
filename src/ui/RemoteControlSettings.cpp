@@ -1,5 +1,6 @@
 #include "ui/RemoteControlSettings.h"
 #include "platform/Paths.h"
+#include "ui/I18n.h"
 #include <optional>
 
 namespace lynx::remoteui
@@ -25,9 +26,9 @@ bool active() { return running; }
 juce::String status()
 {
     if (detail.isNotEmpty()) return detail;
-    return running ? "Remote control active — local clients can read and edit this project."
-                   : enabled() ? "Remote control could not start. Disable and re-enable to retry."
-                               : "Remote control is off.";
+    return juce::String::fromUTF8 (running ? TR_NOOP ("Remote control active — local clients can read and edit this project.")
+                   : enabled() ? TR_NOOP ("Remote control could not start. Disable and re-enable to retry.")
+                               : TR_NOOP ("Remote control is off."));
 }
 void setEnabled (bool on)
 {
@@ -39,7 +40,7 @@ void setEnabled (bool on)
             requested = false;
             if (change) change (false);
         }
-        detail = "The remote control setting could not be saved.";
+        detail = juce::String::fromUTF8 (TR_NOOP ("The remote control setting could not be saved."));
         return;
     }
     requested = on;

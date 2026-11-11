@@ -167,6 +167,45 @@ void jsonNesting()
     check (withinNestingLimit ("{\"name\":\"" + std::string (1000, '[') + "\"}"), "string data counted toward nesting");
     check (withinNestingLimit (R"json({"escaped":"\"[[[[\\","x":[0]})json", 2), "escaped quote or slash corrupted nesting count");
     check (! withinNestingLimit (R"json({"escaped":"\\","x":[[0]]})json", 2), "escaped slash hid actual nesting");
+    check (withinNestingLimit (R"json({'name':'"[[[[',"x":[0]})json", 2), "single-quoted string data counted toward nesting");
+    check (withinNestingLimit (R"json({'escaped':'\'[[[[',"x":[0]})json", 2), "escaped single quote corrupted nesting count");
+    for (const auto limit : { 8u, 64u })
+    {
+        const auto deep = std::string (limit, '[') + "0" + std::string (limit, ']');
+        check (! withinNestingLimit ("['\"'," + deep + "]", limit), "single-quoted double quote hid actual nesting");
+        check (! withinNestingLimit ("{\"x\":'\"',\"deep\":" + deep + "}", limit), "mixed-quote object hid actual nesting");
+        check (! withinNestingLimit ("['\\'\"'," + deep + "]", limit), "escaped single quote hid actual nesting");
+    }
+}
+
+void jsonUtf8()
+{
+    using remote_json::withinNestingLimit;
+    for (const auto& valid : { std::string ("\xc2\x80"), std::string ("\xdf\xbf"), std::string ("\xe0\xa0\x80"),
+                              std::string ("\xed\x9f\xbf"), std::string ("\xee\x80\x80"), std::string ("\xef\xbf\xbf"),
+                              std::string ("\xf0\x90\x80\x80"), std::string ("\xf4\x8f\xbf\xbf"),
+                              std::string ("\xe9\x9f\xb3\xe6\xa8\x82\xf0\x9f\x8e\xb5") })
+        check (withinNestingLimit ("{\"text\":\"" + valid + "\",\"array\":[0]}", 2), "canonical Unicode JSON was rejected");
+    for (const auto& invalid : { std::string ("\x80"), std::string ("\xbf"), std::string ("\xc0\x80"), std::string ("\xc1\x9b"),
+                                std::string ("\xc2"), std::string ("\xc2\x7f"), std::string ("\xc3\x20"),
+                                std::string ("\xe0\x9f\xbf"), std::string ("\xe1\x80"), std::string ("\xe1\x80\x7f"),
+                                std::string ("\xed\xa0\x80"), std::string ("\xed\xbf\xbf"),
+                                std::string ("\xf0\x8f\xbf\xbf"), std::string ("\xf0\x90\x80"), std::string ("\xf1\x80\x80\x7f"),
+                                std::string ("\xf4\x90\x80\x80"), std::string ("\xf5\x80\x80\x80"),
+                                std::string ("\xfe"), std::string ("\xff"), std::string (1, '\0') })
+        check (! withinNestingLimit ("{\"text\":\"" + invalid + "\"}"), "noncanonical UTF-8 or raw NUL reached the JSON parser");
+    check (withinNestingLimit (R"({"nul":"\u0000","bracket":"\u005b"})", 1), "escaped Unicode syntax was rejected");
+    for (const auto limit : { 8u, 64u })
+    {
+        // JUCE 8.0.4 decodes these malformed two-byte sequences to recursive
+        // array delimiters; a raw ASCII-only depth scan used to miss all of them.
+        std::string attack = "[";
+        for (unsigned int i = 0; i < limit + 1; ++i) attack += "\xc1\x9b";
+        attack += "0";
+        for (unsigned int i = 0; i < limit + 1; ++i) attack += "\xc1\x9d";
+        attack += "]";
+        check (! withinNestingLimit (attack, limit), "overlong UTF-8 delimiters bypassed the nesting guard");
+    }
 }
 }
 int main()
@@ -175,6 +214,7 @@ int main()
     {
         instrumentEdits();
         jsonNesting();
+        jsonUtf8();
         authentication();
         std::puts ("Remote instrument edits, JSON nesting and authentication tests passed");
         return 0;
