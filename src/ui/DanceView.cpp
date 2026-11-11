@@ -7,6 +7,7 @@
 #include "engine/AudioEngine.h"
 #include "ui/ChannelSettings.h"
 #include "ui/ColourPicker.h"
+#include "ui/FileChoosers.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 
@@ -234,6 +235,173 @@ void draw (juce::Graphics& g, juce::Point<float> feet, float height, const dance
         }
     }
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Sprite sheets (issue #121): FL's Fruity Dance format, see core/FruityDance.h
+// ---------------------------------------------------------------------------------------------------------------
+namespace
+{
+struct CachedSheet
+{
+    std::shared_ptr<const Sheet> sheet;
+    SheetError error = SheetError::none;
+    juce::Time pictureTime, namesTime;
+    double checkedMs = 0.0;
+};
+
+std::map<std::string, CachedSheet>& sheetCache()
+{
+    static std::map<std::string, CachedSheet> cache;
+    return cache;
+}
+
+juce::File namesFileOf (const std::string& path)
+{
+    const auto names = dance::sheetNamesPath (path);
+    const auto text = juce::String::fromUTF8 (names.c_str());
+    return juce::File::isAbsolutePath (text) ? juce::File (text) : juce::File();
+}
+
+void readSheet (const std::string& path, CachedSheet& c)
+{
+    c.sheet.reset();
+    const auto text = juce::String::fromUTF8 (path.c_str());
+    const auto file = juce::File::isAbsolutePath (text) ? juce::File (text) : juce::File();
+    if (! file.existsAsFile())
+    {
+        c.error = SheetError::missing;
+        return;
+    }
+    c.pictureTime = file.getLastModificationTime();
+    const auto namesFile = namesFileOf (path);
+    c.namesTime = namesFile.existsAsFile() ? namesFile.getLastModificationTime() : juce::Time();
+    auto image = juce::ImageFileFormat::loadFrom (file);
+    if (! image.isValid())
+    {
+        c.error = SheetError::unreadable;
+        return;
+    }
+    auto sheet = std::make_shared<Sheet>();
+    if (namesFile.existsAsFile())
+    {
+        juce::MemoryBlock bytes;
+        namesFile.loadFileAsData (bytes);
+        sheet->names = dance::sheetNames (std::string ((const char*) bytes.getData(), bytes.getSize()));
+    }
+    else
+        sheet->names = dance::defaultSheetNames(); // (FL reads its own names file then)
+    sheet->layout = dance::sheetLayout (image.getWidth(), image.getHeight(), (int) sheet->names.size());
+    if (! sheet->layout.valid)
+    {
+        c.error = SheetError::size;
+        return;
+    }
+    sheet->names.resize ((std::size_t) sheet->layout.rows);
+    sheet->image = image.convertedToFormat (juce::Image::ARGB);
+    c.sheet = std::move (sheet);
+    c.error = SheetError::none;
+}
+
+juce::Rectangle<int> cellOf (const Sheet& sheet, int row, int column)
+{
+    const auto& l = sheet.layout;
+    return { juce::jlimit (0, dance::sheetColumns - 1, column) * l.frameWidth, juce::jlimit (0, l.rows - 1, row) * l.frameHeight, l.frameWidth, l.frameHeight };
+}
+
+// the frame's picture: the cell, or the cell fading to the next one (FL: a cross-fade of the two)
+juce::Image frameImage (const Sheet& sheet, const dance::SheetFrame& frame)
+{
+    const auto a = cellOf (sheet, frame.row, frame.column);
+    if (frame.mix <= 0.0f)
+        return sheet.image.getClippedImage (a);
+    const auto b = cellOf (sheet, frame.nextRow, frame.nextColumn);
+    if (frame.mix >= 1.0f)
+        return sheet.image.getClippedImage (b);
+    juce::Image out (juce::Image::ARGB, a.getWidth(), a.getHeight(), false);
+    const juce::Image::BitmapData from (sheet.image, a.getX(), a.getY(), a.getWidth(), a.getHeight());
+    const juce::Image::BitmapData to (sheet.image, b.getX(), b.getY(), b.getWidth(), b.getHeight());
+    juce::Image::BitmapData dest (out, juce::Image::BitmapData::writeOnly);
+    const auto m = (int) std::lround (frame.mix * 256.0f);
+    const auto bytes = a.getWidth() * 4;
+    for (int y = 0; y < a.getHeight(); ++y)
+    {
+        const auto* p = from.getLinePointer (y);
+        const auto* q = to.getLinePointer (y);
+        auto* d = dest.getLinePointer (y);
+        for (int i = 0; i < bytes; ++i) // (premultiplied pixels: each byte goes from one picture to the other)
+            d[i] = (juce::uint8) (p[i] + (((int) q[i] - (int) p[i]) * m) / 256);
+    }
+    return out;
+}
+} // namespace
+
+std::shared_ptr<const Sheet> sheetFor (const std::string& path, SheetError* error)
+{
+    if (path.empty())
+    {
+        if (error != nullptr)
+            *error = SheetError::missing;
+        return nullptr;
+    }
+    auto& cache = sheetCache();
+    // (sheets nobody shows any more are dropped)
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    for (auto it = cache.begin(); it != cache.end();)
+        it = it->first != path && now - it->second.checkedMs > 10000.0 && (it->second.sheet == nullptr || it->second.sheet.use_count() == 1)
+                 ? cache.erase (it)
+                 : std::next (it);
+    auto& c = cache[path];
+    if (c.checkedMs <= 0.0)
+        readSheet (path, c);
+    else if (now - c.checkedMs > 1000.0 || error != nullptr) // its files changed (a sheet being drawn, a names file added)
+    {
+        const auto text = juce::String::fromUTF8 (path.c_str());
+        const auto file = juce::File::isAbsolutePath (text) ? juce::File (text) : juce::File();
+        const auto namesFile = namesFileOf (path);
+        const auto exists = file.existsAsFile();
+        if (exists != (c.error != SheetError::missing)
+            || (exists && (file.getLastModificationTime() != c.pictureTime
+                           || (namesFile.existsAsFile() ? namesFile.getLastModificationTime() : juce::Time()) != c.namesTime)))
+            readSheet (path, c);
+    }
+    c.checkedMs = now;
+    if (error != nullptr)
+        *error = c.error;
+    return c.sheet;
+}
+
+juce::Rectangle<float> sheetBox (const Sheet& sheet, juce::Point<float> feet, float scale)
+{
+    const auto w = (float) sheet.layout.frameWidth * scale, h = (float) sheet.layout.frameHeight * scale;
+    return { feet.x - w * 0.5f, feet.y - h, w, h };
+}
+
+void drawSheet (juce::Graphics& g, const Sheet& sheet, juce::Point<float> feet, float scale, const dance::SheetFrame& frame)
+{
+    const auto box = sheetBox (sheet, feet, scale);
+    const auto picture = frameImage (sheet, frame);
+    juce::Graphics::ScopedSaveState save (g);
+    g.setImageResamplingQuality (juce::Graphics::mediumResamplingQuality);
+    g.setOpacity (1.0f);
+    const auto t = frame.mirrored ? juce::AffineTransform::scale (-scale, scale).translated (box.getRight(), box.getY())
+                                  : juce::AffineTransform::scale (scale, scale).translated (box.getX(), box.getY());
+    g.drawImageTransformed (picture, t);
+}
+
+bool sheetSolidAt (const Sheet& sheet, juce::Point<float> feet, float scale, const dance::SheetFrame& frame, juce::Point<float> point)
+{
+    const auto box = sheetBox (sheet, feet, scale);
+    if (! box.contains (point) || scale <= 0.0f)
+        return false;
+    auto x = (int) ((point.x - box.getX()) / scale);
+    const auto y = (int) ((point.y - box.getY()) / scale);
+    if (frame.mirrored)
+        x = sheet.layout.frameWidth - 1 - x;
+    const auto cell = cellOf (sheet, frame.row, frame.column);
+    if (x < 0 || y < 0 || x >= cell.getWidth() || y >= cell.getHeight())
+        return false;
+    return sheet.image.getPixelAt (cell.getX() + x, cell.getY() + y).getAlpha() >= 16;
+}
 } // namespace dancer
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -299,15 +467,14 @@ public:
         const auto it = stage.dancers.find (channel);
         if (it == stage.dancers.end() || ! it->second.now.visible)
             return;
-        const auto& d = it->second;
         g.setOrigin (-origin());
-        dancer::draw (g, { (float) d.now.x, (float) d.now.y }, baseHeight * d.now.scale, d.shown, d.now.mirrored, juce::Colour (d.now.colour));
+        drawDancer (g, it->second);
     }
 
     bool hitTest (int x, int y) override
     {
         const auto it = stage.dancers.find (channel);
-        return it != stage.dancers.end() && it->second.now.visible && bodyBox (it->second).contains ((origin() + juce::Point<int> (x, y)).toFloat());
+        return it != stage.dancers.end() && it->second.now.visible && hits (it->second, (origin() + juce::Point<int> (x, y)).toFloat());
     }
 
     void mouseDown (const juce::MouseEvent& e) override { stage.mouseDown (e.getEventRelativeTo (&stage)); }
@@ -403,6 +570,8 @@ juce::Rectangle<float> DanceStage::boxOf (const Dancer& d) const
 {
     const auto h = baseHeight * d.now.scale;
     const auto feet = juce::Point<float> ((float) d.now.x, (float) d.now.y);
+    if (d.sheet != nullptr)
+        return dancer::sheetBox (*d.sheet, feet, d.now.scale);
     return dancer::reach (feet, h);
 }
 
@@ -435,8 +604,13 @@ void DanceStage::scan()
             if (! fresh && d.saved.visible == before.visible)
                 d.now.visible = prev.visible;
             if (fresh)
+            {
                 d.lastMove = d.now.move;
+                d.animator = dance::SheetAnimator ((std::uint32_t) c * 7919u + 1u);
+            }
         }
+        // its sprite sheet (a missing or unusable file: LYNX's own dancer)
+        d.sheet = d.now.sheet.empty() ? nullptr : dancer::sheetFor (d.now.sheet);
         auto inst = engine.getChannelInstrument (c);
         if (inst != d.instrument)
         {
@@ -514,7 +688,7 @@ void DanceStage::timerCallback()
             const auto n = sig->pull (d.seen, keys, 16);
             for (int k = 0; k < n; ++k)
             {
-                const auto a = dance::actionForKey (keys[k]);
+                const auto a = dance::actionForKey (keys[k], d.sheet != nullptr ? d.sheet->moves() : dance::moveCount);
                 if (a.kind == dance::KeyAction::Kind::move)
                 {
                     d.now.move = a.move;
@@ -527,7 +701,24 @@ void DanceStage::timerCallback()
             }
         }
         const auto cycles = freeBeats * 0.5 * d.now.speed;
-        const auto target = dance::pose (d.now.move, cycles, (std::uint32_t) channel * 7919u + 1u);
+        if (d.sheet != nullptr)
+        {
+            // FL's rules: the row changes at a cycle's start, the first row while the song is stopped, the last one
+            // while the dancer is held with the mouse
+            const auto before = d.frame;
+            d.frame = d.animator.advance (cycles, d.sheet->layout.rows, d.now.move, d.now.mirrored, playing, d.now.blend, dragging == channel);
+            d.lastMove = d.now.move;
+            d.blendStart = -1.0;
+            const auto box = d.now.visible ? boxOf (d) : juce::Rectangle<float>();
+            const auto moved = box != d.bounds;
+            const auto dirty = box.isEmpty() ? d.bounds : d.bounds.isEmpty() ? box : d.bounds.getUnion (box);
+            d.bounds = box;
+            syncWindow (d, hadWindows);
+            if (moved || ! (before == d.frame))
+                invalidate (d, dirty);
+            continue;
+        }
+        const auto target = dance::pose (juce::jmin (d.now.move, dance::moveCount - 1), cycles, (std::uint32_t) channel * 7919u + 1u);
         if (d.now.move != d.lastMove)
         {
             d.from = d.shown;
@@ -555,15 +746,32 @@ void DanceStage::paint (juce::Graphics& g)
     {
         if (! d.now.visible || d.window != nullptr)
             continue;
-        const auto h = baseHeight * d.now.scale;
         if (! g.clipRegionIntersects (boxOf (d).getSmallestIntegerContainer()))
             continue;
-        dancer::draw (g, { (float) d.now.x, (float) d.now.y }, h, d.shown, d.now.mirrored, juce::Colour (d.now.colour));
+        drawDancer (g, d);
     }
+}
+
+void DanceStage::drawDancer (juce::Graphics& g, const Dancer& d)
+{
+    const juce::Point<float> feet ((float) d.now.x, (float) d.now.y);
+    if (d.sheet != nullptr)
+        dancer::drawSheet (g, *d.sheet, feet, d.now.scale, d.frame);
+    else
+        dancer::draw (g, feet, baseHeight * d.now.scale, d.shown, d.now.mirrored, juce::Colour (d.now.colour));
+}
+
+bool DanceStage::hits (const Dancer& d, juce::Point<float> p)
+{
+    if (d.sheet != nullptr)
+        return dancer::sheetSolidAt (*d.sheet, { (float) d.now.x, (float) d.now.y }, d.now.scale, d.frame, p);
+    return bodyBox (d).contains (p);
 }
 
 juce::Rectangle<float> DanceStage::bodyBox (const Dancer& d)
 {
+    if (d.sheet != nullptr)
+        return dancer::sheetBox (*d.sheet, { (float) d.now.x, (float) d.now.y }, d.now.scale);
     // the body, not the whole reach
     const auto h = baseHeight * d.now.scale;
     return { (float) d.now.x - h * 0.22f, (float) d.now.y - h * 1.1f, h * 0.44f, h * 1.12f };
@@ -576,7 +784,7 @@ DanceStage::Dancer* DanceStage::dancerAt (juce::Point<float> p, bool withWindows
         auto& d = it->second;
         if (! d.now.visible || (d.window != nullptr && ! withWindows))
             continue;
-        if (bodyBox (d).contains (p))
+        if (hits (d, p))
             return &d;
     }
     return nullptr;
@@ -647,8 +855,18 @@ void DanceStage::showMenu (Dancer& d)
     const auto& song = engine.getSong();
     if (channel >= 0 && channel < (int) song.channels.size())
         menu.addSectionHeader (juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()));
-    for (int m = 0; m < dance::moveCount; ++m)
-        menu.addItem (tr (dance::moveName (m)), true, d.now.move == m, [this, channel, m] {
+    // a sheet's moves are its own: Freestyle, then its names (FL's list)
+    juce::StringArray moves;
+    if (d.sheet != nullptr)
+    {
+        for (const auto& name : dance::sheetMoveNames (d.sheet->names))
+            moves.add (moves.isEmpty() ? tr ("Freestyle") : juce::String::fromUTF8 (name.c_str()));
+    }
+    else
+        for (int m = 0; m < dance::moveCount; ++m)
+            moves.add (tr (dance::moveName (m)));
+    for (int m = 0; m < moves.size(); ++m)
+        menu.addItem (moves[m].isNotEmpty() ? moves[m] : juce::String (m), true, juce::jmin (d.now.move, moves.size() - 1) == m, [this, channel, m] {
             if (auto it = dancers.find (channel); it != dancers.end())
             {
                 auto s = it->second.saved;
@@ -694,9 +912,9 @@ public:
     DanceEditor (AudioEngine& e, int c) : engine (e), channel (c)
     {
         settings = current();
-        shownPose = dance::pose (settings.move, 0.3, (std::uint32_t) channel * 7919u + 1u);
-        for (int m = 0; m < dance::moveCount; ++m)
-            moveBox.addItem (tr (dance::moveName (m)), m + 1);
+        sheet = settings.sheet.empty() ? nullptr : dancer::sheetFor (settings.sheet);
+        shownPose = dance::pose (juce::jmin (settings.move, dance::moveCount - 1), 0.3, (std::uint32_t) channel * 7919u + 1u);
+        fillMoves();
         moveBox.onChange = [this] { change ([this] (dance::Settings& s) { s.move = moveBox.getSelectedId() - 1; }); };
         mirrored.setButtonText (tr ("Mirrored"));
         mirrored.onClick = [this] { change ([this] (dance::Settings& s) { s.mirrored = mirrored.getToggleState(); }); };
@@ -712,7 +930,14 @@ public:
         speed.setDoubleClickReturnValue (true, 1.0);
         speed.setTextValueSuffix (" x");
         speed.onValueChange = [this] { change ([this] (dance::Settings& s) { s.speed = (float) speed.getValue(); }); };
-        for (auto* s : { &size, &speed })
+        // FL's "Blend" (motion blending between a sheet's frames), 0 … 100 %
+        blend.setRange (0.0, 1.0, 0.01);
+        blend.setDoubleClickReturnValue (true, dance::Settings {}.blend);
+        blend.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v * 100.0)) + " %"; };
+        blend.valueFromTextFunction = [] (const juce::String& t) { return t.getDoubleValue() / 100.0; };
+        blend.setTooltip (tr ("Motion blending"));
+        blend.onValueChange = [this] { change ([this] (dance::Settings& s) { s.blend = (float) blend.getValue(); }); };
+        for (auto* s : { &size, &speed, &blend })
         {
             s->setSliderStyle (juce::Slider::LinearHorizontal);
             s->setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 20);
@@ -734,10 +959,31 @@ public:
                 s.visible = true;
             });
         };
-        for (auto* c : std::initializer_list<juce::Component*> { &moveBox, &mirrored, &shown, &size, &speed, &colour, &place })
+        // FL's "Load sprite sheet..." button: a picture of 8 frames across and a row per move, with the moves' names
+        // in a text file of the same name
+        loadSheet.setButtonText (tr ("Load sprite sheet..."));
+        loadSheet.setTooltip (tr ("A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line"));
+        loadSheet.onClick = [this] {
+            const auto now = juce::String::fromUTF8 (settings.sheet.c_str());
+            chooser = lynx::ui::makeFileChooser (tr ("Load sprite sheet"), juce::File::isAbsolutePath (now) ? juce::File (now) : juce::File(), "*.png;*.jpg;*.jpeg");
+            lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                     [safe = juce::Component::SafePointer<DanceEditor> (this)] (const juce::FileChooser& fc) {
+                                         if (safe != nullptr && fc.getResult() != juce::File())
+                                             safe->useSheet (fc.getResult());
+                                     });
+        };
+        ownDancer.setButtonText (tr ("LYNX's dancer"));
+        ownDancer.setTooltip (tr ("Back to LYNX SHARE's own dancer"));
+        ownDancer.onClick = [this] {
+            change ([] (dance::Settings& s) {
+                s.sheet.clear();
+                s.move = juce::jmin (s.move, dance::moveCount - 1);
+            });
+        };
+        for (auto* c : std::initializer_list<juce::Component*> { &moveBox, &mirrored, &shown, &size, &speed, &blend, &colour, &place, &loadSheet, &ownDancer })
             addAndMakeVisible (c);
         load();
-        setSize (660, 340);
+        setSize (660, 404);
         startTimerHz (30);
     }
 
@@ -752,8 +998,19 @@ public:
         {
             juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (stage);
-            const auto h = juce::jmin ((float) stage.getHeight() * 0.68f, 190.0f);
-            dancer::draw (g, { (float) stage.getCentreX(), (float) stage.getBottom() - 26.0f }, h, shownPose, settings.mirrored, juce::Colour (settings.colour));
+            const juce::Point<float> feet ((float) stage.getCentreX(), (float) stage.getBottom() - 26.0f);
+            if (sheet != nullptr)
+            {
+                // the frame as large as the stage takes (never enlarged)
+                const auto fit = juce::jmin (1.0f, ((float) stage.getWidth() - 16.0f) / (float) sheet->layout.frameWidth,
+                                             ((float) stage.getHeight() - 40.0f) / (float) sheet->layout.frameHeight);
+                dancer::drawSheet (g, *sheet, feet, fit, shownFrame);
+            }
+            else
+            {
+                const auto h = juce::jmin ((float) stage.getHeight() * 0.68f, 190.0f);
+                dancer::draw (g, feet, h, shownPose, settings.mirrored, juce::Colour (settings.colour));
+            }
         }
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (theme::type::title));
@@ -763,10 +1020,18 @@ public:
         g.drawFittedText (tr ("Fruity Dance's role with LYNX SHARE's own dancer: it makes no sound. Its notes pick the move; drag the dancer to "
                               "place it, right-click it for its moves."),
                           header.translated (0, 22).withHeight (30), juce::Justification::topLeft, 2);
-        for (const auto& [area, text] : { std::pair { moveLabel, tr ("Move") }, std::pair { sizeLabel, tr ("Size") }, std::pair { speedLabel, tr ("Speed") } })
+        for (const auto& [area, text] : { std::pair { moveLabel, tr ("Move") }, std::pair { sizeLabel, tr ("Size") }, std::pair { speedLabel, tr ("Speed") },
+                                          std::pair { blendLabel, tr ("Blend") } })
         {
             g.setColour (theme::colour::textSecondary);
             g.drawText (text, area, juce::Justification::centredLeft);
+        }
+        if (! settings.sheet.empty())
+        {
+            // the sheet's file (in the warning colour when it cannot be shown: LYNX's dancer stands in)
+            const auto name = juce::File::createLegalFileName (juce::String::fromUTF8 (settings.sheet.c_str()).replaceCharacter ('\\', '/').fromLastOccurrenceOf ("/", false, false));
+            g.setColour (sheet != nullptr ? theme::colour::textSecondary : theme::colour::warning);
+            g.drawText (sheet != nullptr ? name : tr ("Could not read {0}", { name }), sheetName, juce::Justification::centredLeft);
         }
         g.setColour (theme::colour::textSecondary);
         g.drawFittedText (keyHelp(), keysArea, juce::Justification::topLeft, 6);
@@ -797,8 +1062,21 @@ public:
         }
         {
             auto r = row();
+            blendLabel = r.removeFromLeft (60);
+            blend.setBounds (r);
+        }
+        {
+            auto r = row();
             shown.setBounds (r.removeFromLeft (170));
             mirrored.setBounds (r.removeFromLeft (140));
+        }
+        {
+            auto r = row();
+            loadSheet.setBounds (r.removeFromLeft (150));
+            r.removeFromLeft (8);
+            ownDancer.setBounds (r.removeFromLeft (110));
+            r.removeFromLeft (8);
+            sheetName = r;
         }
         {
             auto r = row();
@@ -818,9 +1096,59 @@ private:
         return dance::read (song.channels[(std::size_t) channel].pluginState);
     }
 
+    // the move list: LYNX's own moves, or the sheet's (Freestyle, then its names: FL's list)
+    void fillMoves()
+    {
+        moveBox.clear (juce::dontSendNotification);
+        if (sheet != nullptr)
+        {
+            int id = 0;
+            for (const auto& name : dance::sheetMoveNames (sheet->names))
+            {
+                ++id;
+                moveBox.addItem (id == 1 ? tr ("Freestyle") : name.empty() ? juce::String (id - 1) : juce::String::fromUTF8 (name.c_str()), id);
+            }
+        }
+        else
+            for (int m = 0; m < dance::moveCount; ++m)
+                moveBox.addItem (tr (dance::moveName (m)), m + 1);
+    }
+
+    void useSheet (const juce::File& file)
+    {
+        const auto path = file.getFullPathName().toStdString();
+        dancer::SheetError error = dancer::SheetError::none;
+        const auto loaded = dancer::sheetFor (path, &error);
+        if (loaded == nullptr)
+        {
+            // FL: "Bitmap size is incorrect." and its own dancer stays
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Load sprite sheet"),
+                                                    error == dancer::SheetError::size
+                                                        ? tr ("Bitmap size is incorrect.") + "\n\n"
+                                                              + tr ("The picture's width must be 8 frames and its height one frame for each line of the names file ({0}).",
+                                                                    { juce::String::fromUTF8 (dance::sheetNamesPath (file.getFileName().toStdString()).c_str()) })
+                                                        : tr ("Could not read {0}", { file.getFileName() }));
+            return;
+        }
+        change ([&path, &loaded] (dance::Settings& s) {
+            s.sheet = path;
+            s.move = juce::jmin (s.move, loaded->moves() - 1);
+        });
+    }
+
     void load()
     {
-        moveBox.setSelectedId (settings.move + 1, juce::dontSendNotification);
+        const auto fresh = settings.sheet.empty() ? nullptr : dancer::sheetFor (settings.sheet);
+        if (fresh != sheet || moveBox.getNumItems() == 0)
+        {
+            sheet = fresh;
+            fillMoves();
+        }
+        moveBox.setSelectedId (juce::jmin (settings.move, juce::jmax (0, moveBox.getNumItems() - 1)) + 1, juce::dontSendNotification);
+        blend.setValue (settings.blend, juce::dontSendNotification);
+        blend.setEnabled (sheet != nullptr);
+        colour.setEnabled (sheet == nullptr);
+        ownDancer.setEnabled (! settings.sheet.empty());
         mirrored.setToggleState (settings.mirrored, juce::dontSendNotification);
         shown.setToggleState (settings.visible, juce::dontSendNotification);
         size.setValue (settings.scale, juce::dontSendNotification);
@@ -833,6 +1161,7 @@ private:
         edit (s);
         settings = s;
         saveSettings (engine, channel, s, true);
+        load();
         repaint();
     }
 
@@ -841,8 +1170,17 @@ private:
     juce::String keyHelp() const
     {
         juce::String moves;
-        for (int m = 0; m < dance::moveCount; ++m)
-            moves << (m > 0 ? ", " : "") << keyName (dance::firstMoveKey + m) << " " << tr (dance::moveName (m));
+        if (sheet != nullptr)
+        {
+            // the sheet's moves (the first ones: a long sheet's keys go on in the same order)
+            for (int m = 0; m < juce::jmin (moveBox.getNumItems(), 12); ++m)
+                moves << (m > 0 ? ", " : "") << keyName (dance::firstMoveKey + m) << " " << moveBox.getItemText (m);
+            if (moveBox.getNumItems() > 12)
+                moves << ", ...";
+        }
+        else
+            for (int m = 0; m < dance::moveCount; ++m)
+                moves << (m > 0 ? ", " : "") << keyName (dance::firstMoveKey + m) << " " << tr (dance::moveName (m));
         return tr ("Keys (as in FL's Fruity Dance): {0}. From {1} down: the same moves mirrored. {2} hides the dancer, {3} shows it.",
                    { moves, keyName (dance::firstMirrorKey), keyName (dance::hideKey), keyName (dance::showKey) });
     }
@@ -856,9 +1194,23 @@ private:
         {
             settings = s;
             load();
+            repaint();
+        }
+        else if (++sheetCheck >= 30) // (the sheet's files changed: a sheet being drawn)
+        {
+            sheetCheck = 0;
+            if ((settings.sheet.empty() ? nullptr : dancer::sheetFor (settings.sheet)) != sheet)
+            {
+                load();
+                repaint();
+            }
         }
         const auto beats = clock.beats (engine);
-        shownPose = dance::pose (settings.move, beats * 0.5 * settings.speed, (std::uint32_t) channel * 7919u + 1u);
+        const auto cycles = beats * 0.5 * settings.speed;
+        if (sheet != nullptr) // (the preview always dances the chosen move; on the stage FL's rules apply)
+            shownFrame = animator.advance (cycles, sheet->layout.rows, settings.move, settings.mirrored, true, settings.blend);
+        else
+            shownPose = dance::pose (juce::jmin (settings.move, dance::moveCount - 1), cycles, (std::uint32_t) channel * 7919u + 1u);
         repaint (stage);
     }
 
@@ -867,11 +1219,16 @@ private:
     dance::Settings settings;
     dance::Pose shownPose;
     DanceClock clock;
+    std::shared_ptr<const dancer::Sheet> sheet; // the channel's sprite sheet, when it has a usable one
+    dance::SheetAnimator animator;
+    dance::SheetFrame shownFrame;
+    int sheetCheck = 0;
     juce::ComboBox moveBox;
     juce::ToggleButton mirrored, shown;
-    juce::Slider size, speed;
-    juce::TextButton colour, place;
-    juce::Rectangle<int> stage, header, moveLabel, sizeLabel, speedLabel, keysArea;
+    juce::Slider size, speed, blend;
+    juce::TextButton colour, place, loadSheet, ownDancer;
+    std::unique_ptr<juce::FileChooser> chooser;
+    juce::Rectangle<int> stage, header, moveLabel, sizeLabel, speedLabel, blendLabel, sheetName, keysArea;
 };
 } // namespace
 
