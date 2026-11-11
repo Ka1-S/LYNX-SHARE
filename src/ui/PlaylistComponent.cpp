@@ -1223,7 +1223,9 @@ std::int64_t PlaylistComponent::gridTicks() const
         case grid::Kind::nearest: break;
     }
 
-    return noteedit::screenStep (pixelsPerTick, bar);
+    // FL's Line step at this zoom (round 190ax; it was noteedit::screenStep's: a beat where FL steps half a beat, and
+    // quarter steps zoomed in where FL stays on steps)
+    return noteedit::flLineStep (pixelsPerTick, engine.getSong().beatsPerBar);
 }
 
 std::vector<std::int64_t> PlaylistComponent::snapCandidates() const
