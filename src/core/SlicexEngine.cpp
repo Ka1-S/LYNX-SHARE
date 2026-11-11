@@ -336,8 +336,9 @@ std::shared_ptr<Program> makeProgram (const State& state, DeckAudio deckA, DeckA
         const auto& records = state.decks[(std::size_t) d].regions;
         for (std::size_t i = 0; i < deck.audio.regions.size(); ++i)
             deck.values.push_back (regionValues (i < records.size() ? records[i] : defaultRegion()));
-        if (const double beats = state.decks[(std::size_t) d].beatEnd() - state.decks[(std::size_t) d].beatStart();
-            deck.audio.frames > 0 && deck.audio.sampleRate > 0.0 && std::isfinite (beats) && beats > 0.0)
+        // (the sample's own beat count, not the editor's shown range: a deck saved zoomed in kept its tempo in FL)
+        if (const double beats = state.decks[(std::size_t) d].beats();
+            deck.audio.frames > 0 && deck.audio.sampleRate > 0.0 && beats > 0.0)
             deck.tempo = beats * 60.0 * deck.audio.sampleRate / (double) deck.audio.frames;
     }
     for (int d = 0; d < 2; ++d)
