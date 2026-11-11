@@ -88,6 +88,14 @@
 #    `while (--it != glyphs.begin())`: on an empty vector that starts before its beginning and never stops (SIGSEGV
 #    at LYNX+0xf94c7a in 0.1.25, at start-up on NixOS, where JUCE's own font list had no monospaced family). No
 #    glyphs: nothing to walk over. LYNX also gives every font a typeface now (ui/Theme.cpp getTypefaceForFont).
+# 20. Windows only, juce_audio_devices/native/juce_WASAPI_windows.cpp (issue #134, round 190y): every new Windows Audio
+#    device object (a change of output or input device, the first open) asks the driver about each channel count from
+#    64 down to the mix format's, at every rate and in 7 sample formats: 434 IAudioClient::IsFormatSupported calls for
+#    a stereo device, each a round trip to the Windows audio service, on the message thread. In shared mode the answer
+#    can never raise the count (the engine answers with its mix format, whose channel count is the start value), so the
+#    loop only costs time: 1.1 s on this PC's USB codec, and about 85 s on the reporter's Realtek (its hang report shows
+#    the UI thread in this loop; ~0.15 s per call). Shared and low-latency shared modes now take the mix format's count;
+#    exclusive mode still asks (there the driver does answer for more channels).
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -206,6 +214,10 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("dispatch through the hook" "LYNX patch (issue #32): through the hook"
             "                TranslateMessage (&m);|NL|                DispatchMessage (&m);"
             "                TranslateMessage (&m);|NL||NL|                // LYNX patch (issue #32): through the hook when LYNX set one|NL|                if (lynxDispatchMessageHook != nullptr)|NL|                    lynxDispatchMessageHook (&m);|NL|                else|NL|                    DispatchMessage (&m);")
+    elseif(file MATCHES "juce_WASAPI_windows.cpp$")
+        lynx_juce_fix("shared mode keeps the mix format's channels" "LYNX patch (issue #134): shared mode"
+            "        if (fallbackNumChannels >= maxNumChannelsToQuery)|NL|            return fallbackNumChannels;|NL|"
+            "        if (fallbackNumChannels >= maxNumChannelsToQuery)|NL|            return fallbackNumChannels;|NL||NL|        // LYNX patch (issue #134): shared mode never answers with more channels than its mix format, so the|NL|        // 434+ IsFormatSupported round trips below only cost time (85 s on a Realtek), on the message thread|NL|        if (! isExclusiveMode (deviceMode))|NL|            return fallbackNumChannels;|NL|")
     elseif(file MATCHES "juce_FileChooser_windows.cpp$")
         lynx_juce_fix("file dialog keys only into LYNX" "LYNX patch (round 180a): only into LYNX"
             "                    SendInput ((UINT) std::size (inputs), inputs, sizeof (INPUT));"
@@ -247,6 +259,7 @@ function(lynx_patch_juce juce_dir)
     # (Windows only, so a Linux or macOS configure never rewrites it in a JUCE checkout that others share)
     if(WIN32 OR CMAKE_SCRIPT_MODE_FILE)
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_FileChooser_windows.cpp")
+        lynx_patch_juce_file("${juce_dir}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")
     endif()
 endfunction()
 
