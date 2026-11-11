@@ -326,6 +326,8 @@ Report applyImpl (const std::string& root, const std::vector<Plugin>& plugins, c
             std::optional<std::string> want;
             if (const auto it = state.folders.of.find (p.key); it != state.folders.of.end() && set.count (it->second))
                 want = it->second;
+            else if (state.folders.top.count (p.key))
+                want = std::string(); // at the top of the kind's folder (round 190bf)
             else if (p.builtin && ! state.folders.hidden.count (p.key))
                 want = p.defaultFolder;
             const auto nameIt = state.names.find (p.key);
@@ -465,6 +467,8 @@ void readState (const std::string& root, const std::vector<Plugin>& plugins, con
                 continue;
             }
             const auto& f = it->second;
+            if (f.folder.empty())
+                out.folders.top.insert (p.key); // a root entry (round 190bf)
             if (f.folder.empty() || (p.builtin && f.folder == p.defaultFolder))
                 out.folders.of.erase (p.key);
             else
@@ -626,6 +630,22 @@ Report refresh (const std::string& root, const std::vector<Plugin>& plugins, Sta
     writeReadMe (root);
     r.ok = true;
     return r;
+}
+
+std::string entryFile (const std::string& root, const std::string& key, bool instrument)
+{
+    if (root.empty() || key.empty())
+        return {};
+    const auto tree = readKind (root, instrument);
+    if (const auto it = tree.entries.find (key); it != tree.entries.end())
+        return utf8 (it->second.path);
+    // not filed: its entry under Installed (FL's Browser shows the System items there too)
+    std::error_code ec;
+    const auto installed = u8path (root) / "Installed" / (instrument ? "Generators" : "Effects");
+    for (fs::recursive_directory_iterator it (installed, fs::directory_options::skip_permission_denied, ec), end; it != end && ! ec; it.increment (ec))
+        if (Entry e; isEntryFile (it->path()) && readEntry (it->path(), e) && e.key == key && e.instrument == instrument)
+            return utf8 (it->path());
+    return {};
 }
 
 Report apply (const std::string& root, const std::vector<Plugin>& plugins, const State& state)

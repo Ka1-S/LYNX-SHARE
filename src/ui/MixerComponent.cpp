@@ -3553,6 +3553,21 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         // LYNX's own (round 190aq): also in the record button's menu
         disk.addItem (tr ("Low latency while recording (bypasses effects that add latency on armed or monitored inserts)"), true, ro.lowLatencyRecording,
                       [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.lowLatencyRecording = ! r.lowLatencyRecording; }); });
+        // FL's "Format" group (round 190bf, fl190be bonus shot): the recorded takes' sample format, radio items (the
+        // same setting as Options › Audio › Recording › File format)
+        disk.addSectionHeader (tr ("Format"));
+        {
+            const auto now = eng.getRecordingSettings().format;
+            const std::pair<takes::SampleFormat, const char*> formats[] { { takes::SampleFormat::pcm16, TR_NOOP ("16Bit int") },
+                                                                          { takes::SampleFormat::pcm24, TR_NOOP ("24Bit int") },
+                                                                          { takes::SampleFormat::float32, TR_NOOP ("32Bit float") } };
+            for (const auto& [format, name] : formats)
+                quickpick::addRadioItem (disk, tr (name), now == format, [&eng, format = format] {
+                    auto r = eng.getRecordingSettings();
+                    r.format = format;
+                    eng.setRecordingSettings (r);
+                });
+        }
         menu.addSubMenu (tr ("Disk recording"), disk);
         juce::PopupMenu pdc;
         const auto manual = std::count_if (song.mixer.begin(), song.mixer.end(), [] (const MixerTrack& m) { return m.latencyMs != 0.0f; });

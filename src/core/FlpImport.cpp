@@ -1,4 +1,5 @@
 #include "core/FlpImport.h"
+#include "core/FruityDance.h"
 #include "core/FlpExport.h"
 
 #include "core/Fpc.h"
@@ -1867,6 +1868,12 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 // a visual plugin: notes change the dance, its Gen_Render writes nothing (REA_rodada68 §8)
                 def.instrument = InstrumentKind::fruitydance;
                 def.pluginState = c.pluginState;
+                // a sprite sheet inside FL's folder is saved as %FLStudioFactoryData%\... (round 190bf, fl190be Q5):
+                // LYNX keeps the dancer with the file's real place (the export writes FL's own bytes back while it is
+                // not edited: flOrigin below)
+                if (const auto stored = dance::fromFl (c.pluginState); stored && ! stored->sheet.empty())
+                    if (const auto expanded = dance::fromFl (c.pluginState, options.roots.factoryData); expanded && expanded->sheet != stored->sheet)
+                        def.pluginState = dance::toState (*expanded);
                 adoptedFromPlugin = true;
             }
             else if (name == "transistor bass")

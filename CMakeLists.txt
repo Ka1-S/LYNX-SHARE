@@ -74,6 +74,7 @@ add_library(lynx_core STATIC
     src/core/MissingFiles.cpp
     src/core/PluginCatalog.cpp
     src/core/PluginDbFolder.cpp
+    src/core/FolderWatcher.cpp
     src/core/ProjectSafety.cpp
     src/core/SessionIds.cpp
     src/core/SessionParts.cpp

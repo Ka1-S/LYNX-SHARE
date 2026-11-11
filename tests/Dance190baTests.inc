@@ -133,9 +133,10 @@ TEST (dance190ba_sheet_state)
         const std::string longName = "C:\\" + std::string (300, 'x') + ".png";
         CHECK (fromFl (flState (2, 1, 64, longName)) && fromFl (flState (2, 1, 64, longName))->sheet == longName);
         CHECK (fromFl (flState (2, 1, 64, "D:\\a.png", true)) && fromFl (flState (2, 1, 64, "D:\\a.png", true))->sheet == "D:\\a.png");
-        // control characters at the end are dropped; Latin-1 becomes UTF-8
+        // control characters at the end are dropped; the text is UTF-8 (round 190bf: FL 2026 writes UTF-8, fl190be Q5),
+        // a byte that is not part of a UTF-8 character becomes U+FFFD (was read as Latin-1 until then)
         CHECK (fromFl (flState (2, 1, 64, std::string ("D:\\a.png\0\r\n", 11)))->sheet == "D:\\a.png");
-        CHECK (fromFl (flState (2, 1, 64, "D:\\dan\xe7" "a.png"))->sheet == "D:\\dan\xc3\xa7" "a.png");
+        CHECK (fromFl (flState (2, 1, 64, "D:\\dan\xe7" "a.png"))->sheet == "D:\\dan\xef\xbf\xbd" "a.png");
         // cut short: the dancer is still read, without a sheet
         auto cut = flState (2, 4, 128, "C:\\Sprites\\BF.png");
         cut.resize (cut.size() - 5);

@@ -143,6 +143,7 @@ public:
     // --snapshot: the PROJECT tab with the patterns, generators and samples open, a sample selected
     void showProjectForSnapshot();
     void showPluginDatabaseForSnapshot();
+    std::vector<juce::PopupMenu> pluginDatabaseMenusForSnapshot(); // round 190bf: a folder's and an entry's right-click menus
     void showScores (const juce::String& subfolder = {});         // the Piano roll's File › Browse scores: FL's "Scores" (the user's Presets/Scores and Data/Patches/Scores)
     // FL's Shift+F8: the All tab with the Plugin database opened and scrolled into view; with a folder (the Plugin
     // picker's tab, round 171c; `generators` 1 / 0, -1 = none) that folder of the Generators / Effects opened

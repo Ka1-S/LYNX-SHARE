@@ -208,7 +208,9 @@ private:
 
 // --- WAV file -------------------------------------------------------------------------------------------------------
 
-enum class SampleFormat : std::uint8_t { pcm24, float32 };
+// (pcm16 since round 190bf: FL's Mixer › Disk recording › Format "16Bit int"; added last so saved values keep their meaning)
+enum class SampleFormat : std::uint8_t { pcm24, float32, pcm16 };
+constexpr int bytesPerSample (SampleFormat f) noexcept { return f == SampleFormat::pcm16 ? 2 : f == SampleFormat::pcm24 ? 3 : 4; }
 
 // A WAV writer for takes: the header is valid from the start and rewritten with the current length every
 // `syncSeconds` (and the file flushed), so a crash leaves a playable file missing at most that much.
