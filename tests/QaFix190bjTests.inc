@@ -37,3 +37,38 @@ TEST (qafix190bj_aspect_on_content)
     // no frame (Linux without a known frame size, the snapshots): the content is the box
     CHECK ((aspectContent ({ 0, 0, 950, 600 }, {}, 950, 618, 0.7, 2.0) == Box { 0, 0, 950, 618 }));
 }
+
+// The channel's Freeze menu item has its own key: the spectrum's "Freeze" (a still picture) read "Стоп-кадр" in Russian,
+// "Figer" in French and "Blocca" in Italian on the channel menu (coordinator, round 190bj).
+TEST (qafix190bj_channel_freeze_has_its_own_translation)
+{
+    using namespace i18ntest;
+    const std::pair<const char*, const char*> expected[] = { { "ru", "Заморозить" }, { "fr", "Geler" }, { "it", "Congela" } };
+    for (const auto& entry : std::filesystem::directory_iterator ("resources/i18n"))
+    {
+        if (entry.path().extension() != ".txt")
+            continue;
+        std::vector<std::string> duplicates;
+        const auto table = parseTable (readFile (entry.path()), duplicates);
+        const auto it = table.find ("@channel: Freeze");
+        CHECK (it != table.end() && ! it->second.empty());
+        for (const auto& [lang, word] : expected)
+            if (entry.path().stem() == lang)
+                CHECK (it != table.end() && it->second == word);
+    }
+    const auto rack = readFile ("src/ui/ChannelRackComponent.cpp"), grid = readFile ("src/ui/ClipGridComponent.cpp");
+    CHECK (rack.find ("trc (\"@channel: Freeze\")") != std::string::npos);
+    CHECK (grid.find ("trc (\"@channel: Freeze\")") != std::string::npos);
+    CHECK (grid.find ("menu.addItem (tr (\"Freeze\")") == std::string::npos);
+}
+
+// Piano roll scripts live in Documents/LYNX/Piano roll scripts, as the docs say; the first folder (Documents/Piano roll
+// scripts) is still read (coordinator, round 190bj)
+TEST (qafix190bj_piano_roll_scripts_folder)
+{
+    using namespace i18ntest;
+    const auto code = readFile ("src/ui/PianoRollScripts.cpp");
+    CHECK (code.find ("documentsFolder().getChildFile (\"LYNX\").getChildFile (\"Piano roll scripts\")") != std::string::npos);
+    CHECK (code.find ("oldScriptsFolder()") != std::string::npos);
+    CHECK (readFile ("docs/PARITY.md").find ("Documents/LYNX/Piano roll scripts") != std::string::npos);
+}
