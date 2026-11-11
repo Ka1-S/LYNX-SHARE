@@ -4,6 +4,7 @@
 // and the Piano roll's scripts (round 190as). FL uses one form for both ("Configure script"): the controls the script
 // asks for, Preview (automatic, when a control changes), Regenerate, Reset, Edit script and Accept.
 
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -46,6 +47,7 @@ public:
         description.setFont (theme::font (theme::type::body));
         description.setColour (juce::Label::textColourId, theme::colour::textSecondary);
         description.setJustificationType (juce::Justification::topLeft);
+        description.setMinimumHorizontalScale (1.0f);
         description.setVisible (! form.description.empty());
         addChildComponent (description);
 
@@ -169,7 +171,17 @@ public:
             startTimer (1); // (the first preview: the script with its starting values)
         }
 
-        setSize (500, 24 + 34 + (form.description.empty() ? 0 : 44) + (int) form.controls.size() * 36 + 52);
+        // (the description takes the lines it needs: FL's scripts explain themselves in a paragraph)
+        if (! form.description.empty())
+        {
+            juce::AttributedString text;
+            text.setWordWrap (juce::AttributedString::byWord);
+            text.append (description.getText(), description.getFont());
+            juce::TextLayout layout;
+            layout.createLayout (text, (float) (500 - 2 * theme::space::lg - 8));
+            descriptionHeight = juce::jlimit (22, 200, (int) std::ceil (layout.getHeight()) + 6);
+        }
+        setSize (500, 24 + 34 + (form.description.empty() ? 0 : descriptionHeight + 8) + (int) form.controls.size() * 36 + 52);
     }
 
     ~ScriptPanel() override
@@ -187,7 +199,7 @@ public:
         area.removeFromTop (8);
         if (description.isVisible())
         {
-            description.setBounds (area.removeFromTop (36));
+            description.setBounds (area.removeFromTop (descriptionHeight));
             area.removeFromTop (8);
         }
         for (std::size_t i = 0; i < editors.size(); ++i)
@@ -249,6 +261,7 @@ private:
     Options options;
     bool accepted = false;
     juce::Label header, description;
+    int descriptionHeight = 36;
     juce::OwnedArray<juce::Label> labels;
     std::vector<std::unique_ptr<juce::Component>> editors;
     juce::ToggleButton previewToggle;
