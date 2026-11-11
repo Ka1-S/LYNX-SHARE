@@ -1476,7 +1476,7 @@ void PianoRollComponent::addNoteLanes()
     laneBox.addItem (tr ("Release"), laneRelease);
     laneBox.addItem (tr ("Mod X"), laneModX);
     laneBox.addItem (tr ("Mod Y"), laneModY);
-    laneBox.addItem (tr ("Chance (LYNX)"), laneChance);
+    laneBox.addItem (tr ("Chance"), laneChance);
     laneBox.addItem (tr ("Velocity range (LYNX)"), laneVelocityRange);
 }
 
