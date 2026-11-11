@@ -1,4 +1,5 @@
 #include "core/AlsImport.h"
+#include "core/AlsDevices.h"
 #include "core/Effects.h"
 #include "core/Rack.h"
 
@@ -12,6 +13,7 @@
 #include <unordered_map>
 
 #include "core/ClipLauncher.h"
+#include "core/DynamicsSuite.h"
 #include "core/FlWrapper.h"
 #include "core/Gzip.h"
 #include "core/LiveScales.h"
@@ -104,6 +106,13 @@ struct Ctx
     std::map<std::string, int> audioChannels;        // resolved sample path (+ stretch mode) → audioClip channel
     int nextRow = 0;
     std::set<std::string> missingSeen;
+    // round 190bq (Live's own devices → LYNX's): a track's Id → its insert (a compressor's side-chain input), the key
+    // shift of the instrument just read (a Simpler in Slice mode) and of each channel, and whether the instrument
+    // being read sits on a drum pad (a pad keeps the sample, tuning, level and pan only)
+    std::map<int, int> insertOfTrack;
+    int pendingKeyShift = 0;
+    std::map<int, int> keyShift;
+    bool inDrumPad = false;
 
     // the scale of the first MIDI clip that has Live's clip scale switched on (round 190o)
     std::optional<projectkey::Key> clipKey;
@@ -380,6 +389,43 @@ void pluginMappings (Ctx& ctx, const Element& device, PatcherDoc& doc, int node)
 
 bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth);
 
+// One of Live's own audio effects as the LYNX effect in its role, settings translated (round 190bq, core/AlsDevices.h).
+// The report lists the pair — under "converted" when the maths is the same, under "kept but approximated" when the
+// pair is fitted — and every setting that is clamped, fitted or has no counterpart. False: not a device LYNX maps (or
+// its element lacks the parameters): the caller drops and lists it as before.
+bool nativeEffectFrom (Ctx& ctx, const Element& d, EffectSlot& slot)
+{
+    auto t = alsdev::effectFromLiveDevice (d);
+    if (! t)
+        return false;
+    if (t->side.on)
+    {
+        const auto it = t->side.trackId >= 0 ? ctx.insertOfTrack.find (t->side.trackId) : ctx.insertOfTrack.end();
+        if (it != ctx.insertOfTrack.end())
+        {
+            t->slot.sidechain = it->second;
+            if (t->side.otherTap)
+                t->notes.approximated.push_back ("side-chain input taken after the source track's fader");
+        }
+        else
+        {
+            t->slot.params[dyn::crest::scExternal] = 0.0f;
+            t->notes.dropped.push_back ("side-chain input (its source is not a track of the set; the compressor hears its own input)");
+        }
+    }
+    const auto pair = t->from + " -> " + t->to;
+    if (t->approximate)
+        ctx.note (&FlpImportReport::partialEffects, pair + " (settings fitted to LYNX's engine)");
+    else
+        ctx.note (&FlpImportReport::converted, pair);
+    for (const auto& n : t->notes.approximated)
+        ctx.note (&FlpImportReport::partialEffects, t->from + ": " + n);
+    for (const auto& n : t->notes.dropped)
+        ctx.note (&FlpImportReport::partialEffects, t->from + ": " + n + " (not applied)");
+    slot = std::move (t->slot);
+    return true;
+}
+
 // A Live member name as words: "FormantShift" → "Formant Shift"
 std::string spacedName (std::string_view tag)
 {
@@ -397,7 +443,7 @@ std::string spacedName (std::string_view tag)
 }
 
 // One device of a rack chain → a Patcher node (−1 = dropped and listed)
-int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool instrumentRack, int depth)
+int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool instrumentRack, int depth, bool* native = nullptr)
 {
     const auto tag = std::string (d.name());
     PatchNode node;
@@ -480,9 +526,21 @@ int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool
         return -1;
     }
     if (isMidiEffect (tag))
+    {
         ctx.note (&FlpImportReport::unsupported, deviceName (d));
-    else
-        ctx.note (&FlpImportReport::droppedEffects, deviceName (d));
+        return -1;
+    }
+    // (round 190bq) Live's own effects LYNX has an engine for: the LYNX effect in the chain
+    if (! isInstrumentDevice (tag) && nativeEffectFrom (ctx, d, node.effect))
+    {
+        node.label = d.value ("UserName");
+        const auto n = rack::addDevice (doc, chain, std::move (node));
+        if (n >= 0 && native != nullptr)
+            *native = true;
+        if (n >= 0)
+            return n;
+    }
+    ctx.note (&FlpImportReport::droppedEffects, deviceName (d));
     return -1;
 }
 
@@ -529,10 +587,22 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
         // the chain's devices (Live's chain kinds: AudioToAudio, MidiToAudio, MidiToMidi) [DATA]
         for (const auto* list : { "DeviceChain/AudioToAudioDeviceChain/Devices", "DeviceChain/MidiToAudioDeviceChain/Devices" })
             for (const auto& d : branch.path (list).children())
-                if (rackDeviceFrom (ctx, d, doc, c, instrumentRack, depth) < 0)
-                    for (const auto& parameter : d.children()) // a dropped device's mapped parameters (for the macro names)
-                        if (const auto m = mappingOf (parameter))
-                            droppedTargets[(std::size_t) m->macro].push_back (spacedName (parameter.name()));
+            {
+                bool native = false;
+                if (rackDeviceFrom (ctx, d, doc, c, instrumentRack, depth, &native) >= 0 && ! native)
+                    continue;
+                // a dropped device's mapped parameters (for the macro names); a Live device that became a LYNX effect
+                // (round 190bq) keeps its stored settings, the macros do not move them yet
+                bool mapped = false;
+                for (const auto& parameter : d.children())
+                    if (const auto m = mappingOf (parameter))
+                    {
+                        droppedTargets[(std::size_t) m->macro].push_back (spacedName (parameter.name()));
+                        mapped = true;
+                    }
+                if (native && mapped)
+                    ctx.note (&FlpImportReport::partialEffects, "Macro mappings onto a converted Live device (not applied)");
+            }
         // macros on the chain's volume / pan (Live's linear gain and −1..1 → LYNX's 0..1 controls)
         if (const auto m = mappingOf (branch.path ("MixerDevice/Volume")))
         {
@@ -638,8 +708,17 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
             return false;
         }
         channel.instrument = InstrumentKind::sampler;
+        // (round 190bq) a Simpler loops by its own Loop switch in Classic mode (SustainLoop is the Sampler's); a looped
+        // sample stays a zone, which holds the loop points
+        const auto simpler = tag == "OriginalSimpler" && (bool) device.path ("Globals/PlaybackMode");
+        const auto simplerLoop = simpler && (int) device.number ("Globals/PlaybackMode", 0) == 0
+                                 && device.boolean ("Player/LoopModulators/LoopOn/Manual", false);
+        if (simpler)
+            for (auto& zone : zones)
+                zone.loopMode = 0;
+        const auto firstPath = zones.front().path;
         const auto& z = zones.front();
-        if (zones.size() == 1 && z.lowKey == 0 && z.highKey == 127 && z.lowVelocity <= 1 && z.highVelocity == 127 && std::abs (60 - z.rootKey) <= 24)
+        if (! simplerLoop && zones.size() == 1 && z.lowKey == 0 && z.highKey == 127 && z.lowVelocity <= 1 && z.highVelocity == 127 && std::abs (60 - z.rootKey) <= 24)
         {
             channel.samplePath = z.path;
             channel.sampler.pitch = (float) (60 - z.rootKey) + z.tune;
@@ -654,6 +733,31 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
         // one-shot (Player/PlaybackMode 1 [DATA name]): the whole sample plays (release 0 = one-shot in LYNX)
         if ((int) device.number ("Globals/PlaybackMode", 0) == 1)
             channel.sampler.release = 0.0f;
+        // (round 190bq) the rest of a Simpler: transpose, volume, pan, filter, envelopes, LFO, voices, glide, one-shot
+        // fades, slices, region, loop, warp (core/AlsDevices.h); what LYNX's Sampler lacks goes to the report
+        if (simpler)
+        {
+            alsdev::Notes notes;
+            const auto seconds = ctx.options.common.sampleSeconds ? ctx.options.common.sampleSeconds (firstPath) : 0.0;
+            const auto r = alsdev::applySimpler (device, channel, ctx.song.bpm, seconds, notes);
+            if (r.loop && ! channel.zones.empty())
+                for (auto& zone : channel.zones)
+                {
+                    zone.loopStart = r.loopStart;
+                    zone.loopEnd = r.loopEnd;
+                    zone.loopMode = 1;
+                }
+            if (ctx.inDrumPad)
+                ctx.note (&FlpImportReport::approximated, "Drum rack pad: Simpler settings other than sample, tuning, level and pan (not applied)");
+            else
+            {
+                ctx.pendingKeyShift = r.keyShift;
+                for (const auto& n : notes.approximated)
+                    ctx.note (&FlpImportReport::approximated, "Simpler: " + n);
+                for (const auto& n : notes.dropped)
+                    ctx.note (&FlpImportReport::approximated, "Simpler: " + n + " (not applied)");
+            }
+        }
         ctx.note (&FlpImportReport::converted, tag == "OriginalSimpler" ? "Simpler" : "Sampler");
         return true;
     }
@@ -673,22 +777,37 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
             {
                 ChannelDef sub;
                 sub.name = pad.name;
-                if (instrumentFrom (ctx, inner, sub, nullptr, depth + 1) && sub.instrument == InstrumentKind::sampler)
+                const auto wasPad = ctx.inDrumPad;
+                ctx.inDrumPad = true;
+                const auto made = instrumentFrom (ctx, inner, sub, nullptr, depth + 1);
+                ctx.inDrumPad = wasPad;
+                if (made && sub.instrument == InstrumentKind::sampler)
                 {
+                    // (round 190bq) the pad's Simpler volume and pan ride on the pad's layers and pan
+                    const auto level = std::pow (10.0f, sub.sampler.gainDb / 20.0f);
                     if (sub.zones.empty())
                     {
                         SampleZone z;
                         z.path = sub.samplePath;
                         z.tune = sub.sampler.pitch; // (played at its own pitch on the pad's key)
+                        z.gain = level;
                         pad.layers.push_back (z);
                     }
                     else
+                    {
                         pad.layers = sub.zones;
+                        for (auto& layer : pad.layers)
+                        {
+                            layer.gain *= level;
+                            layer.tune += sub.sampler.pitch;
+                        }
+                    }
+                    pad.pan = sub.pan;
                     break;
                 }
             }
             pad.gain = (float) branch.number ("MixerDevice/Volume/Manual", 1);
-            pad.pan = (float) branch.number ("MixerDevice/Panorama/Manual", 0);
+            pad.pan = (float) std::clamp ((double) pad.pan + branch.number ("MixerDevice/Panorama/Manual", 0), -1.0, 1.0);
             if (! pad.layers.empty())
                 pads->push_back (std::move (pad));
         }
@@ -757,9 +876,17 @@ void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& ins
             continue;
         }
         if (isMidiEffect (tag))
+        {
             ctx.note (&FlpImportReport::unsupported, deviceName (d));
-        else
-            ctx.note (&FlpImportReport::droppedEffects, deviceName (d));
+            continue;
+        }
+        // (round 190bq) Live's own effects LYNX has an engine for: the LYNX effect, settings translated
+        if (EffectSlot slot; insert.effects.size() < (std::size_t) maxEffectSlots && nativeEffectFrom (ctx, d, slot))
+        {
+            insert.effects.push_back (std::move (slot));
+            continue;
+        }
+        ctx.note (&FlpImportReport::droppedEffects, deviceName (d));
     }
 }
 
@@ -1585,6 +1712,9 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
     std::vector<int> channelOf (tracks.size(), -1);
     std::vector<std::vector<DrumPad>> drumPads (tracks.size());
     for (std::size_t i = 0; i < tracks.size(); ++i)
+        if (tracks[i].hasAttr ("Id"))
+            ctx.insertOfTrack[intOf (tracks[i].attr ("Id"), -1)] = insertOf[i];
+    for (std::size_t i = 0; i < tracks.size(); ++i)
     {
         const auto& t = tracks[i];
         const auto kind = t.name();
@@ -1609,6 +1739,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
                 }
                 if (isInstrumentDevice (tag) || tag == "PluginDevice")
                 {
+                    ctx.pendingKeyShift = 0;
                     instrumentFrom (ctx, devices[d], c, &drumPads[i]);
                     firstEffect = d + 1;
                 }
@@ -1616,6 +1747,9 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
             }
             song.channels.push_back (std::move (c));
             channelOf[i] = (int) song.channels.size() - 1;
+            if (ctx.pendingKeyShift != 0)
+                ctx.keyShift[channelOf[i]] = ctx.pendingKeyShift;
+            ctx.pendingKeyShift = 0;
             effectsFrom (ctx, { devices.begin() + (std::ptrdiff_t) firstEffect, devices.end() }, insert);
             song.playlistTracks[(std::size_t) rowOf[i]].mode = PlaylistTrackMode::instrument;
             song.playlistTracks[(std::size_t) rowOf[i]].channel = channelOf[i];
@@ -1695,6 +1829,13 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
     }
     else
         sessionToGrid (ctx, set, tracks, rowOf, channelOf, insertOf, scenes);
+
+    // (round 190bq) a Simpler in Slice mode: Live's first slice plays on C1, LYNX's on key 60 — its notes move up
+    for (const auto& [channel, shift] : ctx.keyShift)
+        for (auto& pattern : song.patterns)
+            for (auto& n : pattern.notes)
+                if (n.channel == channel)
+                    n.key = std::clamp (n.key + shift, 0, 127);
 
     // drum racks: one sampler channel per pad (as an FL drum sampler); later channels shift, so from the last one
     for (std::size_t i = tracks.size(); i-- > 0;)
