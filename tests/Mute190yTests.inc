@@ -134,8 +134,9 @@ TEST (mute190y_muted_insert_runs_its_effects_like_fl)
             p = std::max ({ p, std::abs (r.l[i]), std::abs (r.r[i]) });
         return p;
     };
-    // insert 3's own channel off, so the Master hears insert 1's paths only
-    const auto quiet = [] (const std::function<void (Song&)>& f) { return [f] (Song& s) { f (s); s.channels[1].muted = true; }; };
+    // insert 3 routed nowhere, so the Master hears insert 1's paths only (a muted channel still plays the render's live
+    // notes, so muting channel 1 is not enough)
+    const auto quiet = [] (const std::function<void (Song&)>& f) { return [f] (Song& s) { f (s); s.mixer[3].toMaster = false; }; };
 
     // FL: a muted insert's mixer send is cut (both ways)
     for (const auto fl : { false, true })
