@@ -4,6 +4,7 @@
 #include <optional>
 #include <deque>
 #include <map>
+#include <mutex>
 #include <tuple>
 #include <utility>
 #include <functional>
@@ -25,6 +26,7 @@
 #include "core/TakeRecording.h"
 #include "core/WorkerPool.h"
 #include "core/SerialJobs.h"
+#include "core/PreviewTempo.h"
 #include "engine/MidiSyncIo.h"
 #include "engine/ControllerIo.h"
 #include "core/RackRenderer.h"
@@ -205,6 +207,11 @@ public:
         // armed inserts are disarmed when a take stops. FL has no such option (round 166e measured: neither its
         // "Disarm on stop" nor the mixer's "Auto-unarm" disarms the inserts after a live take).
         bool disarmOnStop = false;
+        // LYNX's "Low latency while recording" (round 190aq, core/LowLatency.h; FL has no such switch): while an insert
+        // with an audio input is armed or monitored "On", the latency-adding effects on its path to the Master are
+        // bypassed and the PDC plan is made without them; they return when it is disarmed. What is recorded and the
+        // saved project never change. Off by default.
+        bool lowLatencyRecording = false;
         // FL's record menu "Disarm on stop" (RecDisableOnStopMenu, round 166e measured): the record switch turns off when
         // playback stops after recording
         bool recordOffOnStop = false;
@@ -289,6 +296,31 @@ public:
 
     // Preview of an audio file (browser). An invalid/empty file stops the preview.
     void previewFile (const juce::File& file);
+    // The Browser's "Preview in time" (LYNX extra, round 190aq, core/PreviewTempo.h; off by default): a previewed loop
+    // plays stretched to the project's tempo and, while the transport plays, starts on the next beat. A file with no
+    // usable tempo plays as it always did. The stretch is made on a worker thread: previewFile returns at once and the
+    // sound starts when it is ready. UI thread.
+    void setPreviewInTime (bool on) noexcept { previewInTime = on; }
+    bool isPreviewInTime() const noexcept { return previewInTime; }
+    struct PreviewTiming
+    {
+        juce::String path;          // the previewed file ("" = none since the last stop)
+        bool pending = false;       // its tempo is being read or its stretch made: nothing sounds yet
+        bool inTime = false;        // it has a tempo: it plays stretched and / or on the beat
+        double fileBpm = 0.0, projectBpm = 0.0, ratio = 1.0; // ratio: played length / file length (1 = not stretched)
+        previewtempo::Source source = previewtempo::Source::none;
+        double prepareMs = 0.0;     // from previewFile to the sample handed to the player (tempo + stretch; 0 = cached)
+        std::size_t frames = 0;     // the played sample's length
+    };
+    const PreviewTiming& getPreviewTiming() const noexcept { return previewTiming; }
+    // An in-time preview's progress 0..1 (0 while it is prepared or waits for its beat), −1 when none plays.
+    double getPreviewInTimeProgress() const noexcept;
+    // Waits for the preview being prepared and starts it (tests and tools: no message loop needed). UI thread.
+    void finishPreviewJobs();
+    // How long the last prepared preview took (tempo detection + stretch), in ms (diagnostics).
+    double getLastPreviewPrepareMs() const noexcept { return lastPreviewPrepareMs; }
+    // How many previews started on a beat (diagnostics, tests).
+    int getPreviewBeatStarts() const noexcept;
     // The Browser's preview volume (0..1.25, 1 = default; core/ValueMath.h previewGain). Applies to the preview
     // playing now too. UI thread.
     void setPreviewVolume (double volume) noexcept;
@@ -847,6 +879,11 @@ public:
     int getLatencySamples() const noexcept { return lastPublishedShape.pdc.total; }
     // The last published PDC plan (per-track latencies: outLat, inAlign). Message thread.
     const PdcPlan& getPdcPlan() const noexcept { return lastPublishedShape.pdc; }
+    // "Low latency while recording" (round 190aq): whether slot `slot` of insert `track` is bypassed for it now, the
+    // latency it would add (samples, 0 = not bypassed), and how many slots are bypassed in all. Message thread.
+    bool isSlotLowLatencyBypassed (int track, int slot) const noexcept { return lowlatency::bypassed (lastPublishedShape.lowLatencySlots, track, slot); }
+    int lowLatencyBypassedLatency (int track, int slot) const noexcept;
+    int lowLatencyBypassedCount() const noexcept;
 
 private:
     bool detachNewPluginsOn = false;
@@ -901,6 +938,34 @@ private:
     double lastLogMs = 0.0;
     class PreviewPlayer* preview = nullptr; // graph node (owned by the graph)
     double previewVolume = 1.0;
+    // "Preview in time" (round 190aq)
+    bool previewInTime = false;
+    PreviewTiming previewTiming;
+    std::uint64_t previewSerial = 0;                              // raised by every previewFile: a stale job's result is dropped
+    double previewHandedAtMs = 0.0;                               // when the sample went to the player
+    std::shared_ptr<std::atomic<bool>> previewAlive = std::make_shared<std::atomic<bool>> (true);
+    std::map<juce::String, previewtempo::Found> previewTempos;    // by path (the file's tempo, found once)
+    struct PreviewStretch
+    {
+        juce::String path;
+        double ratio = 1.0;
+        std::shared_ptr<const SampleData> sample;
+    };
+    std::vector<PreviewStretch> previewStretches;                 // the last few stretched previews
+    void startPreviewInTime (const juce::String& path, std::shared_ptr<const SampleData> sample, const PreviewTiming& timing);
+    struct PreviewResult
+    {
+        std::uint64_t serial = 0;
+        juce::String path;
+        std::shared_ptr<const SampleData> sample, out; // the file, and what plays (the same when not stretched)
+        PreviewTiming timing;
+        previewtempo::Found found;
+        bool detected = false; // the tempo was read from the audio now: kept for the next click
+    };
+    std::mutex previewResultLock;
+    std::vector<PreviewResult> previewResults; // worker → message thread
+    double lastPreviewPrepareMs = 0.0;
+    void takePreviewResults();
     double editorVolume = 1.0;
     void publishSong();
     RackState::Factories rackFactories();
@@ -989,6 +1054,10 @@ private:
     std::atomic<bool> waitingForInput { false };
     void startOnInput() noexcept; // MIDI or UI thread: the first note while waiting starts playback
     std::vector<int> armedInserts;
+    // round 190aq: the inserts "Low latency while recording" bypasses latency-adding slots on, as last published
+    std::vector<char> publishedLowLatency;
+    std::vector<char> lowLatencyTracksNow() const; // what it should be for the song, the armed inserts and the option
+    void refreshLowLatency();                      // republishes when that changed (an insert armed or disarmed, the option)
     juce::String releasedInputDevice; // the input device releaseAudioInputIfUnused closed (reopened by name)
     double lastPlayingTick = 0.0;
     RecordOffOnStop recordSwitch; // FL's "Disarm on stop"
@@ -1048,6 +1117,7 @@ private:
     // settings / log files written off the message thread (issue #13's freezes); declared before the saver so it
     // outlives it, and its destructor writes what is still queued
     SerialJobs fileJobs;
+    SerialJobs previewJobs; // round 190aq: "Preview in time" reads tempos and stretches here
     struct DeviceStateSaver;
     std::unique_ptr<DeviceStateSaver> deviceStateSaver;
 

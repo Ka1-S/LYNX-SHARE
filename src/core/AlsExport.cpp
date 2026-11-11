@@ -1341,7 +1341,18 @@ struct Exporter
                 Node b;
                 b.name = "SendPreBool";
                 b.set ("Id", num (r));
-                b.set ("Value", "false");
+                // LYNX's pre-fader sends (round 190aq): Live's switch is per return, so a return is "Pre" when every
+                // send into it is pre-fader (a mix of both stays "Post", noted below)
+                const auto target = returnInsert[(std::size_t) r];
+                int preSends = 0, postSends = 0;
+                for (std::size_t m = 1; m < song.mixer.size(); ++m)
+                    for (const auto& s : song.mixer[m].sends)
+                        if (s.target == target && returnOf.count (s.target) != 0 && s.target != busOf ((int) m))
+                            (s.pre ? preSends : postSends)++;
+                if (preSends > 0 && postSends > 0)
+                    note ("Pre-fader sends: Live switches Pre / Post per return track, so the sends to " + song.mixer[(std::size_t) target].name
+                          + " are all exported post-fader");
+                b.set ("Value", preSends > 0 && postSends == 0 ? "true" : "false");
                 pre->add (std::move (b));
             }
         }

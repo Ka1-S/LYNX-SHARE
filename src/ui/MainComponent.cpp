@@ -2359,6 +2359,8 @@ void MainComponent::loadUiSettings()
             engine.getTransport().metronomeVolume.store ((float) controls::clampUtilityVolume (line.fromFirstOccurrenceOf ("=", false, false).trim().getDoubleValue()));
         else if (key == "previewVolume")
             engine.setPreviewVolume (line.fromFirstOccurrenceOf ("=", false, false).trim().getDoubleValue());
+        else if (key == "previewInTime") // the Browser's "Preview in time" (round 190aq)
+            engine.setPreviewInTime (on);
         else if (key == "editorVolume")
             engine.setEditorVolume (line.fromFirstOccurrenceOf ("=", false, false).trim().getDoubleValue());
         else if (key == "rackPianoRollView")
@@ -2366,10 +2368,11 @@ void MainComponent::loadUiSettings()
         else if (key == "undoLevels")
             engine.setUndoLevels (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "askWhatToRecord" || key == "recordNotes" || key == "recordAudio" || key == "recordStartsPlayback" || key == "disarmOnStop"
-                 || key == "recordOffOnStop" || key == "unarmAfterRender" || key == "renderAutoClip")
+                 || key == "recordOffOnStop" || key == "unarmAfterRender" || key == "renderAutoClip" || key == "lowLatencyRecording")
         {
             auto o = engine.getRecordOptions();
             (key == "askWhatToRecord" ? o.askWhatToRecord : key == "recordNotes" ? o.recordNotes : key == "recordAudio" ? o.recordAudio
+             : key == "lowLatencyRecording" ? o.lowLatencyRecording
              : key == "disarmOnStop" ? o.disarmOnStop : key == "recordOffOnStop" ? o.recordOffOnStop : key == "unarmAfterRender" ? o.unarmAfterRender
              : key == "renderAutoClip"                                                                                         ? o.autoCreateClip
                                                                                                                                   : o.startsPlayback) = on;
@@ -2535,6 +2538,7 @@ void MainComponent::saveUiSettings()
                                       + "\nplayTruncatedOnTransport=" + juce::String (engine.getTransport().playTruncatedOnTransport.load() ? 1 : 0)
                                       + "\nresetPluginsOnTransport=" + juce::String (engine.getTransport().resetPluginsOnTransport.load() ? 1 : 0)
                                       + "\npreviewVolume=" + juce::String (engine.getPreviewVolume(), 2)
+                                      + "\npreviewInTime=" + juce::String (engine.isPreviewInTime() ? 1 : 0)
                                       + "\neditorVolume=" + juce::String (engine.getEditorVolume(), 2)
                                       + "\nrackPianoRollView=" + juce::String (rack.isPianoRollView() ? 1 : 0)
                                       + "\naskWhatToRecord=" + juce::String (engine.getRecordOptions().askWhatToRecord ? 1 : 0)
@@ -2542,6 +2546,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordAudio=" + juce::String (engine.getRecordOptions().recordAudio ? 1 : 0)
                                       + "\nrecordStartsPlayback=" + juce::String (engine.getRecordOptions().startsPlayback ? 1 : 0)
                                       + "\ndisarmOnStop=" + juce::String (engine.getRecordOptions().disarmOnStop ? 1 : 0)
+                                      + "\nlowLatencyRecording=" + juce::String (engine.getRecordOptions().lowLatencyRecording ? 1 : 0)
                                       + "\nrecordOffOnStop=" + juce::String (engine.getRecordOptions().recordOffOnStop ? 1 : 0)
                                       + "\nunarmAfterRender=" + juce::String (engine.getRecordOptions().unarmAfterRender ? 1 : 0)
                                       + "\nrenderAutoClip=" + juce::String (engine.getRecordOptions().autoCreateClip ? 1 : 0)
@@ -3816,6 +3821,12 @@ void MainComponent::openAudioEditorForSelection()
 
 void MainComponent::showRecordMenu()
 {
+    buildRecordMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (recordMenuButton.isVisible() ? (juce::Component*) &recordMenuButton
+                                                                                                                  : (juce::Component*) &recordButton));
+}
+
+juce::PopupMenu MainComponent::buildRecordMenu()
+{
     const auto o = engine.getRecordOptions();
     auto set = [this] (std::function<void (AudioEngine::RecordOptions&)> change) {
         auto options = engine.getRecordOptions();
@@ -3846,6 +3857,9 @@ void MainComponent::showRecordMenu()
     // LYNX's own (issue #16; FL has no such option): also in Mixer › Disk recording
     menu.addItem (tr ("Disarm the inserts when recording stops"), true, o.disarmOnStop,
                   [set] { set ([] (AudioEngine::RecordOptions& r) { r.disarmOnStop = ! r.disarmOnStop; }); });
+    // LYNX's own (round 190aq, core/LowLatency.h; FL has no such switch): also in Mixer › Disk recording
+    menu.addItem (tr ("Low latency while recording (bypasses effects that add latency on armed or monitored inserts)"), true, o.lowLatencyRecording,
+                  [set] { set ([] (AudioEngine::RecordOptions& r) { r.lowLatencyRecording = ! r.lowLatencyRecording; }); });
     menu.addItem (tr ("Enable recording markers (Start / Stop recording markers in the Playlist)"), true, o.recordingMarkers,
                   [set] { set ([] (AudioEngine::RecordOptions& r) { r.recordingMarkers = ! r.recordingMarkers; }); });
     // FL's "Quantize" section (REA round 139): to the global snap
@@ -3863,8 +3877,7 @@ void MainComponent::showRecordMenu()
     menu.addItem (tr ("Delete unused recordings and save..."), [this] { deleteUnusedRecordingsAndSave(); });
     menu.addSeparator();
     addRecordOptions (menu);
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (recordMenuButton.isVisible() ? (juce::Component*) &recordMenuButton
-                                                                                                      : (juce::Component*) &recordButton));
+    return menu;
 }
 
 void MainComponent::refreshRecordOptionButtons()
