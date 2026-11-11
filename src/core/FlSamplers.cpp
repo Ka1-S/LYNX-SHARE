@@ -102,6 +102,7 @@ std::vector<DrumPad> fpcKitPads (const fpc::Kit& kit, const std::vector<SampleZo
     for (const auto& source : kit.pads)
     {
         DrumPad pad;
+        pad.sourcePad = (int) (&source - kit.pads.data());
         // FPC's own law, and the constant 1/(2·√2) its output carries (measured against FL's renders of
         // pad / layer volume and pan variants of FL's render test, REA_rodada170i §7)
         pad.gain = fpcVolume (std::clamp (source.volume, 0, 128)) * 0.35355339059327373f;
@@ -135,6 +136,7 @@ std::vector<DrumPad> fpcKitPads (const fpc::Kit& kit, const std::vector<SampleZo
             layer.highVelocity = high >= 127 ? 127 : std::max (layer.lowVelocity, high - 1);
             layer.tune = std::clamp (from.tune, -128, 128) * 9.375f / 100.0f;
             pad.layers.push_back (std::move (layer));
+            pad.sourceLayers.push_back ((int) (&from - source.layers.data()));
         }
 
         if (! pad.layers.empty() && ! source.muted())

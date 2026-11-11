@@ -57,7 +57,8 @@ inline lynx::fpc::Kit testKit()
     snare.volume = 99;
     snare.pan = -40;
     snare.tune = 24;
-    snare.flags = 8; // one layer at a time
+    snare.flags = 8;      // one layer at a time
+    snare.trigger[0] = 3; // Cycle (round 190z: the pad channels' zones take turns that way)
     snare.layers = { layer ("snare a.wav", 127, 0, 127), layer ("snare b.wav", 110, 0, 127, -12), layer ("snare c.wav", 127, 0, 127, 30) };
     auto& closed = kit.pads[2];
     closed.name = u"Closed hat";
@@ -84,6 +85,42 @@ inline lynx::fpc::Kit testKit()
     muted.flags = 1;
     muted.layers = { layer ("tom.wav", 127, 0, 127) };
     return kit;
+}
+
+// the kit without its cut groups (round 190z: FPC's own choke is one tick, the pad channels' is the channel declicker)
+inline lynx::fpc::Kit withoutChokes (lynx::fpc::Kit kit)
+{
+    for (auto& p : kit.pads)
+        p.cut = p.cutBy = -1;
+    return kit;
+}
+
+// whether the pad channels play a kit as FPC does (round 190z): no cut groups, no envelope switched on, no layer pan,
+// every layer scales its volume with the velocity and plays forward, one-at-a-time pads cycle, other pads have no
+// overlapping velocity ranges
+inline bool playsAsPadChannels (const lynx::fpc::Kit& kit)
+{
+    for (const auto& p : kit.pads)
+    {
+        if (p.muted() || std::none_of (p.layers.begin(), p.layers.end(), [] (const lynx::fpc::Layer& l) { return ! l.path.empty(); }))
+            continue;
+        if (p.cut >= 0 || p.cutBy >= 0)
+            return false;
+        for (const auto& e : p.envelopes)
+            if (e.unparsed.empty() && e.tail[1] != 0)
+                return false;
+        for (const auto& l : p.layers)
+            if (l.pan != 0 || (l.flags & 1) == 0 || (l.flags & 2) != 0)
+                return false;
+        if (p.oneLayerAtATime() ? p.trigger[0] != 3 : false)
+            return false;
+        if (! p.oneLayerAtATime())
+            for (std::size_t a = 0; a < p.layers.size(); ++a)
+                for (std::size_t b = a + 1; b < p.layers.size(); ++b)
+                    if (p.layers[a].velocityLow < p.layers[b].velocityHigh && p.layers[b].velocityLow < p.layers[a].velocityHigh)
+                        return false;
+    }
+    return true;
 }
 
 // one channel with the kit and a busy pattern on its keys (also a key without a pad and the muted pad's)
@@ -224,7 +261,7 @@ TEST (fpc190q_one_channel_plays_what_the_pad_channels_play)
     // this round), same kit, same notes — pad and layer volumes, pad pan and tuning, velocity layers, layers that take
     // turns, cut groups (also two pads of a group on the same sample), a muted pad, a key without a pad
     using namespace lynx;
-    const auto one = fpc190q::kitSong (fpc190q::testKit());
+    const auto one = fpc190q::kitSong (fpc190q::withoutChokes (fpc190q::testKit()));
     const auto split = fpc190q::asPadChannels (one);
     CHECK (one.channels.size() == 1 && split.channels.size() == 5);
     const auto a = fpc190q::render (one, 4.2);
@@ -237,7 +274,7 @@ TEST (fpc190q_one_channel_plays_what_the_pad_channels_play)
     for (const auto block : { 64, 1024 })
         CHECK (fpc190q::difference (fpc190q::render (one, 4.2, block), fpc190q::render (split, 4.2, block)) <= 2.0e-6f * std::max (1.0f, level));
 
-    // the project's triangular panning law and "Fast declick for cut groups"
+    // the project's triangular panning law and "Fast declick for cut groups" (which FPC's own choke does not use)
     auto tri = one;
     tri.panTriangular = true;
     tri.fastDeclick = true;
@@ -257,7 +294,7 @@ TEST (fpc190q_pad_outputs_reach_their_inserts)
 {
     // a pad with an output offset plays into the insert that many after the channel's, as its own channel would
     using namespace lynx;
-    auto kit = fpc190q::testKit();
+    auto kit = fpc190q::withoutChokes (fpc190q::testKit());
     kit.pads[1].output = 1;
     kit.pads[2].output = 3;
     kit.pads[3].output = 3;
@@ -270,7 +307,7 @@ TEST (fpc190q_pad_outputs_reach_their_inserts)
     const auto b = fpc190q::render (split, 4.2);
     CHECK (fpc190q::peak (b) > 0.05f);
     CHECK (fpc190q::difference (a, b) <= 2.0e-6f * std::max (1.0f, fpc190q::peak (b)));
-    auto plain = fpc190q::kitSong (fpc190q::testKit());
+    auto plain = fpc190q::kitSong (fpc190q::withoutChokes (fpc190q::testKit()));
     plain.mixer[3].volume = 0.5f;
     plain.mixer[5].pan = -1.0f;
     CHECK (fpc190q::difference (a, fpc190q::render (plain, 4.2)) > 1.0e-3f); // (the inserts' settings are heard)
@@ -394,7 +431,7 @@ TEST (fpc190q_fl_projects_sound_the_same_and_go_back_byte_exact)
     if (realFlpDir.empty() || realFlpDir[0] != '/')
         return;
     auto options = fpc190q::flOptions (realFlpDir);
-    int projects = 0, kits = 0, sounding = 0, states = 0;
+    int projects = 0, kits = 0, sounding = 0, states = 0, compared = 0;
     std::error_code error;
     for (const auto& entry : std::filesystem::recursive_directory_iterator (realFlpDir, std::filesystem::directory_options::skip_permission_denied, error))
     {
@@ -440,6 +477,11 @@ TEST (fpc190q_fl_projects_sound_the_same_and_go_back_byte_exact)
 
         options.fpcAsPads = true;
         auto split = importFlp (project, options);
+        // (round 190z: kits with what only FPC plays — its envelopes, choke, layer pan, layer modes — are not compared)
+        const auto comparable = std::all_of (fl.begin(), fl.end(), [] (const std::vector<std::uint8_t>& st) {
+            const auto k = fpc::read (st);
+            return k && fpc190q::playsAsPadChannels (*k);
+        });
         CHECK (split.channels.size() > one.channels.size());
         // only the kits play, dry
         for (auto* s : { &one, &split })
@@ -452,15 +494,20 @@ TEST (fpc190q_fl_projects_sound_the_same_and_go_back_byte_exact)
             s->mode = PlayMode::song;
         }
         const auto a = fpc190q::render (one, 12.0, 512);
-        const auto b = fpc190q::render (split, 12.0, 512);
-        const auto level = fpc190q::peak (b);
-        const auto diff = fpc190q::difference (a, b);
-        if (diff > 2.0e-6f * std::max (1.0f, level))
-            std::printf ("  %s: FPC channel vs pad channels differ by %g (peak %g)\n", entry.path().filename().string().c_str(), (double) diff, (double) level);
-        CHECK (diff <= 2.0e-6f * std::max (1.0f, level));
+        const auto level = fpc190q::peak (a);
+        CHECK (std::isfinite (level));
+        if (comparable)
+        {
+            const auto b = fpc190q::render (split, 12.0, 512);
+            const auto diff = fpc190q::difference (a, b);
+            if (diff > 2.0e-6f * std::max (1.0f, fpc190q::peak (b)))
+                std::printf ("  %s: FPC channel vs pad channels differ by %g (peak %g)\n", entry.path().filename().string().c_str(), (double) diff, (double) level);
+            CHECK (diff <= 2.0e-6f * std::max (1.0f, fpc190q::peak (b)));
+            ++compared;
+        }
         sounding += level > 1.0e-3f ? 1 : 0;
     }
-    std::printf ("  FPC as one channel: %d projects, %d kits, %d sounding in the first 12 s, %d states written back\n", projects, kits, sounding, states);
+    std::printf ("  FPC as one channel: %d projects (%d compared with pad channels), %d kits, %d sounding in the first 12 s, %d states written back\n", projects, compared, kits, sounding, states);
     CHECK (projects >= 3 && sounding >= 1 && states == kits); // (FL 2026: 7 of its 21 demo kits have every pad on the channel's insert)
 }
 

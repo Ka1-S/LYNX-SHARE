@@ -1957,6 +1957,8 @@ public:
         target->basePan = clipMode ? 0.0f : nextPan;
         target->cents = clipMode ? 0.0f : nextCents;
         target->liveRef = clipMode ? std::numeric_limits<float>::quiet_NaN() : pitch.load() * 100.0f + liveRest;
+        if (shaper != nullptr)
+            shaper->voiceStarted ((int) (target - voices.data()));
 
         for (std::size_t i = 0; i < lfoTargets; ++i)
             if (lfos[i].active && ! clipMode)
@@ -2274,6 +2276,11 @@ public:
             return;
         }
 
+        if (shaper != nullptr)
+            for (auto& v : voices)
+                if (v.active && v.key == key)
+                    shaper->voiceReleased ((int) (&v - voices.data()));
+
         // the cutoff/pitch envelopes always release
         for (auto& v : voices)
             if (v.active && v.key == key && v.stage < 3)
@@ -2344,6 +2351,7 @@ public:
 
     void setFastDeclick (bool fast) noexcept override { fastDeclick.store (fast, std::memory_order_relaxed); }
     void setPanTriangular (bool on) noexcept override { panTriangular.store (on, std::memory_order_relaxed); }
+    void setVoiceShaper (VoiceShaper* s) noexcept override { shaper = s; }
 
     // FL's declickers (FUN_012c6ae0: release ms of modes 0…5, and the fast one) as a raised cosine over
     // max(1, round(ms·rate/1000)) frames: g = (1 + cos(k·π/(n+1))) / 2 (FUN_00977870, shape 3)
@@ -2562,6 +2570,13 @@ public:
                     break;
                 }
 
+                float shapeL = 1.0f, shapeR = 1.0f;
+                if (shaper != nullptr && ! shaper->voiceGains ((int) (&v - voices.data()), shapeL, shapeR))
+                {
+                    v.active = false;
+                    break;
+                }
+
                 if (v.flEnvelope)
                 {
                     if (v.tickLeft <= 0.0)
@@ -2653,8 +2668,16 @@ public:
                     v.clipRemaining -= 1.0f;
                 }
 
-                left[i] += sl * gain * gl * v.panL;
-                right[i] += sr * gain * gr * v.panR;
+                if (shaper != nullptr)
+                {
+                    left[i] += sl * gain * gl * v.panL * shapeL;
+                    right[i] += sr * gain * gr * v.panR * shapeR;
+                }
+                else
+                {
+                    left[i] += sl * gain * gl * v.panL;
+                    right[i] += sr * gain * gr * v.panR;
+                }
 
                 v.position += ks.on ? v.rate : v.rate * v.pitchMul * bendMul;
                 ++v.age;
@@ -2992,6 +3015,7 @@ public:
 
 private:
     std::shared_ptr<const SampleData> sample;
+    VoiceShaper* shaper = nullptr; // (FPC's layers, round 190z)
     bool clipMode = false;
     double sampleRate = 44100.0;
     float fadeStep = 0.01f;

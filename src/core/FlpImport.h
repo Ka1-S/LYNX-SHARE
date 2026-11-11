@@ -105,6 +105,8 @@ struct DrumPad
     float pan = 0.0f, tune = 0.0f;  // pan −1..1; tuning in semitones
     int cutGroup = 0, cutBy = 0;    // playing this pad cuts pads with cutBy == cutGroup (0 = none)
     int mixerOffset = 0;            // mixer track relative to the channel's
+    int sourcePad = -1;             // FPC: the pad's index in the kit, and each layer's index in that pad (round 190z)
+    std::vector<int> sourceLayers;
 };
 
 // The sampler channel that plays `pad` of the drum channel `original` (its volume, mixer insert and the rest stay the
