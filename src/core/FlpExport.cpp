@@ -13,6 +13,7 @@
 #include "core/FlEffects.h"
 #include "core/FlStateWrite.h"
 #include "core/FlWrapper.h"
+#include "core/FruityDance.h"
 #include "core/PatternBlocks.h"
 #include "core/ThreeOsc.h"
 #include "core/TimeStretch.h"
@@ -1039,6 +1040,10 @@ struct Converter
             c.type = flp::ChannelType::instrument;
             c.pluginName = name;
             c.pluginState = originMatches (def) && ! def.flOrigin.state.empty() ? def.flOrigin.state : def.pluginState;
+            // a dancer edited in LYNX keeps LYNX's text state: FL gets its own bytes (the sprite sheet's file included)
+            if (def.instrument == InstrumentKind::fruitydance)
+                if (const auto dancer = dance::fromState (c.pluginState))
+                    c.pluginState = dance::toFl (*dancer);
             if (c.pluginState.empty() && def.instrument == InstrumentKind::threeosc)
                 c.pluginState = defaultThreeOscState();
             if (def.instrument == InstrumentKind::fpc) // the kit as FPC's state (core/Fpc.h: FL's own bytes when nothing was edited)

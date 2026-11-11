@@ -8892,3 +8892,11 @@ countries: tr
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE üye kanalları (alt bölge): her biri bir nota taşıyan MIDI kanalları"
 # round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "NEFES"
+"Motion blending" = "Hareket karışımı"
+"Load sprite sheet..." = "Sprite sayfası yükle..."
+"Load sprite sheet" = "Sprite sayfası yükle"
+"LYNX's dancer" = "LYNX dansçısı"
+"Back to LYNX SHARE's own dancer" = "LYNX SHARE'in kendi dansçısına dön"
+"Bitmap size is incorrect." = "Bit eşlem boyutu yanlış."
+"A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Fruity Dance biçiminde bir resim (PNG): yatayda 8 kare, her hareket için bir satır ve her satırda bir hareket adı bulunan aynı adlı bir metin dosyası"
+"The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "Resmin genişliği 8 kare, yüksekliği ise ad dosyasının ({0}) her satırı için bir kare olmalıdır."

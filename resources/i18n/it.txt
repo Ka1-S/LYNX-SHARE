@@ -8859,3 +8859,11 @@ countries: it ch sm
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "Canali membri MPE (zona inferiore): i canali MIDI che portano una nota ciascuno"
 # round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "SOFFIO"
+"Motion blending" = "Fusione del movimento"
+"Load sprite sheet..." = "Carica foglio di sprite..."
+"Load sprite sheet" = "Carica foglio di sprite"
+"LYNX's dancer" = "Ballerino di LYNX"
+"Back to LYNX SHARE's own dancer" = "Torna al ballerino proprio di LYNX SHARE"
+"Bitmap size is incorrect." = "La dimensione della bitmap non è corretta."
+"A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Un'immagine (PNG) nel formato di Fruity Dance: 8 fotogrammi in larghezza, una riga per mossa e un file di testo con lo stesso nome con un nome di mossa per riga"
+"The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "La larghezza dell'immagine deve essere di 8 fotogrammi e l'altezza di un fotogramma per ogni riga del file dei nomi ({0})."

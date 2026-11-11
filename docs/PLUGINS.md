@@ -187,7 +187,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | LYNX Soundfont | Fruity Soundfont Player (SoundFont Player) | Close | own SF2 / SF3 player (TinySoundFont parsing, LYNX SHARE voices): FL's state read (font, preset, envelope / LFO / cut-off overrides, send levels, options; REA_rodada158); preset search over all SoundFonts in the user's folders; "send to" a mixer insert, mod-wheel knob and FL's built-in reverb / chorus sound not reproduced (LYNX SHARE's own reverb / chorus) |
 | Built-in synth | FLEX | Approximate | FLEX packs are encrypted and never opened: a synth patch chosen by preset name |
 | Silent channel | Wasp / Wasp XT | Placeholder | silent in FL Studio 2026 (64-bit placeholder); state kept |
-| LYNX Dance | Fruity Dance | LYNX SHARE original | no sound, as in FL: LYNX SHARE's own animated dancer, its moves picked by the channel's notes; FL's saved state is read on import |
+| LYNX Dance | Fruity Dance | Own dancer + FL sprite sheets | LYNX's own character by default; "Load sprite sheet..." takes a sheet in FL's format (8 frames across, a row per move, a names .txt), issue #121 |
 
 ## Effects
 
