@@ -18,6 +18,7 @@
 #include "core/FlWrapper.h"
 #include "core/Gzip.h"
 #include "core/Inflate.h"
+#include "core/LiveScales.h"
 #include "core/OggVorbis.h"
 #include "core/Patcher.h"
 #include "core/Rack.h"
@@ -167,6 +168,27 @@ std::string num (double v)
 std::string num (std::int64_t v) { return std::to_string (v); }
 std::string num (int v) { return std::to_string (v); }
 std::string boolean (bool b) { return b ? "true" : "false"; }
+
+// The project key as Live's scale (round 190o) [LIVE 12.4 save: ScaleInformation { Root, Name = the scale chooser's
+// index } beside the set's InKey and each MIDI clip's IsInKey; Live 11: a clip's ScaleInformation { RootNote, Name as
+// text }]. A project with no key, or with a scale Live has none like, is written with Scale Mode off (C Major).
+void writeLiveScale (Node& owner, const Song& song, std::string_view inKeyMember)
+{
+    const auto key = projectkey::get (song);
+    const auto index = key ? livescales::indexFor (*key) : -1;
+    auto* info = owner.child ("ScaleInformation");
+    owner.value (inKeyMember, boolean (index >= 0 && info != nullptr)); // (the Live 12 skeleton's set has Scale Mode on)
+    if (index < 0 || info == nullptr)
+        return;
+    if (! info->value ("Root", num (key->root)))
+        info->value ("RootNote", num (key->root));
+    if (auto* name = info->child ("Name"))
+    {
+        const auto old = name->get ("Value");
+        const auto numeric = ! old.empty() && std::all_of (old.begin(), old.end(), [] (char ch) { return ch >= '0' && ch <= '9'; });
+        name->set ("Value", numeric ? num (index) : std::string (livescales::scales()[(std::size_t) index].name));
+    }
+}
 
 // ---------------------------------------------------------------------------------------------------------------
 // Skeletons (core/AlsSkeleton.h): one map of element kind → element per version, decoded once
@@ -662,6 +684,7 @@ struct Exporter
         c.value ("Name", p.name);
         c.value ("Color", num (std::max (0, alsColourIndex (p.colour))));
         c.value ("Disabled", boolean (muted));
+        writeLiveScale (c, song, "IsInKey");
         if (auto* loop = c.child ("Loop"))
         {
             loop->value ("LoopStart", "0");
@@ -1365,6 +1388,7 @@ struct Exporter
                 locs->add (std::move (l));
             }
         }
+        writeLiveScale (set, song, "InKey");
         if (auto* tr = set.child ("Transport"))
         {
             const auto loop = song.loopEnd > song.loopStart;

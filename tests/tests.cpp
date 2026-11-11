@@ -54,6 +54,7 @@
 #include "core/ControlSurface.h"
 #include "core/VoltageController.h"
 #include "core/FlSamplers.h"
+#include "core/Fpc.h"
 #include "core/FlSynths.h"
 #include "core/Inflate.h"
 #include "core/WavPack.h"
@@ -2936,7 +2937,7 @@ TEST (fl_fpc_cycle_layers_and_slicex_master_volume)
     state.push_back (5);
     for (char ch : std::string ("x.wav"))
         state.push_back ((std::uint8_t) ch);
-    const auto sliced = lynx::slicex (state);
+    const auto sliced = lynx::slicexSample (state);
     CHECK (sliced.has_value() && sliced->path == "x.wav");
     CHECK (sliced && std::abs (sliced->gain - (float) ((std::pow (11.0, 1.25) - 1.0) / 10.0)) < 1e-5f);
 }
@@ -17363,6 +17364,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Merge180cTests.inc"
 #include "Slicer180cTests.inc"
 #include "Slicer190fTests.inc"
+#include "Fpc190mTests.inc"
 #include "PluginExport180bTests.inc"
 #include "FlExport180dTests.inc"
 #include "FlpMute182eTests.inc"
@@ -17399,8 +17401,11 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "MultiOut188dTests.inc"
 #include "Strike189dTests.inc"
 #include "NoteChance187cTests.inc"
+#include "MidiTools190oTests.inc"
 #include "Notes188gTests.inc"
 #include "Layer190bTests.inc"
 #include "Undo190bTests.inc"
 #include "Bugs190cTests.inc"
+#include "Slicex190hTests.inc"
+#include "Parity190vTests.inc"
 #include "Surge190xTests.inc"

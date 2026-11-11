@@ -11522,6 +11522,14 @@ private:
                 saveSnapshot (ui, prefix + "-pianoroll-pianokeys.png");
                 lynx::PianoRollComponent::keyStyle = lynx::pianokeys::Style::flat;
                 roll.repaint();
+                // round 190j (discussion #10): the toolbar in a narrow window: the chord stamp as an icon button, and
+                // the menu button still there
+                for (int narrower : { 150, 330 })
+                {
+                    roll.squeezeToolbarForSnapshot (narrower);
+                    saveSnapshot (ui, prefix + "-pianoroll-narrow" + juce::String (narrower) + ".png");
+                    roll.squeezeToolbarForSnapshot (-narrower);
+                }
             }
             if (const auto strip = ui.getToolStripAreaForSnapshot (false); ! strip.isEmpty())
                 saveArea (ui, strip, prefix + "-pianoroll-tools.png");

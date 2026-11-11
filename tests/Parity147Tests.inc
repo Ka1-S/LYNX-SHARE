@@ -154,9 +154,10 @@ TEST (prism_old_projects_keep_classic_dynamic_round147)
     auto old = makeEffectSlot (EffectKind::prismMultiband);
     upgradeLoadedEffectParams (old, (std::size_t) m::dynamicEngine);
     CHECK (! m::measuredDynamic (old.params));
-    // other engines are left alone
+    // other engines are left alone (round 190v: but for Crest's own Law switch, classic for a project saved before it)
     auto crest = makeEffectSlot (EffectKind::crestCompressor);
-    const auto before = crest.params;
+    auto before = crest.params;
+    before[(std::size_t) dyn::crest::law] = 0.0f;
     upgradeLoadedEffectParams (crest, 3);
     CHECK (crest.params == before);
 }

@@ -35,6 +35,12 @@ namespace lynx
 //  - keys (via handleKey): Delete, Backspace (global grid on/off), Ctrl+A/C/X/V/B, Ctrl+Q quantise,
 //    Shift+Q quantise starts, Ctrl+U chop, Ctrl+G join, Ctrl+L legato, Shift+D shrink to grid,
 //    Ctrl+Shift+Left/Right rotate, Ctrl+M mute, Ctrl+P porta, Esc, arrows (Shift = octave/bar)
+namespace pianoroll
+{
+// the toolbar's chord stamp box when the full box (100 px) doesn't fit: its icon and its arrow
+constexpr int compactChordBoxWidth = 46;
+} // namespace pianoroll
+
 class PianoRollComponent final : public juce::Component,
                                  public SharesTitleBar,
                                  public ui::HintSource,
@@ -157,6 +163,7 @@ public:
     std::int64_t gridForSnapshot() const { return gridTicks(); }
     juce::PopupMenu getToolsMenuForSnapshot() { return toolsMenu(); }
     juce::PopupMenu getStampMenuForSnapshot() { return stampMenu(); }
+    void squeezeToolbarForSnapshot (int pixels); // the toolbar as in a window `pixels` narrower (negative: back)
     // zooms in (taller rows, wider steps) and hovers the right edge of the first note; returns its hint
     ui::Hint hoverForSnapshot();
     // the lane box's note properties (ids; pattern event lanes follow from eventLaneIdBase)

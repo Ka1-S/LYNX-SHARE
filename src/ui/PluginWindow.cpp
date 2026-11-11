@@ -234,6 +234,22 @@ public:
         return ref != nullptr && ref->hostKeysFirst && sandboxedPluginProcessId (plugin) == 0 && ! isSandboxedPluginDead (plugin);
     }
 
+    // The channel whose plugin this is (-1: a mixer slot's, or gone)
+    int channelIndex() const
+    {
+        auto& song = const_cast<Song&> (engine.getSong());
+        const auto* ref = find (song);
+        for (std::size_t c = 0; ref != nullptr && c < song.channels.size(); ++c)
+            if (&song.channels[c].plugin == ref)
+                return (int) c;
+        return -1;
+    }
+    int channelMixerTrack (int channel) const
+    {
+        const auto& song = engine.getSong();
+        return channel >= 0 && channel < (int) song.channels.size() ? song.channels[(std::size_t) channel].mixerTrack : -1;
+    }
+
     WrapperSettingsPage (AudioEngine& e, std::function<PluginRef* (Song&)> f, juce::AudioPluginInstance& p, bool channel)
         : engine (e), find (std::move (f)), plugin (p)
     {
@@ -776,6 +792,15 @@ public:
         keyboardPriority.setToggleState (page.pluginKeysFirst(), juce::dontSendNotification);
     }
 
+    // FL's Auto select linked modules (round 187a): the channel and the mixer insert this window belongs to
+    std::pair<int, int> linked() const
+    {
+        if (sideTrack >= 0)
+            return { -1, sideTrack };
+        const auto channel = page.channelIndex();
+        return { channel, page.channelMixerTrack (channel) };
+    }
+
     // the picker's label follows the slot's side input (the window's timer)
     void refreshSidechain()
     {
@@ -1004,6 +1029,18 @@ protected:
 
     std::unique_ptr<juce::Component> content; // until the host takes it
     juce::Component* shownContent = nullptr;   // the host's content (owned by the host)
+
+    // FL's Auto select linked modules [DECOMP FUN_00f5c5f0 -> FUN_00f5c340] (round 187a): called when the host
+    // (floating window or docked frame) becomes the one in use
+    void focusLinked()
+    {
+        if (auto* wrapped = dynamic_cast<WrappedEditor*> (shownContent))
+        {
+            const auto [channel, insert] = wrapped->linked();
+            markLinkedWindow (hostComponent(), channel, insert);
+            linkedWindowFocused (hostComponent());
+        }
+    }
     bool editorResizable = false;
     bool keysFromPluginView = false; // issue #96: the editor's unused keys come back (listenForKeysPluginLeaves)
 
@@ -1125,7 +1162,10 @@ public:
     {
         DocumentWindow::activeWindowStatusChanged();
         if (isActiveWindow())
+        {
             lastUsed() = key();
+            focusLinked();
+        }
     }
 };
 
@@ -1218,12 +1258,14 @@ public:
             setMinimisedFrame (false);
         toFront (true);
         lastUsed() = key();
+        focusLinked();
     }
 
     void mouseDown (const juce::MouseEvent& e) override
     {
         toFront (false);
         lastUsed() = key();
+        focusLinked();
         if (e.eventComponent != this)
             return;
         if (e.mods.isPopupMenu() && e.y < titleHeight)

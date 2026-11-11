@@ -6114,6 +6114,8 @@ countries: pl
 "Allow the plugin to handle keystrokes before the host does" = "Pozwól wtyczce obsługiwać klawisze przed hostem"
 "Disable typing keyboard priority by default" = "Domyślnie wyłącz priorytet klawiatury do grania"
 "Disable typing keyboard priority for all newly added plugins by default" = "Domyślnie wyłącz priorytet klawiatury do grania dla wszystkich nowo dodanych wtyczek"
+"Auto select linked modules" = "Automatycznie zaznaczaj powiązane moduły"
+"Focusing plugin windows selects mixer tracks" = "Aktywowanie okna wtyczki zaznacza ścieżkę miksera"
 "Mute / unmute" = "Wycisz / wyłącz wyciszenie"
 "Portamento / deselect" = "Portamento / odznacz"
 "Shift+arrows" = "Shift+strzałki"
@@ -8404,3 +8406,4 @@ countries: pl
 "Octaver" = "Oktawer"
 "Rectify" = "Prostowanie"
 "CrossFold" = "CrossFold"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Measured: model dopasowany do referencji; classic: model projektów zapisanych wcześniej"

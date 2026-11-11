@@ -92,6 +92,7 @@ add_library(lynx_core STATIC
     src/core/FlEffects.cpp
     src/core/Effector.cpp
     src/core/FlSamplers.cpp
+    src/core/Fpc.cpp
     src/core/FlSynths.cpp
     src/core/FlSytrus.cpp
     src/core/FlGenerators.cpp
@@ -110,6 +111,8 @@ add_library(lynx_core STATIC
     src/core/Granulizer.cpp
     src/core/WaveTraveller.cpp
     src/core/FruitySlicer.cpp
+    src/core/Slicex.cpp
+    src/core/SlicexEngine.cpp
     src/core/Drumaxx.cpp
     src/core/Slayer.cpp
     src/core/Dx10.cpp
@@ -249,6 +252,7 @@ target_sources(lynx_core PRIVATE
 # workflow P2 (note tools, mixer operations, history labels, browser search)
 target_sources(lynx_core PRIVATE
     src/core/NoteTools.cpp
+    src/core/MidiTools.cpp
     src/core/PianoRollTools.cpp
     src/core/EventEdit.cpp
     src/core/AudioEdit.cpp

@@ -258,7 +258,7 @@ namespace
 {
 // The style families (fitted to MEASURE_fabfilter §2, see REA_rodada108 §3): time-constant scales of the level
 // detector (τ = scale × knob), the knee every curve gets on top of the knob, and the curve family.
-enum class Curve { downward, upward, twoWay, vocal, variMu };
+enum class Curve { downward, upward, twoWay, vocal, variMu, twoWayClassic, variMuClassic };
 struct StyleDef
 {
     double attackScale;  // detector attack τ = scale × knob
@@ -288,11 +288,13 @@ constexpr StyleDef styleDefs[allStyles] {
     // upward 2.85 → 2.60 dB rms over 68 jobs (above the threshold it held −6.2 dB where the trial holds −2.8), classic
     // 2.28 → 1.67 dB over 80 jobs (its release was too fast: −3.3 dB where the trial is still at −5.4 on the stair's way
     // down; the attack scale stays round 108's, whose 50 % attack time it measured); both now smooth the gain rather
-    // than the level (gainBlend 1). Two-way and vari-mu refits gained as much on
-    // the bank but lost round 108's own stairs (0.4 → 4.9 / 0.8 → 6.8 dB): kept as they were
+    // than the level (gainBlend 1)
     { 0.000, 1.787, 0.496, 0.96, 0.000, Curve::upward, 0.0, -3.84, 0.812, 0.00, 0.393, 1.00, -0.80, 0.000 }, // upward
-    { 0.235, 0.010, 0.000, 0.00, 1.000, Curve::twoWay, 1.3, 0.00, 0.808, 0.00, 0.002, 0.00, -5.75, 0.473 }, // two-way (round 108's fit: the bank refit lost the −18 dB threshold stairs; recovers within about a millisecond)
-    { 0.335, 0.650, 0.980, 0.00, 1.000, Curve::variMu, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // vari-mu (round 108's fit)
+    // round 190v [EXEC] (trial190k's threshold × ratio × knee × attack grid and release sweep, 1 kHz / pink stairs and
+    // level steps): two-way and vari-mu have their own measured laws (twoWayLaw / variMuLaw below; of this row they use
+    // only the attack floor, vari-mu also the attack / release scales, which stay round 108's)
+    { 0.120, 0.190, 1.000, 0.00, 1.000, Curve::twoWay, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 }, // two-way
+    { 0.335, 0.650, 0.980, 0.00, 1.000, Curve::variMu, 0.0, 0.00, 1.000, 0.00, 0.300, 0.00, 0.00, 0.000 }, // vari-mu
     { 0.300, 0.555, 0.682, 6.11, 0.242, Curve::downward, 0.0, 0.29, 1.000, 5.18, 0.002, 1.00, 0.00, 0.000 }, // classic (round trial187b; attack as round 108 measured it)
     { 0.169, 0.789, 0.880, 7.27, 0.722, Curve::downward, 0.0, 0.77, 1.000, 2.88, 0.750, 0.39 }, // opto
     { 1.611, 0.712, 0.000, 8.40, 0.000, Curve::vocal, 0.0, -0.17, 3.000, 0.00, 0.002, 0.96, 0.00, 0.000 }, // vocal
@@ -303,11 +305,181 @@ constexpr StyleDef styleDefs[allStyles] {
     { 0.023, 3.667, 0.190, 1.69, 0.808, Curve::downward, 0.0, -0.77, 1.000, 0.00, 3.165, 0.83, 0.00, 0.000 }, // mastering (voicing)
 };
 
+// round 190v: the two-way and vari-mu laws of projects saved before that round (round 108's fits; the `law` parameter
+// off). They render exactly as they did.
+constexpr StyleDef classicDefs[2] {
+    { 0.235, 0.010, 0.000, 0.00, 1.000, Curve::twoWayClassic, 1.3, 0.00, 0.808, 0.00, 0.002, 0.00, -5.75, 0.473 },
+    { 0.335, 0.650, 0.980, 0.00, 1.000, Curve::variMuClassic, 0.0, 0.00, 1.000, 0.00, 0.002, 0.00, 0.00, 0.000 },
+};
+// the definition a style runs with: its own, or the classic one of two-way / vari-mu when the measured law is off
+const StyleDef& defOf (Style st, bool measured) noexcept
+{
+    if (! measured && st == Style::twoWay)
+        return classicDefs[0];
+    if (! measured && st == Style::variMu)
+        return classicDefs[1];
+    return styleDefs[(int) st];
+}
+const StyleDef& defOf (const EffectParams& p) noexcept { return defOf (styleOf (p), on (p[law])); }
+
 double releaseTau (const StyleDef& d, double knobMs) noexcept
 {
     return d.releaseScale * 200.0 * std::pow (knobMs / 200.0, d.releaseExp);
 }
 
+// ---- round 190v: the two-way and vari-mu laws, fitted black-box to the reference's static grid (thresholds −48 … −12 dB,
+// ratios 2 / 4 / 10, knees 0 … 72 dB, attacks 0.25 / 10 / 100 ms: 1 kHz stairs −60 … 0 dBFS; round 108's −18 dB
+// stairs are one line of the same grid) ----
+
+// a value over the slope s = 1 − 1/R: straight lines through (0, 0), the three measured ratios and a top at s = 1
+double overSlope (double s, double v2, double v4, double v10, double top) noexcept
+{
+    if (s <= 0.5)
+        return v2 * s / 0.5;
+    if (s <= 0.75)
+        return v2 + (v4 - v2) * (s - 0.5) / 0.25;
+    if (s <= 0.9)
+        return v4 + (v10 - v4) * (s - 0.75) / 0.15;
+    return v10 + (top - v10) * (std::min (s, 1.0) - 0.9) / 0.1;
+}
+
+// Two-way: a fixed gain P, upward compression (slope `up`) under the lower corner and downward compression (slope
+// `down`) over the upper one, both corners softened over the same knee `width`. Measured: the corners sit 6.3 dB
+// under and 3.0 dB over the threshold; the slopes are 0.24 / 0.35 / 0.49 up and 0.25 / 0.60 / 0.80 down at ratio
+// 2 / 4 / 10; the knee is the knob itself (2.9 dB at 0); the fixed gain falls as the threshold rises above −36 dB
+// (nothing below it) and faster with a slow attack: P = P36 − s · (0.172 + 0.172 · log10 (1 + attack / 1 ms)) ·
+// (threshold + 36). 186 curves: 0.08 dB rms, 0.7 dB worst.
+struct TwoWayLaw
+{
+    double base, up, down, lowCorner, highCorner, width;
+};
+TwoWayLaw twoWayLaw (double thr, double r, double knee, double attMs) noexcept
+{
+    const auto s = 1.0 - 1.0 / r;
+    TwoWayLaw w;
+    w.up = overSlope (s, 0.2400, 0.3538, 0.4901, 0.581);
+    w.down = overSlope (s, 0.2502, 0.6043, 0.8046, 0.939);
+    w.base = overSlope (s, 0.2329, 0.4537, 0.7586, 0.962)
+             - s * (0.1724 + 0.1717 * std::log10 (1.0 + std::max (0.0, attMs))) * (std::max (thr, -36.0) + 36.0);
+    w.lowCorner = thr - 6.3128;
+    w.highCorner = thr + 2.96;
+    w.width = std::sqrt (2.8694 * 2.8694 + 1.0195 * 1.0195 * knee * knee);
+    return w;
+}
+// the lift is measured down to 48 dB under its corner; below that it holds, and it never starts on silence (under
+// −90 dBFS: the original's first hit after digital silence comes out turned down, never lifted — round tp172b3)
+constexpr double twoWayLiftSpanDb = 48.0;
+double twoWayGain (const TwoWayLaw& w, double x) noexcept
+{
+    const auto up = x < -90.0 ? 0.0 : w.up * std::min (twoWayLiftSpanDb, kneeCurve (w.lowCorner - x, 1.0, w.width));
+    return w.base + up - w.down * kneeCurve (x - w.highCorner, 1.0, w.width);
+}
+
+// Vari-mu: the reduction grows smoothly out of nothing and its ratio keeps rising with it, −slope · width ·
+// ln (1 + e^((x − corner) / width)). Measured per threshold × ratio × knee (54 curves at attack 10 ms / release
+// 200 ms, each within 0.23 dB): the corner stops following the threshold below about −30 dB (the reduction then
+// depends on the level alone: −23 dBFS at ratio 4, −15 at 2, −31 at 10) and a larger knee moves it up, so the
+// reduction FALLS as the knee grows; the tables hold slope, corner − threshold and width in the detector's own level
+// (which reads a 1 kHz sine 1.04 dB low at those times). Between the nodes: straight lines.
+struct VariMuLaw
+{
+    double slope, corner, width;
+};
+VariMuLaw variMuLaw (double thr, double r, double knee) noexcept
+{
+    static constexpr double thrs[6] { -48.0, -36.0, -30.0, -24.0, -18.0, -12.0 };
+    static constexpr double knees[3] { 0.0, 18.0, 72.0 };
+    // [ratio 2 / 4 / 10][knee 0 / 18 / 72][threshold −48 … −12]
+    static constexpr double slopeT[3][3][6] {
+        { { 0.629, 0.616, 0.609, 0.609, 0.621, 0.649 }, { 0.600, 0.584, 0.573, 0.568, 0.582, 0.592 }, { 0.553, 0.544, 0.539, 0.533, 0.527, 0.521 } },
+        { { 0.693, 0.692, 0.702, 0.727, 0.765, 0.806 }, { 0.675, 0.671, 0.678, 0.700, 0.717, 0.722 }, { 0.646, 0.645, 0.645, 0.645, 0.644, 0.643 } },
+        { { 0.740, 0.763, 0.793, 0.833, 0.874, 0.915 }, { 0.727, 0.745, 0.770, 0.788, 0.801, 0.808 }, { 0.711, 0.714, 0.716, 0.719, 0.722, 0.724 } } };
+    static constexpr double cornerT[3][3][6] {
+        { { 32.00, 19.99, 14.28, 9.17, 5.11, 2.30 }, { 35.04, 22.88, 16.94, 11.49, 7.04, 3.38 }, { 40.44, 28.37, 22.40, 16.55, 10.85, 5.37 } },
+        { { 23.87, 12.66, 7.97, 4.37, 1.95, 0.47 }, { 26.46, 14.95, 9.93, 5.89, 2.54, -0.35 }, { 30.57, 18.86, 13.21, 7.75, 2.51, -2.47 } },
+        { { 15.94, 6.54, 3.43, 1.43, 0.23, -0.34 }, { 18.28, 8.29, 4.64, 1.54, -1.07, -3.25 }, { 22.01, 10.77, 5.45, 0.38, -4.41, -8.91 } } };
+    static constexpr double widthT[3][3][6] {
+        { { 4.88, 4.30, 3.75, 2.99, 2.16, 1.44 }, { 4.84, 4.39, 3.93, 3.33, 2.77, 2.35 }, { 4.84, 4.66, 4.52, 4.35, 4.16, 3.94 } },
+        { { 4.94, 3.91, 3.10, 2.23, 1.47, 0.83 }, { 4.95, 4.12, 3.49, 2.94, 2.47, 2.03 }, { 4.97, 4.71, 4.53, 4.31, 4.06, 3.79 } },
+        { { 4.70, 3.07, 2.17, 1.42, 0.71, 0.33 }, { 4.84, 3.60, 3.08, 2.61, 2.17, 1.74 }, { 5.20, 4.83, 4.60, 4.34, 4.05, 3.74 } } };
+    const auto s = 1.0 - 1.0 / r;
+    // the ratio: between the measured 2 / 4 / 10; outside them the nearest one (scaled below)
+    int ri = 0;
+    double rt = 0.0;
+    if (s > 0.75)
+    {
+        ri = 1;
+        rt = std::min (1.0, (s - 0.75) / 0.15);
+    }
+    else if (s > 0.5)
+        rt = (s - 0.5) / 0.25;
+    const auto kn = std::clamp (knee, 0.0, 72.0);
+    const int ki = kn < 18.0 ? 0 : 1;
+    const auto kt = (kn - knees[ki]) / (knees[ki + 1] - knees[ki]);
+    // the threshold: under −48 dB the corner stays where it is (the level alone decides); over −12 dB the last
+    // segment carries on
+    const auto tc = std::clamp (thr, -48.0, 0.0);
+    int ti = 0;
+    while (ti < 4 && tc > thrs[ti + 1])
+        ++ti;
+    const auto tt = (tc - thrs[ti]) / (thrs[ti + 1] - thrs[ti]);
+    const auto at = [&] (const double (&t)[3][3][6], bool extend) {
+        const auto node = [&] (int a, int b) {
+            const auto v = t[a][b][ti] + (t[a][b][ti + 1] - t[a][b][ti]) * (extend ? tt : std::min (tt, 1.0));
+            return v;
+        };
+        const auto row = [&] (int a) { return node (a, ki) + (node (a, ki + 1) - node (a, ki)) * kt; };
+        return row (ri) + (row (ri + 1) - row (ri)) * rt;
+    };
+    VariMuLaw w;
+    w.slope = at (slopeT, false);
+    w.corner = tc + at (cornerT, true) + (thr < -48.0 ? 0.0 : thr - tc);
+    w.width = std::max (0.3, at (widthT, false));
+    // round 108's −18 dB stairs at ratios 1.5 … 100 (the same law: its ratio 2 and 4 lines are this table's): under
+    // ratio 2 the slope shrinks (0.52 at 1.5) and the corner moves up 2.75 dB by 1.5; over ratio 10 the slope grows
+    // 5.6 % by 100, the corner drops 0.5 dB and the knee narrows
+    if (s < 0.5)
+    {
+        const auto t = std::clamp ((0.5 - s) / (0.5 - 1.0 / 3.0), 0.0, 1.0);
+        w.slope *= s < 1.0 / 3.0 ? 0.834 * s * 3.0 : 1.0 - 0.166 * t;
+        w.corner += 2.75 * t;
+        w.width += 0.43 * t;
+    }
+    else if (s > 0.9)
+    {
+        const auto t = std::min (1.0, (s - 0.9) / 0.09);
+        w.slope *= 1.0 + 0.056 * t;
+        w.corner -= 0.53 * t;
+        w.width = std::max (0.3, w.width * (1.0 - 0.44 * t));
+    }
+    return w;
+}
+// ln (1 + eᶻ) from a table (the engine asks once per sample): exact to 2e-5 between −12 and 12, its asymptotes outside
+double softplus (double z) noexcept
+{
+    constexpr int size = 1024;
+    constexpr double span = 12.0, perUnit = (double) size / (2.0 * span);
+    static const auto table = [] {
+        std::array<float, size + 2> t {};
+        for (int i = 0; i < size + 2; ++i)
+            t[(std::size_t) i] = (float) std::log1p (std::exp ((double) i / perUnit - span));
+        return t;
+    }();
+    if (z >= span)
+        return z;
+    if (z <= -span)
+        return 0.0;
+    const auto pos = (z + span) * perUnit;
+    const auto i = (std::size_t) pos;
+    const auto f = pos - (double) i;
+    return (double) table[i] + f * ((double) table[i + 1] - (double) table[i]);
+}
+double variMuGain (const VariMuLaw& w, double x) noexcept
+{
+    return -w.slope * w.width * softplus ((x - w.corner) / w.width);
+}
+
+// (the classic vari-mu law, projects saved before round 190v)
 // vari-mu: the share of the full ratio reached at an overshoot o (dB), by slope s = 1 − 1/R — measured (§2.1 data,
 // slopes 1/3 … 0.99, overshoots 0 … 18 dB) and divided by our detector's own shortfall (0.96)
 double variMuShare (double s, double o) noexcept
@@ -348,10 +520,10 @@ double variMuShare (double s, double o) noexcept
 // the most an upward curve lifts (dB), whatever the range (round tp172b3, measured)
 constexpr double upwardCapDb = 30.0;
 
-// target gain change (dB; negative = reduction) for a detector level `x` (dB)
-double curveGain (Style st, double x, double thr, double r, double knee, double range) noexcept
+// target gain change (dB; negative = reduction) for a detector level `x` (dB); `attMs`: the attack knob (two-way's
+// fixed gain follows it)
+double curveGain (const StyleDef& d, double x, double thr, double r, double knee, double range, double attMs = 10.0) noexcept
 {
-    const auto& d = styleDefs[(int) st];
     const auto s = 1.0 - 1.0 / r;
     switch (d.curve)
     {
@@ -369,15 +541,7 @@ double curveGain (Style st, double x, double thr, double r, double knee, double 
             return std::clamp (g, -range, std::min (range, upwardCapDb));
         }
         case Curve::twoWay:
-        {
-            // two-way: a fixed offset, upward compression below (threshold − 6 dB), downward above (threshold + 4 dB)
-            const auto kn = d.kneeAdd + d.kneeScale * knee + d.kneeSlope * s;
-            // round tp172b3: the upward part only over the 30 dB under its corner and not on silence (under −90 dBFS:
-            // the original's first hit after digital silence comes out turned down, never lifted)
-            const auto up = x < -90.0 ? 0.0 : d.upSlope * s * std::clamp (thr - 6.0 - x, 0.0, upwardCapDb);
-            const auto g = d.baseDb * s + up - d.slopeScale * kneeCurve (x - thr - 4.0 - d.offsetDb, s, kn);
-            return std::clamp (g, -range, std::min (range, upwardCapDb));
-        }
+            return std::clamp (twoWayGain (twoWayLaw (thr, r, knee, attMs), x), -range, std::min (range, upwardCapDb));
         case Curve::vocal:
         {
             // a long smooth curve that already reduces far below the threshold (softplus in dB), steeper on top
@@ -388,6 +552,18 @@ double curveGain (Style st, double x, double thr, double r, double knee, double 
             return -std::min (range, sv * k * soft);
         }
         case Curve::variMu:
+            return std::max (-range, variMuGain (variMuLaw (thr, r, knee), x));
+        case Curve::twoWayClassic:
+        {
+            // two-way: a fixed offset, upward compression below (threshold − 6 dB), downward above (threshold + 4 dB)
+            const auto kn = d.kneeAdd + d.kneeScale * knee + d.kneeSlope * s;
+            // round tp172b3: the upward part only over the 30 dB under its corner and not on silence (under −90 dBFS:
+            // the original's first hit after digital silence comes out turned down, never lifted)
+            const auto up = x < -90.0 ? 0.0 : d.upSlope * s * std::clamp (thr - 6.0 - x, 0.0, upwardCapDb);
+            const auto g = d.baseDb * s + up - d.slopeScale * kneeCurve (x - thr - 4.0 - d.offsetDb, s, kn);
+            return std::clamp (g, -range, std::min (range, upwardCapDb));
+        }
+        case Curve::variMuClassic:
         {
             // the ratio grows with the reduction (variable-mu tube behaviour), as measured
             const auto o = std::max (0.0, x - thr);
@@ -413,8 +589,17 @@ void scEqParams (const EffectParams& p, EffectParams& out) noexcept
 
 double staticGainDb (const EffectParams& p, double inputDb)
 {
-    return curveGain (styleOf (p), inputDb, thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]),
-                      std::max (0.01, rangeDb (p[range])));
+    const auto& def = defOf (p);
+    const auto att = attackMs (p[attack]);
+    if (def.curve == Curve::twoWay)
+    {
+        // round 190v: two-way's detector (a linear attack / release follower) settles under a steady sine's peak by up
+        // to 3.9 dB as the attack nears the release (0.5 dB at 10 / 200 ms, 2 dB at 100 / 200 ms, measured)
+        const auto rho = att * def.attackScale / std::max (0.5, releaseMs (p[release]) * def.releaseScale);
+        inputDb -= std::min (3.9, 4.0 * std::pow (rho, 0.55));
+    }
+    return curveGain (def, inputDb, thresholdDb (p[threshold]), ratioOf (p[ratio]), kneeDb (p[knee]),
+                      std::max (0.01, rangeDb (p[range])), att);
 }
 
 float characterCurve (Character c, float x) noexcept
@@ -538,6 +723,7 @@ private:
     struct Detector
     {
         double env = -120.0, sustain = 0.0, gain = 0.0;
+        double lin = 1e-6; // round 190v: two-way's follower (linear amplitude)
         double peak = -120.0; // round 173d: the input's peak (instant attack, the detector's release): the lift's ceiling
         int holdLeft = 0, gainHold = 0, peakPos = 0;
     };
@@ -549,7 +735,21 @@ private:
         double thr, rat, kn, rng, aA, relMs, rate, slowCoef, gainBlend, aP = 0.0;
         int holdSamples, window;
         bool autoRel;
+        // round 190v: two-way / vari-mu run their measured laws, set up once per chunk
+        Curve curve = Curve::downward;
+        const StyleDef* def = &styleDefs[0];
+        TwoWayLaw twoWay {};
+        VariMuLaw variMu {};
+        double aRl = 0.0; // two-way: the linear follower's release
     };
+    double styleGain (const Ctx& x, double level) const noexcept
+    {
+        if (x.curve == Curve::twoWay)
+            return std::clamp (twoWayGain (x.twoWay, level), -x.rng, std::min (x.rng, upwardCapDb));
+        if (x.curve == Curve::variMu)
+            return std::max (-x.rng, variMuGain (x.variMu, level));
+        return curveGain (*x.def, level, x.thr, x.rat, x.kn, x.rng);
+    }
 
     // latency = the chosen maximum look-ahead (+ the oversampler when on), as the reference does (§2: 960 samples
     // for "maximum 20 ms" whatever the look-ahead knob says)
@@ -597,7 +797,8 @@ private:
     {
         Ctx c;
         c.st = styleOf (p);
-        const auto& sd = styleDefs[(int) c.st];
+        const auto& sd = defOf (p);
+        c.def = &sd;
         c.thr = on (p[autoThreshold]) ? autoThresholdDb (thresholdDb (p[threshold]), programDb) : thresholdDb (p[threshold]);
         c.rat = ratioOf (p[ratio]);
         c.kn = kneeDb (p[knee]);
@@ -610,8 +811,26 @@ private:
         const auto releaseByAttack = (1.0 + std::pow (10.0 / 50.0, 1.5)) / (1.0 + std::pow (att / 50.0, 1.5));
         c.aA = coef (std::max (sd.attackFloorMs, att * sd.attackScale), rate);
         c.relMs = std::max (0.5, releaseTau (sd, releaseMs (p[release])) * releaseByAttack);
+        c.curve = sd.curve;
+        if (sd.curve == Curve::twoWay)
+        {
+            // round 190v [EXEC] (the reference's level steps at releases 10 … 2500 ms and attacks 0.25 … 100 ms): a
+            // follower in linear amplitude, attack τ = 0.12 × knob, release τ = 0.19 × knob (the gain is back half-way
+            // after about a quarter of the release knob; the release does not shorten with the attack). On a steady
+            // sine it settles under the peak as the two get closer, which is the reference's reading too
+            c.relMs = std::max (0.5, releaseTau (sd, releaseMs (p[release])));
+            c.aRl = coef (c.relMs, rate);
+            c.twoWay = twoWayLaw (c.thr, c.rat, c.kn, att);
+        }
+        else if (sd.curve == Curve::variMu)
+        {
+            // round 190v [EXEC]: vari-mu's release does not shorten with a slow attack (a 1 kHz sine at attack 100 ms
+            // reads 3 dB lower than at 0.25 ms on the reference; with the shortened release it read 8.5 dB lower)
+            c.relMs = std::max (0.5, releaseTau (sd, releaseMs (p[release])));
+            c.variMu = variMuLaw (c.thr, c.rat, c.kn);
+        }
         c.aP = coef (c.relMs, rate);
-        c.autoRel = on (p[autoRelease]) && sd.curve != Curve::twoWay;
+        c.autoRel = on (p[autoRelease]) && sd.curve != Curve::twoWay && sd.curve != Curve::twoWayClassic;
         c.rate = rate;
         c.slowCoef = coef (1000.0, rate);
         c.gainBlend = sd.gainBlend;
@@ -633,7 +852,20 @@ private:
                 level = std::max (level, (double) ring[(std::size_t) k]);
         }
         const auto in = std::max (-120.0, 20.0 * std::log10 (level + 1e-12));
-        if (in > d.env)
+        if (x.curve == Curve::twoWay) // round 190v: the follower works on the amplitude, not on its level in dB
+        {
+            if (level > d.lin)
+            {
+                d.lin = x.aA * d.lin + (1.0 - x.aA) * level;
+                d.holdLeft = x.holdSamples;
+            }
+            else if (d.holdLeft > 0)
+                --d.holdLeft;
+            else
+                d.lin = x.aRl * d.lin + (1.0 - x.aRl) * level;
+            d.env = std::max (-120.0, 20.0 * std::log10 (d.lin + 1e-12));
+        }
+        else if (in > d.env)
         {
             d.env = x.aA * d.env + (1.0 - x.aA) * in;
             d.holdLeft = x.holdSamples;
@@ -645,17 +877,17 @@ private:
             auto ms = x.relMs;
             if (x.autoRel) // program-dependent: short peaks recover faster than sustained reduction
             {
-                const auto now = -curveGain (x.st, d.env, x.thr, x.rat, x.kn, x.rng);
+                const auto now = -styleGain (x, d.env);
                 const auto fraction = now > 0.1 ? std::clamp (d.sustain / now, 0.0, 1.0) : 1.0;
                 ms *= 0.35 + 0.65 * fraction;
             }
             const auto aR = coef (ms, x.rate);
             d.env = aR * d.env + (1.0 - aR) * in;
         }
-        auto g = curveGain (x.st, d.env, x.thr, x.rat, x.kn, x.rng);
+        auto g = styleGain (x, d.env);
         if (x.gainBlend > 0.0) // the gain-domain detector: the instantaneous curve gain, smoothed
         {
-            const auto target = curveGain (x.st, in, x.thr, x.rat, x.kn, x.rng);
+            const auto target = styleGain (x, in);
             if (target < d.gain)
             {
                 d.gain = x.aA * d.gain + (1.0 - x.aA) * target;
@@ -740,7 +972,7 @@ private:
         const auto mx = std::clamp (p[mix], 0.0f, 1.0f);
         const auto st = styleOf (p);
         float makeup = 1.0f;
-        if (on (p[autoGain]) && styleDefs[(int) st].curve != Curve::upward)
+        if (on (p[autoGain]) && defOf (p).curve != Curve::upward)
         {
             const auto rng = std::max (0.01, rangeDb (p[range]));
             // round tp172b [EXEC] (1 kHz stairs through the reference, 32 settings): its auto gain makes up ~0.36 of the
@@ -751,7 +983,13 @@ private:
             const double slowAttack = 1.0 / (1.0 + std::pow (attackMs (p[attack]) / 12.0, 1.1));
             // (the plain curve it was measured against: knee 6 dB + half the knob, no style offsets)
             const auto plain = std::min (rng, kneeCurve (-thresholdDb (p[threshold]), 1.0 - 1.0 / ratioOf (p[ratio]), 6.0 + 0.5 * kneeDb (p[knee])));
-            makeup = (float) dbToGain (std::min (rng, 0.36 * slowAttack * plain));
+            // round 190v [EXEC]: two-way makes up more — tp172b's one two-way capture with auto gain on (threshold −18,
+            // ratio 2, knee 24, attack 30 ms) sits 2.9 dB over the same setting without it, where 0.36 gives 0.9 dB
+            // (never more than 3 dB over the other styles' make-up: one capture does not carry a deep setting, and the
+            // make-up also lifts the pauses)
+            const auto common = 0.36 * slowAttack * plain;
+            const auto made = defOf (p).curve == Curve::twoWay ? std::min (1.19 * slowAttack * plain, common + 3.0) : common;
+            makeup = (float) dbToGain (std::min (rng, made));
         }
         const auto mode = linkModeOf (p[linkMode]);
         const bool ms = mode != LinkMode::stereo;
@@ -2367,6 +2605,26 @@ constexpr StyleDef styleDefs[styles] {
 };
 constexpr double guitarWaitMs = 110.0;
 
+// round 190v [EXEC] (trial190k's noise probes through the reference's Vocal style, threshold −60 so the gate itself
+// stays out of it): after a pause, content above about 4 kHz comes back turned down and recovers on its own: white
+// noise is 0.375 dB down per dB over −62 dBFS at its onset (−7.6 dB at −42 dBFS, −15 at −20, −21 at −6) and the gain
+// climbs back (in linear gain) with a time constant that grows with the noise's amplitude (0.15 s at −42 dBFS, 0.6 s
+// at −30, 1.9 s at −20). Sines and noise low-passed at 2 kHz pass untouched; the Range limits it softly (range 10 dB:
+// −5.7 dB where it was −11), ratio 2 gives 0.7 of it, a hold of 200 ms keeps it open across a 0.4 s pause; an "s"
+// 50 ms after a note, or a hat on a kick's tail, is not touched (it needs the pause). The other styles have none of it.
+// Only sound that is mostly above 4 kHz counts (music and voiced notes after a pause pass on the reference), a longer
+// hold takes it away, and the deeper of the gate and this reduction applies (they don't add).
+namespace vocalNr
+{
+constexpr double highPassHz = 4000.0, floorDb = -62.8, dbPerDb = 0.375;
+constexpr double quietAmp = 0.001;                       // −60 dBFS: under it the input counts as a pause
+constexpr double armAfterMs = 60.0, armOverMs = 250.0;   // the pause it takes (plus 1.5 × the hold) and how long to arm fully
+constexpr double tauAtRef = 1.9, refAmp = 0.1 * 0.912;   // recovery τ (s) at −20 dBFS white noise (its part above 4 kHz)
+constexpr double tauMin = 0.03, tauMax = 10.0;
+constexpr int step = 32;                                 // samples per control step
+constexpr double noiseShareLow = 0.1, noiseShareHigh = 0.75; // the share of the power above 4 kHz from which it works / works fully
+} // namespace vocalNr
+
 // round tp172b [EXEC] (a 1 kHz ramp −60 → 0 → −60 dBFS at 10 dB/s through the reference, threshold −30, ratio 100): an
 // open gate closes this far below the point where it opened (Classic −37.3, Clean −41.0, Vocal −37.8, Guitar −31.9
 // dBFS, less the release's lag on the ramp). The gap shrinks with the ratio: at ratio 2 the reference opens and closes
@@ -2445,6 +2703,12 @@ public:
         gain = 0.0;
         isOpen = false;
         holdLeft = 0;
+        nrHp.reset();
+        nrMs = nrAll = nrPeak = 0.0;
+        nrRecovered = 0.0;
+        nrGapMs = 1e9;
+        nrTarget = nrGain = 1.0;
+        nrCount = 0;
     }
 
     int latencySamples() const noexcept override { return latency.load (std::memory_order_relaxed); }
@@ -2526,10 +2790,57 @@ private:
         gainDelay.setLength (std::max (0, laSamples - (int) std::lround (la * 0.001 * sr)));
         double maxGr = 0.0;
         const bool over = osFactor > 1;
+        // round 190v: the Vocal style's noise reduction (vocalNr above); nothing of it runs in the other styles
+        const bool nr = st == Style::vocal && ! duck && on (p[law]);
+        double nrDepthScale = 0.0, nrRange = 0.0, nrArmMs = 0.0, nrMsCoef = 0.0, nrPeakCoef = 0.0, nrSmooth = 0.0;
+        if (nr)
+        {
+            nrHp.filter (sr, 1, std::min (vocalNr::highPassHz, sr * 0.45), 0.70710678);
+            const auto rt = ratioOf (p[ratio]);
+            nrDepthScale = rt <= 1.0001 ? 0.0 : vocalNr::dbPerDb * std::sqrt (1.0 - 1.0 / rt);
+            nrDepthScale *= std::max (0.0, 1.0 - holdMs (p[hold]) / 250.0); // a long hold takes it away
+            nrRange = rangeDb (p[range]);
+            nrArmMs = vocalNr::armAfterMs + 1.5 * holdMs (p[hold]);
+            nrMsCoef = coef (5.0, sr);
+            nrPeakCoef = coef (5.0, sr);
+            nrSmooth = coef (2.0, sr);
+        }
 
         for (int i = 0; i < n; ++i)
         {
             float sa = external ? scL[i] : l[i], sb = external ? scR[i] : r[i];
+            if (nr)
+            {
+                const auto ha = (double) nrHp.process (sa, 0), hb = (double) nrHp.process (sb, 1);
+                nrMs = nrMsCoef * nrMs + (1.0 - nrMsCoef) * 0.5 * (ha * ha + hb * hb);
+                nrAll = nrMsCoef * nrAll + (1.0 - nrMsCoef) * 0.5 * ((double) sa * sa + (double) sb * sb);
+                const auto pk = (double) std::max (std::abs (sa), std::abs (sb));
+                nrPeak = pk > nrPeak ? pk : nrPeakCoef * nrPeak + (1.0 - nrPeakCoef) * pk;
+                if (++nrCount >= vocalNr::step)
+                {
+                    nrCount = 0;
+                    const auto dt = (double) vocalNr::step / sr;
+                    if (nrPeak < vocalNr::quietAmp) // a pause: it arms again
+                    {
+                        nrGapMs += dt * 1000.0;
+                        nrRecovered = std::min (nrRecovered, 1.0 - std::clamp ((nrGapMs - nrArmMs) / vocalNr::armOverMs, 0.0, 1.0));
+                    }
+                    else // sound: the gain climbs back, slower the louder its part above 4 kHz
+                    {
+                        nrGapMs = 0.0;
+                        const auto amp = std::sqrt (nrMs);
+                        const auto tau = std::clamp (vocalNr::tauAtRef * amp / vocalNr::refAmp, vocalNr::tauMin, vocalNr::tauMax);
+                        nrRecovered += (1.0 - nrRecovered) * (1.0 - std::exp (-dt / tau));
+                    }
+                    auto depth = nrDepthScale * std::max (0.0, 10.0 * std::log10 (nrMs + 1e-30) - vocalNr::floorDb);
+                    // only sound that is mostly above 4 kHz counts as noise (music and voiced notes pass)
+                    depth *= std::clamp ((nrMs / (nrAll + 1e-30) - vocalNr::noiseShareLow) / (vocalNr::noiseShareHigh - vocalNr::noiseShareLow), 0.0, 1.0);
+                    if (depth > 0.0)
+                        depth = depth * nrRange / (depth + nrRange + 1e-9); // the range limits it softly
+                    nrTarget = dbToGain (-(1.0 - nrRecovered) * depth);
+                }
+                nrGain = nrSmooth * nrGain + (1.0 - nrSmooth) * nrTarget;
+            }
             if (expertSc)
             {
                 float a0 = sa, b0 = sb;
@@ -2587,8 +2898,9 @@ private:
                 --holdLeft;
             else
                 gain = aR * gain + (1.0 - aR) * target;
-            maxGr = std::max (maxGr, -gainToDb (gain));
-            const auto g = gainDelay.process ((float) gain);
+            const auto total = nr ? std::min (gain, nrGain) : gain; // the deeper of the gate and the noise reduction
+            maxGr = std::max (maxGr, -gainToDb (total));
+            const auto g = gainDelay.process ((float) total);
             float a = l[i], b = r[i];
             delay.process (a, b);
             if (over) // round 135: the gain is upsampled with the audio and applied at the high rate (below)
@@ -2676,6 +2988,11 @@ private:
     StereoDelay delay;
     MonoDelay gainDelay;
     Biquad hp, lp;
+    // round 190v: the Vocal style's noise reduction — the high band's mean square, the input's peak, how far the gain
+    // has recovered (0 … 1), the pause so far, the gain it applies
+    Biquad nrHp;
+    double nrMs = 0.0, nrAll = 0.0, nrPeak = 0.0, nrRecovered = 0.0, nrGapMs = 1e9, nrTarget = 1.0, nrGain = 1.0;
+    int nrCount = 0;
     double level = 0.0, gain = 0.0;
     bool isOpen = false; // round tp172b: past the opening point (the hysteresis)
     int holdLeft = 0;
@@ -2706,7 +3023,10 @@ const EffectInfo& crestInfo()
                                      // round 137: the side-chain trigger (off), 1/4 note, rate 100 %, length 10 %, no channel
                                      { "Trigger", 0.0f }, { "Trigger sync", 0.5f }, { "Trigger rate", 0.5f }, { "Trigger length", 0.1f },
                                      { "Trigger channel", 0.0f },
-                                     { "Voicing", 0.0f } } }; // round tp172b2
+                                     { "Voicing", 0.0f }, // round tp172b2
+                                     // round 190v: two-way and vari-mu on the reference grid (new instances; projects saved before keep
+                                     // round 108's laws: upgradeLoadedEffectParams)
+                                     { "Law", 1.0f } } };
     return info;
 }
 
@@ -2813,7 +3133,9 @@ const EffectInfo& sentryInfo()
                                      { "Channel mode", 0.0f }, { "SC gain L", 0.5f }, { "SC mix L", 0.5f }, { "SC gain R", 0.5f },
                                      { "SC mix R", 0.5f }, { "Wet pan", 0.5f }, { "Dry pan", 0.5f }, { "Ducking", 0.0f },
                                      { "Input", 0.5f },
-                                     { "Oversampling", 0.0f } } }; // round 135
+                                     { "Oversampling", 0.0f }, // round 135
+                                     // round 190v: the Vocal style's noise reduction (new instances; projects saved before have none)
+                                     { "Law", 1.0f } } };
     return info;
 }
 
@@ -2911,6 +3233,7 @@ std::string paramText (EffectKind kind, int param, float v)
                 static const char* names[voicings] { "None", "Smooth", "Op-El", "Mastering" };
                 return names[pick (v, voicings)];
             }
+            case law: return on (v) ? "measured" : "classic";
             default: return on (v) ? "on" : "off";
         }
     }
@@ -3007,6 +3330,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case dry: return fmt ("%.0f%%", v * 100.0);
             case output: case input: return db (lin (v, -24.0, 24.0));
             case oversampling: return crest::oversamplingOf (v) == 1 ? "off" : std::to_string (crest::oversamplingOf (v)) + "x";
+            case law: return on (v) ? "measured" : "classic";
             case channelMode: return on (v) ? "Mid/Side" : "Left/Right";
             case scGainL: case scGainR: return db (scGainDb (v));
             case scMixL: case scMixR: return fmt ("%+.2f", mixOf (v));

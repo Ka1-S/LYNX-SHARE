@@ -4113,6 +4113,12 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 152: … and before the gain-stage attack keeps round 150's level-follower attack
     if (slot.kind == EffectKind::prismMultiband && savedCount <= (std::size_t) dyn::prism::rev152)
         slot.params[(std::size_t) dyn::prism::rev152] = 0.0f;
+    // round 190v: Crest saved before its two-way / vari-mu refit keeps round 108's laws, Sentry saved before its Vocal
+    // noise reduction has none
+    if (slot.kind == EffectKind::crestCompressor && savedCount <= (std::size_t) dyn::crest::law)
+        slot.params[(std::size_t) dyn::crest::law] = 0.0f;
+    if (slot.kind == EffectKind::sentryGate && savedCount <= (std::size_t) dyn::sentry::law)
+        slot.params[(std::size_t) dyn::sentry::law] = 0.0f;
     // round 150: Auto-pan saved before the Tweak block keeps the Rhythm voicing's clipped angle
     if (slot.kind == EffectKind::autoPan && savedCount <= (std::size_t) autopan::count + 19)
         slot.params[(std::size_t) autopan::count + 19] = 0.0f;
