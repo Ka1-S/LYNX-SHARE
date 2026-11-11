@@ -5951,7 +5951,7 @@ private:
         }
 
         auto effect = std::dynamic_pointer_cast<lynx::PluginEffect> (run->engine->getEffect (0, run->slot));
-        run->render = std::thread ([run, effect] {
+        run->render = std::thread ([run, effect] () mutable {
             const auto start = juce::Time::getMillisecondCounterHiRes();
             run->engine->renderOffline (30.0, 48000.0);
             run->renderSeconds = (juce::Time::getMillisecondCounterHiRes() - start) * 0.001;
@@ -5962,6 +5962,12 @@ private:
             instance.releaseResources();
             instance.prepareToPlay (48000.0, 512);
             run->engine->renderOffline (3.0, 44100.0); // (the engine rebuilds its rack at that rate)
+            // The engine has replaced this instance (made for 48 kHz) by then, so this is its last reference: it is
+            // deleted here, on the export's thread, and its deactivate / destroy go to the message thread, which this
+            // waits for. That has to happen before `done`: once the message thread sees it, it blocks in join() until
+            // this thread ends, and an instance deleted after that waited 10 s for it and then deactivated the plugin
+            // right here, off the main thread (the plugin aborts: about 1 run in 40 under load, round 190au).
+            effect.reset();
             run->done = true;
         });
 
