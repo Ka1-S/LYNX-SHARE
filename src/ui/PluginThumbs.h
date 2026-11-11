@@ -40,7 +40,10 @@ juce::Image shrink (const juce::Image& image, float pixelsPerUnit = 1.0f);
 
 // --pluginthumbs <folder> [key,key...]: draws the editor of every LYNX generator and effect (or only those keys) into
 // `folder`, skipping the pictures that exist. `progress` gets one line per plugin. Returns the number drawn.
-int renderNative (const juce::File& folder, const juce::StringArray& only, const std::function<void (const juce::String&)>& progress);
+// `fullScale` > 0 (round 190bi: --shot-scale / LYNX_SHOT_SCALE given): the whole editor at that many pixels per logical
+// pixel, trimmed to its drawn part but not shrunk to the picker's 258 × 128 budget (the website's plugin pictures).
+int renderNative (const juce::File& folder, const juce::StringArray& only, const std::function<void (const juce::String&)>& progress,
+                  float fullScale = 0.0f);
 
 // Starts the background drawing (a second LYNX process) when pictures are missing; at most one at a time, and only
 // once per run unless `again` (after a version change of the art, say). Returns whether one is running.

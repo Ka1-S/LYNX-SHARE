@@ -8,6 +8,7 @@
 #include "engine/LiveSessions.h"
 #include "ui/AutomationUi.h"
 #include "ui/I18n.h"
+#include "ui/ShotScale.h"
 #include "ui/Theme.h"
 #include "ui/ValueControl.h"
 #include "ui/WindowOwner.h"
@@ -753,11 +754,11 @@ void closeRemoteWindows()
 void saveRemoteShots (const juce::String& prefix)
 {
     auto save = [&] (juce::Component& c, const juce::String& name) {
-        const juce::File file (prefix + "-" + name + ".png");
+        const auto file = shot::file (juce::File (prefix + "-" + name + ".png")); // (round 190bi: ui/ShotScale.h)
         file.deleteFile();
         juce::PNGImageFormat png;
         if (auto out = file.createOutputStream())
-            png.writeImageToStream (c.createComponentSnapshot (c.getLocalBounds()), *out);
+            png.writeImageToStream (shot::snapshot (c), *out);
     };
     // the host's list
     {
