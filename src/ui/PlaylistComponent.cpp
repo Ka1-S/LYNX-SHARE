@@ -1833,12 +1833,12 @@ void PlaylistComponent::paint (juce::Graphics& g)
                             return juce::jlimit (0.0f, 1.0f, (juce::Decibels::gainToDecibels (gain, -60.0f) + 60.0f) / 66.0f);
                         };
                         const auto h = (int) (position (m.level) * (float) bar.getHeight());
-                        g.setColour (m.level >= 1.0f ? colour::meterClip : m.level >= 0.5f ? colour::meterMid : colour::meterLow);
+                        g.setColour (colour::meterLow); // (FL's header meter stays green at every level)
                         g.fillRect (bar.withTop (bar.getBottom() - h));
                         if (m.peak > 0.001f) // the hold line
                         {
                             const auto py = bar.getBottom() - (int) (position (m.peak) * (float) bar.getHeight());
-                            g.setColour (m.peak >= 1.0f ? colour::meterClip : colour::meterLow);
+                            g.setColour (colour::meterLow);
                             g.fillRect (bar.getX(), juce::jmax (bar.getY(), py - 1), bar.getWidth(), 1);
                         }
                     }
