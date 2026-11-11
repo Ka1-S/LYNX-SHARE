@@ -182,6 +182,9 @@ TEST (plug190ad_new_projects_take_fl_plugin_levels)
     c.plugin.id = "x";
     withPlugin.channels.push_back (c);
     CHECK (! adoptFlPluginLevels (withPlugin) && ! withPlugin.flPluginLevels);
+    auto missingPlugin = Song::makeDefault(); // (its plugin is not installed here: still a hosted plugin's channel)
+    missingPlugin.channels.emplace_back().plugin.foreign.format = ForeignPlugin::Format::vst3;
+    CHECK (! adoptFlPluginLevels (missingPlugin));
     withPlugin.flPluginLevels = true; // (a template saved from now on: already FL's)
     CHECK (adoptFlPluginLevels (withPlugin));
 }

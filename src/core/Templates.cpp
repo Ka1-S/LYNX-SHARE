@@ -318,7 +318,10 @@ Song makeNewProject (int templateIndex)
 bool adoptFlPluginLevels (Song& song)
 {
     if (! song.flPluginLevels
-        && std::none_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) { return c.instrument == InstrumentKind::plugin; }))
+        && std::none_of (song.channels.begin(), song.channels.end(), [] (const ChannelDef& c) {
+               // (also a plugin not found on this PC: the channel becomes a hosted plugin again when it is installed)
+               return c.instrument == InstrumentKind::plugin || c.plugin.foreign.format != ForeignPlugin::Format::none;
+           }))
         song.flPluginLevels = true;
     return song.flPluginLevels;
 }
