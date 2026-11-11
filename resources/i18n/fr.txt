@@ -8828,3 +8828,13 @@ countries: fr be ch ca lu
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] ouvrir/fermer l'éditeur  [Alt]+[LMB] garder les autres ouverts  [Ctrl]+[LMB] écouter  [2xLMB] Piano Roll  [LMB] glisser haut/bas réordonne  [RMB] menu du canal"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Crêtemètre (gauche/droite) avec maintien de crête  [LMB] efface le voyant d'écrêtage"
+"Find similar samples" = "Trouver des samples similaires"
+"Similar to {0}" = "Similaire à {0}"
+"Listening to \"{0}\"..." = "Écoute de \"{0}\"..."
+"\"{0}\" can't be compared: it is silent or can't be read." = "\"{0}\" ne peut pas être comparé : il est silencieux ou illisible."
+"Listening to the Browser's samples... nothing like \"{0}\" yet." = "Écoute des samples du Browser... rien de similaire à \"{0}\" pour l'instant."
+"No other samples to compare \"{0}\" with." = "Aucun autre sample auquel comparer \"{0}\"."
+"1 similar sample, most similar first" = "1 sample similaire, le plus proche en premier"
+"{0} similar samples, most similar first" = "{0} samples similaires, le plus proche en premier"
+"{0} samples analysed so far" = "{0} samples analysés jusqu'ici"
+"Compared with {0} samples" = "Comparé à {0} samples"

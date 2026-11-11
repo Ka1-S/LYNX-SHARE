@@ -299,6 +299,9 @@ target_sources(lynx_core PRIVATE
 # in-app update check: versions, release list, build flavours, checksums, release notes (round 166b)
 target_sources(lynx_core PRIVATE
     src/core/UpdateCheck.cpp)
+# the Browser's "Find similar samples" (round 190as)
+target_sources(lynx_core PRIVATE
+    src/core/SampleSimilarity.cpp)
 
 # the embedded Python (pocketpy) and FL's VFX Script (round 165d)
 target_sources(lynx_core PRIVATE

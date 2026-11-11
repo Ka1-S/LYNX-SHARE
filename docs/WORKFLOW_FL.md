@@ -339,6 +339,7 @@ Each interaction has an ID, which section 3 uses for the gap matrix.
 | B8 | Current-project tab: history, patterns, automatable controls (right-click → automation / link) | [DOC][br] |
 | B9 | Quick plugin picker (F8): generators on one side, effects on the other; type to filter; double-click loads into a new channel or the selected insert | [DOC][br-picker] |
 | B10 | Docks left/right; can detach; Backspace/Shift+Backspace navigate back/forward | [DOC][br] |
+| B11 | Sounds tab (FL Cloud, online): a sound's menu › **Find similar samples** lists sounds of the online library with a similar tone and rhythm; Loop Starter's channel menu has the same query. Nothing local is analysed | [DOC][br] `REA_rodada190as.md` §1 |
 
 ### 2.9 Plugin windows (W)
 
@@ -542,6 +543,7 @@ gesture or reduced scope · **No** = absent (searched, not found). Locations are
 | B8 | No | — |
 | B9 | **Done** | **Quick-add palette (F8)**: instruments (built-in and scanned plugins) and effects side by side, filtered as you type, Enter/double-click adds an instrument as a new channel or an effect into the selected insert; opened from the Mixer it starts on the effects |
 | B10 | Partial | Fixed left panel (detachable as a workspace panel); **user folders through "Add folder…" in the folder list** (kept in `browser-folders.txt`). No back/forward |
+| B11 | **Done** (LYNX's own, local) | Right-click an audio file › **Find similar samples**: the Browser lists the samples of its own folders that sound most alike, most similar first, with a percentage (`core/SampleSimilarity.*`: 49 numbers per file for tone, shape, rhythm and pitch classes; index `browser-similar.idx`, at most 150,000 files; one lowest-priority worker that waits while LYNX plays; nothing is analysed before the first use). FL's search is FL Cloud's and can't rank local files; no FL Cloud in LYNX |
 
 **Plugin windows**
 

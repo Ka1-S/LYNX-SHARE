@@ -2548,3 +2548,9 @@ The 100 ms stairs go from 1.28 to about 0.55 dB. One file loses a score step (pi
 attack 100 ms: gain error 0.10 → 0.14 dB, level +0.20 → −0.20 dB). CPU: unchanged up to 30 ms, 0.49 → 0.55 s for 72 s of
 audio at 100 ms. Attacks of 30 ms and under, the classic law and every other style are bit-identical. Open: the step
 is still slower than the reference's (−2.4 dB after 30 ms against −4.8).
+## Round 190as: "Find similar samples" in the Browser (FL's is FL Cloud's; LYNX's is local)
+
+| FL Studio 2026 | LYNX | | Note |
+|---|---|---|---|
+| Sounds tab (FL Cloud, online) › a sound's menu › Find similar samples: FL Cloud ranks its own catalogue ("tone and rhythm"); Loop Starter's channel menu › Find similar samples... opens the same query. No local analysis, no index, no settings (`REA_rodada190as.md` §1) | Browser › right-click an audio file › Find similar samples: the samples of the Browser's own folders, most similar first, with a percentage, in the results list; search box "Similar to <name>" | ⚠️ | LYNX's own measure on local files (`core/SampleSimilarity.*`); FL's ranking can't be compared offline. On FL's packs the 10 nearest files sit in the query's own class folder 56 % of the time (chance 2.9 %) |
+| FL Cloud's online library | — | ❌ | no FL Cloud in LYNX |

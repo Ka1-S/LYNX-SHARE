@@ -14390,6 +14390,75 @@ private:
                 lib.deleteRecursively();
                 ui.getBrowserForSnapshot().resetViewForSnapshot();
             }
+            {
+                // round 190as: "Find similar samples" on a small library of kicks, hats and pads (LYNX_SNAPSHOT_SIMILAR =
+                // "<folder>|<file>" lists a real folder instead)
+                auto lib = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-snapshot-similar");
+                auto query = lib.getChildFile ("Drums/Kicks/Kick 2.wav");
+                const auto real = juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIMILAR", {});
+                const auto made = real.isEmpty();
+                if (made)
+                {
+                    lib.deleteRecursively();
+                    juce::Random random (190);
+                    const auto write = [&] (const juce::String& path, char kind, int v) {
+                        const auto rate = 44100.0;
+                        const auto frames = (int) (rate * (kind == 'k' ? 0.35 : kind == 'h' ? 0.09 : 2.5));
+                        juce::AudioBuffer<float> audio (1, frames);
+                        double phase = 0.0;
+                        float last = 0.0f;
+                        for (int i = 0; i < frames; ++i)
+                        {
+                            const auto t = i / rate;
+                            float x = 0.0f;
+                            if (kind == 'k')
+                            {
+                                phase += juce::MathConstants<double>::twoPi * ((46.0 + 3.0 * v) + 150.0 * std::exp (-t * 35.0)) / rate;
+                                x = (float) (std::sin (phase) * std::exp (-t * (8.0 + v)));
+                            }
+                            else if (kind == 'h')
+                            {
+                                const auto n = random.nextFloat() * 2.0f - 1.0f;
+                                x = (n - last) * 0.5f * (float) std::exp (-t * (50.0 + 12.0 * v));
+                                last = n;
+                            }
+                            else
+                            {
+                                const auto base = 220.0 * std::pow (2.0, v / 12.0);
+                                x = (float) (0.25 * std::min (1.0, t / 0.4) * std::min (1.0, (2.5 - t) / 0.5)
+                                             * (std::sin (juce::MathConstants<double>::twoPi * base * t) + std::sin (juce::MathConstants<double>::twoPi * base * 1.5 * t)));
+                            }
+                            audio.setSample (0, i, 0.8f * x);
+                        }
+                        const auto file = lib.getChildFile (path);
+                        file.getParentDirectory().createDirectory();
+                        juce::WavAudioFormat wav;
+                        if (auto out = file.createOutputStream())
+                            if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (out.release(), rate, 1, 16, {}, 0)))
+                                writer->writeFromAudioSampleBuffer (audio, 0, frames);
+                    };
+                    for (int v = 1; v <= 5; ++v)
+                    {
+                        write ("Drums/Kicks/Kick " + juce::String (v) + ".wav", 'k', v);
+                        write ("Drums/Hats/Hat " + juce::String (v) + ".wav", 'h', v);
+                        write ("Keys/Pad " + juce::String (v) + ".wav", 'p', v);
+                    }
+                }
+                else
+                {
+                    lib = juce::File (real.upToFirstOccurrenceOf ("|", false, false));
+                    query = juce::File (real.fromFirstOccurrenceOf ("|", false, false));
+                }
+                ui.showDesktopForSnapshot (false);
+                ui.getBrowserForSnapshot().showFilterForSnapshot (lib, lynx::browserview::ContentFilter::all);
+                ui.getBrowserForSnapshot().findSimilarForSnapshot (query, lib);
+                offline.dispatchPendingMessages();
+                saveSnapshot (ui, prefix + "-browser-similar.png");
+                ui.getBrowserForSnapshot().setSearchForSnapshot ({});
+                if (made)
+                    lib.deleteRecursively();
+                ui.getBrowserForSnapshot().resetViewForSnapshot();
+            }
 
             // the undo history after a few edits
             offline.editSong ([] (lynx::Song& s) { s.bpm += 1.0; });
