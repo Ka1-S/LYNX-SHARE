@@ -4,6 +4,7 @@
 #include "ui/FileChoosers.h"
 #include "ui/ImageReadback.h"
 #include "ui/MixerComponent.h"
+#include "ui/PluginOffTag.h"
 #include "ui/SlotWatch.h"
 #include "core/ValueMath.h"
 #include "ui/UiTrace.h"
@@ -1418,12 +1419,16 @@ void MixerStrips::paint (juce::Graphics& g)
         // Online Sessions (round 168a): a plugin of this insert is not installed here, its stand-in render plays (an
         // amber R before the name)
         const auto standIn = engine.insertPlaysStandIn (t);
+        // round 190ap: opened without third-party plugins, a plugin of this insert is still off (a grey power tag)
+        const auto pluginOff = ! standIn && engine.insertPluginOff (t);
         const auto name = juce::String::fromUTF8 (track.name.c_str());
         if (const auto box = nameArea (t); ! sp.verticalName)
         {
-            textcache::drawFittedText (g, name, box.withTrimmedLeft (standIn ? 16 : 0), juce::Justification::centred, 1, 0.7f);
+            textcache::drawFittedText (g, name, box.withTrimmedLeft (standIn || pluginOff ? 16 : 0), juce::Justification::centred, 1, 0.7f);
             if (standIn)
                 drawStandInTag (g, { (float) box.getX() + 1.0f, (float) box.getY() + 0.5f, 13.0f, 13.0f });
+            else if (pluginOff)
+                ui::drawPluginOffTag (g, { (float) box.getX() + 1.0f, (float) box.getY() + 0.5f, 13.0f, 13.0f });
         }
         else
         {
@@ -1432,6 +1437,11 @@ void MixerStrips::paint (juce::Graphics& g)
             if (standIn)
             {
                 drawStandInTag (g, juce::Rectangle<float> (13.0f, 13.0f).withCentre ({ (float) column.getCentreX(), (float) column.getBottom() - 6.5f }));
+                column.removeFromBottom (16);
+            }
+            else if (pluginOff)
+            {
+                ui::drawPluginOffTag (g, juce::Rectangle<float> (13.0f, 13.0f).withCentre ({ (float) column.getCentreX(), (float) column.getBottom() - 6.5f }));
                 column.removeFromBottom (16);
             }
             juce::Graphics::ScopedSaveState state (g);
@@ -2501,6 +2511,8 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
             h.hasMenu = true;
             if (engine.insertPlaysStandIn (t))
                 h.text = name + " - " + tr ("Stand-in: a plugin of this insert is not installed on this PC, a render of its sound plays (the plugins' settings are kept)");
+            else if (engine.insertPluginOff (t)) // round 190ap
+                h.text = name + " - " + tr ("A plugin of this insert is switched off: the project was opened without third-party plugins (its settings are kept; File › Switch plugins back on...)");
             break;
         case Part::body:
         case Part::none:

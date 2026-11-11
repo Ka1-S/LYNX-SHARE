@@ -560,6 +560,17 @@ public:
     // the time the last refresh took (ms), for --perf style measurements
     double getAutomationDisplayMs() const noexcept { return automationDisplayCostMs; }
     void setSong (Song newSong); // new/opened project: clears the history
+    // "Open without third-party plugins" (round 190ap, core/PluginHold.h): the project opens with every hosted plugin
+    // switched off (none is created; each slot keeps its saved settings untouched, also through a save). The next
+    // project this engine opens the plain way (setSong, an import) ends the mode.
+    void setSongWithPluginsOff (Song newSong);
+    bool pluginsOff() const;                              // the mode is on and this engine's project is the one it is for
+    std::vector<pluginhold::Use> hostedPluginUses() const; // the song's hosted plugins, each marked off or on
+    // Switches the plugin `id` back on ("" = all of them, which ends the mode): its slots are created from the settings
+    // in the project. Returns how many slots were built again.
+    int switchPluginOn (const std::string& id);
+    bool channelPluginOff (int channel) const noexcept { return std::find (channelsOff.begin(), channelsOff.end(), channel) != channelsOff.end(); }
+    bool insertPluginOff (int track) const noexcept { return std::find (insertsOff.begin(), insertsOff.end(), track) != insertsOff.end(); }
 
     // Edits the song and publishes it to audio. `undoable` edits go into the history;
     // all edits made while the same mouse click is held down
@@ -1129,6 +1140,9 @@ private:
     std::function<std::shared_ptr<Effect>()> externalEffect;
     RackState lastPublishedShape; // channels + instruments of the last snapshot, to reuse voices
     std::vector<int> standInChannels, standInInserts; // (playsStandIn)
+    std::vector<int> channelsOff, insertsOff;         // (channelPluginOff / insertPluginOff, round 190ap), as of the last publish
+    bool rebuildPlugins = false;                      // switchPluginOn's publish: the slots of rebuildPluginId ("" = all) are created anew
+    std::string rebuildPluginId;
     // Issue #36 (u-he Presswerk crashed in its VST3 teardown, freed from the engine's timer callback): the racks the
     // audio thread let go of are freed from a message of their own, not inside the timer callback that collected them.
     // A plugin whose editor is open dies when its window goes (the window closes the editor first). Declared after the

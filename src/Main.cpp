@@ -113,6 +113,7 @@
 #include "engine/FlStudio.h"
 #include "ui/HistoryPanel.h"
 #include "ui/VersionsPanel.h"
+#include "ui/PluginsOffPanel.h"
 #include "ui/MissingFilesDialog.h"
 #include "ui/SettingsDialog.h"
 #include "ui/PluginManager.h"
@@ -1816,6 +1817,14 @@ public:
         // (D#92, round 180a: it was ignored, leaving the blank project with no message). A missing file gets "Could not open".
         if (args.size() > 0 && lynx::safety::isFileArgument (args[0].unquoted().toStdString()))
             fileToOpen = juce::File::getCurrentWorkingDirectory().getChildFile (args[0].unquoted());
+        // LYNX --no-plugins project.lynx (round 190ap): File › "Open without third-party plugins..." from the command
+        // line, for a project a plugin keeps from opening — no hosted plugin is created, each keeps its settings
+        if (const auto i = args.indexOf ("--no-plugins"); i >= 0)
+        {
+            if (i + 1 < args.size() && lynx::safety::isFileArgument (args[i + 1].unquoted().toStdString()))
+                fileToOpen = juce::File::getCurrentWorkingDirectory().getChildFile (args[i + 1].unquoted());
+            startWithoutPlugins = fileToOpen.hasFileExtension ("lynx");
+        }
         // LYNX_TEST_MODE=1 LYNX --open-event-test <ms> <file>: the file arrives the way macOS's Finder delivers it (a Linux
         // or Windows run can exercise that path): 0 ms = at once, before the window exists
         if (lynx::platform::testMode() && args[0] == "--open-event-test" && args.size() > 2)
@@ -2153,7 +2162,12 @@ public:
     {
         startupFileHandled = true;
         if (fileToOpen != juce::File() && mainWindow != nullptr)
+        {
+            if (std::exchange (startWithoutPlugins, false)) // --no-plugins (round 190ap)
+                mainWindow->getContent().openNextWithoutPlugins (true);
             mainWindow->openFile (fileToOpen);
+            mainWindow->getContent().openNextWithoutPlugins (false); // (a file that did not open leaves nothing behind)
+        }
         else if (mainWindow != nullptr && openTimeReport == juce::File())
             mainWindow->getContent().openStartupProject(); // issue #123 (FL's Startup project)
     }
@@ -3386,6 +3400,7 @@ private:
         // round 190ap: the Versions panel's list of files, and its labels on disk beside them
         const auto versionsResult = lynx::versionsSelfTest();
         // round 190ap: a project opened with its plugins off creates none of them and saves their settings unchanged
+        const auto pluginsOffResult = lynx::pluginsOffSelfTest();
 
         // round 177b: automation lanes come back from a project (track, automation, height, folded)
         juce::String lanesResult = "OK";
@@ -3428,7 +3443,7 @@ private:
         const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && substituteOk && patcherOk && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && versionsResult == "OK";
+                        && sidechainResult == "OK" && lanesResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK";
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -3465,6 +3480,7 @@ private:
                << "plugin_art=" << artResult << "\n"
                << "plugin_sidechain=" << sidechainResult << "\n"
                << "versions_panel=" << versionsResult << "\n"
+               << "plugins_off=" << pluginsOffResult << "\n"
                << "lanes_saved=" << lanesResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
@@ -12907,6 +12923,7 @@ private:
     lynx::StartupOptions startupOptions;
     juce::File fileToOpen;
     bool startupFileHandled = false;
+    bool startWithoutPlugins = false; // --no-plugins project.lynx (round 190ap)
     juce::File openTimeReport; // --opentime
     int openTimeIdleSeconds = 10;
 };
