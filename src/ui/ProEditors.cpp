@@ -290,9 +290,10 @@ private:
 
     juce::Rectangle<float> advanced() const
     {
-        // (round 190ar: taller by the levelling rows, upwards: the knob panel's foot stays its foot)
+        // (round 190ar: taller by the levelling rows, and its foot above the display's lower-right strip — display
+        // speed, TP, LUFS, meter scale — which the panel used to cover)
         const auto pn = panel();
-        return { pn.getRight() + 6.0f, pn.getY() - 66.0f, 170.0f, pn.getHeight() + 66.0f };
+        return { pn.getRight() + 6.0f, pn.getY() - 96.0f, 170.0f, pn.getHeight() + 66.0f };
     }
 
     void buttonPressed (const Ctl& c, const juce::MouseEvent&) override

@@ -2253,8 +2253,8 @@ before = the brickwall's own best map):
 One file went down (the fast style on tone bursts, 5 → 3). With the stage off, 28 of 28 renders of the round's Apex
 maps are byte-identical to before.
 
-Not done: the stage has no control in Apex's editor yet (the parameters are there for automation, presets and the
-plugin substitutes; the editor needs a place for them and a look at the shots). The fit's first run stayed in the
+In the editor the stage sits in the Advanced panel under the four switches: a `Levelling` switch (off by default; it
+remembers the threshold, -12 dB the first time) and the `Threshold` / `Attack` value rows. The fit's first run stayed in the
 brickwall solution (ceiling = threshold, stage off: 3.12 / 3.35); the map above starts from ceiling near 0 dB and the
 threshold at −12 dB. Not modelled: the reference's fast style shapes bursts differently in the first milliseconds.
 
