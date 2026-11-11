@@ -8449,3 +8449,4 @@ countries: br
 "Octaver" = "Oitavador"
 "Rectify" = "Retificar"
 "CrossFold" = "CrossFold"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Medido: o modelo ajustado à referência; clássico: o dos projetos salvos antes dele"
