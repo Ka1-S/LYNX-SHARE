@@ -2255,6 +2255,24 @@ Proof: `docs/analise/REA_rodada181b.md`.
 | Tools › Clipboard › Save audio / MIDI clipboard to browser, greyed when empty | same, into the Browser's "Clipboard files" | ⚠️ | audio: CF_WAVE on Windows, else LYNX's audio editor clipboard; " (2)" naming INFERRED |
 | Tools › Score logger (Dump score log to selected pattern, Clear log) | same, moved from Options to Tools | ✅ | |
 
+## Plugin wrapper: Processing › Connections, multi-output generators (round 188d, issue #114)
+
+FL 2026 checked with a multi-output test VST2 (`tools/testplugin/lynx_test_drums_vst2.c`); the Fruity Wrapper code
+read for Auto map / Reset. Details: `docs/analise/REA_rodada188d.md`.
+
+| | FL Studio | LYNX | Status |
+|---|---|---|---|
+| Output list | Processing › Connections: one row per output, "n. pin name" (else "Output n"), LED, mixer track offset wheel ("---" = 0) | the same rows in the Processing tab; VST2 pins are grouped in stereo pairs, VST3 by bus; a bridged plugin lists "Output n" pairs (up to 16) | same |
+| Default routing | every active output on the channel's insert (offset 0) | same | same |
+| Offset | output plays on the channel's insert + offset (wheel −999…999) | same (wheel, drag, double-click types it) | same |
+| LED off | the output is silent | same | same |
+| Auto map outputs | from output 1's offset, +1 per output, inactive ones included | same | same |
+| Reset | offsets back to "---", LEDs unchanged | same | same |
+| Channel volume / pan | apply to every output | same | same |
+| Which outputs start active | as the plugin declares them (a VST2 pin pair without the "active" flag starts off) | same (VST2 pin flag, VST3 bus default-active) | same |
+| Effects' Connections (sidechain inputs, "Auto map inputs") | inputs/outputs of an effect | not yet (LYNX's sidechain picker covers side inputs) | open |
+| .flp import of the mapping | stored in the wrapper data | not yet | open |
+
 ## Round a2m189b: Convert to MIDI (Ableton Live's Convert Melody / Harmony / Drums, LYNX extra)
 
 | Item | FL Studio | Ableton Live 12 | LYNX |
