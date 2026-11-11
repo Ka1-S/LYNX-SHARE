@@ -742,6 +742,16 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         }
         safe->updateTitle();
     };
+    // round 190ah: a guest's LYNX SHARE restarted during a session: the project it had is open again
+    live->onRejoined = [safe = juce::Component::SafePointer<MainComponent> (this)] (Song song) {
+        if (safe == nullptr)
+            return;
+        const auto* host = song.session.find (session::hostTag);
+        const auto hostName = host != nullptr ? juce::String::fromUTF8 (host->name.c_str()) : juce::String();
+        safe->startNewProject (std::move (song), {});
+        safe->projectName = hostName.isNotEmpty() ? tr ("Live session with {0}", { hostName }) : tr ("Live session");
+        safe->updateTitle();
+    };
     engine.onSessionUndoSkipped = [] (const juce::StringArray& skipped) {
         ui::postHint ({ tr ("Undo left alone what someone else changed since: {0}", { skipped.joinIntoString (", ") }), {} }, 4000);
     };
@@ -5330,6 +5340,13 @@ void MainComponent::startLiveFromCommandLine()
         o.autoAccept = true;
         if (! live->resumeHost (LiveSessionManager::defaultJournal(), o))
             platform::testModeLog ("live session: nothing to resume");
+        return;
+    }
+    if (cli.contains ("--live-rejoin"))
+    {
+        // (round 190ah, scripted: a guest goes back into its session without the question)
+        if (! live->resumeGuest (LiveSessionManager::defaultGuestJournal(), o))
+            platform::testModeLog ("live session: nothing to go back to");
         return;
     }
     if (! cli.contains ("--live-host") && ! cli.contains ("--live-join"))

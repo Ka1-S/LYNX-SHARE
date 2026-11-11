@@ -752,10 +752,124 @@ presence, the resume question).
   FLAC packs (16 / 24-bit byte for byte, float and tiny ones raw, a damaged pack refused). `LYNX --livetest report.txt
   [--relay URL] [--plugin file.vst3]` adds: hashing off the thread, FLAC packs, chat, following, permissions, a
   guest's drop, the host's drop, live stand-ins (with `--plugin`), the host's crash and restart from its journal.
-- **Still open**: LAN / direct links and ICE (P3); hand-over to another participant; a guest's own LYNX SHARE
-  restarting (it joins again as a new guest; its part stays in the host's project); PAKE / Noise (§6.4); stand-ins
-  of plugins whose state lives outside the song while the owner tweaks them (they follow the song's captured state);
-  a per-session upload cap.
+- **Still open after 169j** (closed or re-listed by round 190ah, below): LAN / direct links and ICE (P3); hand-over
+  to another participant; a guest's own LYNX SHARE restarting; PAKE / Noise (§6.4); stand-ins of plugins whose state
+  lives outside the song while the owner tweaks them; a per-session upload cap.
+
+### P2, third slice (round 190ah): a guest restarts as itself, media limits, relay limits, checked over the internet
+
+Protocol 3 (`live::protocolVersion`; a `resume` from another protocol is answered `deny version`). Code:
+`core/LiveSession` (`Replica::restored`, `MediaBudget`, `mediaSize`), `engine/LiveSessions` (guest journal, limits,
+participant records), `engine/LiveLink` (`livelink::http`), `ui/LiveSessionUi` (the two new dialogs),
+`engine/LiveTest` (`--livetest`, `--livepeer`), `server/app/lynx_relay.py` (relay limits).
+
+- **Checked for real.** `LYNX --livetest` on the public relay from Windows passed on origin/main before this round
+  (every step). On Linux nothing worked as a host, for three reasons, all fixed here:
+  1. a Linux host could never open a room (release 0.1.25 too): the Linux build has no TLS in `juce::URL`
+     (`JUCE_USE_CURL=0`) and the room is opened with an HTTPS `POST`. `livelink::http` now does the relay's few HTTP
+     calls through the system's libcurl, loaded at run time like the WebSocket's;
+  2. the Linux WebSocket loop asked curl for data only when the socket was readable; what arrived together with
+     the upgrade's answer (the relay's `welcome`, when the relay is near) or inside an already-read TLS record sat in
+     curl's buffer for ever ("Connecting to the session..." until the timeout). It now asks every 10 ms;
+  3. (every system) a session started right after another one ended on the same LYNX SHARE ended at once with "The
+     connection to the session was lost": the old connection's `closed` event was still queued. `Connection::open`
+     drops what the previous connection left.
+  Two computers on two networks: `LYNX --livepeer host|guest|rejoin <folder> [--relay URL] [--code CODE|@file]`
+  runs one side of a scripted session (join, files both ways, the guest closes with an unconfirmed edit, restarts,
+  goes back in, both sides compare digests) and writes a report. Run both ways between this Windows PC and a Linux
+  server in another network: all steps pass.
+- **A guest that restarts comes back as itself.** A guest writes `<profile>/Live session/guest.json` (2 s at most
+  after a change, and once more when LYNX SHARE closes while in a session): the relay, room and code secret, its tag
+  and resume token, the host's public key, its permissions, the position (`rev`, `epoch`, its own next proposal
+  number), the song as it has it, and — when it has unconfirmed edits — the confirmed base they were made on. Closing
+  the window is **not** leaving: the host sees the guest go *away* (its place, area, colour and permissions stay),
+  exactly as when its line drops. *Leave the live session* (and the host's *End*) delete the journal. At the next
+  start LYNX SHARE asks **"LYNX SHARE closed while you were in {host}'s live session ({when}). Go back in? You come
+  back as yourself, with your part and everything you had changed."** — *Go back in* / *Leave the session* (the
+  latter tells the host with a sealed `bye {tag, token}`, which frees the place). A host journal wins when both
+  exist; a journal older than 12 h is dropped; a journal that is damaged or of another kind is ignored, never a
+  crash (a host that was updated meanwhile answers the rejoin with `deny version`). Command line: `--live-rejoin`.
+  - Going back in: connect, `seek` / `host` (the host must still sign with the key from the journal), then the same
+    `resume {tag, token, rev, epoch}` a reconnect sends. Replay path: `Replica::restored (seq)` makes everything that
+    differs from the journal's base a pending edit **on that base** (so the host judges it as it would have before
+    the restart) and proposals continue after the journal's sequence number (the host ignores numbers it already
+    saw). Snapshot path (commits gone, or the host restarted too): `Replica::resume()` as in 169j.
+  - Media the guest had not fetched yet are asked for again after the rejoin; files it was sending start again.
+  - The host now keeps up to 16 participant records for 4 people online (`parts::invite (…, maxRecords)`): an away
+    guest no longer blocks a knock; when the room is full of records, the guest away the longest loses its place
+    ("{0} was away: their place in the session went to {1}"; its part stays in the project).
+- **Media limits (the upload cap).** `live::MediaBudget`, kept by the host and stored in its journal: **1 GB of
+  media per guest** and **8 GB per session** (received + sent, counted as the bytes that travel, so a FLAC pack
+  counts packed). Options: `guestMediaLimit`, `sessionMediaLimit`.
+  - A guest's file that would pass the guest limit is refused at its first piece (`refuse`): the guest's hint says
+    the file stays on its computer, and the host gets **one question** — "{name} has sent {used} of audio files into
+    this session; the limit for one guest is {limit}. … Raise the limit for {name}?" (*Raise the limit*: that guest's
+    limit doubles, more when the waiting files need it, never past the session's; the waiting files are fetched; *Keep the limit*: asked again at most every 10 minutes).
+  - A guest that asks the host for a held-back file is told at once (`limit`), not left waiting; pieces of the
+    stopped upload that were still on their way are ignored when the host asks for the file again.
+  - At the session limit nothing more is sent or fetched; everyone is told once (`limit`), edits, chat and
+    transport go on, and the message points to *Send project...* for a big project.
+- **Relay limits (so the VPS cannot be filled or used as a free tunnel).** In `server/app/lynx_relay.py`, all by
+  environment (`server/env.example`): 12 GiB relayed per room in all, 32 GiB per client address per 24 h, 8 open
+  rooms per client address (besides 10 new rooms per hour and 200 rooms in all), a room lives 72 h at most and is
+  closed after 12 h connected without a frame, 1 MiB per frame, 4 KiB per control message, 4 MiB/s per peer. A room
+  that hits a limit is closed with WebSocket code **4001**; the app says "The LYNX SHARE relay closed this live
+  session: it reached the relay's traffic limit or stayed open too long." and does not reconnect. `/health` shows
+  the limits and how often one was hit (no addresses). The relay keeps nothing on disk, so there is nothing to fill.
+- **Tests**: `tests/Live190ahTests.inc` — `live190ah_guest_restart_comes_back_as_itself`,
+  `live190ah_guest_restart_judged_on_the_journal_base`, `live190ah_guest_restart_while_the_host_restarted_too`,
+  `live190ah_replicas_converge_with_guest_restarts` (24 seeded sessions over links that drop, with guest **and**
+  host restarts from their journals), `live190ah_media_budget`,
+  `live190ah_more_participant_records_than_people_online`. `--livetest` adds: both sides' digests equal, the guest
+  limit asked and raised, a guest's crash and rejoin as itself, its close and rejoin, *Leave the session* at the
+  question, the journal gone after the end, a session at its session limit. Relay: `server/tests/test_security.py`
+  (`RelayLimitTests`), `server/tests/smoke.py` (limits in `/health`, an over-long control message, a frame above
+  1 MiB).
+
+#### Host hand-over: design (not built)
+
+Today the host is four things at once: the `Authority` (order, revisions, epoch), the Ed25519 identity guests check
+on every reconnect, the relay room's host token, and the only complete project + media store. Hand-over moves all
+four, and guests must be able to tell a legitimate new host from anyone who merely has the invite code.
+
+- **Planned hand-over** (the host picks a guest in *People and permissions*; protocol 4):
+  1. `handover {to}` → the chosen guest fetches every medium it still lacks (guests skip stand-ins they do not
+     need) and answers `ready {key}` with a fresh Ed25519 public key.
+  2. The host stops accepting proposals (they queue at the guests, as during a reconnect) and sends the chosen guest
+     `crown {rev, digest, people[], chat, hostToken, term, cert}`: the participant table with tokens, permissions
+     and what each keeps, the relay's host token, a term number (starts at 1, +1 per hand-over) and
+     `cert = sign_old (room | term | newKey)`.
+  3. The new host checks `digest` against its confirmed base, builds an `Authority` at `rev` with a new epoch,
+     writes a host journal (its guest journal is deleted) and broadcasts `host {term, key, cert}`. Guests verify
+     the certificate with the key they hold, store the new key and term in their journals, and `resume`: there is no
+     replay log on the new host, so this is the snapshot path that already exists (pending edits kept).
+  4. The old host turns its state into a `Replica`, gets a guest record (its former area stays its own: areas are by
+     tag, and "who is host" becomes a field of the session instead of the constant `session::hostTag`) and writes a guest journal.
+- **The host is gone for good** (crash and no restart): guests wait as today; after 2 minutes the heir may offer
+  "Carry on without {host}?". For that the host names an heir in advance and refreshes `heir {tag, term+1, cert}`
+  whenever people change; the heir takes over from its own confirmed base (others may be ahead: the epoch / `lost`
+  rule of 169j already keeps their own-area changes). A host that comes back from its journal with a lower term
+  must not act as host: it sees `host {term…}` after connecting and offers to rejoin as a guest.
+- **Journal needs**: `term`, heir certificate and "who is host" in both journals; conversion host ↔ guest journal;
+  old journals (no term) read as term 1.
+- **Product points to decide with the user**: a guest who was only allowed to keep their own part ends up holding
+  the whole project (the hand-over dialog must say so); whether the heir is automatic (longest in the session) or
+  always chosen.
+- **Effort**: planned hand-over **2 rounds** (host-as-a-field refactor, protocol, dialog, seeded tests with
+  hand-overs between drops); take-over without the host **+1–2 rounds** (heir certificates, terms, split-brain
+  tests). Not small, so not started here.
+
+#### Still open (after 190ah), with effort
+
+| What | Effort | Note |
+|---|---|---|
+| Direct links: ICE (libjuice) + KCP, relay as fallback (**P3**) | 3 rounds | Proposed for 0.1.27. Vendoring + zig/MinGW, Linux, macOS builds (1); `IceLink` with the relay room as signalling, no PHP mailbox needed (1); switching relay ↔ direct mid-session, privacy texts (peers then see each other's IP), tests (1). Gains latency and relay traffic; nothing breaks without it. |
+| Host hand-over | 2 + 1–2 rounds | Design above. |
+| PAKE / Noise instead of key-from-code (§6.4) | 1–2 rounds | Today anyone with the code can read the session; the host's signature only protects *who is host*. |
+| Stand-ins of plugins whose state lives outside the song | 1 round | They follow the song's captured state. |
+| Limits in the UI | 0.5 round | The two limits are options in code; no setting yet (the host can only raise per guest when asked). |
+| A song that points at an insert past the mixer's end | 0.5 round | The app never makes one (`Song::claimFreeInsert` grows the mixer), but a patch that did would leave the host with fewer mixer tracks than a guest who joins later (the project loader grows the mixer, the patch path does not). Found by `--livetest` when two guests were let in in the other order. The host should normalise a proposal the way the loader does. |
+| A guest journal on a second computer | — | By design the journal is per profile: going back in works on the computer that was in the session. |
 
 ### 9.1 What is free and what might cost money
 

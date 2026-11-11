@@ -134,5 +134,84 @@ class HandlerTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(api.daily_day, "2000-01-02")
 
 
+class RelayLimitTests(unittest.IsolatedAsyncioTestCase):
+    """Round 190ah: the relay cannot be filled or used as a free tunnel."""
+
+    def test_day_budget_counts_a_window_per_client(self):
+        budget = relay.DayBudget(100, 60)
+        with patch.object(relay.time, "monotonic", return_value=0):
+            self.assertTrue(budget.spend("a", 60))
+            self.assertTrue(budget.spend("a", 40))
+            self.assertFalse(budget.spend("a", 1))
+            self.assertTrue(budget.spend("b", 100))
+        with patch.object(relay.time, "monotonic", return_value=59):
+            self.assertFalse(budget.spend("a", 1))
+        with patch.object(relay.time, "monotonic", return_value=61):
+            self.assertTrue(budget.spend("a", 100))  # a new window
+            budget.sweep()
+            self.assertEqual(list(budget.used), ["a"])
+
+    def test_room_limits(self):
+        with patch.object(relay, "ROOM_BYTES", 1000), patch.object(relay, "ROOM_MAX_HOURS", 72), \
+                patch.object(relay, "ROOM_IDLE_HOURS", 12):
+            room = relay.Room("abcdefghij", "t" * 43, "h" * 43, "client")
+            now = room.created
+            self.assertEqual(room.over_limit(now), "")
+            room.bytes = 1001
+            self.assertEqual(room.over_limit(now), "traffic limit")
+            room.bytes = 0
+            self.assertEqual(room.over_limit(now + 73 * 3600), "open too long")
+            # silent for 13 h: only a room somebody is connected to is closed for it (an empty one just expires)
+            self.assertEqual(room.over_limit(now + 13 * 3600), "")
+            room.peers[1] = object()
+            self.assertEqual(room.over_limit(now + 13 * 3600), "idle too long")
+            room.last_frame = now + 12 * 3600
+            self.assertEqual(room.over_limit(now + 13 * 3600), "")
+
+    async def test_rooms_open_per_client(self):
+        class Request:
+            headers = {"X-Forwarded-For": "192.0.2.7"}
+            remote = "127.0.0.1"
+            can_read_body = False
+
+        class Other(Request):
+            headers = {"X-Forwarded-For": "192.0.2.8"}
+
+        with patch.object(relay, "ROOMS_PER_CLIENT", 2), patch.object(relay, "rooms", {}), \
+                patch.object(relay, "room_limiter", common.RateLimiter(100, 3600)):
+            self.assertEqual((await relay.create_room(Request())).status, 201)
+            self.assertEqual((await relay.create_room(Request())).status, 201)
+            self.assertEqual((await relay.create_room(Request())).status, 429)
+            self.assertEqual((await relay.create_room(Other())).status, 201)  # somebody else is not affected
+            # closing one frees a place
+            relay.rooms.pop(next(k for k, r in relay.rooms.items() if r.creator == common.client_key(Request())))
+            self.assertEqual((await relay.create_room(Request())).status, 201)
+
+    async def test_sweep_closes_rooms_over_a_limit_with_the_limit_code(self):
+        closed = []
+
+        class Socket:
+            closed = False
+
+            async def close(self, code=1000, message=b""):
+                closed.append((code, message))
+
+        with patch.object(relay, "rooms", {}), patch.object(relay, "ROOM_BYTES", 10), patch.object(relay, "limits_hit", 0):
+            busy = relay.Room("aaaaaaaaaa", "t" * 43, "h" * 43)
+            busy.peers[1] = Socket()
+            busy.bytes = 11
+            fine = relay.Room("bbbbbbbbbb", "t" * 43, "h" * 43)
+            fine.peers[1] = Socket()
+            empty = relay.Room("cccccccccc", "t" * 43, "h" * 43)
+            relay.rooms.update({r.id: r for r in (busy, fine, empty)})
+            await relay.sweep(busy.created + 1)
+            self.assertEqual(sorted(relay.rooms), ["bbbbbbbbbb", "cccccccccc"])
+            self.assertEqual(closed, [(relay.CLOSE_LIMIT, b"traffic limit")])
+            self.assertEqual(relay.limits_hit, 1)
+            # an empty room nobody came back to is forgotten after ROOM_HOURS, as before
+            await relay.sweep(empty.created + relay.ROOM_HOURS * 3600 + 1)
+            self.assertNotIn("cccccccccc", relay.rooms)
+
+
 if __name__ == "__main__":
     unittest.main()

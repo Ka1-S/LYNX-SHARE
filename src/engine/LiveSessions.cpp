@@ -8,6 +8,7 @@
 #include "core/MissingFiles.h"
 #include "core/ProjectSafety.h"
 #include "core/SessionParts.h"
+#include "core/Sha256.h"
 #include "core/StandIns.h"
 #include "engine/AudioEngine.h"
 #include "engine/MediaPack.h"
@@ -120,6 +121,51 @@ juce::String wsUrlFor (juce::String relay, const juce::String& room)
 
 std::string userAgent() { return utf8 ("LYNX-SHARE/" + juce::String (JUCE_APPLICATION_VERSION_STRING)); }
 
+// One request to the relay's HTTP API. Linux: the system libcurl (engine/LiveLink.h — this build's JUCE has no TLS
+// there); Windows and macOS: the system's own HTTP through juce::URL.
+struct RelayAnswer
+{
+    int status = 0;
+    juce::var body;
+};
+RelayAnswer relayRequest (const juce::String& method, const juce::String& url, const juce::String& bearer, const juce::String& json, int timeoutMs)
+{
+    RelayAnswer answer;
+    if (livelink::httpAvailable())
+    {
+        std::vector<std::string> headers;
+        if (json.isNotEmpty())
+            headers.push_back ("Content-Type: application/json");
+        if (bearer.isNotEmpty())
+            headers.push_back (utf8 ("Authorization: Bearer " + bearer));
+        const auto r = livelink::http (utf8 (method), utf8 (url), headers, utf8 (json), userAgent(), std::max (1, timeoutMs / 1000));
+        answer.status = r.status;
+        answer.body = juce::JSON::parse (str (r.body));
+        return answer;
+    }
+    juce::StringArray headers;
+    if (json.isNotEmpty())
+        headers.add ("Content-Type: application/json");
+    if (bearer.isNotEmpty())
+        headers.add ("Authorization: Bearer " + bearer);
+    headers.add ("User-Agent: " + str (userAgent()));
+    const auto options = juce::URL::InputStreamOptions (json.isNotEmpty() ? juce::URL::ParameterHandling::inPostData : juce::URL::ParameterHandling::inAddress)
+                       .withExtraHeaders (headers.joinIntoString ("\r\n"))
+                       .withConnectionTimeoutMs (timeoutMs)
+                       .withStatusCode (&answer.status);
+    juce::URL target (url);
+    if (json.isNotEmpty())
+        target = target.withPOSTData (json);
+    if (auto in = target.createInputStream (method == "POST" ? options : options.withHttpRequestCmd (method)))
+        answer.body = juce::JSON::parse (in->readEntireStreamAsString());
+    return answer;
+}
+
+// how many participants a live session's song may know in all (people online at once: session::maxParticipants)
+constexpr int participantRecords = 16;
+constexpr juce::int64 journalHours = 12; // (the relay forgets a room 12 h after its last connection)
+constexpr juce::int64 limitAskAgainMs = 10 * 60 * 1000;
+
 juce::File engineFiles()
 {
     const auto fl = findFlStudioRoots().factoryData;
@@ -216,6 +262,15 @@ LiveSessionManager::LiveSessionManager (AudioEngine& e) : engine (e) {}
 LiveSessionManager::~LiveSessionManager()
 {
     *alive = false;
+    if (! host && ! abandoned && replica && guestJournalFile != juce::File()
+        && (state == State::live || state == State::waitingHost || state == State::reconnecting))
+    {
+        // a guest's LYNX SHARE closes during the session (round 190ah): no goodbye — the host keeps its place, and the
+        // next start offers to go back in as the same guest, with the project as it is now
+        quitting = true;
+        writeGuestJournal (true);
+        abandon();
+    }
     if (isActive() && ! abandoned)
         leave();
     stopTimer();
@@ -229,6 +284,11 @@ LiveSessionManager::~LiveSessionManager()
 juce::File LiveSessionManager::defaultJournal()
 {
     return platform::settingsFile ("Live session").getChildFile ("journal.json");
+}
+
+juce::File LiveSessionManager::defaultGuestJournal()
+{
+    return platform::settingsFile ("Live session").getChildFile ("guest.json");
 }
 
 void LiveSessionManager::runCompletions()
@@ -299,6 +359,11 @@ int LiveSessionManager::waitingChanges() const
     return replica ? replica->waiting() : 0;
 }
 
+int LiveSessionManager::pendingEdits() const
+{
+    return replica ? replica->pending() + (engine.getSongStamp() != lastStamp ? 1 : 0) : 0;
+}
+
 // --- starting / joining / leaving -----------------------------------------------------------------------------------
 
 void LiveSessionManager::setState (State s, const juce::String& text)
@@ -334,6 +399,16 @@ void LiveSessionManager::start (const Options& o)
     renderedSig.clear();
     hostSeed = livecrypto::newSeed();
     journalFile = options.journal != juce::File() ? options.journal : defaultJournal();
+    guestJournalFile = juce::File();
+    budget = {};
+    budget.guestLimit = options.guestMediaLimit;
+    budget.sessionLimit = options.sessionMediaLimit;
+    refused.clear();
+    limitAsked.clear();
+    limitAnsweredMs.clear();
+    sessionLimitTold = false;
+    rejoining = resumeHeld = fetchMissing = quitting = false;
+    primed = true;
     io = std::make_unique<Worker> (false, false);
     renderer = std::make_unique<Worker> (options.inlineWork, true);
     std::string why;
@@ -386,19 +461,12 @@ void LiveSessionManager::start (const Options& o)
     roomAnswer = {};
     startTimer (40);
     httpThread = std::thread ([this, relay, token] {
-        int status = 0;
         juce::String room, hostTok, error;
         auto request = object();
         set (request, "token", token);
-        const auto body = juce::JSON::toString (request, true);
-        juce::var parsed;
-        if (auto in = juce::URL (relay + "/v1/rooms")
-                          .withPOSTData (body)
-                          .createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inPostData)
-                                                  .withExtraHeaders ("Content-Type: application/json\r\nUser-Agent: " + str (userAgent()))
-                                                  .withConnectionTimeoutMs (15000)
-                                                  .withStatusCode (&status)))
-            parsed = juce::JSON::parse (in->readEntireStreamAsString());
+        const auto answer = relayRequest ("POST", relay + "/v1/rooms", {}, juce::JSON::toString (request, true), 15000);
+        const auto status = answer.status;
+        const auto& parsed = answer.body;
         if (status == 201)
         {
             room = parsed["room"].toString();
@@ -448,6 +516,11 @@ void LiveSessionManager::join (const juce::String& code, const Options& o)
     resumeToken.clear();
     seekNonce.clear();
     hostPeer = 0;
+    guestJournalFile = options.guestJournal != juce::File() ? options.guestJournal : defaultGuestJournal();
+    journalSig = 0;
+    journalDirty = false;
+    rejoining = resumeHeld = fetchMissing = quitting = false;
+    primed = true;
     io = std::make_unique<Worker> (false, false);
     renderer = std::make_unique<Worker> (options.inlineWork, true);
     std::string why;
@@ -510,20 +583,26 @@ void LiveSessionManager::end (const juce::String& text, bool keepPart)
     {
         // the room goes at once (else when the relay's timer finds it empty)
         const auto url = options.relay.trimCharactersAtEnd ("/") + "/v1/rooms/" + roomId, token = hostToken;
-        std::thread ([url, token] {
-            int status = 0;
-            juce::URL (url).createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
-                                                   .withHttpRequestCmd ("DELETE")
-                                                   .withExtraHeaders ("Authorization: Bearer " + token)
-                                                   .withConnectionTimeoutMs (8000)
-                                                   .withStatusCode (&status));
-        }).detach();
+        std::thread ([url, token] { relayRequest ("DELETE", url, token, {}, 8000); }).detach();
     }
     if (! host && (wasLive || state == State::waitingHost || state == State::reconnecting) && replica && keepPart)
         engine.editSong ([] (Song& s) { s = parts::keepOnlyPart (s); }, false);
     engine.setSessionHistory (false);
     if (host && ! abandoned && journalFile != juce::File())
         journalFile.deleteFile(); // (ended on purpose: nothing to resume)
+    if (! host && ! abandoned && ! quitting && guestJournalFile != juce::File())
+    {
+        // (the session is over for this guest: nothing to go back to — also not after a write that is still queued)
+        guestJournalFile.deleteFile();
+        if (io)
+            io->post ([file = guestJournalFile]() -> Worker::Done {
+                file.deleteFile();
+                return {};
+            });
+    }
+    refused.clear();
+    limitAsked.clear();
+    rejoining = resumeHeld = fetchMissing = false;
     authority.reset();
     replica.reset();
     uploads.clear();
@@ -704,6 +783,33 @@ void LiveSessionManager::pump()
     }
     if (host && journalDirty && now >= journalDueMs)
         writeJournal (false);
+    if (! host && replica)
+    {
+        // a guest that came back from its journal: its own files get their hashes again before it resumes (the host
+        // may ask for one), and what had not arrived when it closed is asked for again
+        if (! primed && ensureHashed (engine.getSong()))
+        {
+            Song mine = engine.getSong();
+            tokenize (mine);
+            primed = true;
+            if (resumeHeld && hostPeer != 0)
+                sendResume();
+        }
+        if (fetchMissing && state == State::live)
+            fetchMissingMedia();
+        // the guest's journal (round 190ah): written at most every 2 s after anything changed
+        if (guestJournalFile != juce::File() && (state == State::live || state == State::waitingHost || state == State::reconnecting))
+        {
+            const auto sig = engine.getSongStamp() * 1000003u + replica->baseRevision() * 8191u + replica->revision() * 131u + (std::uint64_t) replica->pending();
+            if (sig != journalSig)
+            {
+                journalSig = sig;
+                journalDirty = true;
+            }
+            if (journalDirty && now >= journalDueMs)
+                writeGuestJournal (false);
+        }
+    }
     pumpUploads();
 }
 
@@ -783,6 +889,7 @@ void LiveSessionManager::handleEvent (const livelink::Event& e)
                         auto keep = it->second;
                         keep.accepted = false;
                         keep.relayPeer = 0;
+                        keep.awaySinceMs = juce::Time::currentTimeMillis();
                         away[keep.tag] = keep;
                         journalDirty = true;
                     }
@@ -817,7 +924,7 @@ void LiveSessionManager::handleEvent (const livelink::Event& e)
     {
         // a session that was running reconnects by itself (unless the room is gone or the code no longer works)
         const bool running = state == State::live || state == State::waitingHost || state == State::reconnecting;
-        if (running && e.code != 401 && e.code != 404 && e.code != 4000)
+        if (running && e.code != 401 && e.code != 404 && e.code != 4000 && e.code != 4001)
             return lostConnection (tr ("The connection to the session was lost."));
         juce::String why;
         if (e.code == 401)
@@ -830,6 +937,8 @@ void LiveSessionManager::handleEvent (const livelink::Event& e)
             why = tr ("Too many attempts. Try again in a minute.");
         else if (e.code == 4000)
             why = host ? tr ("The relay closed the session.") : tr ("The host ended the live session.");
+        else if (e.code == 4001)
+            why = tr ("The LYNX SHARE relay closed this live session: it reached the relay's traffic limit or stayed open too long.");
         else if (e.code == 404 && running)
             why = tr ("The live session is over: the relay no longer has it.");
         else
@@ -916,6 +1025,22 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
             return onSeek (from, m);
         if (t == "resume")
             return onResume (from, m);
+        if (t == "bye" && m["token"].toString().isNotEmpty())
+        {
+            // a guest whose LYNX SHARE restarted chose not to come back (round 190ah): its place is free again
+            const auto tag = (std::uint32_t) (int) m["tag"];
+            if (auto gone = away.find (tag); gone != away.end() && gone->second.token == m["token"].toString())
+            {
+                const auto name = gone->second.name;
+                away.erase (gone);
+                journalDirty = true;
+                sendPeople (true);
+                broadcastNeeds();
+                if (onHint)
+                    onHint (tr ("{0} left the live session", { name }));
+            }
+            return;
+        }
         auto it = peers.find (from);
         if (it == peers.end() || ! it->second.accepted)
             return;
@@ -975,7 +1100,7 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
         juce::String why = reason == "version" ? tr ("The host uses another version of LYNX SHARE ({0}). Update both to the same version.", { m["version"].toString() })
                          : reason == "full"    ? tr ("The session is full.")
                                                : tr ("The host did not let you in.");
-        return end (why, false);
+        return end (why, replica != nullptr && ! keepFull);
     }
     if (t == "snapshot")
         onSnapshot (m);
@@ -987,6 +1112,13 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
         if (replica)
             replica->resend();
         resuming = false;
+        if (rejoining)
+        {
+            rejoining = false;
+            ++stats.rejoined;
+            fetchMissing = true;
+        }
+        journalDirty = true;
         ++stats.replayed;
         setState (State::live, tr ("Live"));
         lastStamp = 0; // (poll now)
@@ -1005,7 +1137,8 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
         myPerms.settings = (bool) m["settings"];
         editEverything = myPerms.editEverything;
         keepFull = (bool) m["keepFull"];
-        if (onHint)
+        journalDirty = true;
+        if (onHint && ! (bool) m["quiet"])
             onHint (myPerms.listener         ? tr ("The host made you a listener: you hear everything and edit nothing")
                     : myPerms.editEverything ? tr ("The host lets you edit everything in the project")
                     : myPerms.settings       ? tr ("The host lets you edit your own parts and the tempo and project settings")
@@ -1038,6 +1171,10 @@ void LiveSessionManager::handleMessage (int from, const juce::var& m)
     }
     else if (t == "needs")
         allNeed = keysFromVar (m["keys"]);
+    else if (t == "limit")
+        onLimit (m);
+    else if (t == "have")
+        fetchMissing = true; // (a file the host had held back is there now)
     else if (t == "people")
     {
         people.clear();
@@ -1088,7 +1225,9 @@ void LiveSessionManager::onHello (int from, const juce::var& m)
         return;
     if ((int) m["protocol"] != live::protocolVersion)
         return deny (from, "version");
-    int accepted = (int) away.size();
+    // full: as many guests here now (or asking) as the session takes. A guest who is away keeps its place, but the
+    // one away longest gives it up when the host lets someone new in (accept)
+    int accepted = 0;
     for (const auto& [n, p] : peers)
         accepted += p.accepted || p.asking ? 1 : 0;
     if (accepted >= session::maxParticipants - 1)
@@ -1133,8 +1272,29 @@ void LiveSessionManager::accept (int from)
          ++n)
         name = peer.name + " " + juce::String (n);
     peer.name = name;
+    // every place taken, some by guests who are away: the one away longest gives theirs up (someone coming back under
+    // the same name takes their own place again, below)
+    for (;;)
+    {
+        int taken = 0;
+        for (const auto& [n, q] : peers)
+            taken += n != from && q.accepted ? 1 : 0;
+        auto oldest = away.end();
+        for (auto a = away.begin(); a != away.end(); ++a)
+            if (! a->second.name.equalsIgnoreCase (name))
+            {
+                ++taken;
+                if (oldest == away.end() || a->second.awaySinceMs < oldest->second.awaySinceMs)
+                    oldest = a;
+            }
+        if (taken < session::maxParticipants - 1 || oldest == away.end())
+            break;
+        if (onHint)
+            onHint (tr ("{0} was away: their place in the session went to {1}", { oldest->second.name, name }));
+        away.erase (oldest);
+    }
     // (colour 0: the tag's own, set below)
-    auto* p = parts::invite (song, utf8 (hostName()), utf8 (name), 0, keepFull);
+    auto* p = parts::invite (song, utf8 (hostName()), utf8 (name), 0, keepFull, participantRecords);
     if (p == nullptr)
     {
         deny (from, "full");
@@ -1340,7 +1500,8 @@ void LiveSessionManager::onSnapshot (const juce::var& m)
     const bool resumed = (bool) m["resumed"] && replica != nullptr;
     const auto epoch = (std::uint64_t) (juce::int64) m["epoch"];
     const bool first = state != State::live && ! resumed;
-    if (first)
+    journalDirty = true;
+    if (first || chat.empty())
     {
         chat.clear();
         if (const auto* lines = m["chat"].getArray())
@@ -1364,6 +1525,12 @@ void LiveSessionManager::onSnapshot (const juce::var& m)
         engine.applyRemote (std::move (working));
         ++stats.resumedBySnapshot;
         resuming = false;
+        if (rejoining)
+        {
+            rejoining = false;
+            ++stats.rejoined;
+            fetchMissing = true;
+        }
     }
     else
     {
@@ -1683,8 +1850,25 @@ void LiveSessionManager::serve (int to, const juce::String& sha)
         for (const auto& u : uploads)
             if (u.peer == to && u.sha == sha)
                 return;
-        // a PCM WAV goes as a lossless FLAC pack (made once, off the message thread)
         const auto file = it->second;
+        if (host)
+        {
+            // the session's limit (§8.4): what is already queued counts too
+            juce::int64 queued = 0;
+            for (const auto& u : uploads)
+                queued += std::max<juce::int64> (0, u.file.getSize() - (juce::int64) u.next * chunkSize);
+            if (budget.admitOut (queued + file.getSize()) != live::MediaBudget::Verdict::ok)
+            {
+                auto m = message ("limit");
+                set (m, "sha", sha);
+                set (m, "session", true);
+                set (m, "limit", (juce::int64) budget.sessionLimit);
+                sendJson (to, m);
+                ++stats.mediaRefused;
+                return tellSessionLimit();
+            }
+        }
+        // a PCM WAV goes as a lossless FLAC pack (made once, off the message thread)
         if (file.getFileExtension().toLowerCase() == ".wav" && file.getSize() >= mediapack::minimumSize && unpackable.count (sha) == 0
             && packs.count (sha) == 0 && io && packing.insert (sha).second)
         {
@@ -1705,6 +1889,17 @@ void LiveSessionManager::serve (int to, const juce::String& sha)
     }
     if (! host)
         return;
+    if (auto held = refused.find (sha); held != refused.end())
+    {
+        // a guest's file that stays with that guest (its limit): whoever asks now is told too, not left waiting
+        auto m = message ("limit");
+        set (m, "sha", sha);
+        set (m, "session", false);
+        set (m, "limit", (juce::int64) budget.limitOf (held->second.tag));
+        set (m, "yours", false);
+        sendJson (to, m);
+        return;
+    }
     if (wanted.count (sha) != 0)
         forward[sha].push_back (to); // (a guest's file that is still on its way here)
     else if (auto o = mediaOrigin.find (sha); o != mediaOrigin.end() && peers.count (o->second.first) != 0)
@@ -1759,6 +1954,11 @@ void LiveSessionManager::pumpUploads()
             continue;
         }
         sendRaw (u.peer, plain);
+        if (host)
+        {
+            budget.sent (length);
+            journalDirty = true;
+        }
         if (++u.next >= count)
         {
             ++stats.mediaSent;
@@ -1783,6 +1983,10 @@ void LiveSessionManager::handleMediaChunk (int from, const std::uint8_t* data, s
     const int expected = std::max (1, (int) ((total + chunkSize - 1) / chunkSize));
     const auto expectedLength = std::min<juce::int64> (chunkSize, std::max<juce::int64> (0, total - (juce::int64) index * chunkSize));
     auto part = w.file.withFileExtension (w.file.getFileExtension() + ".part");
+    // pieces of an earlier sending of this file that were already on their way when it was stopped (the host held it
+    // back at a limit, then asked for it again): they are not the start of this one, which is still to come
+    if (w.got == 0 && index != 0)
+        return;
     if (total < 0 || total > maxMediaBytes || count != expected || index != w.got || length != expectedLength || (w.got > 0 && total != w.size))
     {
         part.deleteFile();
@@ -1795,6 +1999,12 @@ void LiveSessionManager::handleMediaChunk (int from, const std::uint8_t* data, s
         w.size = total;
         w.count = count;
         w.packed = packed;
+        if (host)
+        {
+            const auto verdict = budget.admit (w.fromTag, total);
+            if (verdict != live::MediaBudget::Verdict::ok)
+                return refuse (sha, verdict == live::MediaBudget::Verdict::sessionLimit);
+        }
     }
     else if (packed != w.packed)
     {
@@ -1810,8 +2020,168 @@ void LiveSessionManager::handleMediaChunk (int from, const std::uint8_t* data, s
             return;
         }
     }
+    if (host)
+    {
+        budget.received (w.fromTag, length);
+        journalDirty = true;
+    }
     if (++w.got == w.count)
         verifyArrived (sha);
+}
+
+int LiveSessionManager::peerOf (std::uint32_t tag) const
+{
+    for (const auto& [n, p] : peers)
+        if (p.accepted && p.tag == tag)
+            return n;
+    return 0;
+}
+
+void LiveSessionManager::refuse (const juce::String& sha, bool sessionWide)
+{
+    auto it = wanted.find (sha);
+    if (it == wanted.end())
+        return;
+    const auto w = it->second;
+    w.file.withFileExtension (w.file.getFileExtension() + ".part").deleteFile();
+    wanted.erase (it);
+    ++stats.mediaRefused;
+    // the sender stops sending it; whoever waited for it here is told it will not come
+    auto m = message ("limit");
+    set (m, "sha", sha);
+    set (m, "session", sessionWide);
+    set (m, "limit", (juce::int64) (sessionWide ? budget.sessionLimit : budget.limitOf (w.fromTag)));
+    set (m, "yours", true);
+    sendJson (w.fromPeer, m);
+    set (m, "yours", false);
+    for (int peer : forward[sha])
+        sendJson (peer, m);
+    forward.erase (sha);
+    if (onChange)
+        onChange();
+    if (sessionWide)
+        return tellSessionLimit();
+    const auto tag = w.fromTag;
+    refused[sha] = { tag, w.name, w.size };
+    const auto now = juce::Time::currentTimeMillis();
+    if (limitAsked.count (tag) != 0)
+        return; // (the question is open)
+    if (auto answered = limitAnsweredMs.find (tag); answered != limitAnsweredMs.end() && now - answered->second < limitAskAgainMs)
+        return; // (the host said no a moment ago)
+    const auto name = nameOf (tag);
+    if (! onMediaLimit)
+    {
+        if (onHint)
+            onHint (tr ("{0} reached the limit for audio files in this session ({1}): their new files stay on their computer",
+                        { name, str (live::mediaSize (budget.limitOf (tag))) }));
+        limitAnsweredMs[tag] = now;
+        return;
+    }
+    limitAsked.insert (tag);
+    MediaLimit question;
+    question.name = name;
+    question.used = budget.usedBy (tag);
+    question.limit = budget.limitOf (tag);
+    auto flag = alive;
+    question.answer = [this, flag, tag] (bool raise) {
+        if (! *flag || ! host || ! authority)
+            return;
+        limitAsked.erase (tag);
+        if (! raise)
+        {
+            limitAnsweredMs[tag] = juce::Time::currentTimeMillis();
+            return;
+        }
+        juce::int64 held = 0;
+        for (const auto& [heldSha, r] : refused)
+            held += r.tag == tag ? r.size : 0;
+        budget.raise (tag, held);
+        journalDirty = true;
+        // what was held back is fetched now (when that guest is here; else when it is back: the song still wants it)
+        const int peer = peerOf (tag);
+        for (auto r = refused.begin(); r != refused.end();)
+        {
+            if (r->second.tag != tag)
+            {
+                ++r;
+                continue;
+            }
+            if (peer != 0)
+                request (r->first, r->second.name, peer);
+            r = refused.erase (r);
+        }
+    };
+    onMediaLimit (question);
+}
+
+void LiveSessionManager::tellSessionLimit()
+{
+    if (sessionLimitTold)
+        return;
+    sessionLimitTold = true;
+    if (onMediaLimit)
+    {
+        MediaLimit told;
+        told.session = true;
+        told.used = budget.session;
+        told.limit = budget.sessionLimit;
+        onMediaLimit (told);
+    }
+    else if (onHint)
+        onHint (tr ("This live session reached its limit for audio files ({0}): new files are not sent", { str (live::mediaSize (budget.sessionLimit)) }));
+}
+
+// a guest: the host says a file does not travel (its limit for this guest, or the session's)
+void LiveSessionManager::onLimit (const juce::var& m)
+{
+    const auto sha = m["sha"].toString();
+    if (! isSha (sha))
+        return;
+    const auto limit = str (live::mediaSize ((juce::int64) m["limit"]));
+    const bool sessionWide = (bool) m["session"];
+    juce::String name;
+    // one of ours on its way to the host: it stops
+    for (const auto& u : uploads)
+        if (u.sha == sha && u.peer == hostPeer)
+            name = served.count (sha) != 0 ? served[sha].getFileName() : u.file.getFileName();
+    std::erase_if (uploads, [&] (const Upload& u) { return u.sha == sha && u.peer == hostPeer; });
+    if (name.isEmpty() && (bool) m["yours"] && served.count (sha) != 0)
+        name = served[sha].getFileName();
+    if (name.isNotEmpty())
+    {
+        ++stats.mediaRefused;
+        if (onHint)
+            onHint (sessionWide ? tr ("This live session reached its limit for audio files ({0}): {1} was not sent", { limit, name })
+                                : tr ("You reached the host's limit for audio files ({0}): {1} stays on this computer until the host raises it", { limit, name }));
+        return;
+    }
+    // one we were waiting for: it will not come (for now)
+    if (auto it = wanted.find (sha); it != wanted.end() && ! it->second.verifying)
+    {
+        const auto file = it->second.name;
+        it->second.file.withFileExtension (it->second.file.getFileExtension() + ".part").deleteFile();
+        wanted.erase (it);
+        ++stats.mediaRefused;
+        if (onHint)
+            onHint (tr ("{0} will not arrive for now: the session's limit for audio files ({1}) is reached", { file, limit }));
+        if (onChange)
+            onChange();
+    }
+}
+
+// a guest: the files of the session's folder the song points at and that are not here are asked for (again)
+void LiveSessionManager::fetchMissingMedia()
+{
+    fetchMissing = false;
+    if (host || hostPeer == 0)
+        return;
+    for (const auto& path : safety::referencedSamples (engine.getSong()))
+    {
+        const juce::File f (str (path));
+        const auto sha = f.getFileNameWithoutExtension();
+        if (f.isAChildOf (mediaFolder) && isSha (sha) && ! f.existsAsFile())
+            request (sha, f.getFileName(), hostPeer);
+    }
 }
 
 void LiveSessionManager::verifyArrived (const juce::String& sha)
@@ -1875,6 +2245,13 @@ void LiveSessionManager::finishMedia (const juce::String& sha, bool ok)
     for (int peer : forward[sha])
         serve (peer, sha);
     forward.erase (sha);
+    if (host)
+    {
+        // (whoever was told it would not come asks for it now)
+        auto m = message ("have");
+        set (m, "sha", sha);
+        sendToGuests (m);
+    }
     // the song already points at it: load it now
     engine.getSampleLibrary().forget (w.file.getFullPathName());
     const bool polled = lastStamp == engine.getSongStamp(); // (an edit not yet sent must still go out)
@@ -1911,6 +2288,7 @@ void LiveSessionManager::lostConnection (const juce::String& why)
                     auto keep = p;
                     keep.accepted = false;
                     keep.relayPeer = 0;
+                    keep.awaySinceMs = juce::Time::currentTimeMillis();
                     away[keep.tag] = keep;
                 }
             peers.clear();
@@ -1966,11 +2344,19 @@ void LiveSessionManager::onHostAnswer (int from, const juce::var& m)
 
 void LiveSessionManager::sendResume()
 {
+    if (! primed)
+    {
+        // (back from the journal and a big file of ours is still being hashed: in a moment, from pump())
+        resumeHeld = true;
+        return setState (State::waitingHost, tr ("Catching up with the session..."));
+    }
+    resumeHeld = false;
     auto m = message ("resume");
     set (m, "tag", (int) me);
     set (m, "token", resumeToken);
     set (m, "rev", (juce::int64) (replica ? replica->revision() : 0));
     set (m, "epoch", (juce::int64) (replica ? replica->epoch : 0));
+    set (m, "protocol", live::protocolVersion);
     sendJson (hostPeer, m);
     setState (State::waitingHost, tr ("Catching up with the session..."));
 }
@@ -1995,6 +2381,8 @@ void LiveSessionManager::onResume (int from, const juce::var& m)
 {
     const auto tag = (std::uint32_t) (int) m["tag"];
     const auto token = m["token"].toString();
+    if ((int) m["protocol"] != live::protocolVersion)
+        return deny (from, "version"); // (this host was updated since: the same-version rule holds for coming back too)
     std::optional<Peer> back;
     if (auto it = away.find (tag); it != away.end())
         back = it->second;
@@ -2021,6 +2409,13 @@ void LiveSessionManager::onResume (int from, const juce::var& m)
     {
         for (const auto& c : *missed)
             sendJson (from, commitToVar (c));
+        {
+            // (what this guest may do can have changed while it was away: a snapshot says so, a replay does not)
+            auto perms = permsToVar (back->perms, back->keepFull);
+            set (perms, "t", "perms");
+            set (perms, "quiet", true);
+            sendJson (from, perms);
+        }
         auto done = message ("resumed");
         set (done, "rev", (juce::int64) authority->revision());
         sendJson (from, done);
@@ -2119,6 +2514,28 @@ void LiveSessionManager::writeJournal (bool now)
         changes.add (row);
     }
     set (j, "changes", changes);
+    {
+        auto media = object();
+        set (media, "session", (juce::int64) budget.session);
+        juce::Array<juce::var> used, raised;
+        for (const auto& [tag, bytes] : budget.used)
+        {
+            juce::Array<juce::var> row;
+            row.add ((int) tag);
+            row.add ((juce::int64) bytes);
+            used.add (row);
+        }
+        for (const auto& [tag, bytes] : budget.raised)
+        {
+            juce::Array<juce::var> row;
+            row.add ((int) tag);
+            row.add ((juce::int64) bytes);
+            raised.add (row);
+        }
+        set (media, "used", used);
+        set (media, "raised", raised);
+        set (j, "media", media);
+    }
     set (j, "song", ProjectFile::toJson (authority->confirmed()));
     const auto text = juce::JSON::toString (j, true);
     const auto file = journalFile;
@@ -2154,7 +2571,7 @@ std::optional<LiveSessionManager::JournalInfo> LiveSessionManager::readJournal (
     if (const auto* g = j["guests"].getArray())
         info.guests = g->size();
     // (the relay forgets a room 12 h after its last connection)
-    if (juce::Time::getCurrentTime() - info.saved > juce::RelativeTime::hours (12))
+    if (juce::Time::getCurrentTime() - info.saved > juce::RelativeTime::hours ((double) journalHours))
         return std::nullopt;
     return info;
 }
@@ -2170,14 +2587,7 @@ void LiveSessionManager::discardJournal (const juce::File& file, const juce::Str
     if (room.isEmpty() || token.isEmpty() || relay.isEmpty())
         return;
     const auto url = relay.trimCharactersAtEnd ("/") + "/v1/rooms/" + room;
-    std::thread ([url, token] {
-        int status = 0;
-        juce::URL (url).createInputStream (juce::URL::InputStreamOptions (juce::URL::ParameterHandling::inAddress)
-                                               .withHttpRequestCmd ("DELETE")
-                                               .withExtraHeaders ("Authorization: Bearer " + token)
-                                               .withConnectionTimeoutMs (8000)
-                                               .withStatusCode (&status));
-    }).detach();
+    std::thread ([url, token] { relayRequest ("DELETE", url, token, {}, 8000); }).detach();
 }
 
 bool LiveSessionManager::resumeHost (const juce::File& file, const Options& o)
@@ -2220,6 +2630,27 @@ bool LiveSessionManager::resumeHost (const juce::File& file, const Options& o)
     renderedSig.clear();
     hostSeed = seed;
     journalFile = file;
+    guestJournalFile = juce::File();
+    budget = {};
+    budget.guestLimit = options.guestMediaLimit;
+    budget.sessionLimit = options.sessionMediaLimit;
+    {
+        // (a journal of an earlier version has no "media": the count starts again)
+        const auto media = j["media"];
+        budget.session = std::max<juce::int64> (0, (juce::int64) media["session"]);
+        if (const auto* rows = media["used"].getArray())
+            for (const auto& row : *rows)
+                budget.used[(std::uint32_t) (int) row[0]] = std::max<juce::int64> (0, (juce::int64) row[1]);
+        if (const auto* rows = media["raised"].getArray())
+            for (const auto& row : *rows)
+                budget.raised[(std::uint32_t) (int) row[0]] = std::max<juce::int64> (0, (juce::int64) row[1]);
+    }
+    refused.clear();
+    limitAsked.clear();
+    limitAnsweredMs.clear();
+    sessionLimitTold = false;
+    rejoining = resumeHeld = fetchMissing = quitting = false;
+    primed = true;
     io = std::make_unique<Worker> (false, false);
     renderer = std::make_unique<Worker> (options.inlineWork, true);
     invite = *parsed;
@@ -2260,6 +2691,7 @@ bool LiveSessionManager::resumeHost (const juce::File& file, const Options& o)
             p.keepFull = (bool) v["keepFull"];
             if (p.tag > session::hostTag && p.token.isNotEmpty())
             {
+                p.awaySinceMs = juce::Time::currentTimeMillis();
                 away[p.tag] = p;
                 authority->setPermissions (p.tag, p.perms);
             }
@@ -2274,6 +2706,240 @@ bool LiveSessionManager::resumeHost (const juce::File& file, const Options& o)
     setState (State::reconnecting, tr ("Resuming the live session..."));
     connect();
     return true;
+}
+
+// --- the guest's journal (round 190ah) ------------------------------------------------------------------------------
+
+void LiveSessionManager::writeGuestJournal (bool now)
+{
+    journalDirty = false;
+    journalDueMs = juce::Time::currentTimeMillis() + 2000; // (at most every 2 s)
+    if (host || ! replica || guestJournalFile == juce::File() || roomId.isEmpty() || resumeToken.isEmpty())
+        return;
+    const auto& working = engine.getSong();
+    auto j = object();
+    set (j, "version", 1);
+    set (j, "kind", "guest");
+    set (j, "saved", juce::Time::currentTimeMillis());
+    set (j, "relay", options.relay);
+    set (j, "room", roomId);
+    set (j, "secret", str (invite.secret));
+    set (j, "name", options.name);
+    {
+        const auto* h = working.session.find (session::hostTag);
+        set (j, "host", h != nullptr ? str (h->name) : juce::String());
+    }
+    set (j, "tag", (int) me);
+    set (j, "token", resumeToken);
+    set (j, "hostKey", juce::String (livecrypto::toHex (hostKey)));
+    set (j, "rev", (juce::int64) replica->baseRevision());
+    set (j, "epoch", (juce::int64) replica->epoch);
+    set (j, "seq", (juce::int64) replica->sequence());
+    set (j, "perms", permsToVar (myPerms, keepFull));
+    set (j, "mediaFolder", mediaFolder.getFullPathName());
+    // the working song (what this person sees), and the confirmed state it stands on when it has edits the host has
+    // not confirmed (else they are the same: one copy)
+    set (j, "song", ProjectFile::toJson (working));
+    if (replica->pending() > 0 || engine.getSongStamp() != lastStamp || ! live::diff (replica->base(), working).empty())
+        set (j, "base", ProjectFile::toJson (replica->base()));
+    const auto text = juce::JSON::toString (j, true);
+    const auto file = guestJournalFile;
+    auto write = [file, text]() -> Worker::Done {
+        file.getParentDirectory().createDirectory();
+        juce::TemporaryFile temp (file);
+        if (temp.getFile().replaceWithText (text))
+            temp.overwriteTargetFileWithTemporary();
+        return {};
+    };
+    if (now)
+    {
+        io.reset(); // (an older write on its way is finished first, so this one is the last)
+        write();
+    }
+    else if (io)
+        io->post (write);
+    else
+        write();
+}
+
+std::optional<LiveSessionManager::GuestJournalInfo> LiveSessionManager::readGuestJournal (const juce::File& file)
+{
+    if (! file.existsAsFile() || file.getSize() > ((juce::int64) 512 << 20))
+        return std::nullopt;
+    const auto j = juce::JSON::parse (file.loadFileAsString());
+    if (! j.isObject() || (int) j["version"] != 1 || j["kind"].toString() != "guest")
+        return std::nullopt;
+    livecrypto::Invite invite { utf8 (j["room"].toString()), utf8 (j["secret"].toString()) };
+    livecrypto::PublicKey key {};
+    if (! livecrypto::parseCode (livecrypto::formatCode (invite)) || j["token"].toString().isEmpty() || (int) j["tag"] <= (int) session::hostTag
+        || ! livecrypto::fromHex (utf8 (j["hostKey"].toString()), key) || ! j["song"].isString())
+        return std::nullopt;
+    GuestJournalInfo info;
+    info.name = j["name"].toString();
+    info.hostName = j["host"].toString();
+    info.saved = juce::Time ((juce::int64) j["saved"]);
+    info.revision = (std::uint64_t) (juce::int64) j["rev"];
+    if (juce::Time::getCurrentTime() - info.saved > juce::RelativeTime::hours ((double) journalHours))
+        return std::nullopt;
+    return info;
+}
+
+void LiveSessionManager::discardGuestJournal (const juce::File& file, const juce::String& relayDefault)
+{
+    const auto j = juce::JSON::parse (file.loadFileAsString());
+    file.deleteFile();
+    livecrypto::Invite invite { utf8 (j["room"].toString()), utf8 (j["secret"].toString()) };
+    const auto token = j["token"].toString();
+    const int tag = (int) j["tag"];
+    auto relay = j["relay"].toString();
+    if (relay.isEmpty())
+        relay = relayDefault;
+    if (! livecrypto::parseCode (livecrypto::formatCode (invite)) || token.isEmpty() || relay.isEmpty() || ! livelink::Connection::available())
+        return;
+    // the host is told this guest's place is free ("bye" with the place's token): one short connection in the
+    // background; when the host is not there right now the place is given up later (the next person takes it)
+    std::thread ([invite, token, tag, url = utf8 (wsUrlFor (relay, str (invite.room)))] {
+        const auto keys = livecrypto::derive (invite);
+        livelink::Connection link;
+        link.open (url, keys.relayToken, userAgent());
+        bool welcomed = false;
+        for (int i = 0; i < 200 && ! welcomed; ++i)
+        {
+            for (const auto& e : link.events())
+            {
+                if (e.type == livelink::Event::Type::closed)
+                    return;
+                welcomed = welcomed || (e.type == livelink::Event::Type::text && e.text.find ("\"welcome\"") != std::string::npos);
+            }
+            juce::Thread::sleep (50);
+        }
+        if (! welcomed)
+            return;
+        auto bye = message ("bye");
+        set (bye, "tag", tag);
+        set (bye, "token", token);
+        const auto text = juce::JSON::toString (bye, true);
+        std::vector<std::uint8_t> plain;
+        plain.push_back ('J');
+        plain.insert (plain.end(), text.toRawUTF8(), text.toRawUTF8() + text.getNumBytesAsUTF8());
+        livecrypto::Sealer sealer (keys.key);
+        const auto sealed = sealer.seal (plain);
+        std::vector<std::uint8_t> out { 0, 1 }; // (to everyone in the room: only the host acts on it)
+        out.insert (out.end(), sealed.begin(), sealed.end());
+        link.send (std::move (out));
+        for (int i = 0; i < 60 && link.queuedBytes() > 0; ++i)
+            juce::Thread::sleep (50);
+        juce::Thread::sleep (300);
+        link.close();
+    }).detach();
+}
+
+bool LiveSessionManager::resumeGuest (const juce::File& file, const Options& o)
+{
+    if (isActive() || ! readGuestJournal (file))
+        return false;
+    const auto j = juce::JSON::parse (file.loadFileAsString());
+    livecrypto::Invite inv { utf8 (j["room"].toString()), utf8 (j["secret"].toString()) };
+    const auto parsed = livecrypto::parseCode (livecrypto::formatCode (inv));
+    livecrypto::PublicKey key {};
+    juce::String error;
+    auto song = ProjectFile::fromJson (j["song"].toString(), error);
+    std::optional<Song> base;
+    if (j["base"].isString())
+        base = ProjectFile::fromJson (j["base"].toString(), error);
+    std::string why;
+    if (! parsed || ! song || (j["base"].isString() && ! base) || ! livecrypto::fromHex (utf8 (j["hostKey"].toString()), key)
+        || ! livelink::Connection::available (&why))
+        return false;
+    options = o;
+    if (j["relay"].toString().isNotEmpty())
+        options.relay = j["relay"].toString();
+    if (j["name"].toString().isNotEmpty())
+        options.name = j["name"].toString();
+    host = false;
+    me = (std::uint32_t) (int) j["tag"];
+    peers.clear();
+    away.clear();
+    people.clear();
+    stats = {};
+    chat.clear();
+    unread = 0;
+    following = false;
+    abandoned = resuming = false;
+    allNeed.clear();
+    myNeed.clear();
+    renderedSig.clear();
+    hostKey = key;
+    resumeToken = j["token"].toString().substring (0, 64);
+    seekNonce.clear();
+    hostPeer = 0;
+    guestJournalFile = file;
+    journalSig = 0;
+    journalDirty = false;
+    quitting = resumeHeld = fetchMissing = false;
+    rejoining = true;
+    primed = false; // (pump(): this computer's own files get their hashes again first)
+    io = std::make_unique<Worker> (false, false);
+    renderer = std::make_unique<Worker> (options.inlineWork, true);
+    invite = *parsed;
+    keys = livecrypto::derive (invite);
+    roomId = str (invite.room);
+    inviteCode = str (livecrypto::formatCode (invite));
+    myPerms = {};
+    myPerms.editEverything = (bool) j["perms"]["editEverything"];
+    myPerms.listener = (bool) j["perms"]["listener"];
+    myPerms.settings = (bool) j["perms"]["settings"];
+    editEverything = myPerms.editEverything;
+    keepFull = (bool) j["perms"]["keepFull"];
+    mediaFolder = juce::File::isAbsolutePath (j["mediaFolder"].toString()) ? juce::File (j["mediaFolder"].toString()) : juce::File();
+    if (mediaFolder == juce::File())
+        mediaFolder = options.folder != juce::File() ? options.folder : sessionpack::receivedRoot().getChildFile ("Live sessions").getChildFile (roomId);
+    const auto rev = (std::uint64_t) (juce::int64) j["rev"];
+    song->session.me = me;
+    if (onRejoined)
+        onRejoined (*song);
+    else
+        engine.setSong (*song);
+    // the replica as it was: the confirmed state the working song stands on, and (restored) everything the working
+    // song has on top of it waiting to be proposed again
+    replica = std::make_unique<live::Replica> (base ? *base : engine.getSong(), rev, me, &roundTrip);
+    replica->epoch = (std::uint64_t) (juce::int64) j["epoch"];
+    replica->restored ((std::uint32_t) (juce::int64) j["seq"] + 1000u);
+    engine.setSessionHistory (true);
+    lastStamp = 0; // (poll as soon as the host is there)
+    droppedAtMs = juce::Time::currentTimeMillis();
+    reconnectDelayMs = 1000;
+    setState (State::reconnecting, tr ("Going back into the live session..."));
+    connect();
+    return true;
+}
+
+// What the confirmed song is, the same on every computer: every entity through the wire's own JSON, sample paths as
+// their content hashes (the name and the folder differ from one computer to the next).
+juce::String LiveSessionManager::digest()
+{
+    if (! replica)
+        return {};
+    Song song = authority ? authority->confirmed() : replica->confirmed();
+    if (! ensureHashed (song))
+        return {};
+    std::map<std::string, std::string> tokens;
+    for (const auto& path : safety::referencedSamples (song))
+    {
+        const juce::File f (str (path));
+        juce::String sha;
+        if (f.isAChildOf (mediaFolder) && isSha (f.getFileNameWithoutExtension()))
+            sha = f.getFileNameWithoutExtension();
+        else if (f.existsAsFile())
+            sha = shaOf (f);
+        tokens[path] = utf8 (tokenPrefix + (sha.isNotEmpty() ? sha : juce::String ("missing/") + f.getFileName()));
+    }
+    applyRelocations (song, tokens);
+    song.session.me = 0;
+    auto all = live::diff (Song(), song);
+    all.carrier.session.me = 0;
+    const auto text = juce::JSON::toString (patchToVar (all), true);
+    return str (sha256Hex ((const std::uint8_t*) text.toRawUTF8(), text.getNumBytesAsUTF8())).substring (0, 16) + "@" + juce::String ((juce::int64) revision());
 }
 
 // --- chat, transport, permissions ---------------------------------------------------------------------------------------

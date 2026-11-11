@@ -18,4 +18,7 @@ namespace lynx::livetest
 juce::String selfTest (const Song* rich);
 // the --livetest command (message thread, no message loop needed); returns the exit code
 int run (const juce::StringArray& args);
+// LYNX --livepeer host|guest|rejoin <folder> ... (round 190ah): one side of a session between two real computers,
+// scripted, with no window (the two-computer check; see the comment at the function)
+int runPeer (const juce::StringArray& args);
 } // namespace lynx::livetest

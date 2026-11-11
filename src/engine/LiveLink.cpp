@@ -72,6 +72,12 @@ std::vector<Event> Connection::events()
 void Connection::open (const std::string& url, const std::string& token, const std::string& userAgent)
 {
     close();
+    {
+        // what the previous connection still had to say (its own "closed" above all) is not about this one: a session
+        // started right after another one ended would otherwise end at once with "connection lost" (round 190ah)
+        const std::lock_guard<std::mutex> g (lock);
+        incoming.clear();
+    }
     stopping = false;
     state = 1;
     reader = std::thread ([this, url, token, userAgent] { run (url, token, userAgent); });
@@ -288,6 +294,7 @@ struct CurlWsFrame
 };
 constexpr int wsText = 1 << 0, wsBinary = 1 << 1, wsCont = 1 << 2, wsClose = 1 << 3;
 constexpr int optUrl = 10002, optUserAgent = 10018, optHttpHeader = 10023, optConnectTimeout = 78, optNoSignal = 99, optConnectOnly = 141;
+constexpr int optWriteData = 10001, optWriteFunction = 20011, optPostFields = 10015, optPostFieldSize = 60, optCustomRequest = 10036, optTimeout = 13;
 constexpr int infoResponseCode = 0x200000 + 2, infoActiveSocket = 0x500000 + 44;
 constexpr int curlOk = 0, curlAgain = 81;
 
@@ -426,8 +433,10 @@ void Connection::run (std::string url, std::string token, std::string userAgent)
             }
         }
         pollfd p { fd, POLLIN, 0 };
-        if (::poll (&p, 1, 10) <= 0 && message.empty())
-            continue;
+        // (the poll is only the wait: curl is asked every time, because what arrived together with the upgrade's answer
+        // or inside an already-read TLS record sits in curl's buffer and never makes the socket readable — the relay's
+        // "welcome" was lost that way when the relay was near, round 190ah)
+        ::poll (&p, 1, 10);
         for (;;)
         {
             std::size_t got = 0;
@@ -491,4 +500,67 @@ Connection::~Connection()
 {
     close();
 }
+
+#if defined(__linux__)
+namespace
+{
+std::size_t collectBody (char* data, std::size_t size, std::size_t count, void* user)
+{
+    auto& out = *static_cast<std::string*> (user);
+    if (out.size() + size * count > (1u << 20))
+        return 0; // (the relay's answers are a few hundred bytes)
+    out.append (data, size * count);
+    return size * count;
+}
+} // namespace
+
+bool httpAvailable()
+{
+    const auto& c = curl();
+    return c.lib != nullptr && c.easyInit != nullptr && c.setopt != nullptr && c.perform != nullptr && c.getinfo != nullptr && c.slistAppend != nullptr;
+}
+
+HttpAnswer http (const std::string& method, const std::string& url, const std::vector<std::string>& headers, const std::string& body,
+                 const std::string& userAgent, int timeoutSeconds)
+{
+    HttpAnswer answer;
+    if (! httpAvailable())
+        return answer;
+    auto& c = curl();
+    void* h = c.easyInit();
+    if (h == nullptr)
+        return answer;
+    void* list = nullptr;
+    for (const auto& line : headers)
+        list = c.slistAppend (list, line.c_str());
+    c.setopt (h, optUrl, url.c_str());
+    c.setopt (h, optUserAgent, userAgent.c_str());
+    c.setopt (h, optCustomRequest, method.c_str());
+    if (list != nullptr)
+        c.setopt (h, optHttpHeader, list);
+    if (! body.empty() || method == "POST")
+    {
+        c.setopt (h, optPostFields, body.c_str());
+        c.setopt (h, optPostFieldSize, (long) body.size());
+    }
+    c.setopt (h, optConnectTimeout, (long) timeoutSeconds);
+    c.setopt (h, optTimeout, (long) timeoutSeconds * 2);
+    c.setopt (h, optNoSignal, 1L);
+    c.setopt (h, optWriteFunction, &collectBody);
+    c.setopt (h, optWriteData, &answer.body);
+    if (c.perform (h) == curlOk)
+    {
+        long status = 0;
+        c.getinfo (h, infoResponseCode, &status);
+        answer.status = (int) status;
+    }
+    c.cleanup (h);
+    if (list != nullptr)
+        c.slistFree (list);
+    return answer;
+}
+#else
+bool httpAvailable() { return false; }
+HttpAnswer http (const std::string&, const std::string&, const std::vector<std::string>&, const std::string&, const std::string&, int) { return {}; }
+#endif
 } // namespace lynx::livelink
