@@ -8366,3 +8366,4 @@ countries: kr
 "Octaver" = "옥타버"
 "Rectify" = "정류"
 "CrossFold" = "CrossFold"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "측정: 레퍼런스에 맞춘 모델, 클래식: 그 이전에 저장된 프로젝트의 모델"

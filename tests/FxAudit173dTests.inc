@@ -67,6 +67,7 @@ const std::vector<Allowed>& allowed()
         { "Fruity Delay Bank", "B8 Unused", "inert", "hidden-slot: FL's unused slot (bank 8 has no send to next); no control in the editor" },
         { "Fruity WaveShaper", "Unipolar", "inert", "not-in-programme: mirrors a non-symmetric drawn curve; the default curve is a straight line (identical either way)" },
         { "Fruity WaveShaper", "HQ", "inert", "not-in-programme: oversamples the curve; a straight line makes no harmonics to alias" },
+        { "Sentry Gate", "Law", "inert", "not-in-programme: the Vocal style's noise reduction acts on hiss-like sound that starts after a pause (60 ms under -60 dBFS); the programme plays without one (tests/Parity190vTests.inc renders it)" },
         { "LYNX Tune", "Humanize", "inert", "not-in-programme: slows the retune only on a steady note held 0.3 s that then moves; the pad has constant vibrato" },
         { "LYNX Tune", "C# bypass", "inert", "not-in-programme: leaves notes sung near C# alone; the programme sings none there" },
         { "LYNX Tune", "Key map *", "inert", "not-in-programme: a per-key override (8 keys each, C1…B8); the programme sings only a few keys" },
