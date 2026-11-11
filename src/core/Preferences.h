@@ -158,6 +158,9 @@ struct MidiInputPrefs
     bool enabled = true;  // new devices are on
     int midiChannel = 0;  // 0 = any (omni), 1..16 = only that channel
     int target = -1;      // -1 = the selected channels of the Channel Rack, else that Channel Rack channel (0-based)
+    // "Controller type" (round 190aw, core/ControllerProfile.h): "" = detect a profile by the port name,
+    // "generic" = a generic controller (no profile), else a profile's id
+    std::string controller;
 
     bool operator== (const MidiInputPrefs&) const = default;
 };

@@ -69,6 +69,7 @@
 #include "core/EventEdit.h"
 #include "core/Preferences.h"
 #include "core/MidiSync.h"
+#include "core/ControllerSession.h"
 #include "core/History.h"
 #include "core/Gms.h"
 #include "core/GmsMobile.h"
@@ -17473,3 +17474,5 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "ExportSections190apTests.inc"
 #include "DirectWave190ajTests.inc"
 #include "Similar190asTests.inc"
+#include "Controller190awTests.inc"
+#include "ControllerProfiles190awTests.inc"

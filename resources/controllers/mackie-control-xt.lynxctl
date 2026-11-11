@@ -1,0 +1,12 @@
+# Mackie Control Extender (XT): 8 more strips next to a Mackie Control Universal. Same protocol as the main unit
+# (resources/controllers/mackie-control.lynxctl has the sources); its display answers to the model byte 15h.
+# The units of the group share one bank: each takes the next 8 strips, in the order of the Input devices list.
+
+[device]
+extends = mackie-control
+name = Mackie Control Extender (XT)
+maker = Mackie
+match = *Mackie Control*XT*, *MCU*XT*, *Mackie Control Extender*
+
+[display]
+write = F0 00 00 66 15 12 {pos} {text} F7

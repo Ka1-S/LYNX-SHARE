@@ -2565,3 +2565,13 @@ is still slower than the reference's (−2.4 dB after 30 ms against −4.8).
 |---|---|---|---|
 | Sounds tab (FL Cloud, online) › a sound's menu › Find similar samples: FL Cloud ranks its own catalogue ("tone and rhythm"); Loop Starter's channel menu › Find similar samples... opens the same query. No local analysis, no index, no settings (`REA_rodada190as.md` §1) | Browser › right-click an audio file › Find similar samples: the samples of the Browser's own folders, most similar first, with a percentage, in the results list; search box "Similar to <name>" | ⚠️ | LYNX's own measure on local files (`core/SampleSimilarity.*`); FL's ranking can't be compared offline. On FL's packs the 10 nearest files sit in the query's own class folder 56 % of the time (chance 2.9 %) |
 | FL Cloud's online library | — | ❌ | no FL Cloud in LYNX |
+## Round 190aw: MIDI controller profiles (phases A and B of the controller plan)
+
+REA: docs/analise/REA_rodada190aw.md; format: docs/CONTROLLERS.md.
+
+| FL | LYNX | State |
+|---|---|---|
+| Options › MIDI › Input: "Controller type" per device: "(generic controller)", device scripts, the user's with "(user)" | Settings › MIDI › Input devices: a Controller type list in each device row: Detect automatically, Generic controller, the profiles, the user's with "(user)" | Done; "Detect automatically" is LYNX's (FL: "Auto accept detected controller" switch) |
+| Device scripts (`device_*.py`) drive transport, mixer, channels, plugins and send LEDs / displays | Controller profiles (`*.lynxctl`, data only) on the controller layer: transport, mixer bank of 8, Channel Rack, plugin parameter pages, pads as notes / steps; lights, motor faders, rings, SysEx text | Done for profiles; FL-compatible scripts are a later phase on the same layer |
+| "Update MIDI scripts" | "Refresh device list" also reads the user's profiles again; "Controller profiles folder" opens their folder | Done |
+| Links by hand and Pickup in the same panel | Unchanged; a CC linked by hand is never taken by a profile | Done (tests) |

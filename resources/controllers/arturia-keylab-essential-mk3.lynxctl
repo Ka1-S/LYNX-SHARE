@@ -1,0 +1,17 @@
+# Arturia KeyLab Essential mk3 (49 / 61 / 88) through its Mackie Control port. docs/CONTROLLERS.md explains the format.
+#
+# Source (maker document only): "KeyLab Essential mk3 User Manual" (Arturia): the keyboard's DAW buttons, faders and
+# knobs can speak Mackie Control Universal on a port of their own, named "KL Essential 49 mk3 MCU/HUI" (61, 88 alike).
+# That port is off by default: turn it on in Arturia's MIDI Control Center, with the DAW mode set to Mackie Control,
+# and put the keyboard in its DAW mode (Prog button). The manual does not list which control sends which Mackie
+# message; this profile is the plain Mackie Control map (resources/controllers/mackie-control.lynxctl).
+#
+# The keyboard's other ports (keys, pads) stay a generic controller.
+
+[device]
+extends = mackie-control
+name = Arturia KeyLab Essential mk3 (Mackie Control port)
+maker = Arturia
+source = KeyLab Essential mk3 User Manual (Arturia), chapters on the DAW mode and the MIDI ports
+match = *KL Essential*MCU*, *KeyLab Essential*MCU*
+group = keylab-essential

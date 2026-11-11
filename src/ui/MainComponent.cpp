@@ -1,3 +1,4 @@
+#include "ui/ControllerBridge.h"
 #include "ui/AudioClipboard.h"
 #include "ui/MidiClipboard.h"
 #include "ui/VideoTracks.h"
@@ -695,6 +696,12 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     addAndMakeVisible (snapToggleButton);
     engine.addChangeListener (this);
+    // MIDI controller profiles (round 190aw): LYNX as the controllers see it
+    controllerBridge = std::make_unique<ControllerBridge> (engine, ControllerBridge::Window {
+        [this] (const std::string& action) { return runAction (action); },
+        [this] { return mixer.getSelectedTrack(); },
+        [this] (int track) { mixer.selectTrack (track); } });
+    engine.setControllerSurface (controllerBridge.get());
     setTypingPiano (typingPiano);
     refreshRecordOptionButtons();
     refreshToolbar();
@@ -839,6 +846,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    engine.setControllerSurface (nullptr); // (the controllers get their closing messages)
     gamepadInput.reset();
     if (detailView != nullptr) // (round 183a: a docked Piano roll goes home while the workspace still exists)
         detailView->releaseEditor();
