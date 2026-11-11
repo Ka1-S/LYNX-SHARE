@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="wk.troubleshooting.t" data-desc="wk.troubleshooting.s">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Troubleshooting · LYNX SHARE</title>
+<meta name="description" content="First-launch warnings, no sound, plugin problems, crash reports and where to report bugs.">
+<meta property="og:title" content="Troubleshooting · LYNX SHARE">
+<meta property="og:description" content="First-launch warnings, no sound, plugin problems, crash reports and where to report bugs.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.25">
+<meta property="og:url" content="https://lynx-share.com/wiki/troubleshooting/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/wiki/troubleshooting/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/wiki/troubleshooting/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/wiki/troubleshooting/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/wiki/troubleshooting/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/wiki/troubleshooting/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/wiki/troubleshooting/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/wiki/troubleshooting/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/wiki/troubleshooting/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/wiki/troubleshooting/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/wiki/troubleshooting/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/wiki/troubleshooting/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/wiki/troubleshooting/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/wiki/troubleshooting/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/wiki/troubleshooting/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/wiki/troubleshooting/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/wiki/troubleshooting/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/wiki/troubleshooting/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" href="/assets/img/favicon.png?v=0.1.23">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" aria-current="page" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="wrap wiki"><nav class="wnav" id="wnav" aria-label="Wiki"><h2 data-i18n="wkg.start">Start here</h2><a href="/wiki/getting-started/" data-i18n="wk.getting-started.t">Getting started</a><h2 data-i18n="wkg.windows">The windows</h2><a href="/wiki/channel-rack/" data-i18n="wk.channel-rack.t">Channel rack</a><a href="/wiki/piano-roll/" data-i18n="wk.piano-roll.t">Piano roll</a><a href="/wiki/playlist/" data-i18n="wk.playlist.t">Playlist</a><a href="/wiki/mixer/" data-i18n="wk.mixer.t">Mixer</a><a href="/wiki/browser/" data-i18n="wk.browser.t">Browser</a><h2 data-i18n="wkg.from">Coming from another DAW</h2><a href="/wiki/coming-from-fl-studio/" data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</a><a href="/wiki/coming-from-ableton/" data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</a><h2 data-i18n="wkg.more">Working with it</h2><a href="/wiki/plugins/" data-i18n="wk.plugins.t">Plugins</a><a href="/wiki/online-sessions/" data-i18n="wk.online-sessions.t">Online sessions</a><a href="/wiki/simple-layout/" data-i18n="wk.simple-layout.t">Simple layout</a><h2 data-i18n="wkg.ref">Reference</h2><a href="/wiki/shortcuts/" data-i18n="wk.shortcuts.t">Shortcuts</a><a href="/wiki/file-formats/" data-i18n="wk.file-formats.t">File formats</a><a href="/wiki/troubleshooting/" aria-current="page" data-i18n="wk.troubleshooting.t">Troubleshooting</a></nav><article><a class="wjump" href="#wnav" data-i18n="wiki.all">All wiki pages</a><h1><span data-i18n="wk.troubleshooting.t">Troubleshooting</span></h1><p class="sub" data-i18n="wk.troubleshooting.s">First-launch warnings, no sound, plugin problems, crash reports and where to report bugs.</p><p class="enonly" data-i18n="wiki.enOnly">The wiki pages are in English only for now.</p><div class="prose"><h2 id="windows-smartscreen-warns-on-first-launch">Windows: SmartScreen warns on first launch</h2>
+<p>The executable is not code-signed yet, so SmartScreen may warn the first time you run it. Click <code>More info</code>, then <code>Run anyway</code>. The installer needs no admin rights.</p>
+<h2 id="macos-cannot-be-opened">macOS: &quot;cannot be opened&quot;</h2>
+<p>The app is not notarized by Apple and has no Developer ID signature, so the first launch needs one extra step.</p>
+<ol><li>Drag LYNX SHARE to <code>Applications</code>.</li><li>Right-click (Control-click) it, choose <code>Open</code>, then <code>Open</code> again.</li></ol>
+<p>On macOS 15 Sequoia or newer, try to open it once, then go to <code>System Settings › Privacy &amp; Security</code> and click <code>Open Anyway</code>.</p>
+<p>Or, in Terminal:</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>macOS asks for microphone access the first time you record.</p>
+<h2 id="linux-the-appimage-does-not-start">Linux: the AppImage does not start</h2>
+<p>LYNX SHARE needs an x86_64 system with glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36, current Arch or Manjaro) and X11 or XWayland.</p>
+<p>Make the file executable first:</p>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p>Some distributions need libfuse2 to run AppImages. The package is <code>libfuse2</code> on Ubuntu 22.04, <code>libfuse2t64</code> on Ubuntu 24.04, <code>fuse2</code> on Arch and <code>fuse-libs</code> on Fedora.</p>
+<p>If you prefer not to install it, download the <code>.tar.gz</code> instead, extract it and run <code>./install.sh</code>. It installs LYNX SHARE for your user under <code>~/.local</code> with a menu entry. <code>./install.sh --uninstall</code> removes it.</p>
+<h2 id="no-sound-or-the-wrong-audio-device">No sound, or the wrong audio device</h2>
+<ol><li>Open <code>Options › Audio settings...</code>.</li><li>Pick a driver and an output device.</li></ol>
+<p>The drivers per system:</p>
+<ul><li>Windows: Windows Audio (WASAPI), DirectSound, ASIO and the built-in LYNX ASIO driver.</li><li>macOS: Core Audio.</li><li>Linux: PipeWire (native), JACK and ALSA. On a first start LYNX SHARE opens the first of these that has devices.</li></ul>
+<p>ASIO is a Windows driver model and exists only on Windows.</p>
+<p><code>Options › Setup wizard (language, audio, plugin folders)...</code> also tests the audio device.</p>
+<h2 id="linux-the-sound-breaks-up">Linux: the sound breaks up</h2>
+<p>The audio thread should run with real-time priority. <code>Options › Audio settings › Status</code> shows whether it got it. If it did not, do one of these, then log out and in again:</p>
+<ul><li>Install rtkit (<code>sudo apt install rtkit</code>, <code>sudo dnf install rtkit</code> or <code>sudo pacman -S rtkit</code>).</li><li>Add yourself to the <code>audio</code> group with a real-time limit, as JACK set-ups have.</li></ul>
+<p>The details are in <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>.</p>
+<h2 id="a-plugin-crashes">A plugin crashes</h2>
+<p>Run it in its own process, so that only the plugin stops:</p>
+<ol><li>Open <code>Options › General settings...</code>.</li><li>Turn on <code>Run plugins in a separate process (protects LYNX SHARE from crashes)</code>.</li><li>Reopen the project.</li></ol>
+<p>A plugin that stopped responding in its own process is muted. Save the project and reopen it to reload the plugin. See <a href="/wiki/plugins/">Plugins</a>.</p>
+<h2 id="a-plugin-is-missing">A plugin is missing</h2>
+<ul><li>If the plugin is installed but not listed, choose <code>Options › Scan for plugins</code>, or add its folder in <code>Options › Plugin manager...</code> with <code>Plugin folders...</code>.</li><li>A plugin file that fails the scan is skipped. On Windows the reason is in <code>%APPDATA%\LYNX\scan-failures.log</code>. <code>Rescan all...</code> in the Plugin manager tries it again.</li><li>If the plugin is not installed, an effect is replaced by a LYNX SHARE effect with the same role and its settings are kept in the project. <code>Help › Missing files...</code> lists what is missing.</li></ul>
+<h2 id="video-does-not-work-on-linux">Video does not work on Linux</h2>
+<p>Video tracks and <code>Export with video</code> need FFmpeg. LYNX SHARE says how to install it.</p>
+<h2 id="crash-reports">Crash reports</h2>
+<p>Crash reports are opt-in. After a crash or a freeze, the next start asks whether to send a report: <code>Send</code>, <code>Show what will be sent</code>, <code>Don&#x27;t send</code> or <code>Report on GitHub instead</code>. <code>Settings › General › Crash reports</code> sets <code>Ask</code> (the default), <code>Always send</code> or <code>Never send</code>.</p>
+<p>A report contains the LYNX SHARE version, the operating system, the CPU, the graphics cards and their drivers, the screen size, the audio driver and device, the crash or freeze file, the session&#x27;s last 60 steps and the names and versions of the third-party plugins that were loaded.</p>
+<p>It does not contain audio, projects, samples, your computer&#x27;s name or your user name. File names are replaced by their extension unless you tick &quot;include file names&quot;. The server stores no IP address.</p>
+<p>To have a report deleted, open an issue with its id. Sent ids are listed in <code>crash-reports\sent.log</code> in the settings folder. The full text is in the <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">privacy policy</a>.</p>
+<h2 id="reporting-a-bug">Reporting a bug</h2>
+<p>Open an issue at <a href="https://github.com/Ka1-S/LYNX-SHARE/issues">github.com/Ka1-S/LYNX-SHARE/issues</a>. <code>Help › Report a problem...</code> sends a report by hand, with an optional description.</p>
+<p>The settings folder is <code>%APPDATA%\LYNX</code> on Windows, <code>~/Library/Application Support/LYNX</code> on macOS and <code>~/.config/LYNX</code> on Linux.</p></div><nav class="wpn"><a href="/wiki/file-formats/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.file-formats.t">File formats</b></a><span></span></nav></article></div>
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
+<script src="/assets/site.js?v=59e4b1d6" defer></script>
+</body>
+</html>

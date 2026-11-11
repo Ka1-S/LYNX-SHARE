@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="wk.file-formats.t" data-desc="wk.file-formats.s">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>File formats · LYNX SHARE</title>
+<meta name="description" content="Every format LYNX SHARE 0.1.25 opens, imports, saves and exports, with its limits.">
+<meta property="og:title" content="File formats · LYNX SHARE">
+<meta property="og:description" content="Every format LYNX SHARE 0.1.25 opens, imports, saves and exports, with its limits.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.25">
+<meta property="og:url" content="https://lynx-share.com/wiki/file-formats/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/wiki/file-formats/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/wiki/file-formats/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/wiki/file-formats/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/wiki/file-formats/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/wiki/file-formats/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/wiki/file-formats/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/wiki/file-formats/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/wiki/file-formats/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/wiki/file-formats/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/wiki/file-formats/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/wiki/file-formats/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/wiki/file-formats/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/wiki/file-formats/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/wiki/file-formats/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/wiki/file-formats/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/wiki/file-formats/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/wiki/file-formats/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" href="/assets/img/favicon.png?v=0.1.23">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" aria-current="page" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="wrap wiki"><nav class="wnav" id="wnav" aria-label="Wiki"><h2 data-i18n="wkg.start">Start here</h2><a href="/wiki/getting-started/" data-i18n="wk.getting-started.t">Getting started</a><h2 data-i18n="wkg.windows">The windows</h2><a href="/wiki/channel-rack/" data-i18n="wk.channel-rack.t">Channel rack</a><a href="/wiki/piano-roll/" data-i18n="wk.piano-roll.t">Piano roll</a><a href="/wiki/playlist/" data-i18n="wk.playlist.t">Playlist</a><a href="/wiki/mixer/" data-i18n="wk.mixer.t">Mixer</a><a href="/wiki/browser/" data-i18n="wk.browser.t">Browser</a><h2 data-i18n="wkg.from">Coming from another DAW</h2><a href="/wiki/coming-from-fl-studio/" data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</a><a href="/wiki/coming-from-ableton/" data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</a><h2 data-i18n="wkg.more">Working with it</h2><a href="/wiki/plugins/" data-i18n="wk.plugins.t">Plugins</a><a href="/wiki/online-sessions/" data-i18n="wk.online-sessions.t">Online sessions</a><a href="/wiki/simple-layout/" data-i18n="wk.simple-layout.t">Simple layout</a><h2 data-i18n="wkg.ref">Reference</h2><a href="/wiki/shortcuts/" data-i18n="wk.shortcuts.t">Shortcuts</a><a href="/wiki/file-formats/" aria-current="page" data-i18n="wk.file-formats.t">File formats</a><a href="/wiki/troubleshooting/" data-i18n="wk.troubleshooting.t">Troubleshooting</a></nav><article><a class="wjump" href="#wnav" data-i18n="wiki.all">All wiki pages</a><h1><span data-i18n="wk.file-formats.t">File formats</span></h1><p class="sub" data-i18n="wk.file-formats.s">Every format LYNX SHARE 0.1.25 opens, imports, saves and exports, with its limits.</p><p class="enonly" data-i18n="wiki.enOnly">The wiki pages are in English only for now.</p><div class="prose"><p>A project opened from another program&#x27;s format is an import. <code>File › Save</code> then asks where to write a <code>.lynx</code> file, and the original file is never changed.</p>
+<h2 id="what-lynx-share-opens-and-imports">What LYNX SHARE opens and imports</h2>
+<div class="tablewrap"><table><thead><tr><th>Format</th><th>What it is</th><th>Limits</th></tr></thead><tbody><tr><td><code>.lynx</code></td><td>LYNX SHARE&#x27;s own project format (JSON)</td><td>None</td></tr><tr><td><code>.lynxpack</code></td><td>A project or a part sent in an <a href="/wiki/online-sessions/">online session</a></td><td>Opens after a summary. A part is merged into the host&#x27;s project</td></tr><tr><td><code>.zip</code></td><td>A project with its samples, exported by LYNX SHARE, or FL Studio&#x27;s zipped loop package</td><td>Extracted to a folder, then the project inside is opened</td></tr><tr><td><code>.flp</code></td><td>FL Studio project</td><td>Native plugins play on recreated engines of varying exactness. FLEX packs are never opened. See <a href="/wiki/coming-from-fl-studio/">Coming from FL Studio</a></td></tr><tr><td><code>.als</code></td><td>Ableton Live set, Live 11 and 12</td><td>Live&#x27;s own effects are dropped and racks keep their first chain. See <a href="/wiki/coming-from-ableton/">Coming from Ableton Live</a></td></tr><tr><td><code>.flm</code></td><td>FL Studio Mobile project</td><td>Partial: FLM&#x27;s effects and automation are not imported</td></tr><tr><td><code>.mid</code>, <code>.midi</code></td><td>MIDI file</td><td><code>File › Open...</code> makes a new project from it. <code>File › Import › MIDI file...</code> and the Piano roll import it into the current one</td></tr><tr><td><code>.wav</code>, <code>.aif</code>, <code>.aiff</code>, <code>.flac</code>, <code>.ogg</code>, <code>.mp3</code></td><td>Audio files, loaded as samples and audio clips</td><td>Files longer than 30 seconds are streamed from a disk cache</td></tr><tr><td><code>.wv</code></td><td>WavPack samples, as shipped in FL Studio&#x27;s packs</td><td>Read only</td></tr><tr><td><code>.sf2</code>, <code>.sf3</code></td><td>SoundFonts, played by LYNX Soundfont</td><td>None stated</td></tr><tr><td><code>.fst</code></td><td>Preset of an FL Studio native plugin</td><td>Only for the plugins LYNX SHARE has an engine for</td></tr><tr><td><code>.fsc</code></td><td>FL Studio score and automation file</td><td>Piano roll and Event editor</td></tr><tr><td>Video file</td><td><code>File › Import › Video file...</code> puts a video on the Playlist</td><td>Windows and macOS use the system decoders. Linux needs FFmpeg</td></tr></tbody></table></div>
+<h2 id="what-lynx-share-saves-and-exports">What LYNX SHARE saves and exports</h2>
+<div class="tablewrap"><table><thead><tr><th>Format</th><th>What it is</th><th>Limits</th></tr></thead><tbody><tr><td><code>.lynx</code></td><td>The project (<code>File › Save</code>), with autosave</td><td>None stated</td></tr><tr><td><code>.zip</code></td><td><code>File › Export › Project with samples (.zip)...</code></td><td>None stated</td></tr><tr><td><code>.lynxpack</code></td><td><code>File › Online session › Send project...</code></td><td>Third-party plugin parts travel as audio renders plus the plugin settings</td></tr><tr><td><code>.flp</code></td><td><code>File › Export › FL Studio project...</code>, an FL Studio 2026 project or a zipped loop package</td><td>LYNX-only instruments and effects are rendered to audio or swapped for the nearest FL plugin. Modulators are left out</td></tr><tr><td><code>.als</code></td><td><code>File › Export › Ableton Live set (.als)...</code>, for Live 12 or Live 11</td><td>LYNX SHARE&#x27;s own instruments and effects are not converted. Effect-parameter automation and insert-to-insert routes are dropped</td></tr><tr><td>WAV</td><td><code>File › Export › Wave file...</code>, 16-bit, 24-bit or 32-bit float</td><td>Optional dither, tempo information, loop markers and Playlist markers</td></tr><tr><td>MP3</td><td><code>File › Export › MP3 file...</code></td><td>Constant bitrate</td></tr><tr><td>OGG</td><td><code>File › Export › OGG file...</code></td><td>None stated</td></tr><tr><td>FLAC</td><td><code>File › Export › FLAC file...</code>, compression 0 to 8</td><td>Lossless at every level</td></tr><tr><td>Stems</td><td>The <code>Files</code> option of the export window: one file per mixer insert, per channel, or per channel with instruments only</td><td><code>File › Export › All playlist tracks</code> and <code>All playlist track groups</code> write one file per track or group</td></tr><tr><td><code>.mid</code></td><td><code>File › Export › MIDI file...</code> (<code>Ctrl+Shift+M</code>)</td><td>None stated</td></tr><tr><td>Mastered file</td><td><code>File › Export › Master...</code> renders the project and masters it to a loudness target, on your computer</td><td>None stated</td></tr><tr><td>Video</td><td><code>Also write a video with this mix</code> in the export window</td><td>Needs FFmpeg</td></tr><tr><td>Project bones</td><td><code>File › Export › Project bones...</code> writes channel and effect presets and scores to a folder</td><td>None stated</td></tr></tbody></table></div>
+<p>The export window renders the song, the current pattern or the Playlist selection.</p>
+<h2 id="from-the-command-line">From the command line</h2>
+<p>On Windows the program is <code>LYNX.exe</code>. On macOS and Linux it is <code>LYNX</code>.</p>
+<pre><code>LYNX.exe project.lynx                       open a project (.lynx, .flp, .als, .flm or .mid)
+LYNX.exe --export project.flp out.flac      render the song (wav, flac or ogg)
+LYNX.exe --stems project.flp base.wav       one WAV per mixer insert that has sound
+LYNX.exe --export-flp project.lynx out.flp  write an FL Studio project</code></pre>
+<p><code>--export</code>, <code>--stems</code> and <code>--export-flp</code> also accept an <code>.als</code> as the input.</p></div><nav class="wpn"><a href="/wiki/shortcuts/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.shortcuts.t">Shortcuts</b></a><a href="/wiki/troubleshooting/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.troubleshooting.t">Troubleshooting</b></a></nav></article></div>
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
+<script src="/assets/site.js?v=59e4b1d6" defer></script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="wk.browser.t" data-desc="wk.browser.s">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Browser · LYNX SHARE</title>
+<meta name="description" content="Find and preview samples, presets and plugins, and drag them into the project.">
+<meta property="og:title" content="Browser · LYNX SHARE">
+<meta property="og:description" content="Find and preview samples, presets and plugins, and drag them into the project.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.25">
+<meta property="og:url" content="https://lynx-share.com/wiki/browser/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/wiki/browser/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/wiki/browser/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/wiki/browser/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/wiki/browser/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/wiki/browser/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/wiki/browser/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/wiki/browser/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/wiki/browser/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/wiki/browser/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/wiki/browser/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/wiki/browser/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/wiki/browser/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/wiki/browser/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/wiki/browser/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/wiki/browser/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/wiki/browser/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/wiki/browser/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" href="/assets/img/favicon.png?v=0.1.23">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" aria-current="page" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="wrap wiki"><nav class="wnav" id="wnav" aria-label="Wiki"><h2 data-i18n="wkg.start">Start here</h2><a href="/wiki/getting-started/" data-i18n="wk.getting-started.t">Getting started</a><h2 data-i18n="wkg.windows">The windows</h2><a href="/wiki/channel-rack/" data-i18n="wk.channel-rack.t">Channel rack</a><a href="/wiki/piano-roll/" data-i18n="wk.piano-roll.t">Piano roll</a><a href="/wiki/playlist/" data-i18n="wk.playlist.t">Playlist</a><a href="/wiki/mixer/" data-i18n="wk.mixer.t">Mixer</a><a href="/wiki/browser/" aria-current="page" data-i18n="wk.browser.t">Browser</a><h2 data-i18n="wkg.from">Coming from another DAW</h2><a href="/wiki/coming-from-fl-studio/" data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</a><a href="/wiki/coming-from-ableton/" data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</a><h2 data-i18n="wkg.more">Working with it</h2><a href="/wiki/plugins/" data-i18n="wk.plugins.t">Plugins</a><a href="/wiki/online-sessions/" data-i18n="wk.online-sessions.t">Online sessions</a><a href="/wiki/simple-layout/" data-i18n="wk.simple-layout.t">Simple layout</a><h2 data-i18n="wkg.ref">Reference</h2><a href="/wiki/shortcuts/" data-i18n="wk.shortcuts.t">Shortcuts</a><a href="/wiki/file-formats/" data-i18n="wk.file-formats.t">File formats</a><a href="/wiki/troubleshooting/" data-i18n="wk.troubleshooting.t">Troubleshooting</a></nav><article><a class="wjump" href="#wnav" data-i18n="wiki.all">All wiki pages</a><h1><span data-i18n="wk.browser.t">Browser</span></h1><p class="sub" data-i18n="wk.browser.s">Find and preview samples, presets and plugins, and drag them into the project.</p><p class="enonly" data-i18n="wiki.enOnly">The wiki pages are in English only for now.</p><div class="prose"><p>The Browser lists your sample folders, the contents of the current project and the plugins LYNX SHARE knows. Press <code>Alt+F8</code> to show or hide it. <code>F8</code> alone opens the plugin picker, a separate full-screen view of every instrument and effect.</p>
+<h2 id="tabs">Tabs</h2>
+<div class="tablewrap"><table><thead><tr><th>Tab</th><th>Shows</th></tr></thead><tbody><tr><td>ALL</td><td>The current project and every sample folder</td></tr><tr><td>PROJECT</td><td>Only what the current project uses: patterns, effects, generators, automation, audio files</td></tr><tr><td>STARRED</td><td>The files and folders you starred (right-click, then <code>Starred</code>)</td></tr></tbody></table></div>
+<h2 id="browse-and-preview">Browse and preview</h2>
+<ul><li>Click a folder to open or close it. Right-click it for a menu (collapse all, show in the file manager).</li><li>Click an audio file to hear it. The preview strip under the list shows its waveform. Click the strip to hear the file again, or drag from it as if it were the file.</li><li>With the Browser focused, <code>Up</code> and <code>Down</code> step through the files and preview each one. <code>Left</code> closes a folder or goes to its parent, <code>Right</code> opens it.</li></ul>
+<h2 id="use-a-sample">Use a sample</h2>
+<div class="tablewrap"><table><thead><tr><th>Action</th><th>Result</th></tr></thead><tbody><tr><td>Double-click</td><td>New channel with the sample</td></tr><tr><td>Drag to the Channel rack</td><td>New channel, or drop on a row to load it there</td></tr><tr><td>Drag to the Playlist</td><td>Audio clip</td></tr><tr><td><code>Enter</code></td><td>Loads the file into the selected channel</td></tr><tr><td><code>Shift+Up</code> / <code>Shift+Down</code></td><td>Steps to the previous or next file and loads it into the selected channel</td></tr></tbody></table></div>
+<p>The last one lets you audition different samples in place while the pattern plays.</p>
+<h2 id="other-file-types">Other file types</h2>
+<ul><li><strong>Project</strong>: double-click opens it.</li><li><strong>MIDI file</strong>: double-click opens it as a project.</li><li><strong>SoundFont or SFZ</strong>: click previews it, double-click makes a LYNX Soundfont channel (or loads it into the selected one).</li><li><strong>Mixer preset</strong>: double-click loads it onto the selected Mixer inserts, or drag it onto an insert.</li><li><strong>Effect preset</strong>: drag it onto a Mixer insert.</li></ul>
+<h2 id="plugin-database">Plugin database</h2>
+<p>The Plugin database entry lists LYNX SHARE&#x27;s built-in instruments and effects and the installed plugins. <code>Shift+F8</code> jumps to it.</p>
+<ul><li>Double-click an instrument to add it as a new channel, or drag it onto the Channel rack.</li><li>Double-click an effect to add it to the selected Mixer insert, or drag it onto an insert or an effect slot.</li><li><code>F2</code> renames the selected plugin.</li></ul>
+<h2 id="the-project-tab">The PROJECT tab</h2>
+<p>Patterns listed here can be clicked to make them the current pattern, double-clicked to open them in the <a href="/wiki/piano-roll/">Piano roll</a>, or dragged into the <a href="/wiki/playlist/">Playlist</a>. The current project section also lists the undo history: click a step to go back to it.</p>
+<h2 id="search">Search</h2>
+<p>Press <code>Ctrl+F</code> to put the cursor in the search box. It searches the selected folder (or every folder) and below. In the PROJECT tab it searches the project&#x27;s items.</p>
+<p>All words must match. The box also takes <code>OR</code>, a minus sign to exclude a word, and <code>*</code> wildcards:</p>
+<pre><code>kick -loop
+snare OR clap
+hat*.wav</code></pre>
+<p>The folders are indexed in the background. <code>Refresh search index</code> in the Browser&#x27;s menu rebuilds the index.</p>
+<h2 id="your-own-folders">Your own folders</h2>
+<p>Use <code>Add folder</code> in the Browser&#x27;s folder list to add a folder of samples, projects or SoundFonts. Removing a folder from the list does not delete it from the disk. <code>Options › File settings</code> has the search folders.</p></div><nav class="wpn"><a href="/wiki/mixer/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.mixer.t">Mixer</b></a><a href="/wiki/coming-from-fl-studio/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</b></a></nav></article></div>
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
+<script src="/assets/site.js?v=59e4b1d6" defer></script>
+</body>
+</html>

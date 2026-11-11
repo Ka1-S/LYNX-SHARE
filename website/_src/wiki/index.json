@@ -1,0 +1,7 @@
+[
+  {"key": "wkg.start", "title": "Start here", "pages": ["getting-started"]},
+  {"key": "wkg.windows", "title": "The windows", "pages": ["channel-rack", "piano-roll", "playlist", "mixer", "browser"]},
+  {"key": "wkg.from", "title": "Coming from another DAW", "pages": ["coming-from-fl-studio", "coming-from-ableton"]},
+  {"key": "wkg.more", "title": "Working with it", "pages": ["plugins", "online-sessions", "simple-layout"]},
+  {"key": "wkg.ref", "title": "Reference", "pages": ["shortcuts", "file-formats", "troubleshooting"]}
+]

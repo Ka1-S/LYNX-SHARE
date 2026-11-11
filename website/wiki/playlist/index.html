@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="wk.playlist.t" data-desc="wk.playlist.s">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Playlist · LYNX SHARE</title>
+<meta name="description" content="Arrange pattern, audio and automation clips on tracks to build the song.">
+<meta property="og:title" content="Playlist · LYNX SHARE">
+<meta property="og:description" content="Arrange pattern, audio and automation clips on tracks to build the song.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.25">
+<meta property="og:url" content="https://lynx-share.com/wiki/playlist/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/wiki/playlist/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/wiki/playlist/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/wiki/playlist/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/wiki/playlist/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/wiki/playlist/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/wiki/playlist/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/wiki/playlist/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/wiki/playlist/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/wiki/playlist/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/wiki/playlist/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/wiki/playlist/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/wiki/playlist/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/wiki/playlist/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/wiki/playlist/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/wiki/playlist/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/wiki/playlist/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/wiki/playlist/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" href="/assets/img/favicon.png?v=0.1.23">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" aria-current="page" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="wrap wiki"><nav class="wnav" id="wnav" aria-label="Wiki"><h2 data-i18n="wkg.start">Start here</h2><a href="/wiki/getting-started/" data-i18n="wk.getting-started.t">Getting started</a><h2 data-i18n="wkg.windows">The windows</h2><a href="/wiki/channel-rack/" data-i18n="wk.channel-rack.t">Channel rack</a><a href="/wiki/piano-roll/" data-i18n="wk.piano-roll.t">Piano roll</a><a href="/wiki/playlist/" aria-current="page" data-i18n="wk.playlist.t">Playlist</a><a href="/wiki/mixer/" data-i18n="wk.mixer.t">Mixer</a><a href="/wiki/browser/" data-i18n="wk.browser.t">Browser</a><h2 data-i18n="wkg.from">Coming from another DAW</h2><a href="/wiki/coming-from-fl-studio/" data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</a><a href="/wiki/coming-from-ableton/" data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</a><h2 data-i18n="wkg.more">Working with it</h2><a href="/wiki/plugins/" data-i18n="wk.plugins.t">Plugins</a><a href="/wiki/online-sessions/" data-i18n="wk.online-sessions.t">Online sessions</a><a href="/wiki/simple-layout/" data-i18n="wk.simple-layout.t">Simple layout</a><h2 data-i18n="wkg.ref">Reference</h2><a href="/wiki/shortcuts/" data-i18n="wk.shortcuts.t">Shortcuts</a><a href="/wiki/file-formats/" data-i18n="wk.file-formats.t">File formats</a><a href="/wiki/troubleshooting/" data-i18n="wk.troubleshooting.t">Troubleshooting</a></nav><article><a class="wjump" href="#wnav" data-i18n="wiki.all">All wiki pages</a><h1><span data-i18n="wk.playlist.t">Playlist</span></h1><p class="sub" data-i18n="wk.playlist.s">Arrange pattern, audio and automation clips on tracks to build the song.</p><p class="enonly" data-i18n="wiki.enOnly">The wiki pages are in English only for now.</p><div class="prose"><figure><a class="shot" href="/assets/img/playlist.webp"><img src="/assets/img/playlist.webp" alt="The Playlist with clips on tracks" loading="lazy"></a></figure>
+<p>The Playlist is where patterns become a song. It holds three kinds of clips on its tracks: pattern clips, audio clips and automation clips. Press <code>F5</code> to show or hide it, and <code>Enter</code> to maximize or restore it.</p>
+<p>The transport has two modes. Pattern mode plays the current pattern in a loop. Song mode plays the Playlist. Press <code>L</code> to switch.</p>
+<h2 id="place-clips">Place clips</h2>
+<p>The Picker panel lists the patterns, audio and automation of the project. Click one to make it the clip source.</p>
+<ol><li>Pick the Pencil (<code>P</code>).</li><li>Click on a track to place the Picker&#x27;s clip, and drag to position it.</li><li>With the Brush (<code>B</code>), drag to paint clips end to end.</li></ol>
+<p>Audio files can be dragged from the <a href="/wiki/browser/">Browser</a> onto the Playlist.</p>
+<h2 id="tools">Tools</h2>
+<p>The letters work while the typing keyboard piano (<code>Ctrl+T</code>) is off.</p>
+<div class="tablewrap"><table><thead><tr><th>Tool</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td>Pencil</td><td><code>P</code></td><td>Click places the Picker&#x27;s clip</td></tr><tr><td>Brush</td><td><code>B</code></td><td>Drag paints clips end to end</td></tr><tr><td>Eraser</td><td><code>D</code></td><td>Click or drag deletes</td></tr><tr><td>Mute</td><td><code>T</code></td><td>Click or drag mutes or unmutes clips</td></tr><tr><td>Knife</td><td><code>C</code></td><td>Drag a line to cut across clips, click cuts at that point</td></tr><tr><td>Lasso</td><td><code>E</code></td><td>Drag draws a selection box. <code>Shift</code> adds</td></tr><tr><td>Zoom</td><td><code>Z</code></td><td>Click zooms in, drag a range to zoom to it, right-click zooms out</td></tr><tr><td>Listen</td><td><code>Y</code></td><td>Click or drag plays from that point</td></tr><tr><td>Slip</td><td><code>S</code></td><td>Drag slides the clip&#x27;s content inside the clip</td></tr></tbody></table></div>
+<h2 id="working-with-clips">Working with clips</h2>
+<ul><li>Drag a clip to move it. <code>Shift</code>+drag makes a copy.</li><li>Drag a clip&#x27;s end to resize it. Dragging the start trims it while the content stays in place.</li><li>Right-click deletes a clip. <code>Ctrl</code>+drag selects.</li><li>Double-click a clip to open it.</li><li>The button at a clip&#x27;s top left opens the clip menu (make unique, rename and colour, chop, and for audio: pitch, fit to tempo, reverse).</li><li>Hold <code>Alt</code> while dragging to ignore the snap.</li><li>Audio clips have fade handles and a clip gain you drag up or down.</li><li><code>Shift+M</code> switches Stretch: resizing an audio clip then stretches the audio instead of cutting it.</li></ul>
+<h2 id="tracks">Tracks</h2>
+<p>In a track&#x27;s header, click selects, <code>Ctrl</code>+click adds or removes, <code>Shift</code>+click selects a range and right-click opens the track menu. <code>Shift</code>+wheel moves the track up or down. The track&#x27;s light mutes it (click) or solos it (<code>Ctrl</code>+click or right-click). Drag the divider between two tracks to resize one, or <code>Shift</code>+drag to resize all.</p>
+<h2 id="ruler-loop-and-markers">Ruler, loop and markers</h2>
+<ul><li>Click the ruler to set the song position.</li><li>Right-drag, <code>Ctrl</code>+drag or double-click-drag on the ruler makes a time selection, which is also the loop. <code>Shift</code>+drag moves it.</li><li><code>Ctrl+Ins</code> inserts the time selection&#x27;s length across all tracks, <code>Ctrl+Del</code> removes it.</li><li><code>Alt+T</code> adds a marker. Click a marker to jump to it.</li><li><code>Ctrl</code>+wheel zooms, <code>Alt</code>+wheel changes the track height.</li></ul>
+<h2 id="automation">Automation</h2>
+<p>Right-click a knob or fader and choose <code>Create automation clip</code>. The clip appears on the Playlist. With the Pencil, drag its points, and click on the curve to add one. Automation lanes under tracks are optional and off by default.</p>
+<h2 id="arrangements">Arrangements</h2>
+<p>The arrangement box in the toolbar switches between arrangements. A project can have several.</p>
+<h2 id="clip-launch-layout">Clip-launch layout</h2>
+<p><code>View › Layout style › Clip-launch workflow</code> adds a grid of clips and scenes next to the Playlist. It is optional. The Pattern workflow is the default.</p>
+<h2 id="keys">Keys</h2>
+<div class="tablewrap"><table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody><tr><td><code>Ctrl+A</code></td><td>Select all</td></tr><tr><td><code>Ctrl+C</code> / <code>Ctrl+X</code> / <code>Ctrl+V</code></td><td>Copy, cut, paste</td></tr><tr><td><code>Ctrl+B</code></td><td>Duplicate</td></tr><tr><td><code>Del</code></td><td>Delete the selected clips</td></tr><tr><td><code>Shift+Del</code></td><td>Delete the selected clips and close the gaps</td></tr><tr><td><code>Shift+S</code></td><td>Ripple editing on or off</td></tr><tr><td><code>Alt+M</code> / <code>Shift+Alt+M</code></td><td>Mute, unmute the selected clips</td></tr><tr><td><code>Ctrl+Shift+V</code></td><td>Make the selected clips unique</td></tr><tr><td><code>Ctrl+G</code></td><td>Merge pattern clips</td></tr><tr><td><code>PageUp</code> / <code>PageDown</code></td><td>Zoom in, out</td></tr><tr><td><code>Shift+4</code></td><td>Zoom to show everything</td></tr></tbody></table></div>
+<h2 id="known-limits">Known limits</h2>
+<p>From the 0.1.25 release notes: with several overlapping automation clips on one control, the choice of which one plays can differ from FL Studio&#x27;s. A tempo moved by a linked MIDI controller does not resize audio clips. On Linux, video needs FFmpeg.</p></div><nav class="wpn"><a href="/wiki/piano-roll/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.piano-roll.t">Piano roll</b></a><a href="/wiki/mixer/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.mixer.t">Mixer</b></a></nav></article></div>
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
+<script src="/assets/site.js?v=59e4b1d6" defer></script>
+</body>
+</html>

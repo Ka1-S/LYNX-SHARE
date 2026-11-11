@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="wk.coming-from-fl-studio.t" data-desc="wk.coming-from-fl-studio.s">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coming from FL Studio · LYNX SHARE</title>
+<meta name="description" content="What maps to what, opening .flp and .flm projects, and sending a song back to FL Studio.">
+<meta property="og:title" content="Coming from FL Studio · LYNX SHARE">
+<meta property="og:description" content="What maps to what, opening .flp and .flm projects, and sending a song back to FL Studio.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.25">
+<meta property="og:url" content="https://lynx-share.com/wiki/coming-from-fl-studio/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/wiki/coming-from-fl-studio/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/wiki/coming-from-fl-studio/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/wiki/coming-from-fl-studio/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/wiki/coming-from-fl-studio/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" href="/assets/img/favicon.png?v=0.1.23">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" aria-current="page" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="wrap wiki"><nav class="wnav" id="wnav" aria-label="Wiki"><h2 data-i18n="wkg.start">Start here</h2><a href="/wiki/getting-started/" data-i18n="wk.getting-started.t">Getting started</a><h2 data-i18n="wkg.windows">The windows</h2><a href="/wiki/channel-rack/" data-i18n="wk.channel-rack.t">Channel rack</a><a href="/wiki/piano-roll/" data-i18n="wk.piano-roll.t">Piano roll</a><a href="/wiki/playlist/" data-i18n="wk.playlist.t">Playlist</a><a href="/wiki/mixer/" data-i18n="wk.mixer.t">Mixer</a><a href="/wiki/browser/" data-i18n="wk.browser.t">Browser</a><h2 data-i18n="wkg.from">Coming from another DAW</h2><a href="/wiki/coming-from-fl-studio/" aria-current="page" data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</a><a href="/wiki/coming-from-ableton/" data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</a><h2 data-i18n="wkg.more">Working with it</h2><a href="/wiki/plugins/" data-i18n="wk.plugins.t">Plugins</a><a href="/wiki/online-sessions/" data-i18n="wk.online-sessions.t">Online sessions</a><a href="/wiki/simple-layout/" data-i18n="wk.simple-layout.t">Simple layout</a><h2 data-i18n="wkg.ref">Reference</h2><a href="/wiki/shortcuts/" data-i18n="wk.shortcuts.t">Shortcuts</a><a href="/wiki/file-formats/" data-i18n="wk.file-formats.t">File formats</a><a href="/wiki/troubleshooting/" data-i18n="wk.troubleshooting.t">Troubleshooting</a></nav><article><a class="wjump" href="#wnav" data-i18n="wiki.all">All wiki pages</a><h1><span data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</span></h1><p class="sub" data-i18n="wk.coming-from-fl-studio.s">What maps to what, opening .flp and .flm projects, and sending a song back to FL Studio.</p><p class="enonly" data-i18n="wiki.enOnly">The wiki pages are in English only for now.</p><div class="prose"><p>LYNX SHARE is an independent program. It is not affiliated with, endorsed or sponsored by Image-Line, and it contains no Image-Line code. FL Studio is a registered trademark of Image-Line Software.</p>
+<h2 id="what-maps-to-what">What maps to what</h2>
+<p>The windows keep the names and keys you know.</p>
+<div class="tablewrap"><table><thead><tr><th>In FL Studio</th><th>In LYNX SHARE</th></tr></thead><tbody><tr><td>Playlist, Channel rack, Piano roll, Mixer</td><td>Same names, on <code>F5</code>, <code>F6</code>, <code>F7</code> and <code>F9</code></td></tr><tr><td>Plugin picker</td><td><code>F8</code></td></tr><tr><td>Browser</td><td><code>Alt+F8</code></td></tr><tr><td>Pattern / Song mode</td><td><code>L</code></td></tr><tr><td>Undo</td><td><code>Ctrl+Z</code> undoes, or redoes after an undo. <code>Ctrl+Alt+Z</code> undoes backwards</td></tr><tr><td>Save new version</td><td><code>Ctrl+Alt+S</code></td></tr><tr><td>Export</td><td><code>Ctrl+R</code>, MP3 on <code>Ctrl+Shift+R</code>, MIDI on <code>Ctrl+Shift+M</code></td></tr><tr><td>Fruity Wrapper</td><td>Third-party plugins are hosted directly, see <a href="/wiki/plugins/">Plugins</a></td></tr><tr><td><code>.flp</code> project file</td><td><code>.lynx</code> project file</td></tr></tbody></table></div>
+<p>The Mixer has inserts, sends, 10 effect slots per track and sidechain. <code>Help › Shortcuts</code> lists every key.</p>
+<h2 id="opening-a-flp">Opening a .flp</h2>
+<ol><li>Choose <code>File › Open...</code> (<code>Ctrl+O</code>) and pick the <code>.flp</code>.</li><li>LYNX SHARE resolves the project&#x27;s plugins and samples, then opens it. The title shows &quot;(imported from FL Studio)&quot;.</li><li><code>File › Save</code> asks where to write a <code>.lynx</code> file. The <code>.flp</code> itself is never written.</li></ol>
+<p>What is imported:</p>
+<ul><li>Channels, samples, patterns, slide and porta notes, every arrangement, markers, time-signature changes, automation and controller links.</li><li>The Mixer: routing, levels, sidechains, track EQ and native effects with their saved settings.</li><li>Third-party VST3, VST2 and CLAP plugins inside Fruity Wrapper: replaced by the same plugin installed on your computer, with its saved state.</li></ul>
+<h2 id="fl-studio-native-plugins">FL Studio native plugins</h2>
+<p>FL Studio&#x27;s own generators and effects are not loaded. LYNX SHARE plays them on engines it recreated, and each one has a quality level:</p>
+<div class="tablewrap"><table><thead><tr><th>Level</th><th>Meaning</th></tr></thead><tbody><tr><td>Exact</td><td>Bit-identical to the original on every state tested</td></tr><tr><td>Near-exact</td><td>Bit-identical on most states, the rest differ below about -100 dB</td></tr><tr><td>Close</td><td>The same algorithm, within -60 dB of the original on almost all tested states</td></tr><tr><td>Approximate</td><td>The saved settings are mapped onto a LYNX SHARE built-in synth or effect</td></tr><tr><td>Placeholder</td><td>The state is kept and the plugin is silent or passes audio through</td></tr></tbody></table></div>
+<p>The level of every engine, and what each one still lacks, is in <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS.md">PLUGINS.md</a>.</p>
+<p>FLEX packs are encrypted and are never opened. A FLEX channel gets a synth patch chosen by its preset name.</p>
+<h2 id="what-needs-your-own-fl-studio-installation">What needs your own FL Studio installation</h2>
+<p>Opening a <code>.flp</code> works without FL Studio installed. An installation on the same computer adds two things:</p>
+<ul><li>FL Studio&#x27;s factory samples and its plugin database, so samples and plugins are found without a scan.</li><li>The built-in waves, samples, impulses and tables some engines need (FL Keys, Soundgoodizer, Maximus and the others marked with a dagger in PLUGINS.md). They are read from your installation at run time and are not shipped with LYNX SHARE.</li></ul>
+<p>On Linux, LYNX SHARE looks for a Windows FL Studio under Wine. On macOS the app bundle is looked for, but this is untested.</p>
+<h2 id="the-import-report">The import report</h2>
+<p><code>Help › Last FL Studio import report</code> lists what was approximated by the built-in synth, what had no equivalent, which plugins were found or are not installed, which effects were left out or partly reproduced, and how many samples are missing. <code>Help › Missing files...</code> lists the missing samples and plugins.</p>
+<h2 id="exporting-back-to-flp">Exporting back to .flp</h2>
+<ol><li>Choose <code>File › Export › FL Studio project...</code>.</li><li>Pick <code>FL Studio project (.flp)</code> or <code>Zipped loop package (.zip, with every sample)</code>.</li><li>Choose what happens to things FL Studio does not have: render them to audio (sounds the same), or use the nearest FL plugin (stays editable, may sound different, and LYNX-only instruments are left out).</li></ol>
+<p>The file is an FL Studio 2026 project. Samplers, audio clips, FL&#x27;s own generators and effects, third-party plugins (inside Fruity Wrapper), patterns, the Playlist, the Mixer and automation go over with their settings. Modulators are left out. A report lists what went over exactly and what was rendered, replaced or left out.</p>
+<h2 id="fl-studio-mobile-flm">FL Studio Mobile (.flm)</h2>
+<p><code>File › Open...</code> also takes <code>.flm</code> projects. The import is partial.</p>
+<ul><li>Imported: tempo, time signature, one mixer insert per FLM channel, one Playlist track per lane, patterns (each loop pass as a clip), audio clips with offset and pitch, drum kits, DW Sampler samples (as samplers) and <code>.dwp</code> programs (in DirectWave).</li><li>Not imported: FLM&#x27;s effects and automation lanes. Other FLM generators play the built-in synth.</li><li>Samples are searched next to the <code>.flm</code> and in FL Studio&#x27;s copy of the FLM resources. A <code>.dwp</code> that is not found plays a stand-in.</li></ul></div><nav class="wpn"><a href="/wiki/browser/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.browser.t">Browser</b></a><a href="/wiki/coming-from-ableton/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</b></a></nav></article></div>
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
+<script src="/assets/site.js?v=59e4b1d6" defer></script>
+</body>
+</html>

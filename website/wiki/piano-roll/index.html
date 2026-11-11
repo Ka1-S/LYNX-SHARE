@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en" class="nojs" data-title="wk.piano-roll.t" data-desc="wk.piano-roll.s">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piano roll · LYNX SHARE</title>
+<meta name="description" content="Edit the notes of one channel in the current pattern.">
+<meta property="og:title" content="Piano roll · LYNX SHARE">
+<meta property="og:description" content="Edit the notes of one channel in the current pattern.">
+<meta property="og:site_name" content="LYNX SHARE">
+<meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.25">
+<meta property="og:url" content="https://lynx-share.com/wiki/piano-roll/">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:locale:alternate" content="zh_TW">
+<meta property="og:locale:alternate" content="nl_NL">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="id_ID">
+<meta property="og:locale:alternate" content="it_IT">
+<meta property="og:locale:alternate" content="ja_JP">
+<meta property="og:locale:alternate" content="ko_KR">
+<meta property="og:locale:alternate" content="pl_PL">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="tr_TR">
+<link rel="canonical" href="https://lynx-share.com/wiki/piano-roll/">
+<link rel="alternate" hreflang="en" href="https://lynx-share.com/wiki/piano-roll/">
+<link rel="alternate" hreflang="zh-Hans" href="https://lynx-share.com/wiki/piano-roll/?lang=zh-Hans">
+<link rel="alternate" hreflang="zh-Hant" href="https://lynx-share.com/wiki/piano-roll/?lang=zh-Hant">
+<link rel="alternate" hreflang="nl" href="https://lynx-share.com/wiki/piano-roll/?lang=nl">
+<link rel="alternate" hreflang="fr" href="https://lynx-share.com/wiki/piano-roll/?lang=fr">
+<link rel="alternate" hreflang="de" href="https://lynx-share.com/wiki/piano-roll/?lang=de">
+<link rel="alternate" hreflang="id" href="https://lynx-share.com/wiki/piano-roll/?lang=id">
+<link rel="alternate" hreflang="it" href="https://lynx-share.com/wiki/piano-roll/?lang=it">
+<link rel="alternate" hreflang="ja" href="https://lynx-share.com/wiki/piano-roll/?lang=ja">
+<link rel="alternate" hreflang="ko" href="https://lynx-share.com/wiki/piano-roll/?lang=ko">
+<link rel="alternate" hreflang="pl" href="https://lynx-share.com/wiki/piano-roll/?lang=pl">
+<link rel="alternate" hreflang="pt-BR" href="https://lynx-share.com/wiki/piano-roll/?lang=pt">
+<link rel="alternate" hreflang="ru" href="https://lynx-share.com/wiki/piano-roll/?lang=ru">
+<link rel="alternate" hreflang="es" href="https://lynx-share.com/wiki/piano-roll/?lang=es">
+<link rel="alternate" hreflang="tr" href="https://lynx-share.com/wiki/piano-roll/?lang=tr">
+<link rel="alternate" hreflang="x-default" href="https://lynx-share.com/wiki/piano-roll/">
+<script>
+(function(){
+var L=window.LYNX_LANGS=[["en","English"],["zh-Hans","简体中文"],["zh-Hant","繁體中文"],["nl","Nederlands"],["fr","Français"],["de","Deutsch"],["id","Bahasa Indonesia"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["pl","Polski"],["pt-BR","Português (Brasil)"],["ru","Русский"],["es","Español"],["tr","Türkçe"]];
+var pick=function(s){
+  var p=String(s||"").toLowerCase().replace(/_/g,"-").split("-"),l=p[0],i;
+  if(l==="zh"){for(i=1;i<p.length;i++){if(/^(hant|tw|hk|mo)$/.test(p[i]))return"zh-Hant";if(/^(hans|cn|sg)$/.test(p[i]))return"zh-Hans";}return"zh-Hans";}
+  if(l==="pt")return"pt-BR";if(l==="in")return"id";
+  for(i=0;i<L.length;i++)if(L[i][0].toLowerCase()===l)return L[i][0];
+  return"";
+};
+var q=null,lang="",saved="",h=document.documentElement;
+try{q=new URLSearchParams(location.search).get("lang");}catch(e){}
+try{saved=localStorage.getItem("lynx-lang")||"";}catch(e){}
+lang=pick(q)||pick(saved);
+if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
+lang=lang||"en";
+if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
+window.LYNX_LANG=lang;window.LYNX_V="59e4b1d6";
+var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
+(window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
+  k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
+h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
+})();
+</script>
+<meta name="theme-color" content="#0d0e12">
+<link rel="icon" href="/assets/img/favicon.png?v=0.1.23">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/site.css?v=59e4b1d6">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="32" height="32">LYNX SHARE</a>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" aria-current="page" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <div class="navbtns">
+    <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
+    <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
+  </div>
+</div></header>
+<main>
+<div class="wrap wiki"><nav class="wnav" id="wnav" aria-label="Wiki"><h2 data-i18n="wkg.start">Start here</h2><a href="/wiki/getting-started/" data-i18n="wk.getting-started.t">Getting started</a><h2 data-i18n="wkg.windows">The windows</h2><a href="/wiki/channel-rack/" data-i18n="wk.channel-rack.t">Channel rack</a><a href="/wiki/piano-roll/" aria-current="page" data-i18n="wk.piano-roll.t">Piano roll</a><a href="/wiki/playlist/" data-i18n="wk.playlist.t">Playlist</a><a href="/wiki/mixer/" data-i18n="wk.mixer.t">Mixer</a><a href="/wiki/browser/" data-i18n="wk.browser.t">Browser</a><h2 data-i18n="wkg.from">Coming from another DAW</h2><a href="/wiki/coming-from-fl-studio/" data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</a><a href="/wiki/coming-from-ableton/" data-i18n="wk.coming-from-ableton.t">Coming from Ableton Live</a><h2 data-i18n="wkg.more">Working with it</h2><a href="/wiki/plugins/" data-i18n="wk.plugins.t">Plugins</a><a href="/wiki/online-sessions/" data-i18n="wk.online-sessions.t">Online sessions</a><a href="/wiki/simple-layout/" data-i18n="wk.simple-layout.t">Simple layout</a><h2 data-i18n="wkg.ref">Reference</h2><a href="/wiki/shortcuts/" data-i18n="wk.shortcuts.t">Shortcuts</a><a href="/wiki/file-formats/" data-i18n="wk.file-formats.t">File formats</a><a href="/wiki/troubleshooting/" data-i18n="wk.troubleshooting.t">Troubleshooting</a></nav><article><a class="wjump" href="#wnav" data-i18n="wiki.all">All wiki pages</a><h1><span data-i18n="wk.piano-roll.t">Piano roll</span></h1><p class="sub" data-i18n="wk.piano-roll.s">Edit the notes of one channel in the current pattern.</p><p class="enonly" data-i18n="wiki.enOnly">The wiki pages are in English only for now.</p><div class="prose"><figure><a class="shot" href="/assets/img/pianoroll.webp"><img src="/assets/img/pianoroll.webp" alt="The Piano roll" loading="lazy"></a></figure>
+<p>The Piano roll shows the notes of one channel in the current pattern, with a keyboard on the left and a lane for per-note values at the bottom. Press <code>F7</code> to show or hide it, or choose <code>Piano Roll</code> in a channel&#x27;s menu in the <a href="/wiki/channel-rack/">Channel rack</a>.</p>
+<p>The channel box in the toolbar picks which channel you edit. Channels that have notes in this pattern are marked. The wheel over the box steps through channels with notes, <code>Ctrl</code>+wheel through all of them.</p>
+<h2 id="tools">Tools</h2>
+<p>Each tool has a letter key. The letters work while the typing keyboard piano (<code>Ctrl+T</code>) is off.</p>
+<div class="tablewrap"><table><thead><tr><th>Tool</th><th>Key</th><th>What it does</th></tr></thead><tbody><tr><td>Pencil</td><td><code>P</code></td><td>Click adds a note, drag positions it</td></tr><tr><td>Brush</td><td><code>B</code></td><td>Drag paints a run of notes. With <code>Shift</code>, one at a time</td></tr><tr><td>Drum brush</td><td><code>N</code></td><td>One hit per grid cell on the key under the mouse</td></tr><tr><td>Eraser</td><td><code>D</code></td><td>Click or drag deletes</td></tr><tr><td>Mute</td><td><code>T</code></td><td>Click or drag mutes or unmutes notes</td></tr><tr><td>Knife</td><td><code>C</code></td><td>Drag a line to cut across notes, click cuts at that point</td></tr><tr><td>Lasso</td><td><code>E</code></td><td>Drag draws a selection box. <code>Shift</code> adds</td></tr><tr><td>Zoom</td><td><code>Z</code></td><td>Click zooms in, drag a range to zoom to it, right-click zooms out</td></tr><tr><td>Listen</td><td><code>Y</code></td><td>Click or drag plays the notes under the cursor</td></tr></tbody></table></div>
+<h2 id="working-with-notes">Working with notes</h2>
+<ul><li>Drag a note to move it. <code>Shift</code>+drag makes a copy.</li><li>Drag a note&#x27;s end to resize it. The start can be dragged too, with the end staying in place.</li><li>Right-click deletes a note, in any tool.</li><li>Double-click a note to open its properties.</li><li><code>Alt</code>+wheel over a note changes its velocity.</li><li><code>Ctrl</code>+drag selects. <code>Ctrl</code>+click adds a note to the selection or removes it.</li><li>Hold <code>Alt</code> while dragging to ignore the snap. <code>Backspace</code> turns snap off and on.</li><li>With several notes selected, the stretch handle stretches or squeezes them in time.</li></ul>
+<h2 id="keyboard-and-ruler">Keyboard and ruler</h2>
+<p>Click a key on the keyboard to hear it. Further right on the key is louder. <code>Ctrl</code>+click a key selects its notes. Middle-drag on the keyboard makes the keys taller or shorter.</p>
+<p>Click the ruler to set the position. <code>Ctrl</code>+drag, right-drag or double-click-drag on the ruler selects the notes in a time range. <code>Ctrl</code>+wheel zooms and <code>Shift</code>+wheel scrolls.</p>
+<h2 id="toolbar">Toolbar</h2>
+<ul><li><strong>Snap</strong>: &quot;Main&quot; follows the snap in the main toolbar, or pick one for this window.</li><li><strong>Chord</strong>: clicking creates the chosen chord, with the clicked note as the root. <code>Shift+N</code> goes back to single notes.</li><li><strong>Scale</strong>: highlights the notes of a scale. A separate button snaps new and moved notes, and incoming MIDI, to the chosen scale.</li><li><strong>Slide</strong> (<code>S</code>): new notes are slide notes. The note that is sounding glides to them (808 glide).</li><li><strong>Ghost notes</strong> (<code>Alt+V</code>): shows the other channels&#x27; notes behind yours.</li><li><strong>Note colour</strong>: new notes get this colour. There are 16.</li><li><strong>Follow</strong>: the view scrolls with the playhead while the pattern plays.</li><li><strong>Lane box</strong>: chooses what the bottom lane edits (velocity, pan and so on).</li></ul>
+<h2 id="keys">Keys</h2>
+<div class="tablewrap"><table><thead><tr><th>Key</th><th>Action</th></tr></thead><tbody><tr><td><code>Ctrl+A</code></td><td>Select all</td></tr><tr><td><code>Ctrl+D</code> or <code>Esc</code></td><td>Deselect</td></tr><tr><td><code>Ctrl+C</code> / <code>Ctrl+X</code> / <code>Ctrl+V</code></td><td>Copy, cut, paste</td></tr><tr><td><code>Ctrl+B</code></td><td>Duplicate the selection</td></tr><tr><td><code>Del</code></td><td>Delete the selection</td></tr><tr><td><code>Up</code> / <code>Down</code></td><td>Move the selection a semitone</td></tr><tr><td><code>Ctrl+Up</code> / <code>Ctrl+Down</code></td><td>Move the selection an octave</td></tr><tr><td><code>Left</code> / <code>Right</code></td><td>Move the selection one grid step</td></tr><tr><td><code>Ctrl+Q</code></td><td>Quick quantize (starts and lengths)</td></tr><tr><td><code>Shift+Q</code></td><td>Quantize starts</td></tr><tr><td><code>Ctrl+U</code></td><td>Chop the notes to the grid</td></tr><tr><td><code>Ctrl+G</code></td><td>Join touching notes</td></tr><tr><td><code>Ctrl+L</code></td><td>Legato</td></tr><tr><td><code>Alt+M</code> / <code>Shift+Alt+M</code></td><td>Mute, unmute the selection</td></tr><tr><td><code>Ctrl+M</code></td><td>Import a MIDI file into this channel</td></tr><tr><td><code>Ctrl+Shift+M</code></td><td>Export the pattern as a MIDI file</td></tr><tr><td><code>PageUp</code> / <code>PageDown</code></td><td>Zoom in, out</td></tr></tbody></table></div>
+<p>The note tools (Arpeggiate, Strum, Flip, Randomise, Quantize, Chop and others) open dialogs. Their keys are on the <a href="/wiki/shortcuts/">Shortcuts</a> page.</p></div><nav class="wpn"><a href="/wiki/channel-rack/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.channel-rack.t">Channel rack</b></a><a href="/wiki/playlist/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.playlist.t">Playlist</b></a></nav></article></div>
+</main>
+<footer><div class="wrap">
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <span>© 2026 · AGPL-3.0</span>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
+</div></footer>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
+<script src="/assets/site.js?v=59e4b1d6" defer></script>
+</body>
+</html>
