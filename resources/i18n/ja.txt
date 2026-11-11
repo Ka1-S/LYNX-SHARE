@@ -8900,3 +8900,4 @@ countries: jp
 "Bitmap size is incorrect." = "ビットマップのサイズが正しくありません。"
 "A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Fruity Dance 形式の画像 (PNG): 横に 8 フレーム、動きごとに 1 行、同じ名前のテキストファイルに 1 行につき 1 つの動きの名前"
 "The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "画像の幅は 8 フレーム分、高さは名前ファイル ({0}) の各行につき 1 フレーム分である必要があります。"
+"Clean|FET" = "クリーン|FET"

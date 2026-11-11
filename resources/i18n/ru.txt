@@ -8900,3 +8900,4 @@ countries: ru by kz
 "Bitmap size is incorrect." = "Неверный размер изображения."
 "A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Изображение (PNG) в формате Fruity Dance: 8 кадров по ширине, одна строка на движение и текстовый файл с тем же именем, по одному названию движения в строке"
 "The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "Ширина изображения должна составлять 8 кадров, а высота — один кадр на каждую строку файла названий ({0})."
+"Clean|FET" = "Чисто|FET"

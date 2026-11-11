@@ -8867,3 +8867,4 @@ countries: es mx ar co cl pe ve
 "Bitmap size is incorrect." = "El tamaño del mapa de bits es incorrecto."
 "A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Una imagen (PNG) en el formato de Fruity Dance: 8 fotogramas a lo ancho, una fila por movimiento y un archivo de texto con el mismo nombre con un nombre de movimiento por línea"
 "The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "El ancho de la imagen debe ser de 8 fotogramas y su alto de un fotograma por cada línea del archivo de nombres ({0})."
+"Clean|FET" = "Limpio|FET"

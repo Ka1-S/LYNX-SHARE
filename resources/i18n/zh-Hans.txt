@@ -8900,3 +8900,4 @@ countries: cn sg
 "Bitmap size is incorrect." = "位图尺寸不正确。"
 "A picture (PNG) in Fruity Dance's format: 8 frames across, one row per move, and a text file of the same name with one move name per line" = "Fruity Dance 格式的图片 (PNG)：横向 8 帧，每个动作一行，另有一个同名文本文件，每行一个动作名称"
 "The picture's width must be 8 frames and its height one frame for each line of the names file ({0})." = "图片宽度必须为 8 帧，高度为名称文件 ({0}) 每行一帧。"
+"Clean|FET" = "干净|FET"
