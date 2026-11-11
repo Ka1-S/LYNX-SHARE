@@ -146,6 +146,15 @@ std::vector<std::uint8_t> le32s (std::initializer_list<std::uint32_t> values)
     return out;
 }
 
+std::vector<std::uint8_t> le32s (const std::vector<std::uint32_t>& values)
+{
+    std::vector<std::uint8_t> out;
+    for (const auto v : values)
+        for (int k = 0; k < 4; ++k)
+            out.push_back ((std::uint8_t) (v >> (8 * k)));
+    return out;
+}
+
 // FL 2026's Fruity Limiter as it comes (version 7, 169 bytes) [DATA: FL 2026's own templates, e.g. "Cheese's recording
 // setup"]: the substitute for LYNX's Limiter (option B, and the Master, which can't be bounced)
 const std::uint8_t fruityLimiterDefault[169] = {
@@ -632,6 +641,7 @@ std::vector<std::uint8_t> writeWrapper (const ForeignPlugin& p, bool instrument,
             set (0x01000000u, ref->hostKeysFirst);
             fixed = (ref->maxSizeBuffers ? 1u : 0u) | (ref->hostMaxBuffer ? 2u : 0u);
             flags2 = (ref->allNotesOffOnStop ? 0u : 0x1000u) | (ref->allowHostKeys ? 0x800u : 0u);
+            set (0x8u, ref->processInactive); // "Process inactive inputs and outputs" (round 188d)
         }
         else if (p.hasWrapperOptions)
         {
@@ -644,10 +654,32 @@ std::vector<std::uint8_t> writeWrapper (const ForeignPlugin& p, bool instrument,
         o.insert (o.end(), tail.begin(), tail.end());
         r.record (0x02, o);
     }
-    // 0x1E / 0x1F / 0x20: one input and one output bus (FL lays them out again from the plugin)
-    r.record (0x1E, le32s ({ 1, 1, 0, 0 }));
-    r.record (0x1F, le32s ({ 0, instrument ? 0u : 1u, 0 }));
-    r.record (0x20, le32s ({ 0, 1, 0 }));
+    // 0x1E / 0x1F / 0x20: Processing › Connections, 12 bytes per input / output {i32 offset, u32 active, u32 0}
+    // [DATA round 188d]; without a mapping one input and one output (FL lays them out again from the plugin)
+    {
+        const auto* ins = ref != nullptr ? &ref->inputs : (p.hasRoutes ? &p.inputRoutes : nullptr);
+        const auto* outs = ref != nullptr ? &ref->outputs : (p.hasRoutes ? &p.outputRoutes : nullptr);
+        if ((ins != nullptr && ! ins->empty()) || (outs != nullptr && ! outs->empty()))
+        {
+            auto list = [] (const std::vector<PluginOutputRoute>& routes) {
+                std::vector<std::uint32_t> words;
+                for (const auto& route : routes)
+                    words.insert (words.end(), { (std::uint32_t) route.offset, route.isActive (true) ? 1u : 0u, 0u });
+                return le32s (words);
+            };
+            r.record (0x1E, le32s ({ (std::uint32_t) ins->size(), (std::uint32_t) outs->size(), 0, 0 }));
+            if (! ins->empty())
+                r.record (0x1F, list (*ins));
+            if (! outs->empty())
+                r.record (0x20, list (*outs));
+        }
+        else
+        {
+            r.record (0x1E, le32s ({ 1, 1, 0, 0 }));
+            r.record (0x1F, le32s ({ 0, instrument ? 0u : 1u, 0 }));
+            r.record (0x20, le32s ({ 0, 1, 0 }));
+        }
+    }
 
     std::uint32_t type = 0;
     switch (p.format)

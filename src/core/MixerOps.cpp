@@ -619,6 +619,32 @@ int sidechainTo (Song& song, int from, int to)
     return linked;
 }
 
+std::vector<int> insertInputs (const Song& song, int track)
+{
+    std::vector<int> list { track };
+    for (int from = 1; from < (int) song.mixer.size(); ++from)
+        if (from != track && song.routes (from, track))
+            list.push_back (from);
+    return list;
+}
+
+int sidechainIndexSource (const Song& song, int track, int k)
+{
+    if (k <= 0)
+        return -1;
+    const auto list = insertInputs (song, track);
+    return k < (int) list.size() ? list[(std::size_t) k] : -1;
+}
+
+int sidechainIndexOf (const Song& song, int track, int source)
+{
+    const auto list = insertInputs (song, track);
+    for (std::size_t k = 1; k < list.size(); ++k)
+        if (list[k] == source)
+            return (int) k;
+    return 0;
+}
+
 bool listensToSidechain (EffectKind kind) noexcept
 {
     return kind == EffectKind::compressor || kind == EffectKind::fruityLimiter || kind == EffectKind::fruityCompressor

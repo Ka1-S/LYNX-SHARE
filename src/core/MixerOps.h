@@ -79,6 +79,15 @@ int routeTo (Song& song, const std::vector<int>& sources, int to, bool only);
 // or vocoder on `to` without a side input listens to `from`. Returns how many effects now listen.
 int sidechainTo (Song& song, int from, int to);
 
+// FL's inputs list of an insert (REA_rodada22 §1, round 188d [EXEC]): [the insert itself, then every insert routed
+// to it — at any level, level 0 = sidechain only — in ascending order]. A plugin's "sidechain index" k in the
+// wrapper's Processing › Connections picks entry k (0 = the insert's own audio).
+std::vector<int> insertInputs (const Song& song, int track);
+// The source insert of sidechain index k on `track`, or −1 (k ≤ 0, or past the list)
+int sidechainIndexSource (const Song& song, int track, int k);
+// The index of `source` in `track`'s inputs list, or 0 when it is not there
+int sidechainIndexOf (const Song& song, int track, int source);
+
 // The effects a sidechain link feeds (round 170h): LYNX's Compressor, FL's Fruity Limiter / Fruity Compressor
 // (FL users sidechain with these) and the vocoder.
 bool listensToSidechain (EffectKind kind) noexcept;

@@ -7,6 +7,7 @@ namespace multiout188d
 struct TwoOutputs final : lynx::Instrument
 {
     int configured = 0, track = 0;
+    bool processInactive = true;
     lynx::PluginOutputRoute routes[2];
     std::vector<float> aux = std::vector<float> (4096, 0.0f);
     int cursor = 0;
@@ -18,6 +19,7 @@ struct TwoOutputs final : lynx::Instrument
     {
         ++configured;
         track = c.mixerTrack;
+        processInactive = c.plugin.processInactive;
         for (int k = 0; k < 2; ++k)
             routes[k] = c.plugin.outputRoute (k);
     }
@@ -30,7 +32,7 @@ struct TwoOutputs final : lynx::Instrument
     {
         const float level[2] = { 0.25f, 0.5f };
         for (int k = 0; k < 2; ++k)
-            if (routes[k].isActive (true))
+            if (routes[k].isActive (true) || processInactive)
                 for (int i = 0; i < n; ++i)
                 {
                     if (routes[k].offset == 0)
@@ -43,8 +45,8 @@ struct TwoOutputs final : lynx::Instrument
                 }
         cursor += n;
     }
-    int auxOutputCount() const noexcept override { return routes[1].isActive (true) && routes[1].offset != 0 ? 1 : 0; }
-    int auxOutputTrack (int) const noexcept override { return lynx::outputTargetTrack (track, routes[1]); }
+    int auxOutputCount() const noexcept override { return (routes[1].isActive (true) || processInactive) && routes[1].offset != 0 ? 1 : 0; }
+    int auxOutputTrack (int) const noexcept override { return track + routes[1].offset; }
     const float* auxOutputData (int, int) const noexcept override { return aux.data(); }
 };
 
@@ -65,7 +67,7 @@ float master (const lynx::Song& song, std::shared_ptr<TwoOutputs> fake, const ly
     return std::abs (l.back()) + std::abs (rr.back());
 }
 
-lynx::Song song (std::vector<lynx::PluginOutputRoute> routes, bool muteOwnInsert)
+lynx::Song song (std::vector<lynx::PluginOutputRoute> routes, bool muteOwnInsert, bool processInactive = false)
 {
     auto s = lynx::Song::makeDefault();
     s.channels.clear();
@@ -74,6 +76,7 @@ lynx::Song song (std::vector<lynx::PluginOutputRoute> routes, bool muteOwnInsert
     c.plugin.id = "VST-Drums-1";
     c.mixerTrack = 1;
     c.plugin.outputs = std::move (routes);
+    c.plugin.processInactive = processInactive;
     s.channels.push_back (c);
     if (s.mixer.size() < 4)
         s.mixer.resize (4);
@@ -121,6 +124,8 @@ TEST (multiout188d_outputs_reach_their_inserts)
     // inactive: silent anywhere
     CHECK (master (song ({ { 0, 1 }, { 1, 0 } }, true), fake) == 0.0f);
     CHECK (master (song ({ { 0, 1 }, { 0, 0 } }, false), fake) > 0.1f); // (output 1 still plays)
+    // "Process inactive inputs and outputs" on (FL's default) [EXEC fl188d k33]: the inactive output plays on its insert
+    CHECK (master (song ({ { 0, 1 }, { 1, 0 } }, true, true), fake) > 0.1f);
 
     // the same running instrument takes new routes (no new instance: the reuse path configures it)
     std::unique_ptr<const lynx::RackState> first;
@@ -130,4 +135,71 @@ TEST (multiout188d_outputs_reach_their_inserts)
     a.channels[0].plugin.outputs = { { 0, 1 }, { 1, 1 } };
     CHECK (master (a, fake, first.get()) > 0.1f);
     CHECK (fake->configured > before && fake->routes[1].offset == 1);
+}
+
+TEST (multiout188d_flp_connections_records)
+{
+    // FL 2026's records [DATA: mo-a.flp, LYNX Test Drums 2 after Auto map, Clap off, Hat at -2; flags without 0x8 =
+    // "Process inactive inputs and outputs" off]
+    lynx::ForeignPlugin made;
+    made.format = lynx::ForeignPlugin::Format::vst2;
+    made.vst2Id = 0x4C584433;
+    made.name = "LYNX Test Drums 2";
+    lynx::PluginRef ref;
+    ref.outputs = { { 0, -1 }, { 1, -1 }, { 2, 0 }, { -2, -1 }, { 4, -1 } };
+    ref.processInactive = false;
+    const auto blob = lynx::flpexport::writeWrapper (made, true, &ref);
+    lynx::ForeignPlugin back;
+    CHECK (lynx::parseFlWrapper (blob, back));
+    CHECK (back.hasRoutes && back.inputRoutes.empty() && back.outputRoutes.size() == 5);
+    CHECK (back.outputRoutes[2].offset == 2 && back.outputRoutes[2].active == 0 && back.outputRoutes[3].offset == -2 && back.outputRoutes[1].active == 1);
+    CHECK ((back.wrapperFlags & 0x8u) == 0);
+    lynx::PluginRef imported;
+    lynx::applyFlWrapperOptions (back, imported);
+    CHECK (! imported.processInactive && imported.outputs.size() == 5 && imported.outputs[3].offset == -2 && ! imported.outputs[2].isActive (true));
+
+    // the bytes FL wrote: 0x1E {0 inputs, 8 outputs}, 0x20 = 8 x {i32 offset, u32 active, u32 0}
+    std::vector<std::uint8_t> fl { 12, 0, 0, 0 };
+    auto record = [&fl] (std::uint32_t id, std::vector<std::uint32_t> words) {
+        const auto n = (std::uint64_t) words.size() * 4;
+        for (int k = 0; k < 4; ++k) fl.push_back ((std::uint8_t) (id >> (8 * k)));
+        for (int k = 0; k < 8; ++k) fl.push_back ((std::uint8_t) (n >> (8 * k)));
+        for (const auto w : words)
+            for (int k = 0; k < 4; ++k) fl.push_back ((std::uint8_t) (w >> (8 * k)));
+    };
+    record (0x02, {}); // (an empty options record: ignored)
+    record (0x1E, { 0, 8, 0, 0 });
+    record (0x20, { 0, 1, 0, 1, 1, 0, 2, 0, 0, 0xFFFFFFFEu, 1, 0, 4, 1, 0, 5, 1, 0, 6, 1, 0, 7, 1, 0 });
+    record (0x32, { 4, 0, 0, 0 });
+    record (0x33, { 0x4C584433 });
+    lynx::ForeignPlugin parsed;
+    CHECK (lynx::parseFlWrapper (fl, parsed));
+    CHECK (parsed.outputRoutes.size() == 8 && parsed.outputRoutes[3].offset == -2 && parsed.outputRoutes[2].active == 0 && parsed.outputRoutes[7].offset == 7);
+
+    // an effect's inputs (sidechain indexes) travel too [DATA: mo-c.flp]
+    lynx::PluginRef fx;
+    fx.inputs = { { 0, 1 }, { 1, 1 } };
+    fx.outputs = { { 0, 1 }, { 1, 1 } };
+    lynx::ForeignPlugin fxBack;
+    CHECK (lynx::parseFlWrapper (lynx::flpexport::writeWrapper (made, false, &fx), fxBack));
+    CHECK (fxBack.inputRoutes.size() == 2 && fxBack.inputRoutes[1].offset == 1 && fxBack.outputRoutes.size() == 2);
+    // without a mapping: one input and one output, as before
+    lynx::ForeignPlugin plain;
+    CHECK (lynx::parseFlWrapper (lynx::flpexport::writeWrapper (made, true, nullptr), plain) && plain.outputRoutes.size() == 1);
+}
+
+TEST (multiout188d_effect_sidechain_index_picks_the_insert_inputs)
+{
+    // REA_rodada22 §1 + FL [EXEC fl188d n06/n13/n19]: an insert's inputs = [itself, the inserts routed to it in
+    // ascending order]; sidechain index 1 on insert 1 with insert 2 sidechained to it = insert 2
+    auto song = lynx::Song::makeDefault();
+    if (song.mixer.size() < 6)
+        song.mixer.resize (6);
+    lynx::mixerops::sidechainTo (song, 4, 1);
+    lynx::mixerops::sidechainTo (song, 2, 1);
+    const auto inputs = lynx::mixerops::insertInputs (song, 1);
+    CHECK ((inputs == std::vector<int> { 1, 2, 4 }));
+    CHECK (lynx::mixerops::sidechainIndexSource (song, 1, 0) == -1 && lynx::mixerops::sidechainIndexSource (song, 1, 2) == 4);
+    CHECK (lynx::mixerops::sidechainIndexSource (song, 1, 3) == -1);
+    CHECK (lynx::mixerops::sidechainIndexOf (song, 1, 4) == 2 && lynx::mixerops::sidechainIndexOf (song, 1, 5) == 0);
 }

@@ -5106,7 +5106,42 @@ private:
         for (const auto& type : engine.getPluginHost().getKnownPlugins().getTypes())
             if (type.pluginFormatName == "VST" && juce::File (type.fileOrIdentifier) == juce::File (pluginPath))
                 vst2 = type; // (the profile may know other test plugins)
-        if (vst2)
+        if (vst2 && ! vst2->isInstrument)
+        {
+            // an effect (round 188d): on insert 1, with insert 2 routed there as a sidechain (FL's k65 / k78 shots):
+            // wrap-fx-default.png, wrap-fx-automap.png (Auto map inputs and outputs)
+            auto song = lynx::Song::makeDefault();
+            if (song.mixer.size() < 4)
+                song.mixer.resize (4);
+            auto slot = lynx::makeEffectSlot (lynx::EffectKind::plugin);
+            slot.plugin.id = vst2->createIdentifierString().toStdString();
+            slot.plugin.name = vst2->name.toStdString();
+            song.mixer[1].effects = { slot };
+            lynx::mixerops::sidechainTo (song, 2, 1);
+            engine.setSong (song);
+            engine.renderOffline (0.05, 48000.0);
+            if (auto fx = std::dynamic_pointer_cast<lynx::PluginEffect> (engine.getEffect (1, 0)))
+            {
+                auto find = [] (lynx::Song& s) -> lynx::PluginRef* {
+                    return s.mixer.size() < 2 || s.mixer[1].effects.empty() ? nullptr : &s.mixer[1].effects[0].plugin;
+                };
+                auto save = [&] (const char* name) {
+                    const auto image = lynx::wrapperSettingsSnapshot (engine, find, fx->getInstance(), false, 1, 1.5f, 1, 0);
+                    juce::FileOutputStream out (folder.getChildFile (name));
+                    out.setPosition (0);
+                    out.truncate();
+                    return out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out);
+                };
+                ok = save ("wrap-fx-default.png");
+                engine.editSong ([] (lynx::Song& s) {
+                    lynx::autoMapOutputs (s.mixer[1].effects[0].plugin.inputs, 2);
+                    lynx::autoMapOutputs (s.mixer[1].effects[0].plugin.outputs, 2);
+                    s.mixer[1].effects[0].sidechain = lynx::mixerops::sidechainIndexSource (s, 1, 1);
+                });
+                ok = ok && save ("wrap-fx-automap.png") && engine.getSong().mixer[1].effects[0].sidechain == 2;
+            }
+        }
+        else if (vst2)
         {
             auto song = lynx::Song::makeDefault();
             auto& channel = song.channels[0];
@@ -5132,6 +5167,7 @@ private:
                     lynx::autoMapOutputs (s.channels[0].plugin.outputs, 8);
                     s.channels[0].plugin.outputs.resize (8);
                     s.channels[0].plugin.outputs[2].active = 0;
+                    s.channels[0].plugin.processInactive = false; // (as an LED click does, FL's b23)
                 });
                 ok = ok && save ("wrap-automap.png", 1);
             }
@@ -5171,6 +5207,7 @@ private:
             { "output 2 inactive", { { 0, 1 }, { 1, 0 } }, false, -1.0f, true, false },
             { "output 1 inactive", { { 0, 0 } }, false, -1.0f, false, true },
             { "auto map, channel volume 0", { { 0, 1 }, { 1, 1 } }, false, 0.0f, false, false },
+            { "output 2 inactive, Process inactive inputs and outputs on", { { 0, 1 }, { 1, 0 } }, false, -1.0f, true, true },
         };
         auto tone = [] (const std::vector<float>& x, double hz) {
             // Goertzel magnitude over the buffer (normalised to a sine's amplitude)
@@ -5198,6 +5235,8 @@ private:
                 channel.plugin.id = vst2->createIdentifierString().toStdString();
                 channel.plugin.name = vst2->name.toStdString();
                 channel.plugin.outputs = c.routes;
+                // (FL's "Process inactive inputs and outputs" plays an inactive output: off but for the case named so)
+                channel.plugin.processInactive = juce::String (c.name).contains ("Process inactive");
                 channel.mixerTrack = 1;
                 if (c.volume >= 0.0f)
                     channel.volume = c.volume;
