@@ -12,6 +12,7 @@
 #endif
 
 #include "core/CrashReport.h"
+#include "core/EditorLimit.h"
 #include "core/FlWrapper.h"
 #include "core/LastTweaked.h"
 #include "engine/PluginHost.h"
@@ -1022,6 +1023,7 @@ protected:
 
     void stopHost()
     {
+        editorlimit::forget (&plugin);
         crashguard::note (("closing the editor of " + plugin.getName()).toStdString());
         stopTimer();
         plugin.removeListener (this);
@@ -1164,6 +1166,7 @@ public:
         if (isActiveWindow())
         {
             lastUsed() = key();
+            editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
             focusLinked();
         }
     }
@@ -1258,6 +1261,7 @@ public:
             setMinimisedFrame (false);
         toFront (true);
         lastUsed() = key();
+        editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
         focusLinked();
     }
 
@@ -1265,6 +1269,7 @@ public:
     {
         toFront (false);
         lastUsed() = key();
+        editorlimit::touch (key()); // (round 189o: the limit closes the least recently used editors)
         focusLinked();
         if (e.eventComponent != this)
             return;
@@ -1664,11 +1669,17 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
     if (auto it = open.find (&plugin); it != open.end())
     {
         it->second->bringToFront();
+        editorlimit::touch (&plugin);
         return;
     }
 
     installEditorGuard(); // (issue #32: a fault in the plugin's own window closes the editor, not LYNX)
     open[&plugin] = makeHost (std::move (owner), plugin, title, std::move (context));
+    // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h): past 25, the oldest closes
+    editorlimit::opened (&plugin, [k = &plugin] {
+        editorlimit::forget (k);
+        closeHostOf (k); // (closes after this callback)
+    });
     if (! reaper().isTimerRunning())
         reaper().startTimerHz (4);
 }

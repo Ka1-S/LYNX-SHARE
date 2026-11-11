@@ -120,6 +120,9 @@ public:
     static inline pianokeys::Style keyStyle = pianokeys::Style::flat;
     void setKeyStyle (pianokeys::Style style);
     static inline bool songBarsRuler = false; // round 177d: the ruler numbers song bars (off = FL: pattern bars)
+    // FL's General › "Monophonic painting in piano roll" (round 189o, off): on, the Paint tool paints monophonically
+    // without Shift (noteedit::monophonicPaint). Saved with the UI options.
+    static inline bool monophonicPainting = false;
     // the keys of the selection, on every change (the toolbar's chord panel)
     static inline std::function<void (const std::vector<int>&)> onSelectedKeys;
     // View › Background waveform (Alt+N): an audio file dropped on the Piano roll is drawn behind the notes from the

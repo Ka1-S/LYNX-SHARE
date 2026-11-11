@@ -1603,7 +1603,7 @@ void PianoRollComponent::paintNoteAt (std::int64_t start, int key, bool monophon
         }
 
     editNotes ([&] (Pattern& p) {
-        if (monophonic) // Shift: the new note replaces whatever this channel plays at that time
+        if (monophonic) // Shift (or no Shift with "Monophonic painting"): the new note replaces what this channel plays then
         {
             std::vector<int> overlapping;
             for (int i = 0; i < (int) p.notes.size(); ++i)
@@ -1991,7 +1991,7 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
         drag = Drag::paint;
         paintLength = juce::jmax<std::int64_t> (1, newNoteLength());
         const auto start = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn));
-        paintNoteAt (start, snapKey (yToKey (e.y)), e.mods.isShiftDown());
+        paintNoteAt (start, snapKey (yToKey (e.y)), noteedit::monophonicPaint (e.mods.isShiftDown(), monophonicPainting));
         nextPaintTick = start + paintLength;
         previewOn (snapKey (yToKey (e.y)), noteTemplate.velocity);
         return;
@@ -2274,7 +2274,7 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
             const auto tick = snap (xToTick (e.x), snapOn);
             for (int guard = 0; tick >= nextPaintTick && guard < 64; ++guard)
             {
-                paintNoteAt (nextPaintTick, snapKey (yToKey (e.y)), e.mods.isShiftDown());
+                paintNoteAt (nextPaintTick, snapKey (yToKey (e.y)), noteedit::monophonicPaint (e.mods.isShiftDown(), monophonicPainting));
                 nextPaintTick += paintLength;
             }
 

@@ -101,3 +101,76 @@ TEST (playlist189n_normalize_gains_follow_fl)
     CHECK (clipops::groupNormalizeGain ({ 0.0f, 0.0f }) == 0.0f);
     CHECK (std::abs (clipops::groupNormalizeGain ({ 1.0e-6f }) - 1.0e6f) < 1.0f);
 }
+
+// --- Round 189o: FL's audio clip menu › Fades › "Crossfade selected" (Tag 100; [DECOMP] FUN_012447a0 -> FUN_00d01bc0
+// action 0x15 -> FUN_00d02580 with handle kind 0; shown per FUN_01236e30 / FUN_00cfc9b0) ----
+TEST (playlist189o_crossfade_selected_follows_fl)
+{
+    using namespace lynx;
+    // 0: 0..1000, 1: 800..1800 (overlaps 0 by 200), 2: 1700..2300 (overlaps 1 by 100), 3: 5000..5500 (alone)
+    std::vector<Clip> clips { audio189n (0, 1000), audio189n (800, 1000), audio189n (1700, 600), audio189n (5000, 500) };
+    // shown only when the clicked clip is selected...
+    CHECK (! clipops::showCrossfadeSelected (clips, 1, {}));
+    CHECK (! clipops::showCrossfadeSelected (clips, 1, { 0, 2 }));
+    CHECK (clipops::showCrossfadeSelected (clips, 1, { 0, 1, 2 }));
+    // ...and a selected clip has a selected neighbour: alone, or next to unselected clips only, it is hidden
+    CHECK (! clipops::showCrossfadeSelected (clips, 3, { 3 }));
+    CHECK (! clipops::showCrossfadeSelected (clips, 0, { 0 }));
+    // FL looks before first: clip 1's neighbour before is 0 (unselected), so 1 alone doesn't count; 2's (1) does
+    CHECK (! clipops::canCreateCrossfade (clips, { 1 }, -1, { 1, 2 }));
+    CHECK (clipops::showCrossfadeSelected (clips, 1, { 1, 2 }));
+    CHECK (clipops::showCrossfadeSelected (clips, 0, { 0, 1 })); // 0 has none before, 1 after it is selected
+
+    // the action: every selected clip with the clip after it, else the one before it
+    CHECK (clipops::createCrossfades (clips, 1, 0, { 0, 1, 2 }) == 3); // pairs 0|1, 1|2 and (2 has none after) 1|2 again
+    CHECK (clips[0].fadeOut == 200 && clips[1].fadeIn == 200);
+    CHECK (clips[1].fadeOut == 100 && clips[2].fadeIn == 100);
+    CHECK (clips[3].fadeIn == 0 && clips[3].fadeOut == 0);
+}
+
+// --- Round 189o: FL's General › "Monophonic painting in piano roll" (PRPaintMode, off; [DECOMP] FUN_00e5cd20 picks
+// "mono paint" when Shift != the option) ----
+#include "core/NoteEdit.h"
+TEST (pianoroll189o_monophonic_painting_option_inverts_shift)
+{
+    using namespace lynx;
+    CHECK (! noteedit::monophonicPaint (false, false)); // FL's default: plain strokes layer notes
+    CHECK (noteedit::monophonicPaint (true, false));    // Shift paints monophonically
+    CHECK (noteedit::monophonicPaint (false, true));    // the option on: plain strokes are monophonic
+    CHECK (! noteedit::monophonicPaint (true, true));   // and Shift layers
+}
+
+// --- Round 189o: FL's General › "Limit the number of open plugin editors" (LimitEditors, on; [DECOMP] FUN_012baae0:
+// past 25 open editors, the oldest by stamp closes) ----
+#include "core/EditorLimit.h"
+TEST (editors189o_limit_closes_the_oldest_past_25)
+{
+    using namespace lynx;
+    std::vector<std::pair<int, std::uint64_t>> open;
+    for (int i = 0; i < 25; ++i)
+        open.push_back ({ i, (std::uint64_t) (100 - i) }); // window 24 is the oldest
+    CHECK (editorlimit::oldestBeyond (open).empty());
+    open.push_back ({ 25, 1000 });
+    const auto victims = editorlimit::oldestBeyond (open);
+    CHECK (victims.size() == 1 && victims[0] == 24);
+    CHECK (editorlimit::oldestBeyond (open, 23).size() == 3);
+
+    // the registry: 26 windows open one after the other, the first closes; touching one keeps it
+    editorlimit::entries().clear();
+    const auto saved = editorlimit::enabled();
+    editorlimit::enabled() = true;
+    static int keys[30];
+    std::vector<int> closed;
+    for (int i = 0; i < 25; ++i)
+        editorlimit::opened (&keys[i], [&closed, i] { closed.push_back (i); editorlimit::forget (&keys[i]); });
+    CHECK (closed.empty() && editorlimit::entries().size() == 25);
+    editorlimit::touch (&keys[0]); // window 0 used again: window 1 is now the oldest
+    editorlimit::opened (&keys[25], [&closed] { closed.push_back (25); editorlimit::forget (&keys[25]); });
+    CHECK (closed.size() == 1 && closed[0] == 1 && editorlimit::entries().size() == 25);
+    // off: no limit
+    editorlimit::enabled() = false;
+    editorlimit::opened (&keys[26], [&closed] { closed.push_back (26); });
+    CHECK (closed.size() == 1 && editorlimit::entries().size() == 26);
+    editorlimit::entries().clear();
+    editorlimit::enabled() = saved;
+}

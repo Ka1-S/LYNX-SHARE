@@ -11698,6 +11698,14 @@ private:
                 playlist.selectForSnapshot ({});
                 saveMenus (juce::StringArray { "Gain handle, 2 selected", "Fade in, overlapping" },
                            std::vector<juce::PopupMenu> { gain, fadeIn }, prefix + "-fade-gain189n.png");
+                // round 189o: the audio clip menu with both overlapping clips selected (FL's Fades › Crossfade selected
+                // shown) and with none selected (hidden)
+                playlist.selectForSnapshot ({ second - 1, second });
+                auto clipSelected = playlist.getClipMenuForSnapshot (second);
+                playlist.selectForSnapshot ({});
+                auto clipAlone = playlist.getClipMenuForSnapshot (second);
+                saveMenus (juce::StringArray { "Audio clip, 2 selected", "Audio clip, none selected" },
+                           std::vector<juce::PopupMenu> { clipSelected, clipAlone }, prefix + "-xfadesel189o.png");
                 offline.setSong (before);
                 offline.dispatchPendingMessages();
             }
@@ -11808,6 +11816,13 @@ private:
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::info), "-settings-info.png");
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::files), "-settings-files.png");
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::general), "-settings-general.png");
+                {
+                    // round 189o: the whole General page (the Editing and Plugins sections hold FL's "Monophonic painting in
+                    // piano roll" and "Limit the number of open plugin editors")
+                    auto tall = lynx::makeSettingsPanel (offline, lynx::SettingsPage::general);
+                    tall->setSize (tall->getWidth(), 3200);
+                    saveWindow (std::move (tall), "-settings-general-tall189o.png");
+                }
                 {
                     // the whole General page (round 186a: the Startup section is below the first screen)
                     auto tall = lynx::makeSettingsPanel (offline, lynx::SettingsPage::general);

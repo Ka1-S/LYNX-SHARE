@@ -5,6 +5,7 @@
 #include "ui/GamepadInput.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
+#include "core/EditorLimit.h"
 #include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
 #include "core/NoteNames.h"
@@ -2088,6 +2089,10 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::keepEditorsOpen = on;
         else if (key == "selFirstChanPatChanges")
             ChannelRackComponent::selectFirstChannelWithNotes = on;
+        else if (key == "prPaintMode") // FL's PRPaintMode (round 189o)
+            PianoRollComponent::monophonicPainting = on;
+        else if (key == "limitEditors") // FL's LimitEditors (round 189o; on unless saved off)
+            editorlimit::enabled() = on;
         else if (key == "autoSelectLinked")
             ChannelRackComponent::autoSelectLinked = on;
         else if (key == "muteRemovedSteps")
@@ -2347,6 +2352,8 @@ void MainComponent::saveUiSettings()
                                       + "\ntypingLayout=" + juce::String (keys::typingpiano::layoutName (typingLayout)) + "\nkeepEditorsOpen="
                                       + juce::String (ChannelRackComponent::keepEditorsOpen ? 1 : 0)
                                       + "\nselFirstChanPatChanges=" + juce::String (ChannelRackComponent::selectFirstChannelWithNotes ? 1 : 0)
+                                      + "\nprPaintMode=" + juce::String (PianoRollComponent::monophonicPainting ? 1 : 0)
+                                      + "\nlimitEditors=" + juce::String (editorlimit::enabled() ? 1 : 0)
                                       + "\nautoSelectLinked=" + juce::String (ChannelRackComponent::autoSelectLinked ? 1 : 0)
                                       + "\nmuteRemovedSteps=" + juce::String (ChannelRackComponent::muteRemovedSteps ? 1 : 0)
                                       + "\nautomationLanes=" + juce::String (autolanes::shown() ? 1 : 0)
@@ -6166,6 +6173,7 @@ void MainComponent::openSettings (int page)
         o.typingPiano = safe->typingPiano;
         o.keepEditorsOpen = ChannelRackComponent::keepEditorsOpen;
         o.selectFirstChannelWithNotes = ChannelRackComponent::selectFirstChannelWithNotes;
+        o.monophonicPainting = PianoRollComponent::monophonicPainting;
         o.autoSelectLinked = ChannelRackComponent::autoSelectLinked;
         o.alternateUndo = safe->alternateUndo;
         o.rememberSeek = EditorGlobals::get().rememberSeek;
@@ -6186,6 +6194,7 @@ void MainComponent::openSettings (int page)
         o.pluginSandbox = pluginSandboxEnabled();
         o.menuEntry = appImageMenuEntryInstalled();
         o.pluginSubstitutes = pluginSubstitutesEnabled();
+        o.limitEditors = editorlimit::enabled();
         o.crashReports = (int) crashreporter::consent();
         o.checkUpdates = updater::automatic();
         return o;
@@ -6247,6 +6256,7 @@ void MainComponent::openSettings (int page)
             setPluginSandboxEnabled (o.pluginSandbox);
         if (runningAsAppImage() && o.menuEntry != appImageMenuEntryInstalled())
             setAppImageMenuEntry (o.menuEntry);
+        editorlimit::enabled() = o.limitEditors;
         if (o.pluginSubstitutes != pluginSubstitutesEnabled())
             setPluginSubstitutesEnabled (o.pluginSubstitutes);
         if (o.crashReports != (int) crashreporter::consent())
@@ -6254,6 +6264,7 @@ void MainComponent::openSettings (int page)
         updater::setAutomatic (o.checkUpdates);
         ChannelRackComponent::keepEditorsOpen = o.keepEditorsOpen;
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
+        PianoRollComponent::monophonicPainting = o.monophonicPainting;
         ChannelRackComponent::autoSelectLinked = o.autoSelectLinked;
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;

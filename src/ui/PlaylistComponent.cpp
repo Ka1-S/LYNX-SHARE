@@ -6470,6 +6470,13 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
                             s.playlist[(std::size_t) i].fadeIn = s.playlist[(std::size_t) i].fadeOut = 0;
                 });
             });
+        // FL's Fades › "Crossfade selected" (round 189o): only shown when the clicked clip is selected and a selected
+        // clip has a selected neighbour to cross; the same Create crossfade as the fade handle menu
+        if (clipops::showCrossfadeSelected (song.playlist, index, selection))
+            menu.addItem (tr ("Crossfade selected"), [this, index, chosen = selection] {
+                engine.editSong ([index, chosen] (Song& s) { clipops::createCrossfades (s.playlist, index, 0, chosen); });
+                repaint();
+            });
 
         menu.addItem (tr ("Open in a new Sampler channel"), sample != nullptr, false, [this, ch = clip.channel] {
             if (onOpenInSampler)
