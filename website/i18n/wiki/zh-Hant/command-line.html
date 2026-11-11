@@ -1,0 +1,29 @@
+<p>LYNX SHARE 也可以不開啟視窗直接執行。有一個選項能把專案渲染成音訊，有些能把它轉成 FL Studio 專案或 Ableton Live 套裝，另外還有幾個用於測試。專案自己的檢查也使用這些選項。</p>
+<p>程式在 Windows 上是 <code>LYNX.exe</code>，在 macOS 和 Linux 上是 <code>LYNX</code>。在 macOS 上完整路徑是 <code>/Applications/LYNX.app/Contents/MacOS/LYNX</code>。各系統的選項都相同。</p>
+<h2 id="render-a-project-to-a-file">把專案渲染成檔案</h2>
+<ol><li>在程式所在的資料夾開啟終端機。在 Windows 上，這是安裝資料夾，或你解壓縮 zip 的資料夾。</li><li>執行 <code>LYNX.exe --export project.flp out.flac</code>，換成你自己的專案和輸出檔案。</li><li>等程式結束。不會開啟任何視窗。</li><li>讀取寫在輸出檔旁邊的 <code>out.flac.txt</code>。對於匯入的專案，它會列出哪些已轉換、哪些是近似處理、哪些被省略，以及哪些外掛找到了或缺失。</li></ol>
+<h2 id="open-a-project">開啟專案</h2>
+<pre><code>LYNX.exe project.lynx</code></pre>
+<p>啟動 LYNX SHARE 並顯示視窗，然後開啟該檔案。它接受 <code>.lynx</code>、<code>.flp</code>、<code>.als</code>、<code>.flm</code> 和 <code>.mid</code>。相對路徑以目前資料夾為準。</p>
+<h2 id="options-for-everyday-use">日常使用的選項</h2>
+<div class="tablewrap"><table><thead><tr><th>選項</th><th>作用</th></tr></thead><tbody><tr><td><code>--export &lt;project&gt; &lt;out&gt;</code></td><td>渲染整首歌，包含尾音，與匯出視窗相同。<code>&lt;out&gt;</code> 的副檔名決定格式：<code>.wav</code>（24 位元）、<code>.flac</code>、<code>.ogg</code> 或 <code>.mp3</code>（320 kbps）</td></tr><tr><td><code>--export ... --pattern</code></td><td>只渲染目前樣式</td></tr><tr><td><code>--export ... --insert N</code></td><td>只渲染混音插入軌 N 的輸出</td></tr><tr><td><code>--export ... --rate N</code></td><td>以另一個取樣率渲染，單位為 Hz</td></tr><tr><td><code>--stems &lt;project&gt; &lt;base.wav&gt;</code></td><td>為每個有通道的混音插入軌寫出一個 WAV：<code>base - 1.wav</code>、<code>base - 2.wav</code>，依此類推</td></tr><tr><td><code>--export-flp &lt;project&gt; &lt;out.flp&gt;</code></td><td>寫出 FL Studio 專案。若為 <code>out.zip</code>，則寫出壓縮的循環素材包</td></tr><tr><td><code>--export-flp ... --substitute</code></td><td>把僅限 LYNX 的外掛換成最接近的 FL 外掛，而不是把它們渲染成音訊</td></tr><tr><td><code>--export-als &lt;project&gt; &lt;folder&gt;</code></td><td>把 Ableton Live 套裝寫到 <code>&lt;folder&gt;/&lt;name&gt; Project/&lt;name&gt;.als</code>，適用於 Live 12</td></tr><tr><td><code>--export-als ... --live11</code></td><td>寫出適用於 Live 11 的套裝</td></tr><tr><td><code>--devices &lt;report.txt&gt;</code></td><td>列出這台電腦的音訊驅動程式類型和裝置</td></tr><tr><td><code>--showcase &lt;out.lynx&gt;</code></td><td>寫出 LYNX SHARE 自己的展示專案</td></tr><tr><td><code>--lang &lt;id&gt;</code></td><td>這次執行使用另一種介面語言，例如 <code>--lang pt-BR</code></td></tr><tr><td><code>--menu-entry on</code> 或 <code>關</code></td><td>僅限 Linux AppImage：把 LYNX SHARE 加入應用程式選單，或將其移除</td></tr></tbody></table></div>
+<p><code>--export</code>、<code>--stems</code> 和 <code>--export-flp</code> 的專案可以是 <code>.lynx</code>、<code>.flp</code> 或 <code>.als</code>。<code>--export-als</code> 也接受 <code>.flm</code>。</p>
+<p>範例：</p>
+<pre><code>LYNX.exe --export song.lynx song.wav
+LYNX.exe --export song.lynx drums.wav --insert 1
+LYNX.exe --stems song.lynx song.wav
+LYNX.exe --export-flp song.lynx song.flp
+LYNX.exe --export-als song.lynx out-folder --live11
+LYNX.exe --devices devices.txt
+LYNX --lang de</code></pre>
+<h2 id="options-meant-for-testing">用於測試的選項</h2>
+<p>這些選項用來檢查 LYNX SHARE 本身。提交錯誤報告時很有用。</p>
+<div class="tablewrap"><table><thead><tr><th>選項</th><th>作用</th></tr></thead><tbody><tr><td><code>--selftest &lt;report.txt&gt; [demo.lynx]</code></td><td>不使用音訊裝置執行自我測試。通過時，報告以 <code>result=OK</code> 結尾</td></tr><tr><td><code>--snapshot &lt;prefix&gt; [project]</code></td><td>把介面及其視窗繪製成以該前綴命名的 PNG 檔案。這份 wiki 裡的圖片就是這樣做出來的</td></tr><tr><td><code>--render &lt;project&gt; &lt;out.wav&gt; &lt;seconds&gt;</code></td><td>把目前樣式渲染指定秒數，存成 24 位元 WAV</td></tr><tr><td><code>--plugintest &lt;plugin&gt; &lt;report.txt&gt;</code></td><td>載入並測試單一 VST3 或 CLAP 外掛</td></tr><tr><td><code>--sandboxtest &lt;plugin&gt; &lt;report.txt&gt;</code></td><td>在獨立的處理程序中測試外掛，包括會當掉的外掛</td></tr><tr><td><code>--scantest &lt;folder&gt; &lt;report.txt&gt;</code></td><td>在獨立的處理程序中掃描資料夾裡的外掛</td></tr><tr><td><code>--fldb &lt;report.txt&gt; [project.flp]</code></td><td>回報在此找到的 FL Studio 安裝、它的外掛資料庫，以及專案的外掛比對結果</td></tr><tr><td><code>--devicetest &lt;type&gt; &lt;device&gt; &lt;report.txt&gt;</code></td><td>開啟音訊驅動程式播放一秒鐘的靜音，並回報結果</td></tr><tr><td><code>--uiperf &lt;project&gt; &lt;report.txt&gt;</code></td><td>為混音器、播放清單和通道機架的繪製計時</td></tr></tbody></table></div>
+<p>範例：</p>
+<pre><code>LYNX.exe --selftest report.txt
+LYNX.exe --snapshot shots/s project.lynx
+LYNX --devicetest PipeWire &quot;System default&quot; out.txt</code></pre>
+<h2 id="good-to-know">須知</h2>
+<ul><li>結果會寫入檔案，不會顯示在終端機。<code>--export</code> 寫出 <code>&lt;out&gt;.txt</code>，<code>--export-flp</code> 寫出 <code>&lt;out.flp&gt;.txt</code>，<code>--export-als</code> 在資料夾中寫出 <code>export-als.txt</code>，<code>--stems</code> 寫出 <code>&lt;base.wav&gt;.txt</code>。</li><li>程式會讀取標準輸入。在 shell 迴圈中，請在每次呼叫後加上 <code>&lt; /dev/null</code>。</li><li><code>--snapshot</code> 預設以 1280x720 繪製，除非環境變數 <code>LYNX_SNAPSHOT_SIZE</code> 另有指定，例如 <code>1920x1080</code>。</li><li><code>--lang</code> 接受 <code>選項 › 一般設定...</code> 中所列語言的 id，例如 <code>en</code>、<code>pt-BR</code>、<code>de</code>、<code>es</code>、<code>fr</code> 或 <code>ja</code>。不認得的 id 會被忽略。</li><li><code>--export</code> 使用與匯出視窗相同的渲染流程，但不含視窗的其他選項。若需要抖動、位元深度或正規化，請使用視窗。</li><li>原始碼裡還有更多測試選項。它們屬於內部用途，不同版本之間可能會改變。</li></ul>
+<h2 id="related">相關頁面</h2>
+<ul><li><a href="/wiki/exporting/">匯出</a></li><li><a href="/wiki/file-formats/">檔案格式</a></li><li><a href="/wiki/build-from-source/">從原始碼建置</a></li><li><a href="/wiki/troubleshooting/">疑難排解</a></li></ul>

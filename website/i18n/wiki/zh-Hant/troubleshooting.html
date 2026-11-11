@@ -1,0 +1,53 @@
+<p>下面每個標題都是一個問題。如果你的問題不在其中，請依文末的說明回報。</p>
+<h2 id="starting-the-program">啟動程式</h2>
+<h3 id="windows-smartscreen-warns-on-first-launch">Windows：第一次啟動時 SmartScreen 發出警告</h3>
+<p>這個可執行檔還沒有程式碼簽章，所以第一次執行時 SmartScreen 可能會發出警告。</p>
+<ol><li>點擊 <code>More info</code>。</li><li>點擊 <code>Run anyway</code>。</li></ol>
+<p>安裝程式不需要管理員權限。</p>
+<h3 id="macos-cannot-be-opened">macOS：「無法開啟」</h3>
+<p>這個應用程式沒有經過 Apple 公證，也沒有 Developer ID 簽章，所以第一次啟動需要多一個步驟。</p>
+<ol><li>把 LYNX SHARE 拖到 <code>Applications</code>。</li><li>對它按右鍵（Control 點擊），選擇 <code>開啟</code>。</li><li>再點擊一次 <code>開啟</code>。</li></ol>
+<p>在 macOS 15 Sequoia 或更新版本上，先嘗試開啟一次，然後前往 <code>System Settings › Privacy &amp; Security</code>，點擊 <code>Open Anyway</code>。或者在「終端機」中輸入：</p>
+<pre><code>xattr -dr com.apple.quarantine /Applications/LYNX.app</code></pre>
+<p>第一次錄音時，macOS 會要求麥克風存取權限。</p>
+<h3 id="linux-the-appimage-does-not-start">Linux：AppImage 無法啟動</h3>
+<p>LYNX SHARE 需要 x86_64 系統、glibc 2.35 或更新版本（Ubuntu 22.04、Debian 12、Fedora 36、最新的 Arch 或 Manjaro），以及 X11 或 XWayland。</p>
+<ol><li>用下面的兩個指令，讓檔案可執行並執行它。</li><li>如果仍然無法啟動，請安裝 libfuse2。套件在 Ubuntu 22.04 上是 <code>libfuse2</code>，在 Ubuntu 24.04 上是 <code>libfuse2t64</code>，在 Arch 上是 <code>fuse2</code>，在 Fedora 上是 <code>fuse-libs</code>。</li><li>如果你不想安裝它，請改為下載 <code>.tar.gz</code>，解壓縮後執行 <code>./install.sh</code>。</li></ol>
+<pre><code>chmod +x LYNX-*.AppImage
+./LYNX-*.AppImage</code></pre>
+<p><code>./install.sh</code> 會把 LYNX SHARE 安裝到你使用者目錄的 <code>~/.local</code> 下，並附帶選單項目。<code>./install.sh --uninstall</code> 可將其移除。</p>
+<h2 id="sound">聲音</h2>
+<h3 id="no-sound-or-the-wrong-audio-device">沒有聲音，或音訊裝置不對</h3>
+<ol><li>開啟 <code>選項 › 音訊設定...</code>。</li><li>選擇驅動程式。</li><li>選擇輸出裝置。</li></ol>
+<div class="tablewrap"><table><thead><tr><th>系統</th><th>驅動程式</th></tr></thead><tbody><tr><td>Windows</td><td>Windows Audio (WASAPI)、DirectSound、ASIO 和內建的 LYNX ASIO 驅動程式</td></tr><tr><td>macOS</td><td>Core Audio</td></tr><tr><td>Linux</td><td>PipeWire（原生）、JACK 和 ALSA。第一次啟動時，LYNX SHARE 會開啟其中第一個有裝置的</td></tr></tbody></table></div>
+<p>ASIO 是 Windows 的驅動程式模型，只存在於 Windows。<code>選項 › 設定精靈（語言、音訊、外掛資料夾）...</code> 也會測試音訊裝置。見<a href="/wiki/audio-setup/">音訊設定</a>。</p>
+<h3 id="linux-the-sound-breaks-up">Linux：聲音斷斷續續</h3>
+<p>音訊執行緒應以即時優先權執行。</p>
+<ol><li>開啟 <code>選項 › 音訊設定...</code> 並查看 <code>狀態</code>。它會顯示執行緒是否取得了即時優先權。</li><li>如果沒有，請安裝 rtkit（<code>sudo apt install rtkit</code>、<code>sudo dnf install rtkit</code> 或 <code>sudo pacman -S rtkit</code>），或者像 JACK 的設定那樣，把自己加入帶有即時限制的 <code>音訊</code> 群組。</li><li>登出後再登入。</li></ol>
+<p>詳細資訊見 <a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LINUX.md</a>。</p>
+<h2 id="plugins">外掛</h2>
+<h3 id="a-plugin-crashes">外掛當掉</h3>
+<p>讓它在自己的處理程序中執行，這樣只有該外掛會停止。</p>
+<ol><li>開啟 <code>選項 › 一般設定...</code>。</li><li>開啟 <code>在獨立處理程序中執行外掛（防止外掛崩潰影響LYNX SHARE）</code>。</li><li>重新開啟專案。</li></ol>
+<p>在自己處理程序中當掉或停止回應的外掛會被靜音。請儲存專案並重新開啟，才能再次載入該外掛。見<a href="/wiki/plugins/">第三方外掛</a>。</p>
+<h3 id="a-plugin-is-not-in-the-list">外掛不在清單中</h3>
+<ol><li>選擇 <code>選項 › 掃描外掛</code>。</li><li>如果仍然找不到，請開啟 <code>選項 › 外掛管理器...</code>，點擊 <code>外掛資料夾...</code>，加入外掛所在的資料夾。</li><li>查看 <code>失敗</code> 分頁。掃描失敗的外掛檔案會被略過。在 Windows 上，原因記錄在 <code>%APPDATA%\LYNX\scan-failures.log</code> 中。</li><li>點擊 <code>全部重新掃描...</code>，重試失敗的檔案。</li></ol>
+<h3 id="a-project-uses-a-plugin-that-is-not-installed">專案用到未安裝的外掛</h3>
+<p>效果器會被角色相同的 LYNX SHARE 效果器取代，其設定仍保留在專案中。<code>說明 › 缺失的檔案...</code> 會列出缺少的內容。見<a href="/wiki/built-in/">內建樂器與效果器</a>。</p>
+<h3 id="video-does-not-work-on-linux">影片在 Linux 上無法使用</h3>
+<p>影片軌道和 <code>Export with video</code> 需要 FFmpeg。LYNX SHARE 會告訴你如何安裝。</p>
+<h2 id="crash-reports">崩潰報告</h2>
+<figure><a class="shot" href="/assets/img/wiki/crash-report.webp"><img src="/assets/img/wiki/crash-report.webp" alt="下次啟動時顯示的崩潰報告詢問，有 Send、Show what will be sent 和 Don't send" loading="lazy"></a></figure>
+<p>崩潰報告需要你主動同意。崩潰或停止回應之後，下次啟動時會詢問是否傳送報告。</p>
+<div class="tablewrap"><table><thead><tr><th>指令</th><th>作用</th></tr></thead><tbody><tr><td><code>顯示將要傳送的內容</code></td><td>顯示確切的文字</td></tr><tr><td><code>改為在GitHub上報告</code></td><td>開啟 GitHub 的問題表單，並預先填好內容。檔案需由你自己附上</td></tr><tr><td><code>開啟報告所在的資料夾</code></td><td>在你的電腦上顯示報告檔案</td></tr><tr><td><code>Include file names (projects, samples)</code></td><td>關閉時，每個檔案只傳送副檔名</td></tr><tr><td><code>始終傳送，不再詢問</code></td><td>之後的報告不再詢問，直接傳送</td></tr></tbody></table></div>
+<p><code>選項 › 一般設定...</code> 中的 <code>崩潰報告</code> 可設為 <code>Ask</code>（預設）、<code>始終傳送</code> 或 <code>從不傳送</code>。</p>
+<p>報告包含 LYNX SHARE 版本、作業系統、CPU、顯示卡及其驅動程式、螢幕尺寸、音訊驅動程式和裝置、崩潰或停止回應檔案、工作階段的最後 60 個步驟，以及已載入的第三方外掛的名稱和版本。</p>
+<p>報告不包含音訊、專案、取樣、你的電腦名稱或使用者名稱。伺服器不儲存 IP 位址。已傳送的 id 列在設定資料夾的 <code>crash-reports\sent.log</code> 中。若要刪除某份報告，請附上它的 id 開一個問題。完整文字見<a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/PRIVACY.md">隱私權政策</a>。</p>
+<h2 id="report-a-problem">報告問題</h2>
+<figure><a class="shot" href="/assets/img/wiki/report-problem.webp"><img src="/assets/img/wiki/report-problem.webp" alt="「報告問題」視窗：說明框、選填的電子郵件地址和 Send 按鈕" loading="lazy"></a></figure>
+<ol><li>選擇 <code>說明 › 報告問題...</code>。</li><li>描述發生了什麼事。電子郵件地址是選填的，想收到回覆時再填。</li><li>如果問題是崩潰，請保持勾選 <code>附上最新的崩潰/停止回應檔案和本次工作階段的步驟</code>。</li><li>點擊 <code>顯示將要傳送的內容</code> 檢查文字。</li><li>點擊 <code>傳送</code>。在此之前不會傳送任何東西。</li></ol>
+<p>你也可以到 <a href="https://github.com/Ka1-S/LYNX-SHARE/issues">github.com/Ka1-S/LYNX-SHARE/issues</a> 開一個問題。</p>
+<h2 id="good-to-know">須知</h2>
+<ul><li>崩潰之後，專案的備份副本在 LYNX SHARE 的自動儲存資料夾中。</li><li>如果崩潰與某個外掛有關，詢問視窗會提供從現在起讓該外掛在獨立處理程序中執行的選項。</li><li>設定資料夾在 Windows 上是 <code>%APPDATA%\LYNX</code>，在 macOS 上是 <code>~/Library/Application Support/LYNX</code>，在 Linux 上是 <code>~/.config/LYNX</code>。</li></ul>
+<h2 id="related">相關頁面</h2>
+<ul><li><a href="/wiki/audio-setup/">音訊設定</a></li><li><a href="/wiki/plugins/">第三方外掛</a></li><li><a href="/wiki/install/">安裝</a></li><li><a href="/faq/">FAQ</a></li><li><a href="/why/#crash">崩潰防護</a></li></ul>

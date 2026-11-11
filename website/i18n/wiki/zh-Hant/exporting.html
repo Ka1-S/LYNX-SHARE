@@ -1,0 +1,28 @@
+<figure><a class="shot" href="/assets/img/wiki/export.webp"><img src="/assets/img/wiki/export.webp" alt="選取 WAV 的匯出視窗：左側是範圍、尾音和檔案，右側是格式，下方是混音選項" loading="lazy"></a></figure>
+<p>所有離開 LYNX SHARE 的內容都要經過 <code>檔案 › 匯出</code>。音訊格式（WAV、MP3、OGG 和 FLAC）共用同一個匯出視窗。MIDI、FL Studio 專案、Ableton Live 套裝和壓縮專案在同一個選單中各有自己的項目。</p>
+<h2 id="export-the-song-as-a-wav">把歌曲匯出成 WAV</h2>
+<ol><li>選擇 <code>檔案 › 匯出 › Wave檔案...</code>。</li><li>讓 <code>範圍</code> 維持 <code>歌曲（播放清單）</code>，<code>檔案</code> 維持 <code>一個檔案（混音）</code>。</li><li>選一個 <code>位元深度</code>：16 bits、24 bits 或 32 bits (float)。</li><li>把 <code>尾音</code> 設為 <code>保留餘音</code>，讓殘響和釋放在最後一小節之後自然消退。</li><li>按一下 <code>匯出...</code>，選擇名稱和資料夾，然後等待算繪完成。</li><li>完成後，LYNX SHARE 會告訴你檔案放在哪裡以及它的峰值電平。</li></ol>
+<p><code>Ctrl+R</code> 會以你上次匯出的格式開啟視窗。<code>Ctrl+Shift+R</code> 則以 MP3 開啟。</p>
+<h2 id="what-to-render">要算繪什麼</h2>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>範圍</code></td><td><code>歌曲（播放清單）</code>、<code>目前樣式</code> 或 <code>播放清單選取範圍</code></td></tr><tr><td><code>播放</code></td><td>範圍在檔案中播放幾次，從 <code>一次</code> 到 16 次</td></tr><tr><td><code>尾音</code></td><td><code>切掉餘音</code> 剛好在結尾停止。<code>保留餘音</code> 讓聲音自然消退。<code>迴繞餘音</code> 把尾音混入開頭，適合循環</td></tr><tr><td><code>最長尾音</code></td><td>3、6、12 或 30 秒。聲音提前消失時，尾音會更早停止</td></tr><tr><td><code>檔案</code></td><td>一個檔案，或分軌（見下方）</td></tr></tbody></table></div>
+<h2 id="output-format">輸出格式</h2>
+<p>四個按鈕用來選擇格式。<code>同時儲存</code> 會用同一次算繪、以相同名稱寫出其他格式。</p>
+<div class="tablewrap"><table><thead><tr><th>格式</th><th>選項</th></tr></thead><tbody><tr><td>WAV</td><td><code>位元深度</code>：16 bits、24 bits 或 32 bits (float)。<code>抖動</code>：<code>關</code>、<code>TPDF</code> 或 <code>TPDF + 噪音整形</code></td></tr><tr><td>MP3</td><td><code>位元率</code>，固定位元率</td></tr><tr><td>OGG</td><td>位元率</td></tr><tr><td>FLAC</td><td><code>位元深度</code>、<code>壓縮</code>（從 <code>0（最快）</code> 到 <code>8（最小）</code>）、<code>抖動</code>。每個等級都是無損</td></tr></tbody></table></div>
+<p><code>取樣率</code> 和 <code>聲道</code> 適用於所有格式。<code>聲道</code> 可以是 <code>立體聲</code>、<code>單聲道（兩側混合）</code>、<code>單聲道（僅左）</code> 或 <code>單聲道（僅右）</code>。</p>
+<h2 id="mix-options">混音選項</h2>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>正規化（峰值到0 dB）</code></td><td>整體調高或調低檔案，讓最大的峰值達到滿刻度</td></tr><tr><td><code>主控效果</code></td><td>關閉：主控插入軌的效果器被旁通</td></tr><tr><td><code>插槽效果</code></td><td>關閉：其他插入軌的效果器被旁通</td></tr><tr><td><code>所有外掛使用HQ</code></td><td>外掛使用它們的算繪品質。關閉：匯出時使用播放品質</td></tr><tr><td><code>外掛預熱</code></td><td>匯出開始前，第三方外掛先處理一小段靜音</td></tr><tr><td><code>停用最大複音數</code></td><td>解除通道的發聲數限制，所以不會有音符被切掉</td></tr><tr><td><code>修剪延遲補償產生的靜音</code></td><td>移除外掛延遲補償在開頭加入的靜音</td></tr><tr><td><code>速度資訊</code>、<code>循環標記</code>、<code>播放清單標記</code></td><td>僅限 WAV：把速度、循環和播放清單的標記存進檔案</td></tr><tr><td><code>完成後顯示檔案</code></td><td>在檔案管理員中顯示結果</td></tr></tbody></table></div>
+<h2 id="stems-and-tracks">分軌與軌道</h2>
+<figure><a class="shot" href="/assets/img/wiki/export-flac-stems.webp"><img src="/assets/img/wiki/export-flac-stems.webp" alt="匯出視窗設為 FLAC，每個混音插入軌一個檔案，共九個檔案" loading="lazy"></a></figure>
+<p><code>檔案</code> 有三種分軌模式：</p>
+<ul><li><code>每個混音插入軌一個（分軌）</code>：每個有聲音的插入軌各一個檔案。</li><li><code>每個通道一個（分軌）</code>：每個有演奏的通道各一個檔案。</li><li><code>每個通道一個，僅樂器（不含傳送和匯流排）</code>。</li></ul>
+<p>勾選 <code>同時匯出完整混音</code>，就能在分軌之外同時得到完整混音。底部那一行會顯示將寫出多少個檔案。</p>
+<p><code>檔案 › 匯出 › 所有 Playlist 軌道</code> 和 <code>所有 Playlist 軌道群組</code> 會為每條播放清單軌道或每個群組寫出一個檔案。在混音器的選單中，<code>磁碟錄音 › 將錄音預備的軌道渲染為WAV檔案...</code>（<code>Alt+R</code>）只為預備錄音的插入軌開啟匯出視窗。</p>
+<h2 id="other-entries-of-the-export-menu">匯出選單的其他項目</h2>
+<div class="tablewrap"><table><thead><tr><th>指令</th><th>按鍵</th><th>作用</th></tr></thead><tbody><tr><td><code>MIDI檔案...</code></td><td><code>Ctrl+Shift+M</code></td><td>把音符寫成標準 MIDI 檔案（<code>.mid</code>）</td></tr><tr><td><code>母帶處理...</code></td><td><code>Ctrl+Alt+M</code></td><td>算繪專案並在你的電腦上母帶處理到以 LUFS 表示的響度目標</td></tr><tr><td><code>專案及取樣（.zip）...</code></td><td>無</td><td>專案及其取樣打包成一個壓縮檔</td></tr><tr><td><code>FL Studio 專案...</code></td><td>無</td><td>一個 <code>.flp</code>，或含有全部取樣的壓縮循環包</td></tr><tr><td><code>Ableton Live 套裝 (.als)...</code></td><td>無</td><td>適用於 Live 12 或 Live 11 的套裝</td></tr><tr><td><code>專案骨架...</code></td><td>無</td><td>通道與效果器預設集及樂譜，存放在一個資料夾中</td></tr></tbody></table></div>
+<h2 id="exporting-to-fl-studio-and-ableton-live">匯出到 FL Studio 和 Ableton Live</h2>
+<p><code>.flp</code> 是 FL Studio 2026 專案。取樣器、音訊片段、FL Studio 自己的產生器和效果器、第三方外掛、樣式、播放清單、混音器和自動化，都會連同設定一起轉過去。對於 FL Studio 沒有的東西，你可以在 <code>算繪為音訊（聲音相同）</code> 和 <code>使用最接近的 FL 外掛（仍可編輯，聲音可能不同）</code> 之間選擇。選第二種時，僅限 LYNX 的樂器會被略過。調變器一律會被略過。報告會列出哪些被算繪、取代或略過。詳情見<a href="/wiki/coming-from-fl-studio/">從 FL Studio 轉換</a>。</p>
+<p><code>.als</code> 包含每個通道一條 MIDI 軌道、音訊軌道、群組、回送、傳送、帶有狀態的 VST2 和 VST3 外掛、標記，以及音量、聲像和速度的自動化。LYNX SHARE 自己的樂器和效果器不會被轉換，但它們的軌道和音符會保留。效果器參數的自動化和插入軌之間的路由會被捨棄。詳情見<a href="/wiki/coming-from-ableton/">從 Ableton Live 轉換</a>。</p>
+<h2 id="good-to-know">須知</h2>
+<ul><li>匯出 MP3 時 <code>抖動</code> 是灰色的，除了 WAV 以外的所有格式，速度和標記選項也都是灰色的。</li><li>選了 <code>播放清單選取範圍</code> 但播放清單中沒有選取範圍時，會算繪整首歌。視窗會提醒你。</li><li>如果主控插入軌被靜音，視窗會警告檔案將是無聲的。</li><li><code>同時寫出帶此混音的影片</code> 只在專案有影片軌道時出現，而且需要 FFmpeg。</li><li><code>透過硬體即時渲染</code> 只在專案有啟用的硬體插入軌時出現。這種匯出需要和歌曲一樣長的時間。</li><li>渲染為音訊（把插入軌轉成音訊片段）在這個版本中，播放時比它取代的插入軌大聲約 5 dB。</li></ul>
+<h2 id="related">相關頁面</h2>
+<ul><li><a href="/wiki/file-formats/">檔案格式</a></li><li><a href="/wiki/command-line/">命令列</a></li><li><a href="/wiki/coming-from-fl-studio/">從 FL Studio 轉換</a></li><li><a href="/wiki/coming-from-ableton/">從 Ableton Live 轉換</a></li><li><a href="/wiki/mixer/">混音器</a></li></ul>

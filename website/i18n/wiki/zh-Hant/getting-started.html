@@ -1,0 +1,21 @@
+<p>LYNX SHARE 是一款免費、開放原始碼的 DAW，支援 Windows、macOS 和 Linux。它以樣式為核心：你在通道機架和鋼琴捲軸中編寫樣式，在播放清單中編排，在混音器中混音。它可以開啟 FL Studio 專案（<code>.flp</code>）和 Ableton Live 套裝（<code>.als</code>），並以自己的 <code>.lynx</code> 格式儲存。</p>
+<p>它目前是 alpha 版。預期會有錯誤，請經常儲存。</p>
+<h2 id="get-it-running">讓它跑起來</h2>
+<ol><li>查看下面的表格，確認你的系統受到支援。</li><li>下載並安裝。<a href="/wiki/install/">安裝</a>頁面列出了各系統的步驟。</li><li>啟動它。一個簡短的設定精靈會選擇語言、測試音訊輸出，並列出外掛資料夾，這些資料夾隨後會在背景掃描。你可以略過它，之後再用 <code>選項 › 設定精靈（語言、音訊、外掛資料夾）...</code> 重新開啟。</li><li>如果聽不到聲音，請前往<a href="/wiki/audio-setup/">音訊設定</a>。</li><li>閱讀<a href="/wiki/tour/">視窗導覽</a>，然後做出<a href="/wiki/first-song/">你的第一首歌</a>。</li></ol>
+<h2 id="what-you-need">需求</h2>
+<div class="tablewrap"><table><thead><tr><th>系統</th><th>需求</th></tr></thead><tbody><tr><td>Windows</td><td>Windows 10 或 11，64 位元</td></tr><tr><td>macOS</td><td>macOS 11 Big Sur 或更新版本，Intel 或 Apple 晶片</td></tr><tr><td>Linux</td><td>x86_64，glibc 2.35 或更新版本（Ubuntu 22.04+、Debian 12+、Fedora 36+、最新的 Arch 或 Manjaro），X11 或 XWayland</td></tr></tbody></table></div>
+<p>你不需要音訊介面。LYNX SHARE 會透過你的系統已在使用的音效裝置播放。你也不需要 FL Studio。如果同一台電腦上裝有 FL Studio，LYNX SHARE 會找到它的取樣，並為 <code>.flp</code> 專案使用相同的外掛檔案。</p>
+<p>第三方外掛是選用的。LYNX SHARE 有自己的樂器和效果器，列在<a href="/instruments-and-effects/">目錄</a>中。</p>
+<h2 id="save-your-work">儲存你的作品</h2>
+<p><code>Ctrl+S</code> 儲存，<code>Ctrl+Shift+S</code> 另存新檔，<code>Ctrl+Alt+S</code> 儲存新版本（Song_2、Song_3，依此類推）。有自動儲存，可以從 <code>檔案 › 開啟自動儲存資料夾</code> 和 <code>檔案 › 恢復到上一個備份...</code> 取得。</p>
+<p><code>檔案 › 從範本新增</code> 有四個起點：Empty、Basic beat、Trap with 808 和 House。</p>
+<h2 id="the-demo-project">展示專案</h2>
+<p>Windows 的安裝程式和 zip、macOS 的 <code>.dmg</code> 以及 Linux 的 <code>.tar.gz</code> 都附有展示專案 <code>Demo.lynx</code>。用 <code>檔案 › 開啟...</code>（<code>Ctrl+O</code>）開啟它。在 Windows 上，它位於安裝資料夾中，就在 <code>LYNX.exe</code> 旁邊。</p>
+<p>你也可以在終端機中產生它。見<a href="/wiki/command-line/">命令列</a>。</p>
+<pre><code>LYNX.exe --showcase out.lynx</code></pre>
+<h2 id="where-to-go-next">接下來看哪裡</h2>
+<div class="tablewrap"><table><thead><tr><th>你想要</th><th>閱讀</th></tr></thead><tbody><tr><td>了解各個視窗</td><td><a href="/wiki/channel-rack/">通道機架</a>、<a href="/wiki/piano-roll/">鋼琴捲軸</a>、<a href="/wiki/playlist/">播放清單</a>、<a href="/wiki/mixer/">混音器</a>、<a href="/wiki/browser/">瀏覽器</a></td></tr><tr><td>開啟其他程式的專案</td><td><a href="/wiki/coming-from-fl-studio/">從 FL Studio 轉換</a>、<a href="/wiki/coming-from-ableton/">從 Ableton Live 轉換</a></td></tr><tr><td>使用你的 VST、CLAP、LV2 或 AU 外掛</td><td><a href="/wiki/plugins/">外掛</a></td></tr><tr><td>查詢按鍵</td><td><a href="/wiki/shortcuts/">快速鍵</a></td></tr><tr><td>解決問題</td><td><a href="/wiki/troubleshooting/">疑難排解</a>和 <a href="/faq/">FAQ</a></td></tr></tbody></table></div>
+<h2 id="good-to-know">須知</h2>
+<ul><li>程式檔案在 Windows 上叫 <code>LYNX.exe</code>，在 macOS 和 Linux 上叫 <code>LYNX</code>。設定資料夾也叫 <code>LYNX</code>。</li><li>在 Windows 和 macOS 上，第一次啟動時可能會跳出系統警告，因為 Windows 版還沒有程式碼簽章，macOS 版也還沒有公證。<a href="/wiki/install/">安裝</a>頁面說明該點哪裡。</li><li>如果系統的語言是 LYNX SHARE 沒有的，介面預設為英文。你可以在 <code>選項 › 一般設定...</code> 中更改。新的語言會在重新啟動後生效。</li><li>FL Studio 專案中的 FLEX 包是加密的，不會被開啟。這些通道會得到依預設集名稱選出的合成器音色。</li></ul>
+<h2 id="related">相關頁面</h2>
+<ul><li><a href="/wiki/install/">安裝</a></li><li><a href="/wiki/audio-setup/">音訊設定</a></li><li><a href="/wiki/tour/">視窗導覽</a></li><li><a href="/wiki/first-song/">你的第一首歌</a></li><li><a href="/download/">下載</a></li></ul>

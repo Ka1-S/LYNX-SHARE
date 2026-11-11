@@ -1,0 +1,30 @@
+<figure><a class="shot" href="/assets/img/wiki/settings-general.webp"><img src="/assets/img/wiki/settings-general.webp" alt="設定視窗的一般頁面，頂部有七個頁面分頁" loading="lazy"></a></figure>
+<p>設定視窗有七個頁面：音訊、MIDI、一般、主題、檔案、專案和資訊。前五個屬於程式本身。專案和資訊屬於目前開啟的專案，會隨專案一起儲存。每個頁面在 <code>選項</code> 選單的頂部都有自己的項目。</p>
+<h2 id="change-a-setting">變更設定</h2>
+<ol><li>開啟 <code>選項</code> 選單並選擇一個頁面，例如 <code>一般設定...</code>。</li><li>點擊頂部的其他分頁，切換到另一個頁面。</li><li>變更設定。設定會立即生效，只有語言和介面字型要等 LYNX SHARE 重新啟動後才會生效。</li></ol>
+<p><code>F10</code> 開啟 MIDI 頁面，<code>F11</code> 開啟資訊頁面。</p>
+<h2 id="audio">音訊</h2>
+<p><code>選項 › 音訊設定...</code>。驅動程式、裝置、取樣率、緩衝區大小和錄音。<a href="/wiki/audio-setup/">音訊設定</a>說明了這個頁面。</p>
+<h2 id="midi">MIDI</h2>
+<figure><a class="shot" href="/assets/img/wiki/settings-midi.webp"><img src="/assets/img/wiki/settings-midi.webp" alt="MIDI 頁面：輸入裝置、帶有主同步的輸出裝置，以及外部同步" loading="lazy"></a></figure>
+<p><code>選項 › MIDI設定...</code></p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td>輸入裝置</td><td>每個裝置可以關閉、只聆聽某一個 MIDI 通道，並彈奏通道機架中固定的通道，而不是所選的通道</td></tr><tr><td><code>重新整理裝置清單</code></td><td>重新尋找裝置</td></tr><tr><td><code>傳送主同步</code></td><td>把帶有 Song Position Pointer 的 MIDI 時鐘或 MIDI Time Code 傳送到輸出裝置。<code>偏移 (ms)</code> 讓它較晚或較早送出</td></tr><tr><td><code>傳送全部音符關閉</code></td><td>在初始化時以及匯出之後，向裝置傳送全部音符關閉</td></tr><tr><td><code>外部時鐘同步</code></td><td>LYNX SHARE 跟隨所選輸入的 MIDI 時鐘：速度、開始、繼續、停止和位置</td></tr><tr><td><code>力度</code></td><td>用於來自 MIDI 裝置的音符：按演奏、輕、重或固定</td></tr><tr><td><code>表演模式通道</code></td><td>在表演模式下，這個通道上的音符會啟動播放清單片段</td></tr><tr><td><code>歌曲標記跳轉</code></td><td>這個通道上的音符不演奏，而是把歌曲移到某個標記</td></tr><tr><td><code>拾取（接管模式）</code></td><td>控制器要到達參數目前的數值之後才會移動它</td></tr><tr><td>關聯</td><td>這個專案的控制器關聯，然後是全域的，附有 <code>移除關聯</code> 和 <code>全部移除</code></td></tr></tbody></table></div>
+<h2 id="general">一般</h2>
+<p><code>選項 › 一般設定...</code></p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>版面樣式</code></td><td>樣式工作流程（預設）或片段啟動工作流程</td></tr><tr><td><code>Live 專案的工作階段片段</code></td><td>匯入的 Live 套裝的 Session 片段放到哪裡：片段網格，或編排之後的播放清單</td></tr><tr><td><code>語言</code>、<code>介面字型</code></td><td>下次啟動時套用</td></tr><tr><td><code>介面大小</code>、<code>選單密度</code></td><td>整個介面的縮放比例，以及緊湊或寬鬆的選單</td></tr><tr><td><code>波形</code></td><td>簡潔（使用片段顏色）或頻譜顏色，可選擇將立體聲聲道分開顯示</td></tr><tr><td><code>音名</code>、<code>黑鍵</code></td><td>英文、德文或固定唱名的音名，使用升記號或降記號</td></tr><tr><td><code>外掛風格</code></td><td>內建外掛視窗的外觀：自動，或為所有外掛使用同一種風格</td></tr><tr><td><code>動畫</code>、<code>動畫速率</code></td><td>介面動畫，以及播放頭和電平表移動的頻率</td></tr><tr><td><code>使用GPU繪製（Direct2D）</code></td><td>如果顯示驅動程式當機或畫面閃爍，請關閉</td></tr><tr><td>啟動</td><td>啟動畫面、啟動音效，以及每次啟動時在背景尋找新外掛</td></tr><tr><td>編輯</td><td>電腦鍵盤當鋼琴、保持通道編輯器開啟、記住搜尋時間、讓被拉長的樣式片段循環</td></tr><tr><td><code>最大復原次數</code></td><td>25 到 1000</td></tr><tr><td>備份</td><td>多久儲存一次備份副本、每個專案保留幾份，以及 <code>開啟備份資料夾</code></td></tr><tr><td><code>在獨立處理程序中執行外掛</code></td><td>外掛當機不會拖垮 LYNX SHARE。預設為關閉</td></tr><tr><td><code>用LYNX SHARE對應外掛替代缺失的外掛</code></td><td>預設為開啟。專案會保留原本的外掛</td></tr><tr><td><code>崩潰報告</code></td><td>當機或停止回應後詢問（預設）、一律傳送或從不傳送</td></tr><tr><td><code>自動檢查更新</code></td><td>啟動時的更新檢查，附有 <code>立即檢查</code></td></tr></tbody></table></div>
+<h2 id="theme">主題</h2>
+<p><code>選項 › 主題（顏色、背景）...</code></p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td>主題選單</td><td>選擇一個預設集。<code>匯入...</code> 和 <code>匯出...</code> 讀取和寫入 <code>.lynxtheme</code> 檔案，<code>儲存預設集...</code> 保存目前的主題，<code>預設</code> 將它重設</td></tr><tr><td><code>強調色</code>、<code>背景</code>、<code>工作區</code></td><td>主題的三種顏色。工作區顏色可以自動跟隨背景</td></tr><tr><td>工作區圖像</td><td>視窗後方的 PNG、JPEG 或 GIF，附有 <code>圖像適應</code>、<code>圖像不透明度</code> 和 <code>變暗</code></td></tr><tr><td>啟動音效</td><td>你自己長度在 30 秒以內的音效，或 LYNX SHARE 自己的</td></tr></tbody></table></div>
+<h2 id="files">檔案</h2>
+<p><code>選項 › 檔案設定（搜尋資料夾）...</code></p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td>缺失取樣的搜尋資料夾</td><td>缺失的檔案視窗會自動在這些資料夾及其子資料夾中尋找</td></tr><tr><td>瀏覽器資料夾</td><td>顯示在瀏覽器的資料夾清單中，也會用來搜尋缺失的取樣</td></tr><tr><td>外掛資料夾</td><td>由 <code>選項 › 掃描外掛</code> 掃描外掛</td></tr></tbody></table></div>
+<h2 id="project">專案</h2>
+<figure><a class="shot" href="/assets/img/wiki/settings-project.webp"><img src="/assets/img/wiki/settings-project.webp" alt="專案頁面：時間設定、律動與調音、時基，以及播放清單選項" loading="lazy"></a></figure>
+<p><code>選項 › 專案設定（速度、拍號）...</code></p>
+<div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>時間設定</code></td><td>時間分割（每小節幾拍、每拍幾步）或傳統拍號（分子和分母）</td></tr><tr><td><code>速度</code>、<code>每小節拍數</code></td><td>專案的速度，以及一小節的拍數</td></tr><tr><td><code>搖擺</code>、<code>主控音高</code></td><td>全域搖擺程度，以及以音分表示的主控音高</td></tr><tr><td><code>自動交叉淡化</code></td><td>軌道上重疊的音訊片段會在重疊部分交叉淡化</td></tr><tr><td><code>合成軌交叉淡化</code></td><td>合成錄音時使用的交叉淡化長度，以毫秒表示</td></tr><tr><td><code>播放片段中被截斷的音符</code></td><td>開始於樣式片段之前的音符，會從片段的起點開始播放</td></tr><tr><td><code>切斷群組快速去咔嗒</code></td><td>切斷群組切斷音符時更快的漸變</td></tr><tr><td><code>聲像定律</code></td><td>圓形（中央為 0 dB，被推向的那一側 +3 dB）或三角形（較大聲的一側維持原電平）。用於混音器插入軌和取樣器通道</td></tr></tbody></table></div>
+<h2 id="info">資訊</h2>
+<p><code>選項 › 專案資訊...</code>。專案的標題、作者、類型、網站連結和備註，以及 <code>開啟專案時顯示此頁面</code>。底部顯示專案建立的時間和工作時間。</p>
+<h2 id="good-to-know">須知</h2>
+<ul><li>時基固定為每四分音符 960 tick。來自 FL Studio 的專案會被轉換成這個時基。</li><li>歌曲中途的拍號變化不在專案頁面上。請在播放清單的尺規上加入拍號標記。</li><li><code>在獨立處理程序中執行外掛</code> 只對之後開啟的外掛有效。請重新開啟專案，才能移動其他外掛。</li><li>Microsoft Store 版本沒有更新設定，因為由 Store 負責更新。</li><li>快速鍵在 <code>選項 › 管理快速鍵...</code> 中，不在設定頁面上。</li></ul>
+<h2 id="related">相關頁面</h2>
+<ul><li><a href="/wiki/audio-setup/">音訊設定</a></li><li><a href="/wiki/midi-controllers/">MIDI 控制器</a></li><li><a href="/wiki/shortcuts/">快速鍵</a></li><li><a href="/wiki/plugins/">外掛</a></li><li><a href="/wiki/layouts/">版面</a></li></ul>
