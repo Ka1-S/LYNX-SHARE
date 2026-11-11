@@ -60,7 +60,8 @@ inline void trace (const juce::String& what)
 struct SharedBlock
 {
     static constexpr std::uint32_t magicValue = 0x4C594E58; // "LYNX"
-    static constexpr int maxChannels = 8, maxFrames = 4096 /* PluginHost::maxBlockSize */, maxMidi = 1024, maxParams = 512;
+    // (32 channels: a bridged multi-output instrument keeps 16 stereo outputs for the wrapper's Connections, issue #114)
+    static constexpr int maxChannels = 32, maxFrames = 4096 /* PluginHost::maxBlockSize */, maxMidi = 1024, maxParams = 512;
 
     struct Midi
     {
