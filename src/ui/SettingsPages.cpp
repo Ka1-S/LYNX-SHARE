@@ -1274,14 +1274,14 @@ public:
         auto r = getLocalBounds().reduced (8, 4);
         plays.setBounds (r.removeFromRight (230));
         r.removeFromRight (8);
+        channel.setBounds (r.removeFromRight (150));
+        r.removeFromRight (8);
         zone.setVisible (prefsNow.mpe);
-        if (prefsNow.mpe) // (issue #108: the zone's member channels beside the MPE choice)
+        if (prefsNow.mpe) // (issue #108: the zone's member channels beside the MPE choice; the channel box keeps its column)
         {
             zone.setBounds (r.removeFromRight (124));
             r.removeFromRight (8);
         }
-        channel.setBounds (r.removeFromRight (150));
-        r.removeFromRight (8);
         enabled.setBounds (r);
     }
 
