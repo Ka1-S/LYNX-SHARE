@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 
+#include "core/FlAutoSlicer.h"
 #include "core/Instruments.h"
 #include "core/Slicex.h"
 #include "core/SlicexEngine.h"
@@ -1045,13 +1046,17 @@ private:
         return { x0, bar.getY(), std::max (3.0f, x1 - x0), bar.getHeight() };
     }
 
-    // FL scrolls the deck by whole pixels: a zoomed deck's left edge is the shown start taken down to a whole number
-    // of pixels at the current zoom (round 190aj: both ends of a selection dragged in a deck shown from beat 0.5763
-    // came out 0.12 pixel earlier than a plain linear map gives; one zoom measured)
-    double framesPerPixel() const { return shownLength() / (double) std::max (1, getWidth()); }
-    double originPixels() const { return std::floor (shownStart() / framesPerPixel()); }
-    float xOf (double frame) const { return (float) (frame / framesPerPixel() - originPixels()); }
-    double frameAt (float x) const { return (originPixels() + (double) x) * framesPerPixel(); }
+    // FL scrolls the deck by whole pixels of its own 714-pixel deck: a zoomed deck's left edge is the shown start
+    // taken down to a whole number of those pixels at the current zoom (round 190aj: both ends of a selection dragged
+    // in a deck shown from beat 0.5763 came out 0.12 pixel earlier than a plain linear map gives; one zoom measured).
+    // LYNX's deck is that deck scaled, so the step is 1/714 of the shown length whatever the width.
+    double originFrame() const
+    {
+        const auto step = shownLength() / 714.0;
+        return step > 0.0 ? std::floor (shownStart() / step) * step : 0.0;
+    }
+    float xOf (double frame) const { return (float) ((frame - originFrame()) / shownLength() * (double) getWidth()); }
+    double frameAt (float x) const { return originFrame() + (double) x / (double) std::max (1, getWidth()) * shownLength(); }
     // a region's start as drawn (the one being dragged follows the mouse)
     std::int64_t startOf (const std::vector<slicex::WavRegion>& list, int i) const { return i == dragging && moved && ! dragEnd ? dragTo : list[(std::size_t) i].start; }
     // a region's last frame as drawn
@@ -1591,7 +1596,8 @@ public:
     // Mouse commands take positions as fractions of the deck's width, so a script can repeat what was done in FL's
     // 714-pixel deck: drag a b | click a | dclick a (in the wave), tabdrag a b (in the tag row); menu <entry>;
     // addregion <name> | addmarker <name>; key <pgup|pgdn|home|end|up|left|right|ctrl+left|ctrl+right|ctrl+a>;
-    // rest (the zoom goes into the state); state; savewav <file> (the deck's WAV as the state holds it)
+    // rest (the zoom goes into the state); state; savewav <file> (the deck's WAV as the state holds it);
+    // load <file> (File > Load sample); regions (the deck's region list)
     juce::String test (const juce::StringArray& w)
     {
         const auto deck = currentDeck();
@@ -1655,6 +1661,14 @@ public:
                 return "key not taken";
         }
         else if (cmd == "rest") { stopTimer(); storeViews(); }
+        else if (cmd == "load") loadSample (deck, w[1]);
+        else if (cmd == "regions")
+        {
+            juce::String text;
+            for (const auto& r : regions[(std::size_t) deck])
+                text << (r.marker ? "marker " : "region ") << juce::String (r.start) << " '" << r.name << "' ";
+            return text;
+        }
         else if (cmd == "savewav")
         {
             const auto& wav = state.decks[(std::size_t) deck].wav;
@@ -2415,6 +2429,24 @@ private:
             }
         }, true);
         reload();
+        // A sample that brings no regions of its own: FL slices it as it loads ("Marker #1…#n" on its hits, round
+        // 190ac). It is the framework's auto slicer LYNX already has (flslice, decoded in round 165g): on FL's own save
+        // of such a load the markers are its output to the frame (round 190aj). The markers live in the deck's WAV, as
+        // in FL, so only a WAV file gets them.
+        if (sample->markerStarts.empty() && canEmbed (deck) && sample->left.size() == sample->frames())
+        {
+            const auto starts = flslice::autoSlice (sample->left.data(), sample->right.size() == sample->left.size() ? sample->right.data() : nullptr,
+                                                    (std::int64_t) sample->frames(), sample->sampleRate);
+            std::vector<slicex::WavRegion> list;
+            for (const auto start : starts)
+            {
+                slicex::WavRegion marker;
+                marker.start = start;
+                list.push_back (marker);
+            }
+            if (! list.empty())
+                setRegions (deck, std::move (list), std::vector<int> (starts.size(), -1), 0);
+        }
     }
 
     void chooseSample (int deck)

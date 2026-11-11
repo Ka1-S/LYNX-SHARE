@@ -24,6 +24,9 @@ with the deck's beat count from the embedded WAV's `acid` chunk (190ac).
 - No selection, drag: selection from the press to the mouse, to the pixel, not snapped (aj_4).
 - With a selection, press: the NEAREST edge jumps to the mouse and follows the drag (aj_12, aj_18, aj_19, aj_20).
 - Double click: deselect (aj_21).
+- A zoomed deck scrolls by whole pixels: in a deck shown from beat 0.5763301 (6.8448 beats over 714 px) a drag over
+  pixels 126…286 gave 1.78309…3.31693 beats, 0.12 pixel before the plain linear map on both ends, which is the
+  shown start taken down to a whole pixel (60.12 → 60). One zoom measured; LYNX takes the floor.
 - LENGTH / SEL shows "001:02:075 to 001:04:030" (bar:beat:tick, 96 ticks per beat) while a selection exists.
 
 ## 3. Zoom and Select menus
@@ -43,8 +46,10 @@ with the deck's beat count from the embedded WAV's `acid` chunk (190ac).
 ## 4. Add region, Set loop
 
 - Add region (Alt+M) asks the name in an inline box ("New region name"). The region: start = round (selStart ·
-  frames per beat), last frame = round (selEnd · fpb) − 1, purpose "beat", inserted in sample order; the region shown
-  did not change (aj_24: 62259…96846 "Zap"). Measured on one deck; LYNX uses its standard name prompt.
+  frames per beat), last frame = round (selEnd · fpb) − 1, purpose "beat", inserted in sample order (aj_24:
+  62259…96846 "Zap"). Measured on one deck; LYNX uses its standard name prompt. FL's save shows region 0 afterwards
+  where region 18 was shown four steps before (Esc, Deselect, a drag, Add region: which of them went back to region 0
+  was not separated); LYNX keeps the region that was shown.
 - Set loop (Alt+L): `smpl` loop start = round (start), end = round (end) − 1 (aj_25: 111671…161081), and View ▸
   Loop goes on. FL draws the loop as a red line with a "Loop" tag at the bottom at its start and a thin line + tag
   at its end.
@@ -70,7 +75,21 @@ script of gestures at fractions of the deck's width (so FL's pixels can be repea
 after each command it reports what the state holds, and `savewav` writes the deck's WAV for a byte compare with FL's.
 The round's script and report: /mnt/e/lynx-work/slicex190aj/edit/.
 
-## 8. Best way?
+## 8. FL's slicing of an untagged sample on load
+
+190ac saw FL slice a sample without regions as it loads (u1: five markers on its hits, u2: one, u9: four; "Marker
+#1…#n") and left the detection undecoded. It is the framework's auto slicer that round 165g decoded for Fruity
+Granulizer (`lynx::flslice::autoSlice`, src/core/FlAutoSlicer.cpp): run on u9.wav it gives 0, 32465, 64896, 97370, the
+cue points of FL's own save of that load (slicex190ac/fl/ac_untag.flp) to the frame; u1 → 5 slices, u2 → 1 (FL's
+counts in 190ac's shots). `p/asl` runs it on the nine files.
+
+Built: File ▸ Load sample (and a drop) of a WAV without cue points runs the slicer and writes the markers into the
+deck's WAV, as FL does. Not a law change for saved projects: a deck saved before keeps its one region (the markers are
+only made at load). Other formats (MP3, FLAC…) stay one region, because LYNX keeps a deck's regions in its WAV.
+Not measured: whether FL skips the slicing for long files or files with an ACID chunk but no cues; what FL does with
+u2's single marker at 4310 (whether the part before it plays).
+
+## 9. Best way?
 
 - Selection in beats (FL's own unit) rather than frames: a project saved by LYNX opens in FL with the same
   selection, and nothing has to be converted on tempo changes. Kept.
