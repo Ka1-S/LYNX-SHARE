@@ -61,6 +61,7 @@ struct FlpImportOptions
     std::map<std::string, std::string> relocations;
 
     bool threeOscAsSynth = false; // 3x Osc → the built-in synth conversion instead of FL's engine (the synth's preset menu)
+    bool fpcAsPads = false;       // FPC → one sampler channel per pad (the import before round 190q) instead of one FPC channel
 };
 
 // Converts an FL Studio project to our model. Sampler channels whose
@@ -103,6 +104,10 @@ struct DrumPad
     int cutGroup = 0, cutBy = 0;    // playing this pad cuts pads with cutBy == cutGroup (0 = none)
     int mixerOffset = 0;            // mixer track relative to the channel's
 };
+
+// The sampler channel that plays `pad` of the drum channel `original` (its volume, mixer insert and the rest stay the
+// channel's; the pad's gain rides on the zones). `channel` numbers the kit's cut groups apart from other channels'.
+ChannelDef drumPadChannel (const ChannelDef& original, const DrumPad& pad, int channel);
 
 // Replaces channel `channel` with one sampler channel per pad (right after it, on the same mixer insert)
 // and moves notes by key: a pad's note goes to its channel, at key 60. Notes on keys without a

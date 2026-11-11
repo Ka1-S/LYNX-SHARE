@@ -93,6 +93,7 @@ add_library(lynx_core STATIC
     src/core/Effector.cpp
     src/core/FlSamplers.cpp
     src/core/Fpc.cpp
+    src/core/FpcInstrument.cpp
     src/core/FlSynths.cpp
     src/core/FlSytrus.cpp
     src/core/FlGenerators.cpp

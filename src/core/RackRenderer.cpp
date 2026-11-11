@@ -1,6 +1,7 @@
 #include "core/RackRenderer.h"
 #include "core/MixerOps.h"
 
+#include "core/FpcInstrument.h"
 #include "core/FruitySlicer.h"
 #include "core/SlicexInstrument.h"
 #include "core/TempoMap.h"
@@ -232,6 +233,16 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
         instrument->prepare (sampleRate);
         instrument->configure (channel, bpm);
         instrument->settleNew();
+        return instrument;
+    }
+
+    // FPC (round 190q): a zoned sampler per pad, as the channel-per-pad import builds them (no settleNew(), like those)
+    if (kind == InstrumentKind::fpc)
+    {
+        const loadtrace::Scope timing ("rack_zoned");
+        std::shared_ptr<Instrument> instrument = makeFpcInstrument (channel, samples);
+        instrument->prepare (sampleRate);
+        instrument->configure (channel, bpm);
         return instrument;
     }
 
@@ -609,6 +620,9 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                     && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::soundfont
                 || (previous->song.channels[p].samplePath == channel.samplePath && previous->sampleRate == sampleRate))
+            && (kind != InstrumentKind::fpc // (the kit and its files: a new instrument)
+                || (previous->song.channels[p].zones == channel.zones && previous->song.channels[p].pluginState == channel.pluginState
+                    && previous->sampleRate == sampleRate))
             && (kind != InstrumentKind::directwave
                 || (previous->song.channels[p].zones == channel.zones && previous->song.channels[p].modelParams == channel.modelParams
                     && previous->song.channels[p].pluginState == channel.pluginState && previous->sampleRate == sampleRate))
@@ -855,6 +869,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             case InstrumentKind::sawer: case InstrumentKind::flkeys: case InstrumentKind::granulizer:
             case InstrumentKind::drumaxx: case InstrumentKind::slayer: case InstrumentKind::directwave:
             case InstrumentKind::wavetraveller: case InstrumentKind::slicex:
+            case InstrumentKind::fpc: // (its pads have their own cut groups, inside)
             case InstrumentKind::plugin:
                 return false;
             default:
@@ -2358,6 +2373,7 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
 
     auto& instrument = *state.instruments[(std::size_t) i];
     instrument.beginChunk (n); // (extra outputs: a generator Patcher's, REA_rodada141)
+    instrument.setChannelLevels (pan, volume); // (FPC's pads pan around the channel's pan, round 190q)
     // issue #14: the channel's pitch as it is now (a hosted plugin bends to it; native engines took it at note on)
     // (round 167a: the native generators move their sounding notes with it, as FL's do)
     // (round 173d: + the controller's pitch wheel, which FL's generators follow through the channel's pitch)

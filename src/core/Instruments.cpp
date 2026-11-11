@@ -1,5 +1,6 @@
 #include "core/FruityDance.h"
 #include "core/Instruments.h"
+#include "core/FpcInstrument.h"
 #include "core/ControlSurface.h"
 #include "core/VoltageController.h"
 #include "core/Vfx.h"
@@ -318,6 +319,7 @@ private:
             case InstrumentKind::wavetraveller:
             case InstrumentKind::fruityslicer:
             case InstrumentKind::slicex:
+            case InstrumentKind::fpc:
             case InstrumentKind::drumaxx:
             case InstrumentKind::slayer:
             case InstrumentKind::fruitydance:
@@ -3537,6 +3539,8 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
         return makeInstrument (InstrumentKind::sampler, std::move (sample));
     if (kind == InstrumentKind::slicex)
         return makeSlicexInstrument (std::move (sample), nullptr); // (deck B's sample comes from RackRenderer)
+    if (kind == InstrumentKind::fpc) // (without its channel: no pads; the rack builds it from the channel's kit)
+        return makeFpcInstrument ({}, {});
     if (kind == InstrumentKind::drumaxx)
         return makeDrumaxxInstrument();
     if (kind == InstrumentKind::slayer)
