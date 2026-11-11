@@ -98,6 +98,13 @@ and the size rule, the move list and key table for 1 ... 128 rows, state round t
 long and cut names, export bytes), and the animation rules (frame order, cross-fade steps, change at the cycle's
 start, stopped = first row, Freestyle's range, the held row).
 
+Windows (cloud round build 42979719881 of 707fa909e, "completed success"): `LYNX.exe --danceshot` writes
+`sheet_result=OK` - the sheet made from LYNX's poses loads (6 rows, frames 120 x 150), a picture 3 pixels too narrow
+and a missing file are refused, `sheet_mirror_flips=1` (2271 of 2271 solid pixels match the flipped frame),
+`sheet_body_solid=36/36`, `stage_dancers=3`. Found by these pictures: Windows' renderer drew a negative horizontal
+scale unflipped, so a mirrored frame is flipped as a picture of its own; and the contact sheets were saved before
+their Graphics was finished (blank files since round 165e).
+
 ## 5. Not verified
 
 - FL itself was not run this round (no GUI driving): the rules come from the decompiled code and the manual. A sheet
