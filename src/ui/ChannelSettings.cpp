@@ -66,6 +66,8 @@
 #include "ui/VideoPlayerView.h"
 #include "ui/WaveTravellerEditor.h"
 #include "ui/FruitySlicerEditor.h"
+#include "ui/FlVoicePanel.h"
+#include "core/FruitySlicer.h"
 #include "ui/BrowserComponent.h"
 #include "engine/SampleLibrary.h"
 #include "core/SampleFiles.h"
@@ -5129,6 +5131,34 @@ bool hasEnvelopeTab (InstrumentKind kind) noexcept
     return kind == InstrumentKind::synth || kind == InstrumentKind::sampler;
 }
 
+// The channel's Envelope / instrument settings page: LYNX's own for the synth and the sampler; FL's (the plugin voice
+// processor's block in the generator's state) for Fruity Slicer (issue #129)
+std::unique_ptr<juce::Component> makeEnvelopePage (AudioEngine& engine, const ChannelRef& ref, InstrumentKind kind)
+{
+    if (hasEnvelopeTab (kind))
+        return std::make_unique<ModulationPanel> (engine, ref);
+    if (kind != InstrumentKind::fruityslicer)
+        return nullptr;
+    return makeFlVoicePanel (
+        engine,
+        [&engine, ref] () -> std::optional<flvoice::Settings> {
+            const auto* def = ref.get (engine);
+            if (def == nullptr || def->instrument != InstrumentKind::fruityslicer)
+                return std::nullopt;
+            const auto state = fslicer::parse (def->pluginState);
+            return fslicer::voiceSettings (state ? *state : fslicer::State {});
+        },
+        [&engine, ref] (const flvoice::Settings& settings) {
+            ref.edit (engine, [settings] (ChannelDef& def) {
+                if (auto state = fslicer::parse (def.pluginState))
+                {
+                    fslicer::setVoiceSettings (*state, settings);
+                    def.pluginState = fslicer::write (*state);
+                }
+            });
+        });
+}
+
 void showModulationFor (juce::Component& from, AudioEngine& engine, int channel)
 {
     if (auto* frame = from.findParentComponentOfClass<ChannelFrame>(); frame != nullptr && frame->tabCount() >= 2)
@@ -5410,7 +5440,7 @@ std::unique_ptr<juce::Component> makeChannelFrame (AudioEngine& engine, int chan
 {
     const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;
     auto frame = std::make_unique<ChannelFrame> (engine, ChannelRef::rack (channel), makeChannelSettingsPanel (engine, channel),
-                                                 hasEnvelopeTab (kind) ? std::make_unique<ModulationPanel> (engine, ChannelRef::rack (channel)) : nullptr);
+                                                 makeEnvelopePage (engine, ChannelRef::rack (channel), kind));
     frame->showTab (tab < 0 ? frame->tabCount() - 1 : tab);
     return frame;
 }
@@ -5480,7 +5510,7 @@ std::unique_ptr<juce::Component> makeNodeChannelFrame (AudioEngine& engine, std:
     if (page == nullptr)
         return nullptr;
     const auto kind = def->instrument;
-    return std::make_unique<ChannelFrame> (engine, ref, std::move (page), hasEnvelopeTab (kind) ? std::make_unique<ModulationPanel> (engine, ref) : nullptr);
+    return std::make_unique<ChannelFrame> (engine, ref, std::move (page), makeEnvelopePage (engine, ref, kind));
 }
 std::function<void (int)>& openMixerInsertHandler()
 {

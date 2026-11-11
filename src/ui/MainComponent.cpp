@@ -1450,12 +1450,24 @@ void MainComponent::setToolbarEditing (bool editing)
         toolbarEditor->grabKeyboardFocus();
 }
 
+void MainComponent::runUndoStep (undokeys::Step step)
+{
+    if (step != undokeys::Step::none)
+        undoRedo (step == undokeys::Step::redo);
+}
+
 void MainComponent::flUndo()
 {
-    if (alternateUndo)
-        undoRedo (false);
-    else
-        undoRedo (engine.canRedo()); // something undone: Ctrl+Z redoes the next step (FL: "undo/redo on the same shortcut")
+    // FL's default: undo, or redo when something is undone ("undo/redo on the same shortcut"); "Alternate undo mode":
+    // every press one more step back (core/UndoKeys.h)
+    runUndoStep (undokeys::undoKey (alternateUndo, engine.canUndo(), engine.canRedo()));
+}
+
+void MainComponent::flUndoBackwards()
+{
+    // FL's Undo backwards: one more step back; "Alternate undo mode" swaps the two shortcuts, so there it is the
+    // undo/redo key (round 190b)
+    runUndoStep (undokeys::backwardsKey (alternateUndo, engine.canUndo(), engine.canRedo()));
 }
 
 void MainComponent::undoRedo (bool redo)
@@ -1839,7 +1851,7 @@ bool MainComponent::runAction (const std::string& id)
     else if (is ("tools.consolidateSelection")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), false);
     else if (is ("tools.consolidateSelectionSongStart")) consolidatePlaylistSelection (engine, playlist.getSelectedClips(), true);
     else if (is ("edit.undo")) flUndo();
-    else if (is ("edit.undoBackwards")) undoRedo (false);
+    else if (is ("edit.undoBackwards")) flUndoBackwards();
     else if (is ("edit.redo")) undoRedo (true);
     else if (is ("help.shortcuts"))
     {
@@ -2126,6 +2138,9 @@ void MainComponent::loadUiSettings()
             PianoRollComponent::showChordName = on;
         else if (key == "prSongBars")
             PianoRollComponent::songBarsRuler = on;
+        else if (key == "prKeyStyle") // (round 190j: 0 = flat, FL's; 1 = piano keys)
+            PianoRollComponent::keyStyle = line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue() == 1 ? pianokeys::Style::piano
+                                                                                                                  : pianokeys::Style::flat;
         else if (key == "audioLogEnabled")
             engine.getRollingLog().setEnabled (on);
         else if (key == "audioLogSeconds")
@@ -2339,6 +2354,7 @@ void MainComponent::saveUiSettings()
                                       + "\nprGridHighlights=" + juce::String (PianoRollComponent::gridHighlights ? 1 : 0)
                                       + "\nprShowChordName=" + juce::String (PianoRollComponent::showChordName ? 1 : 0)
                                       + "\nprSongBars=" + juce::String (PianoRollComponent::songBarsRuler ? 1 : 0)
+                                      + "\nprKeyStyle=" + juce::String ((int) PianoRollComponent::keyStyle)
                                       + "\naudioLogEnabled=" + juce::String (engine.getRollingLog().isEnabled() ? 1 : 0)
                                       + "\naudioLogSeconds=" + juce::String (engine.getRollingLog().lengthSeconds())
                                       + "\naudioLogPreEffects=" + juce::String (engine.getRollingLog().getPosition() == RollingAudioLog::Position::preEffects ? 1 : 0)
@@ -2675,8 +2691,18 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             if (findToolWindow ("sampleBrowser") == nullptr)
                 toggleSampleBrowser();
         };
-        host.trackAdded = [this] (int) { playlist.repaint(); };
+        host.trackAdded = [this] (int track) { playlist.selectTrack (track); };
         simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
+        // the Simple headers' "+FX" (until the dock's Effects tab, slice S5): the Mixer on that insert
+        playlist.onTrackEffects = [this] (int insert) {
+            workspace.show (Panel::mixer);
+            mixer.selectTrack (insert);
+            refreshPanelButtons();
+        };
+        playlist.onSimpleFilesDropped = [this] (const juce::StringArray& files, std::int64_t tick) {
+            if (simpleWorkflow != nullptr)
+                simpleWorkflow->dropFiles (files, tick);
+        };
     }
     if (from == Style::simple && style != Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->left();
@@ -2732,6 +2758,9 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             flip->show (PlaylistArea::GridView::beside);
         workspace.setTitleAccessory (Panel::playlist, clipLaunch ? clipGridSwitch.get() : nullptr, clipLaunch ? ClipGridSwitch::width : 0);
     }
+    // the Simple workflow's track headers and no pattern picker (no-ops for the other two styles: nothing changes there)
+    playlist.setSimpleHeaders (style == Style::simple);
+    playlistArea.setPickerHidden (style == Style::simple);
     if (style == Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->entered(); // (after the grid's title accessory is gone: the Add track button takes its place)
 }
@@ -6910,9 +6939,12 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     else if (index == 1)
     {
         // FL's Edit menu: "Undo backwards" (Ctrl+Alt+Z) above "Undo" (Ctrl+Z: undo, or redo after an undo)
-        menu.addItem (tr ("Undo backwards") + shortcutText ("edit.undoBackwards"), engine.canUndo(), false, [this] { undoRedo (false); });
-        menu.addItem ((alternateUndo || ! engine.canRedo() ? tr ("Undo") : tr ("Undo (redo)")) + shortcutText ("edit.undo"),
-                      engine.canUndo() || engine.canRedo(), false, [this] { flUndo(); });
+        // ("Alternate undo mode" swaps the two shortcuts, as FL's menu does: round 190b)
+        const auto backwardsId = alternateUndo ? "edit.undo" : "edit.undoBackwards";
+        const auto toggleId = alternateUndo ? "edit.undoBackwards" : "edit.undo";
+        menu.addItem (tr ("Undo backwards") + shortcutText (backwardsId), engine.canUndo(), false, [this] { undoRedo (false); });
+        menu.addItem ((engine.canRedo() ? tr ("Undo (redo)") : tr ("Undo")) + shortcutText (toggleId), engine.canUndo() || engine.canRedo(), false,
+                      [this] { runUndoStep (undokeys::toggle (engine.canUndo(), engine.canRedo())); });
         menu.addItem (tr ("Redo") + shortcutText ("edit.redo"), engine.canRedo(), false, [this] { undoRedo (true); });
         menu.addItem (tr ("Undo history...") + shortcutText ("edit.history"), [this] { showHistory(); });
         menu.addItem (tr ("Audio editor..."), [this] { openAudioEditor (engine); });
