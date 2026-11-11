@@ -12268,6 +12268,49 @@ private:
                 s.mode = lynx::PlayMode::song;
             });
         offline.dispatchPendingMessages();
+        // the case Freeze exists for, a heavy hosted plugin: LYNX_FREEZETEST_PLUGIN = a plugin file whose first
+        // instrument plays the demo song's Lead (tools/testplugin/lynx_test_heavy_vst3.cpp: memory, CPU, latency, a
+        // state, and with LYNX_TEST_HEAVY_LOG the instances alive)
+        int hostedChannel = -1;
+        const auto hostedLog = juce::SystemStats::getEnvironmentVariable ("LYNX_TEST_HEAVY_LOG", {});
+        const auto hostedAlive = [&hostedLog] {
+            int alive = 0;
+            juce::StringArray lines;
+            juce::File (hostedLog).readLines (lines);
+            for (const auto& l : lines)
+                alive += l.startsWith ("create") ? 1 : l.startsWith ("destroy") ? -1 : 0;
+            return alive;
+        };
+        if (const auto pluginPath = juce::SystemStats::getEnvironmentVariable ("LYNX_FREEZETEST_PLUGIN", {}); pluginPath.isNotEmpty() && projectPath.isEmpty())
+        {
+            auto& host = offline.getPluginHost();
+            const auto added = host.addPluginFile (juce::File (pluginPath));
+            report << "hosted plugin file: " << pluginPath << " (" << added << " plugins)\n";
+            for (const auto& type : host.getKnownPlugins().getTypes())
+                if (type.isInstrument && juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName())
+                {
+                    offline.editSong ([&type] (lynx::Song& s) {
+                        auto& c = s.channels[0];
+                        c.instrument = lynx::InstrumentKind::plugin;
+                        c.plugin.id = type.createIdentifierString().toStdString();
+                        c.plugin.name = type.name.toStdString();
+                    });
+                    hostedChannel = 0;
+                    break;
+                }
+            offline.dispatchPendingMessages();
+            auto* instance = dynamic_cast<lynx::PluginInstrument*> (offline.getChannelInstrument (0).get());
+            check (hostedChannel == 0 && instance != nullptr, "the hosted plugin is loaded on channel 1");
+            report << "hosted plugin: " << juce::String::fromUTF8 (offline.getSong().channels[0].plugin.name.c_str())
+                   << ", engine latency " << offline.getLatencySamples() << " frames, instances alive " << hostedAlive() << "\n";
+        }
+        const auto hostedLine = [&] (const char* stage) {
+            if (hostedChannel < 0)
+                return;
+            report << "hosted, " << stage << ": instance on the channel "
+                   << (dynamic_cast<lynx::PluginInstrument*> (offline.getChannelInstrument (hostedChannel).get()) != nullptr ? "yes" : "no")
+                   << ", plugin instances alive in the process " << (hostedLog.isNotEmpty() ? juce::String (hostedAlive()) : juce::String ("(no log)")) << "\n";
+        };
         const juce::File data (prefix + "-data");
         data.deleteRecursively();
         offline.setRecordingTarget (data.getChildFile ("Audio").getChildFile ("Recorded"), "freezetest");
@@ -12282,7 +12325,7 @@ private:
             std::int64_t workingSet = 0, privateBytes = 0;
         };
         // the song as it stands, rendered by an export (its own engine: frozen channels play their audio there too)
-        const auto renderMix = [&] (const char* name) {
+        const auto renderMix = [&] (const char* name, const lynx::Song* other = nullptr, std::vector<int>* renderedLive = nullptr, int range = 0) {
             Mix m;
             offline.dispatchPendingMessages();
             m.workingSet = lynx::toolbar::PerformanceMeter::processMemoryBytes();
@@ -12297,7 +12340,16 @@ private:
                 auto options = settings.toOptions();
                 options.hqAllPlugins = false; // the quality heard while playing: what a frozen channel's audio is made at
                 options.disableMaxPolyphony = false; // (and each channel's Max polyphony, as while playing)
-                lynx::ExportJob job (offline.getSong(), options, file);
+                if (range == 1)
+                    options.range = lynx::exportopts::Range::selection;
+                if (range == 2)
+                {
+                    options.range = lynx::exportopts::Range::pattern;
+                    options.loops = 2;
+                }
+                lynx::ExportJob job (other != nullptr ? *other : offline.getSong(), options, file);
+                if (renderedLive != nullptr)
+                    *renderedLive = job.channelsRenderedLive();
                 const auto started = juce::Time::getMillisecondCounterHiRes();
                 const auto ok = job.run ([] (double) { return true; }, error);
                 m.renderSeconds = (juce::Time::getMillisecondCounterHiRes() - started) / 1000.0;
@@ -12410,6 +12462,10 @@ private:
         saveMenus (juce::StringArray { "Channel (live)" }, std::vector<juce::PopupMenu> { ui.getRackForSnapshot().getChannelMenuForSnapshot (first) }, prefix + "-menu-live.png");
         const auto live = renderMix ("live");
         line ("live     ", live);
+        hostedLine ("live");
+        const auto hostedState = hostedChannel >= 0 ? before.channels[(std::size_t) hostedChannel].plugin.state : std::string();
+        if (hostedChannel >= 0)
+            check (! hostedState.empty(), "the hosted plugin's state is in the project (" + juce::String ((int) hostedState.size()) + " characters)");
         flush();
 
         // --- frozen ---
@@ -12451,6 +12507,9 @@ private:
         }
         const auto frozen = renderMix ("frozen");
         line ("frozen   ", frozen);
+        hostedLine ("frozen");
+        if (hostedChannel >= 0 && hostedLog.isNotEmpty())
+            check (hostedAlive() == 0, "while frozen no instance of the hosted plugin is alive in the process");
         float peak = 0.0f;
         const auto nullFrozen = residual (live, frozen, peak);
         report << "null frozen vs live: " << juce::String (nullFrozen, 1) << " dB (peak " << juce::String (peak, 4) << ", "
@@ -12468,6 +12527,28 @@ private:
         ui.setHintForSnapshot ({ lynx::tr ("{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)",
                                            { juce::String::fromUTF8 (offline.getSong().channels[(std::size_t) first].name.c_str()) }), {} });
         write ("pianoroll-frozen");
+
+        // --- exports that do not play the song's timeline once: a selection, one pattern twice ---
+        // (the frozen audio is the whole song from its start: those renders play the instruments, never a wrong part of it)
+        if (projectPath.isEmpty())
+        {
+            auto part = offline.getSong();
+            part.loopStart = 16 * lynx::ppq;
+            part.loopEnd = 40 * lynx::ppq;
+            const auto partLive = lynx::freeze::thawed (part);
+            for (int range = 1; range <= 2; ++range)
+            {
+                std::vector<int> renderedLive;
+                const auto a = renderMix (range == 1 ? "selection-live" : "pattern-live", &partLive, nullptr, range);
+                const auto b = renderMix (range == 1 ? "selection-frozen" : "pattern-frozen", &part, &renderedLive, range);
+                float partPeak = 0.0f;
+                const auto null = residual (a, b, partPeak);
+                report << (range == 1 ? "export of a selection (bars 5-10)" : "export of the current pattern, twice") << ", frozen vs live: " << juce::String (null, 1)
+                       << " dB (peak " << juce::String (partPeak, 4) << ", " << juce::String (b.audioSeconds, 2) << " s), channels rendered live: " << (int) renderedLive.size() << "\n";
+                check (partPeak > 0.001f && null < -90.0 && a.audio.getNumSamples() == b.audio.getNumSamples(),
+                       range == 1 ? "an export of a selection of a frozen project is the selection" : "an export of one pattern of a frozen project is that pattern");
+            }
+        }
 
         // --- what a save holds ---
         {
@@ -12516,6 +12597,21 @@ private:
                 for (const auto c : targets)
                     othersFresh = othersFresh && (c == first || ! offline.freezeOutOfDate (c));
                 check (othersFresh, "the other frozen channels stay up to date");
+                // an export of the project in that state: the out-of-date channel renders live (never the old audio),
+                // the others keep their frozen audio — the same mix as the edited project with nothing frozen
+                {
+                    std::vector<int> renderedLive;
+                    const auto stale = renderMix ("stale", nullptr, &renderedLive);
+                    const auto edited = lynx::freeze::thawed (offline.getSong());
+                    const auto reference = renderMix ("stale-reference", &edited);
+                    float stalePeak = 0.0f;
+                    const auto nullStale = residual (reference, stale, stalePeak);
+                    const auto nullOld = residual (frozen, stale, stalePeak);
+                    report << "export with channel " << (first + 1) << " out of date: " << juce::String (nullStale, 1) << " dB vs the edited project live, "
+                           << juce::String (nullOld, 1) << " dB vs the old frozen mix; channels rendered live: " << (int) renderedLive.size() << "\n";
+                    check (renderedLive == std::vector<int> { first }, "an export renders the out-of-date frozen channel live, and only that one");
+                    check (nullStale < -90.0 && nullOld > -60.0, "an export of an out-of-date freeze holds the edited notes, not the old audio");
+                }
                 offline.editSong ([&before] (lynx::Song& s) { s.patterns = before.patterns; });
                 check (! offline.freezeOutOfDate (first), "the notes back: up to date again");
             }
@@ -12588,8 +12684,17 @@ private:
         for (const auto& f : stemPaths)
             left += f.existsAsFile() ? 1 : 0;
         check (left == 0, "Unfreeze deletes the frozen audio (" + juce::String (left) + " of " + juce::String ((int) stemPaths.size()) + " files left)");
+        if (hostedChannel >= 0)
+        {
+            // the new instance (it starts with another tuning than the first one had) took the saved state
+            offline.capturePluginStates();
+            check (dynamic_cast<lynx::PluginInstrument*> (offline.getChannelInstrument (hostedChannel).get()) != nullptr, "Unfreeze loads the hosted plugin again");
+            check (offline.getSong().channels[(std::size_t) hostedChannel].plugin.state == hostedState,
+                   "the hosted plugin's state, read back from the new instance, is the state it had before the freeze");
+        }
         const auto unfrozen = renderMix ("unfrozen");
         line ("unfrozen ", unfrozen);
+        hostedLine ("unfrozen");
         const auto nullUnfrozen = residual (live, unfrozen, peak);
         report << "null unfrozen vs live: " << juce::String (nullUnfrozen, 1) << " dB\n";
         check (nullUnfrozen < -90.0, "the unfrozen mix nulls against the live mix");

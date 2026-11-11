@@ -165,6 +165,10 @@ ChannelDef standInChannel (const ChannelDef& c, const std::string& path)
     f.uid = c.uid;
     f.standIns = c.standIns;
     f.freeze = c.freeze;
+    // declicking off, not a new audio clip channel's mode 1: no attack reshapes the start of the audio, and the clip
+    // voice ends with a sharp cut at its note's end — in Pattern mode the next pass continues it sample for sample
+    // (a release there would fade the file's held last frame into the next pass: a click at every loop wrap)
+    f.sampler.declickMode = 0;
     return f;
 }
 } // namespace

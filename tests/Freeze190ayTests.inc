@@ -234,10 +234,11 @@ TEST (freeze190ay_frozen_channel_plays_like_its_instrument)
 
     // Pattern mode: pattern A looping. From the second pass on the loop stem is what the instrument plays (the first
     // pass of the stem already carries the previous pass's tail: known, printed).
-    // Known, not fixed here (Online Sessions' loop stems have it too): 3 ticks after each loop start the previous
-    // pass's audio-clip voice adds its held last value, fading out over 3 ms — the first 10 ticks of a pass are left
-    // out of the check and their residual is printed. The check is made without the insert's delay and reverb, which
-    // would repeat that into the rest of the pass.
+    // The loop wrap is seamless (below -90 dB in the first 10 ticks of a pass, as in the rest of it): the stand-in
+    // channel declicks in mode 0, where a clip voice ends with a sharp cut at its note's end (FL's renders, round
+    // 189l) — the pass that starts there continues it sample for sample. Before that the ended voice, already at its
+    // file's last frame, faded out its held last value over 3 ms into the next pass (-24.6 dB there). Checked dry, and
+    // through the insert's delay and reverb.
     auto loopLive = song, loopIce = frozen;
     loopLive.currentPattern = loopIce.currentPattern = 0;
     loopIce.mode = lynx::PlayMode::pattern;
@@ -254,6 +255,22 @@ TEST (freeze190ay_frozen_channel_plays_like_its_instrument)
         const auto seam = freeze190ayCompare (l1, l2, frames (pass * 3840), frames (pass * 3840 + 10));
         std::printf ("    pass %d: peak %.4f, residual %.1f dB; its first 10 ticks %.1f dB\n", pass + 1, body.peak, body.dB(), seam.dB());
         CHECK (body.peak > 0.05f && body.dB() < -100.0);
+        CHECK (seam.dB() < -90.0);
+    }
+    {
+        auto wetLive = song, wetIce = frozen;
+        wetLive.currentPattern = wetIce.currentPattern = 0;
+        wetIce.mode = lynx::PlayMode::pattern;
+        const auto wetPlayed = lynx::standins::project (wetIce, [] (const lynx::PluginRef&) { return false; });
+        const auto w1 = freeze190ayRender (wetLive, 4 * 3840, {}, false);
+        const auto w2 = freeze190ayRender (wetPlayed, 4 * 3840, provider, false);
+        for (int pass = 2; pass < 4; ++pass) // (from the third pass: the second still hears the first one's missing tail in the reverb)
+        {
+            const auto seam = freeze190ayCompare (w1, w2, frames (pass * 3840), frames (pass * 3840 + 10));
+            const auto body = freeze190ayCompare (w1, w2, frames (pass * 3840 + 10), frames ((pass + 1) * 3840));
+            std::printf ("    with the insert effects, pass %d: residual %.1f dB; its first 10 ticks %.1f dB\n", pass + 1, body.dB(), seam.dB());
+            CHECK (seam.dB() < -90.0);
+        }
     }
 
     // Song mode with nothing arranged plays nothing: the frozen channel adds no clip there (a stem clip would become the

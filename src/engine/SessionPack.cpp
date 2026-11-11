@@ -628,6 +628,42 @@ std::string freezeSource (const Song& song, int channel, double sampleRate)
     return sha256Hex ((const std::uint8_t*) bytes.data(), bytes.size());
 }
 
+Song freshForExport (const Song& song, bool timelineKept, std::vector<int>* thawed)
+{
+    std::vector<int> stale;
+    for (int c = 0; c < (int) song.channels.size(); ++c)
+    {
+        const auto& f = song.channels[(std::size_t) c].freeze;
+        if (! f.on())
+            continue;
+        if (! timelineKept)
+        {
+            stale.push_back (c);
+            continue;
+        }
+        // the rate the channel was frozen at is its audio's (the source counts it); audio that is not there is the
+        // engine's case (it plays the instrument)
+        const auto* whole = standins::find (f.stems, 0, false);
+        if (whole == nullptr)
+            continue;
+        juce::WavAudioFormat wav;
+        const auto file = fileOf (whole->path);
+        if (! file.existsAsFile())
+            continue;
+        std::unique_ptr<juce::AudioFormatReader> reader (wav.createReaderFor (file.createInputStream().release(), true));
+        if (reader == nullptr || freezeSource (song, c, reader->sampleRate) != f.source)
+            stale.push_back (c);
+    }
+    if (thawed != nullptr)
+        *thawed = stale;
+    if (stale.empty())
+        return song;
+    auto copy = song;
+    for (const auto c : stale)
+        copy.channels[(std::size_t) c].freeze = {};
+    return copy;
+}
+
 bool renderFreeze (const Song& song, int channel, double sampleRate, const juce::File& folder, std::vector<StandIn>& stems,
                    const std::function<bool (double)>& progress, juce::String& error)
 {
