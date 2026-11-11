@@ -149,6 +149,13 @@ room). Today it only forwards/echoes; the session protocol on top is the app's (
   4000).
 - A room expires 12 h after its last connection ended. Limits: 10 rooms per hour per client, 200 rooms on the relay
   (`503` when full), **4 peers per room** (ONLINE_SESSIONS.md §10 Q3: 4 proposed).
+- **Abuse limits (round 190ah)**, all by environment (`server/env.example`), so the relay cannot be used as a free
+  tunnel: `LYNX_RELAY_ROOM_BYTES` 12 GiB relayed per room in all, `LYNX_RELAY_CLIENT_BYTES_DAY` 32 GiB sent per client
+  address per 24 h, `LYNX_RELAY_ROOMS_PER_CLIENT` 8 rooms open at once per client address (`429`),
+  `LYNX_RELAY_ROOM_MAX_HOURS` 72 h for a room's whole life, `LYNX_RELAY_ROOM_IDLE_HOURS` 12 h connected without a
+  frame, 4 KiB per control (text) message. A room or connection that hits one is closed with WebSocket code **4001**
+  (the app then tells the user and does not reconnect). `/health` → `relay.limits` lists them and `limitsHit` counts
+  how often one was hit; no addresses are logged. Rooms live in memory only: nothing is written to disk.
 
 ### 3.2 Connect
 

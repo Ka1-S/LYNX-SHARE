@@ -70,6 +70,11 @@ public:
         // host: the journal a restarted LYNX SHARE resumes the session from (default: the profile's
         // "Live session/journal.json"; tests: their own)
         juce::File journal;
+        // guest (round 190ah): the journal a restarted LYNX SHARE comes back into the session from, as the same guest
+        // (default: the profile's "Live session/guest.json")
+        juce::File guestJournal;
+        // host: what one guest may send before the host is asked, and what the session may move in all (§8.4)
+        juce::int64 guestMediaLimit = live::guestMediaBytes, sessionMediaLimit = live::sessionMediaBytes;
         int reconnectForMs = 15 * 60 * 1000;  // how long a dropped computer keeps trying (and guests wait for the host)
         int standInDelayMs = 2000;            // live stand-ins render this long after the part's last change
         bool inlineWork = false;              // command-line runs without a message loop: stand-ins render in pump()
@@ -89,6 +94,18 @@ public:
     static juce::File defaultJournal();
     static std::optional<JournalInfo> readJournal (const juce::File& journal);
     static void discardJournal (const juce::File& journal, const juce::String& relay); // (and closes its room)
+
+    // A guest's journal (round 190ah): the session this LYNX SHARE was in when it closed or crashed.
+    struct GuestJournalInfo
+    {
+        juce::String name, hostName;
+        juce::Time saved;
+        std::uint64_t revision = 0;
+    };
+    static juce::File defaultGuestJournal();
+    static std::optional<GuestJournalInfo> readGuestJournal (const juce::File& journal);
+    // Not going back: the journal goes, and the host is told (in the background) that this guest's place is free.
+    static void discardGuestJournal (const juce::File& journal, const juce::String& relay);
 
     struct Person
     {
@@ -121,6 +138,10 @@ public:
     // The host's LYNX SHARE restarted: the session goes on from its journal (`onResumed` gets the song first); the
     // guests, waiting, reconnect by themselves.
     bool resumeHost (const juce::File& journal, const Options& options);
+    // A guest's LYNX SHARE restarted (round 190ah): it goes back into the session as the same guest — same tag, area,
+    // colour and permissions, no new question to the host — with the project as it had it (`onRejoined` gets that
+    // song first); what it had changed and the host never confirmed is proposed again.
+    bool resumeGuest (const juce::File& journal, const Options& options);
 
     // Session chat (round 169j): to everyone in the session.
     void sendChat (const juce::String& text);
@@ -134,6 +155,11 @@ public:
     void setPermissions (std::uint32_t tag, live::Permissions permissions, bool keepFull);
     live::Permissions myPermissions() const noexcept { return myPerms; }
     int standInsRendering() const noexcept { return rendering ? 1 : 0; }
+    // the host's count of the session's audio files against its limits (round 190ah)
+    const live::MediaBudget& mediaBudget() const noexcept { return budget; }
+    // What the session's confirmed song is, as a hash every computer in it computes the same way (sample paths as
+    // their content hashes): two computers that print the same digest at the same revision hold the same song.
+    juce::String digest();
 
     // --- P5-A1, remote plugins (round 190ai; core/RemotePlugins.h, engine/LiveRemotePlugins.cpp) ---------------------
     // The host shares one of its plugins with the session (opt-in per plugin, off by default, gone when the session
@@ -177,6 +203,7 @@ public:
     juce::String getStatus() const { return status; } // one line for the presence bar / dialogs
     std::vector<Person> getPeople() const;
     int waitingChanges() const;  // commits held while this computer records
+    int pendingEdits() const;    // this computer's edits the host has not answered yet
     int mediaDownloading() const noexcept { return (int) wanted.size(); }
     std::uint32_t myTag() const noexcept { return me; }
 
@@ -190,6 +217,19 @@ public:
     // The host resumed from its journal: the caller opens this song (default: engine.setSong).
     std::function<void (Song song)> onResumed;
     std::function<void (const ChatLine& line)> onChat; // a chat line arrived (or was sent)
+    // A guest came back from its journal: the caller makes this song the open project (default: engine.setSong).
+    std::function<void (Song song)> onRejoined;
+    // The host: a media limit was reached (round 190ah). `session` false: guest `name` has sent `used` and the next
+    // file does not fit their `limit` — answer (true) raises it and fetches what was held back; unset or (false): the
+    // files stay with the guest. `session` true: the whole session is at its limit (answer is empty: nothing to ask).
+    struct MediaLimit
+    {
+        bool session = false;
+        juce::String name;
+        juce::int64 used = 0, limit = 0;
+        std::function<void (bool raise)> answer;
+    };
+    std::function<void (const MediaLimit&)> onMediaLimit;
 
     // tests / scripted runs: a message to every guest (as the host) is counted here
     struct Stats
@@ -199,6 +239,7 @@ public:
         int reconnects = 0, replayed = 0, resumedBySnapshot = 0, standInsRendered = 0, packedSent = 0, followed = 0;
         juce::int64 packedSaved = 0; // bytes FLAC saved on the media sent
         int hashedOffThread = 0;
+        int mediaRefused = 0, rejoined = 0;
         int hostedRendered = 0, valueEditsRefused = 0; // P5-A1: parts rendered for their owners, proposals over the rate limit
     };
     Stats getStats() const noexcept { return stats; }
@@ -228,6 +269,7 @@ private:
         bool keepFull = false;
         std::set<live::Key> need;     // parts it cannot play
         bool lostRev = false;         // it saw commits this host lost (a restart from an older journal)
+        juce::int64 awaySinceMs = 0;  // when its connection dropped (the longest away gives its place up first)
     };
     struct Want
     {
@@ -395,6 +437,27 @@ private:
     void writeJournal (bool now);
     juce::var permsToVar (const live::Permissions& p, bool keepFull) const;
     void verifyArrived (const juce::String& sha);
+    // 190ah
+    struct Refused
+    {
+        std::uint32_t tag = 0;
+        juce::String name;
+        juce::int64 size = 0;
+    };
+    live::MediaBudget budget;                   // host
+    std::map<juce::String, Refused> refused;    // host: sha -> a guest's file held back by their limit
+    std::set<std::uint32_t> limitAsked;         // host: guests whose limit question is open or was answered "no"
+    bool sessionLimitTold = false;
+    juce::File guestJournalFile;
+    std::uint64_t journalSig = 0;
+    bool rejoining = false, primed = true, fetchMissing = false, quitting = false, resumeHeld = false;
+    std::map<std::uint32_t, juce::int64> limitAnsweredMs; // host: when a guest's limit question was last answered "no"
+    void writeGuestJournal (bool now);
+    void refuse (const juce::String& sha, bool sessionWide);
+    void tellSessionLimit();
+    void onLimit (const juce::var& m);
+    void fetchMissingMedia();
+    int peerOf (std::uint32_t tag) const;
     // P5-A1 (engine/LiveRemotePlugins.cpp)
     std::vector<remoteplug::Shared> shared;     // host: what it shares; guest: what the host shares
     std::set<live::Key> hostedBusy;             // the parts being rendered for their owners (guests: as the host says)

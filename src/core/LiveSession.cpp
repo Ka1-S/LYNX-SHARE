@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
@@ -1218,6 +1219,16 @@ void Replica::resend()
     resendBase = base;
 }
 
+void Replica::restored (std::uint32_t firstSeq)
+{
+    seq = std::max (seq, firstSeq);
+    inflight.clear();
+    inflightBase.clear();
+    acks.clear();
+    lastSent = applied; // (everything the working song has on top of the base goes out again)
+    resendBase = appliedRev;
+}
+
 Song Replica::resume (Song snapshot, std::uint64_t r, const Song& working)
 {
     return resume (std::move (snapshot), r, working, r < rev);
@@ -1342,6 +1353,73 @@ Song selectiveRevert (const Song& current, const Song& before, const Song& after
     apply (x, back, [&] (const Key& k) { return allowed.count (k) > 0; });
     return x;
 }
+// --- media limits ----------------------------------------------------------------------------------------------------
+
+std::int64_t MediaBudget::limitOf (std::uint32_t tag) const
+{
+    auto it = raised.find (tag);
+    return it == raised.end() ? guestLimit : std::max (guestLimit, it->second);
+}
+
+std::int64_t MediaBudget::usedBy (std::uint32_t tag) const
+{
+    auto it = used.find (tag);
+    return it == used.end() ? 0 : it->second;
+}
+
+MediaBudget::Verdict MediaBudget::admit (std::uint32_t tag, std::int64_t bytes) const
+{
+    bytes = std::max<std::int64_t> (0, bytes);
+    if (session + bytes > sessionLimit)
+        return Verdict::sessionLimit;
+    if (tag > session::hostTag && usedBy (tag) + bytes > limitOf (tag))
+        return Verdict::guestLimit;
+    return Verdict::ok;
+}
+
+MediaBudget::Verdict MediaBudget::admitOut (std::int64_t bytes) const
+{
+    return session + std::max<std::int64_t> (0, bytes) > sessionLimit ? Verdict::sessionLimit : Verdict::ok;
+}
+
+void MediaBudget::received (std::uint32_t tag, std::int64_t bytes)
+{
+    bytes = std::max<std::int64_t> (0, bytes);
+    session += bytes;
+    if (tag > session::hostTag)
+        used[tag] += bytes;
+}
+
+void MediaBudget::sent (std::int64_t bytes)
+{
+    session += std::max<std::int64_t> (0, bytes);
+}
+
+void MediaBudget::raise (std::uint32_t tag, std::int64_t bytes)
+{
+    auto limit = limitOf (tag);
+    const auto need = usedBy (tag) + std::max<std::int64_t> (0, bytes);
+    while (limit < need && limit < sessionLimit)
+        limit *= 2;
+    if (limit == limitOf (tag) && limit < sessionLimit)
+        limit *= 2;
+    raised[tag] = std::min (limit, sessionLimit);
+}
+
+std::string mediaSize (std::int64_t bytes)
+{
+    char text[32];
+    const double mb = (double) std::max<std::int64_t> (0, bytes) / (1024.0 * 1024.0);
+    if (mb >= 1024.0)
+    {
+        const double gb = mb / 1024.0;
+        std::snprintf (text, sizeof text, gb == std::floor (gb) ? "%.0f GB" : "%.1f GB", gb);
+    }
+    else
+        std::snprintf (text, sizeof text, "%.0f MB", std::max (1.0, std::round (mb)));
+    return text;
+}
+
 // --- chat ------------------------------------------------------------------------------------------------------------
 
 std::string cleanChat (const std::string& text)

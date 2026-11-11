@@ -189,6 +189,33 @@ void leave (Context c)
                                         }));
 }
 
+std::unique_ptr<juce::AlertWindow> makeRejoinDialog (const juce::String& hostName, const juce::String& when)
+{
+    auto w = std::make_unique<juce::AlertWindow> (
+        tr ("Go back into the live session"),
+        (hostName.isNotEmpty() ? tr ("LYNX SHARE closed while you were in {0}'s live session ({1}).", { hostName, when })
+                               : tr ("LYNX SHARE closed while you were in a live session ({0}).", { when }))
+            + " " + tr ("Go back in? You come back as yourself, with your part and everything you had changed."),
+        juce::MessageBoxIconType::QuestionIcon);
+    w->addButton (tr ("Go back in"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    w->addButton (tr ("Leave the session"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    return w;
+}
+
+std::unique_ptr<juce::AlertWindow> makeMediaLimitDialog (const juce::String& name, juce::int64 used, juce::int64 limit)
+{
+    auto size = [] (juce::int64 bytes) { return juce::String::fromUTF8 (lynx::live::mediaSize (bytes).c_str()); };
+    auto w = std::make_unique<juce::AlertWindow> (
+        tr ("Live session"),
+        tr ("{0} has sent {1} of audio files into this session; the limit for one guest is {2}. Their newest files are waiting on their computer.",
+            { name, size (used), size (limit) })
+            + " " + tr ("Raise the limit for {0}?", { name }),
+        juce::MessageBoxIconType::QuestionIcon);
+    w->addButton (tr ("Raise the limit"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    w->addButton (tr ("Keep the limit"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    return w;
+}
+
 void offerResume (Context c)
 {
     const auto journal = LiveSessionManager::defaultJournal();
@@ -196,6 +223,25 @@ void offerResume (Context c)
     if (! info)
     {
         journal.deleteFile(); // (too old for the relay, or damaged)
+        // round 190ah: or this computer was a guest in someone's session when LYNX SHARE closed
+        const auto guestJournal = LiveSessionManager::defaultGuestJournal();
+        const auto guest = LiveSessionManager::readGuestJournal (guestJournal);
+        if (! guest)
+        {
+            guestJournal.deleteFile();
+            return;
+        }
+        if (c.live.isActive())
+            return;
+        auto w = makeRejoinDialog (guest->hostName, guest->saved.toString (true, true, false, true));
+        w.release()->enterModalState (true, juce::ModalCallbackFunction::create ([c, guestJournal] (int r) {
+                                          const auto o = optionsFor (c, myName());
+                                          if (r != 1)
+                                              return LiveSessionManager::discardGuestJournal (guestJournal, o.relay);
+                                          if (! c.live.resumeGuest (guestJournal, o))
+                                              warn (tr ("Go back into the live session"), tr ("The live session could not be resumed."));
+                                      }),
+                                      true);
         return;
     }
     if (c.live.isActive())
@@ -232,6 +278,21 @@ void attach (LiveSessionManager& live)
             ui::postHint ({ text, {} }, 4000);
         else
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Live session"), text);
+    };
+    // round 190ah: a guest reached the limit for audio files (the host decides), or the session did (a plain message)
+    live.onMediaLimit = [] (const LiveSessionManager::MediaLimit& limit) {
+        if (limit.session)
+            return juce::AlertWindow::showMessageBoxAsync (
+                juce::MessageBoxIconType::InfoIcon, tr ("Live session"),
+                tr ("This live session has moved {0} of audio files, its limit. New audio files are not sent any more; everything else goes on.",
+                    { juce::String::fromUTF8 (lynx::live::mediaSize (limit.limit).c_str()) })
+                    + " " + tr ("For a big project, File > Online session > Send project... sends everything in one package."));
+        auto w = makeMediaLimitDialog (limit.name, limit.used, limit.limit);
+        w.release()->enterModalState (true, juce::ModalCallbackFunction::create ([answer = limit.answer] (int r) {
+                                          if (answer)
+                                              answer (r == 1);
+                                      }),
+                                      true);
     };
     live.onKnock = [] (const juce::String& name, std::function<void (bool)> answer) {
         juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Live session"),

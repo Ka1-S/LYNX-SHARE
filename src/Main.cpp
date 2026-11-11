@@ -762,6 +762,15 @@ public:
             return;
         }
 
+        if (args.contains ("--livepeer"))
+        {
+            // LYNX --livepeer host|guest|rejoin <folder> [--relay URL] [--code CODE|@file]: one computer's side of a live
+            // session between two real computers, no window (round 190ah)
+            setApplicationReturnValue (lynx::livetest::runPeer (args));
+            quit();
+            return;
+        }
+
         if (args.contains ("--livetest"))
         {
             // LYNX --livetest report.txt [--relay URL]: a live session of four peers over the relay (round 169b)
@@ -12920,6 +12929,9 @@ private:
             saveAlert (lynx::MainComponent::makeAboutWindow(), "-about.png");
             saveAlert (lynx::makeNameAndColourDialog (lynx::tr ("Rename pattern"), "Pattern 2", lynx::lynxPalette()[6]), "-rename.png");
             saveAlert (lynx::makeRecordChoiceDialog(), "-record-dialog.png");
+            // round 190ah: Online Sessions — a guest's "go back in?" at start-up, the host's question at a guest's file limit
+            saveAlert (lynx::liveui::makeRejoinDialog ("Ana", juce::Time (2026, 10, 10, 21, 40).toString (true, true, false, true)), "-live-rejoin.png");
+            saveAlert (lynx::liveui::makeMediaLimitDialog ("Pedro", (juce::int64) 1010 << 20, (juce::int64) 1 << 30), "-live-media-limit.png");
             saveAlert (lynx::makeSamplePitchDialog (7.25f, true, true), "-sample-pitch.png"); // round 163c
             saveAlert (lynx::makeGradientColourDialog (juce::Colour (0xffe5383b), juce::Colour (0xff3a7bd5), 8), "-gradient.png"); // round 177a
             saveAlert (lynx::makeMidiImportDialog(), "-midi-import-dialog.png"); // File › Import › MIDI file (REA round 143)
