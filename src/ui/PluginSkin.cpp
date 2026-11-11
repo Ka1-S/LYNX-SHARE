@@ -514,7 +514,7 @@ void brandMark (juce::Graphics& g, juce::Rectangle<float> a)
         if (logo.isNull()) return;
         // halve step by step: one big jump from 512 px aliases at the 16-24 px header size
         img = logo;
-        while (img.getWidth() / 2 >= px)
+        while (px > 0 && img.getWidth() / 2 >= px)
             img = img.rescaled (img.getWidth() / 2, img.getHeight() / 2, juce::Graphics::highResamplingQuality);
         if (img.getWidth() != px)
             img = img.rescaled (px, px, juce::Graphics::highResamplingQuality);
