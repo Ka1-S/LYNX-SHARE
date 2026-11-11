@@ -80,6 +80,10 @@ render, **[GUI]** LYNX driven on Windows (fresh profile, `LYNX_TEST_MODE=1`), **
   (classic undo, instead of undo/redo on the same shortcut)" (off) makes Ctrl+Z always undo. Edit menu: "Undo
   backwards" and "Undo" / "Undo (redo)". Ctrl+Y / Ctrl+Shift+Z redo stays (LYNX extra). [TEST]
   `rea167k_undo_backwards_key`.
+- **Round 190b (issue #140):** the alternate mode now swaps the two shortcuts as FL's FUN_010197f0 does: Ctrl+Z walks
+  back, and Ctrl+Alt+Z is the undo/redo key (before, both walked back). The Edit menu shows the swapped shortcuts.
+  The rule is in `core/UndoKeys.h`. [TEST] `u190b_default_mode_ctrl_z_toggles_and_ctrl_alt_z_walks_back`,
+  `u190b_alternate_mode_ctrl_z_walks_the_history`, `u190b_undo_and_redo_shortcuts`.
 
 ## 5. Playlist keys 7 / 8 / 9: clip pitch and clip reverse
 

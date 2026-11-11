@@ -174,6 +174,28 @@ struct ForeignPlugin
     bool operator== (const ForeignPlugin&) const = default;
 };
 
+// One output of a hosted generator in FL's wrapper Processing › Connections (round 188d, issue #114 [UI and audio
+// checked in FL 2026: docs/analise/REA_rodada188d.md]): it plays on the insert `offset` tracks after the channel's
+// own ("---" = 0: the channel's insert, where every active output goes by default); an inactive output is silent.
+struct PluginOutputRoute
+{
+    int offset = 0;          // −999…999, FL's wheel range
+    std::int8_t active = -1; // the row's LED: 1 on, 0 off, −1 as the plugin declares the output (VST2 pin, VST3 bus)
+
+    bool isActive (bool pluginDefault) const noexcept { return active < 0 ? pluginDefault : active != 0; }
+    bool operator== (const PluginOutputRoute&) const = default;
+};
+// FL's Settings › General › "Disable typing keyboard priority by default" (DisablePlugFocusDefaultBox, off; round
+// 187a): on, a plugin added from now on starts with its window's Typing keyboard priority off (LYNX first)
+namespace pluginkeys
+{
+inline std::atomic<bool>& newPluginsHostFirst() noexcept
+{
+    static std::atomic<bool> on { false };
+    return on;
+}
+} // namespace pluginkeys
+
 struct PluginRef
 {
     std::string id;    // unique plugin identifier (JUCE's format-name-hash)
@@ -213,12 +235,19 @@ struct PluginRef
     // what it changes in LYNX comes with the Typing keyboard priority button (issue #96 slice 2)
     bool allowHostKeys = false;
     // FL's plugin-window "Typing keyboard priority" button turned off: LYNX takes the keys it uses (typing piano,
-    // shortcuts) before this plugin, which gets the rest (FL manual, Wrapper > Typing keyboard priority; issue #96)
-    bool hostKeysFirst = false;
+    // shortcuts) before this plugin, which gets the rest (FL manual, Wrapper > Typing keyboard priority; issue #96).
+    // .flp: wrapper flags bit 0x01000000 set [DATA round 187a: one project saved with the button on and off]
+    bool hostKeysFirst = pluginkeys::newPluginsHostFirst().load (std::memory_order_relaxed);
     bool sendLoopPosition = true;   // "Send loop position": the play head reports the loop's start and end
     // Settings › Options › "Bit size" (round 176a, FL's wrapper): which build of a plugin installed as both 32-bit and
     // 64-bit loads — 0 = Native (the 64-bit one when there is one), 32 (in the 32-bit bridge) or 64
     int bitSize = 0;
+    // Processing › Connections (round 188d): [plugin output] its route; outputs past the end keep FL's defaults
+    std::vector<PluginOutputRoute> outputs;
+    PluginOutputRoute outputRoute (int index) const noexcept
+    {
+        return index >= 0 && index < (int) outputs.size() ? outputs[(std::size_t) index] : PluginOutputRoute {};
+    }
     // FL's plugin menu › "Detached" (issue #116): the editor opens in a window of its own above the main window instead
     // of docked in the workspace. LYNX's own field until the .flp bit is found (docking is behind a developer switch)
     bool detached = false;
@@ -231,7 +260,7 @@ struct PluginRef
                && midiInPort == o.midiInPort && midiOutPort == o.midiOutPort && notifyRender == o.notifyRender
                && latencyOverrideMs == o.latencyOverrideMs && releaseVelocity == o.releaseVelocity && sendBendRange == o.sendBendRange
                && bendRange == o.bendRange && modXAftertouch == o.modXAftertouch && allNotesOffOnStop == o.allNotesOffOnStop
-               && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize
+               && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize && outputs == o.outputs
                && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst
                && detached == o.detached;
     }
@@ -749,6 +778,7 @@ struct ChannelDef
     PluginRef plugin;       // used when instrument == plugin
     std::vector<std::uint8_t> controllerState; // instrument == controller: FL Envelope Controller state
     std::vector<float> modelParams; // instrument == sakura / drumpad / boobass / drumsynth / harmless: FL's raw state parameters
+                                    // instrument == minisynth: { 1 } = FL Studio Mobile's build of the engine (core/MiniSynth.h)
     std::vector<std::uint8_t> pluginState; // instrument == sytrus / harmor / ogun / gms / morphine / fruitkick / bassdrum: the FL plugin's saved state (record 0xD5)
     SamplerSettings sampler; // used when instrument == sampler
     SynthSettings synth;     // used when instrument == synth
@@ -925,10 +955,21 @@ enum class EffectKind : std::uint8_t
     pocketTranceDelay,     // Pocket Trance Delay, FL Studio Mobile's Trance Delay, exact (round 188h, core/PocketFx.h)
     pocketTapeDelay,       // Pocket Tape Delay, FL Studio Mobile's Tape Delay, exact (round 188h, core/PocketFx.h)
     pocketMultiFx,         // Pocket MultiFX, FL Studio Mobile's MultiFX, exact (round 188h, core/PocketMultiFx.cpp): an X/Y pad over 8 effects
-    strikeShaper     // LYNX's level-independent transient designer (round trans189d, issue #94, core/StrikeShaper.h): attack / sustain ±15 / ±24 dB
+    strikeShaper,     // LYNX's level-independent transient designer (round trans189d, issue #94, core/StrikeShaper.h): attack / sustain ±15 / ±24 dB
+    pocketAutoduck,        // Pocket Autoduck, FL Studio Mobile's Autoduck, exact (round 189h, core/PocketFx.h)
+    pocketChorus,          // Pocket Chorus, FL Studio Mobile's Chorus, exact (round 189h, core/PocketFx.h)
+    pocketSpacer,          // Pocket Spacer, FL Studio Mobile's Spacer, exact (round 189h, core/PocketFx.h)
+    pocketStereoizer,       // Pocket Stereoizer, FL Studio Mobile's Stereoizer, exact (round 189h, core/PocketFx.h)
+    pocketWowFlutter,      // Pocket Wow & Flutter, FL Studio Mobile's Wow & Flutter (round 189h, core/PocketFxB.cpp)
+    pocketPhaser,          // Pocket Phaser, FL Studio Mobile's Phaser (round 189h, core/PocketFxB.cpp)
+    pocketFlanger,         // Pocket Flanger, FL Studio Mobile's Flanger (round 189h, core/PocketFxB.cpp)
+    pocketTremolo,          // Pocket Tremolo, FL Studio Mobile's Tremolo (round 189h, core/PocketFxB.cpp)
+    pocketWaveshaper,      // Pocket Waveshaper, FL Studio Mobile's Waveshaper, exact (round 189h, core/PocketFxC.cpp): FLM's 20 values
+    pocketCompressor,      // Pocket Compressor, FL Studio Mobile's Compressor, exact (round 189h, core/PocketFxC.cpp): FLM's 9 values
+    pocketSpreader         // Pocket Spreader, FL Studio Mobile's Spreader, exact (round 189h, core/PocketFxC.cpp): FL's Spreader engine, FLM's 4 values
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::strikeShaper;
+constexpr EffectKind lastEffectKind = EffectKind::pocketSpreader;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).

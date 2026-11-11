@@ -2255,6 +2255,24 @@ Proof: `docs/analise/REA_rodada181b.md`.
 | Tools › Clipboard › Save audio / MIDI clipboard to browser, greyed when empty | same, into the Browser's "Clipboard files" | ⚠️ | audio: CF_WAVE on Windows, else LYNX's audio editor clipboard; " (2)" naming INFERRED |
 | Tools › Score logger (Dump score log to selected pattern, Clear log) | same, moved from Options to Tools | ✅ | |
 
+## Plugin wrapper: Processing › Connections, multi-output generators (round 188d, issue #114)
+
+FL 2026 checked with a multi-output test VST2 (`tools/testplugin/lynx_test_drums_vst2.c`); the Fruity Wrapper code
+read for Auto map / Reset. Details: `docs/analise/REA_rodada188d.md`.
+
+| | FL Studio | LYNX | Status |
+|---|---|---|---|
+| Output list | Processing › Connections: one row per output, "n. pin name" (else "Output n"), LED, mixer track offset wheel ("---" = 0) | the same rows in the Processing tab; VST2 pins are grouped in stereo pairs, VST3 by bus; a bridged plugin lists "Output n" pairs (up to 16) | same |
+| Default routing | every active output on the channel's insert (offset 0) | same | same |
+| Offset | output plays on the channel's insert + offset (wheel −999…999) | same (wheel, drag, double-click types it) | same |
+| LED off | the output is silent | same | same |
+| Auto map outputs | from output 1's offset, +1 per output, inactive ones included | same | same |
+| Reset | offsets back to "---", LEDs unchanged | same | same |
+| Channel volume / pan | apply to every output | same | same |
+| Which outputs start active | as the plugin declares them (a VST2 pin pair without the "active" flag starts off) | same (VST2 pin flag, VST3 bus default-active) | same |
+| Effects' Connections (sidechain inputs, "Auto map inputs") | inputs/outputs of an effect | not yet (LYNX's sidechain picker covers side inputs) | open |
+| .flp import of the mapping | stored in the wrapper data | not yet | open |
+
 ## Round a2m189b: Convert to MIDI (Ableton Live's Convert Melody / Harmony / Drums, LYNX extra)
 
 | Item | FL Studio | Ableton Live 12 | LYNX |
@@ -2289,3 +2307,17 @@ for now (FL Studio Mobile reference shots and the matching layouts are the next 
 Not yet (listed in the import report): Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor, Spreader,
 Stereoizer, Flanger, Autoduck (29), Tremolo. No per-effect render from FL Studio Mobile exists yet: an A/B in FL's
 FL Studio Mobile plugin is the open sound check.
+
+## Round 190o: Live's MIDI Transformations (core) and Scale Mode in .als (LYNX extras, Ableton-style)
+
+| Item | FL Studio | Ableton Live 12 | LYNX |
+|---|---|---|---|
+| Span, Strum (grid % + tension curve), Ornament (flam, grace notes), Recombine, Arpeggiate (18 styles), Connect, Chop | its own Piano roll tools (Strum, Arpeggiate, Chop, Articulate, Flam…) | Clip View › Transform panel | ⚠️ core only (`core/MidiTools.h`), note for note against a Live 12.4 save; the panel is the next slice. FL's tools unchanged |
+| Time Warp, Velocity Shaper, Glissando / LFO (MPE), generators Rhythm / Seed / Shape / Stacks / Euclidean | — | Transform / Generate panels | ❌ not built (panels and defaults recorded in REA_rodada190o.md) |
+| Project key ↔ Live's Scale Mode | .flp 0xF3 (as before) | set + clip `ScaleInformation`, `InKey` | ✅ .als import and export (`core/LiveScales.h`); scales Live has and FL's list lacks import as no key |
+
+## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
+FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see
+`docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on
+export, so a plugin detached in FL opens detached in LYNX and the other way round. LYNX's own instruments and effects
+have no Detached state: their imported flags are kept as they were.

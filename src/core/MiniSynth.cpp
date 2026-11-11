@@ -239,6 +239,10 @@ public:
     float P[paramCount] {};
     float keyvel[128] {};
     int last = 0;
+    // FL Studio Mobile's build of this engine (REA spec-minisynth-diff, round 190n): the first note after a reset
+    // glides from its own key, LFO → OSC Mod adds 1·L (clamped to ±1) instead of 12·L, the effects' silence gate
+    // looks at every 32-sample block, 5 voices
+    bool flm = false, flmPlayed = false;
     std::uint32_t counter = 1;
     float keyL[128] {}, keyR[128] {}, keyPitch[128] {}, keyFcut[128] {}, keyFres[128] {};
     float bend = 0.0f, mw = 0.0f;
@@ -277,6 +281,7 @@ public:
         playing = false;
         std::fill (std::begin (keyvel), std::end (keyvel), 0.0f);
         last = 0;
+        flmPlayed = false;
         counter = 1;
         std::fill (std::begin (keyL), std::end (keyL), 1.0f);
         std::fill (std::begin (keyR), std::end (keyR), 1.0f);
@@ -472,7 +477,8 @@ public:
             v = &voices[0];
         counter = counter + 1;
         v->age = counter;
-        v->glide = (float) last;
+        v->glide = (float) (flm && ! flmPlayed ? key : last);
+        flmPlayed = true;
         if (lead)
         {
             bool alone = true;
@@ -528,6 +534,8 @@ public:
         {
             const auto m = std::min (n, blockLen);
             n -= m;
+            if (flm)
+                any = false;
             lfoStep (m, pos);
             pos = pos + (((double) m / rate) * bpm) * 0.016666666666666666;
             for (auto& v : voices)
@@ -810,7 +818,7 @@ void Voice::oscSetup() noexcept
     const auto f = freq;
     auto m = e->oscmod;
     if (e->lfoDest == 2)
-        m = m + e->lfo * 12.0f;
+        m = e->flm ? std::clamp (m + e->lfo, -1.0f, 1.0f) : m + e->lfo * 12.0f;
     const auto expo = (float) i32 (m * 24.0f - 12.0f) * 0.0833333358168602f + 0.006250000558793545f;
     const auto r = (double) powf32 (2.0, (double) expo);
     const auto am = std::fabs (m);
@@ -1039,6 +1047,9 @@ public:
             }
     }
     bool panLawA = true;
+    // FL Studio Mobile's module around the engine (round 190n): the note's velocity is the voice's as it is, the
+    // per-note levels are a linear balance (centre 1, 1), at most 5 voices
+    bool flm = false;
     bool playing = false, changed = false;
 
     // a freshly created plugin (its own 44.1 kHz set-up), then the host's sample rate when it differs (§2.4)
@@ -1051,19 +1062,23 @@ public:
         eng.setRate (44100.0);
         if (fs != 44100.0)
             eng.setRate (fs);
-        eng.setMaxPoly (0);
+        eng.flm = flm;
+        eng.setMaxPoly (flm ? 5 : 0);
         for (auto& h : held)
             h = Held {};
         playing = changed = false;
     }
 
-    void noteOn (int key, double initVol, double fvol, double fpan, double pitchCents) noexcept
+    void noteOn (int key, double initVol, double fvol, double fpan, double pitchCents, float flmVelocity = 0.0f) noexcept
     {
         key = std::clamp (key, 0, 127);
         if (held[key].on)
             eng.note (key, 0.0f);
         held[key] = { true, fvol, fpan, pitchCents, false, {} };
-        eng.note (key, (float) velFromInitVol (initVol) * 0.007874016f);
+        if (flm) // a velocity of 0 would be a note-off
+            eng.note (key, std::clamp (flmVelocity, 1.0f / 127.0f, 1.0f));
+        else
+            eng.note (key, (float) velFromInitVol (initVol) * 0.007874016f);
     }
     void noteOff (int key) noexcept
     {
@@ -1103,7 +1118,13 @@ public:
             if (held[i].on)
             {
                 const auto& h = held[i];
-                if (panLawA)
+                if (flm)
+                {
+                    const auto p = std::clamp ((float) h.fpan, -1.0f, 1.0f);
+                    cl = (float) h.fvol * (p > 0.0f ? 1.0f - p : 1.0f);
+                    cr = (float) h.fvol * (p < 0.0f ? 1.0f + p : 1.0f);
+                }
+                else if (panLawA)
                     lawA (h.fpan, h.fvol, cl, cr);
                 else
                     cl = cr = (float) h.fvol;
@@ -1175,6 +1196,7 @@ struct Setup
 {
     std::array<float, paramCount> P {};
     std::shared_ptr<const Tables> tabs;
+    bool flm = false;
 };
 
 class MiniSynthInstrument final : public Instrument
@@ -1208,11 +1230,14 @@ public:
         delete retired.exchange (nullptr);
         pitchCents.store (channel.sampler.pitch * 100.0f);
         tempo.store (bpm > 0.0 ? bpm : 120.0);
-        if (channel.pluginState == state && channel.samplePath == oscdata)
+        const auto variant = miniSynthIsFlm (channel);
+        if (channel.pluginState == state && channel.samplePath == oscdata && variant == flmVariant)
             return;
         state = channel.pluginState;
         oscdata = channel.samplePath;
+        flmVariant = variant;
         auto s = std::make_unique<Setup>();
+        s->flm = variant;
         if (auto p = parseState (state))
             s->P = *p;
         else
@@ -1250,7 +1275,7 @@ public:
         notePan[k] = nextPan;
         const auto knob = pitchCents.load();
         plugin.noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0),
-                       (double) knob + (double) nextCents);
+                       (double) knob + (double) nextCents, (float) vel);
         plugin.held[k].slide.anchor (live.ref (knob));
         plugin.sliding = plugin.sliding || plugin.held[k].slide.moving(); // (a porta glide-in, round 168l)
         nextPan = 0.0f;
@@ -1345,6 +1370,7 @@ private:
     void applySetup (double sr) noexcept
     {
         plugin.eng.tabs = setup->tabs;
+        plugin.flm = setup->flm;
         plugin.init (sr, setup->P.data());
         plugin.eng.bpm = tempo.load();
         quiet = 0;
@@ -1359,6 +1385,12 @@ private:
             setup = s;
             // a new patch: the plugin restores the state (its parameters) without resetting its voices
             plugin.eng.tabs = setup->tabs;
+            if (plugin.flm != setup->flm) // the other build of the engine: a fresh plugin
+            {
+                plugin.flm = setup->flm;
+                plugin.init (rate, setup->P.data());
+                plugin.eng.bpm = tempo.load();
+            }
             for (int i = 0; i < paramCount; ++i)
                 plugin.eng.setParam (i, setup->P[(std::size_t) i]);
         }
@@ -1371,6 +1403,7 @@ private:
     LiveChannelPitch live; // (audio thread)
     std::atomic<double> tempo { 120.0 };
     std::vector<std::uint8_t> state;
+    bool flmVariant = false;
     std::string oscdata;
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0, lastTicks = -1.0, songBeats = 0.0;
     bool playing = false;
@@ -1383,6 +1416,11 @@ private:
 } // namespace
 
 bool miniSynthStateUsable (const std::vector<std::uint8_t>& state) { return parseState (state).has_value(); }
+
+bool miniSynthIsFlm (const ChannelDef& channel) noexcept
+{
+    return channel.instrument == InstrumentKind::minisynth && ! channel.modelParams.empty() && channel.modelParams[0] >= 0.5f;
+}
 
 std::vector<float> miniSynthParams (const std::vector<std::uint8_t>& state)
 {
@@ -1406,15 +1444,17 @@ namespace minisynth
 {
 std::vector<float> renderReference (const std::vector<std::uint8_t>& state, const std::vector<RefNote>& notes, double sampleRate,
                                     int length, const std::string& oscdataPath, int block, double bpm, int maxPoly, double songPos,
-                                    bool panLawA)
+                                    bool panLawA, bool flm)
 {
     const auto p = parseState (state);
     if (! p || length <= 0)
         return {};
     auto plugin = std::make_unique<Plugin>();
     plugin->eng.tabs = tablesFor (oscdataPath);
+    plugin->flm = flm;
     plugin->init (sampleRate, p->data());
-    plugin->eng.setMaxPoly (maxPoly);
+    if (! flm)
+        plugin->eng.setMaxPoly (maxPoly);
     plugin->eng.bpm = (double) (float) bpm;
     plugin->panLawA = panLawA;
     if (songPos >= 0.0)
@@ -1434,7 +1474,7 @@ std::vector<float> renderReference (const std::vector<std::uint8_t>& state, cons
         for (std::size_t i = 0; i < notes.size(); ++i)
         {
             if (notes[i].start == n0)
-                plugin->noteOn (notes[i].key, notes[i].initVol, notes[i].finalVol, notes[i].finalPan, notes[i].pitchCents);
+                plugin->noteOn (notes[i].key, notes[i].initVol, notes[i].finalVol, notes[i].finalPan, notes[i].pitchCents, (float) notes[i].initVol);
             if (notes[i].release == n0)
                 plugin->noteOff (std::clamp (notes[i].key, 0, 127));
         }

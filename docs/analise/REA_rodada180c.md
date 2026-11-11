@@ -144,6 +144,26 @@ Key = `round(pitch · 0.01)` (0…124) through the 125-entry key table; the voic
 slice keeps its pitch. Length: up to the next slice, or to the sample's end with PLAY TO END (`P+0x13E`), minus one
 frame. LYNX plays it on the sampler's slice mode (first key and PLAY TO END added to it).
 
+## Note-off and the voice settings (round 190f, issue #129)
+
+Voice_Release (`FUN_007684d0`) hands the voice to the plugin voice processor's release, `FUN_00756d80` →
+`FUN_007579d0`: the volume, Mod X, Mod Y and pitch articulators enter their release stage, and **when the volume
+record's envelope is off** (`+4` of the second 0xA0-byte record) it calls `FUN_00757a50`, which starts the 10 ms end
+fade at once — the same code as 3x Osc's (REA_rodada47 §3.1). So a slice never rings past its note in FL: either the
+volume envelope's release plays, or the 441-entry end fade does. LYNX's sampler voice followed FL's *channel sampler*
+here (no envelope = the sample plays on, REA_rodada76 §6), so a Slicer made in LYNX, or one from a state older than
+version 16, kept sounding after the note-off. Now a Slicer voice without volume envelope takes the end fade
+(`Instruments.cpp`, note-off; test `slicer190f_note_off_ends_the_slice`).
+
+The plugin's defaults (`FUN_00757bd0`, used when the state has no block): five neutral records, the volume one with
+flag 4 and release tension −101, Mod X 256, envelopes off. FL's three version-16 demo states all hold a volume envelope
+that is on with delay/attack/hold/decay 100, sustain 128, release 6500; no such constant is in the DLL, so whether a new
+Fruity Slicer starts like that in FL is **[OPEN: needs a fresh Slicer saved from FL]**.
+
+The block's fields are read and written through `core/FlVoiceSettings.h` (`fslicer::voiceSettings` /
+`setVoiceSettings`), in FL's units, so a .flp export carries an edit made in LYNX and FL reads it as its own
+(test `slicer190f_voice_settings_survive_flp_export_and_import`).
+
 ## Dump beat to piano roll (`FUN_0076b640`, tags of the DumpToPRMenu)
 
 Times: `pos · ((ppq · P188 · beats / frames) / 4)` (P188 taken as 4), or the slice's beat place · ppq; Original length
@@ -162,3 +182,36 @@ scales to its 960. Random uses LYNX's generator (Delphi's seed is not shared).
 4. A slice's own key is saved and shown; the voices still map the slices from the first note up (the key table is not
    rebuilt from custom keys).
 5. The editor is LYNX's own drawing in FL's layout, at twice its size.
+
+## A new Fruity Slicer, and FL's Envelope / instrument settings page (round 190m) **[EXEC: FL 2026 GUI + saved .flp]**
+
+**A new Slicer's state.** A Fruity Slicer added from FL's ADD menu and saved at once (no sample) writes 418 bytes:
+version 16, BEATS 0, BPM 0, PS 0, TS 0, **method 4**, ATT 0, **DEC 4**, empty path, 0 slices, **ANIMATE 1**, first
+note 60, PLAY TO END 0, 44100, AUTO-DUMP 1, **DECLICK 1**, AUTO-FIT 1, display 0, then the 364-byte voice block. The
+block is the plugin's defaults (`flvp::defaultSnapshot()`) except the **volume record**: envelope **on** (−1), delay /
+attack / hold / decay **100** (none), sustain **128**, release **6500**; its flag 4 and release tension −101 are the
+defaults already. So a new Slicer's notes end with that short release, not with the 10 ms end fade (which is what a
+state with the envelope off plays). `fslicer::fresh()` carries all of it but the method: LYNX keeps Fill gaps there,
+because method 4 is the licensed engine's and LYNX's TS wheel cannot run it.
+
+**The page** (a Fruity Slicer's channel window, second tab; the same page every generator on the voice processor
+shows). Tabs Panning, Volume, Mod X, Mod Y, Pitch, then three boxes side by side:
+
+| Box | Contents, left to right / top to bottom |
+|---|---|
+| Envelope | switch + title; graph (a node at each corner; on Mod X, Mod Y and Pitch the volume envelope is drawn in grey behind); knobs DELAY, ATT, HOLD, DEC, SUS, REL and, at the right edge, AMT; three small tension knobs under ATT, DEC and REL with "TENSION" between them; Tempo switch bottom right |
+| LFO | three shape buttons (sine, triangle, pulse) + title; graph (a flat line while the amount is 0); knobs DELAY, ATT, AMT, SPEED; Tempo and Global switches |
+| Filter | MOD X knob, MOD Y knob (larger than the others), the type selector ("Fast LP") |
+
+- **Panning has no Envelope box** (LFO and Filter stay where they are); the **Volume envelope has no AMT** knob.
+- The knobs show no value text (FL's hint bar does); each target has its own colour.
+- The graph's time axis is not decompiled. From the shots: a release of 6500 is 8 px of 272, and 20000 or 30000 are
+  a tenth of the width each — LYNX draws `min (1/10, 0.33 · (v − 100)/65436)` of the width per stage **[HYP]**.
+- Not taken over yet: the menu behind the arrow at the Envelope box's right edge (not opened in this session), dragging
+  the graph's nodes, the per-target colours.
+
+**Best way?** FL: one page per generator, a tab per target, envelope and LFO side by side with a graph each.
+Ableton: Simpler / Sampler show one envelope at a time too (Amp, Filter, Pitch tabs) with a graph whose nodes are
+dragged, and the LFO on its own tab. Users: not researched this round. Verdict: FL's layout as the default (it is
+also what Live does in its own way); dragging the nodes in the graph would be the next improvement and is what both
+do.

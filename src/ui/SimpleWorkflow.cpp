@@ -580,60 +580,73 @@ void SimpleWorkflow::importFiles()
     fileChooser = ui::makeFileChooser (tr ("Import audio or MIDI"), juce::File(), engine.getSampleLibrary().wildcard() + ";*.mid;*.midi");
     ui::launchChooser (fileChooser,
                        juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::canSelectMultipleItems,
-                       [this] (const juce::FileChooser& fc) {
-                           juce::StringArray failed;
-                           for (const auto& file : fc.getResults())
-                           {
-                               if (file.hasFileExtension ("mid;midi"))
-                               {
-                                   // one instrument track (LYNX's synth) per MIDI track with notes, from the song's start
-                                   juce::String error;
-                                   const auto midi = MidiFileIo::parseFile (file, error);
-                                   if (! midi)
-                                   {
-                                       failed.add (file.getFileName());
-                                       continue;
-                                   }
-                                   midiimport::Options options;
-                                   bool any = false;
-                                   for (auto& group : midiimport::groups (*midi, options))
-                                   {
-                                       if (group.notes.empty())
-                                           continue;
-                                       simpletracks::Request q;
-                                       q.kind = Kind::instrument;
-                                       q.name = group.name.empty() ? file.getFileNameWithoutExtension().toStdString() : group.name;
-                                       ChannelDef synth;
-                                       synth.instrument = InstrumentKind::synth;
-                                       q.channel = synth;
-                                       Pattern notes;
-                                       notes.notes = std::move (group.notes);
-                                       q.pattern = std::move (notes);
-                                       any = add (std::move (q)) || any;
-                                   }
-                                   if (! any)
-                                       failed.add (file.getFileName());
-                                   continue;
-                               }
-                               const auto data = engine.getSampleLibrary().load (file.getFullPathName());
-                               if (data == nullptr)
-                               {
-                                   failed.add (file.getFileName());
-                                   continue;
-                               }
-                               // the file's length in ticks at the project's tempo (as a drop on the Playlist)
-                               const auto seconds = (double) data->frames() / data->sampleRate;
-                               simpletracks::Request q;
-                               q.kind = Kind::audio;
-                               q.name = file.getFileNameWithoutExtension().toStdString();
-                               q.audioFile = file.getFullPathName().toStdString();
-                               q.audioLength = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * engine.getSong().bpm / 60.0 * ppq));
-                               add (std::move (q));
-                           }
-                           if (! failed.isEmpty())
-                               juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"),
-                                                                       tr ("Could not read {0}", { failed.joinIntoString (", ") }));
-                       });
+                       [this] (const juce::FileChooser& fc) { addFiles (fc.getResults(), 0); });
+}
+
+void SimpleWorkflow::dropFiles (const juce::StringArray& files, std::int64_t tick)
+{
+    juce::Array<juce::File> list;
+    for (const auto& f : files)
+        list.add (juce::File (f));
+    addFiles (list, tick);
+}
+
+void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_t start)
+{
+    juce::StringArray failed;
+    for (const auto& file : files)
+    {
+        if (file.hasFileExtension ("mid;midi"))
+        {
+            // one instrument track (LYNX's synth) per MIDI track with notes, from `start`
+            juce::String error;
+            const auto midi = MidiFileIo::parseFile (file, error);
+            if (! midi)
+            {
+                failed.add (file.getFileName());
+                continue;
+            }
+            midiimport::Options options;
+            bool any = false;
+            for (auto& group : midiimport::groups (*midi, options))
+            {
+                if (group.notes.empty())
+                    continue;
+                simpletracks::Request q;
+                q.kind = Kind::instrument;
+                q.name = group.name.empty() ? file.getFileNameWithoutExtension().toStdString() : group.name;
+                ChannelDef synth;
+                synth.instrument = InstrumentKind::synth;
+                q.channel = synth;
+                Pattern notes;
+                notes.notes = std::move (group.notes);
+                q.pattern = std::move (notes);
+                q.start = start;
+                any = add (std::move (q)) || any;
+            }
+            if (! any)
+                failed.add (file.getFileName());
+            continue;
+        }
+        const auto data = engine.getSampleLibrary().load (file.getFullPathName());
+        if (data == nullptr)
+        {
+            failed.add (file.getFileName());
+            continue;
+        }
+        // the file's length in ticks at the project's tempo (as a drop on the Playlist)
+        const auto seconds = (double) data->frames() / data->sampleRate;
+        simpletracks::Request q;
+        q.kind = Kind::audio;
+        q.name = file.getFileNameWithoutExtension().toStdString();
+        q.audioFile = file.getFullPathName().toStdString();
+        q.audioLength = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * engine.getSong().bpm / 60.0 * ppq));
+        q.start = start;
+        add (std::move (q));
+    }
+    if (! failed.isEmpty())
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"),
+                                                tr ("Could not read {0}", { failed.joinIntoString (", ") }));
 }
 
 void SimpleWorkflow::addDrums (const std::string& genre, bool steps, bool useTempo)

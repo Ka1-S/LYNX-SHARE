@@ -728,7 +728,9 @@ struct Engine::Psola
             mag[(std::size_t) i] = (float) std::pow (p, ex);
         }
         int count = 0;
-        for (int k = binLo; k < binHi && count != 100; ++k)
+        // (the peak search reads a bin on each side: at device rates far above 192 kHz the 60 Hz bin is bin 0 and the
+        // search read before the spectrum — issue #134's audit; unchanged at every rate FL runs at)
+        for (int k = std::max (binLo, 1); k < std::min (binHi, fftN - 1) && count != 100; ++k)
         {
             const float m0 = mag[(std::size_t) k], mm = mag[(std::size_t) k - 1], mp = mag[(std::size_t) k + 1];
             if (! (m0 > mm) || ! (m0 > mp))

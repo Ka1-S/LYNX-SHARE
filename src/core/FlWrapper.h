@@ -57,6 +57,16 @@ bool parseFlVst2State (const std::vector<std::uint8_t>& state, FlVst2State& out)
 // Writes the current (−9) layout; parseFlVst2State reads it back.
 std::vector<std::uint8_t> writeFlVst2State (const FlVst2State& state);
 
+// The plugin record's flags (0xD4, u32 at +16; −1 = no record): 0x4 = the plugin's window is Detached (the window
+// menu's "Detached": a window of its own, in front of FL's panels) instead of docked in FL's workspace. Round 190i,
+// issue #116 [EXEC + DATA FL 2026: docs/analise/REA_rodada190i.md; PyFLP names the bit the same way, DOC].
+constexpr int flDetachedFlag = 0x4;
+constexpr bool flDetached (int recordFlags) noexcept { return recordFlags >= 0 && (recordFlags & flDetachedFlag) != 0; }
+constexpr int withFlDetached (int recordFlags, bool detached) noexcept
+{
+    return detached ? recordFlags | flDetachedFlag : recordFlags & ~flDetachedFlag;
+}
+
 // FL's plugin wrapper settings page (the wrapper's gear tab; REA round 146a: option names and hints from FLEngine's
 // string pool, e.g. "Use fixed size buffers", "|Allow plugin to be multi-threaded by FL Studio",
 // "|Load plugin in separate process (bridged)", "|MIDI input port number"): the options LYNX applies, in FL's
@@ -71,4 +81,15 @@ struct WrapperOption
     bool needsFixed;
 };
 const std::vector<WrapperOption>& wrapperOptions();
+
+// Processing › Connections of a generator (round 188d, issue #114; FL 2026 [EXEC] + Fruity Wrapper FUN_0078aea0 /
+// FUN_00790380 [DECOMP]), on `count` outputs (the routes are first padded to it with FL's defaults):
+// "Auto map outputs": from the first output's offset, one more for each next output (inactive ones included);
+// "Reset": every offset back to 0 ("---"), the LEDs as they are. Trailing default entries are dropped, as saved.
+void autoMapOutputs (std::vector<PluginOutputRoute>& routes, int count);
+void resetOutputOffsets (std::vector<PluginOutputRoute>& routes, int count);
+void trimOutputRoutes (std::vector<PluginOutputRoute>& routes);
+// The insert an output plays on: the channel's insert + its offset; −1 when inactive (`pluginDefault`: whether the
+// plugin declares the output active)
+int outputTargetTrack (int channelTrack, const PluginOutputRoute& route, bool pluginDefault = true) noexcept;
 } // namespace lynx
