@@ -236,6 +236,11 @@ struct SampleData
 // prepare()/configure(), so set it before preparing the graph for the render and clear it afterwards.
 void setOfflineRendering (bool on) noexcept;
 bool offlineRendering() noexcept;
+// An export is rendering, at whatever quality (issue #138): setOfflineRendering() is only on with the Export window's
+// "HQ for all plugins", so an instrument that must wait for data another thread is still loading (LYNX Soundfont's
+// font) asks this instead. Set for the whole of an offline render; never while playing live.
+void setRenderInProgress (bool on) noexcept;
+bool renderInProgress() noexcept;
 // FL's "HQ for all plugins" during an export (REA round 134): effects with an HQ switch use HQ whatever it is set to.
 void setHqForAllPlugins (bool on) noexcept;
 bool hqForAllPlugins() noexcept;

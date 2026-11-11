@@ -413,6 +413,7 @@ float AudioEngine::renderOffline (const RenderOptions& options)
     // "HQ for all plugins" (REA round 134): engines with FL render-quality settings use them (Sytrus) and HQ switches
     // are forced on; without it the export keeps the playback quality
     setOfflineRendering (options.hqAllPlugins);
+    setRenderInProgress (true); // (whatever the quality: LYNX Soundfont waits for a font that is still loading, issue #138)
     setHqForAllPlugins (options.hqAllPlugins);
     setPluginsRenderMode (true); // and hosted plugins are told an export is running (FL: "notify about rendering mode")
     transport.sampleRate.store (sampleRate);
@@ -542,6 +543,7 @@ float AudioEngine::renderOffline (const RenderOptions& options)
     graph.releaseResources();
     setPluginsRenderMode (false);
     setOfflineRendering (false);
+    setRenderInProgress (false);
     setHqForAllPlugins (false);
     return cancelled ? -1.0f : peak;
 }
