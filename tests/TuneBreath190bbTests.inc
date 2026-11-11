@@ -113,6 +113,28 @@ TEST (lynx_tune_round190bb_breathiness_law_and_default)
     for (std::size_t i = 0; i < 4096; ++i)
         same = same && b.process (in[i], 1.0f) == out[i];
     CHECK (same);
+    // a voice so quiet that the bands' powers are in the denormal range: finite, and as quiet (the vector square root
+    // must be the exact one — on ARM64 sse2neon's "precise" _mm_sqrt_ps returned inf / NaN there)
+    b.reset();
+    bool finiteTiny = true;
+    float peakTiny = 0.0f;
+    for (int i = 0; i < 20000; ++i)
+    {
+        const auto y = b.process (1.0e-20f * (float) std::sin (2.0 * r95::pi * 1000.0 * (double) i / 44100.0), 2.0f);
+        finiteTiny = finiteTiny && std::isfinite (y);
+        peakTiny = std::max (peakTiny, std::abs (y));
+    }
+    CHECK (finiteTiny);
+    CHECK (peakTiny < 1.0e-15f);
+    {
+        volatile float tiny = 1.0e-39f;
+        const bool denormals = tiny * 0.5f != 0.0f; // (off under flush-to-zero: the powers are then 0 and so is the noise)
+        CHECK (! denormals || peakTiny > 1.0e-24f);  // … and not silenced by the non-finite guard either
+    }
+    // non-finite or absurd input never gets in or out
+    b.reset();
+    CHECK (b.process (std::numeric_limits<float>::quiet_NaN(), 1.0f) == 0.0f && b.process (std::numeric_limits<float>::infinity(), 1.0f) == 0.0f);
+    CHECK (b.process (0.3f, std::numeric_limits<float>::quiet_NaN()) == 0.0f && std::isfinite (b.process (0.3f, 1.0f)));
     // gain 0 and a silent voice give exactly nothing
     b.reset();
     CHECK (b.process (0.5f, 0.0f) == 0.0f);

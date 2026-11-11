@@ -16,6 +16,21 @@ namespace lynx::vocal
 namespace
 {
 constexpr double pi = 3.14159265358979323846;
+
+#if LYNX_BREATH_SIMD
+// The exactly rounded square root of four floats. Not _mm_sqrt_ps on ARM64: with SSE2NEON_PRECISE_SQRT (core/Simd.h)
+// sse2neon builds it from the reciprocal-square-root estimate and two Newton steps, which is not exactly rounded and
+// returns inf / NaN for inputs in the denormal range (a band's power while the voice has next to nothing there) —
+// round 190bb, a NaN in LYNX Tune's output on macOS arm64 only.
+inline __m128 exactSqrt (__m128 x) noexcept
+{
+ #if defined(__aarch64__) || defined(_M_ARM64)
+    return vreinterpretq_m128_f32 (vsqrtq_f32 (vreinterpretq_f32_m128 (x)));
+ #else
+    return _mm_sqrt_ps (x);
+ #endif
+}
+#endif
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -799,7 +814,7 @@ float BreathNoise::process (float voice, float gain) noexcept
         _mm_store_ps (power + b, pw);
         sumP = _mm_add_ps (sumP, pw);
         sumW = _mm_add_ps (sumW, _mm_mul_ps (_mm_load_ps (weight2 + b), pw));
-        _mm_store_ps (nz + b, _mm_mul_ps (w, _mm_mul_ps (_mm_load_ps (scale + b), _mm_sqrt_ps (_mm_max_ps (zero, pw)))));
+        _mm_store_ps (nz + b, _mm_mul_ps (w, _mm_mul_ps (_mm_load_ps (scale + b), exactSqrt (_mm_max_ps (zero, pw)))));
     }
     alignas (16) float sp[4], sw[4];
     _mm_store_ps (sp, sumP);

@@ -21,7 +21,7 @@ used. The control is described by function ("adds breath noise to the voice") an
 | At 0 the stage is skipped (nothing of it runs); a level left over fades (≈ 150 ms), then the stage resets and is skipped again | LynxTune.cpp `breathOn` |
 | Editor: BREATH, the third small knob of the voice-character group (SHIFT · THROAT · BREATH) in OUTPUT; the Transpose column moves 16 px right and is 8 px narrower | src/core/PluginLayout.cpp |
 | "BREATH" in the 14 language tables | resources/i18n, src/ui/i18n |
-| Tests (5 tests, 53 checks) | tests/TuneBreath190bbTests.inc |
+| Tests (5 tests, 58 checks) | tests/TuneBreath190bbTests.inc |
 
 ## 2. Best way?
 
@@ -107,6 +107,26 @@ rms (max 11 dB at one harmonic).
 - ARM64: the sse2neon path was compiled (zig c++ -target aarch64-macos) but not run; on x86 the scalar path was
   compared with the SSE path (identical bits, 44.1 and 96 kHz). zig c++ (clang 18) also compiles both files clean for
   Linux and Windows.
+
+## 4b. After the first CI run (run 42979078294 on fa5025569)
+
+Two failures in `fxaudit173d_effect_controls_072`, both fixed:
+
+1. **"B dir" changes nothing** (all three Core jobs). [code read] tools/FxAudit.h draws a random context ("rand:k")
+   one value per control in the controls' order — the editor's items, then the parameters it doesn't show. The new
+   knob sat before most of them, so every later control got the next one's draw and the recorded `"B dir" → rand:3`
+   (tests/FxAudit173dKnown.inc) no longer made B an illegal sung note. Fix: `fxaudit::surveyedParamCount (kind)` —
+   parameters added since the survey draw after all the others, so every recorded context of LYNX Tune (B dir rand:3,
+   C# rand:0, D dir rand:5) has the settings it had, plus a random Breathiness. No known key was edited.
+2. **NaN, macOS arm64 only.** [inferred from third_party/sse2neon/sse2neon.h:2678, not run on ARM here] with
+   SSE2NEON_PRECISE_SQRT (core/Simd.h) `_mm_sqrt_ps` is a reciprocal-square-root estimate plus two Newton steps; for
+   an input in the denormal range (a band's power where the voice has next to nothing) the squared estimate
+   overflows and the result is inf / NaN. Fix: the stage takes its square root with `vsqrtq_f32` on ARM64 (exactly
+   rounded, as `sqrtps` on x86 and the scalar path). On top, by construction: a non-finite or absurd voice sample or
+   gain never enters the bank and a non-finite sample never leaves it. The audit test now prints which control gave a
+   NaN, and the round's tests cover the denormal range (not silenced, finite).
+
+The 39 hashes (still `ALL a41b1aeb12d619ab`) and the SSE / scalar comparison were run again after the fix.
 
 ## 5. Stage 2 (not built)
 
