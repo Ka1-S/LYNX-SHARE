@@ -15,6 +15,9 @@
 #include "core/SearchIndex.h"
 #include "core/SearchQuery.h"
 #include "core/SearchService.h"
+#include "core/SampleFiles.h"
+#include "core/SampleSimilarity.h"
+#include "engine/SampleLibrary.h"
 #include "core/ValueMath.h"
 #include "core/Vfx.h"
 #include "platform/Paths.h"
@@ -51,6 +54,7 @@ bool isListed (const juce::File& f)
 }
 
 constexpr int maxResults = 500;
+constexpr int maxSimilar = 100; // "Find similar samples" lists the nearest 100
 
 juce::Array<juce::File> childrenOf (const juce::File& folder)
 {
@@ -277,6 +281,68 @@ struct BrowserComponent::SearchShared
         cb.statusChanged = [raw = s.get()] { raw->statusChanged.sendChangeMessage(); };
         cb.indexChanged = [raw = s.get()] { raw->indexChanged.sendChangeMessage(); };
         s->service = std::make_unique<search::Service> (diskFileSystem(), std::move (cb));
+        current = s;
+        return s;
+    }
+};
+
+// "Find similar samples" (round 190as): the analysis of the Browser's samples and its worker (core/SampleSimilarity.h),
+// one per process while a Browser exists, the index kept in the settings folder between sessions. The worker has the
+// lowest priority, rests as long as it works and waits while LYNX plays, records or renders.
+struct BrowserComponent::SimilarShared
+{
+    juce::ChangeBroadcaster statusChanged;
+    SampleLibrary library;                        // its own readers: nothing goes into the engine's sample cache
+    std::unique_ptr<similarity::Service> service; // (last: goes first)
+    bool passAsked = false;                       // the background pass was started in this session (message thread)
+
+    ~SimilarShared() { service.reset(); }
+
+    static juce::File file() { return platform::settingsFile ("browser-similar.idx"); }
+
+    static std::shared_ptr<SimilarShared> get (AudioEngine& engine)
+    {
+        static std::weak_ptr<SimilarShared> current; // (message thread)
+        if (auto s = current.lock())
+            return s;
+        auto s = std::make_shared<SimilarShared>();
+        similarity::Service::Callbacks cb;
+        cb.fs = diskFileSystem();
+        cb.stat = [] (const std::string& path, std::int64_t& size, std::int64_t& time) {
+            const juce::File f (juce::String::fromUTF8 (path.c_str()));
+            if (! f.existsAsFile())
+                return false;
+            size = f.getSize();
+            time = f.getLastModificationTime().toMilliseconds();
+            return true;
+        };
+        cb.decode = [raw = s.get()] (const std::string& path, double seconds, std::vector<float>& mono, double& rate) {
+            return raw->library.readMono (juce::File (juce::String::fromUTF8 (path.c_str())), seconds, mono, rate);
+        };
+        cb.accepts = [] (const std::string& name) {
+            const auto dot = name.find_last_of ('.');
+            if (dot == std::string::npos)
+                return false;
+            const auto extension = name.substr (dot + 1);
+            return isSampleExtension (extension) && extension.size() != 6; // (not .speech: it has no audio of its own)
+        };
+        cb.load = [] {
+            const auto f = file();
+            juce::MemoryBlock data;
+            if (! f.existsAsFile() || f.getSize() > 64 * 1024 * 1024 || ! f.loadFileAsData (data))
+                return std::string();
+            return std::string (static_cast<const char*> (data.getData()), data.getSize());
+        };
+        cb.save = [] (const std::string& bytes) {
+            const auto f = file();
+            const auto temp = f.getSiblingFile (f.getFileName() + ".tmp");
+            if (temp.replaceWithData (bytes.data(), bytes.size()))
+                temp.moveFileTo (f);
+        };
+        cb.statusChanged = [raw = s.get()] { raw->statusChanged.sendChangeMessage(); };
+        // (the engine outlives every Browser; these are atomics)
+        cb.shouldPause = [&engine] { return engine.bounceStillPlaying() || engine.isRecording() || AudioEngine::offlineRendersRunning().load() > 0; };
+        s->service = std::make_unique<similarity::Service> (std::move (cb));
         current = s;
         return s;
     }
@@ -567,7 +633,9 @@ public:
     }
 
     // flat mode: a list of files with their path relative to the folder searched that holds them
-    void setFiles (const juce::Array<juce::File>& files, const juce::Array<juce::File>& newBases, const juce::String& newStatus)
+    // (`details`: the dimmed text after each name, e.g. how similar the file is; round 190as)
+    void setFiles (const juce::Array<juce::File>& files, const juce::Array<juce::File>& newBases, const juce::String& newStatus,
+                   const juce::StringArray& details = {})
     {
         bases = newBases;
         status = newStatus;
@@ -576,6 +644,7 @@ public:
         {
             auto n = std::make_unique<Node>();
             n->file = f;
+            n->detail = details[(int) flatNodes.size()];
             flatNodes.push_back (std::move (n));
         }
         selected = hovered = -1;
@@ -2420,6 +2489,15 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
         if (safe != nullptr && safe->role == Role::main && ! safe->allRoots.isEmpty())
             safe->searcher->service->refresh (toPaths (safe->withMerged (safe->allRoots)));
     });
+    // "Find similar samples" (round 190as): once it was used (its index file exists), the folders are checked for new
+    // samples in the background a while after start; before that nothing is analysed
+    similar = SimilarShared::get (engine);
+    similar->statusChanged.addChangeListener (this);
+    juce::Timer::callAfterDelay (20000, [safe = juce::Component::SafePointer<BrowserComponent> (this)] {
+        if (safe != nullptr && safe->role == Role::main && ! safe->allRoots.isEmpty() && SimilarShared::file().existsAsFile()
+            && ! std::exchange (safe->similar->passAsked, true))
+            safe->similar->service->refresh (toPaths (safe->withMerged (safe->allRoots)));
+    });
     focusWatcher = std::make_unique<FocusWatcher> (*this);
 
     searchBox.setTextToShowWhenEmpty (tr ("Search (Ctrl+F): kick -loop, snare OR clap, hat*.wav"), theme::colour::textDisabled);
@@ -3170,6 +3248,11 @@ void BrowserComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
         indexStatusChanged();
         return;
     }
+    if (source == &similar->statusChanged)
+    {
+        similarStatusChanged();
+        return;
+    }
     if (source == &searcher->indexChanged)
     {
         applyFilterToTree();
@@ -3221,6 +3304,9 @@ BrowserComponent::~BrowserComponent()
     searcher->statusChanged.removeChangeListener (this);
     searcher->indexChanged.removeChangeListener (this);
     searcher->service->cancelSearch();
+    similar->statusChanged.removeChangeListener (this);
+    if (similarId != 0)
+        similar->service->cancel();
     focusWatcher.reset();
     engine.previewFile ({});
 }
@@ -3376,6 +3462,10 @@ void BrowserComponent::showFileMenu (const juce::File& file)
         menu.addItem (tr ("Send to the Playlist as an audio clip"), onSendToPlaylist != nullptr, false, [this, file] { onSendToPlaylist (file); });
         menu.addSeparator();
         menu.addItem (tr ("Edit in the audio editor..."), [this, file] { openAudioEditor (engine, file); });
+        // FL's Sounds tab menu: "Open/Edit in...", then "Find similar samples" (FL asks FL Cloud; LYNX looks through
+        // the Browser's own folders, round 190as)
+        if (! file.hasFileExtension ("speech"))
+            menu.addItem (tr ("Find similar samples"), [this, file] { findSimilar (file); });
     }
     else if (file.hasFileExtension ("lynx;flp;als;flm"))
         menu.addItem (tr ("Open project"), onOpenProject != nullptr, false, [this, file] { onOpenProject (file); });
@@ -3705,6 +3795,19 @@ void BrowserComponent::runSearch (bool quiet)
 {
     searcher->service->cancelSearch();
     searchId = 0;
+    if (similarTo != juce::File())
+    {
+        // similar samples are listed while the box still says so; any other text is an ordinary search again
+        if (tab != projectTab && searchBox.getText() == similarLabel())
+        {
+            runSimilar (quiet);
+            return;
+        }
+        similarTo = juce::File();
+        similarPartial = false;
+        if (std::exchange (similarId, 0) != 0)
+            similar->service->cancel();
+    }
     const auto query = searchBox.getText().trim();
     resultsView->setVisible (query.isNotEmpty());
     treeView->setVisible (query.isEmpty());
@@ -3798,6 +3901,8 @@ void BrowserComponent::searchAnswered (const search::SearchResult& r, const juce
 void BrowserComponent::indexStatusChanged()
 {
     applyFilterToTree(); // the index changed: folders found empty under the content filter go (round 164)
+    if (similarTo != juce::File() && resultsView->isVisible())
+        return; // similar samples are listed: their own line stays
     const auto st = searcher->service->status();
     juce::String line;
     if (resultsView->isVisible() && tab != projectTab && searchBox.getText().trim().isNotEmpty())
@@ -3818,6 +3923,136 @@ void BrowserComponent::indexStatusChanged()
             resized();
         repaint();
     }
+}
+
+// --- "Find similar samples" (round 190as) ------------------------------------------------------------------------
+
+juce::String BrowserComponent::similarLabel() const
+{
+    return tr ("Similar to {0}", { similarTo.getFileNameWithoutExtension() });
+}
+
+juce::Array<juce::File> BrowserComponent::similarScope() const
+{
+    return withMerged (roots); // every folder this Browser shows, wherever the sample itself is
+}
+
+void BrowserComponent::findSimilar (const juce::File& file)
+{
+    if (! file.existsAsFile())
+        return;
+    if (tab == projectTab)
+        setTab (allTab);
+    similarTo = file;
+    searchPending = false;
+    searchBox.setText (similarLabel(), juce::dontSendNotification);
+    // the first use starts the analysis of the Browser's folders (the clicked file is analysed first, at once)
+    if (! allRoots.isEmpty() && ! std::exchange (similar->passAsked, true))
+        similar->service->refresh (toPaths (withMerged (allRoots)));
+    runSearch();
+}
+
+void BrowserComponent::runSimilar (bool quiet)
+{
+    resultsView->setVisible (true);
+    treeView->setVisible (false);
+    const auto scope = similarScope();
+    if (! quiet)
+    {
+        results->setFiles ({}, scope, tr ("Listening to \"{0}\"...", { similarTo.getFileName() }));
+        resultsView->setViewPosition (0, 0);
+    }
+    similarAskedAt = juce::Time::getMillisecondCounter();
+    // the worker answers on its thread: the answer comes to the message thread (and is dropped if this Browser went)
+    similarId = similar->service->findSimilar (similarTo.getFullPathName().toStdString(), toPaths (scope), (std::size_t) maxSimilar,
+                                               [safe = juce::Component::SafePointer<BrowserComponent> (this)] (const similarity::Result& r) {
+                                                   juce::MessageManager::callAsync ([safe, r] {
+                                                       if (safe != nullptr)
+                                                           safe->similarAnswered (r);
+                                                   });
+                                               });
+}
+
+void BrowserComponent::similarAnswered (const similarity::Result& r)
+{
+    if (r.id != similarId || similarTo == juce::File() || r.query != similarTo.getFullPathName().toStdString())
+        return;
+
+    juce::Array<juce::File> found;
+    juce::StringArray details;
+    for (const auto& m : r.matches)
+        if (juce::File f (juce::String::fromUTF8 (m.path.c_str())); view.filter == browserview::ContentFilter::all || lists (f))
+        {
+            found.add (f);
+            details.add (juce::String (similarity::percent (m.distance)) + "%");
+        }
+
+    const auto name = similarTo.getFileName();
+    // (partial answers keep the selection and the scroll position)
+    const auto selected = results->selectedFile();
+    const auto scroll = resultsView->getViewPosition();
+    results->setFiles (found, similarScope(),
+                       r.failed ? tr ("\"{0}\" can't be compared: it is silent or can't be read.", { name })
+                       : found.isEmpty() ? (r.partial ? tr ("Listening to the Browser's samples... nothing like \"{0}\" yet.", { name })
+                                                      : tr ("No other samples to compare \"{0}\" with.", { name }))
+                                         : juce::String(),
+                       details);
+    if (selected != juce::File())
+        if (const auto row = found.indexOf (selected); row >= 0)
+            results->select (row, false);
+    resultsView->setViewPosition (scroll);
+
+    similarPartial = r.partial && ! r.failed;
+    juce::String line;
+    if (! r.failed)
+    {
+        line = found.size() == 1 ? tr ("1 similar sample, most similar first") : tr ("{0} similar samples, most similar first", { juce::String (found.size()) });
+        if (r.partial)
+            line << "  ·  " << tr ("{0} samples analysed so far", { juce::String ((int) r.searched) });
+        else if (! found.isEmpty())
+            ui::postHint ({ tr ("Compared with {0} samples", { juce::String ((int) r.searched) }), {}, false, false }, 4000);
+    }
+    if (line != statusLine)
+    {
+        const auto relayout = line.isEmpty() != statusLine.isEmpty();
+        statusLine = line;
+        if (relayout)
+            resized();
+        repaint (statusArea);
+    }
+}
+
+void BrowserComponent::similarStatusChanged()
+{
+    // the background analysis moved on: a list still marked "so far" is asked again (not more than every 3 s; the
+    // last time when the pass ends)
+    if (similarTo == juce::File() || ! similarPartial || ! resultsView->isVisible())
+        return;
+    const auto busy = similar->service->status().busy;
+    if (! busy || juce::Time::getMillisecondCounter() - similarAskedAt > 3000)
+        runSimilar (true);
+}
+
+void BrowserComponent::findSimilarForSnapshot (const juce::File& file, const juce::File& folder)
+{
+    similar->passAsked = true;
+    similar->service->refresh (toPaths ({ folder }));
+    similar->service->waitIdle (300000);
+    if (tab == projectTab)
+        setTab (allTab);
+    similarTo = file;
+    searchBox.setText (similarLabel(), juce::dontSendNotification);
+    resultsView->setVisible (true);
+    treeView->setVisible (false);
+    auto answer = std::make_shared<std::pair<std::mutex, similarity::Result>>();
+    similarId = similar->service->findSimilar (file.getFullPathName().toStdString(), toPaths ({ folder }), (std::size_t) maxSimilar,
+                                               [answer] (const similarity::Result& r) {
+                                                   const std::lock_guard<std::mutex> hold (answer->first);
+                                                   answer->second = r;
+                                               });
+    similar->service->waitIdle (120000);
+    const std::lock_guard<std::mutex> hold (answer->first);
+    similarAnswered (answer->second);
 }
 
 void BrowserComponent::refreshSearchIndex (bool rebuild)
