@@ -633,6 +633,60 @@ int followAudioTracks (Song& song, const std::vector<int>& touched, bool makeUni
 
 } // namespace lynx::trackmodes
 
+namespace lynx::audioclips
+{
+int repairChannels (Song& song)
+{
+    int changed = 0;
+    const auto channels = (int) song.channels.size(); // (copies added below are audio clip channels already)
+    for (int index = 0; index < channels; ++index)
+    {
+        if (song.channels[(std::size_t) index].instrument != InstrumentKind::sampler || song.channels[(std::size_t) index].samplePath.empty())
+            continue;
+
+        auto used = false;
+        song.forEachClipList ([&] (const std::vector<Clip>& clips) {
+            for (const auto& c : clips)
+                used = used || (c.kind == ClipKind::audio && c.channel == index);
+        });
+        if (! used)
+            continue;
+
+        const auto playsNotes = std::any_of (song.patterns.begin(), song.patterns.end(), [index] (const Pattern& p) {
+            return std::any_of (p.notes.begin(), p.notes.end(), [index] (const Note& n) { return n.channel == index; });
+        });
+        ++changed;
+        if (! playsNotes)
+        {
+            song.channels[(std::size_t) index].instrument = InstrumentKind::audioClip;
+            continue;
+        }
+
+        auto copy = song.channels[(std::size_t) index];
+        copy.instrument = InstrumentKind::audioClip;
+        copy.instance.renew(); // (a new channel: the renderer must not take it for the Sampler it was copied from)
+        song.channels.push_back (std::move (copy));
+        const auto target = (int) song.channels.size() - 1;
+        song.forEachClipList ([&] (std::vector<Clip>& clips) {
+            for (auto& c : clips)
+                if (c.kind == ClipKind::audio && c.channel == index)
+                    c.channel = target;
+        });
+    }
+    return changed;
+}
+
+void loadSampleInto (ChannelDef& channel, const std::string& path, const std::string& name)
+{
+    channel.samplePath = path;
+    if (channel.instrument == InstrumentKind::granulizer || channel.instrument == InstrumentKind::wavetraveller)
+        return; // FL's Granulizer keeps its engine and plays the file (round 142); so does Wave Traveller
+    if (channel.instrument != InstrumentKind::audioClip)
+        channel.instrument = InstrumentKind::sampler;
+    channel.name = name;
+}
+} // namespace lynx::audioclips
+
 namespace lynx::autoclipplace
 {
 Place forNewClip (const Song& song, bool atPlayback, std::int64_t playTick)

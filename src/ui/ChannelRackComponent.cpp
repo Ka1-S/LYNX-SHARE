@@ -19,6 +19,7 @@
 #include "core/VoltageController.h"
 
 #include "core/MixerOps.h"
+#include "core/PlaylistOps.h"
 
 #include "ui/AutomationUi.h"
 #include "core/NoteTools.h"
@@ -2735,11 +2736,8 @@ void ChannelRackComponent::assignSampleNow (int channel, const juce::File& file)
 
         if (isNew)
             c.mixerTrack = freeInsert;
-        c.samplePath = path;
-        if (! isNew && (c.instrument == InstrumentKind::granulizer || c.instrument == InstrumentKind::wavetraveller)) // FL's Granulizer keeps its engine and plays the file (round 142); so does Wave Traveller
-            return;
-        c.instrument = InstrumentKind::sampler;
-        c.name = name;
+        // (an audio clip channel stays one: as a Sampler its Playlist clips went silent, round 190ax)
+        audioclips::loadSampleInto (c, path, name);
     });
 
     if (channel < 0)

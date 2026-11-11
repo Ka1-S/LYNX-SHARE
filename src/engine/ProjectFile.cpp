@@ -5,6 +5,7 @@
 #include "core/SessionIds.h"
 
 #include "core/MixerOps.h"
+#include "core/PlaylistOps.h"
 
 #include <algorithm>
 #include <tuple>
@@ -3345,6 +3346,10 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 track.mixerTrack = mixer > 0 && mixer < (int) song.mixer.size() ? mixer : -1;
                 track.channel = audio ? -1 : channel;
             }
+
+    // audio clips that point at a Sampler channel (a file dropped on an audio clip channel's row made one before round
+    // 190ax; hand-written projects): the clip showed its waveform and played nothing
+    audioclips::repairChannels (song);
 
     // sends to tracks that don't exist are discarded
     for (auto& t : song.mixer)
