@@ -2401,6 +2401,7 @@ bit-identically (no noise reduction).
 (The gain error is dominated by windows where one gate is open and the other closed.) Open: the reference seems to
 learn — with a 200 ms hold it stops reducing repeated bursts after about 3 s, a kick after a 0.2 s gap loses 7 dB, and
 at thresholds −25 / −10 its onsets are far deeper (−30 … −40 dB); none of that is modelled.
+
 ## Round 190as: "Find similar samples" in the Browser (FL's is FL Cloud's; LYNX's is local)
 
 | FL Studio 2026 | LYNX | | Note |
