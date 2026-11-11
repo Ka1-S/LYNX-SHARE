@@ -516,9 +516,12 @@ void PianoRollComponent::resized()
     const auto h = toolbarHeight - 6;
     auto bar = juce::Rectangle<int> (4 + titleInsetLeft, 3, juce::jmax (0, getWidth() - 8 - titleInsetLeft - titleInsetRight), h);
 
-    // groups that don't fit in a narrow window are hidden (the tools and the grid always show)
-    auto place = [&bar] (juce::Component& c, int width, bool optional = false) {
-        const auto fits = ! optional || width <= bar.getWidth();
+    // groups that don't fit in a narrow window are hidden (the tools and the grid always show). The menu button always
+    // keeps its place: the optional groups only take what is left beside it (round 190j: on a 1024 px screen the
+    // groups before it used up the bar and the Piano roll menu could not be opened).
+    const auto reserved = h + 6;
+    auto place = [&bar, reserved] (juce::Component& c, int width, bool optional = false) {
+        const auto fits = ! optional || width <= bar.getWidth() - reserved;
         c.setVisible (fits);
         c.setBounds (fits ? bar.removeFromLeft (juce::jmin (width, bar.getWidth())) : juce::Rectangle<int>());
         bar.removeFromLeft (juce::jmin (6, bar.getWidth()));
@@ -532,7 +535,8 @@ void PianoRollComponent::resized()
     place (followButton, h);
     place (slideButton, h, true);
     place (colourButton, h, true);
-    place (chordBox, 100, true);
+    // the chord stamp shrinks to its icon and arrow before it is hidden (discussion #10; FL's stamp is an icon button)
+    place (chordBox, 100 <= bar.getWidth() - reserved ? 100 : pianoroll::compactChordBoxWidth, true);
     place (scaleBox, 164, true);
     if (scaleBox.isVisible())
         place (scaleSnapButton, h);
@@ -544,6 +548,11 @@ void PianoRollComponent::resized()
     overview.setBounds (keyboardWidth, toolbarHeight, getWidth() - keyboardWidth - scrollBarSize, overviewHeight);
     vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, getHeight() - headerHeight - velocityHeight);
     updateScrollBars();
+}
+
+void PianoRollComponent::squeezeToolbarForSnapshot (int pixels)
+{
+    setTitleBarInsets (titleInsetLeft, titleInsetRight + pixels);
 }
 
 void PianoRollComponent::scrollToNotes (bool fitPattern)
