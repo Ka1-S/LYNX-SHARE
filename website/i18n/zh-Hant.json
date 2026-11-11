@@ -166,7 +166,6 @@
 "why.online.f2": "開啟、錄製一個部分、再傳回來",
 "why.online.f3t": "主持人",
 "why.online.f3": "合併一個部分：以朋友的顏色加入",
-"why.online.nopic": "這裡沒有螢幕截圖：正式版的截圖模式無法繪製工作階段視窗，而本網站只顯示由正式版建置產生的圖片。",
 "why.projects.t": "開啟並寫出其他 DAW 的專案",
 "why.projects.l": "FL Studio 專案和 Ableton Live 的 set 可用 檔案 › 開啟 開啟，也能寫回去。",
 "why.projects.p1": "開啟 .flp 時會帶入通道、取樣、樣式、編排、自動化和混音器。Live 11 或 12 的 set（.als）會帶入軌道、片段和 Session 檢視，後者會放進片段格線。FL Studio Mobile 專案（.flm）會匯入編排、取樣、鼓組和 DirectWave 程式。原始檔案絕不會被改動：儲存時會寫出 .lynx 檔。",
@@ -406,7 +405,8 @@
 "nav.wiki": "Wiki",
 "f.sign": "程式碼簽署 &amp; 隱私權",
 "legal": "LYNX SHARE是獨立專案，與Image-Line、Ableton或BandLab無關聯，也未獲其認可。FL Studio和FL Studio Mobile是Image-Line Software的商標；Ableton和Live是Ableton AG的商標；BandLab是BandLab Technologies的商標。",
-"aria.lang": "語言"
+"aria.lang": "語言",
+"why.online.cap": "來自 LYNX SHARE 0.1.25：即時工作階段進行中的線上工作階段選單、開始即時工作階段的視窗，以及工作階段聊天。"
 },
 "featured": {},
 "insp": {}

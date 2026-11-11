@@ -166,7 +166,6 @@
 "why.online.f2": "Açar, bir parti kaydeder, geri gönderir",
 "why.online.f3t": "Host",
 "why.online.f3": "Partiyi birleştir: arkadaşın renginde eklenir",
-"why.online.nopic": "Burada ekran görüntüsü yok: oturum pencereleri sürümün ekran görüntüsü modu tarafından çizilemiyor ve bu site yalnızca yayımlanmış sürümden alınan resimleri gösterir.",
 "why.projects.t": "Başka DAW'ların projelerini açar ve yazar",
 "why.projects.l": "FL Studio projeleri ve Ableton Live setleri Dosya › Aç ile açılır ve geri yazılabilir.",
 "why.projects.p1": "Bir .flp; kanalları, sample'ları, pattern'leri, aranjmanı, otomasyonu ve mixer'ıyla gelir. Bir Live 11 veya 12 seti (.als); track'leri, klipleri ve klip ızgarasına oturan Session görünümüyle gelir. FL Studio Mobile projeleri (.flm) aranjmanı, sample'ları, davul kitlerini ve DirectWave programlarını içe aktarır. Özgün dosya asla değişmez: kaydetmek bir .lynx dosyası yazar.",
@@ -406,7 +405,8 @@
 "nav.wiki": "Wiki",
 "f.sign": "Kod imzalama ve gizlilik",
 "legal": "LYNX SHARE bağımsız bir projedir; Image-Line, Ableton veya BandLab ile bağlantılı değildir ve onlar tarafından onaylanmamıştır. FL Studio ve FL Studio Mobile, Image-Line Software'in; Ableton ve Live, Ableton AG'nin; BandLab ise BandLab Technologies'in ticari markalarıdır.",
-"aria.lang": "Dil"
+"aria.lang": "Dil",
+"why.online.cap": "LYNX SHARE 0.1.25'ten: canlı oturum sırasında Çevrimiçi oturum menüsü, canlı oturum başlatma penceresi ve oturum sohbeti."
 },
 "featured": {},
 "insp": {}

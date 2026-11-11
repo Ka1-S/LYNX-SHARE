@@ -7,6 +7,8 @@ There are two ways to work on a project with other people, and both are under `F
 
 ## Send a project to a friend
 
+![Send project](/assets/img/wiki/session-send.webp)
+
 1. Open the project and choose `File › Online session › Send project...`.
 2. Type your name and your friend's name.
 3. Choose what your friend keeps when the session ends: `Only their own part (recommended)` or `A full copy of the project`.
@@ -37,6 +39,8 @@ Merging is one undo step. A newer part from the same friend replaces the earlier
 
 ## Start or join a live session
 
+![Start live session](/assets/img/wiki/session-start.webp)
+
 The host starts the session:
 
 1. Open the project and choose `File › Online session › Start live session...`.
@@ -52,6 +56,8 @@ A guest joins:
 3. Wait for the host to let you in. The host's project opens.
 
 ## During a live session
+
+![Session chat](/assets/img/wiki/session-chat.webp)
 
 The `File › Online session` menu has these commands while a session runs:
 

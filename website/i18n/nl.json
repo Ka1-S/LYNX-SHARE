@@ -166,7 +166,6 @@
 "why.online.f2": "Opent het, neemt een deel op, stuurt het terug",
 "why.online.f3t": "Host",
 "why.online.f3": "Deel samenvoegen: toegevoegd in de kleur van de vriend",
-"why.online.nopic": "Hier geen schermafbeelding: de sessievensters kunnen niet worden getekend door de schermafbeeldingsmodus van de release, en deze site toont alleen afbeeldingen die van de uitgebrachte versie zijn gemaakt.",
 "why.projects.t": "Opent en schrijft projecten van andere DAW's",
 "why.projects.l": "FL Studio-projecten en Ableton Live-sets openen met Bestand › Openen en kunnen weer worden geschreven.",
 "why.projects.p1": "Een .flp komt binnen met zijn kanalen, samples, patterns, arrangement, automation en mixer. Een set van Live 11 of 12 (.als) komt binnen met zijn tracks, clips en Session-weergave, die in het clipraster terechtkomt. FL Studio Mobile-projecten (.flm) importeren het arrangement, de samples, drumkits en DirectWave-programma's. Het oorspronkelijke bestand wordt nooit gewijzigd: opslaan schrijft een .lynx-bestand.",
@@ -406,7 +405,8 @@
 "nav.wiki": "Wiki",
 "f.sign": "Code signing &amp; privacy",
 "legal": "LYNX SHARE is een onafhankelijk project, niet verbonden aan of goedgekeurd door Image-Line, Ableton of BandLab. FL Studio en FL Studio Mobile zijn handelsmerken van Image-Line Software; Ableton en Live zijn handelsmerken van Ableton AG; BandLab is een handelsmerk van BandLab Technologies.",
-"aria.lang": "Taal"
+"aria.lang": "Taal",
+"why.online.cap": "Uit LYNX SHARE 0.1.25: het menu Online sessie tijdens een live sessie, het venster om een live sessie te starten en de sessiechat."
 },
 "featured": {},
 "insp": {}

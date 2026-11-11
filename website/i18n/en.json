@@ -166,7 +166,7 @@
 "why.online.f2": "Opens it, records a part, sends it back",
 "why.online.f3t": "Host",
 "why.online.f3": "Merge a part: added in the friend's colour",
-"why.online.nopic": "No screenshot here: the session windows cannot be drawn by the release's screenshot mode, and this site only shows pictures made from the released build.",
+"why.online.cap": "From LYNX SHARE 0.1.25: the Online session menu during a live session, the Start live session window and the session chat.",
 "why.projects.t": "Opens and writes other DAWs' projects",
 "why.projects.l": "FL Studio projects and Ableton Live sets open with File › Open and can be written back.",
 "why.projects.p1": "An .flp comes in with its channels, samples, patterns, arrangement, automation and mixer. A Live 11 or 12 set (.als) comes in with its tracks, clips and Session view, which lands in the clip grid. FL Studio Mobile projects (.flm) import the arrangement, samples, drum kits and DirectWave programs. The original file is never changed: saving writes a .lynx file.",

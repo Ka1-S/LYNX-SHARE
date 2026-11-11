@@ -166,7 +166,6 @@
 "why.online.f2": "打开它，录制一个部分，再发回来",
 "why.online.f3t": "主持人",
 "why.online.f3": "合并部分：以朋友的颜色添加",
-"why.online.nopic": "此处没有截图：发布版本的截图模式无法绘制会话窗口，而本站只展示由已发布版本生成的图片。",
 "why.projects.t": "打开并写出其他 DAW 的工程",
 "why.projects.l": "FL Studio 工程和 Ableton Live 套装可通过文件 › 打开来打开，也可以写回。",
 "why.projects.p1": "打开 .flp 时会带入其通道、采样、样式、编排、自动化和混音台。Live 11 或 12 的套装（.als）会带入其轨道、片段和 Session 视图，后者进入片段网格。FL Studio Mobile 工程（.flm）会导入编排、采样、鼓组和 DirectWave 程序。原始文件不会被改动：保存时写出的是 .lynx 文件。",
@@ -406,7 +405,8 @@
 "nav.wiki": "Wiki",
 "f.sign": "代码签名 &amp; 隐私",
 "legal": "LYNX SHARE是独立项目，与Image-Line、Ableton或BandLab无关联，也未获其认可。FL Studio和FL Studio Mobile是Image-Line Software的商标；Ableton和Live是Ableton AG的商标；BandLab是BandLab Technologies的商标。",
-"aria.lang": "语言"
+"aria.lang": "语言",
+"why.online.cap": "来自 LYNX SHARE 0.1.25：实时会话进行中的在线会话菜单、开始实时会话的窗口和会话聊天。"
 },
 "featured": {},
 "insp": {}

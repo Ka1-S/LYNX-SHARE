@@ -166,7 +166,6 @@
 "why.online.f2": "파일을 열고 파트를 녹음해 돌려보냅니다",
 "why.online.f3t": "호스트",
 "why.online.f3": "파트 병합: 친구의 색으로 추가됩니다",
-"why.online.nopic": "여기에는 스크린샷이 없습니다. 세션 창은 릴리스의 스크린샷 모드로 그릴 수 없고, 이 사이트는 릴리스된 빌드로 만든 그림만 보여 주기 때문입니다.",
 "why.projects.t": "다른 DAW의 프로젝트를 열고 씁니다",
 "why.projects.l": "FL Studio 프로젝트와 Ableton Live 세트는 파일 › 열기로 열고 다시 저장할 수 있습니다.",
 "why.projects.p1": ".flp는 채널, 샘플, 패턴, 편곡, 오토메이션, 믹서와 함께 열립니다. Live 11 또는 12 세트(.als)는 트랙, 클립, 세션 뷰와 함께 열리며, 세션 뷰는 클립 그리드로 들어갑니다. FL Studio Mobile 프로젝트(.flm)는 편곡, 샘플, 드럼 키트, DirectWave 프로그램을 가져옵니다. 원본 파일은 바뀌지 않고, 저장하면 .lynx 파일이 만들어집니다.",
@@ -406,7 +405,8 @@
 "nav.wiki": "위키",
 "f.sign": "코드 서명 &amp; 개인정보",
 "legal": "LYNX SHARE는 독립 프로젝트이며 Image-Line, Ableton, BandLab과 제휴하거나 그들의 보증을 받지 않았습니다. FL Studio와 FL Studio Mobile은 Image-Line Software의, Ableton과 Live는 Ableton AG의, BandLab은 BandLab Technologies의 상표입니다.",
-"aria.lang": "언어"
+"aria.lang": "언어",
+"why.online.cap": "LYNX SHARE 0.1.25 화면: 라이브 세션 중의 온라인 세션 메뉴, 라이브 세션 시작 창, 세션 채팅."
 },
 "featured": {},
 "insp": {}

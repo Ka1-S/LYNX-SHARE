@@ -166,7 +166,6 @@
 "why.online.f2": "Membukanya, merekam satu bagian, mengirimkannya kembali",
 "why.online.f3t": "Host",
 "why.online.f3": "Gabungkan bagian: ditambahkan dengan warna si teman",
-"why.online.nopic": "Tidak ada tangkapan layar di sini: jendela sesi tidak bisa digambar oleh mode tangkapan layar rilis, dan situs ini hanya menampilkan gambar yang dibuat dari build rilis.",
 "why.projects.t": "Membuka dan menulis proyek DAW lain",
 "why.projects.l": "Proyek FL Studio dan set Ableton Live terbuka lewat File › Buka dan bisa ditulis kembali.",
 "why.projects.p1": "File .flp masuk beserta channel, sample, pattern, arrangement, otomasi, dan mixer-nya. Set Live 11 atau 12 (.als) masuk beserta track, clip, dan tampilan Session, yang mendarat di grid clip. Proyek FL Studio Mobile (.flm) mengimpor arrangement, sample, drum kit, dan program DirectWave. File aslinya tidak pernah diubah: menyimpan menulis file .lynx.",
@@ -406,7 +405,8 @@
 "nav.wiki": "Wiki",
 "f.sign": "Tanda tangan kode &amp; privasi",
 "legal": "LYNX SHARE adalah proyek independen, tidak berafiliasi dengan atau didukung oleh Image-Line, Ableton, maupun BandLab. FL Studio dan FL Studio Mobile adalah merek dagang Image-Line Software; Ableton dan Live adalah merek dagang Ableton AG; BandLab adalah merek dagang BandLab Technologies.",
-"aria.lang": "Bahasa"
+"aria.lang": "Bahasa",
+"why.online.cap": "Dari LYNX SHARE 0.1.25: menu Sesi online saat sesi langsung berjalan, jendela untuk memulai sesi langsung, dan chat sesi."
 },
 "featured": {},
 "insp": {}

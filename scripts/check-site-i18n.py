@@ -154,7 +154,7 @@ def plain(page):
 def english_prose(text):
     """A block of English sentences (a list of product names is the same in every language)."""
     words = text.lower().split()
-    return len(words) >= 6 and sum(w.strip(".,:;()") in ("the", "and", "of", "to", "is", "a", "in", "with", "for", "that", "it", "on", "are", "or") for w in words) >= 3
+    return len(words) >= 6 and len({w.strip(".,:;()") for w in words} & {"the", "and", "of", "to", "is", "a", "in", "with", "for", "that", "it", "on", "are", "or"}) >= 3
 
 
 def body_sources(b):

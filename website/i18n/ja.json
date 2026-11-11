@@ -166,7 +166,6 @@
 "why.online.f2": "開いて、パートを録音し、送り返す",
 "why.online.f3t": "ホスト",
 "why.online.f3": "パートを統合: 相手の色で追加される",
-"why.online.nopic": "ここにはスクリーンショットがありません。セッションのウィンドウはリリース版のスクリーンショットモードでは描画できず、このサイトはリリース版から作った画像だけを載せているためです。",
 "why.projects.t": "他のDAWのプロジェクトを開き、書き出せる",
 "why.projects.l": "FL StudioのプロジェクトとAbleton Liveのセットは、ファイル › 開く で開け、書き戻すこともできます。",
 "why.projects.p1": ".flpは、チャンネル、サンプル、パターン、アレンジメント、オートメーション、ミキサーごと読み込まれます。Live 11または12のセット (.als) は、トラックとクリップ、そしてセッションビューごと読み込まれ、セッションビューはクリップグリッドに入ります。FL Studio Mobileのプロジェクト (.flm) は、アレンジメント、サンプル、ドラムキット、DirectWaveのプログラムを読み込めます。元のファイルは変更されません。保存すると.lynxファイルが書き出されます。",
@@ -406,7 +405,8 @@
 "nav.wiki": "Wiki",
 "f.sign": "コード署名 &amp; プライバシー",
 "legal": "LYNX SHAREは独立したプロジェクトであり、Image-Line、Ableton、BandLabとは提携しておらず、承認も受けていません。FL StudioとFL Studio MobileはImage-Line Softwareの、AbletonとLiveはAbleton AGの、BandLabはBandLab Technologiesの商標です。",
-"aria.lang": "言語"
+"aria.lang": "言語",
+"why.online.cap": "LYNX SHARE 0.1.25 の画面：ライブセッション中のオンラインセッションメニュー、ライブセッションを開始するウィンドウ、セッションチャット。"
 },
 "featured": {},
 "insp": {}

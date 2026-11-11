@@ -166,7 +166,6 @@
 "why.online.f2": "Lo apre, registra una parte e la rimanda indietro",
 "why.online.f3t": "Host",
 "why.online.f3": "Unisci una parte: aggiunta nel colore dell'amico",
-"why.online.nopic": "Qui non c'è uno screenshot: le finestre della sessione non si possono disegnare con la modalità screenshot della versione rilasciata, e questo sito mostra solo immagini ricavate dalla build rilasciata.",
 "why.projects.t": "Apre e scrive i progetti di altre DAW",
 "why.projects.l": "I progetti di FL Studio e i set di Ableton Live si aprono con File › Apri e si possono riscrivere.",
 "why.projects.p1": "Un .flp arriva con i suoi canali, sample, pattern, arrangiamento, automazione e Mixer. Un set di Live 11 o 12 (.als) arriva con le sue tracce, le clip e la vista Session, che finisce nella griglia di clip. I progetti di FL Studio Mobile (.flm) importano l'arrangiamento, i sample, i drum kit e i programmi DirectWave. Il file originale non viene mai modificato: salvando si scrive un file .lynx.",
@@ -406,7 +405,8 @@
 "nav.wiki": "Wiki",
 "f.sign": "Firma del codice e privacy",
 "legal": "LYNX SHARE è un progetto indipendente, non affiliato né approvato da Image-Line, Ableton o BandLab. FL Studio e FL Studio Mobile sono marchi di Image-Line Software; Ableton e Live sono marchi di Ableton AG; BandLab è un marchio di BandLab Technologies.",
-"aria.lang": "Lingua"
+"aria.lang": "Lingua",
+"why.online.cap": "Da LYNX SHARE 0.1.25: il menu Sessione online durante una sessione live, la finestra per avviare una sessione live e la chat della sessione."
 },
 "featured": {},
 "insp": {}
