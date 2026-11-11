@@ -63,3 +63,28 @@ in clips of the clip grid, instruments whose knobs a controller link moves live.
 - **Own field** `freeze` (alternative: the `standIns` list, which an Online Session's apply would overwrite).
 - **Edits blocked in the note editors** (alternative: one guard on every song edit); other edits that change the
   result show "out of date".
+
+## 6. Measured (2026-11-11)
+- Core tests (`tests/Freeze190ayTests.inc`, 4 tests, 52 checks): frozen vs live, Song mode, through a live delay +
+  reverb: -133.7 dB whole song, -130.7 dB in the tail after the last note, -133.7 dB over a repeated pattern; the
+  channel alone -128.7 dB; two frozen channels -130.2 dB; Pattern mode from the second pass -139.6 dB outside the
+  first 10 ticks of a pass.
+- `LYNX.exe --freezetest` (Windows build, real engine, files and export): demo song, 4 channels frozen: -129.1 dB;
+  Unfreeze: bit-identical mix (-200 dB) and the same saved project byte for byte.
+- FL's demo "Thief" (37 channels, 5 instruments frozen): the four 3x Osc / synth channels null at -94.5 dB.
+
+## 7. Known limits
+- **Harmless does not null** (Thief's "Synth Bass": frozen vs live +1 dB from the first note after a 41 s rest). Not
+  the freeze: LYNX's Harmless renders differently after a rest depending on the block size and the channel's volume
+  (the same song rendered in blocks of 480 and of 512 frames differs by +1.7 dB from that note on; the same block
+  size twice is bit-identical). Its plugin-wide phases and counters only run while the channel is processed, and how
+  long it stays awake after a note depends on level and block partition. A frozen Harmless is one valid rendition; the
+  engine needs its own fix (reproducer: `/mnt/e/lynx-work/freeze190ay/harness`, `MINI_DIAG=1`).
+- **Pattern mode, loop seam**: 3 ticks after each loop start the previous pass's audio-clip voice adds its held last
+  value, fading out over 3 ms (-24.6 dB re peak in the test song, on sustained material). Same in Online Sessions' loop
+  stems. The first pass of a loop already carries the previous pass's tail.
+- An export of a frozen project uses the frozen audio (playback quality, the channel's Max polyphony), also when
+  "HQ for all plugins" / "Disable max polyphony" are on, and also when the freeze is out of date.
+- A stem's tail is capped at 4 bars and cut at the song's end; undoing a Freeze leaves its files on disk.
+- Memory: the frozen audio is memory-mapped (about 84 MB of file per 4 minutes of stereo at 44.1 kHz). Freezing pays
+  off for instruments heavier than that (samplers, big hosted plugins); for light built-in synths it only saves CPU.
