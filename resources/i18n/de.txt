@@ -8492,3 +8492,5 @@ countries: de at ch li lu
 "Not saved yet" = "Noch nicht gespeichert"
 "Backed up just now" = "Gerade eben gesichert"
 "Backed up {0} min ago" = "Vor {0} Min. gesichert"
+"Nudge the selected clips left (fine step, no snap)" = "Ausgewählte Clips fein nach links verschieben (feiner Schritt, ohne Raster)"
+"Nudge the selected clips right (fine step, no snap)" = "Ausgewählte Clips fein nach rechts verschieben (feiner Schritt, ohne Raster)"

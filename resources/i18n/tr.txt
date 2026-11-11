@@ -8492,3 +8492,5 @@ countries: tr
 "Not saved yet" = "Henüz kaydedilmedi"
 "Backed up just now" = "Az önce yedeklendi"
 "Backed up {0} min ago" = "{0} dk önce yedeklendi"
+"Nudge the selected clips left (fine step, no snap)" = "Seçili klipleri sola ince kaydır (ince adım, yakalama yok)"
+"Nudge the selected clips right (fine step, no snap)" = "Seçili klipleri sağa ince kaydır (ince adım, yakalama yok)"

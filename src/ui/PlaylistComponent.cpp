@@ -5187,25 +5187,54 @@ void PlaylistComponent::selectAllWithTime()
     setSelection (all);
 }
 
-void PlaylistComponent::shiftSelectedClips (int steps, int tracks)
+void PlaylistComponent::shiftSelectedClips (int steps, int tracks, bool fine)
 {
     // the selected clips, else all of them (FL's menu offers these with nothing selected: FL's usual "selected, else all",
-    // as Mute does, FUN_01061e80)
+    // as Mute does, FUN_01061e80; the manual: "If no selection is made then all the Clips will be moved")
     auto chosen = selection;
     if (chosen.empty())
         for (int i = 0; i < (int) engine.getSong().playlist.size(); ++i)
             chosen.push_back (i);
-    if (chosen.empty())
-        return;
 
-    const auto delta = (std::int64_t) steps * juce::jmax<std::int64_t> (1, gridTicks());
-    engine.editSong ([chosen, delta, tracks] (Song& s) {
+    // FL (FUN_00e51730, round 190ag): one snap step, or with Alt held one pixel's worth of ticks at this zoom
+    const auto step = fine ? clipops::pixelStepTicks (pixelsPerTick) : juce::jmax<std::int64_t> (1, gridTicks());
+    moveClips (std::move (chosen), (std::int64_t) steps * step, tracks, true, true);
+}
+
+void PlaylistComponent::moveClips (std::vector<int> chosen, std::int64_t delta, int tracks, bool newUndoStep, bool keepInView)
+{
+    // the one move behind Shift+arrows, Alt+arrows and the Shift+Alt+wheel nudge (issue #147): the clips move together and
+    // stop together at the song start and at the first / last track; nothing is recorded when they cannot move
+    {
+        auto probe = engine.getSong().playlist;
+        const auto time = delta != 0 ? clipops::shiftClipsInTime (probe, chosen, delta) : 0;
+        const auto rows = tracks != 0 ? clipops::shiftClipsTrack (probe, chosen, tracks) : 0;
+        if (chosen.empty() || (time == 0 && rows == 0))
+            return;
+    }
+
+    auto edge = delta < 0 ? std::numeric_limits<std::int64_t>::max() : std::numeric_limits<std::int64_t>::min();
+    engine.editSong ([&chosen, &edge, delta, tracks] (Song& s) {
         if (delta != 0)
             clipops::shiftClipsInTime (s.playlist, chosen, delta);
         if (tracks != 0)
             clipops::shiftClipsTrack (s.playlist, chosen, tracks);
-    });
-    sortClips (chosen);
+        for (auto i : chosen)
+            if (i >= 0 && i < (int) s.playlist.size())
+                edge = delta < 0 ? std::min (edge, s.playlist[(std::size_t) i].start) : std::max (edge, s.playlist[(std::size_t) i].end());
+    }, newUndoStep);
+    // (only a change of track can put an audio clip on another audio track: a move in time asks nothing)
+    sortClips (tracks != 0 ? std::move (chosen) : std::vector<int> {});
+
+    if (keepInView && delta != 0) // FL scrolls to keep the leading edge of the moved clips in view (FUN_00e7e290)
+        if (const auto to = clipops::scrollToShowEdge (scrollTicks, (double) gridArea().getWidth(), pixelsPerTick, edge, delta > 0);
+            ! juce::approximatelyEqual (to, scrollTicks))
+        {
+            gliding = false;
+            scrollTicks = to;
+            updateScrollBars();
+            repaint();
+        }
 }
 
 void PlaylistComponent::selectBySelectedSource()
@@ -6813,6 +6842,8 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.shiftRight")) shiftSelectedClips (1, 0);
     else if (is ("playlist.shiftUp")) shiftSelectedClips (0, -1);
     else if (is ("playlist.shiftDown")) shiftSelectedClips (0, 1);
+    else if (is ("playlist.nudgeLeft")) shiftSelectedClips (-1, 0, true);
+    else if (is ("playlist.nudgeRight")) shiftSelectedClips (1, 0, true);
     else if (is ("playlist.sliceInsertSpace")) sliceInsertTimeSelection();
     else if (is ("playlist.trimSpace")) trimTimeSelection();
     else if (is ("playlist.deselect"))
@@ -8347,15 +8378,7 @@ void PlaylistComponent::mouseWheelMove (const juce::MouseEvent& e, const juce::M
             const auto now = juce::Time::getMillisecondCounter();
             const auto newBurst = now - lastWheelEdit > 700; // one undo step per burst
             lastWheelEdit = now;
-            const auto ticks = (wheel.deltaY > 0 ? 1 : -1) * gridTicks();
-            engine.editSong ([this, ticks] (Song& s) {
-                auto delta = ticks;
-                for (auto i : selection)
-                    delta = juce::jmax (delta, -s.playlist[(std::size_t) i].start);
-                for (auto i : selection)
-                    s.playlist[(std::size_t) i].start += delta;
-            }, newBurst);
-            sortClips();
+            moveClips (selection, (wheel.deltaY > 0 ? 1 : -1) * gridTicks(), 0, newBurst, false); // (shared with Shift+arrows)
         }
         return;
     }
@@ -8404,8 +8427,7 @@ bool PlaylistComponent::nudgeWithWheel (juce::Point<int> p, float deltaY)
         else
             return true;
     }
-    const auto step = juce::jmax<std::int64_t> (1, (std::int64_t) std::llround (1.0 / pixelsPerTick));
-    const auto delta = (deltaY > 0 ? 1 : -1) * step;
+    const auto delta = (deltaY > 0 ? 1 : -1) * clipops::pixelStepTicks (pixelsPerTick);
     const auto now = juce::Time::getMillisecondCounter();
     const auto newBurst = now - lastWheelEdit > 700;
     lastWheelEdit = now;

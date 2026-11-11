@@ -8492,3 +8492,5 @@ countries: tw hk mo
 "Not saved yet" = "尚未儲存"
 "Backed up just now" = "剛剛已備份"
 "Backed up {0} min ago" = "{0} 分鐘前已備份"
+"Nudge the selected clips left (fine step, no snap)" = "將所選片段向左微移（細微步長，不吸附）"
+"Nudge the selected clips right (fine step, no snap)" = "將所選片段向右微移（細微步長，不吸附）"

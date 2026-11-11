@@ -8492,3 +8492,5 @@ countries: ru by kz
 "Not saved yet" = "Ещё не сохранено"
 "Backed up just now" = "Резервная копия только что"
 "Backed up {0} min ago" = "Резервная копия {0} мин назад"
+"Nudge the selected clips left (fine step, no snap)" = "Слегка сдвинуть выделенные клипы влево (мелкий шаг, без привязки)"
+"Nudge the selected clips right (fine step, no snap)" = "Слегка сдвинуть выделенные клипы вправо (мелкий шаг, без привязки)"

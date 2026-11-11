@@ -8492,3 +8492,5 @@ countries: pl
 "Not saved yet" = "Jeszcze nie zapisano"
 "Backed up just now" = "Kopia zapasowa przed chwilą"
 "Backed up {0} min ago" = "Kopia zapasowa {0} min temu"
+"Nudge the selected clips left (fine step, no snap)" = "Lekko przesuń zaznaczone klipy w lewo (drobny krok, bez przyciągania)"
+"Nudge the selected clips right (fine step, no snap)" = "Lekko przesuń zaznaczone klipy w prawo (drobny krok, bez przyciągania)"

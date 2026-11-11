@@ -8492,3 +8492,5 @@ countries: jp
 "Not saved yet" = "未保存"
 "Backed up just now" = "たった今バックアップ済み"
 "Backed up {0} min ago" = "{0} 分前にバックアップ済み"
+"Nudge the selected clips left (fine step, no snap)" = "選択したクリップを左へ微調整（細かいステップ、スナップなし）"
+"Nudge the selected clips right (fine step, no snap)" = "選択したクリップを右へ微調整（細かいステップ、スナップなし）"

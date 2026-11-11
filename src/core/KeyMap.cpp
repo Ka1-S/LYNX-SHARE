@@ -326,6 +326,10 @@ std::vector<Action> makeActions()
         { "playlist.shiftRight", TR_NOOP ("Shift the selected clips right (one snap step)"), Context::playlist, { chord (right, shift) } },
         { "playlist.shiftUp", TR_NOOP ("Shift the selected clips up (one track)"), Context::playlist, { chord (up, shift) } },
         { "playlist.shiftDown", TR_NOOP ("Shift the selected clips down (one track)"), Context::playlist, { chord (down, shift) } },
+        // round 190ag (issue #147): FL's editor KeyDown (FUN_00e52360) sends Left / Right with Alt held, with or without
+        // Shift, to the same shift as Shift+Left / Right (FUN_00e51730), which then steps by a pixel's worth of ticks
+        { "playlist.nudgeLeft", TR_NOOP ("Nudge the selected clips left (fine step, no snap)"), Context::playlist, { chord (left, alt), chord (left, alt | shift) } },
+        { "playlist.nudgeRight", TR_NOOP ("Nudge the selected clips right (fine step, no snap)"), Context::playlist, { chord (right, alt), chord (right, alt | shift) } },
         { "playlist.sliceInsertSpace", TR_NOOP ("Slice & insert space"), Context::playlist, { chord (insert, ctrl | alt) } },
         { "playlist.trimSpace", TR_NOOP ("Trim selection (keep only the time selection)"), Context::playlist, {} },
         { "playlist.deselect", TR_NOOP ("Deselect (clips and time)"), Context::playlist, { chord ('D', ctrl) } },

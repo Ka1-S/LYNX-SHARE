@@ -8492,3 +8492,5 @@ countries: id
 "Not saved yet" = "Belum disimpan"
 "Backed up just now" = "Baru saja dicadangkan"
 "Backed up {0} min ago" = "Dicadangkan {0} mnt lalu"
+"Nudge the selected clips left (fine step, no snap)" = "Geser halus klip terpilih ke kiri (langkah halus, tanpa snap)"
+"Nudge the selected clips right (fine step, no snap)" = "Geser halus klip terpilih ke kanan (langkah halus, tanpa snap)"

@@ -8492,3 +8492,5 @@ countries: nl be
 "Not saved yet" = "Nog niet opgeslagen"
 "Backed up just now" = "Zojuist geback-upt"
 "Backed up {0} min ago" = "{0} min geleden geback-upt"
+"Nudge the selected clips left (fine step, no snap)" = "Geselecteerde clips fijn naar links schuiven (fijne stap, zonder snap)"
+"Nudge the selected clips right (fine step, no snap)" = "Geselecteerde clips fijn naar rechts schuiven (fijne stap, zonder snap)"

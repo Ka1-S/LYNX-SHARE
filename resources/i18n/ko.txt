@@ -8492,3 +8492,5 @@ countries: kr
 "Not saved yet" = "아직 저장되지 않음"
 "Backed up just now" = "방금 백업됨"
 "Backed up {0} min ago" = "{0}분 전에 백업됨"
+"Nudge the selected clips left (fine step, no snap)" = "선택한 클립을 왼쪽으로 미세 이동 (미세 단계, 스냅 없음)"
+"Nudge the selected clips right (fine step, no snap)" = "선택한 클립을 오른쪽으로 미세 이동 (미세 단계, 스냅 없음)"

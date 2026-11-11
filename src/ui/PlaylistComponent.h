@@ -338,7 +338,8 @@ private:
     void deleteTimeSelection();
     void sliceInsertTimeSelection(); // round 189e: FL's Slice & insert space / Trim selection
     void trimTimeSelection();
-    void shiftSelectedClips (int steps, int tracks); // FL's Shift left / right / up / down
+    void shiftSelectedClips (int steps, int tracks, bool fine = false); // FL's Shift left / right / up / down; fine = FL's Alt step
+    void moveClips (std::vector<int> chosen, std::int64_t delta, int tracks, bool newUndoStep, bool keepInView); // (keys and wheel nudge)
     void selectAllWithTime(); // FL's Select all (Ctrl+A): every clip and the whole song's time (round 189g)
     void makeSelectionUniqueAsSample(); // FL's Make unique as sample (round 189g)
     void showFadeHandleMenu (int index, int side); // FL's fade handle menu (round 189i)

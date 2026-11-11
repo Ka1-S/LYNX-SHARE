@@ -8492,3 +8492,5 @@ countries: fr be ch ca lu
 "Not saved yet" = "Pas encore enregistré"
 "Backed up just now" = "Sauvegardé à l'instant"
 "Backed up {0} min ago" = "Sauvegardé il y a {0} min"
+"Nudge the selected clips left (fine step, no snap)" = "Décaler finement les clips sélectionnés vers la gauche (pas fin, sans grille)"
+"Nudge the selected clips right (fine step, no snap)" = "Décaler finement les clips sélectionnés vers la droite (pas fin, sans grille)"

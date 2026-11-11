@@ -8492,3 +8492,5 @@ countries: it ch sm
 "Not saved yet" = "Non ancora salvato"
 "Backed up just now" = "Backup eseguito adesso"
 "Backed up {0} min ago" = "Backup {0} min fa"
+"Nudge the selected clips left (fine step, no snap)" = "Sposta leggermente le clip selezionate a sinistra (passo fine, senza griglia)"
+"Nudge the selected clips right (fine step, no snap)" = "Sposta leggermente le clip selezionate a destra (passo fine, senza griglia)"

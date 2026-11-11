@@ -8492,3 +8492,5 @@ countries: es mx ar co cl pe ve
 "Not saved yet" = "Aún sin guardar"
 "Backed up just now" = "Copia de seguridad hecha ahora mismo"
 "Backed up {0} min ago" = "Copia de seguridad hace {0} min"
+"Nudge the selected clips left (fine step, no snap)" = "Desplazar un poco los clips seleccionados a la izquierda (paso fino, sin ajuste)"
+"Nudge the selected clips right (fine step, no snap)" = "Desplazar un poco los clips seleccionados a la derecha (paso fino, sin ajuste)"
