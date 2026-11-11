@@ -199,6 +199,8 @@ void applyFlWrapperOptions (const ForeignPlugin& w, PluginRef& ref)
         ref.sendLoopPosition = (w.wrapperFlags & 0x800u) != 0;
         ref.modXAftertouch = (w.wrapperFlags & 0x20000u) != 0;
         ref.resetOnFlush = (w.wrapperFlags & 0x02000000u) == 0;
+        // the window's Typing keyboard priority button off [DATA round 187a: kb-on.flp / kb-off2.flp, 0xB4007D8C -> 0xB5007D8C]
+        ref.hostKeysFirst = (w.wrapperFlags & 0x01000000u) != 0;
         if (w.hasWrapperFlags2)
         {
             ref.allNotesOffOnStop = (w.wrapperFlags2 & 0x1000u) == 0;

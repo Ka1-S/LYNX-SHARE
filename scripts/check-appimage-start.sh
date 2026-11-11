@@ -3,7 +3,10 @@
 # namespace can be created), on a virtual X display; passes when LYNX is still running after WAIT seconds and shows
 # a top-level window. Needs Xvfb and xwininfo (packages xvfb, x11-utils).
 #
-# usage: scripts/check-appimage-start.sh <LYNX AppImage> [seconds to wait, default 12]
+# FONTS=none: the same on a system where no font is found at all, neither by JUCE's own folder scan nor by fontconfig
+# (issue #142: on NixOS JUCE found no monospaced font, and 0.1.25 crashed while drawing its first text with one).
+#
+# usage: [FONTS=none] scripts/check-appimage-start.sh <LYNX AppImage> [seconds to wait, default 12]
 set -uo pipefail
 AI="$(readlink -f "$1")"; WAIT="${2:-12}"
 WORK="$(mktemp -d)"
@@ -21,9 +24,17 @@ elif unshare -rn true 2> /dev/null; then offline=(unshare -rn); echo "network: n
 elif [[ "${REQUIRE_OFFLINE:-0}" == 1 ]]; then echo "ERROR: cannot create a network namespace"; exit 1
 else echo "network: left on (no network namespace in this environment)"; fi
 
+fonts=()
+if [[ "${FONTS:-}" == none ]]; then
+    mkdir -p "$WORK/nofonts"
+    printf '<?xml version="1.0"?>\n<fontconfig><dir>%s</dir></fontconfig>\n' "$WORK/nofonts" > "$WORK/fonts.conf"
+    fonts=(env "JUCE_FONT_PATH=$WORK/nofonts" "FONTCONFIG_FILE=$WORK/fonts.conf")
+    echo "fonts: none (JUCE_FONT_PATH and FONTCONFIG_FILE name an empty folder)"
+fi
+
 mkdir -p "$WORK/home"
 HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" XDG_CACHE_HOME="$WORK/home/.cache" DISPLAY="$DISP" \
-    APPIMAGE_EXTRACT_AND_RUN=1 "${offline[@]}" "$AI" > "$WORK/run.log" 2>&1 &
+    APPIMAGE_EXTRACT_AND_RUN=1 "${offline[@]}" "${fonts[@]}" "$AI" > "$WORK/run.log" 2>&1 &
 APID=$!
 sleep "$WAIT"
 echo "--- output"; head -50 "$WORK/run.log"
