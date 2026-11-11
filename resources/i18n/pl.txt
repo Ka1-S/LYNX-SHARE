@@ -8871,3 +8871,6 @@ countries: pl
 "{0} similar samples, most similar first" = "Podobne sample: {0}, najbardziej podobne na początku"
 "{0} samples analysed so far" = "Przeanalizowane dotąd sample: {0}"
 "Compared with {0} samples" = "Porównano z samplami: {0}"
+"Scripts" = "Skrypty"
+"Run last script again" = "Uruchom ponownie ostatni skrypt"
+"Open script folder..." = "Otwórz folder skryptów..."

@@ -8871,3 +8871,6 @@ countries: ru by kz
 "{0} similar samples, most similar first" = "Похожих сэмплов: {0}, самые похожие первыми"
 "{0} samples analysed so far" = "Проанализировано сэмплов: {0}"
 "Compared with {0} samples" = "Сравнено с сэмплами: {0}"
+"Scripts" = "Скрипты"
+"Run last script again" = "Запустить последний скрипт ещё раз"
+"Open script folder..." = "Открыть папку скриптов..."

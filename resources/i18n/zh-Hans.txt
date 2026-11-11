@@ -8871,3 +8871,6 @@ countries: cn sg
 "{0} similar samples, most similar first" = "{0} 个相似采样，最相似的在前"
 "{0} samples analysed so far" = "目前已分析 {0} 个采样"
 "Compared with {0} samples" = "已与 {0} 个采样比较"
+"Scripts" = "脚本"
+"Run last script again" = "再次运行上一个脚本"
+"Open script folder..." = "打开脚本文件夹..."

@@ -307,7 +307,9 @@ target_sources(lynx_core PRIVATE
 target_sources(lynx_core PRIVATE
     src/core/Python.cpp
     src/core/VfxScript.cpp
-    src/core/EdisonScript.cpp)
+    src/core/EdisonScript.cpp
+    src/core/ScriptDialog.cpp
+    src/core/PianoRollScript.cpp)
 
 # pocketpy 2.2 (MIT; third_party/pocketpy, LYNX's changes marked "LYNX"): a small embeddable Python 3 interpreter,
 # sandboxed (no os module / files) and interruptible (the watchdog)
@@ -524,6 +526,7 @@ if(LYNX_BUILD_APP)
     # workflow P2: note tool dialogs, tool windows, undo history, quick-add palette
     list(APPEND LYNX_APP_SOURCES
         src/ui/NoteToolDialogs.cpp
+        src/ui/PianoRollScripts.cpp
         src/ui/MidiClipboard.cpp
         src/ui/AudioClipboard.cpp
         src/ui/EventEditor.cpp

@@ -8871,3 +8871,6 @@ countries: tw hk mo
 "{0} similar samples, most similar first" = "{0} 個相似取樣，最相似的在前"
 "{0} samples analysed so far" = "目前已分析 {0} 個取樣"
 "Compared with {0} samples" = "已與 {0} 個取樣比較"
+"Scripts" = "指令碼"
+"Run last script again" = "再次執行上一個指令碼"
+"Open script folder..." = "開啟指令碼資料夾..."

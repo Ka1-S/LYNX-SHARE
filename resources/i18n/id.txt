@@ -8838,3 +8838,6 @@ countries: id
 "{0} similar samples, most similar first" = "{0} sampel serupa, yang paling serupa lebih dulu"
 "{0} samples analysed so far" = "{0} sampel dianalisis sejauh ini"
 "Compared with {0} samples" = "Dibandingkan dengan {0} sampel"
+"Scripts" = "Skrip"
+"Run last script again" = "Jalankan lagi skrip terakhir"
+"Open script folder..." = "Buka folder skrip..."

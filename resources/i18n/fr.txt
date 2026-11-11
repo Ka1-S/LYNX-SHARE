@@ -8838,3 +8838,6 @@ countries: fr be ch ca lu
 "{0} similar samples, most similar first" = "{0} samples similaires, le plus proche en premier"
 "{0} samples analysed so far" = "{0} samples analysés jusqu'ici"
 "Compared with {0} samples" = "Comparé à {0} samples"
+"Scripts" = "Scripts"
+"Run last script again" = "Relancer le dernier script"
+"Open script folder..." = "Ouvrir le dossier des scripts..."

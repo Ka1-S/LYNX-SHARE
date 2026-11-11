@@ -8838,3 +8838,6 @@ countries: nl be
 "{0} similar samples, most similar first" = "{0} vergelijkbare samples, de meest gelijkende eerst"
 "{0} samples analysed so far" = "{0} samples geanalyseerd tot nu toe"
 "Compared with {0} samples" = "Vergeleken met {0} samples"
+"Scripts" = "Scripts"
+"Run last script again" = "Laatste script opnieuw uitvoeren"
+"Open script folder..." = "Scriptmap openen..."

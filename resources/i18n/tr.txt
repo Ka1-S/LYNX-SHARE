@@ -8871,3 +8871,6 @@ countries: tr
 "{0} similar samples, most similar first" = "{0} benzer sample, en benzeri en üstte"
 "{0} samples analysed so far" = "Şimdiye kadar {0} sample incelendi"
 "Compared with {0} samples" = "{0} sample ile karşılaştırıldı"
+"Scripts" = "Betikler"
+"Run last script again" = "Son betiği yeniden çalıştır"
+"Open script folder..." = "Betik klasörünü aç..."

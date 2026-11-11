@@ -8871,3 +8871,6 @@ countries: kr
 "{0} similar samples, most similar first" = "비슷한 샘플 {0}개, 가장 비슷한 순"
 "{0} samples analysed so far" = "지금까지 샘플 {0}개 분석됨"
 "Compared with {0} samples" = "샘플 {0}개와 비교함"
+"Scripts" = "스크립트"
+"Run last script again" = "마지막 스크립트 다시 실행"
+"Open script folder..." = "스크립트 폴더 열기..."

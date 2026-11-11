@@ -8871,3 +8871,6 @@ countries: jp
 "{0} similar samples, most similar first" = "似たサンプル {0} 件（似ている順）"
 "{0} samples analysed so far" = "これまでに {0} 件のサンプルを解析"
 "Compared with {0} samples" = "{0} 件のサンプルと比較しました"
+"Scripts" = "スクリプト"
+"Run last script again" = "最後のスクリプトをもう一度実行"
+"Open script folder..." = "スクリプトフォルダーを開く..."
