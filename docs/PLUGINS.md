@@ -161,7 +161,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | SimSynth engine | SimSynth | Exact | all 76 installation states; automation not wired |
 | Fruit Kick engine | Fruit Kick | Exact | release fades and all 8 filter types included |
 | BassDrum engine † | BassDrum | Exact | 228/228 cases at 44.1 and 48 kHz |
-| Toxic engine † | Toxic Biohazard | Exact | 3 demo channels, voice and effects; the step sequencer is ignored |
+| Toxic engine † | Toxic Biohazard | Exact | 3 demo channels, voice and effects; the step sequencer and the MIDI page run too (round 169h) |
 | Plucked! engine | Plucked! | Exact | for the same random seed (FL seeds from the clock) |
 | BeepMap engine | BeepMap | Exact | 9 preset/render-test states; only uncompressed 24/32-bit BMPs |
 | Drumaxx engine | Drumaxx | Exact | all 133 states on random notes; its pattern sequencer and separate outputs are not played |
