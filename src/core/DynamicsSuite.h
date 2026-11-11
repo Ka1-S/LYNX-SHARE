@@ -59,6 +59,10 @@ enum Param
     // round tp172b2 (Pro-C 3 parity, appended; none by default): Pro-C 3's styles that Style has no slot for — Smooth,
     // Op-El and Mastering — chosen over the style when set (the style list itself keeps its 11 entries for old projects)
     voicing,
+    // round 190v (appended; on for new instances): the two-way and vari-mu laws fitted to the reference's threshold ×
+    // ratio × knee × attack grid. Off = round 108's laws: what a project saved before that round loads with
+    // (upgradeLoadedEffectParams), so it sounds as it did. The other styles ignore it.
+    law,
     count
 };
 enum class Trigger { off, hostSync, midi };
@@ -263,6 +267,9 @@ enum Param
     // round 135 (Pro-G's bottom bar): oversampling off / 2x / 4x / 8x — the gate's gain is applied at the high rate
     // (smoother, alias-free fast gating); latency + the oversampler's
     oversampling,
+    // round 190v (appended; on for new instances): the Vocal style's noise reduction. Off = none: what a project saved
+    // before that round loads with (upgradeLoadedEffectParams). The other styles ignore it.
+    law,
     count
 };
 double scGainDb (float v) noexcept;      // −36 … +36 dB
