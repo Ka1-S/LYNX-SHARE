@@ -17,7 +17,7 @@ TEST (controller190aw_builtin_profiles_parse_and_match_their_files)
     for (const auto& entry : std::filesystem::directory_iterator ("resources/controllers"))
         if (entry.path().extension() == ".lynxctl")
         {
-            auto text = readFile (entry.path());
+            auto text = i18ntest::readFile (entry.path());
             std::string plain;
             for (const auto c : text)
                 if (c != '\r')
