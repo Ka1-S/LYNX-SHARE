@@ -39,7 +39,7 @@ inline lynx::EffectSlot slotFor (const std::string& plugin, const std::string& x
 TEST (p190ar_fitted_maps_translate_the_captured_states)
 {
     using namespace lynx;
-    CHECK (p190artr::cases().size() >= 18);
+    CHECK (p190artr::cases().size() >= 33);
     for (const auto& c : p190artr::cases())
     {
         int n = 0;

@@ -8913,3 +8913,8 @@ countries: tw hk mo
 "24Bit int" = "24 位元整數"
 "32Bit float" = "32 位元浮點"
 "WAV 16-bit (the device's sample rate)" = "WAV 16 位元（裝置的取樣率）"
+"Clean|FET" = "乾淨|FET"
+"Levelling" = "電平平衡"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "電平平衡：以較慢的起音把電平保持在上限以下的臨界值，其餘由上限攔住（預設關閉）"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "電平平衡臨界值：保持在上限以下的電平（Off：不做電平平衡）"
+"Levelling attack: how much of a transient passes before the level is held" = "電平平衡起音：電平被保持之前有多少瞬態通過"

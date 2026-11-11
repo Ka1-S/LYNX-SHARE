@@ -8913,3 +8913,8 @@ countries: tr
 "24Bit int" = "24 bit tamsayı"
 "32Bit float" = "32 bit kayan nokta"
 "WAV 16-bit (the device's sample rate)" = "WAV 16 bit (cihazın örnekleme hızı)"
+"Clean|FET" = "Temiz|FET"
+"Levelling" = "Seviyeleme"
+"Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Seviyeleme: seviyeyi yavaş bir atakla tavanın altındaki bir eşikte tutar, gerisini tavan yakalar (varsayılan olarak kapalı)"
+"Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Seviyeleme eşiği: tavanın altında tutulan seviye (Off: seviyeleme yok)"
+"Levelling attack: how much of a transient passes before the level is held" = "Seviyeleme atağı: seviye tutulmadan önce bir geçicinin ne kadarının geçtiği"

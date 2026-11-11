@@ -89,7 +89,11 @@ public:
     ApexEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::apexLimiter, d, 950, 600) { knobRanges = captionAbove = true; fillDemo(); }
 
 private:
-    enum { idPanel = 1, idGain, idCeiling, idTp, idAdvanced, idLoudness, idLoudReset };
+    enum { idPanel = 1, idGain, idCeiling, idTp, idAdvanced, idLoudness, idLoudReset, idLevel };
+    // round 190ar: the levelling stage (Level threshold; 0 = off, as every project saved before has it) is switched
+    // by a toggle that remembers the threshold it had (-12 dB the first time)
+    float levelThreshold = 1.0f / 3.0f;
+    bool levelling() const { return v (apex::pLevelThreshold) > 0.0f; }
     // round tp172b4: the reference opens with its knob panel folded into the tab at the lower left (its idle view)
     bool panelOpen = false, advancedOpen = false;
     static constexpr const char* styles = "Clean|Glue|Punch|Dynamic|Dense|Loud|Bus|Safe";
@@ -250,6 +254,18 @@ private:
                 auto sc = toggle ({ ad.getX() + 10.0f, ad.getY() + 76.0f, ad.getWidth() - 20.0f, 17.0f }, apex::pSidechain, tr ("Side-chain triggering"));
                 sc.hint = tr ("The limiter reacts to the slot's side-chain input (mixer: right-click the slot - Side chain)");
                 out.push_back (sc);
+                // round 190ar: the levelling stage under the ceiling — off unless switched on here
+                auto lv = toggle ({ ad.getX() + 10.0f, ad.getY() + 104.0f, ad.getWidth() - 20.0f, 17.0f }, -1, tr ("Levelling"));
+                lv.id = idLevel;
+                lv.lit = levelling();
+                lv.hint = tr ("Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)");
+                out.push_back (lv);
+                auto lt = barValue ({ ad.getX() + 6.0f, ad.getY() + 123.0f, ad.getWidth() - 12.0f, 17.0f }, apex::pLevelThreshold, tr ("Threshold"));
+                lt.hint = tr ("Levelling threshold: the level held under the ceiling (Off: no levelling)");
+                out.push_back (lt);
+                auto lat = barValue ({ ad.getX() + 6.0f, ad.getY() + 141.0f, ad.getWidth() - 12.0f, 17.0f }, apex::pLevelAttack, tr ("Attack"));
+                lat.hint = tr ("Levelling attack: how much of a transient passes before the level is held");
+                out.push_back (lat);
             }
         }
         else // (its caption, CONTROLS, is written up the tab by paintBody)
@@ -274,14 +290,26 @@ private:
 
     juce::Rectangle<float> advanced() const
     {
+        // (round 190ar: taller by the levelling rows, and its foot above the display's lower-right strip — display
+        // speed, TP, LUFS, meter scale — which the panel used to cover)
         const auto pn = panel();
-        return { pn.getRight() + 6.0f, pn.getY(), 170.0f, pn.getHeight() };
+        return { pn.getRight() + 6.0f, pn.getY() - 96.0f, 170.0f, pn.getHeight() + 66.0f };
     }
 
     void buttonPressed (const Ctl& c, const juce::MouseEvent&) override
     {
         if (c.id == idPanel) panelOpen = ! panelOpen;
         if (c.id == idAdvanced) advancedOpen = ! advancedOpen;
+        if (c.id == idLevel)
+        {
+            if (levelling())
+            {
+                levelThreshold = v (apex::pLevelThreshold);
+                set ({ { apex::pLevelThreshold, 0.0f } });
+            }
+            else
+                set ({ { apex::pLevelThreshold, levelThreshold } });
+        }
         if (c.id == idTp) set ({ { 5, v (5) >= 0.5f ? 0.0f : 1.0f } });
         if (c.id == idLoudness) set ({ { apex::pLoudnessShown, loudnessShown() ? 0.0f : 1.0f } });
         if (c.id == idLoudReset) set ({ { apex::pLoudnessReset, v (apex::pLoudnessReset) >= 0.5f ? 0.0f : 1.0f } }, false);
@@ -483,6 +511,8 @@ private:
                 const auto ad = advanced();
                 drawPanel (g, ad);
                 caption (g, { ad.getX(), ad.getY() + 6.0f, ad.getWidth(), 14.0f }, tr ("Advanced"));
+                g.setColour (colour::border); // (round 190ar: the levelling rows under the four switches)
+                g.drawHorizontalLine ((int) ad.getY() + 98, ad.getX() + 10.0f, ad.getRight() - 10.0f);
             }
         }
         // latency (constant: the maximum look-ahead, + the oversampler)
