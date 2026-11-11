@@ -5181,7 +5181,7 @@ private:
                 s2 = s1;
                 s1 = s0;
             }
-            return std::sqrt (s1 * s1 + s2 * s2 - 2.0 * std::cos (w) * s1 * s2) * 2.0 / (double) juce::jmax<std::size_t> (1, x.size());
+            return std::sqrt (s1 * s1 + s2 * s2 - 2.0 * std::cos (w) * s1 * s2) * 2.0 / (double) std::max<std::size_t> (1, x.size());
         };
         if (! vst2)
             ok = false;
