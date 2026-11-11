@@ -26,7 +26,7 @@ mkdir -p build-local build-local/wavpack
 # workflow shell (key map, workspace layout, rack operations)
 CORE="$CORE src/core/KeyMap.cpp src/core/PresetCycle.cpp src/core/Sfz.cpp src/core/Workspace.cpp src/core/RackOps.cpp src/core/PlaylistTrackOps.cpp src/core/ChannelMiscFx.cpp src/core/MidiImport.cpp"
 # workflow P2 (note tools, mixer operations, history labels, browser search)
-CORE="$CORE src/core/RollingAudioLog.cpp src/core/ChordReadout.cpp src/core/NoteTools.cpp src/core/PianoRollTools.cpp src/core/EventEdit.cpp src/core/AudioEdit.cpp src/core/AudioEditTools.cpp src/core/FlAutoSlicer.cpp src/core/MixerOps.cpp src/core/History.cpp src/core/SearchQuery.cpp src/core/SearchIndex.cpp src/core/SearchService.cpp src/core/BrowserView.cpp src/core/EffectPresets.cpp src/core/PluginPresets.cpp src/core/ParamHelp.cpp"
+CORE="$CORE src/core/RollingAudioLog.cpp src/core/ChordReadout.cpp src/core/NoteTools.cpp src/core/MidiTools.cpp src/core/PianoRollTools.cpp src/core/EventEdit.cpp src/core/AudioEdit.cpp src/core/AudioEditTools.cpp src/core/FlAutoSlicer.cpp src/core/MixerOps.cpp src/core/History.cpp src/core/SearchQuery.cpp src/core/SearchIndex.cpp src/core/SearchService.cpp src/core/BrowserView.cpp src/core/EffectPresets.cpp src/core/PluginPresets.cpp src/core/ParamHelp.cpp"
 # Loop Starter, local (round 168b)
 CORE="$CORE src/core/LoopStarter.cpp"
 # Simple workflow: adding a track (round 184a)
@@ -180,7 +180,8 @@ if [[ "$split" -ge 2 ]] && command -v python3 > /dev/null && python3 scripts/spl
                 pids="$pids $!"
             done
             for p in $pids; do wait "$p" || rc=$?; done
-            cat build-local/split/*.log > build-local/split/errors.log
+            # (not errors.log itself: a second run in the same build-local would otherwise cat it into itself)
+            find build-local/split -maxdepth 1 -name '*.log' ! -name 'errors.log' -exec cat {} + > build-local/split/errors.log
             [[ $rc == 0 ]] && { $CXX $FLAGS $CORE $WAVPACK $(echo "$CHUNKS" | sed 's/\.cpp/.o/g') -o build-local/lynx_tests 2>> build-local/split/errors.log || rc=$?; } ;;
     esac
     grep -v 'glibc version' build-local/split/errors.log >&2 || true

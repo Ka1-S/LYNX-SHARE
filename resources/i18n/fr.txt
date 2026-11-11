@@ -1563,6 +1563,8 @@ countries: fr be ch ca lu
 "Controller type" = "Type de contrôleur"
 "Generic controller: link a knob or fader with a control's right-click menu > Link to MIDI controller." = "Contrôleur générique : liez un bouton ou un fader via le menu clic droit d'un contrôle > Lier à un contrôleur MIDI."
 "Pickup (takeover mode)" = "Reprise (mode takeover)"
+"Foot pedal controls note off" = "La pédale contrôle la fin des notes"
+"Disable to send sustain to plugins" = "Désactivez pour envoyer le sustain aux plugins"
 "A controller moves a parameter only after reaching its current value, so nothing jumps." = "Un contrôleur ne bouge un paramètre qu'après avoir atteint sa valeur actuelle, pour éviter les sauts."
 "Links in this project" = "Liens de ce projet"
 "ch. {0}" = "can. {0}"
@@ -6109,6 +6111,9 @@ countries: fr be ch ca lu
 "Insert effects" = "Effets des pistes"
 "Off: the effects of the inserts (not the Master's) are bypassed for the export" = "Désactivé : les effets des pistes (pas ceux du Master) sont contournés pour l'export"
 "Select first channel with notes when the pattern changes" = "Sélectionner le premier canal avec des notes au changement de pattern"
+"Allow the plugin to handle keystrokes before the host does" = "Laisser le plugin traiter les frappes avant l'hôte"
+"Disable typing keyboard priority by default" = "Désactiver par défaut la priorité du clavier de saisie"
+"Disable typing keyboard priority for all newly added plugins by default" = "Désactiver par défaut la priorité du clavier de saisie pour tous les plugins ajoutés"
 "Mute / unmute" = "Muet / réactiver"
 "Portamento / deselect" = "Portamento / désélectionner"
 "Shift+arrows" = "Maj+flèches"
@@ -7075,6 +7080,9 @@ countries: fr be ch ca lu
 "Pattern blocks: drag to resize, double-click to show every row" = "Blocs de pattern : glisser pour redimensionner, double-clic pour afficher toutes les lignes"
 "Pattern block row: click selects the pattern, double-click opens it, right-click renames and colours it" = "Ligne de blocs de pattern : clic sélectionne le pattern, double-clic l'ouvre, clic droit le renomme et le colore"
 "Pattern blocks: click or drag paints whole blocks of this row's pattern, right-click erases" = "Blocs de pattern : clic ou glisser peint des blocs entiers du pattern de cette ligne, clic droit efface"
+"Pattern blocks: click places one block and drags it along its row, right-click erases" = "Blocs de pattern : clic place un bloc et le fait glisser sur sa ligne, clic droit efface"
+"Pattern blocks: drag paints whole blocks; press a block and drag to move it, right-click erases" = "Blocs de pattern : glisser peint des blocs entiers ; appuyer sur un bloc et glisser le déplace, clic droit efface"
+"Pattern blocks: click or drag erases blocks in any row" = "Blocs de pattern : clic ou glisser efface les blocs de n'importe quelle ligne"
 "This project has pattern blocks. Turn them into clips (one track per pattern) so they keep playing, or delete them?" = "Ce projet contient des blocs de pattern. Les transformer en clips (une piste par pattern) pour qu'ils continuent de jouer, ou les supprimer ?"
 "Turn them into clips" = "Transformer en clips"
 "Delete them" = "Les supprimer"
@@ -8012,6 +8020,16 @@ countries: fr be ch ca lu
 "Use the suggested tempo" = "Utiliser le tempo suggéré"
 "Voice / audio" = "Voix / audio"
 "{0} BPM" = "{0} BPM"
+
+# --- Simple workflow: track headers (round 184a)
+"Drop a loop, audio or MIDI file here" = "Déposez ici une boucle, un fichier audio ou MIDI"
+
+# --- Simple workflow: track header hints (round 184a)
+"Track: [LMB] mute / unmute its mixer track" = "Piste : [LMB] couper / rétablir sa piste de mixage"
+"Track: [LMB] solo its mixer track" = "Piste : [LMB] mettre sa piste de mixage en solo"
+"Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Volume de la piste : [LMB] cliquer ou glisser  [Shift] fin  [2xLMB] 0 dB"
+"Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Panoramique de la piste : [LMB] glisser haut / bas  [Shift] fin  [2xLMB] centre"
+"Track effects: [LMB] open the effects of its mixer track" = "Effets de la piste : [LMB] ouvrir les effets de sa piste de mixage"
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Ajouter un effet à cet insert (ou en déposer un depuis le Navigateur)"
 "Channel on / off (its mute)" = "Canal activé / désactivé (sa sourdine)"
@@ -8110,6 +8128,15 @@ countries: fr be ch ca lu
 "Send the time selection to the comp" = "Envoyer la sélection temporelle vers le comp"
 "Send the time selection of the take lane to its comp" = "Envoyer la sélection temporelle de la piste de prise vers son comp"
 
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "Connexions"
+"Auto map outputs" = "Assigner les sorties automatiquement"
+"Assign all outputs incrementally" = "Assigner toutes les sorties à la suite"
+"Set all inputs and outputs to their default values" = "Remettre toutes les entrées et sorties à leurs valeurs par défaut"
+"Refresh inputs and outputs (after a change in the plugin)" = "Actualiser les entrées et sorties (après un changement dans le plugin)"
+"Mixer track offset for output {0}" = "Décalage de piste de mixage pour la sortie {0}"
+"Deactivate output {0}" = "Désactiver la sortie {0}"
+"Activate output {0}" = "Activer la sortie {0}"
 # --- Game controller (round 184a, S16)
 "Game controller" = "Manette de jeu"
 "Use a game controller" = "Utiliser une manette de jeu"
@@ -8263,6 +8290,9 @@ countries: fr be ch ca lu
 "Mixer groups follow the Playlist (LYNX)" = "Les groupes du Mixer suivent la Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Ranger les inserts comme la Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) déplacé(s) pour suivre la Playlist"
+"Keyboard style" = "Style du clavier"
+"Flat keys (FL Studio style)" = "Touches plates (style FL Studio)"
+"Piano keys (lines between the white keys)" = "Touches de piano (lignes entre les touches blanches)"
 
 # --- Pocket editors: FL Studio Mobile panel captions (round 188i)
 "Release Time" = "Temps de relâchement"

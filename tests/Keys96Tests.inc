@@ -131,3 +131,51 @@ TEST (keys96_option_writes_to_fl_wrapper_flags)
         CHECK (read.allowHostKeys);
     }
 }
+
+TEST (keys187a_typing_keyboard_priority_is_fl_wrapper_flag_0x01000000)
+{
+    // FL 2026: one project saved with the plugin window's keyboard button on and off differs in this bit only
+    // (E:\lynx-work\flgap187a\fl\kb-on.flp / kb-off2.flp: wrapper flags 0xB4007D8C -> 0xB5007D8C)
+    lynx::ForeignPlugin f;
+    lynx::PluginRef ref;
+    f.hasWrapperOptions = true;
+    f.wrapperVersion = 12;
+    f.wrapperFlags = 0xB4007D8Cu;
+    lynx::applyFlWrapperOptions (f, ref);
+    CHECK (! ref.hostKeysFirst);
+    f.wrapperFlags = 0xB5007D8Cu;
+    lynx::applyFlWrapperOptions (f, ref);
+    CHECK (ref.hostKeysFirst && ref.resetOnFlush); // its neighbour 0x02000000 untouched
+
+    using namespace lynx;
+    ForeignPlugin p;
+    p.format = ForeignPlugin::Format::vst3;
+    p.name = "Synth";
+    p.path = "C:/x/Synth.vst3";
+    p.hasClassId = true;
+    p.classId[0] = 0xAB;
+    p.state = flpexport::flVst3State ({ 1, 2, 3 }, { 4 });
+    for (const bool hostFirst : { false, true })
+    {
+        PluginRef r;
+        r.hostKeysFirst = hostFirst;
+        ForeignPlugin back;
+        CHECK (parseFlWrapper (flpexport::writeWrapper (p, true, &r), back) && back.hasWrapperOptions);
+        CHECK (((back.wrapperFlags & 0x01000000u) != 0) == hostFirst);
+        PluginRef read;
+        applyFlWrapperOptions (back, read);
+        CHECK (read.hostKeysFirst == hostFirst);
+    }
+}
+
+TEST (keys187a_new_plugins_follow_disable_typing_keyboard_priority)
+{
+    // FL's General option (DisablePlugFocusDefaultBox, off): on, a new plugin starts with LYNX first
+    CHECK (! lynx::pluginkeys::newPluginsHostFirst().load());
+    CHECK (! lynx::PluginRef {}.hostKeysFirst);
+    lynx::pluginkeys::newPluginsHostFirst() = true;
+    const lynx::PluginRef fresh;
+    lynx::pluginkeys::newPluginsHostFirst() = false;
+    CHECK (fresh.hostKeysFirst);
+    CHECK (! lynx::PluginRef {}.hostKeysFirst);
+}
