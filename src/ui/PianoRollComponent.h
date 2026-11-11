@@ -150,6 +150,12 @@ public:
     std::int64_t timeSelectionFrom() const noexcept { return timeFrom; }
     std::int64_t timeSelectionTo() const noexcept { return timeTo; }
     std::vector<int> selectionForTests() const { return selection; }
+    // The MIDI Tools panel (round 190s): the notes a tool works on (the selection, or every note of the channel when
+    // nothing is selected: `selected` false), and its result becomes the selection.
+    std::vector<int> midiToolNotes (bool& selected) const { selected = ! selection.empty(); return selectionOrAll(); }
+    void selectMidiToolResult (std::vector<int> indices) { setSelection (std::move (indices)); }
+    std::int64_t midiToolGrid() const { return gridTicks(); }
+    void openMidiTools(); // Tools › MIDI Tools: the panel in its own small window
     std::int64_t markerKeyTickForTests() const { return markerKeyTick(); }
     juce::String chordBubbleTextForTests() const { return chordBubble.isVisible() ? chordBubble.getText() : juce::String(); }
 

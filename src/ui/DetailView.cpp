@@ -24,7 +24,9 @@
 #include "ui/FlMods.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
+#include "ui/MidiToolsPanel.h"
 #include "ui/MixerComponent.h"
+#include "ui/PianoRollComponent.h"
 #include "ui/PluginThumbs.h"
 #include "ui/QuickPick.h"
 #include "ui/Theme.h"
@@ -1166,8 +1168,25 @@ private:
 class ClipColumn final : public juce::Component, private juce::ChangeListener
 {
 public:
-    explicit ClipColumn (AudioEngine& e) : engine (e)
+    explicit ClipColumn (AudioEngine& e)
+        : engine (e),
+          tools (e, [this] { return toolTarget(); },
+                 [this] (const std::vector<int>& indices) {
+                     if (auto* roll = editorOf != nullptr ? editorOf() : nullptr)
+                         roll->selectMidiToolResult (indices);
+                 })
     {
+        // Live's Transform section [LIVE 12.4 Clip View] (round 190s): the fourth panel, foldable as Live's sections are
+        addChildComponent (tools);
+        foldTools.setConnectedEdges (0);
+        foldTools.setTooltip (tr ("Transform: show or hide the MIDI Tools"));
+        foldTools.onClick = [this] {
+            toolsFolded = ! toolsFolded;
+            load();
+            if (auto* parent = getParentComponent())
+                parent->resized();
+        };
+        addChildComponent (foldTools);
         for (auto* t : { &clipTitle, &launchTitle, &notesTitle })
         {
             t->setFont (font (type::small, true));
@@ -1310,7 +1329,15 @@ public:
 
     // the reference's Clip / Launch / Notes panels side by side under the clip's name [SHOT d08]
     static constexpr int clipPanel = 164, launchPanel = 136, notesPanel = 172, gap = 8;
-    int preferredWidth() const { return gap + clipPanel + gap + launchPanel + gap + (hasNotes ? notesPanel + gap : 0); }
+    static constexpr int foldedTools = 20;
+    int preferredWidth() const
+    {
+        return gap + clipPanel + gap + launchPanel + gap + (hasNotes ? notesPanel + gap + (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth) + gap : 0);
+    }
+    // the docked Piano roll (nullptr while it is not docked here): the MIDI Tools work on its selection
+    std::function<PianoRollComponent*()> editorOf;
+    MidiToolsPanel& midiTools() noexcept { return tools; }
+    static inline bool toolsFolded = false; // UI only, not saved
 
     void setSlot (int t, int s)
     {
@@ -1330,6 +1357,14 @@ public:
     {
         auto r = getLocalBounds().reduced (gap, 4).withTrimmedRight (1);
         const auto take = [] (juce::Rectangle<int>& area, int h) { auto x = area.removeFromTop (h); area.removeFromTop (3); return x; };
+        if (hasNotes)
+        {
+            // Transform: the whole height at the right; folded, only its button
+            auto t = r.removeFromRight (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth);
+            r.removeFromRight (gap);
+            foldTools.setBounds (t.getRight() - 18, t.getY(), 18, 16);
+            tools.setBounds (t);
+        }
         clipTitle.setBounds (take (r, 16));
         auto top = take (r, 20);
         nameLabel.setBounds (top.removeFromLeft (44));
@@ -1427,6 +1462,10 @@ private:
         scaleRoot.setSelectedId (key ? key->root + 2 : 1, n);
         scaleName.setSelectedId (key ? key->flScale + 1 : 0, n);
         scaleName.setEnabled (key.has_value());
+        tools.setVisible (pattern && ! toolsFolded);
+        foldTools.setVisible (pattern);
+        foldTools.setButtonText (toolsFolded ? juce::String ("+") : juce::String::fromUTF8 ("\xe2\x88\x92")); // (+ / minus sign)
+        foldTools.toFront (false);
         fitScale.setEnabled (key && projectkey::lynxScale (*key) > 0);
     }
 
@@ -1489,9 +1528,35 @@ private:
         });
     }
 
+    // what the MIDI Tools change: the docked Piano roll's selection (or all its channel's notes) while it shows this
+    // clip's pattern; otherwise every note of the pattern
+    MidiToolsPanel::Target toolTarget() const
+    {
+        MidiToolsPanel::Target t;
+        const auto* c = clip();
+        const auto& song = engine.getSong();
+        if (c == nullptr || c->kind != ClipKind::pattern || c->pattern < 0 || c->pattern >= (int) song.patterns.size())
+            return t;
+        t.pattern = c->pattern;
+        if (auto* roll = editorOf != nullptr ? editorOf() : nullptr; roll != nullptr && song.currentPattern == c->pattern)
+        {
+            t.indices = roll->midiToolNotes (t.selected);
+            t.grid = roll->midiToolGrid();
+        }
+        else
+        {
+            t.indices.resize (song.patterns[(std::size_t) c->pattern].notes.size());
+            for (int i = 0; i < (int) t.indices.size(); ++i)
+                t.indices[(std::size_t) i] = i;
+        }
+        return t;
+    }
+
     AudioEngine& engine;
     int track = -1, scene = -1;
     bool hasNotes = true;
+    MidiToolsPanel tools;
+    juce::TextButton foldTools;
     juce::Label clipTitle, launchTitle, notesTitle, nameLabel, startLabel, endLabel, lengthLabel, signatureLabel, modeLabel, quantLabel, signature;
     juce::TextEditor name, start, end, length;
     juce::ToggleButton loop, legato;
@@ -1509,6 +1574,7 @@ public:
     ClipPage (AudioEngine& e, Hooks& h) : engine (e), hooks (h), column (e)
     {
         addChildComponent (column); // (slice 2b: shown while a grid clip is)
+        column.editorOf = [this] { return dynamic_cast<PianoRollComponent*> (editor); };
         for (auto* b : { &notesTab, &envelopesTab })
         {
             addChildComponent (*b);
@@ -1549,6 +1615,7 @@ public:
         column.setSlot (t, s);
         update();
     }
+    MidiToolsPanel& midiTools() noexcept { return column.midiTools(); }
     void editorTakenBack()
     {
         if (editor != nullptr)
@@ -1921,6 +1988,7 @@ void DetailView::mouseUp (const juce::MouseEvent&)
     resizing = false;
 }
 
+MidiToolsPanel& DetailView::midiToolsForSnapshot() { return clipPage->midiTools(); }
 int DetailView::cardCountForCheck() const { return chain->cardCount(); }
 int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
 int DetailView::chainChannelForCheck() const { return chain->channelShown(); }

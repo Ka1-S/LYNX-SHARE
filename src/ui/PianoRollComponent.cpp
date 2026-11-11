@@ -23,6 +23,8 @@
 #include "ui/BrowserComponent.h"
 #include "ui/Dialogs.h"
 #include "ui/MidiClipboard.h"
+#include "ui/MidiToolsPanel.h"
+#include "ui/ToolWindow.h"
 #include "engine/Text.h"
 
 #include <optional>
@@ -3160,6 +3162,39 @@ juce::PopupMenu PianoRollComponent::ghostChannelsMenu()
     return menu;
 }
 
+void PianoRollComponent::openMidiTools()
+{
+    const juce::Component::SafePointer<PianoRollComponent> safe (this);
+    auto panel = std::make_unique<MidiToolsPanel> (
+        engine,
+        [safe] {
+            MidiToolsPanel::Target t;
+            if (safe != nullptr)
+            {
+                t.pattern = safe->engine.getSong().currentPattern;
+                t.indices = safe->midiToolNotes (t.selected);
+                t.grid = safe->midiToolGrid();
+            }
+            return t;
+        },
+        [safe] (const std::vector<int>& indices) {
+            if (safe != nullptr)
+                safe->selectMidiToolResult (indices);
+        });
+    struct Padded final : juce::Component // (the panel with a margin, on the window's background)
+    {
+        explicit Padded (std::unique_ptr<MidiToolsPanel> p) : panel (std::move (p))
+        {
+            addAndMakeVisible (*panel);
+            setSize (MidiToolsPanel::panelWidth + 16, MidiToolsPanel::panelHeight + 12);
+        }
+        void paint (juce::Graphics& g) override { g.fillAll (theme::colour::bg2); }
+        void resized() override { panel->setBounds (getLocalBounds().reduced (8, 6)); }
+        std::unique_ptr<MidiToolsPanel> panel;
+    };
+    openToolWindow (std::make_unique<Padded> (std::move (panel)), tr ("MIDI Tools"), "midiTools");
+}
+
 juce::PopupMenu PianoRollComponent::toolsMenu()
 {
     // FL's piano roll Tools menu (REA round 143, EXEC capture): its groups and keys, in its order
@@ -3201,6 +3236,8 @@ juce::PopupMenu PianoRollComponent::toolsMenu()
     tool (NoteTool::euclidean, nullptr);
     tool (NoteTool::humanize, nullptr);
     tool (NoteTool::noteRepeat, nullptr);
+    // Live 12's MIDI Transformations as a docked-style panel (round 190s; LYNX addition beside FL's tools above)
+    menu.addItem (tr ("MIDI Tools") + "...", [this] { openMidiTools(); });
     {
         juce::PopupMenu velocity;
         auto choose = [this] (std::function<std::vector<int> (const Pattern&, const std::vector<int>&)> pick) {
