@@ -8712,3 +8712,5 @@ countries: kr
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "건반 높이: 위 / 아래로 드래그하거나 휠을 돌리기  [Ctrl] 미세 조정"
 "Switch all plugin editors to" = "모든 플러그인 편집기 전환"
 "Attached" = "도킹됨"
+"Snap notes to the scale on/off" = "노트를 스케일에 스냅 켜기/끄기"
+"Create automation clip for the last tweaked control" = "마지막으로 조작한 컨트롤의 오토메이션 클립 만들기"

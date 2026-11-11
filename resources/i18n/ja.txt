@@ -8712,3 +8712,5 @@ countries: jp
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "鍵盤の高さ：上下にドラッグ、またはホイールを回す  [Ctrl] 微調整"
 "Switch all plugin editors to" = "すべてのプラグインエディターを切り替え"
 "Attached" = "ドッキング"
+"Snap notes to the scale on/off" = "ノートをスケールにスナップ オン/オフ"
+"Create automation clip for the last tweaked control" = "最後に操作したコントロールのオートメーションクリップを作成"

@@ -8712,3 +8712,5 @@ countries: ru by kz
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Высота клавиш: тяните вверх / вниз или крутите колесо  [Ctrl] точно"
 "Switch all plugin editors to" = "Переключить все редакторы плагинов в режим"
 "Attached" = "Пристыкована"
+"Snap notes to the scale on/off" = "Привязка нот к гамме вкл./выкл."
+"Create automation clip for the last tweaked control" = "Создать клип автоматизации для последнего изменённого регулятора"

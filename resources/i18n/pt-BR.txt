@@ -8795,3 +8795,5 @@ countries: br
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Altura das teclas: arraste para cima / baixo ou gire a roda  [Ctrl] fino"
 "Switch all plugin editors to" = "Alternar todos os editores de plugins para"
 "Attached" = "Encaixada"
+"Snap notes to the scale on/off" = "Encaixar notas na escala liga/desliga"
+"Create automation clip for the last tweaked control" = "Criar clipe de automação para o último controle mexido"

@@ -8712,3 +8712,5 @@ countries: nl be
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Toetshoogte: sleep omhoog / omlaag of draai aan het wiel  [Ctrl] fijn"
 "Switch all plugin editors to" = "Alle plugin-editors omschakelen naar"
 "Attached" = "Vastgemaakt"
+"Snap notes to the scale on/off" = "Noten aan de toonladder vastklikken aan/uit"
+"Create automation clip for the last tweaked control" = "Automation clip maken voor de laatst bewogen regelaar"

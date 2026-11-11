@@ -8712,3 +8712,5 @@ countries: id
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Tinggi tuts: seret ke atas / bawah atau putar roda  [Ctrl] halus"
 "Switch all plugin editors to" = "Alihkan semua editor plugin ke"
 "Attached" = "Terpasang"
+"Snap notes to the scale on/off" = "Tempelkan not ke tangga nada aktif/nonaktif"
+"Create automation clip for the last tweaked control" = "Buat clip otomasi untuk kontrol yang terakhir diubah"

@@ -152,6 +152,7 @@
 #include "core/ParametricEqLinear.h"
 #include "core/Song.h"
 #include "core/NoteEdit.h"
+#include "core/ScaleSnap.h"
 #include "core/LiveRecordView.h"
 #include "core/Recorder.h"
 #include "core/KeyMap.h"
@@ -17440,3 +17441,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Slicex190rTests.inc"
 #include "Slicex190acTests.inc"
 #include "Slicex190ajTests.inc"
+#include "ScaleSnap190anTests.inc"

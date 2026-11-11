@@ -8712,3 +8712,5 @@ countries: es mx ar co cl pe ve
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Altura de las teclas: arrastra arriba / abajo o gira la rueda  [Ctrl] fino"
 "Switch all plugin editors to" = "Cambiar todos los editores de plugins a"
 "Attached" = "Acoplado"
+"Snap notes to the scale on/off" = "Ajustar notas a la escala activado/desactivado"
+"Create automation clip for the last tweaked control" = "Crear clip de automatización para el último control movido"

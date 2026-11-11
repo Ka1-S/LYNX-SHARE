@@ -8712,3 +8712,5 @@ countries: tr
 "Key height: drag up / down or turn the wheel  [Ctrl] fine" = "Tuş yüksekliği: yukarı / aşağı sürükleyin veya tekerleği çevirin  [Ctrl] ince"
 "Switch all plugin editors to" = "Tüm plugin düzenleyicilerini şuna geçir"
 "Attached" = "Yerleşik"
+"Snap notes to the scale on/off" = "Notaları gama yapıştır aç/kapat"
+"Create automation clip for the last tweaked control" = "Son oynatılan kontrol için otomasyon klibi oluştur"

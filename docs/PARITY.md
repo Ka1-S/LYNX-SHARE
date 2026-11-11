@@ -2436,3 +2436,27 @@ panning law, note velocity `Round (128 v)`): Surge XT renders within 0.05 dB of 
 own projects, saved or new, keep LYNX's law and sound as before; their `.flp` export writes the plugin channel's
 volume that sounds the same in FL. New projects (File › New, built-in templates, user templates without a hosted
 plugin) start with FL's levels; saved projects and `.als` imports keep theirs.
+## Round 190an: Snap to scale by scale steps (LYNX's own option, off by default)
+FL's Piano roll only highlights the scale; its free drawing is LYNX's default too. With a scale chosen, **Snap notes to
+the scale** (the magnet beside the scale box, the Piano roll menu, the key action `pianoRoll.scaleSnap`, no default key)
+works as in Bitwig 6's Snap to Key, through `core/ScaleSnap.h` for every note editor:
+
+| Gesture | With Snap to scale on |
+|---|---|
+| Draw (pencil, brush, chord stamp) | the note lands on the nearest in-scale key (a tie goes down) |
+| Drag notes (also a Shift-drag clone and a chord still held after drawing) | the grabbed note follows the mouse onto the scale; every other note moves the same number of scale steps, so C E G dragged one step is D F A |
+| Drag along the time axis, resize, paste, switching the option on | pitches are left alone, also off the scale (use *Move the notes onto the scale* for that) |
+| Up / Down, Shift+Up / Down (FL: one semitone) | one scale step; an off-scale note reaches the scale with it |
+| Ctrl+Up / Down (FL: one octave) | one octave, as in FL |
+| A group at the top or bottom of the keyboard | stops as a whole, so it keeps its shape |
+
+Before this round a dragged group snapped note by note to the nearest key (a triad could lose its shape between two
+scale keys) and an off-scale note jumped onto the scale as soon as it was dragged sideways.
+
+## Round 190an: a key for "Automation for last tweaked parameter"
+FL has the menu item (Add › Automation for last tweaked parameter) and no shortcut for it: the DFM item
+`Add_AutoLastMenu` carries no `ShortCut` and FL's ShortcutsModule has no action for it (round 167j's list of 125
+default shortcuts). LYNX adds the global key action `automation.lastTweaked` ("Create automation clip for the last
+tweaked control"), with no default key as in FL; bind one in the shortcut editor. It does what the menu item does, for
+LYNX's own controls and for a hosted plugin's parameters, and the menu item shows the key once one is bound. With
+nothing tweaked yet the hint bar says so.
