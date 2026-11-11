@@ -88,7 +88,9 @@ above its own size. `--artshot` also draws each editor at twice the size: that b
 other modes of the program draw at 100% only, so window and dialog pictures have no @2x file. A plugin without a
 render gets a name plate on its card, never a made-up picture. If `R/logo-<version>.png` (the logo that version
 draws, from its `src/ui/LogoData.h`) differs from the brand's mark, the logo button in the plugin headers is painted
-over with `assets/img/logo.png`; see the note at the top of the script.
+over with `assets/img/logo.png`; see the note at the top of the script. The 0.1.25 pictures are painted this way
+(103 editors, and `assets/img/eq.webp` is a copy of one): at the 0.1.26 release, whose program draws the vector
+pepper itself, render them again and leave `R/logo-<version>.png` out so nothing is painted.
 
 ## Other notes
 
