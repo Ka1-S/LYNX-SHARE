@@ -578,4 +578,79 @@ inline void reverseAudio (Song& song, int clip, std::int64_t wholeFileTicks)
             c.offset = std::max<std::int64_t> (0, wholeFileTicks - (c.offset + played));
         }
 }
+// Playlist › Edit › Shift left / right (Shift+Left / Shift+Right; EEShiftL/RAction Tag -1 / 1 → FUN_00eb32a0 →
+// FUN_00e51730 (editor, Tag, 0), round 189e): the selected clips move by `delta` ticks (one snap step), held so that none
+// starts before the song start. Returns the move applied.
+inline std::int64_t shiftClipsInTime (std::vector<Clip>& playlist, const std::vector<int>& selection, std::int64_t delta)
+{
+    for (auto i : selection)
+        if (i >= 0 && i < (int) playlist.size())
+            delta = std::max (delta, -playlist[(std::size_t) i].start);
+    for (auto i : selection)
+        if (i >= 0 && i < (int) playlist.size())
+            playlist[(std::size_t) i].start += delta;
+    return delta;
+}
+
+// Playlist › Edit › Shift up / down (Shift+Up / Shift+Down; EEShiftU/DAction Tag 1 / -1 → FUN_00eb3300 → FUN_00e51730
+// (editor, 0, Tag); checked live in FL 2026, round 189e shot f11: every selected clip moves one track down): the
+// selected clips move `tracks` tracks (negative = up), held inside tracks 1..500. Returns the move applied.
+inline int shiftClipsTrack (std::vector<Clip>& playlist, const std::vector<int>& selection, int tracks)
+{
+    for (auto i : selection)
+        if (i >= 0 && i < (int) playlist.size())
+            tracks = std::clamp (tracks, -playlist[(std::size_t) i].track, 499 - playlist[(std::size_t) i].track);
+    for (auto i : selection)
+        if (i >= 0 && i < (int) playlist.size())
+            playlist[(std::size_t) i].track += tracks;
+    return tracks;
+}
+
+// Playlist › Select › "Select by selected source" (Shift+C; EESelBySourceAction → FUN_00eb1da0, Playlist only, round 189e):
+// every clip of the current clip source `source` (the Picker's: a pattern, an audio-clip channel or an automation); an
+// audio clip of another audio-clip channel of the same file counts too (FL compares the channels' sample). Empty when there
+// is none (FL: "No clips selected|There are no clips associated with the currently selected source clip.").
+inline std::vector<int> clipsOfSource (const Song& song, const Clip& source)
+{
+    std::vector<int> out;
+    const auto samplePath = [&song] (int channel) -> const std::string* {
+        if (channel < 0 || channel >= (int) song.channels.size() || song.channels[(std::size_t) channel].instrument != InstrumentKind::audioClip)
+            return nullptr;
+        return &song.channels[(std::size_t) channel].samplePath;
+    };
+    for (int i = 0; i < (int) song.playlist.size(); ++i)
+    {
+        const auto& o = song.playlist[(std::size_t) i];
+        if (o.kind != source.kind)
+            continue;
+        auto same = false;
+        if (source.kind == ClipKind::pattern)
+            same = o.pattern == source.pattern;
+        else if (source.kind == ClipKind::automation)
+            same = o.automation == source.automation;
+        else if (source.kind == ClipKind::audio)
+        {
+            const auto* a = samplePath (o.channel);
+            const auto* b = samplePath (source.channel);
+            same = o.channel == source.channel || (a != nullptr && b != nullptr && ! a->empty() && *a == *b);
+        }
+        if (same)
+            out.push_back (i);
+    }
+    return out;
+}
+
+// Playlist › Select › "Invert selection" (Shift+I; EEInvertSelAction → FUN_00eb1ae0): every clip not selected now.
+inline std::vector<int> invertedSelection (int clipCount, const std::vector<int>& selection)
+{
+    std::vector<bool> chosen ((std::size_t) std::max (0, clipCount), false);
+    for (auto i : selection)
+        if (i >= 0 && i < clipCount)
+            chosen[(std::size_t) i] = true;
+    std::vector<int> out;
+    for (int i = 0; i < clipCount; ++i)
+        if (! chosen[(std::size_t) i])
+            out.push_back (i);
+    return out;
+}
 } // namespace lynx::clipops

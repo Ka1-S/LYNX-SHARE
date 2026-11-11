@@ -9,6 +9,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/PickerSelection.h"
+#include "core/PlaylistOps.h"
 #include "engine/AudioEngine.h"
 #include "ui/EditorTools.h"
 #include "ui/FrameTicker.h"
@@ -110,8 +111,16 @@ public:
 
     // The key map's playlist.* actions (zoom presets, ripple editing). False for unknown ids.
     bool runAction (const std::string& id);
+    // FL's Playlist menu › Edit and › Select submenus (round 189e: the items of FL's shared EEMenu the Playlist enables,
+    // in FL's order, FL 2026 shots f04 / f06), for the Playlist's options menu and its right-click menu.
+    juce::PopupMenu editMenu();
+    juce::PopupMenu selectMenu();
+    // The shortcut text of a key map action for menus ("\tShift+C"; empty when unbound), set by the main window.
+    static inline std::function<juce::String (const std::string& id)> shortcutText;
     // FL's "Clone — What do you want to clone along with the track?" window (round 168f), for --snapshot too.
     static std::unique_ptr<juce::AlertWindow> makeCloneTracksDialog (bool groupHeaderSelected);
+    // FL's "Dropped sample(s)" question of a header drop (round 189e), for --snapshot too.
+    static std::unique_ptr<juce::AlertWindow> makeHeaderDropDialog();
 
     // Ripple editing: resizing a clip's end moves the later clips on its track, deleting closes the gap.
     bool isRippleOn() const noexcept { return ripple; }
@@ -320,6 +329,14 @@ private:
     void setTimeSelection (std::int64_t from, std::int64_t to); // also selects the clips it touches
     void insertTimeSelection();
     void deleteTimeSelection();
+    void sliceInsertTimeSelection(); // round 189e: FL's Slice & insert space / Trim selection
+    void trimTimeSelection();
+    void shiftSelectedClips (int steps, int tracks); // FL's Shift left / right / up / down
+    void selectBySelectedSource();
+    // FL's header drop (round 189e, trackmodes::dropOnHeader): the files on header `track`, asking first when the mode is
+    // "Always ask"
+    void dropOnTrackHeader (const juce::StringArray& files, int track);
+    void dropOnTrackHeaderAs (const juce::StringArray& files, int track, trackmodes::HeaderDrop how);
     // fade handle of an audio clip under the mouse: 1 = fade-in, 2 = fade-out, 0 = none
     int fadeHandleAt (int clip, juce::Point<int> p) const;
     // warp markers (round 175a, M3; a LYNX extra, the user's choice: Live edits them only in its Clip View): an audio

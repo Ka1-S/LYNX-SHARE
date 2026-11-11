@@ -5006,6 +5006,239 @@ void PlaylistComponent::deleteTimeSelection()
     sortClips();
 }
 
+void PlaylistComponent::sliceInsertTimeSelection()
+{
+    const auto& song = engine.getSong();
+
+    if (! song.hasLoop())
+        return;
+
+    setSelection ({});
+    engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) { noteedit::sliceInsertTime (s.playlist, s.markers(), from, to - from); });
+    sortClips();
+}
+
+void PlaylistComponent::trimTimeSelection()
+{
+    const auto& song = engine.getSong();
+
+    if (! song.hasLoop())
+        return;
+
+    setSelection ({});
+    engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) {
+        noteedit::trimTime (s.playlist, s.markers(), from, to);
+        s.loopStart = s.loopEnd = 0; // (FL clears the time selection after a trim, FUN_00eb35f0)
+    });
+    sortClips();
+}
+
+void PlaylistComponent::shiftSelectedClips (int steps, int tracks)
+{
+    // the selected clips, else all of them (FL's menu offers these with nothing selected: FL's usual "selected, else all",
+    // as Mute does, FUN_01061e80)
+    auto chosen = selection;
+    if (chosen.empty())
+        for (int i = 0; i < (int) engine.getSong().playlist.size(); ++i)
+            chosen.push_back (i);
+    if (chosen.empty())
+        return;
+
+    const auto delta = (std::int64_t) steps * juce::jmax<std::int64_t> (1, gridTicks());
+    engine.editSong ([chosen, delta, tracks] (Song& s) {
+        if (delta != 0)
+            clipops::shiftClipsInTime (s.playlist, chosen, delta);
+        if (tracks != 0)
+            clipops::shiftClipsTrack (s.playlist, chosen, tracks);
+    });
+    sortClips (chosen);
+}
+
+void PlaylistComponent::selectBySelectedSource()
+{
+    const auto found = clipops::clipsOfSource (engine.getSong(), makeBrushClip (0, 0));
+    if (found.empty())
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("No clips selected"),
+                                                tr ("There are no clips associated with the currently selected source clip."));
+        return;
+    }
+    setSelection (found);
+}
+
+std::unique_ptr<juce::AlertWindow> PlaylistComponent::makeHeaderDropDialog()
+{
+    // FL's "Dropped sample(s)" box (FUN_00e71430: the three choices and Cancel, in FL's order)
+    auto box = std::make_unique<juce::AlertWindow> (tr ("Dropped sample(s)"), tr ("Do you want to create audio clip(s), audio track(s) or instrument track(s)?"),
+                                                    juce::MessageBoxIconType::QuestionIcon);
+    box->addButton (tr ("Audio clip(s)"), 1);
+    box->addButton (tr ("Audio track(s)"), 2);
+    box->addButton (tr ("Instrument track(s)"), 3);
+    box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    return box;
+}
+
+void PlaylistComponent::dropOnTrackHeader (const juce::StringArray& files, int track)
+{
+    juce::StringArray samples;
+    for (const auto& f : files)
+        if (SampleLibrary::isSampleFile (juce::File (f)))
+            samples.add (f);
+    if (samples.isEmpty())
+        return;
+
+    const auto mode = trackmodes::headerDropOptions().mode;
+    if (mode != trackmodes::HeaderDrop::ask)
+    {
+        dropOnTrackHeaderAs (samples, track, mode);
+        return;
+    }
+
+    // FL's question (FUN_00e71430, asked once for all the dropped files)
+    auto* box = makeHeaderDropDialog().release();
+    box->enterModalState (true, juce::ModalCallbackFunction::create ([safe = juce::Component::SafePointer<PlaylistComponent> (this), samples, track] (int result) {
+        if (safe == nullptr || result < 1 || result > 3)
+            return;
+        const auto how = result == 1 ? trackmodes::HeaderDrop::audioClips
+                       : result == 2 ? trackmodes::HeaderDrop::audioTracks
+                                     : trackmodes::HeaderDrop::instrumentTracks;
+        safe->dropOnTrackHeaderAs (samples, track, how);
+    }), true);
+}
+
+void PlaylistComponent::dropOnTrackHeaderAs (const juce::StringArray& files, int track, trackmodes::HeaderDrop how)
+{
+    const auto lock = trackmodes::headerDropOptions().lockToContent;
+    std::vector<int> tracks;
+    auto failed = false;
+    for (const auto& f : files)
+    {
+        const juce::File file (f);
+        const auto data = engine.getSampleLibrary().load (file.getFullPathName());
+        if (data == nullptr)
+            continue;
+        const auto seconds = (double) data->frames() / data->sampleRate;
+        const auto length = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * engine.getSong().bpm / 60.0 * ppq));
+        const auto path = file.getFullPathName().toStdString();
+        const auto name = file.getFileNameWithoutExtension().toStdString();
+        auto done = false;
+        engine.editSong ([&] (Song& s) { done = trackmodes::dropOnHeader (s, track, path, name, length, how, lock); });
+        if (done)
+            tracks.push_back (track);
+        else if (how != trackmodes::HeaderDrop::audioClips)
+            failed = true;
+        ++track; // (FL: each further file on the next track)
+    }
+    sortClips();
+    if (! tracks.empty() && trackmodes::headerDropOptions().selectTracks)
+    {
+        currentTrack = tracks.front();
+        selectedTracks = tracks;
+        repaint();
+    }
+    if (failed)
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Can't create instrument/audio track"),
+                                                tr ("No available mixer track was found."));
+}
+
+juce::PopupMenu PlaylistComponent::editMenu()
+{
+    auto key = [] (const char* id) { return shortcutText != nullptr ? shortcutText (id) : juce::String(); };
+    const auto& song = engine.getSong();
+    const auto any = ! selection.empty(), time = song.hasLoop();
+    juce::PopupMenu m;
+    m.addItem (tr ("Cut") + "\tCtrl+X", any, false, [this] { copySelection(); deleteSelection(); });
+    m.addItem (tr ("Copy") + "\tCtrl+C", any, false, [this] { copySelection(); });
+    m.addItem (tr ("Paste") + "\tCtrl+V", ! clipboard.empty(), false, [this] { pasteClips(); });
+    m.addItem (tr ("Duplicate") + "\tCtrl+B", any || time, false, [this] { duplicateSelection(); });
+    m.addItem (tr ("Delete") + "\tDel", any, false, [this] { if (ripple) rippleDeleteSelection(); else deleteSelection(); });
+    m.addSeparator();
+    m.addItem (tr ("Shift left") + key ("playlist.shiftLeft"), [this] { runAction ("playlist.shiftLeft"); });
+    m.addItem (tr ("Shift right") + key ("playlist.shiftRight"), [this] { runAction ("playlist.shiftRight"); });
+    m.addItem (tr ("Shift up") + key ("playlist.shiftUp"), [this] { runAction ("playlist.shiftUp"); });
+    m.addItem (tr ("Shift down") + key ("playlist.shiftDown"), [this] { runAction ("playlist.shiftDown"); });
+    m.addItem (tr ("Make unique") + key ("playlist.makeUnique"), any, false, [this] { runAction ("playlist.makeUnique"); });
+    m.addSeparator();
+    {
+        auto& o = trackmodes::headerDropOptions();
+        m.addItem (tr ("Dropping on track header locks to content"), true, o.lockToContent, [this] {
+            trackmodes::headerDropOptions().lockToContent = ! trackmodes::headerDropOptions().lockToContent;
+            if (EditorGlobals::get().onOptionsChanged)
+                EditorGlobals::get().onOptionsChanged();
+        });
+        juce::PopupMenu drop;
+        using trackmodes::HeaderDrop;
+        for (auto [how, text] : { std::pair { HeaderDrop::audioClips, TR_NOOP ("As audio clips") }, { HeaderDrop::audioTracks, TR_NOOP ("As audio tracks") },
+                                  { HeaderDrop::instrumentTracks, TR_NOOP ("As instrument tracks") }, { HeaderDrop::ask, TR_NOOP ("Always ask") } })
+        {
+            juce::PopupMenu::Item item (tr (text));
+            item.setTicked (o.mode == how).setAction ([this, how = how] {
+                trackmodes::headerDropOptions().mode = how;
+                if (EditorGlobals::get().onOptionsChanged)
+                    EditorGlobals::get().onOptionsChanged();
+            });
+            item.isEnabled = true;
+            drop.addItem (item);
+        }
+        m.addSubMenu (tr ("Drop audio on track headers"), drop);
+    }
+    m.addSeparator();
+    m.addItem (tr ("Mute") + key ("playlist.muteClips"), [this] { runAction ("playlist.muteClips"); });
+    m.addItem (tr ("Unmute") + key ("playlist.unmuteClips"), [this] { runAction ("playlist.unmuteClips"); });
+    m.addSeparator();
+    m.addItem (tr ("Insert space") + "\tCtrl+Ins", time, false, [this] { insertTimeSelection(); });
+    m.addItem (tr ("Slice & insert space") + "\tCtrl+Alt+Ins", time, false, [this] { runAction ("playlist.sliceInsertSpace"); });
+    m.addItem (tr ("Delete space") + "\tCtrl+Del", time, false, [this] { deleteTimeSelection(); });
+    m.addItem (tr ("Trim selection") + key ("playlist.trimSpace"), time, false, [this] { runAction ("playlist.trimSpace"); });
+    m.addSeparator();
+    m.addItem (tr ("Merge selected clips") + key ("playlist.mergePatternClips"), [this] { runAction ("playlist.mergePatternClips"); });
+    m.addItem (tr ("Merge similar pattern clips") + key ("playlist.mergeSimilarClips"), [this] { runAction ("playlist.mergeSimilarClips"); });
+    m.addItem (tr ("Merge automation clips") + key ("playlist.mergeAutomationClips"), [this] { runAction ("playlist.mergeAutomationClips"); });
+    m.addItem (tr ("Purge unused audio clips"), [this] { runAction ("playlist.purgeUnusedAudio"); });
+    m.addSeparator();
+    m.addItem (tr ("Pitch selected audio clips one semitone down") + key ("playlist.pitchClipsDown"), [this] { runAction ("playlist.pitchClipsDown"); });
+    m.addItem (tr ("Pitch selected audio clips one semitone up") + key ("playlist.pitchClipsUp"), [this] { runAction ("playlist.pitchClipsUp"); });
+    m.addItem (tr ("Reverse selected audio clips") + key ("playlist.reverseClips"), [this] { runAction ("playlist.reverseClips"); });
+    m.addSeparator();
+    m.addItem (tr ("Automatic crossfades (current project)"), true, song.autoCrossfades, [this] { runAction ("playlist.autoCrossfades"); });
+    m.addItem (tr ("Create variants when stretching audio clips"), true, EditorGlobals::get().createVariants, [this] { runAction ("playlist.createVariants"); });
+    m.addItem (tr ("Select tracks when samples are dropped"), true, trackmodes::headerDropOptions().selectTracks, [] {
+        trackmodes::headerDropOptions().selectTracks = ! trackmodes::headerDropOptions().selectTracks;
+        if (EditorGlobals::get().onOptionsChanged)
+            EditorGlobals::get().onOptionsChanged();
+    });
+    return m;
+}
+
+juce::PopupMenu PlaylistComponent::selectMenu()
+{
+    auto key = [] (const char* id) { return shortcutText != nullptr ? shortcutText (id) : juce::String(); };
+    const auto& song = engine.getSong();
+    juce::PopupMenu select;
+    select.addItem (tr ("Deselect") + key ("playlist.deselect"), ! selection.empty() || song.hasLoop(), false, [this] { runAction ("playlist.deselect"); });
+    select.addItem (tr ("Select all") + "\tCtrl+A", [this] {
+        std::vector<int> all ((std::size_t) engine.getSong().playlist.size());
+        for (std::size_t i = 0; i < all.size(); ++i)
+            all[i] = (int) i;
+        setSelection (all);
+    });
+    select.addItem (tr ("Select by selected source") + key ("playlist.selectBySource"), [this] { runAction ("playlist.selectBySource"); });
+    // (the counts are LYNX's own, round 153)
+    const auto overlapping = clipops::overlappingClips (song), stacked = clipops::stackedClips (song), muted = clipops::mutedClips (song);
+    select.addItem (tr ("Muted clips ({0})", { juce::String ((int) muted.size()) }), ! muted.empty(), false, [this, muted] { setSelection (muted); });
+    select.addItem (tr ("Overlapping clips ({0})", { juce::String ((int) overlapping.size()) }), ! overlapping.empty(), false,
+                    [this, overlapping] { setSelection (overlapping); });
+    select.addItem (tr ("Stacked clips: hidden duplicates ({0})", { juce::String ((int) stacked.size()) }), ! stacked.empty(), false,
+                    [this, stacked] { setSelection (stacked); });
+    select.addItem (tr ("Invert selection") + key ("playlist.invertSelection"), [this] { runAction ("playlist.invertSelection"); });
+    select.addSeparator();
+    select.addItem (tr ("Select time around selection") + key ("playlist.selectTimeAround"), ! selection.empty(), false,
+                    [this] { runAction ("playlist.selectTimeAround"); });
+    select.addItem (tr ("Select previous time") + key ("playlist.timePrevious"), song.hasLoop(), false, [this] { runAction ("playlist.timePrevious"); });
+    select.addItem (tr ("Select next time") + key ("playlist.timeNext"), song.hasLoop(), false, [this] { runAction ("playlist.timeNext"); });
+    return select;
+}
+
 juce::Rectangle<int> PlaylistComponent::trackLed (int track) const
 {
     const auto h = heightOf (track);
@@ -5656,15 +5889,8 @@ void PlaylistComponent::showRulerMenu (int x)
 
     menu.addSeparator();
     {
-        // FL's Select submenu (REA round 153)
-        juce::PopupMenu select;
-        const auto overlapping = clipops::overlappingClips (song), stacked = clipops::stackedClips (song), muted = clipops::mutedClips (song);
-        select.addItem (tr ("Overlapping clips ({0})", { juce::String ((int) overlapping.size()) }), ! overlapping.empty(), false,
-                        [this, overlapping] { setSelection (overlapping); });
-        select.addItem (tr ("Stacked clips: hidden duplicates ({0})", { juce::String ((int) stacked.size()) }), ! stacked.empty(), false,
-                        [this, stacked] { setSelection (stacked); });
-        select.addItem (tr ("Muted clips ({0})", { juce::String ((int) muted.size()) }), ! muted.empty(), false, [this, muted] { setSelection (muted); });
-        menu.addSubMenu (tr ("Select"), select);
+        // FL's Select submenu (REA round 153; FL's full list and order, round 189e)
+        menu.addSubMenu (tr ("Select"), selectMenu());
     }
     menu.addItem (tr ("Ripple editing (resizing and deleting move the later clips)") + "\tShift+S", true, ripple, [this] { setRipple (! ripple); });
     {
@@ -6383,6 +6609,20 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.resetEmptyTracks")) resetEmptyTracksAsked();
     else if (is ("playlist.collapseAllGroups")) engine.editSong ([] (Song& s) { pltracks::setAllGroupsCollapsed (s, true); });
     else if (is ("playlist.expandAllGroups")) engine.editSong ([] (Song& s) { pltracks::setAllGroupsCollapsed (s, false); });
+    else if (is ("playlist.shiftLeft")) shiftSelectedClips (-1, 0);
+    else if (is ("playlist.shiftRight")) shiftSelectedClips (1, 0);
+    else if (is ("playlist.shiftUp")) shiftSelectedClips (0, -1);
+    else if (is ("playlist.shiftDown")) shiftSelectedClips (0, 1);
+    else if (is ("playlist.sliceInsertSpace")) sliceInsertTimeSelection();
+    else if (is ("playlist.trimSpace")) trimTimeSelection();
+    else if (is ("playlist.deselect"))
+    {
+        setSelection ({}); // (FL's EEDeselAction, FUN_00eb1a90: the clips and the time selection)
+        if (engine.getSong().hasLoop())
+            engine.editSong ([] (Song& s) { s.loopStart = s.loopEnd = 0; }, false);
+    }
+    else if (is ("playlist.selectBySource")) selectBySelectedSource();
+    else if (is ("playlist.invertSelection")) setSelection (clipops::invertedSelection ((int) engine.getSong().playlist.size(), selection));
     else if (is ("playlist.purgeUnusedAudio"))
     {
         setSelection ({});
@@ -7033,7 +7273,7 @@ bool PlaylistComponent::handleKey (const juce::KeyPress& key)
     }
 
     // Ctrl+Ins / Ctrl+Del: insert / remove the time selection's length across all tracks
-    if (cmd && ! mods.isShiftDown() && code == juce::KeyPress::insertKey) // (Ctrl+Shift+Ins: pattern.insert)
+    if (cmd && ! mods.isShiftDown() && ! mods.isAltDown() && code == juce::KeyPress::insertKey) // (Ctrl+Shift+Ins: pattern.insert; Ctrl+Alt+Ins: playlist.sliceInsertSpace)
     {
         insertTimeSelection();
         return true;
@@ -7593,6 +7833,15 @@ bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t sta
 
 void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int y)
 {
+    // on a track header (round 189e): FL's Edit › Drop audio on track headers, on an unassigned track
+    if (x < headerWidth && y >= tracksTop() && y < gridArea().getBottom())
+        if (const auto track = yToTrack (y); track >= 0 && (track >= (int) engine.getSong().playlistTracks.size()
+                                                             || engine.getSong().playlistTracks[(std::size_t) track].mode == PlaylistTrackMode::unassigned))
+        {
+            dropOnTrackHeader (files, track);
+            return;
+        }
+
     auto start = juce::jmax<std::int64_t> (0, snap (xToTick (x), true));
     auto track = yToTrack (y);
 
