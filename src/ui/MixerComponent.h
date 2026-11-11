@@ -91,6 +91,8 @@ namespace mixeroptions
 extern std::function<void()> changed;
 // Shows or hides the unused inserts in the mixer (the main window points it at its mixer).
 extern std::function<void (bool)> setShowUsedOnly;
+// Shows or hides the loudness panel beside the Master and starts or stops its measurement (round 190am).
+extern std::function<void (bool)> setShowLoudness;
 // Opens the Export window for these inserts only (FL's "Render armed / selected tracks to wave file(s)"; the main
 // window sets it, with the project's folder and name). `done` (optional) runs once the files are written.
 extern std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)> done)> renderTracks;
@@ -172,6 +174,14 @@ public:
     // Mixer menu › "Show only used inserts" (round 163; ui-options.txt "mixerUsedOnly"): inserts nothing uses
     // (Song::insertInUse) take no room; "+" brings back the first unused insert before adding one.
     static inline bool showUsedOnly = false;
+    // Mixer menu › "Loudness meter beside the Master (LYNX)" (round 190am; ui-options.txt "mixerLoudness"; off = FL's
+    // mixer, and nothing is measured): a narrow panel right of the Master with the short-term and integrated loudness
+    // (LUFS) and the true peak (dBTP) of the Master's output, and a Reset button (core/MasterLoudness.h).
+    static inline bool showLoudness = false;
+    void setShowLoudness (bool on);
+    void resetLoudness();
+    void refreshLoudnessForSnapshot() { loudnessShown = engine.getMeters().loudness.read(); repaint(); } // (--snapshot: no frames run)
+    juce::Rectangle<int> loudnessArea() const noexcept; // the panel's plate; empty while it is off
     // Mixer menu › "Keep links to deleted inserts, greyed (LYNX)" (round 186c, pain point 1; ui-options.txt
     // "mixerKeepLostLinks"; off = FL): Delete keeps each send into a deleted insert as a greyed MixerTrack::lostSends link.
     static inline bool keepLostLinks = false;
@@ -211,6 +221,16 @@ private:
     std::vector<bool> hidden;                                    // per track: not shown (unused, "Show only used inserts")
     static constexpr int hiddenX = -100000;
     std::set<int> revealed;                                      // unused inserts shown anyway (added with "+")
+    // the loudness panel (round 190am): its layout x (hiddenX while off), what it shows now and its hover state
+    static constexpr int loudnessWidth = 58;
+    int loudnessX = hiddenX;
+    MasterLoudness::Reading loudnessShown;
+    bool loudnessResetHovered = false;
+    juce::Rectangle<int> loudnessResetArea() const noexcept;
+    juce::Rectangle<int> loudnessBarArea() const noexcept;
+    void paintLoudnessPanel (juce::Graphics& g) const;  // the plate, captions and scale (kept in the picture)
+    void paintLoudnessValues (juce::Graphics& g) const; // the numbers and the bar (drawn over the picture)
+    void showLoudnessMenu();
 public:
     void setShowUsedOnly (bool on)
     {

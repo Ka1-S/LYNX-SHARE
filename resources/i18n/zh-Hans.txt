@@ -8357,3 +8357,8 @@ countries: cn sg
 "Octaver" = "八度器"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "在 Master 旁显示响度表（LYNX）"
+"Start the loudness measurement again" = "重新开始响度测量"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Master 的响度：S = 短期（3 秒），I = 自上次重置以来的综合响度（LUFS），TP = 真峰值（dBTP）"

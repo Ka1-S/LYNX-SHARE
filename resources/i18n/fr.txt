@@ -8357,3 +8357,8 @@ countries: fr be ch ca lu
 "Octaver" = "Octaveur"
 "Rectify" = "Redresser"
 "CrossFold" = "CrossFold"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "Mesure de sonie à côté du Master (LYNX)"
+"Start the loudness measurement again" = "Recommencer la mesure de sonie"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Sonie du Master : S = court terme (3 s), I = intégrée depuis la dernière réinitialisation (LUFS), TP = crête vraie (dBTP)"

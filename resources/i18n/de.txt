@@ -8357,3 +8357,8 @@ countries: de at ch li lu
 "Octaver" = "Oktavierer"
 "Rectify" = "Gleichrichter"
 "CrossFold" = "CrossFold"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "Lautheitsanzeige neben dem Master (LYNX)"
+"Start the loudness measurement again" = "Lautheitsmessung neu starten"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Lautheit des Masters: S = Kurzzeit (3 s), I = integriert seit dem letzten Reset (LUFS), TP = True Peak (dBTP)"

@@ -8357,3 +8357,8 @@ countries: ru by kz
 "Octaver" = "Октавер"
 "Rectify" = "Выпрямление"
 "CrossFold" = "CrossFold"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "Измеритель громкости рядом с Master (LYNX)"
+"Start the loudness measurement again" = "Начать измерение громкости заново"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Громкость Master: S = кратковременная (3 с), I = интегральная с последнего сброса (LUFS), TP = истинный пик (dBTP)"

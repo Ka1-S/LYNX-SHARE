@@ -8357,3 +8357,8 @@ countries: tr
 "Octaver" = "Oktavlayıcı"
 "Rectify" = "Doğrultma"
 "CrossFold" = "CrossFold"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "Master'ın yanında ses yüksekliği ölçer (LYNX)"
+"Start the loudness measurement again" = "Ses yüksekliği ölçümünü yeniden başlat"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Master'ın ses yüksekliği: S = kısa süreli (3 sn), I = son sıfırlamadan beri entegre (LUFS), TP = gerçek tepe (dBTP)"

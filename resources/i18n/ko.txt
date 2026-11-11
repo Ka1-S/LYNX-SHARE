@@ -8357,3 +8357,8 @@ countries: kr
 "Octaver" = "옥타버"
 "Rectify" = "정류"
 "CrossFold" = "CrossFold"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "마스터 옆에 라우드니스 미터(LYNX)"
+"Start the loudness measurement again" = "라우드니스 측정 다시 시작"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "마스터 라우드니스: S = 단기(3초), I = 마지막 초기화 이후 통합(LUFS), TP = 트루 피크(dBTP)"

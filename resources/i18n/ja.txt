@@ -8357,3 +8357,8 @@ countries: jp
 "Octaver" = "オクターバー"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "マスターの横にラウドネスメーター（LYNX）"
+"Start the loudness measurement again" = "ラウドネスの測定をやり直す"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "マスターのラウドネス：S = ショートターム（3 秒）、I = 前回のリセット以降のインテグレーテッド（LUFS）、TP = トゥルーピーク（dBTP）"

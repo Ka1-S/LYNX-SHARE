@@ -8357,3 +8357,8 @@ countries: id
 "Octaver" = "Oktaver"
 "Rectify" = "Rektifikasi"
 "CrossFold" = "CrossFold"
+
+# --- Round 190am: loudness meter beside the Master
+"Loudness meter beside the Master (LYNX)" = "Pengukur loudness di samping Master (LYNX)"
+"Start the loudness measurement again" = "Mulai lagi pengukuran loudness"
+"Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Loudness Master: S = jangka pendek (3 dtk), I = terintegrasi sejak reset terakhir (LUFS), TP = true peak (dBTP)"
