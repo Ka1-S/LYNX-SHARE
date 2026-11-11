@@ -153,6 +153,7 @@
 #include "core/FixedBlock.h"
 #include "core/ParametricEqLinear.h"
 #include "core/Song.h"
+#include "core/Slicex.h"
 #include "core/NoteEdit.h"
 #include "core/ScaleSnap.h"
 #include "core/LiveRecordView.h"
@@ -1469,9 +1470,17 @@ TEST (flp_real_files)
                         harmlessCompLoaded += c.modelParams.size() > (std::size_t) lynx::harmlessCompIndex + 1000 ? 1 : 0;
                     }
                     flKeysChannels += c.zones.size() == 30 && c.zones.front().path.find ("CHANGPIANO") != std::string::npos ? 1 : 0;
+                    // a Slicex channel is its own instrument since round 190l (no sampler slices): its regions are the
+                    // region records of its decks, counted here so the bar below still means "sliced channels import"
+                    std::size_t slicexRegions = 0;
+                    if (c.instrument == lynx::InstrumentKind::slicex)
+                        if (const auto state = lynx::slicex::parse (c.pluginState))
+                            for (const auto& deck : state->decks)
+                                slicexRegions += deck.empty() ? 0 : deck.regions.size();
+                    if (c.sampler.slices.size() >= 4 || slicexRegions >= 4)
+                        ++slicedChannels;
                     if (c.sampler.slices.size() >= 4)
                     {
-                        ++slicedChannels;
                         CHECK (std::is_sorted (c.sampler.slices.begin(), c.sampler.slices.end()));
                         CHECK (c.sampler.slices.back() < 1.0f);
                     }
