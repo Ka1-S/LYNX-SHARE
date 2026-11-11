@@ -62,6 +62,8 @@ struct FlpImportOptions
 
     bool threeOscAsSynth = false; // 3x Osc → the built-in synth conversion instead of FL's engine (the synth's preset menu)
     bool fpcAsPads = false;       // FPC → one sampler channel per pad (the import before round 190q) instead of one FPC channel
+    bool fpcAsChannel = false;    // FPC → always one FPC channel, also a kit with pads on other inserts or without a sample
+                                  // (a kit preset loaded onto a channel: natives::channelFromPresetFile)
 };
 
 // Converts an FL Studio project to our model. Sampler channels whose

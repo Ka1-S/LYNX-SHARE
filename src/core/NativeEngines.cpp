@@ -5,6 +5,8 @@
 
 #include "core/Effects.h"
 #include "core/FlEffects.h"
+#include "core/FlSamplers.h"
+#include "core/Fpc.h"
 #include "core/GrossBeat.h"
 #include "core/HardcoreFx.h"
 #include "core/Harmless.h"
@@ -60,6 +62,7 @@ FlpImportOptions importOptions (const FlAccess& access)
     options.fileExists = access.fileExists;
     options.readFile = access.readFile;
     options.saveEmbedded = access.saveEmbedded;
+    options.fpcAsChannel = true; // (an FPC kit preset: the whole kit on the channel)
     return options;
 }
 
@@ -140,6 +143,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::slicex, "Slicex", "", own, false }, // (round 190r: a new one is FL's Default preset values, decks empty)
         { InstrumentKind::drumaxx, "Drumaxx", "Drumaxx", fl, false },
         { InstrumentKind::drumpad, "Drumpad", "Drumpad", fl, false },
+        { InstrumentKind::fpc, "FPC", "FPC", own, false }, // (without FL: FL's empty kit; the kits are FL's and the user's .fst files)
         { InstrumentKind::fruitkick, "Fruit Kick", "Fruit Kick", fl, false },
         { InstrumentKind::bassdrum, "BassDrum", "BassDrum", fl, false },
     };
@@ -348,6 +352,8 @@ std::optional<ChannelDef> makeChannel (InstrumentKind kind, const FlAccess& acce
     def.instrument = kind;
     if (kind == InstrumentKind::slicex)
         def.pluginState = slicex::write (slicex::fresh());
+    if (kind == InstrumentKind::fpc) // FL's "Empty" kit (32 pads on FL's default notes, no samples)
+        setFpcKit (def, fpc::emptyKit(), {});
     return def;
 }
 

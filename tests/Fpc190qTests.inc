@@ -463,3 +463,106 @@ TEST (fpc190q_fl_projects_sound_the_same_and_go_back_byte_exact)
     std::printf ("  FPC as one channel: %d projects, %d kits, %d sounding in the first 12 s, %d states written back\n", projects, kits, sounding, states);
     CHECK (projects >= 3 && sounding >= 1 && states == kits); // (FL 2026: 7 of its 21 demo kits have every pad on the channel's insert)
 }
+
+// ---- kits (.fst presets of FPC) ----
+
+TEST (fpc190q_new_channel_and_kit_folders)
+{
+    using namespace lynx;
+    // FPC is one of the engines a project can add; without FL Studio a new one is FL's empty kit (silent, as FL's)
+    const auto* engine = natives::instrumentEngine (InstrumentKind::fpc);
+    CHECK (engine != nullptr);
+    if (engine == nullptr)
+        return;
+    CHECK (std::string (engine->name) == "FPC" && natives::presetFolderOf (InstrumentKind::fpc) == "FPC");
+    natives::FlAccess none;
+    CHECK (natives::available (*engine, none));
+    const auto made = natives::makeChannel (InstrumentKind::fpc, none);
+    CHECK (made.has_value());
+    if (made)
+    {
+        CHECK (made->instrument == InstrumentKind::fpc && made->name == "FPC");
+        CHECK (made->pluginState == fpc::write (fpc::emptyKit()) && made->zones.empty());
+        CHECK (fpcChannelPads (*made).empty());
+        CHECK (flpexport::flGeneratorName (*made) == "FPC"); // (it goes to FL as an FPC)
+    }
+
+    // the kits come from FL's own folder and from the user's (nothing of FL is stored in LYNX)
+    FlPathRoots roots;
+    roots.data = "C:/FL/Data";
+    roots.userData = "C:/Users/u/Documents/Image-Line/FL Studio";
+    const auto folders = presetcycle::pluginPresetFolders (roots, true, natives::presetFolderOf (InstrumentKind::fpc));
+    CHECK (folders.size() == 2);
+    if (folders.size() == 2)
+    {
+        CHECK (folders[0] == "C:/FL/Data/Patches/Plugin presets/Generators/FPC");
+        CHECK (folders[1] == "C:/Users/u/Documents/Image-Line/FL Studio/Presets/Plugin presets/Generators/FPC");
+    }
+}
+
+TEST (fpc190q_fl_kits_load_onto_a_channel)
+{
+    // Every FPC kit of the FL install (.fst): it loads onto an FPC channel — also the "multi out" kits, whose pads play
+    // into other inserts —, the state is the file's own bytes, its samples are found in the install
+    using namespace lynx;
+    if (realFlpDir.empty() || realFlpDir[0] != '/')
+        return;
+    const auto fl = natives142::flAccess();
+    const auto folder = std::filesystem::path (realFlpDir) / "Patches" / "Plugin presets" / "Generators" / "FPC";
+    std::error_code error;
+    if (! std::filesystem::is_directory (folder, error))
+        return;
+    int kits = 0, playing = 0, routed = 0, layers = 0, found = 0;
+    ChannelDef current;
+    current.instrument = InstrumentKind::fpc;
+    current.name = "My drums";
+    current.mixerTrack = 7;
+    current.volume = 0.5f;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator (folder, std::filesystem::directory_options::skip_permission_denied, error))
+    {
+        if (entry.path().extension() != ".fst")
+            continue;
+        std::ifstream in (entry.path(), std::ios::binary);
+        const std::vector<std::uint8_t> file ((std::istreambuf_iterator<char> (in)), {});
+        std::vector<std::uint8_t> state;
+        try
+        {
+            for (const auto& c : flp::parseProject (file, true).channels)
+                if (c.pluginName == "FPC")
+                    state = c.pluginState;
+        }
+        catch (const std::exception&)
+        {
+        }
+        if (state.empty())
+            continue;
+        ++kits;
+        const auto name = entry.path().stem().string();
+        const auto loaded = natives::withPreset (current, entry.path().string(), name, fl);
+        if (! loaded)
+            std::printf ("  kit not loaded: %s\n", entry.path().filename().string().c_str());
+        CHECK (loaded.has_value());
+        if (! loaded)
+            continue;
+        CHECK (loaded->instrument == InstrumentKind::fpc && loaded->pluginState == state);
+        CHECK (loaded->name == name && loaded->mixerTrack == 7 && loaded->volume == 0.5f); // (the channel's own settings stay)
+        const auto kit = fpc::read (state);
+        CHECK (kit.has_value());
+        if (! kit)
+            continue;
+        CHECK (loaded->zones.size() == fpcLayerPaths (*kit).size());
+        layers += (int) loaded->zones.size();
+        for (const auto& z : loaded->zones)
+            found += z.path.empty() ? 0 : 1;
+        const auto pads = fpcChannelPads (*loaded);
+        playing += pads.empty() ? 0 : 1;
+        routed += std::any_of (pads.begin(), pads.end(), [] (const DrumPad& p) { return p.mixerOffset != 0; }) ? 1 : 0;
+    }
+    std::printf ("  FPC kits: %d, %d with pads that play, %d with pads on other inserts; %d of %d layer files found\n", kits, playing, routed, found, layers);
+    CHECK (kits >= 19 && playing >= kits - 1 && routed >= 1); // (Empty.fst has no sample)
+    CHECK (layers > 0 && found >= layers * 9 / 10);
+
+    // a new FPC channel on a PC with FL: FL's own new FPC (its Plugin database entry, else the Default kit), with pads
+    const auto made = natives::makeChannel (InstrumentKind::fpc, fl);
+    CHECK (made.has_value() && made->instrument == InstrumentKind::fpc && ! fpcChannelPads (*made).empty());
+}

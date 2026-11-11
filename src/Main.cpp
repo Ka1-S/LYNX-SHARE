@@ -3,6 +3,7 @@
 #include "platform/Paths.h"
 
 #include "core/KeyGuess.h"
+#include "core/FlSamplers.h"
 #include "core/PlaylistOps.h"
 #include "core/Comping.h"
 #include "core/Drumaxx.h"
@@ -3265,6 +3266,15 @@ private:
                 {
                     const auto padKey = lynx::drumaxxParam (one.channels[0].pluginState, 4);
                     key = std::isfinite (padKey) && padKey >= 0.0f && padKey <= 127.0f ? (int) padKey : 48;
+                }
+                // FPC plays its pads' keys; a kit without a sample (FL's "Empty" kit: no FL Studio on this PC) is silent
+                // in FL too (round 190q)
+                if (kind == lynx::InstrumentKind::fpc)
+                {
+                    const auto pads = lynx::fpcChannelPads (one.channels[0]);
+                    if (pads.empty())
+                        continue;
+                    key = pads.front().key;
                 }
                 one.patterns[0].notes = { { 0, 1920, 0, key, 0.8f } };
                 lynx::AudioEngine player (false);
