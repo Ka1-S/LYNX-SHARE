@@ -1,7 +1,7 @@
 language: Nederlands
 countries: nl be
 
-# LYNX SHARE interface in Nederlands (JUCE LocalisedStrings format).
+# LYNX interface in Nederlands (JUCE LocalisedStrings format).
 # One line per string: "English text" = "Translation"  (escapes: \n \t \" \\)
 # Every key of pt-BR.txt must be here; terms: docs/i18n/nl-glossary.md; how to help: docs/i18n/README.md
 # After editing, run: python3 tools/make_i18n.py  (embeds the tables in src/ui/I18nData.h)
@@ -4558,6 +4558,7 @@ countries: nl be
 "The report could not be sent ({0}); LYNX SHARE tries again at the next start" = "Het rapport kon niet worden verstuurd ({0}); LYNX SHARE probeert het opnieuw bij de volgende start"
 "Report a problem" = "Een probleem melden"
 "Report a problem..." = "Een probleem melden..."
+
 # --- In-app update check (round 166b)
 "Check for updates..." = "Controleren op updates..."
 "Check for updates automatically" = "Automatisch controleren op updates"
@@ -5281,6 +5282,27 @@ countries: nl be
 "RPN..." = "RPN..."
 "Send MIDI" = "MIDI versturen"
 "The Dashboard sends its notes, the program and the controls set to \"Send MIDI\" to the plugins whose MIDI input port is this port (plugin window > Settings > MIDI > Input port)." = "Het Dashboard stuurt zijn noten, het programma en de bedieningselementen die op \"MIDI versturen\" staan naar de plugins waarvan de MIDI-invoerpoort deze poort is (pluginvenster > Instellingen > MIDI > Invoerpoort)."
+
+# --- Song markers: FL's marker actions, Time markers, Quantize song jumps, Song marker jump (round 165f)
+"Marker loop" = "Marker-loop"
+"Marker skip" = "Marker-sprong"
+"Marker pause" = "Marker-pauze"
+"Pattern length" = "Patternlengte"
+"Bar override" = "Maat-override"
+"Key/Scale" = "Toonsoort/toonladder"
+"Loop length" = "Looplengte"
+"Add one every" = "Voeg er een toe elke"
+"8 bars" = "8 maten"
+"Bars" = "Maten"
+"Add jump to next bar" = "Sprong naar volgende maat toevoegen"
+"Change to marker loop" = "Omzetten naar marker-loop"
+"Time markers" = "Tijdmarkers"
+"Quantize song jumps" = "Songsprongen quantizen"
+"Place loop (from this marker to the next)" = "Loop plaatsen (van deze marker tot de volgende)"
+"Song marker jump" = "Songmarker-sprong"
+"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "Noten op dit kanaal sturen de song naar een marker in plaats van te spelen: noot 0 gaat naar de eerste marker, de volgende naar de tweede... (Playlist › Songsprongen quantizen geldt tijdens het afspelen)."
+"Jump to the next song marker (Quantize song jumps while playing)" = "Naar de volgende songmarker springen (Songsprongen quantizen tijdens het afspelen)"
+"Jump to the previous song marker" = "Naar de vorige songmarker springen"
 "MUTE" = "MUTE"
 "CHANNEL" = "KANAAL"
 "Bar:Beat:Tick" = "Maat:Tel:Tick"
@@ -5693,6 +5715,62 @@ countries: nl be
 "Black notes" = "Zwarte toetsen"
 "Sharps (#)" = "Kruizen (#)"
 "Flats (b)" = "Mollen (b)"
+"Advanced looping" = "Geavanceerd loopen"
+"Burn" = "Wegschrijven"
+"Burn MIDI to" = "MIDI wegschrijven naar"
+"Burn all looping channels" = "Alle loopende kanalen wegschrijven"
+"Burn selected channels" = "Geselecteerde kanalen wegschrijven"
+"Burn to pattern" = "Naar pattern wegschrijven"
+"Channel looping" = "Kanaal-looping"
+"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "Kanaal-looping: kanalen die korter zijn dan het pattern herhalen tot het einde ervan (polyritmes)  [LMB] aan / uit  [RMB] looptype (step-kanalen, alle kanalen, geavanceerd) en Naar pattern wegschrijven"
+"Channel looping: {0}" = "Kanaal-looping: {0}"
+"Don't loop" = "Niet loopen"
+"Echo delay" = "Echo-delay"
+"Every {0} steps" = "Elke {0} steps"
+"Loop all channels" = "Alle kanalen loopen"
+"Loop point" = "Looppunt"
+"Loop point ({0} steps)" = "Looppunt ({0} steps)"
+"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "Looppunt: [LMB] slepen of [Wheel] zet het in steps  [2xLMB] volgende maat  [RMB] Niet loopen / Step / Tel / Maat, Naar pattern wegschrijven"
+"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "Loopherhaling (na het looppunt): [LMB] bewerkt de step die ze herhaalt"
+"Loop step channels" = "Step-kanalen loopen"
+"Loop type" = "Looptype"
+"Looping on" = "Looping aan"
+"Nothing to burn" = "Niets om weg te schrijven"
+"Reset after burning to MIDI" = "Resetten na wegschrijven naar MIDI"
+"Select what you want to reset:" = "Kies wat je wilt resetten:"
+"Set to next bar" = "Op volgende maat zetten"
+"Set to next beat" = "Op volgende tel zetten"
+"The selected channel doesn't contain any notes to burn." = "Het geselecteerde kanaal bevat geen noten om weg te schrijven."
+"Time (shift and gate)" = "Tijd (verschuiving en gate)"
+"loop at the next bar" = "loop bij de volgende maat"
+"loop at the next beat" = "loop bij de volgende tel"
+"loop at the next step" = "loop bij de volgende step"
+"Receive notes from" = "Noten ontvangen van"
+"Unlock" = "Ontgrendelen"
+"not connected" = "niet verbonden"
+"No MIDI input device" = "Geen MIDI-invoerapparaat"
+"(locked: receives the notes of {0})" = "(vergrendeld: ontvangt de noten van {0})"
+"Create sampled instrument..." = "Gesampled instrument maken..."
+"Create sampled instrument" = "Gesampled instrument maken"
+"Plays {0} key by key and makes a Sampler channel of the recordings." = "Speelt {0} toets voor toets en maakt van de opnamen een Sampler-kanaal."
+"Sampling the instrument..." = "Instrument wordt gesampled..."
+"Writing the samples..." = "Samples worden geschreven..."
+"Could not sample the instrument" = "Kon het instrument niet samplen"
+"Low note" = "Laagste noot"
+"High note" = "Hoogste noot"
+"Keys per zone" = "Toetsen per zone"
+"Root offset" = "Grondtoonverschuiving"
+"Velocity layers" = "Velocity-lagen"
+"Max velocity" = "Max. velocity"
+"Release after (seconds)" = "Loslaten na (seconden)"
+"Max length after release (seconds)" = "Max. lengte na loslaten (seconden)"
+"Stop on" = "Stoppen bij"
+"Max length" = "Max. lengte"
+"16-bit integer" = "16-bit integer"
+"Mono (merged)" = "Mono (samengevoegd)"
+"Enable insert effects" = "Insert-effecten inschakelen"
+"Enable master effects" = "Master-effecten inschakelen"
+"could not read {0}" = "kon {0} niet lezen"
 "Key to" = "Toetsen voor"
 "Percent" = "Procent"
 "Use regions" = "Regio's gebruiken"
@@ -5707,7 +5785,6 @@ countries: nl be
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Voegt lege kolommen in vóór de song voor de clips die gestart worden, met op elke kolom een marker, en een Start-marker waar de song begint; de performance-modus wordt aangezet."
 "Marker count" = "Aantal markers"
 "2 steps" = "2 steps"
-"8 bars" = "8 maten"
 "Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Track: [LMB] selecteren  [Ctrl][LMB] toevoegen / weghalen  [Shift][LMB] bereik  [RMB] menu  [2xLMB] bron van de clip openen  [Shift][Wheel] omhoog / omlaag verplaatsen"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
@@ -5833,7 +5910,6 @@ countries: nl be
 "Pattern length in bars: [LMB] drag or [Wheel] change it  [2xLMB] automatic (from the notes)  [RMB] menu" = "Patternlengte in maten: [LMB] slepen of [Wheel] om te wijzigen  [2xLMB] automatisch (op basis van de noten)  [RMB] menu"
 "Pattern length: {0} (automatic, from the notes)" = "Patternlengte: {0} (automatisch, op basis van de noten)"
 "Pattern length (bars, 0 = automatic)" = "Patternlengte (maten, 0 = automatisch)"
-"Pattern length" = "Patternlengte"
 "Follow: a pattern longer than the Channel Rack pages along with the playing step; off, it stays where you scrolled" = "Volgen: een pattern dat langer is dan de Channel Rack bladert mee met de spelende step; uit blijft het waar je naartoe gescrold hebt"
 "Follow the playhead (page along with the playing step) on/off" = "Afspeelkop volgen (meebladeren met de spelende step) aan/uit"
 "Follow: the view pages along with the playback position; off, it stays where you scrolled" = "Volgen: de weergave bladert mee met de afspeelpositie; uit blijft ze waar je naartoe gescrold hebt"
@@ -5900,9 +5976,6 @@ countries: nl be
 # --- FL legacy effects (round 165k): Fruity Delay (v1) value texts
 "Inverted stereo" = "Omgekeerde stereo"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"
 # --- Newtone editor (round 165g flnewt165)
 "Cut mode (C): click a note to slice it there; Ctrl+click a note to glue it to the one before" = "Knipmodus (C): klik op een noot om hem daar te knippen; Ctrl+klik op een noot om hem aan de vorige te plakken"
 "Score" = "Partituur"
@@ -5945,7 +6018,6 @@ countries: nl be
 "Set image wallpaper..." = "Achtergrondafbeelding instellen..."
 "Remove image wallpaper" = "Achtergrondafbeelding verwijderen"
 "Set background color..." = "Achtergrondkleur instellen..."
-# round 165z-a2 (FL metronome)
 "Metronome track" = "Metronoomspoor"
 "Metronome target mixer track" = "Doel-mixerspoor van de metronoom"
 "The mixer track the metronome plays through (--- is the Master). The click is never in an export." = "Het mixerspoor waardoor de metronoom speelt (--- is de Master). De klik zit nooit in een export."
@@ -5981,8 +6053,6 @@ countries: nl be
 "Ghost channels" = "Ghost-kanalen"
 "Add multiple..." = "Meerdere toevoegen..."
 "You can add a maximum of {0} inserts." = "Je kunt maximaal {0} inserts toevoegen."
-
-# round 166e (issue #16): automatic crossfades, clip gain handle, Disarm on stop / Auto-unarm
 "Clip gain: [LMB] drag up / down (the selected clips together)  [RMB] menu" = "Clipgain: [LMB] omhoog / omlaag slepen (de geselecteerde clips samen)  [RMB] menu"
 "Automatic crossfades (current project) on/off" = "Automatische crossfades (huidig project) aan/uit"
 "Automatic crossfades (current project)" = "Automatische crossfades (huidig project)"
@@ -5997,14 +6067,11 @@ countries: nl be
 "Yes" = "Ja"
 "Make clip unique?" = "Clip uniek maken?"
 "The clip \"{0}\" is also used on another audio track.\n\nDo you want to make this instance unique and then route it to this audio track?" = "De clip \"{0}\" wordt ook op een andere audiotrack gebruikt.\n\nWil je deze instantie uniek maken en daarna naar deze audiotrack routen?"
-# round 166c (LYNX Tune: throat, transpose in scale, created vibrato)
 "THROAT" = "KEEL"
 "Scale steps" = "Toonladdertrappen"
 "In scale" = "In toonladder"
 "AMPLITUDE" = "AMPLITUDE"
 "VARIATION" = "VARIATIE"
-
-# round 167f: FL Emphasis
 "Delta" = "Delta"
 "Envelope order" = "Envelopvolgorde"
 "Linking" = "Koppeling"
@@ -6157,6 +6224,7 @@ countries: nl be
 "Load preset..." = "Preset laden..."
 "Save preset as..." = "Preset opslaan als..."
 "Page {0}" = "Pagina {0}"
+
 # --- Wave Traveller (round 167f)
 "Smooth (cosine)" = "Vloeiend (cosinus)"
 "Bezier" = "Bézier"
@@ -6246,7 +6314,6 @@ countries: nl be
 "SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "SFZ-instrument: [LMB] voorbeluisteren  [2xLMB] nieuw LYNX Soundfont-kanaal (of in het geselecteerde)  slepen naar de Channel Rack"
 "Open a .sf2 / .sf3 / .sfz file" = "Een .sf2- / .sf3- / .sfz-bestand openen"
 "LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load." = "LYNX Soundfont: speelt SoundFont 2- / 3-banken en SFZ-instrumenten af. Zoek presets in al je SoundFonts, klik om voor te beluisteren, dubbelklik om te laden."
-# REA round 167f: FL's Transporter (transient looper)
 "LEVELS" = "NIVEAUS"
 "Loop A" = "Loop A"
 "Loop B" = "Loop B"
@@ -6303,6 +6370,22 @@ countries: nl be
 "Expand all grouped tracks" = "Alle gegroepeerde tracks uitklappen"
 "Purge unused audio clips" = "Ongebruikte audioclips opruimen"
 "Create variants when stretching audio clips" = "Varianten maken bij het uitrekken van audioclips"
+"Extract stems from sample" = "Stems uit sample halen"
+"Extracting stems..." = "Stems worden eruit gehaald..."
+"Downloading the stem model..." = "Stem-model wordt gedownload..."
+"Checking the stem model..." = "Stem-model wordt gecontroleerd..."
+"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "ONNX Runtime kon niet worden geladen. Stems scheiden vereist macOS 13.4 of nieuwer."
+"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "ONNX Runtime kon niet worden geladen. Installeer Microsoft Visual C++ Redistributable (x64) via https://aka.ms/vs/17/release/vc_redist.x64.exe en probeer het opnieuw."
+"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "ONNX Runtime kon niet worden geladen. Stems scheiden vereist de libstdc++ van het systeem."
+"The model returned an unexpected result." = "Het model gaf een onverwacht resultaat."
+"The sample is empty." = "De sample is leeg."
+"The downloaded model failed its checksum, so it was not used." = "Het gedownloade model kwam niet door de checksumcontrole en is daarom niet gebruikt."
+"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "Stems scheiden vereist het model HT-Demucs. Het hoort niet bij LYNX SHARE: het wordt één keer gedownload ({0} MB) en bewaard in {1}."
+"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "Bron: {0} (ONNX-export van Demucs v4 door Meta AI Research)"
+"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "Licentie: de code van Demucs is MIT. De licentie van de getrainde gewichten is niet duidelijk, zoals de makers zeggen: de trainingsdata bevatten MUSDB18-HQ, waarvan een deel alleen voor onderzoek bedoeld was. Beslis zelf of dat past bij je gebruik, vooral commercieel gebruik."
+"Download" = "Downloaden"
+"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "Stems scheiden vereist ONNX Runtime ({0}), dat met het installatieprogramma en de zip van LYNX SHARE meekomt, maar het ontbreekt naast het programma. Installeer LYNX SHARE met het installatieprogramma of pak de hele zip uit."
+"Stems are still being extracted. Try again when that has finished." = "Er worden nog stems gescheiden. Probeer het opnieuw als dat klaar is."
 
 # --- Round 168e: renders to audio clips, consolidation, exports per Playlist track
 "Consolidate playlist selection (from selection start)" = "Playlist-selectie consolideren (vanaf begin selectie)"
@@ -6351,6 +6434,7 @@ countries: nl be
 "The project has no mixer states, effects or notes to export." = "Het project heeft geen mixerstatussen, effecten of noten om te exporteren."
 "Some files could not be written:" = "Sommige bestanden konden niet worden geschreven:"
 "Project bones..." = "Projectbotten..."
+
 # --- Speech synthesizer (round 168b)
 "Male" = "Man"
 "Female" = "Vrouw"
@@ -6444,8 +6528,6 @@ countries: nl be
 "Pattern time markers: Add time signature change..." = "Patroontijdmarkeringen: Maatsoortwijziging toevoegen..."
 "Delete all markers" = "Alle markeringen verwijderen"
 "Colour group" = "Kleurgroep"
-
-# Round 168q: designed pages of Kepler, Kepler Exo, Transistor Bass, Sawer, BeepMap, Fruity Granulizer, Wasp
 "Always|Held" = "Altijd|Vast"
 "Arpeggio" = "Arpeggio"
 "Auto|Man" = "Auto|Hand"
@@ -6518,22 +6600,6 @@ countries: nl be
 "Set as time signature" = "Instellen als maatsoort"
 "Time division: FL Studio's original system (beats per bar, steps per beat). Time signature: traditional time signatures (numerator / denominator)." = "Tijdverdeling: het oorspronkelijke systeem van FL Studio (tellen per maat, stappen per tel). Maatsoort: traditionele maatsoorten (teller / noemer)."
 "Denominator: {0} (the Channel Rack's step grid is {1} steps per beat)." = "Noemer: {0} (het stappenraster van de Channel Rack heeft {1} stappen per tel)."
-"Extract stems from sample" = "Stems uit sample halen"
-"Extracting stems..." = "Stems worden eruit gehaald..."
-"Downloading the stem model..." = "Stem-model wordt gedownload..."
-"Checking the stem model..." = "Stem-model wordt gecontroleerd..."
-"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "ONNX Runtime kon niet worden geladen. Stems scheiden vereist macOS 13.4 of nieuwer."
-"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "ONNX Runtime kon niet worden geladen. Installeer Microsoft Visual C++ Redistributable (x64) via https://aka.ms/vs/17/release/vc_redist.x64.exe en probeer het opnieuw."
-"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "ONNX Runtime kon niet worden geladen. Stems scheiden vereist de libstdc++ van het systeem."
-"The model returned an unexpected result." = "Het model gaf een onverwacht resultaat."
-"The sample is empty." = "De sample is leeg."
-"The downloaded model failed its checksum, so it was not used." = "Het gedownloade model kwam niet door de checksumcontrole en is daarom niet gebruikt."
-"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "Stems scheiden vereist het model HT-Demucs. Het hoort niet bij LYNX SHARE: het wordt één keer gedownload ({0} MB) en bewaard in {1}."
-"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "Bron: {0} (ONNX-export van Demucs v4 door Meta AI Research)"
-"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "Licentie: de code van Demucs is MIT. De licentie van de getrainde gewichten is niet duidelijk, zoals de makers zeggen: de trainingsdata bevatten MUSDB18-HQ, waarvan een deel alleen voor onderzoek bedoeld was. Beslis zelf of dat past bij je gebruik, vooral commercieel gebruik."
-"Download" = "Downloaden"
-"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "Stems scheiden vereist ONNX Runtime ({0}), dat met het installatieprogramma en de zip van LYNX SHARE meekomt, maar het ontbreekt naast het programma. Installeer LYNX SHARE met het installatieprogramma of pak de hele zip uit."
-"Stems are still being extracted. Try again when that has finished." = "Er worden nog stems gescheiden. Probeer het opnieuw als dat klaar is."
 "Configuration" = "Configuratie"
 "Transp." = "Transp."
 "Master envelope" = "Master-envelope"
@@ -6569,8 +6635,6 @@ countries: nl be
 "sequencer on" = "sequencer aan"
 "sequencer off" = "sequencer uit"
 "transpose {0}" = "transpositie {0}"
-
-# Gross Beat editor (round 168m)
 "{0} beats back" = "{0} tellen terug"
 "Beat {0}" = "Tel {0}"
 "The first point of the envelope can't be removed." = "Het eerste punt van de envelope kan niet worden verwijderd."
@@ -6607,6 +6671,7 @@ countries: nl be
 "now" = "nu"
 "1 bar back" = "1 maat terug"
 "2 bars back" = "2 maten terug"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Sample vervangen"
 "Generate steps" = "Stappen genereren"
@@ -6764,7 +6829,6 @@ countries: nl be
 "MODULE 2" = "MODULE 2"
 "MODULE 3" = "MODULE 3"
 "MODULE 4" = "MODULE 4"
-# round 168t: FL's ruler gestures, the rack's built-in views, the windows tip
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap" = "Tijdlijn: [LMB] songpositie  [RMB] of [Ctrl][LMB] of [2xLMB] slepen: tijdselectie (loop)  [Shift][LMB] slepen: verplaatsen  [Ctrl][RMB] slepen: zoomen  [RMB] klik: menu  [Alt] geen snap"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll" = "Tijdlijn: [LMB] positie  [Alt] geen snap  [Ctrl][LMB], [RMB] of [2xLMB] slepen selecteert de noten in een tijdbereik  [Ctrl][Wheel] zoomen  [Shift][Wheel] scrollen"
 "Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete" = "Marker: [LMB] ernaartoe springen (tijdens afspelen: bij de volgende stap van Songsprongen kwantiseren)  [Ctrl][LMB] selecteren tot de volgende marker  [RMB] actie, hernoemen, verwijderen"
@@ -6787,8 +6851,6 @@ countries: nl be
 "Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "Opname-arm: Rec + Play neemt deze insert op in een Playlist-clip  [RMB] opnemen naar een bestand"
 "Recording: {0}" = "Opname: {0}"
 "dry input" = "droge ingang"
-
-# round 168o: designed pages of the synth group
 "Adapt" = "Adapt"
 "Alt" = "Alt"
 "Amplifier" = "Versterker"
@@ -6847,8 +6909,6 @@ countries: nl be
 "Vel sens" = "Vel-gev"
 "Vib" = "Vib"
 "Voice mode" = "Stemmodus"
-
-# Online sessions, phase 1 (round 168a)
 "Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "Stand-in: de plugin is niet geïnstalleerd op deze pc, een render van dit deel speelt (de plugininstellingen blijven bewaard)"
 "Send project..." = "Project versturen..."
 "Send my part back..." = "Mijn deel terugsturen..."
@@ -6942,8 +7002,8 @@ countries: nl be
 "Lock" = "Slot"
 "Mute the selected clips (all when none is selected)" = "Geselecteerde clips dempen (alle als er geen geselecteerd is)"
 "Unmute the selected clips (all when none is selected)" = "Demping van geselecteerde clips opheffen (alle als er geen geselecteerd is)"
-
-# Live sessions (round 169b)
+"Mute removed steps" = "Verwijderde steps dempen"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Pattern afspelen / pauzeren  [RMB] stoppen en terug naar waar het afspelen begon (nogmaals: naar het begin van het pattern)"
 "Live sessions need a newer libcurl on this computer ({0})" = "Livesessies hebben een nieuwere libcurl nodig op deze computer ({0})"
 "Opening the session..." = "Sessie wordt geopend..."
 "Too many sessions were opened from this connection. Try again in a while." = "Er zijn te veel sessies geopend vanaf deze verbinding. Probeer het over een tijdje opnieuw."
@@ -7013,8 +7073,6 @@ countries: nl be
 "{0} files arriving" = "{0} bestanden onderweg"
 "Live session with {0}" = "Livesessie met {0}"
 "Undo left alone what someone else changed since: {0}" = "Ongedaan maken liet ongemoeid wat iemand anders sindsdien wijzigde: {0}"
-"Mute removed steps" = "Verwijderde steps dempen"
-"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Pattern afspelen / pauzeren  [RMB] stoppen en terug naar waar het afspelen begon (nogmaals: naar het begin van het pattern)"
 
 # --- Live sessions: reconnect, chat, permissions, stand-ins (round 169j)
 "The live session could not be resumed: the connection did not come back." = "De livesessie kon niet worden hervat: de verbinding kwam niet terug."
@@ -7098,8 +7156,6 @@ countries: nl be
 "click to step, drag or mouse wheel to change" = "klik om te verspringen, sleep of scrollwiel om te wijzigen"
 "no effect with the current mode (another engine is in use)" = "geen effect in de huidige modus (een andere engine is actief)"
 "arrows step, click for the list, drag or mouse wheel to change" = "pijlen verspringen, klik voor de lijst, sleep of scrollwiel om te wijzigen"
-
-# round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Hoofd: {0}"
 "Last tweaked parameter: the control you moved last and its value. Click for its menu (automation clip, link to controller, events, value)" = "Laatst gewijzigde parameter: de regelaar die je het laatst bewoog en de waarde ervan. Klik voor het menu (automatiseringsclip, koppelen aan controller, events, waarde)"
 "LAST TWEAKED" = "LAATST GEWIJZIGD"
@@ -7116,8 +7172,6 @@ countries: nl be
 "Playlist snap" = "Playlist-snap"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Tijdlijn: [LMB] positie  [Alt] geen snap  [Ctrl][LMB], [RMB] of [2xLMB] slepen selecteert de noten in een tijdbereik  [Ctrl][Wheel] / knijpen zoomen  [Shift][Wheel] scrollen"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Tijdlijn: [LMB] songpositie  [RMB] of [Ctrl][LMB] of [2xLMB] slepen: tijdselectie (loop)  [Shift][LMB] slepen: verplaatsen  [Ctrl][RMB] slepen, [Ctrl][Wheel] / knijpen: zoomen  [RMB] klik: menu  [Alt] geen snap"
-
-# round 170d: count-in catch, played-note latency, Capture MIDI
 "Off (keep their real time)" = "Uit (echte timing behouden)"
 "1/32 note" = "1/32 noot"
 "1/16 note" = "1/16 noot"
@@ -7132,8 +7186,6 @@ countries: nl be
 "Number of steps" = "Aantal stappen"
 "Dual" = "Dubbel"
 "Align all channel editors" = "Alle kanaaleditors uitlijnen"
-
-# Round 171c: the Plugin picker
 "Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "Pluginkiezer: elke plugin als afbeelding; sleep er een naar het Channel Rack of de Mixer (rechtsklik: snel-toevoegen palet)"
 "double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "dubbelklik, rechtsklik of Enter: een nieuw kanaal; sleep het naar het Channel Rack (op een kanaal: vervangt het instrument)"
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "dubbelklik, rechtsklik of Enter: in de geselecteerde mixer-insert; sleep het naar een mixer-insert of een van zijn slots"
@@ -7145,14 +7197,11 @@ countries: nl be
 "Last tweaked ({0})" = "Laatst aangepast ({0})"
 "Deactivate" = "Deactiveren"
 "Automate Patcher parameter" = "Patcher-parameter automatiseren"
-# round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "Opgenomen noten mengen: aan (nieuwe noten komen bij die van het pattern)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Opgenomen noten mengen: uit (de oude noten van een opgenomen kanaal worden vervangen)"
 "Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Opgenomen noten mengen: aan, een opname voegt zijn noten aan het pattern toe (overdub); uit, de oude noten van een opgenomen kanaal worden vervangen"
 "Tempo tapper: tap the beat to set the tempo" = "Tempotapper: tik de beat om het tempo in te stellen"
 "Blend recorded notes" = "Opgenomen noten mengen"
-
-# round 170e3: recording switches (loop record, step edit, punch)
 "Blend recorded notes on/off (off: replace)" = "Opgenomen noten mengen aan/uit (uit: vervangen)"
 "Loop record on/off" = "Loop-opname aan/uit"
 "Step edit on/off" = "Stapinvoer aan/uit"
@@ -7169,9 +7218,8 @@ countries: nl be
 "Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "Stapinvoer: met het transport gestopt gaan noten die je speelt in het huidige patroon op de positie, één rasterstap lang; laat de toetsen los en de positie schuift een stap op (akkoorden: samen vasthouden)"
 "Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "Punch in/out: audio-opname bewaart alleen het loopgebied (het afspelen loopt erdoor; pre- en post-roll in de opname-opties)"
 "Punch in/out" = "Punch in/out"
-
-# round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Wijs iets aan voor hulp  [F1] sneltoetsen  [F5]-[F9] vensters  [Space] afspelen/stoppen"
+
 # --- round 170a (Channel Rack cut/copy/paste, note names on every key)
 "Cut the selected channels' steps" = "Stappen van de geselecteerde kanalen knippen"
 "Copy the selected channels' steps" = "Stappen van de geselecteerde kanalen kopiëren"
@@ -7180,16 +7228,12 @@ countries: nl be
 "Note names on every Piano roll key" = "Nootnamen op elke toets van de Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] omhoog / omlaag slepen: door de patterns bladeren"
 "Playhead column in the Channel Rack" = "Afspeelkolom in de Channel Rack"
-
-# round 170e5: Loop record in Pattern mode
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Loop-opname: aan (de opname herhaalt: het loopgebied in Song-modus, één take per ronde; het pattern in Pattern-modus)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Loop-opname: uit (de opname loopt rechtdoor: door het loopgebied, of voorbij het einde van het pattern, dat langer wordt)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Loop-opname: aan, de opname herhaalt (Song-modus: het loopgebied, één take per ronde; Pattern-modus: het pattern); uit, ze loopt rechtdoor, door het loopgebied of voorbij het einde van het pattern, en houdt alles waar het gespeeld werd (het pattern wordt langer)"
 "Echo time" = "Echotijd"
 "Prime numbers" = "Priemgetallen"
 "The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Het Classic-paneel: hardware-saturator op één scherm (Drive, Punish, vijf stijlen)"
-
-# round 171e: Export to FL Studio
 "{0} saved." = "{0} opgeslagen."
 "Everything went over as FL Studio's own data." = "Alles is overgegaan als eigen gegevens van FL Studio."
 "Export to FL Studio" = "Exporteren naar FL Studio"
@@ -7212,11 +7256,9 @@ countries: nl be
 "Worth knowing" = "Goed om te weten"
 "Samples not on this PC" = "Samples die niet op deze pc staan"
 "Steps use channel colour" = "Stappen in de kanaalkleur"
-# round tp172d: the Echoform / Auto-pan page switch
 "Main|Tweak" = "Hoofd|Tweak"
 "E type|G type" = "E-type|G-type"
 "Modern console" = "Moderne console"
-# round tp172c6: Ridge Strip's DRIVE section
 "Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Satureren|Console E|Console G|Console A|Console N|Console Y|Buis|Gitaarversterker|Basversterker"
 "Switches the drive section on: saturation at the end of the strip, before the output" = "Zet de drive-sectie aan: saturatie aan het eind van de strip, vóór de uitgang"
 "The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "Het soort saturatie: een zachte clipper, vijf consolekanalen, een buistrap of een gitaar- / basversterker"
@@ -7224,8 +7266,6 @@ countries: nl be
 "Level into the drive: more distortion without changing the drive" = "Niveau de drive in: meer vervorming zonder de drive te veranderen"
 "Level after the drive" = "Niveau na de drive"
 "Blends the clean signal back in" = "Mengt het schone signaal terug"
-
-# round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|Ruimte"
 "Modern|Vintage|Plate" = "Modern|Vintage|Plaat"
 "Distance" = "Afstand"
@@ -7234,80 +7274,7 @@ countries: nl be
 "Low decay" = "Laag uitsterven"
 "High decay" = "Hoog uitsterven"
 
-# --- round 173e: marker types, channel looping, MIDI lock, sampled instrument, live session entity names, ON key
-"Marker loop" = "Marker-loop"
-"Marker skip" = "Marker-sprong"
-"Marker pause" = "Marker-pauze"
-"Bar override" = "Maat-override"
-"Key/Scale" = "Toonsoort/toonladder"
-"Loop length" = "Looplengte"
-"Add one every" = "Voeg er een toe elke"
-"Bars" = "Maten"
-"Add jump to next bar" = "Sprong naar volgende maat toevoegen"
-"Change to marker loop" = "Omzetten naar marker-loop"
-"Time markers" = "Tijdmarkers"
-"Quantize song jumps" = "Songsprongen quantizen"
-"Place loop (from this marker to the next)" = "Loop plaatsen (van deze marker tot de volgende)"
-"Song marker jump" = "Songmarker-sprong"
-"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "Noten op dit kanaal sturen de song naar een marker in plaats van te spelen: noot 0 gaat naar de eerste marker, de volgende naar de tweede... (Playlist › Songsprongen quantizen geldt tijdens het afspelen)."
-"Jump to the next song marker (Quantize song jumps while playing)" = "Naar de volgende songmarker springen (Songsprongen quantizen tijdens het afspelen)"
-"Jump to the previous song marker" = "Naar de vorige songmarker springen"
-"Advanced looping" = "Geavanceerd loopen"
-"Burn" = "Wegschrijven"
-"Burn MIDI to" = "MIDI wegschrijven naar"
-"Burn all looping channels" = "Alle loopende kanalen wegschrijven"
-"Burn selected channels" = "Geselecteerde kanalen wegschrijven"
-"Burn to pattern" = "Naar pattern wegschrijven"
-"Channel looping" = "Kanaal-looping"
-"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "Kanaal-looping: kanalen die korter zijn dan het pattern herhalen tot het einde ervan (polyritmes)  [LMB] aan / uit  [RMB] looptype (step-kanalen, alle kanalen, geavanceerd) en Naar pattern wegschrijven"
-"Channel looping: {0}" = "Kanaal-looping: {0}"
-"Don't loop" = "Niet loopen"
-"Echo delay" = "Echo-delay"
-"Every {0} steps" = "Elke {0} steps"
-"Loop all channels" = "Alle kanalen loopen"
-"Loop point" = "Looppunt"
-"Loop point ({0} steps)" = "Looppunt ({0} steps)"
-"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "Looppunt: [LMB] slepen of [Wheel] zet het in steps  [2xLMB] volgende maat  [RMB] Niet loopen / Step / Tel / Maat, Naar pattern wegschrijven"
-"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "Loopherhaling (na het looppunt): [LMB] bewerkt de step die ze herhaalt"
-"Loop step channels" = "Step-kanalen loopen"
-"Loop type" = "Looptype"
-"Looping on" = "Looping aan"
-"Nothing to burn" = "Niets om weg te schrijven"
-"Reset after burning to MIDI" = "Resetten na wegschrijven naar MIDI"
-"Select what you want to reset:" = "Kies wat je wilt resetten:"
-"Set to next bar" = "Op volgende maat zetten"
-"Set to next beat" = "Op volgende tel zetten"
-"The selected channel doesn't contain any notes to burn." = "Het geselecteerde kanaal bevat geen noten om weg te schrijven."
-"Time (shift and gate)" = "Tijd (verschuiving en gate)"
-"loop at the next bar" = "loop bij de volgende maat"
-"loop at the next beat" = "loop bij de volgende tel"
-"loop at the next step" = "loop bij de volgende step"
-"Receive notes from" = "Noten ontvangen van"
-"Unlock" = "Ontgrendelen"
-"not connected" = "niet verbonden"
-"No MIDI input device" = "Geen MIDI-invoerapparaat"
-"(locked: receives the notes of {0})" = "(vergrendeld: ontvangt de noten van {0})"
-"Create sampled instrument..." = "Gesampled instrument maken..."
-"Create sampled instrument" = "Gesampled instrument maken"
-"Plays {0} key by key and makes a Sampler channel of the recordings." = "Speelt {0} toets voor toets en maakt van de opnamen een Sampler-kanaal."
-"Sampling the instrument..." = "Instrument wordt gesampled..."
-"Writing the samples..." = "Samples worden geschreven..."
-"Could not sample the instrument" = "Kon het instrument niet samplen"
-"Low note" = "Laagste noot"
-"High note" = "Hoogste noot"
-"Keys per zone" = "Toetsen per zone"
-"Root offset" = "Grondtoonverschuiving"
-"Velocity layers" = "Velocity-lagen"
-"Max velocity" = "Max. velocity"
-"Release after (seconds)" = "Loslaten na (seconden)"
-"Max length after release (seconds)" = "Max. lengte na loslaten (seconden)"
-"Stop on" = "Stoppen bij"
-"Max length" = "Max. lengte"
-"16-bit integer" = "16-bit integer"
-"Mono (merged)" = "Mono (samengevoegd)"
-"Enable insert effects" = "Insert-effecten inschakelen"
-"Enable master effects" = "Master-effecten inschakelen"
-"could not read {0}" = "kon {0} niet lezen"
+# --- Online session entity names (round 173e) and plugin hardware keys
 "Pattern {0}" = "Pattern {0}"
 "a pattern" = "een pattern"
 "a channel" = "een kanaal"
@@ -7319,7 +7286,6 @@ countries: nl be
 "{0} in {1}" = "{0} in {1}"
 "Playlist clip" = "Playlist-clip"
 "ON" = "AAN"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
 "None|Smooth|Op-El|Mastering" = "Geen|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Nog drie compressorkarakters, in plaats van de stijl: zacht, opto-elektronisch of mastering"
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} is gecrasht. Sla je project nu op (als nieuw bestand is het veiligst)."
@@ -7472,7 +7438,6 @@ countries: nl be
 "Start time (H:M:S:Frame)" = "Begintijd (H:M:S:Frame)"
 "End time (H:M:S:Frame)" = "Eindtijd (H:M:S:Frame)"
 "Current time (H:M:S:Frame)" = "Huidige tijd (H:M:S:Frame)"
-# round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
 "Noise reduction" = "Ruisonderdrukking"
 "Group bypass" = "Groepsbypass"
@@ -7571,7 +7536,6 @@ countries: nl be
 "HighCut" = "High cut"
 "Rushin" = "Gehaast"
 "Draggin" = "Slepend"
-# round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "Niveau de strip in"
 "Level out of the strip, after the output mix" = "Niveau de strip uit, na de output-mix"
 "Blend of the processed strip with the dry input" = "Mengverhouding van de bewerkte strip met de droge ingang"
@@ -7728,8 +7692,6 @@ countries: nl be
 "Auto listen" = "Auto meeluisteren"
 "Auto\nlisten" = "Auto\nmeeluisteren"
 "EQ auto listen" = "EQ auto meeluisteren"
-
-# round 176a: the 32-bit plugin bridge
 "Native" = "Systeemeigen"
 "32 bit" = "32 bit"
 "64 bit" = "64 bit"
@@ -7749,12 +7711,11 @@ countries: nl be
 "Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animaties: panelen faden in en uit, knoppen lichten zacht op, het scrollwiel glijdt"
 "{0} minutes" = "{0} minuten"
 "Longest wait between backups" = "Langste wachttijd tussen back-ups"
-
-# round 177c: comping is an explicit step; loop passes land as in FL
 "Comp these takes" = "Comp maken van deze takes"
 "After loop recording, only the last pass plays" = "Na loopopname speelt alleen de laatste doorgang"
 "Loop-recorded audio: every pass plays" = "In loop opgenomen audio: alle doorgangen spelen"
 "Loop-recorded audio: every pass is muted" = "In loop opgenomen audio: alle doorgangen zijn gedempt"
+
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Clipraster"
 "Stop all clips" = "Alle clips stoppen"
@@ -7857,8 +7818,6 @@ countries: nl be
 "That track is fed by this one: the link would make a loop." = "Dat spoor krijgt signaal van dit spoor: de koppeling zou een lus maken."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Sidechain-ingang: de insert waar dit effect naar luistert. Een keuze routeert die hierheen op niveau 0; die houdt de eigen uitgangen  [LMB] kiezen"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Sidechain-ingang: de insert waar de zij-ingang van deze plugin naar luistert. Een keuze routeert die hierheen op niveau 0; die houdt de eigen uitgangen"
-
-# round 180c: Fruity Slicer
 "Load a sample (Sample menu) or drop one here" = "Laad een sample (menu Sample) of zet er hier een neer"
 "Open a sample to slice (or drop one here)" = "Een sample openen om te verdelen (of zet er hier een neer)"
 "Slicing" = "Verdelen"
@@ -7963,8 +7922,6 @@ countries: nl be
 "Adds the file's time signature to the pattern's markers" = "Voegt de maatsoort van het bestand toe aan de markers van het patroon"
 "Scores" = "Partituren"
 "Folders" = "Mappen"
-
-# round 177a: the mixer menu as FL's
 "Multilink to controllers" = "Multilink naar controllers"
 "Please tweak the controls you want to link..." = "Beweeg de regelaars die je wilt koppelen..."
 "Multilink to controllers on/off" = "Multilink naar controllers aan/uit"
@@ -8030,6 +7987,7 @@ countries: nl be
 "Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Spoorvolume: [LMB] klikken of slepen  [Shift] fijn  [2xLMB] 0 dB"
 "Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Spoorpanning: [LMB] omhoog / omlaag slepen  [Shift] fijn  [2xLMB] midden"
 "Track effects: [LMB] open the effects of its mixer track" = "Spooreffecten: [LMB] de effecten van het mixerspoor openen"
+
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Een effect aan deze insert toevoegen (of er een vanuit de Browser neerzetten)"
 "Channel on / off (its mute)" = "Kanaal aan / uit (de demping)"
@@ -8160,6 +8118,7 @@ countries: nl be
 "D-pad down" = "D-pad omlaag"
 "D-pad left" = "D-pad links"
 "D-pad right" = "D-pad rechts"
+
 # --- Round 186c: mixer Delete questions, Manage messages
 "Delete tracks" = "Sporen verwijderen"
 "This will |delete| {0} selected mixer track(s). Are you sure?" = "Hiermee worden {0} geselecteerde mixersporen |verwijderd|. Weet je het zeker?"
@@ -8213,6 +8172,7 @@ countries: nl be
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Hoe waarschijnlijk de noot klinkt telkens als hij aan de beurt is (LYNX; Live's noot-Chance)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Telkens als hij klinkt, wordt de velocity geloot tussen de velocity van de noot en velocity + dit bereik (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Release-velocity: met het einde van de noot verstuurd naar de instrumenten die hem gebruiken (plugins, Patcher)"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "Het standaardsjabloon is niet gevonden; in plaats daarvan is het standaardproject van LYNX SHARE geopend"
 "{0} could not be opened." = "{0} kon niet worden geopend."
@@ -8232,6 +8192,7 @@ countries: nl be
 "Empty project" = "Leeg project"
 "Last used project" = "Laatst gebruikt project"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Het standaardsjabloon opent met Bestand › Nieuw, en bij het starten als Project bij het starten op \"Standaardsjabloon\" staat, als nieuw naamloos project, zodat het sjabloon zelf nooit wordt overschreven. Bestand › Opslaan als sjabloon... voegt je eigen toe."
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Voor andere apps..."
 "Export for other apps" = "Exporteren voor andere apps"
@@ -8261,6 +8222,7 @@ countries: nl be
 "Send to {0} (deleted)" = "Send naar {0} (verwijderd)"
 "Disconnected links" = "Verbroken koppelingen"
 "Keep links to deleted inserts, greyed (LYNX)" = "Koppelingen naar verwijderde inserts grijs bewaren (LYNX)"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 188h)
 "Pocket Distortion" = "Pocket Distortion"
 "Pocket Limiter Classic" = "Pocket Limiter Classic"
@@ -8332,6 +8294,7 @@ countries: nl be
 "side" = "zijkant"
 "Output M/S" = "Uitgang M/S"
 "Input M/S" = "Ingang M/S"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 189h, batch B)
 "Pocket Wow & Flutter" = "Pocket Wow & Flutter"
 "Pocket Phaser" = "Pocket Phaser"
@@ -8351,6 +8314,7 @@ countries: nl be
 "Amount min" = "Min. hoeveelheid"
 "Stereo offset" = "Stereoverschuiving"
 "16 bars" = "16 maten"
+
 # --- Pocket effects, round 189h: Waveshaper, Compressor, Spreader
 "Pocket Waveshaper" = "Pocket Waveshaper"
 "Pocket Compressor" = "Pocket Compressor"
@@ -8366,3 +8330,33 @@ countries: nl be
 "Octaver" = "Octaver"
 "Rectify" = "Gelijkrichten"
 "CrossFold" = "CrossFold"
+
+# --- Versions panel, open without third-party plugins, export sections and presets (round 190ap)
+"Versions" = "Versies"
+"Opened as a copy: {0}" = "Geopend als kopie: {0}"
+"Save asks where to keep it; the original file is untouched" = "Opslaan vraagt waar het bewaard moet worden; het originele bestand blijft ongewijzigd"
+"Versions..." = "Versies..."
+"Before a save" = "Vóór het opslaan"
+"No saved versions or backups of this project yet." = "Dit project heeft nog geen opgeslagen versies of back-ups."
+"File › Save new version keeps the project as it is now; backups are written while you work." = "Bestand › Nieuwe versie opslaan bewaart het project zoals het nu is; back-ups worden tijdens het werken gemaakt."
+"Opens the chosen version or backup as a new, unsaved project: the file itself and the open project's file stay as they are" = "Opent de gekozen versie of back-up als nieuw, niet-opgeslagen project: het bestand zelf en het bestand van het geopende project blijven ongewijzigd"
+"Opens the file manager on the chosen file" = "Opent de bestandsbeheerder bij het gekozen bestand"
+"A short note for the chosen version or backup (kept in a text file beside it, not inside the project). A labelled backup is never removed to make room for newer ones" = "Een korte notitie bij de gekozen versie of back-up (bewaard in een tekstbestand ernaast, niet in het project). Een back-up met label wordt nooit verwijderd om plaats te maken voor nieuwere"
+"Saves the project under the next number (Song_2, Song_3...) and keeps working in it" = "Slaat het project op onder het volgende nummer (Song_2, Song_3...) en werkt daarin verder"
+"{0} saved version(s), {1} backup(s)" = "{0} opgeslagen versie(s), {1} back-up(s)"
+"Last backup: {0}" = "Laatste back-up: {0}"
+"Not saved yet" = "Nog niet opgeslagen"
+"Label" = "Label"
+"A short note for {0} (empty: no label)" = "Een korte notitie bij {0} (leeg: geen label)"
+"The label could not be written next to the file." = "Het label kon niet naast het bestand worden geschreven."
+"open now" = "nu open"
+"Open as a copy" = "Openen als kopie"
+"Label..." = "Label..."
+"just now" = "zojuist"
+"{0} min ago" = "{0} min geleden"
+"{0} h ago" = "{0} u geleden"
+"{0} d ago" = "{0} d geleden"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"

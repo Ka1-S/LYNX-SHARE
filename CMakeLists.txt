@@ -516,6 +516,7 @@ if(LYNX_BUILD_APP)
         src/ui/LoopStarterWindow.cpp
         src/ui/SimpleWorkflow.cpp
         src/ui/HistoryPanel.cpp
+        src/ui/VersionsPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp
         src/ui/SettingsPages.cpp

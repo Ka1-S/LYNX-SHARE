@@ -1,7 +1,7 @@
 language: Bahasa Indonesia
 countries: id
 
-# LYNX SHARE interface in Bahasa Indonesia (JUCE LocalisedStrings format).
+# LYNX interface in Bahasa Indonesia (JUCE LocalisedStrings format).
 # One line per string: "English text" = "Translation"  (escapes: \n \t \" \\)
 # Every key of pt-BR.txt must be here; terms: docs/i18n/id-glossary.md; how to help: docs/i18n/README.md
 # After editing, run: python3 tools/make_i18n.py  (embeds the tables in src/ui/I18nData.h)
@@ -4558,6 +4558,7 @@ countries: id
 "The report could not be sent ({0}); LYNX SHARE tries again at the next start" = "Laporan tidak dapat dikirim ({0}); LYNX SHARE mencoba lagi saat dimulai berikutnya"
 "Report a problem" = "Laporkan masalah"
 "Report a problem..." = "Laporkan masalah..."
+
 # --- In-app update check (round 166b)
 "Check for updates..." = "Periksa pembaruan..."
 "Check for updates automatically" = "Periksa pembaruan secara otomatis"
@@ -5281,6 +5282,27 @@ countries: id
 "RPN..." = "RPN..."
 "Send MIDI" = "Kirim MIDI"
 "The Dashboard sends its notes, the program and the controls set to \"Send MIDI\" to the plugins whose MIDI input port is this port (plugin window > Settings > MIDI > Input port)." = "Dashboard mengirim not-nya, program, dan kontrol yang diatur ke \"Kirim MIDI\" ke plugin yang port input MIDI-nya adalah port ini (jendela plugin > Pengaturan > MIDI > Port input)."
+
+# --- Song markers: FL's marker actions, Time markers, Quantize song jumps, Song marker jump (round 165f)
+"Marker loop" = "Loop marker"
+"Marker skip" = "Lompatan marker"
+"Marker pause" = "Jeda marker"
+"Pattern length" = "Panjang pattern"
+"Bar override" = "Override bar"
+"Key/Scale" = "Kunci nada/Tangga nada"
+"Loop length" = "Panjang loop"
+"Add one every" = "Tambah satu setiap"
+"8 bars" = "8 bar"
+"Bars" = "Bar"
+"Add jump to next bar" = "Tambah lompatan ke bar berikutnya"
+"Change to marker loop" = "Ubah jadi loop marker"
+"Time markers" = "Marker waktu"
+"Quantize song jumps" = "Kuantisasi lompatan song"
+"Place loop (from this marker to the next)" = "Buat loop (dari marker ini ke berikutnya)"
+"Song marker jump" = "Lompatan marker song"
+"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "Not di channel ini memindahkan song ke marker alih-alih dimainkan: not 0 ke marker pertama, berikutnya ke marker kedua... (Playlist › Kuantisasi lompatan song berlaku saat diputar)."
+"Jump to the next song marker (Quantize song jumps while playing)" = "Lompat ke marker song berikutnya (Kuantisasi lompatan song saat diputar)"
+"Jump to the previous song marker" = "Lompat ke marker song sebelumnya"
 "MUTE" = "MUTE"
 "CHANNEL" = "CHANNEL"
 "Bar:Beat:Tick" = "Bar:Beat:Tick"
@@ -5693,6 +5715,62 @@ countries: id
 "Black notes" = "Tuts hitam"
 "Sharps (#)" = "Kres (#)"
 "Flats (b)" = "Mol (b)"
+"Advanced looping" = "Loop lanjutan"
+"Burn" = "Tulis"
+"Burn MIDI to" = "Tulis MIDI ke"
+"Burn all looping channels" = "Tulis semua channel yang di-loop"
+"Burn selected channels" = "Tulis channel terpilih"
+"Burn to pattern" = "Tulis ke pattern"
+"Channel looping" = "Loop channel"
+"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "Loop channel: channel yang lebih pendek dari pattern diulang sampai akhirnya (poliritme)  [LMB] nyala / mati  [RMB] jenis loop (channel step, semua channel, lanjutan) dan Tulis ke pattern"
+"Channel looping: {0}" = "Loop channel: {0}"
+"Don't loop" = "Tanpa loop"
+"Echo delay" = "Echo delay"
+"Every {0} steps" = "Setiap {0} step"
+"Loop all channels" = "Loop semua channel"
+"Loop point" = "Titik loop"
+"Loop point ({0} steps)" = "Titik loop ({0} step)"
+"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "Titik loop: [LMB] seret atau [Wheel] mengaturnya dalam step  [2xLMB] bar berikutnya  [RMB] Tanpa loop / Step / Beat / Bar, Tulis ke pattern"
+"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "Pengulangan loop (setelah titik loop): [LMB] mengedit step yang diulangnya"
+"Loop step channels" = "Loop channel step"
+"Loop type" = "Jenis loop"
+"Looping on" = "Loop aktif"
+"Nothing to burn" = "Tidak ada yang bisa ditulis"
+"Reset after burning to MIDI" = "Reset setelah ditulis ke MIDI"
+"Select what you want to reset:" = "Pilih yang ingin di-reset:"
+"Set to next bar" = "Atur ke bar berikutnya"
+"Set to next beat" = "Atur ke beat berikutnya"
+"The selected channel doesn't contain any notes to burn." = "Channel terpilih tidak berisi not untuk ditulis."
+"Time (shift and gate)" = "Waktu (geser dan gate)"
+"loop at the next bar" = "loop di bar berikutnya"
+"loop at the next beat" = "loop di beat berikutnya"
+"loop at the next step" = "loop di step berikutnya"
+"Receive notes from" = "Terima not dari"
+"Unlock" = "Buka kunci"
+"not connected" = "tidak terhubung"
+"No MIDI input device" = "Tidak ada perangkat input MIDI"
+"(locked: receives the notes of {0})" = "(terkunci: menerima not dari {0})"
+"Create sampled instrument..." = "Buat instrumen sampel..."
+"Create sampled instrument" = "Buat instrumen sampel"
+"Plays {0} key by key and makes a Sampler channel of the recordings." = "Memainkan {0} tuts demi tuts dan membuat channel Sampler dari rekamannya."
+"Sampling the instrument..." = "Menyampel instrumen..."
+"Writing the samples..." = "Menulis sampel..."
+"Could not sample the instrument" = "Tidak dapat menyampel instrumen"
+"Low note" = "Not terendah"
+"High note" = "Not tertinggi"
+"Keys per zone" = "Tuts per zona"
+"Root offset" = "Offset nada dasar"
+"Velocity layers" = "Lapisan velocity"
+"Max velocity" = "Velocity maks."
+"Release after (seconds)" = "Lepas setelah (detik)"
+"Max length after release (seconds)" = "Panjang maks. setelah dilepas (detik)"
+"Stop on" = "Berhenti saat"
+"Max length" = "Panjang maks."
+"16-bit integer" = "Integer 16-bit"
+"Mono (merged)" = "Mono (digabung)"
+"Enable insert effects" = "Aktifkan efek insert"
+"Enable master effects" = "Aktifkan efek Master"
+"could not read {0}" = "tidak dapat membaca {0}"
 "Key to" = "Tuts untuk"
 "Percent" = "Persen"
 "Use regions" = "Pakai region"
@@ -5707,7 +5785,6 @@ countries: id
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Menyisipkan kolom kosong sebelum song untuk clip yang akan diluncurkan, satu marker di tiap kolom, dan marker Start tempat song dimulai; mode performance dinyalakan."
 "Marker count" = "Jumlah marker"
 "2 steps" = "2 step"
-"8 bars" = "8 bar"
 "Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Track: [LMB] pilih  [Ctrl][LMB] tambah / buang  [Shift][LMB] rentang  [RMB] menu  [2xLMB] buka sumber clip  [Shift][Wheel] pindah ke atas / bawah"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
@@ -5833,7 +5910,6 @@ countries: id
 "Pattern length in bars: [LMB] drag or [Wheel] change it  [2xLMB] automatic (from the notes)  [RMB] menu" = "Panjang pattern dalam bar: [LMB] seret atau [Wheel] untuk mengubah  [2xLMB] otomatis (dari not)  [RMB] menu"
 "Pattern length: {0} (automatic, from the notes)" = "Panjang pattern: {0} (otomatis, dari not)"
 "Pattern length (bars, 0 = automatic)" = "Panjang pattern (bar, 0 = otomatis)"
-"Pattern length" = "Panjang pattern"
 "Follow: a pattern longer than the Channel Rack pages along with the playing step; off, it stays where you scrolled" = "Ikuti: pattern yang lebih panjang dari Channel Rack berpindah halaman mengikuti step yang diputar; jika nonaktif, tetap di tempat Anda menggulir"
 "Follow the playhead (page along with the playing step) on/off" = "Ikuti playhead (berpindah halaman mengikuti step yang diputar) aktif/nonaktif"
 "Follow: the view pages along with the playback position; off, it stays where you scrolled" = "Ikuti: tampilan berpindah halaman mengikuti posisi pemutaran; jika nonaktif, tetap di tempat Anda menggulir"
@@ -5900,9 +5976,6 @@ countries: id
 # --- FL legacy effects (round 165k): Fruity Delay (v1) value texts
 "Inverted stereo" = "Stereo terbalik"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"
 # --- Newtone editor (round 165g flnewt165)
 "Cut mode (C): click a note to slice it there; Ctrl+click a note to glue it to the one before" = "Mode potong (C): klik sebuah not untuk memotongnya di situ; Ctrl+klik sebuah not untuk menempelkannya ke not sebelumnya"
 "Score" = "Partitur"
@@ -5945,7 +6018,6 @@ countries: id
 "Set image wallpaper..." = "Atur gambar latar..."
 "Remove image wallpaper" = "Hapus gambar latar"
 "Set background color..." = "Atur warna latar..."
-# round 165z-a2 (FL metronome)
 "Metronome track" = "Trek metronom"
 "Metronome target mixer track" = "Trek mixer tujuan metronom"
 "The mixer track the metronome plays through (--- is the Master). The click is never in an export." = "Trek mixer tempat metronom berbunyi (--- adalah Master). Klik tidak pernah masuk ke ekspor."
@@ -5981,8 +6053,6 @@ countries: id
 "Ghost channels" = "Channel ghost"
 "Add multiple..." = "Tambah beberapa..."
 "You can add a maximum of {0} inserts." = "Anda dapat menambahkan paling banyak {0} insert."
-
-# round 166e (issue #16): automatic crossfades, clip gain handle, Disarm on stop / Auto-unarm
 "Clip gain: [LMB] drag up / down (the selected clips together)  [RMB] menu" = "Gain klip: [LMB] seret ke atas / bawah (klip terpilih bersama)  [RMB] menu"
 "Automatic crossfades (current project) on/off" = "Crossfade otomatis (proyek ini) nyala/mati"
 "Automatic crossfades (current project)" = "Crossfade otomatis (proyek ini)"
@@ -5997,14 +6067,11 @@ countries: id
 "Yes" = "Ya"
 "Make clip unique?" = "Jadikan klip unik?"
 "The clip \"{0}\" is also used on another audio track.\n\nDo you want to make this instance unique and then route it to this audio track?" = "Klip \"{0}\" juga digunakan di trek audio lain.\n\nApakah Anda ingin menjadikan instans ini unik lalu merutekannya ke trek audio ini?"
-# round 166c (LYNX Tune: throat, transpose in scale, created vibrato)
 "THROAT" = "TENGGOROKAN"
 "Scale steps" = "Langkah skala"
 "In scale" = "Dalam skala"
 "AMPLITUDE" = "AMPLITUDO"
 "VARIATION" = "VARIASI"
-
-# round 167f: FL Emphasis
 "Delta" = "Delta"
 "Envelope order" = "Orde envelope"
 "Linking" = "Penautan"
@@ -6157,6 +6224,7 @@ countries: id
 "Load preset..." = "Muat preset..."
 "Save preset as..." = "Simpan preset sebagai..."
 "Page {0}" = "Halaman {0}"
+
 # --- Wave Traveller (round 167f)
 "Smooth (cosine)" = "Halus (kosinus)"
 "Bezier" = "Bézier"
@@ -6246,7 +6314,6 @@ countries: id
 "SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "Instrumen SFZ: [LMB] pratinjau  [2xLMB] channel LYNX Soundfont baru (atau ke channel terpilih)  seret ke Channel Rack"
 "Open a .sf2 / .sf3 / .sfz file" = "Buka file .sf2 / .sf3 / .sfz"
 "LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load." = "LYNX Soundfont: memutar bank SoundFont 2 / 3 dan instrumen SFZ. Cari preset di semua SoundFont Anda, klik untuk pratinjau, klik ganda untuk memuat."
-# REA round 167f: FL's Transporter (transient looper)
 "LEVELS" = "LEVEL"
 "Loop A" = "Loop A"
 "Loop B" = "Loop B"
@@ -6303,6 +6370,22 @@ countries: id
 "Expand all grouped tracks" = "Bentangkan semua track yang dikelompokkan"
 "Purge unused audio clips" = "Bersihkan klip audio yang tidak dipakai"
 "Create variants when stretching audio clips" = "Buat varian saat meregangkan klip audio"
+"Extract stems from sample" = "Ekstrak stem dari sample"
+"Extracting stems..." = "Mengekstrak stem..."
+"Downloading the stem model..." = "Mengunduh model stem..."
+"Checking the stem model..." = "Memeriksa model stem..."
+"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "ONNX Runtime tidak dapat dimuat. Ekstraksi stem memerlukan macOS 13.4 atau lebih baru."
+"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "ONNX Runtime tidak dapat dimuat. Pasang Microsoft Visual C++ Redistributable (x64) dari https://aka.ms/vs/17/release/vc_redist.x64.exe lalu coba lagi."
+"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "ONNX Runtime tidak dapat dimuat. Ekstraksi stem memerlukan libstdc++ milik sistem."
+"The model returned an unexpected result." = "Model mengembalikan hasil yang tidak terduga."
+"The sample is empty." = "Sample kosong."
+"The downloaded model failed its checksum, so it was not used." = "Model yang diunduh gagal dalam pemeriksaan checksum, jadi tidak digunakan."
+"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "Ekstraksi stem memerlukan model HT-Demucs. Model ini bukan bagian dari LYNX SHARE: diunduh sekali ({0} MB) dan disimpan di {1}."
+"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "Sumber: {0} (ekspor ONNX dari Demucs v4 oleh Meta AI Research)"
+"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "Lisensi: kode Demucs berlisensi MIT. Lisensi bobot hasil pelatihannya tidak jelas, seperti kata para penulisnya: data pelatihannya mencakup MUSDB18-HQ, yang sebagian hanya untuk riset. Putuskan sendiri apakah itu cocok untuk penggunaan Anda, terutama penggunaan komersial."
+"Download" = "Unduh"
+"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "Ekstraksi stem memerlukan ONNX Runtime ({0}), yang disertakan di installer dan zip LYNX SHARE, tetapi tidak ada di samping program. Pasang LYNX SHARE dengan installer, atau ekstrak seluruh zip."
+"Stems are still being extracted. Try again when that has finished." = "Stem masih diekstrak. Coba lagi setelah selesai."
 
 # --- Round 168e: renders to audio clips, consolidation, exports per Playlist track
 "Consolidate playlist selection (from selection start)" = "Konsolidasi pilihan Playlist (dari awal pilihan)"
@@ -6351,6 +6434,7 @@ countries: id
 "The project has no mixer states, effects or notes to export." = "Proyek tidak memiliki status mixer, efek, atau not untuk diekspor."
 "Some files could not be written:" = "Beberapa file tidak bisa ditulis:"
 "Project bones..." = "Tulang proyek..."
+
 # --- Speech synthesizer (round 168b)
 "Male" = "Pria"
 "Female" = "Wanita"
@@ -6444,8 +6528,6 @@ countries: id
 "Pattern time markers: Add time signature change..." = "Penanda waktu pola: Tambah perubahan tanda birama..."
 "Delete all markers" = "Hapus semua penanda"
 "Colour group" = "Grup warna"
-
-# Round 168q: designed pages of Kepler, Kepler Exo, Transistor Bass, Sawer, BeepMap, Fruity Granulizer, Wasp
 "Always|Held" = "Selalu|Ditahan"
 "Arpeggio" = "Arpeggio"
 "Auto|Man" = "Auto|Man."
@@ -6518,22 +6600,6 @@ countries: id
 "Set as time signature" = "Atur sebagai birama"
 "Time division: FL Studio's original system (beats per bar, steps per beat). Time signature: traditional time signatures (numerator / denominator)." = "Pembagian waktu: sistem asli FL Studio (ketukan per bar, step per ketukan). Birama: tanda birama tradisional (pembilang / penyebut)."
 "Denominator: {0} (the Channel Rack's step grid is {1} steps per beat)." = "Penyebut: {0} (grid step Channel Rack memiliki {1} step per ketukan)."
-"Extract stems from sample" = "Ekstrak stem dari sample"
-"Extracting stems..." = "Mengekstrak stem..."
-"Downloading the stem model..." = "Mengunduh model stem..."
-"Checking the stem model..." = "Memeriksa model stem..."
-"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "ONNX Runtime tidak dapat dimuat. Ekstraksi stem memerlukan macOS 13.4 atau lebih baru."
-"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "ONNX Runtime tidak dapat dimuat. Pasang Microsoft Visual C++ Redistributable (x64) dari https://aka.ms/vs/17/release/vc_redist.x64.exe lalu coba lagi."
-"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "ONNX Runtime tidak dapat dimuat. Ekstraksi stem memerlukan libstdc++ milik sistem."
-"The model returned an unexpected result." = "Model mengembalikan hasil yang tidak terduga."
-"The sample is empty." = "Sample kosong."
-"The downloaded model failed its checksum, so it was not used." = "Model yang diunduh gagal dalam pemeriksaan checksum, jadi tidak digunakan."
-"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "Ekstraksi stem memerlukan model HT-Demucs. Model ini bukan bagian dari LYNX SHARE: diunduh sekali ({0} MB) dan disimpan di {1}."
-"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "Sumber: {0} (ekspor ONNX dari Demucs v4 oleh Meta AI Research)"
-"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "Lisensi: kode Demucs berlisensi MIT. Lisensi bobot hasil pelatihannya tidak jelas, seperti kata para penulisnya: data pelatihannya mencakup MUSDB18-HQ, yang sebagian hanya untuk riset. Putuskan sendiri apakah itu cocok untuk penggunaan Anda, terutama penggunaan komersial."
-"Download" = "Unduh"
-"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "Ekstraksi stem memerlukan ONNX Runtime ({0}), yang disertakan di installer dan zip LYNX SHARE, tetapi tidak ada di samping program. Pasang LYNX SHARE dengan installer, atau ekstrak seluruh zip."
-"Stems are still being extracted. Try again when that has finished." = "Stem masih diekstrak. Coba lagi setelah selesai."
 "Configuration" = "Konfigurasi"
 "Transp." = "Transp."
 "Master envelope" = "Envelope master"
@@ -6569,8 +6635,6 @@ countries: id
 "sequencer on" = "sekuenser aktif"
 "sequencer off" = "sekuenser mati"
 "transpose {0}" = "transpos {0}"
-
-# Gross Beat editor (round 168m)
 "{0} beats back" = "{0} ketukan ke belakang"
 "Beat {0}" = "Ketukan {0}"
 "The first point of the envelope can't be removed." = "Titik pertama envelope tidak dapat dihapus."
@@ -6607,6 +6671,7 @@ countries: id
 "now" = "sekarang"
 "1 bar back" = "1 bar ke belakang"
 "2 bars back" = "2 bar ke belakang"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "Ganti sampel"
 "Generate steps" = "Buat langkah"
@@ -6764,7 +6829,6 @@ countries: id
 "MODULE 2" = "MODUL 2"
 "MODULE 3" = "MODUL 3"
 "MODULE 4" = "MODUL 4"
-# round 168t: FL's ruler gestures, the rack's built-in views, the windows tip
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap" = "Penggaris: [LMB] posisi song  [RMB] atau [Ctrl][LMB] atau [2xLMB] seret: pilihan waktu (loop)  [Shift][LMB] seret: pindahkan  [Ctrl][RMB] seret: zoom  [RMB] klik: menu  [Alt] tanpa snap"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll" = "Penggaris: [LMB] posisi  [Alt] tanpa snap  [Ctrl][LMB], [RMB] atau [2xLMB] seret memilih not dalam rentang waktu  [Ctrl][Wheel] zoom  [Shift][Wheel] gulir"
 "Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete" = "Marker: [LMB] lompat ke sana (saat diputar: pada langkah kuantisasi lompatan berikutnya)  [Ctrl][LMB] pilih sampai marker berikutnya  [RMB] aksi, ganti nama, hapus"
@@ -6787,8 +6851,6 @@ countries: id
 "Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "Siap rekam: Rec + Play merekam insert ini ke klip Playlist  [RMB] rekam ke file"
 "Recording: {0}" = "Merekam: {0}"
 "dry input" = "input kering"
-
-# round 168o: designed pages of the synth group
 "Adapt" = "Adapt"
 "Alt" = "Alt"
 "Amplifier" = "Penguat"
@@ -6847,8 +6909,6 @@ countries: id
 "Vel sens" = "Sens vel"
 "Vib" = "Vib"
 "Voice mode" = "Mode suara"
-
-# Online sessions, phase 1 (round 168a)
 "Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "Pengganti: plugin-nya tidak terpasang di PC ini, render bagian ini yang diputar (pengaturan plugin tetap disimpan)"
 "Send project..." = "Kirim proyek..."
 "Send my part back..." = "Kirim balik bagianku..."
@@ -6942,8 +7002,8 @@ countries: id
 "Lock" = "Gembok"
 "Mute the selected clips (all when none is selected)" = "Bisukan klip terpilih (semua jika tidak ada yang dipilih)"
 "Unmute the selected clips (all when none is selected)" = "Batalkan bisu klip terpilih (semua jika tidak ada yang dipilih)"
-
-# Live sessions (round 169b)
+"Mute removed steps" = "Bisukan step yang dihapus"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Putar / jeda pattern  [RMB] hentikan dan kembali ke tempat pemutaran dimulai (lagi: ke awal pattern)"
 "Live sessions need a newer libcurl on this computer ({0})" = "Sesi live memerlukan libcurl yang lebih baru di komputer ini ({0})"
 "Opening the session..." = "Membuka sesi..."
 "Too many sessions were opened from this connection. Try again in a while." = "Terlalu banyak sesi dibuka dari koneksi ini. Coba lagi nanti."
@@ -7013,8 +7073,6 @@ countries: id
 "{0} files arriving" = "{0} file sedang tiba"
 "Live session with {0}" = "Sesi live dengan {0}"
 "Undo left alone what someone else changed since: {0}" = "Urungkan tidak menyentuh yang diubah orang lain sejak itu: {0}"
-"Mute removed steps" = "Bisukan step yang dihapus"
-"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "Putar / jeda pattern  [RMB] hentikan dan kembali ke tempat pemutaran dimulai (lagi: ke awal pattern)"
 
 # --- Live sessions: reconnect, chat, permissions, stand-ins (round 169j)
 "The live session could not be resumed: the connection did not come back." = "Sesi live tidak dapat dilanjutkan: koneksi tidak kembali."
@@ -7098,8 +7156,6 @@ countries: id
 "click to step, drag or mouse wheel to change" = "klik untuk melangkah, seret atau roda mouse untuk mengubah"
 "no effect with the current mode (another engine is in use)" = "tidak berpengaruh pada mode saat ini (mesin lain sedang dipakai)"
 "arrows step, click for the list, drag or mouse wheel to change" = "panah untuk melangkah, klik untuk daftar, seret atau roda mouse untuk mengubah"
-
-# round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "Utama: {0}"
 "Last tweaked parameter: the control you moved last and its value. Click for its menu (automation clip, link to controller, events, value)" = "Parameter terakhir diubah: kontrol yang terakhir Anda gerakkan dan nilainya. Klik untuk menunya (klip automasi, tautkan ke kontroler, event, nilai)"
 "LAST TWEAKED" = "TERAKHIR DIUBAH"
@@ -7116,8 +7172,6 @@ countries: id
 "Playlist snap" = "Snap Playlist"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "Penggaris: [LMB] posisi  [Alt] tanpa snap  [Ctrl][LMB], [RMB] atau [2xLMB] seret memilih not dalam rentang waktu  [Ctrl][Wheel] / cubit zoom  [Shift][Wheel] gulir"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "Penggaris: [LMB] posisi song  [RMB] atau [Ctrl][LMB] atau [2xLMB] seret: pilihan waktu (loop)  [Shift][LMB] seret: pindahkan  [Ctrl][RMB] seret, [Ctrl][Wheel] / cubit: zoom  [RMB] klik: menu  [Alt] tanpa snap"
-
-# round 170d: count-in catch, played-note latency, Capture MIDI
 "Off (keep their real time)" = "Mati (pertahankan waktu aslinya)"
 "1/32 note" = "Not 1/32"
 "1/16 note" = "Not 1/16"
@@ -7132,8 +7186,6 @@ countries: id
 "Number of steps" = "Jumlah langkah"
 "Dual" = "Ganda"
 "Align all channel editors" = "Ratakan semua editor channel"
-
-# Round 171c: the Plugin picker
 "Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "Pemilih plugin: setiap plugin sebagai gambar; seret satu ke Channel Rack atau Mixer (klik kanan: palet tambah cepat)"
 "double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "klik ganda, klik kanan atau Enter: channel baru; seret ke Channel Rack (ke sebuah channel: mengganti instrumennya)"
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "klik ganda, klik kanan atau Enter: ke insert mixer yang dipilih; seret ke insert mixer atau salah satu slotnya"
@@ -7145,14 +7197,11 @@ countries: id
 "Last tweaked ({0})" = "Terakhir diubah ({0})"
 "Deactivate" = "Nonaktifkan"
 "Automate Patcher parameter" = "Otomatisasi parameter Patcher"
-# round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "Campur not rekaman: nyala (not baru ditambahkan ke not pattern)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "Campur not rekaman: mati (not lama kanal yang direkam diganti)"
 "Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "Campur not rekaman: nyala, satu take menambahkan notnya ke pattern (overdub); mati, not lama kanal yang direkam diganti"
 "Tempo tapper: tap the beat to set the tempo" = "Tap tempo: ketuk ketukan untuk mengatur tempo"
 "Blend recorded notes" = "Campur not rekaman"
-
-# round 170e3: recording switches (loop record, step edit, punch)
 "Blend recorded notes on/off (off: replace)" = "Campur not rekaman aktif/nonaktif (nonaktif: ganti)"
 "Loop record on/off" = "Rekam berulang aktif/nonaktif"
 "Step edit on/off" = "Input per langkah aktif/nonaktif"
@@ -7169,9 +7218,8 @@ countries: id
 "Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "Input per langkah: saat transport berhenti, not yang Anda mainkan masuk ke pattern saat ini di posisi, sepanjang satu langkah snap; lepaskan tuts dan posisi maju satu langkah (akor: tahan bersamaan)"
 "Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "Punch in/out: rekaman audio hanya menyimpan wilayah loop (pemutaran melewatinya; pre-roll dan post-roll di opsi rekaman)"
 "Punch in/out" = "Punch in/out"
-
-# round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "Arahkan ke apa saja untuk bantuan  [F1] pintasan  [F5]-[F9] jendela  [Space] putar/berhenti"
+
 # --- round 170a (Channel Rack cut/copy/paste, note names on every key)
 "Cut the selected channels' steps" = "Potong langkah kanal yang dipilih"
 "Copy the selected channels' steps" = "Salin langkah kanal yang dipilih"
@@ -7180,16 +7228,12 @@ countries: id
 "Note names on every Piano roll key" = "Nama not di setiap tuts Piano Roll"
 "[LMB] drag up / down: step through the patterns" = "[LMB] seret ke atas / bawah: telusuri pattern"
 "Playhead column in the Channel Rack" = "Kolom playhead di Channel Rack"
-
-# round 170e5: Loop record in Pattern mode
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "Rekam loop: aktif (rekaman berulang: wilayah loop di mode Song, satu take per putaran; pattern di mode Pattern)"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "Rekam loop: nonaktif (rekaman terus lurus: melewati wilayah loop, atau melewati akhir pattern, yang memanjang)"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "Rekam loop: aktif, rekaman berulang (mode Song: wilayah loop, satu take per putaran; mode Pattern: pattern); nonaktif, terus lurus, melewati wilayah loop atau akhir pattern, dan menyimpan semuanya di tempat dimainkan (pattern memanjang)"
 "Echo time" = "Waktu gema"
 "Prime numbers" = "Bilangan prima"
 "The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Panel Classic: saturator perangkat keras satu layar (Drive, Punish, lima gaya)"
-
-# round 171e: Export to FL Studio
 "{0} saved." = "{0} disimpan."
 "Everything went over as FL Studio's own data." = "Semuanya masuk sebagai data FL Studio sendiri."
 "Export to FL Studio" = "Ekspor ke FL Studio"
@@ -7212,11 +7256,9 @@ countries: id
 "Worth knowing" = "Perlu diketahui"
 "Samples not on this PC" = "Sampel yang tidak ada di PC ini"
 "Steps use channel colour" = "Langkah memakai warna channel"
-# round tp172d: the Echoform / Auto-pan page switch
 "Main|Tweak" = "Utama|Tweak"
 "E type|G type" = "Tipe E|Tipe G"
 "Modern console" = "Konsol modern"
-# round tp172c6: Ridge Strip's DRIVE section
 "Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "Saturasi|Konsol E|Konsol G|Konsol A|Konsol N|Konsol Y|Tabung|Amp gitar|Amp bas"
 "Switches the drive section on: saturation at the end of the strip, before the output" = "Menyalakan bagian drive: saturasi di akhir strip, sebelum output"
 "The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "Jenis saturasi: clipper lembut, lima kanal konsol, tahap tabung, atau amp gitar / bas"
@@ -7224,8 +7266,6 @@ countries: id
 "Level into the drive: more distortion without changing the drive" = "Level ke drive: distorsi lebih banyak tanpa mengubah drive"
 "Level after the drive" = "Level setelah drive"
 "Blends the clean signal back in" = "Mencampur kembali sinyal bersih"
-
-# round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|Ruang"
 "Modern|Vintage|Plate" = "Modern|Vintage|Plat"
 "Distance" = "Jarak"
@@ -7234,80 +7274,7 @@ countries: id
 "Low decay" = "Peluruhan rendah"
 "High decay" = "Peluruhan tinggi"
 
-# --- round 173e: marker types, channel looping, MIDI lock, sampled instrument, live session entity names, ON key
-"Marker loop" = "Loop marker"
-"Marker skip" = "Lompatan marker"
-"Marker pause" = "Jeda marker"
-"Bar override" = "Override bar"
-"Key/Scale" = "Kunci nada/Tangga nada"
-"Loop length" = "Panjang loop"
-"Add one every" = "Tambah satu setiap"
-"Bars" = "Bar"
-"Add jump to next bar" = "Tambah lompatan ke bar berikutnya"
-"Change to marker loop" = "Ubah jadi loop marker"
-"Time markers" = "Marker waktu"
-"Quantize song jumps" = "Kuantisasi lompatan song"
-"Place loop (from this marker to the next)" = "Buat loop (dari marker ini ke berikutnya)"
-"Song marker jump" = "Lompatan marker song"
-"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "Not di channel ini memindahkan song ke marker alih-alih dimainkan: not 0 ke marker pertama, berikutnya ke marker kedua... (Playlist › Kuantisasi lompatan song berlaku saat diputar)."
-"Jump to the next song marker (Quantize song jumps while playing)" = "Lompat ke marker song berikutnya (Kuantisasi lompatan song saat diputar)"
-"Jump to the previous song marker" = "Lompat ke marker song sebelumnya"
-"Advanced looping" = "Loop lanjutan"
-"Burn" = "Tulis"
-"Burn MIDI to" = "Tulis MIDI ke"
-"Burn all looping channels" = "Tulis semua channel yang di-loop"
-"Burn selected channels" = "Tulis channel terpilih"
-"Burn to pattern" = "Tulis ke pattern"
-"Channel looping" = "Loop channel"
-"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "Loop channel: channel yang lebih pendek dari pattern diulang sampai akhirnya (poliritme)  [LMB] nyala / mati  [RMB] jenis loop (channel step, semua channel, lanjutan) dan Tulis ke pattern"
-"Channel looping: {0}" = "Loop channel: {0}"
-"Don't loop" = "Tanpa loop"
-"Echo delay" = "Echo delay"
-"Every {0} steps" = "Setiap {0} step"
-"Loop all channels" = "Loop semua channel"
-"Loop point" = "Titik loop"
-"Loop point ({0} steps)" = "Titik loop ({0} step)"
-"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "Titik loop: [LMB] seret atau [Wheel] mengaturnya dalam step  [2xLMB] bar berikutnya  [RMB] Tanpa loop / Step / Beat / Bar, Tulis ke pattern"
-"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "Pengulangan loop (setelah titik loop): [LMB] mengedit step yang diulangnya"
-"Loop step channels" = "Loop channel step"
-"Loop type" = "Jenis loop"
-"Looping on" = "Loop aktif"
-"Nothing to burn" = "Tidak ada yang bisa ditulis"
-"Reset after burning to MIDI" = "Reset setelah ditulis ke MIDI"
-"Select what you want to reset:" = "Pilih yang ingin di-reset:"
-"Set to next bar" = "Atur ke bar berikutnya"
-"Set to next beat" = "Atur ke beat berikutnya"
-"The selected channel doesn't contain any notes to burn." = "Channel terpilih tidak berisi not untuk ditulis."
-"Time (shift and gate)" = "Waktu (geser dan gate)"
-"loop at the next bar" = "loop di bar berikutnya"
-"loop at the next beat" = "loop di beat berikutnya"
-"loop at the next step" = "loop di step berikutnya"
-"Receive notes from" = "Terima not dari"
-"Unlock" = "Buka kunci"
-"not connected" = "tidak terhubung"
-"No MIDI input device" = "Tidak ada perangkat input MIDI"
-"(locked: receives the notes of {0})" = "(terkunci: menerima not dari {0})"
-"Create sampled instrument..." = "Buat instrumen sampel..."
-"Create sampled instrument" = "Buat instrumen sampel"
-"Plays {0} key by key and makes a Sampler channel of the recordings." = "Memainkan {0} tuts demi tuts dan membuat channel Sampler dari rekamannya."
-"Sampling the instrument..." = "Menyampel instrumen..."
-"Writing the samples..." = "Menulis sampel..."
-"Could not sample the instrument" = "Tidak dapat menyampel instrumen"
-"Low note" = "Not terendah"
-"High note" = "Not tertinggi"
-"Keys per zone" = "Tuts per zona"
-"Root offset" = "Offset nada dasar"
-"Velocity layers" = "Lapisan velocity"
-"Max velocity" = "Velocity maks."
-"Release after (seconds)" = "Lepas setelah (detik)"
-"Max length after release (seconds)" = "Panjang maks. setelah dilepas (detik)"
-"Stop on" = "Berhenti saat"
-"Max length" = "Panjang maks."
-"16-bit integer" = "Integer 16-bit"
-"Mono (merged)" = "Mono (digabung)"
-"Enable insert effects" = "Aktifkan efek insert"
-"Enable master effects" = "Aktifkan efek Master"
-"could not read {0}" = "tidak dapat membaca {0}"
+# --- Online session entity names (round 173e) and plugin hardware keys
 "Pattern {0}" = "Pattern {0}"
 "a pattern" = "sebuah pattern"
 "a channel" = "sebuah channel"
@@ -7319,7 +7286,6 @@ countries: id
 "{0} in {1}" = "{0} di {1}"
 "Playlist clip" = "Clip Playlist"
 "ON" = "NYALA"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
 "None|Smooth|Op-El|Mastering" = "Tidak ada|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "Tiga karakter kompresor lagi, dipakai menggantikan gaya: halus, opto-elektronik, atau mastering"
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} crash. Simpan proyek sekarang (paling aman sebagai file baru)."
@@ -7472,7 +7438,6 @@ countries: id
 "Start time (H:M:S:Frame)" = "Waktu awal (H:M:S:Frame)"
 "End time (H:M:S:Frame)" = "Waktu akhir (H:M:S:Frame)"
 "Current time (H:M:S:Frame)" = "Waktu saat ini (H:M:S:Frame)"
-# round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
 "Noise reduction" = "Pengurang derau"
 "Group bypass" = "Bypass grup"
@@ -7571,7 +7536,6 @@ countries: id
 "HighCut" = "High cut"
 "Rushin" = "Terburu"
 "Draggin" = "Terseret"
-# round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "Level yang masuk ke strip"
 "Level out of the strip, after the output mix" = "Level yang keluar dari strip, setelah output mix"
 "Blend of the processed strip with the dry input" = "Campuran strip yang diproses dengan input dry"
@@ -7728,8 +7692,6 @@ countries: id
 "Auto listen" = "Dengar otomatis"
 "Auto\nlisten" = "Dengar\notomatis"
 "EQ auto listen" = "Dengar otomatis EQ"
-
-# round 176a: the 32-bit plugin bridge
 "Native" = "Bawaan"
 "32 bit" = "32 bit"
 "64 bit" = "64 bit"
@@ -7749,12 +7711,11 @@ countries: id
 "Animations: panels fade in and out, buttons light up gently, the wheel glides" = "Animasi: panel muncul dan menghilang perlahan, tombol menyala lembut, roda gulir meluncur halus"
 "{0} minutes" = "{0} menit"
 "Longest wait between backups" = "Jeda terlama antar cadangan"
-
-# round 177c: comping is an explicit step; loop passes land as in FL
 "Comp these takes" = "Buat comp dari take ini"
 "After loop recording, only the last pass plays" = "Setelah rekam loop, hanya putaran terakhir yang diputar"
 "Loop-recorded audio: every pass plays" = "Audio rekaman loop: semua putaran diputar"
 "Loop-recorded audio: every pass is muted" = "Audio rekaman loop: semua putaran dibisukan"
+
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "Kisi klip"
 "Stop all clips" = "Hentikan semua klip"
@@ -7857,8 +7818,6 @@ countries: id
 "That track is fed by this one: the link would make a loop." = "Track itu menerima sinyal dari track ini: tautannya akan membuat loop."
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "Input sidechain: insert yang didengar efek ini. Memilih satu akan merutekannya ke sini pada level 0; output-nya sendiri tetap ada  [LMB] pilih"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "Input sidechain: insert yang didengar input samping plugin ini. Memilih satu akan merutekannya ke sini pada level 0; output-nya sendiri tetap ada"
-
-# round 180c: Fruity Slicer
 "Load a sample (Sample menu) or drop one here" = "Muat sampel (menu Sample) atau jatuhkan satu di sini"
 "Open a sample to slice (or drop one here)" = "Buka sampel untuk dipotong (atau jatuhkan di sini)"
 "Slicing" = "Pemotongan"
@@ -7963,8 +7922,6 @@ countries: id
 "Adds the file's time signature to the pattern's markers" = "Menambahkan birama file ke penanda pola"
 "Scores" = "Skor"
 "Folders" = "Folder"
-
-# round 177a: the mixer menu as FL's
 "Multilink to controllers" = "Multilink ke kontroler"
 "Please tweak the controls you want to link..." = "Gerakkan kontrol yang ingin Anda tautkan..."
 "Multilink to controllers on/off" = "Multilink ke kontroler aktif/nonaktif"
@@ -8030,6 +7987,7 @@ countries: id
 "Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "Volume trek: [LMB] klik atau seret  [Shift] halus  [2xLMB] 0 dB"
 "Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "Pan trek: [LMB] seret ke atas / bawah  [Shift] halus  [2xLMB] tengah"
 "Track effects: [LMB] open the effects of its mixer track" = "Efek trek: [LMB] buka efek trek mixer-nya"
+
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "Tambahkan efek ke insert ini (atau letakkan satu dari Browser)"
 "Channel on / off (its mute)" = "Channel aktif / nonaktif (mute-nya)"
@@ -8160,6 +8118,7 @@ countries: id
 "D-pad down" = "D-pad bawah"
 "D-pad left" = "D-pad kiri"
 "D-pad right" = "D-pad kanan"
+
 # --- Round 186c: mixer Delete questions, Manage messages
 "Delete tracks" = "Hapus trek"
 "This will |delete| {0} selected mixer track(s). Are you sure?" = "Ini akan |menghapus| {0} trek Mixer yang dipilih. Yakin?"
@@ -8213,6 +8172,7 @@ countries: id
 "How likely the note is to play each time it comes round (LYNX; Live's note Chance)" = "Seberapa mungkin not berbunyi setiap kali gilirannya tiba (LYNX; Chance not milik Live)"
 "Each time it plays, the velocity is drawn between the note's velocity and velocity + this range (LYNX)" = "Setiap kali berbunyi, velocity diundi antara velocity not dan velocity + rentang ini (LYNX)"
 "Release velocity: sent with the note's end to the instruments that use it (plugins, Patcher)" = "Velocity lepas: dikirim bersama akhir not ke instrumen yang memakainya (plugin, Patcher)"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "Template bawaan tidak ditemukan; proyek bawaan LYNX SHARE dibuka sebagai gantinya"
 "{0} could not be opened." = "{0} tidak dapat dibuka."
@@ -8232,6 +8192,7 @@ countries: id
 "Empty project" = "Proyek kosong"
 "Last used project" = "Proyek terakhir digunakan"
 "The default template opens with File › New, and at start-up when Startup project is \"Default template\", as a new untitled project, so the template itself is never overwritten. File › Save as template... adds your own." = "Template bawaan terbuka dengan File › Baru, dan saat mulai bila Proyek saat mulai adalah \"Template bawaan\", sebagai proyek baru tanpa nama, jadi template itu sendiri tidak pernah tertimpa. File › Simpan sebagai template... menambahkan milik Anda."
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Untuk aplikasi lain..."
 "Export for other apps" = "Ekspor untuk aplikasi lain"
@@ -8261,6 +8222,7 @@ countries: id
 "Send to {0} (deleted)" = "Kirim ke {0} (dihapus)"
 "Disconnected links" = "Tautan terputus"
 "Keep links to deleted inserts, greyed (LYNX)" = "Simpan tautan ke insert yang dihapus, berwarna abu-abu (LYNX)"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 188h)
 "Pocket Distortion" = "Pocket Distortion"
 "Pocket Limiter Classic" = "Pocket Limiter Classic"
@@ -8332,6 +8294,7 @@ countries: id
 "side" = "samping"
 "Output M/S" = "Keluaran M/S"
 "Input M/S" = "Masukan M/S"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 189h, batch B)
 "Pocket Wow & Flutter" = "Pocket Wow & Flutter"
 "Pocket Phaser" = "Pocket Phaser"
@@ -8351,6 +8314,7 @@ countries: id
 "Amount min" = "Jumlah min."
 "Stereo offset" = "Offset stereo"
 "16 bars" = "16 bar"
+
 # --- Pocket effects, round 189h: Waveshaper, Compressor, Spreader
 "Pocket Waveshaper" = "Pocket Waveshaper"
 "Pocket Compressor" = "Pocket Compressor"
@@ -8366,3 +8330,33 @@ countries: id
 "Octaver" = "Oktaver"
 "Rectify" = "Rektifikasi"
 "CrossFold" = "CrossFold"
+
+# --- Versions panel, open without third-party plugins, export sections and presets (round 190ap)
+"Versions" = "Versi"
+"Opened as a copy: {0}" = "Dibuka sebagai salinan: {0}"
+"Save asks where to keep it; the original file is untouched" = "Simpan akan menanyakan lokasinya; file asli tidak diubah"
+"Versions..." = "Versi..."
+"Before a save" = "Sebelum menyimpan"
+"No saved versions or backups of this project yet." = "Proyek ini belum punya versi tersimpan atau cadangan."
+"File › Save new version keeps the project as it is now; backups are written while you work." = "File › Simpan versi baru menyimpan proyek seperti saat ini; cadangan ditulis selama Anda bekerja."
+"Opens the chosen version or backup as a new, unsaved project: the file itself and the open project's file stay as they are" = "Membuka versi atau cadangan yang dipilih sebagai proyek baru yang belum disimpan: file itu sendiri dan file proyek yang terbuka tidak berubah"
+"Opens the file manager on the chosen file" = "Membuka pengelola file pada file yang dipilih"
+"A short note for the chosen version or backup (kept in a text file beside it, not inside the project). A labelled backup is never removed to make room for newer ones" = "Catatan singkat untuk versi atau cadangan yang dipilih (disimpan di file teks di sampingnya, bukan di dalam proyek). Cadangan berlabel tidak pernah dihapus untuk memberi ruang bagi yang lebih baru"
+"Saves the project under the next number (Song_2, Song_3...) and keeps working in it" = "Menyimpan proyek dengan nomor berikutnya (Song_2, Song_3...) dan terus bekerja di dalamnya"
+"{0} saved version(s), {1} backup(s)" = "{0} versi tersimpan, {1} cadangan"
+"Last backup: {0}" = "Cadangan terakhir: {0}"
+"Not saved yet" = "Belum disimpan"
+"Label" = "Label"
+"A short note for {0} (empty: no label)" = "Catatan singkat untuk {0} (kosong: tanpa label)"
+"The label could not be written next to the file." = "Label tidak dapat ditulis di samping file."
+"open now" = "sedang dibuka"
+"Open as a copy" = "Buka sebagai salinan"
+"Label..." = "Label..."
+"just now" = "baru saja"
+"{0} min ago" = "{0} mnt lalu"
+"{0} h ago" = "{0} jam lalu"
+"{0} d ago" = "{0} hari lalu"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"

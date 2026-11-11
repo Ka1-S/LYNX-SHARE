@@ -337,6 +337,9 @@ private:
     // project safety (REA round 118, FL's backup folder / save new version / project data files interpreted)
     void saveNewVersion();
     void revertToLastBackup();
+    // round 190ap: the Versions panel (saved versions and backups of this project) and its "Open as a copy"
+    void showVersions();
+    void openProjectAsCopy (const juce::File& file, const juce::String& name);
     void exportPackage();
     sessionui::Context sessionContext(); // the File › Online session commands (round 168a)
     liveui::Context liveContext();       // the live session's (round 169b)
