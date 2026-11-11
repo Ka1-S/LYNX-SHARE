@@ -306,6 +306,18 @@ struct RackState
                                                    const Factories& factories);
 };
 
+// An audio clip's own audio as its channel's instrument plays it (round 189l, FL's Make unique as sample): the clip's
+// pitch, stretch and direction are rendered in, at unity (no clip or channel volume, pan, fades or declick), for the
+// clip's length. The channel's own processing (precomputed effects, its pitch and time stretch, envelopes) is in it
+// too, and the channel copy that plays the result applies it again. Empty when the clip isn't an audio clip or its
+// channel's instrument can't be built. UI thread (allocates).
+struct ClipAudio
+{
+    double sampleRate = 44100.0;
+    std::vector<float> left, right;
+};
+ClipAudio renderClipAudio (const Song& song, std::size_t clipIndex, double sampleRate, const RackState::Factories& factories);
+
 class WorkerPool;
 
 // Whether a parallel container slot (FL's Patcher) can keep its built effect: same branches, children and links.

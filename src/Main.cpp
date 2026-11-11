@@ -11633,6 +11633,39 @@ private:
                        prefix + "-playlist-edit189e.png");
             saveWindow (lynx::PlaylistComponent::makeHeaderDropDialog(), "-header-drop189e.png");
             {
+                // round 189i: FL's fade handle menu (right-click on an audio clip's fade handle), on the song's first audio
+                // clip, or on one added for the shot
+                const auto before = offline.getSong();
+                auto clipIndex = -1;
+                for (std::size_t i = 0; i < before.playlist.size() && clipIndex < 0; ++i)
+                    if (before.playlist[i].kind == lynx::ClipKind::audio)
+                        clipIndex = (int) i;
+                if (clipIndex < 0)
+                {
+                    auto song = before;
+                    lynx::ChannelDef channel;
+                    channel.instrument = lynx::InstrumentKind::audioClip;
+                    channel.name = "Audio clip";
+                    song.channels.push_back (channel);
+                    lynx::Clip clip;
+                    clip.kind = lynx::ClipKind::audio;
+                    clip.channel = (int) song.channels.size() - 1;
+                    clip.length = lynx::ppq * 4;
+                    song.playlist.push_back (clip);
+                    clipIndex = (int) song.playlist.size() - 1;
+                    offline.setSong (song);
+                    offline.dispatchPendingMessages();
+                }
+                saveMenus (juce::StringArray { "Fade handle" },
+                           std::vector<juce::PopupMenu> { ui.getPlaylistForSnapshot().fadeHandleMenu (clipIndex, 1) },
+                           prefix + "-fade-handle189i.png");
+                if (offline.getSong().playlist.size() != before.playlist.size())
+                {
+                    offline.setSong (before);
+                    offline.dispatchPendingMessages();
+                }
+            }
+            {
                 // REA round 143: the piano roll Tools menu, a Playlist track menu and a mixer insert menu (FL's layouts)
                 std::vector<juce::PopupMenu> menus { ui.getPianoRollForSnapshot().getToolsMenuForSnapshot(),
                                                      ui.getPlaylistForSnapshot().getTrackMenuForSnapshot (0),

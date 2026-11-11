@@ -655,6 +655,8 @@ bool dropOnHeader (Song& song, int track, const std::string& path, const std::st
         c.name = quickrender::uniqueChannelName (song, name);
         c.instrument = kind;
         c.samplePath = path;
+        if (kind == InstrumentKind::audioClip)
+            c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
         song.channels.push_back (c);
         return (int) song.channels.size() - 1;
     };

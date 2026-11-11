@@ -1707,6 +1707,7 @@ int placeRenderedFiles (Song& song, const std::vector<RenderedFile>& files)
             stem.resize (dot);
         c.name = stem;
         c.instrument = InstrumentKind::audioClip;
+        c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
         c.samplePath = f.path;
         c.mixerTrack = 0; // FL: "---"
         song.channels.push_back (c);

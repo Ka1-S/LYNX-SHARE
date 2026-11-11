@@ -115,6 +115,8 @@ public:
     // FL's Playlist menu › Edit and › Select submenus (round 189e: the items of FL's shared EEMenu the Playlist enables,
     // in FL's order, FL 2026 shots f04 / f06), for the Playlist's options menu and its right-click menu.
     juce::PopupMenu editMenu();
+    // FL's fade handle menu for an audio clip's fade in (side 0) / out (1) (round 189i; shown by a right-click on the handle)
+    juce::PopupMenu fadeHandleMenu (int index, int side);
     juce::PopupMenu selectMenu();
     // The shortcut text of a key map action for menus ("\tShift+C"; empty when unbound), set by the main window.
     static inline std::function<juce::String (const std::string& id)> shortcutText;
@@ -335,6 +337,7 @@ private:
     void shiftSelectedClips (int steps, int tracks); // FL's Shift left / right / up / down
     void selectAllWithTime(); // FL's Select all (Ctrl+A): every clip and the whole song's time (round 189g)
     void makeSelectionUniqueAsSample(); // FL's Make unique as sample (round 189g)
+    void showFadeHandleMenu (int index, int side); // FL's fade handle menu (round 189i)
     void selectBySelectedSource();
     // FL's header drop (round 189e, trackmodes::dropOnHeader): the files on header `track`, asking first when the mode is
     // "Always ask"
@@ -477,6 +480,8 @@ private:
     int gainStartY = 0;
     static inline double copiedGainDb = 0.0;
     static inline bool hasCopiedGain = false;
+    static inline double copiedFadeMs = 0.0; // the fade handle menu's Copy value (round 189i)
+    static inline bool hasCopiedFade = false;
     // FL: a double click held on the ruler drags a time selection (as Ctrl+drag); released without moving it clears
     bool rulerDoubleDrag = false;
     bool rulerMenuOnClick = false; // a right press on the ruler: the ruler menu if released in place (round 168t)

@@ -3009,6 +3009,7 @@ private:
             ChannelDef c;
             c.name = name;
             c.instrument = InstrumentKind::audioClip;
+            c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
             c.samplePath = path;
             c.mixerTrack = s.claimFreeInsert();
             s.channels.push_back (c);

@@ -667,4 +667,57 @@ inline std::vector<int> invertedSelection (int clipCount, const std::vector<int>
             out.push_back (i);
     return out;
 }
+// Make unique as sample (round 189l): the clip now plays `channel`, a file holding what it played, from its start; its own
+// pitch, stretch and reverse are in the file, so they are reset
+inline void resetRenderedClip (Clip& c, int channel) noexcept
+{
+    c.channel = channel;
+    c.offset = 0;
+    c.offsetFraction = 0.0f;
+    c.pitch = 0.0f;
+    c.stretch = 1.0;
+    c.reversed = false;
+}
+
+// --- FL's per-clip edge declicker (round 189i, REA FLEngine_x64.dll) --------------------------------------------------------
+// The fade handle menu (PLFadeHandleMenu, PLFadeHandleMenuClick 0xea9040 -> FUN_00d02e00 / FUN_00d01bc0) stores, per side,
+// "Manual" (fade flags bit 0 / 1, FUN_00cfbf60: turning it off also zeroes that side's fade) and the Declicker choice
+// (flags >> 2 & 7 / >> 14 & 7, FUN_00cfc020 via FUN_00d03100): Automatic 0, Enabled 2 ("use channel declicker"),
+// Disabled 3 ("bypass declicker"); 1 is FL's own "Automatic, joined seamlessly" (FUN_00d011a0 resets 0 / 1 and sets 1
+// where two clips continue each other). FL /R renders (round 189l) play 1 as Automatic: the channel's declicker is
+// skipped only on a side that is Disabled, manual or has a fade.
+enum DeclickChoice
+{
+    declickAutomatic = 0,
+    declickJoined = 1,
+    declickEnabled = 2,
+    declickDisabled = 3
+};
+
+inline int declickChoice (const Clip& c, int side) noexcept
+{
+    return (int) ((c.flFadeFlags >> (side == 0 ? 2 : 14)) & 7u);
+}
+
+inline void setDeclickChoice (Clip& c, int side, int choice) noexcept
+{
+    const auto shift = side == 0 ? 2u : 14u;
+    c.flFadeFlags = (c.flFadeFlags & ~(7u << shift)) | (((std::uint32_t) choice & 7u) << shift);
+}
+
+inline bool manualFade (const Clip& c, int side) noexcept
+{
+    return (c.flFadeFlags & (side == 0 ? 1u : 2u)) != 0;
+}
+
+// FL's Manual item (FUN_00cfbf60): on / off per side; off also zeroes that side's fade (FL keeps only automatic
+// crossfades on a side that isn't manual)
+inline void setManualFade (Clip& c, int side, bool on) noexcept
+{
+    const auto bit = side == 0 ? 1u : 2u;
+    c.flFadeFlags = on ? (c.flFadeFlags | bit) : (c.flFadeFlags & ~bit);
+    if (! on)
+        (side == 0 ? c.fadeIn : c.fadeOut) = 0;
+}
+
 } // namespace lynx::clipops

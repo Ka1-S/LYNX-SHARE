@@ -90,6 +90,9 @@ public:
     // than one block (so the next block's position is never passed: the playhead only moves forward). 0 when stopped.
     double playheadAdvanceTicks() const noexcept;
     SampleLibrary& getSampleLibrary() noexcept { return samples; }
+    // An audio clip's own audio through its channel's instrument (core renderClipAudio), at the engine's sample rate, with
+    // the samples, stretches and plugins the rack uses (round 189l, Make unique as sample). UI thread.
+    ClipAudio renderClipAudio (std::size_t clipIndex);
     MeterBank& getMeters() noexcept { return meters; }
     // Tools > Audio logger (REA round 153): records everything the Master plays to a WAV in the background.
     AudioLogger& getAudioLogger();
@@ -849,6 +852,7 @@ private:
     double previewVolume = 1.0;
     double editorVolume = 1.0;
     void publishSong();
+    RackState::Factories rackFactories();
     void adoptPrepared (PreparedFlp& prepared); // the plugins of a prepared import found / substituted (message thread)
 
     std::unique_ptr<WorkerPool> workers; // extra renderer threads (before the graph, which uses them)

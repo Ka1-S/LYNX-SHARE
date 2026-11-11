@@ -144,6 +144,7 @@ int applyPatternRender (Song& song, int pattern, const std::string& samplePath, 
     ChannelDef c;
     c.name = uniqueChannelName (song, patternName (song, pattern));
     c.instrument = InstrumentKind::audioClip;
+    c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
     c.samplePath = samplePath;
     c.volume = audioClipUnityVolume; // FL's AudioTrack.fst (10000): the render plays at its own level (1.0 was +5.18 dB)
     c.mixerTrack = 0;
@@ -265,6 +266,7 @@ int applyConsolidation (Song& song, const Plan& plan, const std::string& sampleP
     ChannelDef ch;
     ch.name = uniqueChannelName (song, plan.name);
     ch.instrument = InstrumentKind::audioClip;
+    ch.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
     ch.samplePath = samplePath;
     ch.volume = audioClipUnityVolume; // FL's AudioTrack.fst (10000, FUN_012fbda0): unity (1.0 was +5.18 dB, round 186b)
     ch.mixerTrack = 0;

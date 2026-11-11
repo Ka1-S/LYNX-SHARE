@@ -3403,6 +3403,32 @@ const AutomationDisplay& AudioEngine::getAutomationDisplay()
     return automationDisplay;
 }
 
+RackState::Factories AudioEngine::rackFactories()
+{
+    RackState::Factories factories;
+    factories.samples = [this] (const std::string& path) {
+        const loadtrace::Scope timing ("rack_samples");
+        return samples.load (juce::String::fromUTF8 (path.c_str()));
+    };
+    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones, const StretchMap& map) {
+        const loadtrace::Scope timing ("rack_stretch");
+        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones, map);
+    };
+    factories.stretchedSpans = [this] (const std::string& path, const std::string& variant, const std::shared_ptr<const SampleData>& span,
+                                       double ratio, StretchMethod method, double semitones) {
+        const loadtrace::Scope timing ("rack_stretch");
+        return samples.loadStretchedSpan (juce::String::fromUTF8 (path.c_str()), variant, span, ratio, method, semitones);
+    };
+    factories.pluginInstruments = [this] (const PluginRef& ref, double sr) { return plugins.makeInstrument (ref, sr); };
+    factories.pluginEffects = [this] (const PluginRef& ref, double sr) { return plugins.makeEffect (ref, sr); };
+    return factories;
+}
+
+ClipAudio AudioEngine::renderClipAudio (std::size_t clipIndex)
+{
+    return lynx::renderClipAudio (song, clipIndex, transport.sampleRate.load(), rackFactories());
+}
+
 void AudioEngine::publishSong()
 {
     // Issue #134: a hosted plugin may run the message loop while it is created (a licence or trial box, COM, a splash
@@ -3492,20 +3518,8 @@ void AudioEngine::publishSong()
     transport.songStart.store ((double) song.performanceZoneEnd());
 
     const loadtrace::Scope buildTiming ("rack_build");
-    RackState::Factories factories;
-    factories.samples = [this] (const std::string& path) {
-        const loadtrace::Scope timing ("rack_samples");
-        return samples.load (juce::String::fromUTF8 (path.c_str()));
-    };
-    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones, const StretchMap& map) {
-        const loadtrace::Scope timing ("rack_stretch");
-        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones, map);
-    };
-    factories.stretchedSpans = [this] (const std::string& path, const std::string& variant, const std::shared_ptr<const SampleData>& span,
-                                       double ratio, StretchMethod method, double semitones) {
-        const loadtrace::Scope timing ("rack_stretch");
-        return samples.loadStretchedSpan (juce::String::fromUTF8 (path.c_str()), variant, span, ratio, method, semitones);
-    };
+    auto factories = rackFactories();
+    // the song's own rack (not the offline clip render, which shares rackFactories()) tells the UI a plugin is being created
     factories.pluginInstruments = [this] (const PluginRef& ref, double sr) {
         if (duringPluginCreation)
             duringPluginCreation();
