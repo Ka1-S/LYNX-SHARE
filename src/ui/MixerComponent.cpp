@@ -152,17 +152,29 @@ public:
             return;
         const auto imageSize = (visible.withZeroOrigin().toFloat() * scale).getSmallestIntegerContainer();
 
-        if (visible != shown || image.isNull() || image.getBounds() != imageSize)
+        // (round 190bm) a window drawn without the GPU gets a software picture; a picture lost with its graphics
+        // device is painted again; no picture at all (no memory): straight to the window
+        const auto software = ui::windowDrawnByCpu (owner);
+        const auto losses = ui::pictureLossCount();
+        if (visible != shown || image.isNull() || image.getBounds() != imageSize || software != softwareImage || losses != lossesSeen)
         {
-            if (image.isNull() || image.getBounds() != imageSize)
-                image = juce::Image (juce::Image::RGB, juce::jmax (1, imageSize.getWidth()), juce::jmax (1, imageSize.getHeight()), false);
+            if (image.isNull() || image.getBounds() != imageSize || software != softwareImage)
+                image = ui::makePicture (imageSize.getWidth(), imageSize.getHeight(), software);
+            softwareImage = software;
+            lossesSeen = losses;
             shown = visible;
             valid.clear();
+        }
+        ui::notePicture ("Mixer", image, scale, softwareImage, owner, noted);
+        if (image.isNull())
+        {
+            owner.paintEntireComponent (g, false);
+            return;
         }
 
         if (! valid.containsRectangle (visible))
         {
-            const ui::ScopedNoImageReadback noReadback; // (the picture is only ever drawn to the window)
+            const ui::ScopedNoImageReadback noReadback (image); // (the picture is normally only drawn to the window)
             juce::Graphics imageGraphics (image);
             auto& context = imageGraphics.getInternalContext();
             context.addTransform (juce::AffineTransform::translation ((float) -visible.getX(), (float) -visible.getY()).scaled (scale));
@@ -183,6 +195,8 @@ public:
                                     .translated ((float) visible.getX(), (float) visible.getY()),
                                 false);
         owner.paintMeterLevels (g);
+        if (ui::pictureLostMeanwhile (lossesSeen, lossRetries))
+            owner.repaint();
     }
 
     bool invalidateAll() override // (JUCE's repaint() of the whole component comes here, not to invalidate())
@@ -210,6 +224,10 @@ private:
     juce::Image image;
     juce::Rectangle<int> shown; // the visible part the picture holds
     juce::RectangleList<int> valid;
+    bool softwareImage = false; // the picture is a software image (the window is drawn without the GPU)
+    int lossesSeen = 0;         // ui::pictureLossCount() when the picture was last known good
+    int lossRetries = 0;
+    juce::String noted; // ui::notePicture's memory
 };
 
 MixerStrips::MixerStrips (AudioEngine& e)

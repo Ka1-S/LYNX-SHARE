@@ -71,6 +71,7 @@
 #include "ui/VideoTracks.h"
 #include "ui/AdrWindow.h"
 #include "ui/PlaylistComponent.h"
+#include "ui/PictureCheck.h"
 #include "ui/PatternBlocksView.h"
 #include "ui/PatcherEditor.h"
 #include "ui/VisualEditors.h"
@@ -760,6 +761,17 @@ public:
             const auto i = args.indexOf ("--cachetest");
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
             runCacheTest (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            return;
+        }
+
+        if (args.contains ("--picturetest"))
+        {
+            // LYNX --picturetest report.txt [project.(flp|lynx)] (round 190bm): the Playlist and the Mixer drawn through
+            // their cached pictures at 100-300 %, into native and software targets, against straight paints; off
+            // screen (no window)
+            const auto i = args.indexOf ("--picturetest");
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            runPictureTest (juce::File (args[i + 1].unquoted()), i + 2 < args.size() ? juce::File (args[i + 2].unquoted()) : juce::File());
             return;
         }
 
@@ -3895,8 +3907,30 @@ private:
         auto& lookBefore = juce::LookAndFeel::getDefaultLookAndFeel();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto fontsResult = lynx::theme::fontSelfTest();
+        // round 190bm (0.1.25 showed the Mixer and the Playlist black): their cached pictures shown on native and
+        // software targets against straight paints (ui/PictureCheck.h; --picturetest runs more sizes and scales)
+        juce::String picturesResult = "OK";
+        {
+            lynx::AudioEngine pictureEngine (false);
+            auto pictureFailures = 0;
+            juce::String lines;
+            {
+                lynx::PlaylistComponent playlist (pictureEngine);
+                playlist.setBounds (0, 0, 1200, 700);
+                playlist.setVisible (true);
+                lines << lynx::ui::picturecheck::run (playlist, "Playlist 1200 x 700", { 1.0f, 1.5f }, pictureFailures, {});
+            }
+            {
+                lynx::MixerComponent mixer (pictureEngine);
+                mixer.setBounds (0, 0, 1200, 500);
+                mixer.setVisible (true);
+                lines << lynx::ui::picturecheck::run (mixer, "Mixer 1200 x 500", { 1.0f, 1.5f }, pictureFailures, {});
+            }
+            if (pictureFailures > 0 || ! lines.contains (": ok"))
+                picturesResult = "ERROR " + lines.trim().replace ("\n", "; ");
+        }
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
-        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
+        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK";
@@ -3926,6 +3960,7 @@ private:
                << "undo=" << (undoOk ? "OK" : "ERROR") << "\n"
                << "mixer_basics=" << mixerBasics << "\n"
                << "fonts=" << fontsResult << "\n"
+               << "cached_pictures=" << picturesResult << "\n"
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "cancel_recording=" << (cancelRecordOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"
@@ -7536,6 +7571,63 @@ private:
             text << "result=ERROR " << error << "\n";
         report.replaceWithText (text);
         setApplicationReturnValue (ok && text.contains ("result=OK") ? 0 : 1);
+        quit();
+    }
+
+    // --picturetest (round 190bm): ui/PictureCheck.h on the Playlist and the Mixer, at a window's usual size, at a 4K
+    // screen's, and wider than a GPU bitmap can be (16384 px)
+    void runPictureTest (const juce::File& report, const juce::File& project)
+    {
+        engine = std::make_unique<lynx::AudioEngine>();
+        juce::String error, text;
+        if (project != juce::File())
+        {
+            auto ok = false;
+            if (project.hasFileExtension ("flp"))
+                ok = engine->importFlpFile (project, error);
+            else if (auto song = lynx::ProjectFile::load (project, error))
+            {
+                engine->setSong (std::move (*song));
+                ok = true;
+            }
+            text << "project: " << project.getFullPathName() << (ok ? "" : " (not loaded: " + error + ")") << "\n";
+        }
+       #if JUCE_WINDOWS
+        text << "native image: " << juce::NativeImageType().create (juce::Image::RGB, 8, 8, true)->createType()->getTypeID()
+             << " (software = " << juce::SoftwareImageType().getTypeID() << ")\n";
+       #endif
+        auto failures = 0;
+        struct Size
+        {
+            int width, height;
+            std::vector<float> scales;
+        };
+        const auto folder = report.getParentDirectory();
+        for (const auto& size : { Size { 1466, 930, { 1.0f, 1.5f, 2.0f, 3.0f } }, Size { 3840, 2040, { 1.0f, 2.0f } }, Size { 17000, 700, { 1.0f } } })
+        {
+            const auto label = [&size] (const char* name) { return juce::String (name) + " " + juce::String (size.width) + " x " + juce::String (size.height); };
+            {
+                auto playlist = std::make_unique<lynx::PlaylistComponent> (*engine);
+                playlist->setBounds (0, 0, size.width, size.height);
+                playlist->setVisible (true);
+                {
+                    juce::Image warm (juce::Image::RGB, 64, 64, true); // (one paint asks for the waveforms, then they are waited for)
+                    juce::Graphics g (warm);
+                    playlist->paintEntireComponent (g, true);
+                }
+                lynx::ui::WaveformCache::getInstance()->waitUntilIdle (60000);
+                text << lynx::ui::picturecheck::run (*playlist, label ("Playlist"), size.scales, failures, folder);
+            }
+            {
+                auto mixer = std::make_unique<lynx::MixerComponent> (*engine);
+                mixer->setBounds (0, 0, size.width, juce::jmin (size.height, 700));
+                mixer->setVisible (true);
+                text << lynx::ui::picturecheck::run (*mixer, label ("Mixer"), size.scales, failures, folder);
+            }
+        }
+        text << "failures: " << failures << "\nresult=" << (failures == 0 ? "OK" : "FAIL") << "\n";
+        report.replaceWithText (text);
+        setApplicationReturnValue (failures == 0 ? 0 : 1);
         quit();
     }
 

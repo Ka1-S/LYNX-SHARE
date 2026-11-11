@@ -11,6 +11,7 @@
 #include "engine/PluginSandbox.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
+#include "ui/ImageReadback.h"
 #include "ui/SettingsPages.h"
 #include "ui/Theme.h"
 #include "ui/WindowOwner.h"
@@ -264,6 +265,20 @@ cr::ReportInput makeInput (const Session& session, const juce::String& kind, juc
         in.plugins.push_back ({ utf8 (f[0]), utf8 (f[1]), utf8 (f[2] + (f.size() > 4 && f[4].isNotEmpty() ? " (" + f[4] + ")" : juce::String())), utf8 (f[3]) });
     }
     in.settings = { { "gpuRendering", gpuRenderingEnabled() }, { "pluginSandbox", pluginSandboxEnabled() }, { "pluginSubstitutes", pluginSubstitutesEnabled() } };
+    // (round 190bm: what really draws the main window now, and whether the Playlist's / Mixer's cached pictures are on)
+    if (juce::MessageManager::existsAndIsCurrentThread())
+    {
+        auto byCpu = false; // (plugin windows are always drawn by the CPU: not counted)
+        for (int i = juce::TopLevelWindow::getNumTopLevelWindows(); --i >= 0;)
+            if (auto* window = juce::TopLevelWindow::getTopLevelWindow (i); window != nullptr && ! window->getProperties()["lynxGdi"])
+                byCpu = byCpu || ui::windowDrawnByCpu (*window);
+        in.settings.push_back ({ "windowDrawnByCpu", byCpu });
+    }
+    for (const auto& [name, variable] : { std::pair<const char*, const char*> { "playlistPicture", "LYNX_PLAYLIST_CACHE" }, { "mixerPicture", "LYNX_MIXER_CACHE" } })
+    {
+        const auto* v = std::getenv (variable);
+        in.settings.push_back ({ name, v == nullptr || juce::String (v) != "0" });
+    }
     return in;
 }
 
