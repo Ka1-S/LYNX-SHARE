@@ -31,6 +31,19 @@ public:
     juce::FileSearchPath getDefaultLocationsToSearch() override;
     bool requiresUnblockedMessageThreadDuringCreation (const juce::PluginDescription&) const override { return false; }
 
+    ~ClapPluginFormat() override;
+
+    // A CLAP instance deleted on another thread has its plugin deactivated and destroyed by the message thread (CLAP's
+    // threading rules, issue #46); the deleting thread waits a moment for that and then goes on. Teardowns the message
+    // thread has not run yet wait in a queue: it runs them when it is free again, and this runs them now. Call it on
+    // the message thread when the application closes, after the threads that may still hold plugins have ended (from
+    // any other thread it does nothing).
+    static void finishPendingTeardowns();
+    static int pendingTeardowns();  // how many wait for the message thread now
+    static int deferredTeardowns(); // how many the deleting thread ever went on without (diagnostics, tests)
+    // how long the deleting thread waits for the message thread (default 10 s; the tests shorten it)
+    static void setTeardownWaitMs (int ms);
+
 private:
     void createPluginInstance (const juce::PluginDescription&, double initialSampleRate, int initialBufferSize,
                                PluginCreationCallback) override;
