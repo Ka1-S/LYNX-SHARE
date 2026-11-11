@@ -143,7 +143,7 @@
 "c.gen-layer": "Sam nie wydaje dźwięku. Każda otrzymana nuta jest przekazywana do jego kanałów podrzędnych, więc jeden pattern może grać kilkoma generatorami naraz.",
 "c.gen-lynx-soundfont": "Gra banki SoundFont 2 i 3 oraz instrumenty SFZ, z wyszukiwaniem presetów we wszystkich twoich SoundFontach, obwiednią, filtrem oraz wbudowanym pogłosem i chorusem.",
 "c.gen-midi-out": "Cichy kanał, który wysyła swoje nuty i wartości kontrolerów jako MIDI do pluginów nasłuchujących na jego porcie i niesie 72 pokrętła kontrolerów.",
-"c.gen-minisynth": "Silnik syntezatora analogowego w stylu monofonicznym z oscylatorem, wzmacniaczem, filtrem, dwiema obwiedniami, LFO i sekcją efektów, odbudowany z MiniSynth z FL Studio.",
+"c.gen-minisynth": "Silnik syntezatora z oscylatorami tablicowymi i szumem, filtrem 4-biegunowym, dwiema obwiedniami, LFO oraz efektami distortion, delay, phaser i chorus, odbudowany z MiniSynth z FL Studio.",
 "c.gen-morphine": "Silnik syntezatora addytywnego, który morfuje między przebiegami, z generatorem szumu, equalizerem oraz efektami chorus, delay i reverb.",
 "c.gen-ogun": "Silnik syntezatora addytywnego z kontrolkami barwy widmowej, unison, filtrem, trzypasmowym equalizerem oraz efektami chorus, delay i reverb.",
 "c.gen-patcher": "Graf węzłów złożony z instrumentów, efektów i pluginów VST3 lub CLAP połączonych kablami audio, nut i sterowania, używany jako generator Channel Rack.",

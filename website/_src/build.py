@@ -86,7 +86,8 @@ def slug(s):
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
-def markdown(text):
+def markdown(text, ids=None):
+    """ids: the heading ids to use, in order (a translated body keeps the English anchors)."""
     lines, out, i = text.strip("\n").split("\n"), [], 0
     while i < len(lines):
         ln = lines[i]
@@ -101,7 +102,7 @@ def markdown(text):
         elif re.match(r"#{2,3} ", ln):
             n = len(ln.split(" ")[0])
             t = ln[n + 1:].strip()
-            out.append('<h%d id="%s">%s</h%d>' % (n, slug(t), inline(t), n))
+            out.append('<h%d id="%s">%s</h%d>' % (n, next(ids, "") if ids is not None else slug(t), inline(t), n))
             i += 1
         elif ln.startswith("|"):
             rows = []
@@ -177,12 +178,13 @@ var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
 h.lang=lang;h.classList.remove("nojs");if(location.search.indexOf("shot")>=0)h.classList.add("shot");
+if((" "+(h.getAttribute("data-wt")||"")+" ").indexOf(" "+lang+" ")>=0)h.classList.add("wt");
 if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.remove("i18n-wait");},2500);}
 })();
 </script>""" % (json.dumps(LANGS, ensure_ascii=False, separators=(",", ":")), version)
 
 
-def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", home=False):
+def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", home=False, wt=""):
     """title_key: a string key, or ("", "Plain title") for a title that is the same in every language."""
     plain = title_key[1] if isinstance(title_key, tuple) else None
     title_key = "" if plain else title_key
@@ -192,7 +194,7 @@ def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", ho
     alts = "".join('<link rel="alternate" hreflang="%s" href="%s%s">\n' % (l, url, "" if l == "en" else "?lang=" + ("pt" if l == "pt-BR" else l)) for l, _ in LANGS)
     ogl = "".join('<meta property="og:locale:alternate" content="%s">\n' % v for v in OGL.values())
     nav = "".join('<a href="%s"%s data-i18n="%s">%s</a>' % (h, ' aria-current="page"' if k == cur else "", key, en) for k, h, key, en in NAV if k != "download")
-    attrs = (' data-title="%s"' % title_key if title_key else "") + ' data-desc="%s"' % desc_key + (' data-dict="%s"' % part if part else "") + (' data-home' if home else "")
+    attrs = (' data-title="%s"' % title_key if title_key else "") + ' data-desc="%s"' % desc_key + (' data-dict="%s"' % part if part else "") + (' data-home' if home else "") + (' data-wt="%s"' % wt if wt else "")
     js = "".join('<script src="%s?v=%s" defer></script>\n' % (s, version) for s in ("/assets/site.js",) + tuple(scripts))
     return f"""<!doctype html>
 <html lang="en" class="nojs"{attrs}>
@@ -360,7 +362,7 @@ def wiki_pages():
     for g in index:
         for s in g["pages"] + g.get("hidden", []):
             meta, body = front(SRC / "wiki" / (s + ".md"))
-            pages[s] = {"slug": s, "meta": meta, "body": body}
+            pages[s] = {"slug": s, "meta": meta, "body": body, "prose": markdown(body)}
             T["wk.%s.t" % s] = meta["title"]
             T["wk.%s.s" % s] = meta["summary"]
         T[g["key"]] = g["title"]
@@ -408,6 +410,11 @@ def wiki_nav(index, cat, cur):
     return "".join(out)
 
 
+def enonly(url):
+    """The "English only" note, on pages some language has no translated body for (html.wt hides it for the others)."""
+    return "" if len(BODY_LANGS.get(url, ())) == len(LANGS) - 1 else '<p class="enonly" data-i18n="wiki.enOnly">%s</p>' % T["wiki.enOnly"]
+
+
 def wiki_shell(index, cat, order, url, head, prose, toc):
     n = [e[0] for e in order].index(url) if url in [e[0] for e in order] else -1
     prev = '<a href="%s"><span data-i18n="wiki.prev">%s</span>%s</a>' % (order[n - 1][0], T["wiki.prev"], wlink(order[n - 1], tag="b")[len('<a href="%s">' % order[n - 1][0]):-4]) if n > 0 else "<span></span>"
@@ -417,23 +424,22 @@ def wiki_shell(index, cat, order, url, head, prose, toc):
         tocbox = '<nav class="toc" aria-label="On this page"><h2 data-i18n="wiki.toc">%s</h2><ol>%s</ol></nav>' % (
             T["wiki.toc"], "".join('<li><a href="#%s"%s>%s</a></li>' % (i, ' data-i18n="%s"' % k if k else "", t) for i, k, t in toc))
     return ('<div class="wrap wiki">%s<article><a class="wjump" href="#wnav" data-i18n="wiki.all">%s</a>%s'
-            '<p class="enonly" data-i18n="wiki.enOnly">%s</p><div class="wbody%s">%s<div class="prose">%s</div></div><nav class="wpn">%s%s</nav></article></div>'
-            % (wiki_nav(index, cat, url), T["wiki.all"], head, T["wiki.enOnly"], " hastoc" if tocbox else "", tocbox, prose, prev, nxt))
+            '%s<div class="wbody%s">%s<div class="prose" id="wprose">%s</div></div><nav class="wpn">%s%s</nav></article></div>'
+            % (wiki_nav(index, cat, url), T["wiki.all"], head, enonly(url), " hastoc" if tocbox else "", tocbox, prose, prev, nxt))
 
 
 def render_wiki_page(index, cat, order, pages, s):
     p = pages[s]
     short = ' <span class="tag" data-i18n="wiki.short">%s</span>' % T["wiki.short"] if p["meta"].get("status") == "short" else ""
     head = '<h1><span data-i18n="wk.%s.t">%s</span>%s</h1><p class="sub" data-i18n="wk.%s.s">%s</p>' % (s, esc(T["wk.%s.t" % s]), short, s, esc(T["wk.%s.s" % s]))
-    prose = markdown(p["body"])
+    prose = p["prose"]
     toc = [(i, "", t) for i, t in re.findall(r'<h2 id="([^"]+)">(.*?)</h2>', prose)]
     p["heads"] = [re.sub(r"<[^>]+>", "", t) for _, _, t in toc]
     return wiki_shell(index, cat, order, "/wiki/%s/" % s, head, prose, toc)
 
 
-def render_plugin_page(index, cat, order, p):
-    w = p["wiki"]
-    head = '<h1>%s</h1><p class="sub" data-i18n="c.%s">%s</p><div class="tags">%s</div>' % (esc(p["name"]), p["id"], T["c." + p["id"]], plugin_tags(p))
+def plugin_prose(p, cat, w):
+    """The body of a plugin's page from its texts w (English, or a translation of them); returns (html, toc)."""
     parts = []
     if p["dim"]:
         src = "/assets/img/plugins/%s.webp" % p["id"]
@@ -450,7 +456,64 @@ def render_plugin_page(index, cat, order, p):
     toc.append(("related", "wiki.related", T["wiki.related"]))
     parts.append('<h2 id="related" data-i18n="wiki.related">%s</h2><ul><li><a href="/wiki/built-in/" data-i18n="wiki.relOverview">%s</a></li><li><a href="/instruments-and-effects/#g-%s">%s</a></li></ul>'
                  % (T["wiki.related"], T["wiki.relOverview"], p["cat"], tr("wiki.relCat", len(cat))))
-    return wiki_shell(index, cat, order, "/wiki/built-in/%s/" % p["id"], head, "".join(parts), toc)
+    return "".join(parts), toc
+
+
+def render_plugin_page(index, cat, order, p):
+    head = '<h1>%s</h1><p class="sub" data-i18n="c.%s">%s</p><div class="tags">%s</div>' % (esc(p["name"]), p["id"], T["c." + p["id"]], plugin_tags(p))
+    prose, toc = plugin_prose(p, cat, p["wiki"])
+    return wiki_shell(index, cat, order, "/wiki/built-in/%s/" % p["id"], head, prose, toc)
+
+
+# ---------------------------------------------------------------- translated wiki bodies
+BODY_LANGS = {}     # page address -> the languages that have its body
+
+
+def digest(text):
+    return hashlib.sha1(text.strip().encode("utf-8")).hexdigest()[:10]
+
+
+def plugin_source(w):
+    """What a plugin page's translation was made from (its digest goes into the translation as "source")."""
+    return json.dumps([w["intro"], w.get("controls", []), w.get("tips", [])], ensure_ascii=False)
+
+
+def wiki_bodies(index, pages, cat):
+    """The wiki bodies in other languages, shown in place of the English body by assets/site.js.
+
+    Articles: _src/wiki/<lang>/<page>.md (front matter "source": digest of the English body it was made from).
+    Plugin pages: _src/catalog-wiki/<lang>.json {plugin id: {"source", "intro", "controls", "tips"}}.
+    A body whose source no longer matches the English is left out (scripts/check-site-i18n.py reports it).
+    Written to i18n/wiki/<lang>/<page>.html and built-in/<plugin>.html, plus heads.json for the search."""
+    files = {}
+    for lang, _ in LANGS[1:]:
+        heads = {}
+        for s, p in pages.items():
+            f = SRC / "wiki" / lang / (s + ".md")
+            if not f.exists():
+                continue
+            meta, body = front(f)
+            if meta.get("source") != digest(p["body"]):
+                continue
+            ids = re.findall(r'<h[23] id="([^"]+)"', p["prose"])
+            prose = markdown(body, iter(ids))
+            if re.findall(r'<h[23] id="([^"]*)"', prose) != ids:
+                sys.exit("build: %s has other headings than the English page" % f)
+            url = "/wiki/%s/" % s
+            files["i18n/wiki/%s/%s.html" % (lang, s)] = prose + "\n"
+            heads[url] = [[i, re.sub(r"<[^>]+>", "", t)] for i, t in re.findall(r'<h2 id="([^"]+)">(.*?)</h2>', prose)]
+            BODY_LANGS.setdefault(url, []).append(lang)
+        f = SRC / "catalog-wiki" / (lang + ".json")
+        mine = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+        for p in cat:
+            w = mine.get(p["id"])
+            if not (w and p.get("wiki")) or w.get("source") != digest(plugin_source(p["wiki"])):
+                continue
+            files["i18n/wiki/%s/built-in/%s.html" % (lang, p["id"])] = plugin_prose(p, cat, w)[0] + "\n"
+            BODY_LANGS.setdefault("/wiki/built-in/%s/" % p["id"], []).append(lang)
+        if heads:
+            files["i18n/wiki/%s/heads.json" % lang] = json.dumps(heads, ensure_ascii=False, separators=(",", ":")) + "\n"
+    return files
 
 
 def render_wiki_index(index, cat, pages):
@@ -470,7 +533,7 @@ def render_wiki_index(index, cat, pages):
                      % (g["key"], esc(g["title"]), tr("wiki.pages", count), g["key"], T[g["key"] + ".d"], "".join(rows)))
     return ('<div class="phead"><div class="wrap"><h1 data-i18n="wiki.h1">%s</h1><p data-i18n="wiki.sub">%s</p>%s</div></div>'
             '<div class="wrap wikiidx">'
-            '<p class="enonly" data-i18n="wiki.enOnly">%s</p><div class="wcards">%s</div></div>' % (T["wiki.h1"], T["wiki.sub"], SEARCH % (T["ws.ph"], T["ws.ph"]), T["wiki.enOnly"], "".join(cards)))
+            '%s<div class="wcards">%s</div></div>' % (T["wiki.h1"], T["wiki.sub"], SEARCH % (T["ws.ph"], T["ws.ph"]), enonly("/wiki/"), "".join(cards)))
 
 
 def render_faq():
@@ -528,6 +591,10 @@ def main():
     index, pages = wiki_pages()
     cat = catalog()
     order = wiki_order(index, cat)
+    body_files = wiki_bodies(index, pages, cat)
+    full = [l for l, _ in LANGS[1:] if all(l in BODY_LANGS.get(e[0], ()) for e in order)]
+    if full:
+        BODY_LANGS["/wiki/"] = full                # the index page: languages with every body
     collect((SRC / "pages/why.html").read_text(encoding="utf-8"), T, "why")      # Home's row reuses the Why page's headings
     sub = {"VER_UP": latest["version"].upper(), "VER_LINE": "v" + latest["version"], "LATEST": render_latest(latest),
            "IC_WIN": IC["win"], "IC_MAC": IC["mac"], "IC_LINUX": IC["linux"],
@@ -567,8 +634,9 @@ def main():
     upd = {k: v for k, v in en.items() if k.startswith("u.")}
     cen = {k: v for k, v in en.items() if k.startswith("c.")}
     dump = lambda d: json.dumps(d, ensure_ascii=False, indent=0) + "\n"
-    files = {"i18n/en.json": dump({"ui": ui, "featured": {}, "insp": {}}), "i18n/updates/en.json": dump(upd), "i18n/catalog/en.json": dump(cen),
-             "wiki/search.json": json.dumps({"g": {g["key"]: g["title"] for g in index}, "p": search}, ensure_ascii=False, separators=(",", ":")) + "\n"}
+    files = dict(body_files)
+    files.update({"i18n/en.json": dump({"ui": ui, "featured": {}, "insp": {}}), "i18n/updates/en.json": dump(upd), "i18n/catalog/en.json": dump(cen),
+             "wiki/search.json": json.dumps({"g": {g["key"]: g["title"] for g in index}, "p": search}, ensure_ascii=False, separators=(",", ":")) + "\n"})
     lk = vkey(latest) + "."
     for f in sorted((OUT / "i18n/updates").glob("*.json")) if (OUT / "i18n/updates").is_dir() else []:
         d = upd if f.stem == "en" else json.loads(f.read_text(encoding="utf-8"))
@@ -585,9 +653,13 @@ def main():
             stamp.update(f.read_bytes())
     version = stamp.hexdigest()[:8]
     for path, cur, tk, dk, body, scripts, part in bodies:
-        files[(path.strip("/") + "/index.html").lstrip("/")] = frame(path, cur, tk, dk, body, version, scripts, part, home=path == "/")
+        files[(path.strip("/") + "/index.html").lstrip("/")] = frame(path, cur, tk, dk, body, version, scripts, part, home=path == "/",
+                                                                     wt=" ".join(BODY_LANGS.get(path, ())) if path.startswith("/wiki/") else "")
 
-    stale = []
+    stale = [str(f.relative_to(OUT)) for f in sorted((OUT / "i18n/wiki").glob("**/*.*")) if str(f.relative_to(OUT)) not in files]
+    if not check:
+        for name in stale:                         # bodies whose translation is gone or out of date
+            (OUT / name).unlink()
     for name, text in files.items():
         f = OUT / name
         if not f.exists() or f.read_text(encoding="utf-8") != text:

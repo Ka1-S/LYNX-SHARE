@@ -143,7 +143,7 @@
 "c.gen-layer": "Macht selbst keinen Ton. Jede Note, die er erhält, wird an seine Kindkanäle weitergegeben, sodass ein Pattern mehrere Generatoren gleichzeitig spielen kann.",
 "c.gen-lynx-soundfont": "Spielt SoundFont-2- und -3-Bänke und SFZ-Instrumente, mit Preset-Suche über alle deine SoundFonts, Hüllkurve, Filter und eingebautem Reverb und Chorus.",
 "c.gen-midi-out": "Ein stummer Kanal, der seine Noten und Controller-Werte als MIDI an die Plugins sendet, die an seinem Port lauschen, und 72 Controller-Regler trägt.",
-"c.gen-minisynth": "Analoge Synth-Engine im monophonen Stil mit Oszillator, Verstärker, Filter, zwei Hüllkurven, LFO und einer Effektsektion, nachgebaut nach dem MiniSynth von FL Studio.",
+"c.gen-minisynth": "Synth-Engine mit Tabellen-Oszillatoren und Rauschen, einem 4-Pol-Filter, zwei Hüllkurven, einem LFO sowie Distortion, Delay, Phaser und Chorus, nachgebaut nach dem MiniSynth von FL Studio.",
 "c.gen-morphine": "Additive Synthesizer-Engine, die zwischen Wellenformen morpht, mit einem Rauschgenerator, Equalizer und den Effekten Chorus, Delay und Reverb.",
 "c.gen-ogun": "Additive Synthesizer-Engine mit spektralen Timbre-Reglern, Unison, Filter, dreibandigem Equalizer und den Effekten Chorus, Delay und Reverb.",
 "c.gen-patcher": "Ein Node-Graph aus Instrumenten, Effekten und VST3- oder CLAP-Plugins, verbunden durch Audio-, Noten- und Steuerkabel, als Generator im Channel Rack genutzt.",

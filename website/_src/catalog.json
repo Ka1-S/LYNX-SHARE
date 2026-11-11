@@ -113,68 +113,72 @@
   "desc": "Room and chamber reverb with separate early and late sections, bass and high decay multipliers, and twelve room types.",
   "img": "art/atrium-after-100.png",
   "wiki": {
-   "intro": "Atrium is a reverb for the insert mixer, fitted to the behaviour of a well-known room reverb. It splits the room into an early section and a late section, each with its own size and modulation, and you pick one of twelve room types.",
+   "intro": "Atrium is a room and chamber reverb with separate early and late sections and a three-band decay. Six faders set the overall reverb, the Early and Late tabs switch the dials on the right between the two sections, and the Reverb mode menu picks one of twelve room types.",
    "controls": [
     [
      "Mix",
-     "Dry and wet balance."
+     "Balance between the dry signal and the reverb."
     ],
     [
      "Predelay",
-     "Delay before the reverb starts."
+     "Time before the reverb starts."
     ],
     [
      "Decay",
-     "Reverb time."
+     "How long the reverb takes to die away."
     ],
     [
      "Low cut",
-     "Removes low frequencies from the reverb."
+     "Removes the reverb's lows below this frequency."
     ],
     [
      "High cut",
-     "Removes high frequencies from the reverb."
+     "Removes the reverb's highs above this frequency."
     ],
     [
      "Depth",
-     "Depth control next to the main faders."
+     "Balance between the early reflections, which sound close, and the tail, which sounds far."
     ],
     [
      "Size",
-     "Size of the early or late section, depending on the tab."
+     "Early tab: length of the early reflections. Late tab: size of the tail's space."
     ],
     [
      "Cross",
-     "Cross-feed of that section."
+     "How much the left and right sides of that section feed each other."
     ],
     [
-     "Mod rate",
-     "Rate of that section's modulation."
-    ],
-    [
-     "Mod depth",
-     "Depth of that section's modulation."
+     "Mod rate / Mod depth",
+     "Speed and amount of the modulation of that section."
     ],
     [
      "Send",
-     "Early section only: how much of it feeds the late section."
+     "Early tab. How much of the early reflections feed the tail."
     ],
     [
      "Diffusion",
-     "Diffusion of the reverb."
+     "Early tab. Density of the reflections: low is grainy, high is smooth."
     ],
     [
      "Space",
-     "Space control."
+     "Early tab. Feeds the early reflections back for a bigger, longer space."
+    ],
+    [
+     "Bass mult / Bass xover",
+     "Late tab. Decay of the lows relative to the mids (above 1 is longer) and the frequency where the lows end."
+    ],
+    [
+     "High mult / High xover",
+     "Late tab. Decay of the highs relative to the mids (below 1 is shorter) and the frequency where the highs start."
     ],
     [
      "Reverb mode",
-     "Room type, for example Large Room."
+     "The kind of space: Large Room, Medium Room, Bright Room, Large Chamber, Dark Room, Dark Chamber, Dark Space, Deep Space, Mirror Space, Vast Space, Distant Space or Dense Room."
     ]
    ],
    "tips": [
-    "The status line under the editor describes the chosen room type.",
-    "Use the Early and Late tabs to shape the first reflections separately from the tail."
+    "The status line under the editor describes the chosen reverb mode.",
+    "Size, Cross, Mod rate and Mod depth exist once per section, so check which tab is open before turning them."
    ]
   }
  },
@@ -186,7 +190,7 @@
   "desc": "Moves a sound between left and right from a tempo-synced LFO or a step pattern. It can also output only a control signal.",
   "img": "art/auto-pan-after-100.png",
   "wiki": {
-   "intro": "Auto-pan sweeps the stereo position of a track in time with the song. You choose the movement source, how wide it swings and how fast, and you add it to an insert slot for tremolo-like panning or rhythmic movement.",
+   "intro": "Auto-pan moves a track between left and right. The movement comes from one of three sources: FL LFO, a triangle wave locked to the song position, LFO, a free rate in Hz, or Rhythm steps, a number of steps on the beat grid. A strip in the Pan section shows the current position.",
    "controls": [
     [
      "Offset",
@@ -194,52 +198,64 @@
     ],
     [
      "Width",
-     "How far the sound swings to each side."
+     "How far the sound swings to each side. The knob is bipolar, and negative values reverse the direction."
     ],
     [
      "Tension",
-     "Shape of the movement curve."
+     "FL LFO source. Bends the triangle wave. In the centre it has no effect."
     ],
     [
-     "FL pan law",
-     "Switches the pan law to FL Studio's."
-    ],
-    [
-     "Control only",
-     "Sends the movement as a control signal and leaves the audio unpanned."
+     "Smoothing",
+     "LFO and Rhythm steps sources. From a hard jump between positions to a soft glide."
     ],
     [
      "FL LFO / LFO / Rhythm steps",
-     "Chooses the source of the movement."
+     "Chooses the source of the movement. The Rate section shows the controls of the chosen source."
     ],
     [
      "Period",
-     "Length of one cycle, shown in beats."
+     "FL LFO source. Length of one cycle in beats, up to 64."
     ],
     [
      "Phase",
-     "Start phase of the cycle."
+     "FL LFO source. Shifts the start of the cycle."
     ],
     [
-     "Input",
-     "Input level."
+     "Rate",
+     "LFO source. Free rate from 0.01 Hz to 10 Hz."
     ],
     [
-     "Output",
-     "Output level."
+     "Steps and step note",
+     "Rhythm steps source. 2 to 8 pan positions, each lasting a note value from 1/1 to 1/32."
+    ],
+    [
+     "Direction",
+     "LFO and Rhythm steps sources. Back and forth, left to right, or right to left."
+    ],
+    [
+     "FL pan law",
+     "FL LFO source. Pans with FL Studio's pan law, which folds the far side into the near side, instead of only turning the far side down."
+    ],
+    [
+     "Control only",
+     "Leaves the audio untouched and provides the movement as a live automation source."
+    ],
+    [
+     "Input / Output",
+     "Gain before and after the panner, -24 dB to +24 dB each."
     ],
     [
      "Digital / Analog",
-     "Switches between two processing modes."
+     "Analog adds an asymmetric soft saturation stage."
     ],
     [
      "Measured rhythm voicing",
-     "Switches on the rhythm pan voicing."
+     "Switches to a second panner model with its own panel: Offset, Width, Smoothing, a Rate in Hz or Beats, pattern keys, Phase, Amount and a Tweak page."
     ]
    ],
    "tips": [
-    "Use Control only when you want the pan movement to drive another parameter instead of panning the audio.",
-    "A longer Period gives slow movement, one beat gives a clear rhythmic effect."
+    "Use Control only when the pan movement should drive another parameter instead of panning the audio.",
+    "With the FL LFO source the movement follows the song position, so it lands on the same place of the bar on every playback."
    ]
   }
  },
@@ -607,68 +623,77 @@
   "desc": "Multi-mode echo with tape, bucket brigade, analog, digital, shifter, pitch and reverse characters, tempo sync, wow and flutter, and feedback past 100 percent.",
   "img": "art/echoform-after-100.png",
   "wiki": {
-   "intro": "Echoform is a delay for the insert mixer, fitted to the behaviour of a well-known multi-style echo. Its Style selector picks the character of the repeats, and the Main and Tweak pages hold the rest of the controls.",
+   "intro": "Echoform is an echo with twelve styles and five echo layouts. The Main page has three sections: Echo for time, feedback and filters, Tap tempo for groove and the echo mode, and Style for saturation, levels and the style menus. The Tweak page holds the remaining controls.",
    "controls": [
     [
      "Mix",
-     "Balance between dry and wet."
+     "Balance between the dry signal and the echoes."
     ],
     [
      "Echo time",
-     "Delay time, set in milliseconds or as Time, Note, Dot or Trip."
+     "Delay time. The Time, Note, Dot and Trip keys set it in milliseconds or as a straight, dotted or triplet note value. In Dual and Ping-pong modes it is the left time."
     ],
     [
      "Feedback",
-     "Amount of repeats."
+     "How much of the output is fed back. The range goes to 200 percent, and the loop is soft limited so it stays bounded."
     ],
     [
-     "Lowcut",
-     "Cuts low frequencies in the repeats."
-    ],
-    [
-     "Highcut",
-     "Cuts high frequencies in the repeats."
+     "LowCut / HighCut",
+     "Remove the echoes' lows below 10 Hz to 2 kHz and their highs above 200 Hz to 20 kHz."
     ],
     [
      "Spread",
-     "Stereo spread of the repeats."
+     "Single mode. Offsets the two sides in time for width. In the other modes the same place holds Ratio, Spacing or Delay R."
     ],
     [
      "Prime numbers",
-     "Switches on prime-number delay spacing."
+     "Snaps the delay times to a prime number of samples."
     ],
     [
      "Tap tempo",
-     "Sets the tempo for synced delay times."
+     "Tap the key to set the left echo time. The read-out shows the tempo."
     ],
     [
      "Groove",
-     "Moves the repeats between shuffle and swing."
+     "Moves the odd repeats early or late by up to 25 percent of the echo time. The scale runs from Shuffle to Swing."
     ],
     [
      "Feel",
-     "Moves the repeats between rushin and draggin."
+     "Moves the whole echo train early (Rushin) or late (Draggin) by up to 25 percent of the echo time."
     ],
     [
      "Mode",
-     "Single, Dual, Ratio, Ping-pong or Quad."
+     "Echo layout: Single, Ratio, Quad (four taps), Dual or Ping-pong."
     ],
     [
      "Saturation",
-     "Amount of saturation."
+     "Saturation of the repeats."
+    ],
+    [
+     "Input",
+     "Level into the echoes only, -24 dB to +24 dB. The dry signal is not touched."
+    ],
+    [
+     "Output",
+     "Level of the echoes, -18 dB to +18 dB."
     ],
     [
      "Age",
-     "Amount of ageing in the chosen style."
+     "Wear of the machine the style imitates: noise and darkening."
     ],
     [
-     "Style",
-     "Tape, bucket brigade, analog, digital and other characters."
+     "Style menu",
+     "The machine the echo imitates: Tape, Lo-Fi, Hi-Fi tape, Bucket brigade, Analog, Digital, Clean, Phaser, Shifter, Pitch, Reverse or Detune."
+    ],
+    [
+     "Tape",
+     "Selects a measured tape loop voicing: Off, Ping-pong tape, Studio tape or Studio tape hot."
     ]
    ],
    "tips": [
-    "Feedback can go beyond 100 percent, so turn it up slowly.",
-    "The status line under the editor describes the chosen mode."
+    "The status line under the editor describes the chosen style.",
+    "The Tweak page adds Width, Diffusion, the style's modulation (Wow and Flutter for tape), Ducking, Accent, X-feed and Balance, plus Freeze, a Rhythm mode with its own tap editor and a choice between the project tempo and the echo's own BPM.",
+    "Feedback above 100 percent keeps building, so raise it slowly."
    ]
   }
  },
@@ -680,19 +705,19 @@
   "desc": "Twelve effect types on one XY pad, each with two parameters, an LFO that follows the song tempo, and input and output gain.",
   "img": "art/effector-after-100.png",
   "wiki": {
-   "intro": "Effector offers twelve algorithms behind one XY pad. You pick a type from the row of buttons, drag the dot to set its two parameters and let an LFO move them in time with the song.",
+   "intro": "Effector has twelve effect types behind one XY pad. One type is active at a time. X and Y set its two parameters, and an LFO synced to the project tempo can move them. It loads the settings of the FL Studio Effector from an imported .flp project.",
    "controls": [
     [
-     "Type",
-     "Distort, Lo-fi, Flanger, Phaser, Filter, Delay, Reverb, Stereo, Trancer, Stutter, Vowel or Ring."
+     "Type buttons",
+     "Distort, Lo-fi, Flanger, Phaser, Filter, Delay, Reverb, Stereo, Trans, Grain, Vox or Ring."
     ],
     [
-     "X param",
-     "First parameter of the type."
+     "X param / Y param",
+     "The two parameters of the chosen type. Their meaning changes with the type."
     ],
     [
-     "Y param",
-     "Second parameter of the type."
+     "XY pad",
+     "Sets X and Y together by dragging."
     ],
     [
      "Bypass",
@@ -700,32 +725,38 @@
     ],
     [
      "Dry/wet",
-     "Balance between dry and wet."
+     "Amount of the effect in the output."
     ],
     [
-     "X mod",
-     "Amount of LFO modulation of X."
+     "Rate buttons (8/1 to 1/8)",
+     "Length of one LFO cycle in beats, from eight beats to an eighth of a beat. The Delay type takes its echo time from this setting and Grain its repeat length."
     ],
     [
-     "Y mod",
-     "Amount of LFO modulation of Y."
+     "X mod / Y mod",
+     "How far the LFO moves X and Y. Both are bipolar."
     ],
     [
-     "LFO shape",
-     "Sine, Saw or Square."
+     "Sine / Saw / Square",
+     "LFO shape."
     ],
     [
      "Tempo",
-     "Reduces the LFO tempo."
+     "Shortens the LFO cycle set by the rate buttons."
     ],
     [
-     "Gain",
-     "Input and output gain knobs at the top."
+     "Gain (left)",
+     "Input level."
+    ],
+    [
+     "Gain (right)",
+     "Output gain, -24 dB to +24 dB."
     ]
    ],
    "tips": [
-    "The note values beside the pad set how fast the LFO runs.",
-    "The XY pad is the quickest way to find a setting before fine tuning with the knobs."
+    "Distort: X is the amount, Y the tone. Lo-fi: X holds samples longer, Y reduces the bit depth. Flanger and Phaser: X is the sweep position, Y the feedback.",
+    "Filter: X is a low-pass left of centre and a high-pass right of centre, Y the resonance. Delay: X is the feedback, Y darkens the echoes below centre and cuts their lows above it. Reverb: X is the decay, Y the high damping.",
+    "Stereo: X is the pan position, Y how much of it becomes a level difference. Trans: X is the release time and Y the drop level of a gate that repeats every LFO cycle. Vox: X picks the vowel, Y scales the formant frequencies. Ring: X is the carrier frequency, from 32 Hz to about 13.3 kHz.",
+    "Grain repeats a slice of the audio every LFO cycle and does not use X or Y."
    ]
   }
  },
@@ -802,68 +833,76 @@
   "desc": "Limiter-style dynamics effect with an emphasis amount, ceiling, envelope and hardness controls, true peak and mid/side modes, oversampling and a level-matching option.",
   "img": "plugui/Emphasis.png",
   "wiki": {
-   "intro": "Emphasis is an effect slot plugin for shaping the level of a signal up to a ceiling. It opens the settings of an FL Studio Emphasis plugin when a .flp project is imported. Its latency is reported to the engine for delay compensation.",
+   "intro": "Emphasis is a mastering limiter. The signal passes an input gain, the limiter with its mode, envelope and hardness settings, and a final limiter that holds the output to the ceiling. It loads the settings of the FL Studio Emphasis from an imported .flp project and reports its latency for delay compensation.",
    "controls": [
     [
      "Input gain",
-     "Gain applied before the processing."
+     "Gain before the limiter, 0 dB to +24 dB."
     ],
     [
      "Emphasis",
-     "Amount of the effect, in percent."
+     "Amount, 0 to 100 percent. It sets the attack shape, release shape and knee amount of the limiter."
     ],
     [
      "Ceiling",
-     "Level the output is held to."
+     "Highest output level, up to 0 dB. A new instance is at -0.2 dB."
     ],
     [
      "Mode",
-     "Selects one of four processing modes."
+     "Versatile, Loud, Transient or Steady."
     ],
     [
      "Envelope",
-     "Order of the envelope."
+     "Order of the envelope, 1 to 4: the number of attack and release stages in series."
     ],
     [
      "Hardness",
-     "Hardness setting, 0 to 9."
+     "0 to 9. Each step up halves the limiter's time constant."
     ],
     [
      "Linking",
-     "How much the two channels are linked, in percent."
+     "0 to 100 percent. At 100 percent both channels are controlled by the louder one."
     ],
     [
      "Channel mode",
-     "L/R or M/S processing."
+     "Processes left and right (L/R) or mid and side (M/S)."
     ],
     [
      "Oversampling",
-     "Off, 4x or 8x oversampling."
+     "Off, 2x, 4x, 8x or 16x."
     ],
     [
      "True peak",
-     "Detects true peaks."
-    ],
-    [
-     "Delta",
-     "Outputs the difference the effect makes."
+     "The final limiter detects peaks on a 4 times oversampled signal instead of the sample values."
     ],
     [
      "Level matching",
-     "Compensates the level change."
+     "Scales the output to the level of the input, by a factor of 2 at most."
+    ],
+    [
+     "Delta",
+     "Outputs the delayed dry signal minus the processed signal."
     ],
     [
      "Instant recovery",
-     "Switch for quick recovery after peaks."
+     "Fixes the release time at 5 ms."
     ],
     [
      "DC block",
-     "Removes DC offset."
+     "A 5 Hz high-pass on the input."
+    ],
+    [
+     "Loudness compensation",
+     "Changes the meter only, not the audio."
+    ],
+    [
+     "Bypass",
+     "Crossfades to the dry signal, which keeps the plugin's latency."
     ]
    ],
    "tips": [
-    "Delta lets you hear exactly what the effect removes.",
-    "Turn on Level matching when comparing the effect with the bypassed signal."
+    "Delta plays what the limiter removes.",
+    "Turn on Level matching to compare the processed and bypassed signal at a similar level."
    ]
   }
  },
@@ -875,35 +914,36 @@
   "desc": "Effect with input gain, an emphasis amount, output level, soft clipping and level matching, and a 2 ms look-ahead that is reported for delay compensation.",
   "img": "art/emphasizer-after-100.png",
   "wiki": {
-   "intro": "Emphasizer is an effect slot plugin with three knobs and three switches. It opens the settings of an FL Studio Emphasizer plugin when a .flp project is imported. Its 2 ms look-ahead is compensated by the engine.",
+   "intro": "Emphasizer is a look-ahead limiter with one main knob. The input gain feeds a peak detector, the gain reduction is applied to the signal delayed by 2 ms, and the result is clipped and sent to the output gain. It loads the settings of the FL Studio Emphasizer from an imported .flp project and reports the 2 ms look-ahead for delay compensation.",
    "controls": [
     [
      "Input gain",
-     "Gain applied before the processing."
+     "Gain before the limiter, 0 dB to +24 dB."
     ],
     [
      "Emphasis",
-     "Amount of the effect, in percent."
+     "Amount, 0 to 100 percent. It scales the level that the peak detector sees."
     ],
     [
      "Output",
-     "Output level."
+     "Output level, up to 0 dB."
     ],
     [
      "Soft clipping",
-     "Switch for soft clipping."
+     "Replaces the hard clip at full scale after the limiter with a soft clip that starts below it."
     ],
     [
      "Level matching",
-     "Compensates the level change."
+     "Divides the output by the input gain, so raising Input gain does not raise the level."
     ],
     [
      "Bypass",
-     "Bypasses the effect."
+     "Crossfades to the delayed dry signal instead of switching hard."
     ]
    ],
    "tips": [
-    "Use Bypass together with Level matching to judge the effect at equal level."
+    "With Level matching on, Input gain can be raised to drive the limiter harder without the output getting louder by the same amount.",
+    "The meter strip on the right shows the levels."
    ]
   }
  },
@@ -1792,43 +1832,52 @@
   "desc": "A convolution effect that applies an impulse response to the signal, with dry and wet levels, stereo separation, delay, stretch and an EQ curve.",
   "img": "art/fruity-convolver-after-100.png",
   "wiki": {
-   "intro": "Convolves the signal with an impulse response, typically to place it in a room or through a speaker. The impulse comes from an imported FL Studio project, either embedded or read from your own FL Studio installation. A new instance shows No impulse response and passes only the dry signal.",
+   "intro": "Fruity Convolver convolves the signal with an impulse response. The impulse response comes from an imported FL Studio project: it is either embedded in the plugin's state or a file of your own FL Studio installation, which is read at import and then kept in the project. A new instance has no impulse response, shows No impulse response and passes the dry signal only.",
    "controls": [
     [
      "Dry",
      "Level of the unprocessed signal."
     ],
     [
-     "Wet",
+     "In",
+     "Stereo separation of the input before the convolution, from separated to merged."
+    ],
+    [
+     "Wet (large knob)",
      "Level of the convolved signal."
     ],
     [
-     "In",
-     "Stereo separation of the input."
+     "Wet (small knob)",
+     "Stereo separation of the convolved signal."
     ],
     [
      "Delay",
-     "Pre-delay before the impulse."
+     "Predelay before the impulse response."
     ],
     [
      "Self-conv",
-     "Blends the impulse with itself."
+     "Blends the impulse response with its own self-convolution."
     ],
     [
      "Stretch",
-     "Changes the speed of the impulse."
+     "Resamples the impulse response, from half speed to double speed."
     ],
     [
      "EQ",
-     "Level of the EQ curve."
+     "Amount of the EQ applied to the impulse response."
     ],
     [
      "Normalize",
-     "Normalises the impulse response."
+     "Scales the impulse response by the level of its loudest 300 ms."
+    ],
+    [
+     "Impulse / Equalizer",
+     "The Impulse page shows the waveform with its rate, format and length. The Equalizer page draws and edits the EQ curve."
     ]
    ],
    "tips": [
-    "The Equalizer page draws and edits the curve applied to the impulse."
+    "Dry, Wet and the two separation knobs are the plugin's four automatable controls. The other knobs are part of the plugin state.",
+    "FL Studio's sample editor tools for the impulse response are not reproduced."
    ]
   }
  },
@@ -1953,47 +2002,63 @@
   "desc": "A bank of up to eight delay lines with per-line input, filter, feedback, grain and output sections, plus global dry, wet, input and feedback levels.",
   "img": "art/fruity-delay-bank-after-100.png",
   "wiki": {
-   "intro": "A multi-tap delay for mixer inserts, built from eight numbered slots. Each slot has its own input, filter, feedback, feedback filter, grain and output settings. It opens the settings of the matching effect from an imported FL Studio project.",
+   "intro": "Fruity Delay Bank has eight delay banks. Each bank has an input stage, a filter, a delay line with a feedback path and its own feedback filter, a stepped gain pattern and an output stage, and can send into the next bank. It loads the settings of the FL Studio plugin from an imported .flp project.",
    "controls": [
     [
-     "Dry",
-     "Global level of the unprocessed signal."
+     "Bank switches and tabs 1 to 8",
+     "The switches on top turn each bank on. The tabs choose the bank shown."
     ],
     [
-     "Wet",
-     "Global level of the delayed signal."
-    ],
-    [
-     "In",
-     "Global input level."
-    ],
-    [
-     "FB",
-     "Global feedback level."
+     "Dry / Wet / In / FB",
+     "Global levels: the dry signal, the output of the banks, the input into the banks and the feedback of all banks."
     ],
     [
      "Oversample",
-     "Oversampling switch."
+     "Off, 2x or 4x."
+    ],
+    [
+     "In: Pan, Vol",
+     "Pan and level of the signal entering the bank."
     ],
     [
      "Filter",
-     "Filter in the delay path."
+     "Type (off, low pass, band pass, notch, high pass, low shelf, peaking or high shelf), 1 to 3 sections, Gain, Cut and Res. Post places it after the delay instead of before."
     ],
     [
-     "Feedback",
-     "Feedback mode and time, offset, separation and volume."
+     "Feedback: mode",
+     "Off for no delay, Norm, Inv for swapped outputs, or P.pong for ping-pong feedback."
     ],
     [
-     "Grain",
-     "Grain division and shift."
+     "Feedback: Time and T",
+     "Delay time. T syncs it to the tempo."
     ],
     [
-     "Out",
-     "Output pan and volume, with a Next control."
+     "Feedback: Ofs",
+     "Time offset between the left and right delay."
+    ],
+    [
+     "Feedback: Sep, Pan, Vol",
+     "Stereo matrix, pan and level of the feedback path."
+    ],
+    [
+     "FB filter",
+     "A second filter with the same types, inside the feedback path."
+    ],
+    [
+     "Grain: Div, Sh",
+     "A stepped gain pattern on the delay. Div is the number of steps per delay time (0 is off) and Sh the shape of the steps."
+    ],
+    [
+     "Out: Next",
+     "Amount of this bank sent into the next bank. Bank 8 has no Next."
+    ],
+    [
+     "Out: Pan, Vol",
+     "Pan and level of the bank in the output."
     ]
    ],
    "tips": [
-    "Select a slot with the numbered buttons to edit it."
+    "Select a bank with the numbered tabs to edit it. The switches above the tabs show which banks are on."
    ]
   }
  },
@@ -2200,44 +2265,43 @@
   "img": "art/fruity-flangus-after-100.png",
   "desc": "A multi-voice flanger and chorus hybrid with adjustable voice order, depth, speed and delay, plus spread and cross controls for the stereo image.",
   "wiki": {
-   "intro": "Fruity Flangus is a modulated-delay effect for mixer insert slots that sits between a flanger and a chorus. Several delay voices are swept by LFOs, and the result is mixed with the dry signal. Use it to thicken or widen a sound.",
+   "intro": "Fruity Flangus is a multi-voice modulated delay. Each side gets as many delay voices as the Order setting, each swept by its own LFO, and the voices are mixed with the dry signal. It loads the settings of the FL Studio plugin from an imported .flp project.",
    "controls": [
     [
-     "Order",
-     "Number of modulated voices."
+     "Ord",
+     "Order, 1 to 9. The number of voices per side."
     ],
     [
      "Depth",
-     "How far the LFOs sweep the delay."
+     "How far the LFOs sweep the delay of the voices."
     ],
     [
-     "Speed",
+     "Spd",
      "Speed of the LFOs."
     ],
     [
-     "Delay",
-     "Base delay time of the voices."
+     "Del",
+     "Base delay of the voices."
     ],
     [
-     "Spread",
-     "Stereo spread of the voices."
+     "Sprd",
+     "Spread. How far the start phases of the voices' LFOs are offset from one another."
     ],
     [
      "Cross",
-     "Crossfeed between the left and right sides."
+     "Bipolar. How much of each voice is sent to the opposite channel."
     ],
     [
      "Dry",
-     "Level of the unprocessed signal."
+     "Bipolar. Level of the unprocessed signal."
     ],
     [
      "Wet",
-     "Level of the effect signal."
+     "Bipolar. Level of the voices."
     ]
    ],
    "tips": [
-    "Small Delay values give flanging, larger ones move toward a chorus sound.",
-    "Lower Spread for a narrower result that stays mono compatible."
+    "Changing Order, Depth, Speed, Delay, Spread or Cross sets the voices up again. New voices start with their LFO at phase zero."
    ]
   }
  },
@@ -2315,68 +2379,72 @@
   "img": "art/fruity-limiter-after-100.png",
   "desc": "A limiter, compressor and noise gate in one effect, with gain, saturation, ceiling, envelope curves and a sidechain-capable compression section.",
   "wiki": {
-   "intro": "Fruity Limiter combines a limiter, a compressor and a noise gate in one mixer insert effect. The limiter has gain, saturation and a ceiling, the compressor has threshold, ratio and knee, and the gate has its own threshold and release. Use it to control peaks or as a simple all-round dynamics tool.",
+   "intro": "Fruity Limiter chains a gain, a compressor with an RMS detector, a look-ahead limiter, a noise gate and a soft saturation or clip stage at the ceiling. The Limit and Comp tabs switch the middle of the panel between the limiter and the compressor controls. It loads the settings of the FL Studio plugin from an imported .flp project and reports its look-ahead for delay compensation.",
    "controls": [
     [
      "Gain",
-     "Input gain before the limiter."
+     "Loudness section. Gain at the input of the chain."
     ],
     [
-     "Saturation",
-     "Amount of saturation applied."
+     "Sat",
+     "Threshold of the soft saturation at the output. At its top the saturation is off and the output is clipped at the ceiling."
     ],
     [
-     "Ceiling",
-     "Maximum output level."
+     "Limit / Comp",
+     "Chooses which page of controls is shown. Both sections keep working."
     ],
     [
-     "Attack",
-     "Attack time of the limiter."
+     "Ceil",
+     "Limit page. The level the limiter holds the output to."
     ],
     [
-     "Release",
-     "Release time of the limiter."
+     "Att / Rel",
+     "Limit page. Attack and release time of the limiter."
     ],
     [
      "Sustain",
-     "Time the limiter holds before releasing."
+     "Limit page. Length of the limiter's peak window."
     ],
     [
-     "Comp. threshold",
-     "Level above which the compressor works."
+     "Curve",
+     "The steppers under Att and Rel set the number of smoothing stages of that envelope."
+    ],
+    [
+     "Thres",
+     "Comp page. Level above which the compressor works."
     ],
     [
      "Ratio",
-     "Compression ratio."
+     "Comp page. Compression ratio."
     ],
     [
      "Knee",
-     "Softness of the compressor's transition."
+     "Comp page. How gradually the compression starts around the threshold."
     ],
     [
-     "Comp. attack",
-     "Attack time of the compressor."
+     "Att / Rel (Comp)",
+     "Comp page. Attack and release time of the compressor, with their own Curve stepper."
     ],
     [
-     "Comp. release",
-     "Release time of the compressor."
+     "Sustain (Comp)",
+     "Comp page. Length of the compressor's RMS detector window."
     ],
     [
-     "RMS window",
-     "Averaging window of the level detection."
+     "Noise gate: Thres",
+     "Level below which the gate acts."
     ],
     [
-     "Gate threshold",
-     "Level below which the gate closes."
+     "Noise gate: Gain",
+     "Gain the signal is turned down to while it is below the gate threshold."
     ],
     [
-     "Gate release",
-     "Release time of the gate."
+     "Noise gate: Rel",
+     "How fast the gain moves to the gate gain."
     ]
    ],
    "tips": [
-    "The compression section can take its level from a sidechain route.",
-    "Exact ceiling is an additional on and off switch."
+    "With a sidechain route into the insert, only the compressor's detector listens to it. The limiter and the gate always use the insert's own signal.",
+    "The limiter acts at 0.975 times the ceiling unless the option that makes it act exactly at the ceiling is on."
    ]
   }
  },
@@ -2388,64 +2456,76 @@
   "img": "art/fruity-love-philter-after-100.png",
   "desc": "A multi-unit filter and shaper with eight chainable units, envelopes, LFOs and an envelope follower for animated filtering.",
   "wiki": {
-   "intro": "Fruity Love Philter is a filter machine for mixer insert slots built from eight units. Each unit has a filter, an articulator and a waveshaper, and units can be chained with a next-unit link. Envelopes, an LFO and an envelope follower can modulate the units, which makes it suited to animated, rhythmic filtering.",
+   "intro": "Fruity Love Philter has eight units. Each unit has an input level, a filter, a waveshaper and an output with pan and volume, and can feed the next unit. Per unit, articulators modulate pan, volume, cutoff, resonance, the low, band and high levels and the waveshaper mix from a pattern envelope, an LFO, the Mod X and Mod Y controls and an envelope follower. It loads the settings of the FL Studio plugin from an imported .flp project.",
    "controls": [
     [
-     "Master level",
-     "Overall output level."
+     "Unit switches and tabs 1 to 8",
+     "The switches on top enable each unit. The tabs choose the unit shown."
     ],
     [
-     "Master LFO",
-     "Overall LFO setting."
+     "IN: VOL",
+     "Level of the plugin input into this unit. Negative values invert the phase."
     ],
     [
-     "Follower level",
-     "Gain into the envelope follower."
+     "Filter type and mode",
+     "The type selector picks the filter. The mode sets the number of stages in series: Off, Single, Dual, Triple, Alt dual or Alt triple. Off leaves only gain, pan and waveshaper."
     ],
     [
-     "Follower attack",
-     "Attack time of the envelope follower."
+     "CUT / RES",
+     "Cutoff and resonance (or width) of the unit's filter."
     ],
     [
-     "Follower release",
-     "Release time of the envelope follower."
+     "ENV",
+     "Depth of the cutoff articulator."
     ],
     [
-     "Pattern",
-     "Selects the pattern envelope."
+     "L / B / H",
+     "Levels of the low-pass, band-pass and high-pass outputs of the SVF type."
     ],
     [
-     "Mod X",
-     "Modulation source X."
+     "ALT",
+     "Alternative resonance or width response of the filter."
     ],
     [
-     "Mod Y",
-     "Modulation source Y."
+     "WS: AMP, MIX, MODE",
+     "Waveshaper: gain into the shaper, its mix with the unshaped signal, and a unipolar or bipolar curve."
     ],
     [
-     "Unit cutoff",
-     "Filter cutoff of each unit."
+     "OUT: PAN, VOL",
+     "Pan and level of the unit in the plugin output."
     ],
     [
-     "Unit resonance",
-     "Filter resonance of each unit."
+     "NEXT",
+     "How much of this unit's output feeds the next unit. At zero the units run in parallel."
     ],
     [
-     "Unit envelope amount",
-     "How much the envelope moves the unit."
+     "Articulator editor",
+     "The tabs PAN, VOL, CUT, RES, LOW, BAND, HIGH, WS and WMIX choose the target, and PAT, LFO, MOD X, MOD Y and IEF choose the source whose curve is drawn below."
     ],
     [
-     "Unit pan",
-     "Pan of each unit."
+     "X / Y pad",
+     "Sets Mod X and Mod Y. SMOOTH glides their changes."
     ],
     [
-     "Unit volume",
-     "Level of each unit."
+     "VOL / LFO / IEF sliders",
+     "Master level, master LFO level and the level into the envelope follower."
+    ],
+    [
+     "IEF: USE1, ATT, REL",
+     "Attack and release of the envelope follower. USE1 makes it follow the output of unit 1 instead of the plugin input."
+    ],
+    [
+     "CENTER",
+     "Removes DC offset from the output."
+    ],
+    [
+     "OVERSAMPLING",
+     "Oversampling order of the engine. It is doubled while rendering."
     ]
    ],
    "tips": [
-    "Each unit's controls are listed as Unit 1 to Unit 8 in the parameter list, so any of them can be automated.",
-    "Oversampling is used internally and is doubled when exporting."
+    "Only the first unit is enabled in a new instance.",
+    "The output of every enabled unit is summed, so with NEXT at zero several units work as parallel filters."
    ]
   }
  },
@@ -2457,68 +2537,52 @@
   "img": "art/fruity-multiband-compressor-after-100.png",
   "desc": "A three-band compressor with adjustable crossovers, separate threshold, ratio, attack, release, knee and gain per band, and an optional linear-phase mode.",
   "wiki": {
-   "intro": "Fruity Multiband Compressor splits the signal into low, mid and high bands and compresses each one separately. Add it to a mixer insert slot to control a mix or a single track where one frequency range needs different treatment from the rest.",
+   "intro": "Fruity Multiband Compressor splits the input into a low, a mid and a high band, each with its own filters, runs a peak compressor with make-up gain on each band, and sums them through an output gain and an optional soft limiter. It loads the settings of the FL Studio plugin from an imported .flp project.",
    "controls": [
     [
-     "Output gain",
-     "Level after the three bands."
+     "IIR / FIR",
+     "Type of the band filters. IIR uses 4th-order filters. FIR uses linear-phase filters with 52 samples of latency, which is reported for delay compensation."
     ],
     [
      "Limiter",
-     "Switches the soft output limiter."
+     "Switches the soft limiter on the output."
     ],
     [
-     "Linear phase",
-     "Uses linear-phase crossovers. This adds latency, which is reported for delay compensation."
+     "Gain (left)",
+     "Output gain after the three bands are summed."
     ],
     [
-     "Low crossover",
-     "Upper edge of the low band."
+     "Crossovers",
+     "Four knobs under the band graph: the top of the low band, the bottom and the top of the mid band, and the bottom of the high band."
     ],
     [
-     "Mid lower crossover",
-     "Lower edge of the mid band."
+     "A / M / B",
+     "Per band. A compresses the band, M mutes it and B passes it uncompressed."
     ],
     [
-     "Mid upper crossover",
-     "Upper edge of the mid band."
-    ],
-    [
-     "High crossover",
-     "Lower edge of the high band."
-    ],
-    [
-     "Mode",
-     "Per band: compress, off or bypass."
-    ],
-    [
-     "Threshold",
-     "Level above which a band is compressed."
+     "Thres",
+     "Per band. Level above which the band is compressed."
     ],
     [
      "Ratio",
-     "Compression ratio of the band."
-    ],
-    [
-     "Attack",
-     "Attack time of the band."
-    ],
-    [
-     "Release",
-     "Release time of the band."
+     "Per band. Compression ratio."
     ],
     [
      "Knee",
-     "Softness of the compressor's transition."
+     "Per band. How gradually the compression starts around the threshold."
     ],
     [
-     "Gain",
-     "Level of the band after compression."
+     "Att / Rel",
+     "Per band. Attack and release time of the band's compressor."
+    ],
+    [
+     "Gain (band)",
+     "Per band. Make-up gain after the compressor."
     ]
    ],
    "tips": [
-    "Each band has its own Mode, Gain, Threshold, Ratio, Attack, Release and Knee in the parameter list.",
-    "Linear phase mode reports 52 frames of latency."
+    "Each band is filtered from the input on its own, so the four crossover knobs are independent of each other.",
+    "Switching between IIR and FIR clears the filters."
    ]
   }
  },
@@ -2588,39 +2652,39 @@
   "img": "art/fruity-phaser-after-100.png",
   "desc": "A phaser with a variable number of stages, sweep range and speed, stereo phase offset, feedback and a dry and wet mix.",
   "wiki": {
-   "intro": "Fruity Phaser is a stage-based phaser for mixer insert slots. An LFO sweeps the notches between a minimum and a maximum depth, and feedback sharpens them. Use it on guitars, keys, pads or drums for slow or fast sweeping movement.",
+   "intro": "Fruity Phaser runs the signal through a chain of 3 to 23 all-pass stages whose coefficient an LFO sweeps between a minimum and a maximum depth, with feedback from the last stage to the input. It loads the settings of the FL Studio plugin from an imported .flp project.",
    "controls": [
     [
      "Sweep freq.",
-     "Speed of the sweep."
+     "Rate of the LFO."
     ],
     [
      "Min depth",
-     "Lowest point of the sweep."
+     "All-pass coefficient at the bottom of the LFO."
     ],
     [
      "Max depth",
-     "Highest point of the sweep."
+     "All-pass coefficient at the top of the LFO."
     ],
     [
      "Freq. range",
-     "Switches the sweep between a small and a large rate range."
+     "Switches the LFO between a small and a large rate range. Sweep freq. then covers that range."
     ],
     [
      "Stereo",
-     "Phase offset of the sweep between the sides, up to 180 degrees."
+     "Phase offset of the right channel's LFO, up to half a cycle."
     ],
     [
-     "Stages",
-     "Number of phase stages."
+     "Nr. stages",
+     "Number of all-pass stages, 3 to 23."
     ],
     [
      "Feedback",
-     "Amount of feedback."
+     "Amount of the last stage's output fed back to the input."
     ],
     [
      "Dry-wet",
-     "Balance between the dry and effect signal."
+     "Share of the dry signal in the output. Lower values give more of the phased signal."
     ],
     [
      "Out gain",
@@ -2628,8 +2692,8 @@
     ]
    ],
    "tips": [
-    "More stages give more notches and a denser sound.",
-    "Use the large frequency range for very fast sweeps."
+    "With Stereo at zero both channels sweep together.",
+    "The value shown for Sweep freq. is the real rate in Hz and the value for Stereo is the offset in degrees."
    ]
   }
  },
@@ -2878,48 +2942,60 @@
   "desc": "Optical leveler built on an electro-optical cell model, with peak reduction, gain, compress or limit mode, a VU meter and mix control.",
   "img": "art/glow-leveler-after-100.png",
   "wiki": {
-   "intro": "Glow Leveler is a native LYNX SHARE feedback leveler. It has a slow, program-dependent action: about 10 ms attack and a release that lengthens after long or heavy leveling. You add it on vocals, bass or buses to even out the level.",
+   "intro": "Glow Leveler is an optical leveler: a model of an electro-optical cell with a program-dependent attack and a two-stage release. It has two voicings, Modern and Opto classic, and a new instance starts on Opto classic. A VU meter sits between the Gain and Peak reduction knobs.",
    "controls": [
     [
-     "Gain",
-     "Output gain."
+     "Peak reduction",
+     "How much the leveler turns peaks down. This is the main control."
     ],
     [
-     "Peak reduction",
-     "Amount of leveling."
+     "Gain",
+     "Gain after the leveling."
     ],
     [
      "Compress / Limit",
-     "Switch between compress and limit modes."
+     "Limit uses a harder ratio than Compress."
     ],
     [
      "VU display",
-     "Meter shows gain reduction, input or output."
+     "Sets the meter to show the input level, the gain reduction (GR) or the output level."
     ],
     [
      "Auto makeup",
-     "Automatic makeup gain on or off."
+     "Turns the gain up as the peak reduction rises."
     ],
     [
      "Analog",
-     "Hum setting: 50 Hz, 60 Hz or off."
+     "Adds mains hum and noise after the gain: 50Hz, 60Hz or Off."
     ],
     [
      "Hi freq",
-     "Sidechain emphasis."
+     "Makes the detector more sensitive to highs, which gives less reduction on bass."
     ],
     [
      "Mix",
-     "Dry and wet balance."
+     "Balance between the dry signal and the leveled signal."
     ],
     [
      "Trim",
-     "Output trim, -18 to 18."
+     "Output trim after the mix, -18 dB to +18 dB."
+    ],
+    [
+     "Modern / Opto classic",
+     "Chooses the voicing: Glow's own engine or the measured classic opto leveler."
+    ],
+    [
+     "Old / Measured",
+     "Opto classic only. Two small switches keep the limit and make-up law and the attack and release timing of projects saved with earlier versions, or use the measured ones."
+    ],
+    [
+     "Makeup ref",
+     "Opto classic only. The peak reduction value at which Auto makeup was switched on. The make-up follows the dial from there."
     ]
    ],
    "tips": [
-    "Use Mix to blend the leveled signal with the dry one for parallel leveling.",
-    "The needle can show gain reduction, input or output level."
+    "Turn Mix down to blend the leveled signal with the dry one for parallel leveling.",
+    "Switching Auto makeup off leaves the make-up it had applied in the Gain knob."
    ]
   }
  },
@@ -3045,36 +3121,61 @@
   "desc": "Guitar pedalboard of five boxes holding 11 pedal types, plus cabinet convolution and an 8-band EQ. Needs files from your own FL Studio installation.",
   "img": "art/hardcore-after-100.png",
   "wiki": {
-   "intro": "Hardcore is a chain of five pedal boxes with a cabinet and an 8-band EQ, used on guitars, synths and drums. Pedals include distortion, chorus, flanger, phaser, reverb, delay, noise gate, equalizer, compressor, modulator and tube drive. The cabinet impulses come from your own FL Studio installation; without them the cabinet is off.",
+   "intro": "Hardcore is a guitar multi-effect. The signal passes an input level with a 30 Hz high-pass, five pedal boxes in series, a cabinet convolution, an 8-band EQ and an output level. The cabinet impulses are files of your own FL Studio installation: they are read when an FL Studio project is imported and stored in the project, and without the installation the effect runs with no cabinet.",
    "controls": [
     [
      "Input",
-     "Input level in dB."
+     "Level into the chain."
     ],
     [
      "Output",
-     "Output level in dB."
+     "Level after the EQ."
     ],
     [
      "EQ",
-     "Switches the 8-band EQ on or off."
+     "Switches the 8-band EQ on."
     ],
     [
      "EQ bands",
-     "Eight bands: 125, 250, 500, 1K, 2K, 4K, 8K and 16K."
+     "Eight bipolar faders at 125, 250, 500, 1k, 2k, 4k, 8k and 16k Hz."
     ],
     [
      "Cabinet",
-     "Chooses the cabinet impulse, or None."
+     "Chooses the cabinet impulse, or none."
     ],
     [
-     "Pedal slots",
-     "Five slots, each one a pedal or (empty)."
+     "Box LED",
+     "Switches one of the five boxes on or off."
+    ],
+    [
+     "Pedal menu",
+     "Under each box. Picks its pedal: Distortion, Chorus, Flanger, Phaser, Reverb, Delay, Noise gate, Equalizer, Compressor, Modulator, Tube drive, or empty."
+    ],
+    [
+     "Distortion and Tube drive knobs",
+     "Distortion: Dist, Comb, Inferno, Glass. Tube drive: Low, High, Gain."
+    ],
+    [
+     "Chorus, Flanger and Phaser knobs",
+     "Chorus and Flanger: Width, Speed, Intensity. Phaser: Speed, Tune, Width, Intensity."
+    ],
+    [
+     "Reverb and Delay knobs",
+     "Reverb: Decay, Hi-damp, Mix. Delay: Time, Decay, Mix."
+    ],
+    [
+     "Noise gate and Compressor knobs",
+     "Noise gate: Attack, Release, Threshold. Compressor: Threshold, Ratio, Attack, Release."
+    ],
+    [
+     "Equalizer and Modulator knobs",
+     "Equalizer: Low, Middle, Treble, High. Modulator: Pitch, Amp, Pan, Rate."
     ]
    ],
    "tips": [
-    "Importing an FL Studio project without the installation's cabinet impulses switches the cabinet off.",
-    "The pedals can be switched during playback."
+    "Each box shows only the knobs its pedal uses.",
+    "Because the cabinet impulse is stored in the project, a saved LYNX SHARE project keeps its cabinet without FL Studio.",
+    "FL Studio's own preset browser for this plugin is not reproduced."
    ]
   }
  },
@@ -3510,35 +3611,51 @@
   "desc": "Generates harmonics of the low end of a sound and shows them in a display. It has a look-ahead limiter, a diffuser and a low cut.",
   "img": "art/low-lifter-after-100.png",
   "wiki": {
-   "intro": "Low Lifter works on the bass region of an insert and shows the harmonics it generates from it in a display. You add it to bass or kick channels. Imported FL Studio projects that use the plugin of the same name load its settings.",
+   "intro": "Low Lifter is a bass enhancer. A crossover splits off the low band, which goes through a pre gain, a look-ahead peak limiter and a harmonic enhancer, and is then added back to the delayed high band. It loads the settings of the FL Studio Low Lifter from an imported .flp project.",
    "controls": [
     [
+     "Boost",
+     "Pre gain into the limiter and enhancer, 0 dB to 18 dB."
+    ],
+    [
+     "Slope",
+     "Amount of generated harmonics, -60 dB to 0 dB."
+    ],
+    [
+     "Multiband",
+     "Splits the low band again into four bands around the crossover and processes each on its own."
+    ],
+    [
      "Look-ahead",
-     "Switches the look-ahead on. The docs list a 10 ms delay reported to the host when it is enabled."
+     "Lets the limiter see peaks 10 ms ahead. The delay is reported for delay compensation."
     ],
     [
      "Invert",
-     "Inverts the polarity."
+     "Inverts the polarity of the processed low band."
     ],
     [
-     "Diffuser depth",
-     "Depth of the diffuser section."
+     "Diffuser: Depth, Mix",
+     "Runs the processed low band through four all-pass stages. Depth sets their coefficient and Mix their amount."
     ],
     [
-     "Diffuser mix",
-     "Amount of the diffuser section."
+     "Bands: Low, High knobs",
+     "Gain of the processed low band (-120 dB to +12 dB) and of the high band (-120 dB to 0 dB)."
+    ],
+    [
+     "Bands: Low, High switches",
+     "Turn the low band and the high band on or off."
     ],
     [
      "X-over",
-     "Crossover between the bands."
+     "Crossover frequency between the bands, 20 Hz to 120 Hz."
     ],
     [
      "Low cut",
-     "High-pass for the low end."
+     "High-pass on the output, 20 Hz to 120 Hz."
     ],
     [
      "Mix",
-     "Dry and wet balance."
+     "Balance between the dry signal and the processed signal. The dry signal is delayed to match."
     ],
     [
      "On",
@@ -3546,8 +3663,8 @@
     ]
    ],
    "tips": [
-    "Check the harmonics display while you move the crossover to see which part of the bass is used.",
-    "The effect reports its look-ahead delay for delay compensation."
+    "After the effect starts, the processed band fades in over the first second.",
+    "After a second of silence the engine is skipped and the input passes through."
    ]
   }
  },
@@ -3559,47 +3676,63 @@
   "desc": "Large reverb with decay, size, diffusion, a feedback or feedforward pitch shifter, an output peak filter and a side-chain controlled envelope.",
   "img": "art/luxeverb-after-100.png",
   "wiki": {
-   "intro": "LuxeVerb is a reverb for mixer inserts, with sections for input, reverb, pitch shifter, output and a wet envelope. It also has a second page called Space. FL Studio projects that use LuxeVerb load their settings.",
+   "intro": "LuxeVerb is a reverb built on a 16-line feedback delay network with a pitch shifter in its feedback path, or two feed-forward shifters. The page has Input, Reverb, Pitch, Output and Envelope sections. A second page, Space, switches to a separate reverb engine with its own controls. It loads the settings of the FL Studio LuxeVerb from an imported .flp project.",
    "controls": [
     [
-     "Wet gain",
-     "Level of the signal sent into the reverb."
+     "Input: Wet gain, High cut, Low cut",
+     "Level and filters of the signal sent into the reverb."
     ],
     [
      "Decay",
-     "Reverb time in seconds."
+     "Reverb time. The switch in the section title turns the reverb network on or off."
     ],
     [
      "Brightness",
-     "Tone of the reverb tail."
+     "How long the highs last compared with the rest of the tail."
     ],
     [
      "Size",
-     "Size of the room."
+     "Sets the lengths of the 16 delay lines."
     ],
     [
      "Diffusion",
-     "Density of the reflections."
+     "Amount of the two-stage all-pass diffuser before the network."
     ],
     [
-     "P. delay",
-     "Pre-delay before the reverb starts."
+     "Character",
+     "Rotation angle of the network's feedback matrix, which changes how the lines feed each other."
     ],
     [
-     "Mode",
-     "Normal, Freeze or Sustain."
+     "P. delay and T",
+     "Predelay before the reverb. T sets it as a tempo-synced value."
     ],
     [
-     "Pitch shift",
-     "Pitch of the shifted tail in semitones, set in Feedback or Feedforward routing."
+     "Mod amp / Mod freq",
+     "Amount and speed of the LFO that modulates the line lengths."
     ],
     [
-     "Dry",
-     "Level of the dry signal."
+     "Normal / Freeze / Sustain",
+     "Freeze stops new input and removes the damping, so the current tail is held. Sustain removes the damping but keeps taking input."
     ],
     [
-     "Wet",
-     "Level of the reverb signal."
+     "HQ",
+     "Reads the delay lines with cubic instead of linear interpolation."
+    ],
+    [
+     "Pitch: Feedback",
+     "A pitch shifter in the reverb's feedback path, with Pitch shift, Gain, Delay, Reverb mix and its own High cut and Low cut. The switch in the section title turns it on."
+    ],
+    [
+     "Pitch: Feedforward",
+     "Two shifters ahead of the reverb, each with Pitch, Amp and Delay, plus Direct amp for the unshifted signal."
+    ],
+    [
+     "Output: Dry, Wet, L",
+     "Dry and wet levels. L switches the soft limiter."
+    ],
+    [
+     "Peak freq / Peak gain / Peak Q",
+     "A peak filter on the output."
     ],
     [
      "Width",
@@ -3607,12 +3740,13 @@
     ],
     [
      "Envelope",
-     "Off, Wet or Decay, with threshold, attack, decay and smooth, driven by an optional side-chain."
+     "Off, Wet or Decay. An envelope follower with Threshold, Scale, Offset, Low cut, Attack, Decay and Smooth raises or lowers the wet level or the decay time. Sidechain picks the input it follows."
     ]
    ],
    "tips": [
-    "Use the Freeze mode to hold the current tail while you play over it.",
-    "Pick a side-chain source in the SC box to drive the envelope from another insert."
+    "Freeze holds the current tail while you play over it.",
+    "In Envelope mode Decay the decay time stays between 0.25 and 20 seconds.",
+    "The LuxeVerb and Space tabs also switch the engine, so the page shown is the engine heard."
    ]
   }
  },
@@ -3738,52 +3872,72 @@
   "desc": "Splits the sound into 16 bands, each with its own delay, volume and pan, with eight switchable banks and a morph control.",
   "img": "art/multiband-delay-after-100.png",
   "wiki": {
-   "intro": "Multiband Delay divides the signal into 16 frequency bands and lets you draw a delay time, volume or pan for each. Eight banks of these settings can be stored and morphed between. It is added to a mixer insert, and FL Studio projects with the plugin of the same name load their settings.",
+   "intro": "Multiband Delay splits the signal into 16 bands, sends each band through its own delay line with feedback, volume and pan, and sums the bands again. Eight banks each hold a delay time, a volume and a pan per band. It loads the settings of the FL Studio Multiband Delay from an imported .flp project.",
    "controls": [
     [
-     "Delay, Vol, Pan",
-     "Selects which value the 16 bars edit."
+     "Band display",
+     "Sixteen bars with their frequencies. Drag across them to draw the value of each band for the chosen target and bank."
+    ],
+    [
+     "Delay / Vol / Pan",
+     "Selects which of the three values per band the bars show and edit."
     ],
     [
      "Bank 1 to 8",
-     "Chooses the bank of band settings."
+     "Selects the bank the bars show and edit."
+    ],
+    [
+     "Gentle / Steep / Linear phase",
+     "Type of the band crossover. Linear phase adds 1536 samples of latency, which is reported for delay compensation."
     ],
     [
      "Scale",
-     "Scales the delay times."
+     "Scales the delay times of all bands. The knob is bipolar."
+    ],
+    [
+     "x 0.1",
+     "Shortens the delay times to a tenth."
+    ],
+    [
+     "H",
+     "Harmonic scale. The delay times follow a pitch scale, and Scale moves it in semitone steps."
+    ],
+    [
+     "W",
+     "Weighting. Derives each band's feedback from a decay time set by Feedback, so short and long delays die away over the same time."
     ],
     [
      "Feedback",
-     "Amount of delayed signal fed back."
+     "Amount of each band's delayed signal fed back into its delay line, up to 95 percent."
     ],
     [
      "Smoothing time",
-     "Time the settings take to change."
+     "How slowly the delay times glide to new values."
     ],
     [
      "Keep pitch",
-     "Keeps the pitch when delay times change."
+     "Crossfades to a new delay time over 100 ms instead of gliding, so the pitch does not bend."
     ],
     [
      "Morph",
-     "Moves between the banks."
+     "Interpolates the band values between neighbouring banks, from bank 1 at the left to bank 8 at the right."
+    ],
+    [
+     "Wet: Comp / Sat / Clip",
+     "Stage on the summed bands: a compressor, a saturator or a hard clip."
     ],
     [
      "HP",
-     "High-pass filter on the wet signal."
+     "High-pass filter on the summed bands, 10 Hz to 1 kHz."
     ],
     [
      "Mix",
-     "Dry and wet balance."
-    ],
-    [
-     "Gentle, Steep, Linear phase",
-     "Slope and type of the band crossovers."
+     "Balance between the dry signal and the delayed bands. The dry signal is delayed to match the plugin's latency."
     ]
    ],
    "tips": [
-    "Linear phase crossovers add a delay of 1536 samples, which is reported for compensation.",
-    "Use Morph to move between the stored banks."
+    "Automate Morph to move through the eight banks.",
+    "The selected target and bank are saved with the plugin state."
    ]
   }
  },
@@ -4158,52 +4312,63 @@
   "desc": "Real-time pitch corrector for a single voice or line. Notes you leave lit on the keyboard strip pull the sung pitch towards them, with a speed control.",
   "img": "art/pitcher-after-100.png",
   "wiki": {
-   "intro": "Pitch correction is an effect for a mixer insert that moves a monophonic input towards the nearest allowed note. It is normally used on vocals or solo lines. It also opens the settings of an FL Studio Pitcher when a .flp project is imported.",
+   "intro": "Pitch correction detects the pitch of a monophonic input and shifts it to the nearest allowed note. It loads the settings of an FL Studio Pitcher from an imported .flp project. The plain shifter has 9 samples of latency and the Formant path 257 samples, both reported for delay compensation.",
    "controls": [
     [
      "Note keys (C to B)",
-     "Lit notes are the ones the voice is pulled to."
+     "The twelve notes. Lit notes are the ones the voice is pulled to."
     ],
     [
      "Bypass keys",
-     "A note switched here passes uncorrected."
+     "One per note. A note switched here passes uncorrected."
     ],
     [
      "Enable bypass",
-     "Turns the per-note bypass keys on."
+     "Bypasses the correction for every note."
     ],
     [
      "Speed",
-     "How fast the correction follows. The display shows instant at its fastest setting."
+     "How fast the pitch moves to the target note. Fully up, the correction is immediate."
     ],
     [
      "Fine tune",
-     "Offset of the tuning, shown in cents."
+     "Offset of the output pitch, from -1 to +1 semitone."
     ],
     [
-     "A reference",
-     "Frequency of the A that the notes are measured against, shown as 440.0 Hz by default."
+     "A3 (Hz)",
+     "Reference frequency of A that the notes are measured against, adjustable by up to a semitone either way."
     ],
     [
-     "Gender",
-     "Shifts the formants of the voice, shown as a multiplier."
+     "Range",
+     "Lowest note the detector looks for: 220, 170, 110, 80, 55 or 25 Hz."
     ],
     [
      "Formant",
-     "Button next to Gender for the formant path."
+     "Switches to the formant path, which shifts with pitch-synchronous grains so the Gender knob can set the formants."
+    ],
+    [
+     "Gender",
+     "Formant path only. Resamples the grains by a factor from 0.5 to 2, which moves the formants down or up."
     ],
     [
      "Reference",
-     "Which channel the pitch is read from (Left in the picture)."
+     "Which channel the pitch is read from: Left, Independent (each channel on its own) or Right."
     ],
     [
-     "MIDI, Octaves, Harmonize",
-     "Extra modes for target notes and harmony voices."
+     "MIDI",
+     "Takes the allowed notes from held MIDI notes instead of the note keys."
+    ],
+    [
+     "Octaves",
+     "In MIDI mode, allows only the octave of each held note instead of that note in every octave."
+    ],
+    [
+     "Harmonize",
+     "Builds up to four harmony voices from held MIDI notes. The panel then shows Voice panning, Stereo spread, Replace or Mix, and Vel."
     ]
    ],
    "tips": [
-    "MIDI mode and Harmonize are implemented, but effects in LYNX SHARE receive no MIDI notes, so they behave as if nothing is connected to the MIDI port.",
-    "The effect reports its latency, so the mixer compensates for it."
+    "Effects in LYNX SHARE receive no MIDI notes, so MIDI mode applies no correction and Harmonize outputs the dry voice."
    ]
   }
  },
@@ -4558,39 +4723,40 @@
   "desc": "Gain envelope drawn as up to twelve points over a looped length in beats and locked to the song. It gives rhythmic pumping or gating.",
   "img": "art/rhythmic-envelope-after-100.png",
   "wiki": {
-   "intro": "Rhythmic envelope is a native effect for a mixer insert. Its gain follows a curve of points measured in beats, which loops and stays locked to the song position. The top of the editor shows the curve.",
+   "intro": "Rhythmic envelope multiplies the level of an insert by a curve of up to twelve points. The curve spans a period in beats, loops and follows the song position. The top of the editor draws the curve.",
    "controls": [
     [
      "Period",
-     "Length of the looped curve in beats (1 beats in the picture)."
+     "Length of the looped curve in beats, up to 64."
     ],
     [
      "Points",
-     "Number of points in use."
+     "Number of points in use, 0 to 12. With 0 points the gain stays at unity."
     ],
     [
      "Position",
-     "Where each point sits in the loop."
+     "Where each point sits in the period, from its start to its end."
     ],
     [
      "Level",
-     "Gain at each point."
+     "Gain at each point, from silence to unity."
     ],
     [
      "Tension",
-     "Curvature of the segment at each point."
+     "Bipolar. Bends the segment that leads to the point. In the centre the segment is a straight line."
     ],
     [
-     "1 to 6 and 7 to 12",
+     "1-6 / 7-12",
      "Switch between the two pages of six points."
     ],
     [
      "Control only",
-     "Switch next to Points. Its effect is not described in the source."
+     "Leaves the audio untouched and provides the curve value as a live automation source."
     ]
    ],
    "tips": [
-    "The curve loops over the Period and stays locked to the song position."
+    "Before the first point the level is that of the first point, and after the last point the level of the last point is held until the period ends.",
+    "Use Control only when the curve should drive another parameter instead of the level."
    ]
   }
  },
@@ -4818,31 +4984,31 @@
   "desc": "Stereo widener with spread and separation controls, a low frequency bypass and a mono switch, with a picture of the stereo image.",
   "img": "art/spreader-after-100.png",
   "wiki": {
-   "intro": "Spreader is a stereo widening effect for a mixer insert. It runs FL Studio's engine and opens the settings of a Spreader when a .flp project is imported. The display shows the current width and separation of the stereo image.",
+   "intro": "Spreader widens the stereo image by delaying a side signal and adding it back. The part of the signal below the LF bypass frequency is left out of the widening. It loads the settings of the FL Studio Spreader from an imported .flp project. The display draws the stereo field.",
    "controls": [
     [
      "On",
-     "Switches the effect on or off."
+     "Off passes the dry signal."
     ],
     [
      "Spread",
-     "Widens the stereo image."
+     "Delay of the side signal, up to about 6.35 ms."
     ],
     [
      "Separation",
-     "Separates the left and right parts of the image."
+     "Bipolar. How much of the delayed side signal is added, and with which sign."
     ],
     [
      "LF bypass",
-     "Low frequency setting under which the signal bypasses the effect."
+     "Frequency below which the signal is split off from the widening. The first half of the knob covers up to 500 Hz and the second half 500 Hz to 10 kHz."
     ],
     [
      "Mono",
-     "Mono bass switch."
+     "Mono bass. Outputs the part below the LF bypass frequency in mono."
     ]
    ],
    "tips": [
-    "The engine matches FL's on every distinct installation state tested, at 22.05, 44.1, 48 and 96 kHz."
+    "The controls are smoothed, so the effect fades in over about 2 ms after a reset."
    ]
   }
  },
@@ -4854,43 +5020,61 @@
   "desc": "Coarsens the signal in steps, with an optional filter, a dry/wet mix and an output volume. Used for bit-crush style grit.",
   "img": "art/squeeze-after-100.png",
   "wiki": {
-   "intro": "Squeeze is an effect slot plugin that coarsens the signal in steps and can filter it. Add it to a mixer insert for crushed or lo-fi texture. It imports the settings of the FL Studio plugin of the same family.",
+   "intro": "Squeeze is an insert effect that quantises the signal to a reduced number of levels, can gate it periodically with its Puncher section and can filter it before or after. It loads the settings of Fruity Squeeze from an imported .flp project.",
    "controls": [
     [
-     "Volume",
-     "Output level."
+     "Squarize: Amount",
+     "Number of levels the signal is rounded to. Turning it up lowers the count from 32768 towards 1, so the steps get coarser."
+    ],
+    [
+     "Puncher: Preserve",
+     "Length, in samples, of the part of each Puncher cycle that passes unchanged."
+    ],
+    [
+     "Puncher: Impact",
+     "Length, in samples, of the part of each cycle that is scaled by the Puncher Amount. At 0 the Puncher is off."
+    ],
+    [
+     "Puncher: Relation",
+     "Ties Impact to Preserve: free, equal, double or half."
+    ],
+    [
+     "Puncher: Amount",
+     "Gain applied during the Impact part of the cycle, from silence to unity."
+    ],
+    [
+     "Filter",
+     "Switches the filter on."
+    ],
+    [
+     "Filter type",
+     "Low-pass, high-pass, band-pass, notch or peak."
+    ],
+    [
+     "Freq.",
+     "Filter cutoff, on a logarithmic scale starting at 50 Hz."
+    ],
+    [
+     "Res.",
+     "Filter resonance."
+    ],
+    [
+     "Pre / Pos",
+     "Places the filter before the quantiser and Puncher, or after them."
     ],
     [
      "Mix",
      "Balance between the dry and the processed signal."
     ],
     [
-     "Steps",
-     "Step setting of the squeeze stage."
-    ],
-    [
-     "Filter",
-     "Amount of the filter."
-    ],
-    [
-     "Filter type",
-     "Selects the filter type."
-    ],
-    [
-     "Resonance",
-     "Resonance of the filter."
-    ],
-    [
-     "Cutoff",
-     "Cutoff of the filter."
-    ],
-    [
-     "Filter post",
-     "Places the filter after the squeeze stage."
+     "Gain",
+     "Output level, applied to the dry and processed signal together."
     ]
    ],
    "tips": [
-    "The docs list the engine as near-exact to the reference model, within 5e-9."
+    "The Puncher is a periodic gate that does not follow the signal: it alternates Preserve samples at full level with Impact samples at the Amount gain.",
+    "A block of pure silence passes through unchanged.",
+    "The filter is designed for 44.1 kHz, so at other project sample rates its real cutoff scales with the rate."
    ]
   }
  },
@@ -4940,45 +5124,46 @@
   "cat": "stereo",
   "flp": "Fruity Stereo Shaper",
   "desc": "A stereo matrix that sets how much of each input side reaches left and right, with delay and phase between the channels.",
-  "img": "plugui/Fruity Stereo Shaper.png",
+  "img": "art/fruity-stereo-shaper-after-100.png",
   "wiki": {
-   "intro": "Stereo Shaper routes the input channels to the output channels and offsets them in time and phase. Add it to an insert to narrow, widen or swap channels. It imports the settings of the FL Studio plugin of the same name.",
+   "intro": "Stereo Shaper is a mixer matrix that sets how much of each input side reaches each output side, followed or preceded by a delay and a phase stage on one channel. It loads the settings of Fruity Stereo Shaper from an imported .flp project.",
    "controls": [
     [
      "R > L",
-     "How much of the right input reaches the left output."
+     "How much of the right input goes to the left output. The fader is bipolar, so the signal can be added inverted."
     ],
     [
      "Left",
-     "Level of the left channel."
+     "Level of the left input in the left output. The default position is unity and the top of the range is 4 times (+12 dB)."
     ],
     [
      "Right",
-     "Level of the right channel."
+     "Level of the right input in the right output, with the same range as Left."
     ],
     [
      "L > R",
-     "How much of the left input reaches the right output."
+     "How much of the left input goes to the right output."
     ],
     [
      "Delay",
-     "Delay between the channels."
+     "Delays one channel by up to 500 ms: the right channel when turned right, the left channel when turned left."
     ],
     [
      "Phase",
-     "Phase between the channels."
+     "Runs one channel through an all-pass filter, which shifts its phase: the right channel when turned right, the left when turned left."
     ],
     [
-     "Effects post",
-     "Applies the effects after the shaper stage."
+     "Pre / Post",
+     "Runs the delay and phase stages before the matrix or after it."
     ],
     [
-     "Difference",
-     "Difference setting of the shaper."
+     "In/out difference",
+     "Outputs the input minus the output instead of the processed signal."
     ]
    ],
    "tips": [
-    "The docs list it as an exact engine; its gains ramp per host call, which can differ slightly from FL Studio."
+    "With Left and Right at unity and both cross faders at zero the matrix passes the signal unchanged.",
+    "Changing Delay resizes the delay line and clears it."
    ]
   }
  },
@@ -4990,47 +5175,48 @@
   "desc": "Shapes the attack and release of a sound with separate shape controls, a gain, a drive and a frequency split.",
   "img": "art/transient-processor-after-100.png",
   "wiki": {
-   "intro": "Transient Processor emphasises or softens the attack and the tail of a signal. Add it to a drum or percussion insert to sharpen or relax the hits. It imports the settings of the FL Studio plugin of the same name.",
+   "intro": "Transient Processor raises or lowers the attack and the release part of a sound. It splits the signal at a frequency, detects transients in the part above the split and applies the gain change there. It loads the settings of the FL Studio Transient Processor from an imported .flp project.",
    "controls": [
     [
      "Attack",
-     "Amount of change applied to the attack."
-    ],
-    [
-     "Drive",
-     "Drive amount."
-    ],
-    [
-     "Release",
-     "Amount of change applied to the release."
-    ],
-    [
-     "Gain",
-     "Output gain."
+     "Bipolar. Right of centre makes the onsets louder, left of centre softens them."
     ],
     [
      "Attack shape",
-     "Shape of the attack curve."
+     "Slider under Attack with three positions, Sharp, Mid and Slow, that set how fast the attack detector follows the signal."
+    ],
+    [
+     "Release",
+     "Bipolar. Right of centre lifts the tail after each hit, left of centre lowers it."
     ],
     [
      "Release shape",
-     "Shape of the release curve."
+     "Slider under Release with three positions, Sharp, Mid and Slow, that set the timing of the release detector."
+    ],
+    [
+     "Drive",
+     "Drives the processed band into a soft saturation stage and divides the level back out afterwards."
     ],
     [
      "Split freq.",
-     "Frequency of the split."
+     "Frequency of the split, 5 Hz to 1000 Hz. Only the part above it is processed."
     ],
     [
      "Split balance",
-     "Balance across the split."
+     "Balance between the unprocessed low part and the processed high part. Both are at full level in the centre."
     ],
     [
-     "On",
-     "Turns the effect on or off."
+     "Gain",
+     "Output gain, from -9 dB to +9 dB."
+    ],
+    [
+     "Off / On",
+     "Off passes the input through unchanged."
     ]
    ],
    "tips": [
-    "The docs list it as an exact engine."
+    "The view under the controls shows the gain, and the meters at the sides show input and output.",
+    "About 1.5 seconds after the input goes silent the effect stops processing and passes the signal through until sound returns."
    ]
   }
  },
@@ -5316,59 +5502,77 @@
   "desc": "A phaser with a frequency range, feedback, LFO and tempo sync, plus a built-in delay section and input colouring.",
   "img": "art/vintage-phaser-after-100.png",
   "wiki": {
-   "intro": "Vintage Phaser sweeps notches through the sound between a minimum and maximum frequency. Add it to an insert for phasing on keys, guitars or synths. It imports the FL Studio plugin of the same name; the docs list the match as near-exact.",
+   "intro": "Vintage Phaser sweeps a phaser between a minimum and a maximum frequency with an LFO, and adds a delay, a noise generator with a gate and a mono input switch. The Main page has the Phasing, Modulation, Delay and Levels sections, the Advanced page holds the remaining engine controls. It loads the settings of the FL Studio Vintage Phaser from an imported .flp project.",
    "controls": [
     [
-     "Min freq.",
-     "Lower end of the sweep."
-    ],
-    [
-     "Max freq.",
-     "Upper end of the sweep."
+     "Min / Max",
+     "The two ends of the sweep, each from 1.25 Hz to 20.48 kHz. The sweep between them is exponential."
     ],
     [
      "Feedback",
-     "Feedback amount."
+     "Amount of phaser feedback. Invert feedback on the Advanced page flips its sign."
     ],
     [
-     "LFO speed",
-     "Rate of the LFO."
+     "HQ",
+     "Oversamples 8 times instead of 4 times."
     ],
     [
-     "Tempo sync",
-     "Syncs the LFO to the tempo."
+     "Manual",
+     "Switches the LFO off and holds the phaser at the Manual freq. set on the Advanced page."
+    ],
+    [
+     "Type",
+     "LFO waveform: Triangle or Sine."
+    ],
+    [
+     "Speed and T",
+     "LFO rate. With T on, the rate is a length in steps of the project tempo and the LFO follows the song position."
     ],
     [
      "Start phase",
-     "Start phase of the LFO."
+     "Where in its cycle the LFO starts. It is used only with tempo sync."
     ],
     [
      "L/R phase",
-     "Phase between left and right."
+     "Offsets the LFO of the right channel against the left."
+    ],
+    [
+     "Tension",
+     "Bends the LFO waveform. At zero it has no effect."
+    ],
+    [
+     "Delay: Time and T",
+     "Delay time, up to one second, or in steps of 1/192 beat with T on. The LED in the section title switches the delay on."
+    ],
+    [
+     "Delay: Mix, Stereo, Feedback",
+     "Mix is the level of the delayed signal, Stereo distributes the delayed and direct signals between left and right, and Feedback is the amount fed back."
+    ],
+    [
+     "Delay: LP, HP",
+     "Low-pass (320 Hz to 20.48 kHz) and high-pass (20 Hz to 20.48 kHz) filters in the delay's feedback path."
+    ],
+    [
+     "Keep pitch",
+     "Crossfades between delay times over 100 ms when Time changes, instead of gliding the pitch."
+    ],
+    [
+     "Noise and Noise gate",
+     "Noise adds filtered noise after the phaser. Noise gate closes the output when the signal falls under a threshold tied to the noise level."
+    ],
+    [
+     "Mono input",
+     "Sums left and right before the effect."
     ],
     [
      "Mix",
-     "Balance between dry and wet."
-    ],
-    [
-     "Delay time",
-     "Time of the built-in delay."
-    ],
-    [
-     "Delay fdbk",
-     "Feedback of the delay."
-    ],
-    [
-     "Drive",
-     "Drive amount."
-    ],
-    [
-     "Invert fdbk",
-     "Inverts the feedback."
+     "Balance between the dry and the phased signal."
     ]
    ],
    "tips": [
-    "The docs list the match with the FL Studio plugin as within -121 dB."
+    "Advanced page: Drive sets the saturation of the V2 engine from -15 dB to +15 dB, Colour gain and Colour freq. set a low shelf before the phaser, Input HP and Feedback HP are high-pass filters from 5 Hz to 200 Hz.",
+    "Rate 1 and Rate 2 on the Advanced page set the two ends of the range that the Speed fader covers.",
+    "Min may be set above Max: the two values are sorted before use."
    ]
   }
  },
@@ -5436,55 +5640,60 @@
   "desc": "A band vocoder that imposes the spectrum of a modulator on a carrier, with band count, filter order, formant and envelope controls.",
   "img": "plugui/Fruity Vocoder.png",
   "wiki": {
-   "intro": "Vocoder analyses one signal in frequency bands and uses it to shape another, the classic talking synth effect. Add it to an insert and use the side inputs for modulator and carrier. The docs list the engine as exact for the FL Studio plugin.",
+   "intro": "Vocoder splits a modulator into 4 to 128 frequency bands, follows the level of each band and applies those levels to the same bands of a carrier. The left input is the modulator and the right input the carrier, and the output is mono on both sides. It loads the settings of Fruity Vocoder from an imported .flp project.",
    "controls": [
     [
      "Bands",
-     "Number of bands."
+     "Number of bands: 4, 8, 16, 32, 64 or 128. Changing it resets the per-band levels."
     ],
     [
-     "Order",
-     "Filter order."
+     "Filter",
+     "Number of equal band-pass filters in series per band: 1, 2 or 3."
     ],
     [
-     "Min freq.",
-     "Lowest band frequency."
+     "Min / Max",
+     "Lowest and highest frequency covered by the bands."
     ],
     [
-     "Max freq.",
-     "Highest band frequency."
+     "Scale",
+     "How the band edges are spread between Min and Max."
     ],
     [
-     "Formant",
-     "Formant shift."
+     "BW",
+     "Width of each band-pass filter, 5 to 200 percent."
     ],
     [
-     "Width",
-     "Width of the bands."
+     "Form",
+     "Shifts the carrier bands against the modulator bands, from -1200 to +1200 cents."
     ],
     [
-     "Attack",
-     "Envelope attack."
+     "Invert",
+     "Mirrors the band order of the carrier, so low modulator bands drive high carrier bands."
     ],
     [
-     "Release",
-     "Envelope release."
+     "Att / Rel",
+     "Attack and release time of the band envelope followers, 10 ms to 1000 ms each."
     ],
     [
      "Hold",
-     "Envelope hold."
+     "Stops the analysis and keeps the current band levels."
     ],
     [
-     "Wet",
-     "Wet level."
+     "Mod / Car / Wet",
+     "Levels of the unprocessed modulator, the unprocessed carrier and the vocoded signal in the output."
     ],
     [
-     "Swap L/R",
-     "Swaps the channels."
+     "Modulator / Carrier / Mix",
+     "Listen switch: outputs the modulator alone, the carrier alone, or the mix set by the three faders."
+    ],
+    [
+     "L / R",
+     "Swaps which input side is the modulator and which is the carrier."
     ]
    ],
    "tips": [
-    "The docs list the engine as exact, checked over 500 random runs."
+    "The Side inputs switch in the plugin menu takes the modulator from side input 1 and the carrier from side input 2, each summed to mono, instead of the left and right sides of the insert.",
+    "The band display shows the levels of the analysis bands."
    ]
   }
  },
@@ -5505,39 +5714,39 @@
   "desc": "Shifts pitch and formant of a voice or instrument, with a link between them, a drive stage, a mix and optional MIDI control.",
   "img": "art/voice-shift-after-100.png",
   "wiki": {
-   "intro": "Voice Shift changes the pitch and the formant of the incoming sound. Add it to a vocal insert to move the voice up or down or to change its character.",
+   "intro": "Voice Shift is a pitch and formant shifter for one voice or one monophonic line. It detects pitches between 70 Hz and 1000 Hz. It reports its latency for delay compensation and delays the dry signal to match.",
    "controls": [
     [
      "Pitch",
-     "Pitch shift."
+     "Pitch shift, -12 to +12 semitones."
     ],
     [
      "Formant",
-     "Formant shift."
+     "Formant shift, -12 to +12 semitones."
     ],
     [
      "Link",
-     "Links pitch and formant."
+     "Makes the formants follow the pitch. Formant then works as an offset."
     ],
     [
      "Mode",
-     "Processing mode."
+     "Transpose shifts by the Pitch amount. Quantize also moves the voice to the nearest semitone at once. Robot sings one fixed note, C4 at Pitch 0, which Pitch moves."
     ],
     [
      "Drive",
-     "Drive amount."
+     "A tube-style saturation stage on the shifted voice, 0 to 10."
     ],
     [
      "Mix",
-     "Balance between dry and wet."
+     "Balance between the dry and the shifted signal."
     ],
     [
-     "MIDI",
-     "MIDI setting of the plugin."
+     "MIDI channel",
+     "Off, or a Channel Rack channel whose held notes set the pitch. Transpose and Quantize shift by the distance of the highest held note from C4, and Robot sings that note."
     ]
    ],
    "tips": [
-    "Link ties the pitch and formant controls together."
+    "With Link on, turning Pitch moves the formants with it, like a change of playback speed."
    ]
   }
  },
@@ -5582,11 +5791,11 @@
   "desc": "Audio display with oscilloscope, spectrum, spectrogram, peak meter and vectorscope modes. It shows the sound passing through and does not change it.",
   "img": "thumbs/fx-wave-candy-09bf497e.png",
   "wiki": {
-   "intro": "Wave Candy is a visual effect that you put on an insert slot to watch the signal. It does not change the sound. A new one starts in spectrum mode, and a Wave Candy from an imported FL Studio project opens in the mode its saved state shows.",
+   "intro": "Wave Candy is a display that you put on an insert slot to watch the signal. It does not change the sound. A new one starts in spectrum mode, and a Wave Candy from an imported FL Studio project opens in the display mode its saved state shows. The knobs under the display change with the mode.",
    "controls": [
     [
      "Mode",
-     "Auto, Oscilloscope, Spectrum, Spectrogram, Peak meter or Vectorscope. Auto picks the meter for a tall narrow window, the oscilloscope for a wide short one and the spectrum otherwise."
+     "Auto, Oscilloscope, Spectrum, Spectrogram, Peak meter or Vectorscope. Auto shows the meter in a tall narrow window, the oscilloscope in a wide short one and the spectrum otherwise."
     ],
     [
      "Hold",
@@ -5594,47 +5803,63 @@
     ],
     [
      "Gain",
-     "Display gain, shown in dB."
+     "Display gain, -24 dB to +24 dB. All modes."
     ],
     [
      "Scope window",
-     "Length of audio shown by the oscilloscope, in ms."
+     "Oscilloscope. Length of time shown, 2 ms to 500 ms."
+    ],
+    [
+     "Separation",
+     "Oscilloscope. Draws left and right apart."
     ],
     [
      "Sync",
-     "Switches the oscilloscope sync on or off."
+     "Oscilloscope. Locks the trace to the period of the waveform, at a zero crossing."
+    ],
+    [
+     "Speed",
+     "Spectrum and spectrogram. How fast the spectrum falls or the spectrogram scrolls."
     ],
     [
      "Range",
-     "Dynamic range of the spectrum display, in dB."
+     "Spectrum and spectrogram. Level range shown, 30 dB to 120 dB."
+    ],
+    [
+     "Scale",
+     "Spectrum and spectrogram. Frequency scale, from near linear to logarithmic, which shows more low-frequency detail."
+    ],
+    [
+     "Weighting",
+     "Spectrum and spectrogram. From flat to a tilt of +3 dB per octave."
     ],
     [
      "Resolution",
-     "Size of the spectrum analysis, shown in points."
+     "Spectrum and spectrogram. Analysis size, 1024 to 16384 points."
     ],
     [
      "Meter mode",
-     "Selects how the peak meter reads."
+     "Peak meter. Peak, PPM, RMS, VU or LUFS."
     ],
     [
-     "Peak hold",
-     "How long the peak meter holds a peak, in seconds."
-    ],
-    [
-     "Decay",
-     "How fast the peak meter falls, in dB per second."
+     "Peak hold / Decay",
+     "Peak meter. How long a peak is held, 0 to 5 seconds, and how fast the bar falls, 3 to 60 dB per second."
     ],
     [
      "Meter scale",
-     "Lowest level shown by the peak meter, in dB."
+     "Peak meter. Lowest level shown, -24 dB to -96 dB."
+    ],
+    [
+     "Persistence / Thickness",
+     "Vectorscope. Length of the trail and size of the dots."
     ],
     [
      "Colour",
-     "Hue of the display, shown in degrees."
+     "Hue of the trace. All modes."
     ]
    ],
    "tips": [
-    "Make the window tall and narrow in Auto mode to get a meter, wide and short to get a scope."
+    "In Auto mode, make the window tall and narrow to get a meter, or wide and short to get a scope."
    ]
   }
  },
@@ -5787,55 +6012,68 @@
   "desc": "Bass drum generator with pitch, duration, drive, sub bass and click controls, plus a noise layer that uses a wave file. Needs FL Studio data.",
   "img": "art/bassdrum-after-100.png",
   "wiki": {
-   "intro": "BassDrum is a kick drum generator for the channel rack. Needs the wave data of your own FL Studio installation; LYNX SHARE reads it at run time and does not include it. When the exact engine cannot run, a simpler fallback kick is used. It opens the settings of the matching FL Studio plugin on .flp import.",
+   "intro": "BassDrum is a kick drum generator built on the engine of the FL plugin of the same name: two table oscillators with a falling pitch sweep, a click, an optional noise sample layer, a drive stage and a 42 Hz high-pass. The oscillator table and the noise samples are read at run time from the BassDrum folder of your own FL Studio installation and are not included. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio. On .flp import without that folder the channel uses a simpler sine and sweep conversion.",
    "controls": [
     [
      "Output",
-     "Output level."
+     "Output level. It is multiplied by the note velocity."
     ],
     [
      "Sampling",
-     "One of the main knobs at the top right of the panel."
+     "Resampling ratio of the whole voice, from a quarter to four times, which shifts pitch and length together. The played key transposes the drum the same way."
     ],
     [
      "Duration",
-     "Length of the drum sound."
+     "Length of the drum's level ramp. At 0 the drum is silent."
     ],
     [
-     "Base",
-     "Base pitch knob of the kick."
+     "Base, Peak, Slide",
+     "The pitch sweep. Base is the frequency it settles on (16 to 256 Hz), Peak is the depth of the sweep above it and Slide is how long the sweep takes."
     ],
     [
-     "Peak",
-     "Peak knob of the pitch envelope."
+     "Var base, Var peak, Var slide",
+     "Offsets of the second oscillator's base, peak and slide against the first, from half to double."
     ],
     [
-     "Slide",
-     "Slide knob of the pitch envelope."
+     "Var phase",
+     "Delays the start of the second oscillator, by up to 350 samples of the internal 44.1 kHz rate."
     ],
     [
      "Drive",
-     "Drive amount."
+     "Amount of the saturator after the voice."
     ],
     [
      "Sub bass",
-     "Sub bass layer amount."
+     "Resonance of the 42 Hz high-pass at the output."
     ],
     [
      "Attack",
-     "Attack amount."
+     "Smooths the start of the hit. Higher values give a slower rise."
     ],
     [
-     "Click",
-     "Click amount."
+     "Click, Freq, Cut",
+     "A click that modulates the oscillator phase at the start. Click is its level, Freq its speed and Cut its start phase."
     ],
     [
-     "Noise",
-     "Noise layer with a wave file selector and its A, D, S, Start, Pitch, Filter and Mix knobs."
+     "Noise display",
+     "Shows the noise sample in use, or Needs FL Studio's files when it cannot be read."
+    ],
+    [
+     "Noise: A, D, S",
+     "Attack, decay and sustain of the noise layer's envelope."
+    ],
+    [
+     "Noise: Start",
+     "Delays the noise against the oscillators or the oscillators against the noise, by up to 100 ms either way. At the centre both start together."
+    ],
+    [
+     "Noise: Pitch, Filter, Mix",
+     "Playback speed of the noise sample (two octaves down to two octaves up), its low-pass filter and its level."
     ]
    ],
    "tips": [
-    "Var base, Var peak, Var slide and Var phase knobs vary values from hit to hit."
+    "Note length does not shorten a hit: the note-off is ignored and a voice ends after about 23 ms of silence.",
+    "The voice runs at an internal 44.1 kHz and is resampled to the project rate."
    ]
   }
  },
@@ -6127,67 +6365,68 @@
   "desc": "Sampled piano, electric piano and keys instrument with decay, release, overdrive, velocity and tuning controls. Needs FL Studio data.",
   "img": "art/fl-keys-after-100.png",
   "wiki": {
-   "intro": "FL Keys is a keyboard generator for the channel rack. Needs the wavetable files of your own FL Studio installation; LYNX SHARE does not include them, and without them an imported FL Keys channel falls back to a zoned sampler. It opens the settings of the matching FL Studio plugin on .flp import.",
+   "intro": "FL Keys is a sampled keyboard generator built on the engine of the FL plugin of the same name. It plays a wavetable set such as Grand Piano through an exponential envelope, a soft overdrive, a muffle low-pass, a treble shelf, a tremolo or auto-pan LFO and a short stereo delay. The wavetable files are read from your own FL Studio installation and are not included. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio. On .flp import, when the engine cannot load the set, the channel falls back to a zoned sampler.",
    "controls": [
     [
+     "Name display",
+     "Shows the wavetable set in use, at the top right."
+    ],
+    [
      "Decay",
-     "Environment: decay of the notes."
+     "How fast a note decays while the key is held. At minimum, notes do not decay."
     ],
     [
      "Release",
-     "Environment: release of the notes."
+     "How fast a note fades after the key is released."
     ],
     [
      "Pan",
-     "Environment: stereo position."
+     "Depth of the LFO. Above the centre both sides move together (tremolo); below it they move in opposite directions (auto-pan)."
     ],
     [
      "Stereo",
-     "Environment: stereo width."
+     "Width of the stereo delay and the left to right spread of notes across the keyboard."
     ],
     [
      "Overdrive",
-     "Misc section knob."
+     "Amount of the soft overdrive on each note."
     ],
     [
      "LFO",
-     "Misc section knob."
+     "Rate of the tremolo or auto-pan LFO."
     ],
     [
      "Treble",
-     "Misc section knob."
+     "Gain of the treble shelf: a cut below the centre, a boost above it."
     ],
     [
      "Stretch",
-     "Misc section knob."
+     "Stretches the tuning of notes above middle C, more the further they are from it."
     ],
     [
-     "Vel",
-     "Velocity section knobs."
+     "Muffle and its Vel",
+     "Muffle sets the cutoff of the per-note low-pass. The Vel knob beside it sets how much velocity opens that filter."
     ],
     [
-     "Muffle",
-     "Velocity section knob."
-    ],
-    [
-     "Hardness",
-     "Velocity section knob."
+     "Hardness and its Vel",
+     "Hardness shifts which sample group a key plays, by up to six keys either way. The Vel knob beside it adds a shift for velocities above 40."
     ],
     [
      "Sens",
-     "Velocity section knob."
+     "Velocity sensitivity: the power applied to the note volume."
     ],
     [
      "Tune",
-     "Tuning section knob."
+     "Tuning, one semitone either way."
     ],
     [
      "Detune",
-     "Tuning section knob."
+     "Detunes keys against each other in a fixed per-key pattern."
     ]
    ],
    "tips": [
-    "The preset menu at the top right of the panel picks the instrument, for example Grand Piano."
+    "Up to 32 voices play at once; beyond that the quietest sounding voice ends first.",
+    "Sets marked for resampling, such as Roto Organ, are not resampled when the project rate differs from 44.1 kHz."
    ]
   }
  },
@@ -6199,52 +6438,77 @@
   "desc": "Six-string guitar generator with play modes, an effects section, four amp types and four cabinets. Plays and imports FL Slayer channels.",
   "img": "art/fl-slayer-after-100.png",
   "wiki": {
-   "intro": "FL Slayer is a guitar generator that runs the engine of the FL plugin of the same name, with its own effects, amp and cabinet. You add it as a channel and play it from the piano roll. Needs the files of your own FL Studio installation (the chord and glide tables are read from its engine file); without them the channel stays silent and its settings are kept.",
+   "intro": "FL Slayer is a guitar generator built on the engine of the FL plugin of the same name: six strings played in six modes, an effects block, an amp with a three-band EQ and a cabinet. The recorded pick excitations and the chord and glide tables are read at run time from Slayer_Engine.dll in your own FL Studio installation and are not included. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio. On .flp import, if that file is missing or is a different build, the channel is left unsupported.",
    "controls": [
     [
-     "Pickup position",
-     "Slider that moves the pickup along the strings."
+     "Aid",
+     "Play mode: None, Auto chords, Power chords, Strumming, Solo fixed or Solo dynamic. Auto chords plays the chord of the pressed key across the strings, Power chords plays three notes, Strumming starts each held note one step later, and the Solo modes trigger on the first key and glide to later keys."
     ],
     [
-     "Tone, Slap, Fret, Harm, Damp",
-     "Playing knobs that shape how the strings are plucked and sound."
+     "Aid knob and Latch",
+     "The knob sets the step between strings in the chord and strum modes (0 to 10 steps) and the glide time in the Solo modes. With Latch on, released strings keep sounding."
+    ],
+    [
+     "Type",
+     "String excitation, 0 to 6. 0 uses noise, 1 to 6 use the recorded picks."
+    ],
+    [
+     "Coils",
+     "Pickup setting, 0 to 2. 0 switches both pickup taps off, 1 uses two taps with the second at twice the distance and opposite sign, 2 also scales the distance with the string length."
+    ],
+    [
+     "Pickup position",
+     "Distance of the pickup tap along the string."
+    ],
+    [
+     "Tone",
+     "Tone of the pick excitation and how fast the excitation decays."
+    ],
+    [
+     "Slap",
+     "Lowers the level at which the string signal clips and raises the output gain to match."
+    ],
+    [
+     "Fret",
+     "Amount of the excitation signal added to the string output as fret noise."
+    ],
+    [
+     "Harm",
+     "Frequency of the pickup's resonant filter, from 1000 Hz to 7000 Hz."
+    ],
+    [
+     "Damp",
+     "Damping of the string loop. Higher values also lower the loop gain, so notes ring for a shorter time."
     ],
     [
      "Vel vol and Vel damp",
-     "Knobs for how velocity affects level and damping."
+     "How much note velocity changes the level, and how much it changes the damping."
     ],
     [
-     "Amp",
-     "Four amp types: Clean, Overdrive, Distortion and Fuzz."
+     "Gliss and Bend 2",
+     "Bend 2 is the mod wheel value. With Gliss off it sets the vibrato depth. With Gliss on it steps the pitch in semitones and the pitch bend becomes continuous."
     ],
     [
-     "Cab 1 to Cab 4",
-     "Four cabinet choices."
+     "Amp and Cab 1 to Cab 4",
+     "Amp type: Clean, Overdrive, Distortion or Fuzz. The cabinet choice sets the amp's output filter, a short comb and the output gain."
     ],
     [
      "Drive, Pres, Fdbk",
-     "Amp knobs: drive, presence and feedback."
+     "Drive is the gain into the amp's shaper. Pres (presence) sets the filter stages around the shaper in Overdrive and Distortion. Fdbk is how much of the amp output is fed back into the strings."
     ],
     [
      "Low, Mid, High",
-     "Three-band EQ knobs."
+     "Three-band EQ: low shelf at 500 Hz, peak at 1 kHz and high shelf at 2.5 kHz, each from -10 dB to +10 dB."
     ],
     [
-     "FX",
-     "Effect selector (for example Master: Chorus) with two parameter knobs, Par 1 and Par 2."
-    ],
-    [
-     "Aid",
-     "Selector (for example Auto chords) with a knob and a Latch button."
-    ],
-    [
-     "Type and Coils",
-     "Number boxes in the Strings section."
+     "FX, Par 1, Par 2",
+     "Effect menu with 16 entries: Dry, eight that run before the amp (such as Phaser, Tremolo, Wah-wah, Ring mod and Talk box) and seven that run after the cabinet (such as Chorus, Flanger and Dub delay). Par 1 and Par 2 are the two parameters of the chosen effect."
     ]
    ],
    "tips": [
-    "Imported FL Slayer channels keep their settings and pick up the pan, volume and pitch of the channel.",
-    "Without FL Studio installed the channel is silent, so check the notice at the top of its window first."
+    "Changing a setting restarts the sounding voices.",
+    "The channel's pan, volume and pitch are sent to the engine as FL sends them; the pitch becomes a pitch bend.",
+    "Notes can start up to 5 ms differently from an FL render, because the engine's 5 ms control grid starts with playback here."
    ]
   }
  },
@@ -6256,35 +6520,37 @@
   "desc": "Small kick drum generator with pitch sweep, amplitude decay, click and distortion knobs. Plays and imports Fruit Kick channels.",
   "img": "art/fruit-kick-after-100.png",
   "wiki": {
-   "intro": "Fruit Kick is a kick drum generator that runs the engine of the FL plugin of the same name. You add it as a channel and trigger it from the step sequencer or piano roll. A new instance starts from the Default preset of your own FL Studio installation.",
+   "intro": "Fruit Kick is a kick drum generator built on the engine of the FL plugin of the same name: a sine wave whose pitch and amplitude fall over time, with an optional waveshaper. A new instance starts from the plugin's preset in your own FL Studio installation when there is one, and from LYNX SHARE's own preset bank otherwise.",
    "controls": [
     [
      "Max",
-     "Knob in the pitch group of the kick."
+     "Frequency the pitch sweep starts at. The played note shifts it at half rate."
     ],
     [
      "Min",
-     "Knob in the pitch group of the kick."
+     "Floor frequency where the pitch sweep stops falling."
     ],
     [
      "Decay",
-     "Knob in the pitch group of the kick."
+     "How fast the pitch falls from Max to Min."
     ],
     [
      "Amp decay",
-     "Length of the amplitude envelope."
+     "How fast the amplitude falls. The voice ends when the amplitude drops below 0.0002."
     ],
     [
      "Click",
-     "Amount of click."
+     "Start phase of the sine wave, 0 to 64, where 64 is a quarter cycle. It sets the click at the onset."
     ],
     [
      "Dist",
-     "Amount of distortion."
+     "Mix of the waveshaper: as it rises the dry signal falls and the shaped signal rises."
     ]
    ],
    "tips": [
-    "Imported projects keep the plugin's state, including its release fades and filter type."
+    "Because the note tracks at half rate, one octave on the keyboard moves the start pitch by half an octave.",
+    "Channel envelopes and LFOs for pan, volume, cutoff and resonance are stepped once per sequencer tick.",
+    "A note released without a volume envelope ends with a 10 ms fade."
    ]
   }
  },
@@ -6555,47 +6821,67 @@
   "desc": "Subtractive synthesizer with three oscillators, filter, two envelopes, two LFOs, ten effect slots and an output equaliser. Plays and imports GMS channels.",
   "img": "art/gms-after-100.png",
   "wiki": {
-   "intro": "GMS is a subtractive generator that runs the engine of the FL plugin of the same name. You add it as a channel and play it from the piano roll. Needs the wave data of your own FL Studio installation; without it the channel stays silent and its settings are kept.",
+   "intro": "GMS is a subtractive generator built on the engine of the FL plugin of the same name: three wavetable oscillators plus noise per unison voice, a ladder filter, two envelopes, two LFOs, ten effect slots and an output EQ. The oscillator waves are read at run time from the GMS Synth Waves folder of your own FL Studio installation and are not included; without them the wave screen shows Needs FL Studio's files. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio. On .flp import without the waves the channel uses a simpler three-oscillator conversion.",
    "controls": [
     [
-     "Oscillators",
-     "Wave display with pitch and fine tuning for each oscillator, plus Phase, Voices, Octave, Osc 2, Osc 3, Noise, Unison, Detune and Stereo."
+     "Pitch and Fine",
+     "Pitch and fine detune of each of the three oscillators."
+    ],
+    [
+     "Osc 2, Osc 3, Noise",
+     "Mix levels of oscillator 2, oscillator 3 and the noise."
+    ],
+    [
+     "Phase, Retrig, Inv",
+     "Phase offset of oscillator 2, a switch that retriggers its phase on each note, and a switch that inverts it."
+    ],
+    [
+     "Unison, Voices, Stereo, Detune",
+     "Unison phase with its own Retrig switch, the number of unison voices, their stereo spread and their detune."
+    ],
+    [
+     "Octave, Mono",
+     "Octave shift and monophonic play."
     ],
     [
      "Modulation and Amount",
-     "Modulation type between oscillators and its amount."
-    ],
-    [
-     "Level EG",
-     "Amp, Att, Dec, Sus and Rel."
-    ],
-    [
-     "Channel",
-     "Pan, Pitch and Slide, with an Out level fader."
+     "Modulation between oscillators: Off, FM or Sync, with a slider for its amount."
     ],
     [
      "Filter",
-     "Cut, Res and Kbd faders with LP, BP and HP buttons."
+     "Cut (cutoff), Res (resonance) and Kbd (key tracking) faders with LP, BP and HP types."
     ],
     [
      "Envelope 1 and 2",
-     "Atk, Dec and Amt faders, with Inv and targets Flt, Mod, Freq and LFO."
+     "Atk, Dec and Amt faders, an Inv switch, and a destination: Flt (filter), Mod (modulation amount), Freq or LFO."
     ],
     [
      "LFO 1 and 2",
-     "Rate, Amt, Sync, Dest and Shape."
+     "Rate and Amt faders, Sync (None, Beat or Bar), Retrig, Inv, Dest (Flt, Mod, Freq or Level) and Shape (Sine, Triangle, Saw or Square)."
+    ],
+    [
+     "Level EG",
+     "Amp level and the Att, Dec, Sus and Rel of the level envelope."
+    ],
+    [
+     "Channel",
+     "Out (master level), Pan, Pitch, and Slide time with its On switch."
     ],
     [
      "Effects",
-     "Ten slots: Dist, Crush, Flang, Phas, LP, HP, Delay, Verb, Pan and Tranc."
+     "Tabs for ten units: Dist, Crush, Flang, Phas, LP, HP, Delay, Verb, Pan and Tranc. Each has an On switch, two main knobs named for the unit (for example Feedback and Filter for Delay), and its own LFO with rate, amount, Shape and Sync."
     ],
     [
      "Output EQ",
-     "Five faders with an On button and a Bend knob."
+     "On switch and five band faders."
+    ],
+    [
+     "Bend",
+     "Pitch bend range."
     ]
    ],
    "tips": [
-    "FL's random generator is shared between all instances, so noise and start phases will not match an FL render sample for sample."
+    "Noise, dither and random phases come from a generator owned by each instance, so they differ from any given FL render."
    ]
   }
  },
@@ -6607,55 +6893,77 @@
   "desc": "Additive synthesizer with timbre sliders, harmonic mask, filter, unison, phaser, harmonizer, LFO and an effects rack. Plays and imports Harmless channels.",
   "img": "art/harmless-after-100.png",
   "wiki": {
-   "intro": "Harmless is an additive generator that runs the engine of the FL plugin of the same name, with its effects rack. You add it as a channel and play it from the piano roll. The rack's compressor needs your own FL Studio installation; without it the compressor stays off.",
+   "intro": "Harmless is an additive generator built on the engine of the FL plugin of the same name: up to 528 sine partials per voice, shaped by colour, timbre EQ, harmonic mask, filter, resonance, phaser and pluck, followed by a rack of chorus, delay, reverb and compressor. It can be added without FL Studio and then starts from LYNX SHARE's own preset bank. The rack's compressor loads its presets from your own FL Studio installation; without them the compressor stays off.",
    "controls": [
     [
-     "Timbre",
-     "Prot and Sub sliders, Color selector, Timbre EQ sliders and Phase."
+     "Prot and Sub 1, 3, 4",
+     "Prot is low harmonics protection. The three Sub faders set the levels of sub harmonics 1, 3 and 4."
+    ],
+    [
+     "Timbre EQ",
+     "Six band faders that raise or lower regions of the timbre."
+    ],
+    [
+     "Color",
+     "Base spectrum of the timbre: Saw, Bright saw, Brighter saw, Dephased saw, Dephased saw 2, Squaretooth, Squaretooth 2, Mole, Double saw, Triple saw, Triple saw 2 or Custom."
+    ],
+    [
+     "Phase",
+     "Phase randomness of the partials."
     ],
     [
      "Harmonic mask",
-     "Sliders with Mix and LFO knobs."
+     "Twelve faders that set the mask, Mix for how much of it is applied, and LFO for how much the LFO moves that mix."
     ],
     [
      "Envelope",
-     "Trem, Att, Dec and Rel."
+     "Trem is stereo tremolo depth. Att, Dec and Rel are the volume envelope. The Vel buttons send velocity to the attack and release velocity to the release."
     ],
     [
      "Pluck",
-     "Decay with Alt, Mask and Rel options."
+     "Decay sets the pluck decay, with a Vel button for velocity. Alt selects the alternate pluck mode, Mask makes the pluck use the harmonic mask, and Rel applies the pluck only on release."
     ],
     [
-     "Vol and Pitch",
-     "Volume and pitch sliders; Grit, Vib, LFO, Porta, Mono and Time."
+     "Vol",
+     "Master volume fader, with a Vel button that sends velocity to volume."
+    ],
+    [
+     "Pitch",
+     "Pitch is master pitch and Det is detuning. Grit is grittiness, Vib is vibrato depth and LFO is the pitch LFO amount. Porta and Mono switch portamento and monophonic play; Time is the portamento time, with a Vel button."
     ],
     [
      "Filter",
-     "Type, Res type, Freq, Res, Env, Width and more."
+     "Type picks one of 17 filter shapes, Freq and Width set its frequency and width, and Oct or Hz sets the scale. Env is the filter envelope amount, with Att, Dec, a Slope knob for each and an Adapt switch. LFO and Key set the LFO and key tracking amounts."
+    ],
+    [
+     "Res, Ofs, Osc, Res type",
+     "Res is the resonance amount, Ofs its offset and Osc the self-oscillation level. Res type picks one of nine shapes with its own Oct or Hz scale. Motion tracks the motion of the filter frequency and Adapt adapts the resonance width."
     ],
     [
      "Unison",
-     "Order, Type, and Pan, Pitch, Phase and Var sliders."
+     "Order sets the number of unison voices and Type is Classic, Uniform or Blurred. The faders set panning, pitch thickness, phase and variation; Vel sends velocity to the pitch thickness."
     ],
     [
      "Phaser",
-     "Type, Mix, Width, Offset, Speed and Key."
+     "Type picks one of ten shapes with an Oct or Hz scale. Mix, Width and Offset set the phaser, the two LFO knobs under them move width and offset, Speed is the motion speed and Key tracks the offset with the key."
     ],
     [
      "Harmonizer",
-     "Type, Position, Mix, Width and Str."
+     "Mix, Width and Str (strength), an LFO amount and a Vel button for the width. Type is Oct up, Oct up +1, Oct up +2, Harm up or Harm up +1. Position places it before the filter, before the phaser, before the pluck or last."
     ],
     [
      "LFO",
-     "Shape, Att and Speed, with a Global option."
+     "Shape picks one of 14 sources, including wave shapes and Filter envelope, Filter frequency, Voice random, Velocity and Pitch. Att is the LFO attack, Speed its speed, and Global switches the global LFO."
     ],
     [
      "Effects",
-     "Chorus, Delay, Reverb and Comp, each with its own amounts; HQ and Threaded options."
+     "Chorus type with Mix; Delay type with Vol (input level), Fb and Time; Reverb type with Wet; Comp type with Level. HQ switches high quality and Threaded switches threaded processing."
     ]
    ],
    "tips": [
-    "Imported projects use the additive engine and the rack; channels it cannot read fall back to a simple synth approximation."
+    "Picking a Comp type loads that type's preset from the Harmless folder of the FL Studio installation.",
+    "The rack runs in the order chorus, delay, reverb, compressor.",
+    "Imported channels the engine cannot read fall back to a simple synth approximation."
    ]
   }
  },
@@ -6667,63 +6975,77 @@
   "desc": "Additive synthesizer with image synthesis, two filters, unison, blur, prism, harmonizer and an effects rack. Plays and imports Harmor channels.",
   "img": "art/harmor-after-100.png",
   "wiki": {
-   "intro": "Harmor is an additive generator that runs the engine of the FL plugin of the same name, with its effects rack. You add it as a channel and play it from the piano roll. Needs the files of your own FL Studio installation; without them the channel stays silent and its settings are kept. It is still marked beta.",
+   "intro": "Harmor is an additive generator built on the engine of the FL plugin of the same name: parts A and B, each with up to 520 sine partials per unison voice, image synthesis and an effects rack. The Add menu marks it as beta. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio. The rack's compressor also needs its preset from that installation. The editor shows the controls of part A or B plus the Global and FX strips; FL's timbre and filter shape menus, EQ, envelopes and image pages are not editable here.",
    "controls": [
     [
+     "A and B tabs, A / B slider",
+     "The tabs choose which part the panel shows. The slider sets the mix between part A and part B."
+    ],
+    [
      "Timbre",
-     "Start, Rand, Mix, Sub, Prot and Clip."
+     "Start and Rand set the phase start and phase randomness, Mix is the timbre mix, the three Sub faders set the sub levels, Prot is low harmonics protection and Clip is the clip threshold."
     ],
     [
      "Level",
-     "FX, Vol and Env sliders, with an Auto knob."
-    ],
-    [
-     "Filter 1 and 2",
-     "Freq, Res, Env, Key, Width and Ofs, with Oct and Hz modes and an Adapt option."
+     "FX is the part's effects send, Vol its volume, Env the amount of the volume envelope and Auto the auto gain."
     ],
     [
      "Blur",
-     "Mix, Att, Dec and Harm."
+     "Mix sets the blur mix, Att and Dec the attack and decay of the time blur, and Harm the harmonic blur."
     ],
     [
      "Trem",
-     "Depth and Gap."
-    ],
-    [
-     "Unison",
-     "Order, Type, and Pitch, Pan and Phase sliders."
+     "Depth is the tremolo depth and Gap its stereo gap."
     ],
     [
      "Prism",
-     "Amt."
+     "Amt is the prism amount; it works in both directions from the centre."
     ],
     [
      "Harmonizer",
-     "Amt, Width and Str."
+     "Amt, Width and Str set the harmonizer amount, width and strength."
     ],
     [
      "Vibrato",
-     "Depth and Speed."
+     "Depth and Speed of the vibrato."
+    ],
+    [
+     "Unison",
+     "Order is 1 to 9, Type is Classic, Blurred, Uniform, Random or Hz, and Alt switches alternate phase. The faders set unison pitch, panning and phase."
+    ],
+    [
+     "Filter 1 and Filter 2",
+     "Freq and Width set the filter, Env is the envelope amount, Key the key tracking, Oct or Hz the scale and Adapt the adaptive envelope."
+    ],
+    [
+     "Res, Width, Ofs, Osc, Mix",
+     "Each filter has a resonance with Res (amount), Width, Ofs (offset), an Oct or Hz scale and an Adapt switch for adaptive width. Osc on Filter 1 is self-oscillation. Mix on Filter 2 is the mix between filter 1 and filter 2."
     ],
     [
      "Pluck",
-     "Time."
+     "Time is the pluck time."
     ],
     [
      "Phaser",
-     "Mix, Width, Ofs, Speed and Key."
+     "Mix, Width, Ofs (offset), Speed and Key (key tracking), with an Oct, Hz or Harm scale."
     ],
     [
      "Global",
-     "Part A and B, Legato, Vel, Porta, Pre, Post, Pitch, LFO and an X/Y/Z pad."
+     "Legato and Porta switch legato and portamento, and Vel makes portamento follow velocity. Pre and Post are the volumes before and after the effects, Pitch is the global pitch and LFO the global LFO amount."
+    ],
+    [
+     "X, Y, Z and the pad",
+     "Modulation values X, Y and Z. The pad sets X and Y together."
     ],
     [
      "FX",
-     "Delay and Reverb with Fdbk, Vol and Wet."
+     "Delay switch with Fdbk (feedback) and Vol; Reverb switch with Wet."
     ]
    ],
    "tips": [
-    "Resynthesis images (a sample analysed when it loads) and some filter shapes are not supported yet."
+    "Resynthesis images (a sample analysed when it loads) are ignored: the part plays its timbres instead.",
+    "Filter, resonance or phaser shapes the engine does not know switch that stage off.",
+    "Random draws use a fixed seed per instance, where FL seeds from the clock."
    ]
   }
  },
@@ -6744,51 +7066,52 @@
   "desc": "Analogue-style synthesizer with one oscillator, sub and noise, high-pass and low-pass filters, envelope, chorus and an arpeggiator. Plays and imports Kepler channels.",
   "img": "art/kepler-after-100.png",
   "wiki": {
-   "intro": "Kepler is a one-oscillator generator that runs the engine of the FL plugin of the same name. You add it as a channel and play it from the piano roll. Needs the files of your own FL Studio installation; without them the channel stays silent and its settings are kept.",
+   "intro": "Kepler is a polyphonic generator built on the engine of the FL plugin of the same name: eight voices, each with one oscillator (saw, pulse with pulse width modulation, sub square and noise) and a ladder low-pass filter, then a high-pass filter and a chorus, with an LFO, one envelope and an arpeggiator. The LFO shape and noise tables are read at run time from the engine DLL in your own FL Studio installation, which must be a supported build, and are not included. When that file is not found the editor shows a notice and the channel stays silent with its settings kept. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio. On .flp import without that file the channel uses a simpler synth conversion.",
    "controls": [
     [
-     "Hold and Octave",
-     "Hold button and octave shift of minus 1, 0 or plus 1."
+     "Hold, Octave, Volume",
+     "Hold button, octave shift of -1, 0 or +1, and the main volume."
     ],
     [
      "Arpeggio",
-     "On, Mode (Up, Up/dn, Down), Range (1 to 3), Sync and Rate."
+     "On button, Mode (Up, Up/dn or Down), Range (1, 2 or 3), Sync and Rate."
     ],
     [
      "LFO",
-     "Rate, Delay, Sync, Phase and Auto, Man and Trig modes."
+     "Rate with a Sync switch, Delay, Auto or Man trigger mode with a Trig button, and a Phase switch with its fader for the retrigger phase."
     ],
     [
-     "DCO",
-     "LFO and PWM amounts, Pulse, Saw and Sub waves, Sub and Noise levels."
+     "DCO: LFO, PWM",
+     "LFO is the amount of LFO on the oscillator. PWM sets the pulse width, driven by the LFO, set by hand (Man) or driven by the envelope."
+    ],
+    [
+     "DCO: Pulse, Saw, Sub, Noise",
+     "Buttons that switch the pulse, saw and sub waves, a fader for the sub level and a fader for the noise level."
     ],
     [
      "HPF",
-     "Freq."
+     "Freq sets the high-pass filter."
     ],
     [
      "VCF",
-     "Freq, Res, Env, LFO and Kybd."
+     "Freq (cutoff) and Res (resonance) of the low-pass filter, Env amount with a + or - polarity switch, LFO amount and Kybd (key follow)."
     ],
     [
      "VCA",
-     "Env or Gate."
+     "The amplifier follows the envelope (Env) or the key gate (Gate)."
     ],
     [
      "Env",
-     "A, D, S and R."
+     "A, D, S and R faders of the envelope."
     ],
     [
      "Chorus",
      "Off, I, II or I+II."
-    ],
-    [
-     "Volume",
-     "Output volume."
     ]
    ],
    "tips": [
-    "Self-oscillating presets can drift in phase against FL's render."
+    "Cut groups do not cut this generator.",
+    "Self-oscillating presets can drift in phase against an FL render."
    ]
   }
  },
@@ -6800,59 +7123,76 @@
   "desc": "Two-oscillator analogue-style synthesizer with cross modulation, two envelopes and LFOs, modulation matrix, arpeggiator and effects. Plays and imports Kepler Exo channels.",
   "img": "art/kepler-exo-after-100.png",
   "wiki": {
-   "intro": "Kepler Exo is the two-oscillator Kepler generator with its own effects. It runs the engine file of the FL plugin of the same name. Needs the files of your own FL Studio installation; without them the channel stays silent and its settings are kept.",
+   "intro": "Kepler Exo is the two-oscillator version of Kepler and runs on the same engine, with a second oscillator, cross modulation, a second envelope and LFO, a modulation matrix and effect pages for saturation, chorus, EQ, delay and reverb. Its tables are read at run time from the Kepler Exo engine DLL in your own FL Studio installation, which must be a supported build, and are not included. When that file is not found the editor shows a notice and the channel stays silent with its settings kept. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio. There is no fallback conversion for imported channels.",
    "controls": [
     [
-     "DCO 1 and DCO 2",
-     "Oscillators with LFO, Env and PWM amounts, Pulse, Saw and Sub waves; DCO 2 adds Semi, Fine and Sync."
+     "Top bar",
+     "Hold, Octave (-1, 0 or +1), the X and Y offsets of the modulation routes, master Detune, Vol and Pan."
+    ],
+    [
+     "DCO 1, DCO 2: LFO1, LFO2, Env2, PWM",
+     "Amounts of LFO 1, LFO 2 and envelope 2 on the oscillator, each LFO with a wide switch, and the pulse width with its source: LFO, Man or Env."
+    ],
+    [
+     "DCO 1, DCO 2: Pulse, Saw, Sub",
+     "Buttons for the pulse, saw and sub waves, with faders for the sub level and the sub Phase."
+    ],
+    [
+     "DCO 2: On, Semi, Fine, Sync",
+     "Switches oscillator 2, tunes it in semitones and fine steps, and syncs it."
     ],
     [
      "Cross mod",
-     "Cross modulation between the oscillators (1>2 and 2>1) with a wave choice."
+     "1>2 and 2>1 set how much each oscillator is modulated, each with a shape: Sine, Tri, Pulse, Saw, Noise or the other oscillator."
     ],
     [
      "Mixer",
-     "DCO1, DCO2, Noise and AM levels."
+     "Levels of DCO1, DCO2 and Noise, and the AM amount."
     ],
     [
      "VCF",
-     "6, 12, 18 and 24 dB slopes, Freq, Res, Env1, LFO1, LFO2, Kybd and FM."
+     "Slope of 6, 12, 18 or 24 dB, Freq, Res, Env1 amount with a + or - polarity switch, LFO1, LFO2 and Kybd amounts, and FM with its own shape choice."
     ],
     [
      "HPF",
-     "On and Freq."
+     "On switch and Freq of the high-pass filter."
     ],
     [
      "VCA",
-     "Env1, Gate or Env2, with Vel and Smooth."
+     "The amplifier follows Env1, the key gate or Env2. Vel sets how much velocity changes the volume and Smooth switches smoothing."
     ],
     [
-     "Env 1 and 2",
-     "A, D, S and R."
+     "Env 1, Env 2",
+     "A, D, S and R faders of each envelope."
     ],
     [
-     "LFO 1 and 2",
-     "Rate, Delay, Sync, Phase, Auto and Man, with a wave choice."
+     "LFO 1, LFO 2",
+     "Rate with Sync, Delay, Auto or Man trigger mode and a Phase switch with its fader. LFO 2 adds a shape: Tri, Ramp up, Ramp dn, Sine, S&H or Rnd glide."
     ],
     [
      "Voice",
-     "Mono, Legato, Retrig, Release, Glide and Exp or Lin glide."
+     "LFO trig button, Exp or Lin portamento with the Glide knob, and the Mono, Legato, Retrig and Release switches."
     ],
     [
      "Arpeggio",
-     "On, Mode, Range, Sync, Rate and Gate."
+     "On button, Range (1 to 3), a Mode menu with nine modes (up, down, random and as played variants), Sync, Rate and Gate."
     ],
     [
      "Matrix",
-     "Eight modulation amounts."
+     "Eight knobs, 1 to 8, that set the amounts of the eight modulation routes."
     ],
     [
-     "Chorus and effects",
-     "Chorus with Gate and Noise; Saturation, Chorus, EQ, Delay and Reverb pages."
+     "Chorus",
+     "Off, I, II or I+II, with a Noise knob and a Gate switch."
+    ],
+    [
+     "Effect pages",
+     "Tabs for Saturation (Drive, Pre or Post, HQ), Chorus, EQ (Gain, Freq and Q for Low, Mid and High), Delay and Reverb. Each page has its own On switch."
     ]
    ],
    "tips": [
-    "Imported Kepler Exo channels keep their settings, including the modulation matrix."
+    "Imported Kepler Exo channels keep their settings, including the modulation matrix.",
+    "States that use the 4x oversampling flag are refused by the engine."
    ]
   }
  },
@@ -7105,51 +7445,62 @@
   "name": "MiniSynth",
   "cat": "synth",
   "flp": "MiniSynth",
-  "desc": "Monophonic-style analogue synth engine with oscillator, amplifier, filter, two envelopes, LFO and an effects section, rebuilt from FL Studio's MiniSynth.",
+  "desc": "Synth engine with table oscillators and noise, a 4-pole filter, two envelopes, an LFO and distortion, delay, phaser and chorus effects, rebuilt from FL Studio's MiniSynth.",
   "img": "art/minisynth-after-100.png",
   "wiki": {
-   "intro": "MiniSynth is an engine for FL Studio's MiniSynth. It plays imported projects and its presets, with oscillator, amplifier, filter, filter envelope, LFO and effects pages. Needs the oscillator data file of your own FL Studio installation (docs mark it with a dagger).",
+   "intro": "MiniSynth is a generator built on the engine of the FL plugin of the same name: table oscillators with noise, a 4-pole filter, amplifier and filter envelopes, an LFO, and distortion, delay, phaser and chorus in that fixed order. The wave tables are built at run time from oscdata.dat in your own FL Studio installation, which is not included. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio. On .flp import without that file the channel uses a simpler internal synth conversion.",
    "controls": [
     [
-     "Waveform",
-     "Chooses the oscillator waveform."
+     "Page tabs",
+     "Oscillator, Amplifier, Filter, Filter env, LFO and Effects. Each tab shows one group of controls."
     ],
     [
-     "Transpose",
-     "Shifts the oscillator pitch."
+     "Waveform, Transpose, Modifier, Noise",
+     "Oscillator page. The menu picks one of ten oscillator kinds (Saw, Saw + saw, Pulse, Square + saw, Square + square, Supersaw, Bell, Deaf saw, Saw spread, Saw spread 2). Transpose shifts the pitch, Modifier changes the chosen waveform and Noise adds noise."
     ],
     [
-     "Modifier",
-     "Waveform modifier of the oscillator."
+     "Voice mode, Slide time",
+     "Poly, Mono or Lead, and the slide time between notes."
     ],
     [
-     "Noise",
-     "Amount of noise added."
+     "Mod wheel, Amount",
+     "Sends the mod wheel to Filter or LFO, by the set amount."
     ],
     [
-     "Voice mode",
-     "Poly, Mono or Lead."
+     "Amplifier",
+     "Attack, Decay, Sustain and Release faders of the amplifier envelope, with a display of its shape."
     ],
     [
-     "Slide time",
-     "Glide time between notes."
+     "Filter",
+     "A pad that sets Cutoff and Resonance together, the same two values as knobs, and Keyboard and Velocity tracking."
     ],
     [
-     "Mod wheel",
-     "Sends the mod wheel to Filter or LFO."
+     "Filter envelope",
+     "Attack, Decay, Sustain and Release faders, and an Amount knob that works in both directions."
     ],
     [
-     "Amount",
-     "How strongly the mod wheel acts."
+     "LFO",
+     "Shape (Sine, Saw or Square), Rate, Destination (Filter, Frequency or Osc. modifier) and Amount."
     ],
     [
-     "Amplifier, Filter, Filter env, LFO, Effects",
-     "Pages for the rest of the voice and the effects."
+     "Distortion",
+     "On switch, Overdrive and Decimator."
+    ],
+    [
+     "Delay",
+     "On switch, Time, Feedback, Filter and Mix."
+    ],
+    [
+     "Chorus",
+     "On switch, Rate, Mod (depth) and Mix."
+    ],
+    [
+     "Phaser",
+     "On switch, Speed, Width, Feedback, Mix and Freq."
     ]
    ],
    "tips": [
-    "The window shows these pages along the top: Oscillator, Amplifier, Filter, Filter env, LFO and Effects.",
-    "A new instance starts from the default preset of your FL Studio installation."
+    "Noise, dither, drift and random phases come from a generator owned by each instance, so they differ from any given FL render."
    ]
   }
  },
@@ -7161,19 +7512,11 @@
   "desc": "Additive synthesizer engine that morphs between waveforms, with a noise generator, equaliser and chorus, delay and reverb effects.",
   "img": "art/morphine-after-100.png",
   "wiki": {
-   "intro": "Morphine is an additive engine for FL Studio's Morphine. It plays imported projects and its presets. Needs the noise samples of your own FL Studio installation; without them the noise stays silent.",
+   "intro": "Morphine is an additive generator built on the engine of the FL plugin of the same name: four generators combined through a morph line into up to 128 sine oscillators per voice, plus a noise sample player, then overdrive, chorus, delay, reverb and an eight-band equalizer. The noise sample is read at run time from your own FL Studio installation; when it is not found the noise stays silent. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio. The generator, morph line and modulation pages are not editable here.",
    "controls": [
     [
-     "Transp",
-     "Transposition."
-    ],
-    [
-     "Fine",
-     "Fine tuning."
-    ],
-    [
-     "Bend",
-     "Pitch bend range."
+     "Transp, Fine, Bend",
+     "Transpose, fine tuning and pitch bend range."
     ],
     [
      "Glide",
@@ -7184,16 +7527,16 @@
      "Velocity curve."
     ],
     [
-     "Master envelope: Attack, Decay, Sustain, Release",
-     "Overall amplitude envelope."
+     "Master envelope",
+     "Attack, Decay, Sustain and Release of the master amplitude envelope."
     ],
     [
      "Master: Drive, Level",
-     "Overdrive and output level."
+     "Overdrive amount and master level."
     ],
     [
      "Noise: Mix, Pan, Vel",
-     "Level, pan and velocity response of the noise generator."
+     "Level, pan and velocity response of the noise sample player."
     ],
     [
      "Noise: Mute",
@@ -7201,24 +7544,25 @@
     ],
     [
      "Equalizer",
-     "Eight bands from 62 Hz to 8 kHz, with an on switch."
+     "On switch and eight band faders at 62, 125, 250 and 500 Hz and 1, 2, 4 and 8 kHz."
     ],
     [
-     "Chorus: Depth, Rate, Mix",
-     "Chorus effect."
+     "Chorus",
+     "On switch, Depth, Rate and Mix."
     ],
     [
-     "Delay: Time, Stereo, Fdbk, Mod depth, Mix",
-     "Delay effect."
+     "Delay",
+     "On switch, Time, Stereo, Fdbk (feedback), Mod depth and Mix."
     ],
     [
-     "Reverb: Decay, Hi-cut, Mix",
-     "Reverb effect."
+     "Reverb",
+     "On switch, Decay, Hi-cut (damping) and Mix."
     ]
    ],
    "tips": [
+    "Effects run in the order overdrive, chorus, delay, reverb, equalizer.",
     "Release loops and unison of the original are not modelled.",
-    "Effects run in the order overdrive, chorus, delay, reverb, equaliser."
+    "Changing a setting restarts the sounding voices."
    ]
   }
  },
@@ -7230,51 +7574,65 @@
   "desc": "Additive synthesizer engine with spectral timbre controls, unison, filter, three-band equaliser and chorus, delay and reverb effects.",
   "img": "art/ogun-after-100.png",
   "wiki": {
-   "intro": "Ogun is an additive engine for FL Studio's Ogun. It plays imported projects and its presets, and builds its timbre from spectral controls and two random seeds. The Random spectra are deterministic here.",
+   "intro": "Ogun is an additive generator built on the engine of the FL plugin of the same name. Each voice builds a spectrum of up to 32,767 partials from seeded random weights and turns it into wave tables, followed by a filter, a three-band EQ, chorus, delay and reverb. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio. The articulator curves are not editable here.",
    "controls": [
     [
      "Master: Vol, Crs, Fine",
-     "Volume, coarse and fine tuning."
+     "Master volume, coarse pitch and fine pitch."
     ],
     [
      "Modulation: X, Y",
-     "The X and Y modulation pad and its two knobs."
+     "Modulation X and Y values. The pad sets both together."
     ],
     [
-     "Timbre: Rich, Pre, Dec, Rel, Full, Morph",
-     "Faders that shape the spectrum."
+     "Quality",
+     "Rendering quality. Higher settings read the wave tables with better interpolation, and settings 2 to 4 run at twice the sample rate. Export always uses 4."
+    ],
+    [
+     "Rich",
+     "Richness: how many partials the spectrum has."
+    ],
+    [
+     "Pre, Dec, Rel",
+     "Pre-decay, decay time and release time of the spectrum."
+    ],
+    [
+     "Full, Morph",
+     "Fullness shaping and morph of the spectrum."
     ],
     [
      "Seed 1, Seed 2",
-     "Seeds for the random part of the spectrum."
+     "Seeds for the random weights of the partials."
     ],
     [
      "Unison: Ord, Pan, Vol, Pitch, Phase",
-     "Unison voices and how they differ."
+     "Unison order, and the panning, volume, pitch and phase spread of the unison voices."
     ],
     [
      "Filter: Freq, Res",
-     "Filter cutoff and resonance."
+     "Filter frequency and resonance."
     ],
     [
      "EQ",
-     "Three bands, each with level, Freq and Width."
+     "Three bands, each with a level fader and Freq and Width knobs."
     ],
     [
-     "Chorus: Ord, Dep, Spd, Del, Spr, Crs, Mix",
-     "Chorus effect."
+     "Chorus",
+     "Ord (order), Dep (depth), Spd (speed), Del (delay), Spr (spread), Crs (cross) and Mix."
     ],
     [
-     "Delay: Mode, On, Tempo, Fb, Time, Ofs, Vol",
-     "Delay effect, optionally tempo synced."
+     "Delay",
+     "On switch, Mode (feedback mode), Tempo (tempo sync), Fb (feedback), Time, Ofs (stereo offset) and Vol."
     ],
     [
-     "Reverb: Col, On, Lc, Hc, Pre, Size, Diff, Dec, Hd, Wet",
-     "Reverb effect."
+     "Reverb",
+     "On switch, Col (color), LC and HC (low and high cut), Pre (predelay), Size, Diff (diffusion), Dec (decay), HD (high damping) and Wet."
     ]
    ],
    "tips": [
-    "Seed 2 set to Random uses a per-instance counter, so it does not match FL Studio run for run."
+    "The delay and the reverb run only while their On switches are lit.",
+    "Seed 2 set to Random is a fixed draw per channel, so it does not match an FL render.",
+    "Changing a setting rebuilds the instance."
    ]
   }
  },
@@ -7379,60 +7737,68 @@
   "desc": "Two-oscillator synth engine with unison, filter, LFO, envelopes, arpeggiator, step gate, chorus and tape-style delay.",
   "img": "art/poizone-after-100.png",
   "wiki": {
-   "intro": "PoiZone is an engine for FL Studio's PoiZone. It plays imported projects and its presets. Two oscillators feed a filter, with a modulation LFO and envelope, an arpeggiator and a step gate in front of the chorus and delay.",
+   "intro": "PoiZone is a subtractive generator built on the engine of the FL plugin of the same name: two saw or pulse oscillators with noise, hard sync and ring modulation, a 4-pole filter, an LFO, a modulation envelope and an amp envelope, then a 16-step gate, chorus, stereo tape delay and arpeggiator. It can be added without FL Studio and then starts from LYNX SHARE's own preset bank.",
    "controls": [
     [
      "Unison: Voices, Poly, Detune, Pan",
-     "Voice count, polyphony and how unison voices are spread."
+     "Unison voice count (1, 2, 3, 4, 8, 12 or 16), polyphony, and the detune and pan spread of the unison voices."
     ],
     [
      "Mode: Oct, Mono, Held, Static",
-     "Voice mode."
+     "Oct switches the octaver and Mono monophonic play. Held and Static choose the glide modes."
     ],
     [
      "Master: Glide, Transp., Fine, Gain",
-     "Glide, tuning and output gain."
+     "Glide time, transpose, fine tuning and master gain."
     ],
     [
-     "Oscillators",
-     "A/B balance, noise, pulse widths, pitch and detune of B, with saw or square waves, Ring and Sync."
-    ],
-    [
-     "Filter: Cutoff, Reso, Key trk, Vel trk",
-     "Filter settings, with LP, BP and HP modes."
+     "Mod wheel",
+     "Destination of the mod wheel (Cutoff, LFO amt, Frq A, PW A or PW AB), its Amount, and Bend for the pitch bend range."
     ],
     [
      "LFO",
-     "Amount, rate, shape and sync, sent to a chosen destination."
+     "Destination (Cutoff, Frq A, Frq AB, PW A, PW AB or Pan), Amount, Rate, shape (Saw, Pulse, Tri, Sine or Rnd), Retrig and Sync (Free or 1 to 128)."
     ],
     [
      "Envelope",
-     "Amount, Att, Dec, Sus and Rel, sent to a chosen destination."
+     "Modulation envelope: destination (Cutoff, Frq A, Frq AB, PW A or PW AB), Amount, and Att, Dec, Sus, Rel."
     ],
     [
-     "Amp: Att, Dec, Sus, Rel",
-     "Amplitude envelope."
+     "Amp",
+     "Att, Dec, Sus and Rel of the amplitude envelope."
+    ],
+    [
+     "Oscillators",
+     "A / B balances the two oscillators and Noise adds noise. Each oscillator has a Saw or Sq shape and a pulse width (PW A, PW B). Ring switches ring modulation and Sync hard sync. Pitch B shifts oscillator B in semitones and Detune B detunes it."
+    ],
+    [
+     "Filter",
+     "Cutoff, Reso, Key trk (key tracking) and Vel trk (velocity tracking), with LP, BP and HP modes."
     ],
     [
      "Arpeggiator",
-     "Off, Up, Down, Up-dn or Rnd, with octave range and speed."
+     "Mode (Off, Up, Down, Up-dn or Rnd), octave range 1 to 4, and Speed."
     ],
     [
      "Gate",
-     "Step pattern with smoothing, mix and speed."
+     "Sixteen step buttons, with Smooth, Mix and Speed."
     ],
     [
      "Delay",
-     "Time L, Time R, Feedback, Mod, Low cut, High cut, Wet."
+     "On switch, Time L, Time R, Feedback, Mod, Low cut, High cut and Wet."
     ],
     [
      "Chorus",
-     "Depth, Rate, Wet."
+     "On switch, Depth, Rate and Wet."
+    ],
+    [
+     "Wheels",
+     "Bend is the pitch bend, which springs back to the centre when released. Mod is the mod wheel."
     ]
    ],
    "tips": [
-    "The Delay and Chorus have their own On switches.",
-    "Three random generators are used, so renders are not identical run to run."
+    "Changing a setting restarts the sounding voices.",
+    "Noise, drift and start phases come from generators owned by each instance, so they differ from any given FL render."
    ]
   }
  },
@@ -7444,55 +7810,68 @@
   "desc": "Physical-model synth of plucked and struck strings, with exciter, two strings, comb, resonators, modulation matrix, delay, chorus and reverb.",
   "img": "art/sakura-after-100.png",
   "wiki": {
-   "intro": "Sakura is a physical model rebuilt from the engine of FL Studio's Sakura. An exciter drives two strings and a comb, followed by resonators and effects. It plays imported projects and its presets.",
+   "intro": "Sakura is a physical string model rebuilt from the engine of the FL plugin of the same name. A noise or click exciter passes a low-cut and a high-cut filter and drives two strings, each with a comb, followed by resonators, chorus, reverb and delay. The model runs at an internal 48 kHz. It can be added without FL Studio and then starts from LYNX SHARE's own preset bank.",
    "controls": [
     [
      "Octave, Tune, Master",
-     "Octave shift, tuning and output level."
+     "Transpose, tuning and master level."
     ],
     [
      "Exciter: Noise, Rate",
-     "Noise amount and rate of the exciter."
+     "Noise sets the balance between a single click and held noise. Rate sets how often the noise value changes."
     ],
     [
-     "Hi-cut and Lo-cut",
-     "Filters on the exciter with Cutoff, Res and, for Hi-cut, Attack, Decay, Drive and Sustain."
+     "Lo-cut",
+     "Two-pole high-pass on the exciter. Cutoff runs from 32 Hz to 20.2 kHz and Res sets its resonance."
     ],
     [
-     "String 1 and String 2",
-     "Decay, Damp, Sharp and Offset of each string, with Inv and a Ratio setting."
+     "Hi-cut",
+     "Four-pole resonant low-pass on the exciter with its own envelope. Cutoff and Res set the filter, Drive saturates it, and Attack, Decay and Sustain shape the envelope."
+    ],
+    [
+     "String 1 and 2: Decay, Inv",
+     "Decay is the feedback of the string loop, which sets how long the string rings. Inv negates the feedback."
+    ],
+    [
+     "String 1 and 2: Damp, Sharp, Offset",
+     "Damp low-passes the string loop (0 is no damping). Offset damps the far node of the string harder. Sharp adds a sharpness feedback to the loop filter."
+    ],
+    [
+     "Ratio",
+     "Pitch of string 2 as a multiple of string 1: 4x, 3x, 2x, 1x, 1/2x, 1/3x or 1/4x."
     ],
     [
      "Comb",
-     "Level, Inv and Feedback of the comb."
+     "Level and Feedback of the comb on each string, each with an Inv switch. Comb ratio sets the comb length as a fraction of the string length."
     ],
     [
-     "Strings",
-     "Mix, Stereo and Saturate."
+     "Strings: Mix, Stereo, Saturate",
+     "Mix balances string 1 against string 2. Stereo separates them: centred at the middle, string 1 left and string 2 right at 0. Saturate sets the saturation inside both string loops."
     ],
     [
-     "Amp: Attack, Decay, Sustain, Release",
-     "Amplitude envelope."
+     "Amp",
+     "Attack, Decay, Sustain and Release of the amplitude envelope."
     ],
     [
      "Resonators",
-     "Eight resonators, each with a level fader and switch."
+     "Eight resonators, each with a feedback knob, a frequency slider and an on switch."
     ],
     [
      "Modulation",
-     "ADSR and LFO knobs, and slots that route a source such as Velocity, Pitch wheel, LFO or Envelope to a target."
+     "An envelope (A, D, S, R) and an LFO rate, plus eight slots. Each slot has a source (Envelope, LFO, Mod wheel, Pitch wheel, Aftertouch, Velocity, Key or Release), an amount knob with a negative switch, and a target such as Level, Pan, Pitch, the filter cutoffs or the string decay and damp."
     ],
     [
      "Delay",
-     "Time, Sync, Feedback, Speed, Depth, Blur, Wet."
+     "On switch, Time, Sync (Off or 1/32 to 2 bars), Feedback, Speed, Depth, Blur and Wet."
     ],
     [
      "Chorus and Reverb",
-     "Chorus Depth, Rate, Wet. Reverb Decay, Color, Mix."
+     "Chorus has an On switch, Depth, Rate and Wet. Reverb has an On switch, Decay, Color and Mix."
     ]
    ],
    "tips": [
-    "The mod wheel, pitch bend and channel pressure read as 0 in the modulation matrix, because no controllers are sent to it."
+    "New parameter values apply to the next note.",
+    "The Mod wheel, Pitch wheel and Aftertouch sources read 0, because no MIDI controllers are routed to the matrix."
    ]
   }
  },
@@ -7504,51 +7883,67 @@
   "desc": "Saw-based synth engine with a sub saw, unison, filter, LFO, arpeggiator, modulation slots and chorus, phaser, delay and reverb effects.",
   "img": "art/sawer-after-100.png",
   "wiki": {
-   "intro": "Sawer is an engine for FL Studio's Sawer. It plays imported projects and its presets, and shares its framework with PoiZone. Needs the oscillator cycle file of your own FL Studio installation (docs mark it with a dagger).",
+   "intro": "Sawer is a subtractive generator built on the engine of the FL plugin of the same name: a saw oscillator plus a sub saw, hard sync, noise, a 4-pole filter with low, band, high and notch outputs, then chorus, phaser, delay and reverb, with a six-slot modulation matrix and an arpeggiator. The oscillator cycle is read at run time from data.saw in the Sawer folder of your own FL Studio installation and is not included. When that file is not found the editor shows a notice and the channel stays silent with its settings kept. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio.",
    "controls": [
     [
      "Voices, Bend",
-     "Number of voices and pitch bend range."
+     "Polyphony (4 to 24 voices) and pitch bend range (off, or 1 to 12)."
     ],
     [
-     "Master: Level, Pan, A, D, S, R",
-     "Output level, pan and amplitude envelope."
+     "Master",
+     "Level, Pan and the A, D, S, R faders of the amplitude envelope."
     ],
     [
-     "Pitch: Coarse, Fine",
-     "Tuning."
+     "Pitch",
+     "Coarse (transpose) and Fine tuning."
+    ],
+    [
+     "Glide",
+     "Rate or Time mode, Always or Held key mode, and the glide Time."
+    ],
+    [
+     "Voice",
+     "Poly or Mono, the octaver Off or On, and Free or Sync for the unison retrigger."
     ],
     [
      "Unison",
-     "Voice count of 1, 2, 4 or 8, with Detune and Spread."
+     "1, 2, 4 or 8 voices, with Detune and Spread (pan)."
     ],
     [
-     "Oscillator: Noise, Sync",
-     "Noise and sync amounts, with an on switch."
+     "Oscillator",
+     "Noise level, and the Sync frequency with its On switch."
     ],
     [
-     "Sub saw: Level, Phase, Harmonic, Detune",
-     "The extra saw oscillator."
+     "Sub saw",
+     "Level, Phase, Harmonic (a ratio from 1/4 to 4) and Detune of the second oscillator. The switches choose Free or Sync retrigger, + or - polarity, and Saw or Pulse form."
     ],
     [
-     "Filter: Cutoff, Reso, Key, Vel",
-     "Filter with Low, Band, High and Notch modes."
+     "Filter",
+     "Cutoff, Reso, Key (key tracking) and Vel (velocity tracking), with Low, Band, High and Notch modes."
     ],
     [
      "Filter envelope",
-     "A, D, S, R and Amount, sent to a chosen destination."
+     "A, D, S, R and Amount, sent to Cutoff, Sync, Sub phase or Pitch."
     ],
     [
      "LFO",
-     "Speed, Attack, Release, Amount, shape and destination."
+     "Speed, Attack, Release and Amount; Free or Sync retrigger, Hz or Beat timing, Inv, a shape (Tri, Saw, Square or S&H) and a destination (Cutoff, Sync, Sub phase, Pitch, Noise, Volume or Pan)."
     ],
     [
-     "Effects",
-     "Chorus, Phaser, Delay and Reverb, each with an on switch."
+     "Chorus and Phaser",
+     "Chorus has a switch, Depth, Rate and Mix. Phaser has a switch, Center, Rate, Depth, Fdbk and Mix."
+    ],
+    [
+     "Delay and Reverb",
+     "Delay has a switch, Left and Right times, Fdbk, Mod, LoCut, HiCut and Mix. Reverb has a switch, Decay, HiCut, Damp and Mix."
+    ],
+    [
+     "Modulation",
+     "Six slots. Each has a source (Velocity, Aftertouch, Pitch wheel or a MIDI CC), an amount knob and a destination chosen from the plugin's parameters."
     ],
     [
      "Arpeggio",
-     "Up, Down, Up/dn or Rnd, with speed and octave range."
+     "On switch, mode (Up, Down, Up/dn or Rnd), range 1 to 4 and a note division from 1/32 to 3/4."
     ]
    ],
    "tips": [
@@ -7690,52 +8085,57 @@
   "desc": "Six-operator FM and ring-modulation synth with a modulation matrix, three filters and unison. It plays imported FL Studio Sytrus channels and presets.",
   "img": "art/sytrus-after-100.png",
   "wiki": {
-   "intro": "An engine that follows FL Studio's Sytrus. It plays Sytrus channels and presets from imported projects. A new instance starts from FL's Default preset, so it needs FL Studio installed for that starting point.",
+   "intro": "Sytrus is an FM and ring modulation generator built on the engine of the FL plugin of the same name: six operators, a modulation matrix, three filter units, unison and its own effects chain. It plays Sytrus channels and presets from imported projects. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio. The editor shows the Main page; the operator, filter and effect pages are not editable here and keep the saved patch.",
    "controls": [
     [
-     "Main VOL, LFO, PITCH",
-     "Overall volume, LFO and pitch settings of the voice."
+     "Vol, LFO, Pitch",
+     "Master level, master LFO and master pitch faders. Pitch runs from -24 to 24."
     ],
     [
-     "VOL envelope A, D, S, R",
-     "Amplitude envelope."
+     "Vol A, D, S, R",
+     "Attack, decay, sustain and release faders of the volume envelope."
     ],
     [
-     "FILTER envelope A, D, S, R",
-     "Envelope of the filter."
+     "Filter A, D, S, R",
+     "Attack, decay, sustain and release faders of the filter envelope."
     ],
     [
-     "Unison ORD, PN, VL, PT, SB, PH, EN",
-     "Unison order and the spread of pan, volume, pitch, stereo blend, phase and envelope."
+     "Ord",
+     "Unison order, 1 to 9."
+    ],
+    [
+     "Pn, Vl, Pt, Sb, Ph, En",
+     "Unison pan, volume, pitch, sub layer, phase and envelope variation."
     ],
     [
      "Modulation X, Y",
-     "Two modulation controls, with a pad."
+     "Modulation X and Y values. The pad sets both together."
     ],
     [
-     "Quality, HQ envelopes",
-     "Draft and render settings."
+     "HQ envelopes",
+     "Extra envelope accuracy, switched separately for Draft (live playback) and Render (export)."
     ],
     [
-     "Quality, Oversampling",
-     "Oversampling for draft and render."
+     "Oversampling",
+     "Oversampling order from 0 to 4, where each step doubles the factor, set separately for Draft and Render."
     ],
     [
      "Porta",
-     "Portamento between notes."
+     "Switches portamento."
     ],
     [
      "Matrix",
-     "Routes operators 1 to 6, filters F1 to F3, pan, FX and the output."
+     "Rows are destinations: operators 1 to 6 and filters F1 to F3. Columns 1 to 6 set how much each operator modulates that row; Pan, FX and Out set the row's pan, effects send and output level."
     ],
     [
      "FM, RM",
-     "Switches the matrix between frequency and ring modulation."
+     "Switches the operator columns of the matrix between frequency modulation and ring modulation amounts. Pan, FX and Out show on both."
     ]
    ],
    "tips": [
-    "Chaotic FM patches do not come out sample for sample like the original.",
-    "Settings older than FL's version 17 use the synth conversion instead of the engine."
+    "During export the engine uses the Render settings; live playback uses the Draft settings.",
+    "Chaotic FM patches do not match an FL render sample for sample.",
+    "States older than version 17 use a simpler synth conversion instead of the engine."
    ]
   }
  },
@@ -7747,44 +8147,60 @@
   "desc": "Six-operator FM and wavetable synth with a filter, two LFOs, two effect slots and an eight-band equaliser. It plays imported FL Studio Toxic Biohazard channels.",
   "img": "art/toxic-biohazard-after-100.png",
   "wiki": {
-   "intro": "An engine that follows FL Studio's Toxic Biohazard, with six oscillators, an FM matrix, a filter, an effect rack and an equaliser. It needs the wave data of your own FL Studio installation; without it, an imported patch falls back to a simpler two-operator conversion.",
+   "intro": "Toxic Biohazard is an FM generator built on the engine of the FL plugin of the same name: six oscillators that modulate each other through a matrix, a 4-pole filter with its envelope, two LFOs, a step sequencer, distortion, two effect slots and an eight-band EQ. Built-in waves 2 to 32 are read at run time from your own FL Studio installation and are not included; wave 0 (the preset's own spectrum) and wave 1 (a sine) play without it, and a wave display that lacks its data shows Needs FL Studio's files. It can be added without FL Studio and then starts from LYNX SHARE's own preset bank. On .flp import, a patch that needs the missing waves falls back to a simpler two-operator conversion.",
    "controls": [
     [
-     "Osc 1 to Osc 6",
-     "Each has VEL, INIT, ATT, DEC, SUS and REL levels, a WAVE number, PITCH, DETUNE, FREQ OFS and PHASE."
-    ],
-    [
      "Configuration",
-     "TRANSP., POLY, VOICES, DETUNE, SPREAD and GLIDE with its TIME."
+     "Transp. (transpose), Poly (polyphony), Voices (unison voices) with Detune and Spread, the Glide mode (Bend VT, Held VT, Bend ST or Held ST) and its Time."
     ],
     [
      "Master envelope",
-     "ATT, DEC, SUS, REL, VEL CURVE, DRIVE and MASTER."
+     "Att, Dec, Sus and Rel of the master amplitude envelope, Vel curve, Drive (distortion) and Master (gain)."
     ],
     [
-     "Matrix",
-     "FM between oscillators, plus MIX, PAN, LFO 1, LFO 2 and PITCH MOD amounts."
+     "Osc 1 to Osc 6: faders",
+     "Vel, Init, Att, Dec, Sus and Rel set each oscillator's velocity response, initial level and envelope."
+    ],
+    [
+     "Osc 1 to Osc 6: Wave, Pitch, Detune, Freq ofs, Phase",
+     "Wave number (0 to 32) with a display of its shape, coarse pitch, fine detune, frequency offset and start phase. Free lets the oscillator run free and On switches it."
+    ],
+    [
+     "Mod page: FM",
+     "A 6 by 6 grid of knobs where the oscillator of the row modulates the oscillator of the column."
+    ],
+    [
+     "Mod page: Mix, Pan, LFO 1, LFO 2, Pitch mod",
+     "Per oscillator: output mix, pan and the amounts of LFO 1 and LFO 2. Pitch mod sets how much LFO 2 and the filter envelope move the pitch, and Bend is the bend range."
+    ],
+    [
+     "MIDI page",
+     "Eight modulation slots, each with a source, an amount and a destination parameter."
+    ],
+    [
+     "Seq page",
+     "A step sequencer with up to 64 steps. Each step is a rest, a hold or a value from -24 to 24. Number of steps sets the length; Play, Swing, Dual, Ping-pong and Random are its switches."
     ],
     [
      "LFO 1, LFO 2",
-     "Wave, SPEED and SYNC for each."
+     "Wave number with a display, Speed, Sync (Off or 1/16 to 4 bars) and Free."
     ],
     [
      "Filter",
-     "Off, LP, BP or HP, with CUTOFF, RESO, KEY TRK, VEL TRK, EG AMOUNT, LFO 1 and its own envelope."
+     "Mode (Off, LP, BP or HP), Cutoff, Reso, Key trk, Vel trk, EG amount, LFO 1 amount and the four faders of the filter envelope."
     ],
     [
      "Effect 1, Effect 2",
-     "Delay, Chorus, Reverb, Flanger, Phaser or Lo-fi per slot."
+     "Each slot has an On switch and a type: Delay, Chorus, Reverb, Flanger, Phaser or Lo-fi. The knobs below change with the type, for example Time, Feedback, Rate, Depth, Blur, Mix and a Sync menu for Delay."
     ],
     [
      "EQ",
-     "Eight bands from 62 Hz to 8 kHz."
+     "On switch and eight band faders from 62 Hz to 8 kHz."
     ]
    ],
    "tips": [
-    "The step sequencer of the original is ignored, as it is off in the states the docs tested.",
-    "Switch the Matrix between Mod, MIDI and Seq views from its tabs."
+    "Switching Seq Play on or off releases every held key.",
+    "Phases of free-running oscillators come from a generator owned by each instance, so they differ from any given FL render."
    ]
   }
  },
@@ -7796,36 +8212,52 @@
   "desc": "Monophonic bass synth with a step sequencer, distortion, delay and reverb. It plays imported FL Studio Transistor Bass channels and programs.",
   "img": "art/transistor-bass-after-100.png",
   "wiki": {
-   "intro": "An engine that follows FL Studio's Transistor Bass: one bass voice with its own sequencer and effects. It needs the oscillator cycles of FL Studio's engine_x64.dll from your own FL Studio installation.",
+   "intro": "Transistor Bass is a monophonic bass generator built on the engine of the FL plugin of the same name: a saw or square oscillator, a 4-pole low-pass filter with accent and decay envelopes, distortion, stereo delay and reverb, and 128 programs that each hold a patch and a 16-step sequence. The recorded oscillator cycles of the 303 pulse mode are read at run time from the engine DLL in your own FL Studio installation, which must be a supported build, and are not included. When that file is not found the editor shows a notice and the channel stays silent with its settings kept. A new instance starts from the plugin's preset in your own FL Studio installation, so adding one needs FL Studio installed; otherwise the Add menu lists it as requiring FL Studio.",
    "controls": [
     [
-     "Tune, Wave, Cutoff, Reso, Env mod, Decay, Accent, Volume",
-     "The voice section."
+     "Tune, Wave, 303",
+     "Tuning and waveform of the oscillator. The 303 button switches to the recorded pulse cycles."
+    ],
+    [
+     "Cutoff, Reso, Env mod, Decay, Accent",
+     "Filter cutoff and resonance, how far the envelope moves the cutoff, the envelope decay and the accent amount. Notes with a velocity of 110 or more are accented."
+    ],
+    [
+     "Volume",
+     "Output volume of the voice."
     ],
     [
      "Tweaks",
-     "HP, Min dec, Key, LFO PW, LFO rate, PW and Clicks."
+     "HP (high-pass), Min dec (minimum decay), Key (key follow), LFO PW (LFO amount on the pulse width), LFO rate, PW (pulse width) and Clicks, which the plugin stores as VCA smooth."
     ],
     [
      "Distortion",
-     "HP, Drive, Tone and Volume, with an on switch."
+     "Switch, HP, Drive, Tone and Volume."
     ],
     [
      "Delay",
-     "Amount, Time, R tap, Fdbk, Tone, Stereo and a Sync button."
+     "Switch, Amount, Time, R tap (right tap), Fdbk, Tone, Stereo and a Sync button for tempo sync."
     ],
     [
      "Reverb",
-     "Locut, Hicut, Pre, Pre FB, Size, Diff, Decay, Damp, Width, Dry, ER and Wet."
+     "Switch, LoCut, HiCut, Pre (predelay), Pre fb (predelay feedback), Size, Diff, Decay, Damp, Width, Dry, ER (early reflections) and Wet."
     ],
     [
      "Sequencer",
-     "Per step pitch, octave, gate, slide and accent, with a Length box and Clear, Oct + and Oct - buttons."
+     "Off: notes play the synth directly and a note played while another is held slides. On: a note selects the program of its key and runs that program's sequence in 16th notes until the key is released."
+    ],
+    [
+     "Length",
+     "Number of steps the sequence plays."
+    ],
+    [
+     "Pitch, Octave, Gate, Slide, Accent",
+     "The five rows of the step editor. Per step: its note and octave, whether it sounds, whether it holds into the next step, and whether it is accented."
     ]
    ],
    "tips": [
-    "Controller and pitch-bend messages are not modelled, according to the docs.",
-    "The display line shows the current program and whether the sequencer is on."
+    "MIDI volume and pitch bend events and parameter automation are not modelled.",
+    "With the sequencer on, releasing the key stops the sequence."
    ]
   }
  },
@@ -8225,48 +8657,57 @@
   "desc": "Plays a loaded sample by moving a read position along a drawn curve, with a second curve for volume. It plays imported FL Studio Wave Traveller channels.",
   "img": "art/wave-traveller-after-100.png",
   "wiki": {
-   "intro": "A sample player that follows FL Studio's Wave Traveller. You load a sample and draw how the playback position and the volume move over time. Without a sample the channel is silent; load one or drop one on it.",
+   "intro": "Wave Traveller is a sample generator built on the engine of the FL plugin of the same name. Each of the 120 keys holds its own patch: a position curve that moves through the sample over the note's time, a volume curve and mute switches. The key does not transpose the sample; the channel pitch changes the speed of the curve. It needs no FL Studio files. Without a sample the channel is silent, so load one or drop one on the editor.",
    "controls": [
     [
-     "Load sample",
-     "Loads the sample to play."
+     "Load sample...",
+     "Loads the sample the curves travel through. Dropping a sample on the editor does the same."
     ],
     [
      "Presets",
-     "Loads one of the preset curves."
+     "Loads the curves of one of FL Studio's Wave Traveller presets into the current key. The list is empty when FL Studio is not installed."
     ],
     [
      "Key",
-     "Sets the key the sample is tuned to."
+     "Copies the current key's patch to all keys, or resets it."
     ],
     [
-     "Mode menu",
-     "Chooses how the curve is timed, for example Tempo based spline."
-    ],
-    [
-     "Speed",
-     "How fast the curve is traversed, shown in beats for tempo based modes."
-    ],
-    [
-     "Attack, Release",
-     "Fade in and fade out times."
-    ],
-    [
-     "Start, End",
-     "Part of the sample that is used."
+     "Keyboard",
+     "Selects the key whose patch is shown. Each key plays its own curves."
     ],
     [
      "Position, Volume",
-     "Switch between the position curve and the volume curve."
+     "Switch the curve view between the position curve (where the note is in the sample over its time) and the volume curve."
+    ],
+    [
+     "Curve",
+     "Drag a point to move it. Double click adds or removes a point. Right click sets the segment type and tension or deletes the point."
+    ],
+    [
+     "Mode menu",
+     "Tempo based spline: the curve lasts a number of beats. Absolute speed based spline: the curve plays the sample at a speed factor."
+    ],
+    [
+     "Speed",
+     "In tempo based mode, the beats the curve lasts (0.125 to 8). In absolute mode, a factor of the sample's own speed (0.25 to 4)."
+    ],
+    [
+     "Attack, Release",
+     "Fade in (1 to 500 ms) and fade out (1 to 1000 ms) of the note."
+    ],
+    [
+     "Start, End",
+     "The part of the sample the curve spans."
     ],
     [
      "Mutes",
-     "Click a segment to switch it, right click to remove it."
+     "A strip of mute switches along the curve. Click switches one, right click removes it."
     ]
    ],
    "tips": [
-    "Samples that are not 16-bit at 44.1 kHz use LYNX SHARE's own conversion, according to the docs.",
-    "The keyboard at the bottom of the editor shows the key the channel is set to."
+    "At the end of the curve the last 256 output samples play backwards with a fade out.",
+    "Samples that are not 16-bit at 44.1 kHz go through LYNX SHARE's own conversion.",
+    "Live playback uses a 6-point polynomial interpolation; export uses a windowed sinc."
    ]
   }
  }

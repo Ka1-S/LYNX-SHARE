@@ -143,7 +143,7 @@
 "c.gen-layer": "Kendisi ses çıkarmaz. Aldığı her nota alt kanallarına iletilir; böylece tek bir pattern aynı anda birkaç üreteci çalabilir.",
 "c.gen-lynx-soundfont": "SoundFont 2 ve 3 bankalarını ve SFZ enstrümanlarını çalar; tüm SoundFont'larınızda preset araması, envelope, filtre ve yerleşik reverb ile chorus vardır.",
 "c.gen-midi-out": "Notalarını ve kontrolcü değerlerini portunu dinleyen plugin'lere MIDI olarak gönderen ve 72 kontrolcü düğmesi taşıyan sessiz kanal.",
-"c.gen-minisynth": "Osilatör, amplifikatör, filtre, iki envelope, LFO ve efekt bölümü olan monofonik tarzı analog synth motoru; FL Studio'nun MiniSynth'inden yeniden kuruldu.",
+"c.gen-minisynth": "Tablo osilatörleri ve gürültü, 4 kutuplu filtre, iki envelope, bir LFO ile distortion, delay, phaser ve chorus efektleri olan synth motoru; FL Studio'nun MiniSynth'inden yeniden kuruldu.",
 "c.gen-morphine": "Dalga biçimleri arasında morph yapan, gürültü üreteci, ekolayzır ile chorus, delay ve reverb efektleri olan additive synthesizer motoru.",
 "c.gen-ogun": "Spektral timbre kontrolleri, unison, filtre, üç bantlı ekolayzır ve chorus, delay ile reverb efektleri olan additive synthesizer motoru.",
 "c.gen-patcher": "Audio, nota ve kontrol kablolarıyla birleştirilmiş enstrümanlardan, efektlerden ve VST3 ya da CLAP plugin'lerinden oluşan, Channel Rack üreteci olarak kullanılan node grafiği.",

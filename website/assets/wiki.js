@@ -6,7 +6,18 @@ if (!box || !res) return;
 const t = window.LYNX_T || (k => k);
 let index = null, groups = {}, sel = 0, hits = [];
 const group = k => { const v = t(k); return v === k ? (groups[k] || '') : v; };
-const load = () => index ? Promise.resolve(index) : fetch('/wiki/search.json?v=' + (window.LYNX_V || '')).then(r => r.json()).then(d => { groups = d.g; return index = d.p; });
+const V = window.LYNX_V || '';
+const loadIndex = () => index ? Promise.resolve(index) : fetch('/wiki/search.json?v=' + V).then(r => r.json()).then(d => { groups = d.g; return index = d.p; });
+// the headings of the translated bodies, by page: {address: [[id, text], ...]} (languages without them search the English ones)
+let local = {}, localFor = 'en';
+const loadLocal = () => {
+  const l = document.documentElement.lang || 'en';
+  if (l === localFor) return Promise.resolve();
+  localFor = l; local = {};
+  return l === 'en' ? Promise.resolve() : fetch('/i18n/wiki/' + l + '/heads.json?v=' + V).then(r => r.ok ? r.json() : {}).then(d => { if (localFor === l) local = d; }).catch(() => {});
+};
+const load = () => Promise.all([loadIndex(), loadLocal()]);
+const anchor = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const title = e => { const v = e[1] ? t(e[1]) : e[2]; return v === e[1] ? e[2] : v; };
@@ -16,10 +27,13 @@ function search(q){
   const out = [];
   for (const e of index){
     const ti = norm(title(e) + ' ' + e[2]);
-    let score = 0, head = '';
+    let score = 0, head = null;
     for (const w of words){
       if (ti.startsWith(w)) score += 6; else if (ti.includes(w)) score += 4;
-      else { const h = e[4].find(x => norm(x).includes(w)); if (h){ score += 1; head = head || h; } else { score = -1; break; } }
+      else {
+        const h = (local[e[0]] || []).find(x => norm(x[1]).includes(w)) || (e[4].map(x => [anchor(x), x]).find(x => norm(x[1]).includes(w)));
+        if (h){ score += 1; head = head || h; } else { score = -1; break; }
+      }
     }
     if (score > 0) out.push([score, e, head]);
   }
@@ -28,7 +42,7 @@ function search(q){
 function draw(){
   if (!box.value.trim()){ res.hidden = true; return; }
   res.hidden = false;
-  res.innerHTML = hits.length ? hits.map(([, e, head], i) => `<a href="${e[0]}${head ? '#' + head.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : ''}" class="${i === sel ? 'on' : ''}">${esc(title(e))}<small>${esc(head || group(e[3]))}</small></a>`).join('')
+  res.innerHTML = hits.length ? hits.map(([, e, head], i) => `<a href="${e[0]}${head ? '#' + head[0] : ''}" class="${i === sel ? 'on' : ''}">${esc(title(e))}<small>${esc(head ? head[1] : group(e[3]))}</small></a>`).join('')
                               : `<p>${esc(t('ws.none'))}</p>`;
 }
 box.addEventListener('input', () => load().then(() => { hits = search(box.value); sel = 0; draw(); }));

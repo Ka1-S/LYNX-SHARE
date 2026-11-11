@@ -2,7 +2,8 @@
    LYNX_LANGS / LYNX_LANG / LYNX_DICT / LYNX_V come from the inline script in <head>; LYNX_EN holds the English of the
    few strings only this script writes. Every other English string is in the page itself (and in i18n/en.json, which
    _src/build.py writes from the pages). Other languages: i18n/<id>.json {"ui","featured","insp"}, plus
-   i18n/<part>/<id>.json for pages that name a part in <html data-dict> (the Updates page). */
+   i18n/<part>/<id>.json for pages that name a part in <html data-dict> (the Updates page), plus the body of a wiki
+   page, i18n/wiki/<id>/<page>.html, for the languages <html data-wt> lists. */
 (() => {
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 const html = document.documentElement;
@@ -10,6 +11,8 @@ const LANGS = window.LYNX_LANGS || [['en','English']], EN = window.LYNX_EN || {}
 const SHORT = {'zh-Hans':'简','zh-Hant':'繁','pt-BR':'PT'};
 const OGL = {'en':'en_US','zh-Hans':'zh_CN','zh-Hant':'zh_TW','nl':'nl_NL','fr':'fr_FR','de':'de_DE','id':'id_ID','it':'it_IT','ja':'ja_JP','ko':'ko_KR','pl':'pl_PL','pt-BR':'pt_BR','ru':'ru_RU','es':'es_ES','tr':'tr_TR'};
 const PART = html.dataset.dict || '';
+const BODIES = (html.dataset.wt || '').split(' '), prose = $('#wprose'), proseEn = prose ? prose.innerHTML : '';
+const bodyUrl = l => '/i18n/wiki/' + l + location.pathname.replace(/^\/wiki/, '').replace(/\/$/, '') + '.html?v=' + V;
 let lang = 'en', D = {}, FEAT = {}, INSP = {}, pristine = true;
 
 // t('dl.for', 'Linux'): the text in the current language (English when missing), {0} {1}... replaced by the arguments
@@ -19,8 +22,9 @@ window.LYNX_T = t;
 const cache = window.LYNX_DICT || {};
 function fetchDict(l){
   const get = u => fetch(u).then(r => r.ok ? r.json() : Promise.reject(r.status));
-  return Promise.all([get('/i18n/' + l + '.json?v=' + V), PART ? get('/i18n/' + PART + '/' + l + '.json?v=' + V) : {}])
-    .then(([a, b]) => ({ui: Object.assign({}, a.ui, b), featured: a.featured || {}, insp: a.insp || {}}));
+  const body = prose && BODIES.includes(l) ? fetch(bodyUrl(l)).then(r => r.ok ? r.text() : '').catch(() => '') : '';
+  return Promise.all([get('/i18n/' + l + '.json?v=' + V), PART ? get('/i18n/' + PART + '/' + l + '.json?v=' + V) : {}, body])
+    .then(([a, b, c]) => ({ui: Object.assign({}, a.ui, b), featured: a.featured || {}, insp: a.insp || {}, body: c}));
 }
 function loadLang(l){
   if (l === 'en' && pristine) return Promise.resolve(null);   // the page is already in English
@@ -39,6 +43,10 @@ function applyLang(l, d){
   lang = l; html.lang = l; html.dir = 'ltr';
   if (d){
     pristine = false; D = d.ui || {}; FEAT = d.featured || {}; INSP = d.insp || {};
+    if (prose){   // the wiki body in this language, or the English one (with the "English only" note) when there is none
+      prose.innerHTML = d.body || proseEn; html.classList.toggle('wt', !!d.body);
+      $$('.toc a:not([data-i18n])').forEach(a => { const h = document.getElementById(a.hash.slice(1)); if (h) a.innerHTML = h.innerHTML; });
+    }
     // a key the dictionary lacks keeps the page's own English (scripts/check-site-i18n.py reports it)
     $$('[data-i18n]').forEach(e => {
       if (e._en === undefined) e._en = e.innerHTML;
@@ -141,11 +149,13 @@ if ($('[data-dl]') || $('.ver-line')){
 }
 
 /* screenshots open full size */
-const shots = $$('a.shot');
-if (shots.length){
+if ($('a.shot')){
   const lb = document.createElement('div'); lb.className = 'lightbox'; lb.innerHTML = '<img alt="">'; document.body.appendChild(lb);
   const im = lb.firstChild;
-  shots.forEach(a => a.addEventListener('click', e => { e.preventDefault(); im.src = a.href; im.alt = (a.querySelector('img') || {}).alt || ''; lb.classList.add('open'); }));
+  document.addEventListener('click', e => {   // delegated: a translated wiki body brings its own links
+    const a = e.target.closest ? e.target.closest('a.shot') : null; if (!a) return;
+    e.preventDefault(); im.src = a.href; im.alt = (a.querySelector('img') || {}).alt || ''; lb.classList.add('open');
+  });
   lb.onclick = () => lb.classList.remove('open');
   addEventListener('keydown', e => { if (e.key === 'Escape') lb.classList.remove('open'); });
 }

@@ -143,7 +143,7 @@
 "c.gen-layer": "Maakt zelf geen geluid. Elke noot die hij ontvangt, wordt doorgegeven aan zijn onderliggende kanalen, zodat één pattern meerdere generators tegelijk kan spelen.",
 "c.gen-lynx-soundfont": "Speelt SoundFont 2- en 3-banken en SFZ-instrumenten, met presets zoeken in al je SoundFonts, envelope, filter en ingebouwde reverb en chorus.",
 "c.gen-midi-out": "Een stil kanaal dat zijn noten en controllerwaarden als MIDI verstuurt naar de plugins die op zijn poort luisteren, en 72 controllerknoppen heeft.",
-"c.gen-minisynth": "Analoge synthengine in monofone stijl met oscillator, versterker, filter, twee envelopes, LFO en een effectsectie, nagebouwd naar de MiniSynth van FL Studio.",
+"c.gen-minisynth": "Synthengine met tabeloscillatoren en ruis, een 4-polig filter, twee envelopes, een LFO en distortion, delay, phaser en chorus als effecten, nagebouwd naar de MiniSynth van FL Studio.",
 "c.gen-morphine": "Additieve synthengine die tussen golfvormen morpht, met een ruisgenerator, equalizer en chorus-, delay- en reverbeffecten.",
 "c.gen-ogun": "Additieve synthengine met spectrale timbreregelaars, unison, filter, equalizer met drie banden en chorus-, delay- en reverbeffecten.",
 "c.gen-patcher": "Een nodegraaf van instrumenten, effecten en VST3- of CLAP-plugins die met audio-, noot- en stuurkabels zijn verbonden, gebruikt als Channel Rack-generator.",

@@ -143,7 +143,7 @@
 "c.gen-layer": "No produce sonido por sí mismo. Cada nota que recibe pasa a sus canales hijos, así que un patrón puede tocar varios generadores a la vez.",
 "c.gen-lynx-soundfont": "Reproduce bancos SoundFont 2 y 3 e instrumentos SFZ, con búsqueda de presets en todos tus SoundFonts, envolvente, filtro y reverb y chorus integrados.",
 "c.gen-midi-out": "Un canal silencioso que envía sus notas y valores de controlador como MIDI a los plugins que escuchan en su puerto, y lleva 72 mandos de controlador.",
-"c.gen-minisynth": "Motor de sintetizador analógico de estilo monofónico con oscilador, amplificador, filtro, dos envolventes, LFO y una sección de efectos, reconstruido a partir del MiniSynth de FL Studio.",
+"c.gen-minisynth": "Motor de sintetizador con osciladores de tablas y ruido, un filtro de 4 polos, dos envolventes, un LFO y efectos de distorsión, delay, phaser y chorus, reconstruido a partir del MiniSynth de FL Studio.",
 "c.gen-morphine": "Motor de sintetizador aditivo que hace morph entre formas de onda, con generador de ruido, ecualizador y efectos de chorus, delay y reverb.",
 "c.gen-ogun": "Motor de sintetizador aditivo con controles de timbre espectral, unísono, filtro, ecualizador de tres bandas y efectos de chorus, delay y reverb.",
 "c.gen-patcher": "Un grafo de nodos de instrumentos, efectos y plugins VST3 o CLAP unidos por cables de audio, notas y control, usado como generador del Channel Rack.",

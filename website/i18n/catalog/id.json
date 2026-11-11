@@ -143,7 +143,7 @@
 "c.gen-layer": "Tidak menghasilkan suara sendiri. Setiap nada yang diterimanya diteruskan ke channel turunannya, jadi satu pattern bisa memainkan beberapa generator sekaligus.",
 "c.gen-lynx-soundfont": "Memutar bank SoundFont 2 dan 3 serta instrumen SFZ, dengan pencarian preset di semua SoundFont kamu, envelope, filter, dan reverb serta chorus bawaan.",
 "c.gen-midi-out": "Channel senyap yang mengirim nada dan nilai controller-nya sebagai MIDI ke plugin yang mendengarkan port-nya, dan membawa 72 knob controller.",
-"c.gen-minisynth": "Engine synth analog bergaya monofonik dengan oscillator, amplifier, filter, dua envelope, LFO, dan bagian efek, dibangun ulang dari MiniSynth milik FL Studio.",
+"c.gen-minisynth": "Engine synth dengan oscillator tabel dan noise, filter 4-pole, dua envelope, satu LFO, serta efek distortion, delay, phaser, dan chorus, dibangun ulang dari MiniSynth milik FL Studio.",
 "c.gen-morphine": "Engine synthesizer aditif yang melakukan morph antar bentuk gelombang, dengan generator noise, equalizer, dan efek chorus, delay, dan reverb.",
 "c.gen-ogun": "Engine synthesizer aditif dengan kontrol timbre spektral, unison, filter, equalizer tiga band, dan efek chorus, delay, dan reverb.",
 "c.gen-patcher": "Graf node berisi instrumen, efek, dan plugin VST3 atau CLAP yang dihubungkan dengan kabel audio, nada, dan kontrol, dipakai sebagai generator Channel Rack.",
