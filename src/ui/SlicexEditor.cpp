@@ -1045,8 +1045,13 @@ private:
         return { x0, bar.getY(), std::max (3.0f, x1 - x0), bar.getHeight() };
     }
 
-    float xOf (double frame) const { return (float) ((frame - shownStart()) / shownLength() * (double) getWidth()); }
-    double frameAt (float x) const { return shownStart() + (double) x / (double) std::max (1, getWidth()) * shownLength(); }
+    // FL scrolls the deck by whole pixels: a zoomed deck's left edge is the shown start taken down to a whole number
+    // of pixels at the current zoom (round 190aj: both ends of a selection dragged in a deck shown from beat 0.5763
+    // came out 0.12 pixel earlier than a plain linear map gives; one zoom measured)
+    double framesPerPixel() const { return shownLength() / (double) std::max (1, getWidth()); }
+    double originPixels() const { return std::floor (shownStart() / framesPerPixel()); }
+    float xOf (double frame) const { return (float) (frame / framesPerPixel() - originPixels()); }
+    double frameAt (float x) const { return (originPixels() + (double) x) * framesPerPixel(); }
     // a region's start as drawn (the one being dragged follows the mouse)
     std::int64_t startOf (const std::vector<slicex::WavRegion>& list, int i) const { return i == dragging && moved && ! dragEnd ? dragTo : list[(std::size_t) i].start; }
     // a region's last frame as drawn
@@ -1657,6 +1662,8 @@ public:
         }
         else if (cmd != "state")
             return "unknown command";
+        stopTimer(); // (the zoom is written a moment after it settles; the test reads it at once)
+        storeViews();
         // what the state holds now (what a save writes)
         const auto& d = state.decks[(std::size_t) deck];
         std::int64_t first = -1, last = -1;

@@ -6535,16 +6535,15 @@ private:
                         lines.add (command + " -> " + file.getFileName());
                         continue;
                     }
-                    auto result = lynx::slicexEditorTest (*panel, command);
+                    const auto result = lynx::slicexEditorTest (*panel, command);
                     offline.dispatchPendingMessages();
-                    if (! command.startsWith ("state") && ! command.startsWith ("savewav"))
-                        result = lynx::slicexEditorTest (*panel, "state");
                     lines.add (command + " -> " + result);
                 }
             }
         }
         report.replaceWithText (lines.joinIntoString ("\n") + "\nresult=DONE\n");
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
+        quit();
     }
 
     // --slicexkeytest (round 190ac): see the command line above
