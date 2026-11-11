@@ -11193,6 +11193,15 @@ private:
                     tools.setTool (t);
                     write (("clip-mt-" + juce::String (lynx::MidiToolsPanel::toolName (t)).toLowerCase()).toRawUTF8());
                 }
+                // round 190aa: the pages again with the settings of the Live shots they are compared with
+                tools.setAuto (false);
+                tools.setLiveShotSettingsForSnapshot();
+                for (int t : { (int) lynx::MidiToolsPanel::chop, (int) lynx::MidiToolsPanel::quantize, (int) lynx::MidiToolsPanel::timeWarp })
+                {
+                    tools.setTool (t);
+                    write (("clip-mt-" + juce::String (lynx::MidiToolsPanel::toolName (t)).toLowerCase() + "-set").toRawUTF8());
+                }
+                tools.setAuto (true);
                 tools.setTool (lynx::MidiToolsPanel::arpeggiate);
                 tools.transformNow();
                 offline.dispatchPendingMessages();

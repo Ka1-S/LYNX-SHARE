@@ -495,9 +495,41 @@ Notes connect (Notes notes, const ConnectOptions& o, std::int64_t grid)
 }
 
 // --- Chop --------------------------------------------------------------------------------------------------------
+std::uint16_t chopPattern (int parts, int gaps) noexcept
+{
+    std::uint16_t bits = 0;
+    for (int i = 0; i < std::min (parts, 16); ++i)
+    {
+        const auto gap = gaps > 0 ? i % (gaps + 1) == gaps : gaps < 0 && i % (1 - gaps) != 0;
+        if (! gap)
+            bits = (std::uint16_t) (bits | (1u << i));
+    }
+    return bits;
+}
+
+bool chopPlays (const ChopOptions& o, int part) noexcept
+{
+    const auto parts = std::clamp (o.parts, 2, 64);
+    const auto bits = o.custom ? o.pattern : chopPattern (parts, o.gaps);
+    return (bits >> (part % std::min (parts, 16)) & 1u) != 0; // [MAN] 16 toggles at most, repeated
+}
+
 Notes chop (Notes notes, const ChopOptions& o)
 {
     const auto parts = std::clamp (o.parts, 2, 64);
+    const auto cells = std::min (parts, 16);
+    // each part's share: 1, `stretch` when emphasised [LIVE], times the variation's random factor [LIVE at 50 %]
+    std::vector<double> weight ((std::size_t) parts), edge ((std::size_t) parts + 1, 0.0);
+    Rng rng (o.seed);
+    const auto variation = std::clamp ((double) o.variation, 0.0, 1.0);
+    for (int i = 0; i < parts; ++i)
+    {
+        auto w = (o.emphasis >> (i % cells) & 1u) != 0 ? (double) std::clamp (o.stretch, 2, 8) : 1.0;
+        if (variation > 0.0)
+            w *= 1.0 + variation * (2.0 * rng.unit() - 1.0);
+        weight[(std::size_t) i] = std::max (1.0e-3, w);
+        edge[(std::size_t) i + 1] = edge[(std::size_t) i] + weight[(std::size_t) i];
+    }
     Notes out;
     for (const auto& source : notes)
     {
@@ -506,14 +538,14 @@ Notes chop (Notes notes, const ChopOptions& o)
             out.push_back (source);
             continue;
         }
+        const auto at = [&] (int i) { return source.start + (std::int64_t) std::llround ((double) source.length * edge[(std::size_t) i] / edge.back()); };
         for (int i = 0; i < parts; ++i)
         {
-            const auto gap = o.gaps > 0 ? i % (o.gaps + 1) == o.gaps : o.gaps < 0 && i % (1 - o.gaps) != 0;
-            if (gap)
+            if (! chopPlays (o, i))
                 continue;
             auto n = source;
-            n.start = source.start + source.length * i / parts;
-            n.length = source.start + source.length * (i + 1) / parts - n.start;
+            n.start = at (i);
+            n.length = std::max<std::int64_t> (1, at (i + 1) - n.start);
             if (i > 0)
                 n.slide = n.porta = false;
             out.push_back (n);
@@ -521,6 +553,133 @@ Notes chop (Notes notes, const ChopOptions& o)
     }
     sortByTime (out);
     return out;
+}
+
+// --- Time Warp ---------------------------------------------------------------------------------------------------
+namespace
+{
+// integral of a piecewise linear rate between knots (x, rate), flat beyond the ends, from a to b (a <= b)
+double integrateRate (const std::vector<std::pair<double, double>>& knots, double a, double b)
+{
+    if (b <= a)
+        return 0.0;
+    const auto rateAt = [&knots] (double x) {
+        if (x <= knots.front().first)
+            return knots.front().second;
+        for (std::size_t i = 1; i < knots.size(); ++i)
+            if (x <= knots[i].first)
+            {
+                const auto& [x0, r0] = knots[i - 1];
+                const auto& [x1, r1] = knots[i];
+                return x1 > x0 ? r0 + (r1 - r0) * (x - x0) / (x1 - x0) : r1;
+            }
+        return knots.back().second;
+    };
+    std::vector<double> cuts { a };
+    for (const auto& k : knots)
+        if (k.first > a && k.first < b)
+            cuts.push_back (k.first);
+    cuts.push_back (b);
+    double sum = 0.0;
+    for (std::size_t i = 1; i < cuts.size(); ++i) // linear on each piece: the trapezoid is exact
+        sum += 0.5 * (rateAt (cuts[i - 1]) + rateAt (cuts[i])) * (cuts[i] - cuts[i - 1]);
+    return sum;
+}
+} // namespace
+
+std::pair<std::int64_t, std::int64_t> timeWarpRange (const Notes& notes, const TimeWarpOptions& o)
+{
+    if (o.rangeEnd > o.rangeStart)
+        return { o.rangeStart, o.rangeEnd };
+    constexpr std::int64_t bar = (std::int64_t) ppq * 4;
+    if (notes.empty())
+        return { 0, bar };
+    auto first = notes.front().start, last = first;
+    for (const auto& n : notes)
+    {
+        first = std::min (first, n.start);
+        last = std::max (last, n.start + n.length);
+    }
+    const auto from = first / bar * bar;
+    return { from, std::max (from + bar, (last + bar - 1) / bar * bar) };
+}
+
+Notes timeWarp (Notes notes, const TimeWarpOptions& o, std::int64_t grid)
+{
+    if (notes.empty())
+        return notes;
+    sortByTime (notes);
+    auto first = notes.front().start, last = first;
+    for (const auto& n : notes)
+        last = std::max (last, n.start + n.length);
+    const auto [from, to] = timeWarpRange (notes, o);
+    std::vector<std::pair<double, double>> knots;
+    for (const auto& p : o.points)
+        if (p.on)
+            knots.emplace_back ((double) from + std::clamp (p.time, 0.0, 1.0) * (double) (to - from), 1.0 / std::clamp (p.speed, 0.01, 100.0));
+    if (knots.empty())
+        return notes;
+    std::stable_sort (knots.begin(), knots.end());
+
+    const auto whole = integrateRate (knots, (double) first, (double) last);
+    const auto scale = o.fit && whole > 0.0 ? (double) (last - first) / whole : 1.0;
+    const auto warp = [&] (std::int64_t t) { return first + (std::int64_t) std::llround (scale * integrateRate (knots, (double) first, (double) t)); };
+    for (auto& n : notes)
+    {
+        const auto start = warp (n.start);
+        if (o.includeEnd)
+            n.length = std::max<std::int64_t> (1, warp (n.start + n.length) - start);
+        n.start = start;
+        if (o.quantize && grid > 0)
+            n.start = std::max<std::int64_t> (0, (n.start + grid / 2) / grid * grid);
+    }
+    sortByTime (notes);
+    return notes;
+}
+
+// --- Velocity Shaper -----------------------------------------------------------------------------------------------
+double velocityShape (const VelocityShaperOptions& o, double x) noexcept
+{
+    const auto& p = o.points;
+    if (p.empty())
+        return 1.0;
+    x = std::clamp (x, 0.0, 1.0);
+    std::size_t i = 0;
+    while (i + 1 < p.size() && p[i + 1].x <= x) // the last point at or before x (of points at one x, the later)
+        ++i;
+    if (i + 1 >= p.size() || x < p[i].x)
+        return std::clamp (x < p[i].x ? p.front().y : p.back().y, 0.0, 1.0);
+    const auto& a = p[i];
+    const auto& b = p[i + 1];
+    const auto u = (x - a.x) / (b.x - a.x);
+    const auto c = (double) a.curve;
+    const auto bend = std::abs (c) < 1.0e-6 ? u : (1.0 - std::exp (-c * u)) / (1.0 - std::exp (-c));
+    return std::clamp (a.y + (b.y - a.y) * bend, 0.0, 1.0);
+}
+
+Notes velocityShaper (Notes notes, const VelocityShaperOptions& o, std::int64_t grid)
+{
+    if (notes.empty())
+        return notes;
+    auto first = notes.front().start, last = first + notes.front().length;
+    for (const auto& n : notes)
+    {
+        first = std::min (first, n.start);
+        last = std::max (last, n.start + n.length);
+    }
+    const auto span = (double) std::max<std::int64_t> (1, last - first);
+    const std::int64_t division = o.division == VelocityShaperOptions::eighth ? ppq / 2
+                                : o.division == VelocityShaperOptions::grid   ? std::max<std::int64_t> (1, grid)
+                                                                               : ppq / 4;
+    const auto low = std::clamp (o.minimum, 1, 127), high = std::clamp (o.maximum, 1, 127);
+    for (auto& n : notes)
+    {
+        auto x = ((double) (n.start - first - (std::int64_t) o.rotate * division) / span) * (double) std::max (1, o.loops);
+        x -= std::floor (x);
+        const auto v = std::floor ((double) low + (double) (high - low) * velocityShape (o, x) + 1.0e-9); // [LIVE] rounds down
+        n.velocity = (float) std::clamp (v, 1.0, 127.0) / 127.0f;
+    }
+    return notes;
 }
 
 // --- on a pattern ------------------------------------------------------------------------------------------------

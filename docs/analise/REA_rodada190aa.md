@@ -42,3 +42,60 @@ Notes on the session:
 - [LIVE] Typing "0" with notes selected deactivates them (Live's shortcut): clip T02's notes were saved deactivated by a
   stray key; their times are unaffected and are what the test uses.
 - Arpeggiate's Diverge for four or more notes follows the triad's rule [INFERRED].
+
+## 2. Chop in full [LIVE]
+Panel (`live/x-H04.png`, top to bottom): Parts and Gaps knobs; the **pattern row**, one cell per part (16 at most,
+repeated over more parts [MAN]) in two halves: the upper half lit = the part plays, dark = a gap; the lower half lit
+(cyan) = the part is **emphasised**; **Stretch** "×2" (greyed while nothing is emphasised); **Variation** "0.0 %".
+- A hand-edited pattern makes Gaps read "-"; turning Gaps writes a fresh pattern (H03: part 2 off → `0 .5 .75`).
+- An emphasised part (a note or a gap) lasts `Stretch` parts: H04 part 1 ×2 → shares 2/5 1/5 1/5 1/5; H05 ×4 → 4/7
+  1/7 1/7 1/7; H09 Gaps 1 with the gap emphasised ×4 → notes at 0 and 5/7 of each note, 1/7 long.
+- Variation 50 % (H06, on top of part 1 ×4): shares 0.6146 0.0789 0.1327 0.1739 for **every** note alike: one random
+  draw per run. LYNX scales each share by a random 1 ± variation (the same for every note) [INFERRED law, Live's draw
+  lies inside it].
+- Clicks: Live's lower half cycled an emphasised note into an emphasised gap; LYNX's halves are plain toggles (upper =
+  plays, lower = emphasis). Interaction only; the look and the results are Live's.
+
+## 3. Time Warp [LIVE, 7 of 8 settings within 1e-5 beats]
+Panel (`live/x-W04.png`): "Time 1.1.1" and "Speed ×1.0" of the selected breakpoint; the display (the range's ends as
+two lines, the speed line, numbered circles: up = faster); toggles **1 2 3** (1 and 3 on); **Quantize** Off/On,
+**Range** Fit, **Note End** Include.
+- Model (fitted, `fit/tw.py`): a note at t goes to `first + c · ∫ r` from the first start to t, where r is **1 / speed
+  interpolated linearly** between the breakpoints that are on, which sit at fractions of the clip's range (here the
+  one-bar clip, not the notes' span: 4 beats fits, 3.875 does not), flat beyond them. Fit: c keeps the last end in
+  place; Range off: c = 1 (W06). Quantize: the warped starts go to the nearest grid line, lengths stay (W05).
+  Breakpoint 2 defaults to the middle; Time's arrow key moved it by a tenth of the range (W08: 0.4 shown as 1.2.3).
+- Note End off (W07): lengths stay; Live's c is 0.2 % lower than with Include (starts up to 0.0076 beats = 7 ticks
+  apart). Not explained by any span tried (`fit/tw2.py`, `tw3.py`); LYNX keeps Include's c. Open.
+
+## 4. Velocity Shaper [LIVE, 6 settings note for note; Max for Live device, black box]
+Panel (`live/x-V01.png`): the envelope display with Maximum (127) at its top right and Minimum (1) at its bottom
+right; **Loop** 1, **Rotate** 0, **Division** 1/16 (choices 1/16, 1/8, Grid — Live's own hint text).
+- The new velocity ignores the old one (V01 = V02 with inputs 100 and 50): `floor (min + (max − min) · shape (x))`,
+  x = the note's place in the span **from the first start to the last end** (V03: the second cycle starts at 2 / 3.9375,
+  so its first note is 115, not 127), times Loop, minus Rotate × Division (wrapping: V04 1/16 → peak at 0.25 beats,
+  V05 1/8 → 0.5).
+- The default envelope: from the top, an exponential fall to the floor at x = 0.503, then flat. Of the shapes tried
+  (`fit/vs.py`), only `(e^(−a·u) − e^(−a)) / (1 − e^(−a))`, a = 2.825, with round-down fits all 96 measured notes.
+- Editing (Live: click to add breakpoints and drag them): LYNX drags points, adds one on a click, removes one on a
+  double-click, and bends a line with Alt + drag (the curve value of the segment).
+
+## 5. MPE tools: what LYNX would need (issue #108; not built)
+- **Glissando** [MAN]: needs at least two notes; a pitch bend per note from Start (% of the note's length) to the next
+  note's pitch, with a Curve. LYNX needs per-note pitch-bend envelopes (an MPE note expression lane), their playback to
+  MPE-capable instruments (per-note channel or MIDI 2.0 per-note pitch bend) and the .als `PerNoteEventStore` import /
+  export (Live writes them there; 190o's sets carry an empty store).
+- **LFO** [MAN]: Target Pitch Bend / Slide / Pressure, Attack / Decay, Shape (Sine, Square, Triangle, Random +
+  Reseed), Rate 1 … 1/128, Time Shift, Amount, Amplitude Base. Needs the same per-note expression lanes for the three
+  targets (pitch bend, slide = CC74, pressure), an editor to see them (Live: MPE tab) and the same file support.
+- Both stay out until LYNX has MPE notes; the panel's chooser lists only the tools LYNX can run.
+
+## 6. Best way?
+- **FL:** Piano roll › Tools: Chop (Alt+U, with its own pattern presets), Quantize (Alt+Q / Ctrl+Q with start/end and
+  amount), Articulate / Randomize; no Time Warp and no velocity envelope tool (FL's Randomize and Scale levels do part of
+  it). REA rounds 143a / 168g.
+- **Ableton:** the same jobs live in the Clip View, one panel each, with Auto apply (sections 2–4).
+- **Users:** Live 12's Time Warp and Velocity Shaper are named as the quick way to make fills and accelerating rolls
+  without drawing (research-web.md row 9; Attack Magazine's MIDI Tools piece).
+- **Verdict:** FL's tools stay the default in the FL workflows; Live's pages are added to the MIDI Tools panel
+  (Clip View and Piano roll › Tools › MIDI Tools…). Nothing removed.
