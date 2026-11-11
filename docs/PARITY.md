@@ -878,6 +878,7 @@ edits (Remove / Bypass, Latched / Momentary), Hold, Auto Key.
 | Graph mode (offline editing) | — | out of scope (a separate editor) |
 | Harmony Player | — | out of scope |
 | Preset browser, undo / redo | ✅ | the shared preset bar (round 129) with LYNX Tune's factory presets |
+| Breathiness | — | LYNX extra (round 190bb, issue #103; not a control of the original): BREATH beside SHIFT and THROAT in the output section, 0 … 100 %, off by default (the stage is skipped: old projects render bit-identically). Aspiration noise with the corrected voice's own spectral envelope (third-octave channel-vocoder bank, +6 dB / octave tilt around 2 kHz), on voiced sounds only, never louder than the voice. Measured (REA_rodada190bb-tune §3): at the formant peaks the noise sits within 3.5 dB of the voice's level times the tilt; valleys next to a strong formant fill by up to 16 dB (third-octave resolution); about +0.6 % of a core at 44.1 kHz while on (harness figure), nothing while off |
 
 ---
 

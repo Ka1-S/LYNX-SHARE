@@ -8857,3 +8857,5 @@ countries: it ch sm
 "Channel 2" = "Canale 2"
 "Channels 2-{0}" = "Canali 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "Canali membri MPE (zona inferiore): i canali MIDI che portano una nota ciascuno"
+# round 190bb (LYNX Tune: Breathiness, issue #103)
+"BREATH" = "SOFFIO"

@@ -8890,3 +8890,5 @@ countries: tr
 "Channel 2" = "Kanal 2"
 "Channels 2-{0}" = "Kanallar 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE üye kanalları (alt bölge): her biri bir nota taşıyan MIDI kanalları"
+# round 190bb (LYNX Tune: Breathiness, issue #103)
+"BREATH" = "NEFES"

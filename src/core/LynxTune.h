@@ -9,7 +9,8 @@
 // nearest note of the key/scale (with hysteresis), or the nearest pitch class held on a MIDI source channel — and
 // the wanted correction (target − sung pitch, in semitones) is followed with the retune time constant (0 ms =
 // instant, the hard "robot" effect; slower keeps the singer's own slides and vibrato). Humanize lengthens the retune
-// time on sustained notes; flex-tune leaves notes far from their target as sung. TD-PSOLA shifts the voice by the correction (+ transpose) with the formants preserved, or
+// time on sustained notes; flex-tune leaves notes far from their target as sung. Breathiness (round 190bb) adds
+// aspiration noise shaped by the corrected voice (vocal::BreathNoise). TD-PSOLA shifts the voice by the correction (+ transpose) with the formants preserved, or
 // moved with the pitch when formant preserve is off; formant shift moves them on its own.
 //
 // Latency: a constant number of samples set by the voice range and the low-latency switch (two longest periods, or
@@ -102,8 +103,13 @@ enum Param : int
     vibratoVariation,        // created vibrato: 0 … 100 %: random drift of its rate and depth
     transposeInScale,        // on: Scale transpose moves the target notes by steps of the scale (Transpose is ignored)
     scaleTranspose,          // −7 … +7 steps of the scale (default 0)
+    // round 190bb (appended, issue #103; LYNX's own, 0 by default = the old sound, the stage is skipped):
+    breathiness,             // 0 … 100 %: aspiration noise with the corrected voice's own formants, on voiced sounds
     count
 };
+// round 190bb: the breath noise's level for a value (0 … breathFull, a square law: half travel = −12 dB)
+constexpr double breathFull = 2.0;
+double breathGain (float v) noexcept;
 // round 165hb: the throat length (%) of a value and back, and its formant shift in semitones (measured law)
 double throatPercent (float v) noexcept;
 float throatValue (double percent) noexcept;

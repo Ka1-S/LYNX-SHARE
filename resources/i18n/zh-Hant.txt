@@ -8890,3 +8890,5 @@ countries: tw hk mo
 "Channel 2" = "通道 2"
 "Channels 2-{0}" = "通道 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE 成員通道（低音區）：各承載一個音符的 MIDI 通道"
+# round 190bb (LYNX Tune: Breathiness, issue #103)
+"BREATH" = "氣聲"

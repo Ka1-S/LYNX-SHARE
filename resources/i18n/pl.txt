@@ -8890,3 +8890,5 @@ countries: pl
 "Channel 2" = "Kanał 2"
 "Channels 2-{0}" = "Kanały 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "Kanały członkowskie MPE (dolna strefa): kanały MIDI, z których każdy niesie jedną nutę"
+# round 190bb (LYNX Tune: Breathiness, issue #103)
+"BREATH" = "ODDECH"

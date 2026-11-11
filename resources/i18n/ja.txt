@@ -8890,3 +8890,5 @@ countries: jp
 "Channel 2" = "チャンネル2"
 "Channels 2-{0}" = "チャンネル2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPEメンバーチャンネル（ロワーゾーン）：それぞれ1つのノートを担うMIDIチャンネル"
+# round 190bb (LYNX Tune: Breathiness, issue #103)
+"BREATH" = "ブレス"
