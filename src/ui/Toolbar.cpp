@@ -1638,6 +1638,18 @@ ui::Hint EditOverlay::hintAt (juce::Point<int> p)
  #include <psapi.h>
 #endif
 
+std::int64_t lynx::toolbar::PerformanceMeter::processPrivateBytes()
+{
+#if JUCE_WINDOWS
+    PROCESS_MEMORY_COUNTERS_EX counters {};
+    if (GetProcessMemoryInfo (GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*) &counters, sizeof (counters)))
+        return (std::int64_t) counters.PrivateUsage;
+    return 0;
+#else
+    return processMemoryBytes();
+#endif
+}
+
 std::int64_t lynx::toolbar::PerformanceMeter::processMemoryBytes()
 {
 #if JUCE_WINDOWS

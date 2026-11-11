@@ -282,6 +282,9 @@ private:
     void setSelection (std::vector<int> indices);
     void sortNotes();                                // sorts while keeping the selection (no undo step)
     void editNotes (const std::function<void (Pattern&)>& edit, bool undoable = true);
+    // Freeze (round 190ay): the notes of a frozen channel are read-only. True = the channel shown is frozen; the hint
+    // bar says "Unfreeze to edit" (the edit is refused, not silently dropped).
+    bool refuseFrozenEdit();
     void applyVelocity (int fromX, int toX, int y);
     float laneValue (const Note& n) const;          // 0..1 of the chosen property
     void setLaneValue (Note& n, float value) const; // inverse

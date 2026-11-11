@@ -68,8 +68,29 @@ struct Projected
 // have stand-ins play them instead — Song mode: the pattern stems at their clips (or the timeline stem), Pattern mode:
 // the current pattern's loop stem; an insert's timeline stem replaces its effects and inputs in Song mode. Without any
 // stand-in to play, `song` is returned as is.
-bool hasAny (const Song& song) noexcept; // any channel or insert has stand-ins
+// Frozen channels (round 190ay, FreezeState) play their stems the same way whether or not the plugin is installed: the
+// whole-song stem in Song mode, the current pattern's loop stem in Pattern mode. They are not listed in `out`.
+bool hasAny (const Song& song) noexcept; // any channel or insert has stand-ins, or a channel is frozen
 Song project (const Song& song, const std::function<bool (const PluginRef&)>& missing, Projected* out = nullptr);
 // The stand-in of a channel / insert for pattern `patternUid` (0 = the timeline stem); nullptr if none.
 const StandIn* find (const std::vector<StandIn>& list, std::uint64_t patternUid, bool loop) noexcept;
 } // namespace lynx::standins
+
+// Freeze (round 190ay): a channel rendered to audio that plays in its place while its instrument is not loaded at all.
+// The renders run through sessionpack::renderFreeze (engine/SessionPack.cpp); the playback is standins::project.
+namespace lynx::freeze
+{
+// Why `channel` cannot be frozen, as an English sentence for the UI (translate it); nullptr = it can.
+const char* whyNot (const Song& song, int channel) noexcept;
+// The channel with that uid plays `stems` from now on (its instrument is unloaded at the next publish).
+void apply (Song& song, std::uint64_t channelUid, std::vector<StandIn> stems, std::string source);
+// The channel plays its instrument again (the files are the caller's to delete).
+void clear (Song& song, int channel);
+bool any (const Song& song) noexcept;
+// The song with nothing frozen: what the project exports (.flp, .als) write and what a stem render hears.
+Song thawed (Song song);
+// A stem render's song made light: only `channel` matters there (every other channel is muted, the audio goes straight
+// to the Master), so the other channels' instruments and every insert's effects are swapped for idle built-in ones
+// (same channel / slot numbers) — freezing one channel does not load every plugin of the project a second time.
+void lighten (Song& renderSong, int channel);
+} // namespace lynx::freeze

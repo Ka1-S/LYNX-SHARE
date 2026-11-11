@@ -1,7 +1,7 @@
 language: 日本語
 countries: jp
 
-# LYNX SHARE interface in 日本語 (JUCE LocalisedStrings format).
+# LYNX interface in 日本語 (JUCE LocalisedStrings format).
 # One line per string: "English text" = "Translation"  (escapes: \n \t \" \\)
 # Every key of pt-BR.txt must be here; terms: docs/i18n/ja-glossary.md; how to help: docs/i18n/README.md
 # After editing, run: python3 tools/make_i18n.py  (embeds the tables in src/ui/I18nData.h)
@@ -4559,6 +4559,7 @@ countries: jp
 "The report could not be sent ({0}); LYNX SHARE tries again at the next start" = "レポートを送信できませんでした ({0})。LYNX SHAREは次回起動時に再試行します"
 "Report a problem" = "問題を報告"
 "Report a problem..." = "問題を報告..."
+
 # --- In-app update check (round 166b)
 "Check for updates..." = "アップデートを確認..."
 "Check for updates automatically" = "アップデートを自動で確認"
@@ -5282,6 +5283,27 @@ countries: jp
 "RPN..." = "RPN..."
 "Send MIDI" = "MIDIを送信"
 "The Dashboard sends its notes, the program and the controls set to \"Send MIDI\" to the plugins whose MIDI input port is this port (plugin window > Settings > MIDI > Input port)." = "Dashboardは、ノート、プログラム、「MIDIを送信」に設定したコントロールを、MIDI入力ポートがこのポートであるプラグインに送ります (プラグインウィンドウ > 設定 > MIDI > 入力ポート)。"
+
+# --- Song markers: FL's marker actions, Time markers, Quantize song jumps, Song marker jump (round 165f)
+"Marker loop" = "マーカーループ"
+"Marker skip" = "マーカースキップ"
+"Marker pause" = "マーカーポーズ"
+"Pattern length" = "パターンの長さ"
+"Bar override" = "小節の上書き"
+"Key/Scale" = "キー/スケール"
+"Loop length" = "ループの長さ"
+"Add one every" = "追加する間隔"
+"8 bars" = "8小節"
+"Bars" = "小節"
+"Add jump to next bar" = "次の小節へのジャンプを追加"
+"Change to marker loop" = "マーカーループに変更"
+"Time markers" = "タイムマーカー"
+"Quantize song jumps" = "ソングジャンプをクオンタイズ"
+"Place loop (from this marker to the next)" = "ループを配置 (このマーカーから次まで)"
+"Song marker jump" = "ソングマーカージャンプ"
+"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "このチャンネルのノートは発音せず、ソングをマーカーへ移動します: ノート0は最初のマーカー、次のノートは2番目へ... (再生中は Playlist › ソングジャンプをクオンタイズ が適用されます)。"
+"Jump to the next song marker (Quantize song jumps while playing)" = "次のソングマーカーへジャンプ (再生中はソングジャンプをクオンタイズ)"
+"Jump to the previous song marker" = "前のソングマーカーへジャンプ"
 "MUTE" = "ミュート"
 "CHANNEL" = "チャンネル"
 "Bar:Beat:Tick" = "小節:拍:ティック"
@@ -5694,6 +5716,62 @@ countries: jp
 "Black notes" = "黒鍵"
 "Sharps (#)" = "シャープ (#)"
 "Flats (b)" = "フラット (b)"
+"Advanced looping" = "詳細ループ"
+"Burn" = "書き込み"
+"Burn MIDI to" = "MIDIの書き込み先"
+"Burn all looping channels" = "ループ中の全チャンネルを書き込む"
+"Burn selected channels" = "選択したチャンネルを書き込む"
+"Burn to pattern" = "パターンに書き込む"
+"Channel looping" = "チャンネルループ"
+"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "チャンネルループ: パターンより短いチャンネルが最後まで繰り返されます (ポリリズム)  [LMB] オン / オフ  [RMB] ループの種類 (ステップチャンネル、全チャンネル、詳細)とパターンに書き込む"
+"Channel looping: {0}" = "チャンネルループ: {0}"
+"Don't loop" = "ループしない"
+"Echo delay" = "エコーディレイ"
+"Every {0} steps" = "{0}ステップごと"
+"Loop all channels" = "全チャンネルをループ"
+"Loop point" = "ループポイント"
+"Loop point ({0} steps)" = "ループポイント ({0}ステップ)"
+"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "ループポイント: [LMB] ドラッグまたは [Wheel] でステップ単位に設定  [2xLMB] 次の小節  [RMB] ループしない / ステップ / 拍 / 小節、パターンに書き込む"
+"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "ループの繰り返し (ループポイント以降): [LMB] 繰り返すステップを編集"
+"Loop step channels" = "ステップチャンネルをループ"
+"Loop type" = "ループの種類"
+"Looping on" = "ループ オン"
+"Nothing to burn" = "書き込むものがありません"
+"Reset after burning to MIDI" = "MIDIに書き込んだ後リセット"
+"Select what you want to reset:" = "リセットする項目を選択:"
+"Set to next bar" = "次の小節に設定"
+"Set to next beat" = "次の拍に設定"
+"The selected channel doesn't contain any notes to burn." = "選択したチャンネルには書き込むノートがありません。"
+"Time (shift and gate)" = "タイム (シフトとゲート)"
+"loop at the next bar" = "次の小節でループ"
+"loop at the next beat" = "次の拍でループ"
+"loop at the next step" = "次のステップでループ"
+"Receive notes from" = "ノートの受信元"
+"Unlock" = "ロック解除"
+"not connected" = "未接続"
+"No MIDI input device" = "MIDI入力デバイスがありません"
+"(locked: receives the notes of {0})" = "(ロック中: {0}のノートを受信)"
+"Create sampled instrument..." = "サンプリング音源を作成..."
+"Create sampled instrument" = "サンプリング音源を作成"
+"Plays {0} key by key and makes a Sampler channel of the recordings." = "{0}を1鍵ずつ演奏し、録音からSamplerチャンネルを作成します。"
+"Sampling the instrument..." = "音源をサンプリング中..."
+"Writing the samples..." = "サンプルを書き込み中..."
+"Could not sample the instrument" = "音源をサンプリングできませんでした"
+"Low note" = "最低音"
+"High note" = "最高音"
+"Keys per zone" = "ゾーンあたりの鍵数"
+"Root offset" = "ルートのオフセット"
+"Velocity layers" = "ベロシティレイヤー"
+"Max velocity" = "最大ベロシティ"
+"Release after (seconds)" = "リリースまで (秒)"
+"Max length after release (seconds)" = "リリース後の最大長 (秒)"
+"Stop on" = "停止条件"
+"Max length" = "最大長"
+"16-bit integer" = "16ビット整数"
+"Mono (merged)" = "モノ (ミックス)"
+"Enable insert effects" = "インサートエフェクトを有効化"
+"Enable master effects" = "マスターエフェクトを有効化"
+"could not read {0}" = "{0}を読み込めませんでした"
 "Key to" = "キー割り当て"
 "Percent" = "パーセント"
 "Use regions" = "リージョンを使用"
@@ -5708,7 +5786,6 @@ countries: jp
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "ソングの前に起動するクリップ用の空の列を挿入し、各列にマーカーを、ソングの開始位置にStartマーカーを置きます。パフォーマンスモードがオンになります。"
 "Marker count" = "マーカー数"
 "2 steps" = "2ステップ"
-"8 bars" = "8小節"
 "Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "トラック: [LMB] 選択  [Ctrl][LMB] 追加 / 解除  [Shift][LMB] 範囲  [RMB] メニュー  [2xLMB] クリップのソースを開く  [Shift][Wheel] 上 / 下に移動"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
@@ -5834,7 +5911,6 @@ countries: jp
 "Pattern length in bars: [LMB] drag or [Wheel] change it  [2xLMB] automatic (from the notes)  [RMB] menu" = "パターンの長さ (小節): [LMB] ドラッグまたは[Wheel]で変更  [2xLMB] 自動 (ノートから)  [RMB] メニュー"
 "Pattern length: {0} (automatic, from the notes)" = "パターンの長さ: {0} (自動、ノートから)"
 "Pattern length (bars, 0 = automatic)" = "パターンの長さ (小節、0 = 自動)"
-"Pattern length" = "パターンの長さ"
 "Follow: a pattern longer than the Channel Rack pages along with the playing step; off, it stays where you scrolled" = "追従: チャンネルラックより長いパターンは再生中のステップに合わせてページが切り替わります。オフにするとスクロールした位置に留まります"
 "Follow the playhead (page along with the playing step) on/off" = "再生ヘッドに追従 (再生中のステップに合わせてページ送り) のオン/オフ"
 "Follow: the view pages along with the playback position; off, it stays where you scrolled" = "追従: 再生位置に合わせて表示のページが切り替わります。オフにするとスクロールした位置に留まります"
@@ -5901,9 +5977,6 @@ countries: jp
 # --- FL legacy effects (round 165k): Fruity Delay (v1) value texts
 "Inverted stereo" = "反転ステレオ"
 
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "ピークメーター (左/右) とピークホールド  [LMB] クリップランプをクリア"
 # --- Newtone editor (round 165g flnewt165)
 "Cut mode (C): click a note to slice it there; Ctrl+click a note to glue it to the one before" = "カットモード (C): ノートをクリックするとその位置で分割、Ctrl+クリックで前のノートと結合"
 "Score" = "スコア"
@@ -5946,7 +6019,6 @@ countries: jp
 "Set image wallpaper..." = "背景画像を設定..."
 "Remove image wallpaper" = "背景画像を削除"
 "Set background color..." = "背景色を設定..."
-# round 165z-a2 (FL metronome)
 "Metronome track" = "メトロノームのトラック"
 "Metronome target mixer track" = "メトロノームの出力先ミキサートラック"
 "The mixer track the metronome plays through (--- is the Master). The click is never in an export." = "メトロノームが鳴るミキサートラック（--- はマスター）。クリック音はエクスポートには含まれません。"
@@ -5982,8 +6054,6 @@ countries: jp
 "Ghost channels" = "ゴーストチャンネル"
 "Add multiple..." = "複数追加..."
 "You can add a maximum of {0} inserts." = "追加できるインサートは最大 {0} 個です。"
-
-# round 166e (issue #16): automatic crossfades, clip gain handle, Disarm on stop / Auto-unarm
 "Clip gain: [LMB] drag up / down (the selected clips together)  [RMB] menu" = "クリップゲイン: [LMB] 上下にドラッグ (選択したクリップをまとめて)  [RMB] メニュー"
 "Automatic crossfades (current project) on/off" = "自動クロスフェード (このプロジェクト) オン/オフ"
 "Automatic crossfades (current project)" = "自動クロスフェード (このプロジェクト)"
@@ -5998,14 +6068,11 @@ countries: jp
 "Yes" = "はい"
 "Make clip unique?" = "クリップをユニークにしますか？"
 "The clip \"{0}\" is also used on another audio track.\n\nDo you want to make this instance unique and then route it to this audio track?" = "クリップ \"{0}\" は別のオーディオトラックでも使用されています。\n\nこのインスタンスをユニークにしてから、このオーディオトラックにルーティングしますか？"
-# round 166c (LYNX Tune: throat, transpose in scale, created vibrato)
 "THROAT" = "喉の長さ"
 "Scale steps" = "スケール度数"
 "In scale" = "スケール内"
 "AMPLITUDE" = "振幅"
 "VARIATION" = "揺らぎ"
-
-# round 167f: FL Emphasis
 "Delta" = "デルタ"
 "Envelope order" = "エンベロープ次数"
 "Linking" = "リンク"
@@ -6160,6 +6227,7 @@ countries: jp
 "Load preset..." = "プリセットを読み込む..."
 "Save preset as..." = "名前を付けてプリセットを保存..."
 "Page {0}" = "ページ {0}"
+
 # --- Wave Traveller (round 167f)
 "Smooth (cosine)" = "スムーズ（コサイン）"
 "Bezier" = "ベジェ"
@@ -6249,7 +6317,6 @@ countries: jp
 "SFZ instrument: [LMB] preview  [2xLMB] new LYNX Soundfont channel (or into the selected one)  drag to the Channel Rack" = "SFZ インストゥルメント: [LMB] プレビュー  [2xLMB] 新しいLYNX Soundfontチャンネル (または選択中のチャンネルへ)  チャンネルラックへドラッグ"
 "Open a .sf2 / .sf3 / .sfz file" = ".sf2 / .sf3 / .sfzファイルを開く"
 "LYNX Soundfont: plays SoundFont 2 / 3 banks and SFZ instruments. Search presets across all your SoundFonts, click to preview, double-click to load." = "LYNX Soundfont: SoundFont 2 / 3バンクとSFZインストゥルメントを再生します。すべてのSoundFontからプリセットを検索し、クリックでプレビュー、ダブルクリックで読み込みます。"
-# REA round 167f: FL's Transporter (transient looper)
 "LEVELS" = "レベル"
 "Loop A" = "ループ A"
 "Loop B" = "ループ B"
@@ -6306,6 +6373,22 @@ countries: jp
 "Expand all grouped tracks" = "グループ化されたトラックをすべて展開"
 "Purge unused audio clips" = "未使用のオーディオクリップを削除"
 "Create variants when stretching audio clips" = "オーディオクリップのストレッチ時にバリエーションを作成"
+"Extract stems from sample" = "サンプルからステムを抽出"
+"Extracting stems..." = "ステムを抽出しています..."
+"Downloading the stem model..." = "ステム用モデルをダウンロードしています..."
+"Checking the stem model..." = "ステム用モデルを確認しています..."
+"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "ONNX Runtime を読み込めませんでした。ステムの抽出には macOS 13.4 以降が必要です。"
+"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "ONNX Runtime を読み込めませんでした。https://aka.ms/vs/17/release/vc_redist.x64.exe から Microsoft Visual C++ Redistributable (x64) をインストールして、もう一度お試しください。"
+"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "ONNX Runtime を読み込めませんでした。ステムの抽出にはシステムの libstdc++ が必要です。"
+"The model returned an unexpected result." = "モデルが予期しない結果を返しました。"
+"The sample is empty." = "サンプルが空です。"
+"The downloaded model failed its checksum, so it was not used." = "ダウンロードしたモデルはチェックサムの確認に失敗したため、使用しませんでした。"
+"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "ステムの抽出には HT-Demucs モデルが必要です。LYNX SHARE には含まれていないため、一度だけダウンロード ({0} MB) して {1} に保存します。"
+"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "提供元: {0} (Meta AI Research による Demucs v4 の ONNX 版)"
+"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "ライセンス: Demucs のコードは MIT です。作者によると、学習済みの重みのライセンスははっきりしていません。学習データには一部が研究用途に限られた MUSDB18-HQ が含まれています。用途、特に商用利用に合うかどうかはご自身で判断してください。"
+"Download" = "ダウンロード"
+"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "ステムの抽出には ONNX Runtime ({0}) が必要です。LYNX SHARE のインストーラーと zip に含まれていますが、プログラムの横に見つかりません。インストーラーで LYNX SHARE をインストールするか、zip をすべて展開してください。"
+"Stems are still being extracted. Try again when that has finished." = "まだステムを抽出しています。終わってからもう一度お試しください。"
 
 # --- Round 168e: renders to audio clips, consolidation, exports per Playlist track
 "Consolidate playlist selection (from selection start)" = "Playlist の選択範囲を統合 (選択範囲の先頭から)"
@@ -6354,6 +6437,7 @@ countries: jp
 "The project has no mixer states, effects or notes to export." = "書き出すミキサーの状態、エフェクト、ノートがプロジェクトにありません。"
 "Some files could not be written:" = "一部のファイルを書き込めませんでした:"
 "Project bones..." = "プロジェクトのボーン..."
+
 # --- Speech synthesizer (round 168b)
 "Male" = "男性"
 "Female" = "女性"
@@ -6447,8 +6531,6 @@ countries: jp
 "Pattern time markers: Add time signature change..." = "パターンのタイムマーカー: 拍子変更を追加..."
 "Delete all markers" = "すべてのマーカーを削除"
 "Colour group" = "カラーグループ"
-
-# Round 168q: designed pages of Kepler, Kepler Exo, Transistor Bass, Sawer, BeepMap, Fruity Granulizer, Wasp
 "Always|Held" = "常時|ホールド"
 "Arpeggio" = "アルペジオ"
 "Auto|Man" = "自動|手動"
@@ -6521,22 +6603,6 @@ countries: jp
 "Set as time signature" = "拍子として設定"
 "Time division: FL Studio's original system (beats per bar, steps per beat). Time signature: traditional time signatures (numerator / denominator)." = "タイムディビジョン: FL Studio 本来の方式 (1 小節の拍数、1 拍のステップ数)。拍子: 一般的な拍子 (分子 / 分母)。"
 "Denominator: {0} (the Channel Rack's step grid is {1} steps per beat)." = "分母: {0} (Channel Rack のステップグリッドは 1 拍 {1} ステップ)。"
-"Extract stems from sample" = "サンプルからステムを抽出"
-"Extracting stems..." = "ステムを抽出しています..."
-"Downloading the stem model..." = "ステム用モデルをダウンロードしています..."
-"Checking the stem model..." = "ステム用モデルを確認しています..."
-"ONNX Runtime could not be loaded. Stem extraction needs macOS 13.4 or newer." = "ONNX Runtime を読み込めませんでした。ステムの抽出には macOS 13.4 以降が必要です。"
-"ONNX Runtime could not be loaded. Install the Microsoft Visual C++ Redistributable (x64) from https://aka.ms/vs/17/release/vc_redist.x64.exe and try again." = "ONNX Runtime を読み込めませんでした。https://aka.ms/vs/17/release/vc_redist.x64.exe から Microsoft Visual C++ Redistributable (x64) をインストールして、もう一度お試しください。"
-"ONNX Runtime could not be loaded. Stem extraction needs the system's libstdc++." = "ONNX Runtime を読み込めませんでした。ステムの抽出にはシステムの libstdc++ が必要です。"
-"The model returned an unexpected result." = "モデルが予期しない結果を返しました。"
-"The sample is empty." = "サンプルが空です。"
-"The downloaded model failed its checksum, so it was not used." = "ダウンロードしたモデルはチェックサムの確認に失敗したため、使用しませんでした。"
-"Extracting stems needs the HT-Demucs model. It isn't part of LYNX SHARE: it is downloaded once ({0} MB) and kept in {1}." = "ステムの抽出には HT-Demucs モデルが必要です。LYNX SHARE には含まれていないため、一度だけダウンロード ({0} MB) して {1} に保存します。"
-"Source: {0} (ONNX export of Demucs v4 by Meta AI Research)" = "提供元: {0} (Meta AI Research による Demucs v4 の ONNX 版)"
-"Licence: the Demucs code is MIT. The licence of the trained weights is not clear, as the authors say: the training data includes MUSDB18-HQ, parts of which were for research use only. Decide for yourself whether that fits your use, commercial use above all." = "ライセンス: Demucs のコードは MIT です。作者によると、学習済みの重みのライセンスははっきりしていません。学習データには一部が研究用途に限られた MUSDB18-HQ が含まれています。用途、特に商用利用に合うかどうかはご自身で判断してください。"
-"Download" = "ダウンロード"
-"Stem extraction needs ONNX Runtime ({0}), which comes with LYNX SHARE's installer and zip, but it is missing next to the program. Install LYNX SHARE with the installer, or unpack the whole zip." = "ステムの抽出には ONNX Runtime ({0}) が必要です。LYNX SHARE のインストーラーと zip に含まれていますが、プログラムの横に見つかりません。インストーラーで LYNX SHARE をインストールするか、zip をすべて展開してください。"
-"Stems are still being extracted. Try again when that has finished." = "まだステムを抽出しています。終わってからもう一度お試しください。"
 "Configuration" = "設定"
 "Transp." = "トランス."
 "Master envelope" = "マスターエンベロープ"
@@ -6572,8 +6638,6 @@ countries: jp
 "sequencer on" = "シーケンサー オン"
 "sequencer off" = "シーケンサー オフ"
 "transpose {0}" = "移調 {0}"
-
-# Gross Beat editor (round 168m)
 "{0} beats back" = "{0}拍前"
 "Beat {0}" = "拍 {0}"
 "The first point of the envelope can't be removed." = "エンベロープの最初のポイントは削除できません。"
@@ -6610,6 +6674,7 @@ countries: jp
 "now" = "現在"
 "1 bar back" = "1小節前"
 "2 bars back" = "2小節前"
+
 # --- Loop Starter (round 168b)
 "Replace sample" = "サンプルを置き換え"
 "Generate steps" = "ステップを生成"
@@ -6678,12 +6743,13 @@ countries: jp
 "Var peak" = "変化 ピーク"
 "Var slide" = "変化 スライド"
 "Var phase" = "変化 位相"
+"Osc 1" = "OSC 1"
+"Osc 2" = "OSC 2"
 "Selected" = "選択中"
 "Num" = "番号"
 "Morph to" = "モーフ先"
 "Harm" = "倍音"
 "Lvl" = "レベル"
-"Hi-cut" = "ハイカット"
 "Lo-cut" = "ローカット"
 "String 1" = "弦 1"
 "String 2" = "弦 2"
@@ -6766,7 +6832,6 @@ countries: jp
 "MODULE 2" = "モジュール 2"
 "MODULE 3" = "モジュール 3"
 "MODULE 4" = "モジュール 4"
-# round 168t: FL's ruler gestures, the rack's built-in views, the windows tip
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag: zoom  [RMB] click: menu  [Alt] no snap" = "ルーラー: [LMB] ソングの位置  [RMB] または [Ctrl][LMB] または [2xLMB] ドラッグ: 時間選択 (ループ)  [Shift][LMB] ドラッグ: 移動  [Ctrl][RMB] ドラッグ: ズーム  [RMB] クリック: メニュー  [Alt] スナップなし"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] zoom  [Shift][Wheel] scroll" = "ルーラー: [LMB] 位置  [Alt] スナップなし  [Ctrl][LMB]、[RMB] または [2xLMB] ドラッグで時間範囲内のノートを選択  [Ctrl][Wheel] ズーム  [Shift][Wheel] スクロール"
 "Marker: [LMB] jump to it (while playing: at the next Quantize song jumps step)  [Ctrl][LMB] select up to the next marker  [RMB] action, rename, delete" = "マーカー: [LMB] そこへジャンプ (再生中: 次のジャンプのクオンタイズ位置で)  [Ctrl][LMB] 次のマーカーまで選択  [RMB] アクション、名前変更、削除"
@@ -6789,8 +6854,6 @@ countries: jp
 "Record arm: Rec + Play records this insert into a Playlist clip  [RMB] record to a file" = "録音待機: Rec + Play でこのインサートを Playlist クリップに録音  [RMB] ファイルに録音"
 "Recording: {0}" = "録音: {0}"
 "dry input" = "ドライ入力"
-
-# round 168o: designed pages of the synth group
 "Adapt" = "適応"
 "Alt" = "Alt"
 "Amplifier" = "アンプ"
@@ -6817,6 +6880,7 @@ countries: jp
 "HC" = "HC"
 "HD" = "HD"
 "Harmonic mask" = "倍音マスク"
+"Hi-cut" = "ハイカット"
 "Kb" = "鍵盤"
 "Kbd" = "鍵盤"
 "LC" = "LC"
@@ -6827,8 +6891,6 @@ countries: jp
 "Modulation 1" = "モジュレーション 1"
 "Modulation 2" = "モジュレーション 2"
 "Osc" = "オシレーター"
-"Osc 1" = "OSC 1"
-"Osc 2" = "OSC 2"
 "Osc 3" = "OSC 3"
 "Output EQ" = "出力 EQ"
 "Panner" = "パンナー"
@@ -6850,8 +6912,6 @@ countries: jp
 "Vel sens" = "ベロシティ感度"
 "Vib" = "ビブラート"
 "Voice mode" = "ボイスモード"
-
-# Online sessions, phase 1 (round 168a)
 "Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)" = "代替音源: このプラグインはこのPCにインストールされていないため、このパートのレンダーを再生します (プラグインの設定は保持されます)"
 "Send project..." = "プロジェクトを送信..."
 "Send my part back..." = "自分のパートを返送..."
@@ -6945,8 +7005,8 @@ countries: jp
 "Lock" = "ロック"
 "Mute the selected clips (all when none is selected)" = "選択したクリップをミュート (未選択ならすべて)"
 "Unmute the selected clips (all when none is selected)" = "選択したクリップのミュートを解除 (未選択ならすべて)"
-
-# Live sessions (round 169b)
+"Mute removed steps" = "削除したステップをミュート"
+"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "パターンを再生 / 一時停止  [RMB] 停止して再生を始めた位置に戻る (もう一度: パターンの先頭へ)"
 "Live sessions need a newer libcurl on this computer ({0})" = "ライブセッションには、このコンピューターに新しい libcurl が必要です ({0})"
 "Opening the session..." = "セッションを開いています..."
 "Too many sessions were opened from this connection. Try again in a while." = "この接続から開かれたセッションが多すぎます。しばらくしてからもう一度お試しください。"
@@ -7036,8 +7096,6 @@ countries: jp
 "{0} files arriving" = "{0}個のファイルを受信中"
 "Live session with {0}" = "{0}さんとのライブセッション"
 "Undo left alone what someone else changed since: {0}" = "元に戻すは、その後に他の人が変更したものには触れませんでした: {0}"
-"Mute removed steps" = "削除したステップをミュート"
-"Play / pause the pattern  [RMB] stop and go back to where playback started (again: to the pattern start)" = "パターンを再生 / 一時停止  [RMB] 停止して再生を始めた位置に戻る (もう一度: パターンの先頭へ)"
 
 # --- Live sessions: reconnect, chat, permissions, stand-ins (round 169j)
 "The live session could not be resumed: the connection did not come back." = "ライブセッションを再開できませんでした: 接続が戻りませんでした。"
@@ -7121,8 +7179,6 @@ countries: jp
 "click to step, drag or mouse wheel to change" = "クリックで切り替え、ドラッグまたはマウスホイールで変更"
 "no effect with the current mode (another engine is in use)" = "現在のモードでは効果なし（別のエンジンを使用中）"
 "arrows step, click for the list, drag or mouse wheel to change" = "矢印で1段ずつ、クリックで一覧、ドラッグまたはマウスホイールで変更"
-
-# round 170e: toolbar icons, snap magnet, last tweaked caption, trackpad zoom
 "Main: {0}" = "メイン: {0}"
 "Last tweaked parameter: the control you moved last and its value. Click for its menu (automation clip, link to controller, events, value)" = "最後に操作したパラメーター: 最後に動かしたコントロールとその値。クリックでメニュー (オートメーションクリップ、コントローラーにリンク、イベント、値)"
 "LAST TWEAKED" = "最後に操作"
@@ -7139,8 +7195,6 @@ countries: jp
 "Playlist snap" = "プレイリストのスナップ"
 "Ruler: [LMB] position  [Alt] no snap  [Ctrl][LMB], [RMB] or [2xLMB] drag selects the notes in a time range  [Ctrl][Wheel] or a pinch: zoom  [Shift][Wheel] scroll" = "ルーラー: [LMB] 位置  [Alt] スナップなし  [Ctrl][LMB]、[RMB] または [2xLMB] ドラッグで時間範囲内のノートを選択  [Ctrl][Wheel] / ピンチ ズーム  [Shift][Wheel] スクロール"
 "Ruler: [LMB] song position  [RMB] or [Ctrl][LMB] or [2xLMB] drag: time selection (loop)  [Shift][LMB] drag: move it  [Ctrl][RMB] drag or [Ctrl][Wheel] or a pinch: zoom  [RMB] click: menu  [Alt] no snap" = "ルーラー: [LMB] ソングの位置  [RMB] または [Ctrl][LMB] または [2xLMB] ドラッグ: 時間選択 (ループ)  [Shift][LMB] ドラッグ: 移動  [Ctrl][RMB] ドラッグ, [Ctrl][Wheel] / ピンチ: ズーム  [RMB] クリック: メニュー  [Alt] スナップなし"
-
-# round 170d: count-in catch, played-note latency, Capture MIDI
 "Off (keep their real time)" = "オフ（実際のタイミングを保持）"
 "1/32 note" = "32分音符"
 "1/16 note" = "16分音符"
@@ -7155,8 +7209,6 @@ countries: jp
 "Number of steps" = "ステップ数"
 "Dual" = "デュアル"
 "Align all channel editors" = "すべてのチャンネルエディターを揃える"
-
-# Round 171c: the Plugin picker
 "Plugin picker: every plugin as a picture; drag one onto the Channel Rack or the Mixer (right-click: quick-add palette)" = "プラグインピッカー: すべてのプラグインを画像で表示。Channel Rack かミキサーへドラッグ (右クリック: クイック追加パレット)"
 "double-click, right-click or Enter: a new channel; drag it onto the Channel Rack (onto a channel: replaces its instrument)" = "ダブルクリック、右クリック、Enter: 新しいチャンネル。Channel Rack へドラッグ (チャンネル上: その楽器を置き換え)"
 "double-click, right-click or Enter: into the selected mixer insert; drag it onto a mixer insert or one of its slots" = "ダブルクリック、右クリック、Enter: 選択中のミキサーインサートへ。ミキサーインサートかそのスロットへドラッグ"
@@ -7168,14 +7220,11 @@ countries: jp
 "Last tweaked ({0})" = "最後に調整 ({0})"
 "Deactivate" = "無効化"
 "Automate Patcher parameter" = "Patcher パラメーターをオートメーション"
-# round 170e2: recording panel toggles
 "Blend recorded notes: on (new notes join the pattern's notes)" = "録音ノートをブレンド: オン (新しいノートをパターンのノートに追加)"
 "Blend recorded notes: off (a recorded channel's old notes are replaced)" = "録音ノートをブレンド: オフ (録音したチャンネルの古いノートを置き換え)"
 "Blend recorded notes: on, a take adds its notes to the pattern (overdub); off, a recorded channel's old notes are replaced" = "録音ノートをブレンド: オンでテイクのノートをパターンに追加 (オーバーダブ)、オフで録音したチャンネルの古いノートを置き換えます"
 "Tempo tapper: tap the beat to set the tempo" = "テンポタッパー: ビートをタップしてテンポを設定"
 "Blend recorded notes" = "録音ノートをブレンド"
-
-# round 170e3: recording switches (loop record, step edit, punch)
 "Blend recorded notes on/off (off: replace)" = "録音ノートのブレンド オン/オフ（オフ: 置き換え）"
 "Loop record on/off" = "ループ録音 オン/オフ"
 "Step edit on/off" = "ステップ入力 オン/オフ"
@@ -7192,9 +7241,8 @@ countries: jp
 "Step edit: with the transport stopped, notes you play go into the current pattern at the position, a snap step long; release the keys and the position moves on one step (chords: hold them together)" = "ステップ入力: トランスポート停止中、弾いたノートが現在のパターンの位置にスナップ1ステップの長さで入ります。キーを離すと位置が1ステップ進みます（和音: 同時に押さえる）"
 "Punch in/out: audio recording keeps only the loop region (playback runs through it; pre- and post-roll in the recording options)" = "パンチイン/アウト: オーディオ録音はループ範囲だけを残します（再生はそこを通過、プリロール/ポストロールは録音オプションで）"
 "Punch in/out" = "パンチイン/アウト"
-
-# round 170e3: the idle hint on one line
 "Point at anything for help  [F1] shortcuts  [F5]-[F9] windows  [Space] play/stop" = "何かを指すとヘルプ  [F1] ショートカット  [F5]-[F9] ウィンドウ  [Space] 再生/停止"
+
 # --- round 170a (Channel Rack cut/copy/paste, note names on every key)
 "Cut the selected channels' steps" = "選択したチャンネルのステップを切り取り"
 "Copy the selected channels' steps" = "選択したチャンネルのステップをコピー"
@@ -7203,16 +7251,12 @@ countries: jp
 "Note names on every Piano roll key" = "Piano Roll のすべての鍵盤に音名を表示"
 "[LMB] drag up / down: step through the patterns" = "[LMB] 上下にドラッグ: パターンを切り替え"
 "Playhead column in the Channel Rack" = "チャンネルラックの再生位置の列"
-
-# round 170e5: Loop record in Pattern mode
 "Loop record: on (recording loops: the loop region in Song mode, one take per pass; the pattern in Pattern mode)" = "ループ録音: オン（録音が繰り返す: Song モードではループ範囲、1 周ごとに 1 テイク；Pattern モードではパターン）"
 "Loop record: off (recording plays straight on: through the loop region, or past the pattern's end, which grows)" = "ループ録音: オフ（録音はそのまま進む: ループ範囲を通り抜け、またはパターンの終わりを越えて、パターンが伸びる）"
 "Loop record: on, recording loops (Song mode: the loop region, one take per pass; Pattern mode: the pattern); off, it plays straight on, through the loop region or past the pattern's end, and keeps everything where it was played (the pattern grows)" = "ループ録音: オン、録音が繰り返す（Song モード: ループ範囲、1 周ごとに 1 テイク；Pattern モード: パターン）；オフ、そのまま進み、ループ範囲を通り抜けるかパターンの終わりを越え、演奏した位置にすべて残す（パターンが伸びる）"
 "Echo time" = "エコータイム"
 "Prime numbers" = "素数"
 "The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)" = "Classic パネル：1画面のハードウェア・サチュレーター（Drive、Punish、5つのスタイル）"
-
-# round 171e: Export to FL Studio
 "{0} saved." = "{0} を保存しました。"
 "Everything went over as FL Studio's own data." = "すべて FL Studio 自身のデータとして書き出されました。"
 "Export to FL Studio" = "FL Studio へ書き出し"
@@ -7235,11 +7279,9 @@ countries: jp
 "Worth knowing" = "補足"
 "Samples not on this PC" = "この PC にないサンプル"
 "Steps use channel colour" = "ステップにチャンネルの色を使う"
-# round tp172d: the Echoform / Auto-pan page switch
 "Main|Tweak" = "メイン|微調整"
 "E type|G type" = "Eタイプ|Gタイプ"
 "Modern console" = "モダンコンソール"
-# round tp172c6: Ridge Strip's DRIVE section
 "Saturate|Console E|Console G|Console A|Console N|Console Y|Tube|Guitar amp|Bass amp" = "サチュレート|コンソール E|コンソール G|コンソール A|コンソール N|コンソール Y|真空管|ギターアンプ|ベースアンプ"
 "Switches the drive section on: saturation at the end of the strip, before the output" = "ドライブ部をオンにします: ストリップの最後、出力の前でのサチュレーション"
 "The kind of saturation: a soft clipper, five console channels, a tube stage or a guitar / bass amp" = "サチュレーションの種類: ソフトクリッパー、5種類のコンソールチャンネル、真空管段、ギター / ベースアンプ"
@@ -7247,8 +7289,6 @@ countries: jp
 "Level into the drive: more distortion without changing the drive" = "ドライブへの入力レベル: ドライブを変えずに歪みを増やします"
 "Level after the drive" = "ドライブ後のレベル"
 "Blends the clean signal back in" = "クリーンな信号を混ぜ戻します"
-
-# round tp172b: LuxeVerb's Space engine
 "LuxeVerb|Space" = "LuxeVerb|スペース"
 "Modern|Vintage|Plate" = "モダン|ヴィンテージ|プレート"
 "Distance" = "距離"
@@ -7257,80 +7297,7 @@ countries: jp
 "Low decay" = "低域ディケイ"
 "High decay" = "高域ディケイ"
 
-# --- round 173e: marker types, channel looping, MIDI lock, sampled instrument, live session entity names, ON key
-"Marker loop" = "マーカーループ"
-"Marker skip" = "マーカースキップ"
-"Marker pause" = "マーカーポーズ"
-"Bar override" = "小節の上書き"
-"Key/Scale" = "キー/スケール"
-"Loop length" = "ループの長さ"
-"Add one every" = "追加する間隔"
-"Bars" = "小節"
-"Add jump to next bar" = "次の小節へのジャンプを追加"
-"Change to marker loop" = "マーカーループに変更"
-"Time markers" = "タイムマーカー"
-"Quantize song jumps" = "ソングジャンプをクオンタイズ"
-"Place loop (from this marker to the next)" = "ループを配置 (このマーカーから次まで)"
-"Song marker jump" = "ソングマーカージャンプ"
-"Notes on this channel move the song to a marker instead of playing: note 0 goes to the first marker, the next one to the second... (Playlist › Quantize song jumps applies while playing)." = "このチャンネルのノートは発音せず、ソングをマーカーへ移動します: ノート0は最初のマーカー、次のノートは2番目へ... (再生中は Playlist › ソングジャンプをクオンタイズ が適用されます)。"
-"Jump to the next song marker (Quantize song jumps while playing)" = "次のソングマーカーへジャンプ (再生中はソングジャンプをクオンタイズ)"
-"Jump to the previous song marker" = "前のソングマーカーへジャンプ"
-"Advanced looping" = "詳細ループ"
-"Burn" = "書き込み"
-"Burn MIDI to" = "MIDIの書き込み先"
-"Burn all looping channels" = "ループ中の全チャンネルを書き込む"
-"Burn selected channels" = "選択したチャンネルを書き込む"
-"Burn to pattern" = "パターンに書き込む"
-"Channel looping" = "チャンネルループ"
-"Channel looping: channels shorter than the pattern repeat to its end (polyrhythms)  [LMB] on / off  [RMB] loop type (step channels, all channels, advanced) and Burn to pattern" = "チャンネルループ: パターンより短いチャンネルが最後まで繰り返されます (ポリリズム)  [LMB] オン / オフ  [RMB] ループの種類 (ステップチャンネル、全チャンネル、詳細)とパターンに書き込む"
-"Channel looping: {0}" = "チャンネルループ: {0}"
-"Don't loop" = "ループしない"
-"Echo delay" = "エコーディレイ"
-"Every {0} steps" = "{0}ステップごと"
-"Loop all channels" = "全チャンネルをループ"
-"Loop point" = "ループポイント"
-"Loop point ({0} steps)" = "ループポイント ({0}ステップ)"
-"Loop point: [LMB] drag or [Wheel] sets it in steps  [2xLMB] next bar  [RMB] Don't loop / Step / Beat / Bar, Burn to pattern" = "ループポイント: [LMB] ドラッグまたは [Wheel] でステップ単位に設定  [2xLMB] 次の小節  [RMB] ループしない / ステップ / 拍 / 小節、パターンに書き込む"
-"Loop repeat (after the loop point): [LMB] edits the step it repeats" = "ループの繰り返し (ループポイント以降): [LMB] 繰り返すステップを編集"
-"Loop step channels" = "ステップチャンネルをループ"
-"Loop type" = "ループの種類"
-"Looping on" = "ループ オン"
-"Nothing to burn" = "書き込むものがありません"
-"Reset after burning to MIDI" = "MIDIに書き込んだ後リセット"
-"Select what you want to reset:" = "リセットする項目を選択:"
-"Set to next bar" = "次の小節に設定"
-"Set to next beat" = "次の拍に設定"
-"The selected channel doesn't contain any notes to burn." = "選択したチャンネルには書き込むノートがありません。"
-"Time (shift and gate)" = "タイム (シフトとゲート)"
-"loop at the next bar" = "次の小節でループ"
-"loop at the next beat" = "次の拍でループ"
-"loop at the next step" = "次のステップでループ"
-"Receive notes from" = "ノートの受信元"
-"Unlock" = "ロック解除"
-"not connected" = "未接続"
-"No MIDI input device" = "MIDI入力デバイスがありません"
-"(locked: receives the notes of {0})" = "(ロック中: {0}のノートを受信)"
-"Create sampled instrument..." = "サンプリング音源を作成..."
-"Create sampled instrument" = "サンプリング音源を作成"
-"Plays {0} key by key and makes a Sampler channel of the recordings." = "{0}を1鍵ずつ演奏し、録音からSamplerチャンネルを作成します。"
-"Sampling the instrument..." = "音源をサンプリング中..."
-"Writing the samples..." = "サンプルを書き込み中..."
-"Could not sample the instrument" = "音源をサンプリングできませんでした"
-"Low note" = "最低音"
-"High note" = "最高音"
-"Keys per zone" = "ゾーンあたりの鍵数"
-"Root offset" = "ルートのオフセット"
-"Velocity layers" = "ベロシティレイヤー"
-"Max velocity" = "最大ベロシティ"
-"Release after (seconds)" = "リリースまで (秒)"
-"Max length after release (seconds)" = "リリース後の最大長 (秒)"
-"Stop on" = "停止条件"
-"Max length" = "最大長"
-"16-bit integer" = "16ビット整数"
-"Mono (merged)" = "モノ (ミックス)"
-"Enable insert effects" = "インサートエフェクトを有効化"
-"Enable master effects" = "マスターエフェクトを有効化"
-"could not read {0}" = "{0}を読み込めませんでした"
+# --- Online session entity names (round 173e) and plugin hardware keys
 "Pattern {0}" = "パターン{0}"
 "a pattern" = "パターン"
 "a channel" = "チャンネル"
@@ -7342,7 +7309,6 @@ countries: jp
 "{0} in {1}" = "{1}の{0}"
 "Playlist clip" = "Playlistクリップ"
 "ON" = "オン"
-# round tp172b2: Crest's voicing (Pro-C 3's Smooth / Op-El / Mastering)
 "None|Smooth|Op-El|Mastering" = "なし|Smooth|Op-El|Mastering"
 "Three more compressor characters, used instead of the style: smooth, opto-electronic or mastering" = "スタイルの代わりに使える3つのコンプレッサーキャラクター：スムーズ、オプトエレクトロニック、マスタリング"
 "{0} crashed. Save your project now (as a new file is safest)." = "{0} がクラッシュしました。今すぐプロジェクトを保存してください（新しいファイルとして保存するのが最も安全です）。"
@@ -7495,7 +7461,6 @@ countries: jp
 "Start time (H:M:S:Frame)" = "開始時間 (H:M:S:Frame)"
 "End time (H:M:S:Frame)" = "終了時間 (H:M:S:Frame)"
 "Current time (H:M:S:Frame)" = "現在時間 (H:M:S:Frame)"
-# round tp172c7: Kiln Channel
 "Kiln Channel" = "Kiln Channel"
 "Noise reduction" = "ノイズリダクション"
 "Group bypass" = "グループバイパス"
@@ -7594,7 +7559,6 @@ countries: jp
 "HighCut" = "ハイカット"
 "Rushin" = "走り気味"
 "Draggin" = "もたり気味"
-# round tp172c8: Fret Channel, Shell Channel
 "Level into the strip" = "ストリップへの入力レベル"
 "Level out of the strip, after the output mix" = "ストリップからの出力レベル(出力ミックスの後)"
 "Blend of the processed strip with the dry input" = "処理後の信号とドライ入力のブレンド"
@@ -7751,8 +7715,6 @@ countries: jp
 "Auto listen" = "オートリッスン"
 "Auto\nlisten" = "オート\nリッスン"
 "EQ auto listen" = "EQ オートリッスン"
-
-# round 176a: the 32-bit plugin bridge
 "Native" = "ネイティブ"
 "32 bit" = "32 ビット"
 "64 bit" = "64 ビット"
@@ -7772,12 +7734,11 @@ countries: jp
 "Animations: panels fade in and out, buttons light up gently, the wheel glides" = "アニメーション: パネルがフェードイン・アウトし、ボタンがなめらかに点灯し、ホイールでなめらかにスクロールします"
 "{0} minutes" = "{0} 分"
 "Longest wait between backups" = "バックアップ間の最長待ち時間"
-
-# round 177c: comping is an explicit step; loop passes land as in FL
 "Comp these takes" = "これらのテイクでコンプを作成"
 "After loop recording, only the last pass plays" = "ループ録音後は最後のパスのみ再生"
 "Loop-recorded audio: every pass plays" = "ループ録音したオーディオ: すべてのパスを再生"
 "Loop-recorded audio: every pass is muted" = "ループ録音したオーディオ: すべてのパスをミュート"
+
 # --- Clip grid and Clip-launch workflow (round 181a)
 "Clip grid" = "クリップグリッド"
 "Stop all clips" = "すべてのクリップを停止"
@@ -7880,8 +7841,6 @@ countries: jp
 "That track is fed by this one: the link would make a loop." = "そのトラックはこのトラックから信号を受けています。リンクするとループになります。"
 "Sidechain input: the insert this effect listens to. Picking one routes it here at level 0; it keeps its own outputs  [LMB] choose" = "サイドチェイン入力：このエフェクトが聴くインサート。選ぶとレベル0でここへルーティングされ、元の出力はそのまま残ります  [LMB] 選択"
 "Sidechain input: the insert this plugin's side input listens to. Picking one routes it here at level 0; it keeps its own outputs" = "サイドチェイン入力：このプラグインのサイド入力が聴くインサート。選ぶとレベル0でここへルーティングされ、元の出力はそのまま残ります"
-
-# round 180c: Fruity Slicer
 "Load a sample (Sample menu) or drop one here" = "サンプルを読み込む（Sample メニュー）か、ここにドロップしてください"
 "Open a sample to slice (or drop one here)" = "スライスするサンプルを開く（またはここにドロップ）"
 "Slicing" = "スライス"
@@ -7986,8 +7945,6 @@ countries: jp
 "Adds the file's time signature to the pattern's markers" = "ファイルの拍子をパターンのマーカーに追加します"
 "Scores" = "スコア"
 "Folders" = "フォルダー"
-
-# round 177a: the mixer menu as FL's
 "Multilink to controllers" = "コントローラーへのマルチリンク"
 "Please tweak the controls you want to link..." = "リンクしたいコントロールを動かしてください..."
 "Multilink to controllers on/off" = "コントローラーへのマルチリンク オン/オフ"
@@ -8053,6 +8010,7 @@ countries: jp
 "Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB" = "トラック音量: [LMB] クリックまたはドラッグ  [Shift] 微調整  [2xLMB] 0 dB"
 "Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre" = "トラックのパン: [LMB] 上下にドラッグ  [Shift] 微調整  [2xLMB] センター"
 "Track effects: [LMB] open the effects of its mixer track" = "トラックのエフェクト: [LMB] ミキサートラックのエフェクトを開く"
+
 # --- Detail view of the Clip-launch workflow (round 183a)
 "Add an effect to this insert (or drop one from the Browser)" = "このインサートにエフェクトを追加（またはブラウザからドロップ）"
 "Channel on / off (its mute)" = "チャンネルのオン / オフ（ミュート）"
@@ -8160,6 +8118,7 @@ countries: jp
 "Mixer track offset for output {0}" = "出力 {0} のミキサートラックオフセット"
 "Deactivate output {0}" = "出力 {0} を無効にする"
 "Activate output {0}" = "出力 {0} を有効にする"
+
 # --- Game controller (round 184a, S16)
 "Game controller" = "ゲームコントローラー"
 "Use a game controller" = "ゲームコントローラーを使う"
@@ -8183,6 +8142,7 @@ countries: jp
 "D-pad down" = "十字キー下"
 "D-pad left" = "十字キー左"
 "D-pad right" = "十字キー右"
+
 # --- Round 186c: mixer Delete questions, Manage messages
 "Delete tracks" = "トラックを削除"
 "This will |delete| {0} selected mixer track(s). Are you sure?" = "選択した {0} 個のミキサートラックを|削除|します。よろしいですか？"
@@ -8382,6 +8342,7 @@ countries: jp
 "Blend of the shaped signal with the dry one (parallel processing)" = "整形した信号とドライ信号のブレンド（パラレル処理）"
 "One gain for both channels, so the stereo image stays put" = "両チャンネルに同じゲインをかけ、ステレオイメージを動かしません"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "低音を検出器から外します（ドラムバス上のキックなど）"
+
 "For a file with a true-peak ceiling: {0}" = "トゥルーピークの上限付きファイルには: {0}"
 "(look)" = "（ルック）"
 # --- Default template (issue #123, round 186a)
@@ -8436,6 +8397,7 @@ countries: jp
 "Send to {0} (deleted)" = "{0} へのセンド（削除済み）"
 "Disconnected links" = "切断されたリンク"
 "Keep links to deleted inserts, greyed (LYNX)" = "削除したインサートへのリンクをグレーで残す（LYNX）"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 188h)
 "Pocket Distortion" = "Pocket Distortion"
 "Pocket Limiter Classic" = "Pocket Limiter Classic"
@@ -8518,6 +8480,7 @@ countries: jp
 "side" = "サイド"
 "Output M/S" = "出力M/S"
 "Input M/S" = "入力M/S"
+
 # --- Pocket effects: FL Studio Mobile's own effects (round 189h, batch B)
 "Pocket Wow & Flutter" = "Pocket Wow & Flutter"
 "Pocket Phaser" = "Pocket Phaser"
@@ -8537,6 +8500,7 @@ countries: jp
 "Amount min" = "最小量"
 "Stereo offset" = "ステレオオフセット"
 "16 bars" = "16小節"
+
 # --- Pocket effects, round 189h: Waveshaper, Compressor, Spreader
 "Pocket Waveshaper" = "Pocket Waveshaper"
 "Pocket Compressor" = "Pocket Compressor"
@@ -8553,6 +8517,35 @@ countries: jp
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "計測: リファレンスに合わせたモデル。クラシック: それ以前に保存したプロジェクトのモデル"
+"{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)" = "{0} はフリーズされています：編集するにはフリーズ解除してください（チャンネルを [RMB]、フリーズ解除）"
+"There is no such channel." = "そのようなチャンネルはありません。"
+"An audio clip is audio already: there is nothing to freeze." = "オーディオクリップはすでにオーディオです：フリーズするものがありません。"
+"This channel makes no sound of its own: there is nothing to freeze." = "このチャンネルは独自の音を出しません：フリーズするものがありません。"
+"This channel's plugin is not loaded: there is nothing to render." = "このチャンネルのプラグインが読み込まれていません：レンダリングするものがありません。"
+"This plugin sends outputs to other mixer inserts (Processing > Connections): one frozen audio file could not keep them apart." = "このプラグインは出力を他のミキサーインサートに送っています（処理 > 接続）：フリーズした1つのオーディオファイルでは、それらを分けて保持できません。"
+"This Patcher sends outputs to other mixer inserts: one frozen audio file could not keep them apart." = "この Patcher は出力を他のミキサーインサートに送っています：フリーズした1つのオーディオファイルでは、それらを分けて保持できません。"
+"A Layer channel plays this channel: remove it from the Layer to freeze it." = "Layer チャンネルがこのチャンネルを鳴らしています：フリーズするには Layer から外してください。"
+"Performance mode launches clips live: a frozen channel could not follow them." = "Performance モードはクリップをライブで起動します：フリーズしたチャンネルは追従できません。"
+"This channel plays in clips of the clip grid, launched live: a frozen channel could not follow them." = "このチャンネルは、ライブで起動されるクリップグリッドのクリップ内で再生されます：フリーズしたチャンネルは追従できません。"
+"Frozen, but its audio files are missing: the instrument plays instead.  [RMB] Re-freeze or Unfreeze" = "フリーズ済みですが、オーディオファイルが見つかりません：代わりにインストゥルメントが鳴ります。  [RMB] 再フリーズまたはフリーズ解除"
+"Frozen, out of date: its notes, the tempo or the arrangement changed since the freeze, the audio made before still plays.  [RMB] Re-freeze updates it" = "フリーズ済み、最新ではありません：フリーズ後にノート、テンポ、アレンジが変更されました。以前に作成されたオーディオが鳴り続けます。  [RMB] 再フリーズで更新"
+"Frozen: its rendered audio plays and its instrument is unloaded (no CPU, no RAM).  [RMB] Unfreeze to edit" = "フリーズ済み：レンダリングされたオーディオが再生され、インストゥルメントはアンロードされています（CPU なし、RAM なし）。  [RMB] フリーズ解除して編集"
+"Freeze selected channels" = "選択したチャンネルをフリーズ"
+"Unfreeze selected channels" = "選択したチャンネルのフリーズを解除"
+"Unfreeze" = "フリーズ解除"
+"Re-freeze selected channels" = "選択したチャンネルを再フリーズ"
+"Re-freeze" = "再フリーズ"
+"The plugin {0} is not installed on this PC: there is nothing to render." = "プラグイン {0} はこの PC にインストールされていません：レンダリングするものがありません。"
+"Freezing {0}..." = "{0} をフリーズ中..."
+"{0} is frozen: its audio plays and its instrument is unloaded. Right-click the channel to unfreeze it." = "{0} はフリーズされています：オーディオが再生され、インストゥルメントはアンロードされています。チャンネルを右クリックしてフリーズ解除してください。"
+"Could not freeze" = "フリーズできませんでした"
+"Can't freeze this channel" = "このチャンネルはフリーズできません"
+"Frozen: Unfreeze to edit" = "フリーズ済み：フリーズ解除して編集"
+"A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "コントローラーがこのインストゥルメントのノブにリンクされ、ライブで動かしています：フリーズしたオーディオは追従できません。"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "ピークメーター (左/右) とピークホールド  [LMB] クリップランプをクリア"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "曲をファイルとして保存"

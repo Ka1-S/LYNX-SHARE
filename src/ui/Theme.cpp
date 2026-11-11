@@ -281,6 +281,31 @@ void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, j
     rect (xl, (float) ya, xr, (float) yc);          // middle, full width
 }
 
+void drawFrozenTag (juce::Graphics& g, juce::Rectangle<float> r, juce::Colour tag, juce::Colour flake)
+{
+    fillRoundRect (g, r, 3.0f, tag);
+    const auto centre = r.getCentre();
+    const auto arm = juce::jmin (r.getWidth(), r.getHeight()) * 0.5f - 2.0f;
+    juce::Path p;
+    for (int i = 0; i < 6; ++i)
+    {
+        const auto angle = juce::MathConstants<float>::pi / 3.0f * (float) i;
+        const auto dx = std::sin (angle), dy = -std::cos (angle);
+        p.startNewSubPath (centre);
+        p.lineTo (centre.x + dx * arm, centre.y + dy * arm);
+        // the two short barbs near each tip
+        const auto at = juce::Point<float> (centre.x + dx * arm * 0.6f, centre.y + dy * arm * 0.6f);
+        for (const auto side : { -1.0f, 1.0f })
+        {
+            const auto barb = angle + side * juce::MathConstants<float>::pi / 4.0f;
+            p.startNewSubPath (at);
+            p.lineTo (at.x + std::sin (barb) * arm * 0.38f, at.y - std::cos (barb) * arm * 0.38f);
+        }
+    }
+    g.setColour (flake);
+    g.strokePath (p, juce::PathStrokeType (1.0f, juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
+}
+
 juce::Colour drawDigitDisplay (juce::Graphics& g, juce::Rectangle<float> box, bool hot, bool dimmed, bool marks)
 {
     const auto c = lynx::themes::digitDisplayColours (colour::bg0, colour::border, colour::accent, colour::accentHover,

@@ -1902,6 +1902,14 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("uid", uidVar (c.uid));
     if (! c.standIns.empty())
         o->setProperty ("standIns", standInsToVar (c.standIns));
+    // Freeze (round 190ay): written only while frozen, so every other project's file is what it was
+    if (c.freeze.on())
+    {
+        auto f = std::make_unique<juce::DynamicObject>();
+        f->setProperty ("stems", standInsToVar (c.freeze.stems));
+        f->setProperty ("source", str (c.freeze.source));
+        o->setProperty ("freeze", juce::var (f.release()));
+    }
 
     return juce::var (o.release());
 }
@@ -2227,6 +2235,11 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.patcher = patcherFromVar (c["patcher"], song);
     def.uid = uidFrom (c.getProperty ("uid", {}));
     def.standIns = standInsFromVar (c["standIns"]);
+    if (const auto& f = c["freeze"]; f.isObject())
+    {
+        def.freeze.stems = standInsFromVar (f["stems"]);
+        def.freeze.source = f["source"].toString().toStdString();
+    }
     // projects saved before round 168l: an FL engine's (or another generator's) Mono / Porta, imported from FL, was
     // only in the LYNX Synth's settings (the Mono box came from FL's Mono flag or a Max of 1; a Max of 1 is not Mono)
     if (const auto& misc = c["misc"]; def.instrument != InstrumentKind::synth && ! misc.hasProperty ("mono") && ! misc.hasProperty ("porta"))

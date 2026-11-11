@@ -29,6 +29,17 @@ void showExportDialogForTracks (AudioEngine& engine, const juce::File& suggested
 // "Render to audio" (freeze): the insert becomes an audio clip on a new insert with the same
 // routing, and the original is muted. Runs on a background thread with progress.
 void bounceInsertToAudio (AudioEngine& engine, int track);
+// Freeze (round 190ay; core/StandIns.h lynx::freeze — LYNX's own, FL has none): the channel's own sound (after its
+// instrument, before its volume, pan and insert) is rendered next to the project and plays in the channel's place while
+// the instrument / plugin is not loaded at all: its CPU and RAM are free, the channel's insert effects stay live. The
+// channel keeps its plugin and settings as they are, so Unfreeze brings back the same sound. A frozen channel is
+// rendered again from its instrument ("Re-freeze"). Close the channel's editor first (a plugin window holds its plugin).
+// Runs on a background thread with progress; `done` (optional, message thread) gets whether it froze.
+void freezeChannel (AudioEngine& engine, int channel, std::function<void (bool)> done = {});
+// The instrument plays again and the frozen audio is deleted.
+void unfreezeChannel (AudioEngine& engine, int channel);
+// The same without a window, on the calling (message) thread: the command-line modes and the tests. Empty = frozen.
+juce::String freezeChannelNow (AudioEngine& engine, int channel, const std::function<bool (double)>& progress = {});
 // FL's renders that come back into the project as audio clips (REA round 168e, core/QuickRender.h). Each opens the
 // render window in its audio-clip mode (WAV, no file dialog), renders in the background and then edits the song.
 // Playlist track menu "Consolidate this track" (From track start / From song start; Shift held = choose the folder): a

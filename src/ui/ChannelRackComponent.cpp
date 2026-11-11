@@ -35,6 +35,8 @@
 #include "engine/Text.h"
 #include "ui/Dialogs.h"
 #include "ui/HintBar.h"
+#include "ui/ExportDialog.h"
+#include "core/StandIns.h"
 #include "ui/I18n.h"
 #include "ui/LiveRemoteUi.h"
 #include "ui/BrowserComponent.h"
@@ -981,6 +983,17 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 juce::Graphics::ScopedSaveState keepFont (g);
                 ui::drawPluginOffTag (g, juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f), nameArea.getCentreY() - 6.5f, 14.0f, 13.0f));
             }
+            // Freeze (round 190ay): a frozen channel plays its rendered audio, its instrument is unloaded — a snowflake
+            // tag (amber when the audio is out of date or missing) and a dimmed name
+            const auto frozen = channel.freeze.on();
+            if (frozen)
+            {
+                const auto attention = engine.frozenAudioMissing (row) || engine.freezeOutOfDate (row);
+                const auto tag = juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f) - badgeWidth, nameArea.getCentreY() - 6.5f, 14.0f, 13.0f);
+                badgeWidth += 16.0f;
+                theme::fillRoundRect (g, nameArea, theme::radius::md, bg1.withAlpha (0.35f)); // the plate, dimmed
+                theme::drawFrozenTag (g, tag, (attention ? warning : info).withAlpha (0.85f), bg1);
+            }
             // the channel's icon before its name, as FL's channel button shows it (round 168h)
             auto iconWidth = 0;
             if (const auto icon = trackicons::iconFor (channel.icon); icon != trackicons::Icon::none)
@@ -989,7 +1002,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 ui::drawTrackIcon (g, icon, juce::Rectangle<float> (nameArea.getX() + 12.0f, nameArea.getCentreY() - 7.0f, 14.0f, 14.0f),
                                    channel.muted ? textDisabled : textSecondary.brighter (0.3f));
             }
-            g.setColour (channel.muted ? textDisabled : textPrimary);
+            g.setColour (channel.muted ? textDisabled : frozen ? textSecondary : textPrimary);
             textcache::drawText (g, juce::String::fromUTF8 (channel.name.c_str()),
                                  nameArea.withTrimmedLeft ((float) (14 + iconWidth)).withTrimmedRight ((locked ? 18 : 6) + badgeWidth).toNearestInt(), juce::Justification::centredLeft, true);
 
@@ -1395,9 +1408,60 @@ void ChannelRackComponent::closeEditor (int channel)
         closeChannelSettings (channel);
 }
 
+// --- Freeze (round 190ay) -----------------------------------------------------------------------------------------------
+
+ui::Hint ChannelRackComponent::getChannelHintForSnapshot (int channel)
+{
+    return hintAt ({ stickyX + nameLeft() + nameWidth / 2, rowY (channel) + rowHeight / 2 });
+}
+
+juce::String ChannelRackComponent::frozenHint (int channel)
+{
+    if (engine.frozenAudioMissing (channel))
+        return tr ("Frozen, but its audio files are missing: the instrument plays instead.  [RMB] Re-freeze or Unfreeze");
+    if (engine.freezeOutOfDate (channel))
+        return tr ("Frozen, out of date: its notes, the tempo or the arrangement changed since the freeze, the audio made before still plays.  [RMB] Re-freeze updates it");
+    return tr ("Frozen: its rendered audio plays and its instrument is unloaded (no CPU, no RAM).  [RMB] Unfreeze to edit");
+}
+
+bool ChannelRackComponent::refuseFrozenEdit (int channel)
+{
+    const auto& song = engine.getSong();
+    if (channel < 0 || channel >= (int) song.channels.size() || ! song.channels[(std::size_t) channel].freeze.on())
+        return false;
+    ui::postHint ({ tr ("{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)", { channelName (song, channel) }), {} }, 4000);
+    return true;
+}
+
+void ChannelRackComponent::freezeChannels (std::vector<std::uint64_t> uids)
+{
+    while (! uids.empty())
+    {
+        const auto uid = uids.front();
+        uids.erase (uids.begin());
+        const auto& channels = engine.getSong().channels;
+        const auto it = std::find_if (channels.begin(), channels.end(), [uid] (const ChannelDef& c) { return c.uid == uid && uid != 0; });
+        if (it == channels.end())
+            continue;
+        const auto channel = (int) (it - channels.begin());
+        if (openEditorRow == channel) // (freezeChannel closes the channel's windows)
+            openEditorRow = -1;
+        freezeChannel (engine, channel, [safe = juce::Component::SafePointer<ChannelRackComponent> (this), uids] (bool ok) {
+            if (safe == nullptr)
+                return;
+            safe->repaint();
+            if (ok && ! uids.empty()) // (a refusal or Cancel stops the rest)
+                safe->freezeChannels (uids);
+        });
+        return;
+    }
+}
+
 void ChannelRackComponent::toggleEditor (int channel, bool keepOthers)
 {
     if (channel < 0 || channel >= (int) engine.getSong().channels.size())
+        return;
+    if (refuseFrozenEdit (channel)) // (its instrument is not loaded: there is nothing to show or change)
         return;
 
     const auto kind = engine.getSong().channels[(std::size_t) channel].instrument;
@@ -2003,6 +2067,9 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
                 step %= loop; // a loop repeat edits the step it repeats
             const auto& pattern = song.patterns[(std::size_t) song.currentPattern];
 
+            // Freeze (round 190ay): a frozen channel's steps cannot be edited; the miniature still opens the Piano Roll (read-only)
+            if (! showsNotePreview (pattern, row, pianoRollView) && refuseFrozenEdit (row))
+                return;
             if (showsNotePreview (pattern, row, pianoRollView)) // the miniature opens the Piano Roll (steps would break the melody)
             {
                 if (! flmods::popup (e.mods))
@@ -2238,6 +2305,9 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
                 h.text = name + " - " + tr ("Stand-in: its plugin is not installed on this PC, a render of this part plays (the plugin's settings are kept)");
             else if (engine.channelPluginOff (row)) // round 190ap
                 h.text = name + " - " + tr ("Plugin switched off: the project was opened without third-party plugins (its settings are kept; File › Switch plugins back on...)");
+            // Freeze (round 190ay): what a frozen channel is, and what to do when its audio needs attention
+            if (row >= 0 && row < (int) song.channels.size() && song.channels[(std::size_t) row].freeze.on())
+                h.text = name + " - " + frozenHint (row);
             h.hasMenu = true;
             // FL's hint bar names what the channel is ("Audio Clip", the plugin's name) on the right (REA round 143b)
             if (row >= 0 && row < (int) song.channels.size())
@@ -2405,6 +2475,38 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         closeEditor (channel);
         engine.editSong ([channel] (Song& s) { patcherize::patcherizeChannel (s, channel); });
     });
+    // Freeze (round 190ay; LYNX's own, FL has none): the channel's sound rendered to audio that plays in its place while
+    // its instrument / plugin is unloaded; the clicked channel, or every selected one when it is among them
+    {
+        const auto& song = engine.getSong();
+        std::vector<std::uint64_t> targets;
+        const auto& rows = engine.getSelectedChannels();
+        if (selected > 1 && std::binary_search (rows.begin(), rows.end(), channel))
+        {
+            for (const auto r : rows)
+                if (r >= 0 && r < count && song.channels[(std::size_t) r].freeze.on() == c.freeze.on())
+                    targets.push_back (song.channels[(std::size_t) r].uid);
+        }
+        else
+            targets.push_back (c.uid);
+        const auto several = targets.size() > 1;
+        if (! c.freeze.on())
+            menu.addItem (several ? tr ("Freeze selected channels") : tr ("Freeze"), [this, targets] { freezeChannels (targets); });
+        else
+        {
+            menu.addItem (several ? tr ("Unfreeze selected channels") : tr ("Unfreeze"), [this, targets] {
+                for (const auto uid : targets)
+                {
+                    const auto& channels = engine.getSong().channels;
+                    const auto it = std::find_if (channels.begin(), channels.end(), [uid] (const ChannelDef& d) { return d.uid == uid && uid != 0; });
+                    if (it != channels.end())
+                        unfreezeChannel (engine, (int) (it - channels.begin()));
+                }
+                repaint();
+            });
+            menu.addItem (several ? tr ("Re-freeze selected channels") : tr ("Re-freeze"), [this, targets] { freezeChannels (targets); });
+        }
+    }
     // FL's Loop Starter channel menu (round 168b): Replace sample, Generate steps, Locked, One-shot category
     loopstarterui::addChannelMenu (menu, engine, channel);
     menu.addItem (selected > 1 ? theme::mnemonic (tr ("Clone {0} channels", { juce::String (selected) }), 'C') : theme::mnemonic (tr ("Clone"), 'C') + "\tAlt+C", [this] { cloneSelected(); });
