@@ -8130,6 +8130,15 @@ countries: id
 "Send the time selection to the comp" = "Kirim pilihan waktu ke comp"
 "Send the time selection of the take lane to its comp" = "Kirim pilihan waktu lajur take ke comp-nya"
 
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "Koneksi"
+"Auto map outputs" = "Petakan output otomatis"
+"Assign all outputs incrementally" = "Tetapkan semua output secara berurutan"
+"Set all inputs and outputs to their default values" = "Kembalikan semua input dan output ke nilai bawaannya"
+"Refresh inputs and outputs (after a change in the plugin)" = "Segarkan input dan output (setelah ada perubahan pada plugin)"
+"Mixer track offset for output {0}" = "Offset trek mixer untuk output {0}"
+"Deactivate output {0}" = "Nonaktifkan output {0}"
+"Activate output {0}" = "Aktifkan output {0}"
 # --- Game controller (round 184a, S16)
 "Game controller" = "Pengontrol game"
 "Use a game controller" = "Gunakan pengontrol game"
