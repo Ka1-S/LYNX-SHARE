@@ -1,0 +1,36 @@
+<p>LYNX SHARE est écrit en C++20 avec JUCE 8 et compilé avec CMake. Le code source est sur <a href="https://github.com/Ka1-S/LYNX-SHARE">github.com/Ka1-S/LYNX-SHARE</a>, sous licence GNU Affero General Public License v3.0. Les fichiers de version sont compilés depuis le source étiqueté par GitHub Actions : cette page ne vous sert donc que si vous voulez modifier le code ou compiler pour vous-même.</p>
+<h2 id="build-on-linux">Compiler sous Linux</h2>
+<ol><li>Installez les dépendances listées ci-dessous.</li><li>Récupérez le source avec <code>git clone https://github.com/Ka1-S/LYNX-SHARE.git lynx</code> et entrez dans le dossier <code>lynx</code>.</li><li>Configurez avec <code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release</code>.</li><li>Compilez avec <code>cmake --build build</code>.</li></ol>
+<p>Les dépendances sous Ubuntu 24.04 :</p>
+<pre><code>sudo apt install build-essential cmake ninja-build pkg-config libasound2-dev libjack-jackd2-dev libx11-dev \
+  libxrandr-dev libxinerama-dev libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev</code></pre>
+<h2 id="build-on-windows-with-visual-studio">Compiler sous Windows avec Visual Studio</h2>
+<p>Il faut Visual Studio 2022 Build Tools avec « Desktop development with C++ », CMake 3.22 ou plus récent et Git.</p>
+<pre><code>cmake -B build -G &quot;Visual Studio 17 2022&quot; -A x64
+cmake --build build --config Release</code></pre>
+<h2 id="build-for-windows-from-wsl-or-linux">Compiler pour Windows depuis WSL ou Linux</h2>
+<p>C'est ainsi que le projet lui-même est développé : le programme Windows est compilé en croisé avec Zig, sans Visual Studio.</p>
+<pre><code>./scripts/build-windows-zig.sh</code></pre>
+<p>Le résultat est <code>build-win/LYNX.exe</code>.</p>
+<div class="tablewrap"><table><thead><tr><th>Prérequis</th><th>Version</th><th>Emplacement par défaut</th></tr></thead><tbody><tr><td>Zig</td><td>0.14.1</td><td><code>~/opt/zig-x86_64-linux-0.14.1</code></td></tr><tr><td>JUCE</td><td>8.0.4</td><td><code>~/opt/juce-8.0.4</code></td></tr></tbody></table></div>
+<p>JUCE peut être récupéré avec :</p>
+<pre><code>git clone --depth 1 -b 8.0.4 https://github.com/juce-framework/JUCE ~/opt/juce-8.0.4</code></pre>
+<p>Définissez les variables d'environnement <code>ZIG</code> et <code>JUCE_DIR</code> si vos chemins diffèrent.</p>
+<h2 id="build-on-macos">Compiler sous macOS</h2>
+<p>Il faut les outils en ligne de commande de Xcode (<code>xcode-select --install</code>), CMake et Ninja, par exemple avec <code>brew install cmake ninja</code>.</p>
+<pre><code>cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;
+cmake --build build</code></pre>
+<p><code>CMAKE_OSX_ARCHITECTURES=&quot;arm64;x86_64&quot;</code> produit une app universelle. Omettez-le pour compiler uniquement pour le Mac actuel.</p>
+<h2 id="run-the-core-tests">Lancer les tests du noyau</h2>
+<p>Le noyau (modèle, séquenceur, instruments, effets et import <code>.flp</code>) est du C++ pur et se teste sans JUCE, avec n'importe quel compilateur C++20.</p>
+<pre><code>./scripts/build-local.sh [&quot;folder with .flp files&quot;]</code></pre>
+<p>L'exécution doit se terminer par <code>N checks, 0 failures</code>. Si vous lui donnez le dossier <code>Data</code> d'une installation de FL Studio 2026, il analyse aussi les projets <code>.flp</code> livrés avec FL Studio. Le script compile aussi deux petits outils : <code>build-local/flpdump</code>, qui décompose un <code>.flp</code>, et <code>build-local/renderwav</code>.</p>
+<p>Après une compilation, le programme peut se vérifier lui-même sans périphérique audio :</p>
+<pre><code>LYNX.exe --selftest report.txt</code></pre>
+<p>Le rapport se termine par <code>result=OK</code>. Plus d'options sont décrites dans la page <a href="/wiki/command-line/">Ligne de commande</a>.</p>
+<h2 id="the-source-tree">L'arborescence du source</h2>
+<div class="tablewrap"><table><thead><tr><th>Dossier</th><th>Ce qu'il contient</th></tr></thead><tbody><tr><td><code>src/core/</code></td><td>Modèle, séquenceur, instruments, effets et import <code>.flp</code>. C++ pur, testable sans JUCE</td></tr><tr><td><code>src/flp/</code></td><td>Le lecteur du format <code>.flp</code></td></tr><tr><td><code>src/engine/</code></td><td>Le moteur audio : périphérique, graphe, samples, plugins, fichiers de projet</td></tr><tr><td><code>src/ui/</code></td><td>L'interface : Channel Rack, Piano Roll, Playlist, Mixer, fenêtres</td></tr><tr><td><code>third_party/</code></td><td>CLAP et le décodeur WavPack</td></tr><tr><td><code>tests/</code></td><td>Les tests du noyau</td></tr><tr><td><code>tools/</code></td><td><code>flpdump</code>, <code>renderwav</code>, <code>comparewav</code>, <code>make_logo</code></td></tr><tr><td><code>docs/</code></td><td>Architecture, état, feuille de route et analyse du comportement de FL Studio</td></tr></tbody></table></div>
+<h2 id="good-to-know">Bon à savoir</h2>
+<ul><li>JUCE 8 ne prend pas officiellement en charge MinGW. Le script de compilation Zig contourne les différences. Les correctifs sont dans <code>cmake/mingw/</code> et <code>src/platform/MingwFixes.cpp</code>.</li><li>Ne lancez qu'un seul <code>build-windows-zig.sh</code> à la fois. Deux compilations Zig simultanées peuvent se bloquer. Pour des compilations parallèles dans des worktrees séparés, donnez à chacune son propre cache avec <code>ZIG_GLOBAL_CACHE_DIR</code> et <code>ZIG_LOCAL_CACHE_DIR</code>.</li><li>Certains moteurs lisent des sons et des tables intégrés dans votre propre installation de FL Studio. Rien de FL Studio n'est dans le dépôt.</li><li>Une partie de la documentation de <code>docs/</code> est encore en portugais. Elle est en cours de traduction.</li><li>Si vous distribuez une version modifiée, y compris comme service réseau, la licence vous oblige à publier son source sous la même licence.</li></ul>
+<h2 id="related">Voir aussi</h2>
+<ul><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md">L'environnement de développement complet (SETUP_DEV.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md">LYNX SHARE sous Linux (LINUX.md)</a></li><li><a href="https://github.com/Ka1-S/LYNX-SHARE">Le dépôt et son README</a></li><li><a href="/wiki/command-line/">Ligne de commande</a></li><li><a href="/wiki/file-formats/">Formats de fichiers</a></li></ul>
