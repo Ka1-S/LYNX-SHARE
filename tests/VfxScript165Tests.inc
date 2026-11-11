@@ -369,26 +369,24 @@ TEST (vfx_script_late_answers_play_at_the_next_block)
 {
     using namespace lynx::vfx;
     // a script slower than the real-time budget: its note comes later, at the start of the first block after it
-    // answered. (Round 167e: the script took 6 ms against the 2 ms budget and the test looked 30 ms later. On a busy
-    // machine the test thread could be preempted inside its wait for longer than the script (the answer was then on
-    // time, in the first block) or the Python thread could answer after the 30 ms: the margins, not LYNX, were flaky.
-    // The script now takes 40 ms (20x the budget, well inside the 250 ms real-time limit) and the blocks go on until
-    // the answer has come.)
+    // answered. (Round 167e made the margins larger; round 190at removed them: the macOS CI still failed now and then
+    // because the audio thread, preempted for longer than the script's 40 ms between handing the block over and
+    // looking at the answer, found it on time. The test now holds the Python thread while the first block runs, so the
+    // answer cannot be on time whatever the scheduling, and releases it after that block returned.)
     const char* src = R"(
 import flvfx as vfx, time
 def onTriggerVoice(v):
-    t = time.time() + 0.04
-    while time.time() < t:
-        pass
     c = vfx.Voice(v)
     c.trigger()
 )";
     auto p = makeProcessor (Kind::script, vfxs165::state (src));
     script::setRealtime (true);
+    script::holdScriptThread (true);
     lynx::vfx::Transport t;
     lynx::vfx::EventList first, later;
     auto e = vfx164::on (60, 100);
     p->process (&e, 1, 512, t, first);
+    script::holdScriptThread (false);
     int blocks = 0;
     for (; blocks < 400 && later.size() == 0; ++blocks)
     {
