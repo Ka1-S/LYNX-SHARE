@@ -1,0 +1,670 @@
+{
+"fx-aether": [
+720,
+538
+],
+"fx-apex-limiter": [
+950,
+618
+],
+"fx-atrium": [
+640,
+346
+],
+"fx-auto-pan": [
+816,
+336
+],
+"fx-chorus": [
+380,
+246
+],
+"fx-compressor": [
+420,
+346
+],
+"fx-control-surface": [
+189,
+128
+],
+"fx-crest-compressor": [
+860,
+578
+],
+"fx-crossover": [
+420,
+282
+],
+"fx-delay": [
+420,
+282
+],
+"fx-distortion": [
+400,
+222
+],
+"fx-distructor": [
+720,
+226
+],
+"fx-echoform": [
+960,
+387
+],
+"fx-effector": [
+436,
+438
+],
+"fx-ember-saturator": [
+960,
+558
+],
+"fx-emphasis": [
+560,
+222
+],
+"fx-emphasizer": [
+512,
+124
+],
+"fx-epoch-verb": [
+796,
+346
+],
+"fx-eq": [
+420,
+282
+],
+"fx-equo": [
+572,
+271
+],
+"fx-facet-eq": [
+960,
+560
+],
+"fx-filter": [
+400,
+270
+],
+"fx-foil-plate": [
+720,
+362
+],
+"fx-formula-controller": [
+258,
+102
+],
+"fx-frequency-shifter": [
+460,
+246
+],
+"fx-frequency-shifter-2": [
+383,
+246
+],
+"fx-frequency-splitter": [
+776,
+366
+],
+"fx-fret-channel": [
+960,
+608
+],
+"fx-fruity-7-band-eq": [
+341,
+248
+],
+"fx-fruity-balance": [
+334,
+176
+],
+"fx-fruity-bass-boost": [
+348,
+151
+],
+"fx-fruity-big-clock": [
+420,
+150
+],
+"fx-fruity-blood-overdrive": [
+428,
+212
+],
+"fx-fruity-center": [
+327,
+81
+],
+"fx-fruity-chorus": [
+501,
+231
+],
+"fx-fruity-compressor": [
+501,
+131
+],
+"fx-fruity-convolver": [
+722,
+326
+],
+"fx-fruity-delay": [
+501,
+131
+],
+"fx-fruity-delay-2": [
+404,
+128
+],
+"fx-fruity-delay-3": [
+752,
+246
+],
+"fx-fruity-delay-bank": [
+583,
+304
+],
+"fx-fruity-fast-dist": [
+386,
+148
+],
+"fx-fruity-fast-lp": [
+336,
+151
+],
+"fx-fruity-filter": [
+501,
+131
+],
+"fx-fruity-flanger": [
+501,
+231
+],
+"fx-fruity-flangus": [
+366,
+202
+],
+"fx-fruity-free-filter": [
+418,
+131
+],
+"fx-fruity-html-notebook": [
+560,
+460
+],
+"fx-fruity-limiter": [
+633,
+332
+],
+"fx-fruity-love-philter": [
+670,
+426
+],
+"fx-fruity-multiband-compressor": [
+805,
+186
+],
+"fx-fruity-mute-2": [
+327,
+90
+],
+"fx-fruity-panomatic": [
+346,
+192
+],
+"fx-fruity-phase-inverter": [
+367,
+81
+],
+"fx-fruity-phaser": [
+501,
+181
+],
+"fx-fruity-scratcher": [
+620,
+360
+],
+"fx-fruity-send": [
+317,
+115
+],
+"fx-fruity-soft-clipper": [
+354,
+159
+],
+"fx-fruity-waveshaper": [
+352,
+384
+],
+"fx-gemini-doubler": [
+800,
+506
+],
+"fx-glow-leveler": [
+660,
+358
+],
+"fx-gross-beat": [
+836,
+589
+],
+"fx-halo": [
+700,
+308
+],
+"fx-hardcore": [
+772,
+501
+],
+"fx-hardware-insert": [
+784,
+282
+],
+"fx-horizon": [
+960,
+339
+],
+"fx-hush-de-esser": [
+720,
+518
+],
+"fx-hyper-chorus": [
+754,
+240
+],
+"fx-kiln-channel": [
+460,
+698
+],
+"fx-lattice-mod": [
+670,
+346
+],
+"fx-limiter": [
+380,
+216
+],
+"fx-lo-fi": [
+360,
+222
+],
+"fx-low-lifter": [
+680,
+306
+],
+"fx-luxeverb": [
+947,
+482
+],
+"fx-lynx-tune": [
+800,
+668
+],
+"fx-maximus": [
+633,
+417
+],
+"fx-multiband-delay": [
+568,
+318
+],
+"fx-nebula": [
+704,
+346
+],
+"fx-newtime": [
+960,
+480
+],
+"fx-newtone": [
+960,
+480
+],
+"fx-orbit": [
+470,
+246
+],
+"fx-parametric-eq": [
+707,
+382
+],
+"fx-patcher": [
+206,
+128
+],
+"fx-peak-controller": [
+521,
+240
+],
+"fx-pitch-correction": [
+523,
+356
+],
+"fx-pitch-shift": [
+400,
+246
+],
+"fx-pitch-shifter": [
+744,
+306
+],
+"fx-prism-multiband": [
+920,
+618
+],
+"fx-quell-denoiser": [
+367,
+466
+],
+"fx-reeverb": [
+336,
+281
+],
+"fx-reeverb-2": [
+538,
+192
+],
+"fx-reverb": [
+460,
+316
+],
+"fx-rhythmic-envelope": [
+520,
+376
+],
+"fx-ridge-strip": [
+780,
+790
+],
+"fx-sentry-gate": [
+730,
+398
+],
+"fx-shell-channel": [
+960,
+553
+],
+"fx-spiral-echo": [
+530,
+256
+],
+"fx-spreader": [
+540,
+281
+],
+"fx-squeeze": [
+332,
+249
+],
+"fx-stereo-enhancer": [
+405,
+142
+],
+"fx-stereo-shaper": [
+420,
+246
+],
+"fx-transient-processor": [
+553,
+351
+],
+"fx-transmitter": [
+620,
+458
+],
+"fx-transporter": [
+640,
+288
+],
+"fx-tuner": [
+360,
+330
+],
+"fx-utility": [
+420,
+246
+],
+"fx-vintage-chorus": [
+754,
+240
+],
+"fx-vintage-phaser": [
+754,
+240
+],
+"fx-visualizer": [
+185,
+128
+],
+"fx-vocoder": [
+416,
+332
+],
+"fx-vocodex": [
+598,
+626
+],
+"fx-voice-shift": [
+640,
+318
+],
+"fx-volume-gate": [
+560,
+268
+],
+"fx-wave-candy": [
+203,
+128
+],
+"fx-x-y-controller": [
+220,
+128
+],
+"fx-x-y-z-controller": [
+235,
+128
+],
+"gen-3x-osc": [
+800,
+592
+],
+"gen-bassdrum": [
+800,
+629
+],
+"gen-beepmap": [
+800,
+422
+],
+"gen-boobass": [
+800,
+422
+],
+"gen-clap": [
+99,
+128
+],
+"gen-dashboard": [
+258,
+59
+],
+"gen-drumaxx": [
+960,
+777
+],
+"gen-drumpad": [
+960,
+402
+],
+"gen-envelope-controller": [
+189,
+128
+],
+"gen-fl-keys": [
+800,
+422
+],
+"gen-fl-slayer": [
+800,
+554
+],
+"gen-fruit-kick": [
+800,
+422
+],
+"gen-fruity-dance": [
+250,
+128
+],
+"gen-fruity-dx10": [
+800,
+422
+],
+"gen-fruity-granulizer": [
+800,
+641
+],
+"gen-fruity-slicer": [
+150,
+128
+],
+"gen-fruity-video-player": [
+189,
+128
+],
+"gen-gms": [
+960,
+499
+],
+"gen-harmless": [
+960,
+641
+],
+"gen-harmor": [
+960,
+489
+],
+"gen-hat": [
+99,
+128
+],
+"gen-kepler": [
+960,
+333
+],
+"gen-kepler-exo": [
+960,
+586
+],
+"gen-keyboard-controller": [
+258,
+98
+],
+"gen-kick": [
+99,
+128
+],
+"gen-layer": [
+217,
+128
+],
+"gen-lynx-soundfont": [
+800,
+562
+],
+"gen-midi-out": [
+203,
+128
+],
+"gen-minisynth": [
+913,
+604
+],
+"gen-morphine": [
+960,
+482
+],
+"gen-ogun": [
+800,
+649
+],
+"gen-patcher": [
+206,
+128
+],
+"gen-plucked": [
+800,
+422
+],
+"gen-poizone": [
+960,
+629
+],
+"gen-sakura": [
+960,
+680
+],
+"gen-sawer": [
+960,
+738
+],
+"gen-simsynth": [
+800,
+574
+],
+"gen-snare": [
+99,
+128
+],
+"gen-synth": [
+800,
+572
+],
+"gen-sytrus": [
+960,
+478
+],
+"gen-toxic-biohazard": [
+960,
+785
+],
+"gen-transistor-bass": [
+857,
+824
+],
+"gen-vfx-color-mapper": [
+258,
+120
+],
+"gen-vfx-envelope": [
+201,
+128
+],
+"gen-vfx-key-mapper": [
+188,
+128
+],
+"gen-vfx-keyboard-splitter": [
+214,
+128
+],
+"gen-vfx-level-scaler": [
+210,
+128
+],
+"gen-vfx-script": [
+258,
+94
+],
+"gen-vfx-sequencer": [
+252,
+128
+],
+"gen-voltage-controller": [
+129,
+128
+],
+"gen-wave-traveller": [
+800,
+532
+]
+}

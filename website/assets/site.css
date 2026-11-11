@@ -193,13 +193,47 @@ figure figcaption b{color:var(--text);font-weight:600}
 /* ---------- wiki ---------- */
 .wiki{display:grid;grid-template-columns:230px minmax(0,1fr);gap:56px;padding-top:40px;padding-bottom:80px;align-items:start}
 .wnav{position:sticky;top:92px;font-size:14.5px;max-height:calc(100vh - 110px);overflow-y:auto}
-.wnav h2{font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:20px 0 6px}
-.wnav h2:first-of-type{margin-top:0}
+.wnav summary{font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);padding:8px 0 6px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}
+.wnav summary::-webkit-details-marker{display:none}
+.wnav summary::before{content:"";width:6px;height:6px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim);transform:rotate(-45deg);flex:none;margin-right:2px}
+.wnav details[open]>summary::before{transform:rotate(45deg)}
+.wnav summary:hover{color:var(--text)}
+.wnav details{margin-bottom:8px}
+.wnav details.sub{margin:0}
+.wnav details.sub>summary{text-transform:none;letter-spacing:0;font-size:14.5px;font-weight:400;color:var(--muted);padding:5px 10px;border-left:2px solid var(--line)}
+.wnav details.sub>summary small{color:var(--dim);font-size:12px}
+.wnav details.sub>a{padding-left:24px;font-size:13.5px}
+.wsearch{position:relative;margin-bottom:14px}
+html.nojs .wsearch{display:none}
+.wsearch input{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:9px;color:var(--text);font:14.5px var(--sans);padding:9px 62px 9px 12px}
+.wsearch input::placeholder{color:var(--dim)}
+.wsearch kbd{position:absolute;right:8px;top:8px;font-size:11px;color:var(--dim);pointer-events:none}
+.wres{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 6px);background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 18px 40px rgba(0,0,0,.5);max-height:60vh;overflow-y:auto;padding:6px}
+.wres a{display:block;padding:7px 10px;border-radius:7px;border:0;color:var(--text);font-size:14.5px}
+.wres a small{display:block;color:var(--dim);font-size:12.5px}
+.wres a.on,.wres a:hover{background:rgba(229,56,59,.14)}
+.wres p{padding:8px 10px;color:var(--dim);font-size:14px}
+.phead .wsearch{max-width:460px;margin:22px 0 0}
 .wnav a{display:block;padding:5px 10px;border-left:2px solid var(--line);color:var(--muted)}
 .wnav a:hover{color:var(--text)}
 .wnav a[aria-current]{color:var(--text);border-color:var(--red);background:rgba(229,56,59,.07)}
 .wjump{display:none;font-size:14px;color:var(--muted);text-decoration:underline;text-underline-offset:3px;margin-bottom:14px}
 .wiki article{max-width:780px;min-width:0}
+.wiki article>.tags{margin:-12px 0 24px}
+.toc{border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:24px;font-size:14.5px;background:var(--panel)}
+.toc h2{font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin-bottom:6px}
+.toc ol{list-style:none;columns:2;column-gap:24px}
+.toc a{color:var(--muted);display:block;padding:2px 0}
+.toc a:hover{color:var(--text)}
+@media (max-width:560px){.toc ol{columns:1}}
+@media (min-width:1360px){
+  .wiki{grid-template-columns:230px minmax(0,1fr);max-width:1340px}
+  .wiki article{max-width:none}
+  .wbody.hastoc{display:grid;grid-template-columns:minmax(0,780px) 190px;gap:44px;align-items:start}
+  .wbody.hastoc .toc{order:2;position:sticky;top:92px;border:0;border-left:1px solid var(--line);border-radius:0;background:none;padding:0 0 0 16px}
+  .wbody.hastoc .toc ol{columns:1}
+  .wiki article>h1,.wiki article>.sub,.wiki article>.enonly,.wpn{max-width:780px}
+}
 .wiki article>h1{font-size:clamp(30px,4vw,42px);margin-bottom:10px}
 .wiki article>.sub{color:var(--muted);font-size:17px;margin-bottom:26px}
 .tag{display:inline-block;font:600 11px var(--sans);letter-spacing:.04em;color:var(--amber);border:1px solid rgba(240,173,78,.4);border-radius:6px;padding:1px 7px;vertical-align:2px}
@@ -210,10 +244,14 @@ html:not(:lang(en)) .enonly{display:block}
 .wpn a:hover{color:var(--text)}
 .wpn span{display:block;font-size:12px;color:var(--dim)}
 .wikiidx{padding-top:40px;padding-bottom:80px}
-.wgroup{margin-bottom:34px;max-width:900px}
-.wgroup h2{font-size:20px;margin-bottom:6px}
+.wcards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;align-items:start}
+.wcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px 12px}
+.wcard h2{font-size:22px}
+.wcard .wn{font:500 12px var(--mono);color:var(--dim);margin:4px 0 10px}
+.wcard>p{color:var(--muted);font-size:15px;margin-bottom:8px}
 .wlist{list-style:none}
-.wlist li{display:grid;grid-template-columns:210px minmax(0,1fr);gap:16px;padding:10px 0;border-bottom:1px solid var(--line)}
+.wlist li{padding:9px 0;border-top:1px solid var(--line)}
+.wlist li span[data-i18n^="wk."]{display:block}
 .wlist a{font-weight:600}
 .wlist a:hover{color:var(--red2)}
 .wlist span{color:var(--muted);font-size:14.5px}
@@ -221,7 +259,7 @@ html:not(:lang(en)) .enonly{display:block}
   .wiki{grid-template-columns:minmax(0,1fr);gap:30px;padding-top:22px}
   .wnav{position:static;max-height:none;order:2;border-top:1px solid var(--line);padding-top:24px}
   .wjump{display:inline-block}
-  .wlist li{grid-template-columns:minmax(0,1fr);gap:2px}
+  .wcards{grid-template-columns:minmax(0,1fr)}
 }
 
 /* ---------- FAQ ---------- */
@@ -338,3 +376,64 @@ footer .legal{flex-basis:100%;font-size:12.5px;margin-top:8px}
 
 /* ?shot (headless screenshots): nothing in motion */
 html.shot *{transition:none!important}
+
+/* ---------- tags (catalogue cards, plugin wiki pages) ---------- */
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tags .tag{color:var(--muted);border-color:var(--line);vertical-align:0;font-weight:500;letter-spacing:0;font-size:11.5px;padding:2px 8px}
+.tags .t-instrument{color:#8fd3ff;border-color:rgba(143,211,255,.35)}
+.tags .t-effect{color:#ffb07a;border-color:rgba(255,176,122,.35)}
+.tags .t-tool{color:#b9a5ff;border-color:rgba(185,165,255,.35)}
+.tags .flp{color:var(--green);border-color:rgba(61,220,132,.35)}
+
+/* ---------- instruments and effects ---------- */
+.cfilter{display:flex;flex-wrap:wrap;gap:6px;margin-top:24px}
+.cfilter a{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 12px;background:var(--bg)}
+.cfilter a b{font:500 11.5px var(--mono);color:var(--dim)}
+.cfilter a.ty{color:var(--text);font-weight:600}
+.cfilter a:hover{border-color:var(--dim);color:var(--text)}
+.cfilter a.on{border-color:var(--red);color:var(--text);background:rgba(229,56,59,.12)}
+.cat{padding-top:10px;padding-bottom:80px}
+.ctype{font-size:clamp(24px,3vw,32px);margin:46px 0 4px;padding-top:8px}
+.ctype small,.cgroup h3 small{font:500 13px var(--mono);color:var(--dim);margin-left:6px;letter-spacing:0}
+.cgroup{padding-top:22px}
+.cgroup h3{font-size:18px;color:var(--muted);margin-bottom:14px}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:18px}
+.pc{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column}
+.pc:hover{border-color:#3a3d4b}
+.pimg{display:flex;align-items:center;justify-content:center;position:relative;aspect-ratio:16/10;background:#090a0d;border-bottom:1px solid var(--line)}
+.pimg img{position:absolute;left:8px;top:8px;width:calc(100% - 16px);height:calc(100% - 16px);object-fit:scale-down}
+.plate{font:700 20px var(--head);color:var(--dim);letter-spacing:.02em;text-align:center}
+.pb{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+.pb h4{font-size:17px}
+.pb h4 a:hover{color:var(--red2)}
+.pb p{color:var(--muted);font-size:14px;line-height:1.5;flex:1}
+.cat>.note{margin-top:40px;max-width:820px}
+[hidden]{display:none!important}
+
+/* ---------- why LYNX ---------- */
+.why{padding:64px 0;border-bottom:1px solid var(--line)}
+.why h2{font-size:clamp(26px,3.2vw,36px);margin-bottom:10px}
+.why .lead2{color:var(--text);font-size:18px;margin-bottom:16px}
+.why .prose p,.why .prose li{color:#c9cdd6}
+.why h3{font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--dim);margin:20px 0 8px}
+.why .split{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:52px}
+.why .split.rev>.prose{order:2}
+.whyfig{position:sticky;top:92px}
+.whyfig img{border:1px solid var(--line);border-radius:10px;width:100%}
+.whyfig.narrow img{max-width:375px;margin:0 auto}
+.whyfig figcaption{font-size:13.5px;color:var(--dim);margin-top:10px}
+.flow{list-style:none;counter-reset:f;display:grid;gap:10px}
+.flow li{counter-increment:f;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px 14px 54px;position:relative}
+.flow li::before{content:counter(f);position:absolute;left:16px;top:14px;width:26px;height:26px;border-radius:50%;background:rgba(229,56,59,.16);color:var(--red2);font:700 13px/26px var(--mono);text-align:center}
+.flow b{display:block;font-size:13px;color:var(--dim);font-weight:600}
+@media (max-width:900px){.why{padding:44px 0}.why .split{grid-template-columns:minmax(0,1fr);gap:26px}.why .split.rev>.prose{order:0}.whyfig{position:static}}
+
+/* ---------- home: what only LYNX does ---------- */
+.whyrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.wcell{display:block;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.wcell:hover{border-color:var(--dim)}
+.wcell b{display:block;font:600 15.5px var(--head);margin-bottom:4px}
+.wcell span{color:var(--muted);font-size:13.5px;line-height:1.45;display:block}
+.wcell.hot{border-color:rgba(229,56,59,.45);background:rgba(229,56,59,.07);grid-column:span 2}
+@media (max-width:1000px){.whyrow{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.whyrow{grid-template-columns:minmax(0,1fr)}.wcell.hot{grid-column:auto}}

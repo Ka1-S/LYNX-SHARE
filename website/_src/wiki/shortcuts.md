@@ -3,17 +3,25 @@ title: Shortcuts
 summary: The default keyboard shortcuts of LYNX SHARE 0.1.25, by window.
 status: full
 ---
-These are the default keys in 0.1.25 alpha. Press `F1` in the app for the shortcut sheet.
+![The Manage shortcuts window: a searchable list of actions with the keys of each](/assets/img/wiki/shortcuts.webp)
 
-To change a shortcut, open `Options › Manage shortcuts`. You can search by action or by key, add or change a shortcut, and reset one or all of them. Your changes are saved in `keys.json` in the settings folder (`%APPDATA%\LYNX` on Windows, `~/Library/Application Support/LYNX` on macOS, `~/.config/LYNX` on Linux).
+These are the default keys in 0.1.25 alpha. `Help › Shortcuts` (`F1`) shows the shortcut sheet inside the app. `Options › Manage shortcuts...` opens the editor in the picture, where you change them.
 
 > On macOS the app shows the keys with Mac names: Ctrl is shown as ⌘ and Alt as ⌥.
 
-While the typing keyboard piano is on, its keys play notes and most single-letter shortcuts are paused (`L` still works). Turn it off with `Ctrl+T`.
+## Change a shortcut
+
+1. Choose `Options › Manage shortcuts...`.
+2. Type an action or a key, such as `Ctrl+L`, in the search box. The list beside it limits the search to one place, and `Changed only` shows the ones you changed.
+3. Click the action.
+4. Click `Change` to replace its keys, or `Add shortcut` to give it a second one, then press the new keys. `Esc` cancels.
+5. If the keys are already used in the same place, a message names the other action and lets you move them.
+
+`Remove` clears the keys of the action. `Reset to default` restores one action and `Reset all...` restores every one. Your changes are saved in `keys.json` in the settings folder (`%APPDATA%\LYNX` on Windows, `~/Library/Application Support/LYNX` on macOS, `~/.config/LYNX` on Linux). `Open keys.json` opens that file.
 
 ## Transport and recording
 
-| Key | Action |
+| Key | What it does |
 |---|---|
 | `Space` | Play, or stop and go back to where playback started |
 | `Ctrl+Space` | Play or pause |
@@ -34,7 +42,7 @@ Some of these keys do something else inside an editor that has focus. In the Pia
 
 ## Files and editing
 
-| Key | Action |
+| Key | What it does |
 |---|---|
 | `Ctrl+N` | New project |
 | `Ctrl+O` | Open project |
@@ -52,7 +60,7 @@ Some of these keys do something else inside an editor that has focus. In the Pia
 
 ## Windows
 
-| Key | Action |
+| Key | What it does |
 |---|---|
 | `F5` | Playlist |
 | `F6` | Channel rack |
@@ -73,7 +81,7 @@ Some of these keys do something else inside an editor that has focus. In the Pia
 
 ## Patterns
 
-| Key | Action |
+| Key | What it does |
 |---|---|
 | `Numpad +` / `Numpad -` | Next, previous pattern |
 | `Numpad 1` to `Numpad 9` | Select pattern 1 to 9 |
@@ -88,7 +96,7 @@ Some of these keys do something else inside an editor that has focus. In the Pia
 
 ## Channel rack
 
-| Key | Action |
+| Key | What it does |
 |---|---|
 | `Up` / `Down` | Select the channel above, below |
 | `Shift+Up` / `Shift+Down` | Extend the selection |
@@ -106,7 +114,7 @@ Some of these keys do something else inside an editor that has focus. In the Pia
 
 ## Piano roll
 
-| Key | Action |
+| Key | What it does |
 |---|---|
 | `P` `B` `N` `D` `T` `C` `E` `Z` `Y` | Pencil, Brush, Drum brush, Eraser, Mute, Knife, Lasso, Zoom, Listen |
 | `S` | Slide notes on or off (new notes) |
@@ -145,9 +153,11 @@ Some of these keys do something else inside an editor that has focus. In the Pia
 | `Shift+5` | Zoom to the selection |
 | `Shift+0` | Centre the view on the playhead |
 
-Note tool dialogs in the Piano roll:
+### Note tools
 
-| Key | Tool |
+Each key opens the dialog of one note tool in the Piano roll.
+
+| Key | What it does |
 |---|---|
 | `Alt+A` | Arpeggiate |
 | `Alt+S` | Strum |
@@ -166,7 +176,7 @@ Note tool dialogs in the Piano roll:
 
 ## Playlist
 
-| Key | Action |
+| Key | What it does |
 |---|---|
 | `P` `B` `D` `T` `C` `E` `Z` `Y` `S` | Pencil, Brush, Eraser, Mute, Knife, Lasso, Zoom, Listen, Slip |
 | `Ctrl+A` | Select all |
@@ -203,7 +213,7 @@ Note tool dialogs in the Piano roll:
 
 ## Mixer
 
-| Key | Action |
+| Key | What it does |
 |---|---|
 | `Alt+Left` / `Alt+Right` | Move the selected inserts left, right |
 | `F2` | Rename and colour the selected insert |
@@ -220,7 +230,7 @@ Note tool dialogs in the Piano roll:
 
 ## Browser
 
-| Key | Action |
+| Key | What it does |
 |---|---|
 | `Up` / `Down` | Previous, next file (with preview) |
 | `Shift+Up` / `Shift+Down` | Previous, next file into the selected channel |
@@ -228,3 +238,16 @@ Note tool dialogs in the Piano roll:
 | `Left` | Close the folder, or go to the parent folder |
 | `Right` | Open the folder |
 | `F2` | Rename the selected plugin (Plugin database) |
+
+## Good to know
+
+- While the typing keyboard piano is on, its keys play notes and most single-letter shortcuts are paused (`L` still works). Turn it off with `Ctrl+T`.
+- A shortcut works either everywhere or in one window. One that belongs to a window wins over the same keys that work everywhere, while that window has focus.
+- Some actions have no default key, for example the Quick-add palette. Give them one in the editor.
+
+## Related
+
+- [A tour of the window](/wiki/tour/)
+- [Settings](/wiki/settings/)
+- [MIDI controllers](/wiki/midi-controllers/)
+- [Coming from FL Studio](/wiki/coming-from-fl-studio/)

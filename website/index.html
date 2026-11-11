@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LYNX SHARE: a lightweight open-source DAW that opens FL Studio and Ableton Live projects</title>
-<meta name="description" content="LYNX SHARE is a free, open-source DAW for Windows, macOS and Linux with FL Studio&#x27;s way of working: Channel rack, Piano roll, Playlist and Mixer. It opens .flp, .als and .flm projects and exports .flp and .als.">
+<meta name="description" content="LYNX SHARE is a free, open-source DAW for Windows, macOS and Linux with FL Studio's way of working: Channel rack, Piano roll, Playlist and Mixer. It opens .flp, .als and .flm projects and exports .flp and .als.">
 <meta property="og:title" content="LYNX SHARE: a lightweight open-source DAW that opens FL Studio and Ableton Live projects">
-<meta property="og:description" content="LYNX SHARE is a free, open-source DAW for Windows, macOS and Linux with FL Studio&#x27;s way of working: Channel rack, Piano roll, Playlist and Mixer. It opens .flp, .als and .flm projects and exports .flp and .als.">
+<meta property="og:description" content="LYNX SHARE is a free, open-source DAW for Windows, macOS and Linux with FL Studio's way of working: Channel rack, Piano roll, Playlist and Mixer. It opens .flp, .als and .flm projects and exports .flp and .als.">
 <meta property="og:site_name" content="LYNX SHARE">
 <meta property="og:image" content="https://lynx-share.com/assets/img/hero.webp?v=0.1.25">
 <meta property="og:url" content="https://lynx-share.com/">
@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="66cf0b60";
+window.LYNX_LANG=lang;window.LYNX_V="6366efb5";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -72,12 +72,12 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=66cf0b60">
+<link rel="stylesheet" href="/assets/site.css?v=6366efb5">
 </head>
 <body>
 <header class="top"><div class="wrap">
   <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="32" height="32">LYNX SHARE</a>
-  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
+  <nav class="links" aria-label="Site"><a href="/features/" data-i18n="nav.features">Features</a><a href="/why/" data-i18n="nav.why">Why LYNX</a><a href="/instruments-and-effects/" data-i18n="nav.cat">Plugins</a><a href="/updates/" data-i18n="nav.updates">Updates</a><a href="/wiki/" data-i18n="nav.wiki">Wiki</a><a href="/faq/" data-i18n="nav.faq">FAQ</a></nav>
   <div class="navbtns">
     <label class="lang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
     <a class="btn btn-red btn-sm" href="/download/" data-i18n="nav.download">Download</a>
@@ -130,6 +130,14 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <figure><a class="shot" href="/assets/img/mixer.webp?v=0.1.25"><img src="/assets/img/mixer.webp?v=0.1.25" alt="Mixer" loading="lazy" width="1920" height="1080"></a><figcaption data-i18n="home.capMx"><b>Mixer.</b> Inserts, sends, sidechain and delay compensation.</figcaption></figure>
     </div>
     <p class="note" data-i18n="home.shotsN">Screenshots are from LYNX SHARE's own demo project in the current release. More on the <a href="/features/">Features</a> page.</p>
+  </div>
+</section>
+
+<section class="sec" id="only">
+  <div class="wrap">
+    <h2 data-i18n="home.whyT">What only LYNX does</h2>
+    <div class="whyrow"><a class="wcell" href="/why/#online"><b data-i18n="why.online.t">Online sessions</b><span data-i18n="why.online.l">Work on one project with up to three other people, live or by sending files.</span></a><a class="wcell" href="/why/#projects"><b data-i18n="why.projects.t">Opens and writes other DAWs' projects</b><span data-i18n="why.projects.l">FL Studio projects and Ableton Live sets open with File › Open and can be written back.</span></a><a class="wcell" href="/why/#fl-settings"><b data-i18n="why.fl.t">FL plugins' settings open in LYNX's own engines</b><span data-i18n="why.fl.l">A project that uses FL Studio's native plugins plays without FL Studio installed.</span></a><a class="wcell" href="/why/#workflows"><b data-i18n="why.work.t">Two workflows in one program</b><span data-i18n="why.work.l">Patterns and a Playlist by default, a clip grid with scenes when you want one.</span></a><a class="wcell" href="/why/#crash"><b data-i18n="why.crash.t">Plugin crash protection</b><span data-i18n="why.crash.l">A third-party plugin that crashes does not have to take your project with it.</span></a><a class="wcell" href="/why/#free"><b data-i18n="why.free.t">Free on Windows, Linux and macOS</b><span data-i18n="why.free.l">No price, no account, no subscription, and the source is public.</span></a><a class="wcell hot" href="/instruments-and-effects/"><b data-i18n="home.catT" data-args='[&quot;167&quot;]'>167 built-in instruments and effects</b><span data-i18n="home.catL">Synths, drums, EQs, compressors, reverbs, delays and tools, each with a picture and a wiki page.</span></a></div>
+    <p style="margin-top:18px"><a class="tlink" href="/why/" data-i18n="home.whyAll">All six, with their limits</a></p>
   </div>
 </section>
 
@@ -193,7 +201,7 @@ LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
   <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
-<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})"};</script>
-<script src="/assets/site.js?v=66cf0b60" defer></script>
+<script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","pl.showAll":"Show all ({0})","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
+<script src="/assets/site.js?v=6366efb5" defer></script>
 </body>
 </html>

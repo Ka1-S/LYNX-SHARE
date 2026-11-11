@@ -9,7 +9,18 @@ The Piano roll shows the notes of one channel in the current pattern, with a key
 
 The channel box in the toolbar picks which channel you edit. Channels that have notes in this pattern are marked. The wheel over the box steps through channels with notes, `Ctrl`+wheel through all of them.
 
+## Write some notes
+
+1. In the Channel rack, right-click a channel's name and choose `Piano Roll`.
+2. Press `P` for the Pencil.
+3. Click in the grid to add a note. Keep the button down and drag to position it.
+4. Drag the note's end to make it longer or shorter.
+5. Right-click a note to delete it.
+6. Press `Space` to hear the pattern.
+
 ## Tools
+
+![The Piano roll's toolbar with the channel box, the tools and the snap box](/assets/img/wiki/pianoroll-tools.webp)
 
 Each tool has a letter key. The letters work while the typing keyboard piano (`Ctrl+T`) is off.
 
@@ -44,35 +55,52 @@ Click the ruler to set the position. `Ctrl`+drag, right-drag or double-click-dra
 
 ## Toolbar
 
-- **Snap**: "Main" follows the snap in the main toolbar, or pick one for this window.
-- **Chord**: clicking creates the chosen chord, with the clicked note as the root. `Shift+N` goes back to single notes.
-- **Scale**: highlights the notes of a scale. A separate button snaps new and moved notes, and incoming MIDI, to the chosen scale.
-- **Slide** (`S`): new notes are slide notes. The note that is sounding glides to them (808 glide).
-- **Ghost notes** (`Alt+V`): shows the other channels' notes behind yours.
-- **Note colour**: new notes get this colour. There are 16.
-- **Follow**: the view scrolls with the playhead while the pattern plays.
-- **Lane box**: chooses what the bottom lane edits (velocity, pan and so on).
+| Setting | What it does |
+|---|---|
+| Snap | "Main" follows the snap in the main toolbar, or pick one for this window. |
+| Chord | Clicking creates the chosen chord, with the clicked note as the root. `Shift+N` goes back to single notes. |
+| Scale | Highlights the notes of a scale. A separate button snaps new and moved notes, and incoming MIDI, to the chosen scale. |
+| Slide (`S`) | New notes are slide notes. The note that is sounding glides to them (808 glide). |
+| Ghost notes (`Alt+V`) | Shows the other channels' notes behind yours. |
+| Note colour | New notes get this colour. There are 16. |
+| Follow | The view scrolls with the playhead while the pattern plays. |
+| Lane box | Chooses what the bottom lane edits: Velocity, Pan or Fine pitch. |
 
 ## Keys
 
-| Key | Action |
-|---|---|
-| `Ctrl+A` | Select all |
-| `Ctrl+D` or `Esc` | Deselect |
-| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy, cut, paste |
-| `Ctrl+B` | Duplicate the selection |
-| `Del` | Delete the selection |
-| `Up` / `Down` | Move the selection a semitone |
-| `Ctrl+Up` / `Ctrl+Down` | Move the selection an octave |
-| `Left` / `Right` | Move the selection one grid step |
-| `Ctrl+Q` | Quick quantize (starts and lengths) |
-| `Shift+Q` | Quantize starts |
-| `Ctrl+U` | Chop the notes to the grid |
-| `Ctrl+G` | Join touching notes |
-| `Ctrl+L` | Legato |
-| `Alt+M` / `Shift+Alt+M` | Mute, unmute the selection |
-| `Ctrl+M` | Import a MIDI file into this channel |
-| `Ctrl+Shift+M` | Export the pattern as a MIDI file |
-| `PageUp` / `PageDown` | Zoom in, out |
+| Command | Key | What it does |
+|---|---|---|
+| Select all | `Ctrl+A` | Selects every note |
+| Deselect | `Ctrl+D` or `Esc` | Clears the selection |
+| Copy, cut, paste | `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copies, cuts or pastes notes |
+| Duplicate | `Ctrl+B` | Duplicates the selection |
+| Delete | `Del` | Deletes the selection |
+| Transpose | `Up` / `Down` | Moves the selection a semitone |
+| Transpose octave | `Ctrl+Up` / `Ctrl+Down` | Moves the selection an octave |
+| Nudge | `Left` / `Right` | Moves the selection one grid step |
+| Quick quantize | `Ctrl+Q` | Quantizes starts and lengths |
+| Quantize starts | `Shift+Q` | Quantizes the starts only |
+| Chop | `Ctrl+U` | Chops the notes to the grid |
+| Glue | `Ctrl+G` | Joins touching notes |
+| Legato | `Ctrl+L` | Makes each note last until the next one |
+| Mute, unmute | `Alt+M` / `Shift+Alt+M` | Mutes or unmutes the selection |
+| Import MIDI | `Ctrl+M` | Imports a MIDI file into this channel |
+| Export MIDI | `Ctrl+Shift+M` | Exports the pattern as a MIDI file |
+| Zoom | `PageUp` / `PageDown` | Zooms in or out |
 
 The note tools (Arpeggiate, Strum, Flip, Randomise, Quantize, Chop and others) open dialogs. Their keys are on the [Shortcuts](/wiki/shortcuts/) page.
+
+## Good to know
+
+- The Piano roll shows one channel in one pattern. Change the current pattern and it shows that pattern's notes.
+- The tool letters do nothing while the typing keyboard piano (`Ctrl+T`) is on.
+- Right-click deletes with every tool, so there is no need to switch to the Eraser for one note.
+- `S` is the Slide switch here. In the Playlist the same letter is the Slip tool.
+- Notes that are not plain steps (other keys, longer notes, slides) make the channel's row in the Channel rack show a miniature instead of step buttons.
+
+## Related
+
+- [Channel rack](/wiki/channel-rack/)
+- [Playlist](/wiki/playlist/)
+- [Shortcuts](/wiki/shortcuts/)
+- [File formats](/wiki/file-formats/)

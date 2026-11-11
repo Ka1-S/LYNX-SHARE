@@ -9,17 +9,20 @@ The Playlist is where patterns become a song. It holds three kinds of clips on i
 
 The transport has two modes. Pattern mode plays the current pattern in a loop. Song mode plays the Playlist. Press `L` to switch.
 
-## Place clips
+## Place a pattern in the song
 
-The Picker panel lists the patterns, audio and automation of the project. Click one to make it the clip source.
-
-1. Pick the Pencil (`P`).
-2. Click on a track to place the Picker's clip, and drag to position it.
-3. With the Brush (`B`), drag to paint clips end to end.
+1. Press `F5` to show the Playlist.
+2. In the Picker panel, click a pattern. The Picker lists the patterns, audio and automation of the project, and the one you click becomes the clip source.
+3. Press `P` for the Pencil.
+4. Click on a track to place the clip. Keep the button down and drag to position it.
+5. Press `B` for the Brush and drag along a track to paint clips end to end.
+6. Press `L` for Song mode, then `Space` to play.
 
 Audio files can be dragged from the [Browser](/wiki/browser/) onto the Playlist.
 
 ## Tools
+
+![The Playlist's toolbar with the arrangement box, the tools and the snap box](/assets/img/wiki/playlist-tools.webp)
 
 The letters work while the typing keyboard piano (`Ctrl+T`) is off.
 
@@ -60,32 +63,45 @@ In a track's header, click selects, `Ctrl`+click adds or removes, `Shift`+click 
 
 ## Automation
 
-Right-click a knob or fader and choose `Create automation clip`. The clip appears on the Playlist. With the Pencil, drag its points, and click on the curve to add one. Automation lanes under tracks are optional and off by default.
+Right-click a knob or fader and choose `Create automation clip`. The clip appears on the Playlist. With the Pencil, drag its points, and click on the curve to add one. Automation lanes under tracks are optional and off by default. See [Automation](/wiki/automation/).
 
 ## Arrangements
 
 The arrangement box in the toolbar switches between arrangements. A project can have several.
 
-## Clip-launch layout
-
-`View › Layout style › Clip-launch workflow` adds a grid of clips and scenes next to the Playlist. It is optional. The Pattern workflow is the default.
-
 ## Keys
 
-| Key | Action |
-|---|---|
-| `Ctrl+A` | Select all |
-| `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copy, cut, paste |
-| `Ctrl+B` | Duplicate |
-| `Del` | Delete the selected clips |
-| `Shift+Del` | Delete the selected clips and close the gaps |
-| `Shift+S` | Ripple editing on or off |
-| `Alt+M` / `Shift+Alt+M` | Mute, unmute the selected clips |
-| `Ctrl+Shift+V` | Make the selected clips unique |
-| `Ctrl+G` | Merge pattern clips |
-| `PageUp` / `PageDown` | Zoom in, out |
-| `Shift+4` | Zoom to show everything |
+| Command | Key | What it does |
+|---|---|---|
+| Select all | `Ctrl+A` | Selects every clip |
+| Copy, cut, paste | `Ctrl+C` / `Ctrl+X` / `Ctrl+V` | Copies, cuts or pastes clips |
+| Duplicate | `Ctrl+B` | Duplicates the selection |
+| Delete | `Del` | Deletes the selected clips |
+| Ripple delete | `Shift+Del` | Deletes the selected clips and closes the gaps |
+| Ripple editing | `Shift+S` | Turns ripple editing on or off |
+| Mute, unmute | `Alt+M` / `Shift+Alt+M` | Mutes or unmutes the selected clips |
+| Make unique | `Ctrl+Shift+V` | Makes the selected clips unique |
+| Merge | `Ctrl+G` | Merges pattern clips |
+| Stretch | `Shift+M` | Switches Stretch for resizing audio clips |
+| Insert time | `Ctrl+Ins` | Inserts the time selection's length across all tracks |
+| Delete time | `Ctrl+Del` | Removes the time selection across all tracks |
+| Add marker | `Alt+T` | Adds a marker |
+| Zoom | `PageUp` / `PageDown` | Zooms in or out |
+| Zoom to fit | `Shift+4` | Zooms to show everything |
+| Maximize | `Enter` | Maximizes or restores the Playlist |
 
-## Known limits
+## Good to know
 
-From the 0.1.25 release notes: with several overlapping automation clips on one control, the choice of which one plays can differ from FL Studio's. A tempo moved by a linked MIDI controller does not resize audio clips. On Linux, video needs FFmpeg.
+- The Playlist is heard only in Song mode. In Pattern mode, `Space` plays the current pattern, whatever is on the tracks.
+- `View › Layout style › Clip-launch workflow` adds a grid of clips and scenes next to the Playlist. It is optional. See [Layouts](/wiki/layouts/).
+- With several overlapping automation clips on one control, the choice of which one plays can differ from FL Studio's (0.1.25 release notes).
+- A tempo moved by a linked MIDI controller does not resize audio clips.
+- On Linux, video needs FFmpeg.
+
+## Related
+
+- [Channel rack](/wiki/channel-rack/)
+- [Automation](/wiki/automation/)
+- [Recording](/wiki/recording/)
+- [Exporting](/wiki/exporting/)
+- [Layouts](/wiki/layouts/)

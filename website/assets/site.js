@@ -46,6 +46,7 @@ function applyLang(l, d){
       e.innerHTML = k in D ? t(k, ...a) : e._en;
     });
     $$('[data-i18n-alt]').forEach(e => { if (e._alt === undefined) e._alt = e.alt; e.alt = D[e.dataset.i18nAlt] || e._alt; });
+    $$('[data-i18n-ph]').forEach(e => { if (e._ph === undefined) e._ph = e.placeholder; e.placeholder = D[e.dataset.i18nPh] || e._ph; });
     $$('[data-i18n-aria]').forEach(e => { if (e._aria === undefined) e._aria = e.getAttribute('aria-label'); e.setAttribute('aria-label', D[e.dataset.i18nAria] || e._aria); });
     $$('[data-feat]').forEach(e => { if (FEAT[e.dataset.feat]) e.textContent = FEAT[e.dataset.feat]; else if (e.dataset.en) e.textContent = e.dataset.en; });
     $$('[data-insp]').forEach(e => { if (INSP[e.dataset.insp]) e.textContent = INSP[e.dataset.insp]; else if (e.dataset.en) e.textContent = e.dataset.en; });

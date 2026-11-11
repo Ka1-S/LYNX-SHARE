@@ -1,8 +1,21 @@
 ---
-title: Plugins
-summary: Which plugin formats load on each system, scanning, the sandbox and missing plugins.
+title: Third-party plugins
+summary: Plugin formats per system, scanning, the Plugin manager, separate processes and 32-bit plugins.
 status: full
 ---
+![The Plugin manager: a list of scanned plugins with vendor, type, format, status and file](/assets/img/wiki/plugin-manager.webp)
+
+LYNX SHARE hosts instrument and effect plugins from other makers. It finds them by scanning the plugin folders, and `Options › Plugin manager...` shows what it found. LYNX SHARE's own instruments and effects are described in [Built-in instruments and effects](/wiki/built-in/).
+
+## Scan and add a plugin
+
+1. Choose `Options › Scan for plugins`. Progress shows in the hint bar and you can keep working.
+2. If the plugin is in a folder of its own, open `Options › Plugin manager...`, click `Plugin folders...`, add the folder, then click `Find new plugins`.
+3. Press `F8` for the plugin picker and type part of the plugin's name.
+4. Double-click it or press `Enter`. An instrument becomes a new channel. An effect goes into the selected Mixer insert.
+
+On first start, the setup wizard lists the plugin folders and scans them in the background. `Options › Setup wizard (language, audio, plugin folders)...` opens it again. LYNX SHARE also looks for new plugins a few seconds after each start.
+
 ## Formats per system
 
 | System | Formats hosted |
@@ -13,16 +26,21 @@ status: full
 
 VST2 is not hosted on macOS. On Linux, Windows plugins work through [yabridge](https://github.com/robbert-vdh/yabridge) and Wine, which you install yourself: add the folder yabridge syncs to as a plugin folder.
 
-## Scanning
+## The Plugin manager
 
-On first start, the setup wizard lists the plugin folders and scans them in the background. `Options › Setup wizard (language, audio, plugin folders)...` opens it again.
+| Control | What it does |
+|---|---|
+| Search box | Filters by name, vendor, format or file |
+| `All`, `Instruments`, `Effects`, `Favourites`, `Failed` | Choose which plugins are listed |
+| Star column | Marks a favourite |
+| `Bits` column | 32, 64 or 32+64 (Windows) |
+| `Status` column | `OK`, `File not found` or `Failed to load` |
+| `Find new plugins` | Scans for files that are not in the list yet |
+| `Rescan all...` | Forgets the failed files and examines every file again |
+| `Plugin folders...` | Edits the folders that are scanned |
+| `Add plugin file...` | Adds one plugin file |
 
-To scan later:
-
-1. Choose `Options › Scan for plugins`. Progress shows in the hint bar and you can keep working.
-2. Or open `Options › Plugin manager...` and use `Find new plugins`, `Rescan all...`, `Plugin folders...` or `Add plugin file...`.
-
-LYNX SHARE also looks for new plugins a few seconds after each start.
+Each plugin file is examined in a separate process. A file that crashes or hangs for 30 seconds is marked as failed and skipped later. On Windows the failed files are listed with the reason in `%APPDATA%\LYNX\scan-failures.log`.
 
 The standard folders are scanned, plus the ones you add:
 
@@ -30,43 +48,53 @@ The standard folders are scanned, plus the ones you add:
 - macOS: `VST3`, `Components` and `CLAP` in `~/Library/Audio/Plug-Ins` and `/Library/Audio/Plug-Ins`.
 - Linux: `~/.vst3`, `~/.clap`, `~/.lv2`, `~/.vst` and the same folders under `/usr/lib` and `/usr/local/lib`.
 
-Each plugin file is examined in a separate process. A file that crashes or hangs for 30 seconds is marked as failed and skipped later. On Windows the failed files are listed with the reason in `%APPDATA%\LYNX\scan-failures.log`. `Rescan all...` forgets the failed ones and tries every file again.
+## Run plugins in a separate process
 
-Press `F8` for the plugin picker, which shows every generator and effect. Type to search, then double-click or press `Enter` to add one.
-
-## The plugin sandbox
-
-By default a plugin runs inside LYNX SHARE, so a plugin that crashes can take the program down. The sandbox is optional and runs each plugin in its own process.
+By default a plugin runs inside LYNX SHARE, so a plugin that crashes can take the program down. As an option, each plugin runs in its own process.
 
 1. Open `Options › General settings...`.
 2. Turn on `Run plugins in a separate process (protects LYNX SHARE from crashes)`.
 3. Reopen the project to apply it to plugins that are already open.
 
-If a sandboxed plugin crashes or stops answering, it goes silent, a notice appears and LYNX SHARE keeps running. Save the project and reopen it to reload the plugin. A sandboxed plugin's editor opens in its own window.
+If such a plugin crashes or stops answering, it is muted, a message appears and LYNX SHARE keeps running. Save the project and reopen it to load the plugin again. The plugin's editor opens in its own window.
 
-You can also turn it on for one plugin with `Always run in a separate process` in the plugin window's wrapper menu.
+To do this for one plugin only, use `Run in a separate process` or `Always run <plugin> in a separate process` in the plugin window's wrapper menu. When a plugin's editor crashes, the message that appears offers the second one too.
 
-The sandbox is available on Windows and Linux. The 0.1.25 release notes add macOS.
+This works on Windows and Linux, and since 0.1.25 on macOS.
 
 ## 32-bit plugins (Windows only)
 
-On Windows, 32-bit VST2 and VST3 plugins run through a bridge (`LYNX-bridge32.exe`). The bridge adds no latency. A plugin that crashes in it stops on its own while LYNX SHARE keeps playing. The Plugin manager has a `Bits` column (32, 64 or 32+64), and a bridged plugin's editor opens in its own window.
+On Windows, 32-bit VST2 and VST3 plugins run through a bridge (`LYNX-bridge32.exe`). The bridge adds no latency. A plugin that crashes in it stops on its own while LYNX SHARE keeps playing. A bridged plugin's editor opens in its own window. When both a 32-bit and a 64-bit build of a plugin are installed, `Bit size` in the plugin window's `Wrapper settings` chooses which one loads.
+
+## Plugin performance monitor
+
+![The Plugin performance monitor: one row per instrument and effect with its share of processing time](/assets/img/wiki/plugin-monitor.webp)
+
+`Tools › Plugin performance monitor...` lists every instrument and effect with the processing time it takes: now, on average and at its peak. 100% means one processor core busy for the whole time the audio lasts.
+
+| Setting | What it does |
+|---|---|
+| `Find` | Filters by plugin, channel or insert |
+| `Plugins only` | Hides LYNX SHARE's own instruments and effects |
+| `Freeze` | Stops updating the numbers |
+| `Reset on play` | Starts averages and peaks again each time playback starts |
+| `Reset` | Clears averages and peaks now |
 
 ## When a plugin is not installed
 
 LYNX SHARE first looks for the same plugin by its identifier, then by file, then by name. A project saved with the VST2 opens with the VST3 of the same product and the other way round, but then the plugin plays with its default settings.
 
-If an effect is not installed at all, a LYNX SHARE effect with the same role takes its slot (a reverb for a reverb, a delay for a delay):
+If an effect is not installed at all, a LYNX SHARE effect with the same role takes its slot and the original stays in the project. See [Built-in instruments and effects](/wiki/built-in/). `Help › Missing files...` lists the plugins that were replaced.
 
-- The slot shows the original plugin's name with a LYNX SHARE badge.
-- Where the saved state can be read, its settings are translated. Otherwise the stand-in starts from a default preset.
-- The original plugin and its settings stay in the project. Once the plugin is installed, the project opens with it again.
-- Automation of the original's parameters is kept but does not drive the stand-in.
+## Good to know
 
-`Help › Missing files...` lists the plugins that were replaced. The switch is `Substitute missing plugins with LYNX SHARE equivalents` in `Options › General settings...`, on by default.
+- A hosted plugin's window has a preset bar: the plugin's own programs, your presets, `Save preset...`, `Load preset file...` and `Export preset file...`. `.fxp`, `.fxb` and `.vstpreset` files only load into a plugin that runs inside LYNX SHARE, not in a separate process.
+- The monitor measures only while its window is open.
+- Missing instruments are not substituted yet. A missing instrument plugin becomes a built-in synth chosen by the channel name.
 
-Missing instruments are not substituted yet. A missing instrument plugin becomes a built-in synth chosen by the channel name.
+## Related
 
-## Built-in plugins
-
-LYNX SHARE ships its own instruments and effects: a 3-oscillator synth, a sampler, a SoundFont player, drums, EQs, compressors, limiters, reverbs, delays and more, plus engines recreated from FL Studio's native plugins that play when you open a `.flp`. The full list, with the status of each engine, is in [PLUGINS.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS.md).
+- [Built-in instruments and effects](/wiki/built-in/)
+- [Browser](/wiki/browser/)
+- [Mixer](/wiki/mixer/)
+- [Troubleshooting](/wiki/troubleshooting/)
