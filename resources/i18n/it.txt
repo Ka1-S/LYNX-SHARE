@@ -8362,3 +8362,18 @@ countries: it ch sm
 "Loudness meter beside the Master (LYNX)" = "Misuratore di loudness accanto al Master (LYNX)"
 "Start the loudness measurement again" = "Ricomincia la misura di loudness"
 "Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Loudness del Master: S = breve termine (3 s), I = integrata dall'ultimo ripristino (LUFS), TP = true peak (dBTP)"
+
+# --- Round 190am: Settings > LYNX extras
+"Short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a Reset button. Also in the Mixer menu." = "Loudness a breve termine e integrata (LUFS) e il true peak dell'uscita del Master, con un pulsante Ripristina. Anche nel menu del Mixer."
+"Hides the inserts nothing uses. The Master, the selected insert and any insert that receives audio always stay. Also in the Mixer menu." = "Nasconde gli insert che nulla usa. Il Master, l'insert selezionato e ogni insert che riceve audio restano sempre. Anche nel menu del Mixer."
+"Deleting an insert keeps the links that went into it, greyed, so they can be connected again. Also in the Mixer menu." = "Eliminando un insert, i collegamenti che vi entravano restano, in grigio, per poterli ricollegare. Anche nel menu del Mixer."
+"The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu." = "I gruppi del Mixer rispecchiano i gruppi di tracce della Playlist dopo ogni modifica. Anche nel menu del Mixer."
+"Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu." = "L'automazione può stare in corsie sotto una traccia della Playlist; le clip di automazione continuano a funzionare come prima. Anche nel menu della Playlist."
+"The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu." = "Il righello del Piano Roll mostra i numeri di battuta del punto del brano in cui suona il pattern. Anche nel menu Vista del Piano Roll."
+"The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page." = "Il valore della manopola o del fader sotto il mouse appare accanto al cursore, non solo nella barra dei suggerimenti. Anche nella pagina Generale."
+"The earlier passes stay under it, muted, to pick from. Also in the recording options menu." = "I passaggi precedenti restano sotto, in mute, per sceglierne uno. Anche nel menu delle opzioni di registrazione."
+"A key for the selected device's own window. Also in the Device view's options menu." = "Un tasto per la finestra propria del dispositivo selezionato. Anche nel menu delle opzioni della Vista dispositivi."
+"The Mixer follows the device picked in the Device view. Also in the Device view's options menu." = "Il Mixer segue il dispositivo scelto nella Vista dispositivi. Anche nel menu delle opzioni della Vista dispositivi."
+"A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Un controller di gioco comanda il trasporto e può essere collegato a qualsiasi controllo come un controller MIDI. Anche nella pagina MIDI."
+"LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "I miglioramenti propri di LYNX. Sono tutti disattivati per impostazione predefinita, quindi LYNX SHARE ha l'aspetto e il comportamento di FL Studio finché non ne attivi uno. Ogni interruttore è la stessa impostazione del punto indicato nella sua riga."
+"LYNX extras..." = "Extra di LYNX..."

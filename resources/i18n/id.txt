@@ -8362,3 +8362,18 @@ countries: id
 "Loudness meter beside the Master (LYNX)" = "Pengukur loudness di samping Master (LYNX)"
 "Start the loudness measurement again" = "Mulai lagi pengukuran loudness"
 "Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Loudness Master: S = jangka pendek (3 dtk), I = terintegrasi sejak reset terakhir (LUFS), TP = true peak (dBTP)"
+
+# --- Round 190am: Settings > LYNX extras
+"Short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a Reset button. Also in the Mixer menu." = "Loudness jangka pendek dan terintegrasi (LUFS) serta true peak keluaran Master, dengan tombol Reset. Juga ada di menu Mixer."
+"Hides the inserts nothing uses. The Master, the selected insert and any insert that receives audio always stay. Also in the Mixer menu." = "Menyembunyikan insert yang tidak dipakai apa pun. Master, insert yang dipilih, dan insert yang menerima audio selalu tetap tampil. Juga ada di menu Mixer."
+"Deleting an insert keeps the links that went into it, greyed, so they can be connected again. Also in the Mixer menu." = "Menghapus insert tetap menyimpan tautan yang masuk ke sana, berwarna abu-abu, agar bisa disambungkan lagi. Juga ada di menu Mixer."
+"The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu." = "Grup Mixer mengikuti grup trek Playlist setelah setiap perubahan. Juga ada di menu Mixer."
+"Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu." = "Otomasi dapat berada di jalur di bawah trek Playlist; klip otomasi tetap bekerja seperti sebelumnya. Juga ada di menu Playlist."
+"The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu." = "Penggaris Piano Roll menampilkan nomor birama dari tempat pola itu dimainkan di dalam lagu. Juga ada di menu Tampilan Piano Roll."
+"The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page." = "Nilai knob atau fader di bawah mouse muncul di samping kursor, bukan hanya di bilah petunjuk. Juga ada di halaman Umum."
+"The earlier passes stay under it, muted, to pick from. Also in the recording options menu." = "Putaran sebelumnya tetap ada di bawahnya, dibisukan, untuk dipilih. Juga ada di menu opsi perekaman."
+"A key for the selected device's own window. Also in the Device view's options menu." = "Sebuah tombol untuk jendela milik perangkat yang dipilih. Juga ada di menu opsi Tampilan perangkat."
+"The Mixer follows the device picked in the Device view. Also in the Device view's options menu." = "Mixer mengikuti perangkat yang dipilih di Tampilan perangkat. Juga ada di menu opsi Tampilan perangkat."
+"A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Pengontrol game menjalankan transport dan dapat ditautkan ke kontrol apa pun seperti pengontrol MIDI. Juga ada di halaman MIDI."
+"LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Penyempurnaan milik LYNX sendiri. Semuanya mati secara bawaan, sehingga LYNX SHARE tampil dan bekerja seperti FL Studio sampai Anda menyalakan salah satunya. Setiap sakelar adalah pengaturan yang sama dengan yang ada di tempat yang disebut barisnya."
+"LYNX extras..." = "Ekstra LYNX..."

@@ -11463,6 +11463,7 @@ private:
                     saveWindow (std::move (tall), "-settings-general-tall.png");
                 }
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::theme), "-settings-theme.png");
+                saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::extras), "-settings-extras.png"); // round 190am
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::audio), "-settings-audio.png");
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::midi), "-settings-midi.png");
                 saveWindow (lynx::makePluginManagerPanel (offline, false), "-plugin-manager.png");

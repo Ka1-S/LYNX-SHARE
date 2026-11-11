@@ -6121,11 +6121,12 @@ void MainComponent::openSettings (int page)
         if (safe != nullptr)
             safe->showPluginManager();
     };
+    hooks.runAction = [safe] (const std::string& id) { return safe != nullptr && safe->runAction (id); };
     hooks.midiChanged = [safe] {
         if (safe != nullptr)
             safe->updateGamepad();
     };
-    showSettings (engine, (SettingsPage) juce::jlimit (0, (int) SettingsPage::theme, page), std::move (hooks)); // (Theme was clamped to MIDI)
+    showSettings (engine, (SettingsPage) juce::jlimit (0, (int) SettingsPage::extras, page), std::move (hooks)); // (Theme was clamped to MIDI)
 }
 
 void MainComponent::showPluginManager()
@@ -6994,6 +6995,7 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("General settings..."), [this] { openSettings ((int) SettingsPage::general); });
         menu.addItem (tr ("Theme (colors, background)..."), [this] { openSettings ((int) SettingsPage::theme); });
         menu.addItem (tr ("File settings (search folders)..."), [this] { openSettings ((int) SettingsPage::files); });
+        menu.addItem (tr ("LYNX extras..."), [this] { openSettings ((int) SettingsPage::extras); }); // round 190am
         menu.addItem (tr ("Project settings (tempo, time signature)..."), [this] { openSettings ((int) SettingsPage::project); });
         menu.addItem (tr ("Project info...") + shortcutText ("view.projectInfo"), [this] { openSettings ((int) SettingsPage::info); });
         {

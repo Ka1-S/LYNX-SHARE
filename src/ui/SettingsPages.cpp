@@ -4,15 +4,19 @@
 #include "platform/Package.h"
 
 #include "core/LayoutStyle.h"
+#include "core/LynxExtras.h"
+#include "core/PlaylistOps.h"
 #include "core/ToolbarLayout.h"
 #include "engine/AudioEngine.h"
 #include "engine/PluginHost.h"
 #include "platform/LinuxRealtime.h"
 #include "ui/AutomationUi.h"
+#include "ui/DetailView.h"
 #include "ui/Dialogs.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/NewProjectDialog.h"
+#include "ui/PianoRollComponent.h"
 #include "ui/PluginSkin.h"
 #include "ui/Updater.h"
 
@@ -498,6 +502,16 @@ private:
         styleToggle (t, text);
         t.setToggleState (value, juce::dontSendNotification);
         t.onClick = [this, &t, set = std::move (set)] { change ([&] { set (t.getToggleState()); }); };
+    }
+
+    // the LYNX extras page switches this one too (round 190am): the copy kept here follows when the page comes back
+    void visibilityChanged() override
+    {
+        if (isVisible() && hooks.getGeneral)
+        {
+            options.hoverValues = hooks.getGeneral().hoverValues;
+            hoverValues.setToggleState (options.hoverValues, juce::dontSendNotification);
+        }
     }
 
     static void selectNearest (juce::ComboBox& box, int value)
@@ -1608,6 +1622,13 @@ private:
             hooks.midiChanged();
     }
 
+    // the LYNX extras page switches the game controller too (round 190am)
+    void visibilityChanged() override
+    {
+        if (isVisible())
+            gamepadToggle.setToggleState (engine.getMidiPrefs().gamepad, juce::dontSendNotification);
+    }
+
     void load()
     {
         const juce::ScopedValueSetter<bool> guard (loading, true);
@@ -1783,7 +1804,210 @@ private:
     juce::Label gamepadNote;
     juce::ListBox links;
 };
+
+// ================================================================================================================
+// LYNX extras (round 190am)
+// ================================================================================================================
+class ExtrasPage final : public ScrollingPage
+{
+public:
+    ExtrasPage (AudioEngine& e, SettingsHooks h, bool keep) : engine (e), hooks (std::move (h)), persistent (keep)
+    {
+        styleNote (intro, tr ("LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio "
+                              "until you switch one on. Each switch is the same setting as in the place its line names."));
+        intro.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        add (intro);
+        std::string_view section;
+        for (const auto& item : extras::items)
+        {
+            if (item.section != section)
+            {
+                section = item.section;
+                titles.push_back (std::make_unique<SectionTitle> (tr (std::string (item.section).c_str())));
+                add (*titles.back());
+            }
+            auto& row = *rows.emplace_back (std::make_unique<Row>());
+            row.id = std::string (item.id);
+            row.title = titles.back().get();
+            styleToggle (row.toggle, tr (std::string (item.title).c_str()));
+            row.toggle.setComponentID (juce::String (row.id)); // (--snapshot and tests find a switch by its id)
+            row.toggle.onClick = [this, &row] {
+                setLynxExtra (engine, hooks, row.id, row.toggle.getToggleState(), persistent);
+                refresh(); // (what the app really did, e.g. an action that was refused)
+            };
+            styleNote (row.note, tr (std::string (item.note).c_str()));
+            add (row.toggle);
+            add (row.note);
+        }
+        refresh();
+    }
+
+    // another page or a menu may have switched one meanwhile
+    void visibilityChanged() override
+    {
+        if (isVisible())
+            refresh();
+    }
+
+    int layout (int width) override
+    {
+        Rows r (width);
+        const auto noteFont = theme::font (theme::type::small);
+        const auto linesOf = [&noteFont] (const juce::Label& label, int w) {
+            juce::AttributedString text (label.getText());
+            text.setFont (noteFont);
+            juce::TextLayout fitted;
+            fitted.createLayout (text, (float) juce::jmax (40, w - 8));
+            return juce::jmax (1, fitted.getNumLines());
+        };
+        intro.setBounds (r.full (4 + 15 * linesOf (intro, r.area.getWidth())));
+        const SectionTitle* title = nullptr;
+        for (auto& row : rows)
+        {
+            if (row->title != title)
+            {
+                r.section (*row->title, title == nullptr);
+                title = row->title;
+            }
+            row->toggle.setBounds (r.full (24));
+            const auto noteWidth = r.area.getWidth() - noteIndent;
+            const auto noteHeight = 4 + 15 * linesOf (row->note, noteWidth);
+            row->note.setBounds (r.full (noteHeight).withTrimmedLeft (noteIndent).translated (0, -5));
+        }
+        return r.bottom();
+    }
+
+private:
+    struct Row
+    {
+        std::string id;
+        SectionTitle* title = nullptr;
+        juce::ToggleButton toggle;
+        juce::Label note;
+    };
+
+    void refresh()
+    {
+        for (auto& row : rows)
+            row->toggle.setToggleState (lynxExtraOn (engine, hooks, row->id), juce::dontSendNotification);
+    }
+
+    static constexpr int noteIndent = 27; // under the caption, past the check box
+    AudioEngine& engine;
+    SettingsHooks hooks;
+    bool persistent;
+    juce::Label intro;
+    std::vector<std::unique_ptr<SectionTitle>> titles;
+    std::vector<std::unique_ptr<Row>> rows;
+};
 } // namespace
+
+bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id)
+{
+    if (id == "mixer.loudness") return MixerStrips::showLoudness;
+    if (id == "mixer.usedOnly") return MixerStrips::showUsedOnly;
+    if (id == "mixer.keepLostLinks") return MixerStrips::keepLostLinks;
+    if (id == "mixer.followPlaylist") return MixerStrips::followPlaylist;
+    if (id == "playlist.automationLanes") return autolanes::shown();
+    if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
+    if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
+    if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
+    if (id == "detail.windowKey") return DetailView::extraWindowKey;
+    if (id == "detail.selectInMixer") return DetailView::extraSelectInMixer;
+    if (id == "midi.gamepad") return engine.getMidiPrefs().gamepad;
+    return false;
+}
+
+void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id, bool on, bool persistent)
+{
+    if (lynxExtraOn (engine, hooks, id) == on)
+        return;
+    const auto saved = [] { // the main window writes ui-options.txt
+        if (mixeroptions::changed)
+            mixeroptions::changed();
+    };
+    // a view option with an action: the action is what its menu item runs (it also refreshes the editor and saves)
+    const auto toggledBy = [&hooks] (const char* action) { return hooks.runAction && hooks.runAction (action); };
+
+    if (id == "mixer.loudness")
+    {
+        if (mixeroptions::setShowLoudness)
+            mixeroptions::setShowLoudness (on);
+        else
+            MixerStrips::showLoudness = on;
+        saved();
+    }
+    else if (id == "mixer.usedOnly")
+    {
+        if (mixeroptions::setShowUsedOnly)
+            mixeroptions::setShowUsedOnly (on);
+        else
+            MixerStrips::showUsedOnly = on;
+        saved();
+    }
+    else if (id == "mixer.keepLostLinks")
+    {
+        MixerStrips::keepLostLinks = on;
+        saved();
+    }
+    else if (id == "mixer.followPlaylist")
+    {
+        MixerStrips::followPlaylist = on;
+        if (on)
+            engine.editSong ([] (Song& s) { mixerops::followPlaylistGroups (s); });
+        saved();
+    }
+    else if (id == "playlist.automationLanes")
+    {
+        if (! toggledBy ("playlist.automationLanes"))
+        {
+            autolanes::setShown (on);
+            saved();
+        }
+    }
+    else if (id == "pianoRoll.songBarsRuler")
+    {
+        if (! toggledBy ("pianoRoll.songBarsRuler"))
+        {
+            PianoRollComponent::songBarsRuler = on;
+            saved();
+        }
+    }
+    else if (id == "general.hoverValues")
+    {
+        if (hooks.getGeneral && hooks.setGeneral)
+        {
+            auto options = hooks.getGeneral();
+            options.hoverValues = on;
+            hooks.setGeneral (options);
+        }
+    }
+    else if (id == "record.lastLoopPassPlays")
+    {
+        auto options = engine.getRecordOptions();
+        options.lastLoopPassPlays = on;
+        engine.setRecordOptions (options);
+        saved();
+    }
+    else if (id == "detail.windowKey" || id == "detail.selectInMixer")
+    {
+        (id == "detail.windowKey" ? DetailView::extraWindowKey : DetailView::extraSelectInMixer) = on;
+        saved();
+    }
+    else if (id == "midi.gamepad")
+    {
+        auto prefs = engine.getMidiPrefs();
+        prefs.gamepad = on;
+        engine.setMidiPrefs (prefs, persistent);
+        if (hooks.midiChanged)
+            hooks.midiChanged();
+    }
+}
+
+std::unique_ptr<juce::Component> makeExtrasPage (AudioEngine& engine, const SettingsHooks& hooks, bool persistent)
+{
+    return std::make_unique<ExtrasPage> (engine, hooks, persistent);
+}
 
 std::unique_ptr<juce::Component> makeGeneralPage (AudioEngine& engine, const SettingsHooks& hooks, bool persistent)
 {

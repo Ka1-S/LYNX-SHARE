@@ -8362,3 +8362,18 @@ countries: tw hk mo
 "Loudness meter beside the Master (LYNX)" = "在 Master 旁顯示響度表（LYNX）"
 "Start the loudness measurement again" = "重新開始響度測量"
 "Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Master 的響度：S = 短期（3 秒），I = 自上次重設以來的整合響度（LUFS），TP = 真實峰值（dBTP）"
+
+# --- Round 190am: Settings > LYNX extras
+"Short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a Reset button. Also in the Mixer menu." = "Master 輸出的短期響度和整合響度（LUFS）以及真實峰值，附重設按鈕。混音器選單中也有。"
+"Hides the inserts nothing uses. The Master, the selected insert and any insert that receives audio always stay. Also in the Mixer menu." = "隱藏沒有任何用途的插入軌。Master、選取的插入軌以及任何接收音訊的插入軌一律保留。混音器選單中也有。"
+"Deleting an insert keeps the links that went into it, greyed, so they can be connected again. Also in the Mixer menu." = "刪除插入軌時，原本進入它的連結會以灰色保留，以便重新連接。混音器選單中也有。"
+"The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu." = "每次變更後，混音器的分組都與 Playlist 的音軌分組保持一致。混音器選單中也有。"
+"Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu." = "自動化可以放在 Playlist 音軌下方的通道裡；自動化片段照常使用。Playlist 選單中也有。"
+"The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu." = "鋼琴捲軸的尺規顯示該樣式在歌曲中播放位置的小節編號。鋼琴捲軸的檢視選單中也有。"
+"The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page." = "滑鼠下方旋鈕或推桿的數值會顯示在游標旁，而不只是在提示列裡。一般頁面中也有。"
+"The earlier passes stay under it, muted, to pick from. Also in the recording options menu." = "先前的各遍會靜音保留在其下方，可供挑選。錄音選項選單中也有。"
+"A key for the selected device's own window. Also in the Device view's options menu." = "用來顯示或隱藏所選裝置自身視窗的按鍵。裝置檢視的選項選單中也有。"
+"The Mixer follows the device picked in the Device view. Also in the Device view's options menu." = "混音器跟隨在裝置檢視中選取的裝置。裝置檢視的選項選單中也有。"
+"A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "遊戲手把可以控制走帶，並能像 MIDI 控制器一樣連結到任何控制項。MIDI 頁面中也有。"
+"LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 自己的改進。它們預設全部關閉，因此在你開啟其中一項之前，LYNX SHARE 的外觀和行為都與 FL Studio 相同。每個開關與其所在行指明位置的設定是同一個設定。"
+"LYNX extras..." = "LYNX 附加功能..."

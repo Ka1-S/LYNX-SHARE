@@ -2295,3 +2295,24 @@ FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flag
 `docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on
 export, so a plugin detached in FL opens detached in LYNX and the other way round. LYNX's own instruments and effects
 have no Detached state: their imported flags are kept as they were.
+
+## Round 190am: LYNX extras (loudness meter, used inserts only, the Settings page)
+None of these is an FL Studio feature: they are LYNX's own, all off by default, so FL's look and behaviour are
+unchanged until one is switched on. Nothing is saved in projects.
+
+- **Loudness meter beside the Master** (Mixer menu, `mixerLoudness`): a narrow panel right of the Master shows the
+  short-term (S) and integrated (I) loudness in LUFS and the true peak (TP) in dBTP of the Master's output, a
+  short-term bar with the integrated value as a line, and a Reset button. It is the meter the export and Apex Limiter
+  use (`core/Loudness.h`, ITU-R BS.1770-4), run on the audio thread by `core/MasterLoudness.h`. Off, the audio thread
+  does one atomic load per block and measures nothing. Measured (2026-11-10, `verify/results.txt` of the round):
+  integrated loudness within 0.03 LU of the EBU Tech 3341 cases 1 to 5 at 44.1, 48 and 96 kHz and equal to ffmpeg's
+  `ebur128` to its 0.1 LU read-out on four songs; true peak within +0.27 / -0.23 dB on the cases 15 to 18 and within
+  0.13 dB of ffmpeg on the songs.
+- **Show only used inserts** (Mixer menu, round 163) now has an exact rule, `mixerops::hiddenUnusedInserts`: an
+  insert hides only when it is not the Master, is not selected, was not brought back with "+", shows no level on its
+  meter and nothing uses it (`Song::insertInUse`: no channel, send, effect, input, Playlist link, sidechain or extra
+  output, default name and settings, no automation). A hidden insert that is selected from elsewhere or starts to
+  receive audio comes back and stays.
+- **Settings › LYNX extras**: one page with every LYNX improvement that is off by default (`core/LynxExtras.h`), each
+  with its switch and one line saying what it does and where its own switch is. The page stores nothing: each switch
+  reads and writes the feature's own preference.

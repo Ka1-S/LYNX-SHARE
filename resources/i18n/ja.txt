@@ -8362,3 +8362,18 @@ countries: jp
 "Loudness meter beside the Master (LYNX)" = "マスターの横にラウドネスメーター（LYNX）"
 "Start the loudness measurement again" = "ラウドネスの測定をやり直す"
 "Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "マスターのラウドネス：S = ショートターム（3 秒）、I = 前回のリセット以降のインテグレーテッド（LUFS）、TP = トゥルーピーク（dBTP）"
+
+# --- Round 190am: Settings > LYNX extras
+"Short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a Reset button. Also in the Mixer menu." = "マスター出力のショートタームとインテグレーテッドのラウドネス（LUFS）とトゥルーピークを、リセットボタン付きで表示します。ミキサーメニューにもあります。"
+"Hides the inserts nothing uses. The Master, the selected insert and any insert that receives audio always stay. Also in the Mixer menu." = "何にも使われていないインサートを隠します。マスター、選択中のインサート、オーディオを受けているインサートは常に残ります。ミキサーメニューにもあります。"
+"Deleting an insert keeps the links that went into it, greyed, so they can be connected again. Also in the Mixer menu." = "インサートを削除しても、そこへ入っていたリンクをグレー表示で残し、つなぎ直せるようにします。ミキサーメニューにもあります。"
+"The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu." = "変更のたびに、ミキサーのグループがプレイリストのトラックグループに合わせられます。ミキサーメニューにもあります。"
+"Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu." = "オートメーションをプレイリストのトラックの下のレーンに置けます。オートメーションクリップはこれまでどおり使えます。プレイリストメニューにもあります。"
+"The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu." = "ピアノロールのルーラーに、そのパターンが曲の中で鳴る位置の小節番号を表示します。ピアノロールの表示メニューにもあります。"
+"The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page." = "マウスの下のノブやフェーダーの値を、ヒントバーだけでなくカーソルの横にも表示します。全般ページにもあります。"
+"The earlier passes stay under it, muted, to pick from. Also in the recording options menu." = "それ以前のパスはミュートされて下に残り、選び直せます。録音オプションのメニューにもあります。"
+"A key for the selected device's own window. Also in the Device view's options menu." = "選択中のデバイス自身のウィンドウを開閉するキーです。デバイスビューのオプションメニューにもあります。"
+"The Mixer follows the device picked in the Device view. Also in the Device view's options menu." = "デバイスビューで選んだデバイスにミキサーが追従します。デバイスビューのオプションメニューにもあります。"
+"A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "ゲームコントローラーでトランスポートを操作でき、MIDI コントローラーのようにどのコントロールにもリンクできます。MIDI ページにもあります。"
+"LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 独自の改良です。すべて初期設定ではオフなので、どれかをオンにするまで LYNX SHARE の見た目と動作は FL Studio と同じです。各スイッチは、その行に書かれた場所にある設定と同じものです。"
+"LYNX extras..." = "LYNX の追加機能..."

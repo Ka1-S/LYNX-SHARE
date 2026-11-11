@@ -8362,3 +8362,18 @@ countries: pl
 "Loudness meter beside the Master (LYNX)" = "Miernik głośności obok Mastera (LYNX)"
 "Start the loudness measurement again" = "Zacznij pomiar głośności od nowa"
 "Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Głośność Mastera: S = krótkoterminowa (3 s), I = zintegrowana od ostatniego resetu (LUFS), TP = true peak (dBTP)"
+
+# --- Round 190am: Settings > LYNX extras
+"Short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a Reset button. Also in the Mixer menu." = "Głośność krótkoterminowa i zintegrowana (LUFS) oraz true peak wyjścia Mastera, z przyciskiem Resetuj. Także w menu Miksera."
+"Hides the inserts nothing uses. The Master, the selected insert and any insert that receives audio always stay. Also in the Mixer menu." = "Ukrywa inserty, których nic nie używa. Master, zaznaczony insert i każdy insert odbierający dźwięk zawsze zostają. Także w menu Miksera."
+"Deleting an insert keeps the links that went into it, greyed, so they can be connected again. Also in the Mixer menu." = "Po usunięciu insertu prowadzące do niego połączenia zostają, wyszarzone, aby można je było podłączyć ponownie. Także w menu Miksera."
+"The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu." = "Grupy miksera odwzorowują grupy ścieżek Playlisty po każdej zmianie. Także w menu Miksera."
+"Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu." = "Automatyka może leżeć na pasach pod ścieżką Playlisty; klipy automatyki działają jak dotąd. Także w menu Playlisty."
+"The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu." = "Linijka Piano Roll pokazuje numery taktów miejsca w utworze, w którym gra pattern. Także w menu Widok w Piano Roll."
+"The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page." = "Wartość pokrętła lub suwaka pod myszą pojawia się obok kursora, nie tylko na pasku podpowiedzi. Także na stronie Ogólne."
+"The earlier passes stay under it, muted, to pick from. Also in the recording options menu." = "Wcześniejsze przebiegi zostają pod spodem, wyciszone, do wyboru. Także w menu opcji nagrywania."
+"A key for the selected device's own window. Also in the Device view's options menu." = "Klawisz dla własnego okna zaznaczonego urządzenia. Także w menu opcji Widoku urządzeń."
+"The Mixer follows the device picked in the Device view. Also in the Device view's options menu." = "Mikser podąża za urządzeniem wybranym w Widoku urządzeń. Także w menu opcji Widoku urządzeń."
+"A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Kontroler do gier steruje transportem i można go powiązać z dowolną kontrolką jak kontroler MIDI. Także na stronie MIDI."
+"LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Własne ulepszenia LYNX. Wszystkie są domyślnie wyłączone, więc LYNX SHARE wygląda i działa jak FL Studio, dopóki którejś nie włączysz. Każdy przełącznik to to samo ustawienie co w miejscu wskazanym w jego wierszu."
+"LYNX extras..." = "Dodatki LYNX..."

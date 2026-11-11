@@ -8362,3 +8362,18 @@ countries: ru by kz
 "Loudness meter beside the Master (LYNX)" = "Измеритель громкости рядом с Master (LYNX)"
 "Start the loudness measurement again" = "Начать измерение громкости заново"
 "Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Громкость Master: S = кратковременная (3 с), I = интегральная с последнего сброса (LUFS), TP = истинный пик (dBTP)"
+
+# --- Round 190am: Settings > LYNX extras
+"Short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a Reset button. Also in the Mixer menu." = "Кратковременная и интегральная громкость (LUFS) и истинный пик выхода Master, с кнопкой сброса. Также в меню микшера."
+"Hides the inserts nothing uses. The Master, the selected insert and any insert that receives audio always stay. Also in the Mixer menu." = "Скрывает инсерты, которые ничем не используются. Master, выбранный инсерт и любой инсерт, принимающий звук, остаются всегда. Также в меню микшера."
+"Deleting an insert keeps the links that went into it, greyed, so they can be connected again. Also in the Mixer menu." = "При удалении инсерта связи, которые в него входили, остаются серыми, чтобы их можно было подключить снова. Также в меню микшера."
+"The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu." = "Группы микшера повторяют группы дорожек Playlist после каждого изменения. Также в меню микшера."
+"Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu." = "Автоматизация может лежать в полосах под дорожкой Playlist; клипы автоматизации работают как раньше. Также в меню Playlist."
+"The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu." = "Линейка Piano Roll показывает номера тактов того места песни, где играет паттерн. Также в меню «Вид» Piano Roll."
+"The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page." = "Значение ручки или фейдера под мышью показывается рядом с курсором, а не только в строке подсказок. Также на странице «Общие»."
+"The earlier passes stay under it, muted, to pick from. Also in the recording options menu." = "Предыдущие проходы остаются под ним, заглушённые, на выбор. Также в меню параметров записи."
+"A key for the selected device's own window. Also in the Device view's options menu." = "Клавиша для собственного окна выбранного устройства. Также в меню параметров вида устройств."
+"The Mixer follows the device picked in the Device view. Also in the Device view's options menu." = "Микшер следует за устройством, выбранным в виде устройств. Также в меню параметров вида устройств."
+"A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Геймпад управляет транспортом и может быть привязан к любому элементу управления, как MIDI-контроллер. Также на странице MIDI."
+"LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Собственные улучшения LYNX. Все они по умолчанию выключены, поэтому LYNX SHARE выглядит и ведёт себя как FL Studio, пока вы не включите какое-нибудь. Каждый переключатель — та же настройка, что и в месте, названном в его строке."
+"LYNX extras..." = "Дополнения LYNX..."

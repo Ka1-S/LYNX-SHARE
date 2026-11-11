@@ -2,6 +2,8 @@
 
 #include <functional>
 #include <memory>
+#include <string>
+#include <string_view>
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -73,12 +75,23 @@ struct SettingsHooks
     std::function<void (const GeneralOptions&)> setGeneral; // applies and saves
     std::function<void()> manageShortcuts, managePlugins;
     std::function<void()> midiChanged;                   // the MIDI settings were changed (the engine already has them)
+    // runs one of the main window's actions by id ("playlist.automationLanes"): the LYNX extras page switches a view
+    // option exactly as its menu item does (round 190am)
+    std::function<bool (const std::string&)> runAction;
 };
 
 // Settings pages (Settings window, ui/SettingsDialog.cpp)
 std::unique_ptr<juce::Component> makeGeneralPage (AudioEngine& engine, const SettingsHooks& hooks, bool persistent);
 std::unique_ptr<juce::Component> makeAudioPage (AudioEngine& engine, bool persistent);
 std::unique_ptr<juce::Component> makeMidiPage (AudioEngine& engine, const SettingsHooks& hooks, bool persistent);
+// Settings › LYNX extras (round 190am, decision D7): LYNX's own improvements that are off by default, each with its
+// switch and one line of explanation (core/LynxExtras.h). The switches mirror the preferences the features already
+// have: nothing is stored by the page itself.
+std::unique_ptr<juce::Component> makeExtrasPage (AudioEngine& engine, const SettingsHooks& hooks, bool persistent);
+// Whether the extra `id` (core/LynxExtras.h) is on now, and switching it: the same variables and the same code paths
+// as each feature's own menu item or check box.
+bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id);
+void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id, bool on, bool persistent);
 
 // The autosave folder (%APPDATA%\LYNX\autosave).
 juce::File autosaveFolder();

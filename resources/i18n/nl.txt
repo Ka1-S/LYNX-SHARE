@@ -8362,3 +8362,18 @@ countries: nl be
 "Loudness meter beside the Master (LYNX)" = "Luidheidsmeter naast de Master (LYNX)"
 "Start the loudness measurement again" = "De luidheidsmeting opnieuw starten"
 "Loudness of the Master: S = short-term (3 s), I = integrated since the last reset (LUFS), TP = true peak (dBTP)" = "Luidheid van de Master: S = korte termijn (3 s), I = geïntegreerd sinds de laatste reset (LUFS), TP = true peak (dBTP)"
+
+# --- Round 190am: Settings > LYNX extras
+"Short-term and integrated loudness (LUFS) and the true peak of the Master's output, with a Reset button. Also in the Mixer menu." = "Kortetermijn- en geïntegreerde luidheid (LUFS) en de true peak van de Master-uitgang, met een Reset-knop. Ook in het Mixer-menu."
+"Hides the inserts nothing uses. The Master, the selected insert and any insert that receives audio always stay. Also in the Mixer menu." = "Verbergt de inserts die door niets worden gebruikt. De Master, de geselecteerde insert en elke insert die audio ontvangt blijven altijd staan. Ook in het Mixer-menu."
+"Deleting an insert keeps the links that went into it, greyed, so they can be connected again. Also in the Mixer menu." = "Bij het verwijderen van een insert blijven de koppelingen ernaartoe grijs staan, zodat ze opnieuw kunnen worden verbonden. Ook in het Mixer-menu."
+"The mixer's groups mirror the Playlist's track groups after every change. Also in the Mixer menu." = "De groepen van de Mixer volgen na elke wijziging de spoorgroepen van de Playlist. Ook in het Mixer-menu."
+"Automation can sit in lanes under a Playlist track; automation clips keep working as before. Also in the Playlist menu." = "Automatisering kan in banen onder een Playlist-spoor staan; automatiseringsclips blijven werken zoals voorheen. Ook in het Playlist-menu."
+"The Piano roll's ruler shows the bar numbers of the place in the song where the pattern plays. Also in the Piano roll's View menu." = "De liniaal van de Piano Roll toont de maatnummers van de plek in het nummer waar het pattern speelt. Ook in het menu Weergave van de Piano Roll."
+"The value of the knob or fader under the mouse shows beside the cursor, not only in the hint bar. Also on the General page." = "De waarde van de knop of fader onder de muis verschijnt naast de cursor, niet alleen in de hintbalk. Ook op de pagina Algemeen."
+"The earlier passes stay under it, muted, to pick from. Also in the recording options menu." = "De eerdere rondes blijven eronder staan, gedempt, om uit te kiezen. Ook in het menu met opname-opties."
+"A key for the selected device's own window. Also in the Device view's options menu." = "Een toets voor het eigen venster van het geselecteerde apparaat. Ook in het optiemenu van de Apparaatweergave."
+"The Mixer follows the device picked in the Device view. Also in the Device view's options menu." = "De Mixer volgt het apparaat dat in de Apparaatweergave is gekozen. Ook in het optiemenu van de Apparaatweergave."
+"A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Een gamecontroller bedient het transport en kan net als een MIDI-controller aan elke regelaar worden gekoppeld. Ook op de MIDI-pagina."
+"LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Eigen verbeteringen van LYNX. Ze staan standaard allemaal uit, zodat LYNX SHARE eruitziet en werkt als FL Studio totdat je er een aanzet. Elke schakelaar is dezelfde instelling als op de plek die in de regel wordt genoemd."
+"LYNX extras..." = "LYNX-extra's..."
