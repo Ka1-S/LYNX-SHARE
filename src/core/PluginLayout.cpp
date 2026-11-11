@@ -2180,6 +2180,8 @@ Layout withEmberClassic (Layout l)
     add (label (536, 330, 80, 34, TR_NOOP ("Style"), alignLeft));
     // projects saved before round 165 keep round 136's Punish until switched to the measured law
     add (when (tabs (40, 336, 150, 22, "Classic law", TR_NOOP ("Old|Measured")), "Classic law", 0.0f, 0.5f));
+    // … and those saved before round 190ar keep round trial187b's high-drive tables until switched (the row above it)
+    add (when (tabs (40, 310, 150, 22, "Classic hot law", TR_NOOP ("Old|Measured")), "Classic hot law", 0.0f, 0.5f));
     add (toggle (604, 336, 116, 24, "Voicing", TR_NOOP ("Advanced"), inverted));
     return l;
 }

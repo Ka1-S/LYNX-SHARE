@@ -76,7 +76,7 @@ there.
 | Atrium | ValhallaRoom | 9 | 8 | 5 | 7 | 135 | 170c: Stability 6 → 7 (Early mod rate / depth work); 183b: sound 4 → 5 (fxparity 3.17 → 3.50, verb 8.08 → 8.54; bank 3.14 → 3.59 / 8.14 → 8.52): level laws of Early/Late, Decay and Late size |
 | Auto-pan (stand-in) | PanMan | 9 | 8 | 6 | 8 | 152 |  |
 | Foil Plate | Little Plate | 9 | 8 | 6 | 8 | 152 |  |
-| Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | trial187b | 8 → 9 / 7 → 9; trial187b: drives 8 / 10 measured, a hot model per style: 4.8 → 5.0 (high-drive bank 3.1 → 3.8) |
+| Ember Saturator | Decapitator | 9 | 9 | 5 | 6 | trial187b | 8 → 9 / 7 → 9; trial187b: drives 8 / 10 measured, a hot model per style: 4.8 → 5.0 (high-drive bank 3.1 → 3.8); round 190ar: the coupling ahead of the curve in styles T and P, high-drive bank 3.76 → 3.91 |
 | Apex Limiter | Pro-L 2 | 9 | 9 | 7 | 6 | tp172b | tp172b: sound 2 → 7 (first programme comparison: 5.7 → 6.9; two-stage release); trial187b: 16 more settings measured (6.8), no change |
 | Epoch Verb | ValhallaVintageVerb | 9 | 9 | 5 | 8 | 135 |  |
 | Nebula | Valhalla Supermassive | 9 | 9 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.20 → 3.33, verb 6.05 → 7.19 on the matched settings; bank 3.11 → 3.33 / 6.16 → 7.30; stereo part 1.8 → 9.3): the tail is stereo as the reference's, the modulation law of its level |
@@ -2585,3 +2585,24 @@ what it rendered before.
 | Pre-fader send | none: every route between inserts is post-fader | a Pre / Post toggle per return track (all tracks' sends to that return) | a switch per send: right-click the send knob or the route arrow › "Pre-fader send". The send then leaves after the insert's effects and EQ and before its fader, pan, separation, polarity and swap; the insert's mute and solo still silence it. A "PRE" mark sits beside the knob. Saved only when used (`preSends`): an older LYNX opens the project with those sends post-fader. `.flp` export writes FL's post-fader route and says so in the report. `.als`: Live's "Pre" return comes in as pre-fader sends; a return whose sends are all pre-fader goes out as "Pre" (mixed: "Post", with a note). The planned session-recording mixer (GAPMAP-0126 item 6) uses the same field | LYNX extra |
 | Low latency while recording | "Bypass track latency compensation" per track (the track's outputs are not delayed; its own slow effects still delay it) | "Reduced Latency When Monitoring" (skips the compensation, not the effects) | Record menu and Mixer › Disk recording › "Low latency while recording". While an insert with an audio input is armed or monitored "On", every active slot with a latency above 0 samples (reported, or set by hand for a hosted plugin) on that insert and on its path to the Master (sends above level 0, effect sends, the Master) is bypassed and the PDC plan is made without it; the slot shows an amber ring and a "LOW LAT" badge. Back at disarm (at stop with "Disarm the inserts when recording stops"), when monitoring leaves "On", or when the option goes off; a returning slot starts from a reset state. Never changes the take: an insert whose take is tapped after its slots (FL's default "Post EQ"), or that feeds an armed insert recording more than its device input, keeps its slots. Lives in the engine's snapshot only: the song, undo and the saved project are untouched; exports never use it. First step of the cross-DAW item (Cubase "Constrain Delay Compensation"); the dual-path engine is decision D6 | LYNX extra |
 | Browser preview in time | the Browser plays a file as it is; tempo-synced audition needs the sample dropped into the Playlist (stretch) | the Browser's Preview button with "Raw" off: loops play warped to the set's tempo and wait for the global quantization | Browser options menu › "Preview in time (loops play at the project's tempo, on the beat)". The file's tempo comes from its ACID/tempo chunk, then its name ("… 128 bpm", or a bare number that fits the length in whole beats), then LYNX's tempo detection (only when the file is a whole number of beats long). It is stretched with LYNX's own stretcher (pitch kept) off the audio thread and starts on the next beat heard while the song plays; at once when stopped. One-shots, long files and files with no usable tempo play as today. Key matching is not part of this | built (round 190aq), off by default |
+## Round 190ar: Ember Classic at high drive (styles T and P), the coupling ahead of the curve
+Black-box on the reference's captures (round trial190k's 1 kHz stairs at drive 8 / 10, round trial187b's programme
+takes). Driven hard, the reference's square wave is uneven: the side with the lower ceiling lasts 67 … 77 % of the
+period from −21 dBFS up (T: +0.33 / −0.85, P: +0.32 / −0.85) and the second harmonic stays near −10 dB. Round
+trial187b's tables went even at the top (±0.42; second harmonic −41 dB at −3 dBFS): their bias follows the curve's
+low-passed output, which cannot grow with the input. Now the bias also takes the integral of the curve's output
+(`StyleModel::servo`), so the curve's own output averages to nothing whatever the level.
+
+| Bank | Files | Score before → after | Null before → after | Up / same / down |
+|---|---|---|---|---|
+| trial187b, drives 8 … 10 (20 settings) | 100 | 3.76 → 3.91 | −7.5 → −8.3 dB | 12 / 88 / 0 |
+| T 8 / 9 / 10, P 8 / 9 / 10, P 10 + Punish | 35 | 3.43 → 3.86 | −4.7 → −6.8 dB | 12 / 23 / 0 |
+| tp172d (drives up to 8, styles A / E / N) | 24 | 5.00 → 5.00 | −14.4 → −14.4 dB | 0 / 24 / 0 |
+
+Versioned: the appended `Classic hot law` parameter is on for new instances; a project saved before loads with it off
+and renders bit for bit as before (40 of 40 renders, every style, with and without Punish). Drives up to 5, styles A
+and N, style E and T / E with Punish keep round trial187b's tables: A and N had nothing to gain, the other three each
+put one take a score step down (E alone: drive 8 3.6 → 4.0 and drive 10 3.0 → 3.2, one vocal take 3 → 2).
+CPU and latency unchanged (one multiply-add per oversampled sample). Open: style E's ceilings give way above about
+−14 dBFS at drive 10 (their sum 1.45 → 0.62); a level-dependent ceiling scale did not lower the fit's error.
+Tools and tables: `/mnt/e/lynx-work/parity190ar/ember` (`emfit3.cpp`, `apply_tables.py`, `gatecmp.py`, `gate/`).

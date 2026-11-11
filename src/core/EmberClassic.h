@@ -38,6 +38,12 @@ struct StyleModel
     // round 165 [EXEC trial, REA_rodada165ha §1]: Punish's measured law — it adds punishLawDb + punishLawPerUnitDb × drive
     // before the curve (round 136's constant punishDb was fitted on a reading the trial gets wrong right after a toggle)
     double punishLawDb = 14.0, punishLawPerUnitDb = 0.4;
+    // round 190ar [EXEC trial, black-box]: the coupling ahead of the curve. Driven hard, the reference's square wave is
+    // not half and half: the side with the lower ceiling lasts longer (67 … 77 % of the period in styles E, T and P from
+    // −21 dBFS up at drive 10) and the two ceilings keep their sum, so the curve's own output averages to nothing. The
+    // bias takes the integral of the curve's output (less its value at rest), `servo` per millisecond, with a slow leak;
+    // 0 = no coupling (every round before)
+    double servo = 0.0, servoLeakMs = 3000.0;
 };
 
 constexpr int styleCount = 5;                   // A, E, N, T, P
@@ -68,6 +74,7 @@ struct Settings
     double mix = 1.0;                           // 0 … 1, linear
     double outputDb = 0.0;
     bool measuredPunish = true;                 // round 165: Punish's measured law (false = round 136's +9.75 dB)
+    bool hotCoupling = true;                    // round 190ar: the high-drive tables with the coupling (false = round trial187b's)
     bool operator== (const Settings&) const = default;
 };
 
@@ -123,7 +130,7 @@ private:
     };
     struct Channel
     {
-        double dcX = 0.0, dcY = 0.0, env = 0.0;
+        double dcX = 0.0, dcY = 0.0, env = 0.0, servo = 0.0;
         Os4 os;
         std::vector<float> dry;                 // delay line of the dry input (latency samples)
         std::vector<float> wetPad;              // the wet path's pad up to the latency
@@ -133,7 +140,7 @@ private:
     static constexpr int maxBlock = 2048;
     void design();
     void block (float* left, float* right, int n) noexcept;
-    float curve (float v, double& env) const noexcept;
+    float curve (float v, double& env, double& servo) const noexcept;
 
     double sr = 48000.0;
     Settings s;
@@ -141,7 +148,7 @@ private:
     Biquad lowCut, tone;
     OnePole preLow, preHigh, postLow, postHigh;
     std::array<float, 31> cut {};               // High cut taps (linear phase, centre at 15)
-    double gain = 1.0, out = 1.0, dcA = 0.0, envA = 0.0, envR = 0.0, dryGain = 1.0;
+    double gain = 1.0, out = 1.0, dcA = 0.0, envA = 0.0, envR = 0.0, dryGain = 1.0, servoK = 0.0, servoLeak = 0.0, servoRest = 0.0;
     std::array<Channel, 2> ch;
     std::vector<float> wet;
 };

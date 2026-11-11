@@ -98,7 +98,8 @@ StyleModel punishModelA()
 // curve blends from the table at drive 5 to it at drive 10, and its output trim keeps the table's small-signal gain, so
 // round 136 / 165's drive and Punish laws (measured at −70 dBFS) are unchanged. Level error after: within 0.3 dB (E
 // with Punish −1.0); fxparity on those takes 3.1 → 3.8, round tp172d's 4.8 → 5.0. Below drive 5 nothing changes.
-struct HotModel { double outDb, cPos, pPos, cNeg, pNeg, bias, biasDyn, envAttackMs, envReleaseMs, preLowDb, preHighDb; };
+struct HotModel { double outDb, cPos, pPos, cNeg, pNeg, bias, biasDyn, envAttackMs, envReleaseMs, preLowDb, preHighDb, servo = 0.0; };
+constexpr double servoMax = 256.0; // the coupling's bias, in the curve's units (drive 10 with Punish at full scale: about 180)
 constexpr double hotFromDrive = 5.0;
 constexpr HotModel hotTable[styleCount] {
     { -1.1431, 0.3616, 3.6867, 1.5383, 2.2379, -0.3772, -1.0326, 69.650, 124.432, 0.257, 0.721 }, // A
@@ -113,6 +114,29 @@ constexpr HotModel hotPunishTable[styleCount] {
     { -1.6350, 0.4480, 3.9332, 0.9944, 1.7588, -0.1014, -1.4262, 22.194, 36.546, 1.730, 1.382 }, // N
     { -0.8754, 0.2302, 0.9660, 0.6969, 1.9523, -0.2115, -6.8423, 127.063, 102.321, -1.284, 2.496 }, // T
     { -0.7575, 0.0636, 3.4114, 1.2090, 2.9207, -0.2295, -5.1214, 94.347, 69.891, 0.179, 2.199 }, // P
+};
+// round 190ar [EXEC trial, black-box]: the high-drive tables fitted again with the coupling ahead of the curve
+// (StyleModel::servo). On a 1 kHz tone at drive 10 the reference's square wave is uneven in styles E, T and P: the
+// lower ceiling lasts 67 … 77 % of the period from −21 dBFS up (+0.33 / −0.85 in T, +0.32 / −0.85 in P) and its second
+// harmonic stays near −10 dB, where round trial187b's tables went even (±0.42, second harmonic −41 dB at −3 dBFS).
+// Fitted with parity190ar/ember/emfit3 (coordinate descent from a zero static bias: the null plus twice the level error
+// on round trial187b's takes and round trial190k's stairs), then both ceilings trimmed (T −0.7, P −0.3 dB) so that no
+// take's level moves over a score step. Fit error T −3.2 → −6.2, P −2.0 → −5.4, P with Punish −4.8 → −5.9 dB; fxparity
+// on the 100 high-drive takes 3.76 → 3.91 (12 up, none down), their null −7.5 → −8.3 dB. Styles A and N, T and E with
+// Punish and E keep round trial187b's rows: A and N had no gain, the other three each put one take a score step down.
+constexpr HotModel hotTable190[styleCount] {
+    { -1.1431, 0.3616, 3.6867, 1.5383, 2.2379, -0.3772, -1.0326, 69.650, 124.432, 0.257, 0.721, 0.00000 }, // A
+    { 1.1179, 0.0686, 1.5908, 0.3965, 1.9849, -0.1363, -2.1967, 55.816, 53.249, -1.180, 7.560, 0.00000 }, // E
+    { -1.6350, 0.7426, 1.2038, 1.1049, 1.7309, -0.0687, -1.1247, 21.276, 36.546, 0.827, 0.557, 0.00000 }, // N
+    { -0.8754, 0.3321, 1.0334, 0.5689, 1.0842, 0.0600, -20.6108, 381.289, 1.394, -2.156, 2.393, 0.23599 }, // T
+    { -0.7575, 0.3574, 1.4231, 0.9564, 1.3208, 0.0600, -12.7504, 233.958, 1.763, 0.223, 0.779, 0.66766 }, // P
+};
+constexpr HotModel hotPunishTable190[styleCount] {
+    { -0.8888, 0.4714, 1.9697, 1.1179, 2.0146, -0.1238, -0.1292, 130.526, 40.965, -0.327, -0.079, 0.00000 }, // A
+    { 1.1179, 0.0500, 7.5499, 0.2492, 11.8895, -0.0689, -2.9887, 64.460, 53.249, 1.163, 0.444, 0.00000 }, // E
+    { -1.6350, 0.4480, 3.9332, 0.9944, 1.7588, -0.1014, -1.4262, 22.194, 36.546, 1.730, 1.382, 0.00000 }, // N
+    { -0.8754, 0.2302, 0.9660, 0.6969, 1.9523, -0.2115, -6.8423, 127.063, 102.321, -1.284, 2.496, 0.00000 }, // T
+    { -0.7575, 0.5520, 6.8267, 0.6636, 4.7504, 0.0816, -6.6904, 73.932, 1.763, -0.577, 1.579, 0.29524 }, // P
 };
 
 StyleModel hotBlend (const StyleModel& b, const HotModel& h, double drive) noexcept
@@ -133,6 +157,7 @@ StyleModel hotBlend (const StyleModel& b, const HotModel& h, double drive) noexc
     m.envReleaseMs = mix (b.envReleaseMs, h.envReleaseMs);
     m.preLowDb = mix (b.preLowDb, h.preLowDb);
     m.preHighDb = mix (b.preHighDb, h.preHighDb);
+    m.servo = mix (b.servo, h.servo);
     // the small-signal gain stays the table's (the measured drive / Punish laws): the output trim makes up the curve's
     // slope at its bias, side'(b) = (1 + |b / c|^p)^(−(1 + p) / p)
     const auto slopeDb = [] (const StyleModel& q) {
@@ -274,6 +299,7 @@ void Engine::reset() noexcept
     {
         c.dcX = c.dcY = 0.0;
         c.env = 0.0;
+        c.servo = 0.0;
         c.os.reset();
         std::fill (c.dry.begin(), c.dry.end(), 0.0f);
         std::fill (c.wetPad.begin(), c.wetPad.end(), 0.0f);
@@ -293,7 +319,8 @@ void Engine::set (const Settings& settings, const StyleModel* model)
     {
         const bool p = s.punish && s.measuredPunish;
         const int st = std::clamp (s.style, 0, styleCount - 1);
-        m = hotBlend (p ? punishModel (st) : styleModel (st), (p ? hotPunishTable : hotTable)[st], s.drive);
+        const auto& hot = s.hotCoupling ? (p ? hotPunishTable190 : hotTable190)[st] : (p ? hotPunishTable : hotTable)[st];
+        m = hotBlend (p ? punishModel (st) : styleModel (st), hot, s.drive);
     }
     design();
 }
@@ -351,20 +378,30 @@ void Engine::design()
     dcA = std::exp (-2.0 * pi * m.dcHz / sr);
     envA = std::exp (-1.0 / (std::max (m.envAttackMs, 0.01) * 0.001 * osr));
     envR = std::exp (-1.0 / (std::max (m.envReleaseMs, 0.01) * 0.001 * osr));
+    // round 190ar: the coupling's integrator (per sample at the curve's rate), its leak and the curve's output at rest
+    servoK = std::max (m.servo, 0.0) * 1000.0 / osr;
+    servoLeak = 1000.0 / (std::max (m.servoLeakMs, 1.0) * osr);
+    {
+        const double c = m.bias >= 0.0 ? m.cPos : m.cNeg, p = m.bias >= 0.0 ? m.pPos : m.pNeg;
+        servoRest = m.bias / std::pow (1.0 + std::pow (std::abs (m.bias / c), p), 1.0 / p);
+    }
 }
 
-float Engine::curve (float v, double& env) const noexcept
+float Engine::curve (float v, double& env, double& servo) const noexcept
 {
     // the bias follows the curve's own low-passed output (a coupling capacitor charged by the asymmetric current:
     // "blocking" distortion), with separate charge / discharge times [model fitted to the trial, §1.3]
-    const double b = m.bias + m.biasDyn * env;
+    const double b = m.bias + m.biasDyn * env - servo; // (servo stays 0 without the coupling)
     auto side = [this] (double x) noexcept
     {
         const double c = x >= 0.0 ? m.cPos : m.cNeg, p = x >= 0.0 ? m.pPos : m.pNeg;
         return x / std::pow (1.0 + std::pow (std::abs (x / c), p), 1.0 / p);
     };
-    const double y = side ((double) v + b) - side (b);
+    const double z = side ((double) v + b);
+    const double y = z - side (b);
     env = y + (y > env ? envA : envR) * (env - y);
+    if (servoK > 0.0) // round 190ar: the coupling charges with the curve's output (bounded: a stuck input cannot run it away)
+        servo = std::clamp (servo + servoK * (z - servoRest) - servoLeak * servo, -servoMax, servoMax);
     return (float) y;
 }
 
@@ -393,7 +430,7 @@ void Engine::block (float* left, float* right, int n) noexcept
             v = preHigh.process (v, c);
             wet[(size_t) i] = (float) (v * gain);
         }
-        auto f = [this, &k] (float v) noexcept { return curve (v, k.env); };
+        auto f = [this, &k] (float v) noexcept { return curve (v, k.env, k.servo); };
         for (int i = 0; i < n; ++i)
             wet[(size_t) i] = k.os.run (wet[(size_t) i], f);
         for (int i = 0; i < n; ++i)
