@@ -30,6 +30,13 @@ bool isChannelOpen (int channel);
 void closeChannel (int channel);
 } // namespace RackWindows
 
+namespace rackcards
+{
+// The Rack card of the Detail View's Device View (round 183c-card, on round 183a's DetailCard hook): a rack in a mixer
+// slot or a Channel Rack channel shows as the rack's own view, its Rand / Map in the card's title bar. Call once at start-up.
+void install();
+} // namespace rackcards
+
 class RackView final : public juce::Component, private juce::Timer
 {
 public:
@@ -40,6 +47,8 @@ public:
 
     // The width the rack wants for a body of `height` (its open views side by side)
     int preferredWidth (int height) const;
+    // The narrowest it lays out in: the devices pane one card wide (it scrolls with the wheel)
+    int minimumWidth (int height) const;
     // Called when that width changes (a view opened or closed, macros shown / hidden)
     std::function<void()> onPreferredWidthChanged;
     // The Rand and Map buttons for a title bar that isn't the rack's own (the Device View card)
@@ -53,6 +62,7 @@ public:
     void mouseUp (const juce::MouseEvent& e) override;
     void mouseDoubleClick (const juce::MouseEvent& e) override;
     void mouseMove (const juce::MouseEvent& e) override;
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override;
 
     // The title bar's on / off switch (a mixer slot's or a channel's): its state and its toggle (window header only)
     void setPowerSwitch (std::function<bool()> isOn, std::function<void()> toggle);

@@ -9,6 +9,7 @@
 #include "core/Vfx.h"
 #include "engine/PluginHost.h"
 #include "ui/ControllerKnob.h"
+#include "ui/DetailView.h"
 #include "ui/I18n.h"
 #include "ui/MixerComponent.h"
 #include "ui/PatcherEditor.h"
@@ -89,6 +90,7 @@ struct RackView::Impl
 
     // the sections laid out by place()
     juce::Rectangle<int> header, column, variations, macros, chains, zones, devices, mapList;
+    int deviceScroll = 0; // the devices pane scrolls sideways when the card is narrower than its devices (Device View)
     // a drag in progress
     enum class Drag { none, volume, pan, selector, zoneMove, zoneLo, zoneHi, zoneFadeLo, zoneFadeHi, morph, mapMin, mapMax };
     Drag drag = Drag::none;
@@ -274,7 +276,14 @@ struct RackView::Impl
         return n <= 1 ? 1 : (n + 1) / 2;
     }
 
-    int width (int /*height*/) const
+    // the devices pane's content: every device card and the "+" card
+    static int devicesContentWidth (const RackDoc& r)
+    {
+        return (int) (std::max<std::size_t> (1, rack::devices (r, r.selectedChain).size()) + 1) * (deviceWidth + 4) + 8;
+    }
+
+    // (`devicesOnly`: the narrowest width, with the devices pane one card wide; it scrolls)
+    int width (int /*height*/, bool devicesOnly = false) const
     {
         const auto* r = rack();
         if (r == nullptr)
@@ -287,7 +296,7 @@ struct RackView::Impl
         if (r->showChains)
             w += chainListWidth + (r->zoneEditor >= 0 ? zoneWidth : 0);
         if (r->showDevices)
-            w += (int) (std::max<std::size_t> (1, rack::devices (*r, r->selectedChain).size()) + 1) * (deviceWidth + 4) + 8;
+            w += devicesOnly ? deviceWidth + 12 : devicesContentWidth (*r);
         if (owner.mapping && ownHeader)
             w += mapListWidth;
         return std::max (w, viewColumn + 60);
@@ -315,6 +324,7 @@ struct RackView::Impl
         chains = r != nullptr && r->showChains ? area.removeFromLeft (chainListWidth) : juce::Rectangle<int>();
         zones = r != nullptr && r->showChains && r->zoneEditor >= 0 ? area.removeFromLeft (zoneWidth) : juce::Rectangle<int>();
         devices = r != nullptr && r->showDevices ? area : juce::Rectangle<int>();
+        deviceScroll = r != nullptr ? juce::jlimit (0, std::max (0, devicesContentWidth (*r) - devices.getWidth()), deviceScroll) : 0;
 
         // the macro knobs: 2 rows (Live: 2 × 4 for 8 shown), a Map button under each in Map mode
         const auto shownCount = r != nullptr ? r->shownMacros : 0;
@@ -357,7 +367,21 @@ struct RackView::Impl
     juce::Rectangle<int> chainRow (int c) const { return { chains.getX(), chains.getY() + headerStrip + c * rowHeight, chains.getWidth(), rowHeight }; }
     juce::Rectangle<int> zoneRow (int c) const { return { zones.getX() + 6, zones.getY() + headerStrip + c * rowHeight, zones.getWidth() - 12, rowHeight }; }
     juce::Rectangle<int> variationRow (int v) const { return { variations.getX() + 4, variations.getY() + 28 + v * rowHeight, variations.getWidth() - 8, rowHeight }; }
-    juce::Rectangle<int> deviceCard (int i) const { return { devices.getX() + 4 + i * (deviceWidth + 4), devices.getY() + 4, deviceWidth, devices.getHeight() - 8 }; }
+    juce::Rectangle<int> deviceCard (int i) const
+    {
+        return { devices.getX() + 4 + i * (deviceWidth + 4) - deviceScroll, devices.getY() + 4, deviceWidth, devices.getHeight() - 8 };
+    }
+    // the wheel over a devices pane that doesn't show them all; false = not handled (the Device View's chain scrolls)
+    bool wheel (juce::Point<int> p, float delta)
+    {
+        const auto* r = rack();
+        if (r == nullptr || ! devices.contains (p) || devicesContentWidth (*r) <= devices.getWidth())
+            return false;
+        const auto before = deviceScroll;
+        deviceScroll = juce::jlimit (0, devicesContentWidth (*r) - devices.getWidth(), deviceScroll - juce::roundToInt (delta * 240.0f));
+        owner.repaint();
+        return deviceScroll != before || delta != 0.0f;
+    }
     juce::Rectangle<int> morphSlider() const { return { variations.getX() + 8, variations.getBottom() - 22, variations.getWidth() - 16, 14 }; }
     juce::Rectangle<int> mapRow (int i) const { return { mapList.getX() + 4, mapList.getY() + 24 + i * rowHeight, mapList.getWidth() - 8, rowHeight }; }
 
@@ -630,6 +654,16 @@ struct RackView::Impl
         // the chain's bracket (Live: the rack's devices sit between brackets)
         g.setColour (col::borderStrong);
         g.drawRect (devices.reduced (1));
+        const juce::Graphics::ScopedSaveState clip (g);
+        g.reduceClipRegion (devices.reduced (2));
+        if (deviceScroll > 0 || devicesContentWidth (r) - deviceScroll > devices.getWidth()) // (more to the side: a scroll bar)
+        {
+            const auto track = devices.reduced (6, 0).removeFromBottom (5).translated (0, -2).toFloat();
+            const auto content = (float) devicesContentWidth (r);
+            g.setColour (col::bg4);
+            g.fillRoundedRectangle (track.withX (track.getX() + track.getWidth() * (float) deviceScroll / content)
+                                        .withWidth (track.getWidth() * (float) devices.getWidth() / content), 2.0f);
+        }
         int i = 0;
         for (const auto n : list)
         {
@@ -1404,6 +1438,12 @@ RackView::RackView (AudioEngine& engine, RackLocator locate, std::optional<Autom
 RackView::~RackView() = default;
 
 int RackView::preferredWidth (int height) const { return impl->width (height); }
+int RackView::minimumWidth (int height) const { return impl->width (height, true); }
+void RackView::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
+{
+    if (! impl->wheel (e.getPosition(), std::abs (w.deltaX) > std::abs (w.deltaY) ? w.deltaX : w.deltaY))
+        juce::Component::mouseWheelMove (e, w);
+}
 
 std::unique_ptr<juce::Component> RackView::makeTitleAccessory()
 {
@@ -1635,4 +1675,52 @@ void closeChannel (int channel)
         delete w;
 }
 } // namespace RackWindows
+
+namespace rackcards
+{
+namespace
+{
+class RackCard final : public DetailCard
+{
+public:
+    explicit RackCard (std::unique_ptr<RackView> v) : view (std::move (v))
+    {
+        addAndMakeVisible (*view);
+        accessory = view->makeTitleAccessory();
+        view->onPreferredWidthChanged = [this] {
+            if (onPreferredWidthChanged)
+                onPreferredWidthChanged();
+        };
+    }
+    // as wide as the rack wants, but not past the chain's right edge (so its title bar's Rand / Map stay in view): the
+    // devices pane gives way first and scrolls
+    int preferredWidth (int bodyHeight) const override
+    {
+        const auto wanted = view->preferredWidth (bodyHeight);
+        return widthLimit > 0 ? std::max (std::min (wanted, widthLimit), view->minimumWidth (bodyHeight)) : wanted;
+    }
+    juce::Component* titleAccessory() override { return accessory.get(); }
+    int titleAccessoryWidth() const override { return RackView::titleAccessoryWidth; }
+    void resized() override { view->setBounds (getLocalBounds()); }
+
+private:
+    std::unique_ptr<RackView> view;
+    std::unique_ptr<juce::Component> accessory;
+};
+} // namespace
+
+void install()
+{
+    DetailView::effectCardFactory = [] (AudioEngine& engine, int insert, int slot, const EffectSlot& fx) -> std::unique_ptr<DetailCard> {
+        if (! rack::isRack (fx))
+            return nullptr;
+        return std::make_unique<RackCard> (RackWindows::makeSlotView (engine, insert, slot, false));
+    };
+    DetailView::instrumentCardFactory = [] (AudioEngine& engine, int channel, const ChannelDef& c) -> std::unique_ptr<DetailCard> {
+        if (! rack::isRack (c))
+            return nullptr;
+        return std::make_unique<RackCard> (RackWindows::makeChannelView (engine, channel, false));
+    };
+}
+} // namespace rackcards
 } // namespace lynx
