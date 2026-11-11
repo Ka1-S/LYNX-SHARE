@@ -3118,7 +3118,7 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
             action (menu, "pianoRoll.quantizeHalf", tr ("Quantize starts 50% (halfway to the grid)"));
             action (menu, "pianoRoll.follow", tr ("Follow the playhead (auto scrolling)"), true, EditorGlobals::get().isFollowing (true));
             menu.addSubMenu (tr ("Zoom"), zoomMenu ("pianoRoll."));
-            menu.addItem (tr ("Snap notes to the scale"), pianoRoll.hasScale(), pianoRoll.isScaleSnapOn(),
+            menu.addItem (tr ("Snap notes to the scale") + shortcutText ("pianoRoll.scaleSnap"), pianoRoll.hasScale(), pianoRoll.isScaleSnapOn(),
                           [this] { pianoRoll.setScaleSnap (! pianoRoll.isScaleSnapOn()); });
             break;
         }
