@@ -220,7 +220,12 @@ public:
         close.onClick = [this] { owner.closeByHand(); };
 
         voice.onClick = [this] { owner.addAudio (Kind::voice); };
-        instrument.onClick = [this] { owner.chooseInstrument (instrument); };
+        // one click gives a sound to play at once (LYNX's own synth); "More..." lists every instrument, plugin and Soundfont
+        instrument.onClick = [this] { owner.addDefaultInstrument(); };
+        instrument.rightReserve = 104;
+        moreInstruments.setButtonText (tr ("More..."));
+        moreInstruments.onClick = [this] { owner.chooseInstrument (moreInstruments); };
+        instrument.addAndMakeVisible (moreInstruments);
         drums.onClick = [this] { showStarterPage(); };
         sampler.onClick = [this] { owner.chooseSample(); };
         guitar.onClick = [this] { owner.addAudio (bassButton.getToggleState() ? Kind::bass : Kind::guitar); };
@@ -283,6 +288,8 @@ public:
             }
             genreButtons[genreButtons.size() > 1 ? 1 : 0]->setToggleState (true, juce::dontSendNotification);
         }
+        // the starter's tempo is for a project that has nothing yet: with tracks in it the tempo stays, unless asked
+        useTempo.setToggleState (simpletracks::isEmptySong (owner.engine.getSong()), juce::dontSendNotification);
         starterPage = true;
         updatePage();
     }
@@ -331,6 +338,7 @@ public:
             b.setBounds (r);
         };
         pair (voice, instrument);
+        moreInstruments.setBounds (instrument.getLocalBounds().removeFromRight (instrument.rightReserve).reduced (8, 0).withSizeKeepingCentre (instrument.rightReserve - 16, 28));
         pair (drums, sampler);
         auto g = row();
         guitar.setBounds (g);
@@ -392,7 +400,7 @@ private:
 
     SimpleWorkflow& owner;
     juce::Label title, footer, starterTitle;
-    juce::TextButton close, back, addDrums, guitarButton, bassButton;
+    juce::TextButton close, back, addDrums, guitarButton, bassButton, moreInstruments;
     juce::ToggleButton useTempo;
     Tile voice, instrument, drums, sampler, guitar, import, loops;
     std::vector<std::unique_ptr<juce::TextButton>> genreButtons;
@@ -592,6 +600,19 @@ void SimpleWorkflow::addAudio (Kind kind)
     add (std::move (q));
 }
 
+void SimpleWorkflow::addDefaultInstrument()
+{
+    // LYNX's own synth (what an imported MIDI track plays too), ready for the computer keys and the on-screen keyboard
+    ChannelDef synth;
+    synth.instrument = InstrumentKind::synth;
+    simpletracks::Request q;
+    q.kind = Kind::instrument;
+    q.name = trackNameFor (q.kind);
+    q.channel = std::move (synth);
+    if (add (std::move (q)) && host.showKeys)
+        host.showKeys();
+}
+
 void SimpleWorkflow::chooseInstrument (juce::Component& tile)
 {
     // the Channel Rack's own generator list (the same instruments, plugins and Soundfonts)
@@ -603,7 +624,8 @@ void SimpleWorkflow::chooseInstrument (juce::Component& tile)
             q.kind = c.instrument == InstrumentKind::sampler ? Kind::sampler : Kind::instrument;
             q.name = trackNameFor (q.kind);
             q.channel = std::move (c);
-            add (std::move (q));
+            if (add (std::move (q)) && host.showKeys)
+                host.showKeys();
         },
         [this] { chooseSample(); }, nullptr, chooser.get());
     quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (&tile), {});
@@ -700,6 +722,9 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
         q.name = file.getFileNameWithoutExtension().toStdString();
         q.audioFile = file.getFullPathName().toStdString();
         q.audioLength = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * engine.getSong().bpm / 60.0 * ppq));
+        // a loop made for a tempo (ACID beats, or a tempo in its name that makes whole bars) keeps time: it lasts its
+        // beats at the project's tempo, at its own pitch, and follows the tempo from then on (round 190p)
+        q.audioBeats = simpletracks::loopBeats (file.getFileName().toStdString(), seconds, data->acidBeats, engine.getSong().beatsPerBar);
         q.start = start;
         add (std::move (q));
     }

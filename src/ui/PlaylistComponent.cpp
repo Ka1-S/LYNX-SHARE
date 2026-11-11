@@ -7531,7 +7531,7 @@ namespace
 {
 // An audio clip of `file` at `start` on `track` (one undo step); `reuse`: an existing audio-clip channel of the same
 // file plays it instead of a new one. False when the file can't be read.
-bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t start, int track, bool reuse)
+bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t start, int track, bool reuse, bool loopsKeepTime = false)
 {
     if (! SampleLibrary::isSampleFile (file))
         return false;
@@ -7543,9 +7543,14 @@ bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t sta
 
     // audio length converted to ticks at the current BPM
     const auto seconds = (double) data->frames() / data->sampleRate;
-    const auto length = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * engine.getSong().bpm / 60.0 * ppq));
+    auto length = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * engine.getSong().bpm / 60.0 * ppq));
     const auto path = file.getFullPathName().toStdString();
     const auto name = file.getFileNameWithoutExtension().toStdString();
+    // the Simple workflow (round 190p): a loop made for a tempo lasts its beats at the project's tempo, at its own pitch
+    const auto loopBeats = loopsKeepTime ? simpletracks::loopBeats (file.getFileName().toStdString(), seconds, data->acidBeats, engine.getSong().beatsPerBar)
+                                         : 0.0f;
+    if (loopBeats > 0.0f)
+        length = juce::jmax<std::int64_t> (1, (std::int64_t) std::llround ((double) loopBeats * ppq));
 
     engine.editSong ([=] (Song& s) {
         int channel = -1;
@@ -7563,6 +7568,11 @@ bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t sta
             // dropped on an audio track: the new channel plays through its mixer track (FL [DECOMP FUN_012f2a10])
             const auto linked = trackmodes::armableInsert (s, track);
             c.mixerTrack = linked > 0 ? linked : s.claimFreeInsert();
+            if (loopBeats > 0.0f)
+            {
+                c.sampler.stretchBeats = loopBeats;
+                c.sampler.keepPitch = true;
+            }
             s.channels.push_back (c);
             channel = (int) s.channels.size() - 1;
         }
@@ -7602,7 +7612,7 @@ void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int
         if (videotracks::isVideoFile (juce::File (f)))
             // a video dropped on the clip tracks: a video clip on a video track, where it was dropped (round 174d)
             videotracks::importVideo (engine, juce::File (f), engine.getSong().secondsForTicks (start));
-        else if (addAudioClip (engine, juce::File (f), start, track, false))
+        else if (addAudioClip (engine, juce::File (f), start, track, false, simpleHeaders)) // (Simple: a loop keeps time)
             ++track; // multiple files: one below the other
 }
 

@@ -10397,6 +10397,54 @@ private:
             write ("simple-starter");
             simple->hideChooser();
             write ("simple-closed");
+            // round 190p: a loop keeps time. Two files with the same 4.8 s of audio dropped on the empty Simple timeline:
+            // "Guitar loop 100.wav" (2 bars at 100 BPM) lasts 2 bars at the project's tempo, "Guitar take.wav" plays at
+            // its own speed. Both are undone again, so the shots after this one are as they were.
+            {
+                const auto folder = juce::File (prefix + "-loops");
+                folder.createDirectory();
+                juce::StringArray files;
+                for (const auto* name : { "Guitar loop 100.wav", "Guitar take.wav" })
+                {
+                    const auto file = folder.getChildFile (name);
+                    file.deleteFile();
+                    const auto rate = 44100.0;
+                    const auto frames = (int) (4.8 * rate);
+                    juce::AudioBuffer<float> audio (1, frames);
+                    for (int i = 0; i < frames; ++i)
+                    {
+                        const auto t = (double) i / rate, inBeat = std::fmod (t, 0.6); // a plucked note on every beat at 100 BPM
+                        audio.setSample (0, i, (float) (0.7 * std::exp (-inBeat * 7.0) * std::sin (juce::MathConstants<double>::twoPi * 196.0 * t)));
+                    }
+                    if (auto out = file.createOutputStream())
+                        if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (juce::WavAudioFormat().createWriterFor (out.get(), rate, 1, 16, {}, 0)))
+                        {
+                            out.release();
+                            writer->writeFromAudioSampleBuffer (audio, 0, frames);
+                        }
+                    files.add (file.getFullPathName());
+                }
+                simple->dropFiles (files, 0);
+                offline.dispatchPendingMessages();
+                // the clips' waveforms are analysed in the background and drawn once ready (a live window repaints by
+                // itself; one off-screen paint came too early and showed empty clips)
+                for (const auto& path : files)
+                    lynx::ui::WaveformCache::getInstance()->find (path, [&offline, path] { return offline.getSampleLibrary().load (path); });
+                lynx::ui::WaveformCache::getInstance()->waitUntilIdle (30000);
+                offline.dispatchPendingMessages();
+                write ("simple-loop");
+                const auto& song = offline.getSong();
+                juce::String report;
+                for (const auto& clip : song.playlist)
+                    if (clip.kind == lynx::ClipKind::audio)
+                        report << song.channels[(std::size_t) clip.channel].name << ": " << juce::String ((double) clip.length / lynx::ppq, 3) << " beats, stretch "
+                               << juce::String (song.channels[(std::size_t) clip.channel].sampler.stretchBeats, 2) << "\n";
+                juce::File (prefix + "-loop.txt").replaceWithText ("tempo " + juce::String (song.bpm, 1) + "\n" + report);
+                for (int i = 0; i < files.size() && offline.canUndo(); ++i) // (one undo step per dropped file)
+                    offline.undo();
+                offline.dispatchPendingMessages();
+                simple->hideChooser();
+            }
             // slice S4: the Simple headers with a few tracks (voice, instrument, drums, an audio file), some levels moved
             offline.editSong ([] (lynx::Song& s) {
                 namespace st = lynx::simpletracks;
