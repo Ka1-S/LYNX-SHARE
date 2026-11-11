@@ -2278,6 +2278,47 @@ Proof: `docs/analise/REA_rodada186c.md` (REA of FL 2026 + a hand check in FL).
 | Links to deleted inserts (pain point 1) | dropped | Mixer menu option, off: kept as a greyed dashed chip, "Disconnected links" in the Routing section reconnects or removes them | LYNX extra |
 | Mixer groups that follow the Playlist (pain point 4) | none | Mixer menu option, off, + "Arrange inserts like the Playlist" | LYNX extra |
 
+## Round 190ar, part 2: missing plugins load with the measured settings (fitted-map translators)
+
+Until now a project that used one of these six plugins and was opened without it got LYNX's stand-in at its default
+settings. Round 190ar measured, black-box, which LYNX setting matches each of their settings (one fitted transfer per
+control, from probe renders through the public parameters). `translate = fitted-map` carries those transfers into the
+substitute table: the saved state's parameter values are read (the plugin's own plain XML state as the host stores
+it, captured by saving probe settings; nothing else of the plugin is read) and every linked LYNX parameter is set from
+the measured transfer, linear between the measured settings. A state that cannot be read leaves the stand-in at
+its defaults, as before. Nothing changes for projects that have the plugin installed, and no LYNX effect's sound
+changed.
+
+Scores of what the stand-in sounds like against the plugin (before = stand-in at its defaults = what a project got
+until now; after = stand-in with the translated state):
+
+| Missing plugin (kind) | Stand-in | Bank | Files | Before → after | Null | Level error | Up / same / down |
+|---|---|---|---|---|---|---|---|
+| Bus compressor (SSL Native Bus Compressor 2) | Crest Compressor | tp172c | 16 | 2.69 → 6.06 | 1.1 → −23.2 dB | 8.6 → 0.4 dB | 14 / 2 / 0 |
+| | | programme 182 | 20 | 2.60 → 6.20 | 1.2 → −23.9 dB | 8.9 → 0.5 dB | 19 / 1 / 0 |
+| Compressor (SSL Native X-Comp) | Crest Compressor | tp172c | 12 | 1.75 → 6.75 | 0.9 → −37.3 dB | 7.7 → 0.6 dB | 12 / 0 / 0 |
+| | | programme 182 | 25 | 3.00 → 6.44 | −6.1 → −35.1 dB | 4.9 → 0.6 dB | 21 / 4 / 0 |
+| Limiter (FG-X 2) | Apex Limiter | tp172c | 12 | 3.92 → 7.58 | −50.3 → −90.1 dB | 3.7 → 0.3 dB | 10 / 2 / 0 |
+| | | programme 182 | 25 | 3.48 → 7.44 | −50.7 → −66.6 dB | 3.8 → 0.2 dB | 20 / 5 / 0 |
+| Saturator (SSL Native X-Saturator) | Ember Saturator | tp172c | 12 | 2.33 → 5.00 | −6.4 → −18.3 dB | 8.4 → 1.0 dB | 11 / 1 / 0 |
+| | | programme 182 | 25 | 2.04 → 5.60 | −6.5 → −19.7 dB | 7.1 → 0.8 dB | 24 / 1 / 0 |
+| Gate (SSL X-Gate) | Sentry Gate | tp172c | 12 | 6.75 → 7.33 | −23.3 → −33.6 dB | 0.1 → 0.0 dB | 5 / 7 / 0 |
+| | | programme 182 | 25 | 6.56 → 7.24 | −30.9 → −35.9 dB | 0.1 → 0.1 dB | 11 / 14 / 0 |
+| Lookahead compressor (Harrison) | Crest Compressor | tp172c | 8 | 2.75 → 5.50 | −7.2 → −18.6 dB | 3.3 → 1.2 dB | 7 / 1 / 0 |
+| | | programme 182 | 25 | 3.04 → 5.92 | −9.8 → −22.1 dB | 3.1 → 0.7 dB | 19 / 5 / 1 |
+
+The tp172c rows and the lookahead compressor's programme row are rendered from the C++ translator's own output on the
+captured states; the other programme rows are the same maps evaluated by the fitter (the C++ translator agrees with it
+within 2e-4 on the 18 captured states of the test). The lookahead compressor's map was fitted again on the Vari-mu
+law of round 190v (33 files: 5.48 with the old map on the new law → 5.82). One file went down (lookahead compressor,
+one vocal setting, 6 → 5).
+
+Limits: values between the captured settings are interpolated, and a few fitted transfers are not monotonic (they
+are carried as measured); beyond the captured range the first-to-last trend continues. The second (A/B) slot of the
+FG-X 2 state is not read. The EQ modules have no translator: their fitted per-setting maps are not smooth enough to
+interpolate (a translation in physical units is needed). The FET compressors and X-Limit need the new laws of this
+round and get their translators once those are in.
+
 ## Round 177b: workflow extras beyond FL (FL's own way stays unchanged)
 
 | Feature | FL Studio | LYNX | Status |

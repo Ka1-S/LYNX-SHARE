@@ -555,6 +555,8 @@ translate = harrison-strip
 product = bus / smart compressors (SSL Bus Compressor 2, G3, VBC, sonible smart:comp, pure:comp)
 vendor = Complete Access (role)
 lynx = Crest Compressor
+# round 190ar: the references with a fitted setting map load at the mapped settings (core/FittedMaps.inc)
+translate = fitted-map
 names = SSL Native Bus Compressor 2; SSL G3 MultiBusComp; SSL 360 Link Bus Compressor; SSL Native X-Comp v6; SSL Fusion HF Compressor; VBC FG-Grey; VBC FG-MU; VBC FG-Red; smartcomp3; smartcomp2; purecomp; learncomp; Harrison_LookaheadCompressor; Harrison_MPCCompressor; VM FG-Stress; VM FG-Bomber
 
 [complete-access-vintage-comps]
@@ -573,6 +575,7 @@ names = VM FG-2A; VM SD-3A; VM Custom Opto
 product = limiters (Slate FG-X 2, SSL X-Limit, sonible smart:limit, pure:limit)
 vendor = Complete Access (role)
 lynx = Apex Limiter
+translate = fitted-map
 names = FG-X 2; FG-X; SSL X-Limit; smartlimit; purelimit; learnlimit; Bus Clipper
 
 [complete-access-eqs]
@@ -591,6 +594,7 @@ names = SSL DeEss; VM FG-DS 902; Eiosis E2Deesser; smartdeess; puredeess; Harris
 product = gates (SSL X-Gate, Slate Gate Classic / Drums, Harrison Spectral Gate)
 vendor = Complete Access (role)
 lynx = Sentry Gate
+translate = fitted-map
 names = SSL X-Gate; VM Gate Classic; VM Gate Drums; Harrison_SpectralGate
 
 [complete-access-reverbs]
@@ -612,6 +616,7 @@ names = SSL Native X-Echo; SSL X-Delay; Stellar Echo SD-201; Harrison_3DDelay
 product = saturators (Slate Heatwave / Revival, SSL Fusion Vintage Drive / X-Saturator, Harrison Tape Saturator)
 vendor = Complete Access (role)
 lynx = Ember Saturator
+translate = fitted-map
 names = Heatwave; VM Revival; SSL Fusion Vintage Drive; SSL Native X-Saturator v6; SSL Fusion Transformer; Harrison Tape Saturator
 
 [complete-access-tuners]
@@ -2697,8 +2702,117 @@ int translateSoundtoysEchoBoy (const std::vector<std::uint8_t>& state, EffectSlo
     return 0;
 }
 
+// round 190ar: fitted setting maps as state translators. A map (reference parameter -> LYNX parameter, a transfer fitted
+// black-box on the reference's probe renders) is stored against the entry of the component state that carries that
+// parameter — found on states saved through the public parameter API at known settings (the one entry that moves along a
+// one-control sweep) — as knots  state value -> LYNX value  (linear between them, or the nearest one for a switch; an
+// "add" link is an offset on a value another link set). `fixed` = LYNX parameters the map holds constant.
+// The table is generated (core/FittedMaps.inc); nothing of the reference is read but its saved parameter values.
+struct FittedLink
+{
+    const char* id;
+    int target;
+    bool add, step;
+    std::vector<std::pair<float, float>> knots;
+};
+struct FittedMap
+{
+    const char* marker; // text that names the reference inside its state
+    const char* effect; // the LYNX effect the map was fitted on
+    std::vector<std::pair<int, float>> fixed;
+    std::vector<FittedLink> links;
+};
+const std::vector<FittedMap>& fittedMaps()
+{
+    static const std::vector<FittedMap> maps {
+#include "core/FittedMaps.inc"
+    };
+    return maps;
+}
+
+float fittedValue (const FittedLink& l, double v)
+{
+    const auto& k = l.knots;
+    if (k.empty())
+        return 0.0f;
+    if (l.step)
+    {
+        auto best = k.front();
+        for (const auto& q : k)
+            if (std::abs (q.first - v) < std::abs (best.first - v))
+                best = q;
+        return best.second;
+    }
+    if (v <= k.front().first)
+        return k.front().second;
+    for (std::size_t i = 1; i < k.size(); ++i)
+        if (v <= k[i].first)
+        {
+            const double span = (double) k[i].first - k[i - 1].first;
+            const double f = span > 0.0 ? (v - k[i - 1].first) / span : 1.0;
+            return (float) (k[i - 1].second + f * (k[i].second - k[i - 1].second));
+        }
+    return k.back().second;
+}
+
+int translateFittedMap (const std::vector<std::uint8_t>& state, EffectSlot& slot)
+{
+    const std::string text (state.begin(), state.end());
+    for (const auto& m : fittedMaps())
+    {
+        if (text.find (m.marker) == std::string::npos)
+            continue;
+        const auto kind = effectKindNamed (m.effect);
+        if (! kind || slot.kind != *kind)
+            return 0;
+        // the block to read: the selected A / B state of a two-state plugin, else the whole text; the first entry of an id wins
+        std::size_t from = 0, to = text.size();
+        if (const auto root = text.find ("<SSL_PLUGIN_STATE"); root != std::string::npos)
+        {
+            const bool useB = attributeIn (text, root, "StateASelected") == "0";
+            const auto block = text.find (useB ? "<B " : "<A ", root);
+            if (block == std::string::npos)
+                return 0;
+            from = block;
+            const auto close = text.find (useB ? "</B>" : "</A>", block);
+            to = close == std::string::npos ? text.size() : close;
+        }
+        std::map<std::string, double> values;
+        for (const char* tag : { "<PARAM ", "<entry " })
+            for (auto q = text.find (tag, from); q != std::string::npos && q < to; q = text.find (tag, q + 7))
+            {
+                const auto id = attributeIn (text, q, "id");
+                float value = 0;
+                if (! id.empty() && values.find (id) == values.end() && parseFloat (attributeIn (text, q, "value"), value) && std::isfinite (value))
+                    values[id] = value;
+            }
+        int count = 0;
+        for (const auto& l : m.links)
+            if (values.find (l.id) != values.end())
+                ++count;
+        if (count == 0)
+            return 0; // not a state this map knows: the entry's defaults stay
+        for (const auto& [index, value] : m.fixed)
+            if (index >= 0 && index < maxEffectParams)
+                slot.params[(std::size_t) index] = value;
+        for (const auto& l : m.links)
+        {
+            const auto it = values.find (l.id);
+            if (it == values.end() || l.target < 0 || l.target >= maxEffectParams)
+                continue;
+            auto& p = slot.params[(std::size_t) l.target];
+            const auto y = fittedValue (l, it->second);
+            p = std::clamp (l.add ? p + y : y, 0.0f, 1.0f);
+        }
+        return count;
+    }
+    return 0;
+}
+
 RawTranslator rawTranslatorNamed (std::string_view name)
 {
+    if (name == "fitted-map")
+        return translateFittedMap;
     if (name == "soundtoys-echoboy")
         return translateSoundtoysEchoBoy;
     if (name == "soundtoys-littlealterboy")

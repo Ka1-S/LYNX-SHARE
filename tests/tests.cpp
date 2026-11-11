@@ -17459,6 +17459,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Parity190alTests.inc"
 #include "Slicex190hTests.inc"
 #include "AudioX190aqTests.inc"
+#include "Parity190arTranslateTests.inc"
 #include "Surge190xTests.inc"
 #include "Issue114Tests.inc"
 #include "Slicex190rTests.inc"
