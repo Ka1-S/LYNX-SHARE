@@ -616,7 +616,8 @@ void WaveformDisplay::paint (juce::Graphics& g)
     if (startOffset > 0.0f)
     {
         const auto xs = regionX (startOffset), xr = regionX (0.0f);
-        g.setColour (colour::bg0.withAlpha (0.55f));
+        // (FL's is clearly darker: the waveform at ~35 %, the background darker than the display's)
+        g.setColour (juce::Colours::black.withAlpha (0.65f));
         g.fillRect (juce::Rectangle<float>::leftTopRightBottom (juce::jmin (xr, xs), inner.getY(), juce::jmax (xr, xs), inner.getBottom()));
         g.setColour (colour::warning);
         g.fillRect (xs - 0.5f, inner.getY(), 1.5f, inner.getHeight());
@@ -642,7 +643,8 @@ void WaveformDisplay::paint (juce::Graphics& g)
     if (text.isEmpty())
         text = juce::File (path).getFileName() + "  " + juce::String (frames / summary->sampleRate, 2) + " s"
                + (summary->channels > 1 ? "  " + tr ("stereo") : "  " + tr ("mono"));
-    const auto band = getLocalBounds().reduced (6, 3).removeFromTop (16);
+    // (round 190w: below the "Start" marker's label row when there is one, so both read)
+    const auto band = getLocalBounds().reduced (6, 3).removeFromTop (16).translated (0, startOffset > 0.0f ? 12 : 0);
     g.setColour (colour::bg0.withAlpha (0.6f));
     g.fillRect (band.withWidth (juce::jmin (band.getWidth(), juce::roundToInt (juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), text)) + 8)));
     g.setColour (colour::textSecondary);

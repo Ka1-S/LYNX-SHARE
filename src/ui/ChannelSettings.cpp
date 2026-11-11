@@ -2916,6 +2916,11 @@ public:
         // to round them to 0.25 and cap them at 64, and every other edit in this panel wrote the rounded value back
         stretch.setSkewFactorFromMidPoint (16.0);
         stretch.addMouseListener (&stretchMenu, false);
+        // round 190w: FL's Playback › START OFFSET ([DFM] SmpStartOfsWheel, Max 16384, default 0; hint "Sample start
+        // offset"): where notes start, a fraction of the region (.flp 0xD7 0x90, SamplerSettings::startOffset)
+        setup (startOffsetKnob, startOffsetLabel, TR_NOOP ("Start offset"), 0.0, 1.0, 1.0 / 16384.0, "");
+        startOffsetKnob.setNumDecimalPlacesToDisplay (3);
+        startOffsetKnob.setTooltip (tr ("Sample start offset"));
         setup (regionStart, regionStartLabel, TR_NOOP ("Start"), 0.0, 1.0, 0.001, "");
         setup (regionEnd, regionEndLabel, TR_NOOP ("End"), 0.0, 1.0, 0.001, "");
         setup (cutoff, cutoffLabel, TR_NOOP ("Cutoff"), 20.0, 20000.0, 1.0, " Hz");
@@ -3098,7 +3103,7 @@ public:
 
         area.removeFromTop (8);
         area.removeFromTop (6);
-        place (area.removeFromTop (110), { { &regionStart, &regionStartLabel }, { &regionEnd, &regionEndLabel } });
+        place (area.removeFromTop (110), { { &startOffsetKnob, &startOffsetLabel }, { &regionStart, &regionStartLabel }, { &regionEnd, &regionEndLabel } });
         area.removeFromTop (6);
         {
             auto filterRow = area.removeFromTop (110);
@@ -3214,6 +3219,7 @@ private:
             stretchMethod.setSelectedId ((int) c->sampler.stretchMethod + 1, juce::dontSendNotification);
             stretchMethod.setEnabled (c->sampler.keepPitch);
             regionStart.setValue (c->sampler.regionStart, juce::dontSendNotification);
+            startOffsetKnob.setValue (c->sampler.startOffset, juce::dontSendNotification);
             regionEnd.setValue (c->sampler.regionEnd, juce::dontSendNotification);
             cutoff.setValue (c->sampler.cutoff, juce::dontSendNotification);
             resonance.setValue (c->sampler.resonance, juce::dontSendNotification);
@@ -3318,6 +3324,8 @@ private:
             pitch.setValue (s.pitch, juce::dontSendNotification);
         s.regionStart = (float) regionStart.getValue();
         s.regionEnd = (float) regionEnd.getValue();
+        s.startOffset = (float) startOffsetKnob.getValue();
+        wave.setStartOffset (s.startOffset);
         s.release = (float) release.getValue();
         s.reverse = reverse.getToggleState();
         s.cut = cut.getToggleState();
@@ -3410,13 +3418,13 @@ private:
         }
         m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&stretch));
     }
-    MenuSlider attack, release, decay, sustain, regionStart, regionEnd, cutoff, resonance;
+    MenuSlider attack, release, decay, sustain, regionStart, regionEnd, cutoff, resonance, startOffsetKnob;
     std::vector<std::pair<MenuSlider*, int>> tweakTargets; // knob -> samplerparam
     std::vector<juce::Slider*> automatedShown;             // knobs showing their automation's value now
     std::uint32_t shownGeneration = 0;
     bool dropHighlight = false;
     juce::Label pitchLabel, gainLabel, attackLabel, releaseLabel, decayLabel, sustainLabel, stretchLabel, regionStartLabel, regionEndLabel,
-        cutoffLabel, resonanceLabel;
+        cutoffLabel, resonanceLabel, startOffsetLabel;
     juce::ToggleButton reverse, cut, keepPitch, porta;
     juce::ComboBox filterType, stretchMethod;
     juce::TextButton modulationButton, precomputeButton;

@@ -8263,3 +8263,5 @@ countries: kr
 "Mixer groups follow the Playlist (LYNX)" = "믹서 그룹이 플레이리스트를 따름(LYNX)"
 "Arrange inserts like the Playlist" = "플레이리스트처럼 인서트 정렬"
 "{0} insert(s) moved to follow the Playlist" = "플레이리스트에 맞춰 인서트 {0}개를 옮겼습니다"
+"Start offset" = "시작 오프셋"
+"Sample start offset" = "샘플 시작 오프셋"

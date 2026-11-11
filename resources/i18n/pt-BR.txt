@@ -8346,3 +8346,5 @@ countries: br
 "Mixer groups follow the Playlist (LYNX)" = "Grupos do Mixer seguem a Playlist (LYNX)"
 "Arrange inserts like the Playlist" = "Organizar inserts como a Playlist"
 "{0} insert(s) moved to follow the Playlist" = "{0} insert(s) movido(s) para seguir a Playlist"
+"Start offset" = "Deslocamento do início"
+"Sample start offset" = "Deslocamento do início da amostra"
