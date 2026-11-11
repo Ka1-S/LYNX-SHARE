@@ -188,6 +188,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 
 
 SIZES = json.loads((SRC / "img-sizes.json").read_text(encoding="utf-8"))     # written by import-shots.py
+SIZES.update({"/assets/img/plugins/%s.webp" % k: v[:2] for k, v in json.loads((SRC / "catalog-img.json").read_text(encoding="utf-8")).items()})
 
 
 def sized(page):
