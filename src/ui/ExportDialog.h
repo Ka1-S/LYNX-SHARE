@@ -36,6 +36,9 @@ void bounceInsertToAudio (AudioEngine& engine, int track);
 // rendered again from its instrument ("Re-freeze"). Close the channel's editor first (a plugin window holds its plugin).
 // Runs on a background thread with progress; `done` (optional, message thread) gets whether it froze.
 void freezeChannel (AudioEngine& engine, int channel, std::function<void (bool)> done = {});
+// Why `channel` cannot be frozen, as a translated sentence; empty = it can (round 190bj: "Freeze selected channels"
+// names the channels it leaves out and freezes the others).
+juce::String freezeRefusal (AudioEngine& engine, int channel);
 // The instrument plays again and the frozen audio is deleted.
 void unfreezeChannel (AudioEngine& engine, int channel);
 // The same without a window, on the calling (message) thread: the command-line modes and the tests. Empty = frozen.

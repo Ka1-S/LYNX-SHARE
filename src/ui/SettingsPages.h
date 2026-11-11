@@ -153,7 +153,7 @@ public:
     ScrollingPage()
     {
         viewport.setViewedComponent (&content, false);
-        viewport.setScrollBarsShown (true, false);
+        viewport.setScrollBarsShown (true, false, false, true);
         viewport.setScrollBarThickness (10);
         addAndMakeVisible (viewport);
     }
@@ -161,18 +161,24 @@ public:
     void resized() override
     {
         viewport.setBounds (getLocalBounds());
-        const auto width = getWidth() - (needsScroll() ? viewport.getScrollBarThickness() : 0);
-        content.setSize (width, juce::jmax (getHeight(), layout (width)));
+        // round 190bj (QA: Settings › MIDI at ~390 px lost each input row's switch and device name): below the page's
+        // narrowest width its rows keep that width and the page scrolls sideways instead of squeezing them
+        const auto narrow = getWidth() - viewport.getScrollBarThickness() < minimumWidth();
+        const auto height = getHeight() - (narrow ? viewport.getScrollBarThickness() : 0);
+        const auto width = juce::jmax (minimumWidth(), getWidth() - (needsScroll (height) ? viewport.getScrollBarThickness() : 0));
+        content.setSize (width, juce::jmax (height, layout (width)));
     }
 
 protected:
     virtual int layout (int width) = 0;
+    // the narrowest width the page's rows are laid out at (a narrower window scrolls sideways)
+    virtual int minimumWidth() const { return 560; }
     juce::Component& page() noexcept { return content; }
 
     void add (juce::Component& c) { content.addAndMakeVisible (c); }
 
 private:
-    bool needsScroll() { return layout (getWidth()) > getHeight(); }
+    bool needsScroll (int height) { return layout (juce::jmax (minimumWidth(), getWidth())) > height; }
 
     juce::Viewport viewport;
     juce::Component content;

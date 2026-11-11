@@ -613,7 +613,7 @@ private:
         const auto valid = channel >= 0 && channel < (int) song.channels.size();
         juce::PopupMenu menu;
         if (! valid || ! song.channels[(std::size_t) channel].freeze.on())
-            menu.addItem (tr ("Freeze"), valid, false, [this, channel] {
+            menu.addItem (trc ("@channel: Freeze"), valid, false, [this, channel] {
                 freezeChannel (engine, channel, [safe = juce::Component::SafePointer<juce::Component> (this)] (bool) {
                     if (safe != nullptr)
                         safe->repaint();

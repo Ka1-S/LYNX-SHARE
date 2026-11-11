@@ -14945,6 +14945,26 @@ private:
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::extras), "-settings-extras.png"); // round 190am
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::audio), "-settings-audio.png");
                 saveWindow (lynx::makeSettingsPanel (offline, lynx::SettingsPage::midi), "-settings-midi.png");
+                {
+                    // round 190bj (QA): the MIDI page in a small window keeps each row's switch and device name
+                    auto small = lynx::makeSettingsPanel (offline, lynx::SettingsPage::midi);
+                    small->setSize (390, 390);
+                    saveWindow (std::move (small), "-settings-midi-small.png");
+                }
+                {
+                    // round 190bj (QA): the Apex Limiter's window content at its default size, as sized before (JUCE's ratio
+                    // on the whole window: the status row cut off) and now
+                    lynx::AudioEngine apexEngine (false);
+                    lynx::Song song;
+                    song.mixer.resize (2);
+                    song.mixer[0].name = "Master";
+                    song.mixer[1].name = "Insert 1";
+                    song.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::apexLimiter));
+                    apexEngine.setSong (std::move (song));
+                    apexEngine.dispatchPendingMessages();
+                    savePng (lynx::ProEditorWindows::windowContentForSnapshot (apexEngine, 1, 0, true), prefix + "-apex-window-before190bj.png");
+                    savePng (lynx::ProEditorWindows::windowContentForSnapshot (apexEngine, 1, 0, false), prefix + "-apex-window.png");
+                }
                 saveWindow (lynx::makePluginManagerPanel (offline, false), "-plugin-manager.png");
                 saveWindow (lynx::makeShortcutManagerPanel (false), "-shortcuts.png");
             }

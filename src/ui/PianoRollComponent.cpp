@@ -688,8 +688,8 @@ bool PianoRollComponent::refuseFrozenEdit()
     const auto channel = engine.getSelectedChannel();
     if (channel < 0 || channel >= (int) song.channels.size() || ! song.channels[(std::size_t) channel].freeze.on())
         return false;
-    ui::postHint ({ tr ("{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }), {} },
-                  4000);
+    ui::postNotice ({ tr ("{0} is frozen: Unfreeze to edit ([RMB] on the channel, Unfreeze)", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }), {} },
+                    3000);
     return true;
 }
 

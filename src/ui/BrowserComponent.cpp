@@ -3215,13 +3215,11 @@ void BrowserComponent::rebuildRoots()
     rootAlso.clear();
     using browserview::RootKind;
 
-    // FL folders (if installed) and user folders
-    const auto programs = juce::File::getSpecialLocation (juce::File::globalApplicationsDirectory);
-    juce::File fl;
-
-    for (const auto& dir : programs.getChildFile ("Image-Line").findChildFiles (juce::File::findDirectories, false, "FL Studio*"))
-        if (dir.getChildFile ("Data").isDirectory() && dir.getFileName() > fl.getFileName()) // "FL Studio ASIO" is the driver
-            fl = dir;
+    // FL folders (if installed) and user folders. Round 190bj (QA: the FL folders were listed with LYNX_NO_FL=1): the
+    // installation comes from findFlStudio, as everywhere else (FL's own install path, Program Files\Image-Line, Wine,
+    // LYNX_FL_INSTALL; none with LYNX_NO_FL)
+    const auto flInstall = findFlStudio();
+    const auto fl = flInstall.installDir;
 
     auto add = [this] (const juce::String& name, const juce::File& folder, RootKind kind) {
         if (folder.isDirectory() && ! allRoots.contains (folder))
@@ -3246,7 +3244,7 @@ void BrowserComponent::rebuildRoots()
     const auto data = fl.getChildFile ("Data");
     add (tr ("FL samples (Packs)"), data.getChildFile ("Patches").getChildFile ("Packs"), RootKind::flSamples);
     add (tr ("FL demo projects"), data.getChildFile ("Demo projects"), RootKind::flDemos);
-    const auto userData = findFlStudio().userData;
+    const auto userData = flInstall.userData;
     auto userPresets = [&userData] (const char* folder) {
         return userData.isDirectory() ? userData.getChildFile ("Presets").getChildFile (folder) : juce::File();
     };
