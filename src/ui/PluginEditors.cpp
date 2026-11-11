@@ -5685,6 +5685,7 @@ public:
         }
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
+        markLinkedWindow (*this, -1, track); // FL's Auto select linked modules (round 187a)
         keepAboveMainWindow (*this);
         skin::playOpenAnimation (*editor, editor->editorStyle()); // round 126: fade / scale in
     }

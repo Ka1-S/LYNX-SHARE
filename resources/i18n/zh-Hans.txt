@@ -6114,6 +6114,8 @@ countries: cn sg
 "Allow the plugin to handle keystrokes before the host does" = "允许插件先于宿主处理按键"
 "Disable typing keyboard priority by default" = "默认停用打字键盘优先"
 "Disable typing keyboard priority for all newly added plugins by default" = "对之后新添加的所有插件默认停用打字键盘优先"
+"Auto select linked modules" = "自动选择关联模块"
+"Focusing plugin windows selects mixer tracks" = "聚焦插件窗口时选择对应的混音器轨道"
 "Mute / unmute" = "静音 / 取消静音"
 "Portamento / deselect" = "滑音 / 取消选择"
 "Shift+arrows" = "Shift+方向键"
@@ -8366,3 +8368,4 @@ countries: cn sg
 "Octaver" = "八度器"
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "实测：按参考拟合的模型；经典：此前保存的工程所用的模型"

@@ -6114,6 +6114,8 @@ countries: ru by kz
 "Allow the plugin to handle keystrokes before the host does" = "Позволить плагину обрабатывать нажатия клавиш раньше хоста"
 "Disable typing keyboard priority by default" = "Отключать приоритет клавиатуры для игры по умолчанию"
 "Disable typing keyboard priority for all newly added plugins by default" = "Отключать приоритет клавиатуры для игры у всех новых плагинов по умолчанию"
+"Auto select linked modules" = "Автоматически выбирать связанные модули"
+"Focusing plugin windows selects mixer tracks" = "Фокус на окне плагина выбирает дорожку микшера"
 "Mute / unmute" = "Заглушить / включить"
 "Portamento / deselect" = "Портаменто / снять выделение"
 "Shift+arrows" = "Shift+стрелки"
@@ -8366,3 +8368,4 @@ countries: ru by kz
 "Octaver" = "Октавер"
 "Rectify" = "Выпрямление"
 "CrossFold" = "CrossFold"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Измеренный: модель, подогнанная под эталон; классический: модель проектов, сохранённых ранее"

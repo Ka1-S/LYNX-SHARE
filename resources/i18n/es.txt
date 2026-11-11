@@ -6114,6 +6114,8 @@ countries: es mx ar co cl pe ve
 "Allow the plugin to handle keystrokes before the host does" = "Permitir que el plugin procese las teclas antes que el host"
 "Disable typing keyboard priority by default" = "Desactivar por defecto la prioridad del teclado de escritura"
 "Disable typing keyboard priority for all newly added plugins by default" = "Desactivar por defecto la prioridad del teclado de escritura en todos los plugins que se añadan"
+"Auto select linked modules" = "Seleccionar automáticamente los módulos vinculados"
+"Focusing plugin windows selects mixer tracks" = "Enfocar la ventana de un plugin selecciona la pista del mezclador"
 "Mute / unmute" = "Silenciar / quitar silencio"
 "Portamento / deselect" = "Portamento / deseleccionar"
 "Shift+arrows" = "Shift+flechas"
@@ -8366,3 +8368,4 @@ countries: es mx ar co cl pe ve
 "Octaver" = "Octavador"
 "Rectify" = "Rectificar"
 "CrossFold" = "CrossFold"
+"Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Medido: el modelo ajustado a la referencia; clásico: el de los proyectos guardados antes"
