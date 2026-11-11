@@ -110,6 +110,8 @@ add_library(lynx_core STATIC
     src/core/Granulizer.cpp
     src/core/WaveTraveller.cpp
     src/core/FruitySlicer.cpp
+    src/core/Slicex.cpp
+    src/core/SlicexEngine.cpp
     src/core/Drumaxx.cpp
     src/core/Slayer.cpp
     src/core/Dx10.cpp
