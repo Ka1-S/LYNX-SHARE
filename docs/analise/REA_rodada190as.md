@@ -4,7 +4,7 @@ FL Studio 2026 (25.1.x, `FLEngine_x64.dll` of 2026-10-08, image base 0x400000), 
 FL's online manual. Clean-room: behaviour and formats only; LYNX's code is its own. The third feature of this round,
 Piano roll scripts, is in `REA_rodada190as-pyscript.md` (branch `feature/pyscript190as`).
 
-Evidence tags: [BIN] FLEngine strings / code, [FILE] a file FL ships, [MAN] FL's manual, [LOG] FL's change log
+Evidence tags: [LIVE] seen in the running FL, [BIN] FLEngine strings / code, [FILE] a file FL ships, [MAN] FL's manual, [LOG] FL's change log
 (`Help/WhatsNew.htm`), [EXEC] measured by running LYNX's code.
 
 ## 1. "Find similar samples"
@@ -16,7 +16,7 @@ Evidence tags: [BIN] FLEngine strings / code, [FILE] a file FL ships, [MAN] FL's
 | Fact | Proof |
 |---|---|
 | The command exists in two places: the Sounds tab's per-sound menu (three dots) and Loop Starter's channel menu | [MAN] Browser › Sounds tab › Sound menu: "Open/Edit in...", "Find similar samples", "Show in FL Studio Browser", "Generate PDF license", "Show less like this", "Report". [BIN] the only "similar samples" string in the engine is the Loop Starter channel menu's `Find similar samples...` with the hint `Find samples that match the loop in FL Cloud` (menu builder at `0x1035046`/`0x103506c`, next to `Show more from this pack...` / `Show this pack in FL Cloud`) |
-| FL's ordinary Browser (local folders) has no such command | [BIN] no other "similar" menu string in `FLEngine_x64.dll` or `FL64.exe` (the Sounds tab's own menu is web content: the tab loads `https://sounds.<domain>/fl-studio...` in WebView2); [MAN] the Browser's file right-click menu lists no similarity item |
+| FL's ordinary Browser (local folders) has no such command | [BIN] no other "similar" menu string in `FLEngine_x64.dll` or `FL64.exe` (the Sounds tab's own menu is web content: the tab loads `https://sounds.<domain>/fl-studio...` in WebView2); [LIVE] 2026-11-11, ALL tab › Packs › Loops › right-click `DL Ninety.wav`: Send to selected channel or focused plugin, Open in new channel, Send to playlist as an audio clip / audio track / instrument track, Edit in audio editor / pitch corrector / time warper, Open in new sampler / Fruity Granulizer / Fruity Slicer / Fruity Slicer 2 / Slicex channel, System (Windows shell menu, Open parent folder, Locate file, Delete file...), Tags (Favorite, Tags, Add tag, Edit tags). No similarity item (`shots/similar-fl-browser-file-menu.png`) |
 | The Loop Starter item only builds a search string and opens the Sounds tab with it | [BIN] click handler `0x1036470` → `0xdc0d40`: builds the channel's query (`0xdc24c0`), prefixes `?searchString=` (`0xdc0e28`) and calls the Sounds-tab opener `0x1083710`. No audio is read in that path |
 | The query carries tags and key, not audio features | [LOG] "20957 Added key info to the FL Cloud similar sound query", "20970 Loop Starter similar search breaks with sharpened root notes", "20372 Find similar samples always adds tags to the previous search", "19910 Implemented 'Find similar' option to search in Sounds tab"; [BIN] the neighbouring query fields `rootNote=`, `chordType=`, `bpm=`, `packGenres=`, `packName=` |
 | The ranking is the service's | [MAN] "Shows a list of samples with a similar sound. The similarity search includes both tone and rhythm." Endpoints in the engine: `https://search.<domain>/search/file-by-id/`, `.../search/pack`, `.../secured/loop-starter/batch` [BIN]. What the service computes is not in FL's binaries |
@@ -27,8 +27,11 @@ analysis = none in FL (server side, undisclosed); index file = none; when comput
 service's, not reproducible offline. A like-for-like ranking comparison with FL is therefore not possible on local
 packs: FL cannot rank them.
 
-Not looked at live in this round (see the handoff): the Sounds tab needs FL Cloud online and, for most content, an
-account; rounds never log in.
+Live look (2026-11-11, under the GUI and FL locks): the Sounds tab opened on FL Cloud's "Personalize your experience"
+page (`shots/similar-fl-sounds-tab.png`). The tab is a WebView2 child process, so the round's input guard
+(`safeinput.ps1`: the point must belong to FL's own process) refuses every click into it; the guard was not bypassed,
+so the Sounds list and its "Find similar samples" result list were not driven or shot. Evidence tag [LIVE] below is
+from that session. FL changes made: closing the Welcome window loaded FL's default template; nothing was saved.
 
 ### 1.2 What LYNX does (its own, local)
 
