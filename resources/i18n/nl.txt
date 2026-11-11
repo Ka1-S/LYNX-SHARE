@@ -8128,6 +8128,15 @@ countries: nl be
 "Send the time selection to the comp" = "Tijdselectie naar de comp sturen"
 "Send the time selection of the take lane to its comp" = "Tijdselectie van de take-baan naar de comp sturen"
 
+# --- Plugin wrapper: Processing › Connections, a generator's outputs (round 188d)
+"Connections" = "Verbindingen"
+"Auto map outputs" = "Uitgangen automatisch toewijzen"
+"Assign all outputs incrementally" = "Alle uitgangen opeenvolgend toewijzen"
+"Set all inputs and outputs to their default values" = "Alle in- en uitgangen terugzetten naar hun standaardwaarden"
+"Refresh inputs and outputs (after a change in the plugin)" = "In- en uitgangen vernieuwen (na een wijziging in de plugin)"
+"Mixer track offset for output {0}" = "Mixerspoor-verschuiving voor uitgang {0}"
+"Deactivate output {0}" = "Uitgang {0} uitschakelen"
+"Activate output {0}" = "Uitgang {0} inschakelen"
 # --- Game controller (round 184a, S16)
 "Game controller" = "Gamecontroller"
 "Use a game controller" = "Een gamecontroller gebruiken"
