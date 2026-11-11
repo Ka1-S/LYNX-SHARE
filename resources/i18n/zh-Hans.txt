@@ -8503,3 +8503,5 @@ countries: cn sg
 "Backed up {0} min ago" = "{0} 分钟前已备份"
 "Nudge the selected clips left (fine step, no snap)" = "将所选剪辑向左微移（细微步长，不吸附）"
 "Nudge the selected clips right (fine step, no snap)" = "将所选剪辑向右微移（细微步长，不吸附）"
+# round 190bb (LYNX Tune: Breathiness, issue #103)
+"BREATH" = "气声"

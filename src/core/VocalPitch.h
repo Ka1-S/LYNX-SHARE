@@ -192,4 +192,55 @@ private:
     std::vector<float> wsum;               // round 165j: the summed grain windows per output sample
     float envZ = 0.0f;
 };
+// ---------------------------------------------------------------------------------------------------------------------
+// Breath noise (round 190bb, LYNX Tune's Breathiness; issue #103). Aspiration noise for a voice, written from textbook
+// DSP only (the channel vocoder: H. Dudley, "The Vocoder", Bell Labs Record 18, 1939; U. Zölzer (ed.), DAFX, ch. 9;
+// aspiration noise in breathy voices: D. Klatt, L. Klatt, "Analysis, synthesis, and perception of voice quality
+// variations among female and male talkers", JASA 87(2), 1990):
+//
+//   - the voice is split into third-octave bands (250 Hz … 16 kHz, four cascaded band-pass sections each: 38 dB down
+//     an octave away, so a formant does not fill the valley beside it) and the
+//     power in each band is followed (a 1.5 ms one-pole on the squared band signal, fast enough to keep the
+//     glottal pulses' own rhythm in the upper bands: the noise then comes in bursts at the pitch, as breath does);
+//   - an independent white noise per band goes through the same band-pass and is scaled to that power: the noise has
+//     the voice's own spectral envelope (its formants, wherever the shifter put them);
+//   - the bands are weighted by a tilt of +6 dB per octave around 2 kHz (−18 … +12 dB): the harmonic part of a voice
+//     falls with frequency much faster than its aspiration noise does, so breath is mostly "air" above the formants.
+//
+// The caller adds the returned sample to the voice. Nothing allocates after construction; prepare() is cheap enough
+// for a sample-rate change but is not meant for the audio thread.
+class BreathNoise
+{
+public:
+    static constexpr int maxBands = 19;
+    static constexpr int sections = 4;
+
+    void prepare (double sampleRate) noexcept;
+    void reset() noexcept;
+    // One sample: `voice` = the (mono) voice the noise is shaped by; `gain` = the noise's level (0 = none; 1 = each
+    // band's noise as strong as the voice in that band times the tilt). The noise as a whole is never let over the
+    // voice's own power in the bands. Returns the noise to add.
+    float process (float voice, float gain) noexcept;
+    int bands() const noexcept { return count; }
+    double bandHz (int b) const noexcept { return centre[(std::size_t) std::clamp (b, 0, maxBands - 1)]; }
+    // the tilt (linear gain) of band b
+    double bandWeight (int b) const noexcept { return weight[(std::size_t) std::clamp (b, 0, maxBands - 1)]; }
+    // flushes states that fell under the denormal range (call once per block)
+    void tidy() noexcept;
+
+private:
+    // band-pass section per band (b1 = 0, b2 = −b0), used `sections` times in a row; arrays over the bands so the
+    // compiler can run several bands at once (element-wise only: the result does not depend on it)
+    static constexpr int lanes = 20; // maxBands rounded up to a multiple of 4
+    alignas (16) float b0[lanes] {}, a1[lanes] {}, a2[lanes] {};
+    alignas (16) float v1[sections][lanes] {}, v2[sections][lanes] {}; // the voice's sections (transposed direct form II)
+    alignas (16) float n1[sections][lanes] {}, n2[sections][lanes] {}; // the noise's
+    alignas (16) float power[lanes] {};  // the voice's followed power per band
+    alignas (16) float scale[lanes] {};  // weight / the RMS a unit white noise leaves the band with
+    alignas (16) float weight2[lanes] {}; // weight²
+    std::array<double, maxBands> centre {}, weight {};
+    int count = 0;
+    float follow = 0.0f;
+    std::uint32_t rng = 0x9E3779B9u;
+};
 } // namespace lynx::vocal

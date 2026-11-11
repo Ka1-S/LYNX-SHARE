@@ -8586,3 +8586,5 @@ countries: br
 "Backed up {0} min ago" = "Backup feito há {0} min"
 "Nudge the selected clips left (fine step, no snap)" = "Empurrar os clipes selecionados para a esquerda (passo fino, sem snap)"
 "Nudge the selected clips right (fine step, no snap)" = "Empurrar os clipes selecionados para a direita (passo fino, sem snap)"
+# round 190bb (LYNX Tune: Breathiness, issue #103)
+"BREATH" = "SOPRO"

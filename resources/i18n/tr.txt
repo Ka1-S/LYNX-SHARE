@@ -8503,3 +8503,5 @@ countries: tr
 "Backed up {0} min ago" = "{0} dk önce yedeklendi"
 "Nudge the selected clips left (fine step, no snap)" = "Seçili klipleri sola ince kaydır (ince adım, yakalama yok)"
 "Nudge the selected clips right (fine step, no snap)" = "Seçili klipleri sağa ince kaydır (ince adım, yakalama yok)"
+# round 190bb (LYNX Tune: Breathiness, issue #103)
+"BREATH" = "NEFES"
