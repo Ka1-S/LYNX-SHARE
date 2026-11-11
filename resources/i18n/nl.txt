@@ -8416,3 +8416,12 @@ countries: nl be
 "Rectify" = "Gelijkrichten"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Gemeten: het model dat op de referentie is afgestemd; klassiek: dat van projecten die eerder zijn opgeslagen"
+
+# --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
+"Save the song as a file" = "Het nummer als bestand opslaan"
+"Best quality, larger file" = "Beste kwaliteit, groter bestand"
+"Small, for sharing" = "Klein, om te delen"
+"All changes saved" = "Alle wijzigingen opgeslagen"
+"Not saved yet" = "Nog niet opgeslagen"
+"Backed up just now" = "Zojuist geback-upt"
+"Backed up {0} min ago" = "{0} min geleden geback-upt"

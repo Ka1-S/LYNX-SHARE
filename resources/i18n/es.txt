@@ -8416,3 +8416,12 @@ countries: es mx ar co cl pe ve
 "Rectify" = "Rectificar"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Medido: el modelo ajustado a la referencia; clásico: el de los proyectos guardados antes"
+
+# --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
+"Save the song as a file" = "Guardar la canción como archivo"
+"Best quality, larger file" = "Máxima calidad, archivo más grande"
+"Small, for sharing" = "Pequeño, para compartir"
+"All changes saved" = "Todos los cambios guardados"
+"Not saved yet" = "Aún sin guardar"
+"Backed up just now" = "Copia de seguridad hecha ahora mismo"
+"Backed up {0} min ago" = "Copia de seguridad hace {0} min"

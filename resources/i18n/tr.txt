@@ -8416,3 +8416,12 @@ countries: tr
 "Rectify" = "Doğrultma"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Ölçülmüş: referansa uydurulmuş model; klasik: daha önce kaydedilen projelerin modeli"
+
+# --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
+"Save the song as a file" = "Şarkıyı dosya olarak kaydet"
+"Best quality, larger file" = "En iyi kalite, daha büyük dosya"
+"Small, for sharing" = "Küçük, paylaşmak için"
+"All changes saved" = "Tüm değişiklikler kaydedildi"
+"Not saved yet" = "Henüz kaydedilmedi"
+"Backed up just now" = "Az önce yedeklendi"
+"Backed up {0} min ago" = "{0} dk önce yedeklendi"

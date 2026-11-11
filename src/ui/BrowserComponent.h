@@ -204,6 +204,11 @@ private:
     void showNote (const juce::String& text); // a short note there (files copied in), gone after a few seconds
     juce::Rectangle<int> statusArea;
     void rebuildRoots();
+public:
+    // Where a file dialog for samples should start (round 190t, the Simple workflow's Sampler tile): FL's sample packs
+    // when FL Studio is installed, else the first folder the user added, else the Music folder. May not exist.
+    juce::File firstSampleFolder() const;
+private:
     void rebuildTree();
     static juce::File userFoldersFile();
     static juce::File starredFile();

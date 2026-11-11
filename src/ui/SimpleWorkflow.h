@@ -29,6 +29,11 @@ public:
         std::function<void (juce::Component*, int)> setTitleAccessory; // the Playlist title bar's accessory (nullptr: none)
         std::function<void()> showLoops;                   // the sample browser, to drag loops onto the timeline
         std::function<void (int track)> trackAdded;        // a track was added (select it, scroll to it)
+        // round 190t
+        std::function<juce::File()> sampleFolder;          // where the Sampler tile's file dialog starts (the Browser's samples)
+        std::function<void (int format)> exportAudio;      // the Export window on one format (0 WAV, 1 MP3): the Finish dock
+        std::function<void()> exportOtherApps;             // File › Export › For other apps
+        std::function<juce::String()> saveStatus;          // "Backed up 2 min ago", "Not saved yet"...: beside the title tools
         std::function<void (juce::Component*, int)> setSideDock; // the dock on the right of the Playlist (nullptr: none)
     };
 
@@ -63,6 +68,9 @@ public:
     // --simpleshot: the chooser's two pages, as drawn
     juce::Component* chooserForSnapshot();
     void showStarterPageForSnapshot();
+    // round 190t: a click on the starter page's button `index` (0 = Empty grid), and the status line showing `text`
+    void clickStarterForSnapshot (int index);
+    void setStatusForSnapshot (const juce::String& text);
 
     // how many were ever made in this process (the "nothing exists in Pattern workflow" check)
     static inline std::atomic<int> instances { 0 };
@@ -86,5 +94,6 @@ private:
     std::unique_ptr<juce::Component> addButton, finishButton, titleTools;
     std::unique_ptr<juce::Component> finishDock;
     std::unique_ptr<juce::FileChooser> fileChooser;
+    juce::File sampleFolder; // where the last sample for a Sampler track came from (this session)
 };
 } // namespace lynx

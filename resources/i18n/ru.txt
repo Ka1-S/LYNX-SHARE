@@ -8416,3 +8416,12 @@ countries: ru by kz
 "Rectify" = "Выпрямление"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Измеренный: модель, подогнанная под эталон; классический: модель проектов, сохранённых ранее"
+
+# --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
+"Save the song as a file" = "Сохранить песню в файл"
+"Best quality, larger file" = "Лучшее качество, файл больше"
+"Small, for sharing" = "Небольшой, чтобы делиться"
+"All changes saved" = "Все изменения сохранены"
+"Not saved yet" = "Ещё не сохранено"
+"Backed up just now" = "Резервная копия только что"
+"Backed up {0} min ago" = "Резервная копия {0} мин назад"

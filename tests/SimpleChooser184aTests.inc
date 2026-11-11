@@ -5,6 +5,8 @@
 
 #include "core/ClipOps.h"
 #include "core/LoopStarter.h"
+#include "core/Meters.h"
+#include "core/RackRenderer.h"
 #include "core/SimpleTracks.h"
 
 TEST (simple184a_empty_song_rule)
@@ -94,6 +96,162 @@ TEST (simple184a_starter_beat_becomes_a_drums_track)
     CHECK (s.patterns[(std::size_t) r.pattern].notes.size() == 11);
     CHECK (simpletracks::kindOf (s, r.track) == simpletracks::Kind::drums);
     CHECK (! simpletracks::isEmptySong (s));
+}
+
+// Round 190t, slice A: a starter beat is placed for four bars (whole clips of its pattern), in the same edit.
+TEST (simple190t_touch_keyboard_note_sounds_on_a_new_instrument_track)
+{
+    using namespace lynx;
+    // The Instrument tile's track, then a key of the Touch keyboard (ui/TouchKeyboard.cpp: AudioEngine::sendLiveNote
+    // pushes this NoteEvent on the selected channel into the live queue the renderer reads): the note is heard at the
+    // Master and on the track's own insert, with the transport stopped, and ends after the key is let go.
+    auto s = Song::makeDefault();
+    s.channels.clear();
+    s.patterns.clear();
+    s.playlist.clear();
+    s.mixer = Song::defaultMixer (4);
+    simpletracks::Request q;
+    q.kind = simpletracks::Kind::instrument;
+    q.name = "Instrument";
+    ChannelDef synth;
+    synth.instrument = InstrumentKind::synth; // SimpleWorkflow::addInstrument's default
+    q.channel = synth;
+    const auto added = simpletracks::addTrack (s, q);
+    CHECK (added.ok() && added.channels.size() == 1 && added.insert > 0);
+    if (! added.ok() || added.channels.empty())
+        return;
+    const auto state = RackState::build (s, nullptr, 48000.0);
+    RackRenderer renderer;
+    renderer.prepare (48000.0, 512);
+    LiveEventQueue live;
+    MeterBank meters;
+    std::vector<float> l (512), r (512);
+    auto render = [&] (int blocks) {
+        float peak = 0.0f;
+        for (int b = 0; b < blocks; ++b)
+        {
+            renderer.process (state.get(), false, 0.0, 512, l.data(), r.data(), &live, &meters);
+            for (int i = 0; i < 512; ++i)
+                peak = std::max ({ peak, std::fabs (l[(std::size_t) i]), std::fabs (r[(std::size_t) i]) });
+        }
+        return peak;
+    };
+    CHECK (render (8) == 0.0f); // nothing held: silence
+    (void) meters.takePeak (added.insert, 0);
+
+    NoteEvent on;
+    on.type = NoteEvent::Type::on;
+    on.channel = added.channels.front(); // the channel the new track selects
+    on.key = 60;
+    on.velocity = 0.8f;
+    CHECK (live.push (on));
+    const auto held = render (20); // ~0.2 s
+    CHECK (held > 0.01f);
+    CHECK (meters.takePeak (added.insert, 0) > 0.001f); // through the track's own mixer insert
+
+    auto off = on;
+    off.type = NoteEvent::Type::off;
+    CHECK (live.push (off));
+    render (600); // ~6.4 s: the release is over
+    CHECK (render (8) < 1e-4f);
+}
+
+TEST (simple190t_starter_tempo_is_the_one_on_the_button)
+{
+    using namespace lynx;
+    // every starter: with "Use the suggested tempo" the project gets the BPM written on the button (Lo-fi 84 -> 84),
+    // whatever tempo the generated plan drew from the genre's range
+    const auto config = loopstarter::builtinConfig();
+    loopstarter::Sources sources;
+    sources.config = &config;
+    const auto genres = config.listed();
+    CHECK (genres.size() >= 3);
+    int drewAnother = 0;
+    for (const auto* genre : genres)
+    {
+        const auto onButton = (int) std::lround (genre->defaultTempo);
+        CHECK (loopstarter::suggestedTempo (*genre) == onButton);
+        CHECK (loopstarter::suggestedTempo (sources, genre->id) == onButton);
+        for (std::uint64_t seed = 1; seed <= 12; ++seed)
+        {
+            const auto plan = loopstarter::generate (sources, genre->id, seed);
+            drewAnother += std::fabs (plan.bpm - (double) onButton) > 0.5 ? 1 : 0;
+            simpletracks::Request q; // what the starter page asks for
+            q.kind = simpletracks::Kind::drums;
+            q.kit = loopstarter::kitChannels (plan);
+            q.pattern = loopstarter::kitPattern (plan);
+            q.fillBars = 4;
+            q.bpm = loopstarter::suggestedTempo (sources, genre->id);
+            if (q.kit.empty())
+                continue;
+            Song s;
+            s.mixer.resize (4);
+            s.bpm = 133.0;
+            CHECK (simpletracks::addTrack (s, q).ok());
+            CHECK (s.bpm == (double) onButton);
+        }
+    }
+    CHECK (drewAnother > 0); // the plan's own tempo does differ: the old code took that one
+    loopstarter::Sources none; // no configuration, unknown genre: LYNX's own default genre
+    CHECK (loopstarter::suggestedTempo (none, "no-such-genre") == loopstarter::suggestedTempo (*config.find (config.defaultGenre)));
+}
+
+TEST (simple190t_a_starter_beat_fills_four_bars)
+{
+    using namespace lynx;
+    const auto bar = (std::int64_t) 16 * ticksPerStep;
+    auto add = [bar] (Song& s, int patternBars, int fillBars) {
+        s.mixer.resize (4);
+        simpletracks::Request q;
+        q.kind = simpletracks::Kind::drums;
+        ChannelDef kick;
+        kick.instrument = InstrumentKind::kick;
+        q.kit = { kick };
+        Pattern beat;
+        beat.lengthTicks = patternBars * bar;
+        Note n;
+        n.length = ticksPerStep;
+        n.key = 60;
+        beat.notes = { n };
+        q.pattern = beat;
+        q.fillBars = fillBars;
+        return simpletracks::addTrack (s, q);
+    };
+    {
+        Song s; // one bar: four clips, one after the other, all the same pattern on the drum track
+        const auto r = add (s, 1, 4);
+        CHECK (r.ok() && s.playlist.size() == 4);
+        for (std::size_t i = 0; i < s.playlist.size(); ++i)
+            CHECK (s.playlist[i].start == (std::int64_t) i * bar && s.playlist[i].length == bar && s.playlist[i].pattern == r.pattern
+                   && s.playlist[i].track == r.track && s.playlist[i].kind == ClipKind::pattern);
+        CHECK (r.pattern == (int) s.patterns.size() - 1); // one pattern added, not four
+    }
+    {
+        Song s; // two bars: twice
+        CHECK (add (s, 2, 4).ok() && s.playlist.size() == 2 && s.playlist[1].start == 2 * bar);
+    }
+    {
+        Song s; // three bars: whole clips only, so six bars
+        CHECK (add (s, 3, 4).ok() && s.playlist.size() == 2 && s.playlist[1].start == 3 * bar);
+    }
+    {
+        Song s; // four bars or more: once
+        CHECK (add (s, 4, 4).ok() && s.playlist.size() == 1);
+        Song t;
+        CHECK (add (t, 8, 4).ok() && t.playlist.size() == 1);
+    }
+    {
+        Song s; // 0: as before
+        CHECK (add (s, 1, 0).ok() && s.playlist.size() == 1);
+    }
+    {
+        Song s; // a waltz: four bars of three beats
+        s.beatsPerBar = 3;
+        const auto r = add (s, 1, 4);
+        const auto length = s.playlist[0].length;
+        CHECK (r.ok() && length > 0 && (std::int64_t) s.playlist.size() * length >= 4 * 3 * ppq
+               && (std::int64_t) (s.playlist.size() - 1) * length < 4 * 3 * ppq);
+    }
 }
 
 TEST (simple184a_imported_audio_is_a_track_with_its_clip)

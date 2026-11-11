@@ -2999,6 +2999,16 @@ std::unique_ptr<juce::Component> BrowserComponent::makeSampleBrowserContent (Aud
     return host;
 }
 
+juce::File BrowserComponent::firstSampleFolder() const
+{
+    using browserview::RootKind;
+    for (auto wanted : { RootKind::flSamples, RootKind::user, RootKind::music })
+        for (int i = 0; i < allRoots.size() && i < (int) allRootKinds.size(); ++i)
+            if (allRootKinds[(std::size_t) i] == wanted && allRoots[i].isDirectory())
+                return allRoots[i];
+    return {};
+}
+
 void BrowserComponent::rebuildRoots()
 {
     roots.clear();

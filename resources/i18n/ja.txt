@@ -8416,3 +8416,12 @@ countries: jp
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "計測: リファレンスに合わせたモデル。クラシック: それ以前に保存したプロジェクトのモデル"
+
+# --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
+"Save the song as a file" = "曲をファイルとして保存"
+"Best quality, larger file" = "最高音質、ファイルは大きめ"
+"Small, for sharing" = "小さめ、共有向け"
+"All changes saved" = "すべての変更を保存済み"
+"Not saved yet" = "未保存"
+"Backed up just now" = "たった今バックアップ済み"
+"Backed up {0} min ago" = "{0} 分前にバックアップ済み"

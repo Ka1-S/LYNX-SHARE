@@ -8416,3 +8416,12 @@ countries: kr
 "Rectify" = "정류"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "측정: 레퍼런스에 맞춘 모델, 클래식: 그 이전에 저장된 프로젝트의 모델"
+
+# --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
+"Save the song as a file" = "곡을 파일로 저장"
+"Best quality, larger file" = "최고 음질, 큰 파일"
+"Small, for sharing" = "작은 파일, 공유용"
+"All changes saved" = "모든 변경 사항 저장됨"
+"Not saved yet" = "아직 저장되지 않음"
+"Backed up just now" = "방금 백업됨"
+"Backed up {0} min ago" = "{0}분 전에 백업됨"

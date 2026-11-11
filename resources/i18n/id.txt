@@ -8416,3 +8416,12 @@ countries: id
 "Rectify" = "Rektifikasi"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "Terukur: model yang disesuaikan dengan referensi; klasik: model proyek yang disimpan sebelumnya"
+
+# --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
+"Save the song as a file" = "Simpan lagu sebagai file"
+"Best quality, larger file" = "Kualitas terbaik, file lebih besar"
+"Small, for sharing" = "Kecil, untuk dibagikan"
+"All changes saved" = "Semua perubahan tersimpan"
+"Not saved yet" = "Belum disimpan"
+"Backed up just now" = "Baru saja dicadangkan"
+"Backed up {0} min ago" = "Dicadangkan {0} mnt lalu"

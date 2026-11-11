@@ -8416,3 +8416,12 @@ countries: tw hk mo
 "Rectify" = "整流"
 "CrossFold" = "CrossFold"
 "Measured: the model fitted to the reference; classic: the one of projects saved before it" = "實測：依參考擬合的模型；經典：此前儲存的專案所用的模型"
+
+# --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
+"Save the song as a file" = "將歌曲儲存為檔案"
+"Best quality, larger file" = "最佳音質，檔案較大"
+"Small, for sharing" = "檔案小，方便分享"
+"All changes saved" = "所有變更已儲存"
+"Not saved yet" = "尚未儲存"
+"Backed up just now" = "剛剛已備份"
+"Backed up {0} min ago" = "{0} 分鐘前已備份"

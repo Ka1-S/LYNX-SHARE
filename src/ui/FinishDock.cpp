@@ -139,8 +139,75 @@ private:
     int id;
 };
 
-FinishDock::FinishDock (AudioEngine& e, std::function<void()> close)
-    : engine (e), onClose (std::move (close)), measuring (std::make_shared<std::atomic<int>> (0)),
+// "Save the song as a file": one row per format — its name, what it is good for, and about how big the file will be
+class FinishDock::SaveRow final : public juce::Component,
+                                  public juce::SettableTooltipClient
+{
+public:
+    SaveRow (juce::String n, juce::String h) : name (std::move (n)), help (std::move (h))
+    {
+        setWantsKeyboardFocus (true);
+        setMouseCursor (juce::MouseCursor::PointingHandCursor);
+        setTitle (name);
+        setDescription (help);
+    }
+
+    std::function<void()> onClick;
+
+    void setSize (const juce::String& text)
+    {
+        if (size != text)
+        {
+            size = text;
+            repaint();
+        }
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        auto r = getLocalBounds().toFloat().reduced (1.0f);
+        const auto hover = isMouseOver (true), down = isMouseButtonDown();
+        g.setColour (down ? theme::colour::bg5 : hover ? theme::colour::bg4 : theme::colour::bg3);
+        g.fillRoundedRectangle (r, theme::radius::md);
+        g.setColour (hasKeyboardFocus (false) ? theme::colour::accent : hover ? theme::colour::borderStrong : theme::colour::border);
+        g.drawRoundedRectangle (r.reduced (0.5f), theme::radius::md, 1.0f);
+        auto text = getLocalBounds().reduced (10, 0);
+        g.setColour (theme::colour::textPrimary);
+        g.setFont (theme::font (theme::type::body, true));
+        g.drawText (name, text.removeFromLeft (40), juce::Justification::centredLeft, false);
+        g.setColour (theme::colour::textSecondary);
+        g.setFont (theme::font (theme::type::small));
+        g.drawText (size, text.removeFromRight (64), juce::Justification::centredRight, false);
+        g.drawFittedText (help, text, juce::Justification::centredLeft, 1, 0.75f);
+    }
+
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseDown (const juce::MouseEvent&) override { repaint(); }
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        repaint();
+        if (e.mouseWasClicked() && getLocalBounds().contains (e.getPosition()) && onClick)
+            onClick();
+    }
+    bool keyPressed (const juce::KeyPress& key) override
+    {
+        if ((key == juce::KeyPress::returnKey || key == juce::KeyPress::spaceKey) && onClick)
+        {
+            onClick();
+            return true;
+        }
+        return false;
+    }
+    void focusGained (FocusChangeType) override { repaint(); }
+    void focusLost (FocusChangeType) override { repaint(); }
+
+private:
+    juce::String name, help, size;
+};
+
+FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
+    : engine (e), onClose (std::move (close)), saving (std::move (s)), measuring (std::make_shared<std::atomic<int>> (0)),
       measuredLufs (std::make_shared<std::atomic<float>> (0.0f))
 {
     setTitle (tr ("Master looks"));
@@ -246,7 +313,42 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close)
     };
     addAndMakeVisible (removeButton);
 
+    // the last step in plain words: the song as one file, with the look on (round 190t)
+    if (saving.exportAudio)
+    {
+        saveLabel.setText (tr ("Save the song as a file"), juce::dontSendNotification);
+        saveLabel.setFont (theme::font (theme::type::body, true));
+        addAndMakeVisible (saveLabel);
+        saveRows[0] = std::make_unique<SaveRow> ("WAV", tr ("Best quality, larger file"));
+        saveRows[1] = std::make_unique<SaveRow> ("MP3", tr ("Small, for sharing"));
+        for (int i = 0; i < 2; ++i)
+        {
+            saveRows[i]->onClick = [this, i] { save (i); };
+            addAndMakeVisible (*saveRows[i]);
+        }
+        if (saving.exportOtherApps)
+        {
+            otherApps.setButtonText (tr ("For other apps..."));
+            otherApps.onClick = [this] { save (-1); };
+            addAndMakeVisible (otherApps);
+        }
+    }
+
     refresh();
+}
+
+void FinishDock::save (int format)
+{
+    // "Hear without" is for comparing; the file gets the look
+    if (looks::bypassed (engine.getSong()))
+    {
+        engine.editSong ([] (Song& s) { looks::setBypassed (s, false); });
+        refresh();
+    }
+    if (format < 0 && saving.exportOtherApps)
+        saving.exportOtherApps();
+    else if (format >= 0 && saving.exportAudio)
+        saving.exportAudio (format);
 }
 
 FinishDock::~FinishDock()
@@ -280,6 +382,15 @@ void FinishDock::refresh()
         c->setEnabled (has);
     if (measuring->load() == 0)
         levelInfo.setText (has ? tr ("Input level: {0}", { db (shown.inputDb) }) : juce::String(), juce::dontSendNotification);
+    // about how big each file will be, from the song's length and the Export window's own defaults
+    for (int i = 0; i < 2; ++i)
+        if (saveRows[i] != nullptr)
+        {
+            exportopts::Options o;
+            o.format = i == 0 ? exportopts::Format::wav : exportopts::Format::mp3;
+            const auto seconds = exportMusicSeconds (song, o);
+            saveRows[i]->setSize (seconds > 0.0 ? juce::File::descriptionOfSizeInBytes (exportopts::estimatedBytes (o, seconds)) : juce::String());
+        }
 }
 
 void FinishDock::choose (int id)
@@ -385,7 +496,10 @@ void FinishDock::resized()
     title.setBounds (head);
     status.setBounds (r.removeFromTop (34));
     r.removeFromTop (4);
-    const auto tileH = 64, gap = 6;
+    // (a short window: the look tiles give way so that the Save rows stay in view)
+    const auto saveH = saveRows[0] != nullptr ? 22 + 2 * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0;
+    const auto gap = 6;
+    const auto tileH = juce::jlimit (46, 64, (r.getHeight() - 306 - saveH) / 4 - gap);
     const auto colW = (r.getWidth() - gap) / 2;
     for (int i = 0; i < looks::count; ++i)
     {
@@ -422,5 +536,17 @@ void FinishDock::resized()
     removeButton.setBounds (buttons);
     r.removeFromTop (8);
     peakHint.setBounds (r.removeFromTop (32));
+    if (saveRows[0] != nullptr)
+    {
+        r.removeFromTop (10);
+        saveLabel.setBounds (r.removeFromTop (22));
+        for (auto& row : saveRows)
+        {
+            row->setBounds (r.removeFromTop (32));
+            r.removeFromTop (4);
+        }
+        if (otherApps.isVisible())
+            otherApps.setBounds (r.removeFromTop (30));
+    }
 }
 } // namespace lynx
