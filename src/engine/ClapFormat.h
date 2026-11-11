@@ -38,4 +38,10 @@ private:
 
 // Adds the LYNX formats (JUCE's VST3 + CLAP + our VST2 host) to a manager.
 void addPluginFormats (juce::AudioPluginFormatManager& manager);
+
+// Issue #108 (MPE, core/Mpe.h): from now on a CLAP plugin that takes CLAP notes gets the pitch bend, CC 74 and channel
+// pressure of MIDI channels 2 … 16 as note expressions (tuning over `bendRange` semitones, brightness, pressure) for
+// the notes on that channel; `bendRange` 0 = as before (raw MIDI events). False = not a CLAP plugin of ours, or one
+// that takes MIDI notes (it gets the MPE messages themselves). Call before the plugin processes.
+bool setClapNoteExpressions (juce::AudioPluginInstance& plugin, float bendRange);
 } // namespace lynx

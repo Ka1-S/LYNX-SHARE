@@ -240,6 +240,10 @@ struct PluginRef
     int bendRange = 12;             //   the range sent, 1…48 semitones
     bool modXAftertouch = false;    // "Send MOD X as polyphonic aftertouch": each note's Mod X follows its note on
     bool allNotesOffOnStop = true;  // "Send All Notes Off when playback stops" (off: only the held notes are released)
+    // MPE (issue #108, core/Mpe.h; a LYNX addition, FL's wrapper has no such switch): each note goes out on its own
+    // member channel (2 … 16) with its fine pitch as that channel's pitch bend (range 48), Mod X as CC 74 and Mod Y as
+    // channel pressure; a CLAP plugin that takes CLAP notes gets them as note expressions
+    bool mpe = false;
     bool resetOnFlush = true;       // Troubleshooting › "Reset plugin when FL Studio resets": before an export, on panic
     // FL's Troubleshooting box "Allow FL Studio to process keyboard presses when the keyboard focus option is on"
     // (wrapper flags2 bit 0x800, off for a new plugin): kept from and written back to FL projects (round 181c/187a);
@@ -276,7 +280,7 @@ struct PluginRef
                && hostMaxBuffer == o.hostMaxBuffer
                && midiInPort == o.midiInPort && midiOutPort == o.midiOutPort && notifyRender == o.notifyRender
                && latencyOverrideMs == o.latencyOverrideMs && releaseVelocity == o.releaseVelocity && sendBendRange == o.sendBendRange
-               && bendRange == o.bendRange && modXAftertouch == o.modXAftertouch && allNotesOffOnStop == o.allNotesOffOnStop
+               && bendRange == o.bendRange && modXAftertouch == o.modXAftertouch && allNotesOffOnStop == o.allNotesOffOnStop && mpe == o.mpe
                && resetOnFlush == o.resetOnFlush && sendLoopPosition == o.sendLoopPosition && bitSize == o.bitSize && outputs == o.outputs
                && processInactive == o.processInactive && inputs == o.inputs
                && allowHostKeys == o.allowHostKeys && hostKeysFirst == o.hostKeysFirst

@@ -2322,6 +2322,17 @@ FL Studio Mobile plugin is the open sound check.
 | Time Warp, Velocity Shaper, Glissando / LFO (MPE), generators Rhythm / Seed / Shape / Stacks / Euclidean | — | Transform / Generate panels | ❌ not built (panels and defaults recorded in REA_rodada190o.md) |
 | Project key ↔ Live's Scale Mode | .flp 0xF3 (as before) | set + clip `ScaleInformation`, `InKey` | ✅ .als import and export (`core/LiveScales.h`); scales Live has and FL's list lacks import as no key |
 
+## Round 190bb: MPE, stage 1 (issue #108, a LYNX addition)
+
+FL Studio 2026 has no MPE switch (docs/analise/REA_rodada190bb-mpe.md §1); LYNX adds it on FL's per-note fields.
+
+| Feature | FL 2026 | LYNX | State |
+|---|---|---|---|
+| MPE controller input (lower zone, member channels 2 … 16, bend range 48) | — | Settings › MIDI › device › "MPE controller" + member channel count | ✅ played per note; recorded as the note's fine pitch (bend at the note on), Mod X (CC 74), Mod Y (peak pressure) |
+| Per-note response of built-in instruments | — | Sampler (pitch, Mod X / Mod Y filter), built-in synth (pitch) | ✅ those two; ❌ the other generators |
+| MPE to hosted plugins | — (fine pitch as key / VST3 tuning, Mod X as poly aftertouch) | wrapper Settings › MIDI › "MPE": one member channel per note with bend / CC 74 / pressure; CLAP note expressions (tuning, brightness, pressure) for CLAP-note plugins | ✅ ; ❌ VST3 note expression events (MPE MIDI instead) |
+| Per-note expression curves in the piano roll | — | — | ❌ stage 2 |
+
 ## Round 190i: the plugin window's Detached flag in `.flp` (issue #116)
 FL saves a plugin window's **Detached** state in the plugin record (`0xD4`, flags bit `0x4`; FL 2026 driven, see
 `docs/analise/REA_rodada190i.md`). LYNX reads it into a hosted plugin's Detached setting on import and writes it on

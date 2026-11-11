@@ -62,7 +62,8 @@ bool samePluginProcessing (const PluginRef& a, const PluginRef& b) noexcept
     return a.fixedBuffers == b.fixedBuffers && a.separateProcess == b.separateProcess && a.maxSizeBuffers == b.maxSizeBuffers
            && a.hostMaxBuffer == b.hostMaxBuffer && a.bitSize == b.bitSize && a.releaseVelocity == b.releaseVelocity
            && a.sendBendRange == b.sendBendRange && a.bendRange == b.bendRange && a.modXAftertouch == b.modXAftertouch
-           && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition;
+           && a.allNotesOffOnStop == b.allNotesOffOnStop && a.resetOnFlush == b.resetOnFlush && a.sendLoopPosition == b.sendLoopPosition
+           && a.mpe == b.mpe;
 }
 
 // Silent instrument: plugin channel that could not be loaded.
@@ -3133,6 +3134,18 @@ void RackRenderer::process (const RackState* state,
 
             auto& instrument = *state->instruments[(std::size_t) e.channel];
 
+            if (e.type == NoteEvent::Type::voiceProp) // issue #108: a played MPE note's bend / timbre / pressure
+            {
+                auto base = instrument.wheelCents();
+                if ((std::size_t) e.channel < state->song.channels.size())
+                {
+                    const auto& c = state->song.channels[(std::size_t) e.channel];
+                    base += c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f);
+                }
+                instrument.noteExpression (e.key, e.prop, e.velocity, base);
+                continue;
+            }
+
             auto& held = heldNotes[(std::size_t) std::min (e.channel, maxChannels - 1)];
             const auto bit = std::uint64_t { 1 } << (e.key & 63);
             const auto inRange = e.key >= 0 && e.key < 128;
@@ -3184,7 +3197,9 @@ void RackRenderer::process (const RackState* state,
                 const auto& c = def[(std::size_t) e.channel];
                 // a played note is tuned like the song's notes: Misc › Fine tune and the main pitch (round 162, issue
                 // #9: the fine tune did nothing to the keys played live)
-                const auto cents = c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f) + instrument.wheelCents();
+                // (issue #108: an MPE note starts at its own bend, with its timbre and pressure as Mod X / Mod Y)
+                const auto cents = c.misc.fineTune + (c.misc.mainPitch ? state->song.masterPitch : 0.0f) + instrument.wheelCents()
+                                   + (e.expression ? e.cents : 0.0f);
                 // FL's channel Mono / Porta (round 168l), as for the song's notes
                 const auto mode = polyMode (c, instrument);
                 const auto glideSamples = (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, tps));
@@ -3206,6 +3221,11 @@ void RackRenderer::process (const RackState* state,
                 if (const auto from = on.glide ? on.glideFrom : 0.0f; cents != 0.0f || from != 0.0f)
                     instrument.setNextNoteExpression (0.0f, cents + from, false);
                 HostSlide::pendingGlide() = { on.glide ? on.glideFrom : 0.0f, on.glide ? glideSamples : 0.0f, false };
+                if (e.expression)
+                {
+                    instrument.setNextNoteModulation (e.modX, e.modY);
+                    instrument.setNextNoteFinePitch (e.cents);
+                }
                 instrument.noteOn (e.key, e.velocity);
                 HostSlide::pendingGlide() = {};
             }

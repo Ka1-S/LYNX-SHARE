@@ -19,6 +19,10 @@ struct RecordedEvent
     int key = 60;
     float velocity = 0.8f;
     bool on = true;
+    // MPE (issue #108, core/Mpe.h): a note from an MPE controller carries its own expression into the piano roll —
+    // the "on" its fine pitch (cents) and Mod X, the "off" its Mod Y (the note's peak pressure)
+    bool expression = false;
+    float finePitch = 0.0f, modX = 0.5f, modY = 0.5f;
 };
 
 // Where an absolute transport position falls within the current pattern: in pattern mode,
@@ -291,6 +295,8 @@ private:
     {
         double tick;
         float velocity;
+        bool expression = false; // (issue #108: an MPE note's own fine pitch / Mod X / Mod Y)
+        float finePitch = 0.0f, modX = 0.5f, modY = 0.5f;
     };
 
     void finish (const Song& song, int channel, int key, const Held& held, double endTick);

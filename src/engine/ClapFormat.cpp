@@ -13,6 +13,7 @@
 
 #include <clap/clap.h>
 
+#include "core/Mpe.h"
 #include "platform/NativeEmbed.h"
 #include "platform/Paths.h"
 
@@ -735,6 +736,15 @@ private:
         return audioPorts->get (plugin, 0, input, &info) ? juce::jmin (16, (int) info.channel_count) : fallback;
     }
 
+public:
+    // issue #108: see setClapNoteExpressions (engine/ClapFormat.h)
+    bool setNoteExpressions (float bendRange) noexcept
+    {
+        expressionRange.store (midiDialect ? 0.0f : juce::jmax (0.0f, bendRange), std::memory_order_relaxed);
+        return ! midiDialect;
+    }
+
+private:
     void addMidi (const juce::MidiMessage& m, uint32_t time)
     {
         const auto channel = (int16_t) juce::jlimit (0, 15, m.getChannel() - 1);
@@ -767,6 +777,22 @@ private:
                     events.add (e);
                     heldNotes[i] = false;
                 }
+            return;
+        }
+
+        // issue #108: a member channel's bend / CC 74 / pressure as a note expression for the notes on that channel
+        const auto range = expressionRange.load (std::memory_order_relaxed);
+        if (mpe::NoteExpression x; ! midiDialect && range > 0.0f && mpe::toNoteExpression (m.getRawData(), m.getRawDataSize(), range, x))
+        {
+            auto e = makeEvent<clap_event_note_expression_t> (CLAP_EVENT_NOTE_EXPRESSION, time);
+            e.expression_id = x.expr == mpe::Expr::pitch ? CLAP_NOTE_EXPRESSION_TUNING
+                              : x.expr == mpe::Expr::timbre ? CLAP_NOTE_EXPRESSION_BRIGHTNESS : CLAP_NOTE_EXPRESSION_PRESSURE;
+            e.note_id = -1;
+            e.port_index = 0;
+            e.channel = (int16_t) x.channel;
+            e.key = -1;
+            e.value = x.value;
+            events.add (e);
             return;
         }
 
@@ -846,6 +872,7 @@ private:
     const clap_plugin_latency_t* latency = nullptr;
     const clap_plugin_audio_ports_t* audioPorts = nullptr;
     bool midiDialect = false;
+    std::atomic<float> expressionRange { 0.0f }; // issue #108: > 0 = member channels' MPE data go out as note expressions
     bool initialised = false;
 
     std::atomic<bool> active { false }; // (atomic: prepareToPlay reads them on the export's thread)
@@ -1185,5 +1212,11 @@ std::string clapPluginId (const juce::PluginDescription& description)
         if (const auto* d = module->factory->get_plugin_descriptor (module->factory, i); d != nullptr && d->id != nullptr && idHash (d->id) == description.uniqueId)
             return d->id;
     return {};
+}
+bool setClapNoteExpressions (juce::AudioPluginInstance& plugin, float bendRange)
+{
+    if (auto* clap = dynamic_cast<ClapInstance*> (&plugin))
+        return clap->setNoteExpressions (bendRange);
+    return false;
 }
 } // namespace lynx

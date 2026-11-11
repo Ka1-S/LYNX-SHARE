@@ -1227,11 +1227,29 @@ public:
         channel.addItem (tr ("Any MIDI channel"), 1);
         for (int c = 1; c <= 16; ++c)
             channel.addItem (tr ("MIDI channel {0}", { juce::String (c) }), c + 1);
-        channel.setSelectedId (p.midiChannel + 1, juce::dontSendNotification);
+        // issue #108 (a LYNX addition; FL has no MPE input): the device is an MPE controller — every channel is
+        // taken (channel 1 = master, the member channels from 2 up carry one note each with its bend, CC 74, pressure)
+        channel.addSeparator();
+        channel.addItem (tr ("MPE controller"), mpeItem);
+        channel.setTooltip (tr ("MPE controller: each note has its own MIDI channel; its pitch bend, timbre (CC 74) and pressure are played and recorded per note (fine pitch, Mod X, Mod Y)"));
+        channel.setSelectedId (p.mpe ? mpeItem : p.midiChannel + 1, juce::dontSendNotification);
         channel.onChange = [this] {
-            prefsNow.midiChannel = channel.getSelectedId() - 1;
+            prefsNow.mpe = channel.getSelectedId() == mpeItem;
+            if (! prefsNow.mpe)
+                prefsNow.midiChannel = channel.getSelectedId() - 1;
+            update();
+            resized();
+        };
+        for (int n = 15; n >= 1; --n)
+            zone.addItem (n == 1 ? tr ("Channel 2") : tr ("Channels 2-{0}", { juce::String (n + 1) }), n);
+        zone.setTooltip (tr ("MPE member channels (lower zone): the MIDI channels that carry one note each"));
+        zone.setSelectedId (juce::jlimit (1, 15, p.mpeMembers), juce::dontSendNotification);
+        zone.onChange = [this] {
+            prefsNow.mpeMembers = zone.getSelectedId();
             update();
         };
+        styleCombo (zone);
+        addChildComponent (zone);
 
         plays.addItem (tr ("Plays the selected channels"), 1);
         for (int i = 0; i < (int) channels.size(); ++i)
@@ -1256,6 +1274,12 @@ public:
         auto r = getLocalBounds().reduced (8, 4);
         plays.setBounds (r.removeFromRight (230));
         r.removeFromRight (8);
+        zone.setVisible (prefsNow.mpe);
+        if (prefsNow.mpe) // (issue #108: the zone's member channels beside the MPE choice)
+        {
+            zone.setBounds (r.removeFromRight (124));
+            r.removeFromRight (8);
+        }
         channel.setBounds (r.removeFromRight (150));
         r.removeFromRight (8);
         enabled.setBounds (r);
@@ -1271,6 +1295,7 @@ private:
     void update (bool notify = true)
     {
         channel.setEnabled (prefsNow.enabled);
+        zone.setEnabled (prefsNow.enabled);
         plays.setEnabled (prefsNow.enabled);
         if (notify && onChange)
             onChange (prefsNow);
@@ -1279,7 +1304,8 @@ private:
     prefs::MidiInputPrefs prefsNow;
     std::function<void (const prefs::MidiInputPrefs&)> onChange;
     juce::ToggleButton enabled;
-    juce::ComboBox channel, plays;
+    juce::ComboBox channel, plays, zone;
+    static constexpr int mpeItem = 100;
 };
 
 // One output device (FL's Options › MIDI "Output" panel, round 165f): master sync (MIDI clock or MTC) with its

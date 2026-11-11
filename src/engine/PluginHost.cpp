@@ -295,6 +295,16 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
 {
     buffer.setSize (bufferChannels (*plugin), blockSize);
     midi.ensureSize (8192); // the audio thread only adds events within this capacity
+    if (options.mpe)
+    {
+        // issue #108: the MPE zone (15 member channels, per-note bend range 48) goes out with the first block, before
+        // any note; a CLAP plugin that takes CLAP notes gets the member channels' data as note expressions
+        mpe::zoneSetup (mpe::maxMembers, (int) mpe::defaultBendRange, [this] (int status, int d1, int d2) {
+            const std::uint8_t bytes[3] = { (std::uint8_t) status, (std::uint8_t) d1, (std::uint8_t) d2 };
+            midi.addEvent (bytes, 3, 0);
+        });
+        setClapNoteExpressions (*plugin, mpe::defaultBendRange);
+    }
     outs = pluginOutputs (*plugin);
     routeOffset = std::make_unique<std::atomic<int>[]> (outs.size() + 1);
     routeActive = std::make_unique<std::atomic<bool>[]> (outs.size() + 1);
@@ -333,6 +343,7 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
 void PluginInstrument::releaseHeldKeys() noexcept
 {
     heldKeys.releaseAll ([this] (int ch, int key) { midi.addEvent (juce::MidiMessage::noteOff (ch + 1, key), 0); });
+    mpeNotes.reset(); // (issue #108: their member channels are free again)
     sentKeys.played = {}; // (their note offs went out with these)
 }
 
@@ -472,8 +483,68 @@ void PluginInstrument::slideTo (int key, float, float samples) noexcept
     slideLeft = juce::jmax (1.0f, samples);
 }
 
+// Issue #108: the per-note messages of an MPE member channel (pitch bend over 48 semitones, CC 74, channel pressure)
+void PluginInstrument::sendExpression (int channel, mpe::Expr expr, float value) noexcept
+{
+    const auto ch = juce::jlimit (1, 15, channel) + 1;
+    if (expr == mpe::Expr::pitch)
+        midi.addEvent (juce::MidiMessage::pitchWheel (ch, mpe::bendValue (value, mpe::defaultBendRange)), 0);
+    else if (expr == mpe::Expr::timbre)
+        midi.addEvent (juce::MidiMessage::controllerEvent (ch, 74, mpe::timbreOfModX (value)), 0);
+    else
+        midi.addEvent (juce::MidiMessage::channelPressureChange (ch, juce::jlimit (0, 127, juce::roundToInt (juce::jlimit (0.0f, 1.0f, value) * 127.0f))), 0);
+}
+
+void PluginInstrument::noteExpression (int key, int prop, float value, float) noexcept
+{
+    // (without MPE a plugin has no per-note pitch or timbre to take: FL sends none either)
+    if (! options.mpe || ! std::isfinite (value))
+        return;
+    const auto played = juce::jlimit (0, 127, key);
+    const auto k = sentKeys.sentFor (played);
+    const auto ch = mpeNotes.channelOf (k);
+    if (ch < 0)
+        return;
+    if (prop == (int) vfx::Prop::pitch) // (the note's own cents, from the key it went out on)
+        sendExpression (ch, mpe::Expr::pitch, value - (float) (k - played) * 100.0f);
+    else if (prop == (int) vfx::Prop::modX)
+        sendExpression (ch, mpe::Expr::timbre, value);
+    else if (prop == (int) vfx::Prop::modY)
+        sendExpression (ch, mpe::Expr::pressure, mpe::pressureOfModY (value));
+}
+
 void PluginInstrument::noteOn (int key, float velocity) noexcept
 {
+    if (options.mpe)
+    {
+        // issue #108: the note on its own member channel. Its key as the MIDI formats get it (the nearest key); the
+        // rest of its fine pitch is that channel's pitch bend, its Mod X the channel's CC 74, its Mod Y the pressure —
+        // all three before the note on, as the MPE specification asks. The channel's own pitch (knob, slides, porta)
+        // stays on the master channel, which bends every note.
+        const auto played = juce::jlimit (0, 127, key);
+        const auto fine = std::exchange (nextFine, 0.0f);
+        const auto sent = hostpitch::of (played, fine, hostpitch::Format::midi);
+        sentKeys.on (played, sent);
+        sentKeys.clearTunings(); // (no VST3 tuning in this mode: the bend carries it)
+        const auto k = sent.key;
+        lastKey = k;
+        slideNow = slideTarget = slideLeft = 0.0f;
+        if (auto& glide = HostSlide::pendingGlide(); glide.samples > 0.0f)
+        {
+            slideNow = glide.fromCents / 100.0f;
+            slideLeft = glide.samples;
+            glide.taken = true;
+        }
+        addBend (0);
+        const auto ch = mpeNotes.noteOn (k);
+        sendExpression (ch, mpe::Expr::pitch, (std::isfinite (fine) ? fine : 0.0f) - (float) (k - played) * 100.0f);
+        sendExpression (ch, mpe::Expr::timbre, nextModX);
+        sendExpression (ch, mpe::Expr::pressure, mpe::pressureOfModY (nextModY));
+        midi.addEvent (juce::MidiMessage::noteOn (ch + 1, k, juce::jlimit (0.0f, 1.0f, velocity)), 0);
+        hold (ch, k, true);
+        nextModX = nextModY = 0.5f;
+        return;
+    }
     // issue #63: key + the note's fine pitch, rounded to the key it goes out on (FL's wrapper); a VST3 also gets the
     // rest as its note on's tuning (picked up by the patched JUCE VST3 host, engine/Vst3NoteTuning.h)
     const auto sent = hostpitch::of (juce::jlimit (0, 127, key), std::exchange (nextFine, 0.0f), noteFormat);
@@ -495,19 +566,21 @@ void PluginInstrument::noteOn (int key, float velocity) noexcept
     // FL's "Send MOD X as polyphonic aftertouch": the note's Mod X right after its note on
     if (options.modXAftertouch)
         midi.addEvent (juce::MidiMessage::aftertouchChange (1, k, juce::jlimit (0, 127, juce::roundToInt (nextModX * 127.0f))), 0);
-    nextModX = 0.5f;
+    nextModX = nextModY = 0.5f;
 }
 
 void PluginInstrument::noteOff (int key) noexcept
 {
     const auto k = sentKeys.off (juce::jlimit (0, 127, key)); // (the key its note on went out on, issue #63)
+    // (issue #108: on the member channel its note on took)
+    const auto ch = options.mpe ? juce::jmax (0, mpeNotes.noteOff (k)) : 0;
     // FL's "Send note release velocity" (on by default): the note's release velocity, else 0
     if (options.releaseVelocity)
-        midi.addEvent (juce::MidiMessage::noteOff (1, k, juce::jlimit (0.0f, 1.0f, nextRelease)), 0);
+        midi.addEvent (juce::MidiMessage::noteOff (ch + 1, k, juce::jlimit (0.0f, 1.0f, nextRelease)), 0);
     else
-        midi.addEvent (juce::MidiMessage::noteOff (1, k), 0);
+        midi.addEvent (juce::MidiMessage::noteOff (ch + 1, k), 0);
     nextRelease = 0.5f;
-    hold (0, k, false);
+    hold (ch, k, false);
 }
 
 void PluginInstrument::allNotesOff() noexcept
