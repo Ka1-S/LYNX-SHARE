@@ -947,9 +947,10 @@ public:
 
             auto text = r.withLeft ((int) x).withTrimmedRight (6);
 
-            if (flat && n.kind == Kind::file) // the folder it lives in, on the right
+            const auto flatDetail = flat && n.kind == Kind::file && n.detail.isNotEmpty(); // "87%" of a similar sample
+            if (flat && n.kind == Kind::file) // the folder it lives in, on the right (similar samples: how similar)
             {
-                const auto where = n.file.getParentDirectory().getRelativePathFrom (baseOf (n.file));
+                const auto where = flatDetail ? n.detail : n.file.getParentDirectory().getRelativePathFrom (baseOf (n.file));
                 g.setFont (theme::font (theme::type::caption));
                 g.setColour (textDisabled);
                 const auto w = juce::jmin (text.getWidth() / 2, juce::GlyphArrangement::getStringWidthInt (g.getCurrentFont(), where) + 4);
@@ -976,7 +977,7 @@ public:
             g.drawText (name, text, juce::Justification::centredLeft, true);
 
             // the detail after the name, dimmed: "(insert)", "3x", "missing", a section's count
-            if (n.detail.isNotEmpty() && nameWidth + 12 < text.getWidth())
+            if (n.detail.isNotEmpty() && ! flatDetail && nameWidth + 12 < text.getWidth())
             {
                 g.setFont (theme::font (theme::type::small));
                 g.setColour (n.missing ? meterClip.withAlpha (0.7f) : textDisabled);
