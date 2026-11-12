@@ -9356,6 +9356,8 @@ countries: nl be
 "Note C0" = "Noot C0"
 "Clear all colours" = "Alle kleuren wissen"
 "Presets of {0}" = "Presets van {0}"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "Warp-markeringen: binden punten van de audio aan tellen; de audio ertussen rekt mee (de markeringen van het kanaal). Een markering slepen: de audio ervan gaat naar een andere tel; Shift + slepen: de audio schuift eronder"
+"Show the audio in beats" = "Audio in tellen tonen"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"

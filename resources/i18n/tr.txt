@@ -9356,6 +9356,8 @@ countries: tr
 "Note C0" = "Nota C0"
 "Clear all colours" = "Tüm renkleri temizle"
 "Presets of {0}" = "{0} ön ayarları"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "Warp işaretçileri: sesin noktalarını vuruşlara bağlar; aradaki ses esner (kanalın işaretçileri). İşaretçiyi sürükle: sesi başka bir vuruşa gider; Shift + sürükle: ses altında kayar"
+"Show the audio in beats" = "Sesi vuruşlarla göster"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"

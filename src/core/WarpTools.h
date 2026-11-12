@@ -61,6 +61,41 @@ inline bool scaleTempo (SamplerSettings& s, double factor)
     return true;
 }
 
+// ÷2 / ×2 on the clip the markers were scaled for (round 190cy; Live 12.4.16 live check 190cw shot 02: ÷2 on a 2-bar
+// loop at 120 BPM took the segment to 60 BPM, End 3.1.1 → 2.1.1 and Loop Length 2.0.0 → 1.0.0): the clip's length (its
+// end, and its loop length in a slot) and where it starts in the audio scale by the same factor, so it holds the same
+// audio. Fades stay inside the clip.
+inline void scaleClip (Clip& c, double factor)
+{
+    if (! (factor > 0.0))
+        return;
+    c.length = std::max<std::int64_t> (1, (std::int64_t) std::llround ((double) c.length * factor));
+    const auto exact = ((double) c.offset + (double) c.offsetFraction) * factor;
+    const auto whole = std::floor (exact + 0.5);
+    c.offset = std::max<std::int64_t> (0, (std::int64_t) whole);
+    c.offsetFraction = c.offset > 0 ? (float) (exact - whole) : 0.0f;
+    c.fadeIn = std::min (c.fadeIn, c.length);
+    c.fadeOut = std::min (c.fadeOut, c.length - c.fadeIn);
+}
+
+// Live's warp marker drags, one surface (round 190cy; Live 12.4.16 live check 190cw shot 09): a plain drag moves the
+// marker with its audio to another beat, so the audio on both sides stretches; Shift + drag keeps the marker on its
+// beat and slides the audio under it (the marker is tied to another point of the audio). In an editor drawn in file
+// time the plain drag's beat is the one the pointer's place played on before the drag (`before`: the markers then).
+inline double stretchDragBeat (const std::vector<WarpPoint>& before, double pointerSeconds)
+{
+    return warpedit::beatAt (before, pointerSeconds);
+}
+inline bool slideMarker (SamplerSettings& s, int index, double seconds)
+{
+    if (index <= 0 || index >= (int) s.warp.size())
+        return false;
+    const auto lo = s.warp[(std::size_t) index - 1].seconds + warpedit::minSecondGap;
+    const auto hi = index + 1 < (int) s.warp.size() ? s.warp[(std::size_t) index + 1].seconds - warpedit::minSecondGap : 1.0e9;
+    s.warp[(std::size_t) index].seconds = std::clamp (seconds, lo, std::max (lo, hi));
+    return true;
+}
+
 // "Set 1.1.1 Here": the audio at `seconds` becomes beat 0 (every marker's beat shifts by the same amount; the tempos
 // stay). Returns the shift in beats (what the point's beat was).
 inline double setOneOneOne (SamplerSettings& s, double seconds)

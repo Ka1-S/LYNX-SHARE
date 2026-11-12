@@ -9356,6 +9356,8 @@ countries: tw hk mo
 "Note C0" = "音符 C0"
 "Clear all colours" = "清除所有顏色"
 "Presets of {0}" = "{0} 的預設"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "變速標記：把音訊中的位置固定到節拍上，其間的音訊隨之拉伸（聲道的標記）。拖曳標記：其音訊移到另一拍；Shift + 拖曳：音訊在標記下滑動"
+"Show the audio in beats" = "按拍顯示音訊"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"

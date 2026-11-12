@@ -27,6 +27,15 @@ void openAudioEditorForChannel (AudioEngine& engine, int channel, int clip = -1)
 // The same editor as a panel, without a window (round 175a, for 183a's Clip View): the sample of `channel`, opened from
 // Playlist audio clip `clip` (-1: none). `showWarp`: the warp markers lane starts open.
 std::unique_ptr<juce::Component> makeAudioEditorPanel (AudioEngine& engine, int channel, int clip, bool showWarp = true);
+// Round 190cy: the panel shows the sample of the grid's clip in (track, scene): ÷2 / ×2 scale that clip with the markers.
+void setAudioEditorGridClip (juce::Component& panel, int track, int scene);
+// --warpshot (round 190cy): ÷2 (0.5) / ×2 (2) as the panel's buttons do it; a warp marker held in the middle of a drag
+// (plain: to `beatOrSeconds` as a beat; `slides` (Shift): to `beatOrSeconds` as a point of the audio).
+void scaleAudioEditorTempoForSnapshot (juce::Component& panel, double factor);
+void holdAudioEditorWarpDragForSnapshot (juce::Component& panel, int marker, double beatOrSeconds, bool slides);
+// --warpshot (round 190db): the beat-time view of a warped clip: -1 as the workflow (beats in the Clip-launch
+// workflow), 0 file time, 1 beats (the Warp markers menu's "Show the audio in beats")
+void setAudioEditorBeatTimeForSnapshot (juce::Component& panel, int choice);
 // The record button's "Audio, into the audio editor" choice: an empty editor recording the audio input while the
 // song plays (it starts with the playback and stops with it, like FL's Edison record target).
 void openAudioEditorRecording (AudioEngine& engine);

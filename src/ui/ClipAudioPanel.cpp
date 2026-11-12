@@ -77,7 +77,10 @@ public:
 
         editor = makeAudioEditorPanel (engine, channel, -1, true);
         if (editor != nullptr)
+        {
+            setAudioEditorGridClip (*editor, track, scene); // (round 190cy: ÷2 / ×2 halve / double this clip too)
             addAndMakeVisible (*editor);
+        }
         engine.addChangeListener (this);
         refresh();
     }

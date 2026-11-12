@@ -273,11 +273,15 @@ inline TimeClip cutTime (Song& song, std::int64_t from, std::int64_t to)
     return out;
 }
 
-// Duplicate Time: the range is repeated right after itself, pushing what follows. The markers inside are not repeated.
+// Duplicate Time: the range is repeated right after itself, pushing what follows. Its locators (plain markers) are
+// repeated too (round 190cy; Live 12.4.16 live check 190cw shot 03b: Duplicate Time over a range holding locator "L12"
+// gave a second "L12" one range later); signature changes and FL's marker actions inside it are not.
 inline void duplicateTime (Song& song, std::int64_t from, std::int64_t to)
 {
     auto time = copyTime (song, from, to);
-    time.markers.clear();
+    time.markers.erase (std::remove_if (time.markers.begin(), time.markers.end(),
+                                        [] (const Marker& m) { return m.isSignature() || m.action != Marker::none; }),
+                        time.markers.end());
     pasteTime (song, to, time);
 }
 

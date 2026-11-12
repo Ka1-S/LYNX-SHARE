@@ -9356,6 +9356,8 @@ countries: fr be ch ca lu
 "Note C0" = "Note C0"
 "Clear all colours" = "Effacer toutes les couleurs"
 "Presets of {0}" = "Presets de {0}"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "Marqueurs de warp : ils attachent des points de l'audio à des temps ; l'audio entre eux s'étire (les marqueurs du canal). Glisser un marqueur : son audio va sur un autre temps ; Maj + glisser : l'audio glisse sous lui"
+"Show the audio in beats" = "Afficher l'audio en temps musicaux"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] ouvrir/fermer l'éditeur  [Alt]+[LMB] garder les autres ouverts  [Ctrl]+[LMB] écouter  [2xLMB] Piano Roll  [LMB] glisser haut/bas réordonne  [RMB] menu du canal"
