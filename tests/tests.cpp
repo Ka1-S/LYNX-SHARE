@@ -17491,3 +17491,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "PluginDb190baTests.inc"
 #include "Freeze190ayTests.inc"
 #include "Fl190bfTests.inc"
+#include "SimpleFx190buTests.inc"

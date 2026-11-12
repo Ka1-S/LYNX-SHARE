@@ -647,6 +647,9 @@ struct Exporter
     {
         if (insert < 0 || insert >= (int) song.mixer.size())
             return;
+        // round 190bu: a Live track has no dry/wet for its whole device chain
+        if (const auto& m = song.mixer[(std::size_t) insert]; m.chainBlend < 1.0f && ! m.effects.empty())
+            note ("The effect chain's Blend is not exported (the devices play at full): " + m.name);
         for (const auto& fx : song.mixer[(std::size_t) insert].effects)
         {
             if (fx.kind == EffectKind::plugin)

@@ -33,6 +33,7 @@
 
 #include "core/Biquad.h"
 #include "core/Effects.h"
+#include "core/GoalKnobs.h"
 #include "engine/Text.h"
 #include "engine/ProjectFile.h"
 #include <numeric>
@@ -5415,6 +5416,8 @@ void EffectsPanel::paint (juce::Graphics& g)
             auto name = quickpick::slotName (engine, slot); // (a plugin renamed in the Plugin database: its new name, round 165c)
             if (slot.look != 0) // part of a Master look (round 189k, the Simple workflow's Finish dock)
                 name << " " << tr ("(look)");
+            if (goals::active (slot)) // a one-knob effect of the Simple workflow's dock (round 190bu): its goal's name too
+                name << " (" << (slot.goal == goals::punch ? trc ("@one-knob effect: Punch") : tr (goals::name (slot.goal))) << ")";
             if (slot.sidechain > 0 && slot.sidechain < (int) engine.getSong().mixer.size())
                 name << juce::String::fromUTF8 (" \xe2\x86\x90 ") << juce::String::fromUTF8 (engine.getSong().mixer[(std::size_t) slot.sidechain].name.c_str());
             auto text = textArea;

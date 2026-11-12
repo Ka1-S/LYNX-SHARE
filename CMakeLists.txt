@@ -88,6 +88,9 @@ add_library(lynx_core STATIC
     src/core/ThemePalette.cpp
     src/core/LoopStarter.cpp
     src/core/SimpleTracks.cpp
+    src/core/GoalKnobs.cpp
+    src/core/ChainPresets.cpp
+    src/core/SoundLibrary.cpp
     src/core/GamepadMap.cpp
     src/core/ControllerProfile.cpp
     src/core/ControllerSession.cpp
@@ -545,6 +548,7 @@ if(LYNX_BUILD_APP)
         src/ui/LoopStarterWindow.cpp
         src/ui/SimpleWorkflow.cpp
         src/ui/FinishDock.cpp
+        src/ui/SimpleDock.cpp
         src/ui/HistoryPanel.cpp
         src/ui/VersionsPanel.cpp
         src/ui/PluginsOffPanel.cpp

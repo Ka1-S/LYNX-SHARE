@@ -25,6 +25,8 @@
 #include "core/FlpImport.h"
 #include "core/NoteEdit.h"
 #include "core/MaximusFx.h"
+#include "core/ChainPresets.h"
+#include "core/GoalKnobs.h"
 #include "core/MasterLooks.h"
 #include "core/Harmor.h"
 #include "flp/Flp.h"
@@ -118,6 +120,8 @@
 #include "ui/QuickAddPalette.h"
 #include "ui/I18n.h"
 #include "ui/MainComponent.h"
+#include "ui/SimpleDock.h"
+#include "core/SoundLibrary.h"
 #include "ui/MidiToolsPanel.h"
 #include "ui/FrameProbe.h"
 #include "ui/UiTrace.h"
@@ -1803,6 +1807,17 @@ public:
             return;
         }
 
+        if (args.contains ("--simplefxshot"))
+        {
+            // LYNX.exe --simplefxshot prefix: round 190bu's track dock of the Simple workflow off-screen, at 1x and 2x —
+            // the Instrument tab (LYNX sounds, My SoundFonts), the Effects tab (empty, a preset, its menus), and a text
+            // report: the dock's edits, a user preset saved and loaded, the same slots in the Pattern workflow's Mixer
+            const auto i = args.indexOf ("--simplefxshot");
+            runSimpleFxShot (args[i + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--simpleshot"))
         {
             // LYNX.exe --simpleshot prefix: round 184a's Simple workflow off-screen — View › Layout style with each style
@@ -2628,7 +2643,47 @@ private:
                     return false;
             return true;
         };
-        const auto richOk = richBack && richBack->channels[4].synth == synth && richBack->channels[0].sampler == sampler
+        // round 190bu: a one-knob effect, the chain's Blend and its preset name travel in the project; a project without
+        // them reads as before (no goal, Blend 100 %) and writes none of the new keys
+        bool fx190buOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto plainJson = lynx::ProjectFile::toJson (song);
+            const auto* preset = lynx::chains::find ("Whisper Air");
+            if (preset != nullptr && song.mixer.size() > 2)
+            {
+                lynx::chains::apply (song, 1, *preset);
+                song.mixer[2].effects.push_back (lynx::goals::make (lynx::goals::room, 0.62f));
+                song.mixer[2].effects.push_back (lynx::goals::make (lynx::goals::bass, 0.3f));
+                song.mixer[2].chainBlend = 0.4f;
+                const auto json = lynx::ProjectFile::toJson (song);
+                const auto back = lynx::ProjectFile::fromJson (json, error);
+                const auto plainBack = lynx::ProjectFile::fromJson (plainJson, error);
+                auto same = back && back->mixer.size() == song.mixer.size();
+                for (std::size_t t = 1; same && t <= 2; ++t)
+                {
+                    const auto& a = song.mixer[t];
+                    const auto& b = back->mixer[t];
+                    same = a.effects.size() == b.effects.size() && std::abs (a.chainBlend - b.chainBlend) < 1.0e-6f && a.chainPreset == b.chainPreset;
+                    for (std::size_t i = 0; same && i < a.effects.size(); ++i)
+                        same = a.effects[i].kind == b.effects[i].kind && a.effects[i].goal == b.effects[i].goal
+                               && std::abs (a.effects[i].goalAmount - b.effects[i].goalAmount) < 1.0e-6f && a.effects[i].row == b.effects[i].row
+                               && lynx::goals::active (b.effects[i]) == lynx::goals::active (a.effects[i]);
+                }
+                fx190buOk = same && lynx::chains::unchanged (*back, 1) && back->mixer[2].chainPreset.empty()
+                            && ! plainJson.contains ("\"goal\"") && ! plainJson.contains ("chainBlend") && ! plainJson.contains ("chainPreset")
+                            && json.contains ("\"goalAmount\"") && plainBack && plainBack->mixer[1].chainBlend == 1.0f
+                            && lynx::ProjectFile::toJson (*back) == json;
+                // a user's chain preset file: the slots, Blend and name come back; the strip's level is not part of it
+                song.mixer[2].volume = 0.31f;
+                const auto file = lynx::ProjectFile::mixerTrackStateToJson (lynx::chains::stateOf (song.mixer[2], "Mine"));
+                const auto state = lynx::ProjectFile::mixerTrackStateFromJson (file, error);
+                fx190buOk = fx190buOk && state && state->effects.size() == 2 && state->effects[0].goal == lynx::goals::room
+                            && lynx::goals::active (state->effects[1]) && std::abs (state->chainBlend - 0.4f) < 1.0e-6f && state->chainPreset == "Mine"
+                            && state->volume == lynx::MixerTrack().volume;
+            }
+        }
+        const auto richOk = fx190buOk && richBack && richBack->channels[4].synth == synth && richBack->channels[0].sampler == sampler
                             && richBack->mixer[2].eq == rich.mixer[2].eq && richBack->mixer[2].effects.size() == 2
                             && richBack->mixer[2].effects[0].kind == lynx::EffectKind::parametricEq
                             && paramsClose (richBack->mixer[2].effects[0].params, peqSlot.params)
@@ -13298,6 +13353,343 @@ private:
         ui.setClipLaunchWorkflow (false);
         write ("pattern-after");
         juce::File (prefix + "-counts.txt").replaceWithText ("runtimes before " + juce::String (madeBefore) + ", after " + juce::String (lynx::launcher::Runtime::instances.load()) + "\n");
+    }
+
+    // Round 190bu: the Simple workflow's track dock (ui/SimpleDock.h), off-screen
+    void runSimpleFxShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto writeImage = [&prefix] (const juce::Image& image, const juce::String& name) {
+            const auto file = juce::File (prefix + "-" + name + ".png");
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        juce::String report;
+        const auto line = [&report] (const juce::String& text) { report << text << "\n"; };
+        const auto check = [&report] (const juce::String& what, bool ok) { report << (ok ? "OK    " : "ERROR ") << what << "\n"; };
+
+        const auto madeBefore = lynx::SimpleWorkflow::instances.load();
+        ui.selectTabForSnapshot (2);
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        offline.dispatchPendingMessages();
+        auto* simple = ui.getSimpleWorkflowForSnapshot();
+        if (simple == nullptr)
+        {
+            juce::File (prefix + "-report.txt").replaceWithText ("ERROR no Simple workflow\n");
+            return;
+        }
+        simple->hideChooser();
+        // three tracks: a voice, keys with a few chords, a drum kit
+        int keysInsert = -1;
+        offline.editSong ([&keysInsert] (lynx::Song& s) {
+            namespace st = lynx::simpletracks;
+            st::Request q;
+            q.kind = st::Kind::voice;
+            q.name = "Lead vocal";
+            st::addTrack (s, q);
+            q = {};
+            q.kind = st::Kind::instrument;
+            q.name = "Keys";
+            lynx::ChannelDef keys;
+            keys.instrument = lynx::InstrumentKind::synth;
+            q.channel = keys;
+            lynx::Pattern chords;
+            for (int i = 0; i < 4; ++i)
+                for (int k : { 60, 64, 67 })
+                    chords.notes.push_back (lynx::Note { (std::int64_t) i * 4 * lynx::ppq, 4 * lynx::ppq - lynx::ppq / 4, 0, k });
+            q.pattern = chords;
+            keysInsert = st::addTrack (s, q).insert;
+            q = {};
+            q.kind = st::Kind::drums;
+            for (auto kind : { lynx::InstrumentKind::kick, lynx::InstrumentKind::snare, lynx::InstrumentKind::hat })
+            {
+                lynx::ChannelDef c;
+                c.instrument = kind;
+                c.name = kind == lynx::InstrumentKind::kick ? "Kick" : kind == lynx::InstrumentKind::snare ? "Snare" : "Hat";
+                q.kit.push_back (c);
+            }
+            lynx::Pattern beat;
+            for (int step = 0; step < 16; step += 2)
+                beat.notes.push_back (lynx::Note { (std::int64_t) step * lynx::ticksPerStep, lynx::ticksPerStep, 2, 60 });
+            q.pattern = beat;
+            st::addTrack (s, q);
+        });
+        offline.dispatchPendingMessages();
+        simple->hideChooser();
+        auto& playlist = ui.getPlaylistForSnapshot();
+        // the tracks' places in the Playlist
+        int voiceTrack = -1, keysTrack = -1, drumsTrack = -1;
+        {
+            const auto& song = offline.getSong();
+            for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+                if (const auto kind = lynx::simpletracks::kindOf (song, t))
+                {
+                    if (*kind == lynx::simpletracks::Kind::audio && voiceTrack < 0)
+                        voiceTrack = t;
+                    else if (*kind == lynx::simpletracks::Kind::instrument && keysTrack < 0)
+                        keysTrack = t;
+                    else if (*kind == lynx::simpletracks::Kind::drums && drumsTrack < 0)
+                        drumsTrack = t;
+                }
+        }
+        check ("three Simple tracks (voice, keys, drums)", voiceTrack >= 0 && keysTrack >= 0 && drumsTrack >= 0);
+        playlist.selectTrack (keysTrack);
+        offline.dispatchPendingMessages();
+        auto* dock = simple->dockForSnapshot();
+        if (dock == nullptr)
+        {
+            juce::File (prefix + "-report.txt").replaceWithText (report + "ERROR no dock\n");
+            return;
+        }
+        // the whole window and the dock alone, at 1x and 2x
+        const auto shots = [&] (const juce::String& name) {
+            offline.dispatchPendingMessages();
+            for (float scale : { 1.0f, 2.0f })
+            {
+                const auto suffix = scale > 1.0f ? juce::String ("@2x") : juce::String();
+                writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, scale), name + suffix);
+                writeImage (dock->createComponentSnapshot (dock->getLocalBounds(), true, scale), "dock-" + name + suffix);
+            }
+        };
+        const auto menuShot = [&] (const juce::PopupMenu& menu, const juce::String& title, const juce::String& subTitle, const juce::String& name) {
+            juce::StringArray names { title };
+            std::vector<juce::PopupMenu> menus { menu };
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().subMenu != nullptr && it.getItem().text == subTitle)
+                {
+                    names.add (subTitle);
+                    menus.push_back (*it.getItem().subMenu);
+                }
+            saveMenus (names, menus, prefix + "-" + name + ".png");
+        };
+
+        // --- the Instrument tab ---------------------------------------------------------------------------------------
+        check ("the dock shows the selected track", dock->shownTrack() == keysTrack && dock->isVisible() && dock->getParentComponent() != nullptr);
+        check ("an instrument track opens on its sound", dock->hasInstrumentTabForCheck() && dock->getTab() == lynx::SimpleDock::Tab::instrument);
+        const auto channel = dock->channelForCheck();
+        line ("sound at first: " + dock->soundNameForCheck() + ", rows in its category: " + juce::String (dock->soundRowsForCheck()));
+        shots ("instrument");
+        // a click on a row of another category: the track plays that sound, its own settings stay
+        const auto before = offline.getSong().channels[(std::size_t) channel];
+        dock->showCategoryForSnapshot ((int) lynx::soundlib::Category::pad);
+        offline.dispatchPendingMessages();
+        const auto padRows = dock->soundRowsForCheck();
+        dock->clickSoundForCheck (juce::jmin (2, padRows - 1));
+        offline.dispatchPendingMessages();
+        {
+            const auto& now = offline.getSong().channels[(std::size_t) channel];
+            const auto found = lynx::soundlib::find (lynx::soundlib::builtIn(), now);
+            check ("a click on a sound puts it on the track's channel (" + dock->soundNameForCheck() + ")",
+                   padRows > 0 && found >= 0 && lynx::soundlib::builtIn()[(std::size_t) found].category == lynx::soundlib::Category::pad
+                       && ! lynx::soundlib::sameSound (before, now));
+            check ("the channel keeps its name, level and insert", now.name == before.name && now.volume == before.volume && now.mixerTrack == before.mixerTrack);
+            double seconds = 0.0;
+            const auto heard = offline.auditionSound (now, { 60, 64, 67 }, &seconds);
+            check ("the sound's audition renders (" + juce::String (seconds, 2) + " s)", heard && seconds > 1.0);
+        }
+        shots ("instrument-pad");
+        const auto picked = dock->soundNameForCheck();
+        dock->stepSoundForCheck (1);
+        offline.dispatchPendingMessages();
+        const auto stepped = dock->soundNameForCheck();
+        dock->stepSoundForCheck (-1);
+        offline.dispatchPendingMessages();
+        check ("the arrows step through the category (" + picked + " -> " + stepped + " -> back)", stepped != picked && dock->soundNameForCheck() == picked);
+        check ("one undo step per sound", offline.canUndo());
+        // the user's SoundFont files (an index made here: no file is read)
+        {
+            std::vector<lynx::sf::IndexedFont> fonts (2);
+            fonts[0].path = "/home/me/SoundFonts/Concert Band.sf2";
+            fonts[0].name = "Concert Band";
+            int program = 0;
+            for (const char* name : { "Grand Piano", "Bright Piano", "Electric Piano", "Harpsichord", "Clavinet", "Celesta", "Music Box", "Vibraphone" })
+                fonts[0].presets.push_back ({ name, 0, program++ });
+            for (const auto& [name, p] : std::initializer_list<std::pair<const char*, int>> { { "Finger Bass", 33 }, { "Picked Bass", 34 }, { "Nylon Guitar", 24 }, { "Strings", 48 }, { "Choir Aahs", 52 }, { "Trumpet", 56 } })
+                fonts[0].presets.push_back ({ name, 0, p });
+            fonts[0].presets.push_back ({ "Standard Kit", 128, 0 });
+            fonts[1].path = "/home/me/SoundFonts/Old Upright.sf2";
+            fonts[1].name = "Old Upright";
+            fonts[1].presets.push_back ({ "Old Upright", 0, 0 });
+            fonts[1].presets.push_back ({ "Old Upright Soft", 0, 1 });
+            dock->setFontsForSnapshot (fonts);
+            dock->showCategoryForSnapshot ((int) lynx::soundlib::Category::keys);
+            offline.dispatchPendingMessages();
+            check ("My SoundFonts lists the presets of the user's files by category (Keys: " + juce::String (dock->soundRowsForCheck()) + " of 17)", dock->soundRowsForCheck() == 7);
+            dock->clickSoundForCheck (0);
+            offline.dispatchPendingMessages();
+            const auto& now = offline.getSong().channels[(std::size_t) channel];
+            check ("a SoundFont preset becomes the track's sound (" + dock->soundNameForCheck() + ")",
+                   now.instrument == lynx::InstrumentKind::soundfont && juce::String (now.samplePath).endsWith (".sf2"));
+            shots ("instrument-soundfonts");
+        }
+
+        // --- the Effects tab ------------------------------------------------------------------------------------------
+        playlist.selectTrack (voiceTrack);
+        offline.dispatchPendingMessages();
+        const auto insert = dock->insertForCheck();
+        check ("an audio track has no Instrument tab and opens on its effects",
+               dock->shownTrack() == voiceTrack && ! dock->hasInstrumentTabForCheck() && dock->getTab() == lynx::SimpleDock::Tab::effects && insert > 0);
+        check ("no effects yet: no cards", dock->cardCountForCheck() == 0);
+        shots ("effects-empty");
+        menuShot (dock->addMenuForSnapshot(), lynx::tr ("Add an effect"), {}, "menu-add");
+        // + adds one-knob effects at the end of the chain
+        dock->addOneKnobForCheck (lynx::goals::brighter);
+        dock->addOneKnobForCheck (lynx::goals::room);
+        dock->addOneKnobForCheck (lynx::goals::level);
+        offline.dispatchPendingMessages();
+        const auto slotsText = [&offline] (int t) {
+            juce::String text;
+            const auto rows = lynx::mixerops::effectRows (offline.getSong().mixer[(std::size_t) t].effects); // (the Mixer's slot of each)
+            std::size_t at = 0;
+            for (const auto& fx : offline.getSong().mixer[(std::size_t) t].effects)
+                text << "[slot " << rows[at++] + 1 << " " << lynx::effectInfo (fx.kind).name
+                     << (lynx::goals::active (fx) ? " = " + juce::String (lynx::goals::name (fx.goal)) + " " + juce::String (juce::roundToInt (fx.goalAmount * 100.0f)) + "%" : juce::String())
+                     << (fx.enabled ? "" : " off") << "] ";
+            return text.trimEnd();
+        };
+        line ("after + x3:        " + slotsText (insert));
+        check ("three cards, three one-knob effects", dock->cardCountForCheck() == 3 && dock->oneKnobCardsForCheck() == 3);
+        // the knob writes the effect's own parameters
+        const auto roomBefore = offline.getSong().mixer[(std::size_t) insert].effects[1];
+        dock->turnKnobForCheck (1, 0.8f);
+        offline.dispatchPendingMessages();
+        {
+            const auto& room = offline.getSong().mixer[(std::size_t) insert].effects[1];
+            check ("the knob at 80 % writes the mapped parameters", std::abs (room.goalAmount - 0.8f) < 1.0e-6f && lynx::goals::active (room) && ! (room.params == roomBefore.params));
+        }
+        // ‹ › reorder, × removes
+        dock->moveCardForCheck (2, -1);
+        offline.dispatchPendingMessages();
+        line ("Level moved left:  " + slotsText (insert));
+        {
+            const auto& fx = offline.getSong().mixer[(std::size_t) insert].effects;
+            check ("the card moved one place earlier", fx.size() == 3 && fx[1].goal == lynx::goals::level && fx[2].goal == lynx::goals::room);
+        }
+        dock->removeCardForCheck (0);
+        offline.dispatchPendingMessages();
+        line ("Brighter removed:  " + slotsText (insert));
+        check ("the card is gone", dock->cardCountForCheck() == 2 && offline.getSong().mixer[(std::size_t) insert].effects.size() == 2);
+        // a hand edit in the full editor: the slot is an ordinary effect again (its card shows Mix)
+        offline.editSong ([insert] (lynx::Song& s) {
+            auto& slot = s.mixer[(std::size_t) insert].effects[0];
+            const auto moved = (std::size_t) lynx::goals::mapping (slot.goal, slot.goalAmount).back().param;
+            slot.params[moved] = slot.params[moved] > 0.5f ? 0.2f : 0.9f;
+        });
+        offline.dispatchPendingMessages();
+        check ("a parameter moved by hand makes the card an ordinary effect", dock->cardCountForCheck() == 2 && dock->oneKnobCardsForCheck() == 1);
+        dock->turnKnobForCheck (0, 0.5f); // (its knob is the slot's Mix now)
+        offline.dispatchPendingMessages();
+        check ("an ordinary card's knob is the slot's Mix", std::abs (offline.getSong().mixer[(std::size_t) insert].effects[0].mix - 0.5f) < 1.0e-6f);
+
+        // a preset replaces the chain; Blend is the chain's dry/wet
+        if (const auto* preset = lynx::chains::find ("Clear Voice"))
+            offline.editSongStructural ([insert, preset] (lynx::Song& s) { lynx::chains::apply (s, insert, *preset); });
+        offline.dispatchPendingMessages();
+        line ("preset Clear Voice: " + slotsText (insert));
+        check ("the preset's chain is on the insert", offline.getSong().mixer[(std::size_t) insert].chainPreset == "Clear Voice" && lynx::chains::unchanged (offline.getSong(), insert)
+                                                           && dock->cardCountForCheck() == (int) offline.getSong().mixer[(std::size_t) insert].effects.size());
+        shots ("effects-preset");
+        menuShot (dock->presetMenuForSnapshot(), lynx::tr ("Preset"), lynx::tr ("Voice"), "menu-preset");
+        dock->setBlendForCheck (0.7f);
+        dock->addOneKnobForCheck (lynx::goals::echo);
+        offline.dispatchPendingMessages();
+        check ("Blend 70 % is the insert's chain blend; the preset shows as edited",
+               std::abs (offline.getSong().mixer[(std::size_t) insert].chainBlend - 0.7f) < 1.0e-6f && ! lynx::chains::unchanged (offline.getSong(), insert));
+        shots ("effects-edited");
+
+        // a user preset: saved to a file, loaded on another track (its slots and Blend; that track's level stays)
+        const auto mine = offline.getSong().mixer[(std::size_t) insert];
+        const auto saved = lynx::SimpleDock::saveUserPreset (offline, insert, "My voice");
+        const auto file = lynx::SimpleDock::userPresetFolder().getChildFile ("My voice.lynxtrack");
+        check ("the preset is saved as " + file.getFileName(), saved && file.existsAsFile() && offline.getSong().mixer[(std::size_t) insert].chainPreset == "My voice");
+        offline.editSong ([keysInsert] (lynx::Song& s) { s.mixer[(std::size_t) keysInsert].volume = 0.42f; });
+        const auto loaded = keysInsert > 0 && lynx::SimpleDock::loadUserPreset (offline, keysInsert, file);
+        offline.dispatchPendingMessages();
+        {
+            const auto& other = offline.getSong().mixer[(std::size_t) keysInsert];
+            auto same = loaded && other.effects.size() == mine.effects.size() && std::abs (other.chainBlend - mine.chainBlend) < 1.0e-6f && other.chainPreset == "My voice";
+            for (std::size_t i = 0; same && i < mine.effects.size(); ++i)
+                same = other.effects[i].kind == mine.effects[i].kind && other.effects[i].goal == mine.effects[i].goal
+                       && lynx::mixerops::effectRows (other.effects)[i] == lynx::mixerops::effectRows (mine.effects)[i] && std::abs (other.effects[i].goalAmount - mine.effects[i].goalAmount) < 1.0e-6f && lynx::goals::active (other.effects[i]) == lynx::goals::active (mine.effects[i]);
+            check ("loaded on the Keys track: the same slots and Blend", same);
+            check ("the Keys track keeps its level", std::abs (other.volume - 0.42f) < 1.0e-6f);
+            line ("Keys after load:   " + slotsText (keysInsert));
+        }
+        menuShot (dock->presetMenuForSnapshot(), lynx::tr ("Preset"), lynx::tr ("My presets"), "menu-preset-mine");
+        file.deleteFile();
+
+        // the drums: effects only (a kit has no single sound to pick)
+        playlist.selectTrack (drumsTrack);
+        offline.dispatchPendingMessages();
+        check ("the Drums track shows its insert's effects, no Instrument tab", dock->shownTrack() == drumsTrack && ! dock->hasInstrumentTabForCheck() && dock->insertForCheck() > 0);
+        if (const auto* preset = lynx::chains::find ("Smash Room"))
+            offline.editSongStructural ([t = dock->insertForCheck(), preset] (lynx::Song& s) { lynx::chains::apply (s, t, *preset); });
+        shots ("effects-drums");
+
+        // the project file keeps all of it
+        {
+            juce::String error;
+            const auto json = lynx::ProjectFile::toJson (offline.getSong());
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            auto same = back && back->mixer.size() == offline.getSong().mixer.size();
+            for (std::size_t t = 0; same && t < back->mixer.size(); ++t)
+            {
+                const auto& a = offline.getSong().mixer[t];
+                const auto& b = back->mixer[t];
+                same = a.effects.size() == b.effects.size() && std::abs (a.chainBlend - b.chainBlend) < 1.0e-6f && a.chainPreset == b.chainPreset;
+                for (std::size_t i = 0; same && i < a.effects.size(); ++i)
+                    same = a.effects[i].kind == b.effects[i].kind && a.effects[i].goal == b.effects[i].goal && a.effects[i].row == b.effects[i].row
+                           && std::abs (a.effects[i].goalAmount - b.effects[i].goalAmount) < 1.0e-6f;
+            }
+            check ("saved and loaded as a project: the same chains, knobs, Blend and preset names", same);
+        }
+
+        // --- the same plugins in the same slots in FL's layout --------------------------------------------------------
+        const auto simpleSong = offline.getSong();
+        const auto inSimple = slotsText (insert);
+        ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+        offline.dispatchPendingMessages();
+        check ("Pattern workflow: the dock is gone", dock->getParentComponent() == nullptr);
+        ui.selectTabForSnapshot (3);
+        ui.getMixerForSnapshot().selectTrack (insert);
+        offline.dispatchPendingMessages();
+        for (float scale : { 1.0f, 2.0f })
+            writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, scale), juce::String ("pattern-mixer") + (scale > 1.0f ? "@2x" : ""));
+        line ("Simple layout:     " + inSimple);
+        line ("Pattern layout:    " + slotsText (insert));
+        check ("the same effects in the same Mixer slots in the Pattern workflow", offline.getSong().mixer == simpleSong.mixer && offline.getSong().channels == simpleSong.channels);
+        // an effect added in the Mixer's way shows as a card when the Simple workflow comes back
+        offline.editSongStructural ([insert] (lynx::Song& s) { lynx::mixerops::insertEffectAtRow (s, insert, lynx::makeEffectSlot (lynx::EffectKind::chorus), 7); });
+        ui.selectTabForSnapshot (2);
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        offline.dispatchPendingMessages();
+        simple->hideChooser();
+        playlist.selectTrack (voiceTrack);
+        offline.dispatchPendingMessages();
+        check ("back in Simple: the dock shows the insert as it is now, the Mixer's new effect too",
+               dock->getParentComponent() != nullptr && dock->cardCountForCheck() == (int) offline.getSong().mixer[(std::size_t) insert].effects.size()
+                   && lynx::mixerops::effectRows (offline.getSong().mixer[(std::size_t) insert].effects).back() == 7);
+        line ("Simple again:      " + slotsText (insert));
+        shots ("effects-back");
+        // hidden with its key, shown again by "+FX"
+        simple->toggleDock();
+        offline.dispatchPendingMessages();
+        check ("Ctrl+Alt+L hides the dock", ! simple->isDockShowing() && ! lynx::SimpleDock::shownSetting);
+        writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), "dock-hidden");
+        simple->showEffectsOfInsert (keysInsert);
+        offline.dispatchPendingMessages();
+        check ("+FX on a track header shows the dock on that track's effects",
+               simple->isDockShowing() && dock->shownTrack() == keysTrack && dock->getTab() == lynx::SimpleDock::Tab::effects && dock->insertForCheck() == keysInsert);
+        simple->cycleDockTab();
+        check ("Shift+Tab goes to the Instrument tab", dock->getTab() == lynx::SimpleDock::Tab::instrument);
+        line ("Simple workflow objects: " + juce::String (madeBefore) + " before, " + juce::String (lynx::SimpleWorkflow::instances.load()) + " after");
+        line (report.contains ("ERROR ") ? "RESULT ERROR" : "RESULT OK");
+        juce::File (prefix + "-report.txt").replaceWithText (report);
     }
 
     void runSimpleShot (const juce::String& prefix)

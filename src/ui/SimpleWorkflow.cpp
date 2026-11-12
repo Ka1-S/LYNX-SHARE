@@ -11,6 +11,7 @@
 #include "ui/I18n.h"
 #include "ui/LoopStarterWindow.h"
 #include "ui/QuickPick.h"
+#include "ui/SimpleDock.h"
 #include "ui/Theme.h"
 
 namespace lynx
@@ -526,8 +527,108 @@ void SimpleWorkflow::left()
     active = false;
     hideChooser();
     hideFinish();
+    if (dock != nullptr && dock->getParentComponent() != nullptr && host.setBottomDock)
+        host.setBottomDock (nullptr, nullptr);
     if (host.setTitleAccessory)
         host.setTitleAccessory (nullptr, 0);
+}
+
+// --- the dock for the selected track (round 190bu) --------------------------------------------------------------------
+void SimpleWorkflow::updateDock()
+{
+    if (! active)
+        return;
+    if (! SimpleDock::shownSetting)
+    {
+        if (dock != nullptr && dock->getParentComponent() != nullptr && host.setBottomDock)
+            host.setBottomDock (nullptr, nullptr);
+        return;
+    }
+    if (dock == nullptr)
+    {
+        SimpleDock::Hooks hooks;
+        hooks.toggleChannelWindow = host.toggleChannelWindow;
+        hooks.showKeys = host.showKeys;
+        hooks.layoutChanged = [this] {
+            updateDock(); // (the ▾ button hides it)
+            if (host.settingsChanged)
+                host.settingsChanged();
+        };
+        dock = std::make_unique<SimpleDock> (engine, std::move (hooks));
+    }
+    // the track it shows: the Playlist's current track while that is one of the song's tracks, else the first track
+    const auto& song = engine.getSong();
+    if (dockTrack < 0 && host.selectedTrack)
+        dockTrack = host.selectedTrack();
+    if (dockTrack >= (int) song.playlistTracks.size() || (dockTrack >= 0 && ! simpletracks::kindOf (song, dockTrack)))
+        dockTrack = -1;
+    if (dockTrack < 0)
+        for (int t = 0; t < (int) song.playlistTracks.size() && dockTrack < 0; ++t)
+            if (simpletracks::kindOf (song, t))
+                dockTrack = t;
+    if (dock->shownTrack() != dockTrack)
+        dock->showTrack (dockTrack);
+    else
+        dock->refresh();
+    if (dock->getParentComponent() == nullptr && host.setBottomDock)
+    {
+        dock->setVisible (true);
+        host.setBottomDock (dock.get(), [this] (int available) { return dock != nullptr ? dock->heightFor (available) : 0; });
+    }
+}
+
+void SimpleWorkflow::trackSelected (int track)
+{
+    if (! active || track == dockTrack)
+        return;
+    dockTrack = track;
+    if (isDockShowing())
+        updateDock();
+}
+
+void SimpleWorkflow::showEffectsOfInsert (int insert)
+{
+    if (! active)
+        return;
+    const auto& song = engine.getSong();
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+        if (simpletracks::kindOf (song, t) && simpletracks::insertOf (song, t) == insert)
+        {
+            dockTrack = t;
+            break;
+        }
+    if (! SimpleDock::shownSetting)
+    {
+        SimpleDock::shownSetting = true;
+        if (host.settingsChanged)
+            host.settingsChanged();
+    }
+    updateDock();
+    if (dock != nullptr)
+        dock->setTab (SimpleDock::Tab::effects);
+}
+
+void SimpleWorkflow::toggleDock()
+{
+    SimpleDock::shownSetting = ! SimpleDock::shownSetting;
+    updateDock();
+    if (host.settingsChanged)
+        host.settingsChanged();
+}
+
+void SimpleWorkflow::cycleDockTab()
+{
+    if (isDockShowing())
+        dock->cycleTab();
+}
+
+bool SimpleWorkflow::isDockShowing() const noexcept { return dock != nullptr && dock->getParentComponent() != nullptr; }
+
+SimpleDock* SimpleWorkflow::dockForSnapshot()
+{
+    SimpleDock::shownSetting = true;
+    updateDock();
+    return dock.get();
 }
 
 void SimpleWorkflow::songChanged()
@@ -537,6 +638,7 @@ void SimpleWorkflow::songChanged()
     if (isFinishShowing())
         static_cast<FinishDock&> (*finishDock).refresh();
     static_cast<SimpleTitleTools&> (*titleTools).refresh();
+    updateDock();
     const auto& song = engine.getSong();
     if (simpletracks::isEmptySong (song))
     {

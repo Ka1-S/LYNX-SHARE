@@ -1126,6 +1126,11 @@ struct EffectSlot
     // Part of a Master look (round 189k S8, core/MasterLooks.h): the look's id, 0 = an ordinary slot. Saved in .lynx;
     // FL export writes such a slot as FL's own plugin with its settings (core/FlStateWrite.h).
     std::uint8_t look = 0;
+    // A one-knob effect of the Simple workflow (round 190bu, core/GoalKnobs.h): the goal's id (0 = an ordinary slot) and
+    // where its knob stands (0..1). The slot is the goal's ordinary LYNX effect with the parameters the knob wrote, so
+    // every layout, the Mixer and the exports see a normal effect. Saved in .lynx.
+    std::uint8_t goal = 0;
+    float goalAmount = 0.5f;
     FlOrigin flOrigin;    // imported from FL: the original effect plugin (round 171e)
     InstanceTag instance; // runtime identity of the slot (never saved, not compared)
 
@@ -1415,6 +1420,13 @@ struct MixerTrack
     std::vector<StandIn> standIns;
     // FL's mixer track icon ("Change icon…", .flp 0x5F, REA round 168j): FL's icon index, 0 = none. Kept and saved.
     int icon = 0;
+    // The Simple workflow's Blend (round 190bu): the dry/wet of the whole effect chain, 1 = the chain alone (nothing is
+    // computed), 0 = the insert's input before its first slot; the dry path waits for the chain's latency. Saved in
+    // .lynx when under 1.
+    float chainBlend = 1.0f;
+    // The chain preset ("sound") last put on this insert (core/ChainPresets.h; "" = none). A name only: the slots are
+    // the chain. Saved.
+    std::string chainPreset;
     bool operator== (const MixerTrack&) const = default; // (Online Sessions P2: entity comparison, round 169b)
 };
 

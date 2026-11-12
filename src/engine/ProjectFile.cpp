@@ -1089,6 +1089,11 @@ juce::var effectToVar (const EffectSlot& slot)
         e->setProperty ("row", slot.row);
     if (slot.look != 0) // part of a Master look (round 189k)
         e->setProperty ("look", (int) slot.look);
+    if (slot.goal != 0) // a one-knob effect (round 190bu): the goal and where its knob stands
+    {
+        e->setProperty ("goal", (int) slot.goal);
+        e->setProperty ("goalAmount", juce::roundToInt (slot.goalAmount * 10000.0f) / 10000.0);
+    }
     if (slot.sidechain >= 0)
         e->setProperty ("sidechain", slot.sidechain);
     if (slot.sidechain2 >= 0)
@@ -1174,6 +1179,8 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
     slot.smartDisable = (bool) e.getProperty ("smartDisable", true);
     slot.row = juce::jlimit (-1, maxEffectSlots - 1, (int) e.getProperty ("row", -1));
     slot.look = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("look", 0));
+    slot.goal = (std::uint8_t) juce::jlimit (0, 255, (int) e.getProperty ("goal", 0));
+    slot.goalAmount = juce::jlimit (0.0f, 1.0f, (float) (double) e.getProperty ("goalAmount", 0.5));
 
     if (auto* params = e["params"].getArray())
     {
@@ -2352,6 +2359,10 @@ juce::var mixerTrackToVar (const MixerTrack& t)
 
     if (! effects.isEmpty())
         o->setProperty ("effects", effects);
+    if (t.chainBlend < 1.0f) // the Simple workflow's Blend (round 190bu)
+        o->setProperty ("chainBlend", juce::roundToInt (t.chainBlend * 10000.0f) / 10000.0);
+    if (! t.chainPreset.empty())
+        o->setProperty ("chainPreset", str (t.chainPreset));
     if (! t.standIns.empty())
         o->setProperty ("standIns", standInsToVar (t.standIns));
 
@@ -2393,6 +2404,8 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
         track.latencyBypass = LatencyBypass::whenRecordingOrStopped;
     track.compensateMasterLatency = (bool) t.getProperty ("compensateMaster", true);
     track.icon = juce::jlimit (0, 0xFFFF, (int) t.getProperty ("icon", 0));
+    track.chainBlend = juce::jlimit (0.0f, 1.0f, (float) (double) t.getProperty ("chainBlend", 1.0));
+    track.chainPreset = t.getProperty ("chainPreset", "").toString().toStdString();
     track.outputChannel = juce::jlimit (outputDefault, 255, (int) t.getProperty ("output", outputDefault));
     if (const auto mode = t["outputMode"].toString(); mode == "mono")
         track.outputMode = OutputMode::monoSum;
@@ -3795,5 +3808,7 @@ void applyMixerTrackState (MixerTrack& target, const MixerTrack& state, bool tak
     target.eq = state.eq;
     target.threaded = state.threaded;
     target.effects = state.effects;
+    target.chainBlend = state.chainBlend; // (round 190bu: a state is the whole chain, its Blend and its preset name too)
+    target.chainPreset = state.chainPreset;
 }
 } // namespace lynx::ProjectFile
