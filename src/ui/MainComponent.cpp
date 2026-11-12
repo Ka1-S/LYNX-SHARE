@@ -346,9 +346,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     multilinkButton.setWantsKeyboardFocus (false);
     multilinkButton.onClick = [this] { runAction ("options.multilink"); };
     multilinkButton.onRightClick = [this] {
-        // round 190df: FL's menu as it is (live shot link190bt-09a): no items above its caption while multilink is on
-        juce::PopupMenu menu;
-        addMultilinkControlsItems (menu, engine);
+        auto menu = multilinkButtonMenu (engine); // (round 190df: FL's menu, then LYNX's own items)
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&multilinkButton));
     };
 

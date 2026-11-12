@@ -13,8 +13,10 @@ Markers: [FORM] form resource, [H 0x...] the handler at that address (image base
 address, [SHOT] an FL screenshot, [LIVE] a live FL answer (round 190cq).
 
 ## LYNX choices
-- FL's "Spare state" items are named "A/B compare" / "Store the current settings as B" / "Swap with B", as on the mixer
-  slots (docs/WORKFLOW_FL.md keeps the feature name out of LYNX's UI); the behaviour is FL's.
+- The plugin menu keeps FL's names: "Spare state", "Store in spare state", "Flip with spare state" (FL-native
+  equivalents keep FL's names; coordinator decision).
+- The Multilink button's menu is FL's menu first, in FL's order; LYNX's own "Link to controller" / "Override global
+  links" (round 177b-4, one-step linking of the queued controls) stay after it, below a line.
 - FL's Envelope / instrument page (FlVoicePanel) is the Envelope tab of samplers that run FL's voice (an FL project's
   samplers). LYNX's own samplers keep LYNX's envelope page (switching their voice would change how they sound).
 - Left out (no dead stubs): Browse parameters (LYNX's Browser lists no plugin parameters), Save channel state as... /

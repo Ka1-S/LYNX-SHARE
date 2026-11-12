@@ -9514,3 +9514,8 @@ countries: br
 "Envelope preset name" = "Nome do preset de envelope"
 "Link all parameters..." = "Vincular todos os parâmetros..."
 "{0} parameter selected" = "{0} parâmetro selecionado"
+
+# --- Round 190df (coordinator): FL's spare state names in the plugin menu
+"Spare state" = "Estado reserva"
+"Store in spare state" = "Guardar no estado reserva"
+"Flip with spare state" = "Trocar com o estado reserva"

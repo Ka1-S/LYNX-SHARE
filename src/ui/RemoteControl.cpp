@@ -1007,6 +1007,18 @@ void addMultilinkControlsItems (juce::PopupMenu& menu, AudioEngine& engine)
     }
 }
 
+juce::PopupMenu multilinkButtonMenu (AudioEngine& engine)
+{
+    // FL's menu first, in FL's order (live shot link190bt-09a); LYNX's own one-step items (round 177b-4: the queued
+    // controls link to the next controllers moved) after it, below a line
+    juce::PopupMenu menu;
+    addMultilinkControlsItems (menu, engine);
+    menu.addSeparator();
+    menu.addItem (tr ("Link to controller"), engine.isMultilinkOn(), false, [&engine] { engine.multilinkToControllers (false); });
+    menu.addItem (tr ("Override global links"), engine.isMultilinkOn(), false, [&engine] { engine.multilinkToControllers (true); });
+    return menu;
+}
+
 // FL's FormulaMenu: its sections, dividing lines and presets, in its order.
 juce::PopupMenu remoteControlFormulaMenu (std::function<void (const juce::String&)> pick)
 {

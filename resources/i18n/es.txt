@@ -9372,6 +9372,11 @@ countries: es mx ar co cl pe ve
 "Link all parameters..." = "Vincular todos los parámetros..."
 "{0} parameter selected" = "{0} parámetro seleccionado"
 
+# --- Round 190df (coordinator): FL's spare state names in the plugin menu
+"Spare state" = "Estado de reserva"
+"Store in spare state" = "Guardar en el estado de reserva"
+"Flip with spare state" = "Intercambiar con el estado de reserva"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"

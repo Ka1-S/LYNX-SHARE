@@ -9372,6 +9372,11 @@ countries: cn sg
 "Link all parameters..." = "关联所有参数..."
 "{0} parameter selected" = "已选择 {0} 个参数"
 
+# --- Round 190df (coordinator): FL's spare state names in the plugin menu
+"Spare state" = "备用状态"
+"Store in spare state" = "存入备用状态"
+"Flip with spare state" = "与备用状态互换"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值电平表（左/右）带峰值保持  [LMB] 清除削波指示灯"

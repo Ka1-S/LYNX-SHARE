@@ -10355,8 +10355,7 @@ private:
             engine.setMultilink (true);
             engine.noteTweaked (volume);
             engine.noteTweaked (pan);
-            juce::PopupMenu on;
-            lynx::addMultilinkControlsItems (on, engine);
+            auto on = lynx::multilinkButtonMenu (engine);
             juce::PopupMenu::MenuItemIterator first (on);
             first.next();
             check ("ml_caption_on", first.getItem().isSectionHeader && first.getItem().text == lynx::tr ("{0} parameters selected", { "2" }), first.getItem().text);
@@ -10379,34 +10378,44 @@ private:
             lynx::runMultilinkAction (engine, lynx::mlmenu::Action::initSong, engine.multilinkTargets(), 0);
             check ("ml_init_song", engine.getSong().findInitialValue (volume) >= 0 && ! engine.isMultilinkOn());
             // off: the last two tweaked parameters, no Cancel
-            juce::PopupMenu off;
-            lynx::addMultilinkControlsItems (off, engine);
+            auto off = lynx::multilinkButtonMenu (engine);
             bool hasCancel = false;
             for (juce::PopupMenu::MenuItemIterator it (off); it.next();)
                 hasCancel = hasCancel || it.getItem().text == lynx::tr ("Cancel");
             juce::PopupMenu::MenuItemIterator offFirst (off);
             offFirst.next();
             check ("ml_off_caption", offFirst.getItem().text == lynx::tr ("Last 2 tweaked parameters") && ! hasCancel, offFirst.getItem().text);
+            // LYNX's own one-step items stay, after FL's items below a line (greyed while multilink is off)
+            juce::String last;
+            bool lineBefore = false, prevLine = false;
+            for (juce::PopupMenu::MenuItemIterator it (on); it.next();)
+            {
+                if (it.getItem().text == lynx::tr ("Link to controller"))
+                    lineBefore = prevLine;
+                prevLine = it.getItem().isSeparator;
+                last = it.getItem().text;
+            }
+            check ("ml_lynx_items_after_fl", lineBefore && last == lynx::tr ("Override global links"), last);
             saveMenus (juce::StringArray { "Multilink on (2 queued)", "Multilink off" }, std::vector<juce::PopupMenu> { on, off },
                        prefix + "-multilink-menu.png");
         }
 
-        // ---- the plugin menu's A/B (FL's spare state) and Parameters > Link all parameters...
+        // ---- the plugin menu's spare state and Parameters > Link all parameters...
         {
             FlCtlShotPlugin plugin;
             juce::PopupMenu menu;
             lynx::addPluginWrapperItems (menu, engine, plugin, { AutomationTargetKind::channelParam, 1, 0, 0 });
-            saveMenus (juce::StringArray { "Plugin menu: A/B and parameters" }, std::vector<juce::PopupMenu> { menu }, prefix + "-plugin-menu.png");
+            saveMenus (juce::StringArray { "Plugin menu: spare state and parameters" }, std::vector<juce::PopupMenu> { menu }, prefix + "-plugin-menu.png");
             const auto targets = lynx::allPluginParameterTargets (plugin, { AutomationTargetKind::channelParam, 1, 0, 0 });
             check ("link_all_parameters", targets.size() == 3 && targets[2].param == 2 && targets[2].index == 1);
             auto* cutoff = static_cast<juce::AudioParameterFloat*> (plugin.getParameters()[0]);
             *cutoff = 0.2f;
-            check ("spare_store", clickMenuItem (menu, lynx::tr ("Store the current settings as B")));
+            check ("spare_store", clickMenuItem (menu, lynx::tr ("Store in spare state")));
             *cutoff = 0.9f;
             juce::PopupMenu again;
             lynx::addPluginWrapperItems (again, engine, plugin, { AutomationTargetKind::channelParam, 1, 0, 0 });
-            check ("spare_flip", clickMenuItem (again, lynx::tr ("Swap with B")) && std::abs (cutoff->get() - 0.2f) < 1.0e-6f, juce::String (cutoff->get()));
-            check ("spare_flip_back", clickMenuItem (again, lynx::tr ("Swap with B")) && std::abs (cutoff->get() - 0.9f) < 1.0e-6f, juce::String (cutoff->get()));
+            check ("spare_flip", clickMenuItem (again, lynx::tr ("Flip with spare state")) && std::abs (cutoff->get() - 0.2f) < 1.0e-6f, juce::String (cutoff->get()));
+            check ("spare_flip_back", clickMenuItem (again, lynx::tr ("Flip with spare state")) && std::abs (cutoff->get() - 0.9f) < 1.0e-6f, juce::String (cutoff->get()));
             lynx::sparestate::shared().forget (&plugin);
         }
 

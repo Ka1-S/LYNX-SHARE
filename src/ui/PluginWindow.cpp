@@ -2503,8 +2503,8 @@ std::vector<AutomationTarget> allPluginParameterTargets (juce::AudioPluginInstan
 
 void addPluginWrapperItems (juce::PopupMenu& menu, AudioEngine& engine, juce::AudioPluginInstance& plugin, const AutomationTarget& base)
 {
-    // FL's "Spare state" section [PluginMenu Sparestate1]: LYNX names it A/B compare, as on the mixer slots
-    // (docs/WORKFLOW_FL.md keeps FL's feature name out of the UI). The kept state belongs to this plugin instance.
+    // FL's "Spare state" section [PluginMenu Sparestate1], with FL's names (FL-native equivalents keep FL's names); the
+    // kept state belongs to this plugin instance
     static std::map<const void*, juce::String> keptFor; // (a kept state is only flipped into the same plugin)
     const auto id = plugin.getPluginDescription().createIdentifierString();
     auto& spare = sparestate::shared();
@@ -2513,14 +2513,14 @@ void addPluginWrapperItems (juce::PopupMenu& menu, AudioEngine& engine, juce::Au
         spare.forget (&plugin);
         keptFor.erase (it);
     }
-    menu.addSectionHeader (tr ("A/B compare"));
-    menu.addItem (tr ("Store the current settings as B"), [&plugin, id] {
+    menu.addSectionHeader (tr ("Spare state"));
+    menu.addItem (tr ("Store in spare state"), [&plugin, id] {
         juce::MemoryBlock state;
         plugin.getStateInformation (state);
         sparestate::shared().store (&plugin, { (const std::uint8_t*) state.getData(), (const std::uint8_t*) state.getData() + state.getSize() });
         keptFor[&plugin] = id;
     });
-    menu.addItem (tr ("Swap with B"), spare.has (&plugin), false, [&engine, &plugin] {
+    menu.addItem (tr ("Flip with spare state"), spare.has (&plugin), false, [&engine, &plugin] {
         juce::MemoryBlock state;
         plugin.getStateInformation (state);
         if (const auto load = sparestate::shared().flip (&plugin, { (const std::uint8_t*) state.getData(),
