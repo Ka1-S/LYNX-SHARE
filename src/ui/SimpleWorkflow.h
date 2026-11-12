@@ -29,6 +29,11 @@ public:
         std::function<void()> showKeys;                    // an instrument was added from the chooser: the on-screen keyboard
         std::function<void (juce::Component*, int)> setTitleAccessory; // the Playlist title bar's accessory (nullptr: none)
         std::function<void()> showLoops;                   // the sample browser, to drag loops onto the timeline
+        // round 190ch: the Lyrics / Notes panel (the main window's, the same in every layout), Reference match, and a
+        // new project from the "Start from" list
+        std::function<void()> toggleLyrics;
+        std::function<void()> showReferenceMatch;
+        std::function<void (Song song)> startFrom;
         std::function<void (int track)> trackAdded;        // a track was added (select it, scroll to it)
         // round 190t
         std::function<juce::File()> sampleFolder;          // where the Sampler tile's file dialog starts (the Browser's samples)
@@ -59,6 +64,12 @@ public:
     void showChooser();
     void hideChooser();
     bool isChooserShowing() const noexcept;
+    // "Start from" (round 190ch, ui/StartFromPanel.h): LYNX's demo song and the templates, with a preview, over the
+    // Playlist like the chooser
+    void showStartFrom();
+    void hideStartFrom();
+    bool isStartFromShowing() const noexcept;
+    juce::Component* startFromForSnapshot(); // (made and shown if needed)
 
     // Adds a track built from `request` (one undo step): arms an audio track's insert, selects an instrument's channel,
     // hides the chooser. False (and a message) when it can't be added.
@@ -106,6 +117,7 @@ private:
     Host host;
     bool active = false;
     std::string dismissedFor; // the project (Song::projectId) whose chooser was closed by hand
+    std::unique_ptr<juce::Component> startFrom, lyricsButton; // round 190ch
     std::unique_ptr<Chooser> chooser;
     std::unique_ptr<juce::Component> addButton, finishButton, titleTools;
     std::unique_ptr<juce::Component> finishDock;

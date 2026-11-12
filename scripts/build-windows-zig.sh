@@ -236,6 +236,7 @@ APP_SOURCES+=(src/core/GoalKnobs.cpp src/core/ChainPresets.cpp src/core/SoundLib
 APP_SOURCES+=(src/core/GamepadMap.cpp src/ui/GamepadInput.cpp) # game controller control (round 184a, S16)
 APP_SOURCES+=(src/core/ControllerProfile.cpp src/core/ControllerSession.cpp src/engine/ControllerIo.cpp src/ui/ControllerBridge.cpp) # MIDI controller profiles (round 190aw)
 APP_SOURCES+=(src/core/ExportBundle.cpp src/ui/OtherAppsExport.cpp) # Simple workflow: Export for other apps (round 184a, S9)
+APP_SOURCES+=(src/ui/LyricsPanel.cpp src/ui/ReferenceMatchPanel.cpp src/ui/StartFromPanel.cpp) # lyrics, reference match, start from (round 190ch)
 APP_SOURCES+=(src/core/Preferences.cpp src/core/MidiSync.cpp src/engine/MidiSyncIo.cpp src/ui/SettingsPages.cpp src/ui/PluginManager.cpp src/ui/ShortcutManager.cpp)
 # spectral waveforms: band analysis, background cache and drawing
 APP_SOURCES+=(src/core/WaveAnalysis.cpp src/ui/WaveformView.cpp)

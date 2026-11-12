@@ -12,6 +12,7 @@
 #include "ui/LoopStarterWindow.h"
 #include "ui/QuickPick.h"
 #include "ui/SimpleDock.h"
+#include "ui/StartFromPanel.h"
 #include "ui/Theme.h"
 
 namespace lynx
@@ -219,6 +220,9 @@ public:
         close.setButtonText (juce::String::fromUTF8 ("\xc3\x97"));
         close.setTooltip (tr ("Close"));
         close.onClick = [this] { owner.closeByHand(); };
+        // round 190ch: a new project from LYNX's demo song or a template, with a preview
+        startFrom.setButtonText (tr ("Start from a demo song or a template..."));
+        startFrom.onClick = [this] { owner.showStartFrom(); };
 
         voice.onClick = [this] { owner.addAudio (Kind::voice); };
         // one click gives a sound to play at once (LYNX's own synth); "More..." lists every instrument, plugin and Soundfont
@@ -246,7 +250,7 @@ public:
         }
         guitarButton.setToggleState (true, juce::dontSendNotification);
 
-        for (auto* c : std::initializer_list<juce::Component*> { &title, &close, &voice, &instrument, &drums, &sampler, &guitar, &import, &loops, &footer })
+        for (auto* c : std::initializer_list<juce::Component*> { &title, &close, &voice, &instrument, &drums, &sampler, &guitar, &import, &loops, &footer, &startFrom })
             addAndMakeVisible (*c);
 
         // the starter-beat page
@@ -319,10 +323,12 @@ public:
         c.removeFromTop (16);
         footer.setBounds (c.removeFromBottom (20));
         c.removeFromBottom (6);
+        startFrom.setBounds (c.removeFromBottom (28).withSizeKeepingCentre (juce::jmin (340, c.getWidth()), 28));
+        c.removeFromBottom (8);
 
         // tiles: two columns, then Guitar / bass across, then Import and Loops
         const auto gap = 10;
-        const auto rowH = juce::jlimit (56, 78, (c.getHeight() - 4 * gap) / 5);
+        const auto rowH = juce::jlimit (50, 78, (c.getHeight() - 4 * gap) / 5);
         auto tiles = c;
         auto row = [&] { auto r = tiles.removeFromTop (rowH); tiles.removeFromTop (gap); return r; };
         auto pair = [&] (juce::Component& a, juce::Component& b) {
@@ -380,7 +386,7 @@ private:
 
     void updatePage()
     {
-        for (auto* c : std::initializer_list<juce::Component*> { &title, &voice, &instrument, &drums, &sampler, &guitar, &import, &loops, &footer })
+        for (auto* c : std::initializer_list<juce::Component*> { &title, &voice, &instrument, &drums, &sampler, &guitar, &import, &loops, &footer, &startFrom })
             c->setVisible (! starterPage);
         for (auto* c : std::initializer_list<juce::Component*> { &starterTitle, &back, &useTempo })
             c->setVisible (starterPage);
@@ -392,7 +398,7 @@ private:
 
     SimpleWorkflow& owner;
     juce::Label title, footer, starterTitle;
-    juce::TextButton close, back, guitarButton, bassButton, moreInstruments;
+    juce::TextButton close, back, guitarButton, bassButton, moreInstruments, startFrom;
     juce::ToggleButton useTempo;
     Tile voice, instrument, drums, sampler, guitar, import, loops;
     std::vector<std::unique_ptr<juce::TextButton>> genreButtons;
@@ -421,10 +427,12 @@ class SimpleTitleTools final : public juce::Component,
                                private juce::Timer
 {
 public:
-    SimpleTitleTools (juce::Component& a, juce::Component& b, std::function<juce::String()> statusText) : add (a), finish (b), text (std::move (statusText))
+    SimpleTitleTools (juce::Component& a, juce::Component& b, juce::Component& c, std::function<juce::String()> statusText)
+        : add (a), finish (b), lyrics (c), text (std::move (statusText))
     {
         addAndMakeVisible (add);
         addAndMakeVisible (finish);
+        addAndMakeVisible (lyrics);
         // round 190t: LYNX backs the work up by itself; a beginner should see it ("Backed up 2 min ago")
         status.setFont (theme::font (theme::type::small));
         status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
@@ -436,13 +444,15 @@ public:
         startTimer (2000);
     }
     static constexpr int statusWidth = 150;
-    static constexpr int width = 110 + 6 + 80 + 10 + statusWidth;
+    static constexpr int width = 110 + 6 + 80 + 6 + 80 + 10 + statusWidth; // (round 190ch: + Lyrics)
     void resized() override
     {
         auto r = getLocalBounds();
         add.setBounds (r.removeFromLeft (110));
         r.removeFromLeft (6);
         finish.setBounds (r.removeFromLeft (80));
+        r.removeFromLeft (6);
+        lyrics.setBounds (r.removeFromLeft (80));
         r.removeFromLeft (10);
         status.setBounds (r);
     }
@@ -464,6 +474,7 @@ private:
 
     juce::Component& add;
     juce::Component& finish;
+    juce::Component& lyrics;
     std::function<juce::String()> text;
     juce::Label status;
 };
@@ -484,13 +495,62 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
             showFinish();
     };
     finishButton = std::move (finish);
-    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *finishButton, host.saveStatus);
+    // round 190ch: the project's Lyrics / Notes panel, docked beside the timeline
+    auto lyrics = std::make_unique<juce::TextButton> (tr ("Lyrics"));
+    lyrics->setTooltip (tr ("Lyrics and notes of this project"));
+    lyrics->onClick = [this] {
+        if (host.toggleLyrics)
+            host.toggleLyrics();
+    };
+    lyricsButton = std::move (lyrics);
+    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *finishButton, *lyricsButton, host.saveStatus);
+}
+
+// --- "Start from" (round 190ch) -----------------------------------------------------------------------------------------
+void SimpleWorkflow::showStartFrom()
+{
+    if (startFrom == nullptr)
+    {
+        StartFromPanel::Hooks hooks;
+        hooks.open = [this] (Song song) {
+            hideStartFrom();
+            if (host.startFrom)
+                host.startFrom (std::move (song));
+        };
+        hooks.close = [this] {
+            hideStartFrom();
+            if (simpletracks::isEmptySong (engine.getSong()) && engine.getSong().projectId != dismissedFor)
+                showChooser(); // (back to where it was opened from)
+        };
+        startFrom = std::make_unique<StartFromPanel> (engine, std::move (hooks));
+    }
+    if (host.setOverlay)
+        host.setOverlay (startFrom.get());
+    if (startFrom->isShowing())
+        startFrom->grabKeyboardFocus();
+}
+
+void SimpleWorkflow::hideStartFrom()
+{
+    if (! isStartFromShowing())
+        return;
+    static_cast<StartFromPanel&> (*startFrom).stopPreview();
+    if (host.setOverlay)
+        host.setOverlay (nullptr);
+}
+
+bool SimpleWorkflow::isStartFromShowing() const noexcept { return startFrom != nullptr && startFrom->getParentComponent() != nullptr; }
+
+juce::Component* SimpleWorkflow::startFromForSnapshot()
+{
+    showStartFrom();
+    return startFrom.get();
 }
 
 void SimpleWorkflow::showFinish()
 {
     if (finishDock == nullptr)
-        finishDock = std::make_unique<FinishDock> (engine, [this] { hideFinish(); }, FinishDock::Saving { host.exportAudio, host.exportOtherApps });
+        finishDock = std::make_unique<FinishDock> (engine, [this] { hideFinish(); }, FinishDock::Saving { host.exportAudio, host.exportOtherApps, host.showReferenceMatch });
     static_cast<FinishDock&> (*finishDock).refresh();
     if (host.setSideDock)
         host.setSideDock (finishDock.get(), FinishDock::width);
@@ -525,6 +585,7 @@ void SimpleWorkflow::entered()
 void SimpleWorkflow::left()
 {
     active = false;
+    hideStartFrom();
     hideChooser();
     hideFinish();
     if (dock != nullptr && dock->getParentComponent() != nullptr && host.setBottomDock)
@@ -642,7 +703,7 @@ void SimpleWorkflow::songChanged()
     const auto& song = engine.getSong();
     if (simpletracks::isEmptySong (song))
     {
-        if (song.projectId != dismissedFor && ! isChooserShowing())
+        if (song.projectId != dismissedFor && ! isChooserShowing() && ! isStartFromShowing())
             showChooser();
     }
     else if (isChooserShowing() && ! chooser->starterPage)

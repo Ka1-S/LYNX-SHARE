@@ -17515,3 +17515,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Rollup027Tests.inc"
 #include "Edison190cdTests.inc"
 #include "Warp190cgTests.inc"
+#include "BandlabExtras190chTests.inc"

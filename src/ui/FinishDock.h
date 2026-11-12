@@ -29,6 +29,8 @@ public:
     {
         std::function<void (int format)> exportAudio;
         std::function<void()> exportOtherApps;
+        // round 190ch: the Reference match window (ui/ReferenceMatchPanel.h); without it the button is not shown
+        std::function<void()> referenceMatch;
     };
 
     FinishDock (AudioEngine& engine, std::function<void()> onClose, Saving saving = {});
@@ -56,7 +58,7 @@ private:
     std::unique_ptr<LookTile> tiles[8];
     std::unique_ptr<SaveRow> saveRows[2]; // WAV, MP3
     juce::Label title, status, intensityLabel, toneLabel, levelInfo, peakHint, saveLabel;
-    juce::TextButton closeButton, hearWithout, autoButton, removeButton, otherApps;
+    juce::TextButton closeButton, hearWithout, autoButton, removeButton, otherApps, matchButton;
     juce::Slider intensity, tone[3];
     juce::Label toneNames[3], marks[3];
     std::shared_ptr<std::atomic<int>> measuring; // Auto level's render: 0 idle, 1 running (shared with its thread)
