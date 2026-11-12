@@ -9358,6 +9358,32 @@ countries: tr
 "Channel panning" = "Kanal pan'ı"
 "In: {0} out: {1}" = "Giriş: {0} çıkış: {1}"
 "Note C0" = "Nota C0"
+
+# --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
+"{0} parameters selected" = "{0} parametre seçildi"
+"Last 2 tweaked parameters" = "Son oynanan 2 parametre"
+"No parameter selected" = "Parametre seçilmedi"
+"Last tweaked parameter" = "Son oynanan parametre"
+"Edit events" = "Olayları düzenle"
+"Init pattern with these positions" = "Pattern'i bu konumlarla başlat"
+"Load sample file... / Sample history" = "Sample dosyası yükle... / Sample geçmişi"
+"Locate sample in browser" = "Sample'ı tarayıcıda bul"
+"Remove sample" = "Sample'ı kaldır"
+"Load sample file..." = "Sample dosyası yükle..."
+"Sample history" = "Sample geçmişi"
+"Channel envelope presets" = "Kanal zarf presetleri"
+"Envelope preset name" = "Zarf preseti adı"
+"Link all parameters..." = "Tüm parametreleri bağla..."
+"{0} parameter selected" = "{0} parametre seçildi"
+
+# --- Round 190df (coordinator): FL's spare state names in the plugin menu
+"Spare state" = "Yedek durum"
+"Store in spare state" = "Yedek duruma kaydet"
+"Flip with spare state" = "Yedek durumla değiştir"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
 "Flip horizontally" = "Yatay çevir"
 "Key / scale" = "Ton / dizi"
 "Scales" = "Diziler"
@@ -9390,7 +9416,3 @@ countries: tr
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Bu plugin'i parçaya yükleyip dinlemek için tıkla (Ctrl+Z geri alır)"
 "Add \"{0}\" to favourites" = "\"{0}\" favorilere ekle"
 "Remove \"{0}\" from favourites" = "\"{0}\" favorilerden kaldır"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"

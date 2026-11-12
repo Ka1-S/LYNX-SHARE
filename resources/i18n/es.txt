@@ -9358,6 +9358,32 @@ countries: es mx ar co cl pe ve
 "Channel panning" = "Panorama del canal"
 "In: {0} out: {1}" = "Entrada: {0} salida: {1}"
 "Note C0" = "Nota C0"
+
+# --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
+"{0} parameters selected" = "{0} parámetros seleccionados"
+"Last 2 tweaked parameters" = "Últimos 2 parámetros modificados"
+"No parameter selected" = "Ningún parámetro seleccionado"
+"Last tweaked parameter" = "Último parámetro modificado"
+"Edit events" = "Editar eventos"
+"Init pattern with these positions" = "Iniciar patrón con estas posiciones"
+"Load sample file... / Sample history" = "Cargar archivo de sample... / Historial de samples"
+"Locate sample in browser" = "Localizar el sample en el navegador"
+"Remove sample" = "Quitar el sample"
+"Load sample file..." = "Cargar archivo de sample..."
+"Sample history" = "Historial de samples"
+"Channel envelope presets" = "Presets de envolvente del canal"
+"Envelope preset name" = "Nombre del preset de envolvente"
+"Link all parameters..." = "Vincular todos los parámetros..."
+"{0} parameter selected" = "{0} parámetro seleccionado"
+
+# --- Round 190df (coordinator): FL's spare state names in the plugin menu
+"Spare state" = "Estado de reserva"
+"Store in spare state" = "Guardar en el estado de reserva"
+"Flip with spare state" = "Intercambiar con el estado de reserva"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"
 "Flip horizontally" = "Invertir horizontalmente"
 "Key / scale" = "Tono / escala"
 "Scales" = "Escalas"
@@ -9390,7 +9416,3 @@ countries: es mx ar co cl pe ve
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Haz clic para cargar este plugin en la pista y escucharlo (Ctrl+Z vuelve atrás)"
 "Add \"{0}\" to favourites" = "Añadir \"{0}\" a favoritos"
 "Remove \"{0}\" from favourites" = "Quitar \"{0}\" de favoritos"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"

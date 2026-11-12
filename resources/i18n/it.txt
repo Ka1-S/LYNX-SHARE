@@ -9358,6 +9358,32 @@ countries: it ch sm
 "Channel panning" = "Pan del canale"
 "In: {0} out: {1}" = "Ingresso: {0} uscita: {1}"
 "Note C0" = "Nota C0"
+
+# --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
+"{0} parameters selected" = "{0} parametri selezionati"
+"Last 2 tweaked parameters" = "Ultimi 2 parametri modificati"
+"No parameter selected" = "Nessun parametro selezionato"
+"Last tweaked parameter" = "Ultimo parametro modificato"
+"Edit events" = "Modifica eventi"
+"Init pattern with these positions" = "Inizializza il pattern con queste posizioni"
+"Load sample file... / Sample history" = "Carica file sample... / Cronologia sample"
+"Locate sample in browser" = "Individua il sample nel browser"
+"Remove sample" = "Rimuovi il sample"
+"Load sample file..." = "Carica file sample..."
+"Sample history" = "Cronologia sample"
+"Channel envelope presets" = "Preset di inviluppo del canale"
+"Envelope preset name" = "Nome del preset di inviluppo"
+"Link all parameters..." = "Collega tutti i parametri..."
+"{0} parameter selected" = "{0} parametro selezionato"
+
+# --- Round 190df (coordinator): FL's spare state names in the plugin menu
+"Spare state" = "Stato di riserva"
+"Store in spare state" = "Memorizza nello stato di riserva"
+"Flip with spare state" = "Scambia con lo stato di riserva"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] apri/chiudi l'editor  [Alt]+[LMB] lascia aperti gli altri  [Ctrl]+[LMB] ascolta  [2xLMB] Piano Roll  [LMB] trascina su/giù riordina  [RMB] menu del canale"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Meter di picco (sinistra/destra) con peak hold  [LMB] spegne la spia di clip"
 "Flip horizontally" = "Capovolgi orizzontalmente"
 "Key / scale" = "Tonalità / scala"
 "Scales" = "Scale"
@@ -9390,7 +9416,3 @@ countries: it ch sm
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Fai clic per caricare questo plugin sulla traccia e ascoltarlo (Ctrl+Z torna indietro)"
 "Add \"{0}\" to favourites" = "Aggiungi \"{0}\" ai preferiti"
 "Remove \"{0}\" from favourites" = "Rimuovi \"{0}\" dai preferiti"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] apri/chiudi l'editor  [Alt]+[LMB] lascia aperti gli altri  [Ctrl]+[LMB] ascolta  [2xLMB] Piano Roll  [LMB] trascina su/giù riordina  [RMB] menu del canale"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Meter di picco (sinistra/destra) con peak hold  [LMB] spegne la spia di clip"

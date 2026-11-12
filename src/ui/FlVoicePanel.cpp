@@ -3,10 +3,13 @@
 #include <array>
 #include <cmath>
 
+#include "core/FlControlMenus.h"
 #include "core/FlVoiceProcessor.h"
 #include "engine/AudioEngine.h"
 #include "flp/Flp.h"
+#include "engine/PluginHost.h"
 #include "ui/I18n.h"
+#include "ui/Icons.h"
 #include "ui/PluginSkin.h"
 #include "ui/Theme.h"
 
@@ -247,6 +250,11 @@ public:
             caption (*l, tr ("Tension"));
 
         toggle (envelopeOn, tr ("Envelope"));
+        // FL's ChanEnvPresetBtn (round 190df): top right of the Envelope box, a click lists the channel envelope presets
+        presetsButton.setTooltip (tr ("Channel envelope presets"));
+        presetsButton.setFlat (true);
+        presetsButton.onClick = [this] { presetsMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&presetsButton)); };
+        addAndMakeVisible (presetsButton);
         toggle (envelopeTempo, tr ("Tempo"));
         toggle (lfoTempo, tr ("Tempo"));
         toggle (lfoGlobal, tr ("Global"));
@@ -361,6 +369,7 @@ public:
 
         envelopeBox = at (11, 115, 290, 199);
         envelopeOn.setBounds (at (15, 117, 150, 22));
+        presetsButton.setBounds (at (271, 117, 22, 22)); // (FL: EnvPanel 260, 2, 22 x 22)
         envelopeGraph.setBounds (at (22, 144, 272, 82));
         static constexpr int envelopeX[] = { 36, 70, 104, 138, 172, 206, 277 };
         for (int i = 0; i < 7; ++i)
@@ -398,7 +407,88 @@ public:
         filterType.setBounds (at (465, 286, 91, 22));
     }
 
+    // FL's ChanEnvPresetMenu [0xf5d510]: caption "Presets", the .CHENV files (a click loads one into the shown target,
+    // one undo step "Channel envelope preset change" [0xf5aba0]), a line when there are any, "Save as..." (asks
+    // "Envelope preset name" [0xf5acd0])
+    juce::PopupMenu presetsMenu()
+    {
+        juce::PopupMenu menu;
+        menu.addSectionHeader (tr ("Presets"));
+        const auto files = envelopePresetFiles();
+        for (const auto& f : files)
+            menu.addItem (f.getFileNameWithoutExtension(), [safe = juce::Component::SafePointer<FlVoicePanel> (this), f] {
+                if (safe != nullptr)
+                    safe->loadEnvelopePreset (f);
+            });
+        if (! files.isEmpty())
+            menu.addSeparator();
+        menu.addItem (tr ("Save as..."), [safe = juce::Component::SafePointer<FlVoicePanel> (this)] {
+            if (safe != nullptr)
+                safe->askEnvelopePresetName();
+        });
+        return menu;
+    }
+
+    // LYNX's folder for them (what "Save as..." writes) and FL's user folder when it is there (read only)
+    static juce::File envelopePresetFolder() { return PluginHost::settingsFolder().getChildFile ("Presets").getChildFile ("Channel envelopes"); }
+    static juce::Array<juce::File> envelopePresetFiles()
+    {
+        juce::Array<juce::File> files;
+        juce::StringArray names;
+        const auto fl = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                            .getChildFile ("Image-Line").getChildFile ("FL Studio").getChildFile ("Presets").getChildFile ("Channel envelopes");
+        for (const auto& folder : { envelopePresetFolder(), fl })
+        {
+            auto found = folder.findChildFiles (juce::File::findFiles, false, "*.chenv;*.CHENV");
+            found.sort();
+            for (const auto& f : found)
+                if (! names.contains (f.getFileNameWithoutExtension(), true))
+                {
+                    names.add (f.getFileNameWithoutExtension());
+                    files.add (f);
+                }
+        }
+        return files;
+    }
+
+    bool loadEnvelopePreset (const juce::File& file)
+    {
+        juce::MemoryBlock data;
+        if (! file.loadFileAsData (data) || ! write || ! read || ! read())
+            return false;
+        const auto a = chenv::read ({ (const std::uint8_t*) data.getData(), (const std::uint8_t*) data.getData() + data.getSize() });
+        if (! a)
+            return false;
+        auto next = current;
+        next.articulators[(std::size_t) target] = *a;
+        current = next;
+        write (next);
+        refresh();
+        return true;
+    }
+
+    bool saveEnvelopePreset (const juce::String& name)
+    {
+        const auto clean = juce::File::createLegalFileName (name.trim());
+        if (clean.isEmpty() || ! envelopePresetFolder().createDirectory())
+            return false;
+        const auto bytes = chenv::write (current.articulators[(std::size_t) target]);
+        return envelopePresetFolder().getChildFile (clean + ".CHENV").replaceWithData (bytes.data(), bytes.size());
+    }
+
 private:
+    void askEnvelopePresetName()
+    {
+        auto* box = new juce::AlertWindow (tr ("Save as..."), tr ("Envelope preset name"), juce::MessageBoxIconType::NoIcon);
+        box->addTextEditor ("name", {});
+        box->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        box->enterModalState (true, juce::ModalCallbackFunction::create ([safe = juce::Component::SafePointer<FlVoicePanel> (this), box] (int result) {
+            if (result == 1 && safe != nullptr)
+                safe->saveEnvelopePreset (box->getTextEditorContents ("name"));
+        }), true);
+    }
+
     void title (juce::Label& l, const juce::String& text)
     {
         l.setText (text, juce::dontSendNotification);
@@ -495,6 +585,7 @@ private:
         const auto hasEnvelope = target != flvoice::pan;
         envelopeBox = hasEnvelope ? at (11, 115, 290, 199) : juce::Rectangle<int>();
         envelopeOn.setVisible (hasEnvelope);
+        presetsButton.setVisible (hasEnvelope);
         envelopeTempo.setVisible (hasEnvelope);
         envelopeGraph.setVisible (hasEnvelope);
         for (int i = 0; i < 7; ++i)
@@ -551,6 +642,7 @@ private:
     juce::Label lfoTitle, filterTitle, modXLabel, modYLabel, unusedLabel;
     std::array<juce::Label, 2> tensionLabels;
     juce::ToggleButton envelopeOn, envelopeTempo, lfoTempo, lfoGlobal;
+    IconButton presetsButton { "presets", Icon::chevronDown };
     EnvelopeGraph envelopeGraph;
     LfoGraph lfoGraph;
     std::array<juce::Slider, 7> envelope;
@@ -574,11 +666,44 @@ bool showTargetIn (juce::Component& c, int target)
             return true;
     return false;
 }
+FlVoicePanel* findPanel (juce::Component& c)
+{
+    if (auto* panel = dynamic_cast<FlVoicePanel*> (&c))
+        return panel;
+    for (auto* child : c.getChildren())
+        if (auto* p = findPanel (*child))
+            return p;
+    return nullptr;
+}
 } // namespace
 
 void showFlVoiceTarget (juce::Component& root, int target)
 {
     showTargetIn (root, target);
+}
+
+std::optional<juce::PopupMenu> flVoicePresetsMenu (juce::Component& root)
+{
+    if (auto* p = findPanel (root))
+        return p->presetsMenu();
+    return std::nullopt;
+}
+
+bool flVoiceSavePreset (juce::Component& root, const juce::String& name)
+{
+    auto* p = findPanel (root);
+    return p != nullptr && p->saveEnvelopePreset (name);
+}
+
+bool flVoiceLoadPreset (juce::Component& root, const juce::File& file)
+{
+    auto* p = findPanel (root);
+    return p != nullptr && p->loadEnvelopePreset (file);
+}
+
+juce::File flVoicePresetFolder()
+{
+    return FlVoicePanel::envelopePresetFolder();
 }
 
 std::unique_ptr<juce::Component> makeFlVoicePanel (AudioEngine& engine, std::function<std::optional<flvoice::Settings>()> read,

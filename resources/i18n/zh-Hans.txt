@@ -9358,6 +9358,32 @@ countries: cn sg
 "Channel panning" = "通道声像"
 "In: {0} out: {1}" = "输入: {0} 输出: {1}"
 "Note C0" = "音符 C0"
+
+# --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
+"{0} parameters selected" = "已选择 {0} 个参数"
+"Last 2 tweaked parameters" = "最后调整的 2 个参数"
+"No parameter selected" = "未选择参数"
+"Last tweaked parameter" = "最后调整的参数"
+"Edit events" = "编辑事件"
+"Init pattern with these positions" = "用这些位置初始化样式"
+"Load sample file... / Sample history" = "加载采样文件... / 采样历史"
+"Locate sample in browser" = "在浏览器中定位采样"
+"Remove sample" = "移除采样"
+"Load sample file..." = "加载采样文件..."
+"Sample history" = "采样历史"
+"Channel envelope presets" = "通道包络预设"
+"Envelope preset name" = "包络预设名称"
+"Link all parameters..." = "关联所有参数..."
+"{0} parameter selected" = "已选择 {0} 个参数"
+
+# --- Round 190df (coordinator): FL's spare state names in the plugin menu
+"Spare state" = "备用状态"
+"Store in spare state" = "存入备用状态"
+"Flip with spare state" = "与备用状态互换"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值电平表（左/右）带峰值保持  [LMB] 清除削波指示灯"
 "Flip horizontally" = "水平翻转"
 "Key / scale" = "调 / 音阶"
 "Scales" = "音阶"
@@ -9390,7 +9416,3 @@ countries: cn sg
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "点击以将此插件加载到音轨上并试听（Ctrl+Z 可撤销）"
 "Add \"{0}\" to favourites" = "将“{0}”添加到收藏"
 "Remove \"{0}\" from favourites" = "将“{0}”从收藏中移除"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值电平表（左/右）带峰值保持  [LMB] 清除削波指示灯"

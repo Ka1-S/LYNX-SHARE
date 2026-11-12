@@ -1,3 +1,4 @@
+#include "core/FlControlMenus.h"
 #include "core/PlaylistOps.h"
 #include "core/QuickRender.h"
 
@@ -913,6 +914,7 @@ int repairChannels (Song& song)
 void loadSampleInto (ChannelDef& channel, const std::string& path, const std::string& name, bool autoName)
 {
     channel.samplePath = path;
+    samplehistory::add (path); // FL's Sample history (round 190df): every sample a channel loads
     if (channel.instrument == InstrumentKind::granulizer || channel.instrument == InstrumentKind::wavetraveller)
         return; // FL's Granulizer keeps its engine and plays the file (round 142); so does Wave Traveller
     if (channel.instrument != InstrumentKind::audioClip)

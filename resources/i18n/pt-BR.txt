@@ -9511,3 +9511,25 @@ countries: br
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Clique para carregar este plugin na faixa e ouvi-lo (Ctrl+Z volta)"
 "Add \"{0}\" to favourites" = "Adicionar \"{0}\" aos favoritos"
 "Remove \"{0}\" from favourites" = "Remover \"{0}\" dos favoritos"
+
+# --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
+"{0} parameters selected" = "{0} parâmetros selecionados"
+"Last 2 tweaked parameters" = "Últimos 2 parâmetros mexidos"
+"No parameter selected" = "Nenhum parâmetro selecionado"
+"Last tweaked parameter" = "Último parâmetro mexido"
+"Edit events" = "Editar eventos"
+"Init pattern with these positions" = "Iniciar o pattern com estas posições"
+"Load sample file... / Sample history" = "Carregar arquivo de sample... / Histórico de samples"
+"Locate sample in browser" = "Localizar o sample no navegador"
+"Remove sample" = "Remover o sample"
+"Load sample file..." = "Carregar arquivo de sample..."
+"Sample history" = "Histórico de samples"
+"Channel envelope presets" = "Presets de envelope do canal"
+"Envelope preset name" = "Nome do preset de envelope"
+"Link all parameters..." = "Vincular todos os parâmetros..."
+"{0} parameter selected" = "{0} parâmetro selecionado"
+
+# --- Round 190df (coordinator): FL's spare state names in the plugin menu
+"Spare state" = "Estado reserva"
+"Store in spare state" = "Guardar no estado reserva"
+"Flip with spare state" = "Trocar com o estado reserva"

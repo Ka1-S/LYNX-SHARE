@@ -341,15 +341,12 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     metronomeButton.onRightClick = [this] { showMetronomeMenu(); };
 
-    // FL's MultiLinkBtn (round 177b-4): lit while "Multilink to controllers" is on; [RMB] FL's MultilinkMenu
+    // FL's MultiLinkBtn (round 177b-4): lit while "Multilink to controllers" is on; [RMB] FL's MLWheelMenu (round 190df)
     multilinkButton.setFlat (true);
     multilinkButton.setWantsKeyboardFocus (false);
     multilinkButton.onClick = [this] { runAction ("options.multilink"); };
     multilinkButton.onRightClick = [this] {
-        juce::PopupMenu menu;
-        menu.addItem (tr ("Link to controller"), engine.isMultilinkOn(), false, [this] { engine.multilinkToControllers (false); });
-        menu.addItem (tr ("Override global links"), engine.isMultilinkOn(), false, [this] { engine.multilinkToControllers (true); });
-        addMultilinkControlsItems (menu, engine);
+        auto menu = multilinkButtonMenu (engine); // (round 190df: FL's menu, then LYNX's own items)
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&multilinkButton));
     };
 
@@ -450,6 +447,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         mixer.selectTrack (insert);
     };
     openMixerInsertHandler() = rack.onOpenMixerInsert; // and on the channel window's TRACK box (round 168s)
+    locateInBrowserHandler() = [this] (const juce::File& file) { // (the sampler's File row, round 190df)
+        showPanel (Panel::browser);
+        browser.locateFile (file);
+    };
     mixer.onInstrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); };
     rackViewport.setViewedComponent (&rack, false);
     rackViewport.setScrollBarsShown (true, true);
@@ -895,6 +896,7 @@ MainComponent::~MainComponent()
         sessionMarker.deleteFile();
     mixerinput::openAudioSettings = nullptr;
     openMixerInsertHandler() = nullptr;
+    locateInBrowserHandler() = nullptr;
     PatcherWindows::onBrowsePluginDatabase = nullptr;
     EditorGlobals::get().onOptionsChanged = nullptr;
     PianoRollComponent::shortcutText = nullptr;

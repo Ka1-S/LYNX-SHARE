@@ -4657,6 +4657,24 @@ void BrowserComponent::showPluginDatabase (const juce::String& folder, int gener
     }
 }
 
+bool BrowserComponent::locateFile (const juce::File& file)
+{
+    if (searchBox.getText().isNotEmpty())
+    {
+        searchBox.setText ({}, false);
+        runSearch();
+    }
+    setTab (allTab);
+    if (const auto row = tree->revealFile (file); row >= 0)
+    {
+        tree->select (row, false);
+        tree->grabKeyboardFocus();
+        return true;
+    }
+    showNote (tr ("This file is not in a folder the Browser shows"));
+    return false;
+}
+
 void BrowserComponent::showScores (const juce::String& subfolder)
 {
     // the Piano roll's File › Browse scores (round 168g; FL: FUN_0123a580 opens its browser at the Scores folder): the
