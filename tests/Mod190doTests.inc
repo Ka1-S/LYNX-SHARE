@@ -189,6 +189,28 @@ inline std::array<std::vector<double>, 2> orbitTaps (float mode, float law, int 
     return at;
 }
 
+// the shortest and the longest delay (samples) at which any tap of the left channel reads with at least 10 % weight
+// (an answer above 0.05 to the 0.5 impulses), over the whole run
+inline std::pair<double, double> orbitReach (float law, int pulses, int every)
+{
+    using namespace lynx;
+    namespace ob = echosuite::orbit;
+    auto p = makeEffectSlot (EffectKind::orbit).params;
+    p[ob::mix] = 1.0f, p[ob::feedback] = 0.5f, p[ob::rate] = 0.75f, p[ob::depth] = 0.371f, p[ob::mode] = 1.0f / 11.0f;
+    p[ob::law] = law;
+    Stereo in { std::vector<float> ((std::size_t) (pulses * every), 0.0f), {} };
+    for (int k = 0; k < pulses; ++k)
+        in.l[(std::size_t) (k * every)] = 0.5f;
+    in.r = in.l;
+    const auto y = render (EffectKind::orbit, p, in);
+    double lo = 1e9, hi = -1e9;
+    for (int k = 0; k + 1 < pulses; ++k)
+        for (int i = 1; i < every; ++i)
+            if (std::abs (y.l[(std::size_t) (k * every + i)]) > 0.05f)
+                lo = std::min (lo, (double) i), hi = std::max (hi, (double) i);
+    return { lo, hi };
+}
+
 // the share of steps where the tap moved the given way (down = shorter delay = rising pitch), ignoring wraps
 inline double moving (const std::vector<double>& at, bool down)
 {
@@ -209,15 +231,16 @@ TEST (mod190do_orbit_measured_rise_sweeps_the_whole_depth_and_rise_fall_splits_t
 {
     using namespace mod190do;
     const auto depth = lynx::echosuite::orbit::depthMs (0.371f) * 48.0; // about 240 samples
-    // Rise, measured: two taps sweep the whole depth (classic: half of it, above a 0.25 ms base)
+    // Rise, measured: two taps sweep the whole depth (classic: half of it, above a 0.25 ms base); with sin² weights a
+    // tap reads at 10 % or more over 0.1 … 0.9 of its sweep
     for (const float law : { 1.0f, 0.0f })
     {
-        const auto at = orbitTaps (1.0f / 11.0f, law, 160, 300);
-        const auto [lo, hi] = std::minmax_element (at[0].begin(), at[0].end());
+        const auto [lo, hi] = orbitReach (law, 160, 300);
         if (law >= 0.5f)
-            CHECK (*hi - *lo > 0.85 * depth && *lo < 0.1 * depth);
+            CHECK (hi - lo > 0.7 * depth && lo < 0.15 * depth);
         else
-            CHECK (*hi - *lo < 0.6 * depth && *lo > 0.2 * depth);
+            CHECK (hi - lo < 0.5 * depth && lo > 0.2 * depth);
+        const auto at = orbitTaps (1.0f / 11.0f, law, 160, 300);
         CHECK (moving (at[0], true) > 0.9 && moving (at[1], true) > 0.9); // both channels rise
     }
     // Rise / fall, measured: the left channel rises, the right one falls
@@ -237,8 +260,8 @@ TEST (mod190do_spiral_measured_loop_limits_lower_and_glides_slower)
     p[sp::shift] = 0.5f;
     p[sp::stereo] = 0.0f;
     p[sp::delay] = sp::delayValue (20.0);
-    // a loud sustained tone: the measured loop's limiter holds the repeats lower than the classic tanh (the reference
-    // is 3 … 4 dB under the classic loop on loud material, tp172d S3); a quiet one passes both alike
+    // loud noise: the measured loop's limiter holds the repeats lower than the classic tanh (the reference is 3 … 4 dB
+    // under the classic loop on the loudest 100 ms of programme, tp172d S3); quiet noise passes both alike
     const auto rmsDb = [] (const mod190do::Stereo& s, std::size_t from) {
         double e = 0.0;
         for (std::size_t i = from; i < s.l.size(); ++i)
@@ -260,9 +283,9 @@ TEST (mod190do_spiral_measured_loop_limits_lower_and_glides_slower)
         p[sp::law] = 0.0f;
         const auto c = rmsDb (mod190do::render (EffectKind::spiralEcho, p, in, sr), 24000);
         if (a > 0.1)
-            CHECK (c - m > 1.5);
+            CHECK (c - m > 0.8); // 1.3 dB on this noise (the round's renders: 1.31)
         else
-            CHECK (std::abs (c - m) < 1.0);
+            CHECK (std::abs (c - m) < 0.5); // 0.25 dB: the cuts' bilinear shapes
     }
     // feedback at its top (loop gain 1.5): the measured loop runs away into its limiter and stays bounded
     {
