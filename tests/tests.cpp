@@ -17397,6 +17397,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "DetailView183aTests.inc"
 #include "Als181cTests.inc"
 #include "AlsDevices190bqTests.inc"
+#include "AlsDevices190cfTests.inc"
 #include "Merge180cTests.inc"
 #include "Slicer180cTests.inc"
 #include "Slicer190fTests.inc"

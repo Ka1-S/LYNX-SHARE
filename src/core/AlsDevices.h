@@ -14,7 +14,25 @@
 //   Glue Compressor                → Crest Compressor, Bus style
 //   Utility (StereoGain)           → Utility
 //   Reverb                         → Atrium
+// Lot 2 (round 190cf), by count in the sets Live ships:
+//   Delay, Echo                    → Echoform (Clean mode)
+//   Multiband Dynamics             → Prism Multiband (3 bands)
+//   Auto Filter (both generations) → Filter
+//   Saturator                      → Ember Saturator
+//   Overdrive                      → Distortion
+//   Limiter                        → Apex Limiter
+//   Gate                           → Sentry Gate
+//   Compressor in Expand mode      → Sentry Gate, Upward style
+//   Channel EQ                     → EQ (3 bands)
+//   Chorus-Ensemble, Chorus        → Chorus
+//   Auto Pan (as a panner)         → Auto-pan
+//   Redux                          → Lo-fi
+//   Arpeggiator                    → the channel arpeggiator
+//   Pitch, Velocity, Chord, Note Length → written into the notes of the track's clips
+// and, for every translated device, which Live parameter drives which LYNX parameter (automation, rack macros).
 
+#include <array>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -79,6 +97,8 @@ struct SideInput
     int trackId = -1;
     bool otherTap = false;
 };
+// (exposed for lot 2: Gate, Multiband Dynamics and the Expand mode read the same routing)
+SideInput sideInputOf (const xml::Element& device);
 bool compressorToCrest (const xml::Element& device, EffectSlot& slot, Notes& notes, SideInput& side);
 bool glueToCrest (const xml::Element& device, EffectSlot& slot, Notes& notes, SideInput& side);
 
@@ -120,6 +140,125 @@ double reverbInputLowHz (double centreHz, double widthOct) noexcept;
 double reverbInputHighHz (double centreHz, double widthOct) noexcept;
 bool reverbToAtrium (const xml::Element& device, EffectSlot& slot, Notes& notes);
 
+// ================================================================================================ lot 2 (190cf)
+// What a translation may need from the set
+struct Context
+{
+    double bpm = 120.0; // the set's tempo: a synced time LYNX can only hold in ms is fixed at this tempo (and reported)
+};
+// One Live parameter that drives one LYNX parameter: `live` is the parameter's element path inside the device
+// ("Feedback", "Lfo/Frequency"), `value` turns Live's own unit into LYNX's 0..1. Automation envelopes and rack macro
+// mappings on that Live parameter are carried onto `param` through it.
+struct ParamLink
+{
+    std::string live;
+    int param = 0;
+    std::function<float (double)> value;
+};
+
+// ---- shared laws of lot 2 ---------------------------------------------------------------------------------------
+// A cutoff stored as a pitch [DATA: the older Auto Filter, 20 … 135] in Hz: 440 · 2^((n − 69) / 12) = 26 Hz … 19.9 kHz,
+// the range Ableton's manual gives the control
+double hzOfLiveNote (double note) noexcept;
+// The synced LFO rates of Auto Filter / Auto Pan (`BeatRate` 0 … 21) in quarter notes [DOC list, DATA: the default 4
+// is the manual's default 1/16; order ASSUMED ascending]: 1/64, 1/48, 1/32, 1/24, 1/16, 1/12, 1/8, 1/6, 3/16, 1/4,
+// 5/16, 1/3, 3/8, 1/2, 3/4, 1, 1.5, 2, 3, 4, 6, 8 bars
+double liveBeatRateBeats (int index) noexcept;
+// Delay's synced time buttons (`SyncedSixteenth` 0 … 7) in sixteenths [DOC]: 1, 2, 3, 4, 5, 6, 8, 16
+int delaySixteenths (int index) noexcept;
+// Echoform's note sync for a length in quarter notes: { kind (1 straight, 2 dotted, 3 triplet), note index 0 … 9 =
+// 1/64 … 8/1 }; nullopt when no note value has that length
+std::optional<std::pair<int, int>> echoformNoteOf (double beats) noexcept;
+float echoformSyncValue (int kind) noexcept;  // 0 ms, 1 note, 2 dotted, 3 triplet
+float echoformNoteValue (int index) noexcept; // 0 … 9
+// Dry/Wet → Echoform's equal-power Mix. Equal-loudness [ASSUMED: cos / sin, as Echoform's]: the same number. Linear
+// (dry 1 − x, wet x): the mix with the same wet : dry ratio, (2 / π) · atan (x / (1 − x)) — up to 3 dB louder at 50 %
+float echoformMixOf (double dryWet, bool equalLoudness) noexcept;
+// A resonance 0 … 1 (1.25) as a Q for LYNX's Filter [ASSUMED: the state-variable damping law Q = 1 / (2 (1 − r)),
+// 0.5 with no resonance], clamped to the Filter's 0.5 … 12
+double filterQOfResonance (double resonance) noexcept;
+// LYNX's basic effects keep their laws inside Effects.cpp; the inverses used here, each pinned by a test against
+// formatEffectParam: Filter (type 0 low-pass, 1 high-pass, 2 band-pass; cutoff 20 Hz … 20 kHz log; Q 0.5 … 12 log),
+// Lo-fi (rate = 44100 / (⌊128 v³⌋ + 1) Hz; 65536 / (2048 v² + 1) levels), EQ (±18 dB; mid 200 Hz … 5 kHz log),
+// Chorus (0.05 … 5 Hz log; 0 … 8 ms), Distortion (0 … 36 dB)
+float filterTypeValue (int type) noexcept;
+float filterCutoffValue (double hz) noexcept;
+float filterQValue (double q) noexcept;
+float lofiRateValue (double hz) noexcept;
+float lofiBitsValue (double bits) noexcept;
+float eqGainValue (double db) noexcept;
+float eqMidValue (double hz) noexcept;
+float chorusRateValue (double hz) noexcept;
+// Multiband Dynamics stores each band's two actions as slopes [DATA: Above −1 … 1, Below −3 … 1; the manual's
+// ratios]: above the threshold the output rises 1 + a dB per dB (a < 0 compresses, −1 = a limit; a > 0 expands
+// upward), below it 1 − b dB per dB (b > 0 compresses upward, 1 = flat; b < 0 expands downward, −3 = 1 : 4).
+// One Prism band holds one action: expand off / on, the sign of its range, and the ratio that gives the same slope.
+struct PrismAction
+{
+    bool active = false, expand = false, upward = false, limit = false;
+    double ratio = 1.0;
+};
+PrismAction prismAbove (double slope) noexcept;
+PrismAction prismBelow (double slope) noexcept;
+// Prism's attack / release are detector time constants: 0.11 + 89 v^3.9 ms and 130 + 3500 v³ ms
+float prismAttackValue (double ms) noexcept;
+float prismReleaseValue (double ms) noexcept;
+// Sentry Gate's times: attack 1000 v⁴ ms, hold 250 v² ms, release 5000 v³ ms
+float sentryAttackValue (double ms) noexcept;
+float sentryHoldValue (double ms) noexcept;
+float sentryReleaseValue (double ms) noexcept;
+// Limiter's look-ahead choices [DOC]: 1.5, 3, 6 ms; Gate's [DOC]: 0, 1.5, 10 ms
+double limiterLookaheadMs (int index) noexcept;
+double gateLookaheadMs (int index) noexcept;
+// Arpeggiator's synced rates (`SyncedRate` 0 … 13) in quarter notes [DOC list; DATA: 8 in a new device = the
+// manual's default 1/8]: 1/128, 1/96, 1/64, 1/48, 1/32, 1/24, 1/16, 1/12, 1/8, 1/6, 1/4, 1/3, 1/2, 1/1
+double arpRateBeats (int index) noexcept;
+// Arpeggiator's Style [DOC order, DATA 0 … 17] as the channel arpeggiator's direction (1 up, 2 down, 3 up-down, 4
+// random, 5 up-down with the ends twice); `exact` false = the nearest one
+int arpDirectionOf (int style, bool& exact) noexcept;
+
+// ---- lot 2 devices ----------------------------------------------------------------------------------------------
+struct Translated;
+bool delayToEchoform (const xml::Element& device, const Context& context, Translated& out);
+bool echoToEchoform (const xml::Element& device, const Context& context, Translated& out);
+bool multibandToPrism (const xml::Element& device, Translated& out);
+bool autoFilterToFilter (const xml::Element& device, Translated& out);  // AutoFilter (up to Live 12.1) and AutoFilter2
+bool saturatorToEmber (const xml::Element& device, Translated& out);
+bool overdriveToDistortion (const xml::Element& device, Translated& out);
+bool limiterToApex (const xml::Element& device, Translated& out);
+bool gateToSentry (const xml::Element& device, Translated& out);
+bool expanderToSentry (const xml::Element& device, Translated& out);     // Compressor with Model 2 (Expand)
+bool channelEqToEq (const xml::Element& device, Translated& out);
+bool chorusToChorus (const xml::Element& device, Translated& out);       // Chorus2 (Chorus-Ensemble) and Chorus
+bool autoPanToAutoPan (const xml::Element& device, const Context& context, Translated& out);
+bool reduxToLofi (const xml::Element& device, Translated& out);
+
+// ---- MIDI effects -----------------------------------------------------------------------------------------------
+// Arpeggiator → the channel arpeggiator (false: the element holds no arpeggiator data)
+bool arpeggiatorToArp (const xml::Element& device, const Context& context, ArpSettings& arp, Notes& notes);
+// The MIDI effects LYNX has no live note processor for in a channel, written into the notes instead: what one note
+// becomes. Pitch: transposed. Velocity: the input range onto Out Low … Out Hi (Clip / Gate / Fixed). Chord: the note
+// plus up to six shifted copies. Note Length: a fixed length.
+struct NoteEdit
+{
+    int key = 60;
+    float velocity = 0.78f; // 0..1
+    double lengthBeats = 0.25;
+};
+struct NoteEffect
+{
+    enum class Kind { transpose, velocity, chord, length };
+    Kind kind = Kind::transpose;
+    std::string name;                 // "Pitch", "Velocity", …: for the report
+    int semitones = 0;                // transpose
+    int lowest = 1, range = 127, outLow = 1, outHigh = 127, mode = 0; // velocity (0 clip, 1 gate, 2 fixed)
+    std::vector<std::pair<int, float>> chord; // semitones, velocity factor
+    double lengthBeats = 0.0;         // length
+};
+std::vector<NoteEdit> applyNoteEffect (const NoteEffect& effect, const NoteEdit& note);
+// nullopt: not one of those devices, or a setting that cannot be written into notes (then it stays "unsupported")
+std::optional<NoteEffect> noteEffectFromLiveDevice (const xml::Element& device, const Context& context, Notes& notes);
+
 // ---- one entry point for the importer ---------------------------------------------------------------------------
 struct Translated
 {
@@ -128,10 +267,12 @@ struct Translated
     bool approximate = false; // the pair is fitted, not the same maths (the report lists it under "approximated")
     Notes notes;
     SideInput side;
+    int sideParam = -1;            // (190cf) the LYNX parameter that switches the external side chain on (−1 = none)
+    std::vector<ParamLink> links;  // (190cf) automation / macro routes
 };
 // nullopt: not one of the devices above, or its element lacks the parameters (then the importer does what it did
 // before: the device is dropped and listed)
-std::optional<Translated> effectFromLiveDevice (const xml::Element& device);
+std::optional<Translated> effectFromLiveDevice (const xml::Element& device, const Context& context = {});
 
 // ---- Simpler ----------------------------------------------------------------------------------------------------
 // Voices [DOC: 1 … 8, 10, 12, 14, 16, 20, 24, 32; DATA: the stored index 0 … 14, 5 in a new Simpler = 6 voices]

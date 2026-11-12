@@ -34,30 +34,6 @@ double manual (const Element& device, const std::string& name, double fallback) 
 bool manualBool (const Element& device, const std::string& name, bool fallback) { return device.boolean (name + "/Manual", fallback); }
 bool has (const Element& device, const std::string& name) { return (bool) device.path (name + "/Manual"); }
 
-// The side-chain input of Compressor / Glue [DATA: SideChain/OnOff, RoutedInput/Routable/Target "AudioIn/Track.<id>/
-// <tap>", "AudioIn/None"]: the tap is PreFxOut, PostFxOut, PostMixerOut or a device inside the track
-SideInput sideInputOf (const Element& device)
-{
-    SideInput s;
-    s.on = manualBool (device, "SideChain/OnOff", false);
-    if (! s.on)
-        return s;
-    const auto target = device.value ("SideChain/RoutedInput/Routable/Target");
-    static constexpr std::string_view prefix = "AudioIn/Track.";
-    if (target.rfind (prefix, 0) == 0)
-    {
-        const auto rest = target.substr (prefix.size());
-        char* end = nullptr;
-        const auto id = std::strtol (rest.c_str(), &end, 10);
-        if (end != rest.c_str())
-        {
-            s.trackId = (int) id;
-            s.otherTap = std::string_view (end) != "/PostMixerOut";
-        }
-    }
-    return s;
-}
-
 // The side-chain EQ of Compressor ("SideChainEq_On" …) and Glue ("SideChainEq/On" …) on Crest's first side-chain band.
 // Types [DOC: low shelf, bell, high shelf, low pass, band pass, high pass; DATA: 0…5, order ASSUMED]
 void sideChainEq (const Element& device, const std::string& stem, EffectParams& p, Notes& notes)
@@ -94,6 +70,30 @@ void sideChainCommon (const Element& device, EffectParams& p, Notes& notes, Side
     }
 }
 } // namespace
+
+// The side-chain input of Compressor / Glue [DATA: SideChain/OnOff, RoutedInput/Routable/Target "AudioIn/Track.<id>/
+// <tap>", "AudioIn/None"]: the tap is PreFxOut, PostFxOut, PostMixerOut or a device inside the track
+SideInput sideInputOf (const Element& device)
+{
+    SideInput s;
+    s.on = manualBool (device, "SideChain/OnOff", false);
+    if (! s.on)
+        return s;
+    const auto target = device.value ("SideChain/RoutedInput/Routable/Target");
+    static constexpr std::string_view prefix = "AudioIn/Track.";
+    if (target.rfind (prefix, 0) == 0)
+    {
+        const auto rest = target.substr (prefix.size());
+        char* end = nullptr;
+        const auto id = std::strtol (rest.c_str(), &end, 10);
+        if (end != rest.c_str())
+        {
+            s.trackId = (int) id;
+            s.otherTap = std::string_view (end) != "/PostMixerOut";
+        }
+    }
+    return s;
+}
 
 double dbOfGain (double linear) noexcept { return linear > 0.0 ? std::max (-200.0, 20.0 * std::log10 (linear)) : -200.0; }
 double gainOfDb (double db) noexcept { return std::pow (10.0, db / 20.0); }
@@ -524,36 +524,79 @@ bool reverbToAtrium (const Element& device, EffectSlot& slot, Notes& notes)
 
 // ================================================================================================ entry point
 
-std::optional<Translated> effectFromLiveDevice (const Element& device)
+std::optional<Translated> effectFromLiveDevice (const Element& device, const Context& context)
 {
     const auto tag = device.name();
     Translated t;
     bool ok = false;
+    // (190cf) a Live parameter that drives a LYNX parameter by the law the translator used (automation, rack macros)
+    const auto link = [&t] (const char* live, int param, std::function<float (double)> law) { t.links.push_back ({ live, param, std::move (law) }); };
     if (tag == "Eq8")
     {
         t.from = "EQ Eight";
         t.to = "Facet EQ";
         ok = eqEightToFacet (device, t.slot, t.notes);
+        // in Stereo mode band k is Facet's band k: its frequency, gain and Q follow (L/R and M/S pack the bands)
+        if (ok && std::clamp ((int) device.number ("Mode", 0), 0, 2) == 0)
+        {
+            const auto sign = manual (device, "Scale", 1.0) < 0.0 ? -1.0 : 1.0;
+            for (int b = 0; b < facet::bands; ++b)
+            {
+                const auto stem = "Bands." + std::to_string (b) + "/ParameterA/";
+                const auto mode = (Eq8Mode) std::clamp ((int) manual (device, stem + "Mode", 3), 0, 7);
+                t.links.push_back ({ stem + "Freq", facet::param (b, 1), [] (double hz) { return facet::hzValue (hz); } });
+                if (mode == Eq8Mode::bell || mode == Eq8Mode::lowShelf || mode == Eq8Mode::highShelf)
+                    t.links.push_back ({ stem + "Gain", facet::param (b, 2), [sign] (double db) { return facet::gainValue (sign * db); } });
+                t.links.push_back ({ stem + "Q", facet::param (b, 3), [mode] (double q) { return facet::qValue (facetQ (mode, q)); } });
+            }
+            link ("GlobalGain", facet::outputParam, [] (double db) { return linValue (db, -24.0, 24.0); });
+        }
     }
     else if (tag == "Compressor2")
     {
         t.from = "Compressor";
-        t.to = "Crest Compressor";
         t.approximate = true;
-        ok = compressorToCrest (device, t.slot, t.notes, t.side);
+        if ((int) manual (device, "Model", 0) == 2)
+        {
+            t.to = "Sentry Gate";
+            ok = expanderToSentry (device, t);
+        }
+        else
+        {
+            using namespace dyn::crest;
+            t.to = "Crest Compressor";
+            ok = compressorToCrest (device, t.slot, t.notes, t.side);
+            t.sideParam = scExternal;
+            link ("Threshold", threshold, [] (double gain) { return linValue (dbOfGain (gain), -60.0, 0.0); });
+            link ("Ratio", ratio, [] (double r) { return r >= 1.0e6 ? 1.0f : ratioValue (std::min (r, 100.0)); });
+            link ("Attack", attack, [] (double ms) { return attackValue (ms); });
+            link ("Release", release, [] (double ms) { return releaseValue (ms); });
+            link ("Knee", knee, [] (double db) { return linValue (db, 0.0, 72.0); });
+            link ("Gain", output, [] (double db) { return linValue (db, -36.0, 36.0); });
+            link ("DryWet", mix, [] (double v) { return unit (v); });
+        }
     }
     else if (tag == "GlueCompressor")
     {
+        using namespace dyn::crest;
         t.from = "Glue Compressor";
         t.to = "Crest Compressor";
         t.approximate = true;
         ok = glueToCrest (device, t.slot, t.notes, t.side);
+        t.sideParam = scExternal;
+        link ("Threshold", threshold, [] (double db) { return linValue (db, -60.0, 0.0); });
+        link ("Makeup", output, [] (double db) { return linValue (db, -36.0, 36.0); });
+        link ("Range", range, [] (double db) { return db >= 60.0 ? 1.0f : linValue (db, 0.0, 60.0); });
+        link ("DryWet", mix, [] (double v) { return unit (v); });
     }
     else if (tag == "StereoGain")
     {
         t.from = "Utility";
         t.to = "Utility";
         ok = utilityToUtility (device, t.slot, t.notes);
+        if (ok && ! device.boolean ("LegacyMode", false))
+            link ("Gain", 0, [] (double gain) { return gain <= 0.0 ? 0.0f : std::max (1.0e-4f, linValue (dbOfGain (gain), -24.0, 24.0)); });
+        link ("Balance", 1, [] (double v) { return linValue (v, -1.0, 1.0); });
     }
     else if (tag == "Reverb")
     {
@@ -561,6 +604,95 @@ std::optional<Translated> effectFromLiveDevice (const Element& device)
         t.to = "Atrium";
         t.approximate = true;
         ok = reverbToAtrium (device, t.slot, t.notes);
+        link ("MixDirect", 0, [] (double v) { return unit (v); });
+        link ("PreDelay", 1, [] (double ms) { return linValue (ms, 0.0, 500.0); });
+        link ("DecayTime", 2, [] (double ms) { return verbs::atrium::decayValue (ms / 1000.0); });
+        link ("RoomSize", 5, [] (double size) { return atriumSizeOf (size); });
+    }
+    // ---- lot 2 (round 190cf) ----
+    else if (tag == "Delay")
+    {
+        t.from = "Delay";
+        t.to = "Echoform";
+        t.approximate = true;
+        ok = delayToEchoform (device, context, t);
+    }
+    else if (tag == "Echo")
+    {
+        t.from = "Echo";
+        t.to = "Echoform";
+        t.approximate = true;
+        ok = echoToEchoform (device, context, t);
+    }
+    else if (tag == "MultibandDynamics")
+    {
+        t.from = "Multiband Dynamics";
+        t.to = "Prism Multiband";
+        t.approximate = true;
+        ok = multibandToPrism (device, t);
+    }
+    else if (tag == "AutoFilter" || tag == "AutoFilter2")
+    {
+        t.from = "Auto Filter";
+        t.to = "Filter";
+        t.approximate = true;
+        ok = autoFilterToFilter (device, t);
+    }
+    else if (tag == "Saturator")
+    {
+        t.from = "Saturator";
+        t.to = "Ember Saturator";
+        t.approximate = true;
+        ok = saturatorToEmber (device, t);
+    }
+    else if (tag == "Overdrive")
+    {
+        t.from = "Overdrive";
+        t.to = "Distortion";
+        t.approximate = true;
+        ok = overdriveToDistortion (device, t);
+    }
+    else if (tag == "Limiter")
+    {
+        t.from = "Limiter";
+        t.to = "Apex Limiter";
+        t.approximate = true;
+        ok = limiterToApex (device, t);
+    }
+    else if (tag == "Gate")
+    {
+        t.from = "Gate";
+        t.to = "Sentry Gate";
+        t.approximate = true;
+        ok = gateToSentry (device, t);
+    }
+    else if (tag == "ChannelEq")
+    {
+        t.from = "Channel EQ";
+        t.to = "EQ";
+        t.approximate = true;
+        ok = channelEqToEq (device, t);
+    }
+    else if (tag == "Chorus2" || tag == "Chorus")
+    {
+        t.from = tag == "Chorus2" ? "Chorus-Ensemble" : "Chorus";
+        t.to = "Chorus";
+        t.approximate = true;
+        ok = chorusToChorus (device, t);
+    }
+    else if (tag == "AutoPan")
+    {
+        t.from = "Auto Pan";
+        t.to = "Auto-pan";
+        t.approximate = true;
+        ok = autoPanToAutoPan (device, context, t);
+    }
+    else if (tag == "Redux2")
+    {
+        t.from = "Redux";
+        t.to = "Lo-fi";
+        t.approximate = true;
+        ok = reduxToLofi (device, t);
     }
     if (! ok)
         return std::nullopt;
