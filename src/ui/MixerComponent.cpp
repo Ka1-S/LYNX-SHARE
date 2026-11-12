@@ -1,3 +1,4 @@
+#include "ui/CleanVoiceMenu.h"
 #include "ui/FlMods.h"
 #include "platform/Paths.h"
 #include "ui/ColourPicker.h"
@@ -3244,6 +3245,8 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         }
         menu.addSubMenu (tr ("File"), file);
     }
+    if (t > 0) // round 190ch (LYNX's own, not an FL item): the one-click vocal clean-up chain on this insert
+        menu.addSubMenu (tr ("Clean voice"), lynx::ui::cleanVoiceMenu (engine, t));
     if (t > 0)
     {
         const auto& mt = song.mixer[(std::size_t) t];

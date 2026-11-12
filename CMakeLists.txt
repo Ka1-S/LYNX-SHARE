@@ -547,6 +547,9 @@ if(LYNX_BUILD_APP)
         src/ui/FinishDock.cpp
         src/ui/HistoryPanel.cpp
         src/ui/VersionsPanel.cpp
+        src/ui/LyricsPanel.cpp
+        src/ui/ReferenceMatchPanel.cpp
+        src/ui/StartFromPanel.cpp
         src/ui/PluginsOffPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp

@@ -131,6 +131,10 @@
 #include "engine/FlStudio.h"
 #include "ui/HistoryPanel.h"
 #include "ui/VersionsPanel.h"
+#include "ui/CleanVoiceMenu.h"
+#include "ui/LyricsPanel.h"
+#include "ui/ReferenceMatchPanel.h"
+#include "ui/StartFromPanel.h"
 #include "ui/PluginsOffPanel.h"
 #include "ui/MissingFilesDialog.h"
 #include "ui/SettingsDialog.h"
@@ -1839,6 +1843,14 @@ public:
         if (args.contains ("--versionsshot"))
         {
             runVersionsShot (args[args.indexOf ("--versionsshot") + 1].unquoted());
+            quit();
+            return;
+        }
+
+        // --bandlabshot <prefix> (round 190ch): Lyrics / Notes, Reference match, Start from and Clean voice, offscreen
+        if (args.contains ("--bandlabshot"))
+        {
+            runBandlabShot (args[args.indexOf ("--bandlabshot") + 1].unquoted());
             quit();
             return;
         }
@@ -9608,6 +9620,302 @@ private:
     //   -pluginsoff-window.png / -pluginsoff-mixer.png   a project opened without its third-party plugins (the tags)
     //   -pluginsoff-panel.png / -pluginsoff-panel-one.png   the list, all off, then after "Switch on" for one
     //   -export-default.png / -export.png   the Export window as it opens, and with the additions in use
+    // --bandlabshot <prefix> (round 190ch): the Lyrics / Notes panel (Pattern and Simple layouts, and on its own), the
+    // Reference match window measured on a real render and a real file, "Start from", and Clean voice, off-screen; and
+    // <prefix>-report.txt with what each route did (ok / FAIL lines)
+    void runBandlabShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        ui.setSize (1600, 900);
+        // (each step is named on stderr as it starts: a run that stops says where)
+        const auto note = [] (const juce::String& what) { std::fprintf (stderr, "bandlabshot: %s\n", what.toRawUTF8()); };
+        const auto shoot = [&prefix, &note] (juce::Component& c, const char* name) {
+            note (name);
+            savePng (lynx::shot::snapshot (c), prefix + "-" + name + ".png");
+        };
+        juce::String report;
+        const auto check = [&report, &note] (const juce::String& what, bool ok) {
+            note ((ok ? "ok    " : "FAIL  ") + what);
+            report << (ok ? "ok    " : "FAIL  ") << what << "\n";
+        };
+        const auto bar = (double) lynx::ppq * 4.0;
+
+        // ---- 1. Lyrics / Notes: the project's Comments
+        {
+            auto song = lynx::makeShowcaseSong (0);
+            song.info.title = "Night Drive";
+            song.info.comments = "[Intro]\n\n[5] [Verse 1]\n[5] Headlights on the empty road\n[7] Radio is playing low\n[9] Every sign says slow\n"
+                                 "I keep driving through the night\n\n[Chorus]\nNight drive, night drive\nNothing but the white line\n\n"
+                                 "Notes: double the chorus vocal, try the second verse an octave down.";
+            lynx::Marker chorus;
+            chorus.tick = (std::int64_t) (12.0 * bar);
+            chorus.name = "Chorus";
+            song.addMarker (chorus);
+            offline.setSong (std::move (song));
+        }
+        note ("song set");
+        offline.dispatchPendingMessages();
+        ui.selectTabForSnapshot (2);
+        note ("show lyrics");
+        ui.showLyrics (false);
+        note ("lyrics shown");
+        if (auto* panel = ui.getLyricsPanelForSnapshot())
+        {
+            panel->showForSnapshot ({}, 6.5 * bar); // the playhead inside bar 7: that line is the one playing
+            shoot (ui, "lyrics-pattern");
+            shoot (*panel, "lyrics-panel");
+            const auto markersBefore = offline.getSong().markers().size();
+            panel->setCaretLineForSnapshot (6); // "I keep driving through the night"
+            panel->markAtPlayheadForSnapshot (10.0 * bar + 2.0 * lynx::ppq);
+            offline.dispatchPendingMessages();
+            ui.commitSongNotes();
+            const auto& s = offline.getSong();
+            check ("Marker at playhead stamps the line [11.3] and adds one marker",
+                   juce::String::fromUTF8 (s.info.comments.c_str()).contains ("[11.3] I keep driving") && s.markers().size() == markersBefore + 1);
+            // (no audio device here: the seek is the request the audio thread takes at its next block)
+            const auto& seek = offline.getTransport().seekRequest;
+            check ("clicking the stamped line moves the playhead to bar 7", panel->jumpToLineForSnapshot (4) && std::abs (seek.load() - 6.0 * bar) < 1.0);
+            check ("clicking [Chorus] (no position) goes to the marker of that name, bar 13",
+                   panel->jumpToLineForSnapshot (8) && std::abs (seek.load() - 12.0 * bar) < 1.0);
+            check ("a line without a position does not jump", ! panel->jumpToLineForSnapshot (9));
+            panel->showForSnapshot ("night", 10.5 * bar);
+            shoot (*panel, "lyrics-search");
+            // the text travels in the project file, and old readers see it as the Comments they always had
+            juce::String error;
+            const auto json = lynx::ProjectFile::toJson (offline.getSong());
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            check ("lyrics round-trip through .lynx (the Comments field)", back.has_value() && back->info.comments == offline.getSong().info.comments);
+            const auto text = lynx::lyrics::exportText (offline.getSong(), lynx::lyrics::Stamps::times);
+            juce::File (prefix + "-lyrics-export.txt").replaceWithText (juce::String::fromUTF8 (text.c_str()));
+            check ("export as text with times", text.find ("[0:") != std::string::npos);
+            panel->showForSnapshot ({}, 6.5 * bar);
+        }
+        else
+            check ("the docked Lyrics panel exists", false);
+        {
+            const auto names = ui.getMenuNamesForSnapshot();
+            const auto view = names.indexOf (lynx::tr ("View"));
+            saveMenus (juce::StringArray { lynx::tr ("View") }, std::vector<juce::PopupMenu> { ui.getMenuForSnapshot (juce::jmax (0, view)) }, prefix + "-menu-view.png");
+        }
+        ui.showDesktopForSnapshot (false);
+        check ("the panel stays docked beside the Playlist in the default desktop", ui.isLyricsShowing());
+        shoot (ui, "lyrics-desktop");
+
+        // ---- the Simple layout: the Lyrics button in its title tools, the chooser's "Start from" link
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        offline.dispatchPendingMessages();
+        ui.selectTabForSnapshot (2); // (the Playlist alone, as --simpleshot shows the layout)
+        auto* simple = ui.getSimpleWorkflowForSnapshot();
+        check ("the Simple workflow exists", simple != nullptr);
+        if (simple != nullptr)
+        {
+            simple->hideChooser();
+            if (! ui.isLyricsShowing())
+                ui.showLyrics (false);
+            shoot (ui, "lyrics-simple");
+            ui.hideLyrics();
+            check ("closing the panel keeps the text", juce::String::fromUTF8 (offline.getSong().info.comments.c_str()).contains ("Night drive, night drive"));
+
+            // ---- 4. Clean voice: on a voice track, from the track's menu
+            lynx::simpletracks::Result voice;
+            offline.editSongStructural ([&voice] (lynx::Song& s) {
+                lynx::simpletracks::Request q;
+                q.kind = lynx::simpletracks::Kind::voice;
+                q.name = "Lead vocal";
+                voice = lynx::simpletracks::addTrack (s, q);
+            });
+            offline.dispatchPendingMessages();
+            check ("a voice track was added", voice.insert > 0);
+            if (voice.insert > 0)
+            {
+                auto menu = ui.getPlaylistForSnapshot().getTrackMenuForSnapshot (voice.track);
+                juce::StringArray names { "Track" };
+                std::vector<juce::PopupMenu> menus { menu };
+                for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                    if (it.getItem().subMenu != nullptr && it.getItem().text == lynx::tr ("Clean voice"))
+                    {
+                        names.add (lynx::tr ("Clean voice"));
+                        menus.push_back (*it.getItem().subMenu);
+                    }
+                check ("the Simple track menu has Clean voice", menus.size() == 2);
+                saveMenus (names, menus, prefix + "-cleanvoice-menu.png");
+                const auto before = offline.getSong().mixer[(std::size_t) voice.insert].effects.size();
+                check ("Clean voice applies", lynx::ui::applyCleanVoice (offline, voice.insert, false));
+                offline.dispatchPendingMessages();
+                const auto& fx = offline.getSong().mixer[(std::size_t) voice.insert].effects;
+                check ("four slots in front of the track's effects", fx.size() == before + 4 && lynx::cleanvoice::slotsOf (offline.getSong(), voice.insert).size() == 4
+                                                                         && fx[0].kind == lynx::EffectKind::facetEq);
+                check ("with noise reduction: five, none doubled", lynx::ui::applyCleanVoice (offline, voice.insert, true)
+                                                                       && offline.getSong().mixer[(std::size_t) voice.insert].effects.size() == before + 5);
+                offline.dispatchPendingMessages();
+                juce::String error;
+                const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (offline.getSong()), error);
+                check ("the chain round-trips through .lynx and is still found", back.has_value() && lynx::cleanvoice::slotsOf (*back, voice.insert).size() == 5
+                                                                                     && back->mixer[(std::size_t) voice.insert].effects == offline.getSong().mixer[(std::size_t) voice.insert].effects);
+                saveMenus (juce::StringArray { lynx::tr ("Clean voice") }, std::vector<juce::PopupMenu> { lynx::ui::cleanVoiceMenu (offline, voice.insert) },
+                           prefix + "-cleanvoice-menu-on.png");
+                ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+                offline.dispatchPendingMessages();
+                ui.showPanelsForSnapshot ({ lynx::workspace::Panel::mixer });
+                ui.selectMixerTrackForSnapshot (voice.insert);
+                shoot (ui, "cleanvoice-mixer");
+                offline.undo(); // the second chain
+                offline.dispatchPendingMessages();
+                check ("undo brings the first chain back", lynx::cleanvoice::slotsOf (offline.getSong(), voice.insert).size() == 4);
+                ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+                offline.dispatchPendingMessages();
+                ui.selectTabForSnapshot (2); // (the Playlist alone, as --simpleshot shows the layout)
+                simple = ui.getSimpleWorkflowForSnapshot();
+            }
+        }
+
+        // ---- 2. Reference match: the song's Master render against a file (pink noise with more top, at about -14 LUFS)
+        {
+            const auto file = juce::File (prefix + "-reference.wav");
+            file.deleteFile();
+            const auto rate = 44100.0;
+            const auto frames = (int) (20.0 * rate);
+            juce::AudioBuffer<float> audio (2, frames);
+            juce::Random random (190);
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                double b0 = 0, b1 = 0, b2 = 0, hp = 0;
+                for (int i = 0; i < frames; ++i)
+                {
+                    const auto w = (double) random.nextFloat() * 2.0 - 1.0;
+                    b0 = 0.99765 * b0 + w * 0.0990460;
+                    b1 = 0.96300 * b1 + w * 0.2965164;
+                    b2 = 0.57000 * b2 + w * 1.0526913;
+                    const auto pink = (b0 + b1 + b2 + w * 0.1848) * 0.071; // (about -14 LUFS: a streaming master)
+                    hp += 0.25 * (pink - hp); // a little more top than pink noise has
+                    audio.setSample (ch, i, (float) (pink + 0.35 * (pink - hp)));
+                }
+            }
+            if (auto out = file.createOutputStream())
+                if (auto writer = std::unique_ptr<juce::AudioFormatWriter> (juce::WavAudioFormat().createWriterFor (out.get(), rate, 2, 24, {}, 0)))
+                {
+                    out.release();
+                    writer->writeFromAudioSampleBuffer (audio, 0, frames);
+                }
+            note ("measure reference");
+            const auto reference = lynx::ReferenceMatchPanel::measureFile (offline, file);
+            note ("measure song");
+            const auto song = lynx::ReferenceMatchPanel::measureSong (offline.getSong(), false);
+            check ("the reference file was measured", reference.valid);
+            check ("the song's Master render was measured", song.valid);
+            lynx::ReferenceMatchPanel panel (offline, {});
+            panel.setSize (lynx::ReferenceMatchPanel::defaultWidth, lynx::ReferenceMatchPanel::defaultHeight);
+            panel.showForSnapshot ("Reference.wav", song, reference, nullptr);
+            shoot (panel, "refmatch-measured");
+            const auto masterBefore = offline.getSong().mixer[0].effects.size();
+            check ("Match adds its two slots at the end of the Master", panel.matchForSnapshot() && offline.getSong().mixer[0].effects.size() == masterBefore + 2);
+            offline.dispatchPendingMessages();
+            const auto first = lynx::ReferenceMatchPanel::measureSong (offline.getSong(), true);
+            panel.showForSnapshot ("Reference.wav", song, reference, &first);
+            panel.refresh();
+            shoot (panel, "refmatch-matched");
+            report << "      first Match: " << juce::String (first.lufs, 2) << " LUFS, " << juce::String (first.truePeakDb, 2) << " dBTP, EQ output "
+                   << juce::String (lynx::facet::outputDb (offline.getSong().mixer[0].effects[masterBefore].params[(std::size_t) lynx::facet::outputParam]), 2) << " dB\n";
+            // a result more than 0.5 LU from the reference (a limiter that has to hold peaks back): Match again takes
+            // what is missing, as the window's note says
+            auto after = first;
+            const auto secondPass = std::abs (first.lufs - reference.lufs) > 0.5;
+            if (secondPass)
+            {
+                check ("Match again replaces the two slots (level corrected)", panel.matchForSnapshot() && offline.getSong().mixer[0].effects.size() == masterBefore + 2);
+                offline.dispatchPendingMessages();
+                after = lynx::ReferenceMatchPanel::measureSong (offline.getSong(), true);
+                panel.showForSnapshot ("Reference.wav", song, reference, &after);
+                panel.refresh();
+                shoot (panel, "refmatch-matched-again");
+            }
+            report << "      " << (secondPass ? "a second Match was needed for the level" : "one Match was enough for the level") << "\n";
+            const auto& s = panel.suggestionForSnapshot();
+            report << "      song " << juce::String (song.lufs, 2) << " LUFS, " << juce::String (song.truePeakDb, 2) << " dBTP, width " << juce::String (song.widthPercent(), 1)
+                   << " % | reference " << juce::String (reference.lufs, 2) << " LUFS, " << juce::String (reference.truePeakDb, 2) << " dBTP, width "
+                   << juce::String (reference.widthPercent(), 1) << " % | after " << juce::String (after.lufs, 2) << " LUFS, " << juce::String (after.truePeakDb, 2)
+                   << " dBTP\n      next suggestion: gain " << juce::String (s.gainDb, 2) << " dB, EQ fit error " << juce::String (s.fitErrorDb, 2) << " dB\n";
+            double before = 0.0, now = 0.0;
+            int counted = 0;
+            {
+                // tone only (each curve around its own mean), over the bands both hold
+                double ms = 0, mr = 0, ma = 0;
+                const auto used = juce::jmin (song.usedBands, reference.usedBands);
+                for (int k = 0; k < used; ++k)
+                    ms += song.spectrumDb[(std::size_t) k], mr += reference.spectrumDb[(std::size_t) k], ma += after.spectrumDb[(std::size_t) k];
+                for (int k = 2; k < used; ++k, ++counted)
+                {
+                    before += std::abs ((song.spectrumDb[(std::size_t) k] - ms / used) - (reference.spectrumDb[(std::size_t) k] - mr / used));
+                    now += std::abs ((after.spectrumDb[(std::size_t) k] - ma / used) - (reference.spectrumDb[(std::size_t) k] - mr / used));
+                }
+            }
+            report << "      mean tone difference to the reference: " << juce::String (before / juce::jmax (1, counted), 2) << " dB before, "
+                   << juce::String (now / juce::jmax (1, counted), 2) << " dB after one Match (each band moves 6 dB at most)\n";
+            check ("after Match the tone is closer to the reference", after.valid && now < before);
+            check ("after Match the loudness is within 1 LU of the reference", std::abs (after.lufs - reference.lufs) < 1.0);
+            check ("the limiter holds the peaks: under 0 dBTP, within 0.6 dB of its -1 dB ceiling", after.truePeakDb < 0.0 && after.truePeakDb <= -1.0 + 0.6);
+            juce::String error;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (offline.getSong()), error);
+            check ("the match round-trips through .lynx as two ordinary Master slots", back.has_value() && lynx::refmatch::present (*back)
+                                                                                         && back->mixer[0].effects == offline.getSong().mixer[0].effects);
+            ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+            offline.dispatchPendingMessages();
+            ui.showPanelsForSnapshot ({ lynx::workspace::Panel::mixer });
+            ui.selectMixerTrackForSnapshot (0);
+            shoot (ui, "refmatch-mixer");
+            ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+            offline.dispatchPendingMessages();
+            ui.selectTabForSnapshot (2); // (the Playlist alone, as --simpleshot shows the layout)
+            simple = ui.getSimpleWorkflowForSnapshot();
+            if (simple != nullptr)
+            {
+                simple->hideChooser();
+                simple->showFinish();
+                shoot (ui, "finish-dock"); // "Match a reference track..." under the saving buttons
+                simple->hideFinish();
+            }
+            file.deleteFile();
+        }
+
+        // ---- 3. Start from: the chooser's link, the list, and opening an entry
+        if (simple != nullptr)
+        {
+            simple->showChooser();
+            shoot (ui, "chooser");
+            simple->hideChooser();
+            auto* panel = dynamic_cast<lynx::StartFromPanel*> (simple->startFromForSnapshot());
+            check ("the Start from list opens", panel != nullptr && simple->isStartFromShowing());
+            if (panel != nullptr)
+            {
+                shoot (ui, "startfrom");
+                auto list = lynx::startfrom::entries();
+                check ("it lists the demo song and the templates shipped", list.size() >= 3 && list[0].kind == lynx::startfrom::Entry::Kind::demo
+                                                                               && (int) list.size() == panel->entryCountForSnapshot());
+                for (auto& e : list)
+                    report << "      " << e.name << " | " << juce::String (e.bpm, 0) << " BPM, " << e.channels << " channels, " << e.bars << " bars"
+                           << (e.playable ? ", preview" : "") << "\n";
+                if (const auto demo = lynx::startfrom::songOf (list[0]))
+                {
+                    const auto wav = juce::File (prefix + "-preview.wav");
+                    const auto ok = lynx::startfrom::renderPreview (*demo, wav);
+                    check ("the demo's preview renders (" + juce::String (wav.getSize() / 1024) + " kB)", ok && wav.getSize() > 100000);
+                    wav.deleteFile();
+                }
+                panel->selectForSnapshot (juce::jmin (2, panel->entryCountForSnapshot() - 1));
+                shoot (ui, "startfrom-selected");
+                offline.markSaved(); // (a project with changes asks first: Save / Don't save / Cancel)
+                const auto opened = panel->openForSnapshot (0);
+                offline.dispatchPendingMessages();
+                check ("opening the demo starts a new project from it and closes the list",
+                       opened && ! simple->isStartFromShowing() && offline.getSong().info.comments.empty() && ! offline.getSong().channels.empty());
+                shoot (ui, "startfrom-opened");
+            }
+        }
+        juce::File (prefix + "-report.txt").replaceWithText (report);
+    }
+
     void runVersionsShot (const juce::String& prefix)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);

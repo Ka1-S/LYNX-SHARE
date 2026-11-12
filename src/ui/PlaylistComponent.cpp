@@ -1,3 +1,4 @@
+#include "ui/CleanVoiceMenu.h"
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
 #include "core/RulerGestures.h"
@@ -5916,6 +5917,9 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         menu.addItem (tr ("Mute all clips"), hasClips, false, [muteAll] { muteAll (true); });
         menu.addItem (tr ("Unmute all clips"), hasClips, false, [muteAll] { muteAll (false); });
     }
+    // round 190ch (LYNX's own): one click cleans a recorded voice, a chain of LYNX's effects on the track's insert
+    if (const auto insert = simpleHeaders ? simpletracks::insertOf (engine.getSong(), track) : -1; insert > 0)
+        menu.addSubMenu (tr ("Clean voice"), ui::cleanVoiceMenu (engine, insert));
     menu.addSeparator();
     menu.addItem (theme::mnemonic (tr ("Insert one"), 'I'), [this, track] {
         setSelection ({});

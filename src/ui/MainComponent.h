@@ -51,6 +51,8 @@ struct Changes;
 struct State;
 } // namespace gamepad
 
+class LyricsPanel;
+
 class MainComponent final : public juce::Component,
                             public juce::DragAndDropContainer,
                             public ui::HintSource,
@@ -112,6 +114,15 @@ public:
     SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
+    // round 190ch (LYNX's own): the project's Lyrics / Notes panel — docked on the right of the Playlist in every layout,
+    // or in its own window — and the Reference match window
+    void toggleLyrics();
+    void showLyrics (bool floating);
+    void hideLyrics();
+    bool isLyricsShowing() const;
+    void showReferenceMatch();
+    LyricsPanel* getLyricsPanelForSnapshot(); // (docked, made if needed)
+    void commitSongNotes(); // what is being typed in the Lyrics / Notes panel reaches the project now (before a save)
     juce::PopupMenu getKeyMenuForSnapshot() { return makeKeyMenu(); } // --simpleshot (round 184a S11)
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
@@ -649,6 +660,10 @@ private:
     PlaylistArea playlistArea { picker, playlist };
     layoutstyle::Style layoutStyle = layoutstyle::Style::pattern;
     layoutstyle::SettingsReader startStyle; // the style saved in the UI settings (applied when the window is ready)
+    // round 190ch: the docked Lyrics / Notes panel (made when first shown) and the ones living in tool windows
+    std::unique_ptr<juce::Component> lyricsDock;
+    juce::Component::SafePointer<juce::Component> lyricsWindowPanel, referenceMatchPanel;
+    void refreshSongNotes(); // the song changed: the panels above follow
     bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to
     void addLayoutStyleItems (juce::PopupMenu& menu);
     std::unique_ptr<juce::Component> clipGridView, clipGridSwitch; // made when Clip-launch workflow is first chosen (round 181a)

@@ -34,6 +34,8 @@
 #include "core/EditorPolish.h"
 
 #include "ui/HistoryPanel.h"
+#include "ui/LyricsPanel.h"
+#include "ui/ReferenceMatchPanel.h"
 #include "ui/VersionsPanel.h"
 #include "ui/PluginsOffPanel.h"
 #include "ui/MissingFilesDialog.h"
@@ -2863,6 +2865,13 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
             if (findToolWindow ("sampleBrowser") == nullptr)
                 toggleSampleBrowser();
         };
+        // round 190ch: Lyrics / Notes, Reference match and a new project from the "Start from" list
+        host.toggleLyrics = [this] { toggleLyrics(); };
+        host.showReferenceMatch = [this] { showReferenceMatch(); };
+        host.startFrom = [this] (Song song) {
+            auto shared = std::make_shared<Song> (std::move (song));
+            confirmDiscard ([this, shared] { startNewProject (std::move (*shared), {}); });
+        };
         host.trackAdded = [this] (int track) { playlist.selectTrack (track); };
         host.setSideDock = [this] (juce::Component* c, int width) { playlistArea.setSideDock (c, width); };
         // round 190t: the Sampler tile's start folder, the Finish dock's "Save the song as a file", the backup status
@@ -3451,6 +3460,112 @@ std::unique_ptr<juce::Component> MainComponent::makeQuickAddForSnapshot()
     targets.addInstrument = [] (ChannelDef) {};
     targets.addEffect = [] (EffectSlot) {};
     return makeQuickAddPalette (engine, std::move (targets));
+}
+
+// --- round 190ch: Lyrics / Notes and Reference match ------------------------------------------------------------------
+bool MainComponent::isLyricsShowing() const
+{
+    return (lyricsDock != nullptr && lyricsDock->getParentComponent() != nullptr) || lyricsWindowPanel != nullptr;
+}
+
+LyricsPanel* MainComponent::getLyricsPanelForSnapshot()
+{
+    showLyrics (false);
+    return static_cast<LyricsPanel*> (lyricsDock.get());
+}
+
+void MainComponent::hideLyrics()
+{
+    if (lyricsDock != nullptr && lyricsDock->getParentComponent() != nullptr)
+    {
+        static_cast<LyricsPanel&> (*lyricsDock).commit();
+        playlistArea.setSideDock (nullptr, 0);
+    }
+    if (lyricsWindowPanel != nullptr)
+        closeToolWindowOf (*lyricsWindowPanel);
+}
+
+void MainComponent::toggleLyrics()
+{
+    if (isLyricsShowing())
+        hideLyrics();
+    else
+        showLyrics (false);
+}
+
+void MainComponent::showLyrics (bool floating)
+{
+    hideLyrics();
+    if (floating)
+    {
+        LyricsPanel::Hooks hooks;
+        hooks.toggleFloating = [this] { juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (this)] {
+            if (safe != nullptr)
+                safe->showLyrics (false);
+        }); };
+        auto panel = std::make_unique<LyricsPanel> (engine, std::move (hooks));
+        panel->setFloating (true);
+        panel->setSize (420, 560);
+        lyricsWindowPanel = panel.get();
+        openToolWindow (std::move (panel), tr ("Lyrics and notes"), "lyrics");
+        return;
+    }
+    if (lyricsDock == nullptr)
+    {
+        LyricsPanel::Hooks hooks;
+        hooks.close = [this] { hideLyrics(); };
+        hooks.toggleFloating = [this] { juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (this)] {
+            if (safe != nullptr)
+                safe->showLyrics (true);
+        }); };
+        lyricsDock = std::make_unique<LyricsPanel> (engine, std::move (hooks));
+    }
+    // the dock on the right of the Playlist is one place: the Simple workflow's Finish dock gives way
+    if (simpleWorkflow != nullptr && simpleWorkflow->isFinishShowing())
+        simpleWorkflow->hideFinish();
+    static_cast<LyricsPanel&> (*lyricsDock).refresh();
+    if (! workspace.isPanelVisible (Panel::playlist))
+    {
+        workspace.show (Panel::playlist);
+        refreshPanelButtons();
+    }
+    playlistArea.setSideDock (lyricsDock.get(), LyricsPanel::width);
+}
+
+void MainComponent::showReferenceMatch()
+{
+    if (auto* open = findToolWindow ("referenceMatch"))
+    {
+        open->toFront (true);
+        return;
+    }
+    ReferenceMatchPanel::Hooks hooks;
+    hooks.showMaster = [this] {
+        workspace.show (Panel::mixer);
+        mixer.selectTrack (0);
+        refreshPanelButtons();
+    };
+    auto panel = std::make_unique<ReferenceMatchPanel> (engine, std::move (hooks));
+    referenceMatchPanel = panel.get();
+    openToolWindow (std::move (panel), tr ("Reference match"), "referenceMatch");
+}
+
+void MainComponent::commitSongNotes()
+{
+    if (lyricsDock != nullptr)
+        static_cast<LyricsPanel&> (*lyricsDock).commit();
+    if (auto* panel = dynamic_cast<LyricsPanel*> (lyricsWindowPanel.getComponent()))
+        panel->commit();
+}
+
+void MainComponent::refreshSongNotes()
+{
+    if (lyricsDock != nullptr && lyricsDock->getParentComponent() != nullptr)
+        static_cast<LyricsPanel&> (*lyricsDock).refresh();
+    if (auto* panel = dynamic_cast<LyricsPanel*> (lyricsWindowPanel.getComponent()))
+        panel->refresh();
+    if (auto* panel = dynamic_cast<ReferenceMatchPanel*> (referenceMatchPanel.getComponent()))
+        panel->refresh();
 }
 
 void MainComponent::showHistory()
@@ -4388,6 +4503,7 @@ void MainComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     }
     if (layoutStyle == layoutstyle::Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->songChanged(); // (an empty project opens on the New track chooser)
+    refreshSongNotes(); // (round 190ch: the Lyrics / Notes panel and Reference match show the project's own state)
     // FL's "Select first channel with notes when the pattern changes" (Settings › General, REA round 167j §5)
     if (song.currentPattern != lastCurrentPattern)
     {
@@ -5519,6 +5635,7 @@ juce::File newBackupFile (const juce::File& folder, const juce::String& stem, sa
 
 void MainComponent::autosave()
 {
+    commitSongNotes(); // (round 190ch: notes still being typed are part of what is saved)
     // backup copy of the open project, so work isn't lost if something crashes ("Song (autosaved on 2026-10-20 at
     // 14h19).lynx" in the backup folder, like FL's Backup folder); only the newest few of each project are kept
     // The plugins' settings are read here (they answer on the message thread); writing the file (the big part:
@@ -5602,6 +5719,7 @@ void MainComponent::keepOverwrittenCopy (const juce::File& file)
 
 void MainComponent::saveNewVersion()
 {
+    commitSongNotes(); // (round 190ch: notes still being typed are part of what is saved)
     // FL's "Save new version": Song.flp -> Song_2.flp -> Song_3.flp, next to the current file
     if (currentFile == juce::File())
     {
@@ -7041,6 +7159,7 @@ void MainComponent::exportMidiFile()
 
 void MainComponent::save (bool askForFile, std::function<void()> afterSaved)
 {
+    commitSongNotes(); // (round 190ch: notes still being typed are part of what is saved)
     auto write = [this, afterSaved] (const juce::File& file) {
         juce::String error;
         engine.capturePluginStates(); // plugin state lives in the plugins; copy it before saving
@@ -7557,6 +7676,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Tempo tapper") + shortcutText ("view.tempoTapper"), [this] { openTempoTapper (engine); });
         menu.addItem (tr ("Sample browser (separate window)") + shortcutText ("view.sampleBrowser"), true, findToolWindow ("sampleBrowser") != nullptr,
                       [this] { toggleSampleBrowser(); });
+        // round 190ch (LYNX's own): the project's lyrics / notes beside the Playlist, and matching a reference track
+        menu.addItem (tr ("Lyrics and notes"), true, isLyricsShowing(), [this] { toggleLyrics(); });
+        menu.addItem (tr ("Reference match..."), [this] { showReferenceMatch(); });
         menu.addSeparator();
         menu.addItem (tr ("Typing keyboard to piano") + shortcutText ("view.typingPiano"), true, typingPiano, [this] { toggleTypingPiano(); });
         menu.addItem (tr ("Touch keyboard") + shortcutText ("view.touchKeyboard"), true, isTouchKeyboardOpen(), [this] { toggleTouchKeyboard (engine); });

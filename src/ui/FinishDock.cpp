@@ -313,6 +313,15 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
     };
     addAndMakeVisible (removeButton);
 
+    // round 190ch: measure a finished track and match its tone and loudness (its own window)
+    if (saving.referenceMatch)
+    {
+        matchButton.setButtonText (tr ("Match a reference track..."));
+        matchButton.setTooltip (tr ("Measures a finished track and your song, and suggests an EQ curve and a level"));
+        matchButton.onClick = [this] { saving.referenceMatch(); };
+        addAndMakeVisible (matchButton);
+    }
+
     // the last step in plain words: the song as one file, with the look on (round 190t)
     if (saving.exportAudio)
     {
@@ -497,7 +506,7 @@ void FinishDock::resized()
     status.setBounds (r.removeFromTop (34));
     r.removeFromTop (4);
     // (a short window: the look tiles give way so that the Save rows stay in view)
-    const auto saveH = saveRows[0] != nullptr ? 22 + 2 * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0;
+    const auto saveH = (saveRows[0] != nullptr ? 22 + 2 * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0) + (matchButton.isVisible() ? 34 : 0);
     const auto gap = 6;
     const auto tileH = juce::jlimit (46, 64, (r.getHeight() - 306 - saveH) / 4 - gap);
     const auto colW = (r.getWidth() - gap) / 2;
@@ -535,6 +544,11 @@ void FinishDock::resized()
     buttons.removeFromLeft (6);
     removeButton.setBounds (buttons);
     r.removeFromTop (8);
+    if (matchButton.isVisible())
+    {
+        matchButton.setBounds (r.removeFromTop (28));
+        r.removeFromTop (6);
+    }
     peakHint.setBounds (r.removeFromTop (32));
     if (saveRows[0] != nullptr)
     {
