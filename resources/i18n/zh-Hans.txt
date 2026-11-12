@@ -9416,3 +9416,5 @@ countries: cn sg
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "点击以将此插件加载到音轨上并试听（Ctrl+Z 可撤销）"
 "Add \"{0}\" to favourites" = "将“{0}”添加到收藏"
 "Remove \"{0}\" from favourites" = "将“{0}”从收藏中移除"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "已选择外部输入。是否切换到\"仅外部输入\"，以免在此轨道上录入内部音频？"
+"The input of a mixer track can't be changed while recording." = "录音时无法更改混音器轨道的输入。"

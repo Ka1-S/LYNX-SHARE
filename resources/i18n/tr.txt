@@ -9416,3 +9416,5 @@ countries: tr
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Bu plugin'i parçaya yükleyip dinlemek için tıkla (Ctrl+Z geri alır)"
 "Add \"{0}\" to favourites" = "\"{0}\" favorilere ekle"
 "Remove \"{0}\" from favourites" = "\"{0}\" favorilerden kaldır"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Harici bir giriş seçildi. Bu kanalda dahili sesi kaydetmemek için \"Yalnızca harici giriş\" seçeneğine geçilsin mi?"
+"The input of a mixer track can't be changed while recording." = "Kayıt sırasında bir mikser kanalının girişi değiştirilemez."

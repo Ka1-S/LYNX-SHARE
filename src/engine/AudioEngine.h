@@ -259,6 +259,9 @@ public:
     struct RecordOptions
     {
         int countInBars = 0;            // 0 = off
+        // FL's "Precount duration" (core/CountIn.h, issue #152): the length the count-in keeps while it is off, so
+        // Ctrl+P turns a 2-bar count-in off and back on at 2 bars. A count-in that is on sets it.
+        int countInLength = 1;
         bool waitForInput = false;      // playback starts at the first played note
         RecordMode mode = RecordMode::replace; // "Blend recorded notes" off, FL's factory default (round 177c)
         std::int64_t quantise = 0;      // record quantise in ticks (<= 1: as played); follows the global grid
@@ -472,6 +475,7 @@ public:
     };
     // cheap: a take records (notes held or recorded, or audio)
     bool isLiveRecording() const noexcept { return recorder.isActive() || takeCount > 0; }
+    bool isRecordingAudioTakes() const noexcept { return takeCount > 0; } // audio takes are open (issue #152)
     LiveRecording liveRecording() const;
 
     // Audio recording from the interface input: with this on, recording (Rec + Play) writes the

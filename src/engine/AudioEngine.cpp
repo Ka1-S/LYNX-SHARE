@@ -2,6 +2,7 @@
 #include "core/VideoPlayer.h"
 
 #include "core/Comping.h"
+#include "core/CountIn.h"
 #include "core/EdisonFx.h"
 #include "core/FlSettings.h"
 #include "core/LiveSession.h"
@@ -781,7 +782,8 @@ int AudioEngine::lowLatencyBypassedCount() const noexcept
 void AudioEngine::setRecordOptions (const RecordOptions& options)
 {
     recordOptions = options;
-    recordOptions.countInBars = juce::jlimit (0, 4, options.countInBars);
+    recordOptions.countInBars = juce::jlimit (0, countin::maxBars, options.countInBars);
+    recordOptions.countInLength = countin::lengthFor (recordOptions.countInBars, options.countInLength); // (issue #152)
     recordOptions.preRollBars = juce::jlimit (0, 8, options.preRollBars);
     recordOptions.postRollBars = juce::jlimit (0, 8, options.postRollBars);
     recordOptions.catchWindow = juce::jlimit<std::int64_t> (0, ppq, options.catchWindow);

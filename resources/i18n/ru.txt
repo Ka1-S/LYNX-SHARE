@@ -9416,3 +9416,5 @@ countries: ru by kz
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Щёлкните, чтобы загрузить этот плагин на дорожку и послушать его (Ctrl+Z — отменить)"
 "Add \"{0}\" to favourites" = "Добавить «{0}» в избранное"
 "Remove \"{0}\" from favourites" = "Убрать «{0}» из избранного"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Выбран внешний вход. Переключиться на \"Только внешний вход\", чтобы не записывать внутренний звук на этой дорожке?"
+"The input of a mixer track can't be changed while recording." = "Вход дорожки микшера нельзя менять во время записи."

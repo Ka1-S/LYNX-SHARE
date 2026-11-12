@@ -9416,3 +9416,5 @@ countries: it ch sm
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Fai clic per caricare questo plugin sulla traccia e ascoltarlo (Ctrl+Z torna indietro)"
 "Add \"{0}\" to favourites" = "Aggiungi \"{0}\" ai preferiti"
 "Remove \"{0}\" from favourites" = "Rimuovi \"{0}\" dai preferiti"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Hai scelto un ingresso esterno. Passare a \"Solo ingresso esterno\" per non registrare l'audio interno su questa traccia?"
+"The input of a mixer track can't be changed while recording." = "L'ingresso di una traccia del mixer non può essere cambiato durante la registrazione."

@@ -7164,10 +7164,46 @@ void warnDoubleMonitoring (AudioEngine& engine, int track)
     });
 }
 
+// FL's question when an external input is chosen on an insert that records more than it (core/LiveInput.h
+// asksExternalInputOnly, issue #152): Yes = "External input only", so the take holds the input alone.
+void askExternalInputOnly (AudioEngine& engine, int track)
+{
+    const auto& mixer = engine.getSong().mixer;
+    if (track < 0 || track >= (int) mixer.size())
+        return;
+    const auto& mt = mixer[(std::size_t) track];
+    if (! asksExternalInputOnly (track, mt.inputChannel, mt.recordSource))
+        return;
+    auto options = juce::MessageBoxOptions()
+                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
+                       .withTitle (tr ("External input"))
+                       .withMessage (tr ("You've selected an external input. Do you want to switch to \"External input only\" to avoid recording "
+                                         "internal audio on this track?"))
+                       .withButton (tr ("Yes"))
+                       .withButton (tr ("No"));
+    juce::AlertWindow::showAsync (options, [&engine, track] (int result) {
+        if (result == 1)
+            engine.setInsertRecordSource (track, RecordSource::externalInput);
+    });
+}
+
 void showMenu (AudioEngine& engine, int track, juce::Component* target, std::function<void()> chosen)
 {
     if (track < 0 || track >= (int) engine.getSong().mixer.size())
         return;
+
+    // FL: "The input of a mixer track can't be changed while recording." (a take keeps the channels it started with;
+    // issue #152)
+    if (engine.isRecordingAudioTakes())
+    {
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                          .withIconType (juce::MessageBoxIconType::WarningIcon)
+                                          .withTitle (tr ("Warning"))
+                                          .withMessage (tr ("The input of a mixer track can't be changed while recording."))
+                                          .withButton (tr ("OK")),
+                                      nullptr);
+        return;
+    }
 
     // the device input opens on demand (only then does Windows show the microphone as in use)
     if (! engine.hasAudioInput())
@@ -7196,6 +7232,7 @@ void showMenu (AudioEngine& engine, int track, juce::Component* target, std::fun
                       [&engine, track, source, chosen] {
                           engine.setInsertInput (track, source.channel, source.stereo);
                           warnDoubleMonitoring (engine, track);
+                          askExternalInputOnly (engine, track);
                           if (chosen)
                               chosen();
                       });

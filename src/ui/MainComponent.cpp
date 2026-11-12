@@ -10,6 +10,7 @@
 #include "core/FlSettings.h"
 #include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
+#include "core/CountIn.h"
 #include "core/MixerOps.h"
 #include "core/NoteNames.h"
 #include "core/KeyGuess.h"
@@ -334,7 +335,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     metronomeButton.setOnColour (theme::colour::bg6);
     metronomeButton.setIconColourWhenOn (theme::colour::accent);
     metronomeButton.setTooltip (tr ("Metronome"));
-    metronomeButton.onClick = [this] { engine.getTransport().metronome.store (metronomeButton.getToggleState()); };
+    metronomeButton.onClick = [this] {
+        engine.getTransport().metronome.store (metronomeButton.getToggleState());
+        saveUiSettings(); // FL keeps it (ToolbarForm "MetronomeBtn", issue #152)
+    };
     midiLight.onReconnect = [this] {
         engine.reconnectMidiInputs();
         midiInputTicks = 0; // shows the reopened inputs at the next tick
@@ -1900,13 +1904,16 @@ bool MainComponent::runAction (const std::string& id)
     {
         engine.getTransport().metronome.store (! engine.getTransport().metronome.load());
         refreshModeButton();
+        saveUiSettings(); // FL keeps it (ToolbarForm "MetronomeBtn", issue #152)
     }
     else if (is ("record.countIn"))
     {
+        // FL's Ctrl+P (issue #152): off <-> on at the length chosen last (it was always 1 bar), kept between sessions
         auto o = engine.getRecordOptions();
-        o.countInBars = o.countInBars > 0 ? 0 : 1;
+        o.countInBars = countin::toggled (o.countInBars, o.countInLength);
         engine.setRecordOptions (o);
         refreshRecordOptionButtons();
+        saveUiSettings();
     }
     else if (is ("record.captureMidi")) // round 170d (Ableton's Capture MIDI, Logic's Capture as Recording)
     {
@@ -2241,6 +2248,7 @@ void MainComponent::loadUiSettings()
         auto o = engine.getRecordOptions();
         o.mode = startingRecordMode (uiSettingsFile().existsAsFile(), saved != lines.end(),
                                      saved != lines.end() && saved->fromFirstOccurrenceOf ("=", false, false).trim() == "1");
+        o.countInBars = countin::startingBars (uiSettingsFile().existsAsFile()); // (issue #152; saved keys below win)
         engine.setRecordOptions (o);
     }
 
@@ -2513,6 +2521,18 @@ void MainComponent::loadUiSettings()
                 (key == "recordPreRoll" ? o.preRollBars : o.postRollBars) = juce::jlimit (0, 8, v);
             engine.setRecordOptions (o);
         }
+        else if (key == juce::String (countin::onKey.data()) || key == juce::String (countin::lengthKey.data())) // (issue #152)
+        {
+            auto o = engine.getRecordOptions();
+            countin::readSetting (key.toStdString(), line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue(), o.countInBars, o.countInLength);
+            engine.setRecordOptions (o);
+            refreshRecordOptionButtons();
+        }
+        else if (key == "metronomeOn") // (issue #152)
+        {
+            engine.getTransport().metronome.store (on);
+            refreshModeButton();
+        }
         else if (key == "recordQuantiseStarts")
         {
             recordQuantiseOn = on;
@@ -2665,6 +2685,10 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordLastPassPlays=" + juce::String (engine.getRecordOptions().lastLoopPassPlays ? 1 : 0)
                                       + "\nrecordBlend=" + juce::String (engine.getRecordOptions().mode == RecordMode::overdub ? 1 : 0)
                                       + "\nrecordPreRoll=" + juce::String (engine.getRecordOptions().preRollBars)
+                                      // FL's precount switch and duration, and the metronome switch (issue #152)
+                                      + "\n" + juce::String (countin::onKey.data()) + "=" + juce::String (engine.getRecordOptions().countInBars > 0 ? 1 : 0)
+                                      + "\n" + juce::String (countin::lengthKey.data()) + "=" + juce::String (engine.getRecordOptions().countInLength)
+                                      + "\nmetronomeOn=" + juce::String (engine.getTransport().metronome.load() ? 1 : 0)
                                       + "\nrecordCatchWindow=" + juce::String (engine.getRecordOptions().catchWindow)
                                       + "\nrecordCompensateOutput=" + juce::String (engine.getRecordOptions().compensateOutput ? 1 : 0)
                                       + "\nrecordPostRoll=" + juce::String (engine.getRecordOptions().postRollBars) + "\nmixerUsedOnly=" + juce::String (MixerStrips::showUsedOnly ? 1 : 0) + "\nmixerLoudness=" + juce::String (MixerStrips::showLoudness ? 1 : 0) + "\nmixerKeepLostLinks=" + juce::String (MixerStrips::keepLostLinks ? 1 : 0) + "\nmixerFollowPlaylist=" + juce::String (MixerStrips::followPlaylist ? 1 : 0) + "\nmixerLayout=" + juce::String ((int) MixerStrips::layout)
