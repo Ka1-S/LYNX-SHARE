@@ -274,50 +274,55 @@ constexpr int block = 512; // the render call FLM plans its glides and global tu
 // the input held; the step's 4×4 transition is squared 12 times into the sample's (y ← A·y + B·x)
 struct Ladder
 {
-    double a[4][4] {}, bvec[4] {};
-    double y[2][4] {};
+    // in float and in FLM's order of operations (measured against FLM inside FL: the ladder nulls at −73 dB only so)
+    float m[16] {}, b[4] {};   // column-major M[r + 4c]
+    float y[2][4] {};
 
-    void design (double fc, double fs, double k) noexcept
+    void design (double fcD, double fs, double kD) noexcept
     {
-        const auto g = std::clamp (fc * 6.25 / (4096.0 * fs), 0.0, 1.0), h = 1.0 - g;
-        double s[4][4] {}, sb[4] {};
-        s[0][0] = h, s[0][3] = -4.0 * k * g, sb[0] = g;
-        for (int i = 1; i < 4; ++i)
-        {
-            for (int j = 0; j < 4; ++j)
-                s[i][j] = g * s[i - 1][j];
-            s[i][i] += h;
-            sb[i] = g * sb[i - 1];
-        }
+        const auto fc = (float) fcD;
+        auto g = (float) ((0.000244140625 / fs) * (double) (fc * 6.25f));
+        g = std::clamp (g, 0.0f, 1.0f);
+        const auto k = std::clamp ((float) kD, 0.0f, 1.0f);
+        const float h = 1.0f - g;
+        float a = k * -4.0f * g;
+        for (auto& v : m) v = 0.0f;
+        const float hg = h * g;
+        m[0] = h; m[12] = a;
+        a = a * g; m[13] = a;
+        a = a * g; m[14] = a;
+        const float hgg = hg * g;
+        m[1] = hg; m[5] = h; m[15] = a * g + h; m[2] = hgg; m[6] = hg; m[10] = h;
+        m[3] = hgg * g; m[7] = hgg; m[11] = hg;
+        b[0] = g; b[1] = g * g; b[2] = g * g * g; b[3] = g * g * g * g;
         for (int r = 0; r < 12; ++r)
         {
-            double nb[4], na[4][4];
+            float n[16], nb[4];
             for (int i = 0; i < 4; ++i)
             {
-                nb[i] = sb[i];
-                for (int j = 0; j < 4; ++j)
-                    nb[i] += s[i][j] * sb[j];
+                float acc = b[i];
+                for (int j = 0; j < 4; ++j) acc += m[i + 4 * j] * b[j];
+                nb[i] = acc;
             }
-            for (int i = 0; i < 4; ++i)
-                for (int j = 0; j < 4; ++j)
+            for (int rr = 0; rr < 4; ++rr)
+                for (int c = 0; c < 4; ++c)
                 {
-                    na[i][j] = 0.0;
-                    for (int m = 0; m < 4; ++m)
-                        na[i][j] += s[i][m] * s[m][j];
+                    float acc = 0.0f;
+                    for (int j = 0; j < 4; ++j) acc += m[rr + 4 * j] * m[j + 4 * c];
+                    n[rr + 4 * c] = acc;
                 }
-            std::memcpy (s, na, sizeof (s));
-            std::memcpy (sb, nb, sizeof (sb));
+            std::memcpy (m, n, sizeof (m));
+            std::memcpy (b, nb, sizeof (b));
         }
-        std::memcpy (a, s, sizeof (a));
-        std::memcpy (bvec, sb, sizeof (bvec));
     }
 
-    double run (int ch, double x) noexcept
+    double run (int ch, double xD) noexcept
     {
-        double n[4];
+        const auto x = (float) xD;
+        float n[4];
         auto& st = y[ch];
         for (int i = 0; i < 4; ++i)
-            n[i] = a[i][0] * st[0] + a[i][1] * st[1] + a[i][2] * st[2] + a[i][3] * st[3] + bvec[i] * x;
+            n[i] = m[i] * st[0] + m[i + 4] * st[1] + m[i + 8] * st[2] + m[i + 12] * st[3] + b[i] * x;
         std::memcpy (st, n, sizeof (n));
         return st[3];
     }
@@ -632,7 +637,7 @@ private:
         v.panL = d > 0.0f ? 1.0f - d : 1.0f;
         v.panR = d < 0.0f ? 1.0f + d : 1.0f;
         // the envelopes start their attack from where they are
-        v.ftgt = 4.0, v.frate = onePoleRate (P (param::filterAttack), 500.0);
+        v.ftgt = 4.0, v.frate = (float) onePoleRate (P (param::filterAttack), 500.0);
         v.ptgt = 4.0, v.prate = onePoleRate (P (param::pitchAttack), 500.0);
         v.lfoPhase = 0.0, v.lfoFade = 0.0;
         v.glide = glideOffset, v.glideTarget = 0.0;
@@ -643,7 +648,7 @@ private:
     void release (Voice& v, bool fast) noexcept
     {
         v.state = 2;
-        v.ftgt = 0.0, v.frate = onePoleRate (P (param::filterRelease), 50.0);
+        v.ftgt = 0.0, v.frate = (float) onePoleRate (P (param::filterRelease), 50.0);
         v.ptgt = 0.0, v.prate = onePoleRate (P (param::pitchRelease), 50.0);
         if (fast)
             v.rel = 1.0 / (0.001 * fs);
@@ -698,7 +703,6 @@ private:
         const auto res = (double) P (param::resonance);
         const auto q = 16.0 * res * res * res + 0.5;
         const auto cutoff = P (param::cutoff), kbd = P (param::kbdTrack), velTrack = P (param::velTrack);
-        const auto fAmount = (2.0 * (double) P (param::filterAmount) - 1.0) * 8.0;
         const auto fSus = (double) P (param::filterSustain), fDec = onePoleRate (P (param::filterDecay), 50.0);
         const auto pSus = (double) P (param::pitchSustain), pDec = onePoleRate (P (param::pitchDecay), 50.0);
 
@@ -725,8 +729,12 @@ private:
                     updateLfo (v, shape, amount, fade, dPhase, lfoMode, dest);
                     if (kind != 0)
                     {
-                        const auto c = std::clamp (cutoff + (dest == 0 ? (float) v.lfo : 0.0f) + velTrack * v.velocity, 0.0f, 1.0f);
-                        const auto fc = cutoffHz (c, ((double) v.key + v.glide - 48.0) * (double) kbd / 12.0, fAmount * v.fenv);
+                        // (in float, in FLM's order: the cutoff law of FLM_FORMAT §7.5)
+                        const auto c = std::clamp ((cutoff + (dest == 0 ? (float) v.lfo : 0.0f)) + velTrack * v.velocity, 0.0f, 1.0f);
+                        const float envT = ((P (param::filterAmount) * 2.0f - 1.0f) * (float) v.fenv) * 8.0f;
+                        const float base = (float) ((double) c * 10.4 + 4.0) + envT;
+                        const float kt = (((float) v.key + (float) v.glide) - 48.0f) * kbd * 0.083333336f + base;
+                        const auto fc = (double) std::min (std::pow (2.0f, kt), 22000.0f);
                         if (kind == 1)
                             v.ladder.design (fc, fs, std::clamp (res, 0.0, 1.0));
                         else
@@ -761,9 +769,9 @@ private:
                 if (v.looping && v.pos >= v.loopEnd)
                     v.pos -= v.loopEnd - v.loopStart;
                 // filter envelope, filter
-                v.fenv += (v.ftgt - v.fenv) * v.frate;
+                v.fenv = (double) (((float) v.ftgt - (float) v.fenv) * (float) v.frate + (float) v.fenv);
                 if (v.fenv > 1.0)
-                    v.fenv = 1.0, v.ftgt = fSus, v.frate = fDec;
+                    v.fenv = 1.0, v.ftgt = (float) fSus, v.frate = (float) fDec;
                 if (kind == 1)
                 {
                     xl = v.ladder.run (0, xl);
