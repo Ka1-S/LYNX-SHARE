@@ -8,6 +8,7 @@
 
 #include "core/FlmEffects.h"
 #include "core/ParametricEqFl.h"
+#include "core/PocketFx.h"
 #include "core/Reeverb2.h"
 
 namespace flm188f
