@@ -253,7 +253,9 @@ TEST (p190v_projects_saved_before_keep_the_classic_laws)
     for (const auto kind : { EffectKind::crestCompressor, EffectKind::sentryGate })
     {
         const auto law = (std::size_t) (kind == EffectKind::crestCompressor ? (int) c::law : (int) s::law);
-        CHECK (effectInfo (kind).params.size() == law + 1 && std::string (effectInfo (kind).params[law].name) == "Law");
+        // (round 190dm appended Sentry's trigger controls after it)
+        CHECK (effectInfo (kind).params.size() == (kind == EffectKind::sentryGate ? (std::size_t) s::count : law + 1)
+               && std::string (effectInfo (kind).params[law].name) == "Law");
         auto fresh = makeEffectSlot (kind);
         CHECK (fresh.params[law] >= 0.5f);
         auto old = makeEffectSlot (kind);

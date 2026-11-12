@@ -199,6 +199,10 @@ struct Settings
     // round 165x (REA_rodada165x §1) [EXEC]: the peak reduction dial where AUTO MAKEUP was switched on (its make-up is
     // autoMakeupDb (peakReduction) − autoMakeupDb (makeupRef)); 46 = the round-152 reference
     double makeupRef = 46.0;
+    // round 190dm [EXEC] (an FG-2A-type reference's tone-burst probes): the cell's memory — the release slows with how long
+    // and how hard the cell was lit (an exposure state that charges while lit), so it recovers fast after a short burst
+    // and slowly after a long one; Compress only. Off = the release laws above, sample for sample
+    bool memory = false;
 };
 double autoMakeupDb (double peakReduction) noexcept; // round 152: AUTO MAKEUP's gain (dB) at a peak reduction dial
 double gainForMakeupDb (double db) noexcept;          // round 165x: the gain dial giving makeupDb (inverse)
@@ -215,7 +219,7 @@ public:
 
 private:
     double sr = 48000.0;
-    double cf = 0.0, cs = 0.0, el = 0.0, mem = 0.0, ctl = 0.0, yc[2] {}, fx1[2] {}, fy1[2] {}, tx[2][4] {}, ty[2][4] {}, xp[2] {};
+    double cf = 0.0, cs = 0.0, el = 0.0, mem = 0.0, ctl = 0.0, exposure = 0.0, yc[2] {}, fx1[2] {}, fy1[2] {}, tx[2][4] {}, ty[2][4] {}, xp[2] {};
     Biquad sc, sc172, scLow172; // round 123's emphasis; round 172d's (Compress with the measured release)
     double scDesignedRate = 0.0;
     float last = 0.0f;

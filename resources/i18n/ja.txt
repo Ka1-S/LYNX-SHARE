@@ -9416,3 +9416,8 @@ countries: jp
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "クリックでこのプラグインをトラックに読み込んで試聴します (Ctrl+Z で元に戻します)"
 "Add \"{0}\" to favourites" = "「{0}」をお気に入りに追加"
 "Remove \"{0}\" from favourites" = "「{0}」をお気に入りから削除"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "セルのメモリー"
+"Level|Transient" = "レベル|トランジェント"
+"Smooth|Mid|Sharp" = "なめらか|中間|急峻"

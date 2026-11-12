@@ -9533,3 +9533,8 @@ countries: br
 "Spare state" = "Estado reserva"
 "Store in spare state" = "Guardar no estado reserva"
 "Flip with spare state" = "Trocar com o estado reserva"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Memória da célula"
+"Level|Transient" = "Nível|Transiente"
+"Smooth|Mid|Sharp" = "Suave|Médio|Brusco"

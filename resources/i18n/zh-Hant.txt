@@ -9416,3 +9416,8 @@ countries: tw hk mo
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "按一下以將此外掛載入到音軌上並試聽（Ctrl+Z 可復原）"
 "Add \"{0}\" to favourites" = "將「{0}」新增到我的最愛"
 "Remove \"{0}\" from favourites" = "將「{0}」從我的最愛中移除"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "光電池記憶"
+"Level|Transient" = "電平|瞬態"
+"Smooth|Mid|Sharp" = "平滑|中等|陡峭"

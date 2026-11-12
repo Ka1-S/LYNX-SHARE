@@ -9416,3 +9416,8 @@ countries: tr
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Bu plugin'i parçaya yükleyip dinlemek için tıkla (Ctrl+Z geri alır)"
 "Add \"{0}\" to favourites" = "\"{0}\" favorilere ekle"
 "Remove \"{0}\" from favourites" = "\"{0}\" favorilerden kaldır"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Hücre belleği"
+"Level|Transient" = "Seviye|Geçici"
+"Smooth|Mid|Sharp" = "Yumuşak|Orta|Keskin"

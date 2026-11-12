@@ -9416,3 +9416,8 @@ countries: id
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Klik untuk memuat plugin ini di trek dan mendengarnya (Ctrl+Z kembali)"
 "Add \"{0}\" to favourites" = "Tambah \"{0}\" ke favorit"
 "Remove \"{0}\" from favourites" = "Hapus \"{0}\" dari favorit"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Memori sel"
+"Level|Transient" = "Level|Transien"
+"Smooth|Mid|Sharp" = "Halus|Sedang|Tajam"

@@ -9416,3 +9416,8 @@ countries: ru by kz
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Щёлкните, чтобы загрузить этот плагин на дорожку и послушать его (Ctrl+Z — отменить)"
 "Add \"{0}\" to favourites" = "Добавить «{0}» в избранное"
 "Remove \"{0}\" from favourites" = "Убрать «{0}» из избранного"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Память ячейки"
+"Level|Transient" = "Уровень|Транзиент"
+"Smooth|Mid|Sharp" = "Плавно|Средне|Резко"

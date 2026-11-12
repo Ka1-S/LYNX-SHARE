@@ -9416,3 +9416,8 @@ countries: fr be ch ca lu
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Cliquez pour charger ce plugin sur la piste et l'écouter (Ctrl+Z revient en arrière)"
 "Add \"{0}\" to favourites" = "Ajouter « {0} » aux favoris"
 "Remove \"{0}\" from favourites" = "Retirer « {0} » des favoris"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Mémoire de la cellule"
+"Level|Transient" = "Niveau|Transitoire"
+"Smooth|Mid|Sharp" = "Doux|Moyen|Raide"
