@@ -9,7 +9,6 @@
 #include <optional>
 #include <set>
 
-#include "core/DirectWave.h"
 #include "core/FlmDwSampler.h"
 #include "core/FlmSlicer.h"
 #include "core/FlmEffects.h"
@@ -364,56 +363,6 @@ void addPatternClips (Ctx& ctx, const flm::Clip& clip, int pattern, int row)
         c.offset = ticksOf (pass.from);
         ctx.song.playlist.push_back (c);
     }
-}
-
-// FLM's DW Sampler playing a DirectWave program (.dwp: "DwPr" + DirectWave's own saved state, FLM_FORMAT §7) → LYNX's
-// DirectWave engine (slice F3). The program is looked for in FL's copy of FLM's resources ("DirectWave Samples…") and
-// next to the project; its zones' files ("%ILSharedData%\DirectWave\<program>\<file>.wav") in the program's folder.
-bool directWaveProgram (Ctx& ctx, const flm::Module& m, ChannelDef& c)
-{
-    const auto& o = ctx.options.common;
-    if (! o.readFile || ! o.fileExists)
-        return false;
-    auto lower = m.presetFile;
-    std::transform (lower.begin(), lower.end(), lower.begin(), [] (unsigned char ch) { return (char) std::tolower (ch); });
-    if (lower.size() < 4 || lower.compare (lower.size() - 4, 4, ".dwp") != 0)
-        return false;
-    std::vector<std::string> candidates = ctx.deviceCandidates (m.presetFile);
-    if (! m.presetName.empty())
-    {
-        if (! ctx.options.resourceRoot.empty())
-            for (const auto* folder : { "DirectWave Samples", "DirectWave Samples EXP" })
-                candidates.push_back (joinPath (joinPath (ctx.options.resourceRoot, folder), m.presetName + ".dwp"));
-        candidates.push_back (joinPath (o.projectFolder, m.presetName + ".dwp"));
-    }
-    candidates.push_back (m.presetFile);
-    const auto program = ctx.resolve (candidates, c.name);
-    if (program.empty())
-        return false;
-    const auto bytes = o.readFile (program);
-    if (bytes.size() < 8 || std::memcmp (bytes.data(), "DwPr", 4) != 0)
-        return false;
-    const std::vector<std::uint8_t> state (bytes.begin() + 4, bytes.end());
-    const auto slash = program.find_last_of ("/\\");
-    const auto folder = slash == std::string::npos ? std::string() : program.substr (0, slash);
-    const auto existing = [&] (const std::string& zonePath) -> std::string {
-        auto p = zonePath;
-        std::replace (p.begin(), p.end(), '\\', '/');
-        const auto file = pathFileName (p);
-        const auto parentEnd = p.find_last_of ('/');
-        const auto parentStart = parentEnd == std::string::npos || parentEnd == 0 ? std::string::npos : p.find_last_of ('/', parentEnd - 1);
-        std::vector<std::string> zoneCandidates;
-        if (parentEnd != std::string::npos)
-            zoneCandidates.push_back (joinPath (folder, p.substr (parentStart == std::string::npos ? 0 : parentStart + 1)));
-        zoneCandidates.push_back (joinPath (folder, file));
-        return ctx.resolve (zoneCandidates, c.name);
-    };
-    if (! dw::importChannel (c, state, existing, o.readFile, o.saveEmbedded))
-        return false;
-    c.keyLow = m.keyLow;
-    c.keyHigh = m.keyHigh;
-    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: DW Sampler (DirectWave program)");
-    return true;
 }
 
 // FLM's MiniSynth → LYNX's MiniSynth engine (F4). FLM's parameters 1…43 are the desktop plugin's 0…42, in the same
@@ -1069,7 +1018,9 @@ bool dwSamplerState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     c.keyHigh = m.keyHigh;
     c.modelParams = flmdw::channelParams (values, custom->pbRange, custom->smoothAttack, decays);
     ctx.note (&FlpImportReport::converted, zones.size() > 1 ? "FL Studio Mobile: DW Sampler (multisample, FLM's engine)" : "FL Studio Mobile: DW Sampler (FLM's engine)");
-    if (zones.empty())
+    if (zones.empty() && custom->hasPath && ! custom->path.empty())
+        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: DW Sampler whose program or sample is missing (silent until it is found)");
+    else if (zones.empty())
         ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: DW Sampler without a sample (silent, as in FLM)");
     return true;
 }
@@ -1253,28 +1204,6 @@ ChannelDef instrumentChannel (Ctx& ctx, const flm::Module* gen, const flm::Chann
         return c;
     }
     if (gen->type == flm::module::dwSampler && dwSamplerState (ctx, *gen, c)) // round 190de: FLM's own DW Sampler
-        return c;
-    if (gen->type == flm::module::dwSampler && isAudioFile (gen->presetFile.empty() ? gen->presetName : gen->presetFile))
-    {
-        // a single sample (a .dwp multisample program is DirectWave's, F4): the module's file, saved on the device;
-        // its relative name is relative to the user library, the .flm's folder in a share-zip
-        const auto& folder = ctx.options.common.projectFolder;
-        std::vector<std::string> candidates;
-        if (! gen->presetName.empty() && isAudioFile (gen->presetName))
-            candidates.push_back (joinPath (folder, gen->presetName));
-        for (const auto& c : ctx.deviceCandidates (gen->presetFile))
-            candidates.push_back (c);
-        candidates.push_back (gen->presetFile);
-        if (const auto name = pathFileName (gen->presetName.empty() ? gen->presetFile : gen->presetName); ! name.empty())
-            candidates.push_back (joinPath (folder, name));
-        c.instrument = InstrumentKind::sampler;
-        c.samplePath = ctx.resolve (candidates, c.name);
-        c.keyLow = gen->keyLow;
-        c.keyHigh = gen->keyHigh;
-        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: DW Sampler (one sample)");
-        return c;
-    }
-    if (gen->type == flm::module::dwSampler && directWaveProgram (ctx, *gen, c))
         return c;
     if (gen->type == flm::module::miniSynth && miniSynthState (ctx, *gen, c))
         return c;
