@@ -106,6 +106,16 @@ inline juce::Image makePicture (int width, int height, bool software)
     }
 }
 
+// (JUCE defines JUCE_WINDOWS only on Windows: used in an expression it does not compile elsewhere)
+inline const char* directImageName() noexcept
+{
+   #if JUCE_WINDOWS
+    return "Direct2D image";
+   #else
+    return "native image";
+   #endif
+}
+
 // A session step for the reports (round 190bm): what a cache's picture is and what draws the window, once per kind of
 // picture and scale ("Playlist picture: 2880 x 1500 px at 150 %, Direct2D image, window drawn with the GPU"). `last`
 // is the cache's own memory of what it noted.
@@ -113,7 +123,7 @@ inline void notePicture (const char* name, const juce::Image& picture, float sca
 {
     const auto drawn = owner.getPeer() == nullptr ? "no window" : windowDrawnByCpu (owner) ? "window drawn without the GPU" : "window drawn with the GPU";
     const auto kind = picture.isNull() ? juce::String ("no picture (painted straight to the window)")
-                                       : juce::String (software ? "software image" : JUCE_WINDOWS ? "Direct2D image" : "native image");
+                                       : juce::String (software ? "software image" : directImageName());
     const auto key = kind + ", " + drawn + " at " + juce::String (juce::roundToInt (scale * 100.0f)) + " %";
     if (key == last)
         return;

@@ -10,12 +10,14 @@
 #include "core/DetailChain.h"
 #include "core/Effects.h"
 #include "core/FlEffects.h"
+#include "core/HotSwap.h"
 #include "core/MeterBallistics.h"
 #include "core/NoteEdit.h"
 #include "core/NoteNames.h"
 #include "core/NoteTools.h"
 #include "core/PlaylistOps.h"
 #include "core/ProjectKey.h"
+#include "core/Rack.h"
 #include "core/NativeEngines.h"
 #include "engine/AudioEngine.h"
 #include "engine/FlStudio.h"
@@ -31,6 +33,7 @@
 #include "ui/NumBox.h"
 #include "ui/PianoRollComponent.h"
 #include "ui/PlaylistComponent.h"
+#include "ui/PluginHeader.h"
 #include "ui/PluginThumbs.h"
 #include "ui/QuickPick.h"
 #include "ui/Theme.h"
@@ -83,6 +86,39 @@ void drawWindowGlyph (juce::Graphics& g, juce::Rectangle<int> r, bool hot)
     g.drawRect (box, 1.0f);
     g.fillRect (box.withHeight (2.5f));
 }
+
+// Round 190ce: the hot-swap button of a card's title bar (the reference's round button with two arrows, left of its
+// save button [lesson image BrowseButtonInst.png, shot d04]); filled with the accent colour while the Browser is linked.
+void drawSwapGlyph (juce::Graphics& g, juce::Rectangle<int> r, bool hot, bool linked)
+{
+    const auto box = r.toFloat().withSizeKeepingCentre (13.0f, 13.0f);
+    if (linked)
+    {
+        g.setColour (colour::accent);
+        g.fillEllipse (box);
+    }
+    g.setColour (linked ? juce::Colours::white : hot ? colour::textPrimary : colour::textSecondary);
+    g.drawEllipse (box, 1.0f);
+    const auto cx = box.getCentreX(), cy = box.getCentreY();
+    juce::Path p; // two arrows, one each way
+    p.startNewSubPath (cx - 3.0f, cy - 2.0f);
+    p.lineTo (cx + 3.0f, cy - 2.0f);
+    p.lineTo (cx + 1.0f, cy - 4.0f);
+    p.startNewSubPath (cx + 3.0f, cy + 2.0f);
+    p.lineTo (cx - 3.0f, cy + 2.0f);
+    p.lineTo (cx - 1.0f, cy + 4.0f);
+    g.strokePath (p, juce::PathStrokeType (1.0f));
+}
+
+// The save-preset button beside it (the reference's disk).
+void drawSaveGlyph (juce::Graphics& g, juce::Rectangle<int> r, bool hot)
+{
+    const auto box = r.toFloat().withSizeKeepingCentre (11.0f, 11.0f);
+    g.setColour (hot ? colour::textPrimary : colour::textSecondary);
+    g.drawRoundedRectangle (box, 1.5f, 1.0f);
+    g.fillRect (box.getX() + 3.0f, box.getY() + 1.0f, 5.0f, 3.0f);
+    g.fillRect (box.getX() + 2.5f, box.getBottom() - 4.5f, 6.0f, 3.0f);
+}
 } // namespace
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -103,7 +139,17 @@ public:
         slotActions.setMenuTarget (this);
         slotActions.extendSlotMenu = [this] (juce::PopupMenu& menu, int slot) {
             const auto key = tagOf (slot);
+            // round 190ce: the reference's device menu starts with Cut / Copy, then Fold [shot d04]; Paste and
+            // Duplicate are its Edit menu's commands on the selected device
+            menu.addItem (tr ("Cut") + "\tCtrl+X", [this, slot] { copyDevice (slot, true); });
+            menu.addItem (tr ("Copy") + "\tCtrl+C", [this, slot] { copyDevice (slot, false); });
+            menu.addItem (tr ("Paste") + "\tCtrl+V", deviceClipboard().has_value() && effectCount() < maxEffectSlots, false, [this, slot] { pasteDevice (slot + 1); });
+            menu.addItem (tr ("Duplicate") + "\tCtrl+D", effectCount() < maxEffectSlots, false, [this, slot] { duplicateDevice (slot, -1); });
+            menu.addSeparator();
             menu.addItem (folded.count (key) > 0 ? tr ("Unfold") : tr ("Fold"), [this, key] { toggleFold (key); });
+            menu.addItem (tr ("Hot-swap in the Browser") + "\tQ", hooks.toggleHotSwap != nullptr, linkedTo (hotswap::Kind::effect, key), [this, slot] { toggleSwap (hotswap::targetOfEffect (engine.getSong(), insert, slot)); });
+            if (canSavePreset (slot))
+                menu.addItem (tr ("Save preset..."), [this, slot] { savePreset (slot); });
             menu.addSeparator();
         };
         addAndMakeVisible (cardHost); // (custom card bodies; clicks elsewhere fall through to this view)
@@ -133,6 +179,34 @@ public:
     {
         if (i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].kind != Card::add)
             toggleFold (keyOf (cards[(std::size_t) i]));
+    }
+    // round 190ce: what the hot-swap key links the Browser to (the selected card; none: nothing selected)
+    hotswap::Target selectedTarget() const
+    {
+        const auto i = selectedCard();
+        return i < 0 ? hotswap::Target() : targetOf (cards[(std::size_t) i]);
+    }
+    void selectCard (int i) { select (i); }
+    void showCardMenuForSnapshot (int i)
+    {
+        if (i >= 0 && i < (int) cards.size() && cards[(std::size_t) i].kind == Card::effect)
+            showCardMenu (i);
+    }
+    // the 0 key: the selected device on / off
+    bool toggleSelectedOn()
+    {
+        const auto i = selectedCard();
+        if (i < 0)
+            return false;
+        toggleOn (cards[(std::size_t) i]);
+        return true;
+    }
+    bool duplicateCard (int i)
+    {
+        if (i < 0 || i >= (int) cards.size() || cards[(std::size_t) i].kind != Card::effect)
+            return false;
+        duplicateDevice (cards[(std::size_t) i].index, -1);
+        return true;
     }
 
     void paint (juce::Graphics& g) override
@@ -227,8 +301,12 @@ public:
             return toggleOn (card);
         if (hit.part == Part::window)
             return toggleWindow (card);
+        if (hit.part == Part::swap)
+            return toggleSwap (targetOf (card));
+        if (hit.part == Part::save)
+            return savePreset (card.index);
         if (hit.part == Part::title && card.kind == Card::effect)
-            dragCard = hit.card; // (a drag moves it; a click only selects)
+            dragCard = hit.card; // (a drag moves it; a click only selects; Ctrl + drag copies it)
     }
 
     void mouseDrag (const juce::MouseEvent& e) override
@@ -265,8 +343,13 @@ public:
             const auto from = cards[(std::size_t) dragCard].index;
             const auto to = effectPositionFor (positionAt (e.x));
             const auto tag = tagOf (from);
-            engine.editSongStructural ([t = insert, from, to] (Song& song) { detailchain::moveEffectBefore (song, t, from, to); });
-            selectedTag = tag;
+            if (e.mods.isCtrlDown()) // round 190ce: Ctrl + drag leaves the device where it was and drops a copy
+                duplicateDevice (from, to);
+            else
+            {
+                engine.editSongStructural ([t = insert, from, to] (Song& song) { detailchain::moveEffectBefore (song, t, from, to); });
+                selectedTag = tag;
+            }
         }
         dragCard = -1;
         dragging = false;
@@ -337,6 +420,47 @@ public:
             refresh();
             return true;
         }
+        // round 190ce: the reference's Edit commands on the selected device, and its Group / Ungroup keys
+        if (key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown() && i >= 0 && cards[(std::size_t) i].kind == Card::effect)
+        {
+            const auto slot = cards[(std::size_t) i].index;
+            const auto shift = key.getModifiers().isShiftDown();
+            const auto code = juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) key.getKeyCode());
+            if (! shift && (code == 'C' || code == 'X'))
+            {
+                copyDevice (slot, code == 'X');
+                return true;
+            }
+            if (! shift && code == 'D')
+            {
+                duplicateDevice (slot, -1);
+                return true;
+            }
+            if (! shift && code == 'V')
+            {
+                pasteDevice (slot + 1);
+                return true;
+            }
+            if (code == 'G')
+            {
+                if (! shift)
+                    slotActions.groupIntoRack (slot, false);
+                else
+                    ungroupDevice (slot);
+                refresh();
+                return true;
+            }
+        }
+        if (key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown() && ! key.getModifiers().isShiftDown()
+            && juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) key.getKeyCode()) == 'V' && insert >= 0 && deviceClipboard().has_value())
+        {
+            pasteDevice (effectCount()); // (nothing selected, or the instrument: at the end of the chain)
+            return true;
+        }
+        // the reference's 0 key: the selected device on / off (the typing keyboard keeps the key while it is on)
+        if (! key.getModifiers().isAnyModifierKeyDown() && (key.getKeyCode() == '0' || key.getTextCharacter() == '0')
+            && (hooks.typingKeyboardOn == nullptr || ! hooks.typingKeyboardOn()) && toggleSelectedOn())
+            return true;
         if (key.isKeyCode (juce::KeyPress::leftKey) || key.isKeyCode (juce::KeyPress::rightKey))
         {
             const auto step = key.isKeyCode (juce::KeyPress::leftKey) ? -1 : 1;
@@ -373,9 +497,11 @@ public:
             }
             case Part::led: return { card.kind == Card::instrument ? tr ("Channel on / off (its mute)") : tr ("Effect on / off (bypass)"), {}, false, false };
             case Part::window: return { tr ("Show or hide the window"), {}, false, false };
+            case Part::swap: return { tr ("Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)"), cardName (card), false, false };
+            case Part::save: return { tr ("Save the device's settings as a preset"), cardName (card), false, false };
             case Part::title:
             case Part::folded:
-                return { tr ("Click: select. Double-click: fold / unfold. Drag: move it in the chain. Right-click: its menu"), cardName (card), false, true };
+                return { tr ("Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu"), cardName (card), false, true };
             default: break;
         }
         if (card.kind == Card::add)
@@ -454,7 +580,7 @@ private:
         int kind = -1; // the slot's EffectKind / the channel's InstrumentKind it was made for
         std::unique_ptr<DetailCard> card;
     };
-    enum class Part { none, picker, title, led, window, knob, body, folded };
+    enum class Part { none, picker, title, led, window, swap, save, knob, body, folded };
     struct Hit
     {
         Part part = Part::none;
@@ -639,7 +765,7 @@ private:
                 if (auto* extra = c.custom->titleAccessory())
                 {
                     const auto w = c.custom->titleAccessoryWidth();
-                    extra->setBounds (juce::Rectangle<int> (c.bounds.getRight() - 22 - w, c.bounds.getY() + 2, w, titleHeight - 4) - origin);
+                    extra->setBounds (juce::Rectangle<int> (c.bounds.getRight() - 4 - titleButtonsWidth (c) - w, c.bounds.getY() + 2, w, titleHeight - 4) - origin);
                     extra->setVisible (! c.folded);
                 }
             }
@@ -785,8 +911,119 @@ private:
         juce::PopupMenu menu;
         const auto key = keyOf (c);
         menu.addItem (folded.count (key) > 0 ? tr ("Unfold") : tr ("Fold"), [this, key] { toggleFold (key); });
+        menu.addItem (tr ("Hot-swap in the Browser") + "\tQ", hooks.toggleHotSwap != nullptr, linkedTo (targetOf (c)), [this, c] { toggleSwap (targetOf (c)); });
         menu.addItem (tr ("Show or hide the window"), [this, c] { toggleWindow (c); });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    // --- round 190ce: hot-swap, presets, copies ------------------------------------------------------------------------
+    hotswap::Target targetOf (const Card& c) const
+    {
+        const auto& song = engine.getSong();
+        return c.kind == Card::instrument ? hotswap::targetOfChannel (song, c.index)
+               : c.kind == Card::effect   ? hotswap::targetOfEffect (song, insert, c.index)
+                                          : hotswap::Target();
+    }
+    bool linkedTo (const hotswap::Target& t) const { return t.active() && hooks.hotSwapTarget != nullptr && hooks.hotSwapTarget() == t; }
+    bool linkedTo (hotswap::Kind kind, std::uint64_t instance) const { return linkedTo (hotswap::Target { kind, instance }); }
+    void toggleSwap (const hotswap::Target& t)
+    {
+        if (t.active() && hooks.toggleHotSwap != nullptr)
+            hooks.toggleHotSwap (t);
+        repaint();
+    }
+    // LYNX's own effects save their settings as presets (ui/PluginHeader.h); a plugin saves in its own window, a rack
+    // or a Patcher in its editor.
+    bool canSavePreset (int slot) const
+    {
+        const auto* fx = effectAt (slot);
+        return fx != nullptr && fx->kind != EffectKind::plugin && fx->kind != EffectKind::patcher && pluginheader::PresetBar (engine, insert, slot).hasLynxPresets();
+    }
+    void savePreset (int slot)
+    {
+        if (! canSavePreset (slot))
+            return;
+        presetBar = std::make_unique<pluginheader::PresetBar> (engine, insert, slot);
+        presetBar->savePreset (*this);
+    }
+    static std::optional<EffectSlot>& deviceClipboard()
+    {
+        static std::optional<EffectSlot> clip; // (one for every Device View of the session)
+        return clip;
+    }
+    void copyDevice (int slot, bool cut)
+    {
+        engine.capturePluginStates(); // (a plugin's current settings go with the copy)
+        const auto* fx = effectAt (slot);
+        if (fx == nullptr)
+            return;
+        deviceClipboard() = *fx;
+        if (cut)
+        {
+            slotActions.deleteSlot (slot);
+            refresh();
+        }
+    }
+    void pasteDevice (int position)
+    {
+        if (! deviceClipboard().has_value() || insert < 0)
+            return;
+        if (effectCount() >= maxEffectSlots)
+        {
+            ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+            return;
+        }
+        int added = -1;
+        engine.editSong ([t = insert, position, &added, fx = *deviceClipboard()] (Song& song) mutable { added = detailchain::pasteEffect (song, t, std::move (fx), position); });
+        if (added >= 0)
+        {
+            selectedTag = tagOf (added);
+            instrumentSelected = false;
+        }
+        refresh();
+    }
+    void duplicateDevice (int slot, int position)
+    {
+        if (effectCount() >= maxEffectSlots)
+        {
+            ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+            return;
+        }
+        engine.capturePluginStates();
+        int added = -1;
+        engine.editSong ([t = insert, slot, position, &added] (Song& song) { added = detailchain::duplicateEffect (song, t, slot, position); });
+        if (added >= 0)
+        {
+            selectedTag = tagOf (added);
+            instrumentSelected = false;
+        }
+        refresh();
+    }
+    void ungroupDevice (int slot)
+    {
+        const auto* fx = effectAt (slot);
+        if (fx == nullptr || ! rack::isRack (*fx))
+            return;
+        const auto* r = rack::rackOf (fx->patcher);
+        if (r == nullptr || r->kind != RackDoc::Kind::audioEffect || r->chains.size() != 1)
+            return; // (as the slot menu's Ungroup: one-chain Audio Effect Racks)
+        engine.capturePluginStates();
+        engine.editSong ([t = insert, slot] (Song& song) { rack::ungroupSlot (song, t, slot); });
+    }
+    // the title bar's buttons at the right: [hot-swap] [save] [window]
+    int titleButtonsWidth (const Card& c) const
+    {
+        return 18 + (c.kind == Card::add ? 0 : 18) + (c.kind == Card::effect && canSavePreset (c.index) ? 18 : 0);
+    }
+    juce::Rectangle<int> saveBounds (const Card& c) const
+    {
+        return c.kind == Card::effect && canSavePreset (c.index) ? juce::Rectangle<int> (c.bounds.getRight() - 38, c.bounds.getY() + 3, 16, 14) : juce::Rectangle<int>();
+    }
+    juce::Rectangle<int> swapBounds (const Card& c) const
+    {
+        if (c.kind == Card::add)
+            return {};
+        return { c.bounds.getRight() - 38 - (saveBounds (c).isEmpty() ? 0 : 18), c.bounds.getY() + 3, 16, 14 };
     }
     void showInsertMenu()
     {
@@ -908,6 +1145,10 @@ private:
                 h.part = Part::folded;
             else if (windowBounds (c).contains (p))
                 h.part = Part::window;
+            else if (swapBounds (c).contains (p))
+                h.part = Part::swap;
+            else if (saveBounds (c).contains (p))
+                h.part = Part::save;
             else if (titleBounds (c).contains (p))
                 h.part = Part::title;
             else
@@ -1012,9 +1253,12 @@ private:
             drawVerticalText (g, name, c.bounds.withTrimmedTop (titleHeight));
         else
         {
-            g.drawText (name, titleBounds (c).withTrimmedLeft (21).withTrimmedRight (22 + (c.custom != nullptr ? c.custom->titleAccessoryWidth() : 0)),
+            g.drawText (name, titleBounds (c).withTrimmedLeft (21).withTrimmedRight (4 + titleButtonsWidth (c) + (c.custom != nullptr ? c.custom->titleAccessoryWidth() : 0)),
                         juce::Justification::centredLeft, true);
             drawWindowGlyph (g, windowBounds (c), hover.card == i && hover.part == Part::window);
+            drawSwapGlyph (g, swapBounds (c), hover.card == i && hover.part == Part::swap, linkedTo (targetOf (c)));
+            if (const auto save = saveBounds (c); ! save.isEmpty())
+                drawSaveGlyph (g, save, hover.card == i && hover.part == Part::save);
             if (c.custom != nullptr)
             {
                 // (its own component draws the body)
@@ -1151,6 +1395,7 @@ private:
     AudioEngine& engine;
     Hooks& hooks;
     EffectsPanel slotActions; // never shown: the Mixer slot's own menus, windows and edits, on this view's insert
+    std::unique_ptr<pluginheader::PresetBar> presetBar; // (round 190ce: the Save preset dialog of the card last asked)
     juce::Component cardHost;  // the chain area: custom card bodies live here (clipped to it)
     std::map<std::uint64_t, CustomEntry> customs;
     juce::ScrollBar scrollBar { false };
@@ -2162,6 +2407,18 @@ void DetailView::mouseUp (const juce::MouseEvent&)
 }
 
 MidiToolsPanel& DetailView::midiToolsForSnapshot() { return clipPage->midiTools(); }
+hotswap::Target DetailView::selectedDeviceTarget() const { return devicesPage && isShowing() ? chain->selectedTarget() : hotswap::Target(); }
+void DetailView::hotSwapChanged() { chain->repaint(); }
+void DetailView::selectCardForCheck (int card) { chain->selectCard (card); }
+bool DetailView::duplicateCardForCheck (int card) { return chain->duplicateCard (card); }
+juce::PopupMenu DetailView::cardMenuForSnapshot (int card)
+{
+    juce::PopupMenu menu;
+    EffectsPanel::slotMenuForSnapshot = &menu;
+    chain->showCardMenuForSnapshot (card);
+    EffectsPanel::slotMenuForSnapshot = nullptr;
+    return menu;
+}
 int DetailView::cardCountForCheck() const { return chain->cardCount(); }
 int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
 int DetailView::chainChannelForCheck() const { return chain->channelShown(); }

@@ -8280,7 +8280,6 @@ countries: pl
 "Deactivate input {0}" = "Wyłącz wejście {0}"
 "Activate input {0}" = "Włącz wejście {0}"
 "Input {0}" = "Wejście {0}"
-# Round 183c: Racks
 "Add chain" = "Dodaj łańcuch"
 "Audio Effect Rack" = "Rack efektów audio"
 "Chain Pan" = "Panorama łańcucha"
@@ -8342,9 +8341,9 @@ countries: pl
 "Blend of the shaped signal with the dry one (parallel processing)" = "Mieszanka ukształtowanego sygnału z suchym (przetwarzanie równoległe)"
 "One gain for both channels, so the stereo image stays put" = "Jedno wzmocnienie dla obu kanałów, żeby obraz stereo się nie przesuwał"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "Nie wpuszcza niskich dźwięków do detektora (stopa na szynie perkusji)"
-
 "For a file with a true-peak ceiling: {0}" = "Plik z limitem true peak: {0}"
 "(look)" = "(look)"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "Nie znaleziono domyślnego szablonu; zamiast niego otwarto domyślny projekt LYNX SHARE"
 "{0} could not be opened." = "Nie udało się otworzyć {0}."
@@ -8368,6 +8367,7 @@ countries: pl
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Odłączaj wszystkie nowe wtyczki"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Wł.: okno dodanej wtyczki otwiera się odłączone, nad panelami. Wył.: otwiera się zadokowane na pulpicie, za klikniętym panelem. Menu okna każdej wtyczki › Odłączony zmienia to dla tej wtyczki"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Dla innych aplikacji..."
 "Export for other apps" = "Eksport dla innych aplikacji"
@@ -8542,10 +8542,6 @@ countries: pl
 "Can't freeze this channel" = "Nie można zamrozić tego kanału"
 "Frozen: Unfreeze to edit" = "Zamrożony: odmroź, aby edytować"
 "A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "Kontroler jest powiązany z pokrętłami tego instrumentu i porusza nimi na żywo: zamrożone audio nie mogłoby za nim nadążyć."
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] otwórz/zamknij edytor  [Alt]+[LMB] nie zamykaj innych  [Ctrl]+[LMB] odsłuch  [2xLMB] Piano Roll  [LMB] przeciągnij w górę/dół zmienia kolejność  [RMB] menu kanału"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Miernik szczytowy (lewy/prawy) z podtrzymaniem  [LMB] gasi lampkę przesterowania"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "Zapisz utwór jako plik"
@@ -8740,7 +8736,6 @@ countries: pl
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Kontroler do gier steruje transportem i można go powiązać z dowolną kontrolką jak kontroler MIDI. Także na stronie MIDI."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Własne ulepszenia LYNX. Wszystkie są domyślnie wyłączone, więc LYNX SHARE wygląda i działa jak FL Studio, dopóki którejś nie włączysz. Każdy przełącznik to to samo ustawienie co w miejscu wskazanym w jego wierszu."
 "LYNX extras..." = "Dodatki LYNX..."
-
 "Search your plugins" = "Szukaj w swoich pluginach"
 "Nothing is shared." = "Nic nie jest udostępnione."
 "{0} shared with the session" = "Udostępnione sesji: {0}"
@@ -8883,7 +8878,6 @@ countries: pl
 "Channel 2" = "Kanał 2"
 "Channels 2-{0}" = "Kanały 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "Kanały członkowskie MPE (dolna strefa): kanały MIDI, z których każdy niesie jedną nutę"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "ODDECH"
 "Motion blending" = "Przenikanie ruchu"
 "Load sprite sheet..." = "Wczytaj arkusz sprite'ów..."
@@ -8931,3 +8925,47 @@ countries: pl
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (ostatni wiersz arkusza) jest pokazywany, gdy tancerz jest trzymany myszą."
 "Show complete piano roll preview" = "Pokaż pełny podgląd Piano Roll"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: podgląd nut kanału pokazuje cały pattern, nawet gdy jest dłuższy niż widoczna część racka; wyłączone: przewija się razem z krokami"
+
+# --- Round 190ce: Browser collections, hot-swap, Device View commands
+"Hot-swap: link the Browser to the selected device, instrument or sample (again: end)" = "Hot-swap: łączy Browser z wybranym urządzeniem, instrumentem lub samplem (ponownie: kończy)"
+"Collection 1 (Starred): add or remove the selected item" = "Kolekcja 1 (Ulubione): dodaje lub usuwa wybrany element"
+"Collection 2: add or remove the selected item" = "Kolekcja 2: dodaje lub usuwa wybrany element"
+"Collection 3: add or remove the selected item" = "Kolekcja 3: dodaje lub usuwa wybrany element"
+"Collection 4: add or remove the selected item" = "Kolekcja 4: dodaje lub usuwa wybrany element"
+"Collection 5: add or remove the selected item" = "Kolekcja 5: dodaje lub usuwa wybrany element"
+"Collection 6: add or remove the selected item" = "Kolekcja 6: dodaje lub usuwa wybrany element"
+"Collection 7: add or remove the selected item" = "Kolekcja 7: dodaje lub usuwa wybrany element"
+"Remove the selected item from every collection" = "Usuwa wybrany element ze wszystkich kolekcji"
+"Collection: the items you put in it (right-click an item > Collections, or the keys 1-7 on a selected row)" = "Kolekcja: elementy, które do niej włożono (prawy klik na elemencie > Kolekcje lub klawisze 1-7 na zaznaczonym wierszu)"
+"Collection" = "Kolekcja"
+"Hide this collection" = "Ukryj tę kolekcję"
+"Orange" = "Pomarańczowy"
+"Yellow" = "Żółty"
+"Green" = "Zielony"
+"Blue" = "Niebieski"
+"Purple" = "Fioletowy"
+"Gray" = "Szary"
+"Select a file, a folder or a plugin in the Browser first" = "Najpierw zaznacz plik, folder lub plugin w Browserze"
+"Added to the collection {0}" = "Dodano do kolekcji {0}"
+"Removed from the collection {0}" = "Usunięto z kolekcji {0}"
+"Removed from every collection" = "Usunięto ze wszystkich kolekcji"
+"Rename collection" = "Zmień nazwę kolekcji"
+"Name of the collection (empty: its default name):" = "Nazwa kolekcji (puste: nazwa domyślna):"
+"Remove from all" = "Usuń ze wszystkich"
+"Show in the STARRED tab" = "Pokaż na karcie ULUBIONE"
+"Collections" = "Kolekcje"
+"Swapping {0}" = "Zamiana: {0}"
+"End hot-swap (Esc)" = "Zakończ hot-swap (Esc)"
+"Hot-swap: Enter or a double-click loads the selected plugin, preset or sample in place of this device" = "Hot-swap: Enter lub dwukrotne kliknięcie ładuje wybrany plugin, preset lub sample w miejsce tego urządzenia"
+"Hot-swap: this can't take the place of {0}" = "Hot-swap: to nie może zająć miejsca {0}"
+"Preview files when they are selected" = "Odsłuchuj pliki po ich zaznaczeniu"
+"Show in its folder" = "Pokaż w jego folderze"
+"This file is not in a folder the Browser shows" = "Tego pliku nie ma w folderze pokazywanym przez Browser"
+"Hot-swap in the Browser" = "Hot-swap w Browserze"
+"Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "Hot-swap: łączy Browser z tym urządzeniem; to, co tam załadujesz, zajmie jego miejsce (Q, ponownie, aby zakończyć)"
+"Save the device's settings as a preset" = "Zapisz ustawienia urządzenia jako preset"
+"Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "Klik: zaznacz. Dwukrotne kliknięcie: zwiń / rozwiń. Przeciągnij: przenieś w łańcuchu (Ctrl + przeciągnij: kopiuj). Prawy klik: jego menu"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] otwórz/zamknij edytor  [Alt]+[LMB] nie zamykaj innych  [Ctrl]+[LMB] odsłuch  [2xLMB] Piano Roll  [LMB] przeciągnij w górę/dół zmienia kolejność  [RMB] menu kanału"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Miernik szczytowy (lewy/prawy) z podtrzymaniem  [LMB] gasi lampkę przesterowania"

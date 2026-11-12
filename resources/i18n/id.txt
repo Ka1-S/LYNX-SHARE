@@ -8280,7 +8280,6 @@ countries: id
 "Deactivate input {0}" = "Nonaktifkan input {0}"
 "Activate input {0}" = "Aktifkan input {0}"
 "Input {0}" = "Input {0}"
-# Round 183c: Racks
 "Add chain" = "Tambah rantai"
 "Audio Effect Rack" = "Rak efek audio"
 "Chain Pan" = "Pan rantai"
@@ -8368,6 +8367,7 @@ countries: id
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Lepaskan semua plugin baru"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Aktif: jendela plugin yang ditambahkan terbuka terlepas, di atas panel. Nonaktif: terbuka tertambat di desktop, di belakang panel yang diklik. Menu jendela setiap plugin › Terlepas mengubahnya untuk plugin itu"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Untuk aplikasi lain..."
 "Export for other apps" = "Ekspor untuk aplikasi lain"
@@ -8736,7 +8736,6 @@ countries: id
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Pengontrol game menjalankan transport dan dapat ditautkan ke kontrol apa pun seperti pengontrol MIDI. Juga ada di halaman MIDI."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Penyempurnaan milik LYNX sendiri. Semuanya mati secara bawaan, sehingga LYNX SHARE tampil dan bekerja seperti FL Studio sampai Anda menyalakan salah satunya. Setiap sakelar adalah pengaturan yang sama dengan yang ada di tempat yang disebut barisnya."
 "LYNX extras..." = "Ekstra LYNX..."
-
 "Search your plugins" = "Cari di plugin Anda"
 "Nothing is shared." = "Tidak ada yang dibagikan."
 "{0} shared with the session" = "{0} dibagikan ke sesi"
@@ -8842,10 +8841,6 @@ countries: id
 "{0} min ago" = "{0} mnt lalu"
 "{0} h ago" = "{0} jam lalu"
 "{0} d ago" = "{0} hari lalu"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"
 "Find similar samples" = "Cari sampel serupa"
 "Similar to {0}" = "Serupa dengan {0}"
 "Listening to \"{0}\"..." = "Mendengarkan \"{0}\"..."
@@ -8883,7 +8878,6 @@ countries: id
 "Channel 2" = "Kanal 2"
 "Channels 2-{0}" = "Kanal 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "Kanal anggota MPE (zona bawah): kanal MIDI yang masing-masing membawa satu not"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "NAPAS"
 "Motion blending" = "Pembauran gerakan"
 "Load sprite sheet..." = "Muat lembar sprite..."
@@ -8931,3 +8925,47 @@ countries: id
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (baris terakhir lembar) ditampilkan saat penari ditahan dengan mouse."
 "Show complete piano roll preview" = "Tampilkan pratinjau Piano Roll lengkap"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: pratinjau not sebuah channel menampilkan seluruh pattern meskipun pattern lebih panjang daripada yang ditampilkan rack; jika mati, pratinjau bergulir bersama langkah"
+
+# --- Round 190ce: Browser collections, hot-swap, Device View commands
+"Hot-swap: link the Browser to the selected device, instrument or sample (again: end)" = "Hot-swap: tautkan Browser ke perangkat, instrumen, atau sample yang dipilih (lagi: akhiri)"
+"Collection 1 (Starred): add or remove the selected item" = "Koleksi 1 (Berbintang): tambah atau hapus item yang dipilih"
+"Collection 2: add or remove the selected item" = "Koleksi 2: tambah atau hapus item yang dipilih"
+"Collection 3: add or remove the selected item" = "Koleksi 3: tambah atau hapus item yang dipilih"
+"Collection 4: add or remove the selected item" = "Koleksi 4: tambah atau hapus item yang dipilih"
+"Collection 5: add or remove the selected item" = "Koleksi 5: tambah atau hapus item yang dipilih"
+"Collection 6: add or remove the selected item" = "Koleksi 6: tambah atau hapus item yang dipilih"
+"Collection 7: add or remove the selected item" = "Koleksi 7: tambah atau hapus item yang dipilih"
+"Remove the selected item from every collection" = "Hapus item yang dipilih dari semua koleksi"
+"Collection: the items you put in it (right-click an item > Collections, or the keys 1-7 on a selected row)" = "Koleksi: item yang Anda masukkan ke dalamnya (klik kanan item > Koleksi, atau tombol 1-7 pada baris yang dipilih)"
+"Collection" = "Koleksi"
+"Hide this collection" = "Sembunyikan koleksi ini"
+"Orange" = "Oranye"
+"Yellow" = "Kuning"
+"Green" = "Hijau"
+"Blue" = "Biru"
+"Purple" = "Ungu"
+"Gray" = "Abu-abu"
+"Select a file, a folder or a plugin in the Browser first" = "Pilih dulu file, folder, atau plugin di Browser"
+"Added to the collection {0}" = "Ditambahkan ke koleksi {0}"
+"Removed from the collection {0}" = "Dihapus dari koleksi {0}"
+"Removed from every collection" = "Dihapus dari semua koleksi"
+"Rename collection" = "Ganti nama koleksi"
+"Name of the collection (empty: its default name):" = "Nama koleksi (kosong: nama bawaannya):"
+"Remove from all" = "Hapus dari semua"
+"Show in the STARRED tab" = "Tampilkan di tab BERBINTANG"
+"Collections" = "Koleksi"
+"Swapping {0}" = "Mengganti {0}"
+"End hot-swap (Esc)" = "Akhiri hot-swap (Esc)"
+"Hot-swap: Enter or a double-click loads the selected plugin, preset or sample in place of this device" = "Hot-swap: Enter atau klik ganda memuat plugin, preset, atau sample yang dipilih menggantikan perangkat ini"
+"Hot-swap: this can't take the place of {0}" = "Hot-swap: ini tidak bisa menggantikan {0}"
+"Preview files when they are selected" = "Pratinjau file saat dipilih"
+"Show in its folder" = "Tampilkan di foldernya"
+"This file is not in a folder the Browser shows" = "File ini tidak ada di folder yang ditampilkan Browser"
+"Hot-swap in the Browser" = "Hot-swap di Browser"
+"Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "Hot-swap: tautkan Browser ke perangkat ini; yang Anda muat di sana menggantikannya (Q, lagi untuk mengakhiri)"
+"Save the device's settings as a preset" = "Simpan pengaturan perangkat sebagai preset"
+"Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "Klik: pilih. Klik ganda: lipat / buka. Seret: pindahkan di rantai (Ctrl + seret: salin). Klik kanan: menunya"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"

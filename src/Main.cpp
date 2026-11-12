@@ -1854,6 +1854,17 @@ public:
             return;
         }
 
+        if (args.contains ("--liveshot190ce"))
+        {
+            // LYNX.exe --liveshot190ce prefix: round 190ce off-screen, in the Ableton-style layout: the Device View's cards
+            // with their hot-swap and save buttons, a device's menu, hot-swap on (the Browser's bar, the lit button), a
+            // swap and its undo, a duplicate, and the Browser's collections (STARRED tab, the Collections menu, a search
+            // by a collection's name). Writes prefix-checks.txt.
+            runLiveShot190ce (args[args.indexOf ("--liveshot190ce") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--typeaheadtest"))
         {
             // LYNX.exe --typeaheadtest out.txt: issue #64 — a real popup menu (headings, a submenu) driven by key presses
@@ -13434,6 +13445,175 @@ private:
         juce::File (prefix + "-counts.txt").replaceWithText ("simple workflows before " + juce::String (madeBefore) + ", in pattern workflow "
                                                              + juce::String (madePattern) + ", after " + juce::String (lynx::SimpleWorkflow::instances.load())
                                                              + "\nstyle after " + lynx::layoutstyle::id (ui.getLayoutStyle()) + "\n" + keyCounts);
+    }
+
+    void runLiveShot190ce (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto write = [&prefix, &ui, &offline] (const char* name) {
+            offline.dispatchPendingMessages();
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (ui), out);
+        };
+        juce::String checks;
+        const auto check = [&checks] (const char* what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+
+        // a small library of its own (empty files: only names are shown)
+        const auto lib = juce::File (prefix + "-library");
+        lib.deleteRecursively();
+        for (const auto* path : { "Drums/Kicks/Kick Hard.wav", "Drums/Kicks/Kick Soft.wav", "Drums/Snare Tight.wav", "Drums/Hat Closed.wav",
+                                  "Loops/Break 120.wav", "Loops/Shaker 98.wav", "Textures/Vinyl Noise.wav", "Textures/Rain.wav" })
+            lib.getChildFile (path).create();
+        auto& browser = ui.getBrowserForSnapshot();
+        auto& store = lynx::BrowserComponent::collectionStore();
+        store = {};
+        const auto item = [&lib] (const char* path) { return lib.getChildFile (path).getFullPathName().toStdString(); };
+
+        ui.setVisible (true);
+        lynx::DetailView::shownSetting = lynx::DetailView::devicesPage = true;
+        ui.setClipLaunchWorkflow (true);
+        ui.showPanelsForSnapshot ({ lynx::workspace::Panel::browser, lynx::workspace::Panel::playlist });
+        offline.editSong ([] (lynx::Song& s) {
+            if (s.channels.size() < 2)
+                s.channels.resize (2);
+            s.channels[0].name = "Bass synth";
+            s.channels[0].mixerTrack = 2;
+            s.channels[1].mixerTrack = 3;
+            if (s.mixer.size() < 4)
+                s.mixer.resize (4);
+            s.mixer[2].name = "Bass";
+            s.mixer[2].effects.clear();
+            for (auto kind : { lynx::EffectKind::eq, lynx::EffectKind::compressor, lynx::EffectKind::delay })
+            {
+                lynx::EffectSlot fx;
+                fx.kind = kind;
+                const auto& info = lynx::effectInfo (kind);
+                for (std::size_t k = 0; k < info.params.size() && k < fx.params.size(); ++k)
+                    fx.params[k] = info.params[k].defaultValue;
+                s.mixer[2].effects.push_back (fx);
+            }
+            s.mixer[2].effects[1].enabled = false; // the compressor: off, at half mix
+            s.mixer[2].effects[1].mix = 0.5f;
+            while (s.patterns.size() < 2)
+                s.patterns.emplace_back();
+            s.patterns[0].name = "Bass line";
+            lynx::Note note;
+            note.channel = 0;
+            note.key = 36;
+            s.patterns[0].notes = { note };
+            s.patterns[0].lengthTicks = 4 * lynx::ppq;
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 3));
+            s.playlistTracks[1].name = "Bass";
+            lynx::Clip clip;
+            clip.pattern = 0;
+            clip.length = 4 * lynx::ppq;
+            lynx::launcher::setClip (s, 1, 0, clip);
+        }, false);
+        offline.dispatchPendingMessages();
+        auto* detail = ui.getDetailViewForSnapshot();
+        if (detail == nullptr)
+        {
+            juce::File (prefix + "-checks.txt").replaceWithText ("FAIL no detail view\n");
+            return;
+        }
+        detail->showSelection (1, 0);
+        detail->setPage (lynx::DetailView::Page::devices);
+        detail->selectCardForCheck (2); // the compressor (card 0 is the instrument)
+        write ("01-devices"); // the cards' title buttons: hot-swap, save, fold
+        saveMenus (juce::StringArray { "Device (effect card)" }, std::vector<juce::PopupMenu> { detail->cardMenuForSnapshot (2) }, prefix + "-02-device-menu.png");
+
+        // hot-swap on for the compressor: the Browser's bar, the Plugin database's effects, the card's button lit
+        const auto compressor = lynx::hotswap::targetOfEffect (offline.getSong(), 2, 1);
+        browser.beginHotSwap (compressor);
+        write ("03-hotswap-effect");
+        check ("hot-swap links the compressor", browser.isHotSwapping() && browser.hotSwapTarget() == compressor);
+        // a swap through the Browser itself (the row of LYNX's Reverb, then Enter): the slot keeps its place, its off
+        // state and its Mix; the link moves to the new device
+        {
+            browser.showPluginDatabase ("LYNX SHARE", 0); // (the folder of LYNX's own effects, opened as a click would)
+            browser.selectRowForSnapshot (lynx::tr (lynx::effectInfo (lynx::EffectKind::reverb).name));
+            write ("03a-hotswap-row"); // the candidate's row selected
+            check ("swap: Enter on the Reverb row is taken by hot-swap", browser.hotSwapLoadSelected());
+            offline.dispatchPendingMessages();
+            const auto& slot = offline.getSong().mixer[2].effects[1];
+            check ("swap: reverb in the compressor's place, still off at 50 % mix", slot.kind == lynx::EffectKind::reverb && ! slot.enabled && slot.mix == 0.5f);
+            check ("swap: three effects as before", offline.getSong().mixer[2].effects.size() == 3);
+            check ("swap: the Browser is linked to the new device", browser.isHotSwapping() && browser.hotSwapTarget() == lynx::hotswap::targetOfEffect (offline.getSong(), 2, 1)
+                                                                        && ! (browser.hotSwapTarget() == compressor));
+            write ("03b-hotswap-swapped");
+            offline.undo();
+            offline.dispatchPendingMessages();
+            const auto& back = offline.getSong().mixer[2].effects[1];
+            check ("undo: the compressor is back with its instance", back.kind == lynx::EffectKind::compressor && back.instance.id == compressor.instance);
+            check ("undo: the Browser is still linked to it", browser.isHotSwapping() && browser.hotSwapTarget() == compressor);
+        }
+        // linked to the instrument instead
+        const auto bass = lynx::hotswap::targetOfChannel (offline.getSong(), 0);
+        browser.beginHotSwap (bass);
+        detail->selectCardForCheck (0);
+        write ("04-hotswap-instrument");
+        check ("re-link to the instrument", browser.hotSwapTarget() == bass);
+        browser.endHotSwap();
+        check ("hot-swap ended", ! browser.isHotSwapping());
+        write ("05-hotswap-ended"); // the Browser as it was before
+        // the device is deleted while linked: the mode ends by itself
+        browser.beginHotSwap (lynx::hotswap::targetOfEffect (offline.getSong(), 2, 2));
+        offline.editSong ([] (lynx::Song& s) { s.mixer[2].effects.pop_back(); });
+        offline.dispatchPendingMessages();
+        check ("deleting the linked device ends hot-swap", ! browser.isHotSwapping());
+        offline.undo();
+        offline.dispatchPendingMessages();
+
+        // Duplicate (Ctrl+D) of the EQ
+        check ("duplicate", detail->duplicateCardForCheck (1));
+        offline.dispatchPendingMessages();
+        check ("duplicate: four effects, EQ twice", offline.getSong().mixer[2].effects.size() == 4 && offline.getSong().mixer[2].effects[1].kind == lynx::EffectKind::eq
+                                                        && offline.getSong().mixer[2].effects[0].instance.id != offline.getSong().mixer[2].effects[1].instance.id);
+        write ("06-duplicated");
+
+        // --- collections ---
+        browser.showFilterForSnapshot (lib, lynx::browserview::ContentFilter::all);
+        ui.waitForBrowserForSnapshot();
+        browser.setInCollection (item ("Drums/Kicks/Kick Hard.wav"), 0, true);
+        browser.setInCollection (item ("Drums/Snare Tight.wav"), 0, true);
+        browser.setInCollection (item ("Loops"), 0, true);
+        browser.setTab (lynx::BrowserComponent::starredTab);
+        write ("07-starred-only"); // only Starred shown: the tab as it always was
+        browser.setInCollection (item ("Drums/Kicks/Kick Hard.wav"), 4, true); // also Blue
+        browser.setInCollection (item ("Loops/Break 120.wav"), 4, true);
+        browser.setInCollection (item ("Textures/Vinyl Noise.wav"), 3, true);
+        browser.setInCollection (item ("Textures/Rain.wav"), 3, true);
+        browser.setInCollection (item ("Drums/Hat Closed.wav"), 1, true);
+        store.rename (3, "Textures");
+        browser.setCollectionShown (1, true);
+        browser.setCollectionShown (3, true);
+        browser.setCollectionShown (4, true);
+        write ("08-collections"); // a heading per collection shown
+        check ("collections: four shown", store.shown().size() == 4);
+        check ("collections: an item in two", store.mask (item ("Drums/Kicks/Kick Hard.wav")) == 0b10001);
+        saveMenus (juce::StringArray { "Collections (a row's menu)" }, std::vector<juce::PopupMenu> { browser.collectionsMenuForSnapshot (item ("Drums/Kicks/Kick Hard.wav")) },
+                   prefix + "-09-collections-menu.png");
+        saveMenus (juce::StringArray { "Browser options" }, std::vector<juce::PopupMenu> { browser.buildViewMenu() }, prefix + "-10-browser-options.png");
+        browser.setTab (lynx::BrowserComponent::allTab);
+        write ("11-all-tab-chips"); // the colour chips on the rows of the ALL tab
+        browser.setSearchForSnapshot ("textures");
+        ui.waitForBrowserForSnapshot();
+        write ("12-search-collection-name"); // found by the collection's name
+        browser.setSearchForSnapshot ({});
+        // the file round trip
+        {
+            const auto text = store.toText();
+            check ("collections: text round trip", lynx::collections::Store::fromText (text) == store);
+        }
+        store = {};
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+        lib.deleteRecursively();
     }
 
     void runDetailShot (const juce::String& prefix)

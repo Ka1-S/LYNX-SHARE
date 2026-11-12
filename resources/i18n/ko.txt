@@ -8280,7 +8280,6 @@ countries: kr
 "Deactivate input {0}" = "입력 {0} 비활성화"
 "Activate input {0}" = "입력 {0} 활성화"
 "Input {0}" = "입력 {0}"
-# Round 183c: Racks
 "Add chain" = "체인 추가"
 "Audio Effect Rack" = "오디오 이펙트 랙"
 "Chain Pan" = "체인 팬"
@@ -8342,9 +8341,9 @@ countries: kr
 "Blend of the shaped signal with the dry one (parallel processing)" = "다듬은 신호와 드라이 신호의 혼합 (병렬 처리)"
 "One gain for both channels, so the stereo image stays put" = "두 채널에 하나의 게인을 적용해 스테레오 이미지가 움직이지 않게 합니다"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "낮은 음을 검출기에서 제외합니다 (드럼 버스의 킥 등)"
-
 "For a file with a true-peak ceiling: {0}" = "트루 피크 상한이 있는 파일은: {0}"
 "(look)" = "(룩)"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "기본 템플릿을 찾을 수 없어 대신 LYNX SHARE의 기본 프로젝트를 열었습니다"
 "{0} could not be opened." = "{0}을(를) 열 수 없습니다."
@@ -8368,6 +8367,7 @@ countries: kr
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "새 플러그인 모두 분리"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "켜짐: 추가한 플러그인의 창이 분리된 상태로 패널 위에 열립니다. 꺼짐: 데스크톱에 도킹되어 열리며 클릭한 패널 뒤로 갑니다. 각 플러그인 창 메뉴 › 분리됨에서 플러그인별로 바꿀 수 있습니다"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "다른 앱용..."
 "Export for other apps" = "다른 앱용으로 내보내기"
@@ -8542,10 +8542,6 @@ countries: kr
 "Can't freeze this channel" = "이 채널은 프리즈할 수 없습니다"
 "Frozen: Unfreeze to edit" = "프리즈됨: 프리즈 해제하여 편집"
 "A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "컨트롤러가 이 악기의 노브에 연결되어 라이브로 움직입니다: 프리즈된 오디오는 따라갈 수 없습니다."
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "곡을 파일로 저장"
@@ -8740,7 +8736,6 @@ countries: kr
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "게임 컨트롤러로 트랜스포트를 조작하고 MIDI 컨트롤러처럼 어떤 컨트롤에도 연결할 수 있습니다. MIDI 페이지에도 있습니다."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX만의 개선 기능입니다. 모두 기본적으로 꺼져 있어, 하나를 켜기 전까지 LYNX SHARE는 FL Studio처럼 보이고 동작합니다. 각 스위치는 해당 줄에 적힌 곳에 있는 설정과 같은 설정입니다."
 "LYNX extras..." = "LYNX 추가 기능..."
-
 "Search your plugins" = "플러그인 검색"
 "Nothing is shared." = "공유 중인 항목이 없습니다."
 "{0} shared with the session" = "세션과 공유 중: {0}개"
@@ -8883,7 +8878,6 @@ countries: kr
 "Channel 2" = "채널 2"
 "Channels 2-{0}" = "채널 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE 멤버 채널(하위 존): 각각 노트 하나를 담당하는 MIDI 채널"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "숨소리"
 "Motion blending" = "모션 블렌딩"
 "Load sprite sheet..." = "스프라이트 시트 불러오기..."
@@ -8931,3 +8925,47 @@ countries: kr
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}(시트의 마지막 행)은 댄서를 마우스로 잡고 있는 동안 표시됩니다."
 "Show complete piano roll preview" = "피아노 롤 미리 보기 전체 표시"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "채널 랙: 패턴이 랙에 보이는 범위보다 길어도 채널의 노트 미리 보기에 패턴 전체를 표시합니다. 끄면 스텝과 함께 스크롤됩니다"
+
+# --- Round 190ce: Browser collections, hot-swap, Device View commands
+"Hot-swap: link the Browser to the selected device, instrument or sample (again: end)" = "핫스왑: 브라우저를 선택한 장치, 악기 또는 샘플에 연결(다시: 종료)"
+"Collection 1 (Starred): add or remove the selected item" = "컬렉션 1(별표): 선택한 항목 추가 또는 제거"
+"Collection 2: add or remove the selected item" = "컬렉션 2: 선택한 항목 추가 또는 제거"
+"Collection 3: add or remove the selected item" = "컬렉션 3: 선택한 항목 추가 또는 제거"
+"Collection 4: add or remove the selected item" = "컬렉션 4: 선택한 항목 추가 또는 제거"
+"Collection 5: add or remove the selected item" = "컬렉션 5: 선택한 항목 추가 또는 제거"
+"Collection 6: add or remove the selected item" = "컬렉션 6: 선택한 항목 추가 또는 제거"
+"Collection 7: add or remove the selected item" = "컬렉션 7: 선택한 항목 추가 또는 제거"
+"Remove the selected item from every collection" = "선택한 항목을 모든 컬렉션에서 제거"
+"Collection: the items you put in it (right-click an item > Collections, or the keys 1-7 on a selected row)" = "컬렉션: 넣어 둔 항목(항목 우클릭 > 컬렉션, 또는 선택한 행에서 1-7 키)"
+"Collection" = "컬렉션"
+"Hide this collection" = "이 컬렉션 숨기기"
+"Orange" = "주황"
+"Yellow" = "노랑"
+"Green" = "초록"
+"Blue" = "파랑"
+"Purple" = "보라"
+"Gray" = "회색"
+"Select a file, a folder or a plugin in the Browser first" = "먼저 브라우저에서 파일, 폴더 또는 플러그인을 선택하세요"
+"Added to the collection {0}" = "컬렉션 {0}에 추가했습니다"
+"Removed from the collection {0}" = "컬렉션 {0}에서 제거했습니다"
+"Removed from every collection" = "모든 컬렉션에서 제거했습니다"
+"Rename collection" = "컬렉션 이름 바꾸기"
+"Name of the collection (empty: its default name):" = "컬렉션 이름(비워 두면 기본 이름):"
+"Remove from all" = "모두에서 제거"
+"Show in the STARRED tab" = "별표 탭에서 보기"
+"Collections" = "컬렉션"
+"Swapping {0}" = "{0} 교체 중"
+"End hot-swap (Esc)" = "핫스왑 종료 (Esc)"
+"Hot-swap: Enter or a double-click loads the selected plugin, preset or sample in place of this device" = "핫스왑: Enter 또는 더블 클릭하면 선택한 플러그인, 프리셋 또는 샘플이 이 장치 대신 로드됩니다"
+"Hot-swap: this can't take the place of {0}" = "핫스왑: 이것은 {0}을(를) 대신할 수 없습니다"
+"Preview files when they are selected" = "선택할 때 파일 미리 듣기"
+"Show in its folder" = "해당 폴더에서 보기"
+"This file is not in a folder the Browser shows" = "이 파일은 브라우저에 표시되는 폴더에 없습니다"
+"Hot-swap in the Browser" = "브라우저에서 핫스왑"
+"Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "핫스왑: 브라우저를 이 장치에 연결합니다. 거기서 로드한 것이 이 장치를 대신합니다(Q, 다시 누르면 종료)"
+"Save the device's settings as a preset" = "장치 설정을 프리셋으로 저장"
+"Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "클릭: 선택. 더블 클릭: 접기 / 펼치기. 드래그: 체인에서 이동(Ctrl + 드래그: 복사). 우클릭: 메뉴"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"

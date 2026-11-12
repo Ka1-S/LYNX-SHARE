@@ -8280,7 +8280,6 @@ countries: it ch sm
 "Deactivate input {0}" = "Disattiva ingresso {0}"
 "Activate input {0}" = "Attiva ingresso {0}"
 "Input {0}" = "Ingresso {0}"
-# Round 183c: Racks
 "Add chain" = "Aggiungi catena"
 "Audio Effect Rack" = "Rack di effetti audio"
 "Chain Pan" = "Pan della catena"
@@ -8368,6 +8367,7 @@ countries: it ch sm
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Separa tutti i nuovi plugin"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Attivo: la finestra di un plugin aggiunto si apre separata, sopra i pannelli. Disattivo: si apre agganciata nel desktop, dietro un pannello cliccato. Il menu della finestra di ogni plugin › Separato lo cambia per quel plugin"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Per altre app..."
 "Export for other apps" = "Esporta per altre app"
@@ -8736,7 +8736,6 @@ countries: it ch sm
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Un controller di gioco comanda il trasporto e può essere collegato a qualsiasi controllo come un controller MIDI. Anche nella pagina MIDI."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "I miglioramenti propri di LYNX. Sono tutti disattivati per impostazione predefinita, quindi LYNX SHARE ha l'aspetto e il comportamento di FL Studio finché non ne attivi uno. Ogni interruttore è la stessa impostazione del punto indicato nella sua riga."
 "LYNX extras..." = "Extra di LYNX..."
-
 "Search your plugins" = "Cerca nei tuoi plugin"
 "Nothing is shared." = "Nulla è condiviso."
 "{0} shared with the session" = "{0} condivisi con la sessione"
@@ -8842,10 +8841,6 @@ countries: it ch sm
 "{0} min ago" = "{0} min fa"
 "{0} h ago" = "{0} h fa"
 "{0} d ago" = "{0} g fa"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] apri/chiudi l'editor  [Alt]+[LMB] lascia aperti gli altri  [Ctrl]+[LMB] ascolta  [2xLMB] Piano Roll  [LMB] trascina su/giù riordina  [RMB] menu del canale"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Meter di picco (sinistra/destra) con peak hold  [LMB] spegne la spia di clip"
 "Find similar samples" = "Trova sample simili"
 "Similar to {0}" = "Simile a {0}"
 "Listening to \"{0}\"..." = "Ascolto di \"{0}\"..."
@@ -8883,7 +8878,6 @@ countries: it ch sm
 "Channel 2" = "Canale 2"
 "Channels 2-{0}" = "Canali 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "Canali membri MPE (zona inferiore): i canali MIDI che portano una nota ciascuno"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "SOFFIO"
 "Motion blending" = "Fusione del movimento"
 "Load sprite sheet..." = "Carica foglio di sprite..."
@@ -8931,3 +8925,47 @@ countries: it ch sm
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (l'ultima riga del foglio) viene mostrata mentre il ballerino è tenuto con il mouse."
 "Show complete piano roll preview" = "Mostra l'anteprima completa del Piano Roll"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: l'anteprima delle note di un canale mostra l'intero pattern anche quando è più lungo della parte visibile del rack; disattivata, scorre con gli step"
+
+# --- Round 190ce: Browser collections, hot-swap, Device View commands
+"Hot-swap: link the Browser to the selected device, instrument or sample (again: end)" = "Hot-swap: collega il Browser al dispositivo, strumento o sample selezionato (di nuovo: termina)"
+"Collection 1 (Starred): add or remove the selected item" = "Raccolta 1 (Preferiti): aggiunge o rimuove l'elemento selezionato"
+"Collection 2: add or remove the selected item" = "Raccolta 2: aggiunge o rimuove l'elemento selezionato"
+"Collection 3: add or remove the selected item" = "Raccolta 3: aggiunge o rimuove l'elemento selezionato"
+"Collection 4: add or remove the selected item" = "Raccolta 4: aggiunge o rimuove l'elemento selezionato"
+"Collection 5: add or remove the selected item" = "Raccolta 5: aggiunge o rimuove l'elemento selezionato"
+"Collection 6: add or remove the selected item" = "Raccolta 6: aggiunge o rimuove l'elemento selezionato"
+"Collection 7: add or remove the selected item" = "Raccolta 7: aggiunge o rimuove l'elemento selezionato"
+"Remove the selected item from every collection" = "Rimuove l'elemento selezionato da tutte le raccolte"
+"Collection: the items you put in it (right-click an item > Collections, or the keys 1-7 on a selected row)" = "Raccolta: gli elementi che ci hai messo (clic destro su un elemento > Raccolte, o i tasti 1-7 su una riga selezionata)"
+"Collection" = "Raccolta"
+"Hide this collection" = "Nascondi questa raccolta"
+"Orange" = "Arancione"
+"Yellow" = "Giallo"
+"Green" = "Verde"
+"Blue" = "Blu"
+"Purple" = "Viola"
+"Gray" = "Grigio"
+"Select a file, a folder or a plugin in the Browser first" = "Seleziona prima un file, una cartella o un plugin nel Browser"
+"Added to the collection {0}" = "Aggiunto alla raccolta {0}"
+"Removed from the collection {0}" = "Rimosso dalla raccolta {0}"
+"Removed from every collection" = "Rimosso da tutte le raccolte"
+"Rename collection" = "Rinomina raccolta"
+"Name of the collection (empty: its default name):" = "Nome della raccolta (vuoto: il nome predefinito):"
+"Remove from all" = "Rimuovi da tutte"
+"Show in the STARRED tab" = "Mostra nella scheda PREFERITI"
+"Collections" = "Raccolte"
+"Swapping {0}" = "Sostituzione di {0}"
+"End hot-swap (Esc)" = "Termina hot-swap (Esc)"
+"Hot-swap: Enter or a double-click loads the selected plugin, preset or sample in place of this device" = "Hot-swap: Invio o un doppio clic carica il plugin, preset o sample selezionato al posto di questo dispositivo"
+"Hot-swap: this can't take the place of {0}" = "Hot-swap: questo non può prendere il posto di {0}"
+"Preview files when they are selected" = "Ascolta i file in anteprima quando vengono selezionati"
+"Show in its folder" = "Mostra nella sua cartella"
+"This file is not in a folder the Browser shows" = "Questo file non è in una cartella mostrata dal Browser"
+"Hot-swap in the Browser" = "Hot-swap nel Browser"
+"Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "Hot-swap: collega il Browser a questo dispositivo; ciò che carichi lì ne prende il posto (Q, di nuovo per terminare)"
+"Save the device's settings as a preset" = "Salva le impostazioni del dispositivo come preset"
+"Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "Clic: seleziona. Doppio clic: comprimi / espandi. Trascina: sposta nella catena (Ctrl + trascina: copia). Clic destro: il suo menu"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] apri/chiudi l'editor  [Alt]+[LMB] lascia aperti gli altri  [Ctrl]+[LMB] ascolta  [2xLMB] Piano Roll  [LMB] trascina su/giù riordina  [RMB] menu del canale"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Meter di picco (sinistra/destra) con peak hold  [LMB] spegne la spia di clip"

@@ -2737,3 +2737,15 @@ put one take a score step down (E alone: drive 8 3.6 → 4.0 and drive 10 3.0 �
 CPU and latency unchanged (one multiply-add per oversampled sample). Open: style E's ceilings give way above about
 −14 dBFS at drive 10 (their sum 1.45 → 0.62); a level-dependent ceiling scale did not lower the fit's error.
 Tools and tables: `/mnt/e/lynx-work/parity190ar/ember` (`emfit3.cpp`, `apply_tables.py`, `gatecmp.py`, `gate/`).
+
+## Round 190ce: Browser collections, hot-swap, device commands (LYNX extras, Ableton-style)
+
+| Item | FL Studio | Ableton Live 12 | LYNX |
+|---|---|---|---|
+| Collections: seven colour labels per item, several at once; rename, show / hide; keys 1-7 and 0 | one Starred flag (STARRED tab) | Browser sidebar › Collections | ✅ Starred is collection 1, six more (`core/BrowserCollections.h`); the STARRED tab lists the collections shown; the key of each colour needs a live check (`docs/analise/REA_rodada190ce.md` §1) |
+| Search by a collection's name | — | search matches tags | ⚠️ collection names only; no other tags |
+| Automatic preview switch | a click previews | headphone button | ✅ Browser options › Preview files when they are selected |
+| Show a search result in its folder | — | Show in Places | ✅ right-click › Show in its folder |
+| Hot-swap (Q): the Browser replaces the linked device, preset or sample in place | Replace in the slot / channel menus (unchanged) | Hot-Swap mode | ✅ `core/HotSwap.h`: effects, instruments, effect / synth presets, samples; bar in the Browser, button on the device card. ❌ rack chains, drum pads, similar-sample swap |
+| Device Cut / Copy / Paste / Duplicate, Ctrl-drag copy, 0 = on / off, Ctrl+G / Ctrl+Shift+G | slot menu, Alt-drag in the Mixer | Device View edit commands | ✅ effect cards of the Device View (Ableton-style layout). ❌ several cards at once, drag to another track |
+| MIDI / Key Map Mode overlay | Link to controller, Multilink | Ctrl+M / Ctrl+K | ❌ not built (REA_rodada190ce.md §4) |

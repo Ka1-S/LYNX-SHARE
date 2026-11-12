@@ -8280,7 +8280,6 @@ countries: nl be
 "Deactivate input {0}" = "Ingang {0} uitschakelen"
 "Activate input {0}" = "Ingang {0} inschakelen"
 "Input {0}" = "Ingang {0}"
-# Round 183c: Racks
 "Add chain" = "Keten toevoegen"
 "Audio Effect Rack" = "Audio-effectrack"
 "Chain Pan" = "Ketenpanorama"
@@ -8368,6 +8367,7 @@ countries: nl be
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Alle nieuwe plug-ins losmaken"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Aan: het venster van een toegevoegde plug-in opent losgemaakt, boven de panelen. Uit: het opent gedockt in het bureaublad, achter een paneel waarop je klikt. Het venstermenu van elke plug-in › Losgemaakt wijzigt dit per plug-in"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Voor andere apps..."
 "Export for other apps" = "Exporteren voor andere apps"
@@ -8736,7 +8736,6 @@ countries: nl be
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Een gamecontroller bedient het transport en kan net als een MIDI-controller aan elke regelaar worden gekoppeld. Ook op de MIDI-pagina."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Eigen verbeteringen van LYNX. Ze staan standaard allemaal uit, zodat LYNX SHARE eruitziet en werkt als FL Studio totdat je er een aanzet. Elke schakelaar is dezelfde instelling als op de plek die in de regel wordt genoemd."
 "LYNX extras..." = "LYNX-extra's..."
-
 "Search your plugins" = "Zoeken in je plugins"
 "Nothing is shared." = "Er wordt niets gedeeld."
 "{0} shared with the session" = "{0} gedeeld met de sessie"
@@ -8842,10 +8841,6 @@ countries: nl be
 "{0} min ago" = "{0} min geleden"
 "{0} h ago" = "{0} u geleden"
 "{0} d ago" = "{0} d geleden"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"
 "Find similar samples" = "Vergelijkbare samples zoeken"
 "Similar to {0}" = "Lijkt op {0}"
 "Listening to \"{0}\"..." = "Luisteren naar \"{0}\"..."
@@ -8883,7 +8878,6 @@ countries: nl be
 "Channel 2" = "Kanaal 2"
 "Channels 2-{0}" = "Kanalen 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE-memberkanalen (onderste zone): de MIDI-kanalen die elk één noot dragen"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "ADEM"
 "Motion blending" = "Bewegingsovervloeiing"
 "Load sprite sheet..." = "Spritesheet laden..."
@@ -8931,3 +8925,47 @@ countries: nl be
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (de laatste rij van het blad) wordt getoond zolang de danser met de muis wordt vastgehouden."
 "Show complete piano roll preview" = "Volledige Piano Roll-voorvertoning tonen"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: de nootvoorvertoning van een kanaal toont het hele pattern, ook als het langer is dan het rack laat zien; uit: ze schuift mee met de stappen"
+
+# --- Round 190ce: Browser collections, hot-swap, Device View commands
+"Hot-swap: link the Browser to the selected device, instrument or sample (again: end)" = "Hot-swap: koppel de Browser aan het geselecteerde apparaat, instrument of de geselecteerde sample (nogmaals: stoppen)"
+"Collection 1 (Starred): add or remove the selected item" = "Collectie 1 (Met ster): het geselecteerde item toevoegen of verwijderen"
+"Collection 2: add or remove the selected item" = "Collectie 2: het geselecteerde item toevoegen of verwijderen"
+"Collection 3: add or remove the selected item" = "Collectie 3: het geselecteerde item toevoegen of verwijderen"
+"Collection 4: add or remove the selected item" = "Collectie 4: het geselecteerde item toevoegen of verwijderen"
+"Collection 5: add or remove the selected item" = "Collectie 5: het geselecteerde item toevoegen of verwijderen"
+"Collection 6: add or remove the selected item" = "Collectie 6: het geselecteerde item toevoegen of verwijderen"
+"Collection 7: add or remove the selected item" = "Collectie 7: het geselecteerde item toevoegen of verwijderen"
+"Remove the selected item from every collection" = "Het geselecteerde item uit alle collecties verwijderen"
+"Collection: the items you put in it (right-click an item > Collections, or the keys 1-7 on a selected row)" = "Collectie: de items die je erin hebt gezet (klik met rechts op een item > Collecties, of de toetsen 1-7 op een geselecteerde rij)"
+"Collection" = "Collectie"
+"Hide this collection" = "Deze collectie verbergen"
+"Orange" = "Oranje"
+"Yellow" = "Geel"
+"Green" = "Groen"
+"Blue" = "Blauw"
+"Purple" = "Paars"
+"Gray" = "Grijs"
+"Select a file, a folder or a plugin in the Browser first" = "Selecteer eerst een bestand, map of plug-in in de Browser"
+"Added to the collection {0}" = "Toegevoegd aan de collectie {0}"
+"Removed from the collection {0}" = "Verwijderd uit de collectie {0}"
+"Removed from every collection" = "Verwijderd uit alle collecties"
+"Rename collection" = "Collectie hernoemen"
+"Name of the collection (empty: its default name):" = "Naam van de collectie (leeg: de standaardnaam):"
+"Remove from all" = "Uit alle verwijderen"
+"Show in the STARRED tab" = "Tonen op het tabblad MET STER"
+"Collections" = "Collecties"
+"Swapping {0}" = "{0} vervangen"
+"End hot-swap (Esc)" = "Hot-swap stoppen (Esc)"
+"Hot-swap: Enter or a double-click loads the selected plugin, preset or sample in place of this device" = "Hot-swap: Enter of dubbelklikken laadt de geselecteerde plug-in, preset of sample in plaats van dit apparaat"
+"Hot-swap: this can't take the place of {0}" = "Hot-swap: dit kan niet de plaats van {0} innemen"
+"Preview files when they are selected" = "Bestanden beluisteren zodra ze geselecteerd zijn"
+"Show in its folder" = "Tonen in de map"
+"This file is not in a folder the Browser shows" = "Dit bestand staat niet in een map die de Browser toont"
+"Hot-swap in the Browser" = "Hot-swap in de Browser"
+"Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "Hot-swap: koppel de Browser aan dit apparaat; wat je daar laadt, neemt zijn plaats in (Q, nogmaals om te stoppen)"
+"Save the device's settings as a preset" = "De instellingen van het apparaat opslaan als preset"
+"Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "Klik: selecteren. Dubbelklik: in- / uitklappen. Slepen: verplaatsen in de keten (Ctrl + slepen: kopiëren). Rechtsklik: het menu"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"

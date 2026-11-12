@@ -8280,7 +8280,6 @@ countries: jp
 "Deactivate input {0}" = "入力 {0} を無効にする"
 "Activate input {0}" = "入力 {0} を有効にする"
 "Input {0}" = "入力 {0}"
-# Round 183c: Racks
 "Add chain" = "チェーンを追加"
 "Audio Effect Rack" = "オーディオエフェクトラック"
 "Chain Pan" = "チェーンのパン"
@@ -8342,9 +8341,9 @@ countries: jp
 "Blend of the shaped signal with the dry one (parallel processing)" = "整形した信号とドライ信号のブレンド（パラレル処理）"
 "One gain for both channels, so the stereo image stays put" = "両チャンネルに同じゲインをかけ、ステレオイメージを動かしません"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "低音を検出器から外します（ドラムバス上のキックなど）"
-
 "For a file with a true-peak ceiling: {0}" = "トゥルーピークの上限付きファイルには: {0}"
 "(look)" = "（ルック）"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "デフォルトのテンプレートが見つからないため、代わりに LYNX SHARE のデフォルトのプロジェクトを開きました"
 "{0} could not be opened." = "{0} を開けませんでした。"
@@ -8368,6 +8367,7 @@ countries: jp
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "新しいプラグインをすべて切り離す"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "オン：追加したプラグインのウィンドウは切り離されて、パネルの上に開きます。オフ：デスクトップにドッキングして開き、クリックしたパネルの後ろに回ります。各プラグインのウィンドウメニュー › 切り離し でプラグインごとに変更できます"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "他のアプリ用..."
 "Export for other apps" = "他のアプリ用に書き出し"
@@ -8542,10 +8542,6 @@ countries: jp
 "Can't freeze this channel" = "このチャンネルはフリーズできません"
 "Frozen: Unfreeze to edit" = "フリーズ済み：フリーズ解除して編集"
 "A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "コントローラーがこのインストゥルメントのノブにリンクされ、ライブで動かしています：フリーズしたオーディオは追従できません。"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "ピークメーター (左/右) とピークホールド  [LMB] クリップランプをクリア"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "曲をファイルとして保存"
@@ -8740,7 +8736,6 @@ countries: jp
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "ゲームコントローラーでトランスポートを操作でき、MIDI コントローラーのようにどのコントロールにもリンクできます。MIDI ページにもあります。"
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 独自の改良です。すべて初期設定ではオフなので、どれかをオンにするまで LYNX SHARE の見た目と動作は FL Studio と同じです。各スイッチは、その行に書かれた場所にある設定と同じものです。"
 "LYNX extras..." = "LYNX の追加機能..."
-
 "Search your plugins" = "プラグインを検索"
 "Nothing is shared." = "共有しているものはありません。"
 "{0} shared with the session" = "セッションと共有中: {0}"
@@ -8883,7 +8878,6 @@ countries: jp
 "Channel 2" = "チャンネル2"
 "Channels 2-{0}" = "チャンネル2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPEメンバーチャンネル（ロワーゾーン）：それぞれ1つのノートを担うMIDIチャンネル"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "ブレス"
 "Motion blending" = "モーションブレンド"
 "Load sprite sheet..." = "スプライトシートを読み込む..."
@@ -8931,3 +8925,47 @@ countries: jp
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（シートの最後の行）はダンサーをマウスでつかんでいる間に表示されます。"
 "Show complete piano roll preview" = "ピアノロールのプレビュー全体を表示"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "チャンネルラック: パターンがラックの表示幅より長くても、チャンネルのノートプレビューにパターン全体を表示します。オフの場合はステップと一緒にスクロールします"
+
+# --- Round 190ce: Browser collections, hot-swap, Device View commands
+"Hot-swap: link the Browser to the selected device, instrument or sample (again: end)" = "ホットスワップ: ブラウザーを選択中のデバイス、インストゥルメント、サンプルにリンク (もう一度: 終了)"
+"Collection 1 (Starred): add or remove the selected item" = "コレクション 1 (スター付き): 選択中の項目を追加または削除"
+"Collection 2: add or remove the selected item" = "コレクション 2: 選択中の項目を追加または削除"
+"Collection 3: add or remove the selected item" = "コレクション 3: 選択中の項目を追加または削除"
+"Collection 4: add or remove the selected item" = "コレクション 4: 選択中の項目を追加または削除"
+"Collection 5: add or remove the selected item" = "コレクション 5: 選択中の項目を追加または削除"
+"Collection 6: add or remove the selected item" = "コレクション 6: 選択中の項目を追加または削除"
+"Collection 7: add or remove the selected item" = "コレクション 7: 選択中の項目を追加または削除"
+"Remove the selected item from every collection" = "選択中の項目をすべてのコレクションから削除"
+"Collection: the items you put in it (right-click an item > Collections, or the keys 1-7 on a selected row)" = "コレクション: 入れた項目 (項目を右クリック > コレクション、または選択行で 1-7 キー)"
+"Collection" = "コレクション"
+"Hide this collection" = "このコレクションを非表示"
+"Orange" = "オレンジ"
+"Yellow" = "イエロー"
+"Green" = "グリーン"
+"Blue" = "ブルー"
+"Purple" = "パープル"
+"Gray" = "グレー"
+"Select a file, a folder or a plugin in the Browser first" = "先にブラウザーでファイル、フォルダー、またはプラグインを選択してください"
+"Added to the collection {0}" = "コレクション {0} に追加しました"
+"Removed from the collection {0}" = "コレクション {0} から削除しました"
+"Removed from every collection" = "すべてのコレクションから削除しました"
+"Rename collection" = "コレクション名を変更"
+"Name of the collection (empty: its default name):" = "コレクション名 (空欄: 既定の名前):"
+"Remove from all" = "すべてから削除"
+"Show in the STARRED tab" = "「スター付き」タブで表示"
+"Collections" = "コレクション"
+"Swapping {0}" = "{0} を入れ替え中"
+"End hot-swap (Esc)" = "ホットスワップを終了 (Esc)"
+"Hot-swap: Enter or a double-click loads the selected plugin, preset or sample in place of this device" = "ホットスワップ: Enter またはダブルクリックで、選択中のプラグイン、プリセット、サンプルをこのデバイスと入れ替えてロード"
+"Hot-swap: this can't take the place of {0}" = "ホットスワップ: これは {0} の代わりにはできません"
+"Preview files when they are selected" = "選択時にファイルをプレビュー"
+"Show in its folder" = "フォルダーで表示"
+"This file is not in a folder the Browser shows" = "このファイルはブラウザーに表示されているフォルダーにありません"
+"Hot-swap in the Browser" = "ブラウザーでホットスワップ"
+"Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "ホットスワップ: ブラウザーをこのデバイスにリンク。そこでロードしたものがこのデバイスと入れ替わります (Q、もう一度で終了)"
+"Save the device's settings as a preset" = "デバイスの設定をプリセットとして保存"
+"Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "クリック: 選択。ダブルクリック: 折りたたみ/展開。ドラッグ: チェーン内で移動 (Ctrl + ドラッグ: コピー)。右クリック: メニュー"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "ピークメーター (左/右) とピークホールド  [LMB] クリップランプをクリア"

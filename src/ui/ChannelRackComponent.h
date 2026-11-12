@@ -109,6 +109,10 @@ public:
     void setPianoRollView (bool on);
     bool isPianoRollView() const noexcept { return pianoRollView; }
     bool areGraphLanesShown() const noexcept { return graphLanes; }
+    // Round 190ce (hot-swap, core/HotSwap.h): the Browser replaces the linked channel's instrument or sample through
+    // the rack's own paths (its editor closes first; a sample loads as a drop on the channel does).
+    void closeEditorForHotSwap (int channel) { closeEditor (channel); }
+    void assignSampleForHotSwap (int channel, const juce::File& file) { assignSample (channel, file); }
     juce::PopupMenu getChannelMenuForSnapshot (int channel) { return buildChannelMenu (channel); }
     ui::Hint getChannelHintForSnapshot (int channel); // the hint of the channel's name button (--freezetest)
     void setGraphLevelForSnapshot (int level) { graphLevel = level; graphLanes = true; updateSize(); repaint(); }

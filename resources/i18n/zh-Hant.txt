@@ -8280,7 +8280,6 @@ countries: tw hk mo
 "Deactivate input {0}" = "停用輸入 {0}"
 "Activate input {0}" = "啟用輸入 {0}"
 "Input {0}" = "輸入 {0}"
-# Round 183c: Racks
 "Add chain" = "新增鏈"
 "Audio Effect Rack" = "音訊效果機架"
 "Chain Pan" = "鏈聲像"
@@ -8342,9 +8341,9 @@ countries: tw hk mo
 "Blend of the shaped signal with the dry one (parallel processing)" = "處理後訊號與乾訊號的混合（並行處理）"
 "One gain for both channels, so the stereo image stays put" = "兩個聲道使用同一增益，立體聲像保持不動"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "讓低音不進入偵測器（例如鼓匯流排上的大鼓）"
-
 "For a file with a true-peak ceiling: {0}" = "需要真峰值上限的檔案：{0}"
 "(look)" = "（風格）"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "找不到預設範本；已改為開啟 LYNX SHARE 的預設專案"
 "{0} could not be opened." = "無法開啟 {0}。"
@@ -8368,6 +8367,7 @@ countries: tw hk mo
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "分離所有新外掛"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "開：新增的外掛視窗以分離方式開啟，位於面板之上。關：在桌面中停駐開啟，位於所點擊的面板之後。每個外掛的視窗選單 › 已分離 可為該外掛單獨變更"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "用於其他應用程式..."
 "Export for other apps" = "匯出給其他應用程式"
@@ -8542,10 +8542,6 @@ countries: tw hk mo
 "Can't freeze this channel" = "無法凍結此通道"
 "Frozen: Unfreeze to edit" = "已凍結：解凍以編輯"
 "A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "有控制器連結到此樂器的旋鈕並即時移動它們：凍結的音訊無法跟隨。"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "將歌曲儲存為檔案"
@@ -8740,7 +8736,6 @@ countries: tw hk mo
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "遊戲手把可以控制走帶，並能像 MIDI 控制器一樣連結到任何控制項。MIDI 頁面中也有。"
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 自己的改進。它們預設全部關閉，因此在你開啟其中一項之前，LYNX SHARE 的外觀和行為都與 FL Studio 相同。每個開關與其所在行指明位置的設定是同一個設定。"
 "LYNX extras..." = "LYNX 附加功能..."
-
 "Search your plugins" = "搜尋你的外掛"
 "Nothing is shared." = "未共用任何內容。"
 "{0} shared with the session" = "已與工作階段共用 {0} 個"
@@ -8883,7 +8878,6 @@ countries: tw hk mo
 "Channel 2" = "通道 2"
 "Channels 2-{0}" = "通道 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE 成員通道（低音區）：各承載一個音符的 MIDI 通道"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "氣聲"
 "Motion blending" = "動作混合"
 "Load sprite sheet..." = "載入精靈表..."
@@ -8931,3 +8925,47 @@ countries: tw hk mo
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（表單的最後一列）在用滑鼠按住舞者時顯示。"
 "Show complete piano roll preview" = "顯示完整的鋼琴捲軸預覽"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "通道機架：即使樣式比機架顯示的範圍長，通道的音符預覽也會顯示整個樣式；關閉時，預覽會隨步進一起捲動"
+
+# --- Round 190ce: Browser collections, hot-swap, Device View commands
+"Hot-swap: link the Browser to the selected device, instrument or sample (again: end)" = "熱插拔：將瀏覽器連結到所選的裝置、樂器或取樣（再按一次：結束）"
+"Collection 1 (Starred): add or remove the selected item" = "收藏集 1（星標）：新增或移除所選項目"
+"Collection 2: add or remove the selected item" = "收藏集 2：新增或移除所選項目"
+"Collection 3: add or remove the selected item" = "收藏集 3：新增或移除所選項目"
+"Collection 4: add or remove the selected item" = "收藏集 4：新增或移除所選項目"
+"Collection 5: add or remove the selected item" = "收藏集 5：新增或移除所選項目"
+"Collection 6: add or remove the selected item" = "收藏集 6：新增或移除所選項目"
+"Collection 7: add or remove the selected item" = "收藏集 7：新增或移除所選項目"
+"Remove the selected item from every collection" = "將所選項目從所有收藏集中移除"
+"Collection: the items you put in it (right-click an item > Collections, or the keys 1-7 on a selected row)" = "收藏集：放入其中的項目（在項目上按右鍵 > 收藏集，或在所選列按 1-7 鍵）"
+"Collection" = "收藏集"
+"Hide this collection" = "隱藏此收藏集"
+"Orange" = "橘色"
+"Yellow" = "黃色"
+"Green" = "綠色"
+"Blue" = "藍色"
+"Purple" = "紫色"
+"Gray" = "灰色"
+"Select a file, a folder or a plugin in the Browser first" = "請先在瀏覽器中選取檔案、資料夾或外掛程式"
+"Added to the collection {0}" = "已新增到收藏集 {0}"
+"Removed from the collection {0}" = "已從收藏集 {0} 中移除"
+"Removed from every collection" = "已從所有收藏集中移除"
+"Rename collection" = "重新命名收藏集"
+"Name of the collection (empty: its default name):" = "收藏集名稱（留空：預設名稱）："
+"Remove from all" = "從全部中移除"
+"Show in the STARRED tab" = "在「星標」分頁中顯示"
+"Collections" = "收藏集"
+"Swapping {0}" = "正在替換 {0}"
+"End hot-swap (Esc)" = "結束熱插拔 (Esc)"
+"Hot-swap: Enter or a double-click loads the selected plugin, preset or sample in place of this device" = "熱插拔：按 Enter 或按兩下，將所選外掛程式、預設集或取樣載入並取代此裝置"
+"Hot-swap: this can't take the place of {0}" = "熱插拔：這無法取代 {0}"
+"Preview files when they are selected" = "選取檔案時預聽"
+"Show in its folder" = "在其資料夾中顯示"
+"This file is not in a folder the Browser shows" = "此檔案不在瀏覽器顯示的資料夾中"
+"Hot-swap in the Browser" = "在瀏覽器中熱插拔"
+"Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "熱插拔：將瀏覽器連結到此裝置；在那裡載入的內容會取代它（Q，再按一次結束）"
+"Save the device's settings as a preset" = "將裝置的設定儲存為預設集"
+"Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "按一下：選取。按兩下：摺疊 / 展開。拖曳：在鏈中移動（Ctrl + 拖曳：複製）。按右鍵：其選單"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"
