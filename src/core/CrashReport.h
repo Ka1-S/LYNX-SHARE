@@ -123,6 +123,11 @@ EditorCrashStep parseEditorCrashStep (std::string_view step); // with or without
 // closed (platform/CrashGuard.h dispatchGuarded): errors and C++ exceptions yes; debugger events, heap corruption,
 // stack overflow and fail-fast never (going on with a damaged heap or stack only moves the crash)
 bool editorFaultCatchable (std::uint32_t code) noexcept;
+// Round 190ci: whether this exception code (NTSTATUS) is a processor fault (access violation, illegal instruction,
+// division by zero...): the ones the crash handler reports straight from the first-chance hook when the faulting
+// stack cannot be walked (platform/CrashGuard.h setUnwalkableFaultHandler). Never C++ exceptions, debugger events,
+// stack overflows (no room left for a handler) or fail-fasts.
+bool processorFault (std::uint32_t code) noexcept;
 std::string formatUuid (const std::uint8_t (&bytes)[16]); // the v4 UUID text of 16 random bytes (version bits set)
 
 // ---- GitHub ------------------------------------------------------------------------------------------------------

@@ -203,10 +203,16 @@ struct StartupTrace
 StartupTrace startupTrace;
 void startupMarkHook (const char* step) { startupTrace.mark (step); }
 
+juce::File crashFolderForTest; // --faulttest: where the crash file goes instead of the settings' autosave folder
 // Crashed: try to save the project and write the backtrace (like FL's "emergency save").
 void onCrash (void* exceptionPointers)
 {
-    const auto folder = lynx::platform::settingsFile ("autosave");
+    // (round 190ci: once. The hook for stacks Windows cannot walk, crashguard::setUnwalkableFaultHandler, may have run
+    // this before the top-level filter does)
+    static std::atomic<bool> reported { false };
+    if (reported.exchange (true))
+        return;
+    const auto folder = crashFolderForTest != juce::File() ? crashFolderForTest : lynx::platform::settingsFile ("autosave");
     folder.createDirectory();
     const auto stamp = juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H-%M-%S");
     // JUCE's backtrace (named frames only), then every frame of the faulting thread as module+offset (round 157a: a
@@ -517,6 +523,17 @@ public:
 
         // a crash in any mode (UI, command line) writes its backtrace to %APPDATA%\LYNX\autosave
         juce::SystemStats::setApplicationCrashHandler (onCrash);
+        // round 190ci: also for a fault on a stack Windows cannot walk, which never reaches that handler (Windows)
+        lynx::crashguard::setUnwalkableFaultHandler (onCrash);
+        if (const auto args = juce::StringArray::fromTokens (commandLine, true); args.contains ("--faulttest"))
+        {
+            // LYNX.exe --faulttest plain|unwalkable <folder> (round 190ci): ends by an access violation on purpose,
+            // before any window, so that --selftest can check that the crash file gets written (into <folder>)
+            const auto i = args.indexOf ("--faulttest");
+            crashFolderForTest = juce::File (args[i + 2].unquoted());
+            lynx::crashguard::quietCrashReports();
+            lynx::crashguard::faultForTest (args[i + 1] == "unwalkable");
+        }
         lynx::crashguard::hardenSignals(); // issue #115: stack overflows and SIGTERM / SIGHUP leave a trace (Linux / macOS)
 
         // SFZ instruments (round 167o): their FLAC / OGG / AIFF / MP3 samples through JUCE's readers
@@ -2532,6 +2549,42 @@ private:
 
     // LYNX.exe --selftest report.txt: renders 2 s without a sound card and writes the result.
     // Exit code 0 = audio came out, 1 = silence.
+    // --selftest (round 190ci): two more copies of LYNX end by a fault on purpose (--faulttest), one on a normal stack
+    // (the top-level filter) and one on a stack Windows cannot walk (the first-chance hook); each must leave
+    // "crash <time>.txt" with the access violation in the folder it is given.
+    static juce::String faultReportSelfTest()
+    {
+       #if JUCE_WINDOWS && (defined (_M_X64) || defined (__x86_64__))
+        const auto exe = juce::File::getSpecialLocation (juce::File::currentExecutableFile);
+        const auto root = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                              .getChildFile ("lynx-faulttest-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt64()));
+        juce::StringArray problems;
+        for (const auto* kind : { "plain", "unwalkable" })
+        {
+            const auto folder = root.getChildFile (kind);
+            folder.createDirectory();
+            juce::ChildProcess child;
+            const auto started = child.start (juce::StringArray { exe.getFullPathName(), "--faulttest", kind, folder.getFullPathName() }, 0);
+            if (! started || ! child.waitForProcessToFinish (60000))
+            {
+                child.kill();
+                problems.add (juce::String (kind) + ": " + (started ? "did not end" : "did not start"));
+                continue;
+            }
+            juce::String text;
+            for (const auto& file : folder.findChildFiles (juce::File::findFiles, false, "crash *.txt"))
+                text = file.loadFileAsString();
+            if (! text.contains ("0xc0000005"))
+                problems.add (juce::String (kind) + ": " + (text.isEmpty() ? "no crash file" : "a crash file without the access violation")
+                              + " (exit code 0x" + juce::String::toHexString ((juce::int64) child.getExitCode()) + ")");
+        }
+        root.deleteRecursively();
+        return problems.isEmpty() ? juce::String ("OK") : "ERROR " + problems.joinIntoString ("; ");
+       #else
+        return "SKIPPED (Windows x64 only)";
+       #endif
+    }
+
     void runSelfTest (const juce::String& reportPath, const juce::String& demoProjectPath)
     {
         lynx::AudioEngine offline (false);
@@ -3941,8 +3994,18 @@ private:
             if (pictureFailures > 0 || ! lines.contains (": ok"))
                 picturesResult = "ERROR " + lines.trim().replace ("\n", "; ");
         }
+        // round 190ci (the 0.1.26 release candidate ended when an FPC channel was added): every built-in generator and
+        // effect, its editor built as the Channel Rack / mixer opens it and painted once. The report file names the
+        // plugin being opened, so a run that dies there says which one.
+        const auto editorsResult = lynx::pluginthumbs::checkEditors ([&reportPath] (const juce::String& key) {
+            if (reportPath.isNotEmpty())
+                juce::File (reportPath).replaceWithText ("(opening the editor of " + key + ")\n");
+        });
+        // round 190ci: a fault leaves a crash file, also on a stack Windows cannot walk (that FPC fault left none)
+        const auto faultResult = faultReportSelfTest();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
-        const auto ok = mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
+        const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR")
+                        && mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
@@ -3974,6 +4037,8 @@ private:
                << "mixer_basics=" << mixerBasics << "\n"
                << "fonts=" << fontsResult << "\n"
                << "cached_pictures=" << picturesResult << "\n"
+               << "plugin_editors=" << editorsResult << "\n"
+               << "fault_report=" << faultResult << "\n"
                << "recording=" << (recordOk && recordUndoOk ? "OK" : "ERROR") << "\n"
                << "cancel_recording=" << (cancelRecordOk ? "OK" : "ERROR") << "\n"
                << "midi=" << (midiOk ? "OK" : "ERROR") << "\n"

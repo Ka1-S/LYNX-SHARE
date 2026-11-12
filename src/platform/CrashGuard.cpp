@@ -404,6 +404,206 @@ int unwind (CONTEXT context, std::uintptr_t* frames, int capacity)
     return count;
 }
 
+// Round 190ci: whether a walk from `context` (a context of the calling thread) reaches the thread's first frame the
+// way Windows' exception dispatch has to before it can call the top-level filter: every frame inside the thread's
+// stack, every caller's address inside a module (or code with unwind tables of its own), and the last frame one of
+// ntdll's thread / fiber start functions. No C++ objects here (SEH frame).
+bool walksToThreadStart (CONTEXT context) noexcept
+{
+    const auto* tib = reinterpret_cast<const NT_TIB*> (NtCurrentTeb());
+    const auto low = (DWORD64) (std::uintptr_t) tib->StackLimit, high = (DWORD64) (std::uintptr_t) tib->StackBase;
+    static void* const ntdll = GetModuleHandleW (L"ntdll.dll");
+    __try
+    {
+        DWORD64 last = 0;
+        for (int frame = 0; frame < 4096; ++frame)
+        {
+            if (context.Rip == 0)
+            {
+                void* base = nullptr;
+                return last != 0 && RtlPcToFileHeader (reinterpret_cast<void*> (last), &base) != nullptr && base == ntdll;
+            }
+            if (context.Rsp < low || context.Rsp + 8 > high || (context.Rsp & 7) != 0)
+                return false;
+            last = context.Rip;
+            DWORD64 imageBase = 0;
+            auto* function = RtlLookupFunctionEntry (context.Rip, &imageBase, nullptr);
+            if (function == nullptr)
+            {
+                // a leaf function: the return address is on top of the stack. (A caller that is in no module and has no
+                // unwind table is not code: the walk is reading something else than return addresses.)
+                void* base = nullptr;
+                if (frame > 0 && RtlPcToFileHeader (reinterpret_cast<void*> (context.Rip), &base) == nullptr)
+                    return false;
+                context.Rip = *reinterpret_cast<DWORD64*> (context.Rsp);
+                context.Rsp += 8;
+                continue;
+            }
+            void* handlerData = nullptr;
+            DWORD64 establisher = 0;
+            RtlVirtualUnwind (UNW_FLAG_NHANDLER, imageBase, context.Rip, function, &context, &handlerData, &establisher, nullptr);
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+    }
+    return false;
+}
+
+bool onOwnStack (const CONTEXT& context) noexcept
+{
+    const auto* tib = reinterpret_cast<const NT_TIB*> (NtCurrentTeb());
+    return context.Rsp >= (DWORD64) (std::uintptr_t) tib->StackLimit && context.Rsp + 8 <= (DWORD64) (std::uintptr_t) tib->StackBase
+           && (context.Rsp & 7) == 0;
+}
+
+// The words of the calling thread's stack above `context`'s stack pointer that point into loaded modules, as
+// "rsp+0x… module+0x…" lines (at most 96, the nearest 32 KiB)
+std::string stackWordsInModules (const CONTEXT& context)
+{
+    if (! onOwnStack (context))
+        return {};
+    const auto high = (DWORD64) (std::uintptr_t) reinterpret_cast<const NT_TIB*> (NtCurrentTeb())->StackBase;
+    const auto end = std::min<DWORD64> (high, context.Rsp + 32768);
+    std::string text;
+    int lines = 0;
+    for (auto at = context.Rsp; at + 8 <= end && lines < 96; at += 8)
+    {
+        const auto word = *reinterpret_cast<const DWORD64*> (at);
+        HMODULE module = nullptr;
+        if (word < 0x10000 || ! GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                                    reinterpret_cast<LPCWSTR> (word), &module) || module == nullptr)
+            continue;
+        char offset[40];
+        std::snprintf (offset, sizeof (offset), "rsp+0x%04llx  ", (unsigned long long) (at - context.Rsp));
+        text += offset + describeAddress (reinterpret_cast<const void*> (word)) + "\n";
+        ++lines;
+    }
+    return text;
+}
+
+// Whether `context` is Windows' exception dispatch itself faulting: the fault is in ntdll and one of the nearest frames
+// is KiUserExceptionDispatcher (the dispatch of an earlier exception of this thread is under it). No C++ objects here.
+bool insideExceptionDispatch (const EXCEPTION_RECORD& record, const CONTEXT& context) noexcept
+{
+    static void* const ntdll = GetModuleHandleW (L"ntdll.dll");
+    static const auto dispatcher = ntdll != nullptr ? (std::uintptr_t) reinterpret_cast<void*> (GetProcAddress (static_cast<HMODULE> (ntdll), "KiUserExceptionDispatcher"))
+                                                    : (std::uintptr_t) 0;
+    void* base = nullptr;
+    if (dispatcher == 0 || RtlPcToFileHeader (record.ExceptionAddress, &base) == nullptr || base != ntdll)
+        return false;
+    __try
+    {
+        std::uintptr_t frames[8] = {};
+        const auto n = unwind (context, frames, 8);
+        for (int i = 1; i < n; ++i)
+            if (frames[i] >= dispatcher && frames[i] < dispatcher + 0x100)
+                return true;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+    }
+    return false;
+}
+
+// Whether a fault on a stack that does not walk is the app's own: the first of the fault address and the nearest
+// words on the stack that is in a module outside Windows' folder is in the app's .exe (the FPC fault: strcmp in
+// ucrtbase called from LYNX.exe). A fault in a plugin's module, or in code no module holds, is not.
+bool faultIsTheApps (const EXCEPTION_RECORD& record, const CONTEXT& context) noexcept
+{
+    const auto self = static_cast<void*> (GetModuleHandleW (nullptr));
+    wchar_t windows[MAX_PATH] = {};
+    const auto windowsLength = GetWindowsDirectoryW (windows, MAX_PATH);
+    const auto high = (DWORD64) (std::uintptr_t) reinterpret_cast<const NT_TIB*> (NtCurrentTeb())->StackBase;
+    auto address = (DWORD64) (std::uintptr_t) record.ExceptionAddress;
+    auto at = context.Rsp;
+    for (int candidates = 0; candidates < 5;)
+    {
+        void* base = nullptr;
+        if (address >= 0x10000 && RtlPcToFileHeader (reinterpret_cast<void*> (address), &base) != nullptr && base != nullptr)
+        {
+            ++candidates;
+            if (base == self)
+                return true;
+            wchar_t path[MAX_PATH] = {};
+            const auto n = GetModuleFileNameW (static_cast<HMODULE> (base), path, MAX_PATH);
+            const auto system = n > 0 && windowsLength > 0 && windowsLength < MAX_PATH
+                                && CompareStringOrdinal (path, (int) windowsLength, windows, (int) windowsLength, TRUE) == CSTR_EQUAL;
+            if (! system)
+                return false;
+        }
+        else if (candidates == 0)
+            return false; // (the fault itself is in no module: generated code)
+        if (at + 8 > high || at > context.Rsp + 512)
+            return false;
+        address = *reinterpret_cast<const DWORD64*> (at);
+        at += 8;
+    }
+    return false;
+}
+
+void (*unwalkableFaultHandler) (void*) = nullptr;
+std::atomic<bool> unwalkableFaultReported { false };
+std::atomic<DWORD> hookBusyThread { 0 };
+// the newest processor fault on a stack that does not walk (one is enough: the next thing its thread does is the
+// dispatch that fails)
+struct PendingFault
+{
+    std::atomic<DWORD> thread { 0 };
+    EXCEPTION_RECORD record {};
+    CONTEXT context {};
+};
+PendingFault pendingFault;
+
+LONG CALLBACK firstChance (EXCEPTION_POINTERS* ep) noexcept
+{
+    if (ep == nullptr || ep->ExceptionRecord == nullptr || ep->ContextRecord == nullptr || unwalkableFaultHandler == nullptr
+        || ! crashreport::processorFault ((std::uint32_t) ep->ExceptionRecord->ExceptionCode) || unwalkableFaultReported.load())
+        return EXCEPTION_CONTINUE_SEARCH;
+    const auto thread = GetCurrentThreadId();
+    if (hookBusyThread.load() == thread) // (a fault of the hook's own work)
+        return EXCEPTION_CONTINUE_SEARCH;
+    DWORD free = 0;
+    if (! hookBusyThread.compare_exchange_strong (free, thread))
+        return EXCEPTION_CONTINUE_SEARCH; // (two threads faulting at once: one report is enough)
+
+    if (insideExceptionDispatch (*ep->ExceptionRecord, *ep->ContextRecord))
+    {
+        // Windows' dispatch of an earlier fault of this thread has faulted itself: no handler will ever run, the dispatch
+        // of this fault walks the same stack and faults again until the stack is used up. Report the earlier fault (the
+        // real one) and end as the top-level filter would have.
+        if (! unwalkableFaultReported.exchange (true))
+        {
+            EXCEPTION_POINTERS original { ep->ExceptionRecord, ep->ContextRecord };
+            if (pendingFault.thread.load() == thread)
+                original = { &pendingFault.record, &pendingFault.context };
+            const auto code = original.ExceptionRecord->ExceptionCode;
+            unwalkableFaultHandler (&original);
+            TerminateProcess (GetCurrentProcess(), (UINT) code);
+        }
+    }
+    else if (onOwnStack (*ep->ContextRecord) && ! walksToThreadStart (*ep->ContextRecord))
+    {
+        // The app's own fault: no handler can be reached (the walk to any of them fails) and no plugin is playing with
+        // exceptions here, so this is the crash. Report it and end as the top-level filter would have.
+        if (faultIsTheApps (*ep->ExceptionRecord, *ep->ContextRecord) && ! unwalkableFaultReported.exchange (true))
+        {
+            const auto code = ep->ExceptionRecord->ExceptionCode;
+            unwalkableFaultHandler (ep);
+            TerminateProcess (GetCurrentProcess(), (UINT) code);
+        }
+        // Somebody else's (a plugin's module, generated code): remembered only. A plugin's copy protection may fault on
+        // purpose and handle it in a hook of its own; if nothing does, see above.
+        pendingFault.thread = 0;
+        pendingFault.record = *ep->ExceptionRecord;
+        pendingFault.record.ExceptionRecord = nullptr;
+        pendingFault.context = *ep->ContextRecord;
+        pendingFault.thread = thread;
+    }
+    hookBusyThread = 0;
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 std::vector<std::uintptr_t> sampleThread (HANDLE thread)
 {
     std::uintptr_t frames[64] = {};
@@ -509,8 +709,21 @@ std::string exceptionBacktrace (void* exceptionPointers)
             text = head + describeAddress (ep->ExceptionRecord->ExceptionAddress) + "\n";
         }
         std::uintptr_t frames[96] = {};
-        const auto n = unwind (*ep->ContextRecord, frames, 96);
-        return text + formatFrames (std::vector<std::uintptr_t> (frames, frames + n));
+        auto n = unwind (*ep->ContextRecord, frames, 96);
+        const auto unwalkable = onOwnStack (*ep->ContextRecord) && ! walksToThreadStart (*ep->ContextRecord);
+        if (unwalkable) // (the frames end where the walk stops reading code addresses)
+            for (int i = 1; i < n; ++i)
+                if (void* base = nullptr; RtlPcToFileHeader (reinterpret_cast<void*> (frames[i]), &base) == nullptr)
+                {
+                    n = i + 1;
+                    break;
+                }
+        text += formatFrames (std::vector<std::uintptr_t> (frames, frames + n));
+        if (unwalkable)
+            if (const auto words = stackWordsInModules (*ep->ContextRecord); ! words.empty())
+                text += "--- the stack could not be walked to the thread's first frame; the words on it that point into modules "
+                        "(the callers are among them)\n" + words;
+        return text;
 #elif defined(LYNX_EXECINFO)
         // macOS / Linux (round 161): JUCE's crash handler passes the signal number; the frames are this thread's, the
         // signal handler's own first (exceptionBacktrace, onCrash, JUCE's handleCrash, the kernel's signal trampoline)
@@ -526,6 +739,39 @@ std::string exceptionBacktrace (void* exceptionPointers)
 #endif
     }
     catch (...) { return {}; }
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__ ((noinline))
+#endif
+void faultForTest (bool unwalkable) noexcept
+{
+    volatile std::uintptr_t marker = 0;
+#if defined(LYNX_UNWIND)
+    if (unwalkable)
+    {
+        // every word of the stack above this frame (the return addresses of all the callers): this never returns
+        const auto* tib = reinterpret_cast<const NT_TIB*> (NtCurrentTeb());
+        for (auto* word = const_cast<volatile std::uintptr_t*> (&marker) + 1; word < static_cast<volatile std::uintptr_t*> (tib->StackBase); ++word)
+            *word = 0x10;
+    }
+#else
+    (void) unwalkable;
+#endif
+    *reinterpret_cast<volatile int*> (marker + 0x10) = 1;
+    std::_Exit (3); // (not reached)
+}
+
+void setUnwalkableFaultHandler (void (*handler) (void*)) noexcept
+{
+#if defined(LYNX_UNWIND)
+    static std::atomic<bool> installed { false };
+    unwalkableFaultHandler = handler;
+    if (handler != nullptr && ! installed.exchange (true))
+        AddVectoredExceptionHandler (0, firstChance); // (last in the chain: a plugin's own hooks added first run first)
+#else
+    (void) handler;
+#endif
 }
 
 namespace
