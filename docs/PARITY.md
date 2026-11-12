@@ -3081,21 +3081,24 @@ row's tail score 2.72 → 2.28 because it is another device.
 | H-Delay (tp172d) | 12 | 5.92 → **6.17** | 5.54 → **6.15** (S2 3.08 → 4.90) |
 | EchoBoy (tp172d) | 20 | 5.15 → 5.15 | 6.34 → 6.34 |
 | EchoBoy Jr (prog182) | 25 | 4.56 → 4.56 | 8.08 → 8.08 (programme only) |
-| ValhallaDelay (tp172d) | 16 | 4.25 → **4.56** | 5.90 → **6.21** (D 6.32 → 6.61, S1 6.71 → 7.06, S3 6.58 → 7.17) |
+| ValhallaDelay (tp172d) | 16 | 4.25 → **4.56** | 5.90 → **6.22** (D 6.32 → 6.62, S1 6.71 → 7.08, S3 6.58 → 7.18) |
 | PrimalTap (prog182) | 25 | 3.64 → 3.64 | 7.40 → 7.40 |
 | Stellar Echo (tp172c) | 6 | 3.33 → 3.33 | 2.72 → 2.72 |
 | Little PrimalTap (prog182) | 25 | 2.84 → 2.84 | 6.23 → 6.23 |
 | X-Echo (tp172c) | 9 | 2.78 → 2.78 | 4.55 → 4.55 |
 | 3D Delay (tp172c) | 6 | 1.67 → 1.67 | 2.47 → 2.47 |
 | X-Delay (tp172c) | 3 | 1.67 → 1.67 | 1.90 → 1.90 |
-| **Family mean** | | **3.58 → 3.64** (10 rows) | **4.20 → 4.33** (7 impulse-bank rows) |
+| **Family mean** | | **3.58 → 3.64** (10 rows) | **4.20 → 4.34** (7 impulse-bank rows) |
 
 Baseline = this branch's base (rollup027 77026c3a2; ValhallaDelay already 4.25 with round 190ca's trim). No file went
 down on the wave score and no setting on the tail score; the 16 renders that changed all moved up on the tail score
 (ValhallaDelay S3 music ESR −7.5 → −16.1 dB, S1 drums / music 4 → 6; H-Delay S2 spectrum 3.7 / 5.6 / 3.2 / 10.0 →
-0.7 / 3.0 / 1.0 / 5.0 dB). CPU per instance (48 kHz, 20 s of bursts, blocks of 512, best of 5, loaded machine): Tape
-Classic 1.7 … 2.1 % of one core, Tape Measured 2.5 … 2.6 % (about + 30 %; the level law runs on polynomial log2 /
-exp2, the hiss is a 2.7 s table made in prepare (), + 1 MB per instance); Clean with Mod clock = the ms law within the
-noise. Latency: 0 samples reported, unchanged. Not done (next): Hi-Fi tape / the other ValhallaDelay modes (S2 still
+0.7 / 3.0 / 1.0 / 5.0 dB). CPU per instance (48 kHz, 20 s of bursts, blocks of 512, ten interleaved runs against the
+base build's binary): Tape Classic min 1.32 / median 1.44 % of one core, Tape Measured min 1.34 / median 1.52 %
+(+ 2 … 6 %). That needed: both sides recorded at once (2-double sections), one level follower for the pair whose gain is
+worked out again on a 0.5 dB rise or every 16 samples (polynomial log2 / exp2 from the bits), coefficients only when the
+time / Era / rate change, the hiss read from a 2.7 s table made in prepare () (+ 1 MB per instance), and two weak fitted
+sections left out (the bank scores the same or higher without them). Clean with Mod clock = the ms law within noise.
+Latency: 0 samples reported, unchanged. Not done (next): Hi-Fi tape / the other ValhallaDelay modes (S2 still
 4.0, its wow is random per render), wow / flutter depth law (EchoBoy's mod part), BBD clock stage (no bank row runs a
 BBD mode through the maps), the structure rows (3 taps, multi-head + spring). Lab: `/mnt/e/lynx-work/echo190dl`.
