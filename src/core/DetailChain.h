@@ -178,4 +178,24 @@ inline int moveEffectBefore (Song& song, int track, int from, int position)
     const auto to = std::clamp (position > from ? position - 1 : position, 0, n - 1);
     return to != from && mixerops::moveEffectSlot (song, track, from, to) ? to : -1;
 }
+
+// Round 190ce: the Device View's Copy / Paste / Duplicate and Ctrl-drag of a card (the reference DAW's Edit commands on
+// a selected device; docs/analise/REA_rodada190ce.md §3). A copy is a new device: a new running instance, its sidechain
+// sources kept, no automation of its own (automation clips stay with the original).
+// Pastes `fx` before the card at effect position `position`; returns its index, or -1 (no such insert, 10 effects).
+inline int pasteEffect (Song& song, int track, EffectSlot fx, int position)
+{
+    fx.instance.renew();
+    fx.row = -1;
+    return insertEffectAt (song, track, std::move (fx), position);
+}
+
+// Duplicate: a copy of effect `index` right after it (Ctrl-drag: `position` = where it is dropped; -1 = right after).
+inline int duplicateEffect (Song& song, int track, int index, int position = -1)
+{
+    if (track < 0 || track >= (int) song.mixer.size() || index < 0 || index >= (int) song.mixer[(std::size_t) track].effects.size())
+        return -1;
+    auto copy = song.mixer[(std::size_t) track].effects[(std::size_t) index];
+    return pasteEffect (song, track, std::move (copy), position < 0 ? index + 1 : position);
+}
 } // namespace lynx::detailchain

@@ -869,6 +869,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
 MainComponent::~MainComponent()
 {
+    EffectsPanel::onHotSwapSlot = nullptr; // (round 190ce: it calls this window)
     engine.setControllerSurface (nullptr); // (the controllers get their closing messages)
     engine.selectedMixerTrackForLinks = nullptr;
     closeRemoteControlSettings();
@@ -1707,6 +1708,13 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     }
     const auto pianoKeys = typingPiano && ! isPlainKey (chord); // (a FREE plain key is a shortcut as with the piano off)
 
+    // round 190ce: Esc ends hot-swap (the reference's key for it) before it means anything else
+    if (key.isKeyCode (juce::KeyPress::escapeKey) && ! key.getModifiers().isAnyModifierKeyDown() && browser.isHotSwapping())
+    {
+        browser.endHotSwap();
+        return true;
+    }
+
     // 2. a key the user gave an action himself (Options › Shortcuts) wins over the panels' built-in keys
     // (issue #12: Metronome on 'C' did nothing while the Playlist, whose Knife is 'C', had the focus)
     if (const auto own = keyMap.findUserBound (chord, focusContext(), pianoKeys); ! own.empty() && runAction (own))
@@ -1783,6 +1791,33 @@ bool MainComponent::runAction (const std::string& id)
     if (id.rfind ("view.detail", 0) == 0) // round 183a: Clip-launch workflow only (false: the chord falls through as before)
         return runDetailAction (id);
 
+    // Round 190ce: the Browser's collections (the number keys on its selected row), hot-swap, the Device View's 0 key
+    if (id.rfind ("browser.collection", 0) == 0 && id.size() == 19 && id.back() >= '1' && id.back() <= '7')
+    {
+        browser.toggleCollectionOnSelection (id.back() - '1');
+        return true;
+    }
+    if (id == "browser.clearCollections")
+    {
+        browser.clearCollectionsOnSelection();
+        return true;
+    }
+    if (id == "view.hotSwap")
+    {
+        if (browser.isHotSwapping())
+        {
+            browser.endHotSwap();
+            return true;
+        }
+        // the Device View's selected device when it shows one, else the selected channel
+        auto target = detailView != nullptr ? detailView->selectedDeviceTarget() : hotswap::Target();
+        if (! target.active())
+            target = hotswap::targetOfChannel (engine.getSong(), engine.getSelectedChannel());
+        if (! target.active())
+            return false;
+        toggleHotSwap (target);
+        return true;
+    }
     if (id == "rack.follow")
     {
         auto& g = EditorGlobals::get();
@@ -2135,6 +2170,15 @@ void MainComponent::connectBrowser (BrowserComponent& b)
             showPanel (Panel::mixer);
     };
     b.onPreviewVolumeChanged = [this] { saveUiSettings(); };
+    // round 190ce: hot-swap (the main Browser only: it is the one the device buttons and the key link)
+    b.onHotSwapChanged = [this] {
+        if (detailView != nullptr)
+            detailView->hotSwapChanged();
+    };
+    b.onHotSwapWillReplaceInstrument = [this] (int channel) { rack.closeEditorForHotSwap (channel); };
+    if (b.getRole() == BrowserComponent::Role::main)
+        EffectsPanel::onHotSwapSlot = [this] (int track, int slot) { toggleHotSwap (hotswap::targetOfEffect (engine.getSong(), track, slot)); };
+    b.onHotSwapSample = [this] (int channel, const juce::File& file) { rack.assignSampleForHotSwap (channel, file); };
     b.onSendToPlaylist = [this] (const juce::File& file) {
         playlist.addAudioClipAtPlayhead (file);
         showPanel (Panel::playlist);
@@ -2396,6 +2440,8 @@ void MainComponent::loadUiSettings()
             engine.setPreviewVolume (line.fromFirstOccurrenceOf ("=", false, false).trim().getDoubleValue());
         else if (key == "previewInTime") // the Browser's "Preview in time" (round 190aq)
             engine.setPreviewInTime (on);
+        else if (key == "browserAutoPreview") // the Browser's "Preview files when they are selected" (round 190ce)
+            BrowserComponent::autoPreview = on;
         else if (key == "editorVolume")
             engine.setEditorVolume (line.fromFirstOccurrenceOf ("=", false, false).trim().getDoubleValue());
         else if (key == "rackPianoRollView")
@@ -2576,6 +2622,7 @@ void MainComponent::saveUiSettings()
                                       + juce::String (flsettings::serialise())
                                       + "\npreviewVolume=" + juce::String (engine.getPreviewVolume(), 2)
                                       + "\npreviewInTime=" + juce::String (engine.isPreviewInTime() ? 1 : 0)
+                                      + "\nbrowserAutoPreview=" + juce::String (BrowserComponent::autoPreview ? 1 : 0)
                                       + "\neditorVolume=" + juce::String (engine.getEditorVolume(), 2)
                                       + "\nrackPianoRollView=" + juce::String (rack.isPianoRollView() ? 1 : 0)
                                       + "\naskWhatToRecord=" + juce::String (engine.getRecordOptions().askWhatToRecord ? 1 : 0)
@@ -3004,6 +3051,9 @@ void MainComponent::makeDetailView()
     h.dockPianoRoll = [this] (int pattern) { return dockPianoRoll (pattern); };
     h.undockPianoRoll = [this] { undockPianoRoll(); };
     h.selectPattern = [this] (int pattern) { selectPattern (pattern); };
+    h.toggleHotSwap = [this] (const hotswap::Target& target) { toggleHotSwap (target); };
+    h.hotSwapTarget = [this] { return browser.hotSwapTarget(); };
+    h.typingKeyboardOn = [this] { return typingPiano; };
     // any way the Piano roll panel comes up (F7, its button, a layout) takes the docked editor back first
     workspace.onWillShow = [this] (Panel panel) {
         if (panel == Panel::pianoRoll && pianoRollDocked)
@@ -3069,6 +3119,18 @@ void MainComponent::undockPianoRoll()
     pianoRoll.setDocked (false);
     juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
     workspace.setContent (Panel::pianoRoll, pianoRoll, "Piano Roll", Icon::pianoRoll); // (its panel has it again)
+}
+
+// Round 190ce: links the Browser to `target` (showing the Browser), or ends the link when it is linked to it already.
+void MainComponent::toggleHotSwap (const hotswap::Target& target)
+{
+    if (browser.isHotSwapping() && browser.hotSwapTarget() == target)
+    {
+        browser.endHotSwap();
+        return;
+    }
+    showPanel (Panel::browser);
+    browser.beginHotSwap (target);
 }
 
 bool MainComponent::pianoRollKeysHere() const

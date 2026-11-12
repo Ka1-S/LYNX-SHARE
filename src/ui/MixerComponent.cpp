@@ -6789,6 +6789,12 @@ void EffectsPanel::showSlotMenu (int slot)
     if (extendSlotMenu != nullptr) // (round 183a: the Device View's card adds Fold / Unfold first; the Mixer adds nothing)
         extendSlotMenu (menu, slot);
     menu.addSubMenu (tr ("Replace with"), replace);
+    // round 190ce: hot-swap from the Mixer too (the Device View's card has its own item and button)
+    if (extendSlotMenu == nullptr && onHotSwapSlot != nullptr)
+        menu.addItem (tr ("Hot-swap in the Browser"), [t = track, slot] {
+            if (onHotSwapSlot != nullptr)
+                onHotSwapSlot (t, slot);
+        });
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
 
     // FL presets (Plugin presets\Effects\<plugin>) that map to this effect
@@ -6985,6 +6991,11 @@ void EffectsPanel::showSlotMenu (int slot)
     menu.addSeparator();
     menu.addItem (tr ("Delete") + "\tDel", [this, slot] { deleteSlot (slot); });
 
+    if (slotMenuForSnapshot != nullptr) // (the shot routes: the menu itself, nothing opens)
+    {
+        *slotMenuForSnapshot = menu;
+        return;
+    }
     // FL: with the slot's menu open, Delete removes the plugin (issue #11)
     quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), {},
                          [safe = juce::Component::SafePointer<EffectsPanel> (this), slot] (const juce::KeyPress& key) {

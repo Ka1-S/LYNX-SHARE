@@ -657,6 +657,7 @@ private:
     std::unique_ptr<SimpleWorkflow> simpleWorkflow; // made when Simple workflow is first chosen (round 184a)
     std::unique_ptr<DetailView> detailView; // made with the grid (round 183a); never in Pattern workflow
     void makeDetailView();
+    void toggleHotSwap (const hotswap::Target& target); // round 190ce (core/HotSwap.h)
     // Slice 2: the Piano roll docked in the detail view's Clip page (its panel lets go of it meanwhile)
     bool pianoRollDocked = false;
     juce::Component* dockPianoRoll (int pattern);

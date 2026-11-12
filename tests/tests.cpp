@@ -17507,3 +17507,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Nebula190caTests.inc"
 #include "Settings190bxTests.inc"
 #include "Link190btTests.inc"
+#include "LiveBrowser190ceTests.inc"
