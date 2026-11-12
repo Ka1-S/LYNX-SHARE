@@ -9010,7 +9010,6 @@ countries: it ch sm
 "New link" = "Nuovo collegamento"
 "MIDI controller" = "Controller MIDI"
 "Ctrl" = "Ctrl"
-"MIDI input port number" = "Numero della porta di ingresso MIDI"
 "MIDI channel number" = "Numero del canale MIDI"
 "Continuous Controller number" = "Numero del Continuous Controller"
 "Auto detect" = "Rilevamento automatico"

@@ -9010,7 +9010,6 @@ countries: kr
 "New link" = "새 연결"
 "MIDI controller" = "MIDI 컨트롤러"
 "Ctrl" = "Ctrl"
-"MIDI input port number" = "MIDI 입력 포트 번호"
 "MIDI channel number" = "MIDI 채널 번호"
 "Continuous Controller number" = "Continuous Controller 번호"
 "Auto detect" = "자동 감지"

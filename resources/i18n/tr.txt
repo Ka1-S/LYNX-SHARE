@@ -9010,7 +9010,6 @@ countries: tr
 "New link" = "Yeni bağlantı"
 "MIDI controller" = "MIDI kontrolcü"
 "Ctrl" = "Ctrl"
-"MIDI input port number" = "MIDI giriş port numarası"
 "MIDI channel number" = "MIDI kanal numarası"
 "Continuous Controller number" = "Continuous Controller numarası"
 "Auto detect" = "Otomatik algıla"

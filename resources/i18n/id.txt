@@ -9010,7 +9010,6 @@ countries: id
 "New link" = "Tautan baru"
 "MIDI controller" = "Kontroler MIDI"
 "Ctrl" = "Ctrl"
-"MIDI input port number" = "Nomor port input MIDI"
 "MIDI channel number" = "Nomor channel MIDI"
 "Continuous Controller number" = "Nomor Continuous Controller"
 "Auto detect" = "Deteksi otomatis"

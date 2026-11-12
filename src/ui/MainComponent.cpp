@@ -1805,6 +1805,9 @@ bool MainComponent::runAction (const std::string& id)
     }
     if (id == "view.hotSwap")
     {
+        // (round 190ck: the default Q only in the Ableton-style layout, core/HotSwap.h keyActsInLayout)
+        if (! hotswap::keyActsInLayout (layoutStyle, keyMap.isDefault ("view.hotSwap")))
+            return false;
         if (browser.isHotSwapping())
         {
             browser.endHotSwap();

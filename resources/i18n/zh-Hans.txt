@@ -9010,7 +9010,6 @@ countries: cn sg
 "New link" = "新建关联"
 "MIDI controller" = "MIDI控制器"
 "Ctrl" = "Ctrl"
-"MIDI input port number" = "MIDI输入端口号"
 "MIDI channel number" = "MIDI通道编号"
 "Continuous Controller number" = "Continuous Controller编号"
 "Auto detect" = "自动检测"

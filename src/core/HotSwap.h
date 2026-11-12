@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "core/LayoutStyle.h"
 #include "core/MixerOps.h"
 #include "core/PlaylistOps.h"
 #include "core/RackOps.h"
@@ -27,6 +28,16 @@
 namespace lynx::hotswap
 {
 enum class Kind : std::uint8_t { none, effect, channel };
+
+// Round 190ck (the 0.1.27 rollup, coordinator's decision): the default key of "view.hotSwap", a plain Q, is the
+// reference DAW's key and acts only in the Ableton-style (Clip-launch) layout. In FL's Pattern layout and in the Simple
+// layout the default key does nothing (the chord falls through as if unbound; FL has no hot-swap mode and gives Q no
+// such meaning): hot-swap stays reachable there from the Mixer slot's menu, the Browser's bar and Esc. A key the user
+// bound to the action himself (`defaultKeys` false) works in every layout.
+constexpr bool keyActsInLayout (layoutstyle::Style style, bool defaultKeys) noexcept
+{
+    return style == layoutstyle::Style::clipLaunch || ! defaultKeys;
+}
 
 // What the Browser is linked to. The slot / channel is followed by its running instance (core InstanceTag), so the link
 // survives a reorder of the chain or of the Channel Rack; a swap gives the new device's instance back.

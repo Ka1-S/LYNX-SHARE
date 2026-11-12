@@ -9131,7 +9131,6 @@ countries: br
 "New link" = "Novo vínculo"
 "MIDI controller" = "Controlador MIDI"
 "Ctrl" = "Ctrl"
-"MIDI input port number" = "Número da porta de entrada MIDI"
 "MIDI channel number" = "Número do canal MIDI"
 "Continuous Controller number" = "Número do Continuous Controller"
 "Auto detect" = "Detectar automaticamente"
