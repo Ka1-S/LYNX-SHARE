@@ -508,8 +508,9 @@ juce::var rackToVar (const RackDoc& r)
     o->setProperty ("kind", (int) r.kind);
     if (! r.name.empty())
         o->setProperty ("name", str (r.name));
-    juce::Array<juce::var> chains;
-    for (const auto& c : r.chains)
+    juce::Array<juce::var> chains, returns;
+    for (const auto* list : { &r.chains, &r.returns })
+    for (const auto& c : *list)
     {
         auto v = std::make_unique<juce::DynamicObject>();
         v->setProperty ("name", str (c.name));
@@ -530,9 +531,25 @@ juce::var rackToVar (const RackDoc& r)
         v->setProperty ("mixer", c.mixer);
         if (c.gate >= 0)
             v->setProperty ("gate", c.gate);
-        chains.add (juce::var (v.release()));
+        if (r.drum && list == &r.chains) // a Drum Rack pad (round 190ec): [receive, play, choke, audio to] and its sends
+        {
+            v->setProperty ("pad", ints ({ c.receive, c.play, c.choke, c.audioTo }));
+            juce::Array<juce::var> sends; // [level, on] per return chain
+            for (const auto& x : c.sends)
+                sends.add (juce::Array<juce::var> { (double) x.level, x.on });
+            if (! sends.isEmpty())
+                v->setProperty ("sends", sends);
+        }
+        (list == &r.chains ? chains : returns).add (juce::var (v.release()));
     }
     o->setProperty ("chains", chains);
+    if (r.drum) // (round 190ec; a LYNX without Drum Racks reads an Instrument Rack: kind 1, its pads key-split)
+    {
+        o->setProperty ("drum", true);
+        if (! returns.isEmpty())
+            o->setProperty ("returns", returns);
+        o->setProperty ("drumView", juce::Array<juce::var> { r.showPads, r.showIO, r.showSends, r.showReturns, r.padScroll });
+    }
     juce::Array<juce::var> macros;
     for (const auto& m : r.macros)
     {
@@ -603,7 +620,9 @@ RackDoc rackFromVar (const juce::var& v, int nodeCount)
         z.fadeHi = juce::jlimit (z.fadeLo, z.hi, (int) a[3]);
         return z;
     };
-    if (auto* chains = v["chains"].getArray())
+    r.drum = (bool) v.getProperty ("drum", false) && r.kind == RackDoc::Kind::instrument;
+    const auto readChains = [&] (const juce::var& list, std::vector<RackChain>& into, bool pads) {
+        if (auto* chains = list.getArray())
         for (const auto& c : *chains)
         {
             RackChain chain;
@@ -622,8 +641,44 @@ RackDoc rackFromVar (const juce::var& v, int nodeCount)
                         chain.nodes.push_back (k);
             chain.mixer = node (c.getProperty ("mixer", -1));
             chain.gate = node (c.getProperty ("gate", -1));
-            r.chains.push_back (std::move (chain));
+            if (pads && r.drum)
+            {
+                if (const auto& pad = c["pad"]; pad.isArray() && pad.size() >= 4)
+                {
+                    chain.receive = juce::jlimit (-1, 127, (int) pad[0]);
+                    chain.play = juce::jlimit (0, 127, (int) pad[1]);
+                    chain.choke = juce::jlimit (0, rack::drumChokeGroups, (int) pad[2]);
+                    chain.audioTo = juce::jmax (-1, (int) pad[3]);
+                }
+                if (auto* sends = c["sends"].getArray())
+                    for (const auto& x : *sends)
+                        if (x.isArray() && x.size() >= 2)
+                            chain.sends.push_back ({ juce::jlimit (0.0f, 1.0f, (float) (double) x[0]), (bool) x[1] });
+            }
+            else if (! pads)
+                chain.receive = -1;
+            into.push_back (std::move (chain));
         }
+    };
+    readChains (v["chains"], r.chains, true);
+    if (r.drum)
+    {
+        readChains (v["returns"], r.returns, false);
+        for (auto& c : r.chains)
+        {
+            c.sends.resize (r.returns.size());
+            if (c.audioTo >= (int) r.returns.size())
+                c.audioTo = -1;
+        }
+        if (const auto& view = v["drumView"]; view.isArray() && view.size() >= 5)
+        {
+            r.showPads = (bool) view[0];
+            r.showIO = (bool) view[1];
+            r.showSends = (bool) view[2];
+            r.showReturns = (bool) view[3];
+            r.padScroll = juce::jlimit (0, rack::drumPadRows - 4, (int) view[4]);
+        }
+    }
     if (auto* macros = v["macros"].getArray())
         for (int k = 0; k < juce::jmin (rackMacroCount, macros->size()); ++k)
         {
@@ -687,7 +742,7 @@ RackDoc rackFromVar (const juce::var& v, int nodeCount)
         r.showDevices = (bool) view[2];
         r.showVariations = (bool) view[3];
         r.zoneEditor = juce::jlimit (-1, 2, (int) view[4]);
-        r.selectedChain = juce::jlimit (0, juce::jmax (0, (int) r.chains.size() - 1), (int) view[5]);
+        r.selectedChain = juce::jlimit (0, juce::jmax (0, rack::chainSlots (r) - 1), (int) view[5]);
         r.autoSelect = (bool) view[6];
     }
     return r;

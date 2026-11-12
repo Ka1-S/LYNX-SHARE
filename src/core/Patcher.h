@@ -199,8 +199,10 @@ private:
         std::array<std::uint16_t, 128> held {}; // [key] the MIDI channels (bit) of the notes that entered
     };
     std::vector<ZoneState> zoneStates;
-    // true = the note enters (its velocity scaled by the zone); a note-off passes only if its note-on did
-    bool zoneGate (int zone, bool on, int key, int midiChannel, float& velocity) noexcept;
+    // true = the note enters (its velocity scaled by the zone); a note-off passes only if its note-on did. A Drum Rack
+    // pad's zone (round 190ec) turns `key` into its Play note, and a note-on cuts the other pads of its choke group.
+    bool zoneGate (int zone, bool on, int& key, int midiChannel, float& velocity) noexcept;
+    void choke (int zone) noexcept;
     // A Layer node (round 165c, FL's Layer inside a Patcher): the generator nodes cabled to its Children pin are its
     // children, in node order; Random / Sequential / Crossfade and its level, pan and pitch as a Layer channel's.
     struct LayerNode;

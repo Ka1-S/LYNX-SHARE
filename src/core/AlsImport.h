@@ -42,6 +42,9 @@ struct AlsImportOptions
     // Session clips: false (default, the user's choice of 2026-11-08) → LYNX's clip grid, scene for scene (round 181c);
     // true → the Playlist after the arrangement, one section per scene (the default before).
     bool sessionOnPlaylist = false;
+    // Drum Racks (round 190ec): false (default) → a LYNX Drum Rack with the pads' chains, choke groups, returns and
+    // sends; true → one sampler channel per pad, as an FL drum kit (the import before 190ec)
+    bool drumPadsAsChannels = false;
 };
 
 // True for a gzip file whose XML root is a Live set (also for plain XML starting with <?xml … <Ableton).

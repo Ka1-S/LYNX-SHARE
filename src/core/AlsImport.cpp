@@ -586,7 +586,60 @@ RackZone zoneOf (const Element& range, RackZone fallback)
     return z;
 }
 
-// Fills a new rack document from a Live rack device (the document comes from rack::makeRack: its first chain is replaced)
+// A Drum Rack pad (round 190ec, docs/analise/ALS_FORMAT.md §7): DrumBranch/BranchInfo {ReceivingNote = 128 − the key, 0 = all
+// notes; SendingNote = the key played; ChokeGroup 0 none, 1…16} [DATA: the shipped kits, pad names against clip notes],
+// the chain's sends (MixerDevice/SendInfos/AudioBranchSendInfo {Index, Send (linear gain, −70 dB floor = off), EnabledByUser})
+// and its Audio To (RoutingHelper/Routable/Target "…/DeviceIn.<d>.R<k>,ChainIn" = return chain k; "AudioOut/None" = the
+// rack's output) [DATA: Drums Lesson routes all 16 pads into "a Mix Bus" that way]
+void drumPadFrom (const Element& branch, RackChain& chain, std::vector<std::vector<std::pair<int, RackSend>>>& sends, std::vector<int>& audioTo)
+{
+    const auto receiving = (int) branch.number ("BranchInfo/ReceivingNote", 128 - rack::drumFirstPad);
+    chain.receive = receiving >= 1 && receiving <= 128 ? 128 - receiving : -1;
+    chain.play = std::clamp ((int) branch.number ("BranchInfo/SendingNote", rack::drumPlayNote), 0, 127);
+    chain.choke = std::clamp ((int) branch.number ("BranchInfo/ChokeGroup", 0), 0, rack::drumChokeGroups);
+    std::vector<std::pair<int, RackSend>> mine;
+    for (const auto& info : branch.path ("MixerDevice/SendInfos").children ("AudioBranchSendInfo"))
+    {
+        RackSend x;
+        const auto level = info.number ("Send/Manual", 0.0);
+        x.level = level > 0.000317 ? (float) std::clamp (level, 0.0, 1.0) : 0.0f; // (Live's floor, −70 dB, is −inf)
+        x.on = info.boolean ("EnabledByUser", true);
+        mine.emplace_back ((int) info.number ("Index", (double) mine.size()), x);
+    }
+    sends.push_back (std::move (mine));
+    const auto target = branch.value ("MixerDevice/RoutingHelper/Routable/Target");
+    int to = -1;
+    if (const auto at = target.rfind (".R"); at != std::string::npos && target.find (",ChainIn", at) != std::string::npos)
+        to = std::atoi (target.c_str() + at + 2);
+    audioTo.push_back (to);
+}
+
+void drumReturnsFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
+{
+    for (const auto& branch : device.path ("ReturnBranches").children())
+    {
+        auto name = branch.value ("Name/UserName");
+        if (name.empty())
+            name = branch.value ("Name/EffectiveName");
+        const auto k = rack::addReturn (doc, name);
+        auto* r = rack::rackOf (doc);
+        if (k < 0)
+            return;
+        auto& ret = r->returns[(std::size_t) k];
+        ret.active = branch.boolean ("MixerDevice/Speaker/Manual", true);
+        ret.solo = branch.boolean ("IsSoloed", false);
+        ret.volume = (float) std::clamp (branch.number ("MixerDevice/Volume/Manual", 1.0), 0.0, 2.0);
+        ret.pan = (float) std::clamp (branch.number ("MixerDevice/Panorama/Manual", 0.0), -1.0, 1.0);
+        const auto slot = (int) r->chains.size() + k;
+        for (const auto& d : branch.path ("DeviceChain/AudioToAudioDeviceChain/Devices").children())
+            rackDeviceFrom (ctx, d, doc, slot, false, depth, nullptr, nullptr);
+        if (mappingOf (branch.path ("MixerDevice/Volume")) || mappingOf (branch.path ("MixerDevice/Panorama")))
+            ctx.note (&FlpImportReport::approximated, "Drum rack: a macro on a return chain's volume or pan (not applied)");
+    }
+}
+
+// Fills a new rack document from a Live rack device (the document comes from rack::makeRack: its first chain is replaced;
+// from rack::makeDrumRack for a Drum Rack)
 bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
 {
     auto* r = rack::rackOf (doc);
@@ -595,6 +648,12 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
     const auto instrumentRack = r->kind == RackDoc::Kind::instrument;
     std::array<std::vector<std::string>, rackMacroCount> droppedTargets;
     auto skipMidi = std::exchange (ctx.skipLeadingMidi, 0); // (round 190cf) only for the rack this call reads
+    // a Drum Rack (round 190ec): its pads' Simplers play their Play note, so a Slice-mode Simpler on a pad must not move
+    // the track's notes (the key shift is the track channel's own)
+    const auto drum = r->drum;
+    const auto keyShiftBefore = ctx.pendingKeyShift;
+    std::vector<std::vector<std::pair<int, RackSend>>> drumSends; // [chain] (return index, send)
+    std::vector<int> drumAudioTo;
     while (! r->chains.empty())
     {
         rack::removeChain (doc, 0);
@@ -615,6 +674,8 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
         chain.select = zoneOf (branch.child ("BranchSelectorRange"), RackZone { 0, 0, 0, 0 });
         chain.key = zoneOf (branch.path ("ZoneSettings/KeyRange"), RackZone {});
         chain.velocity = zoneOf (branch.path ("ZoneSettings/VelocityRange"), RackZone { 1, 127, 1, 127 });
+        if (drum)
+            drumPadFrom (branch, chain, drumSends, drumAudioTo);
         // the chain's devices (Live's chain kinds: AudioToAudio, MidiToAudio, MidiToMidi) [DATA]
         for (const auto* list : { "DeviceChain/AudioToAudioDeviceChain/Devices", "DeviceChain/MidiToAudioDeviceChain/Devices" })
             for (const auto& d : branch.path (list).children())
@@ -659,7 +720,28 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
         }
         r = rack::rackOf (doc);
     }
-    if (r->chains.empty())
+    if (drum) // the return chains, then the chains' sends and Audio To (round 190ec)
+    {
+        drumReturnsFrom (ctx, device, doc, depth);
+        r = rack::rackOf (doc);
+        for (int c = 0; c < (int) r->chains.size() && c < (int) drumSends.size(); ++c)
+        {
+            auto& chain = r->chains[(std::size_t) c];
+            chain.sends.assign (r->returns.size(), RackSend {});
+            for (const auto& [k, send] : drumSends[(std::size_t) c])
+                if (k >= 0 && k < (int) r->returns.size())
+                    chain.sends[(std::size_t) k] = send;
+            const auto to = drumAudioTo[(std::size_t) c];
+            chain.audioTo = to >= 0 && to < (int) r->returns.size() ? to : -1;
+        }
+        ctx.pendingKeyShift = keyShiftBefore;
+        r->showPads = device.boolean ("ArePadsVisible", true);
+        r->showIO = device.boolean ("IsMidiSectionVisible", false);
+        r->showSends = device.boolean ("AreSendsVisible", false);
+        r->showReturns = device.boolean ("IsReturnBranchesListVisible", false);
+        r->padScroll = std::clamp ((int) device.number ("PadScrollPosition", rack::drumDefaultScroll), 0, rack::drumPadRows - 4);
+    }
+    else if (r->chains.empty())
         rack::addChain (doc);
     r = rack::rackOf (doc);
     for (int k = 0; k < rackMacroCount; ++k)
@@ -718,7 +800,7 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
             rack::setMacro (doc, k, rack::rackOf (doc)->macros[(std::size_t) k].value);
     rack::rackOf (doc)->name = device.value ("UserName");
     rack::compile (doc);
-    ctx.note (&FlpImportReport::converted, instrumentRack ? "Instrument rack" : "Audio effect rack");
+    ctx.note (&FlpImportReport::converted, drum ? "Drum rack" : instrumentRack ? "Instrument rack" : "Audio effect rack");
     return true;
 }
 
@@ -799,6 +881,17 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
         }
         ctx.note (&FlpImportReport::converted, tag == "OriginalSimpler" ? "Simpler" : "Sampler");
         return true;
+    }
+    if (tag == "DrumGroupDevice" && depth < 8 && ! ctx.options.drumPadsAsChannels) // (round 190ec: a LYNX Drum Rack)
+    {
+        auto doc = rack::makeDrumRack();
+        if (rackFrom (ctx, device, doc, depth))
+        {
+            channel.instrument = InstrumentKind::patcher;
+            channel.patcher = std::move (doc);
+            return true;
+        }
+        return false;
     }
     if (tag == "DrumGroupDevice" && pads != nullptr)
     {
