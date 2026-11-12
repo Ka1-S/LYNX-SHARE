@@ -74,7 +74,12 @@ constexpr int spectralTiltParam0 = 106; // + band
 // the EQ / the target = the slot's sidechain track, both delayed by the EQ's latency), [115] target level match
 constexpr int listenParam = 114;
 constexpr int targetLevelParam = 115;
-constexpr int paramCount = 116;
+// round 190cx (.als import, measured in Live 12.4): [116] cut Q law — 0 = the highest-Q section of a steep cut carries
+// the band's Q (the reference EQ's law, the default: every older project keeps it), 1 = every section's Q is scaled
+// by the band's Q (Live's EQ Eight 48 dB cuts: an 8th-order Butterworth at Q 1, all four section Qs scaled with Q).
+// 6 and 12 dB/oct cuts have one section and sound the same under both.
+constexpr int cutLawParam = 116;
+constexpr int paramCount = 117;
 constexpr int maxSections = 8; // 96 dB/oct = 16th order
 
 enum class Shape { off, bell, lowShelf, highShelf, lowCut, highCut, notch, bandPass, tiltShelf, flatTilt, allPass };

@@ -100,23 +100,44 @@ double gainOfDb (double db) noexcept { return std::pow (10.0, db / 20.0); }
 
 // ================================================================================================ EQ Eight
 
-double facetQ (Eq8Mode mode, double liveQ) noexcept
+double eq8CutSectionScale (double liveQ) noexcept
+{
+    return std::max (0.05, 1.0 + 0.2611 * std::log (std::max (liveQ, 1.0e-3) / 0.714));
+}
+
+double eq8ShelfCookbookQ (double liveQ) noexcept
+{
+    return std::sqrt (0.5) * std::pow (root2 * std::max (liveQ, 1.0e-3), 0.3966);
+}
+
+double eq8AdaptiveQ (double liveQ, double gainDb, double factor) noexcept
+{
+    return liveQ * std::pow (std::clamp (factor, 1.0, 4.0), std::abs (gainDb) / 2.0);
+}
+
+namespace
+{
+double facetQUnclamped (Eq8Mode mode, double liveQ) noexcept
 {
     const auto q = std::max (liveQ, 1.0e-3);
-    double out = q;
     switch (mode)
     {
         case Eq8Mode::bell:
-        case Eq8Mode::notch: out = root2 * q; break;
-        case Eq8Mode::lowShelf:
-        case Eq8Mode::highShelf: out = std::pow (q * root2, 1.0 / 0.4697); break;
+        case Eq8Mode::notch:
         case Eq8Mode::lowCut12:
-        case Eq8Mode::highCut12: out = q * root2; break;
+        case Eq8Mode::highCut12: return root2 * q;
+        // Facet's shelf is the cookbook shelf with Qs = 0.7071·Qfacet^0.4697
+        case Eq8Mode::lowShelf:
+        case Eq8Mode::highShelf: return std::pow (eq8ShelfCookbookQ (q) / std::sqrt (0.5), 1.0 / 0.4697);
+        // with Facet's cut law "all sections" its Q is the scale of the Butterworth section Qs
         case Eq8Mode::lowCut48:
-        case Eq8Mode::highCut48: out = root2 * q * q * q * q; break;
+        case Eq8Mode::highCut48: return eq8CutSectionScale (q);
     }
-    return std::clamp (out, 0.025, 40.0);
+    return q;
 }
+} // namespace
+
+double facetQ (Eq8Mode mode, double liveQ) noexcept { return std::clamp (facetQUnclamped (mode, liveQ), 0.025, 40.0); }
 
 void setFacetBand (EffectParams& p, int b, const Eq8Band& band, double gainSign, int placement)
 {
@@ -165,16 +186,28 @@ bool eqEightToFacet (const Element& device, EffectSlot& slot, Notes& notes)
     p[facet::scaleParam] = unit (std::abs (scale) / 2.0);
     p[facet::outputParam] = linValue (manual (device, "GlobalGain", 0.0), -24.0, 24.0); // ±12 dB in Live
 
-    bool gained = false, clampedQ = false;
+    // 48 dB cuts [MEASURED 190cw r01–r03]: every Butterworth section scaled with Q (Facet's "all sections" cut law)
+    p[facet::cutLawParam] = 1.0f;
+    bool shelfGained = false, clampedQ = false;
     const auto noteBand = [&] (const Eq8Band& band) {
-        const auto hasGain = band.mode == Eq8Mode::bell || band.mode == Eq8Mode::lowShelf || band.mode == Eq8Mode::highShelf;
-        gained = gained || (band.on && hasGain && std::abs (band.gainDb) > 0.05);
-        const auto q = std::max (band.q, 1.0e-3);
-        const auto wanted = band.mode == Eq8Mode::lowCut48 || band.mode == Eq8Mode::highCut48 ? root2 * q * q * q * q
-                            : band.mode == Eq8Mode::lowShelf || band.mode == Eq8Mode::highShelf ? std::pow (q * root2, 1.0 / 0.4697) : q * root2;
+        const auto wanted = facetQUnclamped (band.mode, band.q);
         clampedQ = clampedQ || (band.on && (wanted > 40.0 || wanted < 0.025));
-        if (band.on && (band.mode == Eq8Mode::lowCut48 || band.mode == Eq8Mode::highCut48))
-            notes.approximated.push_back ("48 dB/oct cut (same slope and level at the cut frequency, a rounder corner)");
+        // the laws hold where they were measured (round 190cw renders); outside, they are extrapolated and listed
+        if (band.on && (band.mode == Eq8Mode::lowCut48 || band.mode == Eq8Mode::highCut48) && (band.q < 0.45 || band.q > 1.1))
+            notes.approximated.push_back (text ("48 dB/oct cut at Q %.2f (Live's law measured at Q 0.5 … 1)", band.q));
+        if (band.on && (band.mode == Eq8Mode::lowShelf || band.mode == Eq8Mode::highShelf) && std::abs (band.gainDb) > 0.05 && (band.q < 0.65 || band.q > 2.2))
+            notes.approximated.push_back (text ("shelf at Q %.2f (Live's shelf Q law measured at Q 0.71 and 2)", band.q));
+        shelfGained = shelfGained || (band.on && (band.mode == Eq8Mode::lowShelf || band.mode == Eq8Mode::highShelf) && std::abs (band.gainDb) > 0.05);
+    };
+    // Adaptive Q [MEASURED 190cw r09 / r12: a bell at Q 2, ±12 dB acts as Q 3.97 / 3.95 with AdaptiveQ on; DATA:
+    // AdaptiveQFactor 1.12 in every saved device]: the bell's Q × factor^(|gain| / 2) — with 1.12 that is
+    // Q·10^(|gain| / 40) within 1 %. The gain is the one the filter gets (after Scale) [ASSUMED]
+    const auto adaptive = manualBool (device, "AdaptiveQ", false);
+    const auto adaptiveFactor = device.number ("AdaptiveQFactor", 1.12);
+    const auto adapt = [&] (Eq8Band band) {
+        if (adaptive && band.mode == Eq8Mode::bell)
+            band.q = eq8AdaptiveQ (band.q, band.gainDb * std::abs (scale), adaptiveFactor);
+        return band;
     };
 
     // Mode [DATA: 0 Stereo, 1 L/R, 2 M/S]: in Stereo only curve A sounds; in L/R and M/S curve A is the left / mid
@@ -184,7 +217,7 @@ bool eqEightToFacet (const Element& device, EffectSlot& slot, Notes& notes)
     {
         for (int b = 0; b < facet::bands; ++b)
         {
-            const auto band = readBand (b, "ParameterA");
+            const auto band = adapt (readBand (b, "ParameterA"));
             setFacetBand (p, b, band, sign, (int) facet::Placement::stereo);
             noteBand (band);
         }
@@ -197,7 +230,7 @@ bool eqEightToFacet (const Element& device, EffectSlot& slot, Notes& notes)
         for (const auto* curve : { "ParameterA", "ParameterB" })
             for (int b = 0; b < 8; ++b)
             {
-                const auto band = readBand (b, curve);
+                const auto band = adapt (readBand (b, curve));
                 if (! band.on)
                     continue;
                 if (used >= facet::bands)
@@ -213,10 +246,8 @@ bool eqEightToFacet (const Element& device, EffectSlot& slot, Notes& notes)
         if (left > 0)
             notes.dropped.push_back (text ("%.0f band(s) of the second channel curve (Facet EQ has 8 bands in all)", left));
     }
-    // Adaptive Q [DATA: AdaptiveQ on in most devices, AdaptiveQFactor 1.12]: Live narrows a band as its gain grows; the
-    // law is not known, so the bands keep the Q the device stores
-    if (manualBool (device, "AdaptiveQ", false) && gained)
-        notes.approximated.push_back ("Adaptive Q (bands keep their set Q)");
+    if (adaptive && shelfGained)
+        notes.approximated.push_back ("Adaptive Q on a shelf (measured on bells only: the shelf keeps its Q)");
     if (clampedQ)
         notes.approximated.push_back ("a band's resonance beyond Facet EQ's Q range");
     return true;
@@ -331,6 +362,12 @@ bool glueToCrest (const Element& device, EffectSlot& slot, Notes& notes, SideInp
 
 // ================================================================================================ Utility
 
+std::pair<double, double> utilityBalanceGains (double balance) noexcept
+{
+    const auto t = (std::clamp (balance, -1.0, 1.0) + 1.0) * 0.25 * 3.14159265358979323846;
+    return { root2 * std::cos (t), root2 * std::sin (t) };
+}
+
 StereoMatrix utilityMatrix (const LiveUtility& u) noexcept
 {
     const auto sl = u.phaseL ? -1.0 : 1.0, sr = u.phaseR ? -1.0 : 1.0;
@@ -355,6 +392,12 @@ StereoMatrix utilityMatrix (const LiveUtility& u) noexcept
     m.rl = w[0][0] * a[0][1] + w[0][1] * a[1][1];
     m.lr = w[1][0] * a[0][0] + w[1][1] * a[1][0];
     m.rr = w[1][0] * a[0][1] + w[1][1] * a[1][1];
+    // the balance, last: constant power with a boost [MEASURED 190cw r15: +0.5 → L × 0.541, R × 1.307]
+    const auto [gl, gr] = utilityBalanceGains (u.balance);
+    m.ll *= gl;
+    m.rl *= gl;
+    m.lr *= gr;
+    m.rr *= gr;
     return m;
 }
 
@@ -362,10 +405,12 @@ bool utilityIsExact (const LiveUtility& u) noexcept
 {
     const auto db = dbOfGain (u.gain);
     const auto gainOk = u.mute || u.gain <= 0.0 || (db > -24.0 && db <= 24.0);
-    const auto widthOk = u.mono || (u.midSideOn ? std::abs (u.midSide - 1.0) < 1.0e-6 : (std::abs (u.width - 1.0) < 1.0e-6 || u.width < 1.0e-6));
-    // (a phase switch together with a channel mode other than Stereo: which comes first is not known)
-    const auto orderOk = u.channelMode == 1 || ! (u.phaseL || u.phaseR);
-    return gainOk && widthOk && orderOk && std::abs (u.balance) < 1.0e-6 && ! u.bassMono && ! u.dcFilter;
+    // [MEASURED 190cw r13–r17]: width M + w·S, the balance law and phase before channel mode are Live's; the matrix
+    // (balance included) must fit LYNX's ±2 coefficients
+    const auto m = utilityMatrix (u);
+    const auto fits = std::abs (m.ll) <= 2.0 && std::abs (m.rl) <= 2.0 && std::abs (m.lr) <= 2.0 && std::abs (m.rr) <= 2.0;
+    const auto widthOk = u.mono || ! u.midSideOn || std::abs (u.midSide - 1.0) < 1.0e-6;
+    return gainOk && widthOk && fits && ! u.bassMono && ! u.dcFilter;
 }
 
 LiveUtility readUtility (const Element& device)
@@ -404,9 +449,8 @@ bool utilityToUtility (const Element& device, EffectSlot& slot, Notes& notes)
         if (db > 24.0 || db <= -24.0)
             notes.approximated.push_back (text ("gain %.1f dB (Utility: -24 … +24 dB)", db));
     }
-    p[1] = linValue (u.balance, -1.0, 1.0);
-    if (std::abs (u.balance) > 1.0e-6)
-        notes.approximated.push_back ("balance (LYNX lowers the other side in a straight line; Live's law not confirmed)");
+    // the balance is in the matrix (Live's constant-power law); LYNX's own balance stays centred
+    p[1] = 0.5f;
     auto m = utilityMatrix (u);
     const auto fits = std::abs (m.ll) <= 2.0 && std::abs (m.rl) <= 2.0 && std::abs (m.lr) <= 2.0 && std::abs (m.rr) <= 2.0;
     p[2] = linValue (m.ll, -2.0, 2.0);
@@ -414,13 +458,10 @@ bool utilityToUtility (const Element& device, EffectSlot& slot, Notes& notes)
     p[4] = linValue (m.lr, -2.0, 2.0);
     p[5] = linValue (m.rr, -2.0, 2.0);
     if (! fits)
-        notes.approximated.push_back (text ("width %.0f %% (Utility's matrix reaches 300 %%)", u.width * 100.0));
-    else if (! u.mono && ! u.midSideOn && std::abs (u.width - 1.0) > 1.0e-6 && u.width > 1.0e-6)
-        notes.approximated.push_back (text ("width %.0f %% (mid + width x side; Live's law not confirmed)", u.width * 100.0));
+        notes.approximated.push_back (std::abs (u.balance) > 1.0e-6 ? text ("width %.0f %% with a balance (Utility's matrix coefficients reach 2)", u.width * 100.0)
+                                                                    : text ("width %.0f %% (Utility's matrix reaches 300 %%)", u.width * 100.0));
     if (! u.mono && u.midSideOn && std::abs (u.midSide - 1.0) > 1.0e-6)
         notes.approximated.push_back ("mid/side balance (straight-line law; Live's not confirmed)");
-    if (u.channelMode != 1 && (u.phaseL || u.phaseR))
-        notes.approximated.push_back ("phase switch with a channel mode (their order in Live not confirmed)");
     if (u.bassMono)
         notes.dropped.push_back (text ("Bass Mono (below %.0f Hz)", manual (device, "BassMonoFrequency", 120.0)));
     if (u.dcFilter)
