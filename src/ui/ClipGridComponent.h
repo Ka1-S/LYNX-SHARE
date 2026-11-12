@@ -8,6 +8,7 @@
 namespace lynx
 {
 class AudioEngine;
+class SessionMixerComponent;
 
 // The clip grid of the Clip-launch workflow (round 181a, core/ClipLauncher.h): Playlist tracks as columns, scenes as rows.
 // Own design and art. Made only the first time the grid is shown; never in Pattern workflow. It repaints from a timer that
@@ -26,4 +27,8 @@ juce::PopupMenu clipGridSlotMenu (juce::Component& grid, int track, int scene);
 bool clipGridDrag (const juce::var& description, int& track, int& scene);
 // The grid's selected track and scene ({ 0, 0 } before any click).
 std::pair<int, int> clipGridSelection (juce::Component& grid);
+// Round 190dr: the Session mixer under the slots (ui/SessionMixer.h), and the column a dragged device would land in
+// (-1: none), for --liveshot190dr.
+SessionMixerComponent* clipGridMixer (juce::Component& grid);
+void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track);
 } // namespace lynx

@@ -6,8 +6,12 @@
 #include "core/Groove.h"
 #include "core/SessionOps.h"
 #include "ui/ClipGridComponent.h"
+#include "ui/SessionMixer.h"
 #include "core/FlSamplers.h"
 #include "core/ArrangeOps.h"
+#include "core/ClipSample.h"
+#include "core/DetailChain.h"
+#include "core/SessionMixer.h"
 #include "core/PlaylistOps.h"
 #include "core/WarpTools.h"
 #include "core/Comping.h"
@@ -1997,6 +2001,17 @@ public:
             // swap and its undo, a duplicate, and the Browser's collections (STARRED tab, the Collections menu, a search
             // by a collection's name). Writes prefix-checks.txt.
             runLiveShot190ce (args[args.indexOf ("--liveshot190ce") + 1].unquoted());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--liveshot190dr"))
+        {
+            // LYNX.exe --liveshot190dr prefix: round 190dr off-screen, in the Clip-launch workflow: the Session mixer
+            // under the clip grid (default sections, Track Options, Volume only, hidden, its View menu), the Clip page's
+            // Sample panel of an audio clip (Warp on / off, the Set buttons while it plays, the sample's title) and a
+            // device dragged from one track's Device View to another track. Writes prefix-checks.txt.
+            runLiveShot190dr (args[args.indexOf ("--liveshot190dr") + 1].unquoted());
             quit();
             return;
         }
@@ -4210,6 +4225,71 @@ private:
                 arrange190cgResult = "ERROR round trip " + why;
         }
 
+        // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
+        // a device dragged to another track and a Warp switch are one undo step each in a real engine
+        juce::String livescr190drResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::launcher::ensureGrid (song);
+            juce::String why;
+            const auto plain = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            song.clipGrid->mixerView.io = false;
+            song.clipGrid->mixerView.trackOptions = true;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            if (! plain || ! plain->clipGrid || ! (plain->clipGrid->mixerView == lynx::SessionMixerView {}))
+                livescr190drResult = "ERROR view defaults " + why;
+            else if (! back || ! back->clipGrid || back->clipGrid->mixerView.io || ! back->clipGrid->mixerView.trackOptions || ! back->clipGrid->mixerView.shown)
+                livescr190drResult = "ERROR view round trip " + why;
+            lynx::AudioEngine e (false);
+            e.editSong ([] (lynx::Song& s) {
+                if (s.mixer.size() < 4)
+                    s.mixer.resize (4);
+                s.mixer[2].effects.clear();
+                s.mixer[3].effects.clear();
+                for (auto kind : { lynx::EffectKind::eq, lynx::EffectKind::compressor })
+                {
+                    lynx::EffectSlot fx;
+                    fx.kind = kind;
+                    s.mixer[2].effects.push_back (fx);
+                }
+                lynx::Automation a;
+                a.target = { lynx::AutomationTargetKind::effectMix, 2, 1, 0 };
+                s.automations.push_back (a);
+            }, false);
+            const auto id = e.getSong().mixer[2].effects[1].instance.id;
+            const auto automations = e.getSong().automations.size();
+            e.editSongStructural ([] (lynx::Song& s) { lynx::detailchain::moveEffectToInsert (s, 2, 1, 3, false); });
+            const auto& moved = e.getSong();
+            if (livescr190drResult == "OK"
+                && (moved.mixer[2].effects.size() != 1 || moved.mixer[3].effects.size() != 1 || moved.mixer[3].effects[0].instance.id != id
+                    || moved.automations.size() != automations || moved.automations.back().target.index != 3 || moved.automations.back().target.slot != 0))
+                livescr190drResult = "ERROR device move";
+            e.undo();
+            const auto& undone = e.getSong();
+            if (livescr190drResult == "OK"
+                && (undone.mixer[2].effects.size() != 2 || undone.mixer[3].effects.size() != 0 || undone.mixer[2].effects[1].instance.id != id
+                    || undone.automations.back().target.index != 2 || undone.automations.back().target.slot != 1))
+                livescr190drResult = "ERROR device move undo";
+            e.editSong ([] (lynx::Song& s) {
+                s.channels.resize (std::max<std::size_t> (s.channels.size(), 1));
+                s.channels[0].sampler.stretchBeats = 16.0f;
+                lynx::Clip c;
+                c.kind = lynx::ClipKind::audio;
+                c.channel = 0;
+                c.offset = 4 * lynx::ppq;
+                c.length = 8 * lynx::ppq;
+                lynx::launcher::setClip (s, 0, 0, c);
+            }, false);
+            e.editSong ([] (lynx::Song& s) { lynx::clipsample::setWarp (s, 0, false, 4.0); });
+            const auto* off = e.getSong().clipGrid ? lynx::launcher::clipAt (*e.getSong().clipGrid, 0, 0) : nullptr;
+            if (livescr190drResult == "OK" && (e.getSong().channels[0].sampler.stretchBeats != 0.0f || off == nullptr || off->length != (std::int64_t) std::llround (8.0 * lynx::ppq * (4.0 * e.getSong().bpm / 60.0) / 16.0)))
+                livescr190drResult = "ERROR warp off";
+            e.undo();
+            const auto* on = e.getSong().clipGrid ? lynx::launcher::clipAt (*e.getSong().clipGrid, 0, 0) : nullptr;
+            if (livescr190drResult == "OK" && (e.getSong().channels[0].sampler.stretchBeats != 16.0f || on == nullptr || on->length != 8 * lynx::ppq))
+                livescr190drResult = "ERROR warp undo";
+        }
+
         const auto mixerBasics = lynx::mixerbasics::run();
         // issue #142: every font has a typeface, and one without does not crash (fonts get theirs through the
         // look and feel, as in the app)
@@ -4252,7 +4332,7 @@ private:
                         && mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
+                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
                         && danceWindowResult == "OK";
 
         juce::String report;
@@ -4303,6 +4383,7 @@ private:
                << "dance_window_detail=" << danceWindowDetail << "\n"
                << "lanes_saved=" << lanesResult << "\n"
                << "arrange190cg_saved=" << arrange190cgResult << "\n"
+               << "livescr190dr=" << livescr190drResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -16036,6 +16117,297 @@ private:
         store = {};
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
         lib.deleteRecursively();
+    }
+
+    void runLiveShot190dr (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto write = [&prefix] (juce::Component& c, const char* name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (c), out);
+        };
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+
+        // a two-bar loop of clicks for the audio clip
+        const auto wav = juce::File (prefix + "-loop.wav");
+        wav.deleteFile();
+        {
+            const double rate = 48000.0;
+            juce::AudioBuffer<float> buffer (2, (int) (rate * 4.0));
+            buffer.clear();
+            for (int hit = 0; hit < 16; ++hit)
+                for (int k = 0; k < 3000 && hit * 12000 + k < buffer.getNumSamples(); ++k)
+                    for (int ch = 0; ch < 2; ++ch)
+                        buffer.setSample (ch, hit * 12000 + k, (float) (std::sin (k * (hit % 4 == 0 ? 0.05 : 0.3)) * std::exp (-k / 500.0) * 0.8));
+            if (auto out = std::unique_ptr<juce::FileOutputStream> (wav.createOutputStream()))
+                if (auto* writer = juce::WavAudioFormat().createWriterFor (out.get(), rate, 2, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> owned (writer);
+                    owned->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+                }
+        }
+        ui.setVisible (true);
+        lynx::DetailView::shownSetting = true;
+        lynx::DetailView::devicesPage = false;
+        ui.setClipLaunchWorkflow (true);
+        ui.getPlaylistForSnapshot().addAudioClipAtPlayhead (wav);
+        offline.dispatchPendingMessages();
+        int audioChannel = -1;
+        offline.editSong ([&audioChannel] (lynx::Song& s) {
+            lynx::Clip audio;
+            if (! s.playlist.empty())
+            {
+                audio = s.playlist.front();
+                audioChannel = audio.channel;
+                s.playlist.clear();
+            }
+            const int channels = (int) s.channels.size();
+            s.channels.resize ((std::size_t) channels + 3);
+            const char* names[] { "Drum kit", "Bass synth", "Keys" };
+            for (int k = 0; k < 3; ++k)
+            {
+                auto& ch = s.channels[(std::size_t) (channels + k)];
+                ch.name = names[k];
+                ch.instrument = k == 0 ? lynx::InstrumentKind::sampler : lynx::InstrumentKind::synth;
+                ch.mixerTrack = k + 1;
+            }
+            if (audioChannel >= 0)
+                s.channels[(std::size_t) audioChannel].mixerTrack = 5;
+            if (s.mixer.size() < 8)
+                s.mixer.resize (8);
+            const char* inserts[] { "Master", "Drums", "Bass", "Keys", "Vox", "Loop", "Reverb", "Delay" };
+            for (int i = 1; i < 8; ++i)
+                s.mixer[(std::size_t) i].name = inserts[i];
+            s.mixer[1].volume = lynx::sessionmixer::positionForDb (-3.0);
+            s.mixer[2].pan = 0.3f;
+            s.mixer[2].effects.clear();
+            for (auto kind : { lynx::EffectKind::eq, lynx::EffectKind::compressor, lynx::EffectKind::delay })
+            {
+                lynx::EffectSlot fx;
+                fx.kind = kind;
+                const auto& info = lynx::effectInfo (kind);
+                for (std::size_t k = 0; k < info.params.size() && k < fx.params.size(); ++k)
+                    fx.params[k] = info.params[k].defaultValue;
+                s.mixer[2].effects.push_back (fx);
+            }
+            s.mixer[3].muted = true; // the Keys' activator off
+            s.mixer[4].inputChannel = 0;
+            s.mixer[4].inputStereo = true;
+            s.mixer[4].monitor = lynx::InputMonitor::automatic;
+            s.mixer[4].effects.clear();
+            {
+                lynx::EffectSlot fx;
+                fx.kind = lynx::EffectKind::reverb;
+                s.mixer[4].effects.push_back (fx);
+            }
+            s.mixer[5].solo = true;
+            for (auto [from, to, level] : std::initializer_list<std::tuple<int, int, float>> { { 1, 6, 0.35f }, { 2, 6, 0.6f }, { 3, 6, 0.8f }, { 2, 7, 0.25f }, { 4, 7, 0.5f } })
+            {
+                lynx::MixerSend send;
+                send.target = to;
+                send.level = lynx::faderGain (level);
+                s.mixer[(std::size_t) from].sends.push_back (send);
+            }
+            while (s.patterns.size() < 3)
+                s.patterns.emplace_back();
+            const char* patterns[] { "Beat", "Bassline", "Chords" };
+            for (int p = 0; p < 3; ++p)
+            {
+                auto& pattern = s.patterns[(std::size_t) p];
+                pattern.name = patterns[p];
+                lynx::Note n;
+                n.channel = channels + p;
+                n.key = 48 + p * 5;
+                pattern.notes = { n };
+                pattern.lengthTicks = 4 * lynx::ppq;
+            }
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 8));
+            const char* tracks[] { "Drums", "Bass", "Keys", "Vox", "Loop", "FX" };
+            for (int t = 0; t < 6; ++t)
+                s.playlistTracks[(std::size_t) t].name = tracks[t];
+            s.playlistTracks[3].mode = lynx::PlaylistTrackMode::audio;
+            s.playlistTracks[3].mixerTrack = 4;
+            for (int t = 0; t < 3; ++t)
+                for (int r = 0; r < 3; ++r)
+                    if (! (t == 2 && r == 0))
+                    {
+                        lynx::Clip clip;
+                        clip.pattern = t;
+                        clip.length = 4 * lynx::ppq;
+                        lynx::launcher::setClip (s, t, r, clip);
+                    }
+            if (audioChannel >= 0)
+            {
+                audio.track = 4;
+                audio.start = 0;
+                lynx::launcher::setClip (s, 4, 0, audio);
+                lynx::launcher::setClip (s, 4, 1, audio);
+            }
+            auto& grid = lynx::launcher::ensureGrid (s);
+            const char* scenes[] { "Intro", "Verse", "Drop" };
+            grid.scenes.resize (5);
+            for (int r = 0; r < 3; ++r)
+                grid.scenes[(std::size_t) r].name = scenes[r];
+        }, false);
+        offline.dispatchPendingMessages();
+        offline.setGridTrackArmed (3, true);
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+        offline.dispatchPendingMessages();
+        ui.resized();
+        auto* gridView = ui.getClipGridForSnapshot();
+        auto* mixer = gridView != nullptr ? lynx::clipGridMixer (*gridView) : nullptr;
+        auto* detail = ui.getDetailViewForSnapshot();
+        if (gridView == nullptr || mixer == nullptr || detail == nullptr)
+        {
+            juce::File (prefix + "-checks.txt").replaceWithText ("FAIL no grid, mixer or detail view\n");
+            return;
+        }
+        // the meters: a level per insert, as a playing song leaves them (offscreen nothing plays), two ticks
+        const auto levels = [&] {
+            for (int k = 0; k < 2; ++k)
+            {
+                const float peaks[] { 0.9f, 0.5f, 0.7f, 0.0f, 0.3f, 0.45f, 0.2f, 0.12f };
+                for (int i = 0; i < 8; ++i)
+                    offline.getMeters().accumulate (i, peaks[i], peaks[i] * 0.85f);
+                mixer->tick();
+            }
+        };
+        if (auto* runtime = offline.launcherStateForSnapshot())
+        {
+            runtime->tracks[0].playing.store (1);
+            runtime->tracks[0].progress.store (0.3f);
+            runtime->tracks[1].playing.store (1);
+            runtime->tracks[1].progress.store (0.3f);
+            runtime->tracks[4].playing.store (0);
+            runtime->tracks[4].progress.store (0.5f);
+            runtime->running.store (true);
+        }
+        levels();
+        gridView->resized();
+        write (ui, "01-session-mixer");
+        write (*gridView, "01b-grid-alone");
+        using Part = lynx::SessionMixerComponent::Part;
+        check ("mixer: Sends rows are the two buses (Reverb 6, Delay 7)", mixer->sendTargets() == std::vector<int> { 6, 7 });
+        check ("mixer: the arm buttons moved into the Volume section", mixer->armsShown());
+        check ("mixer: Drums strip has activator, solo, arm, pan, volume", ! mixer->partBounds (0, Part::activator).isEmpty() && ! mixer->partBounds (0, Part::solo).isEmpty()
+                                                                         && ! mixer->partBounds (0, Part::arm).isEmpty() && ! mixer->partBounds (0, Part::pan).isEmpty()
+                                                                         && ! mixer->partBounds (0, Part::volume).isEmpty());
+        check ("mixer: Vox strip (audio track) has Audio From, its channel, Monitor and Audio To", ! mixer->partBounds (3, Part::inType).isEmpty()
+                                                                                                && ! mixer->partBounds (3, Part::inChannel).isEmpty()
+                                                                                                && ! mixer->partBounds (3, Part::monAuto).isEmpty()
+                                                                                                && ! mixer->partBounds (3, Part::output).isEmpty());
+        check ("mixer: Bass strip (instrument) shows MIDI From, no Monitor", mixer->partBounds (1, Part::monIn).isEmpty() && ! mixer->partBounds (1, Part::output).isEmpty());
+        check ("mixer: FX strip (no clips) has no activator but an arm", mixer->partBounds (5, Part::activator).isEmpty() && ! mixer->partBounds (5, Part::arm).isEmpty());
+        check ("mixer: Main strip has volume and pan, no activator", ! mixer->partBounds (-2, Part::volume).isEmpty() && mixer->partBounds (-2, Part::activator).isEmpty());
+        {
+            const auto hit = mixer->hitAt (mixer->partBounds (2, Part::solo).getCentre());
+            check ("mixer: a click on the Keys' S is its solo", hit.column == 2 && hit.part == Part::solo);
+            const auto send = mixer->hitAt (mixer->partBounds (1, Part::send, 1).getCentre());
+            check ("mixer: the Bass' second knob is its send to Delay", send.column == 1 && send.part == Part::send && send.row == 1);
+        }
+        {
+            juce::PopupMenu menu;
+            mixer->addViewItems (menu);
+            saveMenus (juce::StringArray { "Mixer (footer button)" }, std::vector<juce::PopupMenu> { menu }, prefix + "-02-mixer-view-menu.png");
+        }
+        offline.editSong ([] (lynx::Song& s) { lynx::launcher::ensureGrid (s).mixerView.trackOptions = true; }, false);
+        offline.dispatchPendingMessages();
+        gridView->resized();
+        levels();
+        write (*gridView, "03-mixer-track-options");
+        offline.editSong ([] (lynx::Song& s) {
+            auto& v = lynx::launcher::ensureGrid (s).mixerView;
+            v.trackOptions = v.io = v.sends = false;
+        }, false);
+        offline.dispatchPendingMessages();
+        gridView->resized();
+        levels();
+        write (*gridView, "04-mixer-volume-only");
+        offline.editSong ([] (lynx::Song& s) { lynx::launcher::ensureGrid (s).mixerView.shown = false; }, false);
+        offline.dispatchPendingMessages();
+        gridView->resized();
+        write (*gridView, "05-mixer-hidden");
+        check ("mixer hidden: the arm buttons are back in the status row", ! mixer->armsShown() && mixer->getHeight() == 0);
+        offline.editSong ([] (lynx::Song& s) { lynx::launcher::ensureGrid (s).mixerView = {}; }, false);
+        offline.dispatchPendingMessages();
+        gridView->resized();
+
+        // the Clip page of the Loop clip (track 4, scene 0) while it plays: Warp on, the Set buttons lit, the title
+        detail->showSelection (4, 0);
+        detail->setPage (lynx::DetailView::Page::clip);
+        offline.editSong ([] (lynx::Song&) {}, false); // (a change message: the Clip panel reads the playing state)
+        offline.dispatchPendingMessages();
+        write (ui, "06-clip-audio-warp-on");
+        if (audioChannel >= 0)
+        {
+            const auto beforeLength = lynx::launcher::clipAt (*offline.getSong().clipGrid, 4, 0)->length;
+            offline.editSong ([audioChannel] (lynx::Song& s) { lynx::clipsample::setWarp (s, audioChannel, false, 4.0); });
+            offline.dispatchPendingMessages();
+            write (ui, "07-clip-audio-warp-off");
+            check ("warp off: the channel plays at its own speed", ! lynx::clipsample::isWarped (offline.getSong().channels[(std::size_t) audioChannel].sampler));
+            offline.undo();
+            offline.dispatchPendingMessages();
+            check ("warp: undo gives the clip back as it was", lynx::launcher::clipAt (*offline.getSong().clipGrid, 4, 0)->length == beforeLength
+                                                                  && lynx::clipsample::isWarped (offline.getSong().channels[(std::size_t) audioChannel].sampler));
+            // Set (start) at the play position, half way: one undo step
+            const auto clipBefore = *lynx::launcher::clipAt (*offline.getSong().clipGrid, 4, 0);
+            offline.editSong ([] (lynx::Song& s) {
+                for (auto& c : s.clipGrid->clips)
+                    if (c.track == 4 && c.gridSlot >= 0 && s.clipGrid->slots[(std::size_t) c.gridSlot].scene == 0)
+                        lynx::clipsample::setStartAt (c, lynx::clipsample::playPosition (c, 0.5f));
+            });
+            const auto& after = *lynx::launcher::clipAt (*offline.getSong().clipGrid, 4, 0);
+            check ("set start: the clip starts half way and ends where it did", after.offset == clipBefore.offset + clipBefore.length / 2
+                                                                                 && after.offset + after.length == clipBefore.offset + clipBefore.length);
+            offline.undo();
+            offline.dispatchPendingMessages();
+        }
+        // a MIDI clip's Clip page too (the Set buttons are there for every clip)
+        detail->showSelection (0, 1);
+        offline.editSong ([] (lynx::Song&) {}, false);
+        offline.dispatchPendingMessages();
+        write (ui, "08-clip-midi-set-buttons");
+
+        // the Device View of Bass (insert 2): its compressor dragged onto Keys (insert 3), then Ctrl-dragged onto Vox
+        detail->showSelection (1, 0);
+        detail->setPage (lynx::DetailView::Page::devices);
+        offline.dispatchPendingMessages();
+        write (ui, "09-devices-bass-before");
+        lynx::setClipGridDeviceDropForSnapshot (*gridView, 2);
+        write (ui, "10-device-dragged-over-keys");
+        lynx::setClipGridDeviceDropForSnapshot (*gridView, -1);
+        int fromId = 0;
+        {
+            const auto& s = offline.getSong();
+            fromId = (int) (s.mixer[2].effects[1].instance.id & 0x7fffffff);
+        }
+        offline.editSongStructural ([] (lynx::Song& s) { lynx::detailchain::moveEffectToInsert (s, 2, 1, 3, false); });
+        offline.dispatchPendingMessages();
+        check ("drag to Keys: the compressor moved (same device)", offline.getSong().mixer[2].effects.size() == 2 && offline.getSong().mixer[3].effects.size() == 1
+                                                                    && (int) (offline.getSong().mixer[3].effects[0].instance.id & 0x7fffffff) == fromId);
+        detail->showSelection (2, 1);
+        offline.dispatchPendingMessages();
+        write (ui, "11-devices-keys-after-move");
+        offline.editSongStructural ([] (lynx::Song& s) { lynx::detailchain::moveEffectToInsert (s, 2, 0, 4, true); });
+        offline.dispatchPendingMessages();
+        check ("Ctrl-drag to Vox: a copy of the EQ after its reverb, Bass keeps its own", offline.getSong().mixer[4].effects.size() == 2
+                                                                                         && offline.getSong().mixer[4].effects[1].kind == lynx::EffectKind::eq
+                                                                                         && offline.getSong().mixer[2].effects[0].kind == lynx::EffectKind::eq);
+        offline.undo();
+        offline.undo();
+        offline.dispatchPendingMessages();
+        check ("undo twice: Bass has its three devices again, Keys none", offline.getSong().mixer[2].effects.size() == 3 && offline.getSong().mixer[3].effects.empty()
+                                                                         && offline.getSong().mixer[4].effects.size() == 1);
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+        wav.deleteFile();
     }
 
     void runWarpShot (const juce::String& prefix)

@@ -2,7 +2,10 @@
 
 #include <cmath>
 
+#include <juce_audio_formats/juce_audio_formats.h>
+
 #include "core/ClipLauncher.h"
+#include "core/ClipSample.h"
 #include "ui/AudioEditor.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
@@ -36,6 +39,21 @@ public:
             });
         };
         addAndMakeVisible (mode);
+
+        // round 190dr: Live's Warp switch above the mode chooser [SHOT live-clipview-audio-panel.png]: on = the sample follows
+        // the song's tempo, off = it plays at its own speed (core/ClipSample.h)
+        warp.setButtonText (tr ("Warp"));
+        warp.setClickingTogglesState (true);
+        warp.setColour (juce::TextButton::buttonOnColourId, colour::accent);
+        warp.setColour (juce::TextButton::textColourOnId, colour::onAccent);
+        warp.setTooltip (tr ("Warp: the sample follows the song's tempo. Off: it plays at its own speed. It belongs to the channel: every clip of this audio changes with it"));
+        warp.onClick = [this] {
+            if (refreshing || ! (fileSeconds > 0.0))
+                return;
+            engine.editSong ([c = channel, on = warp.getToggleState(), seconds = fileSeconds] (Song& s) { clipsample::setWarp (s, c, on, seconds); });
+        };
+        addAndMakeVisible (warp);
+        readFileInfo();
 
         gain.setSliderStyle (juce::Slider::LinearVertical);
         gain.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 62, 18);
@@ -100,6 +118,25 @@ public:
         g.setFont (font (type::caption));
         g.drawText (tr ("Gain"), gainLabel, juce::Justification::centred);
         g.drawText (tr ("Pitch"), pitchLabel, juce::Justification::centred);
+        // round 190dr: the sample's title over its editor, as Live's "loop16.wav 48.0 kHz · 16-Bit · 2 Ch"
+        if (! titleBar.isEmpty())
+        {
+            g.setColour (colour::bg2);
+            g.fillRect (titleBar);
+            g.setColour (colour::border);
+            g.fillRect (titleBar.getX(), titleBar.getBottom() - 1, titleBar.getWidth(), 1);
+            const auto icon = titleBar.withWidth (22).toFloat().withSizeKeepingCentre (14.0f, 10.0f);
+            g.setColour (colour::textSecondary);
+            g.drawRect (icon, 1.0f);
+            for (int k = 0; k < 4; ++k) // (a small waveform in the mark)
+            {
+                const auto x = icon.getX() + 3.0f + (float) k * 2.6f, h = k % 2 == 0 ? 5.0f : 2.5f;
+                g.fillRect (x, icon.getCentreY() - h * 0.5f, 1.2f, h);
+            }
+            g.setColour (colour::textPrimary);
+            g.setFont (font (type::small));
+            g.drawText (titleText, titleBar.withTrimmedLeft (26).withTrimmedRight (6), juce::Justification::centredLeft, true);
+        }
     }
 
     void resized() override
@@ -107,6 +144,8 @@ public:
         auto area = getLocalBounds();
         auto column = area.removeFromLeft (columnWidth).reduced (8, 0);
         column.removeFromTop (20);
+        warp.setBounds (column.removeFromTop (22).withWidth (column.getWidth() / 2 - 2));
+        column.removeFromTop (4);
         mode.setBounds (column.removeFromTop (22));
         column.removeFromTop (6);
         auto bottom = column.removeFromBottom (juce::jmin (26, column.getHeight() / 4));
@@ -119,6 +158,7 @@ public:
         semitones.setBounds (column.removeFromTop (22));
         column.removeFromTop (4);
         cents.setBounds (column.removeFromTop (22));
+        titleBar = area.removeFromTop (titleText.isEmpty() ? 0 : 20);
         if (editor != nullptr)
             editor->setBounds (area);
     }
@@ -155,6 +195,36 @@ private:
         semitones.setValue (whole, juce::dontSendNotification);
         cents.setValue (std::round (((double) c->pitch - whole) * 100.0), juce::dontSendNotification);
         reverse.setToggleState (c->reversed, juce::dontSendNotification);
+        warp.setToggleState (clipsample::isWarped (sampler), juce::dontSendNotification);
+        warp.setEnabled (fileSeconds > 0.0);
+    }
+
+    // The file's rate, depth, channels and length, read from its header once (the panel is made again for another clip).
+    void readFileInfo()
+    {
+        const auto& song = engine.getSong();
+        if (! juce::isPositiveAndBelow (channel, (int) song.channels.size()))
+            return;
+        const juce::File file (juce::String::fromUTF8 (song.channels[(std::size_t) channel].samplePath.c_str()));
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        double rate = 0.0;
+        int bits = 0, channels = 0;
+        if (std::unique_ptr<juce::AudioFormatReader> reader (formats.createReaderFor (file)); reader != nullptr && reader->sampleRate > 0.0)
+        {
+            rate = reader->sampleRate;
+            bits = (int) reader->bitsPerSample;
+            channels = (int) reader->numChannels;
+            fileSeconds = (double) reader->lengthInSamples / reader->sampleRate;
+        }
+        else if (const auto data = engine.getSampleLibrary().findLoaded (file.getFullPathName()); data != nullptr && data->sampleRate > 0.0)
+        {
+            rate = data->sampleRate;
+            channels = data->right.empty() && data->mappedRight == nullptr ? 1 : 2;
+            fileSeconds = (double) (data->isMapped() ? data->mappedFrames : data->left.size()) / data->sampleRate;
+        }
+        if (file.getFileName().isNotEmpty())
+            titleText = juce::String::fromUTF8 (clipsample::infoText (file.getFileName().toStdString(), rate, bits, channels).c_str());
     }
 
     static constexpr int columnWidth = 176;
@@ -162,8 +232,10 @@ private:
     int track, scene, channel;
     juce::ComboBox mode;
     juce::Slider gain, semitones, cents;
-    juce::TextButton reverse;
-    juce::Rectangle<int> gainLabel, pitchLabel;
+    juce::TextButton reverse, warp;
+    juce::Rectangle<int> gainLabel, pitchLabel, titleBar;
+    juce::String titleText;
+    double fileSeconds = 0.0;
     std::unique_ptr<juce::Component> editor;
     bool refreshing = false;
 };

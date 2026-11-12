@@ -2097,6 +2097,16 @@ struct ClipGridScene
     bool operator== (const ClipGridScene&) const = default;
 };
 
+// The Session mixer under the clip grid (round 190dr): Live's View > Mixer (the set's MixerInSession) and View > Mixer
+// Controls > In/Out, Sends, Volume, Track Options (SessionIO, SessionSends, SessionVolume, SessionTrackOptions). The
+// defaults are those of Live's default set. View only: the strips show and edit the mixer inserts the tracks play
+// through (core/SessionMixer.h). Saved in .lynx only when it differs from the defaults.
+struct SessionMixerView
+{
+    bool shown = true, io = true, sends = true, volume = true, trackOptions = false;
+    bool operator== (const SessionMixerView&) const = default;
+};
+
 struct ClipGrid
 {
     // Columns are Playlist tracks (Clip::track), rows are scenes (ClipGridSlot::scene). Every Clip has start 0: it has no
@@ -2108,6 +2118,7 @@ struct ClipGrid
     LaunchQuant globalQuant = LaunchQuant::bar;
     bool followActions = true; // follow actions on the whole grid (off: edit playing clips with no jumps)
     bool backOnStop = false; // "Give tracks back to the Playlist when the transport stops" (off: they stay taken until asked)
+    SessionMixerView mixerView; // round 190dr: the Session mixer's sections
     bool operator== (const ClipGrid&) const = default;
 };
 

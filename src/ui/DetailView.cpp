@@ -7,6 +7,7 @@
 #include <set>
 
 #include "core/ClipLauncher.h"
+#include "core/ClipSample.h"
 #include "core/DetailChain.h"
 #include "core/Effects.h"
 #include "core/FlEffects.h"
@@ -322,6 +323,20 @@ public:
             ui::showValueTip (*this, knobBounds (card, knobDrag), spec.text (v));
             return;
         }
+        // round 190dr: out of the chain, the card goes on as a drag-and-drop the clip grid takes (another track)
+        if (dragCard >= 0 && dragCard < (int) cards.size() && cards[(std::size_t) dragCard].kind == Card::effect && insert >= 0
+            && (e.y < 0 || e.y >= getHeight()))
+            if (auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this); container != nullptr && ! container->isDragAndDropActive())
+            {
+                const auto& card = cards[(std::size_t) dragCard];
+                auto image = createComponentSnapshot (card.bounds.getIntersection (getLocalBounds()).withHeight (juce::jmin (card.bounds.getHeight(), 28)));
+                container->startDragging (deviceDragDescription (insert, card.index), this, juce::ScaledImage (image), true);
+                dragCard = -1;
+                dragging = false;
+                dropBefore = -1;
+                repaint();
+                return;
+            }
         if (dragCard >= 0 && (dragging || e.getDistanceFromDragStart() > 4))
         {
             dragging = true;
@@ -513,9 +528,11 @@ public:
     // --- drops from the Browser ----------------------------------------------------------------------------------
     bool isInterestedInDragSource (const SourceDetails& details) override
     {
+        int from = -1, slot = -1;
         return insert >= 0
                && ((BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst"))
-                   || BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details));
+                   || BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details)
+                   || (detailDeviceDrag (details.description, from, slot) && from == insert)); // (round 190dr: back into its own chain)
     }
     void itemDragMove (const SourceDetails& details) override
     {
@@ -536,6 +553,22 @@ public:
         const auto position = effectPositionFor (positionAt (details.localPosition.x));
         dropBefore = -1;
         repaint();
+        // round 190dr: a card that left the chain and came back: a move inside the chain (Ctrl: a copy), as a plain drag
+        if (int from = -1, slot = -1; detailDeviceDrag (details.description, from, slot))
+        {
+            if (from != insert)
+                return;
+            if (juce::ModifierKeys::currentModifiers.isCommandDown())
+                duplicateDevice (slot, position);
+            else
+            {
+                const auto tag = tagOf (slot);
+                engine.editSongStructural ([t = insert, slot, position] (Song& song) { detailchain::moveEffectBefore (song, t, slot, position); });
+                selectedTag = tag;
+            }
+            refresh();
+            return;
+        }
         if (BrowserComponent::isGeneratorDrag (details))
         {
             if (auto c = BrowserComponent::draggedGenerator (details); c && hooks.instrumentDropped != nullptr)
@@ -1467,7 +1500,7 @@ private:
     bool active = true;
 };
 
-class ClipColumn final : public juce::Component, private juce::ChangeListener
+class ClipColumn final : public juce::Component, private juce::ChangeListener, private juce::Timer
 {
 public:
     explicit ClipColumn (AudioEngine& e)
@@ -1587,6 +1620,19 @@ public:
             ed->onEscapeKey = [this] { load(); };
         }
         start.setTooltip (tr ("Where the clip starts in its source (bars:beats:ticks)"));
+        // round 190dr: Live's Set buttons beside Start and End [SHOT live-clipview-audio-panel.png]: the marker goes to where
+        // the playing clip is now; dim while the clip does not play (core/ClipSample.h)
+        for (auto* b : { &setStart, &setEnd })
+        {
+            b->setButtonText (tr ("Set"));
+            b->setConnectedEdges (0);
+            b->setEnabled (false);
+            b->onClick = [this, b] { setHere (b == &setStart); };
+            addAndMakeVisible (*b);
+        }
+        setStart.setTooltip (tr ("Set: the clip starts where it plays now"));
+        setEnd.setTooltip (tr ("Set: the clip ends where it plays now"));
+        showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 10);
         end.setTooltip (tr ("Where the clip ends in its source (bars:beats:ticks)"));
         length.setTooltip (tr ("bars:beats:ticks"));
         signature.setFont (font (type::small));
@@ -1755,7 +1801,17 @@ public:
             row.removeFromLeft (6);
             b.setBounds (row);
         };
-        halves (take (c, 14), startLabel, endLabel);
+        {
+            // Start [Set] | End [Set]
+            auto row = take (c, 16);
+            const auto w = (row.getWidth() - 6) / 2;
+            auto a = row.removeFromLeft (w);
+            row.removeFromLeft (6);
+            setStart.setBounds (a.removeFromRight (30));
+            startLabel.setBounds (a);
+            setEnd.setBounds (row.removeFromRight (30));
+            endLabel.setBounds (row);
+        }
         halves (take (c, 20), start, end);
         loop.setBounds (take (c, 20));
         halves (take (c, 14), lengthLabel, signatureLabel);
@@ -1798,6 +1854,37 @@ public:
 
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override { load(); }
+
+    // the Set buttons are lit only while this clip plays
+    bool clipPlays (float* progress = nullptr) const
+    {
+        const auto* state = engine.launcherState();
+        if (state == nullptr || track < 0 || track >= launcher::maxTracks || clip() == nullptr)
+            return false;
+        const auto& view = state->tracks[(std::size_t) track];
+        if (view.playing.load (std::memory_order_relaxed) != scene || ! state->running.load (std::memory_order_relaxed))
+            return false;
+        if (progress != nullptr)
+            *progress = view.progress.load (std::memory_order_relaxed);
+        return true;
+    }
+    void timerCallback() override
+    {
+        const auto on = clipPlays();
+        for (auto* b : { &setStart, &setEnd })
+            if (b->isEnabled() != on)
+                b->setEnabled (on);
+    }
+    void setHere (bool startMarker)
+    {
+        float progress = 0.0f;
+        if (! clipPlays (&progress))
+            return;
+        editClip ([startMarker, progress] (Clip& c, ClipGridSlot&) {
+            const auto at = clipsample::playPosition (c, progress);
+            startMarker ? clipsample::setStartAt (c, at) : clipsample::setEndAt (c, at);
+        });
+    }
 
     // the grid clip of the slot (const) and its settings
     const Clip* clip() const
@@ -1867,6 +1954,7 @@ private:
         foldTools.setButtonText (toolsFolded ? juce::String ("+") : juce::String::fromUTF8 ("\xe2\x88\x92")); // (+ / minus sign)
         foldTools.toFront (false);
         fitScale.setEnabled (key && projectkey::lynxScale (*key) > 0);
+        timerCallback(); // (the Set buttons)
     }
 
     // the clip's own fields (one undo step)
@@ -1978,6 +2066,8 @@ private:
     int transposed = 0, interval = 0;
     juce::Label clipTitle, launchTitle, notesTitle, nameLabel, startLabel, endLabel, lengthLabel, signatureLabel, modeLabel, quantLabel, signature;
     juce::TextEditor name, start, end, length;
+    juce::TextButton setStart, setEnd; // round 190dr
+    std::unique_ptr<ui::TimerWhileShowing> showingTimer;
     juce::ToggleButton loop, legato;
     juce::ComboBox mode, quant;
     juce::TextButton invert, reverse, makeLegato, humanize, duplicate, quantize, randomize, timesTwo, divideTwo, fitScale;
@@ -2449,4 +2539,25 @@ int DetailView::chainInsertForCheck() const { return chain->insertShown(); }
 int DetailView::chainChannelForCheck() const { return chain->channelShown(); }
 bool DetailView::isFoldedForCheck (int card) const { return chain->isCardFolded (card); }
 void DetailView::toggleFoldForCheck (int card) { chain->toggleCardFold (card); }
+// ---------------------------------------------------------------------------------------------------------------------
+// Round 190dr: the description of a device card dragged out of the Device View
+namespace
+{
+constexpr const char* deviceDragTag = "lynx-device";
+}
+
+juce::String deviceDragDescription (int insert, int slot)
+{
+    return juce::String (deviceDragTag) + "|" + juce::String (insert) + "|" + juce::String (slot);
+}
+
+bool detailDeviceDrag (const juce::var& description, int& insert, int& slot)
+{
+    const auto parts = juce::StringArray::fromTokens (description.toString(), "|", "");
+    if (parts.size() != 3 || parts[0] != deviceDragTag)
+        return false;
+    insert = parts[1].getIntValue();
+    slot = parts[2].getIntValue();
+    return insert >= 0 && slot >= 0;
+}
 } // namespace lynx
