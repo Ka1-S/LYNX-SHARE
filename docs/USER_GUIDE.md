@@ -28,7 +28,8 @@ all three). Switching moves panels only; the project stays the same.
 
 In the clip grid (Clip-launch workflow):
 
-- **Record into a slot**: arm a track with the button under its slots (Ctrl-click arms more than one); its empty slots
+- **Record into a slot**: arm a track with its Arm button (in the mixer under the slots, or under its slots while the
+  mixer's Volume section is hidden; Ctrl-click arms more than one); its empty slots
   show round record buttons. Click one: the recording starts on the next point of the launch quantisation (after the
   count-in when the transport was stopped). Click the recording slot's launch button to end it and let the new clip
   loop; the track's stop button ends it without playing. While a slot records, it shows the new clip (its name, the
@@ -45,6 +46,20 @@ In the clip grid (Clip-launch workflow):
   the Playlist, or drop an audio file or a pattern from the Browser on a slot. Copy and Paste also work between the
   grid and the Playlist. Ctrl+Shift+M puts a new empty MIDI clip in the selected slot (in the Clip-launch layout; in the
   other layouts the key stays Export › MIDI file and the command is in the slot's menu).
+- **Mixer** (under the slots, as Live's Session mixer): each track has a strip for the mixer track it plays through:
+  **In/Out** (Audio From with its input channel, Monitor In / Auto / Off, Audio To: Main or another mixer track),
+  **Sends** (a knob per mixer track any track sends to; turning a knob up from zero makes the send), **Track Options**
+  (Track Delay in ms) and **Volume** (the volume in dB, the pan knob, the Track Activator with the track's number, Solo,
+  Arm, and the meter with its volume handle; double-click the meter for 0 dB). Solo is exclusive; Ctrl-click solos more
+  tracks. The Main strip sits under the scenes. The **Mixer** button under the grid (and the grid's right-click menu)
+  shows or hides the mixer and each section; the project keeps the choice. A track whose clips play through several
+  mixer tracks, or none, shows no controls but its Arm button.
+- **Devices to another track**: drag a device's title bar out of the Device View onto another track's column in the
+  grid: it moves to the end of that track's chain, with its automation. Hold Ctrl when you drop to put a copy there.
+- **Audio clips** in the Clip View: the **Warp** switch (on: the sample follows the song's tempo; off: it plays at its
+  own speed; it belongs to the sample's channel), the warp mode, gain, pitch and Reverse, the sample's name, rate, depth
+  and channels over its editor, and **Set** beside Start and End (for every clip): while the clip plays, Set puts that
+  marker where it is playing.
 - **Grooves** (the Grooves button under the grid opens the Groove Pool): add one of LYNX's grooves with **+** (or import
   a groove file you own), then pick it for a MIDI clip in the slot's menu › Groove. The clip plays through it without
   changing its notes. Each groove has Base, Quantize, Timing, Random and Velocity; **Global Amount** scales all grooves

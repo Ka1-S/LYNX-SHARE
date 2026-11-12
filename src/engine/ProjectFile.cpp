@@ -1533,6 +1533,13 @@ juce::var clipGridToVar (const ClipGrid& grid)
         root->setProperty ("backOnStop", true);
     if (! grid.followActions)
         root->setProperty ("followActions", false);
+    // round 190dr: the Session mixer's sections (only when not the defaults: older projects read the defaults)
+    if (grid.mixerView != SessionMixerView {})
+    {
+        const auto& m = grid.mixerView;
+        juce::Array<juce::var> view { m.shown, m.io, m.sends, m.volume, m.trackOptions };
+        root->setProperty ("mixerView", view);
+    }
     juce::Array<juce::var> scenes;
     for (const auto& scene : grid.scenes)
     {
@@ -1593,6 +1600,8 @@ std::optional<ClipGrid> clipGridFromVar (const juce::var& v, const Song& song)
     grid.globalQuant = (LaunchQuant) juce::jlimit (1, (int) LaunchQuant::thirtySecond, (int) v.getProperty ("quant", (int) LaunchQuant::bar));
     grid.backOnStop = (bool) v.getProperty ("backOnStop", false);
     grid.followActions = (bool) v.getProperty ("followActions", true);
+    if (const auto* view = v["mixerView"].getArray(); view != nullptr && view->size() >= 5)
+        grid.mixerView = { (bool) (*view)[0], (bool) (*view)[1], (bool) (*view)[2], (bool) (*view)[3], (bool) (*view)[4] };
     if (const auto* scenes = v["scenes"].getArray())
         for (const auto& o : *scenes)
         {

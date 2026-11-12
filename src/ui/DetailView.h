@@ -139,4 +139,9 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DetailView)
 };
+
+// Round 190dr: a device card dragged out of the Device View (the reference: drag a device to another track to move it
+// there, Ctrl to copy it). The description a drop target reads; true and the device's insert and slot when it is one.
+juce::String deviceDragDescription (int insert, int slot);
+bool detailDeviceDrag (const juce::var& description, int& insert, int& slot);
 } // namespace lynx

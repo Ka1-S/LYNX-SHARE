@@ -11,7 +11,10 @@
 #include "core/SessionOps.h"
 #include "engine/SampleLibrary.h"
 #include "ui/BrowserComponent.h"
+#include "ui/DetailView.h"
+#include "ui/HintBar.h"
 #include "ui/GroovePoolComponent.h"
+#include "ui/SessionMixer.h"
 #include "ui/ExportDialog.h"
 #include "engine/AudioEngine.h"
 #include "ui/I18n.h"
@@ -82,7 +85,7 @@ public:
         setWantsKeyboardFocus (true);
         setTitle (tr ("Clip grid"));
         setAccessible (true);
-        for (auto* b : { &stopAll, &backToPlaylist, &grooves })
+        for (auto* b : { &stopAll, &backToPlaylist, &grooves, &mixerButton })
         {
             addAndMakeVisible (*b);
             b->setConnectedEdges (0);
@@ -98,6 +101,16 @@ public:
         grooves.setTooltip (tr ("Show or hide the Groove Pool"));
         grooves.setClickingTogglesState (true);
         grooves.onClick = [this] { showGroovePool (grooves.getToggleState()); };
+        // round 190dr: the Session mixer under the slots, and Live's View > Mixer / Mixer Controls items on a button
+        mixer = std::make_unique<SessionMixerComponent> (engine);
+        addAndMakeVisible (*mixer);
+        mixerButton.setButtonText (tr ("Mixer"));
+        mixerButton.setTooltip (tr ("Show or hide the mixer under the clips, and its sections"));
+        mixerButton.onClick = [this] {
+            juce::PopupMenu menu;
+            mixer->addViewItems (menu);
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&mixerButton));
+        };
         stopAll.setButtonText (tr ("Stop all clips"));
         stopAll.onClick = [this] { engine.launcherCommand ({ launcher::Command::Type::stopAll }); };
         backToPlaylist.setButtonText (tr ("Back to Playlist"));
@@ -133,8 +146,12 @@ public:
         sessionRecord.setBounds (foot.removeFromLeft (foot.getHeight()));
         foot.removeFromLeft (6);
         grooves.setBounds (foot.removeFromLeft (juce::jmin (72, juce::jmax (0, foot.getWidth()))));
+        foot.removeFromLeft (6);
+        mixerButton.setBounds (foot.removeFromLeft (juce::jmin (64, juce::jmax (0, foot.getWidth()))));
         if (groovePool != nullptr && groovePool->isVisible())
             groovePool->setBounds (0, getHeight() - footerHeight - poolHeight(), getWidth(), poolHeight());
+        const auto cells = cellArea();
+        mixer->setBounds (0, cells.getBottom() + statusHeight, getWidth(), mixerHeight());
         clampScroll();
         syncControls();
     }
@@ -169,7 +186,7 @@ public:
         }
 
         // the scene column stays in place
-        const juce::Rectangle<int> sceneColumn (cells.getRight(), 0, sceneWidth, getHeight() - footerHeight - poolHeight());
+        const juce::Rectangle<int> sceneColumn (cells.getRight(), 0, sceneWidth, cells.getBottom() + statusHeight);
         g.setColour (c::bg2);
         g.fillRect (sceneColumn);
         g.setColour (c::border);
@@ -194,6 +211,15 @@ public:
             g.drawRect (juce::Rectangle<int> (columnX (dropTrack), rowY (dropScene), columnWidth, rowHeight).reduced (1), 2);
         }
 
+        // a device dragged over a track: that whole column (round 190dr)
+        if (deviceDropTrack >= 0)
+        {
+            juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (juce::Rectangle<int> (0, 0, cells.getRight(), cells.getBottom() + statusHeight));
+            g.setColour (c::accent);
+            g.drawRect (juce::Rectangle<int> (columnX (deviceDropTrack), 0, columnWidth, cells.getBottom() + statusHeight).reduced (1), 2);
+        }
+
         // the footer: controls on the scene side and the buttons, on a band
         const auto foot = getLocalBounds().removeFromBottom (footerHeight);
         g.setColour (c::bg3);
@@ -213,7 +239,7 @@ public:
             if (e.mods.isPopupMenu())
                 return;
             const auto x = e.x - columnX (t);
-            if (x >= columnWidth - armWidth - 6)
+            if (x >= columnWidth - armWidth - 6 && ! mixer->armsShown()) // (round 190dr: with the mixer's Volume section the arm is there, as in Live)
                 engine.setGridTrackArmed (t, ! engine.isGridTrackArmed (t), ! e.mods.isCommandDown());
             else if (x < launchZone)
                 engine.launcherCommand ({ launcher::Command::Type::stopTrack, t });
@@ -295,14 +321,54 @@ public:
     bool isInterestedInDragSource (const SourceDetails& details) override
     {
         int t = 0, r = 0;
-        return clipGridDrag (details.description, t, r) || BrowserComponent::draggedPattern (details) >= 0
+        return clipGridDrag (details.description, t, r) || detailDeviceDrag (details.description, t, r) || BrowserComponent::draggedPattern (details) >= 0
                || SampleLibrary::isSampleFile (BrowserComponent::draggedFile (details));
     }
     void itemDragEnter (const SourceDetails& details) override { itemDragMove (details); }
-    void itemDragMove (const SourceDetails& details) override { setDropCell (details.localPosition); }
-    void itemDragExit (const SourceDetails&) override { setDropCell ({ -1, -1 }); }
+    void itemDragMove (const SourceDetails& details) override
+    {
+        int insert = 0, slot = 0;
+        if (detailDeviceDrag (details.description, insert, slot))
+        {
+            setDeviceDropTrack (trackAtX (details.localPosition.x));
+            return;
+        }
+        setDropCell (details.localPosition);
+    }
+    void itemDragExit (const SourceDetails&) override
+    {
+        setDropCell ({ -1, -1 });
+        setDeviceDropTrack (-1);
+    }
     void itemDropped (const SourceDetails& details) override
     {
+        // round 190dr: a device from the Device View dropped on a track (anywhere in its column): it moves to the end of
+        // that track's chain, with Ctrl a copy goes there (core/DetailChain.h moveEffectToInsert)
+        if (int from = 0, slot = 0; detailDeviceDrag (details.description, from, slot))
+        {
+            const auto t = trackAtX (details.localPosition.x);
+            setDeviceDropTrack (-1);
+            if (t < 0)
+                return;
+            const auto to = sessionmixer::stripOf (engine.getSong(), t).insert;
+            if (to <= 0)
+            {
+                ui::postHint ({ tr ("This track plays through no mixer track of its own: the device can't go there"), {} }, 3000);
+                return;
+            }
+            if (to == from)
+                return;
+            if (to < (int) engine.getSong().mixer.size() && (int) engine.getSong().mixer[(std::size_t) to].effects.size() >= maxEffectSlots)
+            {
+                ui::postHint ({ tr ("This insert has no free slot (10 effects)"), {} }, 3000);
+                return;
+            }
+            const auto copy = juce::ModifierKeys::currentModifiers.isCommandDown();
+            engine.capturePluginStates();
+            engine.editSongStructural ([=] (Song& s) { detailchain::moveEffectToInsert (s, from, slot, to, copy); });
+            repaint();
+            return;
+        }
         const auto hit = hitTestCell (details.localPosition);
         setDropCell ({ -1, -1 });
         if (hit.track < 0 || hit.scene < 0)
@@ -383,6 +449,9 @@ public:
             }
     }
 
+    SessionMixerComponent* sessionMixer() noexcept { return mixer.get(); }
+    void deviceDropForSnapshot (int t) { setDeviceDropTrack (t); }
+
     // The Detail View's listener (round 183a; none in Pattern workflow, where no grid exists).
     std::function<void (int, int, GridPick)> onPick;
     std::pair<int, int> selection() const noexcept { return { selectedTrack, selectedScene }; }
@@ -458,7 +527,8 @@ public:
 
 private:
     AudioEngine& engine;
-    juce::TextButton stopAll, backToPlaylist, grooves;
+    juce::TextButton stopAll, backToPlaylist, grooves, mixerButton;
+    std::unique_ptr<SessionMixerComponent> mixer;
     RingButton sessionRecord;
     juce::ComboBox globalQuant;
     std::unique_ptr<juce::Component> groovePool;
@@ -467,6 +537,7 @@ private:
     int pressedTrack = -1, pressedScene = -1;
     int dragTrack = -1, dragScene = -1; // the clip a drag would take
     int dropTrack = -1, dropScene = -1; // the slot a drag is over
+    int deviceDropTrack = -1;           // round 190dr: the track a dragged device is over
 
     struct Cell
     {
@@ -494,7 +565,17 @@ private:
     juce::Rectangle<int> cellArea() const
     {
         return { 0, headerHeight, juce::jmax (0, getWidth() - sceneWidth),
-                 juce::jmax (0, getHeight() - headerHeight - footerHeight - statusHeight - poolHeight()) };
+                 juce::jmax (0, getHeight() - headerHeight - footerHeight - statusHeight - poolHeight() - mixerHeight()) };
+    }
+    // the Session mixer's height (round 190dr): its shown sections, leaving the slots at least two rows
+    int mixerHeight() const
+    {
+        return mixer == nullptr ? 0 : mixer->wantedHeight (getHeight() - headerHeight - footerHeight - statusHeight - poolHeight() - 2 * rowHeight);
+    }
+    void syncMixer()
+    {
+        if (mixer != nullptr)
+            mixer->setColumns (columnCount(), columnWidth, scrollX, cellArea().getRight(), sceneWidth);
     }
     int poolHeight() const
     {
@@ -533,6 +614,22 @@ private:
         }
     }
     int columnX (int t) const noexcept { return t * columnWidth - scrollX; }
+    // the track whose column is at x (any height), or -1
+    int trackAtX (int x) const
+    {
+        if (x < 0 || x >= cellArea().getRight())
+            return -1;
+        const auto t = (x + scrollX) / columnWidth;
+        return t >= 0 && t < columnCount() ? t : -1;
+    }
+    void setDeviceDropTrack (int t)
+    {
+        if (t != deviceDropTrack)
+        {
+            deviceDropTrack = t;
+            repaint();
+        }
+    }
     int rowY (int r) const noexcept { return headerHeight + r * rowHeight - scrollY; }
     int firstColumn() const noexcept { return juce::jmax (0, scrollX / columnWidth); }
     int firstRow() const noexcept { return juce::jmax (0, scrollY / rowHeight); }
@@ -542,6 +639,7 @@ private:
         const auto cells = cellArea();
         scrollX = juce::jlimit (0, juce::jmax (0, columnCount() * columnWidth - cells.getWidth()), scrollX);
         scrollY = juce::jlimit (0, juce::jmax (0, rowCount() * rowHeight - cells.getHeight()), scrollY);
+        syncMixer();
     }
     void revealSelection()
     {
@@ -761,6 +859,8 @@ private:
             g.setFont (theme::font (theme::type::small));
             g.drawText (juce::String (session::lengthCounter (elapsed, song.beatsPerBar)), box, juce::Justification::centred, false);
         }
+        if (mixer->armsShown()) // (round 190dr: the arm button is in the mixer's Volume section, as in Live)
+            return;
         theme::fillRoundRect (g, arm, 2.0f, armed ? c::record : c::bg4);
         if (! armed)
         {
@@ -1173,6 +1273,10 @@ private:
         for (const auto n : fixedLengths)
             fixed.addItem (n == 1 ? tr ("1 bar") : tr ("{0} bars", { juce::String (n) }), true, bars == n, [this, n] { engine.setSlotRecordBars (n); });
         menu.addSubMenu (tr ("Fixed recording length"), fixed);
+        // round 190dr: Live's View > Mixer and View > Mixer Controls
+        juce::PopupMenu mixerItems;
+        mixer->addViewItems (mixerItems);
+        menu.addSubMenu (tr ("Mixer"), mixerItems);
         const auto follow = grid == nullptr || grid->followActions;
         menu.addItem (tr ("Follow actions on the whole grid"), true, follow, [this, follow] {
             engine.editSong ([follow] (Song& s) { launcher::ensureGrid (s).followActions = ! follow; }, false);
@@ -1212,6 +1316,13 @@ private:
     void timerCallback() override
     {
         syncControls();
+        syncMixer();
+        if (mixer != nullptr)
+        {
+            if (const auto want = mixerHeight(); want != mixer->getHeight())
+                resized();
+            mixer->tick();
+        }
         repaint();
     }
     void componentMovedOrResized (bool, bool) override {}
@@ -1270,5 +1381,16 @@ std::pair<int, int> clipGridSelection (juce::Component& grid)
     if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
         return g->selection();
     return { 0, 0 };
+}
+SessionMixerComponent* clipGridMixer (juce::Component& grid)
+{
+    auto* g = dynamic_cast<ClipGridComponent*> (&grid);
+    return g != nullptr ? g->sessionMixer() : nullptr;
+}
+
+void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->deviceDropForSnapshot (track);
 }
 } // namespace lynx
