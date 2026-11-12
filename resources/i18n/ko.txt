@@ -6810,6 +6810,7 @@ countries: kr
 "FILTER" = "필터"
 "Low-pass|High-pass|Band-pass" = "로우패스|하이패스|밴드패스"
 "12 dB/oct state-variable filter" = "12 dB/oct 상태 변수 필터"
+"12 dB/oct|24 dB/oct" = "12 dB/oct|24 dB/oct"
 "CHORUS" = "코러스"
 "LEVEL" = "레벨"
 "STEREO MATRIX" = "스테레오 매트릭스"

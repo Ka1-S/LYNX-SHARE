@@ -329,8 +329,8 @@ Code: `src/core/AlsDevicesLot2.cpp` (laws and translators, declared in `AlsDevic
 | Delay (`Delay`) | Echoform, Clean mode | per side: synced sixteenths (1…6, 8, 16) as a note value, or the free time in ms; Link; ping-pong; feedback; freeze; band-pass → low cut + high cut; time modulation rate / depth; dry/wet | 5 sixteenths or an offset (held in ms at the set's tempo), filter modulation, transition mode, linear dry/wet law |
 | Echo (`Echo`) | Echoform, Clean mode | per side: division / sixteenths with straight, triplet, dotted modes, or ms; link; feedback (inverted listed); channel mode stereo / ping-pong; input and output gain; high-pass / low-pass → low cut / high cut; modulation rate / depth; dry/wet | Mid/Side mode, filter resonance, Reverb, Noise, Wobble, Gate, Ducking, stereo width, envelope modulation |
 | Multiband Dynamics (`MultibandDynamics`) | Prism Multiband, 2 or 3 bands | crossovers, per band: on, one action (above or below the threshold, as compression / limit / expansion / upward lift), thresholds with the band's input gain folded in, output gain, attack, release; Amount; Time; output | a band's second action, RMS detection, times beyond Prism's ranges, soft knee as a fixed 6 dB knee |
-| Auto Filter (`AutoFilter`, `AutoFilter2`) | Filter | low-pass / high-pass / band-pass, cutoff (pitch → Hz in the older device), resonance → Q, dry/wet | LFO, envelope follower, circuit / drive, 24 dB slope; notch and morph types are not translated (device dropped and listed) |
-| Saturator (`Saturator`) | Ember Saturator | drive (negative drive → input gain), curve → nearest of tube / tape / transistor / fuzz, output, dry/wet, auto gain off | Color filters, output clip, DC filter, the curve itself (named) |
+| Auto Filter (`AutoFilter`, `AutoFilter2`) | Filter | low-pass / high-pass / band-pass, cutoff (pitch → Hz in the older device), resonance → Q (§16), 12 / 24 dB slope, dry/wet | LFO, envelope follower, circuit / drive, band pass peak level, Q over 12; notch and morph types are not translated (device dropped and listed) |
+| Saturator (`Saturator`) | Ember Saturator | drive (negative drive → input gain), curve → the fitted Ember curve with drive / output offsets (§16), output, dry/wet, auto gain off | Color filters, output clip, DC filter, the curve itself (named) |
 | Overdrive (`Overdrive`) | Distortion | drive, tone, dry/wet | band-pass before the drive, Dynamics |
 | Limiter (`Limiter`) | Apex Limiter, Clean style | gain, ceiling, release, look-ahead, stereo link, true-peak mode | negative gain, release above 1 s, auto release, 6 ms look-ahead, Soft Clip mode, Mid/Side routing, Maximize |
 | Gate (`Gate`) | Sentry Gate, Classic style | threshold (linear → dB), attack, hold, release, floor → range, Flip → ducking, look-ahead, side-chain input + high pass / low pass | Return (hysteresis), other side-chain EQ shapes, side-chain dry/wet |
@@ -347,10 +347,34 @@ Where MIDI effects are read: before the instrument on a MIDI track, and at the h
 Laws that carry a unit conversion:
 - **Echoform**: sixteenth counts index 0…7 → 1, 2, 3, 4, 5, 6, 8, 16 sixteenths; a time that is a note value × straight / dotted / triplet goes to the note sync, any other to ms at the set's tempo. Feedback gain g → Echoform value g / 2. Delay's band-pass (centre f, width w octaves) → low cut f·2^(−w/2), high cut f·2^(w/2). A linear dry/wet d → the equal-power mix value with the same wet : dry ratio, `(2/π)·atan(d / (1 − d))`.
 - **Multiband Dynamics**: the saved "ratio" r is a slope. Above the threshold the output rises (1 + r) dB per dB: r = −0.75 → 4 : 1, r = −1 → limit, r > 0 → upward expansion. Below it the output falls (1 − r) dB per dB: r > 0 lifts quiet signal (upward compression), r = 1 holds it at the threshold, r < 0 expands downwards. Amount scales r; Time scales attack and release. A band's input gain g moves its thresholds by −g at Prism's input and adds to its level.
-- **Auto Filter**: the older device's cutoff is a pitch, Hz = 440·2^((n − 69)/12). Resonance r (older device 0…1.25, new 0…1) → the cookbook Q = 0.7071·12.5^r, clamped to the Filter's 0.5 … 12. Measured in Live 12.4 (round 190cw r18 / r19, fitted in 190cx): a low pass at 1 kHz with r = 0.5 is the cookbook biquad at Q 2.49 (new) / 2.50 (older) within 0.02 dB, the two tags the same curve within 0.035 dB once the new device's Output (a linear gain: 0.5 = −6.02 dB, listed when not 1) is taken out; 0.7071 at r = 0 is assumed, so the law rests on one point.
-- **Saturator** curve type 0…7 (Live 12.4's menu, round 190cw): Analog Clip, Soft Sine, Bass Shaper, Medium Curve, Hard Curve, Sinoid Fold, Digital Clip, Waveshaper → Ember's tube, tape, tube, tape, transistor, fuzz, transistor, fuzz.
+- **Auto Filter** (resonance law superseded by §16): the older device's cutoff is a pitch, Hz = 440·2^((n − 69)/12). Resonance r (older device 0…1.25, new 0…1) → the cookbook Q = 0.7071·12.5^r, clamped to the Filter's 0.5 … 12. Measured in Live 12.4 (round 190cw r18 / r19, fitted in 190cx): a low pass at 1 kHz with r = 0.5 is the cookbook biquad at Q 2.49 (new) / 2.50 (older) within 0.02 dB, the two tags the same curve within 0.035 dB once the new device's Output (a linear gain: 0.5 = −6.02 dB, listed when not 1) is taken out; 0.7071 at r = 0 is assumed, so the law rests on one point.
+- **Saturator** (curve mapping superseded by §16) curve type 0…7 (Live 12.4's menu, round 190cw): Analog Clip, Soft Sine, Bass Shaper, Medium Curve, Hard Curve, Sinoid Fold, Digital Clip, Waveshaper → Ember's tube, tape, tube, tape, transistor, fuzz, transistor, fuzz.
 - **Gate / Compressor**: thresholds are linear gains → dB; Gate's floor ("Gain") −75 dB is "−inf dB" in Live 12.4 → Sentry's deepest floor (100 dB, a full gate), above it the floor in dB; Gate look-ahead index 0 / 1 / 2 = 0 / 1.5 / 10 ms; Limiter look-ahead index = 1.5 / 3 / 6 ms.
 - **Redux → Lo-fi**: the Lo-fi holds n = 44100 / rate whole samples and quantises to 2^bits levels.
 - **Arpeggiator**: synced-rate index 0…13 = 1/128, 1/96, 1/64, 1/48, 1/32, 1/24, 1/16, 1/12, 1/8, 1/6, 1/4, 1/3, 1/2, 1/1 [DATA: default 8; DOC]; gate % → 0…1.
 
 **Automation and macros.** Each translator also returns, per Live parameter it maps continuously, a link `{Live parameter path, LYNX parameter, law}`. An arrangement envelope whose `PointeeId` is such a parameter's `AutomationTarget` becomes an automation of that effect parameter with every point passed through the law; a rack macro mapped onto it (`KeyMidi`, channel 16) becomes a `RackMapping` whose ends are the law of the mapping's `Min` / `Max`. Mappings and envelopes onto a setting with no LYNX control are listed. Envelopes onto devices inside a rack and clip envelopes are still listed as unsupported.
+
+## 16. Device laws refit to Live 12.4.16's renders (round 190da, 2026-11-12)
+
+Round 190cz rendered 190 tracks in Live 12.4.16 (an impulse, a sweep, sines, noise and a 1 kHz staircase through one
+device each, 48 kHz float); round 190da fitted the laws and ran every case through the importer and LYNX's engines
+(before / after tables: `/mnt/e/lynx-work/als190cf/HANDOFF.md` § Round 190da). The laws now in `AlsDevices*.cpp`:
+
+- **Auto Filter**: both tags are cookbook biquads at the cutoff, Q = 0.5 + 2x / (1 − x) (Q does not depend on the cutoff;
+  low, high and band pass share it). Older device x = min(r, 0.9) (Q 0.5 … 18.5); new device x from its measured table
+  (0.5 → 2.49, 0.9 → 17.86, 1 → 35.78; r above 1 acts as 1). The 24 dB/oct slope adds a second stage of the same type
+  with Q2 = 0.5 + x / (1 + x): LYNX's Filter got an appended Slope parameter (0 = 12 dB/oct, every older project) that
+  runs that pair. Live's band pass peaks at its Q (the cookbook "constant skirt" form); the Filter's at 0 dB (listed). Q
+  over the Filter's 12 is listed.
+- **EQ Eight**: 48 dB cut section scale 1 + 0.2632·ln(Q / 0.7071) (exact at Q 0.1 … 10, low and high cut); shelves: Live's
+  Q is a fixed cookbook Q, the same for both shelves and every gain (13-point table Q 0.1 … 18, a quintic in ln Q);
+  Adaptive Q: Q × AdaptiveQFactor^(|gain × Scale| − 6) on bells and, when AdaptiveQAffectsShelves, on the shelf's cookbook Q.
+- **Utility**: mid/side balance m: mid × min(1, 2 − m), side × min(1, m); the balance comes after width / mono / mid-side.
+- **Glue Compressor**: Range ≤ 40 stops the gain reduction at 1.1727·Range − 2.197 dB; from 50 up no limit (Crest's 60 dB).
+  The detector weighting seen in the rendered preset is its own side-chain EQ (high pass 200 Hz), which the importer
+  already carries.
+- **Saturator**: Drive is a gain before a memoryless curve (Waveshaper excepted). Per type, the Ember curve and drive /
+  output offsets fitted on the curves at drive 0 and +12 dB (`AlsDevicesLot2.cpp`, `saturatorFit`).
+- **Reverb**: Live's 1 kHz T30 ≈ 0.91 × Decay → Atrium's decay 0.94 × Decay; the loop's high shelf (gain g) → Atrium's
+  High mult 1 / (1 + 0.08·(−20 log10 g)·Decay). Atrium's fully wet tail is louder than Live's (listed with the measured sizes).

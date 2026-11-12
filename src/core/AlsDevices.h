@@ -67,22 +67,30 @@ enum class Eq8Mode { lowCut48, lowCut12, lowShelf, bell, notch, highShelf, highC
 // Live 12.4's EQ Eight as rendered in round 190cw (noise through one band at 1 kHz, transfer function vs the dry track):
 //   bell / notch   Qb = Qfacet / √2 in the constant-Q biquad; Live = the textbook bell (0.03 … 0.08 dB) → Qfacet = √2 · Q
 //   12 dB cuts     section Q = 0.7071 · Qfacet; Live = the textbook 2nd order (0.08 dB)            → Qfacet = √2 · Q
-//   shelves        Qs = 0.7071 · Qfacet^0.4697; Live's Q 0.71 / 2 act as cookbook Q 0.71 / 1.068 →
-//                  Qs = eq8ShelfCookbookQ (Q), Qfacet = (Qs / 0.7071)^(1 / 0.4697)
+//   shelves        Qs = 0.7071 · Qfacet^0.4697; Live's Q acts as a fixed cookbook Q, the same for both shelves and
+//                  every gain [MEASURED 190cz, 13 points Q 0.1 … 18, fit 0.000 dB]: Qs = eq8ShelfCookbookQ (Q),
+//                  Qfacet = (Qs / 0.7071)^(1 / 0.4697)
 //   48 dB cuts     Live = an 8th-order Butterworth at Q 0.71 with all four section Qs scaled by
-//                  eq8CutSectionScale (Q) (Q 0.5 / 0.71 / 1 → × 0.907 / 0.999 / 1.088, fit 0.14 dB); Facet holds it
-//                  with its cut law "all sections" (facet::cutLawParam) and Qfacet = that scale
+//                  eq8CutSectionScale (Q) [MEASURED 190cz at Q 0.1 / 0.71 / 3 / 10, low and high cut: exact; 190cw
+//                  Q 0.5 / 1]; Facet holds it with its cut law "all sections" (facet::cutLawParam), Qfacet = that scale
 // (clamped to Facet's 0.025 … 40)
-double eq8CutSectionScale (double liveQ) noexcept;  // 1 + 0.2611·ln(Q / 0.714), at least 0.05
-double eq8ShelfCookbookQ (double liveQ) noexcept;   // 0.71·(Q / 0.71)^0.394
-// Adaptive Q on a bell: Q × factor^(|gain dB| / 2) (factor = the device's AdaptiveQFactor, 1.12 in every saved set)
-double eq8AdaptiveQ (double liveQ, double gainDb, double factor) noexcept;
-double facetQ (Eq8Mode mode, double liveQ) noexcept;
+double eq8CutSectionScale (double liveQ) noexcept;  // 1 + 0.2632·ln(Q / 0.7071), at least 0.05
+// ln Qs = −0.000248 L⁵ + 0.002322 L⁴ − 0.004732 L³ − 0.036516 L² + 0.410151 L − 0.200340, L = ln Q (Q held to Live's
+// 0.1 … 18): 0.1 → 0.301, 0.71 → 0.708, 2 → 1.068, 10 → 1.720, 18 → 1.969 (within 0.05 % of the 13 measured points)
+double eq8ShelfCookbookQ (double liveQ) noexcept;
+// Adaptive Q [MEASURED 190cz, 18 renders: exact]: the band's Q (a shelf's: its cookbook Q above) × factor^(|gain| − 6),
+// gain in dB after Scale, factor = the device's AdaptiveQFactor (1.12 in every saved set): wider under 6 dB, the set Q
+// at 6 dB, narrower above; bells always, shelves when AdaptiveQAffectsShelves (true in 178 of the 181 shipped devices)
+double eq8AdaptiveQ (double q, double gainDb, double factor) noexcept;
+// `adaptive`: the Adaptive Q multiplier of the band (eq8AdaptiveQ (1, gain, factor), 1 = none) — on a bell's Q, on a
+// shelf's cookbook Q
+double facetQ (Eq8Mode mode, double liveQ, double adaptive = 1.0) noexcept;
 struct Eq8Band
 {
     bool on = true;
     Eq8Mode mode = Eq8Mode::bell;
     double hz = 1000.0, gainDb = 0.0, q = 0.7071;
+    double adaptive = 1.0; // the Adaptive Q multiplier (see facetQ)
 };
 // Writes one band into a Facet EQ parameter set; `gainSign` −1 folds a negative Scale into the gains
 void setFacetBand (EffectParams& params, int facetBand, const Eq8Band& band, double gainSign, int placement);
@@ -109,6 +117,11 @@ struct SideInput
 SideInput sideInputOf (const xml::Element& device);
 bool compressorToCrest (const xml::Element& device, EffectSlot& slot, Notes& notes, SideInput& side);
 bool glueToCrest (const xml::Element& device, EffectSlot& slot, Notes& notes, SideInput& side);
+// Glue's Range [DATA: 0 … 70 dB] as Crest's range (0 … 60 dB, its most) [MEASURED 190cz, ratio 2 / 4 / 10 with 20 dB
+// more input]: up to 40 the gain reduction stops hard at 1.1727·Range − 2.197 dB (10 → 9.53, 20 → 21.20, 30 → 33.0,
+// 40 → 44.71); Range 50 is within 0.3 … 1.4 dB of no limit and 60 … 70 are no limit up to 78.6 dB of gain
+// reduction: from 50 up, Crest's 60 dB
+double glueRangeDb (double liveRange) noexcept;
 
 // ---- Utility → Utility ------------------------------------------------------------------------------------------
 struct LiveUtility
@@ -130,12 +143,13 @@ struct StereoMatrix
 // Live's balance (−1 … 1) as left / right gains: √2·cos((b + 1)·π/4), √2·sin((b + 1)·π/4) — constant power with a
 // boost (+0.5 → L × 0.541, R × 1.307; measured in Live 12.4, round 190cw r15)
 std::pair<double, double> utilityBalanceGains (double balance) noexcept;
-// Phase switches, then channel mode, then Mono or Width (M = (L + R) / 2, S = (L − R) / 2; out = M ± width·S), then
-// the balance gains on the outputs. Width, phase-before-mode and the balance law are measured (round 190cw r13–r17)
+// Phase switches, then channel mode, then Mono, Width or the mid/side balance (M = (L + R) / 2, S = (L − R) / 2; out =
+// M ± width·S; mid/side balance m: M·min(1, 2 − m) ± S·min(1, m)), then the balance gains on the outputs. All measured
+// (rounds 190cw r13–r17, 190cz u00–u13: balance after width / mono / mid-side, exact)
 StereoMatrix utilityMatrix (const LiveUtility& u) noexcept;
 // True when LYNX's Utility does exactly what these settings say: plain gain within ±24 dB or mute, phase switches,
-// channel mode, Mono, any width and balance whose matrix fits LYNX's ±2 coefficients, mid/side balance neutral, no
-// Bass Mono / DC filter
+// channel mode, Mono, any width, mid/side balance and balance whose matrix fits LYNX's ±2 coefficients, no Bass Mono /
+// DC filter
 bool utilityIsExact (const LiveUtility& u) noexcept;
 LiveUtility readUtility (const xml::Element& device);
 bool utilityToUtility (const xml::Element& device, EffectSlot& slot, Notes& notes);
@@ -143,7 +157,14 @@ bool utilityToUtility (const xml::Element& device, EffectSlot& slot, Notes& note
 // when it holds anything Live's device cannot say exactly (a balance, a free matrix)
 std::optional<LiveUtility> liveUtilityOf (const EffectSlot& slot) noexcept;
 
-// ---- Reverb → Atrium (fitted by reading, not by measurement) ----------------------------------------------------
+// ---- Reverb → Atrium (decay and high damping measured in round 190cz; the rest fitted by reading) --------------
+// Live's Decay (s) as Atrium's: 0.94 × [MEASURED: Live's 1 kHz T30 = 0.91 × Decay; fitted with the High mult below]
+double reverbAtriumDecaySec (double liveDecaySec) noexcept;
+// Live's high shelf in the loop (gain g, on) as Atrium's High mult: 1 / (1 + 0.08 · L · Decay), L = −20·log10 g dB
+// lost per pass [MEASURED at g 0.7: T30 at 4 / 8 kHz within 0.1 s at Decay 1, 2.5 and 5 s; the law in g ASSUMED]
+double reverbAtriumHighMult (double shelfHiGain, double liveDecaySec) noexcept;
+// (Atrium's fully wet tail is louder than Live's: +12.9 / +7.9 / +4.5 dB at Decay 1 / 2.5 / 5 s [MEASURED]; Atrium has no
+// wet level of its own, so it is listed)
 // Live's room size (0.22 … 500, 100 by default) on Atrium's Late size (0 … 1, 0.5 by default): log on each side
 float atriumSizeOf (double liveRoomSize) noexcept;
 // Reflect and Diffuse levels (linear gains) as Atrium's Early / late (equal power: 0 early only … 1 late only)
@@ -187,11 +208,14 @@ float echoformNoteValue (int index) noexcept; // 0 … 9
 // Dry/Wet → Echoform's equal-power Mix. Equal-loudness [ASSUMED: cos / sin, as Echoform's]: the same number. Linear
 // (dry 1 − x, wet x): the mix with the same wet : dry ratio, (2 / π) · atan (x / (1 − x)) — up to 3 dB louder at 50 %
 float echoformMixOf (double dryWet, bool equalLoudness) noexcept;
-// A resonance 0 … 1 (the older Auto Filter: 0 … 1.25) as a Q for LYNX's Filter (the cookbook biquad): Q = 0.7071 · 12.5^r,
-// clamped to the Filter's 0.5 … 12. [MEASURED 190cw r18 / r19: low pass at 1 kHz, resonance 0.5 — both tags give the
-// same curve (the new one 6.02 dB lower: its Output was 0.5), the cookbook low pass at Q 2.49 / 2.50 within 0.02 dB;
-// 0.7071 at no resonance is ASSUMED, so one point fixes the law]
-double filterQOfResonance (double resonance) noexcept;
+// Auto Filter's resonance r as the cookbook Q of its 12 dB stage [MEASURED 190cz, low pass at 1 kHz, 14 + 27 renders,
+// ≤ 0.003 dB; 200 Hz / 5 kHz, high and band pass at 0.5 the same]: Q = 0.5 + 2x / (1 − x) with an inner x — the older
+// device (`AutoFilter`, up to Live 12.1, LegacyQ 0.82 as in every shipped set) x = min(r, 0.9) (Q 0.5 … 18.5); the new
+// one (`AutoFilter2`) x from its measured table (Q 0.5 at r 0, 2.49 at 0.5, 35.8 at 1; r over 1 acts as 1). LYNX's
+// Filter takes Q 0.5 … 12: above that it is listed. Its 24 dB/oct slope adds the second stage of Live's pair
+// (filterSecondStageQ).
+double autoFilterX (double resonance, bool legacy) noexcept;
+double filterQOfResonance (double resonance, bool legacy) noexcept;
 // LYNX's basic effects keep their laws inside Effects.cpp; the inverses used here, each pinned by a test against
 // formatEffectParam: Filter (type 0 low-pass, 1 high-pass, 2 band-pass; cutoff 20 Hz … 20 kHz log; Q 0.5 … 12 log),
 // Lo-fi (rate = 44100 / (⌊128 v³⌋ + 1) Hz; 65536 / (2048 v² + 1) levels), EQ (±18 dB; mid 200 Hz … 5 kHz log),
@@ -239,6 +263,15 @@ bool echoToEchoform (const xml::Element& device, const Context& context, Transla
 bool multibandToPrism (const xml::Element& device, Translated& out);
 bool autoFilterToFilter (const xml::Element& device, Translated& out);  // AutoFilter (up to Live 12.1) and AutoFilter2
 bool saturatorToEmber (const xml::Element& device, Translated& out);
+// Saturator's curve type (Live's menu order) as Ember: its style (0 tube, 1 tape, 2 transistor) or character (1 … 28,
+// 0 = none), Ember's drive = Live's drive + driveDb, Ember's output = Live's output + outputDb
+struct SaturatorFit
+{
+    const char* name;
+    int style, character;
+    double driveDb, outputDb;
+};
+const SaturatorFit& saturatorFit (int type) noexcept;
 bool overdriveToDistortion (const xml::Element& device, Translated& out);
 bool limiterToApex (const xml::Element& device, Translated& out);
 bool gateToSentry (const xml::Element& device, Translated& out);

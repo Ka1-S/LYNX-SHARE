@@ -6810,6 +6810,7 @@ countries: ru by kz
 "FILTER" = "ФИЛЬТР"
 "Low-pass|High-pass|Band-pass" = "ФНЧ|ФВЧ|Полосовой"
 "12 dB/oct state-variable filter" = "Фильтр переменных состояния 12 дБ/окт"
+"12 dB/oct|24 dB/oct" = "12 dB/окт|24 dB/окт"
 "CHORUS" = "ХОРУС"
 "LEVEL" = "УРОВЕНЬ"
 "STEREO MATRIX" = "СТЕРЕОМАТРИЦА"

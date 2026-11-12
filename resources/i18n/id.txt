@@ -6810,6 +6810,7 @@ countries: id
 "FILTER" = "FILTER"
 "Low-pass|High-pass|Band-pass" = "Low-pass|High-pass|Band-pass"
 "12 dB/oct state-variable filter" = "Filter state-variable 12 dB/okt"
+"12 dB/oct|24 dB/oct" = "12 dB/okt|24 dB/okt"
 "CHORUS" = "CHORUS"
 "LEVEL" = "LEVEL"
 "STEREO MATRIX" = "MATRIKS STEREO"

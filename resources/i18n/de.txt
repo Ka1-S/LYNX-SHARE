@@ -6810,6 +6810,7 @@ countries: de at ch li lu
 "FILTER" = "FILTER"
 "Low-pass|High-pass|Band-pass" = "Tiefpass|Hochpass|Bandpass"
 "12 dB/oct state-variable filter" = "State-Variable-Filter 12 dB/Okt."
+"12 dB/oct|24 dB/oct" = "12 dB/Okt|24 dB/Okt"
 "CHORUS" = "CHORUS"
 "LEVEL" = "PEGEL"
 "STEREO MATRIX" = "STEREOMATRIX"

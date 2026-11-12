@@ -6810,6 +6810,7 @@ countries: tr
 "FILTER" = "FİLTRE"
 "Low-pass|High-pass|Band-pass" = "Alçak geçiren|Yüksek geçiren|Bant geçiren"
 "12 dB/oct state-variable filter" = "12 dB/okt durum değişkenli filtre"
+"12 dB/oct|24 dB/oct" = "12 dB/okt|24 dB/okt"
 "CHORUS" = "KORUS"
 "LEVEL" = "SEVİYE"
 "STEREO MATRIX" = "STEREO MATRİS"

@@ -37,6 +37,10 @@ std::string formatEffectParam (EffectKind kind, int param, float value01, double
 std::string formatEffectParam (EffectKind kind, int param, float value01, double bpm, const EffectParams& context);
 
 EffectSlot makeEffectSlot (EffectKind kind);
+// The basic Filter's second stage at 24 dB/oct (round 190da, its appended Slope): the same type and cutoff, Q2 =
+// 0.5 + x / (1 + x) for the first stage's Q = 0.5 + 2x / (1 − x) — the pair Ableton Live 12.4's Auto Filter runs
+// (measured in round 190cz: both stages cookbook biquads, 0.003 dB); at Q 0.5 both are 0.5
+double filterSecondStageQ (double q) noexcept;
 // A slot loaded from a project that stored `savedCount` parameters: parameters added later that switch an engine
 // to a newer construction get the value that keeps the old sound (round 147: Prism's measured Dynamic phase).
 void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexcept;

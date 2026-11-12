@@ -6810,6 +6810,7 @@ countries: es mx ar co cl pe ve
 "FILTER" = "FILTRO"
 "Low-pass|High-pass|Band-pass" = "Paso bajo|Paso alto|Paso banda"
 "12 dB/oct state-variable filter" = "Filtro de estado variable 12 dB/oct"
+"12 dB/oct|24 dB/oct" = "12 dB/oct|24 dB/oct"
 "CHORUS" = "CHORUS"
 "LEVEL" = "NIVEL"
 "STEREO MATRIX" = "MATRIZ ESTÉREO"

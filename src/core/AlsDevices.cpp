@@ -102,33 +102,34 @@ double gainOfDb (double db) noexcept { return std::pow (10.0, db / 20.0); }
 
 double eq8CutSectionScale (double liveQ) noexcept
 {
-    return std::max (0.05, 1.0 + 0.2611 * std::log (std::max (liveQ, 1.0e-3) / 0.714));
+    return std::max (0.05, 1.0 + 0.2632 * std::log (std::max (liveQ, 1.0e-3) / 0.7071));
 }
 
 double eq8ShelfCookbookQ (double liveQ) noexcept
 {
-    return 0.71 * std::pow (std::max (liveQ, 1.0e-3) / 0.71, 0.394);
+    const auto l = std::log (std::clamp (liveQ, 0.1, 18.0));
+    return std::exp (((((-0.000248 * l + 0.002322) * l - 0.004732) * l - 0.036516) * l + 0.410151) * l - 0.200340);
 }
 
-double eq8AdaptiveQ (double liveQ, double gainDb, double factor) noexcept
+double eq8AdaptiveQ (double q, double gainDb, double factor) noexcept
 {
-    return liveQ * std::pow (std::clamp (factor, 1.0, 4.0), std::abs (gainDb) / 2.0);
+    return q * std::pow (std::clamp (factor, 1.0, 4.0), std::min (std::abs (gainDb), 60.0) - 6.0);
 }
 
 namespace
 {
-double facetQUnclamped (Eq8Mode mode, double liveQ) noexcept
+double facetQUnclamped (Eq8Mode mode, double liveQ, double adaptive = 1.0) noexcept
 {
     const auto q = std::max (liveQ, 1.0e-3);
     switch (mode)
     {
-        case Eq8Mode::bell:
+        case Eq8Mode::bell: return root2 * q * adaptive;
         case Eq8Mode::notch:
         case Eq8Mode::lowCut12:
         case Eq8Mode::highCut12: return root2 * q;
         // Facet's shelf is the cookbook shelf with Qs = 0.7071·Qfacet^0.4697
         case Eq8Mode::lowShelf:
-        case Eq8Mode::highShelf: return std::pow (eq8ShelfCookbookQ (q) / std::sqrt (0.5), 1.0 / 0.4697);
+        case Eq8Mode::highShelf: return std::pow (eq8ShelfCookbookQ (q) * adaptive / std::sqrt (0.5), 1.0 / 0.4697);
         // with Facet's cut law "all sections" its Q is the scale of the Butterworth section Qs
         case Eq8Mode::lowCut48:
         case Eq8Mode::highCut48: return eq8CutSectionScale (q);
@@ -137,7 +138,7 @@ double facetQUnclamped (Eq8Mode mode, double liveQ) noexcept
 }
 } // namespace
 
-double facetQ (Eq8Mode mode, double liveQ) noexcept { return std::clamp (facetQUnclamped (mode, liveQ), 0.025, 40.0); }
+double facetQ (Eq8Mode mode, double liveQ, double adaptive) noexcept { return std::clamp (facetQUnclamped (mode, liveQ, adaptive), 0.025, 40.0); }
 
 void setFacetBand (EffectParams& p, int b, const Eq8Band& band, double gainSign, int placement)
 {
@@ -158,7 +159,7 @@ void setFacetBand (EffectParams& p, int b, const Eq8Band& band, double gainSign,
     p[(std::size_t) facet::param (b, 0)] = facet::shapeValue (shape);
     p[(std::size_t) facet::param (b, 1)] = facet::hzValue (band.hz);
     p[(std::size_t) facet::param (b, 2)] = facet::gainValue (facet::hasGain (shape) ? gainSign * band.gainDb : 0.0);
-    p[(std::size_t) facet::param (b, 3)] = facet::qValue (facetQ (band.mode, band.q));
+    p[(std::size_t) facet::param (b, 3)] = facet::qValue (facetQ (band.mode, band.q, band.adaptive));
     p[(std::size_t) facet::param (b, 4)] = facet::slopeValue (slope);
     p[(std::size_t) (facet::powerParam0 + b)] = band.on ? 0.0f : 1.0f;
     p[(std::size_t) (facet::placementParam0 + b)] = facet::placementValue ((facet::Placement) placement);
@@ -186,27 +187,26 @@ bool eqEightToFacet (const Element& device, EffectSlot& slot, Notes& notes)
     p[facet::scaleParam] = unit (std::abs (scale) / 2.0);
     p[facet::outputParam] = linValue (manual (device, "GlobalGain", 0.0), -24.0, 24.0); // ±12 dB in Live
 
-    // 48 dB cuts [MEASURED 190cw r01–r03]: every Butterworth section scaled with Q (Facet's "all sections" cut law)
+    // 48 dB cuts [MEASURED 190cw r01–r03, 190cz Q 0.1 … 10]: every Butterworth section scaled with Q (Facet's "all
+    // sections" cut law)
     p[facet::cutLawParam] = 1.0f;
-    bool shelfGained = false, clampedQ = false;
+    bool clampedQ = false;
     const auto noteBand = [&] (const Eq8Band& band) {
-        const auto wanted = facetQUnclamped (band.mode, band.q);
+        const auto wanted = facetQUnclamped (band.mode, band.q, band.adaptive);
         clampedQ = clampedQ || (band.on && (wanted > 40.0 || wanted < 0.025));
-        // the laws hold where they were measured (round 190cw renders); outside, they are extrapolated and listed
-        if (band.on && (band.mode == Eq8Mode::lowCut48 || band.mode == Eq8Mode::highCut48) && (band.q < 0.45 || band.q > 1.1))
-            notes.approximated.push_back (text ("48 dB/oct cut at Q %.2f (Live's law measured at Q 0.5 … 1)", band.q));
-        if (band.on && (band.mode == Eq8Mode::lowShelf || band.mode == Eq8Mode::highShelf) && std::abs (band.gainDb) > 0.05 && (band.q < 0.65 || band.q > 2.2))
-            notes.approximated.push_back (text ("shelf at Q %.2f (Live's shelf Q law measured at Q 0.71 and 2)", band.q));
-        shelfGained = shelfGained || (band.on && (band.mode == Eq8Mode::lowShelf || band.mode == Eq8Mode::highShelf) && std::abs (band.gainDb) > 0.05);
+        // the laws hold where they were measured (rounds 190cw / 190cz); outside, they are extrapolated and listed
+        if (band.on && (band.mode == Eq8Mode::lowCut48 || band.mode == Eq8Mode::highCut48) && (band.q < 0.095 || band.q > 10.5))
+            notes.approximated.push_back (text ("48 dB/oct cut at Q %.2f (Live's law measured at Q 0.1 … 10)", band.q));
     };
-    // Adaptive Q [MEASURED 190cw r09 / r12: a bell at Q 2, ±12 dB acts as Q 3.97 / 3.95 with AdaptiveQ on; DATA:
-    // AdaptiveQFactor 1.12 in every saved device]: the bell's Q × factor^(|gain| / 2) — with 1.12 that is
-    // Q·10^(|gain| / 40) within 1 %. The gain is the one the filter gets (after Scale) [ASSUMED]
+    // Adaptive Q [MEASURED 190cz: 9 bell and 9 shelf renders, exact]: Q × factor^(|gain| − 6), the gain after Scale; on
+    // shelves when AdaptiveQAffectsShelves [DATA: true in 178 of 181 shipped devices]
     const auto adaptive = manualBool (device, "AdaptiveQ", false);
     const auto adaptiveFactor = device.number ("AdaptiveQFactor", 1.12);
+    const auto shelvesToo = device.boolean ("AdaptiveQAffectsShelves", true);
     const auto adapt = [&] (Eq8Band band) {
-        if (adaptive && band.mode == Eq8Mode::bell)
-            band.q = eq8AdaptiveQ (band.q, band.gainDb * std::abs (scale), adaptiveFactor);
+        const auto shelf = band.mode == Eq8Mode::lowShelf || band.mode == Eq8Mode::highShelf;
+        if (adaptive && (band.mode == Eq8Mode::bell || (shelf && shelvesToo)))
+            band.adaptive = eq8AdaptiveQ (1.0, band.gainDb * std::abs (scale), adaptiveFactor);
         return band;
     };
 
@@ -246,8 +246,6 @@ bool eqEightToFacet (const Element& device, EffectSlot& slot, Notes& notes)
         if (left > 0)
             notes.dropped.push_back (text ("%.0f band(s) of the second channel curve (Facet EQ has 8 bands in all)", left));
     }
-    if (adaptive && shelfGained)
-        notes.approximated.push_back ("Adaptive Q on a shelf (measured on bells only: the shelf keeps its Q)");
     if (clampedQ)
         notes.approximated.push_back ("a band's resonance beyond Facet EQ's Q range");
     return true;
@@ -343,9 +341,7 @@ bool glueToCrest (const Element& device, EffectSlot& slot, Notes& notes, SideInp
     const auto releaseIndex = (int) manual (device, "Release", 3);
     p[autoRelease] = releaseIndex >= 6 ? 1.0f : 0.0f;
     p[release] = releaseValue (releaseIndex >= 6 ? 600.0 : glueReleaseMs (releaseIndex));
-    // Range [DATA: 0 … 70 dB, 70 = no limit] → Crest's 0 … 60 dB (60 = no limit)
-    const auto rangeLive = manual (device, "Range", 70.0);
-    p[range] = rangeLive >= 60.0 ? 1.0f : linValue (rangeLive, 0.0, 60.0);
+    p[range] = linValue (glueRangeDb (manual (device, "Range", 70.0)), 0.0, 60.0);
     p[knee] = 0.0f;
     p[output] = linValue (manual (device, "Makeup", 0.0), -36.0, 36.0); // [DATA: 0 … 20 dB]
     p[autoGain] = 0.0f;
@@ -357,7 +353,17 @@ bool glueToCrest (const Element& device, EffectSlot& slot, Notes& notes, SideInp
         notes.dropped.push_back ("Soft clip");
     sideChainCommon (device, p, notes, side);
     sideChainEq (device, "SideChainEq/", p, notes);
+    // [MEASURED 190cz g01, round 190da] the side-chain EQ above holds: the rendered Glue (its preset's side-chain EQ on,
+    // high pass 200 Hz, Q 0.71) weighted its detector as a 2nd-order high pass at 204.5 Hz, Q 0.70 (40 / 63 / 100 /
+    // 160 / 250 Hz −28.2 / −20.5 / −12.8 / −5.8 / −1.6 dB); Crest with the translated band: −28.2 / −20.2 / −12.4 / −5.4 / −1.5
     return true;
+}
+
+double glueRangeDb (double liveRange) noexcept
+{
+    if (liveRange >= 50.0)
+        return 60.0;
+    return std::clamp (1.1727 * liveRange - 2.197, 0.0, 60.0);
 }
 
 // ================================================================================================ Utility
@@ -376,7 +382,8 @@ StereoMatrix utilityMatrix (const LiveUtility& u) noexcept
     if (u.channelMode == 0) { a[1][0] = sl; a[1][1] = 0.0; }
     else if (u.channelMode == 2) { a[0][0] = 0.0; a[0][1] = sr; }
     else if (u.channelMode == 3) { a[0][0] = 0.0; a[0][1] = sr; a[1][0] = sl; a[1][1] = 0.0; }
-    // the stereo stage: out = M·gm ± S·gs
+    // the stereo stage: out = M·gm ± S·gs; mid/side balance m [MEASURED 190cz u05–u13: mid × min(1, 2 − m), side ×
+    // min(1, m), linear]
     double gm = 1.0, gs = u.midSideOn ? 1.0 : std::clamp (u.width, 0.0, 4.0);
     if (u.midSideOn)
     {
@@ -405,12 +412,12 @@ bool utilityIsExact (const LiveUtility& u) noexcept
 {
     const auto db = dbOfGain (u.gain);
     const auto gainOk = u.mute || u.gain <= 0.0 || (db > -24.0 && db <= 24.0);
-    // [MEASURED 190cw r13–r17]: width M + w·S, the balance law and phase before channel mode are Live's; the matrix
-    // (balance included) must fit LYNX's ±2 coefficients
+    // [MEASURED 190cw r13–r17, 190cz u00–u13]: width M + w·S, the mid/side balance, the balance law after the width /
+    // mono / mid-side stage and phase before channel mode are Live's; the matrix (balance included) must fit LYNX's ±2
+    // coefficients
     const auto m = utilityMatrix (u);
     const auto fits = std::abs (m.ll) <= 2.0 && std::abs (m.rl) <= 2.0 && std::abs (m.lr) <= 2.0 && std::abs (m.rr) <= 2.0;
-    const auto widthOk = u.mono || ! u.midSideOn || std::abs (u.midSide - 1.0) < 1.0e-6;
-    return gainOk && widthOk && fits && ! u.bassMono && ! u.dcFilter;
+    return gainOk && fits && ! u.bassMono && ! u.dcFilter;
 }
 
 LiveUtility readUtility (const Element& device)
@@ -460,8 +467,6 @@ bool utilityToUtility (const Element& device, EffectSlot& slot, Notes& notes)
     if (! fits)
         notes.approximated.push_back (std::abs (u.balance) > 1.0e-6 ? text ("width %.0f %% with a balance (Utility's matrix coefficients reach 2)", u.width * 100.0)
                                                                     : text ("width %.0f %% (Utility's matrix reaches 300 %%)", u.width * 100.0));
-    if (! u.mono && u.midSideOn && std::abs (u.midSide - 1.0) > 1.0e-6)
-        notes.approximated.push_back ("mid/side balance (straight-line law; Live's not confirmed)");
     if (u.bassMono)
         notes.dropped.push_back (text ("Bass Mono (below %.0f Hz)", manual (device, "BassMonoFrequency", 120.0)));
     if (u.dcFilter)
@@ -528,7 +533,11 @@ bool reverbToAtrium (const Element& device, EffectSlot& slot, Notes& notes)
     auto& p = slot.params;
     p[0] = unit (manual (device, "MixDirect", 0.55));                      // Dry/Wet
     p[1] = linValue (manual (device, "PreDelay", 2.5), 0.0, 500.0);        // ms [DATA: 0.5 … 250]
-    p[2] = verbs::atrium::decayValue (manual (device, "DecayTime", 1200.0) / 1000.0); // ms [DATA: 200 … 60000] → 0.1 … 100 s
+    // Decay [DATA: 200 … 60000 ms; MEASURED 190cz r00–r04: Live's 1 kHz T30 ≈ 0.91 × the setting] → Atrium's decay
+    // × 0.94 with the high damping below (a grid of Atrium decays and High mults against the T30 of Live's renders per
+    // octave, 125 Hz … 8 kHz, at Decay 1 / 2.5 / 5 s: no octave further from Live than before, most 3 … 10 × closer)
+    const auto decaySec = manual (device, "DecayTime", 1200.0) / 1000.0;
+    p[2] = verbs::atrium::decayValue (reverbAtriumDecaySec (decaySec));
     // the input filter → High cut (100 … 15000 Hz) and Low cut (0 … 1000 Hz)
     const auto centre = manual (device, "BandFreq", 830.0), width = manual (device, "BandWidth", 5.85);
     p[3] = manualBool (device, "BandHighOn", false) ? linValue (reverbInputHighHz (centre, width), 100.0, 15000.0) : 1.0f;
@@ -543,7 +552,7 @@ bool reverbToAtrium (const Element& device, EffectSlot& slot, Notes& notes)
     const auto lowOn = manualBool (device, "ShelfLowOn", false), highOn = manualBool (device, "ShelfHighOn", false);
     p[9] = linValue (lowOn ? manual (device, "ShelfLoGain", 0.75) : 1.0, 0.5, 2.0);    // [DATA: 0.2 … 1]
     p[10] = linValue (manual (device, "ShelfLoFreq", 90.0), 100.0, 10000.0);
-    p[11] = linValue (highOn ? manual (device, "ShelfHiGain", 0.7) : 1.0, 0.1, 1.0);   // [DATA: 0.2 … 1]
+    p[11] = linValue (highOn ? reverbAtriumHighMult (manual (device, "ShelfHiGain", 0.7), decaySec) : 1.0, 0.1, 1.0); // [DATA: 0.2 … 1]
     p[12] = linValue (manual (device, "ShelfHiFreq", 4500.0), 100.0, 15000.0);
     // Spin → the early reflections' modulation
     const auto spin = manualBool (device, "SpinOn", false);
@@ -560,7 +569,19 @@ bool reverbToAtrium (const Element& device, EffectSlot& slot, Notes& notes)
         notes.dropped.push_back ("Scale");
     if ((int) manual (device, "HighFilterType", 0) != 0)
         notes.approximated.push_back ("high filter as a low pass (Atrium damps with a decay multiplier)");
+    // [MEASURED 190cz r00–r03: Live's tail energy grows with Decay, −16.7 / −11.5 / −8.3 dB at 1 / 2.5 / 5 s (fully
+    // wet); Atrium's stays at −3.7 dB; Atrium has no wet level of its own]
+    if (manual (device, "MixDirect", 0.55) > 0.0)
+        notes.approximated.push_back ("wet level (Atrium's fully wet tail is louder than Live's: measured +13 / +8 / +4.5 dB at Decay 1 / 2.5 / 5 s)");
     return true;
+}
+
+double reverbAtriumDecaySec (double liveDecaySec) noexcept { return 0.94 * liveDecaySec; }
+
+double reverbAtriumHighMult (double shelfHiGain, double liveDecaySec) noexcept
+{
+    const auto lossDb = -20.0 * std::log10 (std::clamp (shelfHiGain, 0.01, 1.0));
+    return std::clamp (1.0 / (1.0 + 0.08 * lossDb * std::max (liveDecaySec, 0.0)), 0.1, 1.0);
 }
 
 // ================================================================================================ entry point
@@ -584,6 +605,7 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
             const auto sign = scale < 0.0 ? -1.0 : 1.0;
             const auto adaptive = manualBool (device, "AdaptiveQ", false);
             const auto factor = device.number ("AdaptiveQFactor", 1.12);
+            const auto shelvesToo = device.boolean ("AdaptiveQAffectsShelves", true);
             for (int b = 0; b < facet::bands; ++b)
             {
                 const auto stem = "Bands." + std::to_string (b) + "/ParameterA/";
@@ -591,9 +613,11 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
                 t.links.push_back ({ stem + "Freq", facet::param (b, 1), [] (double hz) { return facet::hzValue (hz); } });
                 if (mode == Eq8Mode::bell || mode == Eq8Mode::lowShelf || mode == Eq8Mode::highShelf)
                     t.links.push_back ({ stem + "Gain", facet::param (b, 2), [sign] (double db) { return facet::gainValue (sign * db); } });
-                // (190cx) a bell under Adaptive Q keeps the narrowing of its stored gain (a moving gain leaves Q there)
-                const auto narrow = adaptive && mode == Eq8Mode::bell ? eq8AdaptiveQ (1.0, manual (device, stem + "Gain", 0.0) * std::abs (scale), factor) : 1.0;
-                t.links.push_back ({ stem + "Q", facet::param (b, 3), [mode, narrow] (double q) { return facet::qValue (facetQ (mode, q * narrow)); } });
+                // (190cx, 190da) a band under Adaptive Q keeps the factor of its stored gain (a moving gain leaves Q there)
+                const auto shelf = mode == Eq8Mode::lowShelf || mode == Eq8Mode::highShelf;
+                const auto narrow = adaptive && (mode == Eq8Mode::bell || (shelf && shelvesToo))
+                                        ? eq8AdaptiveQ (1.0, manual (device, stem + "Gain", 0.0) * std::abs (scale), factor) : 1.0;
+                t.links.push_back ({ stem + "Q", facet::param (b, 3), [mode, narrow] (double q) { return facet::qValue (facetQ (mode, q, narrow)); } });
             }
             link ("GlobalGain", facet::outputParam, [] (double db) { return linValue (db, -24.0, 24.0); });
         }
@@ -632,7 +656,7 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
         t.sideParam = scExternal;
         link ("Threshold", threshold, [] (double db) { return linValue (db, -60.0, 0.0); });
         link ("Makeup", output, [] (double db) { return linValue (db, -36.0, 36.0); });
-        link ("Range", range, [] (double db) { return db >= 60.0 ? 1.0f : linValue (db, 0.0, 60.0); });
+        link ("Range", range, [] (double db) { return linValue (glueRangeDb (db), 0.0, 60.0); });
         link ("DryWet", mix, [] (double v) { return unit (v); });
     }
     else if (tag == "StereoGain")
@@ -653,7 +677,7 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
         ok = reverbToAtrium (device, t.slot, t.notes);
         link ("MixDirect", 0, [] (double v) { return unit (v); });
         link ("PreDelay", 1, [] (double ms) { return linValue (ms, 0.0, 500.0); });
-        link ("DecayTime", 2, [] (double ms) { return verbs::atrium::decayValue (ms / 1000.0); });
+        link ("DecayTime", 2, [] (double ms) { return verbs::atrium::decayValue (reverbAtriumDecaySec (ms / 1000.0)); });
         link ("RoomSize", 5, [] (double size) { return atriumSizeOf (size); });
     }
     // ---- lot 2 (round 190cf) ----
