@@ -543,7 +543,8 @@ private:
         const auto* a = current();
         const auto value = editedPoints (*a)[(std::size_t) point].value;
         juce::PopupMenu menu;
-        menu.addSectionHeader (valueText (value));
+        // FL's header is the point's place in the clip, "Point 2/14" (live check 190cq, shot curves190bw-01)
+        menu.addSectionHeader (automationPointMenuHeader (point, (int) editedPoints (*a).size()));
         menu.addItem (tr ("Delete"), editedPoints (*a).size() > 1, false, [this, point] {
             edit ([point] (Automation& x) {
                 if (editedPoints (x).size() > 1)
@@ -891,6 +892,11 @@ AutomationPointMemory& automationPointMemory()
 {
     static AutomationPointMemory memory;
     return memory;
+}
+
+juce::String automationPointMenuHeader (int point, int count)
+{
+    return tr ("Point {0}/{1}", { juce::String (point + 1), juce::String (count) });
 }
 
 void addAutomationModeItems (juce::PopupMenu& menu, int current, bool enabled, std::function<void (int)> pick)

@@ -12717,15 +12717,60 @@ private:
                                                                      { lynx::NoteTool::scaleLevels, "-tool-scalelevels.png" },
                                                                      { lynx::NoteTool::randomise, "-tool-randomise.png" },
                                                                      { lynx::NoteTool::lfo, "-tool-lfo.png" } };
+            // round 190ct: checks of the FL-live fixes, one line each in <prefix>-checks.txt (OK / FAIL)
+            juce::StringArray checks;
+            const auto check = [&checks] (bool ok, const juce::String& what) { checks.add ((ok ? "OK   " : "FAIL ") + what); };
+            {
+                juce::String header;
+                const auto pointMenu = playlist.getAutomationPointMenuForSnapshot (clipIndex, 10); // (the iterator keeps a reference)
+                for (juce::PopupMenu::MenuItemIterator it (pointMenu); it.next();)
+                {
+                    header = it.getItem().text;
+                    break;
+                }
+                check (header == "Point 11/14", "point menu header \"" + header + "\" (FL: \"Point n/N\")");
+            }
             for (const auto& [tool, name] : tools)
             {
                 auto panel = lynx::makeNoteToolPanel (offline, tool, roll.noteIndicesForSnapshot(), roll.gridForSnapshot());
                 offline.dispatchPendingMessages();
                 savePng (panel->createComponentSnapshot (panel->getLocalBounds()), prefix + name);
+                if (tool == lynx::NoteTool::flip)
+                {
+                    std::vector<juce::ToggleButton*> toggles;
+                    for (auto* child : panel->getChildren())
+                        if (auto* t = dynamic_cast<juce::ToggleButton*> (child))
+                            toggles.push_back (t);
+                    check (toggles.size() == 3 && toggles[0]->getToggleState() && toggles[1]->getToggleState() && ! toggles[2]->getToggleState(),
+                           "flip opens with Flip horizontally on, Preserve start times on, Flip vertically off");
+                    if (toggles.size() == 3)
+                    {
+                        toggles[2]->setToggleState (true, juce::sendNotificationSync);
+                        check (! toggles[0]->getToggleState() && toggles[2]->getToggleState(), "flip: vertically turns horizontally off (radios)");
+                        toggles[0]->setToggleState (true, juce::sendNotificationSync);
+                        check (toggles[0]->getToggleState() && ! toggles[2]->getToggleState(), "flip: horizontally turns vertically off (radios)");
+                    }
+                }
+                if (tool == lynx::NoteTool::limit)
+                {
+                    auto* list = lynx::noteToolLongestChoiceForSnapshot (*panel);
+                    juce::ComboBox* key = nullptr;
+                    for (auto* child : panel->getChildren())
+                        if (auto* box = dynamic_cast<juce::ComboBox*> (child); box != nullptr && box->getNumItems() == 12)
+                            key = box;
+                    check (list != nullptr && list->getNumItems() == 89, "limit list has (none) + 66 chords + 22 scales: "
+                                                                             + juce::String (list != nullptr ? list->getNumItems() : 0));
+                    check (list != nullptr && key != nullptr && list->getY() == key->getY() && list->getX() > key->getRight(),
+                           "limit: Key and the chord / scale list share one row");
+                    if (list != nullptr)
+                        saveMenus (juce::StringArray { "Limit: Key / scale list" }, std::vector<juce::PopupMenu> { *list->getRootMenu() },
+                                   prefix + "-tool-limit-list.png");
+                }
                 if (tool == lynx::NoteTool::lfo)
                     saveMenus (juce::StringArray { "LFO tool: right-click on a Period slider" },
                                std::vector<juce::PopupMenu> { lynx::noteToolPresetMenuForSnapshot (*panel) }, prefix + "-tool-lfo-steps.png");
             }
+            juce::File (prefix + "-checks.txt").replaceWithText (checks.joinIntoString ("\n") + "\n");
         }
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
     }

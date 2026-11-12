@@ -154,6 +154,14 @@ struct Control
     std::function<void()> onChange; // runs before the preview (presets that set other controls)
     // a slider's right-click menu of fixed values (FL's wheel popup menus, e.g. the LFO tool's SpeedWheelMenu)
     std::vector<std::pair<juce::String, double>> presets;
+    // (round 190ct) a toggle in a radio group (FL's radio pairs, e.g. Flip horizontally / vertically): 0 = none
+    int radioGroup = 0;
+    // (round 190ct) shares the row of the control before it, to its right (FL's "Key / scale" row: key + list)
+    bool joinPrevious = false;
+    int indent = 0; // pixels the label moves right (an option that belongs to the row above, as FL draws it)
+    // (round 190ct) fills a choice box itself (headings and separators, as FL's chord / scale list); the selected
+    // index counts the items only
+    std::function<void (juce::ComboBox&)> fill;
 };
 
 // A slider whose right-click opens a menu of fixed values (round 190bw).
@@ -236,7 +244,7 @@ public:
 
         int height = 92 + 44 + (hasExtraButton() ? rowHeight : 0);
         for (const auto& c : controls)
-            height += c.kind == Control::header ? headerHeight : rowHeight;
+            height += c.kind == Control::header ? headerHeight : c.joinPrevious ? 0 : rowHeight;
 
         setSize (440, height);
         preview();
@@ -276,8 +284,20 @@ public:
                 continue;
             }
 
+            if (controls[c].joinPrevious)
+                continue; // placed with the control before it
+
             auto row = area.removeFromTop (rowHeight).reduced (0, 3);
-            labels[c]->setBounds (row.removeFromLeft (150));
+            labels[c]->setBounds (row.removeFromLeft (150).withTrimmedLeft (controls[c].indent));
+            if (c + 1 < controls.size() && controls[c + 1].joinPrevious && editors[c] != nullptr && editors[c + 1] != nullptr)
+            {
+                // two editors on one row: a narrow first one (the key), the rest for the second (the list)
+                editors[c]->setBounds (row.removeFromLeft (64));
+                row.removeFromLeft (6);
+                editors[c + 1]->setBounds (row);
+                labels[c + 1]->setBounds ({});
+                continue;
+            }
             if (editors[c] != nullptr)
                 editors[c]->setBounds (controls[c].kind == Control::toggle ? row.removeFromLeft (40) : row);
         }
@@ -340,7 +360,10 @@ private:
         else if (c.kind == Control::choice)
         {
             auto box = std::make_unique<juce::ComboBox>();
-            box->addItemList (c.choices, 1);
+            if (c.fill)
+                c.fill (*box);
+            else
+                box->addItemList (c.choices, 1);
             box->setSelectedItemIndex ((int) c.initial, juce::dontSendNotification);
             box->onChange = changed;
             editor = std::move (box);
@@ -348,6 +371,9 @@ private:
         else if (c.kind == Control::toggle)
         {
             auto toggle = std::make_unique<juce::ToggleButton>();
+            toggle->setRadioGroupId (c.radioGroup);
+            if (c.radioGroup != 0)
+                toggle->getProperties().set ("lynxRadio", true); // drawn as a radio dot (Theme.cpp drawTickBox), as FL's
             toggle->setToggleState (c.initial > 0.5, juce::dontSendNotification);
             toggle->onClick = changed;
             editor = std::move (toggle);
@@ -485,10 +511,20 @@ private:
                 add ({ Control::slider, tr ("Octaves"), 1.0, 4.0, 1.0, 1.0, [] (double v) { return juce::String (juce::roundToInt (v)); } });
                 break;
             case NoteTool::flip:
-                add ({ Control::toggle, tr ("Flip in time"), 0, 1, 1, 1 });
-                add ({ Control::toggle, tr ("Flip in pitch"), 0, 1, 1, 0 });
-                add ({ Control::toggle, tr ("Preserve start times"), 0, 1, 1, 0 });
+            {
+                // FL's score flipper (live check 190cq, shot curves190bw-04): two exclusive radios, "Preserve start times"
+                // under the horizontal one and on at the first open
+                Control horizontal { Control::toggle, tr ("Flip horizontally"), 0, 1, 1, 1 };
+                horizontal.radioGroup = 1;
+                add (horizontal);
+                Control preserve { Control::toggle, tr ("Preserve start times"), 0, 1, 1, 1 };
+                preserve.indent = 24;
+                add (preserve);
+                Control vertical { Control::toggle, tr ("Flip vertically"), 0, 1, 1, 0 };
+                vertical.radioGroup = 1;
+                add (vertical);
                 break;
+            }
             case NoteTool::randomise:
                 add ({ Control::slider, tr ("Velocity"), 0.0, 1.0, 0.01, 0.2, percent });
                 add ({ Control::slider, tr ("Pan"), 0.0, 1.0, 0.01, 0.0, percent });
@@ -523,12 +559,28 @@ private:
                 // FL's limiter / transposer: "Key / scale restriction" (base key, scale, Snap) and "Keyboard range /
                 // transpose" (Wrap to top / bottom, the transposition FL sets with the keyboard's marked key)
                 add ({ Control::header, tr ("Key / scale restriction") });
-                add ({ Control::choice, tr ("Base key"), 0, 11, 1, 0, {}, pitchClassNames() });
+                add ({ Control::choice, tr ("Key / scale"), 0, 11, 1, 0, {}, pitchClassNames() });
                 {
-                    juce::StringArray scaleNames { tr ("(none)") };
-                    for (std::size_t s = 1; s < notetools::scales().size(); ++s)
-                        scaleNames.add (tr (notetools::scales()[s].name));
-                    add ({ Control::choice, tr ("Scale"), 0, (double) scaleNames.size() - 1, 1, 0, {}, scaleNames });
+                    // FL's list (System/Config/Chords.map; live check 190cq, shot curves190bw-05f): (none), the chords
+                    // in groups under "Chords", then the scales under "Scales"; key and list share FL's one row
+                    const auto& list = notetools::limitRestrictions();
+                    Control restriction { Control::choice, {}, 0, (double) list.size() - 1, 1, 0 };
+                    restriction.joinPrevious = true;
+                    restriction.fill = [] (juce::ComboBox& box) {
+                        const auto& entries = notetools::limitRestrictions();
+                        for (std::size_t i = 0; i < entries.size(); ++i)
+                        {
+                            const auto& e = entries[i];
+                            if (e.groupStart && e.kind == notetools::LimitRestriction::chord && (i == 1 || entries[i - 1].kind != e.kind))
+                                box.addSectionHeading (tr ("Chords"));
+                            else if (e.groupStart && e.kind == notetools::LimitRestriction::scale)
+                                box.addSectionHeading (tr ("Scales"));
+                            else if (e.groupStart)
+                                box.addSeparator();
+                            box.addItem (e.kind == notetools::LimitRestriction::chord ? juce::String (e.name) : tr (e.name), (int) i + 1);
+                        }
+                    };
+                    add (restriction);
                 }
                 add ({ Control::choice, tr ("Snap"), 0, 2, 1, 0, {}, { tr ("Above"), tr ("Under"), tr ("Alternate") } });
                 add ({ Control::header, tr ("Keyboard range / transpose") });
@@ -808,7 +860,7 @@ private:
                 break;
             }
             case NoteTool::flip:
-                flip (p, indices, on (0), on (1), on (2));
+                flip (p, indices, on (0), on (2), on (1));
                 break;
             case NoteTool::randomise:
             {
@@ -1240,6 +1292,15 @@ juce::PopupMenu noteToolPresetMenuForSnapshot (juce::Component& panel)
             return menu;
     }
     return {};
+}
+
+juce::ComboBox* noteToolLongestChoiceForSnapshot (juce::Component& panel)
+{
+    juce::ComboBox* best = nullptr;
+    for (auto* child : panel.getChildren())
+        if (auto* box = dynamic_cast<juce::ComboBox*> (child); box != nullptr && (best == nullptr || box->getNumItems() > best->getNumItems()))
+            best = box;
+    return best;
 }
 
 void showNoteTool (AudioEngine& engine, NoteTool tool, std::vector<int> indices, std::int64_t grid, std::function<void()> onFinished)

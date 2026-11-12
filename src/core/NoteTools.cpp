@@ -5,6 +5,7 @@
 #include <iterator>
 #include <map>
 #include <tuple>
+#include <string_view>
 
 namespace lynx::notetools
 {
@@ -457,17 +458,20 @@ void randomise (Pattern& pattern, const std::vector<int>& indices, const Randomi
         const auto rx = random.bipolar (true), ry = random.bipolar (true), rt = random.bipolar (o.bipolar);
         const auto rl = random.bipolar (true);
         const auto rr = random.bipolar (true); // drawn last: the older amounts keep their values for a seed
+        // FL's Bipolar box covers every level; off, the levels only go up (live FL check 190cq: pan and velocity at
+        // 100 % moved only towards the right / 100 %). The draws stay the same, so Bipolar on is unchanged.
+        const auto way = [&o] (float r) { return o.bipolar ? r : std::abs (r); };
 
-        n.velocity = std::clamp (n.velocity + o.velocity * rv, 0.0f, 1.0f);
-        n.pan = std::clamp (n.pan + 2.0f * o.pan * rp, -1.0f, 1.0f);
-        n.finePitch = std::clamp (n.finePitch + 120.0f * o.finePitch * rf, -120.0f, 120.0f);
-        n.modX = std::clamp (n.modX + o.modX * rx, 0.0f, 1.0f);
-        n.modY = std::clamp (n.modY + o.modY * ry, 0.0f, 1.0f);
+        n.velocity = std::clamp (n.velocity + o.velocity * way (rv), 0.0f, 1.0f);
+        n.pan = std::clamp (n.pan + 2.0f * o.pan * way (rp), -1.0f, 1.0f);
+        n.finePitch = std::clamp (n.finePitch + 120.0f * o.finePitch * way (rf), -120.0f, 120.0f);
+        n.modX = std::clamp (n.modX + o.modX * way (rx), 0.0f, 1.0f);
+        n.modY = std::clamp (n.modY + o.modY * way (ry), 0.0f, 1.0f);
         if (o.release != 0.0f)
-            setLevelValue (n, Level::release, levelValue (n, Level::release) + o.release * rr);
+            setLevelValue (n, Level::release, levelValue (n, Level::release) + o.release * way (rr));
 
-        if (o.timing > 0)
-            n.start = std::max<std::int64_t> (0, n.start + (std::int64_t) std::llround ((double) o.timing * (o.bipolar ? rt : -rt)));
+        if (o.timing > 0) // off: only later
+            n.start = std::max<std::int64_t> (0, n.start + (std::int64_t) std::llround ((double) o.timing * way (rt)));
 
         if (o.length > 0.0f)
             n.length = std::max<std::int64_t> (1, (std::int64_t) std::llround ((double) n.length * (1.0 + (double) o.length * rl)));
@@ -555,7 +559,9 @@ void limit (Pattern& pattern, const std::vector<int>& indices, const LimitOption
     const auto high = std::clamp (std::max (o.lowKey, o.highKey), 0, 127);
     const auto minV = std::clamp (std::min (o.minVelocity, o.maxVelocity), 0.0f, 1.0f);
     const auto maxV = std::clamp (std::max (o.minVelocity, o.maxVelocity), 0.0f, 1.0f);
-    const auto restricted = o.scale > 0 && o.scale < (int) scales().size();
+    const auto restricted = o.scale > 0 && o.scale < (int) limitRestrictions().size();
+    const auto allowed = limitAllowedKeys (o.root, restricted ? o.scale : 0);
+    const auto inside = [&allowed] (int key) { return key >= 0 && key < (int) allowed.size() && allowed[(std::size_t) key]; };
     unsigned ties = 0;
 
     for (auto i : validSorted (pattern, indices))
@@ -563,12 +569,12 @@ void limit (Pattern& pattern, const std::vector<int>& indices, const LimitOption
         auto& n = pattern.notes[(std::size_t) i];
         auto key = std::clamp (n.key, 0, 127);
 
-        if (restricted && ! inScale (key, o.root, o.scale))
+        if (restricted && ! inside (key))
         {
-            // the nearest scale key; FL's search stops at the ends of the keyboard, whatever key is there
+            // the nearest allowed key; FL's search stops at the ends of the keyboard, whatever key is there
             auto down = key, up = key;
-            do { --down; } while (down >= 1 && ! inScale (down, o.root, o.scale));
-            do { ++up; } while (up <= 126 && ! inScale (up, o.root, o.scale));
+            do { --down; } while (down >= 1 && ! inside (down));
+            do { ++up; } while (up <= 126 && ! inside (up));
             down = std::max (down, 0);
             up = std::min (up, 127);
 
@@ -599,6 +605,135 @@ void limit (Pattern& pattern, const std::vector<int>& indices, const LimitOption
         n.key = key;
         n.velocity = std::clamp (n.velocity, minV, maxV);
     }
+}
+
+const std::vector<LimitRestriction>& limitRestrictions()
+{
+    // FL's System/Config/Chords.map, in its order (the steps between the notes, in semitones)
+    static const std::vector<LimitRestriction> list {
+        { TR_NOOP ("(none)"), LimitRestriction::none, false, {} },
+{ "Major", LimitRestriction::chord, true, { 4, 3 } },
+        { "sus2", LimitRestriction::chord, false, { 2, 5 } },
+        { "sus4", LimitRestriction::chord, false, { 5, 2 } },
+        { "Majb5", LimitRestriction::chord, false, { 4, 2 } },
+        { "minor", LimitRestriction::chord, false, { 3, 4 } },
+        { "mb5", LimitRestriction::chord, false, { 3, 3 } },
+        { "aug", LimitRestriction::chord, false, { 4, 4 } },
+        { "augsus4", LimitRestriction::chord, false, { 5, 3 } },
+        { "tri", LimitRestriction::chord, false, { 3, 3, 3 } },
+        { "6", LimitRestriction::chord, true, { 4, 3, 2 } },
+        { "6sus4", LimitRestriction::chord, false, { 5, 2, 2 } },
+        { "6add9", LimitRestriction::chord, false, { 4, 3, 2, 5 } },
+        { "m6", LimitRestriction::chord, false, { 3, 4, 2 } },
+        { "m6add9", LimitRestriction::chord, false, { 3, 4, 2, 5 } },
+        { "7", LimitRestriction::chord, true, { 4, 3, 3 } },
+        { "7sus4", LimitRestriction::chord, false, { 5, 2, 3 } },
+        { "7#5", LimitRestriction::chord, false, { 4, 4, 2 } },
+        { "7b5", LimitRestriction::chord, false, { 4, 2, 4 } },
+        { "7#9", LimitRestriction::chord, false, { 4, 3, 3, 5 } },
+        { "7b9", LimitRestriction::chord, false, { 4, 3, 3, 3 } },
+        { "7#5#9", LimitRestriction::chord, false, { 4, 4, 2, 5 } },
+        { "7#5b9", LimitRestriction::chord, false, { 4, 4, 2, 3 } },
+        { "7b5b9", LimitRestriction::chord, false, { 4, 2, 4, 3 } },
+        { "7add11", LimitRestriction::chord, false, { 4, 3, 3, 7 } },
+        { "7add13", LimitRestriction::chord, false, { 4, 3, 3, 11 } },
+        { "7#11", LimitRestriction::chord, false, { 4, 3, 3, 8 } },
+        { "Maj7", LimitRestriction::chord, false, { 4, 3, 4 } },
+        { "Maj7b5", LimitRestriction::chord, false, { 4, 2, 5 } },
+        { "Maj7#5", LimitRestriction::chord, false, { 4, 4, 3 } },
+        { "Maj7#11", LimitRestriction::chord, false, { 4, 3, 4, 7 } },
+        { "Maj7add13", LimitRestriction::chord, false, { 4, 3, 4, 10 } },
+        { "m7", LimitRestriction::chord, false, { 3, 4, 3 } },
+        { "m7b5", LimitRestriction::chord, false, { 3, 3, 4 } },
+        { "m7b9", LimitRestriction::chord, false, { 3, 4, 3, 3 } },
+        { "m7add11", LimitRestriction::chord, false, { 3, 4, 3, 7 } },
+        { "m7add13", LimitRestriction::chord, false, { 3, 4, 3, 11 } },
+        { "m-Maj7", LimitRestriction::chord, false, { 3, 4, 4 } },
+        { "m-Maj7add11", LimitRestriction::chord, false, { 3, 4, 4, 6 } },
+        { "m-Maj7add13", LimitRestriction::chord, false, { 3, 4, 4, 10 } },
+        { "9", LimitRestriction::chord, true, { 4, 3, 3, 4 } },
+        { "9sus4", LimitRestriction::chord, false, { 5, 2, 3, 4 } },
+        { "add9", LimitRestriction::chord, false, { 4, 3, 7 } },
+        { "9#5", LimitRestriction::chord, false, { 4, 4, 2, 4 } },
+        { "9b5", LimitRestriction::chord, false, { 4, 2, 4, 4 } },
+        { "9#11", LimitRestriction::chord, false, { 4, 3, 3, 4, 4 } },
+        { "9b13", LimitRestriction::chord, false, { 4, 3, 3, 4, 6 } },
+        { "Maj9", LimitRestriction::chord, false, { 4, 3, 4, 3 } },
+        { "Maj9sus4", LimitRestriction::chord, false, { 5, 2, 4, 3 } },
+        { "Maj9#5", LimitRestriction::chord, false, { 4, 4, 3, 3 } },
+        { "Maj9#11", LimitRestriction::chord, false, { 4, 3, 4, 3, 4 } },
+        { "m9", LimitRestriction::chord, false, { 3, 4, 3, 4 } },
+        { "madd9", LimitRestriction::chord, false, { 3, 4, 7 } },
+        { "m9b5", LimitRestriction::chord, false, { 3, 3, 4, 4 } },
+        { "m9-Maj7", LimitRestriction::chord, false, { 3, 4, 4, 3 } },
+        { "11", LimitRestriction::chord, true, { 4, 3, 3, 4, 3 } },
+        { "11b9", LimitRestriction::chord, false, { 4, 3, 3, 3, 4 } },
+        { "Maj11", LimitRestriction::chord, false, { 4, 3, 4, 3, 3 } },
+        { "m11", LimitRestriction::chord, false, { 3, 4, 3, 4, 3 } },
+        { "m-Maj11", LimitRestriction::chord, false, { 3, 4, 4, 3, 3 } },
+        { "13", LimitRestriction::chord, true, { 4, 3, 3, 4, 7 } },
+        { "13#9", LimitRestriction::chord, false, { 4, 3, 3, 5, 6 } },
+        { "13b9", LimitRestriction::chord, false, { 4, 3, 3, 3, 8 } },
+        { "13b5b9", LimitRestriction::chord, false, { 4, 2, 4, 3, 8 } },
+        { "Maj13", LimitRestriction::chord, false, { 4, 3, 4, 3, 7 } },
+        { "m13", LimitRestriction::chord, false, { 3, 4, 3, 4, 7 } },
+        { "m-Maj13", LimitRestriction::chord, false, { 3, 4, 4, 3, 7 } },
+        { TR_NOOP ("Major"), LimitRestriction::scale, true, { 2, 2, 1, 2, 2, 2 } },
+        { TR_NOOP ("Major pentatonic"), LimitRestriction::scale, false, { 2, 2, 3, 2 } },
+        { TR_NOOP ("Major bebop"), LimitRestriction::scale, false, { 2, 2, 1, 2, 1, 1, 2 } },
+        { TR_NOOP ("Minor Harmonic"), LimitRestriction::scale, false, { 2, 1, 2, 2, 1, 3 } },
+        { TR_NOOP ("Minor Melodic"), LimitRestriction::scale, false, { 2, 1, 2, 2, 2, 2 } },
+        { TR_NOOP ("Minor pentatonic"), LimitRestriction::scale, false, { 3, 2, 2, 3 } },
+        { TR_NOOP ("Minor Natural (Aeolian)"), LimitRestriction::scale, false, { 2, 1, 2, 2, 1, 2 } },
+        { TR_NOOP ("Minor Neapolitan"), LimitRestriction::scale, false, { 1, 2, 2, 2, 1, 3 } },
+        { TR_NOOP ("Minor Hungarian"), LimitRestriction::scale, false, { 2, 1, 3, 1, 1, 3 } },
+        { TR_NOOP ("Whole tone"), LimitRestriction::scale, false, { 2, 2, 2, 2, 2 } },
+        { TR_NOOP ("Diminished"), LimitRestriction::scale, false, { 2, 1, 2, 1, 2, 1, 2 } },
+        { TR_NOOP ("Dominant bebop"), LimitRestriction::scale, false, { 2, 2, 1, 2, 2, 1, 1 } },
+        { TR_NOOP ("Jap in sen"), LimitRestriction::scale, false, { 1, 4, 2, 3 } },
+        { TR_NOOP ("Blues"), LimitRestriction::scale, false, { 3, 2, 1, 1, 3 } },
+        { TR_NOOP ("Arabic"), LimitRestriction::scale, false, { 1, 3, 1, 2, 1, 3 } },
+        { TR_NOOP ("Enigmatic"), LimitRestriction::scale, false, { 1, 3, 2, 2, 2, 1 } },
+        { TR_NOOP ("Neapolitan"), LimitRestriction::scale, false, { 1, 2, 2, 2, 2, 2 } },
+        { TR_NOOP ("Dorian"), LimitRestriction::scale, false, { 2, 1, 2, 2, 2, 1 } },
+        { TR_NOOP ("Phrygian"), LimitRestriction::scale, false, { 1, 2, 2, 2, 1, 2 } },
+        { TR_NOOP ("Lydian"), LimitRestriction::scale, false, { 2, 2, 2, 1, 2, 2 } },
+        { TR_NOOP ("Mixolydian"), LimitRestriction::scale, false, { 2, 2, 1, 2, 2, 1 } },
+        { TR_NOOP ("Locrian"), LimitRestriction::scale, false, { 1, 2, 2, 1, 2, 2 } },
+    };
+    return list;
+}
+
+int limitRestrictionIndex (const char* name, LimitRestriction::Kind kind) noexcept
+{
+    const auto& list = limitRestrictions();
+    for (std::size_t i = 1; i < list.size(); ++i)
+        if (list[i].kind == kind && std::string_view (list[i].name) == name)
+            return (int) i;
+    return 0;
+}
+
+std::array<bool, 132> limitAllowedKeys (int root, int restriction)
+{
+    std::array<bool, 132> allowed {};
+    const auto& list = limitRestrictions();
+    if (restriction <= 0 || restriction >= (int) list.size())
+    {
+        allowed.fill (true);
+        return allowed;
+    }
+    const auto mark = [&allowed] (int key) {
+        if (key >= 0 && key < (int) allowed.size())
+            allowed[(std::size_t) key] = true;
+    };
+    for (int octave = -1; octave <= 10; ++octave)
+    {
+        auto key = octave * 12 + ((root % 12) + 12) % 12;
+        mark (key);
+        for (const auto step : list[(std::size_t) restriction].steps)
+            mark (key += step);
+    }
+    return allowed;
 }
 
 // --- LYNX's script-like tools (REA round 143) --------------------------------------------------------
