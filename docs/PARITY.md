@@ -3039,3 +3039,37 @@ to 7.417. The map now carries the switch (core/FittedMaps.inc, by hand until the
 `/mnt/e/lynx-work/parity190ar/maps/FG_X_2.json` has it): 7.750.
 Tools and tables: `/mnt/e/lynx-work/apexfix190co` (`tp.py`, `bank.py`, `pb.py`, `partp.py`, `scorediff.py`,
 `metertable.py`; round 190co2's variant search and final runs in `var/`, `parity_final/`, `table.py`).
+
+## Round 190do: deterministic modulation — Spiral Echo, Orbit, Lattice Mod, Gemini Doubler (new instances only)
+
+Plan 0.1.27 §4 item 5 (track B). Each of the four effects got an appended law parameter (**Law**; Gemini Doubler:
+**Head law**), Classic | Measured, default Measured: a project or preset saved before ends one parameter short, so
+`upgradeLoadedEffectParams` loads it as Classic and it renders bit for bit as before (16 of 16 fxrender comparisons with
+the base commit byte-identical; eight render fingerprints from the base commit's objects in `tests/Mod190doTests.inc`,
+hash-checked on glibc ≥ 2.43, energy / sample tolerances everywhere). All facts below are black-box: the tp172d
+reference renders and the refcap0124 one-parameter captures, tracked with the work folder's scripts.
+
+| Effect | What the Measured law changes | Evidence |
+|---|---|---|
+| Spiral Echo | loop cuts as first-order bilinear sections (low cut at 0.8 × the knob), a second-order all-pass at 2875 Hz (Q 0.34) in the loop, loop limiter 0.256 · tanh (x / 0.256), delay changes glide with τ = 0.175 s, the shifter's oscillator as a rotating phasor | per-echo transfer and group delay of S1 / S3 echo trains; level of 100 ms windows against loudness (3 … 4 dB under the classic loop on loud material); refcap delay sweeps (exponential glide, τ 0.16 … 0.18 s); fitted on the 16 bank files |
+| Orbit | Rise: two taps sweep the whole depth (0 … depth; classic 0.25 … 0.75 above a 0.25 ms base). Rise / fall: left channel rises, right channel falls, in phase (classic: one triangle tap). Feedback 0.7 · \|x\|^0.891 (0.377 at +50 %; classic 0.247) | taps tracked over 8 s of music (deconvolution, 60 ms windows): 48 samples/s at 0.10 Hz × 10 ms, L and R a quarter cycle apart, start phase 0 after a reset |
+| Lattice Mod | detune excursion × 3.5 (the classic law multiplied both 50 % settings into a quarter of the ±25-cent swing) | refcap captures: taps anywhere in 340 … 739 samples for a 10 ms delay at the default depth (±200 samples ≈ ±22 cents at 0.5 Hz) |
+| Gemini Doubler | Align off: one read head per voice drifting by (1 − ratio) per sample away from the delay and jumping back by 252 samples (2-sample crossfade), linear reads (classic: two taps half a 13.3 ms window apart, sin weights: a fixed 150 Hz comb inside each voice) | refcap default impulse (one tap per voice); voices tracked over 8 s: V2 within [delay + 2, delay + 254], V1 within [delay − 265, delay − 10], jumps every 1.52 … 1.57 s |
+
+Bank (tp172d, same renders and scorer as SCOREBOARD-v3; tail = `scripts/taillab.py`, round 190bp):
+
+| Reference | LYNX | Files | wave before → after | tail before → after | files up / same / down | mean ESR |
+|---|---|---|---|---|---|---|
+| ValhallaFreqEcho | Spiral Echo | 16 | 3.38 → 3.88 | 5.93 → 6.79 | 7 / 9 / 0 | −3.5 → −7.3 dB |
+| ValhallaSpaceModulator | Orbit | 12 | 3.75 → 5.25 | 6.32 → 8.27 | 9 / 3 / 0 | −2.6 → −9.0 dB |
+| ValhallaUberMod | Lattice Mod | 12 | 3.92 → 4.00 | 6.33 → 7.05 | 1 / 11 / 0 | −0.0 → −0.5 dB |
+| Doubler2 Stereo | Gemini Doubler | 9 | 4.44 → 4.67 | 7.89 → 8.63 | 2 / 6 / 1 | −3.0 → −3.0 dB |
+
+No row drops on either score. The one file down (Gemini D_vocal 6 → 4: 50 ms envelope correlation 0.982 → 0.970) is
+set by where the reference's free-running heads happened to be: its heads are not reset by the host's reset (their
+offset at the start of the vocal and the music file of one setting differ by ~500 samples), so no reset-deterministic
+model can null those files; S2 (direct off) music / vocal went 4 → 6 with spectra 1.8 / 2.0 → 0.5 dB.
+Not modelled (left out): Orbit's other nine modes (not in the bank, no evidence), Spiral's near-zero-delay resonator at
+its default (D: the reference's loop phase is not matched by the fitted all-pass; spectrum 3.5 → 2.8 dB, still step 3),
+the reference's startup glide in the impulse captures (a capture-history effect), Lattice's per-mode LFO designs.
+CPU and the work folder: see `/mnt/e/lynx-work/mod190do/HANDOFF.md`.

@@ -2899,6 +2899,9 @@ Layout geminiDoubler()
     v.push_back (dial (754, 206, 30, "High freq", TR_NOOP ("Freq")));
     // round 165w: the shelves' law (Measured: −88 … +12 dB, the reference's; Old: round 124's, kept by older projects)
     v.push_back (tabs (656, 168, 132, 18, "EQ law", TR_NOOP ("Old|Measured")));
+    // round 190do: the voices' read head with Align off (Measured: one head, the default of new instances; Classic: two
+    // crossfaded taps, kept by older projects)
+    v.push_back (tabs (520, 168, 132, 18, "Head law", TR_NOOP ("Classic|Measured"), {}, compactKeys));
     // one row per voice; round 135w: voices 3 and 4 (the four-voice doubler's) on a second page of the same rows
     v.push_back (section (4, 264, 680, 192, TR_NOOP ("Voices")));
     l.pages = { TR_NOOP ("Voices 1-2"), TR_NOOP ("Voices 3-4") };
@@ -3805,6 +3808,8 @@ Layout spiralLayout()
                          syncValues));
     v.push_back (label (300, 170, 76, 18, TR_NOOP ("Output")));
     v.push_back (menuOf (380, 168, 100, 22, "Stereo", TR_NOOP ("Output"), TR_NOOP ("Mono|Stereo"), { 0.0f, 1.0f }));
+    // round 190do: the loop law (Measured = the default of new instances; Classic = the loop of projects saved before)
+    v.push_back (tabs (196, 168, 100, 22, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys));
     return l;
 }
 
@@ -3830,6 +3835,8 @@ Layout orbitLayout()
     v.push_back (menuOf (70, 150, 170, 24, "Mode", TR_NOOP ("Mode"),
                          TR_NOOP ("Rise|Rise / fall|Through-zero +|Through-zero −|Tri chorus|Octo chorus|Doubler|Drift rise|Drift rise / fall|Ensemble|Symphonic"),
                          modeValues));
+    // round 190do: the sweep law (Measured = the default of new instances; Classic = the voices of projects saved before)
+    v.push_back (tabs (290, 151, 160, 22, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys));
     return l;
 }
 
@@ -3916,6 +3923,10 @@ Layout latticeLayout()
         auto pan = menuOf (552, 102, 104, 22, "Input pan", TR_NOOP ("Input pan"), TR_NOOP ("Stereo|Swapped|Mono|Mono left|Mono right"), panValues);
         pan.page = 5;
         v.push_back (pan);
+        // round 190do: the detune law (Measured = the default of new instances; Classic = the depth of projects saved before)
+        auto law = tabs (552, 150, 104, 22, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys);
+        law.page = 5;
+        v.push_back (law);
     }
     v.push_back (display (312, 230, 354, 62, "lattice"));
     return l;
