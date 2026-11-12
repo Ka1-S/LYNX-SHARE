@@ -151,6 +151,12 @@ struct RackState
         std::shared_ptr<DelayLine> delay;
         int latency = 0;
         std::array<float, 2 * capacity> dry {};
+        // round 190dg: the Blend the audio last ran (a new value ramps from it over one chunk instead of stepping; a
+        // stage kept for its insert's next state carries it). Written by the audio thread, read by the next build.
+        std::atomic<float> lastWet { 1.0f };
+        // samples still to come before a new stage's delayed dry path holds the input (until then the mix stays where it
+        // was: a delay line starts empty)
+        int warmup = 0;
     };
     std::vector<std::shared_ptr<ChainBlendStage>> chainBlends; // [track]
 
@@ -571,6 +577,9 @@ private:
     float* channelBuffer (int channel, int side) noexcept;
     float* trackScratch (int track, int side) noexcept;
     void runEffects (const RackState& state, int track, int n) noexcept;
+    // one slot's process, with a moved one-knob slot's glide (round 190dg)
+    void runGoalSlot (const EffectSlot& slot, Effect& effect, std::size_t key, float* l, float* r, int n, const EffectParams& params,
+                      double bpm) noexcept;
     void setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept;
     void connect (const RackState& state, const SlotConnections& c, Effect& effect, int track, const float* l, const float* r) noexcept;
     void updateAutomation (const RackState& state, double startTick) noexcept;
@@ -623,6 +632,15 @@ private:
     // round 190aq: slots skipped for low latency last block; back in the chain they start from a reset state
     // (their look-ahead buffers hold what played before the bypass)
     std::vector<char> lowLatencySkipped; // maxMixerTracks * maxEffectSlots
+    // round 190dg: each one-knob slot's knob (core/GoalKnobs.h) as this renderer last ran it, and the effect it ran it
+    // on. A knob turned since glides there over the block in steps of `goalGlideStep` samples, so a dragged knob doesn't
+    // step its effect's parameters once per edit (a click on a held tone). NaN / nullptr: not run yet.
+    std::vector<float> goalGlideAmount;           // maxMixerTracks * maxEffectSlots
+    std::vector<const Effect*> goalGlideEffect;   // maxMixerTracks * maxEffectSlots
+    static constexpr int goalGlideStep = 8;
+    // the fastest a knob or a Blend moves on the audio side: the whole range in this many seconds (a jump, e.g. a double
+    // click back to the default, becomes a short glide)
+    static constexpr double fullTurnSeconds = 0.25;
     float* tapBuffer (int tap, int side) noexcept;
     std::array<char, maxChannels> channelSilent {};          // channel skipped in this chunk (idle, no notes)
     std::array<NoteMask, maxChannels> heldNotes {};          // keys held on each channel (effects that follow notes: LYNX Tune)

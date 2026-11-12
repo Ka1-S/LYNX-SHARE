@@ -17512,6 +17512,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Link190btTests.inc"
 #include "LiveBrowser190ceTests.inc"
 #include "SimpleFx190buTests.inc"
+#include "SimpleGate190dgTests.inc"
 #include "Rollup027Tests.inc"
 #include "Edison190cdTests.inc"
 #include "Warp190cgTests.inc"

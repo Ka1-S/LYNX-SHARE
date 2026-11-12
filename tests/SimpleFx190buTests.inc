@@ -119,7 +119,7 @@ inline bool hasParam (lynx::EffectKind kind, const char* name)
 TEST (simplefx190bu_goal_table)
 {
     using namespace lynx;
-    const std::size_t moves[] { 0, 7, 10, 4, 5, 7, 6, 8, 8 }; // every parameter the table names exists in its effect
+    const std::size_t moves[] { 0, 7, 10, 5, 5, 7, 6, 8, 8 }; // every parameter the table names exists in its effect (190dg: Punch's Output)
     std::set<std::string> names;
     for (int id = 1; id <= goals::count; ++id)
     {
@@ -179,7 +179,7 @@ TEST (simplefx190bu_goal_table)
         CHECK (hasParam (EffectKind::aether, p));
     for (const char* p : { "Mix", "Feedback", "Low cut", "High cut", "Ducking", "Style", "Sync L", "Note L", "Sync R", "Note R" })
         CHECK (hasParam (EffectKind::echoform, p));
-    for (const char* p : { "Attack", "Sustain", "Guard", "Mix" })
+    for (const char* p : { "Attack", "Sustain", "Guard", "Output", "Mix" })
         CHECK (hasParam (EffectKind::strikeShaper, p));
     for (const char* p : { "Mix", "Decay", "Late size", "Predelay", "Low cut" })
         CHECK (hasParam (EffectKind::atrium, p));

@@ -8926,6 +8926,7 @@ countries: es mx ar co cl pe ve
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (la última fila de la hoja) se muestra mientras el bailarín se sujeta con el ratón."
 "Show complete piano roll preview" = "Mostrar la vista previa completa del Piano Roll"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: la vista previa de notas de un canal muestra todo el pattern aunque sea más largo que la parte visible del rack; desactivado, se desplaza con los pasos"
+
 # --- round 190by: Pocket SuperSaw and FL Studio Mobile's remaining effects
 "Pocket SuperSaw" = "Pocket SuperSaw"
 "Pocket SuperSaw — LYNX's engine for FL Studio Mobile's SuperSaw" = "Pocket SuperSaw — el motor de LYNX para el SuperSaw de FL Studio Mobile"
@@ -9341,6 +9342,8 @@ countries: es mx ar co cl pe ve
 "Start from" = "Empezar desde"
 "Opens as a new, untitled project." = "Se abre como un proyecto nuevo, sin título."
 "The result is {0} from the reference's loudness. Match again to correct the level." = "El resultado está a {0} del volumen de la referencia. Iguala de nuevo para corregir el nivel."
+"Match adds two Master effects, Facet EQ and Apex Limiter, with the preset name \"Reference match\". Open them to change any band or the level." = "Igualar añade dos efectos al Master, Facet EQ y Apex Limiter, con el nombre de preset \"Reference match\". Ábrelos para cambiar cualquier banda o el nivel."
+
 # --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
 "Inc" = "Inc"
 "How to treat a note or button link" = "Cómo tratar un enlace de nota o botón"
@@ -9355,15 +9358,6 @@ countries: es mx ar co cl pe ve
 "Channel panning" = "Panorama del canal"
 "In: {0} out: {1}" = "Entrada: {0} salida: {1}"
 "Note C0" = "Nota C0"
-"Clear all colours" = "Quitar todos los colores"
-"Presets of {0}" = "Presets de {0}"
-"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "Marcadores de warp: fijan puntos del audio a pulsos; el audio entre ellos se estira (los marcadores del canal). Arrastrar un marcador: su audio va a otro pulso; Mayús + arrastrar: el audio se desliza bajo él"
-"Show the audio in beats" = "Mostrar el audio en pulsos"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"
-"Match adds two Master effects, Facet EQ and Apex Limiter, with the preset name \"Reference match\". Open them to change any band or the level." = "Igualar añade dos efectos al Master, Facet EQ y Apex Limiter, con el nombre de preset \"Reference match\". Ábrelos para cambiar cualquier banda o el nivel."
 "Flip horizontally" = "Invertir horizontalmente"
 "Key / scale" = "Tono / escala"
 "Scales" = "Escalas"
@@ -9383,3 +9377,20 @@ countries: es mx ar co cl pe ve
 
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 "New mixer track(s)" = "Nueva(s) pista(s) del mezclador"
+"Clear all colours" = "Quitar todos los colores"
+"Presets of {0}" = "Presets de {0}"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "Marcadores de warp: fijan puntos del audio a pulsos; el audio entre ellos se estira (los marcadores del canal). Arrastrar un marcador: su audio va a otro pulso; Mayús + arrastrar: el audio se desliza bajo él"
+"Show the audio in beats" = "Mostrar el audio en pulsos"
+
+# --- Round 190dg: the Simple dock's installed plugins and favourite chain presets
+"Synths and samplers" = "Sintetizadores y samplers"
+"My plugins" = "Mis plugins"
+"The instrument plugins installed on this computer" = "Los plugins de instrumento instalados en este equipo"
+"No instrument plugins found yet. Scan for plugins in the Plugin manager." = "Aún no se encontraron plugins de instrumento. Busca plugins en el Gestor de plugins."
+"Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Haz clic para cargar este plugin en la pista y escucharlo (Ctrl+Z vuelve atrás)"
+"Add \"{0}\" to favourites" = "Añadir \"{0}\" a favoritos"
+"Remove \"{0}\" from favourites" = "Quitar \"{0}\" de favoritos"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"

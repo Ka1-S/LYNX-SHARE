@@ -8926,6 +8926,7 @@ countries: tr
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (sayfanın son satırı), dansçı fareyle tutulurken gösterilir."
 "Show complete piano roll preview" = "Piano Roll önizlemesinin tamamını göster"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: bir kanalın nota önizlemesi, pattern rack'in gösterdiğinden uzun olsa bile pattern'in tamamını gösterir; kapalıyken adımlarla birlikte kayar"
+
 # --- round 190by: Pocket SuperSaw and FL Studio Mobile's remaining effects
 "Pocket SuperSaw" = "Pocket SuperSaw"
 "Pocket SuperSaw — LYNX's engine for FL Studio Mobile's SuperSaw" = "Pocket SuperSaw — FL Studio Mobile'ın SuperSaw'ı için LYNX motoru"
@@ -9341,6 +9342,8 @@ countries: tr
 "Start from" = "Şununla başla"
 "Opens as a new, untitled project." = "Yeni, adsız bir proje olarak açılır."
 "The result is {0} from the reference's loudness. Match again to correct the level." = "Sonuç, referansın ses yüksekliğinden {0} uzakta. Seviyeyi düzeltmek için yeniden eşleyin."
+"Match adds two Master effects, Facet EQ and Apex Limiter, with the preset name \"Reference match\". Open them to change any band or the level." = "Eşleme, Master'a \"Reference match\" preset adıyla iki efekt ekler: Facet EQ ve Apex Limiter. Herhangi bir bandı veya seviyeyi değiştirmek için onları açın."
+
 # --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
 "Inc" = "Inc"
 "How to treat a note or button link" = "Nota veya düğme bağlantısı nasıl ele alınır"
@@ -9355,15 +9358,6 @@ countries: tr
 "Channel panning" = "Kanal pan'ı"
 "In: {0} out: {1}" = "Giriş: {0} çıkış: {1}"
 "Note C0" = "Nota C0"
-"Clear all colours" = "Tüm renkleri temizle"
-"Presets of {0}" = "{0} ön ayarları"
-"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "Warp işaretçileri: sesin noktalarını vuruşlara bağlar; aradaki ses esner (kanalın işaretçileri). İşaretçiyi sürükle: sesi başka bir vuruşa gider; Shift + sürükle: ses altında kayar"
-"Show the audio in beats" = "Sesi vuruşlarla göster"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
-"Match adds two Master effects, Facet EQ and Apex Limiter, with the preset name \"Reference match\". Open them to change any band or the level." = "Eşleme, Master'a \"Reference match\" preset adıyla iki efekt ekler: Facet EQ ve Apex Limiter. Herhangi bir bandı veya seviyeyi değiştirmek için onları açın."
 "Flip horizontally" = "Yatay çevir"
 "Key / scale" = "Ton / dizi"
 "Scales" = "Diziler"
@@ -9383,3 +9377,20 @@ countries: tr
 
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 "New mixer track(s)" = "Yeni mikser kanal(lar)ı"
+"Clear all colours" = "Tüm renkleri temizle"
+"Presets of {0}" = "{0} ön ayarları"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "Warp işaretçileri: sesin noktalarını vuruşlara bağlar; aradaki ses esner (kanalın işaretçileri). İşaretçiyi sürükle: sesi başka bir vuruşa gider; Shift + sürükle: ses altında kayar"
+"Show the audio in beats" = "Sesi vuruşlarla göster"
+
+# --- Round 190dg: the Simple dock's installed plugins and favourite chain presets
+"Synths and samplers" = "Synth'ler ve sampler'lar"
+"My plugins" = "Plugin'lerim"
+"The instrument plugins installed on this computer" = "Bu bilgisayarda yüklü enstrüman plugin'leri"
+"No instrument plugins found yet. Scan for plugins in the Plugin manager." = "Henüz enstrüman plugin'i bulunamadı. Plugin yöneticisinde plugin tara."
+"Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Bu plugin'i parçaya yükleyip dinlemek için tıkla (Ctrl+Z geri alır)"
+"Add \"{0}\" to favourites" = "\"{0}\" favorilere ekle"
+"Remove \"{0}\" from favourites" = "\"{0}\" favorilerden kaldır"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"

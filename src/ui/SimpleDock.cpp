@@ -10,6 +10,7 @@
 #include "core/SimpleTracks.h"
 #include "core/SoundLibrary.h"
 #include "engine/AudioEngine.h"
+#include "engine/PluginHost.h"
 #include "engine/ProjectFile.h"
 #include "platform/Paths.h"
 #include "ui/FileChoosers.h"
@@ -355,6 +356,27 @@ public:
         juce::PopupMenu menu;
         const auto& song = engine.getSong();
         const auto current = insert >= 0 && insert < (int) song.mixer.size() ? song.mixer[(std::size_t) insert].chainPreset : std::string();
+        auto files = userPresetFolder().findChildFiles (juce::File::findFiles, false, juce::String ("*") + ProjectFile::mixerTrackStateExtension);
+        files.sort();
+        // round 190dg: the favourites first, under their own heading (a factory preset or one of the user's)
+        const auto favs = favouritePresets();
+        if (! favs.isEmpty())
+        {
+            juce::PopupMenu starred;
+            for (const auto& f : favs)
+            {
+                const auto name = f.toStdString();
+                if (chains::find (name) != nullptr)
+                    starred.addItem (f, true, current == name, [this, name] { applyFactory (name); });
+                else if (const auto file = userPresetFolder().getChildFile (f + ProjectFile::mixerTrackStateExtension); file.existsAsFile())
+                    starred.addItem (f, true, current == name, [this, file] { loadUserPreset (engine, insert, file); });
+            }
+            if (starred.getNumItems() > 0)
+            {
+                menu.addSubMenu (glyph ("\xe2\x98\x85 ") + tr ("Favourites"), starred, true, nullptr, favs.contains (utf8 (current)));
+                menu.addSeparator();
+            }
+        }
         for (const auto* category : chains::categories())
         {
             juce::PopupMenu sub;
@@ -370,8 +392,6 @@ public:
         }
         menu.addSeparator();
         juce::PopupMenu mine;
-        auto files = userPresetFolder().findChildFiles (juce::File::findFiles, false, juce::String ("*") + ProjectFile::mixerTrackStateExtension);
-        files.sort();
         for (const auto& f : files)
             mine.addItem (f.getFileNameWithoutExtension(), true, current == f.getFileNameWithoutExtension().toStdString(),
                           [this, f] { loadUserPreset (engine, insert, f); });
@@ -379,6 +399,13 @@ public:
             mine.addItem (tr ("(none yet)"), false, false, nullptr);
         menu.addSubMenu (tr ("My presets"), mine);
         menu.addItem (tr ("Save as my preset..."), hasEffects(), false, [this] { askSaveName(); });
+        if (! current.empty()) // the track's own preset as a favourite (or not any more)
+        {
+            const auto shown = utf8 (current);
+            const bool starred = favs.contains (shown);
+            menu.addItem (starred ? tr ("Remove \"{0}\" from favourites", { shown }) : tr ("Add \"{0}\" to favourites", { shown }),
+                          [shown, starred] { setFavouritePreset (shown, ! starred); });
+        }
         if (! files.isEmpty()) // (to the system's bin: a preset removed by mistake can be taken back)
         {
             juce::PopupMenu bin;
@@ -523,6 +550,10 @@ public:
             cards[(std::size_t) card]->knob.turnTo (v);
     }
     void blendForCheck (float v) { blend.turnTo (v); }
+    const juce::Component* cardForSnapshot (int card) const
+    {
+        return card >= 0 && card < (int) cards.size() ? cards[(std::size_t) card].get() : nullptr;
+    }
 
     AudioEngine& engine;
     int insert = -1;
@@ -774,22 +805,29 @@ public:
         ownButton.setButtonText (tr ("LYNX sounds"));
         fontsButton.setButtonText (tr ("My SoundFonts"));
         fontsButton.setTooltip (tr ("The sounds of your own .sf2 and .sf3 files"));
-        for (auto* b : { &ownButton, &fontsButton })
+        pluginsButton.setButtonText (tr ("My plugins"));
+        pluginsButton.setTooltip (tr ("The instrument plugins installed on this computer"));
+        for (auto* b : { &ownButton, &fontsButton, &pluginsButton })
         {
             b->setClickingTogglesState (true);
             b->setRadioGroupId (1902);
             addAndMakeVisible (*b);
         }
         ownButton.setConnectedEdges (juce::Button::ConnectedOnRight);
-        fontsButton.setConnectedEdges (juce::Button::ConnectedOnLeft);
+        fontsButton.setConnectedEdges (juce::Button::ConnectedOnLeft | juce::Button::ConnectedOnRight);
+        pluginsButton.setConnectedEdges (juce::Button::ConnectedOnLeft);
         ownButton.setToggleState (true, juce::dontSendNotification);
         ownButton.onClick = [this] {
             if (ownButton.getToggleState())
-                setSource (false);
+                setSource (From::own);
         };
         fontsButton.onClick = [this] {
             if (fontsButton.getToggleState())
-                setSource (true);
+                setSource (From::fonts);
+        };
+        pluginsButton.onClick = [this] {
+            if (pluginsButton.getToggleState())
+                setSource (From::plugins);
         };
         folderButton.setButtonText (tr ("Add folder..."));
         folderButton.setTooltip (tr ("Adds a folder with your SoundFont files to the list"));
@@ -846,7 +884,7 @@ public:
         if (! known || ! soundlib::sameSound (lastDef, def) || lastListSize != list().size())
         {
             current = soundlib::find (list(), def);
-            currentOwn = fonts ? soundlib::find (soundlib::builtIn(), def) : current;
+            currentOwn = from != From::own ? soundlib::find (soundlib::builtIn(), def) : current;
             lastDef = def;
             lastListSize = list().size();
             known = true;
@@ -891,8 +929,9 @@ public:
         keysButton.setBounds (side.removeFromTop (26));
         r.removeFromLeft (pad + 1 + pad);
         auto top = r.removeFromTop (26);
-        ownButton.setBounds (top.removeFromLeft (juce::jmin (130, top.getWidth() / 4)));
-        fontsButton.setBounds (top.removeFromLeft (juce::jmin (140, top.getWidth() / 3)));
+        ownButton.setBounds (top.removeFromLeft (juce::jmin (120, top.getWidth() / 5)));
+        fontsButton.setBounds (top.removeFromLeft (juce::jmin (130, top.getWidth() / 4)));
+        pluginsButton.setBounds (top.removeFromLeft (juce::jmin (110, top.getWidth() / 3)));
         top.removeFromLeft (pad);
         if (folderButton.isVisible())
         {
@@ -922,18 +961,25 @@ public:
     void parentHierarchyChanged() override { updateTimer(); }
 
     // --- the list ----------------------------------------------------------------------------------------------------
-    const std::vector<soundlib::Sound>& list() const { return fonts ? fontSounds : soundlib::builtIn(); }
-
-    void setSource (bool useFonts)
+    enum class From { own, fonts, plugins };
+    const std::vector<soundlib::Sound>& list() const
     {
-        fonts = useFonts;
-        (fonts ? fontsButton : ownButton).setToggleState (true, juce::dontSendNotification);
+        return from == From::fonts ? fontSounds : from == From::plugins ? pluginSounds : soundlib::builtIn();
+    }
+
+    void setSource (From source)
+    {
+        from = source;
+        fonts = from == From::fonts;
+        (from == From::fonts ? fontsButton : from == From::plugins ? pluginsButton : ownButton).setToggleState (true, juce::dontSendNotification);
         folderButton.setVisible (fonts);
         if (fonts && ! injected)
         {
             ensureSoundFontIndex();
             takeFonts();
         }
+        if (from == From::plugins && ! pluginsInjected)
+            takePlugins();
         known = false;
         categoryPicked = false;
         resized();
@@ -981,11 +1027,13 @@ public:
             sounds.deselectAllRows();
         sounds.repaint();
         const bool noFonts = fonts && fontSounds.empty();
-        listHint.setVisible (noFonts || rows.empty());
+        const bool noPlugins = from == From::plugins && pluginSounds.empty();
+        listHint.setVisible (noFonts || noPlugins || rows.empty());
         listHint.setText (noFonts ? (sf::PresetIndex::shared().busy() && ! injected
                                          ? tr ("Looking for your SoundFont files...")
                                          : tr ("No SoundFont files found yet. Add a folder with your .sf2 or .sf3 files."))
-                                  : rows.empty() ? tr ("No sounds here.") : juce::String(),
+                          : noPlugins ? tr ("No instrument plugins found yet. Scan for plugins in the Plugin manager.")
+                          : rows.empty() ? tr ("No sounds here.") : juce::String(),
                           juce::dontSendNotification);
     }
 
@@ -1013,7 +1061,12 @@ public:
             }
         });
         if (done && hear)
-            audition (sound);
+        {
+            if (sound.source == soundlib::Source::plugin) // (heard on the track itself, as it loaded)
+                engine.auditionChannelSound (c);
+            else
+                audition (sound);
+        }
     }
 
     void stepSound (int delta)
@@ -1031,13 +1084,19 @@ public:
     {
         if (row < 0 || row >= (int) rows.size())
             return;
-        if (previewOnly)
+        // (a plugin can only be heard once it runs on the track: its ▶ uses it too, and Ctrl+Z goes back)
+        if (previewOnly && list()[(std::size_t) rows[(std::size_t) row]].source != soundlib::Source::plugin)
             audition (list()[(std::size_t) rows[(std::size_t) row]]);
         else
             pick (rows[(std::size_t) row], true);
     }
 
     int rowCount() const noexcept { return (int) rows.size(); }
+    void searchFor (const juce::String& text)
+    {
+        search.setText (text, false);
+        refilter(); // (what typing does, at once: the editor's own change message is posted)
+    }
     juce::String shownName() const { return name.getText() + " [" + detail.getText() + "]"; }
 
     AudioEngine& engine;
@@ -1112,10 +1171,35 @@ private:
         {
             return row >= 0 && row < (int) page.rows.size() ? utf8 (page.list()[(std::size_t) page.rows[(std::size_t) row]].name) : juce::String();
         }
-        juce::String getTooltipForRow (int) override { return tr ("Click to use this sound; the arrow plays it without choosing it"); }
+        juce::String getTooltipForRow (int) override
+        {
+            return page.from == From::plugins ? tr ("Click to load this plugin on the track and hear it (Ctrl+Z goes back)")
+                                              : tr ("Click to use this sound; the arrow plays it without choosing it");
+        }
         InstrumentPage& page;
     };
 
+    // the plugin host's scanned instruments (the list the plugin picker shows)
+    void takePlugins()
+    {
+        std::vector<soundlib::InstalledPlugin> installed;
+        for (const auto& t : engine.getPluginHost().getKnownPlugins().getTypes())
+            if (t.isInstrument)
+                installed.push_back ({ t.createIdentifierString().toStdString(), t.name.toStdString(), t.manufacturerName.toStdString(),
+                                       t.pluginFormatName.toStdString(), t.category.toStdString() });
+        pluginSounds = soundlib::fromPlugins (installed);
+        known = false;
+    }
+
+public:
+    void setPlugins (std::vector<soundlib::InstalledPlugin> installed)
+    {
+        pluginsInjected = true;
+        pluginSounds = soundlib::fromPlugins (installed);
+        known = false;
+    }
+
+private:
     void takeFonts()
     {
         auto& index = sf::PresetIndex::shared();
@@ -1163,18 +1247,19 @@ private:
 
     juce::Label soundCaption, name, detail, listHint;
     GlyphButton prev { glyph ("\xe2\x80\xb9") }, next { glyph ("\xe2\x80\xba") };
-    juce::TextButton editorButton, keysButton, ownButton, fontsButton, folderButton;
+    juce::TextButton editorButton, keysButton, ownButton, fontsButton, pluginsButton, folderButton;
     juce::TextEditor search;
     CategoryModel categoryModel;
     SoundModel soundModel;
     juce::ListBox categories, sounds;
     std::unique_ptr<juce::FileChooser> chooser;
-    std::vector<soundlib::Sound> fontSounds;
+    std::vector<soundlib::Sound> fontSounds, pluginSounds;
     std::vector<int> rows, counts, shownCategories;
     ChannelDef lastDef;
     std::size_t lastListSize = 0;
     int category = 0, current = -1, currentOwn = -1, generation = -1;
-    bool fonts = false, injected = false, known = false, categoryPicked = false, stale = true;
+    bool fonts = false, injected = false, pluginsInjected = false, known = false, categoryPicked = false, stale = true;
+    From from = From::own;
 };
 
 // =====================================================================================================================
@@ -1300,6 +1385,17 @@ void SimpleDock::paint (juce::Graphics& g)
     g.fillRoundedRectangle ((float) getWidth() * 0.5f - 16.0f, 2.0f, 32.0f, 2.0f, 1.0f);
 
     const auto& song = engine.getSong();
+    // round 190dg: the track's chain preset, right of the tabs (the header's FX button is too small to name it)
+    if (insert > 0 && insert < (int) song.mixer.size() && ! song.mixer[(std::size_t) insert].chainPreset.empty())
+    {
+        auto name = utf8 (song.mixer[(std::size_t) insert].chainPreset);
+        if (! chains::unchanged (song, insert))
+            name << " " << tr ("(edited)");
+        const auto area = strip.withLeft (effectsButton.getRight() + 16).withRight (hideButton.getX() - 10);
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::small));
+        g.drawText (tr ("Preset") + glyph (": ") + name, area, juce::Justification::centredRight, true);
+    }
     auto text = strip.withTrimmedLeft (12).withRight (instrumentButton.isVisible() ? instrumentButton.getX() - 12 : effectsButton.getX() - 12);
     if (track < 0)
     {
@@ -1374,6 +1470,29 @@ void SimpleDock::mouseUp (const juce::MouseEvent&)
 // --- the user's own chain presets ------------------------------------------------------------------------------------
 juce::File SimpleDock::userPresetFolder() { return platform::documentsFolder().getChildFile ("LYNX/Chain presets"); }
 
+// round 190dg: the favourite chain presets, one name a line, in the order they were starred
+juce::File SimpleDock::favouritesFile() { return userPresetFolder().getChildFile ("Favourites.txt"); }
+
+juce::StringArray SimpleDock::favouritePresets()
+{
+    auto lines = juce::StringArray::fromLines (favouritesFile().loadFileAsString());
+    lines.trim();
+    lines.removeEmptyStrings();
+    lines.removeDuplicates (false);
+    return lines;
+}
+
+bool SimpleDock::setFavouritePreset (const juce::String& name, bool on)
+{
+    auto lines = favouritePresets();
+    if (on)
+        lines.addIfNotAlreadyThere (name.trim());
+    else
+        lines.removeString (name.trim());
+    favouritesFile().getParentDirectory().createDirectory();
+    return favouritesFile().replaceWithText (lines.joinIntoString ("\n") + (lines.isEmpty() ? "" : "\n"));
+}
+
 bool SimpleDock::saveUserPreset (AudioEngine& engine, int insert, const juce::String& rawName)
 {
     const auto name = juce::File::createLegalFileName (rawName.trim());
@@ -1411,7 +1530,12 @@ juce::PopupMenu SimpleDock::addMenuForSnapshot() { return effectsPage->addMenu()
 void SimpleDock::setFontsForSnapshot (std::vector<sf::IndexedFont> fonts)
 {
     instrumentPage->setFonts (std::move (fonts), true);
-    instrumentPage->setSource (true);
+    instrumentPage->setSource (InstrumentPage::From::fonts);
+}
+void SimpleDock::setPluginsForSnapshot (std::vector<soundlib::InstalledPlugin> plugins)
+{
+    instrumentPage->setPlugins (std::move (plugins));
+    instrumentPage->setSource (InstrumentPage::From::plugins);
 }
 void SimpleDock::showCategoryForSnapshot (int category) { instrumentPage->pickCategory (category); }
 int SimpleDock::soundRowsForCheck() const { return instrumentPage->rowCount(); }
@@ -1423,4 +1547,10 @@ void SimpleDock::moveCardForCheck (int card, int delta) { effectsPage->move (car
 void SimpleDock::removeCardForCheck (int card) { effectsPage->remove (card); }
 void SimpleDock::addOneKnobForCheck (int goal) { effectsPage->addOneKnob (goal); }
 void SimpleDock::setBlendForCheck (float value) { effectsPage->blendForCheck (value); }
+juce::Rectangle<int> SimpleDock::cardBoundsForSnapshot (int card) const
+{
+    const auto* c = effectsPage->cardForSnapshot (card);
+    return c != nullptr ? getLocalArea (c, c->getLocalBounds()) : juce::Rectangle<int>();
+}
+void SimpleDock::setSearchForSnapshot (const juce::String& text) { instrumentPage->searchFor (text); }
 } // namespace lynx
