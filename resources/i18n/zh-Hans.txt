@@ -8931,3 +8931,6 @@ countries: cn sg
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（表单的最后一行）在用鼠标按住舞者时显示。"
 "Show complete piano roll preview" = "显示完整的钢琴卷帘预览"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "通道机架：即使样式比机架显示的范围长，通道的音符预览也会显示整个样式；关闭时，预览会随步进一起滚动"
+
+# --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
+"New mixer track(s)" = "新建混音轨道"

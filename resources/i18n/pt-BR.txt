@@ -9046,3 +9046,6 @@ countries: br
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (a última linha da folha) aparece enquanto o dançarino é segurado com o mouse."
 "Show complete piano roll preview" = "Mostrar a prévia completa do Piano Roll"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: a prévia de notas de um canal mostra o pattern inteiro mesmo quando ele é mais longo do que o rack mostra; desligado, ela rola junto com os passos"
+
+# --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
+"New mixer track(s)" = "Nova(s) trilha(s) do mixer"

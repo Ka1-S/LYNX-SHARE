@@ -8931,3 +8931,6 @@ countries: tr
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (sayfanın son satırı), dansçı fareyle tutulurken gösterilir."
 "Show complete piano roll preview" = "Piano Roll önizlemesinin tamamını göster"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: bir kanalın nota önizlemesi, pattern rack'in gösterdiğinden uzun olsa bile pattern'in tamamını gösterir; kapalıyken adımlarla birlikte kayar"
+
+# --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
+"New mixer track(s)" = "Yeni mikser kanal(lar)ı"

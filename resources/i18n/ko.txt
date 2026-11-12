@@ -8931,3 +8931,6 @@ countries: kr
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}(시트의 마지막 행)은 댄서를 마우스로 잡고 있는 동안 표시됩니다."
 "Show complete piano roll preview" = "피아노 롤 미리 보기 전체 표시"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "채널 랙: 패턴이 랙에 보이는 범위보다 길어도 채널의 노트 미리 보기에 패턴 전체를 표시합니다. 끄면 스텝과 함께 스크롤됩니다"
+
+# --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
+"New mixer track(s)" = "새 믹서 트랙"

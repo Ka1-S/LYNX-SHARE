@@ -412,7 +412,7 @@ int freeMixerTrack (Song& song)
 {
     const auto isFree = [&song] (int t) {
         const auto& m = song.mixer[(std::size_t) t];
-        if (! m.effects.empty() || linkedElsewhere (song, t, -1))
+        if (! m.effects.empty() || linkedElsewhere (song, t, -1) || song.session.reservedForOther (true, t))
             return false;
         for (const auto& c : song.channels)
             if (c.mixerTrack == t)
@@ -427,10 +427,7 @@ int freeMixerTrack (Song& song)
     for (int t = 1; t < (int) song.mixer.size(); ++t)
         if (isFree (t))
             return t;
-    if (song.mixer.empty() || (int) song.mixer.size() >= maxMixerTracks)
-        return -1;
-    song.mixer.emplace_back().name = "Insert " + std::to_string (song.mixer.size());
-    return (int) song.mixer.size() - 1;
+    return addMixerTrack (song);
 }
 
 bool makeAudioTrack (Song& song, int track)
@@ -493,6 +490,37 @@ bool canLinkToMixerTrack (const Song& song, int track, int mixer)
            && ! song.session.reservedForOther (true, mixer);
 }
 
+bool hasOwnName (const Song& song, int mixer)
+{
+    if (mixer <= 0 || mixer >= (int) song.mixer.size())
+        return false;
+    const auto& name = song.mixer[(std::size_t) mixer].name;
+    return ! name.empty() && name != "Insert " + std::to_string (mixer);
+}
+
+bool canAddMixerTrack (const Song& song)
+{
+    if (song.mixer.empty())
+        return false;
+    for (int t = (int) song.mixer.size(); t < maxMixerTracks; ++t)
+        if (! song.session.reservedForOther (true, t))
+            return true;
+    return false;
+}
+
+int addMixerTrack (Song& song)
+{
+    if (! canAddMixerTrack (song))
+        return -1;
+    // inserts reserved for another participant are added as plain inserts and skipped (Song::claimFreeInsert's rule)
+    while (true)
+    {
+        song.mixer.emplace_back().name = "Insert " + std::to_string (song.mixer.size());
+        if (const auto t = (int) song.mixer.size() - 1; ! song.session.reservedForOther (true, t))
+            return t;
+    }
+}
+
 bool linkToMixerTrack (Song& song, int track, int mixer)
 {
     if (! canLinkToMixerTrack (song, track, mixer))
@@ -500,13 +528,37 @@ bool linkToMixerTrack (Song& song, int track, int mixer)
     auto* t = trackAt (song, track);
     if (t->mode == PlaylistTrackMode::audio && t->mixerTrack == mixer)
         return true;
+    auto& m = song.mixer[(std::size_t) mixer];
+    const auto insertName = hasOwnName (song, mixer) ? m.name : "Insert " + std::to_string (mixer);
+    if (t->mode == PlaylistTrackMode::unassigned)
+    {
+        // FL (FUN_012f38f0): the insert's colour when the track has the default one; the insert's own name, else the
+        // track's, else "Insert N"
+        if (t->colour == 0)
+            t->colour = m.colour;
+        if (hasOwnName (song, mixer) || t->name.empty())
+            t->name = insertName;
+    }
+    else if (t->mode == PlaylistTrackMode::audio && t->mixerTrack > 0 && t->mixerTrack < (int) song.mixer.size())
+    {
+        // FL: the previous insert is reset (name, colour; its effects and routing stay)
+        auto& old = song.mixer[(std::size_t) t->mixerTrack];
+        old.name = "Insert " + std::to_string (t->mixerTrack);
+        old.colour = 0;
+    }
     t->mode = PlaylistTrackMode::audio;
     t->mixerTrack = mixer;
     t->channel = -1;
+    // FL: the track and the insert end with one name and colour
     if (t->name.empty())
     {
-        const auto& name = song.mixer[(std::size_t) mixer].name;
-        t->name = name.empty() ? "Insert " + std::to_string (mixer) : name;
+        t->name = insertName;
+        t->colour = m.colour;
+    }
+    else
+    {
+        m.name = t->name;
+        m.colour = t->colour;
     }
     std::vector<int> onTrack;
     for (int i = 0; i < (int) song.playlist.size(); ++i)
@@ -514,6 +566,52 @@ bool linkToMixerTrack (Song& song, int track, int mixer)
             onTrack.push_back (i);
     followAudioTracks (song, onTrack);
     return true;
+}
+
+int assignAudioTracks (Song& song, const std::vector<int>& tracks, int mixer)
+{
+    if (mixer != newMixerTrack && (mixer <= 0 || mixer >= (int) song.mixer.size()))
+        return 0;
+    int linked = 0;
+    auto next = mixer;
+    for (std::size_t i = 0; i < tracks.size(); ++i)
+    {
+        if (next == newMixerTrack || next >= (int) song.mixer.size())
+        {
+            next = addMixerTrack (song);
+            if (next < 0)
+                break;
+        }
+        // a refused track (LYNX: the pick is linked to another selected track, e.g. the menu's own) leaves the insert
+        // to the next one
+        if (! linkToMixerTrack (song, tracks[i], next))
+            continue;
+        ++linked;
+        // FL: the next insert no Playlist track is linked to (LYNX: nor reserved for another participant)
+        do
+            ++next;
+        while (next < (int) song.mixer.size() && (linkedElsewhere (song, next, -1) || song.session.reservedForOther (true, next)));
+        if (next >= maxMixerTracks)
+            break;
+    }
+    return linked;
+}
+
+AudioTrackMenu audioTrackMenu (const Song& song, int track)
+{
+    AudioTrackMenu menu;
+    menu.canAddMixerTrack = canAddMixerTrack (song);
+    const auto* t = track >= 0 && track < (int) song.playlistTracks.size() ? &song.playlistTracks[(std::size_t) track] : nullptr;
+    for (int m = 1; m < (int) song.mixer.size(); ++m)
+    {
+        auto& item = menu.inserts.emplace_back();
+        item.mixer = m;
+        item.name = song.mixer[(std::size_t) m].name;
+        // FL ticks the insert the track is stored as linked to, whatever its mode
+        item.ticked = t != nullptr && t->mode != PlaylistTrackMode::unassigned && t->mixerTrack == m;
+        item.enabled = item.ticked || canLinkToMixerTrack (song, track, m);
+    }
+    return menu;
 }
 
 int instrumentTrackPattern (Song& song, int track)

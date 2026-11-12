@@ -46,12 +46,13 @@ TEST (tracklink_unassigned_track_links_to_a_prepared_insert)
     using namespace lynx;
     tracklink::Setup s;
     s.clip (2, 0);
-    // an insert in use (effects, a name) is a valid target and is not changed
+    // an insert in use (effects, a name) is a valid target; FL (round 190cp, FUN_012f38f0): an insert with its own name
+    // gives it to the track, the track keeps its own (non-default) colour and the insert takes it: one name, one colour
     CHECK (trackmodes::canLinkToMixerTrack (s.song, 2, 7));
     CHECK (trackmodes::linkToMixerTrack (s.song, 2, 7));
     const auto& t = s.song.playlistTracks[2];
-    CHECK (t.mode == PlaylistTrackMode::audio && t.mixerTrack == 7 && t.channel == -1 && t.name == "Vocals");
-    CHECK (s.song.mixer[7].name == "Vox chain" && s.song.mixer[7].colour == 0xFF20C060 && s.song.mixer[7].effects.size() == 1);
+    CHECK (t.mode == PlaylistTrackMode::audio && t.mixerTrack == 7 && t.channel == -1 && t.name == "Vox chain" && t.colour == 0xFF3366CC);
+    CHECK (s.song.mixer[7].name == "Vox chain" && s.song.mixer[7].colour == 0xFF3366CC && s.song.mixer[7].effects.size() == 1);
     CHECK (trackmodes::describe (s.song, 2) == "(Audio track, linked to mixer track 7)" && trackmodes::armableInsert (s.song, 2) == 7);
     // the audio clips already on the track play through it, as with Track mode › Audio track
     CHECK (s.song.channels[(std::size_t) s.take].mixerTrack == 7);
@@ -63,31 +64,38 @@ TEST (tracklink_an_unnamed_track_takes_the_insert_name)
 {
     using namespace lynx;
     tracklink::Setup s;
-    // FL: "Track 1" › Audio track › "6. Insert 6" renames the track "Insert 6"; the insert keeps its name
+    // FL: "Track 1" › Audio track › "6. Insert 6" renames the track "Insert 6"
     CHECK (trackmodes::linkToMixerTrack (s.song, 0, 9));
     CHECK (s.song.playlistTracks[0].name == "Insert 9" && s.song.mixer[9].name == "Insert 9" && s.song.mixer[9].colour == 0);
     s.song.mixer[10].name.clear();
     s.song.playlistTracks.resize (5);
-    CHECK (trackmodes::linkToMixerTrack (s.song, 3, 10) && s.song.playlistTracks[3].name == "Insert 10" && s.song.mixer[10].name.empty());
-    CHECK (trackmodes::linkToMixerTrack (s.song, 4, 7) && s.song.playlistTracks[4].name == "Vox chain");
-    // a named track keeps its name and colour, and so does the insert
+    CHECK (trackmodes::linkToMixerTrack (s.song, 3, 10) && s.song.playlistTracks[3].name == "Insert 10" && s.song.mixer[10].name == "Insert 10");
+    // an unnamed track with the default colour takes the insert's name and colour
+    CHECK (trackmodes::linkToMixerTrack (s.song, 4, 7) && s.song.playlistTracks[4].name == "Vox chain" && s.song.playlistTracks[4].colour == 0xFF20C060);
+    CHECK (s.song.mixer[7].name == "Vox chain" && s.song.mixer[7].colour == 0xFF20C060);
+    // a named track and an insert without a name of its own: the insert takes the track's name and colour
+    s.song.mixer[11].colour = 0xFF808000;
     CHECK (trackmodes::linkToMixerTrack (s.song, 2, 11));
     CHECK (s.song.playlistTracks[2].name == "Vocals" && s.song.playlistTracks[2].colour == 0xFF3366CC);
-    CHECK (s.song.mixer[11].name == "Insert 11" && s.song.mixer[11].colour == 0);
+    CHECK (s.song.mixer[11].name == "Vocals" && s.song.mixer[11].colour == 0xFF3366CC);
 }
 
-TEST (tracklink_audio_track_relinks_and_the_old_insert_stays)
+TEST (tracklink_audio_track_relinks_and_the_old_insert_is_reset)
 {
     using namespace lynx;
     tracklink::Setup s;
     s.song.mixer[6].name = "Old bus";
+    s.song.mixer[6].colour = 0xFFAA0000;
     s.song.mixer[6].effects.push_back (makeEffectSlot (EffectKind::parametricEq));
     const auto a = s.clip (1, 0);
     CHECK (trackmodes::followAudioTracks (s.song, { a }) == 1 && s.song.channels[(std::size_t) s.take].mixerTrack == 6);
     CHECK (trackmodes::linkToMixerTrack (s.song, 1, 7));
     CHECK (s.song.playlistTracks[1].mode == PlaylistTrackMode::audio && s.song.playlistTracks[1].mixerTrack == 7);
     CHECK (s.song.channels[(std::size_t) s.take].mixerTrack == 7); // the clip on the track follows
-    CHECK (s.song.mixer[6].name == "Old bus" && s.song.mixer[6].effects.size() == 1); // the old insert is left alone
+    // FL: the previous insert goes back to its default name and colour; its effects stay
+    CHECK (s.song.mixer[6].name == "Insert 6" && s.song.mixer[6].colour == 0 && s.song.mixer[6].effects.size() == 1);
+    // the unnamed track takes the new insert's name and colour
+    CHECK (s.song.playlistTracks[1].name == "Vox chain" && s.song.playlistTracks[1].colour == 0xFF20C060);
     // the previous insert is free for another track now
     CHECK (trackmodes::canLinkToMixerTrack (s.song, 0, 6));
 }
@@ -116,10 +124,14 @@ TEST (tracklink_instrument_track_becomes_an_audio_track)
     tracklink::Setup s;
     // as Track mode › Audio track does: the track becomes an audio track, its former channel stays on its insert
     CHECK (trackmodes::makeInstrumentTrack (s.song, 0, 4) && s.song.playlistTracks[0].mixerTrack == 5);
+    const auto fiveName = s.song.mixer[5].name;
+    const auto fiveColour = s.song.mixer[5].colour;
     CHECK (trackmodes::linkToMixerTrack (s.song, 0, 7));
     const auto& t = s.song.playlistTracks[0];
     CHECK (t.mode == PlaylistTrackMode::audio && t.channel == -1 && t.mixerTrack == 7);
-    CHECK (s.song.channels[4].mixerTrack == 5 && s.song.mixer[7].name == "Vox chain");
+    // FL: the (named) track gives its name and colour to the insert; its former insert is the channel's, not reset
+    CHECK (s.song.channels[4].mixerTrack == 5 && ! t.name.empty() && s.song.mixer[7].name == t.name && s.song.mixer[7].colour == t.colour);
+    CHECK (s.song.mixer[7].effects.size() == 1 && s.song.mixer[5].name == fiveName && s.song.mixer[5].colour == fiveColour);
 }
 
 TEST (tracklink_refuses_master_range_linked_and_reserved_inserts)
@@ -152,17 +164,138 @@ TEST (tracklink_refuses_master_range_linked_and_reserved_inserts)
     CHECK (! trackmodes::linkToMixerTrack (r.song, 2, 6) && r.song.playlistTracks == before);
 }
 
-TEST (tracklink_next_free_mixer_track_moves_a_linked_track)
+TEST (tracklink_new_mixer_track_always_adds_an_insert)
 {
     using namespace lynx;
     tracklink::Setup s;
-    // the menu's "Next free insert" on an audio track: freeMixerTrack + linkToMixerTrack
-    const auto spare = trackmodes::freeMixerTrack (s.song);
-    CHECK (spare == 8); // 1..5 channels, 6 linked, 7 has effects
-    CHECK (trackmodes::linkToMixerTrack (s.song, 1, spare) && s.song.playlistTracks[1].mixerTrack == 8);
-    CHECK (s.song.playlistTracks[1].name == "Insert 8" && s.song.mixer[8].name == "Insert 8");
-    // on an unassigned (or instrument) track it is makeAudioTrack, as Track mode › Audio track was
-    CHECK (trackmodes::makeAudioTrack (s.song, 2) && s.song.playlistTracks[2].mixerTrack == 6 && s.song.mixer[6].name == "Vocals");
+    // FL's "New mixer track(s)" (FUN_012ec590 / FUN_012a71e0): a new insert past the last one, even with free ones
+    CHECK (trackmodes::canAddMixerTrack (s.song) && trackmodes::freeMixerTrack (s.song) == 8);
+    s.song.mixer[6].name = "Insert 6";
+    s.song.playlistTracks[1].name = "Guitar";
+    CHECK (s.song.mixer.size() == 17); // Master + inserts 1..16
+    CHECK (trackmodes::assignAudioTracks (s.song, { 1 }, trackmodes::newMixerTrack) == 1);
+    CHECK (s.song.mixer.size() == 18 && s.song.playlistTracks[1].mixerTrack == 17);
+    CHECK (s.song.mixer[17].name == "Guitar" && s.song.mixer[6].name == "Insert 6");
+    // an unassigned, unnamed track: both become "Insert N"
+    CHECK (trackmodes::assignAudioTracks (s.song, { 0 }, trackmodes::newMixerTrack) == 1);
+    CHECK (s.song.playlistTracks[0].mixerTrack == 18 && s.song.playlistTracks[0].name == "Insert 18" && s.song.mixer[18].name == "Insert 18");
+    // greyed when the mixer is full: nothing is added or linked
+    while ((int) s.song.mixer.size() < maxMixerTracks)
+        s.song.mixer.emplace_back().name = "Insert " + std::to_string (s.song.mixer.size());
+    const auto tracksBefore = s.song.playlistTracks;
+    CHECK (! trackmodes::canAddMixerTrack (s.song) && trackmodes::addMixerTrack (s.song) == -1);
+    CHECK (trackmodes::assignAudioTracks (s.song, { 2 }, trackmodes::newMixerTrack) == 0);
+    CHECK ((int) s.song.mixer.size() == maxMixerTracks && s.song.playlistTracks == tracksBefore);
+    CHECK (! trackmodes::audioTrackMenu (s.song, 2).canAddMixerTrack);
+    // the Master and inserts that do not exist are no pick
+    CHECK (trackmodes::assignAudioTracks (s.song, { 2 }, 0) == 0 && trackmodes::assignAudioTracks (s.song, { 2 }, maxMixerTracks) == 0);
+}
+
+TEST (tracklink_new_mixer_track_skips_inserts_reserved_in_a_session)
+{
+    using namespace lynx;
+    tracklink::Setup s;
+    SessionParticipant host, guest;
+    host.tag = session::hostTag;
+    guest.tag = 2;
+    guest.insertFirst = 17;
+    guest.insertCount = 2;
+    s.song.session.participants = { host, guest };
+    // the host's new mixer track is 19: 17 and 18 are added as plain inserts for the guest
+    CHECK (trackmodes::assignAudioTracks (s.song, { 2 }, trackmodes::newMixerTrack) == 1);
+    CHECK (s.song.playlistTracks[2].mixerTrack == 19 && s.song.mixer.size() == 20 && s.song.mixer[17].name == "Insert 17");
+    // review L3: the free mixer track an audio / instrument track takes is never one reserved for another participant
+    tracklink::Setup f;
+    guest.insertFirst = 8;
+    guest.insertCount = 3;
+    f.song.session.participants = { host, guest };
+    CHECK (trackmodes::freeMixerTrack (f.song) == 11);
+    CHECK (trackmodes::makeAudioTrack (f.song, 0) && f.song.playlistTracks[0].mixerTrack == 11);
+    // ... while the guest takes them
+    f.song.session.me = 2;
+    CHECK (trackmodes::freeMixerTrack (f.song) == 8);
+}
+
+TEST (tracklink_a_pick_links_every_selected_track)
+{
+    using namespace lynx;
+    tracklink::Setup s;
+    s.song.playlistTracks.resize (6);
+    // FL (FUN_012ec590): the first selected track takes the pick, each next one the next insert no track is linked to
+    // (here 9 is linked to track 5, so 10), new inserts past the last one
+    CHECK (trackmodes::linkToMixerTrack (s.song, 5, 9));
+    CHECK (trackmodes::assignAudioTracks (s.song, { 0, 2, 3 }, 8) == 3);
+    CHECK (s.song.playlistTracks[0].mixerTrack == 8 && s.song.playlistTracks[2].mixerTrack == 10 && s.song.playlistTracks[3].mixerTrack == 11);
+    CHECK (s.song.playlistTracks[5].mixerTrack == 9);
+    CHECK (trackmodes::assignAudioTracks (s.song, { 3, 4 }, 16) == 2);
+    CHECK (s.song.playlistTracks[3].mixerTrack == 16 && s.song.playlistTracks[4].mixerTrack == 17 && s.song.mixer.size() == 18);
+    // track 3's previous insert is reset; the track's stored name ("Insert 11", from its first link) travels to the new
+    // insert (FL's audio-track branch: the insert takes the track's name)
+    CHECK (s.song.mixer[11].name == "Insert 11" && s.song.playlistTracks[3].name == "Insert 11" && s.song.mixer[16].name == "Insert 11");
+    CHECK (s.song.playlistTracks[4].name == "Insert 17" && s.song.mixer[17].name == "Insert 17");
+    // the menu's track (2, on 10) ticks its own insert with track 0 selected above it: track 0 can't take 10, so the
+    // pick goes on to track 2, which keeps it
+    CHECK (trackmodes::assignAudioTracks (s.song, { 0, 2 }, 10) == 1);
+    CHECK (s.song.playlistTracks[0].mixerTrack == 8 && s.song.playlistTracks[2].mixerTrack == 10);
+    // "New mixer track(s)" with two tracks: two new inserts
+    CHECK (trackmodes::assignAudioTracks (s.song, { 0, 2 }, trackmodes::newMixerTrack) == 2);
+    CHECK (s.song.playlistTracks[0].mixerTrack == 18 && s.song.playlistTracks[2].mixerTrack == 19 && s.song.mixer.size() == 20);
+}
+
+TEST (tracklink_audio_track_menu_model)
+{
+    using namespace lynx;
+    tracklink::Setup s;
+    s.song.playlistTracks[2].name.clear(); // FL builds the entries from the inserts only
+    s.song.mixer[9].name.clear();
+    auto menu = trackmodes::audioTrackMenu (s.song, 2);
+    CHECK (menu.canAddMixerTrack && menu.inserts.size() == 16); // inserts 1..16, no Master
+    if (menu.inserts.size() == 16)
+    {
+        CHECK (menu.inserts[0].mixer == 1 && menu.inserts[6].mixer == 7 && menu.inserts[6].name == "Vox chain");
+        CHECK (menu.inserts[8].name.empty()); // the UI shows "9. Insert 9"
+        // insert 6 is track 1's: greyed, its text unchanged (no "(other track)"); the others enabled, none ticked
+        CHECK (! menu.inserts[5].enabled && menu.inserts[5].name == "Insert 6");
+        CHECK (std::count_if (menu.inserts.begin(), menu.inserts.end(), [] (const trackmodes::AudioTrackMenuItem& i) { return i.ticked; }) == 0);
+        CHECK (std::count_if (menu.inserts.begin(), menu.inserts.end(), [] (const trackmodes::AudioTrackMenuItem& i) { return ! i.enabled; }) == 1);
+    }
+    // track 1's own insert is ticked and enabled
+    menu = trackmodes::audioTrackMenu (s.song, 1);
+    CHECK (menu.inserts.size() == 16 && menu.inserts[5].ticked && menu.inserts[5].enabled);
+    // review L6: FL ticks the stored link whatever the mode (an instrument track's insert)
+    CHECK (trackmodes::makeInstrumentTrack (s.song, 0, 4));
+    menu = trackmodes::audioTrackMenu (s.song, 0);
+    CHECK (menu.inserts.size() == 16 && menu.inserts[4].ticked && menu.inserts[4].enabled);
+    // an insert reserved for another participant is greyed too (LYNX's online sessions)
+    SessionParticipant host, guest;
+    host.tag = session::hostTag;
+    guest.tag = 2;
+    guest.insertFirst = 12;
+    guest.insertCount = 1;
+    s.song.session.participants = { host, guest };
+    menu = trackmodes::audioTrackMenu (s.song, 2);
+    CHECK (menu.inserts.size() == 16 && ! menu.inserts[11].enabled && menu.inserts[12].enabled);
+    // a track past the stored ones: nothing ticked, the free inserts enabled
+    menu = trackmodes::audioTrackMenu (s.song, 40);
+    CHECK (menu.inserts.size() == 16 && ! menu.inserts[6].ticked && menu.inserts[6].enabled);
+}
+
+TEST (tracklink_relinked_audio_track_names_the_new_insert)
+{
+    using namespace lynx;
+    tracklink::Setup s;
+    // a named audio track (FL: its name was set by the first link) relinks: the old insert is reset, the new one takes
+    // the track's name and colour even when it had one of its own (FL's audio-track branch of FUN_012f38f0)
+    CHECK (trackmodes::linkToMixerTrack (s.song, 2, 11));
+    CHECK (s.song.mixer[11].name == "Vocals" && s.song.mixer[11].colour == 0xFF3366CC);
+    CHECK (trackmodes::linkToMixerTrack (s.song, 2, 7));
+    CHECK (s.song.mixer[11].name == "Insert 11" && s.song.mixer[11].colour == 0);
+    CHECK (s.song.playlistTracks[2].name == "Vocals" && s.song.mixer[7].name == "Vocals" && s.song.mixer[7].colour == 0xFF3366CC);
+    CHECK (s.song.mixer[7].effects.size() == 1);
+    // hasOwnName: a stored name other than the default "Insert N"
+    CHECK (! trackmodes::hasOwnName (s.song, 11) && trackmodes::hasOwnName (s.song, 7) && ! trackmodes::hasOwnName (s.song, 0));
+    s.song.mixer[3].name.clear();
+    CHECK (! trackmodes::hasOwnName (s.song, 3) && ! trackmodes::hasOwnName (s.song, 99));
 }
 
 TEST (tracklink_link_follows_insert_delete_and_move)
