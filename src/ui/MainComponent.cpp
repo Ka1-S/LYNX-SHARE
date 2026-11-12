@@ -3205,7 +3205,7 @@ private:
 void MainComponent::syncClipLaunchSwitches()
 {
     if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
-        flip->setStates (false, getMapMode());
+        flip->setStates (drawmode::isOn(), getMapMode());
 }
 
 
@@ -3225,6 +3225,11 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         clipGridSwitch = std::make_unique<ClipGridSwitch> ([this] (PlaylistArea::GridView view) { setClipGridView (view); });
         if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get())) // (round 190ef)
         {
+            flip->onDraw = [] { drawmode::toggle(); };
+            drawmode::addListener ([safe = juce::Component::SafePointer<MainComponent> (this)] (bool) {
+                if (safe != nullptr)
+                    safe->syncClipLaunchSwitches();
+            });
             flip->onKey = [this] { setMapMode (getMapMode() == remotemap::Mode::key ? remotemap::Mode::off : remotemap::Mode::key); };
             flip->onMidi = [this] { setMapMode (getMapMode() == remotemap::Mode::midi ? remotemap::Mode::off : remotemap::Mode::midi); };
         }
