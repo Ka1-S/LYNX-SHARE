@@ -953,7 +953,7 @@ int clipToLane (Song& song, int clipIndex, int track)
     inside.push_back ({ clip.start, source.valueAt ((double) clip.offset), 0.0f });
     for (const auto& p : source.points)
         if (p.tick > clip.offset && p.tick < clip.offset + clip.length)
-            inside.push_back ({ clip.start + p.tick - clip.offset, p.value, p.tension });
+            inside.push_back ({ clip.start + p.tick - clip.offset, p.value, p.tension, p.mode });
     inside.push_back ({ clip.end(), source.valueAt ((double) (clip.offset + clip.length)), 0.0f });
 
     auto& points = song.automations[(std::size_t) lane].points;

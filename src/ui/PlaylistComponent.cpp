@@ -1,3 +1,4 @@
+#include "core/FlCurve.h"
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
 #include "core/FlSettings.h"
@@ -2529,6 +2530,7 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
     const auto clip = g.getClipBounds().toFloat();
     juce::Path curve;
     bool started = false;
+    auto lastY = 0.0f;
 
     // (samples every 2 px on the body's own grid, from a little before the repainted area to a little after it: a
     // repaint of part of the clip draws the same line as a paint of all of it; round 174f)
@@ -2538,14 +2540,18 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
         const auto x = body.getX() + 2.0f * (float) k;
         if (x > lastX)
             break;
-        const auto value = automation.playAt ((double) c.offset + xToTick ((int) x) - (double) c.start, xToTick ((int) x)); // (with its LFO)
-        const auto y = body.getBottom() - value * body.getHeight();
+        const auto yAt = [&] (int sx) {
+            const auto songTick = xToTick (sx);
+            return body.getBottom() - automation.playAt ((double) c.offset + songTick - (double) c.start, songTick) * body.getHeight(); // (with its LFO)
+        };
+        const auto y = yAt ((int) x);
 
         if (! started)
             curve.startNewSubPath (x, y);
-        else
-            curve.lineTo (x, y);
+        else // (round 190bw: Hold, Stairs and Pulse segments keep square corners)
+            automationLineTo (curve, x - 2.0f, lastY, x, y, [&] { return yAt ((int) x - 1); });
 
+        lastY = y;
         started = true;
     }
 
@@ -2752,16 +2758,24 @@ void PlaylistComponent::paintLanes (juce::Graphics& g, juce::Rectangle<int> grid
             juce::Path curve, fill;
             bool started = false;
             const auto from = (float) juce::jmax (grid.getX(), clipArea.getX()), to = (float) juce::jmin (grid.getRight(), clipArea.getRight());
+            auto lastY = 0.0f;
             for (auto x = from; x <= to; x += 2.0f)
             {
-                const auto y = body.getBottom() - automation.valueAt (xToTick ((int) x)) * body.getHeight();
+                const auto yAt = [&] (int sx) { return body.getBottom() - automation.valueAt (xToTick (sx)) * body.getHeight(); };
+                const auto y = yAt ((int) x);
                 if (! started)
                 {
                     curve.startNewSubPath (x, y);
                     fill.startNewSubPath (x, body.getBottom());
+                    curve.lineTo (x, y);
+                    fill.lineTo (x, y);
                 }
-                curve.lineTo (x, y);
-                fill.lineTo (x, y);
+                else // (round 190bw: Hold, Stairs and Pulse segments keep square corners)
+                {
+                    automationLineTo (curve, x - 2.0f, lastY, x, y, [&] { return yAt ((int) x - 1); });
+                    automationLineTo (fill, x - 2.0f, lastY, x, y, [&] { return yAt ((int) x - 1); });
+                }
+                lastY = y;
                 started = true;
             }
             if (started)
@@ -2848,8 +2862,7 @@ bool PlaylistComponent::laneMouseDown (const juce::MouseEvent& e)
     {
         if (point >= 0 && points.size() > 1)
             engine.editSong ([a, point] (Song& s) {
-                auto& p = s.automations[(std::size_t) a].points;
-                p.erase (p.begin() + point);
+                eraseAutomationPoint (s.automations[(std::size_t) a].points, point);
             });
         else if (point < 0)
             showLaneMenu (hit.track, hit.lane);
@@ -2890,12 +2903,7 @@ bool PlaylistComponent::laneMouseDown (const juce::MouseEvent& e)
     p.value = e.mods.isShiftDown() ? engine.getSong().automations[(std::size_t) a].valueAt ((double) p.tick)
                                    : juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight()));
     int added = -1;
-    engine.editSong ([a, p, &added] (Song& s) {
-        auto& list = s.automations[(std::size_t) a].points;
-        const auto at = std::upper_bound (list.begin(), list.end(), p.tick, [] (std::int64_t t, const AutomationPoint& q) { return t < q.tick; });
-        added = (int) (at - list.begin());
-        list.insert (at, p);
-    });
+    engine.editSong ([a, p, &added] (Song& s) { added = insertAutomationPoint (s.automations[(std::size_t) a].points, p); });
     drag = Drag::lanePoint;
     autoPoint = added;
     return true;
@@ -3065,13 +3073,21 @@ int PlaylistComponent::automationHandleAt (int clip, juce::Point<int> p) const
 
 void PlaylistComponent::showAutomationPointMenu (int clip, int point)
 {
-    // FL's point menu (the parts LYNX's automation has): delete, copy / paste / type in the value, straight segment
+    auto menu = getAutomationPointMenuForSnapshot (clip, point);
+    if (menu.getNumItems() > 0)
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+}
+
+juce::PopupMenu PlaylistComponent::getAutomationPointMenuForSnapshot (int clip, int point)
+{
+    // FL's point menu [RES FLEngine TFruityLoopsMainForm.EEACPointMenu]: Delete, the Mode block (13 curve modes, round
+    // 190bw), then Copy value / Paste value / Type in value...; LYNX's own commands follow
     const auto& song = engine.getSong();
     if (clip < 0 || clip >= (int) song.playlist.size())
-        return;
+        return {};
     const auto a = song.playlist[(std::size_t) clip].automation;
     if (a < 0 || a >= (int) song.automations.size() || point < 0 || point >= (int) song.automations[(std::size_t) a].points.size())
-        return;
+        return {};
     const auto& automation = song.automations[(std::size_t) a];
     const auto value = automation.points[(std::size_t) point].value;
     juce::PopupMenu menu;
@@ -3079,9 +3095,12 @@ void PlaylistComponent::showAutomationPointMenu (int clip, int point)
     menu.addItem (tr ("Delete"), automation.points.size() > 1, false, [this, a, point] {
         engine.editSong ([a, point] (Song& s) {
             auto& points = s.automations[(std::size_t) a].points;
-            if (points.size() > 1 && point < (int) points.size())
-                points.erase (points.begin() + point);
+            if (points.size() > 1)
+                eraseAutomationPoint (points, point);
         });
+    });
+    addAutomationModeItems (menu, automationPointMode (automation.points, point), point > 0, [this, a, point] (int mode) {
+        engine.editSong ([a, point, mode] (Song& s) { setAutomationPointMode (s.automations[(std::size_t) a].points, point, mode); });
     });
     menu.addSeparator();
     menu.addItem (tr ("Copy value"), [value] { copiedAutomationValue() = value; });
@@ -3093,16 +3112,12 @@ void PlaylistComponent::showAutomationPointMenu (int clip, int point)
         });
     });
     menu.addItem (tr ("Type in value..."), [this, a, point] { typeAutomationPointValue (engine, a, point); });
-    menu.addItem (tr ("Straight segment (reset the curve)"), point + 1 < (int) automation.points.size(), false, [this, a, point] {
-        engine.editSong ([a, point] (Song& s) {
-            auto& points = s.automations[(std::size_t) a].points;
-            if (point < (int) points.size())
-                points[(std::size_t) point].tension = 0.0f;
-        });
-    });
     menu.addSeparator();
+    menu.addItem (tr ("Straight segment (reset the curve)"), point + 1 < (int) automation.points.size(), false, [this, a, point] {
+        engine.editSong ([a, point] (Song& s) { setAutomationSegmentTension (s.automations[(std::size_t) a].points, point, 0.0f); });
+    });
     menu.addItem (tr ("Edit points..."), [this, a] { openAutomationEditor (engine, a); });
-    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    return menu;
 }
 
 double PlaylistComponent::clipFileSeconds (int index) const
@@ -3960,11 +3975,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         if (const auto handle = automationHandleAt (hit, e.getPosition()); handle >= 0)
         {
             const auto automation = engine.getSong().playlist[(std::size_t) hit].automation;
-            engine.editSong ([automation, handle] (Song& s) {
-                auto& points = s.automations[(std::size_t) automation].points;
-                if (handle < (int) points.size())
-                    points[(std::size_t) handle].tension = 0.0f;
-            });
+            automationPointMemory().tension = 0.0f; // FL's "default tension" also clears the editor's memory
+            engine.editSong ([automation, handle] (Song& s) { setAutomationSegmentTension (s.automations[(std::size_t) automation].points, handle, 0.0f); });
             return;
         }
         if (automationEditable (hit) && automationBody (engine.getSong().playlist[(std::size_t) hit]).contains (e.position))
@@ -3977,11 +3989,9 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             p.value = e.mods.isShiftDown() ? automation.valueAt ((double) p.tick)
                                            : juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight()));
             int added = -1;
-            engine.editSong ([a = c.automation, p, &added] (Song& s) {
-                auto& points = s.automations[(std::size_t) a].points;
-                const auto at = std::upper_bound (points.begin(), points.end(), p.tick, [] (std::int64_t t, const AutomationPoint& q) { return t < q.tick; });
-                added = (int) (at - points.begin());
-                points.insert (at, p);
+            // FL: the new point takes the mode and tension last used (round 190bw)
+            engine.editSong ([a = c.automation, p, &added, m = automationPointMemory()] (Song& s) {
+                added = insertAutomationPoint (s.automations[(std::size_t) a].points, p, m.mode, m.tension);
             });
             setSelection ({});
             drag = Drag::autoPoint;
@@ -4143,6 +4153,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             drag = Drag::autoTension;
             autoClip = hit;
             autoPoint = handle;
+            automationPointMemory() = { points[(std::size_t) handle].mode < flcurve::modeCount ? (int) points[(std::size_t) handle].mode : 0,
+                                        points[(std::size_t) handle].tension };
             tensionStart = points[(std::size_t) handle].tension;
             // a positive tension lowers a rising segment's middle and raises a falling one's: the handle follows the mouse
             tensionSign = points[(std::size_t) handle + 1].value >= points[(std::size_t) handle].value ? -1.0f : 1.0f;
@@ -4156,10 +4168,8 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             p.tick = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn) - c.start + c.offset);
             const auto body = automationBody (c);
             p.value = juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight()));
-            engine.editSong ([a = c.automation, p] (Song& s) {
-                auto& points = s.automations[(std::size_t) a].points;
-                points.push_back (p);
-                std::stable_sort (points.begin(), points.end(), [] (auto& l, auto& r) { return l.tick < r.tick; });
+            engine.editSong ([a = c.automation, p, m = automationPointMemory()] (Song& s) {
+                insertAutomationPoint (s.automations[(std::size_t) a].points, p, m.mode, m.tension);
             });
             point = automationPointAt (hit, e.getPosition());
         }
@@ -4484,7 +4494,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             const auto range = juce::jmax (30.0f, laneBody (laneTrack, laneIndex).getHeight()) * (flmods::ctrl (e.mods) ? 4.0f : 1.0f);
             const auto up = -(float) e.getDistanceFromDragStartY() / range;
             const auto tension = juce::jlimit (-1.0f, 1.0f, tensionStart + tensionSign * up);
-            engine.editSong ([a, i = autoPoint, tension] (Song& s) { s.automations[(std::size_t) a].points[(std::size_t) i].tension = tension; });
+            engine.editSong ([a, i = autoPoint, tension] (Song& s) { setAutomationSegmentTension (s.automations[(std::size_t) a].points, i, tension); });
             return;
         }
 
@@ -4533,7 +4543,8 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             const auto range = juce::jmax (30.0f, automationBody (song.playlist[(std::size_t) autoClip]).getHeight()) * (flmods::ctrl (e.mods) ? 4.0f : 1.0f);
             const auto up = -(float) e.getDistanceFromDragStartY() / range;
             const auto tension = juce::jlimit (-1.0f, 1.0f, tensionStart + tensionSign * up);
-            engine.editSong ([a, i = autoPoint, tension] (Song& s) { s.automations[(std::size_t) a].points[(std::size_t) i].tension = tension; });
+            automationPointMemory().tension = tension; // (FL's editor memory: the next new point takes it)
+            engine.editSong ([a, i = autoPoint, tension] (Song& s) { setAutomationSegmentTension (s.automations[(std::size_t) a].points, i, tension); });
             return;
         }
 

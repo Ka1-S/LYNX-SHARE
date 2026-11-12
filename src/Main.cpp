@@ -1776,6 +1776,15 @@ public:
             return;
         }
 
+        if (args.contains ("--curveshot"))
+        {
+            // LYNX.exe --curveshot prefix: round 190bw — an automation clip with one segment per FL curve mode in the
+            // point editor and in the Playlist, and FL's point menu, off-screen
+            runCurveShot (args[args.indexOf ("--curveshot") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--remoteshot"))
         {
             // LYNX.exe --remoteshot prefix: Online Sessions P5-A1 (round 190ai) — the host's "Share plugins with guests"
@@ -1787,7 +1796,7 @@ public:
             return;
         }
 
-        if (args.contains ("--settingsshot"))
+        if (args.contains ("--settingsshot") && ! args.contains ("--rtstress")) // (--rtstress has its own --settingsshot file.png option, round 161)
         {
             // LYNX.exe --settingsshot prefix: round 190bx — every Settings page off-screen at the window's size, in a
             // small window (390 x 390) and, for the long pages, whole (see runSettingsShot)
@@ -2590,7 +2599,26 @@ private:
             lynx::ProjectFile::save (original, juce::File (demoProjectPath), error);
 
         const auto reloaded = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (original), error);
-        const auto projectOk = reloaded && reloaded->channels.size() == original.channels.size()
+        // round 190bw: FL's curve modes of automation points come back from a project, tension whole; a bent point
+        // without a mode (a project saved before the modes: [tick, value, tension]) keeps LYNX's older law
+        const auto curveModesOk = [&original] {
+            auto song = original;
+            auto& a = song.automations[0];
+            a.points = { { 0, 0.25f, 0.5f, (std::uint8_t) lynx::flcurve::stairs },
+                         { 960, 1.0f, -0.123456f, (std::uint8_t) lynx::flcurve::smooth },
+                         { 1920, 0.5f, 0.0f, (std::uint8_t) lynx::flcurve::hold },
+                         { 2400, 0.75f, 0.7f, lynx::AutomationPoint::legacyCurve },
+                         { 2880, 0.3f, 0.0f, 0 },
+                         { 3840, 0.6f, 0.0f, 0 } };
+            a.lfo.on = true;
+            a.lfo.amp = { { 0, 1.0f, -0.25f, (std::uint8_t) lynx::flcurve::pulse }, { 960, 0.5f, 0.0f, 0 } };
+            juce::String e;
+            const auto text = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (text, e);
+            return back && back->automations.size() == 1 && back->automations[0].points == a.points && back->automations[0].lfo.amp == a.lfo.amp
+                   && back->automations[0].valueAt (700.0) == a.valueAt (700.0) && back->automations[0].valueAt (2600.0) == a.valueAt (2600.0);
+        }();
+        const auto projectOk = curveModesOk && reloaded && reloaded->channels.size() == original.channels.size()
                                && reloaded->channels[0].name == original.channels[0].name
                                && reloaded->patterns[0].notes.size() == original.patterns[0].notes.size()
                                && reloaded->patterns[0].notes[3].start == original.patterns[0].notes[3].start
@@ -12524,6 +12552,92 @@ private:
             }
             shoot (lynx::SettingsPage::audio, "audio-whole", 680, 1500);
             shoot (lynx::SettingsPage::general, "general-whole", 680, 2300);
+        }
+        juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
+    }
+
+    // round 190bw: FL's 13 curve modes of an automation clip's points (see --curveshot)
+    void runCurveShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        {
+            lynx::MainComponent ui (offline, false);
+            const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+            ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+            offline.dispatchPendingMessages();
+            // FL's menu order, one bar per mode, the levels going up and down; a tension where the mode needs one to show
+            static const int order[] = { lynx::flcurve::smooth, lynx::flcurve::hold, lynx::flcurve::singleCurve, lynx::flcurve::singleCurve2,
+                                         lynx::flcurve::singleCurve3, lynx::flcurve::doubleCurve, lynx::flcurve::doubleCurve2, lynx::flcurve::doubleCurve3,
+                                         lynx::flcurve::halfSine, lynx::flcurve::stairs, lynx::flcurve::smoothStairs, lynx::flcurve::pulse, lynx::flcurve::wave };
+            const auto bar = (std::int64_t) lynx::ppq * 4;
+            offline.editSong ([bar] (lynx::Song& song) {
+                song.mode = lynx::PlayMode::song;
+                lynx::Automation a;
+                a.name = "Curve modes";
+                a.target = { lynx::AutomationTargetKind::mixerVolume, 1 };
+                a.points.push_back ({ 0, 0.15f, 0.0f });
+                int k = 0;
+                for (const auto mode : order)
+                {
+                    const auto stepped = mode == lynx::flcurve::stairs || mode == lynx::flcurve::smoothStairs || mode == lynx::flcurve::pulse || mode == lynx::flcurve::wave;
+                    a.points.back().mode = (std::uint8_t) mode;
+                    a.points.back().tension = mode == lynx::flcurve::smooth || mode == lynx::flcurve::hold ? 0.0f : stepped ? -0.72f : (k % 2 == 0 ? 0.55f : -0.55f);
+                    ++k;
+                    a.points.push_back ({ bar * k, k % 2 == 1 ? 0.85f : 0.15f, 0.0f });
+                }
+                song.automations.insert (song.automations.begin(), a);
+                for (auto& c : song.playlist)
+                    if (c.kind == lynx::ClipKind::automation)
+                        ++c.automation;
+                lynx::Clip clip;
+                clip.kind = lynx::ClipKind::automation;
+                clip.automation = 0;
+                clip.track = 3;
+                clip.length = bar * 13;
+                song.playlist.push_back (clip);
+                if (song.playlistTracks.size() < 4)
+                    song.playlistTracks.resize (4);
+                song.playlistTracks[3].height = 150;
+            }, false);
+            offline.dispatchPendingMessages();
+            ui.selectTabForSnapshot (2);
+            offline.dispatchPendingMessages();
+            auto& playlist = ui.getPlaylistForSnapshot();
+            saveSnapshot (ui, prefix + "-playlist.png");
+            const auto clipIndex = (int) offline.getSong().playlist.size() - 1;
+            // the point menu of the point that ends the "Stairs" segment (point 10), and of the first point
+            saveMenus (juce::StringArray { "Automation point (ends a Stairs segment)", "First point" },
+                       std::vector<juce::PopupMenu> { playlist.getAutomationPointMenuForSnapshot (clipIndex, 10), playlist.getAutomationPointMenuForSnapshot (clipIndex, 0) },
+                       prefix + "-point-menu.png");
+            auto editor = lynx::makeAutomationEditor (offline, 0);
+            editor->setSize (1500, 420);
+            savePng (editor->createComponentSnapshot (editor->getLocalBounds()), prefix + "-editor.png");
+            editor.reset();
+            // the project itself, for --export-flp and a look at the same clip in FL
+            {
+                juce::String saveError;
+                lynx::ProjectFile::save (offline.getSong(), juce::File (prefix + "-modes.lynx"), saveError);
+            }
+
+            // part 2: the Piano roll tools that gained FL's options (they preview on the pattern and put the notes back)
+            ui.selectTabForSnapshot (1);
+            offline.dispatchPendingMessages();
+            auto& roll = ui.getPianoRollForSnapshot();
+            const std::pair<lynx::NoteTool, const char*> tools[] = { { lynx::NoteTool::flip, "-tool-flip.png" },
+                                                                     { lynx::NoteTool::limit, "-tool-limit.png" },
+                                                                     { lynx::NoteTool::scaleLevels, "-tool-scalelevels.png" },
+                                                                     { lynx::NoteTool::randomise, "-tool-randomise.png" },
+                                                                     { lynx::NoteTool::lfo, "-tool-lfo.png" } };
+            for (const auto& [tool, name] : tools)
+            {
+                auto panel = lynx::makeNoteToolPanel (offline, tool, roll.noteIndicesForSnapshot(), roll.gridForSnapshot());
+                offline.dispatchPendingMessages();
+                savePng (panel->createComponentSnapshot (panel->getLocalBounds()), prefix + name);
+                if (tool == lynx::NoteTool::lfo)
+                    saveMenus (juce::StringArray { "LFO tool: right-click on a Period slider" },
+                               std::vector<juce::PopupMenu> { lynx::noteToolPresetMenuForSnapshot (*panel) }, prefix + "-tool-lfo-steps.png");
+            }
         }
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
     }

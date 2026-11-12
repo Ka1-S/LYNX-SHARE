@@ -1,4 +1,5 @@
 #include "engine/ProjectFile.h"
+#include "core/FlCurve.h"
 #include "core/Preferences.h"
 
 #include "core/ClipLauncher.h"
@@ -1317,6 +1318,15 @@ AutomationTargetKind targetKindFromName (const juce::String& name)
 // Online Sessions (round 168a): uids as 16 hex digits, stand-ins as small objects
 juce::var uidVar (std::uint64_t uid) { return str (uids::toHex (uid)); }
 std::uint64_t uidFrom (const juce::var& v) { return uids::fromHex (v.toString().toStdString()); }
+
+// A saved automation point's curve mode (round 190bw): the fourth element when present; without it a bent segment
+// comes from a project saved before FL's curve modes and keeps LYNX's older law, a straight one is a Single curve.
+std::uint8_t savedPointMode (const juce::var& pt)
+{
+    if (pt.size() >= 4)
+        return (std::uint8_t) juce::jlimit (0, (int) flcurve::modeCount - 1, (int) pt[3]);
+    return pt.size() >= 3 && (double) pt[2] != 0.0 ? AutomationPoint::legacyCurve : (std::uint8_t) 0;
+}
 
 juce::var standInsToVar (const std::vector<StandIn>& list)
 {
@@ -2665,9 +2675,20 @@ juce::String toJson (const Song& song, bool stampVersion)
         o->setProperty ("target", juce::Array<juce::var> { targetKindName (a.target.kind), a.target.index, a.target.slot, a.target.param });
         juce::Array<juce::var> points;
 
+        // [tick, value, tension] is a straight segment or an older project's bend (LYNX's own law); a fourth element is
+        // FL's curve mode of the segment (round 190bw), with the tension then kept whole for the .flp round trip
         for (const auto& pt : a.points)
-            points.add (juce::Array<juce::var> { (juce::int64) pt.tick, juce::roundToInt (pt.value * 10000.0f) / 10000.0,
-                                                 juce::roundToInt (pt.tension * 1000.0f) / 1000.0 });
+        {
+            juce::Array<juce::var> p { (juce::int64) pt.tick, juce::roundToInt (pt.value * 10000.0f) / 10000.0 };
+            if (pt.mode == AutomationPoint::legacyCurve || (pt.mode == 0 && pt.tension == 0.0f))
+                p.add (juce::roundToInt (pt.tension * 1000.0f) / 1000.0);
+            else
+            {
+                p.add ((double) pt.tension);
+                p.add ((int) pt.mode);
+            }
+            points.add (p);
+        }
 
         o->setProperty ("points", points);
         if (a.isLive())
@@ -2682,7 +2703,12 @@ juce::String toJson (const Song& song, bool stampVersion)
         {
             juce::Array<juce::var> amp;
             for (const auto& pt : l.amp)
-                amp.add (juce::Array<juce::var> { (juce::int64) pt.tick, (double) pt.value, (double) pt.tension });
+            {
+                juce::Array<juce::var> p { (juce::int64) pt.tick, (double) pt.value, (double) pt.tension };
+                if (pt.mode != AutomationPoint::legacyCurve && ! (pt.mode == 0 && pt.tension == 0.0f))
+                    p.add ((int) pt.mode);
+                amp.add (p);
+            }
             o->setProperty ("lfo", juce::Array<juce::var> { l.on, l.level, l.add, l.flags, l.speed, l.tension, l.skew, l.pulseWidth,
                                                             (juce::int64) l.phase, (double) l.range, amp });
             if (l.fl.present)
@@ -3267,7 +3293,8 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                     if (pt.isArray() && pt.size() >= 2)
                         automation.points.push_back ({ juce::jmax<juce::int64> (0, (juce::int64) pt[0]),
                                                        juce::jlimit (0.0f, 1.0f, (float) (double) pt[1]),
-                                                       pt.size() >= 3 ? juce::jlimit (-1.0f, 1.0f, (float) (double) pt[2]) : 0.0f });
+                                                       pt.size() >= 3 ? juce::jlimit (-1.0f, 1.0f, (float) (double) pt[2]) : 0.0f,
+                                                       savedPointMode (pt) });
 
             if (const auto& source = a["source"]; source.isArray() && source.size() >= 3)
                 automation.source = { (int) source[0], (int) source[1], (int) source[2], source.size() >= 4 ? (int) source[3] : -1 };
@@ -3295,7 +3322,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                     for (const auto& pt : *amp)
                         if (pt.isArray() && pt.size() >= 3)
                             lfo.amp.push_back ({ juce::jmax<juce::int64> (0, (juce::int64) pt[0]), juce::jlimit (0.0f, 1.0f, (float) (double) pt[1]),
-                                                 juce::jlimit (-1.0f, 1.0f, (float) (double) pt[2]) });
+                                                 juce::jlimit (-1.0f, 1.0f, (float) (double) pt[2]), savedPointMode (pt) });
                 if (lfo.amp.empty())
                     lfo.amp.push_back ({ 0, 1.0f, 0.0f });
                 if (const auto& f = a["lfoFl"]; f.isArray() && f.size() >= 13)

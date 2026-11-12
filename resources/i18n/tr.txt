@@ -8280,7 +8280,6 @@ countries: tr
 "Deactivate input {0}" = "{0}. girişi devre dışı bırak"
 "Activate input {0}" = "{0}. girişi etkinleştir"
 "Input {0}" = "Giriş {0}"
-# Round 183c: Racks
 "Add chain" = "Zincir ekle"
 "Audio Effect Rack" = "Ses efekti rafı"
 "Chain Pan" = "Zincir panı"
@@ -8342,9 +8341,9 @@ countries: tr
 "Blend of the shaped signal with the dry one (parallel processing)" = "Biçimlendirilmiş sinyalin kuru sinyalle karışımı (paralel işleme)"
 "One gain for both channels, so the stereo image stays put" = "Stereo görüntü kaymasın diye iki kanal için tek bir kazanç"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "Pes notaları dedektörden uzak tutar (davul bus'ındaki bir kick)"
-
 "For a file with a true-peak ceiling: {0}" = "Gerçek tepe sınırı olan bir dosya için: {0}"
 "(look)" = "(görünüm)"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "Varsayılan şablon bulunamadı; onun yerine LYNX SHARE'in varsayılan projesi açıldı"
 "{0} could not be opened." = "{0} açılamadı."
@@ -8368,6 +8367,7 @@ countries: tr
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Tüm yeni eklentileri ayır"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Açık: eklediğiniz bir eklentinin penceresi ayrılmış olarak, panellerin üstünde açılır. Kapalı: masaüstüne yerleşik açılır, tıkladığınız bir panelin arkasına geçer. Her eklentinin pencere menüsü › Ayrılmış bunu o eklenti için değiştirir"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Diğer uygulamalar için..."
 "Export for other apps" = "Diğer uygulamalar için dışa aktar"
@@ -8542,10 +8542,6 @@ countries: tr
 "Can't freeze this channel" = "Bu kanal dondurulamaz"
 "Frozen: Unfreeze to edit" = "Dondurulmuş: düzenlemek için çözün"
 "A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "Bir kontrolcü bu enstrümanın düğmelerine bağlı ve onları canlı hareket ettiriyor: dondurulmuş ses onu takip edemez."
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "Şarkıyı dosya olarak kaydet"
@@ -8740,7 +8736,6 @@ countries: tr
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Bir oyun kumandası transportu yönetir ve bir MIDI denetleyicisi gibi herhangi bir kontrole bağlanabilir. MIDI sayfasında da var."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX'in kendi iyileştirmeleri. Hepsi varsayılan olarak kapalıdır; birini açana kadar LYNX SHARE, FL Studio gibi görünür ve davranır. Her anahtar, satırında adı geçen yerdeki ayarın aynısıdır."
 "LYNX extras..." = "LYNX ekstraları..."
-
 "Search your plugins" = "Plugin'lerinde ara"
 "Nothing is shared." = "Hiçbir şey paylaşılmıyor."
 "{0} shared with the session" = "Oturumla paylaşılan: {0}"
@@ -8883,7 +8878,6 @@ countries: tr
 "Channel 2" = "Kanal 2"
 "Channels 2-{0}" = "Kanallar 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE üye kanalları (alt bölge): her biri bir nota taşıyan MIDI kanalları"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "NEFES"
 "Motion blending" = "Hareket karışımı"
 "Load sprite sheet..." = "Sprite sayfası yükle..."
@@ -8997,3 +8991,14 @@ countries: tr
 "Show recent changes at the top" = "Son değişiklikleri en üstte göster"
 "Sort the undo history from new to old" = "Geri alma geçmişini yeniden eskiye sıralar"
 "Click a step to go back (or forward) to it. Newest at the top." = "Bir adıma geri (veya ileri) gitmek için ona tıklayın. En yenisi en üstte."
+"Preserve start times" = "Başlangıç zamanlarını koru"
+"Key / scale restriction" = "Ton / gam kısıtlaması"
+"Above" = "Üstte"
+"Under" = "Altta"
+"Keyboard range / transpose" = "Klavye aralığı / transpoze"
+"Wrap to top / bottom" = "Üste / alta sar"
+"{0} steps" = "{0} adım"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"

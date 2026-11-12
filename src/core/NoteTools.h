@@ -112,8 +112,11 @@ std::vector<int> arpeggiate (Pattern& pattern, const std::vector<int>& indices, 
 
 // --- flip -------------------------------------------------------------------------------------
 // Horizontal: mirrors the notes in time inside their span. Vertical: mirrors the keys around the middle
-// of their range.
-void flip (Pattern& pattern, const std::vector<int>& indices, bool horizontal, bool vertical);
+// of their range. With preserveStarts (FL's "Preserve start times") the horizontal flip mirrors the start
+// times between the first and the last start instead of mirroring each note's whole extent, so the set of
+// start times stays on the same grid whatever the note lengths are.
+void flip (Pattern& pattern, const std::vector<int>& indices, bool horizontal, bool vertical,
+           bool preserveStarts = false);
 
 // --- randomise --------------------------------------------------------------------------------
 struct RandomiseOptions
@@ -122,6 +125,7 @@ struct RandomiseOptions
     float pan = 0.0f;
     float finePitch = 0.0f;   // fraction of ±120 cents
     float modX = 0.0f, modY = 0.0f;
+    float release = 0.0f;     // (round 190bw; FL's randomizer has Release beside Mod X and Mod Y)
     std::int64_t timing = 0;  // maximum start shift in ticks (never before 0)
     float length = 0.0f;      // maximum relative length change (0..1)
     bool bipolar = true;      // changes go both ways; otherwise only down (velocity) / only later (timing)
@@ -135,13 +139,37 @@ void randomise (Pattern& pattern, const std::vector<int>& indices, const Randomi
 // from `scaleStart` (first note) to `scaleEnd` (last note) through time: a fade in or out.
 void scaleLevels (Pattern& pattern, const std::vector<int>& indices, Level level, float scaleStart, float scaleEnd, float offset);
 
+// FL's "level scaling" law on a normalised value x (0…1) [REA FLEngine 0xdf0a40 / 0xdf0900, round 190bw]:
+//   d = |x − center| / max (center, 1 − center)                    (0…1: how far from the centre)
+//   f = d,  or bent by the tension t (−1…1) with p = 1001^|t| − 1:  t > 0: 1 − ((p + 1)^(1 − d) − 1) / p
+//                                                                   t < 0: ((p + 1)^d − 1) / p
+//   y = sign (x − center) · f · multiply · max (center, 1 − center) + offset + center,  limited to 0…1
+// center 0…1 (FL's default 0), multiply −2…2 (default 1), offset −1…1, tension −1…1. With tension 0 this is
+// (x − center) · multiply + center + offset.
+double flLevelScale (double x, double center, double multiply, double offset, double tension) noexcept;
+
+// The same tool with FL's Center and Tension; the multiplier still ramps from scaleStart to scaleEnd through time
+// (LYNX's own extra: FL has one Multiply for all notes).
+void scaleLevels (Pattern& pattern, const std::vector<int>& indices, Level level, float scaleStart, float scaleEnd, float offset,
+                  float center, float tension);
+
 // --- limit ------------------------------------------------------------------------------------
 struct LimitOptions
 {
-    int lowKey = 36, highKey = 84;   // notes outside move by octaves into the range (or are clamped if it is narrower)
-    float minVelocity = 0.0f, maxVelocity = 1.0f;
+    int lowKey = 36, highKey = 84;   // notes outside move by octaves into the range, then are clamped
+    float minVelocity = 0.0f, maxVelocity = 1.0f; // LYNX's own extra (FL's limiter has no velocity range)
+
+    // FL's "Key / scale restriction" and "Keyboard range / transpose" (round 190bw, FL's limiter / transposer):
+    int root = 0;                    // base key, 0 = C ... 11 = B
+    int scale = 0;                   // index into scales(); 0 = no restriction
+    enum Snap { above, under, alternate };
+    int snap = above;                // where a note exactly between two scale keys goes (alternate: up first)
+    bool wrap = false;               // "Wrap to top / bottom": notes above the range go to its lowest octave,
+                                     // notes below to its highest octave (off: the nearest octave that fits)
+    int transpose = 0;               // semitones, applied after the range; folded by octaves onto the keyboard
 };
 
+// The order is FL's: scale restriction on the note's own key, then the range, then the transposition.
 void limit (Pattern& pattern, const std::vector<int>& indices, const LimitOptions& options);
 
 // --- LYNX's own versions of the tools FL ships as piano roll scripts (REA round 143: Tools › Scripts) -----------

@@ -165,6 +165,7 @@ public:
     void selectClipsForSnapshot (const std::vector<int>& clips) { setSelection (clips); repaint(); }
     void setScrollTickForSnapshot (double tick) { scrollTicks = tick; repaint(); }
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
+    juce::PopupMenu getAutomationPointMenuForSnapshot (int clip, int point); // FL's point menu of an automation clip's point (round 190bw)
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
     // hovers the right edge of the first clip in view (grip, outline, menu button); returns its hint
     ui::Hint hoverForSnapshot();

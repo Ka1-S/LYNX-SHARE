@@ -20,7 +20,7 @@ enum Mode : int
     singleCurve2 = 7,
     doubleCurve2 = 8,
     halfSine = 9,
-    smooth = 10, // (needs its neighbours: LYNX draws it straight)
+    smooth = 10, // (needs its neighbours: prepareSmooth; `prepare` alone gives a straight segment)
     singleCurve3 = 11,
     doubleCurve3 = 12,
     modeCount = 13
@@ -40,6 +40,20 @@ Segment prepare (int mode, float tension) noexcept;
 // The shape 0..1 at x 0..1 (0 = the previous point's value, 1 = this point's).
 double evaluate (const Segment& s, double x) noexcept;
 inline double shape (int mode, float tension, double x) noexcept { return evaluate (prepare (mode, tension), x); }
+
+// Mode 10, "Smooth" (round 190bw; the same shared envelope library, REA_rodada51 §2.4): a cubic Hermite segment from
+// y0 to y1 over the time dx whose end slopes come from the neighbouring segments, and only from neighbours that are
+// "Smooth" themselves. `before`: the segment that ends where this one starts (its length and its start level);
+// `after`: the segment that starts where this one ends (its length and its end level). A neighbour that is missing or
+// not smooth gives a flat end. The tension pulls the curve back to the straight line (|t| = 1: straight).
+struct SmoothSide
+{
+    bool smooth = false; // that neighbour segment exists and is in Smooth mode
+    double dx = 0.0;     // its length (any unit, the same as the segment's)
+    double y = 0.0;      // before: the level where it starts; after: the level where it ends
+    bool hasY = true;    // before only: false when there is no point before the neighbour's start
+};
+Segment prepareSmooth (float tension, double dx, double y0, double y1, const SmoothSide& before, const SmoothSide& after) noexcept;
 
 const char* modeName (int mode) noexcept; // "Single curve", "Stairs"…
 } // namespace lynx::flcurve

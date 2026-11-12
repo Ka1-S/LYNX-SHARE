@@ -507,7 +507,7 @@ gesture or reduced scope · **No** = absent (searched, not found). Locations are
 |---|---|---|
 | A1 | Partial | Right-click any knob → clip + editor. With a time selection the clip spans it; otherwise the whole song. Goes on a new bottom track (not "highest empty track in view") |
 | A2 | **Done** (most) | Editor window: click adds, drag moves, **Shift / Ctrl pressed after the click lock time / value**, **right-click point menu: type value, copy/paste value, straight segment, delete**; Shift+right-click adds a point on the curve. **Inline in the Playlist** (Pencil/Brush): drag a point, click on the curve to add one, right-click a point deletes it |
-| A3 | Partial | Alt+drag on a segment sets tension; "straight segment" in the point menu. No curve-type menu (needs a per-segment shape in the model) |
+| A3 | **Done** | Alt+drag on a segment sets tension; the point menu has FL's **Mode** list (Smooth, Hold, Single curve 1–3, Double curve 1–3, Half sine, Stairs, Smooth stairs, Pulse, Wave) in the Playlist and in the editor, with FL's shapes (`core/FlCurve`, REA round 190bw), saved in `.lynx` and carried by `.flp` import and export; a new point takes the last mode and tension used, as in FL. "Straight segment" stays as a LYNX extra |
 | A4–A6 | No | — |
 | A7 | No | — |
 | A8 | Partial | Make unique and tempo automation exist |
