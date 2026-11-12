@@ -9375,3 +9375,6 @@ countries: kr
 "Neapolitan" = "나폴리탄"
 "Remove Edison instances" = "Edison 인스턴스 제거"
 "Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "프로젝트에서 모든 Edison 인스턴스를 제거할까요?\n(실행 취소 불가)"
+
+# --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
+"New mixer track(s)" = "새 믹서 트랙"

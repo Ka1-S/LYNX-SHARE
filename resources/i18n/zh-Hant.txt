@@ -9375,3 +9375,6 @@ countries: tw hk mo
 "Neapolitan" = "那不勒斯"
 "Remove Edison instances" = "移除 Edison 實例"
 "Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "確定要從專案中移除所有 Edison 實例嗎？\n(無法復原)"
+
+# --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
+"New mixer track(s)" = "新增混音軌道"

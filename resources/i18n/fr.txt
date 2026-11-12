@@ -9375,3 +9375,6 @@ countries: fr be ch ca lu
 "Neapolitan" = "Napolitaine"
 "Remove Edison instances" = "Retirer les instances d'Edison"
 "Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "Voulez-vous vraiment retirer toutes les instances d'Edison du projet ?\n(Impossible d'annuler)"
+
+# --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
+"New mixer track(s)" = "Nouvelle(s) piste(s) de mixage"

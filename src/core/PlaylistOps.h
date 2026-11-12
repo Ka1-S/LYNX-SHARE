@@ -111,7 +111,8 @@ namespace lynx::trackmodes
 {
 // A mixer track nothing uses yet (no channel routed to it, no track linked to it, no effects, nothing sent into it),
 // from insert 1 on; a new insert is added when there is none and the mixer has room. -1 when the mixer is full
-// (FL: "Can't create new audio or instrument track: no available mixer tracks").
+// (FL: "Can't create new audio or instrument track: no available mixer tracks"). In an online session an insert
+// reserved for another participant is never taken (Song::nextFreeInsert's rule).
 int freeMixerTrack (Song& song);
 // "Track mode › Audio track": links the track to a free mixer track (named and coloured after the track). False when
 // no mixer track is free.
@@ -119,6 +120,50 @@ bool makeAudioTrack (Song& song, int track);
 // "Track mode › Instrument track": the track belongs to `channel` (an instrument, not an audio clip or automation
 // channel) and to its mixer track (a free one when the channel plays on the Master or on a track already linked).
 bool makeInstrumentTrack (Song& song, int track, int channel);
+// "Track mode › Audio track › N. <insert>" (FL 2026: the submenu lists the mixer tracks; issue #15's "route the track
+// itself to 14"; REA round 190cp, FUN_012f38f0): the track becomes an audio track linked to mixer track `mixer` (an
+// instrument track too: its channel stays where it is), and the track and the insert end with one name and colour:
+// - an unassigned track first takes the insert's own name (hasOwnName) when it has one, the insert's colour when its
+//   own is the default, and "Insert N" when neither has a name;
+// - an audio track's previous insert goes back to its default name ("Insert N") and colour (its effects and routing
+//   stay);
+// - then a track without a name takes the insert's name and colour, otherwise the insert takes the track's.
+// The audio clips already on the track follow it (followAudioTracks). False when canLinkToMixerTrack says no; the
+// insert the track already has changes nothing.
+bool linkToMixerTrack (Song& song, int track, int mixer);
+// Whether `track` can be linked to `mixer`: an existing insert (never the Master), not linked to another Playlist
+// track (one track per insert, as makeAudioTrack keeps it) and not reserved for another participant of an online
+// session.
+bool canLinkToMixerTrack (const Song& song, int track, int mixer);
+// Whether insert `mixer` carries a name of its own: a stored name other than the default "Insert <its number>".
+bool hasOwnName (const Song& song, int mixer);
+// FL's "New mixer track(s)" is enabled: the mixer has room for another insert (in an online session, one not
+// reserved for another participant).
+bool canAddMixerTrack (const Song& song);
+// Appends an insert past the last one (skipping inserts reserved for another participant) and returns it; -1 (and no
+// change) when canAddMixerTrack says no.
+int addMixerTrack (Song& song);
+constexpr int newMixerTrack = -1;
+// FL's Track mode › Audio track pick (FUN_012ec590, one undo step "assign to audio track(s)"): the first of `tracks`
+// is linked to `mixer` (newMixerTrack: a new insert, FL's "New mixer track(s)"), each next one to the next insert no
+// Playlist track is linked to, new inserts past the last one, up to the mixer's limit. Returns how many were linked.
+int assignAudioTracks (Song& song, const std::vector<int>& tracks, int mixer);
+// The Audio track submenu as FL builds it (FUN_0122eff0): "New mixer track(s)" (enabled while canAddMixerTrack), a
+// separator, then one entry per insert from 1 on: "N. <name>" ("N. Insert N" without a name), ticked when it is the
+// track's stored link, greyed when it is not and the insert is linked to another track (LYNX: or reserved for another
+// participant of an online session). The text of a greyed entry is not changed.
+struct AudioTrackMenuItem
+{
+    int mixer = 0;
+    std::string name; // the insert's stored name (empty: show "Insert N")
+    bool enabled = false, ticked = false;
+};
+struct AudioTrackMenu
+{
+    bool canAddMixerTrack = false;
+    std::vector<AudioTrackMenuItem> inserts;
+};
+AudioTrackMenu audioTrackMenu (const Song& song, int track);
 // "Track mode › Unassigned".
 void unassign (Song& song, int track);
 // The pattern the pencil places on an instrument track (REA round 151 [EXEC FL 2026: drawing on an instrument track

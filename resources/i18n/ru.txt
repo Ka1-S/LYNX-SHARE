@@ -9375,3 +9375,6 @@ countries: ru by kz
 "Neapolitan" = "Неаполитанский"
 "Remove Edison instances" = "Удалить экземпляры Edison"
 "Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "Удалить все экземпляры Edison из проекта?\n(Отменить нельзя)"
+
+# --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
+"New mixer track(s)" = "Новые дорожки микшера"

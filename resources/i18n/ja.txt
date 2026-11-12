@@ -9375,3 +9375,6 @@ countries: jp
 "Neapolitan" = "ナポリタン"
 "Remove Edison instances" = "Edison のインスタンスを削除"
 "Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "プロジェクトからすべての Edison のインスタンスを削除しますか？\n(元に戻せません)"
+
+# --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
+"New mixer track(s)" = "新しいミキサートラック"

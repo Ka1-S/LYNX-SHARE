@@ -5896,18 +5896,34 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
     });
     menu.addSeparator();
     {
-        // FL's "Track mode" (round 146a): unassigned, an audio track (linked to a free mixer track) or an instrument
+        // FL's "Track mode" (round 146a): unassigned, an audio track (linked to a mixer track) or an instrument
         // track (a channel and its mixer track)
-        juce::PopupMenu modes, instruments;
+        juce::PopupMenu modes, audio, instruments;
         modes.addItem (theme::mnemonic (tr ("Unassigned"), 'U'), true, info.mode == PlaylistTrackMode::unassigned,
                        [this, track] { engine.editSong ([track] (Song& s) { trackmodes::unassign (s, track); }); });
-        modes.addItem (theme::mnemonic (tr ("Audio track"), 'A'), true, info.mode == PlaylistTrackMode::audio, [this, track] {
-            bool ok = false;
-            engine.editSong ([track, &ok] (Song& s) { ok = trackmodes::makeAudioTrack (s, track); });
-            if (! ok)
+        // FL's Audio track ▸ (REA round 190cp, FUN_0122eff0 / FUN_012ec590; round 165 issue11c f5): "New mixer
+        // track(s)", then every insert as "N. name", the linked one ticked, one linked to another track greyed. A pick
+        // works on the selected tracks, one undo step; an insert left behind is disarmed (FL).
+        const auto assign = [this, tracks = tracksForMenu (track)] (int mixer) {
+            std::vector<int> before;
+            for (const auto t : tracks)
+                before.push_back (trackmodes::armableInsert (engine.getSong(), t));
+            int linked = 0;
+            engine.editSong ([&tracks, mixer, &linked] (Song& s) { linked = trackmodes::assignAudioTracks (s, tracks, mixer); });
+            for (std::size_t i = 0; i < tracks.size(); ++i)
+                if (before[i] > 0 && before[i] != trackmodes::armableInsert (engine.getSong(), tracks[i]) && engine.isInsertArmed (before[i]))
+                    engine.setInsertArmed (before[i], false);
+            if (linked == 0 && mixer == trackmodes::newMixerTrack)
                 juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Can't create new audio track"),
                                                         tr ("There are no available mixer tracks."));
-        });
+        };
+        const auto audioMenu = trackmodes::audioTrackMenu (song, track);
+        audio.addItem (tr ("New mixer track(s)"), audioMenu.canAddMixerTrack, false, [assign] { assign (trackmodes::newMixerTrack); });
+        audio.addSeparator();
+        for (const auto& item : audioMenu.inserts)
+            audio.addItem (juce::String (item.mixer) + ". " + (item.name.empty() ? tr ("Insert {0}", { juce::String (item.mixer) }) : juce::String::fromUTF8 (item.name.c_str())),
+                           item.enabled, item.ticked, [assign, m = item.mixer] { assign (m); });
+        modes.addSubMenu (theme::mnemonic (tr ("Audio track"), 'A'), audio, true, nullptr, info.mode == PlaylistTrackMode::audio);
         for (int c = 0; c < (int) song.channels.size(); ++c)
         {
             const auto kind = song.channels[(std::size_t) c].instrument;

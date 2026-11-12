@@ -9375,3 +9375,6 @@ countries: nl be
 "Neapolitan" = "Napolitaans"
 "Remove Edison instances" = "Edison-instanties verwijderen"
 "Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "Weet je zeker dat je alle Edison-instanties uit het project wilt verwijderen?\n(Kan niet ongedaan worden gemaakt)"
+
+# --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
+"New mixer track(s)" = "Nieuwe mixertrack(s)"
