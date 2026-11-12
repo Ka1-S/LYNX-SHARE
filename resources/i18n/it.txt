@@ -8968,6 +8968,7 @@ countries: it ch sm
 "Lowest" = "Minimo"
 "Highest" = "Massimo"
 "Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "Marker di warp: legano punti dell'audio ai battiti; l'audio tra loro si allunga (i marker del canale). Trascina un marker: il suo audio va su un altro battito; Maiusc + trascina: l'audio scorre sotto di esso"
+"Show the audio in beats" = "Mostra l'audio in beat"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] apri/chiudi l'editor  [Alt]+[LMB] lascia aperti gli altri  [Ctrl]+[LMB] ascolta  [2xLMB] Piano Roll  [LMB] trascina su/giù riordina  [RMB] menu del canale"

@@ -23,6 +23,7 @@
 #include "core/ValueMath.h"
 #include "core/WarpEdit.h"
 #include "core/WarpTools.h"
+#include "core/WarpView.h"
 #include "core/ClipLauncher.h"
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
@@ -513,14 +514,22 @@ public:
         const auto markers = warpMarkers();
         if (index <= 0 || index >= (int) markers.size())
             return;
+        if (drag != Drag::warp)
+        {
+            syncAxis();
+            dragAxis = axis;
+        }
         warpSelected = warpDrag = index;
         warpDragSlides = slides;
         warpDragBefore = markers;
         warpDragBeat = slides ? markers[(std::size_t) index].beats : beatOrSeconds;
         warpDragSeconds = slides ? beatOrSeconds : markers[(std::size_t) index].seconds;
         drag = Drag::warp;
+        syncAxis();
         repaint();
     }
+    // --warpshot (round 190db): -1 as the workflow, 0 file time, 1 beats
+    void setBeatTimeForSnapshot (int choice) { setBeatTimeChoice (choice); }
     void setGridClip (int track, int scene)
     {
         source.gridTrack = track;
@@ -535,6 +544,7 @@ public:
             c->setVisible (warpMode);
         warpSelected = warpDrag = warpHover = -1;
         resized();
+        syncAxis();
         repaint();
     }
     // ÷2 / ×2 (round 190cy, as Live 12.4.16): the markers' beats and the clip the editor was opened from (a Playlist
@@ -569,6 +579,7 @@ public:
             }
         });
         source.index = channel;
+        syncAxis();
         repaint();
     }
     void findWarpAttacks()
@@ -587,6 +598,71 @@ public:
             warpAttacks.push_back ((double) a / doc.audio.sampleRate);
     }
     double secondsToX (double seconds) const { return frameToX (seconds * doc.audio.sampleRate); }
+
+    // --- the beat-time view (round 190db; Live 12.4.16's Clip View draws a warped clip in beats, live check 190cw shot
+    // warp190cg-09). A warped channel's audio with the warp lane shown is drawn through its markers: the ruler counts
+    // bars.beats, each marker segment of the file is resampled to its beat span, and a marker drag redraws the two
+    // segments around the marker as it moves. The view's units are beats scaled so the file spans [0, frames], so the
+    // view position, the zoom and everything kept in file frames (selection, markers, loop, envelopes, cursor) work as in
+    // file time; the selection stays in file time, so the edits act on the audio they show. Unwarped audio and the
+    // Pattern workflow (unless chosen in the Warp markers menu) keep the file-time view.
+    bool beatTimeChosen() const noexcept { return beatTimeChoice < 0 ? EditorGlobals::get().clipLaunchWorkflow : beatTimeChoice > 0; }
+    double unitOfFrame (double frame) const noexcept { return axis.valid() ? axis.unitOfFrame (frame) : frame; }
+    double frameOfUnit (double unit) const noexcept { return axis.valid() ? axis.frameOfUnit (unit) : unit; }
+    bool warpDragHeld() const noexcept { return drag == Drag::warp && warpDrag > 0 && warpDrag < (int) warpDragBefore.size(); }
+    // brings `axis` up to the channel's markers (or the held drag's preview); the view keeps its place. True on a change.
+    bool syncAxis()
+    {
+        warpview::BeatAxis next;
+        if (warpMode && beatTimeChosen() && ! doc.audio.empty() && doc.audio.sampleRate > 0.0)
+        {
+            if (warpDragHeld() && dragAxis.valid())
+                next = warpview::withScaleOf (dragAxis, warpDragSlides ? warpview::slidePreview (warpDragBefore, warpDrag, warpDragSeconds)
+                                                                       : warpview::stretchPreview (warpDragBefore, warpDrag, warpDragBeat));
+            else if (const auto markers = warpMarkers(); markers.size() >= 2)
+                next = warpview::makeAxis (markers, (double) doc.audio.frames(), doc.audio.sampleRate);
+        }
+        if (next.valid() == axis.valid() && (! next.valid() || (next.markers == axis.markers && next.beat0 == axis.beat0 && next.unitsPerBeat == axis.unitsPerBeat && next.frames == axis.frames)))
+            return false;
+        if (axis.valid() && next.valid())
+            warpview::keepView (axis, next, viewStart, fpp);
+        else if (const auto width = waveArea.getWidth(); width > 0)
+        {
+            // to or from file time: the same stretch of the file stays in view
+            const auto left = frameOfUnit (viewStart), right = frameOfUnit (viewStart + (double) width * fpp);
+            const auto l = next.valid() ? next.unitOfFrame (left) : left, r = next.valid() ? next.unitOfFrame (right) : right;
+            viewStart = l;
+            fpp = r > l ? (r - l) / (double) width : fpp;
+        }
+        axis = std::move (next);
+        ++axisVersion;
+        clampView();
+        return true;
+    }
+    void setBeatTimeChoice (int choice)
+    {
+        beatTimeChoice = choice;
+        syncAxis();
+        repaint();
+    }
+    // what a held drag changes on screen: the ruler, the lane and the waveform between the marker's neighbours (they keep
+    // their beats, so their place, during a drag in beats), and the overview
+    void repaintWarpDrag()
+    {
+        if (! axis.valid() || ! warpDragHeld() || envMode != EnvMode::wave)
+        {
+            repaint();
+            return;
+        }
+        const auto& w = warpDragBefore;
+        const auto xOfBeat = [this] (double b) { return (float) waveArea.getX() + (float) ((axis.unitOfBeat (b) - viewStart) / fpp); };
+        const auto left = juce::jmax ((float) waveArea.getX(), xOfBeat (w[(std::size_t) warpDrag - 1].beats) - 3.0f);
+        const auto right = warpDrag + 1 < (int) w.size() ? juce::jmin ((float) waveArea.getRight(), xOfBeat (w[(std::size_t) warpDrag + 1].beats) + 60.0f)
+                                                         : (float) waveArea.getRight();
+        if (right > left)
+            repaint (juce::Rectangle<float>::leftTopRightBottom (left, (float) rulerArea.getY(), right, (float) waveArea.getBottom()).getSmallestIntegerContainer());
+        repaint (overviewArea);
+    }
     int warpMarkerAtX (int x) const
     {
         const auto markers = warpMarkers();
@@ -636,10 +712,13 @@ public:
         }
         const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
         g.setFont (font (type::small));
+        // in beats the axis holds the markers as drawn (a held drag's preview included): each sits on its beat
+        const auto inBeats = axis.valid() && axis.markers.size() == markers.size();
         for (std::size_t k = 0; k < markers.size(); ++k)
         {
             const auto stretching = (int) k == warpDrag && ! warpDragSlides && ! warpDragBefore.empty();
-            const auto seconds = stretching ? warpedit::secondsAt (warpDragBefore, warpDragBeat) // (where its new beat is now)
+            const auto seconds = inBeats ? axis.markers[k].seconds
+                                 : stretching ? warpedit::secondsAt (warpDragBefore, warpDragBeat) // (where its new beat is now)
                                  : (int) k == warpDrag ? warpDragSeconds
                                                        : markers[k].seconds;
             const auto x = (float) secondsToX (seconds);
@@ -653,7 +732,7 @@ public:
             g.fillPath (flag);
             g.setColour (fill.withAlpha (selected ? 0.8f : 0.4f));
             g.drawVerticalLine ((int) std::round (x), (float) warpLane.getY() + 10.0f, (float) waveArea.getBottom());
-            const auto b = stretching ? warpDragBeat : markers[k].beats;
+            const auto b = inBeats ? axis.markers[k].beats : stretching ? warpDragBeat : markers[k].beats;
             const auto bar = (int) std::floor (b / perBar) + 1;
             const auto beat = b - (bar - 1) * perBar + 1.0;
             const auto label = juce::String (bar) + "." + (std::abs (beat - std::round (beat)) < 0.005 ? juce::String ((int) std::round (beat)) : juce::String (beat, 2));
@@ -682,6 +761,10 @@ public:
             warpDragSlides = e.mods.isShiftDown();
             warpDragBefore = warpMarkers();
             warpDragBeat = warpDragBefore[(std::size_t) m].beats;
+            // round 190db: in beats the drag keeps the axis' scale; the pointer's beat is read on it
+            syncAxis();
+            dragAxis = axis;
+            slideDownBeat = axis.valid() ? axis.beatOfUnit (viewStart + (double) (e.x - waveArea.getX()) * fpp) : 0.0;
             drag = Drag::warp;
         }
         else if (e.mods.isPopupMenu())
@@ -692,6 +775,7 @@ public:
             menu.addItem (tr ("Remove all warp markers"), warpMarkers().size() > 2, false, [this] {
                 editWarp ([] (SamplerSettings& s, double) { warpedit::clearMarkers (s); });
             });
+            menu.addItem (tr ("Show the audio in beats"), true, beatTimeChosen(), [this] { setBeatTimeChoice (beatTimeChosen() ? 0 : 1); });
             const auto markers = warpMarkers();
             addWarpCommands (menu, m >= 0 && m < (int) markers.size() ? markers[(std::size_t) m].seconds : (double) xToFrame (e.x) / doc.audio.sampleRate);
             menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
@@ -703,6 +787,11 @@ public:
         const auto markers = warpMarkers();
         if (warpDrag <= 0 || warpDrag >= (int) markers.size())
             return;
+        if (axis.valid() && dragAxis.valid() && warpDrag < (int) warpDragBefore.size())
+        {
+            warpMouseDragInBeats (e);
+            return;
+        }
         auto seconds = (double) xToFrame (e.x) / doc.audio.sampleRate;
         if (! warpDragSlides)
         {
@@ -730,6 +819,42 @@ public:
         warpDragSeconds = juce::jlimit (lo, juce::jmax (lo, hi), seconds);
         repaint();
     }
+    // round 190db: a drag in the beat-time view (Live 12.4.16, live check 190cw shot warp190cg-09). Plain: the marker
+    // and its audio follow the pointer onto its beat (a sixteenth within 6 px; Alt: free), so the audio on both sides
+    // stretches as it moves. Shift: the marker keeps its beat and the audio slides under it with the pointer (an attack
+    // within 6 px of the marker lands on it; Alt: free). Only the two segments around the marker are drawn again.
+    void warpMouseDragInBeats (const juce::MouseEvent& e)
+    {
+        const auto& w = warpDragBefore;
+        const auto pointerBeat = dragAxis.beatOfUnit (viewStart + (double) (e.x - waveArea.getX()) * fpp);
+        const auto pixels = [this] (double units) { return std::abs (units) / fpp; };
+        if (! warpDragSlides)
+        {
+            auto beat = pointerBeat;
+            if (const auto sixteenth = std::round (beat * 4.0) / 4.0; ! e.mods.isAltDown() && pixels (dragAxis.unitOfBeat (sixteenth) - dragAxis.unitOfBeat (beat)) <= 6.0)
+                beat = sixteenth;
+            warpDragBeat = warpview::stretchPreview (w, warpDrag, beat)[(std::size_t) warpDrag].beats;
+        }
+        else
+        {
+            auto seconds = warpview::slideDragSeconds (w, warpDrag, slideDownBeat, pointerBeat);
+            if (! e.mods.isAltDown())
+            {
+                const auto rate = doc.audio.sampleRate;
+                auto best = 6.0;
+                for (const auto a : warpAttacks)
+                    if (const auto d = pixels (dragAxis.unitOfFrame (a * rate) - dragAxis.unitOfFrame (seconds * rate)); d <= best)
+                    {
+                        best = d;
+                        seconds = a;
+                    }
+                // (attacks are found over the editor's copy; the file's end is the limit)
+            }
+            warpDragSeconds = warpview::slidePreview (w, warpDrag, seconds)[(std::size_t) warpDrag].seconds;
+        }
+        syncAxis();
+        repaintWarpDrag();
+    }
     void warpMouseUp()
     {
         const auto index = warpDrag, at = warpDrag;
@@ -749,6 +874,8 @@ public:
                 warptools::slideMarker (s, at, seconds);
             });
         warpDragBefore.clear();
+        dragAxis = {};
+        syncAxis();
         repaint();
     }
     void warpDoubleClick (const juce::MouseEvent& e)
@@ -1073,6 +1200,8 @@ public:
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
+        if (syncAxis()) // (the markers changed elsewhere: the Playlist, undo; the whole view follows)
+            repaint();
         g.fillAll (colour::bg2);
         g.setColour (colour::bg3);
         g.fillRect (getLocalBounds().removeFromTop (36));
@@ -1097,6 +1226,7 @@ public:
     {
         grabKeyboardFocus();
         drag = Drag::none;
+        syncAxis();
         if (doc.audio.empty())
         {
             if (e.mods.isPopupMenu())
@@ -1267,6 +1397,7 @@ public:
 
     void mouseDoubleClick (const juce::MouseEvent& e) override
     {
+        syncAxis();
         if (warpMode && ! doc.audio.empty() && warpLane.contains (e.getPosition()))
         {
             warpDoubleClick (e);
@@ -1460,10 +1591,11 @@ private:
     };
 
     // --- coordinates ----------------------------------------------------------------------------------------
-    float frameToX (double frame) const noexcept { return (float) waveArea.getX() + (float) ((frame - viewStart) / fpp); }
+    // (round 190db: through the warp markers in the beat-time view; the same as before in file time)
+    float frameToX (double frame) const noexcept { return (float) waveArea.getX() + (float) ((unitOfFrame (frame) - viewStart) / fpp); }
     std::int64_t xToFrame (int x) const noexcept
     {
-        return juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (viewStart + (double) (x - waveArea.getX()) * fpp));
+        return juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (frameOfUnit (viewStart + (double) (x - waveArea.getX()) * fpp)));
     }
     double maxFpp() const noexcept { return juce::jmax (1.0, (double) doc.audio.frames() / juce::jmax (1, waveArea.getWidth())); }
 
@@ -1496,9 +1628,10 @@ private:
     {
         if (r.empty())
             return;
-        fpp = (double) r.length() / juce::jmax (1, waveArea.getWidth());
+        const auto from = unitOfFrame ((double) r.start), to = unitOfFrame ((double) r.end);
+        fpp = (to - from) / juce::jmax (1, waveArea.getWidth());
         clampView();
-        viewStart = (double) r.start;
+        viewStart = from;
         clampView();
         repaint();
     }
@@ -1536,7 +1669,7 @@ private:
         selection = {};
         if (frameToX ((double) cursor) < (float) waveArea.getX() || frameToX ((double) cursor) > (float) waveArea.getRight())
         {
-            viewStart = (double) cursor - (double) waveArea.getWidth() * fpp * 0.5;
+            viewStart = unitOfFrame ((double) cursor) - (double) waveArea.getWidth() * fpp * 0.5;
             clampView();
         }
         repaint();
@@ -1545,12 +1678,14 @@ private:
     // --- painting -------------------------------------------------------------------------------------------
     // per pixel column x of a lane: the min/max of the samples it covers (exact when zoomed in, from the
     // summary when zoomed out)
-    bool columnRange (int channel, double from, double to, float& lo, float& hi) const
+    bool columnRange (int channel, double from, double to, float& lo, float& hi) const { return framesRange (channel, from, to, lo, hi, fpp > 256.0); }
+    // the min / max of frames [from, to): from the summary when asked to (wide stretches), else exact
+    bool framesRange (int channel, double from, double to, float& lo, float& hi, bool fromSummary) const
     {
         const auto frames = doc.audio.frames();
         if (to <= 0.0 || from >= (double) frames)
             return false;
-        if (fpp > 256.0 && summary != nullptr)
+        if (fromSummary && summary != nullptr)
         {
             const auto p = summary->query (from, to, doc.audio.numChannels() > 1 ? channel : -1);
             if (! p.valid)
@@ -1598,6 +1733,8 @@ private:
         juce::Graphics::ScopedSaveState save (g);
         g.reduceClipRegion (waveArea);
         paintSelectionAndRegions (g);
+        if (axis.valid())
+            paintBeatGrid (g);
 
         const auto lanes = doc.audio.numChannels();
         for (int lane = 0; lane < lanes; ++lane)
@@ -1618,6 +1755,11 @@ private:
                 g.drawHorizontalLine ((int) r.getY(), r.getX(), r.getRight());
             }
 
+            if (axis.valid())
+            {
+                paintLaneInBeats (g, lane, centre, half);
+                continue;
+            }
             const auto width = waveArea.getWidth();
             if (fpp < 1.0)
             {
@@ -1656,28 +1798,94 @@ private:
                     bottoms[(std::size_t) x] = mid + 0.5f;
                 }
             }
-            juce::Path wave;
-            for (int x = 0; x < width;)
+            fillWave (g, valid, tops, bottoms);
+        }
+    }
+
+    // one filled shape per lane: the top edge (maxima) left to right, the bottom edge (minima) back
+    void fillWave (juce::Graphics& g, const std::vector<char>& valid, const std::vector<float>& tops, const std::vector<float>& bottoms)
+    {
+        const auto width = (int) valid.size();
+        juce::Path wave;
+        for (int x = 0; x < width;)
+        {
+            while (x < width && ! valid[(std::size_t) x])
+                ++x;
+            if (x >= width)
+                break;
+            const auto start = x;
+            while (x < width && valid[(std::size_t) x])
+                ++x;
+            const auto px = [this] (int i) { return (float) (waveArea.getX() + i); };
+            wave.startNewSubPath (px (start), tops[(std::size_t) start]);
+            for (int i = start + 1; i < x; ++i)
+                wave.lineTo (px (i), tops[(std::size_t) i]);
+            wave.lineTo (px (x), tops[(std::size_t) (x - 1)]);
+            wave.lineTo (px (x), bottoms[(std::size_t) (x - 1)]);
+            for (int i = x - 1; i >= start; --i)
+                wave.lineTo (px (i), bottoms[(std::size_t) i]);
+            wave.closeSubPath();
+        }
+        g.setColour (waveColour());
+        g.fillPath (wave);
+    }
+
+    // round 190db: a lane of the beat-time view. Each pixel column shows the stretch of the file its beats play
+    // (warpview::columnPeaks keeps the columns a drag does not touch); zoomed in past a sample per pixel, the samples
+    // joined by a line at their beats.
+    void paintLaneInBeats (juce::Graphics& g, int lane, float centre, float half)
+    {
+        const auto width = waveArea.getWidth();
+        const auto& data = doc.audio.channels[(std::size_t) lane];
+        const auto firstFrame = axis.frameOfUnit (viewStart), lastFrame = axis.frameOfUnit (viewStart + (double) width * fpp);
+        if (lastFrame - firstFrame < (double) width)
+        {
+            const auto first = juce::jmax<std::int64_t> (0, (std::int64_t) std::floor (firstFrame) - 1);
+            const auto last = juce::jmin<std::int64_t> (doc.audio.frames() - 1, (std::int64_t) std::ceil (lastFrame) + 1);
+            juce::Path line;
+            for (auto i = first; i <= last; ++i)
             {
-                while (x < width && ! valid[(std::size_t) x])
-                    ++x;
-                if (x >= width)
-                    break;
-                const auto start = x;
-                while (x < width && valid[(std::size_t) x])
-                    ++x;
-                const auto px = [this] (int i) { return (float) (waveArea.getX() + i); };
-                wave.startNewSubPath (px (start), tops[(std::size_t) start]);
-                for (int i = start + 1; i < x; ++i)
-                    wave.lineTo (px (i), tops[(std::size_t) i]);
-                wave.lineTo (px (x), tops[(std::size_t) (x - 1)]);
-                wave.lineTo (px (x), bottoms[(std::size_t) (x - 1)]);
-                for (int i = x - 1; i >= start; --i)
-                    wave.lineTo (px (i), bottoms[(std::size_t) i]);
-                wave.closeSubPath();
+                const auto p = juce::Point<float> (frameToX ((double) i), centre - juce::jlimit (-1.0f, 1.0f, data[(std::size_t) i]) * half);
+                i == first ? line.startNewSubPath (p) : line.lineTo (p);
             }
             g.setColour (waveColour());
-            g.fillPath (wave);
+            g.strokePath (line, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            return;
+        }
+        if ((int) waveColumns.size() != doc.audio.numChannels())
+            waveColumns.assign ((std::size_t) doc.audio.numChannels(), {});
+        auto& columns = waveColumns[(std::size_t) lane];
+        warpview::columnPeaks (axis, viewStart, fpp, width, (std::uint64_t) docVersion, columns, [this, lane] (double from, double to, float& lo, float& hi) {
+            return framesRange (lane, from, to, lo, hi, to - from > 256.0);
+        });
+        std::vector<float> tops ((std::size_t) width), bottoms ((std::size_t) width);
+        for (std::size_t x = 0; x < (std::size_t) width; ++x)
+        {
+            tops[x] = centre - juce::jlimit (-1.0f, 1.0f, columns.hi[x]) * half;
+            bottoms[x] = centre - juce::jlimit (-1.0f, 1.0f, columns.lo[x]) * half;
+            if (bottoms[x] - tops[x] < 1.0f)
+            {
+                const auto mid = (bottoms[x] + tops[x]) * 0.5f;
+                tops[x] = mid - 0.5f;
+                bottoms[x] = mid + 0.5f;
+            }
+        }
+        fillWave (g, columns.valid, tops, bottoms);
+    }
+
+    // round 190db: the beat lines behind the waveform in the beat-time view (bars stronger), at the ruler's step
+    void paintBeatGrid (juce::Graphics& g)
+    {
+        using namespace theme;
+        const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        const auto step = warpview::rulerStep (axis.unitsPerBeat / fpp, perBar);
+        const auto firstBeat = axis.beatOfUnit (viewStart), lastBeat = axis.beatOfUnit (viewStart + (double) waveArea.getWidth() * fpp);
+        for (auto b = std::floor (firstBeat / step) * step; b <= lastBeat; b += step)
+        {
+            const auto x = (float) waveArea.getX() + (float) ((axis.unitOfBeat (b) - viewStart) / fpp);
+            const auto onBar = std::abs (b / perBar - std::round (b / perBar)) < 1.0e-6;
+            g.setColour (onBar ? colour::gridBar : colour::gridBeat);
+            g.drawVerticalLine ((int) x, (float) waveArea.getY(), (float) waveArea.getBottom());
         }
     }
 
@@ -1712,12 +1920,14 @@ private:
 
         const auto columns = juce::jmax (1, waveArea.getWidth() / 2);
         const auto height = juce::jmax (1, waveArea.getHeight());
-        const auto key = juce::String (docVersion) + "|" + juce::String (viewStart) + "|" + juce::String (fpp) + "|" + juce::String (columns) + "x"
+        // the file range in view (round 190db: in beats, the range the view's beats play; the columns are then
+        // redistributed along the beats, so a marker drag only redistributes them)
+        const auto from = (std::int64_t) frameOfUnit (viewStart);
+        const auto to = juce::jmin (doc.audio.frames(), (std::int64_t) std::ceil (frameOfUnit (viewStart + waveArea.getWidth() * fpp)));
+        const auto key = juce::String (docVersion) + "|" + juce::String (from) + "|" + juce::String (to) + "|" + juce::String (columns) + "x"
                          + juce::String (height) + "|" + juce::String (fftSize) + (logFrequency ? "l" : "n");
         if (key != spectrumKey)
         {
-            const auto from = (std::int64_t) viewStart;
-            const auto to = juce::jmin (doc.audio.frames(), (std::int64_t) std::ceil (viewStart + waveArea.getWidth() * fpp));
             const auto spec = ae::spectrogram (doc.audio, { from, to }, columns, fftSize);
             spectrumImage = juce::Image (juce::Image::RGB, columns, height, false);
             const auto nyquist = doc.audio.sampleRate * 0.5;
@@ -1741,7 +1951,28 @@ private:
             }
             spectrumKey = key;
         }
-        g.drawImage (spectrumImage, waveArea.toFloat());
+        if (axis.valid() && to > from)
+        {
+            const auto warpedKey = key + "|" + juce::String ((juce::int64) axisVersion) + "|" + juce::String (viewStart) + "|" + juce::String (fpp);
+            if (warpedKey != spectrumWarpedKey)
+            {
+                spectrumWarped = juce::Image (juce::Image::RGB, columns, height, false);
+                const juce::Image::BitmapData source (spectrumImage, juce::Image::BitmapData::readOnly);
+                juce::Image::BitmapData out (spectrumWarped, juce::Image::BitmapData::writeOnly);
+                const auto unitsPerColumn = (double) waveArea.getWidth() * fpp / columns;
+                for (int c = 0; c < columns; ++c)
+                {
+                    const auto f = axis.frameOfUnit (viewStart + ((double) c + 0.5) * unitsPerColumn);
+                    const auto sc = juce::jlimit (0, columns - 1, (int) ((f - (double) from) / (double) (to - from) * columns));
+                    for (int y = 0; y < height; ++y)
+                        out.setPixelColour (c, y, source.getPixelColour (sc, y));
+                }
+                spectrumWarpedKey = warpedKey;
+            }
+            g.drawImage (spectrumWarped, waveArea.toFloat());
+        }
+        else
+            g.drawImage (spectrumImage, waveArea.toFloat());
 
         juce::Graphics::ScopedSaveState save (g);
         g.reduceClipRegion (waveArea);
@@ -1801,6 +2032,50 @@ private:
         if (doc.audio.empty())
             return;
 
+        if (axis.valid())
+            paintBeatRuler (g);
+        else
+            paintTimeRuler (g);
+
+        // regions and markers: flags with their names; the loop: a bar along the bottom
+        paintRulerMarks (g);
+    }
+
+    // round 190db: the beat-time view's ruler, labelled as Live's Clip View labels it ("1", "1.2", "1.2.3"), with
+    // sixteenth ticks when there is room
+    void paintBeatRuler (juce::Graphics& g)
+    {
+        using namespace theme;
+        const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        const auto pixelsPerBeat = axis.unitsPerBeat / fpp;
+        const auto step = warpview::rulerStep (pixelsPerBeat, perBar);
+        const auto tick = step <= 1.0 ? 0.25 : (step <= perBar ? 1.0 : (double) perBar);
+        const auto firstBeat = axis.beatOfUnit (viewStart), lastBeat = axis.beatOfUnit (viewStart + (double) waveArea.getWidth() * fpp);
+        const auto xOf = [this] (double b) { return (float) waveArea.getX() + (float) ((axis.unitOfBeat (b) - viewStart) / fpp); };
+        g.setFont (font (type::caption));
+        if (tick * pixelsPerBeat >= 6.0)
+        {
+            g.setColour (colour::gridBeat);
+            for (auto b = std::floor (firstBeat / tick) * tick; b <= lastBeat; b += tick)
+                if (const auto x = xOf (b); x >= (float) rulerArea.getX())
+                    g.drawVerticalLine ((int) x, (float) rulerArea.getBottom() - 4.0f, (float) rulerArea.getBottom());
+        }
+        for (auto b = std::floor (firstBeat / step) * step; b <= lastBeat; b += step)
+        {
+            const auto x = xOf (b);
+            if (x < (float) rulerArea.getX())
+                continue;
+            g.setColour (colour::gridBar);
+            g.drawVerticalLine ((int) x, (float) rulerArea.getBottom() - 7.0f, (float) rulerArea.getBottom());
+            g.setColour (colour::textSecondary);
+            g.drawText (juce::String (warpview::beatLabel (b, perBar)), juce::Rectangle<float> (x + 3.0f, (float) rulerArea.getY(), 60.0f, 13.0f),
+                        juce::Justification::centredLeft);
+        }
+    }
+
+    void paintTimeRuler (juce::Graphics& g)
+    {
+        using namespace theme;
         // a time step that leaves ~90 px between labels
         const auto rate = doc.audio.sampleRate;
         const auto secondsPerPixel = fpp / rate;
@@ -1834,8 +2109,11 @@ private:
             g.drawText (formatTime ((std::int64_t) std::llround (t * rate)), juce::Rectangle<float> (x + 3.0f, (float) rulerArea.getY(), 90.0f, 13.0f),
                         juce::Justification::centredLeft);
         }
+    }
 
-        // regions and markers: flags with their names; the loop: a bar along the bottom
+    void paintRulerMarks (juce::Graphics& g)
+    {
+        using namespace theme;
         for (const auto& m : doc.markers)
         {
             const auto x = frameToX ((double) m.start);
@@ -1934,7 +2212,8 @@ private:
         g.setColour (waveColour().withAlpha (0.55f));
         for (int x = 0; x < overviewArea.getWidth(); ++x)
         {
-            const auto p = summary->query (x * perPixel, (x + 1) * perPixel, -1);
+            // (round 190db: in beats, each pixel shows the file its beats play)
+            const auto p = summary->query (frameOfUnit (x * perPixel), frameOfUnit ((x + 1) * perPixel), -1);
             if (! p.valid)
                 break;
             const auto a = juce::jmin (1.0f, std::max (std::abs (p.lo), std::abs (p.hi)));
@@ -3362,9 +3641,9 @@ private:
             playhead = playFrom < 0 ? -1 : playFrom + (std::int64_t) pos; // (a tool preview is not on the timeline)
             // page along with the playhead (Follow on, issue #12)
             if (playhead >= 0 && EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::audioEditor)
-                && ((double) playhead > viewStart + (double) waveArea.getWidth() * fpp || (double) playhead < viewStart) && fpp < maxFpp())
+                && (unitOfFrame ((double) playhead) > viewStart + (double) waveArea.getWidth() * fpp || unitOfFrame ((double) playhead) < viewStart) && fpp < maxFpp())
             {
-                viewStart = (double) playhead;
+                viewStart = unitOfFrame ((double) playhead);
                 clampView();
                 repaint();
             }
@@ -3757,6 +4036,16 @@ private:
     juce::Label warpBpmBox;
     juce::TextButton warpHalveButton, warpDoubleButton;
     double warpGridBeats = 0.25, warpAmount = 1.0;
+    // round 190db: the beat-time view of a warped clip (core/WarpView.h). `axis` is valid while the view is in beats;
+    // `dragAxis` is the axis when a marker drag began (its scale holds during the drag, so the pointer's beat and the
+    // markers the drag does not touch stay put); `waveColumns` keep each pixel column's peaks with its stretch of the file.
+    int beatTimeChoice = -1; // -1: as the workflow (beats in the Clip-launch workflow), 0 / 1: chosen in the menu
+    warpview::BeatAxis axis, dragAxis;
+    double slideDownBeat = 0.0; // Shift + drag in beats: the pointer's beat at the press
+    std::uint64_t axisVersion = 0;
+    std::vector<warpview::Columns> waveColumns;
+    juce::Image spectrumWarped;
+    juce::String spectrumWarpedKey;
     juce::Slider volumeKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
     juce::OwnedArray<juce::TextButton> quickButtons;
 
@@ -4056,6 +4345,8 @@ juce::PopupMenu AudioEditor::mainMenu()
     {
         juce::PopupMenu warp;
         warp.addItem (tr ("Show warp markers"), has, warpMode, [this] { setWarpMode (! warpMode); });
+        // round 190db: a warped clip drawn in beats while the markers are shown (default: the Clip-launch workflow)
+        warp.addItem (tr ("Show the audio in beats"), has, beatTimeChosen(), [this] { setBeatTimeChoice (beatTimeChosen() ? 0 : 1); });
         warp.addItem (tr ("Auto-warp"), has, false, [this] { autoWarp(); });
         warp.addItem (tr ("Remove the selected warp marker"), warpMode && warpSelected > 0, false, [this] { removeWarpMarker (warpSelected); });
         warp.addItem (tr ("Remove all warp markers"), has && warpMarkers().size() > 2, false, [this] {
@@ -4142,6 +4433,12 @@ void holdAudioEditorWarpDragForSnapshot (juce::Component& panel, int marker, dou
 {
     if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
         editor->holdWarpDragForSnapshot (marker, beatOrSeconds, slides);
+}
+
+void setAudioEditorBeatTimeForSnapshot (juce::Component& panel, int choice)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->setBeatTimeForSnapshot (choice);
 }
 
 void setAudioEditorGridClip (juce::Component& panel, int track, int scene)

@@ -13603,14 +13603,28 @@ private:
                 editor->setSize (1120, 600);
                 write (*editor, "audio-editor-warp");
                 // round 190cy (Live 12.4.16 live check 190cw shot 09): a plain drag of marker 3 holds it two sixteenths
-                // later (its audio goes there: the label shows the new beat); Shift + drag slides the audio under it
+                // later (its audio goes there); Shift + drag slides the audio under it. Round 190db: the Clip-launch
+                // workflow draws the warped clip in beats, so the held drag shows the audio stretched around the marker
+                // (plain) or slid under it, its attack later (Shift, to the right as in Live's shot)
                 const auto& w = offline.getSong().channels[(std::size_t) channel].sampler.warp;
                 if (w.size() > 4)
                 {
                     lynx::holdAudioEditorWarpDragForSnapshot (*editor, 3, w[3].beats + 0.5, false);
                     write (*editor, "audio-editor-drag-stretch");
-                    lynx::holdAudioEditorWarpDragForSnapshot (*editor, 3, w[3].seconds + 0.12, true);
+                    lynx::holdAudioEditorWarpDragForSnapshot (*editor, 3, w[3].seconds - 0.12, true);
                     write (*editor, "audio-editor-drag-slide");
+                }
+                // the same clip in file time (the Pattern workflow's view, or "Show the audio in beats" off)
+                if (auto inFileTime = lynx::makeAudioEditorPanel (offline, channel, 0, true))
+                {
+                    inFileTime->setSize (1120, 600);
+                    lynx::setAudioEditorBeatTimeForSnapshot (*inFileTime, 0);
+                    write (*inFileTime, "audio-editor-file-time");
+                    if (w.size() > 4)
+                    {
+                        lynx::holdAudioEditorWarpDragForSnapshot (*inFileTime, 3, w[3].beats + 0.5, false);
+                        write (*inFileTime, "audio-editor-file-time-drag");
+                    }
                 }
             }
         // round 190cy (Live 12.4.16 live check 190cw shot 02): ÷2 from the editor of the first Playlist clip halves that

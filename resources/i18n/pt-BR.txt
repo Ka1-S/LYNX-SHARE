@@ -9089,3 +9089,4 @@ countries: br
 "Lowest" = "Mínimo"
 "Highest" = "Máximo"
 "Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "Marcadores de warp: prendem pontos do áudio a batidas; o áudio entre eles estica (os marcadores do canal). Arrastar um marcador: o áudio dele vai para outra batida; Shift + arrastar: o áudio desliza sob ele"
+"Show the audio in beats" = "Mostrar o áudio em batidas"
