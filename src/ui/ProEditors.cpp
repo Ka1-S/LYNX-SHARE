@@ -631,11 +631,12 @@ private:
 class HushEditor final : public ProEditor
 {
 public:
-    HushEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::hushDeEsser, d, 720, 500)
+    // round 190dm: + a row for Air and Mix (500 → 596)
+    HushEditor (AudioEngine& e, int t, int s, bool d) : ProEditor (e, t, s, EffectKind::hushDeEsser, d, 720, 596)
     {
         knobRanges = true; // round tp172b4: each knob's scale under it, the value on hover
         fillDemo();
-        if (! displayShown()) setSize (720, 500 - (int) waveH);
+        if (! displayShown()) setSize (720, 596 - (int) waveH);
     }
 
 private:
@@ -774,6 +775,13 @@ private:
         auto la = toggle ({ 522.0f, y0 + 214.0f, 64.0f, 18.0f }, P ("Lookahead"), tr ("On"));
         la.hint = tr ("Look-ahead on / off");
         out.push_back (la);
+        // round 190dm: Air (the high shelf on the processed signal) and Mix (dry / processed), beside the output meters
+        auto air = knob ({ 420.0f, y0 + 244.0f, 84.0f, 90.0f }, P ("Air"), tr ("Air"));
+        air.cap = juce::Colour (0xff53524f);
+        out.push_back (air);
+        auto mix = knob ({ 512.0f, y0 + 244.0f, 84.0f, 90.0f }, P ("Mix"), tr ("Mix"));
+        mix.cap = juce::Colour (0xff53524f);
+        out.push_back (mix);
         // the meter's threshold arrow
         out.push_back (custom ({ meters().getX() - 12.0f, meterY ((float) thresholdDb()) - 7.0f, 12.0f, 14.0f }, idMeterThreshold, pThr(), tr ("Threshold: drag up or down")));
         // round 135w: the output meter (−30 … 0 dBFS, the reference's), its peak read-out and clip lamp: click to reset
@@ -801,7 +809,7 @@ private:
         {
             const auto show = ! displayShown();
             set ({ { P ("Display"), show ? 1.0f : 0.0f } }, false);
-            setSize (720, show ? 500 : 500 - (int) waveH);
+            setSize (720, show ? 596 : 596 - (int) waveH);
         }
         repaint();
     }
@@ -1541,6 +1549,11 @@ private:
             out.push_back (k);
         }
         out.push_back (toggle ({ 646.0f, m.getY() + 290.0f, 72.0f, 20.0f }, lookaheadOn, tr ("On")));
+        // round 190dm: the trigger (Level = the gate before; Transient = a drum gate) under the ratio / range knobs, its
+        // release shape under the style column (only with Transient)
+        out.push_back (tabs ({ 14.0f, m.getBottom() - 30.0f, 168.0f, 24.0f }, trigger, "Level|Transient", { 0.0f, 1.0f }));
+        if (v (trigger) >= 0.5f)
+            out.push_back (menu ({ 530.0f, m.getBottom() - 30.0f, 100.0f, 24.0f }, releaseShape, {}, "Smooth|Mid|Sharp", { 0.0f, 0.5f, 1.0f }));
         out.push_back (button ({ d.getCentreX() - 60.0f, m.getBottom() - 30.0f, 120.0f, 24.0f }, idExpert, tr ("Expert"), expertOpen,
                                tr ("Expert: side chain (internal / external, gain and mix per channel), side-chain filters, upward expansion, ducking, wet / dry level and pan")));
         if (expertOpen)
@@ -1562,6 +1575,9 @@ private:
             out.push_back (knob ({ 160.0f, ry, 70.0f, 96.0f }, scGainR, msMode ? tr ("Gain S") : tr ("Gain R"), 1, true));
             out.push_back (knob ({ 230.0f, ry, 70.0f, 96.0f }, scMixR, msMode ? tr ("Mix S") : tr ("Mix R"), 0, true));
             out.push_back (toggle ({ 330.0f, ry + 36.0f, 110.0f, 22.0f }, ducking, tr ("Ducking")));
+            // round 190dm: the transient detector's sensitivity (with Transient)
+            if (v (trigger) >= 0.5f)
+                out.push_back (knob ({ 446.0f, ry, 80.0f, 96.0f }, sensitivity, tr ("Sensitivity")));
             out.push_back (knob ({ 530.0f, ry, 84.0f, 96.0f }, wetPan, tr ("Wet pan"), 0, true));
             out.push_back (knob ({ 630.0f, ry, 84.0f, 96.0f }, dryPan, tr ("Dry pan"), 0, true));
         }
