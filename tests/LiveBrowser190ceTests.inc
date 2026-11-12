@@ -90,6 +90,27 @@ TEST (live190ce_an_item_carries_several_collections_at_once)
     CHECK (isPluginItem (pluginItem ("lynx:fx:Reverb")) && ! isPluginItem ("/plugin:x") && pluginKeyOf (pluginItem ("lynx:fx:Reverb")) == "lynx:fx:Reverb");
 }
 
+TEST (live190cy_labelling_with_a_hidden_collection_shows_it)
+{
+    // Live 12.4.16 (live check 190cw): the key of a hidden colour labels the item and the collection appears
+    using namespace lynx::collections;
+    Store s;
+    CHECK (s.shown() == std::vector<int> { 0 });
+    CHECK (s.toggle ("/a.wav", 4)); // key 5: in, and Blue is listed from now on
+    CHECK (s.isShown (4) && s.shown() == (std::vector<int> { 0, 4 }));
+    CHECK (! s.toggle ("/a.wav", 4)); // out again: the collection stays listed (hiding is the user's own choice)
+    CHECK (s.isShown (4));
+    s.setShown (4, false);
+    CHECK (s.label ("/b", 4, true) && s.isShown (4) && s.has ("/b", 4)); // the item menu's label does the same
+    s.setShown (2, false);
+    CHECK (! s.label ("/b", 2, false) && ! s.isShown (2)); // taking a label off shows nothing
+    CHECK (s.label ("/b", 0, true) && s.isShown (0) && s.shown().size() == 2);
+    CHECK (! s.label ("", 3, true) && ! s.isShown (3)); // nothing odd gets in, nothing is shown for it
+    // the text round trip keeps it shown
+    const auto back = Store::fromText (s.toText());
+    CHECK (back.isShown (4) && back.has ("/b", 4));
+}
+
 TEST (live190ce_collections_round_trip_through_the_settings_file)
 {
     using namespace lynx::collections;
@@ -188,7 +209,8 @@ TEST (live190ce_hot_swap_replaces_the_device_in_place)
     CHECK (now.active() && now.instance == freshInstance && now.instance != target.instance);
     const auto& slot = s.mixer[1].effects[1];
     CHECK (slot.kind == EffectKind::reverb);
-    CHECK (slot.row == 3 && ! slot.enabled && slot.mix == 0.5f); // its place, on / off state and Mix stay
+    CHECK (slot.row == 3 && slot.mix == 0.5f); // its place and Mix stay
+    CHECK (slot.enabled); // round 190cy: it comes in with its own on / off state (Live 12.4.16), not the old one's (off)
     CHECK (s.mixer[1].effects.size() == 2 && s.mixer[1].effects[0].kind == EffectKind::eq && s.mixer[1].effects[0].instance.id == eqInstance);
     CHECK (! hotswap::exists (s, target) && hotswap::exists (s, now));
     // the old link is dead: nothing is replaced through it
@@ -237,6 +259,20 @@ TEST (live190ce_hot_swap_preset_changes_only_the_settings)
     CHECK (slot.kind == EffectKind::eq && slot.params[0] == 0.25f && slot.params[1] == 0.75f && slot.state == state && slot.presetName == "Bright");
     CHECK (slot.instance.id == target.instance && hotswap::exists (s, target)); // the device, and so the link, stay
     CHECK (! hotswap::swapEffectPreset (s, hotswap::targetOfChannel (s, 0), EffectKind::eq, params, nullptr, "x"));
+    // round 190cy: a preset swapped onto a device that was off comes in on, as the preset loads it (Live 12.4.16: an
+    // Utility that was off, swapped for "Wide Stereo", came in on); a plugin's own preset file the same
+    const auto off = hotswap::targetOfEffect (s, 1, 1); // the compressor, off
+    CHECK (! s.mixer[1].effects[1].enabled);
+    CHECK (hotswap::swapEffectPreset (s, off, EffectKind::compressor, params, nullptr, "Glue"));
+    CHECK (s.mixer[1].effects[1].enabled && s.mixer[1].effects[1].mix == 0.5f && s.mixer[1].effects[1].row == 3);
+    s.mixer[1].effects[1].enabled = false;
+    CHECK (hotswap::presetLoadedInto (s, off) && s.mixer[1].effects[1].enabled);
+    CHECK (! hotswap::presetLoadedInto (s, hotswap::targetOfChannel (s, 0)));
+    // a fresh device that is itself off (a preset saved off) stays off
+    auto offFresh = live190ce::fx (EffectKind::delay);
+    offFresh.enabled = false;
+    const auto now = hotswap::swapEffect (s, off, offFresh);
+    CHECK (now.active() && ! s.mixer[1].effects[1].enabled);
 }
 
 TEST (live190ce_hot_swap_of_a_channel_keeps_its_place_notes_and_levels)

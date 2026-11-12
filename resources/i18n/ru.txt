@@ -9354,6 +9354,8 @@ countries: ru by kz
 "Channel panning" = "Панорама канала"
 "In: {0} out: {1}" = "Вход: {0} выход: {1}"
 "Note C0" = "Нота C0"
+"Clear all colours" = "Снять все цвета"
+"Presets of {0}" = "Пресеты {0}"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"

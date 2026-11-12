@@ -9354,6 +9354,8 @@ countries: kr
 "Channel panning" = "채널 팬"
 "In: {0} out: {1}" = "입력: {0} 출력: {1}"
 "Note C0" = "노트 C0"
+"Clear all colours" = "모든 색상 지우기"
+"Presets of {0}" = "{0} 프리셋"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"

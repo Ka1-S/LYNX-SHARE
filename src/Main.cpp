@@ -164,6 +164,7 @@
 #include "ui/PluginEditors.h"
 #include "core/PluginLayout.h"
 #include "core/EffectPresets.h"
+#include "ui/PluginHeader.h"
 #include "core/Vfx.h"
 #include "core/TransistorBass.h"
 #include "ui/Splash.h"
@@ -15483,7 +15484,8 @@ private:
             check ("swap: Enter on the Reverb row is taken by hot-swap", browser.hotSwapLoadSelected());
             offline.dispatchPendingMessages();
             const auto& slot = offline.getSong().mixer[2].effects[1];
-            check ("swap: reverb in the compressor's place, still off at 50 % mix", slot.kind == lynx::EffectKind::reverb && ! slot.enabled && slot.mix == 0.5f);
+            // (round 190cy: the device comes in with its own on / off state, on, as in Live 12.4.16; the Mix stays)
+            check ("swap: reverb in the compressor's place, on (its own state), at 50 % mix", slot.kind == lynx::EffectKind::reverb && slot.enabled && slot.mix == 0.5f);
             check ("swap: three effects as before", offline.getSong().mixer[2].effects.size() == 3);
             check ("swap: the Browser is linked to the new device", browser.isHotSwapping() && browser.hotSwapTarget() == lynx::hotswap::targetOfEffect (offline.getSong(), 2, 1)
                                                                         && ! (browser.hotSwapTarget() == compressor));
@@ -15493,6 +15495,34 @@ private:
             const auto& back = offline.getSong().mixer[2].effects[1];
             check ("undo: the compressor is back with its instance", back.kind == lynx::EffectKind::compressor && back.instance.id == compressor.instance);
             check ("undo: the Browser is still linked to it", browser.isHotSwapping() && browser.hotSwapTarget() == compressor);
+        }
+        // round 190cy (Live 12.4.16 live check 190cw shot 02a): hot-swap starts on the device's current preset. The
+        // compressor got its settings from a saved preset of LYNX's ("Glue bus", in this run's own settings folder)
+        {
+            browser.endHotSwap();
+            const auto folder = lynx::pluginheader::userFolder (lynx::EffectKind::compressor);
+            folder.createDirectory();
+            const auto& fx = offline.getSong().mixer[2].effects[1];
+            for (const auto* name : { "Glue bus", "Gentle", "Parallel smash" })
+                folder.getChildFile (juce::String (name) + ".lynxpreset").replaceWithText (lynx::presets::toText (lynx::EffectKind::compressor, name, fx.params));
+            offline.editSong ([] (lynx::Song& s) { s.mixer[2].effects[1].presetName = "Glue bus"; }, false);
+            offline.dispatchPendingMessages();
+            browser.beginHotSwap (compressor);
+            write ("03c-hotswap-current-preset");
+            check ("hot-swap starts on the current preset", browser.getSelectedFile() == folder.getChildFile ("Glue bus.lynxpreset"));
+            // a preset of the same effect swapped in comes in on (the compressor was off)
+            browser.selectRowForSnapshot ("Gentle.lynxpreset");
+            check ("swap: the preset row is taken by hot-swap", browser.hotSwapLoadSelected());
+            offline.dispatchPendingMessages();
+            const auto& now = offline.getSong().mixer[2].effects[1];
+            check ("swap: the preset's settings, the device on", now.kind == lynx::EffectKind::compressor && now.presetName == "Gentle" && now.enabled);
+            write ("03d-hotswap-preset-swapped");
+            offline.undo();
+            offline.dispatchPendingMessages();
+            check ("undo: the compressor off again", ! offline.getSong().mixer[2].effects[1].enabled);
+            browser.endHotSwap();
+            check ("hot-swap ended: the preset list goes", ! browser.isHotSwapping());
+            browser.beginHotSwap (compressor);
         }
         // linked to the instrument instead
         const auto bass = lynx::hotswap::targetOfChannel (offline.getSong(), 0);
@@ -15538,8 +15568,19 @@ private:
         write ("08-collections"); // a heading per collection shown
         check ("collections: four shown", store.shown().size() == 4);
         check ("collections: an item in two", store.mask (item ("Drums/Kicks/Kick Hard.wav")) == 0b10001);
-        saveMenus (juce::StringArray { "Collections (a row's menu)" }, std::vector<juce::PopupMenu> { browser.collectionsMenuForSnapshot (item ("Drums/Kicks/Kick Hard.wav")) },
+        // round 190cy: the Clip-launch workflow's row menu lists the collections flat, as Live's item menu (shot 05);
+        // the Pattern workflow keeps the "Collections" sub-menu
+        browser.setLiveItemMenus (false);
+        saveMenus (juce::StringArray { "Collections (Pattern workflow: a row's sub-menu)" }, std::vector<juce::PopupMenu> { browser.collectionsMenuForSnapshot (item ("Drums/Kicks/Kick Hard.wav")) },
                    prefix + "-09-collections-menu.png");
+        browser.setLiveItemMenus (true);
+        saveMenus (juce::StringArray { "Collections (Clip-launch workflow: a row's menu)" }, std::vector<juce::PopupMenu> { browser.collectionsMenuForSnapshot (item ("Drums/Kicks/Kick Hard.wav")) },
+                   prefix + "-09b-collections-flat.png");
+        // the key of a hidden collection (6, Purple) labels the row and the collection appears
+        check ("hidden collection: not shown before", ! store.isShown (5));
+        browser.setInCollection (item ("Textures/Rain.wav"), 5, true);
+        check ("hidden collection: its key shows it", store.isShown (5) && store.has (item ("Textures/Rain.wav"), 5));
+        write ("08b-hidden-collection-shown");
         saveMenus (juce::StringArray { "Browser options" }, std::vector<juce::PopupMenu> { browser.buildViewMenu() }, prefix + "-10-browser-options.png");
         browser.setTab (lynx::BrowserComponent::allTab);
         write ("11-all-tab-chips"); // the colour chips on the rows of the ALL tab

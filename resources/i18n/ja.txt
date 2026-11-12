@@ -9354,6 +9354,8 @@ countries: jp
 "Channel panning" = "チャンネルパン"
 "In: {0} out: {1}" = "入力: {0} 出力: {1}"
 "Note C0" = "ノート C0"
+"Clear all colours" = "すべての色をクリア"
+"Presets of {0}" = "{0} のプリセット"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"

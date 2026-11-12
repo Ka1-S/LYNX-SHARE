@@ -139,11 +139,24 @@ struct Store
             items[item] = after;
         return true;
     }
+    // set() as the number keys and the item menu do it: an item put into a hidden collection shows that collection
+    // (round 190cy, Live 12.4.16 live check 190cw: the key of a hidden colour labels the item and the collection
+    // appears in the sidebar). Returns whether anything changed.
+    bool label (const std::string& item, int collection, bool on)
+    {
+        const auto changed = set (item, collection, on);
+        if (on && has (item, collection) && ! isShown (collection))
+        {
+            setShown (collection, true);
+            return true;
+        }
+        return changed;
+    }
     // The number keys: in if it was out, out if it was in. Returns the new state.
     bool toggle (const std::string& item, int collection)
     {
         const auto on = ! has (item, collection);
-        set (item, collection, on);
+        label (item, collection, on);
         return has (item, collection);
     }
     // Key 0: out of every collection. Returns whether it was in any.

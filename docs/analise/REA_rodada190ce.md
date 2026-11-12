@@ -55,13 +55,29 @@ What LYNX does with it (`core/HotSwap.h`, `ui/BrowserComponent`, `ui/DetailView`
 - One mode of LYNX's one Browser. Started with Q, the two-arrow button of a device card, "Hot-swap in the Browser" in a
   card's or a mixer slot's menu. Ended with Q, Esc, the bar's X, the card's button, or by itself when the device is deleted.
 - Linked to a mixer effect: Plugin database effects, FL effect presets and LYNX effect presets of the same effect take its
-  place; the slot keeps its place, its on / off state, its Mix and its sidechain sources (LYNX's choice, see the last row).
+  place; the slot keeps its place, its Mix and its sidechain sources, and the device comes in with its own on / off
+  state (round 190cy, see below).
 - Linked to a channel: Plugin database generators and synth presets replace the instrument (place, notes, insert and
   levels stay); a channel that plays a sample takes another sample, and the Browser opens at the current sample.
 - Each swap is one undo step; Undo brings the earlier device back and the link follows it (LYNX's choice).
-- When the mode ends the Browser shows the tab and the search it showed before (LYNX's choice).
-- Not built: the current *preset* shown at its place (LYNX presets of a device have no single folder in the tree; only a
-  sample is revealed), hot-swap of rack chains and drum pads, swap to the next / previous similar sample.
+- When the mode ends the Browser shows the tab and the search it showed before (LYNX's choice, kept as a LYNX extra by
+  the owner's decision of round 190cy: Live leaves its browser where hot-swap took it).
+- Not built: hot-swap of rack chains and drum pads, swap to the next / previous similar sample.
+
+### Live check 190cw (Live 12.4.16) and round 190cy
+- A swapped-in device does not keep the old one's on / off: an Utility that was off, swapped for the preset "Wide
+  Stereo", came in on. LYNX: a new effect keeps the state it was loaded with (on); a preset of the same effect (LYNX's
+  `.lynxpreset`, a hosted plugin's preset file) switches the device on. A channel keeps its mute (the instrument card's
+  LED is the channel's mute, shared with the Pattern workflow).
+- Hot-swap starts on the current preset (Mono.adv selected). LYNX: an effect whose settings came from a preset (its
+  preset name) opens on that preset's file, among FL's presets of the plugin it stands for and LYNX's own saved presets
+  of the effect: in its folder when the Browser shows that folder, else as a list of the effect's presets with the
+  current one selected (the list goes when the mode ends). Factory presets have no file and are not shown.
+- Undo while hot-swapping, Q with nothing selected: as built.
+- Collections: the key of a hidden collection labels the item and shows the collection (also from the row menu).
+  The Clip-launch workflow's row menu lists the collections flat, as Live's item menu: "Clear all colours" (0), then
+  the seven with their keys; Rename and Hide are on a collection's heading, which also has "Show in the STARRED tab"
+  (Live's Collections › Edit). The Pattern workflow keeps round 190ce's "Collections" sub-menu.
 
 ## 3. Device commands in the Device View
 

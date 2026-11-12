@@ -218,7 +218,10 @@ public:
     void clearCollectionsOnSelection();
     void renameCollection (int collection);                  // asks for the name (empty: the default again)
     void setCollectionShown (int collection, bool shown);
-    void addCollectionItems (juce::PopupMenu& menu, const std::string& item); // the "Collections" sub-menu of a row's menu
+    void addCollectionItems (juce::PopupMenu& menu, const std::string& item); // the collections part of a row's menu
+    // Round 190cy: the Clip-launch workflow's row menus list the collections flat, as Live's item menu does (the
+    // Pattern workflow keeps the "Collections" sub-menu). Set by the main window with the workflow.
+    void setLiveItemMenus (bool on) noexcept { liveItemMenus = on; }
     void selectRowForSnapshot (const juce::String& label);   // --shots: the first row with this name
     juce::PopupMenu collectionsMenuForSnapshot (const std::string& item);
 
@@ -296,6 +299,12 @@ private:
     std::set<int> closedCollections; // the STARRED tab's collection headings the user folded
     bool previewWanted (bool asked) const noexcept { return asked && autoPreview; }
     hotswap::Session swapSession;
+    bool liveItemMenus = false;
+    // round 190cy: hot-swap starts on the linked effect's current preset (Live 12.4.16 reveals it, live check 190cw
+    // shot 02a): in its folder when the Browser shows that folder, else the effect's presets as a list, the current
+    // one selected. False: the effect has no preset file.
+    bool revealCurrentPreset (const hotswap::Target& target);
+    bool presetsListed = false; // (that list is up: it goes when the mode ends)
     std::unique_ptr<HotSwapBar> swapBar;
     bool hotSwapLoadFile (const juce::File& file);
     bool hotSwapLoadPlugin (const std::function<std::optional<ChannelDef>()>& generator, const std::function<std::optional<EffectSlot>()>& effect);

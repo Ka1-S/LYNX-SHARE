@@ -13,6 +13,8 @@
 #include "core/ControlSurface.h"
 #include "core/EffectPresets.h"
 #include "core/FlEffects.h"
+#include "core/PresetCycle.h"
+#include "ui/PluginHeader.h"
 #include "core/NativeEngines.h"
 #include "core/VoltageController.h"
 #include "core/FlpImport.h"
@@ -2129,6 +2131,15 @@ private:
                 if (safeBrowser != nullptr)
                     safeBrowser->setCollectionShown (c, false);
             });
+            // the collections the STARRED tab lists (round 190cy: here, as Live's Collections › Edit, since the
+            // Clip-launch workflow's row menu has only the labels)
+            juce::PopupMenu show;
+            for (int c = 0; c < collections::count; ++c)
+                show.addItem (BrowserComponent::collectionName (c), true, BrowserComponent::collectionStore().isShown (c), [safeBrowser, c] {
+                    if (safeBrowser != nullptr)
+                        safeBrowser->setCollectionShown (c, ! BrowserComponent::collectionStore().isShown (c));
+                });
+            menu.addSubMenu (tr ("Show in the STARRED tab"), show);
             present (menu);
             return;
         }
@@ -3021,7 +3032,7 @@ void BrowserComponent::collectionsChanged()
 
 void BrowserComponent::setInCollection (const std::string& item, int collection, bool on)
 {
-    if (! collectionStore().set (item, collection, on))
+    if (! collectionStore().label (item, collection, on)) // (a hidden collection shows itself: round 190cy)
         return;
     saveCollections();
     collectionsChanged();
@@ -3082,14 +3093,39 @@ void BrowserComponent::renameCollection (int collection)
     }), true);
 }
 
-// A row's "Collections" sub-menu: the seven, each ticked when the item is in it (with its key), "Remove from all",
-// then which collections the STARRED tab lists and their names.
+// The collections in a row's menu. Clip-launch workflow (round 190cy, Live 12.4.16 live check 190cw shot 05): a flat
+// list in the menu itself, "Clear all colours" (0) then the seven with their keys (1-7), ticked when the item is in
+// one; renaming and showing / hiding are on a collection's heading. Pattern workflow: as round 190ce built it, a
+// "Collections" sub-menu with the seven, "Remove from all", which collections the STARRED tab lists and their names.
 void BrowserComponent::addCollectionItems (juce::PopupMenu& menu, const std::string& item)
 {
     if (item.empty())
         return;
     juce::Component::SafePointer<BrowserComponent> safe (this);
     const auto& store = collectionStore();
+    if (liveItemMenus)
+    {
+        menu.addSeparator();
+        menu.addItem (tr ("Clear all colours") + "\t0", store.mask (item) != 0, false, [safe, item] {
+            if (safe == nullptr || ! collectionStore().clear (item))
+                return;
+            saveCollections();
+            safe->collectionsChanged();
+        });
+        for (int c = 0; c < collections::count; ++c)
+        {
+            juce::PopupMenu::Item entry (collectionName (c) + "\t" + juce::String (c + 1));
+            entry.setTicked (store.has (item, c));
+            entry.setColour (collectionColour (c).brighter (0.25f));
+            entry.setAction ([safe, item, c] {
+                if (safe != nullptr)
+                    safe->setInCollection (item, c, ! collectionStore().has (item, c));
+            });
+            menu.addItem (entry);
+        }
+        menu.addSeparator();
+        return;
+    }
     juce::PopupMenu sub;
     for (int c = 0; c < collections::count; ++c)
     {
@@ -3195,6 +3231,9 @@ void BrowserComponent::beginHotSwap (const hotswap::Target& target)
                 }
             shown = shown || sample == juce::File() || ! sample.existsAsFile(); // (no sample yet: the folders as they are)
         }
+    // an effect with a preset: that preset, as Live starts hot-swap on the device's current preset (round 190cy)
+    if (! shown && target.kind == hotswap::Kind::effect)
+        shown = revealCurrentPreset (target);
     if (! shown)
         showPluginDatabase ({}, target.kind == hotswap::Kind::channel ? 1 : 0);
     swapBar->setVisible (true);
@@ -3204,6 +3243,48 @@ void BrowserComponent::beginHotSwap (const hotswap::Target& target)
         onHotSwapChanged();
 }
 
+bool BrowserComponent::revealCurrentPreset (const hotswap::Target& target)
+{
+    const auto& song = engine.getSong();
+    const auto at = hotswap::findEffect (song, target.instance);
+    if (! at.found())
+        return false;
+    const auto& fx = song.mixer[(std::size_t) at.track].effects[(std::size_t) at.slot];
+    if (fx.presetName.empty())
+        return false;
+    // the files the effect's presets come from: FL's preset folders of the plugin it stands for (the editor's preset
+    // list, round 168r) and LYNX's own saved presets of the effect
+    juce::Array<juce::File> files, folders;
+    if (const auto roots = findFlStudioRoots(); ! roots.data.empty())
+        for (const auto& plugin : flPluginsForEffect (fx.kind))
+        {
+            const auto paths = presetcycle::pluginPresetFolders (roots, false, plugin);
+            for (const auto& folder : paths)
+                folders.addIfNotAlreadyThere (juce::File (juce::String::fromUTF8 (folder.c_str())));
+            for (const auto& p : presetcycle::listPresets (paths))
+                files.add (juce::File (juce::String::fromUTF8 (p.path.c_str())));
+        }
+    folders.add (pluginheader::userFolder (fx.kind));
+    files.addArray (pluginheader::userPresets (fx.kind));
+    const auto name = juce::String::fromUTF8 (fx.presetName.c_str());
+    const auto current = std::find_if (files.begin(), files.end(), [&name] (const juce::File& f) { return f.getFileNameWithoutExtension() == name; });
+    if (current == files.end())
+        return false;
+    const auto file = *current;
+    setTab (allTab);
+    if (const auto row = tree->revealFile (file); row >= 0)
+    {
+        tree->select (row, false);
+        return true;
+    }
+    resultsView->setVisible (true);
+    treeView->setVisible (false);
+    results->setFiles (files, folders, tr ("Presets of {0}", { hotSwapTargetName() }));
+    results->select (files.indexOf (file), false);
+    presetsListed = true;
+    return true;
+}
+
 void BrowserComponent::endHotSwap()
 {
     if (! swapSession.active())
@@ -3211,7 +3292,7 @@ void BrowserComponent::endHotSwap()
     const auto back = swapSession.end();
     swapBar->setVisible (false);
     setTab (back.tab);
-    if (searchBox.getText() != juce::String::fromUTF8 (back.search.c_str()))
+    if (std::exchange (presetsListed, false) || searchBox.getText() != juce::String::fromUTF8 (back.search.c_str()))
     {
         searchBox.setText (juce::String::fromUTF8 (back.search.c_str()), false);
         runSearch();
@@ -3307,6 +3388,9 @@ bool BrowserComponent::hotSwapLoadFile (const juce::File& file)
         if (plugin == nullptr || ! pluginpresetui::load (*plugin, file, error))
             return false;
         engine.markModified();
+        // the device comes in on, as the preset loads it (round 190cy, Live 12.4.16)
+        if (const auto at = hotswap::findEffect (song, target.instance); at.found() && ! song.mixer[(std::size_t) at.track].effects[(std::size_t) at.slot].enabled)
+            engine.editSong ([target] (Song& s) { hotswap::presetLoadedInto (s, target); });
         return loaded();
     }
 

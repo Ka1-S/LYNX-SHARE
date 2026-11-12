@@ -6,8 +6,9 @@
 //
 // What LYNX links:
 //   - a mixer effect slot: another effect from the Plugin database, an FL effect preset (.fst) or one of LYNX's own
-//     effect presets (.lynxpreset of the same effect) takes its place; the slot keeps its row, its on / off state, its
-//     Mix and its sidechain sources;
+//     effect presets (.lynxpreset of the same effect) takes its place; the slot keeps its row, its Mix and its sidechain
+//     sources, and the device comes in with its own on / off state: on (round 190cy, Live 12.4.16 live check 190cw: an
+//     Utility that was off, swapped for the preset "Wide Stereo", came in on);
 //   - a channel: another generator from the Plugin database or a synth preset replaces its instrument (the channel keeps
 //     its place, notes, insert and levels, core replaceGenerator); a channel that plays a sample takes another sample.
 // The link is a mode of the session, never saved. Every swap is one ordinary song edit (one undo step each).
@@ -116,8 +117,9 @@ inline bool playsSample (const ChannelDef& c) noexcept
 }
 
 // --- the swaps -------------------------------------------------------------------------------------------------------
-// Another device into the linked slot. The slot's place in the chain and in the mixer rows, its on / off state, its Mix
-// and its sidechain sources stay; the new device is a new instance. Returns the link to it (none: the slot is gone).
+// Another device into the linked slot. The slot's place in the chain and in the mixer rows, its Mix and its sidechain
+// sources stay; the new device is a new instance with its own on / off state (round 190cy: as loaded, not the old
+// device's). Returns the link to it (none: the slot is gone).
 inline Target swapEffect (Song& song, const Target& target, EffectSlot fresh)
 {
     const auto at = findEffect (song, target.instance);
@@ -125,7 +127,6 @@ inline Target swapEffect (Song& song, const Target& target, EffectSlot fresh)
         return {};
     auto& slot = song.mixer[(std::size_t) at.track].effects[(std::size_t) at.slot];
     fresh.row = slot.row;
-    fresh.enabled = slot.enabled;
     fresh.mix = slot.mix;
     fresh.smartDisable = slot.smartDisable;
     if (mixerops::acceptsSidechain (fresh.kind))
@@ -137,8 +138,9 @@ inline Target swapEffect (Song& song, const Target& target, EffectSlot fresh)
     return { Kind::effect, slot.instance.id };
 }
 
-// A preset of the same effect into the linked slot: only its settings change (the instance, and so the link, stays).
-// False when the slot is gone or holds another kind of effect.
+// A preset of the same effect into the linked slot: its settings change (the instance, and so the link, stays) and the
+// device is on, as a preset loads it (round 190cy, Live 12.4.16: the swapped-in preset's own state; LYNX presets carry
+// no on / off). False when the slot is gone or holds another kind of effect.
 inline bool swapEffectPreset (Song& song, const Target& target, EffectKind kind, const EffectParams& params,
                               const std::vector<std::uint8_t>* state, const std::string& presetName)
 {
@@ -152,6 +154,17 @@ inline bool swapEffectPreset (Song& song, const Target& target, EffectKind kind,
     if (state != nullptr)
         slot.state = *state;
     slot.presetName = presetName;
+    slot.enabled = true;
+    return true;
+}
+
+// A hosted plugin's own preset file loaded into the linked slot: the device is on, as above (round 190cy).
+inline bool presetLoadedInto (Song& song, const Target& target)
+{
+    const auto at = findEffect (song, target.instance);
+    if (target.kind != Kind::effect || ! at.found())
+        return false;
+    song.mixer[(std::size_t) at.track].effects[(std::size_t) at.slot].enabled = true;
     return true;
 }
 

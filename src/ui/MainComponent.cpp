@@ -3016,6 +3016,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         detailView->releaseEditor();
     layoutStyle = style;
     layoutstyle::setCurrent (style); // (round 190cm: the clip grid's and the audio editor's Ableton-style keys follow it)
+    browser.setLiveItemMenus (clipLaunch); // (round 190cy: Live's flat collection labels in the rows' menus)
     if (clipGridView != nullptr || clipLaunch)
     {
         playlistArea.setClipGrid (clipLaunch ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);

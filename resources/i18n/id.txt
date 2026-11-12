@@ -9354,6 +9354,8 @@ countries: id
 "Channel panning" = "Pan channel"
 "In: {0} out: {1}" = "Masuk: {0} keluar: {1}"
 "Note C0" = "Not C0"
+"Clear all colours" = "Hapus semua warna"
+"Presets of {0}" = "Preset {0}"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"

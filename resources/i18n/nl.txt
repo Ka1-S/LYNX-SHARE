@@ -9354,6 +9354,8 @@ countries: nl be
 "Channel panning" = "Kanaalpanorama"
 "In: {0} out: {1}" = "In: {0} uit: {1}"
 "Note C0" = "Noot C0"
+"Clear all colours" = "Alle kleuren wissen"
+"Presets of {0}" = "Presets van {0}"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"

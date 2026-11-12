@@ -9497,3 +9497,5 @@ countries: br
 
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 "New mixer track(s)" = "Nova(s) trilha(s) do mixer"
+"Clear all colours" = "Limpar todas as cores"
+"Presets of {0}" = "Presets de {0}"
