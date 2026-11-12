@@ -522,12 +522,75 @@ void WaveformDisplay::setStartOffset (float fraction)
     }
 }
 
-float WaveformDisplay::regionX (float fraction) const
+float WaveformDisplay::displayX (double fraction) const
 {
     const auto inner = getLocalBounds().toFloat().reduced (1.0f);
-    const auto x0 = inner.getX() + inner.getWidth() * juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionEnd : regionStart);
-    const auto x1 = inner.getX() + inner.getWidth() * juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionStart : regionEnd);
+    return inner.getX() + inner.getWidth() * (float) ((fraction - viewStart) / juce::jmax (1.0e-9, viewEnd - viewStart));
+}
+
+float WaveformDisplay::regionX (float fraction) const
+{
+    const auto x0 = displayX (juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionEnd : regionStart));
+    const auto x1 = displayX (juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionStart : regionEnd));
     return x0 + (x1 - x0) * juce::jlimit (0.0f, 1.0f, fraction);
+}
+
+void WaveformDisplay::setWatermark (const juce::String& text)
+{
+    if (text != watermark)
+    {
+        watermark = text;
+        repaint();
+    }
+}
+
+void WaveformDisplay::setCaptionVisible (bool shown)
+{
+    if (shown != captionShown)
+    {
+        captionShown = shown;
+        repaint();
+    }
+}
+
+void WaveformDisplay::setLoop (float start, float end)
+{
+    if (start != loopStart || end != loopEnd)
+    {
+        loopStart = start;
+        loopEnd = end;
+        repaint();
+    }
+}
+
+void WaveformDisplay::setView (double start, double end)
+{
+    // at least 1/512 of the file shown, inside the file
+    const auto width = juce::jlimit (1.0 / 512.0, 1.0, end - start);
+    start = juce::jlimit (0.0, 1.0 - width, start);
+    if (start == viewStart && start + width == viewEnd)
+        return;
+    viewStart = start;
+    viewEnd = start + width;
+    repaint();
+    if (onViewChanged != nullptr)
+        onViewChanged();
+}
+
+void WaveformDisplay::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w)
+{
+    if (! zoomEnabled || w.deltaY == 0.0f)
+    {
+        juce::Component::mouseWheelMove (e, w);
+        return;
+    }
+    // the fraction under the mouse stays where it is
+    const auto inner = getLocalBounds().toFloat().reduced (1.0f);
+    const auto at = juce::jlimit (0.0, 1.0, (double) ((e.position.x - inner.getX()) / juce::jmax (1.0f, inner.getWidth())));
+    const auto anchor = viewStart + at * (viewEnd - viewStart);
+    const auto factor = std::pow (0.8, (double) w.deltaY * 4.0); // (wheel up = closer)
+    const auto width = juce::jlimit (1.0 / 512.0, 1.0, (viewEnd - viewStart) * factor);
+    setView (anchor - at * width, anchor - at * width + width);
 }
 
 juce::Rectangle<int> WaveformDisplay::locatorArea (float fraction) const
@@ -594,15 +657,26 @@ void WaveformDisplay::paint (juce::Graphics& g)
     }
 
     const auto frames = (double) summary->frames;
-    const auto perPixel = frames / (double) inner.getWidth();
-    paintWaveform (g, inner, *summary, reversed ? frames : 0.0, reversed ? -perPixel : perPixel,
+    const auto perPixel = frames * (viewEnd - viewStart) / (double) inner.getWidth();
+    const juce::Graphics::ScopedSaveState clipToInner (g);
+    g.reduceClipRegion (inner.toNearestInt());
+    // round 190dh: the faded name behind the waveform (FL's Sampler page)
+    if (watermark.isNotEmpty())
+    {
+        g.setColour (colour::textSecondary.withAlpha (0.22f));
+        g.setFont (font (juce::jlimit (14.0f, 34.0f, inner.getHeight() * 0.24f)));
+        g.drawText (watermark, inner.reduced (10.0f, 4.0f).removeFromTop (juce::jlimit (18.0f, 44.0f, inner.getHeight() * 0.32f)),
+                    juce::Justification::centredRight, false);
+        g.setFont (font (type::small));
+    }
+    paintWaveform (g, inner, *summary, reversed ? frames * (1.0 - viewStart) : frames * viewStart, reversed ? -perPixel : perPixel,
                    currentWaveStyle (colour::audioClip.brighter (0.3f), normalisingGain (*summary)));
 
     // the part outside the region is dimmed; its edges are marked in the accent colour
     if (regionStart > 0.0f || regionEnd < 1.0f)
     {
-        const auto x0 = inner.getX() + inner.getWidth() * juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionEnd : regionStart);
-        const auto x1 = inner.getX() + inner.getWidth() * juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionStart : regionEnd);
+        const auto x0 = displayX (juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionEnd : regionStart));
+        const auto x1 = displayX (juce::jlimit (0.0f, 1.0f, reversed ? 1.0f - regionStart : regionEnd));
         g.setColour (colour::bg0.withAlpha (0.7f));
         g.fillRect (juce::Rectangle<float>::leftTopRightBottom (inner.getX(), inner.getY(), x0, inner.getBottom()));
         g.fillRect (juce::Rectangle<float>::leftTopRightBottom (x1, inner.getY(), inner.getRight(), inner.getBottom()));
@@ -638,7 +712,21 @@ void WaveformDisplay::paint (juce::Graphics& g)
         g.fillRect (x - 0.75f, inner.getY(), 1.5f, inner.getHeight());
     }
 
+    // round 190dh: the loop the sampler plays (its start and end, in the information colour)
+    if (loopStart >= 0.0f && loopEnd >= loopStart)
+    {
+        g.setColour (colour::info);
+        for (const auto f : { loopStart, loopEnd })
+            g.fillRect (displayX (reversed ? 1.0 - (double) f : (double) f) - 0.5f, inner.getY(), 1.5f, inner.getHeight());
+        const auto xa = displayX (reversed ? 1.0 - (double) loopEnd : (double) loopStart);
+        const auto xb = displayX (reversed ? 1.0 - (double) loopStart : (double) loopEnd);
+        g.setColour (colour::info.withAlpha (0.10f));
+        g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xa, inner.getY(), juce::jmax (xa + 1.0f, xb), inner.getBottom()));
+    }
+
     // caption: the file name and its length
+    if (! captionShown)
+        return;
     auto text = caption;
     if (text.isEmpty())
         text = juce::File (path).getFileName() + "  " + juce::String (frames / summary->sampleRate, 2) + " s"

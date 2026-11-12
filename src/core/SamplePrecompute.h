@@ -290,12 +290,27 @@ inline void reverb (std::vector<float>& L, std::vector<float>& R, double seconds
     }
 }
 
+// The loop a channel plays, in file frames [start, end) (−1 = none): the loop points of its Playback START / END knobs
+// (FL's LoopStartWheel / LoopEndWheel, kept inclusive like FL's, REA round 190dh) or else the file's own loop.
+inline std::pair<std::int64_t, std::int64_t> loopOf (const SampleData& in, const SamplerSettings& s) noexcept
+{
+    if (s.hasLoopOverride())
+    {
+        const auto last = (std::int64_t) in.frames() - 1;
+        const auto a = std::clamp<std::int64_t> (s.loopStart, 0, std::max<std::int64_t> (0, last));
+        const auto b = std::clamp<std::int64_t> (s.loopEnd, a, std::max<std::int64_t> (0, last));
+        return { a, b + 1 };
+    }
+    return { in.loopStart, in.loopEnd };
+}
+
 // Whether a channel's sample goes through the precompute: any effect on, or (an FL sampler channel, which FL crops
 // with declicked edges) a region narrower than the file.
 inline bool needed (const SamplerSettings& s) noexcept
 {
     const auto region = std::min (s.regionStart, s.regionEnd) > 0.0f || s.regionEnd < 1.0f;
-    return s.precompute.any() || (region && ! s.flChannel.empty());
+    // (round 190dh: loop points set with the Playback START / END knobs replace the file's loop here)
+    return s.precompute.any() || (region && ! s.flChannel.empty()) || (s.hasLoopOverride() && s.useLoopPoints);
 }
 
 // The processed region of `in` (see the file comment). Returns nullptr when nothing is to be done.
@@ -335,8 +350,9 @@ inline std::shared_ptr<SampleData> apply (const SampleData& in, const SamplerSet
     const auto d0 = 44100.0 / rate;
 
     std::int64_t ls = -1, le = -1; // the loop, inclusive frames (SampleData's end is exclusive)
-    if (s.useLoopPoints && in.loopStart >= 0 && in.loopEnd > in.loopStart + 1 && in.loopStart >= s0 && in.loopEnd - 1 <= s1)
-        ls = in.loopStart - s0, le = in.loopEnd - 1 - s0;
+    const auto [fileLoopStart, fileLoopEnd] = loopOf (in, s);
+    if (s.useLoopPoints && fileLoopStart >= 0 && fileLoopEnd > fileLoopStart + 1 && fileLoopStart >= s0 && fileLoopEnd - 1 <= s1)
+        ls = fileLoopStart - s0, le = fileLoopEnd - 1 - s0;
 
     auto forEach = [&] (auto&& fn) {
         fn (L);
@@ -567,6 +583,7 @@ inline PlayedSpan playedSpan (const std::shared_ptr<const SampleData>& in, const
         std::weak_ptr<const SampleData> data;
         float regionStart, regionEnd;
         bool reverse, loops, whole;
+        std::int64_t loopStart, loopEnd;
         std::vector<std::int32_t> flChannel;
         SamplePrecompute precompute;
         PlayedSpan span;
@@ -575,7 +592,8 @@ inline PlayedSpan playedSpan (const std::shared_ptr<const SampleData>& in, const
     static std::vector<Entry> cache;
     const auto same = [&] (const Entry& e) {
         return e.data.lock() == in && e.regionStart == s.regionStart && e.regionEnd == s.regionEnd && e.reverse == s.reverse
-               && e.loops == s.useLoopPoints && e.whole == wholeRegion && e.flChannel == s.flChannel && e.precompute == s.precompute;
+               && e.loops == s.useLoopPoints && e.whole == wholeRegion && e.loopStart == s.loopStart && e.loopEnd == s.loopEnd
+               && e.flChannel == s.flChannel && e.precompute == s.precompute;
     };
     {
         const std::scoped_lock l (lock);
@@ -588,7 +606,7 @@ inline PlayedSpan playedSpan (const std::shared_ptr<const SampleData>& in, const
     std::erase_if (cache, [] (const Entry& e) { return e.data.expired(); });
     if (cache.size() >= 64)
         cache.erase (cache.begin());
-    cache.push_back ({ in, s.regionStart, s.regionEnd, s.reverse, s.useLoopPoints, wholeRegion, s.flChannel, s.precompute, span });
+    cache.push_back ({ in, s.regionStart, s.regionEnd, s.reverse, s.useLoopPoints, wholeRegion, s.loopStart, s.loopEnd, s.flChannel, s.precompute, span });
     return span;
 }
 
@@ -606,6 +624,12 @@ inline std::string variantKey (const SamplerSettings& s, bool wholeRegion)
         add ((double) v);
     for (const auto v : s.flChannel)
         add ((double) v);
+    if (s.hasLoopOverride()) // (round 190dh; absent otherwise, so the keys of older spans stay as they were)
+    {
+        k += "L";
+        add ((double) s.loopStart);
+        add ((double) s.loopEnd);
+    }
     return k;
 }
 

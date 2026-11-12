@@ -4,6 +4,7 @@
 #include "ui/ChannelSettings.h"
 #include "core/FlControlMenus.h"
 #include "core/FlmDwSampler.h"
+#include "core/SamplerPage.h"
 #include "ui/FileChoosers.h"
 #include "ui/Icons.h"
 #include "ui/LayerEditor.h"
@@ -2727,7 +2728,8 @@ public:
         trim.setTooltip (tr ("Cuts the silence below this level at the sample's start and end"));
         declickLabel.setText (tr ("Declicking mode"), juce::dontSendNotification);
         addAndMakeVisible (declickLabel);
-        declick.addItemList ({ tr ("Out only"), tr ("Transient (no bleeding)"), tr ("Transient"), tr ("Generic"), tr ("Smooth"), tr ("Crossfade") }, 1);
+        for (const auto* name : samplerpage::declickModeNames) // (FL's items, round 190dh)
+            declick.addItem (tr (name), declick.getNumItems() + 1);
         declick.setTooltip (tr ("How fast a cut note fades out: 10 ms (out only, transient no bleeding), 20 ms (transient, generic), 100 ms (smooth), 200 ms (crossfade)"));
         declick.onChange = [this] { apply(); };
         addAndMakeVisible (declick);
@@ -2917,117 +2919,85 @@ public:
     }
 };
 
+// FL's "effects target" selector at the head of the Precomputed effects box (round 190dh; form TPluginForm
+// FXPanel.EffectsTargetSelect, 46 x 19, two cells; EffectsTargetSelectChange 0xf616d0 shows FXLegacyPanel for cell 1):
+// a wrench (the effects) and the legacy effects
+class EffectsTargetSelect final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    std::function<void (int)> onChange;
+    int getIndex() const noexcept { return index; }
+    void setIndex (int i)
+    {
+        if (i != index)
+        {
+            index = i;
+            repaint();
+        }
+    }
+    void paint (juce::Graphics& g) override
+    {
+        const auto b = getLocalBounds().toFloat();
+        for (int i = 0; i < 2; ++i)
+        {
+            auto cell = b.withWidth (b.getWidth() / 2.0f).translated ((float) i * b.getWidth() / 2.0f, 0.0f).reduced (1.0f);
+            g.setColour (i == index ? theme::colour::bg6 : theme::colour::bg3);
+            g.fillRoundedRectangle (cell, 2.0f);
+            const auto colour = i == index ? theme::colour::warning : theme::colour::textSecondary;
+            const auto icon = cell.withSizeKeepingCentre (cell.getHeight() - 3.0f, cell.getHeight() - 3.0f);
+            if (i == 1)
+                icons::draw (g, Icon::mic, icon, colour);
+            else
+            {
+                // a wrench: a handle and an open jaw
+                const auto u = icon.getWidth() / 24.0f;
+                juce::Path p;
+                p.startNewSubPath (icon.getX() + 5.0f * u, icon.getBottom() - 5.0f * u);
+                p.lineTo (icon.getX() + 14.0f * u, icon.getY() + 10.0f * u);
+                g.setColour (colour);
+                g.strokePath (p, juce::PathStrokeType (3.2f * u, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+                juce::Path jaw;
+                jaw.addCentredArc (icon.getX() + 16.5f * u, icon.getY() + 7.5f * u, 5.0f * u, 5.0f * u, 0.0f, 0.9f, 5.4f, true);
+                g.strokePath (jaw, juce::PathStrokeType (2.6f * u, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            }
+        }
+    }
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        const auto i = e.x < getWidth() / 2 ? 0 : 1;
+        if (i != index)
+        {
+            index = i;
+            repaint();
+            if (onChange != nullptr)
+                onChange (index);
+        }
+    }
+
+private:
+    int index = 0;
+};
+
+// The Sampler page (round 190dh: FL's Sampler page, form TPluginForm.SmpSheet, 561 x 399, and the FL 2026 shot
+// dock188a): File row, Content, Playback | Time stretching, Precomputed effects; the waveform; then "LYNX extras", the
+// sampler controls FL's page has no place for (Gain, the envelope, the filter, Cut itself, Porta, Modulation).
 class SettingsPanel final : public juce::Component,
                             public juce::DragAndDropTarget,
                             public juce::FileDragAndDropTarget,
                             private juce::ChangeListener,
+                            private juce::ScrollBar::Listener,
                             private juce::Timer
 {
 public:
+    // the page in FL's form units (FL's 561 x 399 sheet, then LYNX's extras below it)
+    static constexpr int designWidth = 558, designHeight = 524;
+    static constexpr float defaultScale = 1.25f;
+
     SettingsPanel (AudioEngine& e, ChannelRef c)
         : engine (e),
           ref (std::move (c))
     {
-        setup (pitch, pitchLabel, TR_NOOP ("Pitch"), -24.0, 24.0, 0.01, " st");
-        pitch.setTooltip (tr ("The sample's pitch in semitones (0.5 = 50 cents). The Piano Roll's keys play it chromatically around its root note (Misc › Root note, C5 by default); right-click the channel › Pitch... for semitones + cents"));
-        setup (gain, gainLabel, TR_NOOP ("Gain"), -24.0, 24.0, 0.1, " dB");
-        gain.textFromValueFunction = [] (double v) { return (v > 0.04 ? "+" : "") + juce::String (std::abs (v) < 0.05 ? 0.0 : v, 1) + " dB"; };
-        gain.valueFromTextFunction = [] (const juce::String& t) { return t.retainCharacters ("+-0123456789.,").replaceCharacter (',', '.').getDoubleValue(); };
-        gain.setTooltip (tr ("Sample gain: boosts or cuts the sample's level before the channel volume (-24 to +24 dB, double-click = 0 dB)"));
-        gain.setValue (0.0, juce::dontSendNotification);
-        setup (attack, attackLabel, TR_NOOP ("Attack"), 0.0, 2.0, 0.001, " s");
-        setup (release, releaseLabel, TR_NOOP ("Release"), 0.0, 4.0, 0.001, " s");
-        setup (decay, decayLabel, TR_NOOP ("Decay"), 0.0, 10.0, 0.001, " s");
-        setup (sustain, sustainLabel, TR_NOOP ("Sustain"), 0.0, 1.0, 0.01, "");
-        setup (stretch, stretchLabel, TR_NOOP ("Stretch"), 0.0, 1024.0, 0.01, " beats");
-        // issue #32 #7: "Fit to tempo" sets exact lengths (16.45 beats for a loop with a tail, 128 for 32 bars); the knob used
-        // to round them to 0.25 and cap them at 64, and every other edit in this panel wrote the rounded value back
-        stretch.setSkewFactorFromMidPoint (16.0);
-        stretch.addMouseListener (&stretchMenu, false);
-        // round 190w: FL's Playback › START OFFSET ([DFM] SmpStartOfsWheel, Max 16384, default 0; hint "Sample start
-        // offset"): where notes start, a fraction of the region (.flp 0xD7 0x90, SamplerSettings::startOffset)
-        setup (startOffsetKnob, startOffsetLabel, TR_NOOP ("Start offset"), 0.0, 1.0, 1.0 / 16384.0, "");
-        startOffsetKnob.setNumDecimalPlacesToDisplay (3);
-        startOffsetKnob.setTooltip (tr ("Sample start offset"));
-        setup (regionStart, regionStartLabel, TR_NOOP ("Start"), 0.0, 1.0, 0.001, "");
-        setup (regionEnd, regionEndLabel, TR_NOOP ("End"), 0.0, 1.0, 0.001, "");
-        setup (cutoff, cutoffLabel, TR_NOOP ("Cutoff"), 20.0, 20000.0, 1.0, " Hz");
-        setup (resonance, resonanceLabel, TR_NOOP ("Resonance"), 0.0, 1.0, 0.01, "");
-        cutoff.setSkewFactorFromMidPoint (1000.0);
-        cutoff.setDoubleClickReturnValue (true, 20000.0);
-        cutoff.setTooltip (tr ("Channel filter cutoff (low-pass at maximum with no resonance = off)"));
-        filterType.addItemList ({ tr ("Low-pass"), tr ("Band-pass"), tr ("High-pass"), tr ("Notch") }, 1);
-        filterType.onChange = [this] { apply(); };
-        addAndMakeVisible (filterType);
-        modulationButton.setButtonText (tr ("Modulation (envelopes and LFOs)..."));
-        modulationButton.onClick = [this] { showModulationFor (*this, engine, ref.index); };
-        addAndMakeVisible (modulationButton);
-        precomputeButton.setButtonText (tr ("Precomputed effects..."));
-        precomputeButton.setTooltip (tr ("FL's precomputed effects: remove DC, normalize, reverse polarity, fades, swap / fade stereo, trim, loop crossfade, loop points and the declicking mode"));
-        precomputeButton.onClick = [this] {
-            juce::CallOutBox::launchAsynchronously (std::make_unique<PrecomputePanel> (engine, ref), precomputeButton.getScreenBounds(), nullptr);
-        };
-        addAndMakeVisible (precomputeButton);
-        regionEnd.setDoubleClickReturnValue (true, 1.0);
-        regionStart.setTooltip (tr ("Where the sample starts playing (fraction of the file)"));
-        sustain.setDoubleClickReturnValue (true, 1.0);
-        decay.setSkewFactorFromMidPoint (0.5);
-        stretch.setTooltip (tr ("0 = off. Otherwise the whole sample lasts this many beats and follows the BPM (by resampling, like FL's Resample mode)"));
-        attack.setSkewFactorFromMidPoint (0.2);
-        release.setSkewFactorFromMidPoint (0.4);
-        release.setTooltip (tr ("0 = the whole sample plays (one-shot), like FL's steps"));
-
-        keepPitch.setButtonText (tr ("Keep length (stretch engine)"));
-        keepPitch.setTooltip (tr ("On: the pitch, the fine tune and the keys change the pitch without changing the length, and \"Stretch\" changes the length without changing the pitch (like FL's Stretch modes). Off: resample, pitch and speed change together"));
-        keepPitch.onClick = [this] { apply(); };
-        addAndMakeVisible (keepPitch);
-
-        stretchMethod.addItem (tr ("General"), 1);
-        stretchMethod.addItem (tr ("Drums / transients"), 2);
-        stretchMethod.addItem (tr ("Vocal / mono"), 3);
-        // LYNX's warp modes modelled on Ableton Live's (round 175a, N4)
-        stretchMethod.addSeparator();
-        stretchMethod.addItem (tr ("Warp: Beats"), 4);
-        stretchMethod.addItem (tr ("Warp: Tones"), 5);
-        stretchMethod.addItem (tr ("Warp: Texture"), 6);
-        stretchMethod.addItem (tr ("Warp: Complex"), 7);
-        stretchMethod.setTooltip (tr ("How the stretch keeping pitch is computed: General for full mixes and chords, Drums for loops and percussive sounds (attacks kept sharp), Vocal for a single voice or instrument"));
-        stretchMethod.onChange = [this] { apply(); };
-        addAndMakeVisible (stretchMethod);
-
-        reverse.setButtonText (tr ("Reverse"));
-        cut.setButtonText (tr ("Cut itself"));
-        porta.setButtonText ("Porta");
-        porta.setTooltip (tr ("Portamento: the note starts from the previous note's pitch (with Cut itself, the 808 glide)"));
-        cut.setTooltip (tr ("A new note cuts the previous one (good for hi-hats and 808s)"));
-
-        for (auto* b : { &reverse, &cut, &porta })
-        {
-            addAndMakeVisible (b);
-            b->onClick = [this] { apply(); };
-        }
-
-        // the knobs an automation clip can drive (samplerparam, issue #12): right-click = FL's parameter menu; a move
-        // is a tweak (Last tweaked, automation recording)
-        for (auto [slider, param] : { std::pair { &attack, (int) samplerparam::attack }, { &decay, (int) samplerparam::decay },
-                                      { &sustain, (int) samplerparam::sustain }, { &release, (int) samplerparam::release },
-                                      { &cutoff, (int) samplerparam::cutoff }, { &resonance, (int) samplerparam::resonance },
-                                      { &regionStart, (int) samplerparam::start }, { &regionEnd, (int) samplerparam::end } })
-        {
-            if (ref.index < 0) // (a Patcher node: no automation target)
-                break;
-            const auto target = [this, param] { return AutomationTarget { AutomationTargetKind::channelParam, ref.index, 0, param }; };
-            // one menu, FL's parameter menu (the slider contract's plain value menu used to open beside it)
-            ui::setOwnMenu (*slider);
-            slider->onMenu = [this, slider, target] { ui::showSliderMenu (*slider, &engine, target()); };
-            slider->onDragStart = [this, target] { engine.noteTweaked (target(), true); };
-            slider->onDragEnd = [this, target] { engine.tweakReleased (target()); };
-            tweakTargets.push_back ({ slider, param });
-        }
-
-        // FL's File row (round 190df; form TPluginForm SmpSheet.GrooveBox, shot dock188a fl-05): "File", the sample's
-        // name, then Load (click: the file dialog; right-click: "Sample history"; wheel: steps through it), Locate
-        // sample in browser and Remove sample
+        // ---- File row (round 190df; form GrooveBox, shot dock188a fl-05) ----
         fileLabel.setText (tr ("File"), juce::dontSendNotification);
         fileLabel.setJustificationType (juce::Justification::centredRight);
         addAndMakeVisible (fileLabel);
@@ -3054,16 +3024,173 @@ public:
             addAndMakeVisible (b);
         }
 
+        // ---- Content (form WavePanel) ----
+        toggle (keepOnDisk, TR_NOOP ("Keep on disk"), TR_NOOP ("Stream sample from hard disk when possible"));
+        keepOnDisk.setTooltip (tr ("Stream sample from hard disk when possible") + " - "
+                               + tr ("FL's option, kept for FL projects: LYNX streams samples longer than 30 s from its disk cache by itself"));
+        toggle (resampleBox, TR_NOOP ("Resample"), TR_NOOP ("Upsample to mixing frequency"));
+        resampleBox.setTooltip (tr ("Upsample to mixing frequency") + " - " + tr ("FL's option, kept for FL projects: LYNX resamples in real time"));
+        toggle (loadRegionsBox, TR_NOOP ("Load regions"), nullptr);
+        loadRegionsBox.setTooltip (tr ("Load sample regions and REX / ZGR beat markers") + " - " + tr ("FL's option, kept for FL projects"));
+        toggle (loadMarkersBox, TR_NOOP ("Load slice markers"), nullptr);
+        loadMarkersBox.setTooltip (tr ("Load ACID and Apple Loops beat markers") + " - " + tr ("FL's option, kept for FL projects"));
+        declickLabel.setText (tr ("Declicking mode"), juce::dontSendNotification);
+        addAndMakeVisible (declickLabel);
+        for (const auto* name : samplerpage::declickModeNames)
+            declick.addItem (tr (name), declick.getNumItems() + 1);
+        declick.setTooltip (tr ("Declicking method") + " - "
+                            + tr ("How fast a cut note fades out: 10 ms (out only, transient no bleeding), 20 ms (transient, generic), 100 ms (smooth), 200 ms (crossfade)"));
+        declick.onChange = [this] { apply (&declick); };
+        addAndMakeVisible (declick);
+
+        // ---- Playback (form LoopPanel) ----
+        knob (startOffsetKnob, startOffsetLabel, TR_NOOP ("Start offset"), TR_NOOP ("Sample start offset"), 0.0, 1.0, 1.0 / 16384.0, 0.0);
+        startOffsetKnob.textFromValueFunction = [] (double v) { return juce::String (v * 100.0, 1) + " %"; };
+        knob (loopStartKnob, loopStartLabel, TR_NOOP ("Start"), TR_NOOP ("Loop start position"), 0.0, 1.0, 1.0, 0.0);
+        knob (loopEndKnob, loopEndLabel, TR_NOOP ("End"), TR_NOOP ("Loop end position"), 0.0, 1.0, 1.0, 0.0);
+        for (auto* k : { &loopStartKnob, &loopEndKnob })
+            k->textFromValueFunction = [] (double v) { return juce::String ((juce::int64) std::llround (v)); }; // (frames)
+        toggle (useLoops, TR_NOOP ("Use loop points"), TR_NOOP ("Use sample loop points"));
+        toggle (pingPong, TR_NOOP ("Ping pong loop"), TR_NOOP ("Loop forward / backward"));
+
+        // ---- Time stretching (form StretchPanel) ----
+        knob (stretchPitchKnob, stretchPitchLabel, TR_NOOP ("Pitch"), TR_NOOP ("Pitch shift"), -1200.0, 1200.0, 1.0, 0.0);
+        stretchPitchKnob.textFromValueFunction = [] (double v) { return tr ("{0} cents", { (v > 0.5 ? "+" : "") + juce::String (juce::roundToInt (v)) }); };
+        knob (mulKnob, mulLabel, TR_NOOP ("Mul"), TR_NOOP ("Time stretch (multiplicator)"), -20000.0, 20000.0, 1.0, 0.0);
+        mulKnob.textFromValueFunction = [] (double v) { return juce::String::charToString (0x00d7) + juce::String (samplerpage::mulFactor ((int) v), 3); };
+        knob (stretch, stretchLabel, TR_NOOP ("Time"), TR_NOOP ("Time stretch (time)"), 0.0, 1024.0, 0.01, 0.0);
+        stretch.textFromValueFunction = [] (double v) { return v <= 0.0 ? tr ("(none)") : tr ("{0} beats", { juce::String (v, 2) }); };
+        // issue #32 #7: "Fit to tempo" sets exact lengths (16.45 beats for a loop with a tail, 128 for 32 bars)
+        stretch.setSkewFactorFromMidPoint (16.0);
+        stretch.addMouseListener (&stretchMenu, false);
+        modeLabel.setText (tr ("Mode"), juce::dontSendNotification);
+        addAndMakeVisible (modeLabel);
+        for (int i = 0; i < samplerpage::modeItemCount; ++i)
+        {
+            if (samplerpage::modeItems[i].header)
+                stretchMethod.addSectionHeading (tr (samplerpage::modeItems[i].name));
+            else
+                stretchMethod.addItem (tr (samplerpage::modeItems[i].name), i + 1);
+        }
+        stretchMethod.setTooltip (tr ("Stretching method") + " - " + tr ("Resample") + " / "
+                                  + tr ("How the stretch keeping pitch is computed: General for full mixes and chords, Drums for loops and percussive sounds (attacks kept sharp), Vocal for a single voice or instrument"));
+        stretchMethod.onChange = [this] { apply (&stretchMethod); };
+        addAndMakeVisible (stretchMethod);
+
+        // ---- Precomputed effects (form FXPanel) ----
+        toggle (removeDc, TR_NOOP ("Remove DC offset"), TR_NOOP ("Center vertically"));
+        toggle (normalize, TR_NOOP ("Normalize"), TR_NOOP ("Normalize to 0dB"));
+        toggle (reverse, TR_NOOP ("Reverse"), TR_NOOP ("Flip horizontally"));
+        toggle (polarity, TR_NOOP ("Reverse polarity"), TR_NOOP ("Flip vertically"));
+        toggle (fadeStereo, TR_NOOP ("Fade stereo"), TR_NOOP ("Fade from left channel to right channel"));
+        toggle (swapStereo, TR_NOOP ("Swap stereo"), TR_NOOP ("Swap left & right channels"));
+        knob (regionStart, regionStartLabel, TR_NOOP ("Smp start"), TR_NOOP ("Sample start offset"), 0.0, 1.0, 1.0 / 16384.0, 0.0);
+        knob (lengthKnob, lengthLabel, TR_NOOP ("Length"), TR_NOOP ("Sample end offset"), 0.0, 1.0, 1.0 / 16384.0, 1.0);
+        for (auto* k : { &regionStart, &lengthKnob })
+            k->textFromValueFunction = [] (double v) { return juce::String (v * 100.0, 1) + " %"; };
+        knob (fadeIn, fadeInLabel, TR_NOOP ("In"), TR_NOOP ("Quick fade in"), 0.0, 1024.0, 1.0, 0.0);
+        knob (fadeOut, fadeOutLabel, TR_NOOP ("Out"), TR_NOOP ("Quick fade out"), 0.0, 1024.0, 1.0, 0.0);
+        knob (crossfade, crossfadeLabel, TR_NOOP ("Crossfade"), TR_NOOP ("Crossfade loop"), 0.0, 1024.0, 1.0, 0.0);
+        knob (trim, trimLabel, TR_NOOP ("Trim"), TR_NOOP ("Silence trimming threshold"), 0.0, 256.0, 1.0, 0.0);
+        auto percent = [] (double hi) { return [hi] (double v) { return juce::String (v / hi * 100.0, 1) + " %"; }; };
+        fadeIn.textFromValueFunction = percent (1024.0);
+        fadeOut.textFromValueFunction = percent (1024.0);
+        crossfade.textFromValueFunction = percent (2048.0); // (of the loop: FL's knob reaches half of it)
+        trim.textFromValueFunction = [] (double v) { return v <= 0.0 ? tr ("Off") : juce::String (20.0 * std::log10 (v / 32768.0), 1) + " dB"; };
+        effectsTarget.setTooltip (tr ("effects target"));
+        effectsTarget.onChange = [this] (int) { showLegacy(); };
+        addAndMakeVisible (effectsTarget);
+        // the legacy effects (form FXLegacyPanel; REA round 167l §1: FL's ranges and defaults)
+        const std::tuple<MenuSlider*, juce::Label*, const char*, const char*, double, double, double> legacy[] = {
+            { &boost, &boostLabel, TR_NOOP ("Boost"), TR_NOOP ("Boosts the gain"), 0.0, 256.0, 0.0 },
+            { &eq, &eqLabel, TR_NOOP ("EQ"), TR_NOOP ("Shifts the frequency balance"), 0.0, 256.0, 128.0 },
+            { &ringMix, &ringMixLabel, TR_NOOP ("RM mix"), TR_NOOP ("Ring modulation mix"), 0.0, 256.0, 0.0 },
+            { &ringFreq, &ringFreqLabel, TR_NOOP ("RM freq"), TR_NOOP ("Ring modulation frequency"), 0.0, 256.0, 128.0 },
+            { &legacyCut, &legacyCutLabel, TR_NOOP ("Cut"), TR_NOOP ("Filter cutoff"), 16.0, 1024.0, 1024.0 },
+            { &legacyRes, &legacyResLabel, TR_NOOP ("Res"), TR_NOOP ("Filter resonance"), 0.0, 640.0, 0.0 },
+            { &reverbAmount, &reverbLabel, TR_NOOP ("Reverb"), TR_NOOP ("Reverb amount"), 0.0, 256.0, 0.0 },
+            { &stereoDelay, &stereoDelayLabel, TR_NOOP ("Stereo delay"), TR_NOOP ("Stereo delay"), 0.0, 4096.0, 2048.0 },
+            { &pogo, &pogoLabel, TR_NOOP ("Pogo"), TR_NOOP ("Pogo effect"), 0.0, 512.0, 256.0 } };
+        for (auto [k, label, text, hint, lo, hi, def] : legacy)
+            knob (*k, *label, text, hint, lo, hi, 1.0, def);
+        reverbType.addItemList ({ "A", "B" }, 1);
+        reverbType.setTooltip (tr ("Reverb type"));
+        reverbType.onChange = [this] { apply (&reverbType); };
+        addChildComponent (reverbType);
+        toggle (clip, TR_NOOP ("Clip"), TR_NOOP ("Add clipping at 0dB"));
+
+        // ---- the waveform ----
         wave.setEmptyText (tr ("No sample loaded"));
-        wave.setTooltip (tr ("The sample: colours show where it is bass-heavy (warm) or bright (cool); outside Start/End is dimmed"));
+        wave.setTooltip (tr ("Waveform") + " - " + tr ("click: preview the sample; mouse wheel: zoom"));
+        wave.setWatermark (tr ("Sampler"));
+        wave.setCaptionVisible (false);
+        wave.setZoomable (true);
+        wave.onViewChanged = [this] { waveScroll.setCurrentRange (wave.getViewStart(), wave.getViewEnd() - wave.getViewStart(), juce::dontSendNotification); };
         // round 190w: FL 2026 previews the sample when its display is clicked (from the start offset, to its end) and shows
         // the playback locator over it (What's New 21138; [SHOT] flgap190w burst n2 / o3)
         wave.onClick = [this] { previewFromDisplay(); };
         addAndMakeVisible (wave);
+        waveScroll.setRangeLimits (0.0, 1.0, juce::dontSendNotification);
+        waveScroll.setCurrentRange (0.0, 1.0, juce::dontSendNotification);
+        waveScroll.setAutoHide (false);
+        waveScroll.addListener (this);
+        addAndMakeVisible (waveScroll);
+
+        // ---- LYNX extras ----
+        knob (gain, gainLabel, TR_NOOP ("Gain"), nullptr, -24.0, 24.0, 0.1, 0.0);
+        gain.textFromValueFunction = [] (double v) { return (v > 0.04 ? "+" : "") + juce::String (std::abs (v) < 0.05 ? 0.0 : v, 1) + " dB"; };
+        gain.valueFromTextFunction = [] (const juce::String& t) { return t.retainCharacters ("+-0123456789.,").replaceCharacter (',', '.').getDoubleValue(); };
+        gain.setTooltip (tr ("Sample gain: boosts or cuts the sample's level before the channel volume (-24 to +24 dB, double-click = 0 dB)"));
+        knob (attack, attackLabel, TR_NOOP ("Attack"), nullptr, 0.0, 2.0, 0.001, 0.0);
+        knob (decay, decayLabel, TR_NOOP ("Decay"), nullptr, 0.0, 10.0, 0.001, 0.0);
+        knob (sustain, sustainLabel, TR_NOOP ("Sustain"), nullptr, 0.0, 1.0, 0.01, 1.0);
+        knob (release, releaseLabel, TR_NOOP ("Release"), nullptr, 0.0, 4.0, 0.001, 0.0);
+        for (auto* k : { &attack, &decay, &release })
+            k->textFromValueFunction = [] (double v) { return juce::String (v, 3) + " s"; };
+        knob (cutoff, cutoffLabel, TR_NOOP ("Cutoff"), nullptr, 20.0, 20000.0, 1.0, 20000.0);
+        cutoff.textFromValueFunction = [] (double v) { return juce::String (juce::roundToInt (v)) + " Hz"; };
+        knob (resonance, resonanceLabel, TR_NOOP ("Resonance"), nullptr, 0.0, 1.0, 0.01, 0.0);
+        cutoff.setSkewFactorFromMidPoint (1000.0);
+        cutoff.setTooltip (tr ("Channel filter cutoff (low-pass at maximum with no resonance = off)"));
+        decay.setSkewFactorFromMidPoint (0.5);
+        attack.setSkewFactorFromMidPoint (0.2);
+        release.setSkewFactorFromMidPoint (0.4);
+        release.setTooltip (tr ("0 = the whole sample plays (one-shot), like FL's steps"));
+        filterType.addItemList ({ tr ("Low-pass"), tr ("Band-pass"), tr ("High-pass"), tr ("Notch") }, 1);
+        filterType.onChange = [this] { apply (&filterType); };
+        addAndMakeVisible (filterType);
+        toggle (cut, TR_NOOP ("Cut itself"), nullptr);
+        cut.setTooltip (tr ("A new note cuts the previous one (good for hi-hats and 808s)"));
+        porta.setButtonText ("Porta");
+        porta.setTooltip (tr ("Portamento: the note starts from the previous note's pitch (with Cut itself, the 808 glide)"));
+        porta.onClick = [this] { apply (&porta); };
+        addAndMakeVisible (porta);
+        modulationButton.setButtonText (tr ("Modulation (envelopes and LFOs)..."));
+        modulationButton.onClick = [this] { showModulationFor (*this, engine, ref.index); };
+        addAndMakeVisible (modulationButton);
+        extrasLabel.setText (tr ("LYNX extras"), juce::dontSendNotification);
+
+        // the knobs an automation clip can drive (samplerparam, issue #12): right-click = FL's parameter menu; a move
+        // is a tweak (Last tweaked, automation recording)
+        for (auto [slider, param] : { std::pair { &attack, (int) samplerparam::attack }, { &decay, (int) samplerparam::decay },
+                                      { &sustain, (int) samplerparam::sustain }, { &release, (int) samplerparam::release },
+                                      { &cutoff, (int) samplerparam::cutoff }, { &resonance, (int) samplerparam::resonance },
+                                      { &regionStart, (int) samplerparam::start }, { &lengthKnob, (int) samplerparam::end } })
+        {
+            if (ref.index < 0) // (a Patcher node: no automation target)
+                break;
+            const auto target = [this, param] { return AutomationTarget { AutomationTargetKind::channelParam, ref.index, 0, param }; };
+            ui::setOwnMenu (*slider);
+            slider->onMenu = [this, slider, target] { ui::showSliderMenu (*slider, &engine, target()); };
+            slider->onDragStart = [this, target] { engine.noteTweaked (target(), true); };
+            slider->onDragEnd = [this, target] { engine.tweakReleased (target()); };
+            tweakTargets.push_back ({ slider, param });
+        }
 
         refresh();
+        showLegacy();
         engine.addChangeListener (this);
-        setSize (420, 676 + fileRowHeight);
+        setSize (juce::roundToInt (designWidth * defaultScale), juce::roundToInt (designHeight * defaultScale));
         if (ref.index >= 0)
             startTimerHz (30); // the knobs follow their automation while the song plays (issue #12)
     }
@@ -3071,6 +3198,7 @@ public:
     ~SettingsPanel() override
     {
         stopPreview();
+        waveScroll.removeListener (this);
         engine.removeChangeListener (this);
     }
 
@@ -3117,78 +3245,141 @@ public:
         wave.setLocator (at);
     }
 
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (theme::colour::bg2);
+        // FL's boxes: a rounded panel with its caption on a tab at the top left (the File row has none)
+        for (const auto& [area, caption, captionLeft] : groups)
+        {
+            const auto r = area.toFloat();
+            g.setColour (theme::colour::bg3);
+            g.fillRoundedRectangle (r, 3.0f);
+            g.setColour (theme::colour::border);
+            g.drawRoundedRectangle (r.reduced (0.5f), 3.0f, 1.0f);
+            if (caption.isEmpty())
+                continue;
+            const auto h = scaled (19.0f);
+            g.setFont (theme::font (juce::jlimit (10.0f, 18.0f, scaled (12.5f)), true));
+            const auto w = (float) juce::GlyphArrangement::getStringWidth (g.getCurrentFont(), caption) + scaled (16.0f);
+            juce::Path tab;
+            const auto x0 = r.getX() + scaled ((float) captionLeft);
+            tab.startNewSubPath (x0, r.getY());
+            tab.lineTo (x0 + w, r.getY());
+            tab.lineTo (x0 + w - h * 0.45f, r.getY() + h);
+            tab.lineTo (x0, r.getY() + h);
+            tab.closeSubPath();
+            g.setColour (theme::colour::bg4);
+            g.fillPath (tab);
+            g.setColour (theme::colour::textPrimary);
+            g.drawText (caption, juce::Rectangle<float> (x0 + scaled (6.0f), r.getY(), w, h), juce::Justification::centredLeft, false);
+        }
+        // FL 2026's loop glyph between the loop START and END captions
+        if (! loopGlyph.isEmpty())
+            icons::draw (g, Icon::loop, loopGlyph.toFloat(), theme::colour::textSecondary);
+    }
+
     void resized() override
     {
-        auto area = getLocalBounds().reduced (12);
-        {
-            // (FL's order, right-aligned: Load, Locate, Remove)
-            auto row = area.removeFromTop (fileRowHeight - 6);
-            removeButton.setBounds (row.removeFromRight (26));
-            locateButton.setBounds (row.removeFromRight (26));
-            loadButton.setBounds (row.removeFromRight (34));
-            row.removeFromRight (6);
-            fileLabel.setBounds (row.removeFromLeft (34));
-            row.removeFromLeft (6);
-            fileName.setBounds (row);
-            area.removeFromTop (6);
-        }
-        wave.setBounds (area.removeFromTop (92));
-        area.removeFromTop (8);
-        auto place = [] (juce::Rectangle<int> row, std::initializer_list<std::pair<juce::Slider*, juce::Label*>> items) {
-            const auto w = row.getWidth() / 3;
-
-            for (auto [slider, label] : items)
-            {
-                auto column = row.removeFromLeft (w);
-                label->setBounds (column.removeFromTop (18));
-                slider->setBounds (column);
-            }
+        // FL's layout in its own units, scaled to the page (the whole page fits; at 1.25 it is FL's at 125 %)
+        scale = juce::jmax (0.55f, juce::jmin ((float) getWidth() / (float) designWidth, (float) getHeight() / (float) designHeight));
+        offsetX = juce::jmax (0, (getWidth() - juce::roundToInt ((float) designWidth * scale)) / 2);
+        groups.clear();
+        const auto captionFont = theme::font (juce::jlimit (8.0f, 13.0f, scaled (8.6f)), true);
+        const auto textFont = juce::jlimit (9.0f, 17.0f, scaled (12.0f));
+        auto place = [this, captionFont] (juce::Slider& k, juce::Label& label, int x, int y, int labelX, int labelW, int size = 34) {
+            k.setBounds (R (x, y, size, size));
+            label.setFont (captionFont);
+            label.setBounds (R (labelX, y + size - 1, labelW, 13));
         };
 
-        auto top = area.removeFromTop (110);
+        // left column: File row, Content, Playback
+        groups.push_back ({ R (7, 7, 268, 35), juce::String(), 0 });
         {
-            // Gain, Pitch, Stretch and the keep-pitch switch (a third of the width: its text is long)
-            const auto w4 = top.getWidth() * 2 / 9;
-            for (auto [slider, label] : { std::pair { &gain, &gainLabel }, { &pitch, &pitchLabel }, { &stretch, &stretchLabel } })
+            removeButton.setBounds (R (243, 13, 19, 23));
+            locateButton.setBounds (R (224, 13, 19, 23));
+            loadButton.setBounds (R (192, 13, 32, 23));
+            fileLabel.setFont (theme::font (textFont, true));
+            fileLabel.setBounds (R (11, 15, 24, 15));
+            fileName.setFont (theme::font (textFont));
+            fileName.setBounds (R (38, 13, 152, 21));
+        }
+        groups.push_back ({ R (7, 50, 268, 110), tr ("Content"), 0 });
+        keepOnDisk.setBounds (R (12, 75, 126, 21));
+        resampleBox.setBounds (R (12, 96, 126, 21));
+        loadRegionsBox.setBounds (R (140, 75, 128, 21));
+        loadMarkersBox.setBounds (R (140, 96, 128, 21));
+        declickLabel.setFont (theme::font (textFont));
+        declickLabel.setBounds (R (14, 126, 100, 23));
+        declick.setBounds (R (116, 126, 152, 23));
+
+        groups.push_back ({ R (7, 168, 268, 79), tr ("Playback"), 0 });
+        place (startOffsetKnob, startOffsetLabel, 26, 194, 9, 68);
+        place (loopStartKnob, loopStartLabel, 80, 194, 66, 40);
+        place (loopEndKnob, loopEndLabel, 118, 194, 112, 30);
+        loopGlyph = R (105, 229, 10, 10);
+        useLoops.setBounds (R (150, 191, 122, 21));
+        pingPong.setBounds (R (150, 213, 122, 21));
+
+        // right column: Time stretching, Precomputed effects
+        groups.push_back ({ R (283, 7, 268, 76), tr ("Time stretching"), 0 });
+        place (stretchPitchKnob, stretchPitchLabel, 291, 33, 285, 44, 32);
+        place (mulKnob, mulLabel, 333, 33, 327, 44, 32);
+        place (stretch, stretchLabel, 373, 33, 367, 44, 32);
+        modeLabel.setFont (theme::font (textFont, true));
+        modeLabel.setBounds (R (410, 31, 40, 23));
+        stretchMethod.setBounds (R (450, 31, 96, 23));
+
+        groups.push_back ({ R (283, 91, 268, 156), tr ("Precomputed effects"), 49 });
+        effectsTarget.setBounds (R (284, 92, 46, 18));
+        removeDc.setBounds (R (288, 116, 126, 23));
+        normalize.setBounds (R (288, 138, 126, 23));
+        reverse.setBounds (R (288, 160, 126, 23));
+        polarity.setBounds (R (416, 116, 130, 23));
+        fadeStereo.setBounds (R (416, 138, 130, 23));
+        swapStereo.setBounds (R (416, 160, 130, 23));
+        place (regionStart, regionStartLabel, 290, 195, 280, 54);
+        place (lengthKnob, lengthLabel, 332, 195, 326, 46);
+        place (fadeIn, fadeInLabel, 386, 195, 383, 40);
+        place (fadeOut, fadeOutLabel, 425, 195, 422, 40);
+        place (crossfade, crossfadeLabel, 472, 195, 459, 60);
+        place (trim, trimLabel, 511, 195, 508, 40);
+        // the legacy panel over the same box (FXLegacyPanel at 284, 113)
+        place (boost, boostLabel, 291, 118, 285, 46);
+        place (eq, eqLabel, 333, 118, 327, 46);
+        place (ringMix, ringMixLabel, 381, 118, 375, 46);
+        place (ringFreq, ringFreqLabel, 421, 118, 415, 46);
+        place (legacyCut, legacyCutLabel, 472, 117, 466, 46);
+        place (legacyRes, legacyResLabel, 511, 117, 505, 46);
+        clip.setBounds (R (287, 167, 52, 16));
+        reverbType.setBounds (R (288, 199, 44, 22));
+        place (reverbAmount, reverbLabel, 333, 195, 324, 52);
+        place (stereoDelay, stereoDelayLabel, 381, 195, 362, 72);
+        place (pogo, pogoLabel, 511, 195, 505, 46);
+
+        // the waveform under both columns, with its scroll bar
+        wave.setBounds (R (7, 255, 544, 112));
+        waveScroll.setBounds (R (7, 368, 544, 14));
+
+        // LYNX extras (FL's page has no place for them)
+        groups.push_back ({ R (7, 390, 544, 128), extrasLabel.getText(), 0 });
+        {
+            int x = 18;
+            for (auto [k, label] : { std::pair { &gain, &gainLabel }, { &attack, &attackLabel }, { &decay, &decayLabel },
+                                     { &sustain, &sustainLabel }, { &release, &releaseLabel }, { &cutoff, &cutoffLabel },
+                                     { &resonance, &resonanceLabel } })
             {
-                auto column = top.removeFromLeft (w4);
-                label->setBounds (column.removeFromTop (18));
-                slider->setBounds (column);
+                place (*k, *label, x, 418, x - 12, 58, 36);
+                x += 58;
             }
-            auto column = top.withSizeKeepingCentre (juce::jmin (top.getWidth(), 140), juce::jmin (top.getHeight(), 64));
-            keepPitch.setBounds (column.removeFromTop (column.getHeight() / 2));
-            stretchMethod.setBounds (column.withSizeKeepingCentre (column.getWidth(), juce::jmin (column.getHeight(), 24)));
+            filterType.setBounds (R (432, 420, 110, 22));
+            cut.setBounds (R (432, 446, 110, 21));
+            porta.setBounds (R (432, 468, 110, 21));
+            modulationButton.setBounds (R (18, 488, 260, 22));
         }
-        area.removeFromTop (6);
-        auto envelope = area.removeFromTop (110);
-        const auto w = envelope.getWidth() / 4;
-
-        for (auto [slider, label] : { std::pair { &attack, &attackLabel }, { &decay, &decayLabel }, { &sustain, &sustainLabel }, { &release, &releaseLabel } })
-        {
-            auto column = envelope.removeFromLeft (w);
-            label->setBounds (column.removeFromTop (18));
-            slider->setBounds (column);
-        }
-
-        area.removeFromTop (8);
-        area.removeFromTop (6);
-        place (area.removeFromTop (110), { { &startOffsetKnob, &startOffsetLabel }, { &regionStart, &regionStartLabel }, { &regionEnd, &regionEndLabel } });
-        area.removeFromTop (6);
-        {
-            auto filterRow = area.removeFromTop (110);
-            filterType.setBounds (filterRow.removeFromRight (filterRow.getWidth() / 3).withSizeKeepingCentre (124, 24));
-            place (filterRow.withWidth (filterRow.getWidth() * 3 / 2), { { &cutoff, &cutoffLabel }, { &resonance, &resonanceLabel } });
-        }
-        {
-            auto buttons = area.removeFromBottom (26);
-            const auto half = buttons.getWidth() / 2;
-            modulationButton.setBounds (buttons.removeFromLeft (half).reduced (4, 0));
-            precomputeButton.setBounds (buttons.reduced (4, 0));
-        }
-        area.removeFromTop (6);
-        reverse.setBounds (area.removeFromLeft (150).removeFromTop (24));
-        cut.setBounds (area.removeFromLeft (130).removeFromTop (24));
-        porta.setBounds (area.removeFromLeft (100).removeFromTop (24));
+        for (auto* b : { &keepOnDisk, &resampleBox, &loadRegionsBox, &loadMarkersBox, &useLoops, &pingPong, &removeDc, &normalize, &reverse,
+                         &polarity, &fadeStereo, &swapStereo, &clip, &cut, &porta })
+            b->setSize (b->getWidth(), b->getHeight()); // (their text follows the LookAndFeel's toggle font, sized by height)
+        repaint();
     }
 
     int getChannel() const noexcept { return ref.index; }
@@ -3225,7 +3416,97 @@ public:
         }
     }
 
+    // (the shot route, round 190dh: turn a control as a user would — `what`: a knob's name or a toggle's — and read the
+    // channel back; true when the control exists)
+    bool shotTurn (const juce::String& what, double value, bool shift = false)
+    {
+        refresh(); // (the engine's change message is asynchronous: the page shows the channel as a user would see it)
+        shiftHeld = shift;
+        const juce::ScopedValueSetter<bool> nofocus (shotDriven, true);
+        auto turn = [&] (juce::Slider& s) { s.setValue (value, juce::sendNotificationSync); return true; };
+        auto click = [&] (juce::Button& b) { b.setToggleState (value != 0.0, juce::dontSendNotification); b.onClick(); return true; };
+        bool done = false;
+        if (what == "pitch") done = turn (stretchPitchKnob);
+        else if (what == "mul") done = turn (mulKnob);
+        else if (what == "time") done = turn (stretch);
+        else if (what == "loopStart") done = turn (loopStartKnob);
+        else if (what == "loopEnd") done = turn (loopEndKnob);
+        else if (what == "crossfade") done = turn (crossfade);
+        else if (what == "smpStart") done = turn (regionStart);
+        else if (what == "length") done = turn (lengthKnob);
+        else if (what == "useLoops") done = click (useLoops);
+        else if (what == "pingPong") done = click (pingPong);
+        else if (what == "keepOnDisk") done = click (keepOnDisk);
+        else if (what == "mode") { stretchMethod.setSelectedId ((int) value + 1, juce::sendNotificationSync); done = true; }
+        else if (what == "declick") { declick.setSelectedId ((int) value + 1, juce::sendNotificationSync); done = true; }
+        else if (what == "legacy") { effectsTarget.setIndex ((int) value); showLegacy(); done = true; }
+        else if (what == "zoom") { wave.setView (0.25, 0.25 + value); done = true; }
+        shiftHeld = false;
+        refresh();
+        return done;
+    }
+    bool shotLegacyShown() const { return boost.isVisible() && ! removeDc.isVisible(); }
+    bool shotEnabled (const juce::String& what) const { return what == "keepOnDisk" ? keepOnDisk.isEnabled() : what == "loopStart" ? loopStartKnob.isEnabled() : false; }
+    double shotScrollStart() const { return waveScroll.getCurrentRangeStart(); }
+    juce::String shotModeText() const { return stretchMethod.getText(); }
+
 private:
+    juce::Rectangle<int> R (int x, int y, int w, int h) const
+    {
+        return { offsetX + juce::roundToInt ((float) x * scale), juce::roundToInt ((float) y * scale), juce::roundToInt ((float) w * scale),
+                 juce::roundToInt ((float) h * scale) };
+    }
+    float scaled (float v) const noexcept { return v * scale; }
+
+    void toggle (juce::ToggleButton& b, const char* text, const char* hint)
+    {
+        b.setButtonText (tr (text));
+        if (hint != nullptr)
+            b.setTooltip (tr (hint));
+        b.onClick = [this, &b] { apply (&b); };
+        addAndMakeVisible (b);
+    }
+
+    void knob (juce::Slider& s, juce::Label& label, const char* name, const char* hint, double lo, double hi, double step, double def)
+    {
+        s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
+        s.setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
+        s.setPopupDisplayEnabled (true, true, this);
+        s.setRange (lo, hi, step);
+        s.setValue (def, juce::dontSendNotification);
+        s.setDoubleClickReturnValue (true, def);
+        if (hint != nullptr)
+            s.setTooltip (tr (hint));
+        s.onValueChange = [this, &s] { apply (&s); };
+        label.setText (tr (name).toUpperCase(), juce::dontSendNotification);
+        label.setJustificationType (juce::Justification::centredTop);
+        label.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        label.setInterceptsMouseClicks (false, false);
+        label.setBorderSize ({});
+        addAndMakeVisible (s);
+        addAndMakeVisible (label);
+    }
+
+    // FL's EffectsTargetSelect: cell 1 shows the legacy panel over the effects (FUN_0060a270 on FXLegacyPanel)
+    void showLegacy()
+    {
+        const auto legacy = effectsTarget.getIndex() == 1;
+        for (juce::Component* c : std::initializer_list<juce::Component*> { &removeDc, &normalize, &reverse, &polarity, &fadeStereo, &swapStereo, &regionStart,
+                                                                           &regionStartLabel, &lengthKnob, &lengthLabel, &fadeIn, &fadeInLabel, &fadeOut,
+                                                                           &fadeOutLabel, &crossfade, &crossfadeLabel, &trim, &trimLabel })
+            c->setVisible (! legacy);
+        for (juce::Component* c : std::initializer_list<juce::Component*> { &boost, &boostLabel, &eq, &eqLabel, &ringMix, &ringMixLabel, &ringFreq, &ringFreqLabel,
+                                                                           &legacyCut, &legacyCutLabel, &legacyRes, &legacyResLabel, &reverbAmount, &reverbLabel,
+                                                                           &stereoDelay, &stereoDelayLabel, &pogo, &pogoLabel, &reverbType, &clip })
+            c->setVisible (legacy);
+    }
+
+    void scrollBarMoved (juce::ScrollBar*, double start) override
+    {
+        const auto width = wave.getViewEnd() - wave.getViewStart();
+        wave.setView (start, start + width);
+    }
+
     void setDropHighlight (bool on)
     {
         if (dropHighlight != on)
@@ -3235,7 +3516,8 @@ private:
         }
     }
 
-    // the new sample plays with the same settings; slices of the old one no longer apply, the channel takes its name
+    // the new sample plays with the same settings; slices of the old one no longer apply, the channel takes its name;
+    // loop points set on the old one go with it
     void replaceSample (const juce::File& file)
     {
         if (current() == nullptr || ! file.existsAsFile())
@@ -3249,6 +3531,7 @@ private:
             d.samplePath = path;
             d.zones.clear();
             d.sampler.slices.clear();
+            d.sampler.loopStart = d.sampler.loopEnd = -1;
             d.name = name;
         });
         samplehistory::add (file.getFullPathName().toStdString()); // (FL: every sample a sampler loads)
@@ -3306,6 +3589,7 @@ private:
             d.samplePath.clear();
             d.zones.clear();
             d.sampler.slices.clear();
+            d.sampler.loopStart = d.sampler.loopEnd = -1;
         });
     }
 
@@ -3323,68 +3607,115 @@ public:
     }
 
 private:
-
-    void setup (juce::Slider& s, juce::Label& label, const char* name, double lo, double hi, double step, const char* suffix)
-    {
-        s.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
-        s.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 18);
-        s.setRange (lo, hi, step);
-        s.setTextValueSuffix (suffix);
-        s.setDoubleClickReturnValue (true, 0.0);
-        s.onValueChange = [this, &s] { apply (&s); };
-        label.setText (tr (name), juce::dontSendNotification);
-        label.setJustificationType (juce::Justification::centred);
-        addAndMakeVisible (s);
-        addAndMakeVisible (label);
-    }
-
     const ChannelDef* current() const
     {
         return ref.get (engine);
     }
 
+    // the channel's sample as the loop knobs see it (frames and the file's own loop); none for a multi-sample channel
+    std::shared_ptr<const SampleData> sampleOf (const ChannelDef& c) const
+    {
+        if (c.samplePath.empty() || ! c.zones.empty())
+            return nullptr;
+        return engine.getSampleLibrary().load (juce::String::fromUTF8 (c.samplePath.c_str()));
+    }
+
     void refresh()
     {
-        if (const auto* c = current())
+        const auto* c = current();
+        if (c == nullptr)
+            return;
+        const auto& s = c->sampler;
+        const juce::ScopedValueSetter<bool> guard (updating, true);
+        const auto sample = sampleOf (*c);
+        const auto frames = sample != nullptr ? (std::int64_t) sample->frames() : 0;
+        // Content
+        keepOnDisk.setToggleState (s.keepOnDisk, juce::dontSendNotification);
+        keepOnDisk.setEnabled (samplerpage::keepOnDiskAvailable (s, sample != nullptr && sample->loopStart >= 0 && sample->loopEnd > sample->loopStart));
+        resampleBox.setToggleState (s.resampleOnLoad, juce::dontSendNotification);
+        loadRegionsBox.setToggleState (s.loadRegions, juce::dontSendNotification);
+        loadMarkersBox.setToggleState (s.loadSliceMarkers, juce::dontSendNotification);
+        declick.setSelectedId (juce::jlimit (0, 5, s.declickMode) + 1, juce::dontSendNotification);
+        // Playback
+        startOffsetKnob.setValue (s.startOffset, juce::dontSendNotification);
+        useLoops.setToggleState (s.useLoopPoints, juce::dontSendNotification);
+        pingPong.setToggleState (s.precompute.pingPong, juce::dontSendNotification);
+        loopStartKnob.setEnabled (frames > 1);
+        loopEndKnob.setEnabled (frames > 1);
+        shownFileLoop = { sample != nullptr ? sample->loopStart : -1, sample != nullptr ? sample->loopEnd : -1 };
+        shownFrames = frames;
+        if (frames > 1)
         {
-            updating = true;
-            pitch.setValue (c->sampler.pitch, juce::dontSendNotification);
-            gain.setValue (c->sampler.gainDb, juce::dontSendNotification);
-            attack.setValue (c->sampler.attack, juce::dontSendNotification);
-            decay.setValue (c->sampler.decay, juce::dontSendNotification);
-            sustain.setValue (c->sampler.sustain, juce::dontSendNotification);
-            stretch.setValue (c->sampler.stretchBeats, juce::dontSendNotification);
-            shownStretch = stretch.getValue();
-            keepPitch.setToggleState (c->sampler.keepPitch, juce::dontSendNotification);
-            stretchMethod.setSelectedId ((int) c->sampler.stretchMethod + 1, juce::dontSendNotification);
-            stretchMethod.setEnabled (c->sampler.keepPitch);
-            regionStart.setValue (c->sampler.regionStart, juce::dontSendNotification);
-            startOffsetKnob.setValue (c->sampler.startOffset, juce::dontSendNotification);
-            regionEnd.setValue (c->sampler.regionEnd, juce::dontSendNotification);
-            cutoff.setValue (c->sampler.cutoff, juce::dontSendNotification);
-            resonance.setValue (c->sampler.resonance, juce::dontSendNotification);
-            filterType.setSelectedId (c->sampler.filterType + 1, juce::dontSendNotification);
-            release.setValue (c->sampler.release, juce::dontSendNotification);
-            reverse.setToggleState (c->sampler.reverse, juce::dontSendNotification);
-            cut.setToggleState (channelCutsItself (*c), juce::dontSendNotification); // (issue #68: the rack menu's state too)
-            porta.setToggleState (c->sampler.porta, juce::dontSendNotification);
-            updating = false;
-            showAutomation (true);
-
-            const auto path = juce::String::fromUTF8 ((c->samplePath.empty() && ! c->zones.empty() ? c->zones.front().path : c->samplePath).c_str());
-            fileName.setText (juce::File (path).getFileName(), juce::dontSendNotification); // (FL: the name, the path's end)
-            fileName.setTooltip (path);
-            locateButton.setEnabled (! c->samplePath.empty());
-            removeButton.setEnabled (! c->samplePath.empty() || ! c->zones.empty());
-            wave.setFile (path, [&e = engine, path] { return e.getSampleLibrary().load (path); });
-            wave.setRegion (c->sampler.regionStart, c->sampler.regionEnd);
-            wave.setReversed (c->sampler.reverse);
-            wave.setStartOffset (c->sampler.startOffset); // round 190w (FL dims the region before it)
-
-            if (auto* w = findParentComponentOfClass<juce::DocumentWindow>())
-                w->setName (tr ("Sampler settings - {0}", { juce::String::fromUTF8 (c->name.c_str()) })
-                            + (c->zones.empty() ? juce::String() : tr (" (multi-sample: {0} zones)", { juce::String ((int) c->zones.size()) })));
+            loopStartKnob.setRange (0.0, (double) (frames - 1), 1.0);
+            loopEndKnob.setRange (0.0, (double) (frames - 1), 1.0);
+            const auto [a, b] = samplerpage::shownLoop (s, shownFileLoop.first, shownFileLoop.second);
+            loopStartKnob.setValue ((double) juce::jmax<std::int64_t> (0, a), juce::dontSendNotification);
+            loopEndKnob.setValue ((double) (b >= 0 ? b : frames - 1), juce::dontSendNotification);
+            loopStartKnob.setDoubleClickReturnValue (false, 0.0);
+            loopEndKnob.setDoubleClickReturnValue (false, 0.0);
+            wave.setLoop (a >= 0 && s.useLoopPoints ? (float) a / (float) (frames - 1) : -1.0f, b >= 0 && s.useLoopPoints ? (float) b / (float) (frames - 1) : -1.0f);
         }
+        else
+            wave.setLoop (-1.0f, -1.0f);
+        // Time stretching
+        stretchPitchKnob.setValue (s.flStretchPitch, juce::dontSendNotification);
+        mulKnob.setValue (s.stretchMul, juce::dontSendNotification);
+        stretch.setValue (samplerpage::stretchTime (s), juce::dontSendNotification);
+        stretchMethod.setSelectedId (samplerpage::modeIndex (s) + 1, juce::dontSendNotification);
+        // Precomputed effects
+        const auto& p = s.precompute;
+        removeDc.setToggleState (p.removeDc, juce::dontSendNotification);
+        normalize.setToggleState (p.normalize, juce::dontSendNotification);
+        reverse.setToggleState (s.reverse, juce::dontSendNotification);
+        polarity.setToggleState (p.reversePolarity, juce::dontSendNotification);
+        fadeStereo.setToggleState (p.fadeStereo, juce::dontSendNotification);
+        swapStereo.setToggleState (p.swapStereo, juce::dontSendNotification);
+        regionStart.setValue (s.regionStart, juce::dontSendNotification);
+        lengthKnob.setValue (samplerpage::lengthOf (s), juce::dontSendNotification);
+        fadeIn.setValue (p.fadeIn, juce::dontSendNotification);
+        fadeOut.setValue (p.fadeOut, juce::dontSendNotification);
+        // (a value over FL's knob range from an old project shows at the end of a range that holds it)
+        crossfade.setRange (0.0, juce::jmax (1024.0, (double) p.crossfade), 1.0);
+        crossfade.setValue (p.crossfade, juce::dontSendNotification);
+        trim.setRange (0.0, juce::jmax (256.0, (double) p.trim), 1.0);
+        trim.setValue (p.trim, juce::dontSendNotification);
+        boost.setValue (p.boost, juce::dontSendNotification);
+        eq.setValue (p.eq, juce::dontSendNotification);
+        ringMix.setValue (p.ringMix, juce::dontSendNotification);
+        ringFreq.setValue (p.ringFreq, juce::dontSendNotification);
+        legacyCut.setValue (p.cutoff, juce::dontSendNotification);
+        legacyRes.setValue (p.resonance, juce::dontSendNotification);
+        reverbAmount.setValue (p.reverb, juce::dontSendNotification);
+        reverbType.setSelectedId (p.reverbType == 0 ? 1 : 2, juce::dontSendNotification);
+        stereoDelay.setValue (p.stereoDelay, juce::dontSendNotification);
+        pogo.setValue (p.pogo, juce::dontSendNotification);
+        clip.setToggleState (p.clip, juce::dontSendNotification);
+        // LYNX extras
+        gain.setValue (s.gainDb, juce::dontSendNotification);
+        attack.setValue (s.attack, juce::dontSendNotification);
+        decay.setValue (s.decay, juce::dontSendNotification);
+        sustain.setValue (s.sustain, juce::dontSendNotification);
+        release.setValue (s.release, juce::dontSendNotification);
+        cutoff.setValue (s.cutoff, juce::dontSendNotification);
+        resonance.setValue (s.resonance, juce::dontSendNotification);
+        filterType.setSelectedId (s.filterType + 1, juce::dontSendNotification);
+        cut.setToggleState (channelCutsItself (*c), juce::dontSendNotification); // (issue #68: the rack menu's state too)
+        porta.setToggleState (s.porta, juce::dontSendNotification);
+        showAutomation (true);
+
+        const auto path = juce::String::fromUTF8 ((c->samplePath.empty() && ! c->zones.empty() ? c->zones.front().path : c->samplePath).c_str());
+        fileName.setText (juce::File (path).getFileName(), juce::dontSendNotification); // (FL: the name, the path's end)
+        fileName.setTooltip (path);
+        locateButton.setEnabled (! c->samplePath.empty());
+        removeButton.setEnabled (! c->samplePath.empty() || ! c->zones.empty());
+        wave.setFile (path, [&e = engine, path] { return e.getSampleLibrary().load (path); });
+        wave.setRegion (s.regionStart, s.regionEnd);
+        wave.setReversed (s.reverse);
+        wave.setStartOffset (s.startOffset); // round 190w (FL dims the region before it)
+
+        if (auto* w = findParentComponentOfClass<juce::DocumentWindow>())
+            w->setName (tr ("Sampler settings - {0}", { juce::String::fromUTF8 (c->name.c_str()) })
+                        + (c->zones.empty() ? juce::String() : tr (" (multi-sample: {0} zones)", { juce::String ((int) c->zones.size()) })));
     }
 
     // The knobs an automation drives show its value while the song plays, as in FL (issue #12); a knob held by the
@@ -3402,24 +3733,30 @@ private:
             return;
 
         std::vector<juce::Slider*> now;
-        updating = true;
+        const juce::ScopedValueSetter<bool> guard (updating, true);
+        auto shownSettings = c->sampler; // (the region as the automation has it: LENGTH is relative to SMP START)
+        for (const auto& [slider, param] : tweakTargets)
+            if (const auto v = shown.valueOf ({ AutomationTargetKind::channelParam, ref.index, 0, param }))
+                samplerparam::set (shownSettings, param, *v);
         for (const auto& [slider, param] : tweakTargets)
         {
             if (slider->isMouseButtonDown())
                 continue;
             const auto v = shown.valueOf ({ AutomationTargetKind::channelParam, ref.index, 0, param });
             const auto was = std::find (automatedShown.begin(), automatedShown.end(), slider) != automatedShown.end();
+            const auto value = [&] (const SamplerSettings& s) {
+                return param == samplerparam::end ? (double) samplerpage::lengthOf (s) : (double) samplerparam::toNatural (param, samplerparam::get (s, param));
+            };
             if (v)
             {
-                slider->setValue (samplerparam::toNatural (param, *v), juce::dontSendNotification);
+                slider->setValue (value (shownSettings), juce::dontSendNotification);
                 now.push_back (slider);
             }
             else if (was && ! force)
-                slider->setValue (samplerparam::toNatural (param, samplerparam::get (c->sampler, param)), juce::dontSendNotification);
+                slider->setValue (value (c->sampler), juce::dontSendNotification);
         }
-        updating = false;
         automatedShown = std::move (now);
-        wave.setRegion ((float) regionStart.getValue(), (float) regionEnd.getValue());
+        wave.setRegion (shownSettings.regionStart, shownSettings.regionEnd);
     }
 
     void timerCallback() override
@@ -3429,84 +3766,128 @@ private:
         followPreview();
     }
 
-    // the Song's value of `param` (a knob that shows its automation must not write the automated value back)
-    static void keepSongValue (SamplerSettings& s, const SamplerSettings& song, int param) noexcept
+    // One control changed (`changed`): its law applied to the channel's sampler settings (core/SamplerPage.h), one edit
+    void apply (juce::Component* changed)
     {
-        switch (param)
-        {
-            case samplerparam::attack: s.attack = song.attack; break;
-            case samplerparam::decay: s.decay = song.decay; break;
-            case samplerparam::sustain: s.sustain = song.sustain; break;
-            case samplerparam::release: s.release = song.release; break;
-            case samplerparam::cutoff: s.cutoff = song.cutoff; break;
-            case samplerparam::resonance: s.resonance = song.resonance; break;
-            case samplerparam::start: s.regionStart = song.regionStart; break;
-            case samplerparam::end: s.regionEnd = song.regionEnd; break;
-            default: break;
-        }
-    }
+        const auto* c = current();
+        if (updating || c == nullptr)
+            return;
+        auto s = c->sampler;
+        const auto& old = c->sampler;
+        bool cutOn = channelCutsItself (*c), cutChanged = false;
+        auto value = [] (juce::Component* k) { return static_cast<juce::Slider*> (k)->getValue(); };
+        auto on = [] (juce::Component* b) { return static_cast<juce::Button*> (b)->getToggleState(); };
+        auto& p = s.precompute;
 
-    void apply (juce::Slider* changed = nullptr)
-    {
-        if (updating || current() == nullptr)
+        if (changed == &keepOnDisk) s.keepOnDisk = on (changed);
+        else if (changed == &resampleBox) s.resampleOnLoad = on (changed);
+        else if (changed == &loadRegionsBox) s.loadRegions = on (changed);
+        else if (changed == &loadMarkersBox) s.loadSliceMarkers = on (changed);
+        else if (changed == &declick) s.declickMode = juce::jlimit (0, 5, declick.getSelectedId() - 1);
+        else if (changed == &startOffsetKnob) s.startOffset = (float) value (changed);
+        else if (changed == &loopStartKnob || changed == &loopEndKnob)
+        {
+            const auto keep = shiftHeld || (! shotDriven && juce::ModifierKeys::currentModifiers.isShiftDown()); // (FL: Shift moves the loop)
+            if (changed == &loopStartKnob)
+                samplerpage::setLoopStart (s, (std::int64_t) std::llround (value (changed)), shownFrames, shownFileLoop.first, shownFileLoop.second, keep);
+            else
+                samplerpage::setLoopEnd (s, (std::int64_t) std::llround (value (changed)), shownFrames, shownFileLoop.first, shownFileLoop.second, keep);
+        }
+        else if (changed == &useLoops)
+        {
+            s.useLoopPoints = on (changed);
+            // FL's LoopBoxClick 0xf67f70: switching loop points on makes the channel cut itself (FUN_00feaaf0)
+            if (s.useLoopPoints && ! cutOn && ref.index >= 0)
+                cutOn = cutChanged = true;
+        }
+        else if (changed == &pingPong) p.pingPong = on (changed);
+        else if (changed == &stretchPitchKnob) samplerpage::turnStretchPitch (s, juce::roundToInt (value (changed)));
+        else if (changed == &mulKnob)
+        {
+            const auto sample = sampleOf (*c);
+            const auto beats = sample != nullptr && sample->sampleRate > 0.0
+                                   ? (double) sample->frames() / sample->sampleRate * engine.getSong().bpm / 60.0 : 0.0;
+            samplerpage::setStretchMul (s, juce::roundToInt (value (changed)), beats);
+        }
+        else if (changed == &stretch) samplerpage::setStretchTime (s, (float) value (changed));
+        else if (changed == &stretchMethod) samplerpage::selectMode (s, stretchMethod.getSelectedId() - 1);
+        else if (changed == &removeDc) p.removeDc = on (changed);
+        else if (changed == &normalize) p.normalize = on (changed);
+        else if (changed == &reverse) s.reverse = on (changed);
+        else if (changed == &polarity) p.reversePolarity = on (changed);
+        else if (changed == &fadeStereo) p.fadeStereo = on (changed);
+        else if (changed == &swapStereo) p.swapStereo = on (changed);
+        else if (changed == &regionStart) samplerpage::setSmpStart (s, (float) value (changed));
+        else if (changed == &lengthKnob) samplerpage::setLength (s, (float) value (changed));
+        else if (changed == &fadeIn) p.fadeIn = juce::roundToInt (value (changed));
+        else if (changed == &fadeOut) p.fadeOut = juce::roundToInt (value (changed));
+        else if (changed == &crossfade)
+        {
+            const auto loopsBefore = s.useLoopPoints;
+            samplerpage::turnCrossfade (s, juce::roundToInt (value (changed)));
+            // (FL ticks "Use loop points" the way a click does, so the channel cuts itself as with the click)
+            if (s.useLoopPoints && ! loopsBefore && ! cutOn && ref.index >= 0)
+                cutOn = cutChanged = true;
+        }
+        else if (changed == &trim) p.trim = juce::roundToInt (value (changed));
+        else if (changed == &boost) p.boost = juce::roundToInt (value (changed));
+        else if (changed == &eq) p.eq = juce::roundToInt (value (changed));
+        else if (changed == &ringMix) p.ringMix = juce::roundToInt (value (changed));
+        else if (changed == &ringFreq) p.ringFreq = juce::roundToInt (value (changed));
+        else if (changed == &legacyCut) p.cutoff = juce::roundToInt (value (changed));
+        else if (changed == &legacyRes) p.resonance = juce::roundToInt (value (changed));
+        else if (changed == &reverbAmount) p.reverb = juce::roundToInt (value (changed));
+        else if (changed == &reverbType) p.reverbType = reverbType.getSelectedId() == 1 ? 0 : 1;
+        else if (changed == &stereoDelay) p.stereoDelay = juce::roundToInt (value (changed));
+        else if (changed == &pogo) p.pogo = juce::roundToInt (value (changed));
+        else if (changed == &clip) p.clip = on (changed);
+        else if (changed == &gain) s.gainDb = std::abs (value (changed)) < 0.05 ? 0.0f : (float) value (changed);
+        else if (changed == &attack) s.attack = (float) value (changed);
+        else if (changed == &decay) s.decay = (float) value (changed);
+        else if (changed == &sustain) s.sustain = (float) value (changed);
+        else if (changed == &release) s.release = (float) value (changed);
+        else if (changed == &cutoff) s.cutoff = (float) value (changed);
+        else if (changed == &resonance) s.resonance = (float) value (changed);
+        else if (changed == &filterType) s.filterType = juce::jlimit (0, 3, filterType.getSelectedId() - 1);
+        else if (changed == &cut)
+        {
+            cutOn = on (changed);
+            cutChanged = cutOn != channelCutsItself (*c); // (issue #68: the rack menu's cut-itself too)
+        }
+        else if (changed == &porta) s.porta = on (changed);
+        else
             return;
 
-        auto s = current()->sampler; // keeps what the panel does not show (slices)
-        s.pitch = (float) pitch.getValue();
-        s.gainDb = std::abs (gain.getValue()) < 0.05 ? 0.0f : (float) gain.getValue();
-        s.attack = (float) attack.getValue();
-        s.decay = (float) decay.getValue();
-        s.sustain = (float) sustain.getValue();
-        if (changed == &stretch || stretch.getValue() != shownStretch) // (unmoved: keep the exact value, not the knob's)
-            s.stretchBeats = (float) (shownStretch = stretch.getValue());
-        s.keepPitch = keepPitch.getToggleState();
-        s.stretchMethod = (StretchMethod) juce::jlimit (0, stretchMethodCount - 1, stretchMethod.getSelectedId() - 1);
-        stretchMethod.setEnabled (s.keepPitch);
-        // leaving Beats (or Keep length): an imported clip's offline transposition moves to the Pitch knob, which the other
+        // leaving Beats (or Resample): an imported clip's offline transposition moves to the Pitch knob, which the other
         // modes apply in real time, so the sample stays at its pitch
-        if (s.moveBakedPitchToKnob())
-            pitch.setValue (s.pitch, juce::dontSendNotification);
-        s.regionStart = (float) regionStart.getValue();
-        s.regionEnd = (float) regionEnd.getValue();
-        s.startOffset = (float) startOffsetKnob.getValue();
-        wave.setStartOffset (s.startOffset);
-        s.release = (float) release.getValue();
-        s.reverse = reverse.getToggleState();
-        s.cut = cut.getToggleState();
-        const auto cutChanged = s.cut != channelCutsItself (*current()); // (issue #68: the rack menu's cut-itself too)
-        s.porta = porta.getToggleState();
-        s.cutoff = (float) cutoff.getValue();
-        s.resonance = (float) resonance.getValue();
-        s.filterType = juce::jlimit (0, 3, filterType.getSelectedId() - 1);
-        for (const auto& [slider, param] : tweakTargets)
-            if (slider != changed && std::find (automatedShown.begin(), automatedShown.end(), slider) != automatedShown.end())
-                keepSongValue (s, current()->sampler, param);
+        s.moveBakedPitchToKnob();
         bool dropFlmVoice = false;
         {
-            // an ADSR edited by hand replaces FL's imported volume envelope
-            const auto& old = current()->sampler;
+            // an ADSR edited by hand replaces FL's imported volume envelope (and FL Studio Mobile's pad envelope, round
+            // 190bs); so does an edited envelope or filter for FL's whole sampler voice (REA_rodada76)
             auto moved = [] (float a, float b) { return std::abs (a - b) > 1.0e-4f; };
             const auto adsr = moved (s.attack, old.attack) || moved (s.decay, old.decay) || moved (s.sustain, old.sustain) || moved (s.release, old.release);
             if (adsr)
             {
                 s.flVolumeEnvelope.clear();
-                s.flmPad.clear(); // and FL Studio Mobile's pad envelope (round 190bs)
-                dropFlmVoice = flmdw::isChannel (*current()); // and FL Studio Mobile's DW Sampler voice (round 190de)
+                s.flmPad.clear();
+                dropFlmVoice = flmdw::isChannel (*c); // and FL Studio Mobile's DW Sampler voice (round 190de)
             }
-            // so does an edited envelope or filter for FL's whole sampler voice (REA_rodada76)
             if (adsr || moved (s.cutoff, old.cutoff) || moved (s.resonance, old.resonance) || s.filterType != old.filterType)
                 s.flChannel.clear();
         }
-        if (s == current()->sampler && ! cutChanged)
+        if (cutChanged)
+            s.cut = cutOn;
+        if (s == old && ! cutChanged)
             return;
 
-        const auto before = current()->sampler;
-        ref.edit (engine, [s, cutChanged, dropFlmVoice, index = ref.index] (ChannelDef& channelDef) {
+        const auto before = old;
+        ref.edit (engine, [s, cutChanged, cutOn, dropFlmVoice, index = ref.index] (ChannelDef& channelDef) {
             channelDef.sampler = s;
             if (dropFlmVoice) // (the Sampler's own voice from now on: the module's values go, its zones stay)
                 channelDef.modelParams.clear();
             if (cutChanged)
-                setChannelCutsItself (channelDef, index, s.cut);
+                setChannelCutsItself (channelDef, index, cutOn);
         });
         for (const auto& [slider, param] : tweakTargets)
             if (std::abs (samplerparam::get (before, param) - samplerparam::get (s, param)) > 1.0e-6f)
@@ -3530,9 +3911,17 @@ private:
 
     AudioEngine& engine;
     ChannelRef ref;
-    bool updating = false;
-    juce::Slider pitch, gain, stretch;
-    double shownStretch = 0.0;
+    bool updating = false, shiftHeld = false, shotDriven = false;
+    float scale = 1.0f;
+    int offsetX = 0;
+    struct Group
+    {
+        juce::Rectangle<int> area;
+        juce::String caption;
+        int captionLeft;
+    };
+    std::vector<Group> groups;
+    juce::Rectangle<int> loopGlyph;
 
     // FL's TIME knob menu (r168s c_f20): (none), Autodetect, Project tempo, 1 beat, 2 beats, 1 bar, 2 bars, 3 bars, 4 bars
     struct StretchMenu final : juce::MouseListener
@@ -3553,8 +3942,8 @@ private:
             return;
         const auto& song = engine.getSong();
         const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (c->samplePath.c_str()));
-        const auto now = c->sampler.stretchBeats;
-        auto set = [this] (float beats) { ref.edit (engine, [beats] (ChannelDef& d) { d.sampler.stretchBeats = beats; }); };
+        const auto now = samplerpage::stretchTime (c->sampler);
+        auto set = [this] (float beats) { ref.edit (engine, [beats] (ChannelDef& d) { samplerpage::setStretchTime (d.sampler, beats); }); };
         juce::PopupMenu m;
         m.addItem (tr ("(none)"), true, now <= 0.0f, [set] { set (0.0f); });
         m.addItem (tr ("Autodetect"), sample != nullptr, false, [set, sample, bpm = song.bpm] { set (tempodetect::fitBeatsOf (sample.get(), bpm)); });
@@ -3569,21 +3958,48 @@ private:
         }
         m.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&stretch));
     }
-    MenuSlider attack, release, decay, sustain, regionStart, regionEnd, cutoff, resonance, startOffsetKnob;
-    std::vector<std::pair<MenuSlider*, int>> tweakTargets; // knob -> samplerparam
-    std::vector<juce::Slider*> automatedShown;             // knobs showing their automation's value now
-    std::uint32_t shownGeneration = 0;
-    bool dropHighlight = false;
-    juce::Label pitchLabel, gainLabel, attackLabel, releaseLabel, decayLabel, sustainLabel, stretchLabel, regionStartLabel, regionEndLabel,
-        cutoffLabel, resonanceLabel, startOffsetLabel;
-    juce::ToggleButton reverse, cut, keepPitch, porta;
-    juce::ComboBox filterType, stretchMethod;
-    juce::TextButton modulationButton, precomputeButton;
+
+    // File row
     static constexpr int fileRowHeight = 34; // FL's File row (round 190df)
     juce::Label fileLabel, fileName;
     WheelIconButton loadButton { "load", Icon::open }, locateButton { "locate", Icon::browser }, removeButton { "remove", Icon::close };
     std::unique_ptr<juce::FileChooser> sampleChooser;
+    // Content
+    juce::ToggleButton keepOnDisk, resampleBox, loadRegionsBox, loadMarkersBox;
+    juce::Label declickLabel;
+    juce::ComboBox declick;
+    // Playback
+    MenuSlider startOffsetKnob, loopStartKnob, loopEndKnob;
+    juce::Label startOffsetLabel, loopStartLabel, loopEndLabel;
+    juce::ToggleButton useLoops, pingPong;
+    std::pair<std::int64_t, std::int64_t> shownFileLoop { -1, -1 };
+    std::int64_t shownFrames = 0;
+    // Time stretching
+    MenuSlider stretchPitchKnob, mulKnob, stretch;
+    juce::Label stretchPitchLabel, mulLabel, stretchLabel, modeLabel;
+    juce::ComboBox stretchMethod;
+    // Precomputed effects (and FL's legacy panel)
+    juce::ToggleButton removeDc, normalize, reverse, polarity, fadeStereo, swapStereo, clip;
+    MenuSlider regionStart, lengthKnob, fadeIn, fadeOut, crossfade, trim;
+    juce::Label regionStartLabel, lengthLabel, fadeInLabel, fadeOutLabel, crossfadeLabel, trimLabel;
+    EffectsTargetSelect effectsTarget;
+    MenuSlider boost, eq, ringMix, ringFreq, legacyCut, legacyRes, reverbAmount, stereoDelay, pogo;
+    juce::Label boostLabel, eqLabel, ringMixLabel, ringFreqLabel, legacyCutLabel, legacyResLabel, reverbLabel, stereoDelayLabel, pogoLabel;
+    juce::ComboBox reverbType;
+    // the waveform
     ui::WaveformDisplay wave;
+    juce::ScrollBar waveScroll { false };
+    // LYNX extras
+    MenuSlider gain, attack, decay, sustain, release, cutoff, resonance;
+    juce::Label gainLabel, attackLabel, decayLabel, sustainLabel, releaseLabel, cutoffLabel, resonanceLabel, extrasLabel;
+    juce::ComboBox filterType;
+    juce::ToggleButton cut, porta;
+    juce::TextButton modulationButton;
+
+    std::vector<std::pair<MenuSlider*, int>> tweakTargets; // knob -> samplerparam
+    std::vector<juce::Slider*> automatedShown;             // knobs showing their automation's value now
+    std::uint32_t shownGeneration = 0;
+    bool dropHighlight = false;
     int previewKey = -1, previewFrames = 0; // round 190w: the display's preview note (-1 = none)
     bool previewSeen = false;
 };
@@ -5787,6 +6203,26 @@ std::optional<juce::PopupMenu> samplerHistoryMenu (juce::Component& root)
     if (auto* p = findSamplerPage (root))
         return p->sampleHistoryMenuForShot();
     return std::nullopt;
+}
+
+bool samplerPageTurn (juce::Component& root, const juce::String& what, double value, bool shift)
+{
+    auto* p = findSamplerPage (root);
+    return p != nullptr && p->shotTurn (what, value, shift);
+}
+
+juce::String samplerPageQuery (juce::Component& root, const juce::String& what)
+{
+    auto* p = findSamplerPage (root);
+    if (p == nullptr)
+        return {};
+    if (what == "legacy")
+        return p->shotLegacyShown() ? "1" : "0";
+    if (what == "mode")
+        return p->shotModeText();
+    if (what == "scroll")
+        return juce::String (p->shotScrollStart(), 3);
+    return p->shotEnabled (what) ? "1" : "0";
 }
 
 bool samplerFileRowPress (juce::Component& root, int button)

@@ -1998,6 +1998,14 @@ public:
             return;
         }
 
+        // --samplerpageshot <prefix> (round 190dh): FL's Sampler page offscreen (shots and checks in prefix-checks.txt)
+        if (args.contains ("--samplerpageshot"))
+        {
+            setApplicationReturnValue (runSamplerPageShot (args[args.indexOf ("--samplerpageshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--warpshot"))
         {
             // LYNX.exe --warpshot prefix: round 190cg's pictures (warp commands in the audio editor, the Clip page's
@@ -10632,6 +10640,139 @@ private:
                 return true;
             }
         return false;
+    }
+
+    // --samplerpageshot <prefix> (round 190dh): FL's Sampler page offscreen — the page as FL's shot (dock188a) shows it,
+    // the legacy effects, a small window, a zoomed waveform — and its laws turned as a user would; prefix-checks.txt
+    bool runSamplerPageShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        const auto shoot = [&prefix] (juce::Component& c, const char* name) {
+            savePng (c.createComponentSnapshot (c.getLocalBounds()), prefix + "-" + name + ".png");
+        };
+        lynx::AudioEngine engine (false);
+        const auto folder = juce::File (prefix).getParentDirectory().getChildFile ("sampler-samples");
+        folder.createDirectory();
+        // an 808-like kick, 1 s (FL's shot: "Basic 808 Kick.wav")
+        const auto kick = folder.getChildFile ("Basic 808 Kick.wav");
+        {
+            juce::AudioBuffer<float> buffer (1, 44100);
+            double phase = 0.0;
+            for (int i = 0; i < buffer.getNumSamples(); ++i)
+            {
+                const auto t = i / 44100.0;
+                phase += juce::MathConstants<double>::twoPi * (48.0 + 90.0 * std::exp (-t * 30.0)) / 44100.0;
+                buffer.setSample (0, i, (float) (0.9 * std::sin (phase) * std::exp (-t * 3.2)));
+            }
+            kick.deleteFile();
+            juce::WavAudioFormat wav;
+            if (auto out = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (kick.createOutputStream().release(), 44100.0, 1, 16, {}, 0)))
+                out->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+        }
+        engine.editSong ([&] (lynx::Song& s) {
+            if (s.channels.empty())
+                s.channels.resize (1);
+            lynx::audioclips::loadSampleInto (s.channels[0], kick.getFullPathName().toStdString(), "808 Kick");
+            // FL's shot: Resample and Load regions on, Use loop points on, declicking "Out only (no bleeding)"
+            s.channels[0].sampler.resampleOnLoad = true;
+        });
+        const auto sampler = [&engine] { return engine.getSong().channels[0].sampler; };
+        auto frame = lynx::makeChannelFrame (engine, 0, 0);
+        frame->setSize (frame->getWidth() > 0 ? frame->getWidth() : 700, frame->getHeight() > 0 ? frame->getHeight() : 720);
+        frame->createComponentSnapshot (frame->getLocalBounds()); // (starts the waveform's analysis)
+        lynx::ui::WaveformCache::getInstance()->waitUntilIdle (8000);
+        shoot (*frame, "sampler-page");
+        report.add ("page size " + juce::String (frame->getWidth()) + "x" + juce::String (frame->getHeight()));
+
+        // ---- the laws, turned on the page
+        auto& f = *frame;
+        lynx::samplerPageTurn (f, "pingPong", 1.0);
+        check ("ping_pong", sampler().precompute.pingPong);
+        lynx::samplerPageTurn (f, "pingPong", 0.0);
+        lynx::samplerPageTurn (f, "loopStart", 5000.0);
+        check ("loop_start", sampler().loopStart == 5000 && sampler().loopEnd == 5001, juce::String (sampler().loopStart) + "/" + juce::String (sampler().loopEnd));
+        lynx::samplerPageTurn (f, "loopEnd", 15000.0);
+        check ("loop_end", sampler().loopStart == 5000 && sampler().loopEnd == 15000);
+        lynx::samplerPageTurn (f, "loopStart", 20000.0, true); // Shift: the loop moves
+        check ("loop_shift_moves", sampler().loopStart == 20000 && sampler().loopEnd == 30000, juce::String (sampler().loopStart) + "/" + juce::String (sampler().loopEnd));
+        check ("keep_on_disk_greyed_with_loop", lynx::samplerPageQuery (f, "keepOnDisk") == "0");
+        lynx::samplerPageTurn (f, "useLoops", 0.0);
+        check ("keep_on_disk_back", lynx::samplerPageQuery (f, "keepOnDisk") == "1" && ! sampler().useLoopPoints);
+        check ("not_cut_yet", ! lynx::channelCutsItself (engine.getSong().channels[0]));
+        lynx::samplerPageTurn (f, "useLoops", 1.0);
+        check ("use_loops_cuts_itself", sampler().useLoopPoints && lynx::channelCutsItself (engine.getSong().channels[0]));
+        engine.editSong ([] (lynx::Song& s) {
+            lynx::setChannelCutsItself (s.channels[0], 0, false);
+            s.channels[0].sampler.useLoopPoints = false;
+        });
+        lynx::samplerPageTurn (f, "crossfade", 300.0); // (Use loop points off: the crossfade switches it on)
+        check ("crossfade_switches_loops_on", sampler().precompute.crossfade == 300 && sampler().useLoopPoints);
+        lynx::samplerPageTurn (f, "crossfade", 0.0);
+        lynx::samplerPageTurn (f, "pitch", 300.0); // (Resample: FL switches to Auto)
+        check ("pitch_resample_to_auto", sampler().keepPitch && sampler().flStretchMode == 5 && sampler().flStretchPitch == 300
+                                              && lynx::samplerPageQuery (f, "mode") == lynx::tr ("General"),
+               lynx::samplerPageQuery (f, "mode") + " " + juce::String (sampler().pitch));
+        lynx::samplerPageTurn (f, "pitch", 0.0);
+        lynx::samplerPageTurn (f, "mode", 1.0); // Resample
+        check ("mode_resample", ! sampler().keepPitch && std::abs (sampler().pitch) < 1.0e-4f);
+        lynx::samplerPageTurn (f, "time", 4.0);
+        lynx::samplerPageTurn (f, "mul", 10000.0);
+        check ("time_mul", std::abs (sampler().stretchBeats - 8.0f) < 1.0e-3f && sampler().stretchMul == 10000, juce::String (sampler().stretchBeats));
+        lynx::samplerPageTurn (f, "mul", 0.0);
+        lynx::samplerPageTurn (f, "time", 0.0);
+        lynx::samplerPageTurn (f, "length", 0.5);
+        lynx::samplerPageTurn (f, "smpStart", 0.5);
+        check ("smp_start_keeps_length", std::abs (sampler().regionStart - 0.5f) < 1.0e-3f && std::abs (sampler().regionEnd - 0.75f) < 1.0e-3f,
+               juce::String (sampler().regionStart) + "-" + juce::String (sampler().regionEnd));
+        lynx::samplerPageTurn (f, "smpStart", 0.0);
+        lynx::samplerPageTurn (f, "length", 1.0);
+        lynx::samplerPageTurn (f, "declick", 4.0);
+        check ("declick_mode", sampler().declickMode == 4);
+        lynx::samplerPageTurn (f, "declick", 0.0);
+
+        // ---- the .lynx keeps what the page set
+        {
+            lynx::samplerPageTurn (f, "mul", -5000.0);
+            lynx::samplerPageTurn (f, "keepOnDisk", 1.0);
+            juce::String error;
+            const auto json = lynx::ProjectFile::toJson (engine.getSong(), false);
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            check ("lynx_round_trip", back.has_value() && back->channels[0].sampler == engine.getSong().channels[0].sampler, error);
+            lynx::samplerPageTurn (f, "mul", 0.0);
+            lynx::samplerPageTurn (f, "keepOnDisk", 0.0);
+        }
+
+        // ---- shots: FL's state again (loop points from the file: none), the legacy panel, a zoom, a small window
+        engine.editSong ([] (lynx::Song& s) {
+            auto& ch = s.channels[0];
+            ch.sampler.loopStart = ch.sampler.loopEnd = -1;
+            ch.sampler.useLoopPoints = true;
+            ch.sampler.precompute = {};
+        });
+        lynx::samplerPageTurn (f, "show", 0.0); // (no control: the page shows the channel again)
+        frame->createComponentSnapshot (frame->getLocalBounds());
+        shoot (*frame, "sampler-page-fl-state");
+        lynx::samplerPageTurn (f, "legacy", 1.0);
+        check ("legacy_panel", lynx::samplerPageQuery (f, "legacy") == "1");
+        shoot (*frame, "sampler-page-legacy");
+        lynx::samplerPageTurn (f, "legacy", 0.0);
+        lynx::samplerPageTurn (f, "zoom", 0.25);
+        check ("zoom_scroll", lynx::samplerPageQuery (f, "scroll") == "0.250", lynx::samplerPageQuery (f, "scroll"));
+        shoot (*frame, "sampler-page-zoom");
+        lynx::samplerPageTurn (f, "zoom", 1.0);
+        frame->setSize (520, 470);
+        frame->createComponentSnapshot (frame->getLocalBounds());
+        shoot (*frame, "sampler-page-small");
+
+        report.add (juce::String ("result=") + (allOk ? "OK" : "FAIL"));
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\n");
+        return allOk;
     }
 
     bool runFlCtlShot (const juce::String& prefix)
