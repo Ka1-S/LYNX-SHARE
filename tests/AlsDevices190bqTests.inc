@@ -107,13 +107,21 @@ TEST (als190bq_eq_eight_q_laws_match_the_analog_prototypes)
 {
     using namespace lynx;
     using alsdev::Eq8Mode;
-    // the Q conversions: bell and notch √2·Q, 12 dB cuts Q / 0.7071, shelves (Q / 0.7071)^(1 / 0.4697), 48 dB cuts √2·Q⁴
+    // the Q conversions (round 190cx, measured in Live 12.4): bell, notch and 12 dB cuts √2·Q; shelves through the
+    // cookbook Q 0.7071·(√2·Q)^0.3966; 48 dB cuts = the scale of all four Butterworth section Qs, 1 + 0.2611·ln(Q / 0.714)
     CHECK (std::abs (alsdev::facetQ (Eq8Mode::bell, 0.7071) - 1.0) < 1e-3);
     CHECK (std::abs (alsdev::facetQ (Eq8Mode::notch, 2.0) - 2.8284) < 1e-3);
     CHECK (std::abs (alsdev::facetQ (Eq8Mode::lowCut12, 0.7071) - 1.0) < 1e-3 && std::abs (alsdev::facetQ (Eq8Mode::highCut12, 2.0) - 2.8284) < 1e-3);
-    CHECK (std::abs (alsdev::facetQ (Eq8Mode::lowShelf, 0.7071) - 1.0) < 1e-3 && std::abs (alsdev::facetQ (Eq8Mode::highShelf, 1.0) - std::pow (1.41421356, 1.0 / 0.4697)) < 1e-3);
-    CHECK (std::abs (alsdev::facetQ (Eq8Mode::lowCut48, 0.7071) - 1.41421356 * 0.25) < 1e-3);
-    CHECK (alsdev::facetQ (Eq8Mode::bell, 18.0) < 40.0 && alsdev::facetQ (Eq8Mode::lowCut48, 18.0) == 40.0 && alsdev::facetQ (Eq8Mode::bell, 0.0) >= 0.025);
+    CHECK (std::abs (alsdev::facetQ (Eq8Mode::lowShelf, 0.7071) - 1.0) < 1e-3 && std::abs (alsdev::facetQ (Eq8Mode::highShelf, 1.0) - std::pow (1.41421356, 0.3966 / 0.4697)) < 1e-3);
+    // the measured points: shelf Q 0.71 → cookbook 0.709, Q 2 → 1.068; 48 dB cut Q 0.5 / 0.71 / 1 → sections × 0.907 / 0.999 / 1.088
+    CHECK (std::abs (alsdev::eq8ShelfCookbookQ (0.71) - 0.709) < 0.002 && std::abs (alsdev::eq8ShelfCookbookQ (2.0) - 1.068) < 0.002);
+    CHECK (std::abs (alsdev::facetQ (Eq8Mode::lowCut48, 0.5) - 0.907) < 0.002 && std::abs (alsdev::facetQ (Eq8Mode::highCut48, 0.71) - 0.999) < 0.002 &&
+           std::abs (alsdev::facetQ (Eq8Mode::lowCut48, 1.0) - 1.088) < 0.002);
+    // Adaptive Q: a bell at Q 2, ±12 dB acts as Q 3.97 / 3.95 (factor 1.12 → 3.95)
+    CHECK (std::abs (alsdev::eq8AdaptiveQ (2.0, 12.0, 1.12) - 3.948) < 0.002 && std::abs (alsdev::eq8AdaptiveQ (2.0, -12.0, 1.12) - 3.948) < 0.002 &&
+           alsdev::eq8AdaptiveQ (2.0, 0.0, 1.12) == 2.0);
+    CHECK (alsdev::facetQ (Eq8Mode::bell, 18.0) < 40.0 && alsdev::facetQ (Eq8Mode::lowCut48, 18.0) < 2.0 && alsdev::facetQ (Eq8Mode::lowCut48, 0.1) > 0.4 &&
+           alsdev::facetQ (Eq8Mode::bell, 0.0) >= 0.025);
 
     auto params = makeEffectSlot (EffectKind::facetEq).params;
     const auto band = [&params] (Eq8Mode mode, double hz, double gain, double q) {
@@ -140,11 +148,12 @@ TEST (als190bq_eq_eight_q_laws_match_the_analog_prototypes)
     std::printf ("  bell: worst %.4f dB\n", worst);
     CHECK (worst < 0.02);
 
-    // Low shelf (cookbook): A·(s² + (√A/Q)s + A) / (A·s² + (√A/Q)s + 1); high shelf: A·(A·s² + (√A/Q)s + 1) / (s² + (√A/Q)s + A)
+    // Low shelf (cookbook): A·(s² + (√A/Qs)s + A) / (A·s² + (√A/Qs)s + 1); high shelf: A·(A·s² + (√A/Qs)s + 1) / (s² + (√A/Qs)s + A),
+    // Qs = the cookbook Q Live's Q acts as
     worst = 0.0;
-    for (const auto& [hz, gain, q] : { std::array<double, 3> { 100.0, 6.0, 0.7071 }, { 300.0, -8.0, 1.0 }, { 150.0, 4.0, 0.5 } })
+    for (const auto& [hz, gain, q] : { std::array<double, 3> { 100.0, 6.0, 0.7071 }, { 300.0, -8.0, 1.0 }, { 150.0, 4.0, 0.5 }, { 200.0, 12.0, 2.0 } })
     {
-        const auto a = std::pow (10.0, gain / 40.0), m = std::sqrt (a) / q;
+        const auto a = std::pow (10.0, gain / 40.0), m = std::sqrt (a) / alsdev::eq8ShelfCookbookQ (q);
         band (Eq8Mode::lowShelf, hz, gain, q);
         for (const auto r : ratios)
             worst = std::max (worst, std::abs (facet::analogDb (params, 0, hz * r) - als190bq::analogDb (a, a * m, a * a, a, m, 1, r)));
@@ -172,20 +181,90 @@ TEST (als190bq_eq_eight_q_laws_match_the_analog_prototypes)
     std::printf ("  12 dB cuts and notch: worst %.4f dB\n", worst);
     CHECK (worst < 0.02);
 
-    // 48 dB cuts (four equal 12 dB sections in series): the same level at the cut frequency and the same stop-band
-    // slope; the corner is rounder in Live — the differences two octaves down and around the corner are printed and
-    // bounded (measured 2026-11-11: 1.62 dB and 4.52 dB at the worst Q of the three)
-    double atCut = 0.0, stop = 0.0, corner = 0.0;
-    for (const auto q : { 0.7071, 1.0, 0.5 })
+    // 48 dB cuts (round 190cx): an 8th-order Butterworth (section Qs 0.5098, 0.6013, 0.9000, 2.5629) with every section
+    // Q scaled by the scale fitted to each Live render (Q 0.5 / 0.71 / 1 → 0.907 / 0.999 / 1.088). The importer sets
+    // Facet's cut law to "all sections"; the default law (top section only) is checked to stay as it was.
+    worst = 0.0;
+    const double bw8[4] { 0.50979558, 0.60134489, 0.89997622, 2.56291545 };
+    for (const auto& [q, scale] : { std::array<double, 2> { 0.5, 0.907 }, { 0.71, 0.999 }, { 1.0, 1.088 } })
     {
         band (Eq8Mode::lowCut48, 100.0, 0.0, q);
-        atCut = std::max (atCut, std::abs (facet::analogDb (params, 0, 100.0) - 4.0 * als190bq::analogDb (1, 0, 0, 1, 1 / q, 1, 1.0)));
-        stop = std::max (stop, std::abs (facet::analogDb (params, 0, 25.0) - 4.0 * als190bq::analogDb (1, 0, 0, 1, 1 / q, 1, 0.25)));
-        for (double r = 0.5; r <= 8.0; r *= 1.05946)
-            corner = std::max (corner, std::abs (facet::analogDb (params, 0, 100.0 * r) - 4.0 * als190bq::analogDb (1, 0, 0, 1, 1 / q, 1, r)));
+        auto all = params;
+        all[facet::cutLawParam] = 1.0f;
+        for (double r = 0.25; r <= 8.0; r *= 1.05946)
+        {
+            double want = 0.0;
+            for (const auto sq : bw8)
+                want += als190bq::analogDb (1, 0, 0, 1, 1 / (sq * scale), 1, r);
+            worst = std::max (worst, std::abs (facet::analogDb (all, 0, 100.0 * r) - want));
+        }
     }
-    std::printf ("  48 dB cut: at the cut frequency %.3f dB, two octaves into the stop band %.3f dB, corner %.2f dB\n", atCut, stop, corner);
-    CHECK (atCut < 0.05 && stop < 2.0 && corner < 5.0);
+    std::printf ("  48 dB cut (all sections scaled): worst %.4f dB\n", worst);
+    CHECK (worst < 0.05);
+    // Facet's default cut law is unchanged: the top section alone carries Q (Q 2 → the top section at 2 × 2.5629)
+    auto old = makeEffectSlot (EffectKind::facetEq).params;
+    CHECK (old[facet::cutLawParam] == 0.0f);
+    old[(std::size_t) facet::param (0, 0)] = facet::shapeValue (facet::Shape::lowCut);
+    old[(std::size_t) facet::param (0, 1)] = facet::hzValue (100.0);
+    old[(std::size_t) facet::param (0, 3)] = facet::qValue (2.0);
+    old[(std::size_t) facet::param (0, 4)] = facet::slopeValue (48);
+    double oldWorst = 0.0;
+    for (double r = 0.25; r <= 8.0; r *= 1.05946)
+    {
+        double want = 0.0;
+        for (int k = 0; k < 4; ++k)
+            want += als190bq::analogDb (1, 0, 0, 1, 1 / (bw8[k] * (k == 3 ? 2.0 : 1.0)), 1, r);
+        oldWorst = std::max (oldWorst, std::abs (facet::analogDb (old, 0, 100.0 * r) - want));
+    }
+    CHECK (oldWorst < 1e-6);
+}
+
+// The importer's EQ Eight against Live 12.4's own renders (round 190cw: white noise through one band at 1 kHz, the
+// transfer function against the dry track, 48 kHz): Facet EQ's digital response at the same bins, in dB
+TEST (als190cx_eq_eight_matches_the_live_renders)
+{
+    using namespace lynx;
+    const double hz[8] { 123.047, 251.953, 498.047, 708.984, 1001.953, 1412.109, 2003.906, 4001.953 };
+    struct Render
+    {
+        const char* name;
+        int mode;
+        double q, gain;
+        bool adaptive;
+        double live[8];
+        double tolerance;
+    };
+    const Render renders[] = {
+        { "LC48 Q 0.5", 0, 0.5, 0, false, { -148.54, -96.26, -49.78, -26.25, -6.28, -2.29, -1.38, -0.41 }, 0.3 },
+        { "LC48 Q 0.71", 0, 0.71, 0, false, { -149.85, -95.83, -48.39, -23.95, -2.92, 0.01, 0.01, 0.00 }, 0.3 },
+        { "LC48 Q 1", 0, 1.0, 0, false, { -154.05, -95.49, -47.24, -21.98, 0.08, 1.97, 1.15, 0.32 }, 0.3 },
+        { "LC12 Q 0.71", 1, 0.71, 0, false, { -36.48, -23.99, -12.34, -6.94, -2.96, -0.94, -0.24, -0.01 }, 0.15 },
+        { "bell +12 Q 0.71", 3, 0.71, 12, false, { 0.46, 1.80, 5.64, 9.27, 12.00, 9.25, 5.62, 1.71 }, 0.15 },
+        { "bell +12 Q 2", 3, 2.0, 12, false, { 0.06, 0.28, 1.45, 4.27, 11.99, 4.24, 1.45, 0.26 }, 0.15 },
+        { "bell +12 Q 2 adaptive", 3, 2.0, 12, true, { 0.02, 0.07, 0.43, 1.67, 11.97, 1.65, 0.43, 0.07 }, 0.15 },
+        { "bell -12 Q 2 adaptive", 3, 2.0, -12, true, { -0.02, -0.07, -0.43, -1.67, -11.98, -1.65, -0.43, -0.07 }, 0.15 },
+        { "low shelf +12 Q 0.71", 2, 0.71, 12, false, { 12.00, 11.94, 11.13, 9.26, 5.98, 2.73, 0.87, 0.05 }, 0.15 },
+        { "low shelf +12 Q 2", 2, 2.0, 12, false, { 12.11, 12.43, 13.05, 11.48, 5.96, 0.49, -1.04, -0.41 }, 0.15 },
+    };
+    xml::Document doc;
+    for (const auto& r : renders)
+    {
+        std::string bands;
+        for (int b = 0; b < 8; ++b)
+            bands += als190bq::eqBand (b, b == 0, b == 0 ? r.mode : 3, 1000.0, b == 0 ? r.gain : 0.0, b == 0 ? r.q : 0.7071);
+        const auto t = alsdev::effectFromLiveDevice (als190bq::parse (doc, "<Eq8>" + als175a::v ("Mode", "0") + als190bq::par ("GlobalGain", 0.0) +
+                                                                                  als190bq::par ("Scale", 1.0) + bands + als190bq::flag ("AdaptiveQ", r.adaptive) +
+                                                                                  als175a::v ("AdaptiveQFactor", "1.12") + "</Eq8>"));
+        CHECK (t.has_value());
+        if (! t)
+            continue;
+        double worst = 0.0;
+        for (int k = 0; k < 8; ++k)
+            if (r.live[k] > -60.0)
+                worst = std::max (worst, std::abs (facet::responseDb (t->slot.params, 48000.0, hz[k]) - r.live[k]));
+        std::printf ("  %-24s worst %.3f dB\n", r.name, worst);
+        CHECK (worst < r.tolerance);
+    }
 }
 
 TEST (als190bq_eq_eight_becomes_facet_eq)
@@ -225,9 +304,12 @@ TEST (als190bq_eq_eight_becomes_facet_eq)
     CHECK (std::abs (facet::gainDb (p[(std::size_t) facet::param (1, 2)]) - 3.0) < 1e-4 && std::abs (facet::gainDb (p[(std::size_t) facet::param (2, 2)]) + 6.0) < 1e-4);
     CHECK (std::abs (facet::gainDb (p[(std::size_t) facet::param (4, 2)])) < 1e-6); // (a notch has no gain)
     CHECK (std::abs (facet::outputDb (p[facet::outputParam]) + 6.0) < 1e-4);
-    CHECK (std::abs (facet::q (p[(std::size_t) facet::param (2, 3)]) - 2.0 * 1.41421356) < 1e-3);
-    // the whole curve at 1 kHz: the bell's −6 dB × 50 % plus the output, and what the neighbours add there
-    CHECK (als190bq::hasNote (t->notes.approximated, "Adaptive Q") && als190bq::hasNote (t->notes.approximated, "48 dB/oct"));
+    // the bell (Q 2, +6 dB, Scale −50 %) with Adaptive Q: Q × 1.12^(|6 × 0.5| / 2), as Facet's √2·Q
+    CHECK (std::abs (facet::q (p[(std::size_t) facet::param (2, 3)]) - 2.0 * std::pow (1.12, 1.5) * 1.41421356) < 2e-3);
+    // the notch keeps its Q (Adaptive Q narrows bells only); the 48 dB cut at Q 0.71 is inside the measured span
+    CHECK (std::abs (facet::q (p[(std::size_t) facet::param (4, 3)]) - 6.0 * 1.41421356) < 1e-2);
+    CHECK (p[facet::cutLawParam] == 1.0f && std::abs (facet::q (p[(std::size_t) facet::param (7, 3)]) - 0.9975) < 2e-3);
+    CHECK (als190bq::hasNote (t->notes.approximated, "Adaptive Q on a shelf") && ! als190bq::hasNote (t->notes.approximated, "48 dB/oct"));
     CHECK (t->notes.dropped.empty());
 
     // M/S: curve A = mid, curve B = side, the bands that are on, in order; a ninth is listed
@@ -355,8 +437,10 @@ TEST (als190bq_utility_is_the_same_maths)
     u = {};
     u.width = 0.0;
     CHECK (is (alsdev::utilityMatrix (u), 0.5, 0.5, 0.5, 0.5) && alsdev::utilityIsExact (u));
-    u.width = 2.0; // side doubled: L' = 1.5 L − 0.5 R
-    CHECK (is (alsdev::utilityMatrix (u), 1.5, -0.5, -0.5, 1.5) && ! alsdev::utilityIsExact (u));
+    u.width = 2.0; // side doubled: L' = 1.5 L − 0.5 R (Live's law, measured; fits LYNX's matrix)
+    CHECK (is (alsdev::utilityMatrix (u), 1.5, -0.5, -0.5, 1.5) && alsdev::utilityIsExact (u));
+    u.width = 4.0; // 2.5 / −1.5: beyond LYNX's ±2 coefficients
+    CHECK (! alsdev::utilityIsExact (u));
     u = {};
     u.phaseL = true;
     CHECK (is (alsdev::utilityMatrix (u), -1, 0, 0, 1) && alsdev::utilityIsExact (u));
@@ -369,8 +453,10 @@ TEST (als190bq_utility_is_the_same_maths)
     CHECK (is (alsdev::utilityMatrix (u), 0, 1, 0, 1));
     u.channelMode = 3; // Swap
     CHECK (is (alsdev::utilityMatrix (u), 0, 1, 1, 0));
-    u.phaseL = true;
-    CHECK (! alsdev::utilityIsExact (u)); // (their order is not confirmed)
+    u.phaseL = true; // phase first, then the channel mode [MEASURED 190cw r17: L = R, R = −L]
+    CHECK (is (alsdev::utilityMatrix (u), 0, 1, -1, 0) && alsdev::utilityIsExact (u));
+    u.channelMode = 0; // [MEASURED r16: both sides −L]
+    CHECK (is (alsdev::utilityMatrix (u), -1, 0, -1, 0));
     u = {};
     u.midSideOn = true;
     u.midSide = 0.0; // mid only
@@ -378,8 +464,12 @@ TEST (als190bq_utility_is_the_same_maths)
     u.midSide = 2.0; // side only
     CHECK (is (alsdev::utilityMatrix (u), 0.5, -0.5, -0.5, 0.5));
     u = {};
-    u.balance = 0.2;
-    CHECK (! alsdev::utilityIsExact (u));
+    u.balance = 0.5; // [MEASURED 190cw r15: L × 0.5412, R × 1.3066]
+    const auto [bl, br] = alsdev::utilityBalanceGains (0.5);
+    CHECK (std::abs (bl - 0.5412) < 1e-4 && std::abs (br - 1.3066) < 1e-4 && alsdev::utilityIsExact (u));
+    CHECK (std::abs (alsdev::utilityMatrix (u).ll - 0.5412) < 1e-4 && std::abs (alsdev::utilityMatrix (u).rr - 1.3066) < 1e-4);
+    CHECK (std::abs (alsdev::utilityBalanceGains (0.0).first - 1.0) < 1e-12 && std::abs (alsdev::utilityBalanceGains (-1.0).second) < 1e-12 &&
+           std::abs (alsdev::utilityBalanceGains (-1.0).first - 1.41421356) < 1e-6);
     u = {};
     u.bassMono = true;
     CHECK (! alsdev::utilityIsExact (u));
@@ -403,6 +493,32 @@ TEST (als190bq_utility_is_the_same_maths)
     const Case cases[] = { { 1.41253757, false, false, false, 1, 1.0, false }, { 0.5, false, true, false, 1, 1.0, false }, { 1.0, false, false, false, 3, 1.0, false },
                            { 2.0, false, false, false, 0, 1.0, false }, { 0.25, false, false, false, 2, 1.0, true }, { 1.0, true, false, false, 1, 1.0, false },
                            { 0.0, false, false, false, 1, 1.0, false }, { 1.0, false, false, true, 1, 0.0, false } };
+    // (and with a balance, a width and phase + channel mode, round 190cx: still exact, not exportable)
+    struct Extra
+    {
+        double width, balance;
+        bool pl;
+        int mode;
+    };
+    const Extra extras[] = { { 1.0, 0.5, false, 1 }, { 0.5, 0.0, false, 1 }, { 1.5, -0.3, false, 1 }, { 1.0, 0.0, true, 3 }, { 1.0, 0.0, true, 0 } };
+    for (const auto& c : extras)
+    {
+        const auto t = alsdev::effectFromLiveDevice (als190bq::parse (doc, device (1.0, false, c.pl, false, c.mode, c.width, false, c.balance)));
+        CHECK (t && t->notes.approximated.empty() && t->notes.dropped.empty() && std::abs (t->slot.params[1] - 0.5f) < 1e-6);
+        if (! t)
+            continue;
+        const auto m = alsdev::utilityMatrix (alsdev::readUtility (doc.root()));
+        float l[4] { 1.0f, 0.0f, 0.5f, -0.25f }, r[4] { 0.0f, 1.0f, -0.3f, 0.75f };
+        const float inL[4] { 1.0f, 0.0f, 0.5f, -0.25f }, inR[4] { 0.0f, 1.0f, -0.3f, 0.75f };
+        auto fx = makeEffect (t->slot);
+        fx->prepare (48000.0);
+        fx->process (l, r, 4, t->slot.params, 120.0);
+        double w = 0.0;
+        for (int i = 0; i < 4; ++i)
+            w = std::max ({ w, std::abs ((double) l[i] - (m.ll * inL[i] + m.rl * inR[i])), std::abs ((double) r[i] - (m.lr * inL[i] + m.rr * inR[i])) });
+        CHECK (w < 1e-6);
+        CHECK (! alsdev::liveUtilityOf (t->slot).has_value() || std::abs (c.balance) < 1e-9);
+    }
     double worst = 0.0;
     for (const auto& c : cases)
     {
@@ -444,11 +560,10 @@ TEST (als190bq_utility_is_the_same_maths)
     t = alsdev::effectFromLiveDevice (als190bq::parse (doc, device (0.01, false, false, false, 1, 1.0, false, 0.0)));
     CHECK (t && t->slot.params[0] > 0.0f && als190bq::hasNote (t->notes.approximated, "gain -40.0 dB")); // (never the knob's "mute")
     t = alsdev::effectFromLiveDevice (als190bq::parse (doc, device (1.0, false, false, false, 1, 4.0, false, -0.5, true)));
-    CHECK (t && als190bq::hasNote (t->notes.approximated, "balance") && als190bq::hasNote (t->notes.approximated, "width 400 %") &&
-           als190bq::hasNote (t->notes.dropped, "Bass Mono (below 120 Hz)"));
-    CHECK (t && std::abs (t->slot.params[1] - 0.25f) < 1e-6);
+    CHECK (t && als190bq::hasNote (t->notes.approximated, "width 400 % with a balance") && als190bq::hasNote (t->notes.dropped, "Bass Mono (below 120 Hz)"));
+    CHECK (t && std::abs (t->slot.params[1] - 0.5f) < 1e-6); // the balance is in the matrix, LYNX's own stays centred
     t = alsdev::effectFromLiveDevice (als190bq::parse (doc, device (1.0, false, false, false, 1, 0.5, false, 0.0)));
-    CHECK (t && als190bq::hasNote (t->notes.approximated, "width 50 %") && std::abs (als190bq::utilCoef (t->slot.params[2]) - 0.75f) < 1e-6 &&
+    CHECK (t && t->notes.approximated.empty() && std::abs (als190bq::utilCoef (t->slot.params[2]) - 0.75f) < 1e-6 &&
            std::abs (als190bq::utilCoef (t->slot.params[3]) - 0.25f) < 1e-6);
     // a LYNX Utility with a balance or a free matrix has no exact Live form: not exported
     auto slot = makeEffectSlot (EffectKind::utility);

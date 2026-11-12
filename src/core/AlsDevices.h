@@ -17,6 +17,7 @@
 
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/Song.h"
@@ -44,13 +45,20 @@ double gainOfDb (double db) noexcept;
 // ---- EQ Eight → Facet EQ ----------------------------------------------------------------------------------------
 // The band's filter type, in the order Live stores it [DATA: Mode 0…7; the defaults of bands 1…8 and the manual's list]
 enum class Eq8Mode { lowCut48, lowCut12, lowShelf, bell, notch, highShelf, highCut12, highCut48 };
-// Facet EQ's Q for a Live Q, per filter family. Facet's prototypes (docs/analise/MEASURE_fabfilter.md §1):
-//   bell / notch   Qb = Qfacet / √2 in the constant-Q biquad  → Qfacet = √2 · Q
-//   shelves        Qs = 0.7071 · Qfacet^0.4697                → Qfacet = (Q / 0.7071)^(1 / 0.4697)
-//   12 dB cuts     section Q = 0.7071 · Qfacet                → Qfacet = Q / 0.7071
-//   48 dB cuts     Live's "x4" = four equal 12 dB sections in series [ASSUMED]: 4 · 20·log10(Q) dB at the cut
-//                  frequency; Facet's 48 dB cut holds 20·log10(Qfacet / √2) there → Qfacet = √2 · Q⁴
+// Facet EQ's Q for a Live Q, per filter family. Facet's prototypes (docs/analise/MEASURE_fabfilter.md §1) against
+// Live 12.4's EQ Eight as rendered in round 190cw (noise through one band at 1 kHz, transfer function vs the dry track):
+//   bell / notch   Qb = Qfacet / √2 in the constant-Q biquad; Live = the textbook bell (0.03 … 0.08 dB) → Qfacet = √2 · Q
+//   12 dB cuts     section Q = 0.7071 · Qfacet; Live = the textbook 2nd order (0.08 dB)            → Qfacet = √2 · Q
+//   shelves        Qs = 0.7071 · Qfacet^0.4697; Live's Q 0.71 / 2 act as cookbook Q 0.709 / 1.068 →
+//                  Qs = eq8ShelfCookbookQ (Q), Qfacet = (Qs / 0.7071)^(1 / 0.4697)
+//   48 dB cuts     Live = an 8th-order Butterworth at Q 0.71 with all four section Qs scaled by
+//                  eq8CutSectionScale (Q) (Q 0.5 / 0.71 / 1 → × 0.907 / 0.999 / 1.088, fit 0.14 dB); Facet holds it
+//                  with its cut law "all sections" (facet::cutLawParam) and Qfacet = that scale
 // (clamped to Facet's 0.025 … 40)
+double eq8CutSectionScale (double liveQ) noexcept;  // 1 + 0.2611·ln(Q / 0.714), at least 0.05
+double eq8ShelfCookbookQ (double liveQ) noexcept;   // 0.7071·(√2·Q)^0.3966
+// Adaptive Q on a bell: Q × factor^(|gain dB| / 2) (factor = the device's AdaptiveQFactor, 1.12 in every saved set)
+double eq8AdaptiveQ (double liveQ, double gainDb, double factor) noexcept;
 double facetQ (Eq8Mode mode, double liveQ) noexcept;
 struct Eq8Band
 {
@@ -87,22 +95,27 @@ struct LiveUtility
 {
     double gain = 1.0;        // linear; 0 = −inf dB [DATA: 0 … 56.23 = +35 dB]
     bool mute = false, phaseL = false, phaseR = false, mono = false, bassMono = false, dcFilter = false;
-    int channelMode = 1;      // 0 Left, 1 Stereo, 2 Right, 3 Swap [DATA: 0…3, 1 in every saved device; order ASSUMED]
+    int channelMode = 1;      // 0 Left, 1 Stereo, 2 Right, 3 Swap [DATA: 0…3; order seen in Live 12.4, round 190cw]
     double width = 1.0;       // 0 … 4 (0 … 400 %)
     bool midSideOn = false;   // the Width control shows Mid/Side balance instead
     double midSide = 1.0;     // 0 mid only … 1 neutral … 2 side only
     double balance = 0.0;     // −1 … 1
     bool operator== (const LiveUtility&) const = default;
 };
-// out L = ll·L + rl·R, out R = lr·L + rr·R (before gain and balance)
+// out L = ll·L + rl·R, out R = lr·L + rr·R (before gain; the balance included)
 struct StereoMatrix
 {
     double ll = 1.0, rl = 0.0, lr = 0.0, rr = 1.0;
 };
-// Phase switches, then channel mode, then Mono or Width (M = (L + R) / 2, S = (L − R) / 2; out = M ± width·S)
+// Live's balance (−1 … 1) as left / right gains: √2·cos((b + 1)·π/4), √2·sin((b + 1)·π/4) — constant power with a
+// boost (+0.5 → L × 0.541, R × 1.307; measured in Live 12.4, round 190cw r15)
+std::pair<double, double> utilityBalanceGains (double balance) noexcept;
+// Phase switches, then channel mode, then Mono or Width (M = (L + R) / 2, S = (L − R) / 2; out = M ± width·S), then
+// the balance gains on the outputs. Width, phase-before-mode and the balance law are measured (round 190cw r13–r17)
 StereoMatrix utilityMatrix (const LiveUtility& u) noexcept;
 // True when LYNX's Utility does exactly what these settings say: plain gain within ±24 dB or mute, phase switches,
-// channel mode, Mono, Width 0 % or 100 %, balance centred, no Bass Mono / DC filter
+// channel mode, Mono, any width and balance whose matrix fits LYNX's ±2 coefficients, mid/side balance neutral, no
+// Bass Mono / DC filter
 bool utilityIsExact (const LiveUtility& u) noexcept;
 LiveUtility readUtility (const xml::Element& device);
 bool utilityToUtility (const xml::Element& device, EffectSlot& slot, Notes& notes);
