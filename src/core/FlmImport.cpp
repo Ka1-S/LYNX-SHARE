@@ -54,16 +54,6 @@ std::string fileStem (const std::string& path)
     return name;
 }
 
-bool isAudioFile (const std::string& path)
-{
-    auto lower = path;
-    std::transform (lower.begin(), lower.end(), lower.begin(), [] (unsigned char c) { return (char) std::tolower (c); });
-    for (const auto* ext : { ".wav", ".mp3", ".ogg", ".flac", ".aif", ".aiff" })
-        if (lower.size() > std::strlen (ext) && lower.compare (lower.size() - std::strlen (ext), std::string::npos, ext) == 0)
-            return true;
-    return false;
-}
-
 std::string moduleLabel (std::uint32_t type)
 {
     const auto* name = flm::moduleName (type);
