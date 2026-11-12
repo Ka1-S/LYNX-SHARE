@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "core/KeyFollow.h"
 #include "core/LoopStarter.h"
 #include "core/MidiImport.h"
 #include "engine/AudioEngine.h"
@@ -588,10 +589,23 @@ void SimpleWorkflow::left()
     hideStartFrom();
     hideChooser();
     hideFinish();
+    releaseEditor(); // (the docked Piano roll goes back to its panel)
     if (dock != nullptr && dock->getParentComponent() != nullptr && host.setBottomDock)
         host.setBottomDock (nullptr, nullptr);
     if (host.setTitleAccessory)
         host.setTitleAccessory (nullptr, 0);
+}
+
+void SimpleWorkflow::editorTakenBack()
+{
+    if (dock != nullptr)
+        dock->editorTakenBack();
+}
+
+void SimpleWorkflow::releaseEditor()
+{
+    if (dock != nullptr)
+        dock->releaseEditor();
 }
 
 // --- the dock for the selected track (round 190bu) --------------------------------------------------------------------
@@ -610,6 +624,11 @@ void SimpleWorkflow::updateDock()
         SimpleDock::Hooks hooks;
         hooks.toggleChannelWindow = host.toggleChannelWindow;
         hooks.showKeys = host.showKeys;
+        hooks.dockPianoRoll = host.dockPianoRoll;
+        hooks.undockPianoRoll = host.undockPianoRoll;
+        hooks.setFoldToKey = host.setFoldToKey;
+        hooks.foldedToKey = host.foldedToKey;
+        hooks.openPianoRollPanel = host.openPianoRollPanel;
         hooks.layoutChanged = [this] {
             updateDock(); // (the ▾ button hides it)
             if (host.settingsChanged)
@@ -780,6 +799,9 @@ bool SimpleWorkflow::add (simpletracks::Request request)
         engine.setInsertArmed (r.insert, true);
     if (! r.channels.empty() && ! simpletracks::isAudioKind (request.kind))
         engine.setSelectedChannel (r.channels.front());
+    lastAddedTrack = r.track;
+    if (r.pattern >= 0 && r.pattern < (int) engine.getSong().patterns.size() && ! simpletracks::isAudioKind (request.kind) && request.kind != Kind::drums)
+        engine.editSong ([p = r.pattern] (Song& s) { s.currentPattern = p; }, false); // (the typing keys record into it)
     hideChooser();
     if (host.trackAdded)
         host.trackAdded (r.track);
@@ -805,7 +827,22 @@ void SimpleWorkflow::addDefaultInstrument()
     q.kind = Kind::instrument;
     q.name = trackNameFor (q.kind);
     q.channel = std::move (synth);
-    if (add (std::move (q)) && host.showKeys)
+    q.emptyBars = 4; // a pattern to write into (round 190ds)
+    if (add (std::move (q)))
+        showKeysForNewTrack();
+}
+
+void SimpleWorkflow::showKeysForNewTrack()
+{
+    if (SimpleDock::shownSetting && active)
+    {
+        dockTrack = lastAddedTrack;
+        updateDock();
+        if (dock != nullptr)
+            dock->showKeyboard();
+        return;
+    }
+    if (host.showKeys)
         host.showKeys();
 }
 
@@ -820,8 +857,9 @@ void SimpleWorkflow::chooseInstrument (juce::Component& tile)
             q.kind = c.instrument == InstrumentKind::sampler ? Kind::sampler : Kind::instrument;
             q.name = trackNameFor (q.kind);
             q.channel = std::move (c);
-            if (add (std::move (q)) && host.showKeys)
-                host.showKeys();
+            q.emptyBars = 4; // a pattern to write into (round 190ds)
+            if (add (std::move (q)))
+                showKeysForNewTrack();
         },
         [this] { chooseSample(); }, nullptr, chooser.get());
     quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (&tile), {});
@@ -852,6 +890,7 @@ void SimpleWorkflow::chooseSample()
                            q.kind = Kind::sampler;
                            q.name = file.getFileNameWithoutExtension().toStdString();
                            q.channel = std::move (c);
+                           q.emptyBars = 4; // a pattern to write into (round 190ds)
                            add (std::move (q));
                        });
 }
@@ -875,6 +914,7 @@ void SimpleWorkflow::dropFiles (const juce::StringArray& files, std::int64_t tic
 void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_t start)
 {
     juce::StringArray failed;
+    std::optional<keyfollow::LoopKey> firstKey; // the first keyed loop (a project without a key is offered its key)
     for (const auto& file : files)
     {
         if (file.hasFileExtension ("mid;midi"))
@@ -926,11 +966,53 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
         // beats at the project's tempo, at its own pitch, and follows the tempo from then on (round 190p)
         q.audioBeats = simpletracks::loopBeats (file.getFileName().toStdString(), seconds, data->acidBeats, engine.getSong().beatsPerBar);
         q.start = start;
+        // round 190ds: a loop follows the project key — its key from its name, else detected from a loop's audio (a
+        // file made for a tempo); voice takes and songs (over 70 s) are left alone
+        if (seconds <= 70.0)
+        {
+            auto key = keyfollow::keyInName (file.getFileName().toStdString());
+            int source = key ? 1 : 0;
+            if (! key && q.audioBeats > 0.0f)
+                if (key = keyfollow::detectKey (*data).key; key)
+                    source = 2;
+            if (key)
+            {
+                q.audioKeyRoot = key->root;
+                q.audioKeyMinor = key->minor;
+                q.audioKeySource = source;
+                q.followKey = true;
+                if (! firstKey)
+                    firstKey = key;
+            }
+        }
         add (std::move (q));
     }
     if (! failed.isEmpty())
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"),
                                                 tr ("Could not read {0}", { failed.joinIntoString (", ") }));
+    if (firstKey && keyfollow::asksToSetKey (engine.getSong()))
+        offerProjectKey (firstKey->root, firstKey->minor);
+}
+
+void SimpleWorkflow::offerProjectKey (int root, bool minor)
+{
+    const keyfollow::LoopKey key { root, minor };
+    const auto name = juce::String (projectkey::rootName (root)) + " " + (minor ? tr ("minor") : tr ("major"));
+    lastKeyQuestion = tr ("Set the project key to {0}? Loops that follow the key are moved to it, keeping their length.", { name });
+    auto setKey = [this, key] {
+        engine.editSong ([key] (Song& s) { projectkey::set (s, keyfollow::projectKeyFor (key)); });
+    };
+    if (answerForSnapshot >= 0)
+    {
+        if (answerForSnapshot == 1)
+            setKey();
+        return;
+    }
+    juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Project key"), lastKeyQuestion, tr ("Set the key"), tr ("Not now"),
+                                        nullptr, juce::ModalCallbackFunction::create ([setKey] (int result) {
+                                            if (result == 1)
+                                                setKey();
+                                        }));
 }
 
 void SimpleWorkflow::addDrums (const std::string& genre, bool steps, bool useTempo)

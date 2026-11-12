@@ -2,10 +2,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <set>
 
 #include "core/ChainPresets.h"
 #include "core/DetailChain.h"
 #include "core/GoalKnobs.h"
+#include "core/KeyFollow.h"
 #include "core/MixerOps.h"
 #include "core/SimpleTracks.h"
 #include "core/SoundLibrary.h"
@@ -19,6 +21,7 @@
 #include "ui/QuickPick.h"
 #include "ui/SoundFontEditor.h"
 #include "ui/Theme.h"
+#include "ui/TouchKeyboard.h"
 
 namespace lynx
 {
@@ -1265,37 +1268,240 @@ private:
 // =====================================================================================================================
 // The dock
 // =====================================================================================================================
+// --- Editor: the Piano roll docked on the track's pattern (round 190ds) ---------------------------------------------
+class SimpleDock::EditorPage final : public juce::Component
+{
+public:
+    EditorPage (AudioEngine& e, Hooks& h) : engine (e), hooks (h)
+    {
+        fold.setButtonText (tr ("Only notes in key"));
+        fold.setTooltip (tr ("Shows only the rows of the project key's notes"));
+        fold.onClick = [this] {
+            if (hooks.setFoldToKey)
+                hooks.setFoldToKey (fold.getToggleState());
+        };
+        open.setButtonText (tr ("Open in the Piano roll"));
+        open.setTooltip (tr ("The full Piano roll window, with every tool"));
+        open.onClick = [this] {
+            if (hooks.openPianoRollPanel)
+                hooks.openPianoRollPanel();
+        };
+        again.setButtonText (tr ("Show the editor here"));
+        again.onClick = [this] {
+            takenBack = false;
+            update();
+        };
+        makePattern.setButtonText (tr ("New pattern"));
+        makePattern.setTooltip (tr ("An empty 4-bar pattern on this track, to write notes into"));
+        makePattern.onClick = [this] { make(); };
+        addAndMakeVisible (fold);
+        addAndMakeVisible (open);
+        addChildComponent (again);
+        addChildComponent (makePattern);
+    }
+
+    ~EditorPage() override { release(); }
+
+    void show (int newTrack, int newChannel)
+    {
+        if (newTrack != track)
+            takenBack = false;
+        track = newTrack;
+        channel = newChannel;
+        update();
+    }
+
+    // Docks the Piano roll on the track's pattern while this page shows. A track without a pattern gets one the first
+    // time (after this call returns: no song edit inside the dock's own refresh); after an undo removed it, a button.
+    void update()
+    {
+        const auto& song = engine.getSong();
+        const auto pattern = track >= 0 ? simpletracks::patternOf (song, track) : -1;
+        const auto canHave = track >= 0 && (simpletracks::kindOf (song, track) == simpletracks::Kind::instrument
+                                            || simpletracks::kindOf (song, track) == simpletracks::Kind::sampler);
+        if (! shownInTree() || ! canHave)
+        {
+            release();
+            refreshControls (pattern);
+            return;
+        }
+        if (pattern < 0)
+        {
+            release();
+            if (made.count (song.playlistTracks[(std::size_t) track].channel) == 0 && ! pendingMake)
+            {
+                pendingMake = true;
+                juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<EditorPage> (this)] {
+                    if (safe != nullptr)
+                    {
+                        safe->pendingMake = false;
+                        if (safe->shownInTree())
+                            safe->make();
+                    }
+                });
+            }
+            refreshControls (pattern);
+            return;
+        }
+        if (channel >= 0 && engine.getSelectedChannel() != channel)
+            engine.setSelectedChannel (channel); // (the Piano roll shows the selected channel's notes)
+        if (! takenBack && (editor == nullptr || dockedPattern != pattern || song.currentPattern != pattern) && hooks.dockPianoRoll)
+        {
+            if (auto* e = hooks.dockPianoRoll (pattern))
+            {
+                editor = e;
+                dockedPattern = pattern;
+                addAndMakeVisible (*editor);
+                resized();
+            }
+        }
+        refreshControls (pattern);
+    }
+
+    void release()
+    {
+        if (editor != nullptr && hooks.undockPianoRoll)
+        {
+            editor = nullptr;
+            hooks.undockPianoRoll();
+        }
+        editor = nullptr;
+        dockedPattern = -1;
+    }
+
+    void takenBackByPanel()
+    {
+        if (editor != nullptr)
+        {
+            editor = nullptr;
+            dockedPattern = -1;
+            takenBack = true;
+        }
+        refreshControls (dockedPattern);
+    }
+
+    bool docked() const noexcept { return editor != nullptr; }
+
+    void visibilityChanged() override { update(); }
+    void parentHierarchyChanged() override
+    {
+        if (! shownInTree())
+            release();
+    }
+
+    // visible with all its parents (isShowing() also asks for a window on the desktop, which --snapshot has not)
+    bool shownInTree() const
+    {
+        for (auto* c = static_cast<const juce::Component*> (this); c != nullptr; c = c->getParentComponent())
+            if (! c->isVisible())
+                return false;
+        return getParentComponent() != nullptr;
+    }
+
+    void resized() override
+    {
+        auto bar = getLocalBounds().removeFromTop (barHeight).reduced (10, 4);
+        open.setBounds (bar.removeFromRight (170));
+        bar.removeFromRight (8);
+        fold.setBounds (bar.removeFromRight (160));
+        const auto body = getLocalBounds().withTrimmedTop (barHeight);
+        again.setBounds (body.withSizeKeepingCentre (220, 30));
+        makePattern.setBounds (body.withSizeKeepingCentre (160, 30));
+        if (editor != nullptr)
+            editor->setBounds (body);
+    }
+
+    void paint (juce::Graphics& g) override
+    {
+        g.fillAll (colour::bg1);
+        const auto& song = engine.getSong();
+        auto bar = getLocalBounds().removeFromTop (barHeight).reduced (12, 0);
+        const auto pattern = track >= 0 ? simpletracks::patternOf (song, track) : -1;
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::small));
+        if (pattern >= 0)
+            g.drawText (tr ("Notes of {0}", { utf8 (song.patterns[(std::size_t) pattern].name) }), bar, juce::Justification::centredLeft, true);
+        if (editor == nullptr)
+        {
+            g.setFont (font (type::body));
+            const auto body = getLocalBounds().withTrimmedTop (barHeight).withTrimmedBottom (80);
+            g.drawText (takenBack ? tr ("The Piano roll is open in its own window") : pattern < 0 ? tr ("This track has no pattern yet") : juce::String(),
+                        body, juce::Justification::centred, true);
+        }
+    }
+
+    static constexpr int barHeight = 30;
+
+private:
+    void make()
+    {
+        if (track < 0)
+            return;
+        const auto t = track;
+        int ch = -1;
+        if (t < (int) engine.getSong().playlistTracks.size())
+            ch = engine.getSong().playlistTracks[(std::size_t) t].channel;
+        made.insert (ch);
+        engine.editSong ([t] (Song& s) { simpletracks::ensurePattern (s, t, 4); });
+        update();
+    }
+
+    void refreshControls (int pattern)
+    {
+        const auto& song = engine.getSong();
+        fold.setEnabled (projectkey::get (song).has_value() && editor != nullptr);
+        fold.setToggleState (hooks.foldedToKey && hooks.foldedToKey(), juce::dontSendNotification);
+        again.setVisible (takenBack && editor == nullptr);
+        makePattern.setVisible (! takenBack && editor == nullptr && pattern < 0 && track >= 0 && ! pendingMake);
+        repaint();
+    }
+
+    AudioEngine& engine;
+    Hooks& hooks;
+    juce::ToggleButton fold;
+    juce::TextButton open, again, makePattern;
+    juce::Component* editor = nullptr; // the main window's Piano roll while docked here (not owned)
+    int track = -1, channel = -1, dockedPattern = -1;
+    bool takenBack = false, pendingMake = false;
+    std::set<int> made; // channels whose pattern this page made once (an undo then asks, it doesn't make it again)
+};
+
 SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h))
 {
+    // the Instrument tab's "Keyboard" button shows the dock's own Keyboard tab (round 190ds)
+    hooks.showKeys = [this] { showKeyboard(); };
     effectsPage = std::make_unique<EffectsPage> (engine);
     instrumentPage = std::make_unique<InstrumentPage> (engine, hooks);
+    editorPage = std::make_unique<EditorPage> (engine, hooks);
     addChildComponent (*effectsPage);
     addChildComponent (*instrumentPage);
+    addChildComponent (*editorPage);
 
     instrumentButton.setButtonText (tr ("Instrument"));
+    keyboardButton.setButtonText (tr ("Keyboard"));
+    keyboardButton.setTooltip (tr ("Play the track: piano, Scale keys or Chord pad"));
+    editorButton.setButtonText (tr ("Editor"));
+    editorButton.setTooltip (tr ("Write the track's notes"));
     effectsButton.setButtonText (tr ("Effects"));
-    for (auto* b : { &instrumentButton, &effectsButton })
+    const std::pair<juce::TextButton*, Tab> tabs[] { { &instrumentButton, Tab::instrument }, { &keyboardButton, Tab::keyboard },
+                                                     { &editorButton, Tab::editor }, { &effectsButton, Tab::effects } };
+    for (auto [b, t] : tabs)
     {
         b->setClickingTogglesState (true);
         b->setRadioGroupId (1901);
         addAndMakeVisible (*b);
+        b->onClick = [this, b = b, t = t] {
+            if (b->getToggleState())
+            {
+                tabChosen = true;
+                setTab (t);
+            }
+        };
     }
-    instrumentButton.setConnectedEdges (juce::Button::ConnectedOnRight);
-    effectsButton.setConnectedEdges (juce::Button::ConnectedOnLeft);
-    instrumentButton.onClick = [this] {
-        if (instrumentButton.getToggleState())
-        {
-            tabChosen = true;
-            setTab (Tab::instrument);
-        }
-    };
-    effectsButton.onClick = [this] {
-        if (effectsButton.getToggleState())
-        {
-            tabChosen = true;
-            setTab (Tab::effects);
-        }
-    };
+    followButton.setButtonText (tr ("Follow the project key"));
+    followButton.setTooltip (tr ("The loop is moved to the project key (its length stays); off: it plays in its own key"));
+    followButton.onClick = [this] { clickFollowForCheck(); };
+    addChildComponent (followButton);
     hideButton.setButtonText (glyph ("\xe2\x96\xbe"));
     hideButton.setTooltip (tr ("Hide the track dock"));
     hideButton.onClick = [this] {
@@ -1322,6 +1528,7 @@ void SimpleDock::refresh()
     const auto& song = engine.getSong();
     insert = channel = -1;
     instrumentTab = false;
+    playTabs = false;
     if (track >= 0)
     {
         const auto chain = detailchain::forTrack (song, track);
@@ -1333,37 +1540,136 @@ void SimpleDock::refresh()
             const auto kind = song.channels[(std::size_t) channel].instrument;
             instrumentTab = kind != InstrumentKind::audioClip && kind != InstrumentKind::sampler
                             && simpletracks::kindOf (song, track).value_or (simpletracks::Kind::instrument) == simpletracks::Kind::instrument;
+            // the track plays notes: it can be played and written (round 190ds)
+            const auto trackKind = simpletracks::kindOf (song, track);
+            playTabs = trackKind == simpletracks::Kind::instrument || trackKind == simpletracks::Kind::sampler;
         }
     }
     instrumentButton.setVisible (instrumentTab);
-    if (! instrumentTab)
+    keyboardButton.setVisible (playTabs);
+    editorButton.setVisible (playTabs);
+    if ((tab == Tab::instrument && ! instrumentTab) || ((tab == Tab::keyboard || tab == Tab::editor) && ! playTabs))
         tab = Tab::effects;
+    if (! tabChosen && (instrumentTab || playTabs))
+        tab = instrumentTab ? Tab::instrument : Tab::keyboard; // (an instrument track opens on its sound; an audio track on its effects)
     else if (! tabChosen)
-        tab = Tab::instrument; // (an instrument track opens on its sound; an audio track on its effects)
+        tab = Tab::effects;
     effectsPage->show (insert);
     instrumentPage->show (instrumentTab ? channel : -1);
     showPage();
+    editorPage->show (playTabs ? track : -1, channel);
+    updateFollow();
     resized();
     repaint();
 }
 
 void SimpleDock::setTab (Tab t)
 {
-    tab = t == Tab::instrument && ! instrumentTab ? Tab::effects : t;
+    if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor) && ! playTabs))
+        t = Tab::effects;
+    tab = t;
     showPage();
 }
 
 void SimpleDock::cycleTab()
 {
     tabChosen = true;
-    setTab (tab == Tab::effects ? Tab::instrument : Tab::effects);
+    std::vector<Tab> shown;
+    if (instrumentTab)
+        shown.push_back (Tab::instrument);
+    if (playTabs)
+        shown.push_back (Tab::keyboard), shown.push_back (Tab::editor);
+    shown.push_back (Tab::effects);
+    const auto at = std::find (shown.begin(), shown.end(), tab);
+    setTab (at == shown.end() || at + 1 == shown.end() ? shown.front() : *(at + 1));
 }
 
 void SimpleDock::showPage()
 {
-    (tab == Tab::instrument ? instrumentButton : effectsButton).setToggleState (true, juce::dontSendNotification);
+    auto& button = tab == Tab::instrument ? instrumentButton : tab == Tab::keyboard ? keyboardButton : tab == Tab::editor ? editorButton : effectsButton;
+    button.setToggleState (true, juce::dontSendNotification);
+    if (tab == Tab::keyboard && keyboardPage == nullptr)
+    {
+        keyboardPage = makeKeyboardPanel (engine, [this] { return channel; });
+        addChildComponent (*keyboardPage);
+        resized();
+    }
+    if (tab == Tab::keyboard && channel >= 0 && engine.getSelectedChannel() != channel)
+        engine.setSelectedChannel (channel); // (the typing keys play the selected channel: this track)
     instrumentPage->setVisible (tab == Tab::instrument);
     effectsPage->setVisible (tab == Tab::effects);
+    editorPage->setVisible (tab == Tab::editor);
+    if (keyboardPage != nullptr)
+        keyboardPage->setVisible (tab == Tab::keyboard);
+}
+
+void SimpleDock::showKeyboard()
+{
+    tabChosen = true;
+    setTab (Tab::keyboard);
+}
+
+void SimpleDock::editorTakenBack() { editorPage->takenBackByPanel(); }
+void SimpleDock::releaseEditor() { editorPage->release(); }
+bool SimpleDock::isEditorDocked() const noexcept { return editorPage->docked(); }
+
+std::vector<int> SimpleDock::trackAudioClips() const
+{
+    std::vector<int> out;
+    const auto& song = engine.getSong();
+    for (int i = 0; i < (int) song.playlist.size(); ++i)
+        if (const auto& c = song.playlist[(std::size_t) i]; c.kind == ClipKind::audio && c.track == track && track >= 0)
+            out.push_back (i);
+    return out;
+}
+
+// "Loop key: G minor · moved −5" and the switch, for an audio track whose loop has a known key (round 190ds)
+void SimpleDock::updateFollow()
+{
+    const auto& song = engine.getSong();
+    std::optional<keyfollow::LoopKey> key;
+    bool all = true;
+    int shift = 0;
+    for (const auto i : trackAudioClips())
+    {
+        const auto& c = song.playlist[(std::size_t) i];
+        if (const auto k = keyfollow::loopKeyOf (song, c.channel); k && ! key)
+        {
+            key = k;
+            shift = keyfollow::shiftOf (song, c);
+        }
+        all = all && c.followKey;
+    }
+    const auto show = key.has_value() && simpletracks::kindOf (song, track) == simpletracks::Kind::audio;
+    followButton.setVisible (show);
+    followText.clear();
+    if (show)
+    {
+        followButton.setToggleState (all, juce::dontSendNotification);
+        const auto name = utf8 (projectkey::rootName (key->root)) + " " + (key->minor ? tr ("minor") : tr ("major"));
+        followText = tr ("Loop key: {0}", { name }) + glyph ("  \xc2\xb7  ")
+                     + (! projectkey::get (song) ? tr ("no project key") : ! all ? tr ("plays in its own key")
+                        : shift == 0 ? tr ("already in key") : tr ("moved {0} semitones", { (shift > 0 ? "+" : "") + juce::String (shift) }));
+    }
+}
+
+bool SimpleDock::followShownForCheck() const { return followButton.isVisible(); }
+
+void SimpleDock::clickFollowForCheck()
+{
+    const auto clips = trackAudioClips();
+    bool all = ! clips.empty();
+    for (const auto i : clips)
+        all = all && engine.getSong().playlist[(std::size_t) i].followKey;
+    engine.editSong ([clips, on = ! all] (Song& s) { keyfollow::setFollow (s, clips, on); });
+    updateFollow();
+    repaint();
+}
+
+juce::Component* SimpleDock::keyboardPanelForSnapshot()
+{
+    setTab (Tab::keyboard);
+    return keyboardPage.get();
 }
 
 int SimpleDock::heightFor (int available) const noexcept
@@ -1386,17 +1692,26 @@ void SimpleDock::paint (juce::Graphics& g)
 
     const auto& song = engine.getSong();
     // round 190dg: the track's chain preset, right of the tabs (the header's FX button is too small to name it)
-    if (insert > 0 && insert < (int) song.mixer.size() && ! song.mixer[(std::size_t) insert].chainPreset.empty())
+    const auto rightEdge = followButton.isVisible() ? followButton.getX() - 10 : hideButton.getX() - 10;
+    if (followButton.isVisible()) // round 190ds: the loop's key and what following does
+    {
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::small));
+        const auto area = strip.withLeft (effectsButton.getRight() + 16).withRight (rightEdge);
+        g.drawText (followText, area, juce::Justification::centredRight, true);
+    }
+    else if (insert > 0 && insert < (int) song.mixer.size() && ! song.mixer[(std::size_t) insert].chainPreset.empty())
     {
         auto name = utf8 (song.mixer[(std::size_t) insert].chainPreset);
         if (! chains::unchanged (song, insert))
             name << " " << tr ("(edited)");
-        const auto area = strip.withLeft (effectsButton.getRight() + 16).withRight (hideButton.getX() - 10);
+        const auto area = strip.withLeft (effectsButton.getRight() + 16).withRight (rightEdge);
         g.setColour (colour::textSecondary);
         g.setFont (font (type::small));
         g.drawText (tr ("Preset") + glyph (": ") + name, area, juce::Justification::centredRight, true);
     }
-    auto text = strip.withTrimmedLeft (12).withRight (instrumentButton.isVisible() ? instrumentButton.getX() - 12 : effectsButton.getX() - 12);
+    auto text = strip.withTrimmedLeft (12).withRight (instrumentButton.isVisible() ? instrumentButton.getX() - 12
+                                                      : keyboardButton.isVisible() ? keyboardButton.getX() - 12 : effectsButton.getX() - 12);
     if (track < 0)
     {
         g.setColour (colour::textSecondary);
@@ -1426,14 +1741,27 @@ void SimpleDock::resized()
 {
     auto strip = getLocalBounds().withHeight (stripHeight).reduced (0, 4);
     hideButton.setBounds (strip.removeFromRight (34).withTrimmedRight (8));
+    followButton.setBounds (strip.removeFromRight (190).withTrimmedRight (10));
     // the tabs sit after the track's name, left of the middle
-    auto tabs = strip.withLeft (juce::jmin (300, getWidth() / 3)).withWidth (instrumentTab ? 220 : 110);
+    const auto count = 1 + (instrumentTab ? 1 : 0) + (playTabs ? 2 : 0);
+    auto tabs = strip.withLeft (juce::jmin (300, getWidth() / 3)).withWidth (100 * count);
+    std::vector<juce::TextButton*> shown;
     if (instrumentTab)
-        instrumentButton.setBounds (tabs.removeFromLeft (110));
-    effectsButton.setBounds (tabs.removeFromLeft (110));
+        shown.push_back (&instrumentButton);
+    if (playTabs)
+        shown.push_back (&keyboardButton), shown.push_back (&editorButton);
+    shown.push_back (&effectsButton);
+    for (std::size_t i = 0; i < shown.size(); ++i)
+    {
+        shown[i]->setConnectedEdges ((i > 0 ? juce::Button::ConnectedOnLeft : 0) | (i + 1 < shown.size() ? juce::Button::ConnectedOnRight : 0));
+        shown[i]->setBounds (tabs.removeFromLeft (100));
+    }
     const auto body = getLocalBounds().withTrimmedTop (stripHeight);
     effectsPage->setBounds (body);
     instrumentPage->setBounds (body);
+    editorPage->setBounds (body);
+    if (keyboardPage != nullptr)
+        keyboardPage->setBounds (body);
 }
 
 void SimpleDock::mouseMove (const juce::MouseEvent& e)

@@ -677,6 +677,7 @@ private:
     // Slice 2: the Piano roll docked in the detail view's Clip page (its panel lets go of it meanwhile)
     bool pianoRollDocked = false;
     juce::Component* dockPianoRoll (int pattern);
+    void pianoRollPanelWillShow (Panel panel);
     void undockPianoRoll();
     bool pianoRollKeysHere() const; // the docked Piano roll was clicked last: the keys are its own
     struct DockClickWatcher final : juce::MouseListener

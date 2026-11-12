@@ -417,6 +417,7 @@ private:
     void pasteClips (std::int64_t at = -1);
     void normalizeClips (const std::vector<int>& targets, bool asGroup = false);
     juce::PopupMenu buildClipMenu (int index, int mouseX);
+    void addKeyFollowItems (juce::PopupMenu& menu, int index, const std::vector<int>& targets); // round 190ds
     void duplicateSelection();
     void seekTo (int x, bool snapOn = true); // Alt held while scrubbing: snapOn false (free position, FL)
     void paintAudioClip (juce::Graphics& g, const Clip& clip, juce::Rectangle<float> bounds);

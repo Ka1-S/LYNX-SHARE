@@ -1417,7 +1417,7 @@ juce::var clipsToVar (const std::vector<Clip>& list)
         const auto pan = juce::roundToInt (c.pan * 1000.0f) / 1000.0;
         const auto pitch = juce::roundToInt (c.pitch * 1000.0f) / 1000.0;
         const auto stretch = std::round (c.stretch * 1.0e6) / 1.0e6;
-        const int used = c.fadeCurve != 0 ? 13 : c.linearFades != 0 || c.flFadeFlags != 0 ? 12 : c.fadeInTension != 0.0f || c.fadeOutTension != 0.0f ? 11 : c.uid != 0 ? 10 : stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
+        const int used = c.followKey || c.keyShift != 0 ? 14 : c.fadeCurve != 0 ? 13 : c.linearFades != 0 || c.flFadeFlags != 0 ? 12 : c.fadeInTension != 0.0f || c.fadeOutTension != 0.0f ? 11 : c.uid != 0 ? 10 : stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
                        : (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f) ? 3 : 0;
         if (used > 0)
         {
@@ -1456,6 +1456,11 @@ juce::var clipsToVar (const std::vector<Clip>& list)
             }
             if (used >= 13)
                 clip.add ((int) c.fadeCurve); // comp crossfades (round 177c): index 21, after round 180d's fade fields
+            if (used >= 14)
+            {
+                clip.add (c.followKey); // follows the project key, and the part of the pitch that is the key's (round 190ds)
+                clip.add ((int) c.keyShift);
+            }
         }
 
         clips.add (clip);
@@ -1499,6 +1504,8 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
                 clip.linearFades = c.size() >= 20 ? (std::uint8_t) ((int) c[19] & 3) : (std::uint8_t) 0;
                 clip.flFadeFlags = c.size() >= 21 ? (std::uint32_t) (juce::int64) c[20] : 0u;
                 clip.fadeCurve = c.size() >= 22 ? (std::uint8_t) juce::jlimit (0, 3, (int) c[21]) : 0;
+                clip.followKey = c.size() >= 24 && (bool) c[22];
+                clip.keyShift = c.size() >= 24 ? (std::int8_t) juce::jlimit (-12, 12, (int) c[23]) : (std::int8_t) 0;
             }
 
             if (c.size() >= 7 && (int) c[5] == 2)
@@ -1907,6 +1914,8 @@ juce::var channelToVar (const ChannelDef& c)
             sampler->setProperty ("flStretchMode", c.sampler.flStretchMode);
         if (c.sampler.flStretchPitch != 0)
             sampler->setProperty ("flStretchPitch", c.sampler.flStretchPitch);
+        if (c.sampler.loopKeyRoot >= 0) // round 190ds: the audio's key (core/KeyFollow.h)
+            sampler->setProperty ("loopKey", juce::Array<juce::var> { c.sampler.loopKeyRoot, c.sampler.loopKeyMinor ? 1 : 0, (int) c.sampler.loopKeySource });
         if (c.sampler.stretchPitch != 0.0f)
             sampler->setProperty ("stretchPitch", c.sampler.stretchPitch);
         if (! c.sampler.warp.empty()) // warp markers (round 175a, M1): [seconds, beats] pairs
@@ -2258,6 +2267,12 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.sampler.stretchMethod = (StretchMethod) juce::jlimit (0, stretchMethodCount - 1, (int) s.getProperty ("stretchMethod", 0));
         def.sampler.flStretchMode = (int) s.getProperty ("flStretchMode", 0);
         def.sampler.flStretchPitch = (int) s.getProperty ("flStretchPitch", 0);
+        if (const auto& k = s.getProperty ("loopKey", {}); k.isArray() && k.size() >= 3)
+        {
+            def.sampler.loopKeyRoot = juce::jlimit (0, 11, (int) k[0]);
+            def.sampler.loopKeyMinor = (int) k[1] != 0;
+            def.sampler.loopKeySource = (std::uint8_t) juce::jlimit (0, 3, (int) k[2]);
+        }
         def.sampler.stretchPitch = juce::jlimit (-48.0f, 48.0f, (float) (double) s.getProperty ("stretchPitch", 0.0));
         const auto warpVar = s.getProperty ("warp", {});
         if (const auto* warp = warpVar.getArray())
@@ -2606,6 +2621,18 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("scaleHighlight", juce::Array<juce::var> { song.scaleHighlight.scale, song.scaleHighlight.root });
     if (! song.dataFolder.empty())
         root->setProperty ("dataFolder", juce::String::fromUTF8 (song.dataFolder.c_str()));
+    if (! song.keyboardChords.empty()) // round 190ds: the Chord pad's chord set, [root, quality, octave, [extensions]]
+    {
+        juce::Array<juce::var> chords;
+        for (const auto& k : song.keyboardChords)
+        {
+            juce::Array<juce::var> ext;
+            for (auto e : k.extensions)
+                ext.add (e);
+            chords.add (juce::Array<juce::var> { k.root, k.quality, k.octave, ext });
+        }
+        root->setProperty ("keyboardChords", chords);
+    }
     if (! song.info.empty())
     {
         auto info = std::make_unique<juce::DynamicObject>();
@@ -3298,6 +3325,22 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     if (const auto& sh = root["scaleHighlight"]; sh.isArray() && sh.size() >= 2)
         song.scaleHighlight = { juce::jlimit (-3, 255, (int) sh[0]), juce::jlimit (0, 11, (int) sh[1]) };
     song.dataFolder = root.getProperty ("dataFolder", {}).toString().toStdString();
+    song.keyboardChords.clear();
+    if (const auto* chords = root.getProperty ("keyboardChords", {}).getArray())
+        for (const auto& c : *chords)
+            if (c.isArray() && c.size() >= 3)
+            {
+                KeyboardChord k;
+                k.root = juce::jlimit (0, 11, (int) c[0]);
+                k.quality = juce::jlimit (0, 5, (int) c[1]);
+                k.octave = juce::jlimit (0, 9, (int) c[2]);
+                if (c.size() >= 4)
+                    if (const auto* ext = c[3].getArray())
+                        for (const auto& e : *ext)
+                            k.extensions.push_back (juce::jlimit (1, 35, (int) e));
+                if (song.keyboardChords.size() < 24)
+                    song.keyboardChords.push_back (std::move (k));
+            }
     if (const auto info = root.getProperty ("info", {}); info.isObject())
     {
         auto get = [&info] (const char* key) { return info.getProperty (key, {}).toString().toStdString(); };

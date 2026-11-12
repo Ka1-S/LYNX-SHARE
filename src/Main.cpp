@@ -132,6 +132,8 @@
 #include "ui/I18n.h"
 #include "ui/MainComponent.h"
 #include "ui/SimpleDock.h"
+#include "core/ScaleKeys.h"
+#include "core/KeyFollow.h"
 #include "core/SoundLibrary.h"
 #include "ui/MidiToolsPanel.h"
 #include "ui/FrameProbe.h"
@@ -1894,6 +1896,17 @@ public:
             const auto i = args.indexOf ("--gridshot");
             const auto project = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
             runGridShot (args[i + 1].unquoted(), project);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--simple190dsshot"))
+        {
+            // LYNX.exe --simple190dsshot prefix: round 190ds off-screen, at 1x and 2x — loops dropped in the Simple
+            // workflow following the project key (the dock's switch, the clip menu), the docked Piano roll in the Editor
+            // tab, the keyboard's modes Keys / Scale keys / Chord pad with the scale selector — and a text report
+            const auto i = args.indexOf ("--simple190dsshot");
+            runSimple190dsShot (args[i + 1].unquoted());
             quit();
             return;
         }
@@ -15372,6 +15385,314 @@ private:
         simple->cycleDockTab();
         check ("Shift+Tab goes to the Instrument tab", dock->getTab() == lynx::SimpleDock::Tab::instrument);
         line ("Simple workflow objects: " + juce::String (madeBefore) + " before, " + juce::String (lynx::SimpleWorkflow::instances.load()) + " after");
+        line (report.contains ("ERROR ") ? "RESULT ERROR" : "RESULT OK");
+        juce::File (prefix + "-report.txt").replaceWithText (report);
+    }
+
+    void runSimple190dsShot (const juce::String& prefix)
+    {
+        namespace st = lynx::simpletracks;
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        ui.setVisible (true); // (no window: the docked editor only needs its parents visible)
+        const auto writeImage = [&prefix] (const juce::Image& image, const juce::String& name) {
+            const auto file = juce::File (prefix + "-" + name + ".png");
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        juce::String report;
+        const auto line = [&report] (const juce::String& text) { report << text << "\n"; };
+        const auto check = [&report] (const juce::String& what, bool ok) { report << (ok ? "OK    " : "ERROR ") << what << "\n"; };
+
+        ui.selectTabForSnapshot (2);
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        offline.dispatchPendingMessages();
+        auto* simple = ui.getSimpleWorkflowForSnapshot();
+        if (simple == nullptr)
+        {
+            juce::File (prefix + "-report.txt").replaceWithText ("ERROR no Simple workflow\n");
+            return;
+        }
+        simple->hideChooser();
+        auto& playlist = ui.getPlaylistForSnapshot();
+
+        // --- three loops: two with their key in the name, one only in its sound ---------------------------------------
+        const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-190ds-loops");
+        dir.deleteRecursively();
+        dir.createDirectory();
+        // a chord loop (two bars at 120 BPM, 48 kHz): each chord's notes with six harmonics, a soft attack per beat
+        const auto writeLoop = [&dir] (const juce::String& name, std::vector<std::vector<int>> chords) {
+            const int frames = 192000;
+            juce::AudioBuffer<float> audio (1, frames);
+            audio.clear();
+            for (int i = 0; i < frames; ++i)
+            {
+                const auto& chord = chords[(std::size_t) (i / (frames / (int) chords.size()))];
+                const auto t = (double) i / 48000.0;
+                const auto beat = std::fmod (t, 0.5);
+                double v = 0.0;
+                for (const auto key : chord)
+                {
+                    const auto f = 440.0 * std::pow (2.0, (key - 69) / 12.0);
+                    for (int h = 1; h <= 6; ++h)
+                        v += std::sin (2.0 * juce::MathConstants<double>::pi * f * h * t) / (h * h);
+                }
+                audio.setSample (0, i, (float) (0.08 * v * (1.0 - std::exp (-beat * 60.0)) * (0.6 + 0.4 * std::exp (-beat * 3.0))));
+            }
+            const auto wav = dir.getChildFile (name);
+            juce::WavAudioFormat format;
+            std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+            if (auto* w = format.createWriterFor (out.get(), 48000.0, 1, 16, {}, 0))
+            {
+                out.release();
+                std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                writer->writeFromAudioSampleBuffer (audio, 0, frames);
+            }
+            return wav.getFullPathName();
+        };
+        const auto gMinor = writeLoop ("Night Pad 120 Gm.wav", { { 55, 58, 62 }, { 51, 55, 58 }, { 53, 57, 60 }, { 55, 58, 62 } });
+        const auto dMinor = writeLoop ("Pluck_120_D_minor.wav", { { 50, 53, 57 }, { 46, 50, 53 }, { 48, 52, 55 }, { 50, 53, 57 } });
+        const auto eMinor = writeLoop ("Warm Keys Loop 120 bpm.wav", { { 52, 55, 59, 64 }, { 48, 52, 55, 60 }, { 50, 54, 57, 62 }, { 52, 55, 59, 64 } });
+        lynx::SimpleWorkflow::answerForSnapshot = 1; // "Set the project key to G minor?" — yes
+        simple->dropFiles ({ gMinor, dMinor, eMinor }, 0);
+        lynx::SimpleWorkflow::answerForSnapshot = -1;
+        offline.dispatchPendingMessages();
+        simple->hideChooser();
+        line ("question: " + simple->lastKeyQuestionForCheck());
+        check ("the first keyed loop offered its key (G minor)", simple->lastKeyQuestionForCheck().contains ("G minor"));
+        {
+            const auto& song = offline.getSong();
+            const auto key = lynx::projectkey::get (song);
+            check ("the project key is G minor", key && key->root == 7 && lynx::projectkey::isMinor (*key));
+            std::vector<int> clips;
+            for (int i = 0; i < (int) song.playlist.size(); ++i)
+                if (song.playlist[(std::size_t) i].kind == lynx::ClipKind::audio)
+                    clips.push_back (i);
+            check ("three loop clips", clips.size() == 3);
+            const int expect[] { 0, 5, 3 }; // G minor, D minor (F -> Bb: +5), E minor detected (G -> Bb: +3)
+            const int roots[] { 7, 2, 4 };
+            const int sources[] { 1, 1, 2 };
+            for (std::size_t k = 0; k < clips.size() && k < 3; ++k)
+            {
+                const auto& c = song.playlist[(std::size_t) clips[k]];
+                const auto& sampler = song.channels[(std::size_t) c.channel].sampler;
+                line ("loop " + juce::String ((int) k + 1) + ": key " + juce::String (sampler.loopKeyRoot) + (sampler.loopKeyMinor ? "m" : "") + " source "
+                      + juce::String ((int) sampler.loopKeySource) + " follow " + juce::String (c.followKey ? 1 : 0) + " shift " + juce::String ((int) c.keyShift)
+                      + " pitch " + juce::String (c.pitch));
+                check ("loop " + juce::String ((int) k + 1) + " key, source and move", sampler.loopKeyRoot == roots[k] && sampler.loopKeyMinor
+                                                                                        && sampler.loopKeySource == sources[k] && c.followKey
+                                                                                        && c.keyShift == expect[k] && std::abs (c.pitch - (float) expect[k]) < 1.0e-4f);
+            }
+        }
+        // the key changes: every following loop moves with it (one undo step)
+        offline.editSong ([] (lynx::Song& s) { lynx::projectkey::set (s, lynx::projectkey::Key { 9, lynx::projectkey::commonFirst()[1] }); });
+        offline.dispatchPendingMessages();
+        {
+            const auto& song = offline.getSong();
+            std::vector<int> shifts;
+            for (const auto& c : song.playlist)
+                if (c.kind == lynx::ClipKind::audio)
+                    shifts.push_back (c.keyShift);
+            line ("after A minor: " + juce::String (shifts.size() > 2 ? shifts[0] : 99) + " " + juce::String (shifts.size() > 2 ? shifts[1] : 99) + " "
+                  + juce::String (shifts.size() > 2 ? shifts[2] : 99));
+            check ("A minor: the loops move by +2, -5, +5", shifts == std::vector<int> { 2, -5, 5 });
+        }
+        // the loop tracks in the dock: the switch and what it does
+        int loopTrack = -1;
+        for (const auto& c : offline.getSong().playlist)
+            if (c.kind == lynx::ClipKind::audio && loopTrack < 0)
+                loopTrack = c.track;
+        playlist.selectTrack (loopTrack);
+        offline.dispatchPendingMessages();
+        auto* dock = simple->dockForSnapshot();
+        if (dock == nullptr)
+        {
+            juce::File (prefix + "-report.txt").replaceWithText (report + "ERROR no dock\n");
+            return;
+        }
+        simple->trackSelected (loopTrack);
+        offline.dispatchPendingMessages();
+        const auto shots = [&] (const juce::String& name) {
+            offline.dispatchPendingMessages();
+            for (float scale : { 1.0f, 2.0f })
+            {
+                const auto suffix = scale > 1.0f ? juce::String ("@2x") : juce::String();
+                writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, scale), name + suffix);
+                writeImage (dock->createComponentSnapshot (dock->getLocalBounds(), true, scale), "dock-" + name + suffix);
+            }
+        };
+        const auto menuShot = [&] (const juce::PopupMenu& menu, const juce::String& title, const juce::String& subTitle, const juce::String& name) {
+            juce::StringArray names { title };
+            std::vector<juce::PopupMenu> menus { menu };
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().subMenu != nullptr && it.getItem().text.startsWith (subTitle))
+                {
+                    names.add (subTitle);
+                    menus.push_back (*it.getItem().subMenu);
+                }
+            saveMenus (names, menus, prefix + "-" + name + ".png");
+        };
+        check ("the dock shows the follow switch for the loop track", dock->followShownForCheck());
+        shots ("follow-on");
+        {
+            int clip = -1;
+            for (int i = 0; i < (int) offline.getSong().playlist.size() && clip < 0; ++i)
+                if (offline.getSong().playlist[(std::size_t) i].kind == lynx::ClipKind::audio)
+                    clip = i;
+            const auto menu = playlist.getClipMenuForSnapshot (clip);
+            bool follow = false, keyItem = false;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+            {
+                follow = follow || (it.getItem().text.startsWith (lynx::tr ("Follow the project key")) && it.getItem().isTicked);
+                keyItem = keyItem || it.getItem().text.startsWith (lynx::tr ("Loop key"));
+            }
+            check ("the clip menu has Follow the project key (ticked) and Loop key", follow && keyItem);
+            menuShot (menu, lynx::tr ("Audio clip"), lynx::tr ("Loop key"), "menu-clip-key");
+        }
+        dock->clickFollowForCheck(); // off: back to its own key
+        offline.dispatchPendingMessages();
+        {
+            float pitch = 99.0f;
+            bool following = true;
+            for (const auto& c : offline.getSong().playlist)
+                if (c.kind == lynx::ClipKind::audio && c.track == loopTrack)
+                    pitch = c.pitch, following = c.followKey;
+            check ("switched off: the loop plays in its own key (pitch 0)", ! following && std::abs (pitch) < 1.0e-6f);
+        }
+        shots ("follow-off");
+        dock->clickFollowForCheck();
+        offline.dispatchPendingMessages();
+
+        // --- an instrument track from the tile: a pattern to write into, the Editor tab ------------------------------
+        {
+            st::Request q;
+            q.kind = st::Kind::instrument;
+            q.name = "Keys";
+            lynx::ChannelDef synth;
+            synth.instrument = lynx::InstrumentKind::synth;
+            q.channel = synth;
+            q.emptyBars = 4;
+            st::Result r;
+            offline.editSong ([&] (lynx::Song& s) { r = st::addTrack (s, q); });
+            offline.dispatchPendingMessages();
+            check ("the new Instrument track has an empty 4-bar pattern on it", r.ok() && r.pattern >= 0
+                                                                                  && st::patternOf (offline.getSong(), r.track) == r.pattern
+                                                                                  && offline.getSong().patterns[(std::size_t) r.pattern].notes.empty());
+            // a few notes, as the first clicks would write them (A minor: A C E, then G B D)
+            offline.editSong ([r] (lynx::Song& s) {
+                auto& p = s.patterns[(std::size_t) r.pattern];
+                const int keys[] { 57, 60, 64, 67, 71, 74, 69, 72 };
+                for (int i = 0; i < 8; ++i)
+                {
+                    lynx::Note n;
+                    n.channel = r.channels.front();
+                    n.key = keys[i];
+                    n.start = (std::int64_t) (i / 3) * lynx::ppq * 2 + (i % 3 == 0 ? 0 : 0);
+                    n.length = lynx::ppq * 2;
+                    n.velocity = 0.8f;
+                    p.notes.push_back (n);
+                }
+                p.sortNotes();
+            });
+            offline.dispatchPendingMessages();
+            playlist.selectTrack (r.track);
+            simple->trackSelected (r.track);
+            offline.dispatchPendingMessages();
+            check ("the instrument track has the Keyboard and Editor tabs", dock->hasPlayTabsForCheck());
+            dock->setTab (lynx::SimpleDock::Tab::editor);
+            offline.dispatchPendingMessages();
+            check ("the Piano roll is docked in the Editor tab", dock->isEditorDocked());
+            check ("on the track's pattern", offline.getSong().currentPattern == r.pattern);
+            shots ("editor");
+            ui.getPianoRollForSnapshot().setFoldToScale (true);
+            dock->refresh();
+            shots ("editor-in-key");
+            ui.getPianoRollForSnapshot().setFoldToScale (false);
+
+            // --- the keyboard's modes ------------------------------------------------------------------------------
+            auto& keyboard = lynx::scalekeys::current();
+            const auto saved = keyboard;
+            keyboard = {};
+            keyboard.lockToKey = true;
+            dock->setTab (lynx::SimpleDock::Tab::keyboard);
+            if (auto* panel = dock->keyboardPanelForSnapshot())
+            {
+                lynx::refreshKeyboardPanel (*panel);
+                shots ("keys-locked");
+                keyboard.lockToKey = false;
+                keyboard.mode = lynx::scalekeys::Mode::scaleKeys;
+                lynx::refreshKeyboardPanel (*panel);
+                shots ("scale-keys");
+                keyboard.mode = lynx::scalekeys::Mode::chordPad;
+                keyboard.complexity = lynx::scalekeys::Complexity::seventh;
+                keyboard.strumMs = 40;
+                lynx::refreshKeyboardPanel (*panel);
+                shots ("chord-pad");
+            }
+            check ("the Keyboard tab shows the keyboard panel", dock->keyboardPanelForSnapshot() != nullptr);
+            // the same panel as the Touch keyboard window, each mode with a key / pad held
+            for (const auto& [mode, name, pressed] : { std::tuple { lynx::scalekeys::Mode::scaleKeys, juce::String ("window-scale-keys"), 4 },
+                                                       std::tuple { lynx::scalekeys::Mode::chordPad, juce::String ("window-chord-pad"), 3 } })
+            {
+                auto panel = lynx::makeKeyboardPanelForSnapshot (offline, mode, pressed, [] { return 0; });
+                panel->setSize (1100, 260);
+                for (float scale : { 1.0f, 2.0f })
+                    writeImage (panel->createComponentSnapshot (panel->getLocalBounds(), true, scale), name + (scale > 1.0f ? "@2x" : ""));
+                if (mode == lynx::scalekeys::Mode::chordPad)
+                    menuShot (lynx::chordPadMenuForSnapshot (*panel, 3), lynx::tr ("Edit chord"), lynx::tr ("Chord type"), "menu-chord-edit");
+            }
+            // the Chord pad on an FL Studio Mobile chord set (the default set's shape: C Dm Em F G Am B° C)
+            {
+                const auto set = lynx::scalekeys::parseFlmChordSet (R"({"chords":[{"baseNote":0,"extensions":[],"octave":3,"quality":0},{"baseNote":2,"extensions":[],"octave":3,"quality":1},{"baseNote":4,"extensions":[],"octave":3,"quality":1},{"baseNote":5,"extensions":[],"octave":3,"quality":0},{"baseNote":7,"extensions":[],"octave":3,"quality":0},{"baseNote":9,"extensions":[],"octave":3,"quality":1},{"baseNote":11,"extensions":[],"octave":3,"quality":3},{"baseNote":0,"extensions":[],"octave":4,"quality":0}],"rootNote":0})");
+                check ("an FLM chord set reads as 8 chords (B diminished)", set.size() == 8 && set[6].quality == 3);
+                offline.editSong ([set] (lynx::Song& s) { s.keyboardChords = set; });
+                keyboard.projectChords = true;
+                keyboard.complexity = lynx::scalekeys::Complexity::triad;
+                auto panel = lynx::makeKeyboardPanelForSnapshot (offline, lynx::scalekeys::Mode::chordPad, 5, [] { return 0; });
+                panel->setSize (1100, 260);
+                for (float scale : { 1.0f, 2.0f })
+                    writeImage (panel->createComponentSnapshot (panel->getLocalBounds(), true, scale), juce::String ("window-chord-set") + (scale > 1.0f ? "@2x" : ""));
+            }
+            // the typing keys in each mode (A minor; Z = the root)
+            {
+                const auto& song = offline.getSong();
+                lynx::scalekeys::Settings s;
+                s.mode = lynx::scalekeys::Mode::scaleKeys;
+                juce::String z;
+                for (const int typed : { 60, 62, 64, 65, 67, 69, 71, 72, 61 })
+                {
+                    const auto n = lynx::scalekeys::typedNotes (song, s, typed, 60);
+                    z << (n.empty() ? juce::String ("-") : juce::String (n.front())) << " ";
+                }
+                line ("Scale keys, typing C D E F G A B C C#: " + z);
+                check ("Scale keys: the white typing keys play A minor from A", z.trim() == "69 71 72 74 76 77 79 81 -");
+                s.mode = lynx::scalekeys::Mode::chordPad;
+                s.projectChords = false;
+                const auto pad = lynx::scalekeys::typedNotes (song, s, 60, 60);
+                check ("Chord pad: Z plays A minor (A C E)", pad == std::vector<int> { 69, 72, 76 });
+            }
+            keyboard = saved;
+        }
+
+        // --- the project round trip --------------------------------------------------------------------------------
+        {
+            const auto json = lynx::ProjectFile::toJson (offline.getSong());
+            juce::String error;
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            bool same = back.has_value() && back->keyboardChords == offline.getSong().keyboardChords && back->playlist.size() == offline.getSong().playlist.size();
+            for (std::size_t i = 0; same && i < back->playlist.size(); ++i)
+                same = back->playlist[i].followKey == offline.getSong().playlist[i].followKey && back->playlist[i].keyShift == offline.getSong().playlist[i].keyShift
+                       && back->playlist[i].pitch == offline.getSong().playlist[i].pitch;
+            for (std::size_t c = 0; same && c < back->channels.size(); ++c)
+                same = back->channels[c].sampler.loopKeyRoot == offline.getSong().channels[c].sampler.loopKeyRoot
+                       && back->channels[c].sampler.loopKeySource == offline.getSong().channels[c].sampler.loopKeySource;
+            check ("follow, key moves, loop keys and the chord set survive .lynx", same);
+        }
+        dir.deleteRecursively();
         line (report.contains ("ERROR ") ? "RESULT ERROR" : "RESULT OK");
         juce::File (prefix + "-report.txt").replaceWithText (report);
     }
