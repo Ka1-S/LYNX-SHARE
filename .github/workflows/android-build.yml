@@ -33,12 +33,13 @@ on:
 env:
   ANDROID_NDK_VERSION: r27
   ANDROID_API_LEVEL: 24
+  # Default values for manual dispatch; overridden by inputs
   CMAKE_BUILD_TYPE: ${{ github.event.inputs.build_type || 'Release' }}
   ANDROID_ABI: ${{ github.event.inputs.android_abi || 'arm64-v8a' }}
 
 jobs:
   build-android:
-    name: Build Android (${{ env.ANDROID_ABI }}, ${{ env.CMAKE_BUILD_TYPE }})
+    name: Build Android
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -98,8 +99,6 @@ jobs:
             -DLYNX_LTO=OFF \
             -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
             -GNinja
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
 
       # ---------------------------------------------------------
       # 6. Build native library (limit parallel jobs for memory)
@@ -107,8 +106,6 @@ jobs:
       - name: Build native library
         run: |
           cmake --build build-android --parallel 2
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
 
       # ---------------------------------------------------------
       # 7. Verify native library was built
