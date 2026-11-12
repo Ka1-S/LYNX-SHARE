@@ -1,4 +1,5 @@
 #include "core/PocketSuperSaw.h"
+#include "core/MidiControls.h" // round 190dw item 4
 
 #include <algorithm>
 #include <atomic>
@@ -1325,6 +1326,11 @@ public:
 
     void setParameter (int index, float value) noexcept override
     {
+        if (index == midictl::ccBase + 1 && std::isfinite (value)) // round 190dw item 4: an imported .flm mod-wheel lane
+        {
+            engine.setModWheel (std::clamp (value, 0.0f, 1.0f));
+            return;
+        }
         if (index < 0 || index >= pocketsaw::paramCount || ! std::isfinite (value))
             return;
         const auto v = std::clamp (value, 0.0f, 1.0f);

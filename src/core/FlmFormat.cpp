@@ -280,6 +280,18 @@ Rack readRack (Bytes body)
         }
         else if (c.tag == "RMOd" || c.tag == "RMOD")
             rack.modules.push_back (readModule (c.body));
+        else if (c.tag == "CCLK") // round 190dw item 4: (cc, module instance, parameter) triples
+        {
+            Reader f { c.body };
+            while (f.has (12))
+            {
+                Rack::CcLink link;
+                link.cc = f.i32();
+                link.module = f.i32();
+                link.param = f.i32();
+                rack.ccLinks.push_back (link);
+            }
+        }
     }
     return rack;
 }

@@ -664,6 +664,41 @@ Exact for every mode but the random ones (Random… and Delay Rand.: one seeded 
 jitter. Left out: slide notes and note repeats in such a rack, the same-key rules of Note Echo (an echo under a held
 dry note of its key), the editor's Stop.
 
+### 7.9 MIDI to the modules, controller links, pad output links, GMSynth's last four effects (round 190dw)
+
+PROVEN-REA (FL-hosted build; addresses in the round's notes `/mnt/e/lynx-work/flm190dw/rea/spec-item4.md`).
+
+- **How the rack hands MIDI on** (setter 0x18059e0c0): every CC lane value goes to each module's CC handler (vtable
+  slot 77); CC 1 then to slot 74 (mod wheel), the Pitch Bend 4v − 2 to slot 75, the Aftertouch value to slot 76. CC 7
+  is the rack's Level (same storage and fader law), CC 8 and CC 10 its Pan, CC 64 falling below ½ releases held notes.
+- **Who listens** (the 47 vtables): mod wheel — MiniSynth (engine wheel × MW Amount on MW Dest: filter ×4, LFO amount,
+  OSC Mod), GMSynth and SuperSaw, as the raw 0…1 value; nobody else. **Aftertouch — no module** (slot 76 is the base's
+  empty handler everywhere; the rack only stores RPRM [5]). Bend — DW Sampler, MiniSynth, GMSynth, SuperSaw, 3x Osc
+  (stored; its use was not found) and SoundFont Player (half the value × 2: ±2 semitones); **Transistor Bass does not
+  bend** (base handler).
+- **CCLK** (rack child): 12-byte entries (i32 CC, i32 module instance id, i32 parameter). The base CC handler sets that
+  parameter of that module to the CC's value: a CC lane is then a lane on each linked parameter.
+- **PADS** only maps the 22 on-screen pads to kit slots (the pad grid reads it); notes carry the slot index, so it
+  does not change playback.
+- **A pad's output link** (LINk's fourth word, a channel id): the slot is not mixed into its own rack; the target
+  channel's mix renders it into the target's buffer, with the sends that channel receives.
+- **GMSynth's FLNG / F HP / RING / VOX** (kinds 1, 4, 8, 9; until now passed through):
+  FLNG = the MultiFX flanger's tape ((int)(fs·0.005) samples), −(L + R)/2·fade in, feedback −0.96·Y, delay
+  (1 − (X + lfo/2))⁴ of the tape, added to both sides; F HP = four high-pass biquads (2^(7.424·(X + lfo) + 5) Hz,
+  q = 2Y² + 1, feed-forward (1 + cos)/(sin/q + 2)) in F LP's pipeline; RING = a sine of 2^(8.7·(X + lfo/2) + 5) Hz times
+  the signal, Y unused; VOX = eight constant-skirt band-passes (Q 12) per side on three formant sets (A 250/700/2500/3500,
+  B 700/1250/2500/3500, C 250/2500/2700/3500, then 4200/8500/10000/12000 Hz for all) cycled A → B → C → A by 3·(X + lfo),
+  shifted by 2^(1.7·(Y − ½)), the sum × (1 − pair/8). RING and VOX fade their wet in through a second gain that a reset
+  sets to 0 and that rises by 0.005 a sample.
+- **3x Osc's CSTM**: one "PATH" chunk (u32 length + "@R@…"/"@L@…" text), the custom shape's file.
+
+LYNX: GMSynth (FLM) renders all ten kinds; MiniSynth's FLM build, GMSynth (FLM) and Pocket SuperSaw take a CC #1 lane
+as their wheel; CC 7 / 8 / 10 lanes play as Level / Pan lanes; CC lanes with CCLK links play as lanes on the linked
+parameters; Aftertouch lanes and held aftertouch are dropped (nothing in FLM reads them); a linked pad plays into the
+target channel's insert; SoundFont Player's held bend and lanes use ±2 semitones, Transistor Bass ignores the bend;
+SoundFont Player's Attack / Decay / Sustain / Release lanes (Envelope = Custom) and 3x Osc's Pan lane import; 3x Osc's
+custom shape plays the file its PATH names.
+
 ## 8. Relation to FLM-exported .flp (issue #88)
 
 FL Studio desktop hosts FLM instruments as the "FL Studio Mobile Rack" generator (`FL Studio Mobile Rack_x64.dll`).
@@ -692,6 +727,6 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
    code: 30 = 11, 32 = 16 (14 and 15 are unnamed wet and dry levels), 42 = 8.
 5. HEAD 272/280 (loop range).
 6. (round 190bs) The sample slot: the third `MAIN` tail field (f32 0.5) and `LINk`'s second word; where a slot with
-   an output link plays; the stretch modes' algorithms (LYNX uses its own stretcher); how a kit sample's legacy `STRC`
+   an output link plays; the stretch modes' algorithms (LYNX uses its own stretcher) (round 190dw: where a linked slot plays is settled, §7.9); how a kit sample's legacy `STRC`
    stretch sounds (two samples of one demo song; since round 190de LYNX stretches them with its own stretcher); the module's octave shift
    and the second dispatch switch next to the key range (0x420 / 0x42c in the module object: not found in the file).

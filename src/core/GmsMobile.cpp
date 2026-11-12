@@ -1,5 +1,6 @@
 #include "core/GmsMobile.h"
 
+#include "core/PocketTape.h" // round 190dw item 4 (FLNG)
 #include "core/Reeverb2.h"
 
 #include <algorithm>
@@ -200,10 +201,23 @@ struct Fx
     std::unique_ptr<reeverb2::Engine> reverb;
     reeverb2::Settings reverbSet;
     int reverbRate = 0;
+    // --- round 190dw item 4: FLNG, F HP, RING, VOX (FLM_FORMAT §7.9)
+    // FLNG: FLM's tape of ⌊fs·0.005⌋ samples (the MultiFX flanger's, core/PocketTape.h); RING: its oscillator phase;
+    // RING / VOX: FLM's second gain, reset to 0 and gliding to 1 by 0.005 per processed sample; VOX: eight constant-skirt
+    // band-passes per side (F HP keeps its four biquads in x1 … y2, as F LP does)
+    pocket::tape::Tape tape;
+    float ringPhase = 0.0f, mixNow = 0.0f;
+    struct Band
+    {
+        float f = -1.0f, q = -1.0f, rate = -1.0f, b0 = 0.0f, c1 = 0.0f, c2 = 0.0f, x1 = 0.0f, x2 = 0.0f, y1 = 0.0f, y2 = 0.0f;
+    };
+    Band vox[2][8];
+    // --- end of round 190dw item 4
 
     void prepare (float rate)
     {
         fs = rate;
+        tape.allocate (std::max (4, i32 ((double) (fs * 0.005f)))); // round 190dw item 4
         const auto n = std::max (8, i32 ((double) fs * 0.002));
         lineL.assign ((std::size_t) n, 0.0f);
         lineR.assign ((std::size_t) n, 0.0f);
@@ -231,6 +245,15 @@ struct Fx
         fade = on ? 1.0f : 0.0f;
         smoothA = smoothB = -1.0f;
         tail = i32 ((double) (fs * 10.0f));
+        // round 190dw item 4 (FLM's reset 0x1806db5b0: the tape cleared, the band states and the ring phase zeroed, the
+        // second gain back to 0)
+        tape.clear();
+        tape.fb = 0.0f;
+        ringPhase = 0.0f;
+        mixNow = 0.0f;
+        for (auto& side : vox)
+            for (auto& b : side)
+                b.x1 = b.x2 = b.y1 = b.y2 = 0.0f;
     }
     // (allocates: prepare / setPatch) the plate for a slot whose kind is RVRB
     void ensureReverb()
@@ -328,6 +351,11 @@ struct Fx
             case fx::pan: return running() && panner (L, R, n, input, target);
             case fx::delay: return running() && delay (L, R, n, seconds, input, target);
             case fx::reverb: return running() && reverb != nullptr && reverbFx (L, R, n, input, target);
+            // round 190dw item 4
+            case fx::flanger: return running() && flanger (L, R, n, input, target);
+            case fx::highPass: return running() && highPass (L, R, n, input, target);
+            case fx::ring: return running() && ringMod (L, R, n, input, target);
+            case fx::vox: return running() && voxFx (L, R, n, input, target);
             default: return false;
         }
     }
@@ -633,6 +661,166 @@ struct Fx
         reset();
         return false;
     }
+
+    // --- round 190dw item 4 (FLM's GMSynth effect processors, PROVEN-REA; FLM_FORMAT §7.9)
+    // FLNG (inline in the dispatcher 0x1806db820): the mono −(L + R)/2 × fade through FLM's tape, feedback −0.96·Y,
+    // delay (1 − (X + lfo/2))⁴ (clamped 0…1) of the tape, added to both sides; runs on 0.25 s after its input
+    bool flanger (float* L, float* R, int n, bool input, float target) noexcept
+    {
+        if (! head (n, input, fs * 0.25f, target))
+            return false;
+        const auto fb = (float) ((double) Y * -0.96);
+        const auto l = lfo (n);
+        auto d = 1.0f - (l * 0.5f + X);
+        d = d * d;
+        d = d * d;
+        if (d <= 0.0f)
+            d = 0.0f;
+        if (1.0f <= d)
+            d = 1.0f;
+        tape.target = 1.0 / ((double) d * (double) (tape.n - 2) + 2.0);
+        tape.fb = fb;
+        for (int i = 0; i < n; ++i)
+        {
+            fade = (target - fade) * 0.005f + fade;
+            const auto y = tape.tick ((L[i] * -0.5f - R[i] * 0.5f) * fade);
+            R[i] = y + R[i];
+            L[i] = y + L[i];
+        }
+        return finish();
+    }
+
+    // F HP (0x1806dc340): four identical high-pass biquads in series (one sample of delay between them), cutoff
+    // 2^(7.424·(X + lfo) + 5) Hz, q = 2Y² + 1, FLM's high-pass design 0x18060d940 (feed-forward (1 + cos)/(sin/q + 2),
+    // feedback as F LP's); cross-faded against the dry signal
+    bool highPass (float* L, float* R, int n, bool input, float target) noexcept
+    {
+        if (! head (n, input, fs, target))
+            return false;
+        const auto l = lfo (n);
+        const auto q = (Y + Y) * Y + 1.0f;
+        const auto f = powf32 (2.0f, clamp01 (l + X) * 7.424f + 5.0f);
+        const auto w = (float) ((double) f * twoPi / (double) fs);
+        const auto s = (float) std::sin ((double) w), c = (float) std::cos ((double) w);
+        const auto tiny = [] (float v) { return v < 9.999999717180685e-10f && v > -9.999999717180685e-10f ? 0.0f : v; };
+        const auto inv = 1.0f / (s + q);
+        const auto b = tiny ((c + 1.0f) / (s / q + 2.0f));
+        const auto a1 = tiny (c * inv * (q * -2.0f));
+        const auto a2 = tiny ((q - s) * inv);
+        float* io[2] = { L, R };
+        for (int i = 0; i < n; ++i)
+        {
+            fade = (target - fade) * 0.005f + fade;
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                const auto x = io[ch][i] + 1.0000000031710769e-30f;
+                float in[4] = { x, y1[ch][0], y1[ch][1], y1[ch][2] }, y[4];
+                for (int j = 0; j < 4; ++j)
+                    y[j] = ((x1[ch][j] * -2.0f + in[j] + x2[ch][j]) * b - y1[ch][j] * a1) - a2 * y2[ch][j];
+                for (int j = 0; j < 4; ++j)
+                {
+                    x2[ch][j] = x1[ch][j];
+                    x1[ch][j] = in[j];
+                    y2[ch][j] = y1[ch][j];
+                    y1[ch][j] = y[j];
+                }
+                io[ch][i] = (1.0f - fade) * x + fade * y[3];
+            }
+        }
+        return finish();
+    }
+
+    // RING (0x1806ddfc0): a sine of 2^(8.7·(X + lfo/2) + 5) Hz (32 Hz … 13.3 kHz; float phase) times the signal,
+    // cross-faded against the dry by fade × the second gain; Y is not used
+    bool ringMod (float* L, float* R, int n, bool input, float target) noexcept
+    {
+        if (! head (n, input, fs * 0.25f, target))
+            return false;
+        const auto u = std::min (std::max (lfo (n) * 0.5f + X, 0.0f), 1.0f);
+        const auto inc = powf32 (2.0f, u * 8.7f + 5.0f) / fs;
+        for (int i = 0; i < n; ++i)
+        {
+            mixNow = (1.0f - mixNow) * 0.005f + mixNow;
+            fade = (target - fade) * 0.005f + fade;
+            const auto g = fade * mixNow;
+            auto ph = inc + ringPhase;
+            ph = ph - (float) i32 ((double) ph);
+            ringPhase = ph;
+            const auto s = (float) std::sin ((double) ph * twoPi);
+            R[i] = s * R[i] * g + (1.0f - g) * R[i];
+            L[i] = s * L[i] * g + (1.0f - g) * L[i];
+        }
+        return finish();
+    }
+
+    // VOX (0x1806dda30): eight constant-skirt band-passes (Q 12, design 0x18060dc80 in double) per side on three formant
+    // sets blended by 3·(X + lfo): A → B → C → A, the eight centres × 2^(1.7·(Y − ½)); the sum × (1 − k/8) for the
+    // k-th pair, cross-faded against the dry by fade × the second gain
+    void voxCoefficients (Band& b, float f, float q) noexcept
+    {
+        if (f == b.f && q == b.q && fs == b.rate)
+            return;
+        b.f = f;
+        b.q = q;
+        b.rate = fs;
+        const auto w = (double) f * twoPi / (double) fs;
+        const auto s = std::sin (w), c = std::cos (w);
+        const auto k = 1.0 / ((0.5 / (double) q) * s + 1.0);
+        const auto tiny = [] (float v) { return v < 9.999999717180685e-10f && v > -9.999999717180685e-10f ? 0.0f : v; };
+        b.b0 = tiny ((float) ((double) (float) (s * 0.5) * k));
+        b.c1 = tiny ((float) ((double) (float) (c + c) * k));
+        b.c2 = tiny ((float) ((double) (float) (1.0 - s / (double) (q + q)) * k));
+    }
+    bool voxFx (float* L, float* R, int n, bool input, float target) noexcept
+    {
+        static constexpr float setA[8] { 250.0f, 700.0f, 2500.0f, 3500.0f, 4200.0f, 8500.0f, 10000.0f, 12000.0f };
+        static constexpr float setB[8] { 700.0f, 1250.0f, 2500.0f, 3500.0f, 4200.0f, 8500.0f, 10000.0f, 12000.0f };
+        static constexpr float setC[8] { 250.0f, 2500.0f, 2700.0f, 3500.0f, 4200.0f, 8500.0f, 10000.0f, 12000.0f };
+        if (! head (n, input, fs * 0.25f, target))
+            return false;
+        const auto v = std::min (std::max (lfo (n) + X, 0.0f), 1.0f) * 3.0f;
+        const auto shift = powf32 (2.0f, (Y - 0.5f) * 1.7f);
+        const auto k = i32 ((double) v);
+        const auto pair = k < 3 ? k : 0;
+        const auto frac = v - (float) k;
+        float wA = 0.0f, wB = 0.0f, wC = 0.0f;
+        if (pair == 0)
+            wA = 1.0f - frac, wB = frac;
+        else if (pair == 1)
+            wB = 1.0f - frac, wC = frac;
+        else
+            wA = frac, wC = 1.0f - frac;
+        const auto gain = 1.0f - (float) pair * 0.125f;
+        for (auto& side : vox)
+            for (int j = 0; j < 8; ++j)
+                voxCoefficients (side[j], ((wB * setB[j] + wA * setA[j]) + wC * setC[j]) * shift, 12.0f);
+        const auto tiny = [] (float x) { return x < 9.999999717180685e-10f && x > -9.999999717180685e-10f ? 0.0f : x; };
+        float* io[2] = { L, R };
+        for (int i = 0; i < n; ++i)
+        {
+            mixNow = (1.0f - mixNow) * 0.005f + mixNow;
+            fade = (target - fade) * 0.005f + fade;
+            const auto g = fade * mixNow;
+            for (int ch = 0; ch < 2; ++ch)
+            {
+                const auto dry = io[ch][i];
+                const auto x = tiny (dry);
+                float sum = 0.0f;
+                for (auto& b : vox[ch])
+                {
+                    const auto y = tiny (((x - b.x2) * b.b0 + b.y1 * b.c1) - b.c2 * b.y2);
+                    b.x2 = b.x1;
+                    b.x1 = x;
+                    b.y2 = b.y1;
+                    b.y1 = y;
+                    sum = sum + y * gain;
+                }
+                io[ch][i] = (1.0f - g) * dry + sum * g;
+            }
+        }
+        return finish();
+    }
+    // --- end of round 190dw item 4
 };
 
 // ------------------------------------------------------------------------------------------------------- voice
@@ -1362,6 +1550,7 @@ bool Player::resourcesLoaded() const noexcept { return impl->tabA != nullptr && 
 void Player::setParam (int index, float value) noexcept { impl->setParam (index, value); }
 void Player::note (int key, float velocity, float pan, float pitch) noexcept { impl->note (key, velocity, pan, pitch); }
 void Player::setPitchOffset (float semitones) noexcept { impl->pitchOffset = semitones; }
+void Player::setModWheel (float value) noexcept { impl->modWheel = std::isfinite (value) ? std::clamp (value, 0.0f, 1.0f) : 0.0f; } // round 190dw item 4
 void Player::allNotesOff() noexcept
 {
     for (int k = 0; k < 128; ++k)
@@ -1395,7 +1584,7 @@ int Player::activeVoices() const noexcept
 
 namespace fx
 {
-bool implemented (int kind) noexcept { return kind == dist || kind == phaser || kind == lowPass || kind == delay || kind == reverb || kind == pan; }
+bool implemented (int kind) noexcept { return kind >= dist && kind <= vox; } // (all ten since round 190dw)
 const char* name (int kind) noexcept
 {
     static const char* const names[10] = { "DIST", "FLNG", "PHAS", "F LP", "F HP", "DLY", "RVRB", "PAN", "RING", "VOX" };

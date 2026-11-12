@@ -1,4 +1,5 @@
 #include "core/MiniSynth.h"
+#include "core/MidiControls.h" // round 190dw item 4
 #include "core/HostSlide.h"
 
 #include <algorithm>
@@ -1257,6 +1258,16 @@ public:
     void setParameter (int index, float value) noexcept override
     {
         take();
+        // --- round 190dw item 4: FL Studio Mobile's build takes an imported mod-wheel lane (CC #1) on the engine's
+        // wheel as FLM's slot 74 does (0x1806aea00: the raw value into the engine's wheel, read by MW Dest × MW Amount);
+        // the desktop build keeps ignoring MIDI indices here
+        if (index == midictl::ccBase + 1 && flmVariant && std::isfinite (value))
+        {
+            plugin.eng.mw = std::clamp (value, 0.0f, 1.0f);
+            idleKnown = false;
+            return;
+        }
+        // --- end of round 190dw item 4
         if (index < 0 || index >= paramCount || ! std::isfinite (value))
             return;
         const auto v = std::clamp (value, 0.0f, 1.0f);
