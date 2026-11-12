@@ -2450,6 +2450,12 @@ struct Song
     // behaviour before (the insert skipped its effects); projects saved before keep it off, .flp imports and new
     // projects turn it on. Saved with the project.
     bool muteRunsEffects = false;
+    // FL 2026 (round 190eh renders, issue #158): a pattern plays from one Playlist clip at a time. A clip of the same
+    // pattern that starts later (on any track) takes over at its start: the earlier clip starts no more notes from there
+    // (also after the later clip has ended), the notes it already started play to their ends (scheduleSong). Clips of
+    // different patterns never cut each other. Off = LYNX's behaviour before (every clip played all its notes);
+    // projects saved before keep it off, .flp imports and new projects turn it on. Saved with the project.
+    bool patternClipTakeover = false;
     // LYNX option (round 190y, off): "Muted inserts don't process" — a muted insert skips its effects, EQ and meter, as
     // LYNX did before (saves CPU; unlike FL, a Fruity Send or controller in it goes quiet and its effects start fresh at
     // unmute). Saved with the project only when on; an .flp export keeps FL's behaviour.

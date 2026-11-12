@@ -194,7 +194,17 @@ struct ScheduleIndex
     std::vector<std::int64_t> maxNoteLength; // per pattern
     std::vector<std::int64_t> patternLength; // per pattern: effectiveLength, the period of a long clip's repeats
     std::int64_t maxShift = 0;               // the largest channel time shift (FL's Misc › Shift), ticks
+    // per Playlist clip: the next clip of the same pattern by start (the same start: later in the list), -1 = none or
+    // not a pattern clip (Song::patternClipTakeover, issue #158)
+    std::vector<int> nextOfPattern;
 };
+
+// FL's pattern clip takeover (Song::patternClipTakeover, issue #158): the song tick from which Playlist clip `clipIndex`
+// starts no more notes — the start of the first later clip of its pattern that plays (on any track; the same start:
+// the clip later in the list wins). Muted clips, clips on muted tracks and Performance-mode zone clips take nothing
+// over. Max = never (the option off, not a pattern clip, no later clip). With an index built from this song, O(1) in
+// the usual case; without one, a scan of the Playlist.
+std::int64_t patternClipStopsAt (const Song& song, std::size_t clipIndex, const ScheduleIndex* index = nullptr) noexcept;
 
 // When a note plays (ticks within its pattern) and for how long: the swing (with the channel's swing mix), FL's
 // Misc › Time › Shift and Gate (REA round 146b). c = the note's channel (nullptr: only the swing).
