@@ -203,6 +203,26 @@ inline double spectralDistanceDb (const std::vector<double>& a, const std::vecto
     return std::sqrt (sum / std::max (1, count));
 }
 
+// energy away (beyond ±4 bins) from the partials of `keys` (MIDI keys, harmonics 1…6) against the energy on them, dB,
+// 100 Hz – 6 kHz: how much of a chord is not the notes it should play (lower is better)
+inline double offPartialsDb (const std::vector<double>& m, const std::vector<double>& keys, double rate, int n)
+{
+    std::vector<double> partials;
+    for (const auto k : keys)
+        for (int h = 1; h <= 6; ++h)
+            partials.push_back (440.0 * std::pow (2.0, (k - 69.0) / 12.0) * h);
+    double on = 0.0, off = 0.0;
+    for (int b = (int) (100.0 * n / rate); b <= (int) (6000.0 * n / rate); ++b)
+    {
+        const auto f = b * rate / n;
+        bool near = false;
+        for (const auto p : partials)
+            near = near || std::abs (f - p) <= 4.0 * rate / n;
+        (near ? on : off) += m[(std::size_t) b] * m[(std::size_t) b];
+    }
+    return 10.0 * std::log10 ((off + 1e-30) / (on + 1e-30));
+}
+
 inline double rms (const std::vector<float>& x, std::size_t from, std::size_t to)
 {
     double s = 0.0;
@@ -688,15 +708,16 @@ TEST (simple190ds_key_move_quality)
         // the length stays: the end of the clip (3.4 … 3.9 s) as loud as without the move, silence after it
         const auto endLevel = 20.0 * std::log10 (rms (r.out, (std::size_t) (3.4 * rate), (std::size_t) (3.9 * rate))
                                                  / std::max (1e-12, rms (plain.out, (std::size_t) (3.4 * rate), (std::size_t) (3.9 * rate))));
+        // (after the clip the song loops back to its start: the same as without the move)
         const auto after = rms (r.out, (std::size_t) (4.1 * rate), (std::size_t) (4.4 * rate));
         const auto off = offHarmonicDb (m, expected, rate, n);
         worstCents = std::max (worstCents, std::abs (cents));
         worstLength = std::max (worstLength, std::abs (endLevel));
         worstOffDb = std::max (worstOffDb, off);
         shiftedNs = std::max (shiftedNs, r.nsPerSample);
-        CHECK (after < 1e-3);
         if (report())
-            std::printf ("  %+d: %+.2f cents, end %+.2f dB, off-harmonic %.1f dB, %.0f ns/sample\n", shift, cents, endLevel, off, r.nsPerSample);
+            std::printf ("  %+d: %+.2f cents, end %+.2f dB, off-harmonic %.1f dB, %.0f ns/sample, after the end %.6f (plain %.6f)\n", shift, cents, endLevel, off,
+                         r.nsPerSample, after, rms (plain.out, (std::size_t) (4.1 * rate), (std::size_t) (4.4 * rate)));
     }
     CHECK (worstCents < 3.0);   // pitch-exact within 3 cents for every move
     CHECK (worstLength < 1.5);  // the clip plays to its end, at its level
@@ -705,9 +726,10 @@ TEST (simple190ds_key_move_quality)
         std::printf ("  worst: %.2f cents, %.2f dB at the end, off-harmonic %.1f dB, CPU %.0f ns/sample (plain %.0f)\n", worstCents, worstLength, worstOffDb,
                      shiftedNs, plain.nsPerSample);
 
-    // a chord loop moved +3 / −5, against the ideal transposition (the same loop resampled by the channel: same pitches,
-    // no stretch) — for the clip's pitch on a loop that keeps time (the case of a dropped loop) in each of LYNX's stretch
-    // modes, and on a loop at its own speed
+    // a chord loop (G minor: Gm Eb F Gm) moved +3 / −5: how much of its first chord (0.12 … 0.46 s, 16384 points) is not
+    // the moved chord's partials — for the ideal transposition (the loop resampled by the channel: the same pitches, no
+    // stretch), the clip's pitch on a loop that keeps time (a dropped loop) in each of LYNX's stretch modes, the clip's
+    // pitch on a loop at its own speed, and the loop not moved at all
     const auto loop = chordLoop ({ { 55, 58, 62 }, { 51, 55, 58 }, { 53, 57, 60 }, { 55, 58, 62 } });
     const struct
     {
@@ -715,34 +737,32 @@ TEST (simple190ds_key_move_quality)
         const char* name;
     } modes[] { { StretchMethod::general, "general (default)" }, { StretchMethod::transients, "transients" }, { StretchMethod::mono, "mono" },
                 { StretchMethod::tones, "tones" }, { StretchMethod::texture, "texture" }, { StretchMethod::complex, "complex" } };
+    constexpr int cn = 16384;
+    const auto at = (std::size_t) (0.12 * rate);
     for (const int shift : { 3, -5 })
     {
-        // ideal: resampled by the channel (pitch and speed together); compared over the first chord, which lasts 1 s,
-        // whose start sits at 0 in both (0.25 … 0.65 s of each, 16384 points)
-        const auto ideal = renderClip (loop, 0.0f, false, StretchMethod::general, (float) shift, false);
-        const auto idealSpec = spectrum (ideal.out, (std::size_t) (0.12 * rate), 16384);
-        const auto own = spectrum (renderClip (loop, 0.0f, false).out, (std::size_t) (0.12 * rate), 16384);
-        const auto unshiftedDistance = spectralDistanceDb (own, idealSpec, rate, 16384);
-        double best = 1e9;
+        const std::vector<double> moved { 55.0 + shift, 58.0 + shift, 62.0 + shift };
+        const auto ideal = offPartialsDb (spectrum (renderClip (loop, 0.0f, false, StretchMethod::general, (float) shift, false).out, at, cn), moved, rate, cn);
+        const auto unmoved = offPartialsDb (spectrum (renderClip (loop, 0.0f, false).out, at, cn), moved, rate, cn);
+        double general = 0.0, best = 1e9;
         const char* bestName = "";
-        double general = 0.0;
         for (const auto& mode : modes)
         {
             const auto r = renderClip (loop, (float) shift, true, mode.method);
-            const auto d = spectralDistanceDb (spectrum (r.out, (std::size_t) (0.12 * rate), 16384), idealSpec, rate, 16384);
+            const auto d = offPartialsDb (spectrum (r.out, at, cn), moved, rate, cn);
             if (mode.method == StretchMethod::general)
                 general = d;
             if (d < best)
                 best = d, bestName = mode.name;
             if (report())
-                std::printf ("  chord loop %+d, kept in time, %s: %.2f dB from the ideal transposition, %.0f ns/sample\n", shift, mode.name, d, r.nsPerSample);
+                std::printf ("  chord loop %+d, kept in time, %s: off the chord's partials %.1f dB, %.0f ns/sample\n", shift, mode.name, d, r.nsPerSample);
         }
-        const auto unstretched = renderClip (loop, (float) shift, false);
-        const auto du = spectralDistanceDb (spectrum (unstretched.out, (std::size_t) (0.12 * rate), 16384), idealSpec, rate, 16384);
+        const auto own = offPartialsDb (spectrum (renderClip (loop, (float) shift, false).out, at, cn), moved, rate, cn);
         if (report())
-            std::printf ("  chord loop %+d at its own speed (clip pitch only): %.2f dB; not moved at all: %.2f dB; best mode: %s\n", shift, du,
-                         unshiftedDistance, bestName);
-        CHECK (general < unshiftedDistance * 0.5); // much nearer the right notes than not moving
-        CHECK (du < unshiftedDistance * 0.5);
+            std::printf ("  chord loop %+d: ideal (resampled) %.1f dB, at its own speed (clip pitch only) %.1f dB, not moved %.1f dB; best mode: %s\n", shift,
+                         ideal, own, unmoved, bestName);
+        CHECK (general < unmoved - 15.0); // the moved loop plays the moved chord
+        CHECK (own < unmoved - 15.0);
+        CHECK (general < -20.0);          // the rest at least 20 dB under the chord (measured: -42.8 dB at +3, -27.5 dB at -5)
     }
 }
