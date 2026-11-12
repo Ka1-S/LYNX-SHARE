@@ -2958,3 +2958,84 @@ No sound law changed; what the full suite found in the new 0.1.27 code is closed
 - **Mixer insert menu**: "Clean voice" (LYNX's own) sits in the menu's Sound section with LYNX's other sound items.
 - Audits: the generator and effect control audits now know the contexts of the Pocket engines' conditional controls
   (`tools/CtlWake.h`, `tools/FxAudit.h`); Pocket Tape Stop silent with Play off is FL Studio Mobile's behaviour.
+
+## Round 190co: Apex Limiter holds the true-peak ceiling; the true-peak meter reads what a 16× meter reads
+Round 190cn measured the 0.1.26 limiter with True peak on and the ceiling at −1 dB: up to +1.07 dBTP with
+oversampling off, and LYNX's own meter 0.2 … 2.4 dB under a reference meter on limited material. Two causes: the
+limiter's last word was a clip of the samples at the base rate (flat tops overshoot between the samples), and the
+meter's 4-point interpolator was 12 taps long and never looked at the samples themselves.
+
+Reference meter of this round (and of `tests/ApexFix190coTests.inc`): 16× polyphase, 128 taps per phase, Kaiser
+β = 10, the sample peak folded in. ffmpeg's `ebur128=peak=true` (4×, libswresample's 32-tap filter, printed to
+0.1 dB) is the second opinion.
+
+**Meter** (`core/Loudness.h` `TruePeak`, used by the Loudness meter, the mastering assistant, the Master loudness
+read-out and Apex's own display): a half-band cascade, 1× → 2× with 128 taps (Kaiser β = 10), 2× → 4× with 12 taps,
+a parabola through every local maximum of the 4× sequence, and the samples themselves. Against the reference over 60
+files (five signals, three rates, limited and not): 0.1.26 −2.41 … +0.25 dB, now −0.024 … +0.012 dB. The reading is
+68 samples late; `Meter::flushTruePeak` runs the tail out at the end of a file. Cost of the true-peak part, stereo at
+48 kHz: about 0.25 → 0.35 % of one core (g++ −O2, best of five on a loaded machine; quiet stretches cost nothing, the
+filters sleep under −60 dB).
+
+**Limiter**: with True peak on, a guard stage ends the chain at the base rate, after the oversampler: the true peak of
+every sample period by the meter's estimator and by a short 4× interpolator of the kind most meters use (the higher
+counts), required gain = ceiling / peak taken 6 % deeper, held over the ramp and 8 samples each side and smoothed by
+two running means of 0.125 ms. Under the ceiling the guard is a delay, bit for bit. Dither, Unity gain and Audition
+moved behind it. (Round 190co2 tuned the dip: 0.25 ms cost the trial187b bank a step, 6.800 → 6.763; 0.125 ms with 8
+samples each side keeps every bank's score and holds the ceiling as well.)
+
+Highest output over the ceiling, True peak on (16× reference; ffmpeg in brackets), 0.1.26 → now:
+
+| Signal (round 190cn's) | 44.1 kHz, Off | 48 kHz, Off | 96 kHz, Off | 2× … 8×, all rates |
+|---|---|---|---|---|
+| Dense mix, + 12 dB | +1.64 (+1.0) → +0.03 (0.0) | +1.59 (+1.1) → +0.02 (0.0) | +1.34 (+1.1) → +0.02 (0.0) | +0.24 (+0.4) → +0.02 (0.0) |
+| Clipped sweep, + 6 dB | +2.07 (+1.9) → +0.01 (0.0) | +2.07 (+1.9) → +0.01 (0.0) | +2.06 (+1.8) → +0.01 (0.0) | +0.10 (+0.2) → +0.02 (0.0) |
+| Quarter-rate sine, + 6 dB | −0.08 → −0.08 | −0.08 → −0.08 | −0.08 → −0.08 | −0.01 → −0.01 |
+| White noise, + 12 dB | +1.65 (+1.0) → +0.02 (+0.1) | +1.80 (+1.4) → +0.02 (0.0) | +2.03 (+1.3) → +0.02 (0.0) | +0.32 (+0.2) → +0.02 (0.0) (4×) |
+| Square, + 9 dB | +2.85 (+1.4) → −0.10 (−1.5) | +2.85 (+1.4) → −0.10 (−1.5) | +2.85 (+1.4) → −0.14 (−1.5) | +0.21 → 0.00 (4×) |
+| Mix, look-ahead 0 | +1.94 → +0.01 | +2.19 → +0.02 | +1.98 → +0.02 | +0.40 → +0.02 (4×) |
+| Mix, Loud, ceiling 0 dB, + 18 dB | +1.64 → +0.03 | +1.59 → +0.02 | +1.34 → +0.02 | +0.24 → +0.02 (4×) |
+| Mix, Unity gain | +1.64 → +0.03 | +1.59 → +0.02 | +1.34 → +0.02 | +0.62 → +0.02 (4×) |
+
+72 renders with True peak on: highest +0.026 dB (0.1.26: +2.85); ffmpeg reads at most +0.1 (its 0.1 dB step). True
+peak off: the 9 renders are the same files, byte for byte, and so are 36 more (oversampling Off/2×/4×/8× × three
+styles × three signals), and the latency is unchanged. Per-render table: `/mnt/e/lynx-work/apexfix190co/table_final.md`.
+
+Not versioned: a project saved with True peak on now holds its ceiling (the switch never did what it says; no "law"
+parameter). True peak off is the 0.1.26 limiter exactly. What changes for a saved project with True peak on: the
+overshoots are gone (on the dense mix at 48 kHz, + 12 dB into −1 dB, 2.3 % of the samples differ from 0.1.26's with
+oversampling off and 1.2 % at 4×, latency-compensated; the level changes by −0.003 / −0.000 dB RMS) and the reported
+latency grows by the guard's. FG-X 2 substitutes now run with True peak off, as the reference's own switch says.
+
+Latency (samples; reported to the host, `apex::latencyFor (rate, factor, truePeak)`), 0.1.26 → now with True peak on:
+44.1 kHz 225 → 310, 48 kHz 244 → 329, 96 kHz 484 → 581; + 55 with oversampling on, as before. True peak off: 225 /
+244 / 484 as before. Switching True peak changes the reported latency the way the oversampling switch always did.
+CPU (48 kHz, dense mix, % of one core, g++ −O2, best pass, 0.1.26 → now), True peak on: Off 0.96 → 1.60, 2× 3.52 →
+4.20, 4× 6.36 → 7.00, 8× 11.13 → 11.95; True peak off: unchanged (0.93 / 3.37 / 6.05 / 10.68 → 0.87 / 3.40 / 6.07 /
+10.68).
+
+Parity banks (fxparity score; the reference captures themselves read up to +1.18 dBTP over their ceiling with their
+true-peak switch on, mean +0.30 dB over 100 takes; LYNX 0.1.26 read up to +3.61, mean +1.01; now up to +0.03):
+
+| Bank | Files | Score before → after | Null before → after | Up / same / down |
+|---|---|---|---|---|
+| tp172b, Pro-L 2 | 24 | 7.083 → 7.083 | −41.1 → −40.8 dB | 1 / 22 / 1 |
+| trial187b, Pro-L 2 | 80 | 6.800 → 6.800 | −28.2 → −28.1 dB | 3 / 73 / 4 |
+| tp172c, SSL X-Limit | 16 | 4.938 → 4.938 | −17.0 → −17.0 dB | 0 / 16 / 0 |
+| tp172c, FG-X 2 | 12 | 7.583 → 7.750 | −90.2 → −90.7 dB | 2 / 10 / 0 |
+| tp172c, Bus Clipper | 12 | 3.333 → 3.333 | −12.2 → −12.2 dB | 0 / 12 / 0 |
+
+No bank's score drops. The Pro-L 2 takes that went down a step (tp172b S1 drums, trial187b L15 / L16 drums, L5
+bursts) are takes where the reference lets through more than its ceiling (drums: +0.7 … +1.2 dB over) and 0.1.26
+happened to overshoot with it; the ones that went up are where 0.1.26 overshot more than the reference. trial187b L14
+stair is the scorer, not the sound: LYNX's 3.2 kHz third-octave band is the same before and after (63.0 dB), the
+reference's sits on the 60 dB inclusion threshold (29.5 / 29.6 dB) and crosses it because the longer latency changes
+the aligned overlap by 95 samples. Mean distance between LYNX's and the reference's true peak: 0.71 → 0.33 dB.
+
+FG-X 2 (round 190co2): its captured states store the reference's true-peak switch (`LevelTruePeakLimiting`) at 0.25,
+off, the way they store their bypass switches, and its renders run +2 … +5 dBTP over a sample peak at the ceiling. The
+fitted map left that switch out, so Apex ran with True peak on (its default); now that True peak holds, the bank fell
+to 7.417. The map now carries the switch (core/FittedMaps.inc, by hand until the generator's map in
+`/mnt/e/lynx-work/parity190ar/maps/FG_X_2.json` has it): 7.750.
+Tools and tables: `/mnt/e/lynx-work/apexfix190co` (`tp.py`, `bank.py`, `pb.py`, `partp.py`, `scorediff.py`,
+`metertable.py`; round 190co2's variant search and final runs in `var/`, `parity_final/`, `table.py`).

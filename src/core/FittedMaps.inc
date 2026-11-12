@@ -20,7 +20,11 @@
       { { 2, 0.01216f }, { 3, 0.95424f }, { 7, 0.33566f } },
       { { "LevelGain", 0, false, false, { { 0.0f, 0.0f }, { 0.125f, 0.08356f }, { 0.15f, 0.10027f }, { 0.2f, 0.13369f }, { 0.25f, 0.16711f }, { 0.3f, 0.20053f }, { 0.375f, 0.25067f }, { 0.4f, 0.26738f }, { 0.5f, 0.33422f }, { 0.625f, 0.41778f }, { 0.75f, 0.50134f }, { 0.875f, 0.58489f }, { 1.0f, 0.66845f } } },
         { "LevelMode", 4, false, true, { { 0.0f, 0.95f }, { 0.125f, 0.95f }, { 0.25f, 0.95f }, { 0.375f, 0.95f }, { 0.5f, 0.95f }, { 0.625f, 0.225f }, { 0.75f, 0.95f }, { 0.875f, 0.0f }, { 1.0f, 0.95f } } },
-        { "LevelCeiling", 1, false, false, { { -0.0f, 1.0f }, { 0.125f, 0.99139f }, { 0.25f, 0.98279f }, { 0.3333f, 0.97707f }, { 0.375f, 0.97418f }, { 0.5f, 0.96557f }, { 0.625f, 0.95696f }, { 0.75f, 0.94836f }, { 0.875f, 0.93975f }, { 1.0f, 0.93114f } } } } },
+        { "LevelCeiling", 1, false, false, { { -0.0f, 1.0f }, { 0.125f, 0.99139f }, { 0.25f, 0.98279f }, { 0.3333f, 0.97707f }, { 0.375f, 0.97418f }, { 0.5f, 0.96557f }, { 0.625f, 0.95696f }, { 0.75f, 0.94836f }, { 0.875f, 0.93975f }, { 1.0f, 0.93114f } } },
+        // (round 190co2, by hand until the generator's map has it: the reference's true-peak switch, a two-state entry
+        // stored like its bypass switches, 0.25 = off; off in every captured state, whose renders read +2 ... +5 dBTP
+        // over a sample peak at the ceiling. Before, Apex ran with True peak on, its default.)
+        { "LevelTruePeakLimiting", 5, false, true, { { 0.25f, 0.0f }, { 0.75f, 1.0f } } } } },
     { "PluginName=\"SSL Native X-Saturator v6\"", "Ember Saturator",
       { { 1, 0.5f }, { 7, 0.0f } },
       { { "drive", 0, false, false, { { -12.0f, 0.0f }, { -7.5f, 0.02649f }, { -3.0f, 0.11647f }, { 0.0f, 0.17647f }, { 1.5f, 0.20646f }, { 4.0f, 0.25642f }, { 6.0f, 0.29645f }, { 10.5f, 0.38643f }, { 12.0f, 0.41667f }, { 15.0f, 0.4933f }, { 18.0f, 0.57024f }, { 19.5f, 0.60871f }, { 22.0f, 0.67241f }, { 24.0f, 0.71646f } } },
