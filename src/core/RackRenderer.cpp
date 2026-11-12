@@ -607,6 +607,73 @@ ClipAudio renderClipAudio (const Song& song, std::size_t clipIndex, double sampl
     return out;
 }
 
+ClipAudio renderAudition (const ChannelDef& channel, const std::vector<int>& keys, double noteSeconds, double tailSeconds, double bpm,
+                          double sampleRate, const RackState::Factories& factories, float peak)
+{
+    ClipAudio out;
+    out.sampleRate = sampleRate;
+    if (keys.empty() || noteSeconds <= 0.0 || sampleRate <= 0.0)
+        return out;
+    auto instrument = buildInstrument (channel, sampleRate, bpm, factories);
+    if (instrument == nullptr)
+        return out;
+    const auto noteFrames = (std::size_t) (noteSeconds * sampleRate);
+    const auto frames = noteFrames * keys.size() + (std::size_t) (std::max (0.0, tailSeconds) * sampleRate);
+    out.left.assign (frames, 0.0f);
+    out.right.assign (frames, 0.0f);
+    const auto gain = channelGain (channel.volume);
+    constexpr std::size_t block = 256;
+    std::size_t note = 0;
+    int held = -1;
+    for (std::size_t at = 0; at < frames; at += block)
+    {
+        // (notes change on block edges: an audition needs no sample-exact timing)
+        while (note <= keys.size() && at >= note * noteFrames)
+        {
+            if (held >= 0)
+                instrument->noteOff (held);
+            held = note < keys.size() ? keys[note] : -1;
+            if (held >= 0)
+                instrument->noteOn (held, 0.8f);
+            ++note;
+        }
+        instrument->render (out.left.data() + at, out.right.data() + at, (int) std::min (block, frames - at), gain, gain);
+    }
+    instrument->allNotesOff();
+
+    float top = 0.0f;
+    for (std::size_t i = 0; i < frames; ++i)
+    {
+        if (! std::isfinite (out.left[i]) || ! std::isfinite (out.right[i]))
+            out.left[i] = out.right[i] = 0.0f;
+        top = std::max (top, std::max (std::abs (out.left[i]), std::abs (out.right[i])));
+    }
+    if (top < 1.0e-5f) // nothing sounded (an engine whose data files are not on this computer)
+    {
+        out.left.clear();
+        out.right.clear();
+        return out;
+    }
+    if (peak > 0.0f)
+    {
+        const auto scale = peak / top;
+        for (std::size_t i = 0; i < frames; ++i)
+        {
+            out.left[i] *= scale;
+            out.right[i] *= scale;
+        }
+    }
+    // a short fade at the end: a long release is cut without a click
+    const auto fade = std::min (frames, (std::size_t) (0.02 * sampleRate));
+    for (std::size_t i = 0; i < fade; ++i)
+    {
+        const auto g = (float) i / (float) fade;
+        out.left[frames - 1 - i] *= g;
+        out.right[frames - 1 - i] *= g;
+    }
+    return out;
+}
+
 // Round 190ao: the build keeps a hosted plugin's instance while the slot's plugin id is the same; an id no plugin has
 // makes it build that one again.
 namespace
@@ -1285,6 +1352,30 @@ void RackState::buildPdc (const RackState* previous)
             return *old;
         return std::make_shared<DelayLine> (length);
     };
+
+    // round 190bu: the inserts with a chain Blend under 100 % get their dry path, as late as their active slots make
+    // the chain (the slots' own latencies, whatever the PDC setting: both paths are inside the insert)
+    chainBlends.assign (song.mixer.size(), nullptr);
+    for (std::size_t t = 0; t < song.mixer.size() && t < slotLatency.size(); ++t)
+    {
+        const auto& track = song.mixer[t];
+        if (track.chainBlend >= 1.0f || track.effects.empty())
+            continue;
+        int latency = 0;
+        for (std::size_t s = 0; s < track.effects.size() && s < slotLatency[t].size(); ++s)
+            if (song.slotActive (track.effects[s]) && track.effects[s].mix > 0.0f)
+                latency += std::max (0, slotLatency[t][s]);
+        if (previous != nullptr && t < previous->chainBlends.size() && previous->chainBlends[t] != nullptr && previous->chainBlends[t]->latency == latency)
+        {
+            chainBlends[t] = previous->chainBlends[t];
+            continue;
+        }
+        auto stage = std::make_shared<ChainBlendStage>();
+        stage->latency = latency;
+        if (latency > 0)
+            stage->delay = std::make_shared<DelayLine> (latency);
+        chainBlends[t] = std::move (stage);
+    }
 
     channelDelays.resize (pdc.channelDelay.size());
 
@@ -2863,6 +2954,14 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
     auto* l = trackBuffer (track, 0);
     auto* r = trackBuffer (track, 1);
     int audible = -1; // -1 = not measured yet; an effect's output is the next one's input
+    // round 190bu: the chain's Blend (nullptr at 100 %): the insert's input is kept before the first slot
+    static_assert (chunkCapacity <= RackState::ChainBlendStage::capacity);
+    auto* blend = (std::size_t) track < state.chainBlends.size() ? state.chainBlends[(std::size_t) track].get() : nullptr;
+    if (blend != nullptr)
+    {
+        std::memcpy (blend->dry.data(), l, sizeof (float) * (std::size_t) n);
+        std::memcpy (blend->dry.data() + RackState::ChainBlendStage::capacity, r, sizeof (float) * (std::size_t) n);
+    }
     const auto timing = times->enabled.load (std::memory_order_relaxed);
     auto timed = [this, timing] (std::size_t key, auto&& run) {
         if (! timing || key >= times->effectNs.size())
@@ -3127,6 +3226,21 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
 
         if (audible == 1 && key < smartDisable.size())
             smartDisable[key].silentSamples = 0; // tail (reverb, delay): keep processing
+    }
+
+    // round 190bu: the chain's Blend: the kept input, as late as the chain, mixed with the chain's output
+    if (blend != nullptr)
+    {
+        auto* dl = blend->dry.data();
+        auto* dr = blend->dry.data() + RackState::ChainBlendStage::capacity;
+        if (blend->delay != nullptr)
+            blend->delay->process (dl, dr, n);
+        const auto wet = std::clamp (state.song.mixer[(std::size_t) track].chainBlend, 0.0f, 1.0f);
+        for (int k = 0; k < n; ++k)
+        {
+            l[k] = dl[k] + (l[k] - dl[k]) * wet;
+            r[k] = dr[k] + (r[k] - dr[k]) * wet;
+        }
     }
 }
 

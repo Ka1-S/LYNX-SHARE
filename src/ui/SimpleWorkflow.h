@@ -17,6 +17,7 @@
 namespace lynx
 {
 class AudioEngine;
+class SimpleDock;
 
 class SimpleWorkflow
 {
@@ -35,6 +36,11 @@ public:
         std::function<void()> exportOtherApps;             // File › Export › For other apps
         std::function<juce::String()> saveStatus;          // "Backed up 2 min ago", "Not saved yet"...: beside the title tools
         std::function<void (juce::Component*, int)> setSideDock; // the dock on the right of the Playlist (nullptr: none)
+        // round 190bu: the dock for the selected track, under the timeline
+        std::function<void (juce::Component*, std::function<int (int)>)> setBottomDock; // (nullptr: none; its height out of the panel's)
+        std::function<void (int channel)> toggleChannelWindow; // the instrument's own window
+        std::function<int()> selectedTrack;                // the Playlist's current track (-1: none)
+        std::function<void()> settingsChanged;             // the dock's height or shown state changed: save the UI settings
     };
 
     SimpleWorkflow (AudioEngine& engine, Host host);
@@ -65,6 +71,15 @@ public:
     void hideFinish();
     bool isFinishShowing() const noexcept;
 
+    // The dock for the selected track (slices S5, S6, S13, S14; ui/SimpleDock.h): its sound and its effects, under the
+    // timeline. Made the first time it shows.
+    void trackSelected (int track);      // a click on a track header
+    void showEffectsOfInsert (int insert); // "+FX" on a header: the dock, on its Effects tab, for the track of `insert`
+    void toggleDock();                   // Ctrl+Alt+L
+    void cycleDockTab();                 // Shift+Tab
+    bool isDockShowing() const noexcept;
+    SimpleDock* dockForSnapshot();       // (made and shown if needed)
+
     // --simpleshot: the chooser's two pages, as drawn
     juce::Component* chooserForSnapshot();
     void showStarterPageForSnapshot();
@@ -85,6 +100,7 @@ private:
     void addFiles (const juce::Array<juce::File>& files, std::int64_t start);
     void addDrums (const std::string& genre, bool steps, bool useTempo);
     void addAudio (simpletracks::Kind kind);
+    void updateDock(); // shows or hides the dock as the setting says, on the Playlist's current track
 
     AudioEngine& engine;
     Host host;
@@ -93,6 +109,8 @@ private:
     std::unique_ptr<Chooser> chooser;
     std::unique_ptr<juce::Component> addButton, finishButton, titleTools;
     std::unique_ptr<juce::Component> finishDock;
+    std::unique_ptr<SimpleDock> dock;
+    int dockTrack = -1;
     std::unique_ptr<juce::FileChooser> fileChooser;
     juce::File sampleFolder; // where the last sample for a Sampler track came from (this session)
 };

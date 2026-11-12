@@ -3808,6 +3808,21 @@ RackState::Factories AudioEngine::rackFactories()
     return factories;
 }
 
+bool AudioEngine::auditionSound (const ChannelDef& channel, const std::vector<int>& keys, double* seconds)
+{
+    auto audio = lynx::renderAudition (channel, keys, 0.32, 0.9, song.bpm, transport.sampleRate.load(), rackFactories());
+    if (seconds != nullptr)
+        *seconds = audio.sampleRate > 0.0 ? (double) audio.left.size() / audio.sampleRate : 0.0;
+    if (audio.left.empty())
+        return false;
+    auto sample = std::make_shared<SampleData>();
+    sample->sampleRate = audio.sampleRate;
+    sample->left = std::move (audio.left);
+    sample->right = std::move (audio.right);
+    previewSample (std::move (sample), false, 1.0f);
+    return true;
+}
+
 ClipAudio AudioEngine::renderClipAudio (std::size_t clipIndex)
 {
     return lynx::renderClipAudio (song, clipIndex, transport.sampleRate.load(), rackFactories());

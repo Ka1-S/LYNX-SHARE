@@ -192,6 +192,7 @@ public:
     void setSimpleHeaders (bool on);
     bool hasSimpleHeaders() const noexcept { return simpleHeaders; }
     std::function<void (int insert)> onTrackEffects; // "+FX" on a Simple header: the insert's effects
+    std::function<void (int track)> onSimpleTrackSelected; // the Simple workflow: a track was selected (its dock follows)
     // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
     std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
 

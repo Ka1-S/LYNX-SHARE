@@ -39,6 +39,7 @@
 #include "ui/PluginsOffPanel.h"
 #include "ui/MissingFilesDialog.h"
 #include "ui/SettingsDialog.h"
+#include "ui/SimpleDock.h"
 #include "ui/PluginManager.h"
 #include "ui/ShortcutManager.h"
 #include "ui/WaveformView.h"
@@ -2376,6 +2377,10 @@ void MainComponent::loadUiSettings()
             DetailView::preferredHeight = juce::jlimit (DetailView::minHeight, 2000, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "detailShown")
             DetailView::shownSetting = on;
+        else if (key == "simpleDockHeight") // round 190bu: the Simple workflow's track dock
+            SimpleDock::preferredHeight = juce::jlimit (SimpleDock::minHeight, 2000, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "simpleDockShown")
+            SimpleDock::shownSetting = on;
         else if (key == "detailDevices")
             DetailView::devicesPage = on;
         else if (key == "detailExtraWindowKey")
@@ -2592,6 +2597,8 @@ void MainComponent::saveUiSettings()
                                       + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
                                       + "\ndetailHeight=" + juce::String (DetailView::preferredHeight)
                                       + "\ndetailShown=" + juce::String (DetailView::shownSetting ? 1 : 0)
+                                      + "\nsimpleDockHeight=" + juce::String (SimpleDock::preferredHeight)
+                                      + "\nsimpleDockShown=" + juce::String (SimpleDock::shownSetting ? 1 : 0)
                                       + "\ndetailDevices=" + juce::String (DetailView::devicesPage ? 1 : 0)
                                       + "\ndetailExtraWindowKey=" + juce::String (DetailView::extraWindowKey ? 1 : 0)
                                       + "\ndetailExtraSelectInMixer=" + juce::String (DetailView::extraSelectInMixer ? 1 : 0)
@@ -2929,12 +2936,20 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         host.exportAudio = [this] (int format) { exportAudio (format); };
         host.exportOtherApps = [this] { exportForOtherApps(); };
         host.saveStatus = [this] { return simpleSaveStatus(); };
+        // round 190bu: the dock for the selected track sits where Clip-launch's detail view does (never both)
+        host.setBottomDock = [this] (juce::Component* c, std::function<int (int)> heightFor) { playlistArea.setDetailView (c, std::move (heightFor)); };
+        host.toggleChannelWindow = [this] (int channel) { rack.toggleEditor (channel, true); };
+        host.selectedTrack = [this] { return playlist.getCurrentTrack(); };
+        host.settingsChanged = [this] { saveUiSettings(); };
         simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
-        // the Simple headers' "+FX" (until the dock's Effects tab, slice S5): the Mixer on that insert
+        // the Simple headers' "+FX": the dock's Effects tab on that track (round 190bu; the Mixer shows the same slots)
         playlist.onTrackEffects = [this] (int insert) {
-            workspace.show (Panel::mixer);
-            mixer.selectTrack (insert);
-            refreshPanelButtons();
+            if (simpleWorkflow != nullptr)
+                simpleWorkflow->showEffectsOfInsert (insert);
+        };
+        playlist.onSimpleTrackSelected = [this] (int track) {
+            if (simpleWorkflow != nullptr && layoutStyle == layoutstyle::Style::simple)
+                simpleWorkflow->trackSelected (track);
         };
         playlist.onSimpleFilesDropped = [this] (const juce::StringArray& files, std::int64_t tick) {
             if (simpleWorkflow != nullptr)
@@ -3035,6 +3050,9 @@ void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
                       [this] { runAction ("view.detailDevices"); });
         menu.addItem (tr ("Switch between clip view and device view") + shortcutText ("view.detailSwitch"), [this] { runAction ("view.detailSwitch"); });
     }
+    // round 190bu: the Simple workflow's dock for the selected track (its sound and its effects)
+    if (layoutStyle == Style::simple && simpleWorkflow != nullptr)
+        menu.addItem (tr ("Track dock") + shortcutText ("view.detailToggle"), true, SimpleDock::shownSetting, [this] { runAction ("view.detailToggle"); });
 }
 
 void MainComponent::makeDetailView()
@@ -3140,6 +3158,16 @@ bool MainComponent::pianoRollKeysHere() const
 
 bool MainComponent::runDetailAction (const std::string& id)
 {
+    if (layoutStyle == layoutstyle::Style::simple && simpleWorkflow != nullptr) // round 190bu: the same keys, the track dock
+    {
+        if (id == "view.detailToggle")
+            simpleWorkflow->toggleDock();
+        else if (id == "view.detailSwitch")
+            simpleWorkflow->cycleDockTab();
+        else
+            return false;
+        return true;
+    }
     if (! isClipLaunchWorkflow() || detailView == nullptr) // (Pattern workflow: the keys keep their old meaning)
         return false;
     if (id == "view.detailToggle")

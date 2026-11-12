@@ -171,6 +171,10 @@ public:
     // Channel rack, the song playing or recording). auditionState: 0 idle, 1 waiting to start, 2 sounding (tests).
     bool auditionPreset (const juce::AudioPluginInstance& plugin);
     int auditionState() const noexcept { return auditionChannel < 0 ? 0 : auditionSounding ? 2 : 1; }
+    // Round 190bu (the Simple workflow's sound picker): `channel`'s instrument heard alone through the preview output,
+    // without touching the song — the notes `keys` in turn (core/RackRenderer.h renderAudition). False when the
+    // instrument can't be built or makes no sound on this computer. `seconds` (optional) = how long the audition is.
+    bool auditionSound (const ChannelDef& channel, const std::vector<int>& keys, double* seconds = nullptr);
     // FL's Project info working time (REA round 167g): wall-clock time since the project was opened, added to the
     // saved total at each save. workSecondsNow() = the saved total + this session so far.
     void stampWorkTime();

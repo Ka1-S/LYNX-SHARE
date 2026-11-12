@@ -5570,6 +5570,8 @@ void PlaylistComponent::setSimpleHeaders (bool on)
 
 void PlaylistComponent::selectTrackChannel (int track)
 {
+    if (onSimpleTrackSelected)
+        onSimpleTrackSelected (track);
     const auto& song = engine.getSong();
     const auto kind = simpletracks::kindOf (song, track);
     if (! kind)

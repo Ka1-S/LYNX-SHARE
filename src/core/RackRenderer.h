@@ -141,6 +141,19 @@ struct RackState
     std::vector<std::vector<std::shared_ptr<DelayLine>>> sendDelays; // [track][k] like PdcPlan::sendDelay
     std::vector<int> latencies; // channels, then slots of all tracks
 
+    // The Simple workflow's Blend (round 190bu, MixerTrack::chainBlend): the dry/wet of an insert's whole effect chain.
+    // One stage per insert whose Blend is under 100 % (nullptr = 100 %: nothing is copied or mixed): the insert's
+    // input before its first slot, kept in `dry` and delayed by the chain's latency (`delay`, nullptr = none) so the
+    // two paths line up. Built with the PDC plan; a stage of the same latency is kept across rebuilds.
+    struct ChainBlendStage
+    {
+        static constexpr int capacity = 512; // (the renderer's chunk)
+        std::shared_ptr<DelayLine> delay;
+        int latency = 0;
+        std::array<float, 2 * capacity> dry {};
+    };
+    std::vector<std::shared_ptr<ChainBlendStage>> chainBlends; // [track]
+
     // Inserts with a hardware output target (REA round 156), each delayed by what it lacks to line up with the
     // Master output (pdc.total − outLat[track]; nullptr = no delay). Built with the PDC plan.
     struct HwRoute
@@ -341,6 +354,13 @@ struct ClipAudio
     std::vector<float> left, right;
 };
 ClipAudio renderClipAudio (const Song& song, std::size_t clipIndex, double sampleRate, const RackState::Factories& factories);
+
+// A channel's instrument heard alone before it is in the song (round 190bu: the Simple workflow's sound picker): the
+// notes `keys` (MIDI keys, 60 = C5) one after the other, `noteSeconds` each, then `tailSeconds` of release, at unity
+// through no mixer; then the whole is brought to `peak` (0 = left as rendered) so every sound previews at one level.
+// Empty when the instrument can't be built or stays silent. UI thread (allocates).
+ClipAudio renderAudition (const ChannelDef& channel, const std::vector<int>& keys, double noteSeconds, double tailSeconds, double bpm,
+                          double sampleRate, const RackState::Factories& factories, float peak = 0.5f);
 
 class WorkerPool;
 

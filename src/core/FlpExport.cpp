@@ -1621,7 +1621,10 @@ struct Converter
                         control (0, flp::ControlId::mixerSendBase + target, 0);
             }
 
-            // the effect slots
+            // the effect slots. Round 190bu: FL has no dry/wet for a whole chain, so the insert's Blend goes into each
+            // exported slot's own Mix (the same for one effect, close for several) and the report says so
+            const auto chainBlend = std::isfinite (track.chainBlend) ? std::clamp (track.chainBlend, 0.0f, 1.0f) : 1.0f;
+            bool blendNoted = false;
             int next = 0;
             for (int s = 0; s < (int) track.effects.size(); ++s)
             {
@@ -1691,7 +1694,13 @@ struct Converter
                 slotMap[{ t, s }] = row;
                 slotPlugin[{ t, s }] = slot.plugin;
                 control (row, 0x1F00, fx.enabled ? 1 : 0);
-                control (row, 0x1F01, std::clamp (iround (fx.mix * 12800.0), 0, 12800));
+                control (row, 0x1F01, std::clamp (iround (fx.mix * chainBlend * 12800.0), 0, 12800));
+                if (chainBlend < 1.0f && ! blendNoted)
+                {
+                    blendNoted = true;
+                    report.notes.push_back (insertLabel (song, t) + ": the chain's Blend (" + std::to_string (iround (chainBlend * 100.0))
+                                            + "%) is written into each effect's Mix level (FL has no dry/wet for a whole chain)");
+                }
                 m.slots.push_back (std::move (slot));
                 next = row + 1;
             }
