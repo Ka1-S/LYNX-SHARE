@@ -66,10 +66,19 @@ the segment BPM with /2 x2; Start / End / Loop / Length / Signature / Scale in t
 | Sample title "name  rate · depth · channels" over the editor | `clipsample::infoText`, read from the file's header | [S2] | exact text; LYNX's own small mark instead of Live's icon |
 | Set beside Start and End | puts the marker where the playing clip is (`playPosition` from the launcher's progress); dim while it does not play | [S2] dim Set buttons; [STR] `Set Clip Start` | exact for Start / End, for MIDI and audio clips |
 
-Left out: Follow (meaning not known: **needs a live check**), Edit (external editor), Fade, RAM, HiQ (no LYNX
-equivalent; Fade's behaviour on Session clips needs a live check), Loop Position / Length with their own Set buttons
-(one Start / Length in LYNX's slot model), a Groove chooser for audio clips (grooves act on MIDI clips only), BPM moved
-from the editor's toolbar into the panel (kept where round 190cg put it, approved then).
+Left out in the first pass and built in 2b below: Edit, Fade, Position / Length with Set, Groove chooser, BPM in the
+panel. Still left out: Follow (meaning not known: **needs a live check**), RAM, HiQ, a Groove chooser for audio clips.
+
+### 2b. After the coordinator's review (190dr-2)
+
+The Clip and Audio sections now follow [S2] field by field:
+- Clip: Start [Set] | End [Set], Loop, Position [Set] | Length [Set] in "bar. beat. sixteenth" (lengths from 0),
+  seconds "m:ss:mmm" for unwarped audio; Signature (the project's) | Groove (the Groove Pool's grooves, MIDI clips only);
+  Scale. LYNX's loop starts at the clip start, so Position moves Start and End together (approximate; a separate loop
+  start needs launcher work).
+- Audio: Warp, the mode list with Live's names on LYNX's engines (Re-Pitch = resampling; Complex Pro left out), BPM with
+  ÷2 / ×2 (warp190cg's command), Gain with its dB read-out, Pitch knob with st / ct, Reverse | Edit (LYNX's audio editor
+  window), Fade (the clip's edge fades, 4 ms: LYNX's length). Follow, RAM and HiQ left out (no matching behaviour).
 
 ## 3. Device View: a device to another track (#26) — `core/DetailChain.h` `moveEffectToInsert`
 
