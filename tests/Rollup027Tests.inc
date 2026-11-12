@@ -58,3 +58,22 @@ TEST (rollup027_hot_swap_default_key_only_in_the_ableton_style_layout)
     map.setChords ("view.hotSwap", { { 'H', 0 } });
     CHECK (! map.isDefault ("view.hotSwap") && hotswap::keyActsInLayout (Style::pattern, map.isDefault ("view.hotSwap")));
 }
+
+// 190bz (the reverbs' Measured law; the stand-in rule pinned to Classic) × 190ca (per-device starting presets fitted on
+// the classic Foil engine): a stand-in that starts from its own preset still runs the Classic law.
+TEST (rollup027_reverb_stand_ins_with_their_own_preset_keep_the_classic_law)
+{
+    using namespace lynx;
+    const auto law = (std::size_t) verbs::foil::engineLaw;
+    CHECK (std::string (effectInfo (EffectKind::foilPlate).params[law].name) == "Law");
+    CHECK (makeEffectSlot (EffectKind::foilPlate).params[law] == 1.0f); // a new Foil Plate: Measured
+    for (const char* name : { "SSL PlateVerb", "SSL SpringVerb", "SSL Native FlexVerb", "VerbSuite Classics", "Lustrous Plates", "SSL GateVerb" })
+    {
+        const auto s = p190ca::substituted (p190ca::vst3Named (name));
+        CHECK (s.kind == EffectKind::foilPlate && s.isSubstitute());
+        CHECK (s.params[law] == 0.0f);
+    }
+    // (and the preset of 190ca is the one in use: PlateVerb's fitted decay, not the role's 0.3)
+    const auto plate = p190ca::substituted (p190ca::vst3Named ("SSL PlateVerb"));
+    CHECK (std::abs (plate.params[(std::size_t) p190ca::paramNamed (plate.kind, "Decay")] - 0.3028f) < 1e-6f);
+}
