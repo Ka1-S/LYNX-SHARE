@@ -50,14 +50,15 @@ juce::String keyName (int key)
     return juce::String (notenames::keyName (key)); // Settings › General › Note names (round 165f)
 }
 
+// (round 190ea: never out of range: an empty pattern when a hand-built song has none; an edit keeps one first)
 const Pattern& currentPattern (const Song& s)
 {
-    return s.patterns[(std::size_t) s.currentPattern];
+    return s.activePattern();
 }
 
 Pattern& currentPattern (Song& s)
 {
-    return s.patterns[(std::size_t) s.currentPattern];
+    return s.activePattern();
 }
 
 // "\t" + the key map's shortcut of `id` for a menu item (empty when unbound or no key map is connected)
@@ -3342,7 +3343,7 @@ juce::PopupMenu PianoRollComponent::toolsMenu()
         juce::PopupMenu velocity;
         auto choose = [this] (std::function<std::vector<int> (const Pattern&, const std::vector<int>&)> pick) {
             const auto& song = engine.getSong();
-            setSelection (pick (song.patterns[(std::size_t) song.currentPattern], channelNotes()));
+            setSelection (pick (song.activePattern(), channelNotes()));
         };
         velocity.addItem (tr ("Loudest quarter"), [choose] { choose ([] (const Pattern& p, const std::vector<int>& t) { return notetools::selectLoudest (p, t, 0.25f, true); }); });
         velocity.addItem (tr ("Quietest quarter"), [choose] { choose ([] (const Pattern& p, const std::vector<int>& t) { return notetools::selectLoudest (p, t, 0.25f, false); }); });
@@ -3353,7 +3354,7 @@ juce::PopupMenu PianoRollComponent::toolsMenu()
             });
         if (! selection.empty())
         {
-            const auto& notes = engine.getSong().patterns[(std::size_t) engine.getSong().currentPattern].notes;
+            const auto& notes = engine.getSong().activePattern().notes;
             const auto v = selection.front() < (int) notes.size() ? notes[(std::size_t) selection.front()].velocity : 0.0f;
             velocity.addSeparator();
             velocity.addItem (tr ("Same velocity as the selected note ({0}%)", { juce::String (juce::roundToInt (v * 100.0f)) }), [choose, v] {
@@ -3800,7 +3801,7 @@ bool PianoRollComponent::runAction (const std::string& id)
     else if (is ("pianoRoll.exportMidi"))
     {
         const auto& song = engine.getSong();
-        const auto name = juce::String::fromUTF8 (song.patterns[(std::size_t) song.currentPattern].name.c_str());
+        const auto name = juce::String::fromUTF8 (song.activePattern().name.c_str());
         chooser = lynx::ui::makeFileChooser (tr ("Export MIDI"), juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile (name + ".mid"),
                                                        "*.mid");
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
@@ -4616,7 +4617,7 @@ bool PianoRollComponent::playheadFrame (double)
         const auto& followSong = engine.getSong();
         const auto loops = followSong.mode == PlayMode::pattern && engine.patternLinearOrigin() < 0.0 && followSong.currentPattern >= 0
                            && followSong.currentPattern < (int) followSong.patterns.size();
-        const auto loopTicks = loops ? (double) followSong.patterns[(std::size_t) followSong.currentPattern].effectiveLength (followSong.beatsPerBar) : 0.0;
+        const auto loopTicks = loops ? (double) followSong.activePattern().effectiveLength (followSong.beatsPerBar) : 0.0;
         const auto newStart = transportedit::followViewStartInLoop (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
                                                                     20.0 / pixelsPerTick, loopTicks);
 

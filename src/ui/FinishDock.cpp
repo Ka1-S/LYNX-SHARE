@@ -413,7 +413,7 @@ void FinishDock::choose (int id)
     engine.editSongStructural ([&ok, s] (Song& song) { ok = looks::apply (song, s); });
     if (! ok)
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Master looks"),
-                                                tr ("The Master has no room for the look: it needs four free effect slots."));
+                                                tr ("The Master has no room for the look: it needs five free effect slots."));
     refresh();
 }
 

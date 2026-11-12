@@ -289,7 +289,7 @@ bool ControllerBridge::step (int index) const
     const auto channel = engine.getSelectedChannel();
     if (song.currentPattern < 0 || song.currentPattern >= (int) song.patterns.size() || channel < 0 || channel >= (int) song.channels.size())
         return false;
-    return song.patterns[(std::size_t) song.currentPattern].hasStep (channel, index);
+    return song.activePattern().hasStep (channel, index);
 }
 
 void ControllerBridge::setStep (int index, bool on)
@@ -302,7 +302,7 @@ void ControllerBridge::setStep (int index, bool on)
     flush();
     engine.editSong ([channel, index] (Song& song) {
         if (song.currentPattern >= 0 && song.currentPattern < (int) song.patterns.size())
-            song.patterns[(std::size_t) song.currentPattern].toggleStep (channel, index);
+            song.activePattern().toggleStep (channel, index);
     });
 }
 

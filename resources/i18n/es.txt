@@ -8189,7 +8189,7 @@ countries: es mx ar co cl pe ve
 "Measuring the mix..." = "Midiendo la mezcla..."
 "The mix is silent: nothing to measure." = "La mezcla está en silencio: no hay nada que medir."
 "Mix {0} LUFS: input level {1}" = "Mezcla {0} LUFS: nivel de entrada {1}"
-"The Master has no room for the look: it needs four free effect slots." = "El máster no tiene espacio para el look: necesita cuatro ranuras de efecto libres."
+"The Master has no room for the look: it needs five free effect slots." = "El máster no tiene espacio para el look: necesita cinco ranuras de efecto libres."
 "Master looks: give the whole song a finished sound" = "Looks de máster: dale a toda la canción un sonido terminado"
 "Balanced" = "Equilibrado"
 "Clarity" = "Claridad"

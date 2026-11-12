@@ -8189,7 +8189,7 @@ countries: it ch sm
 "Measuring the mix..." = "Misurazione del mix..."
 "The mix is silent: nothing to measure." = "Il mix è silenzioso: niente da misurare."
 "Mix {0} LUFS: input level {1}" = "Mix {0} LUFS: livello di ingresso {1}"
-"The Master has no room for the look: it needs four free effect slots." = "Il master non ha spazio per il look: servono quattro slot effetto liberi."
+"The Master has no room for the look: it needs five free effect slots." = "Il master non ha spazio per il look: servono cinque slot effetto liberi."
 "Master looks: give the whole song a finished sound" = "Look del master: dai a tutto il brano un suono finito"
 "Balanced" = "Bilanciato"
 "Clarity" = "Chiarezza"

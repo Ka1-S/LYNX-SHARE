@@ -1022,7 +1022,7 @@ private:
 std::unique_ptr<juce::Component> makeNoteInspector (AudioEngine& engine, std::vector<int> indices, int focus)
 {
     const auto& song = engine.getSong();
-    const auto count = (int) song.patterns[(std::size_t) song.currentPattern].notes.size();
+    const auto count = (int) song.activePattern().notes.size();
     indices.erase (std::remove_if (indices.begin(), indices.end(), [count] (int i) { return i < 0 || i >= count; }), indices.end());
 
     if (indices.empty())

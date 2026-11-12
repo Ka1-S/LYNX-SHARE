@@ -8189,7 +8189,7 @@ countries: jp
 "Measuring the mix..." = "ミックスを測定中..."
 "The mix is silent: nothing to measure." = "ミックスが無音です: 測定するものがありません。"
 "Mix {0} LUFS: input level {1}" = "ミックス {0} LUFS: 入力レベル {1}"
-"The Master has no room for the look: it needs four free effect slots." = "マスターにルックを入れる空きがありません: 空きエフェクトスロットが4つ必要です。"
+"The Master has no room for the look: it needs five free effect slots." = "マスターにルックを入れる空きがありません: 空きエフェクトスロットが5つ必要です。"
 "Master looks: give the whole song a finished sound" = "マスタールック: 曲全体を仕上がったサウンドに"
 "Balanced" = "バランス"
 "Clarity" = "クリア"

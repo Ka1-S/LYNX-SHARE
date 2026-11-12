@@ -580,7 +580,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     playlist.onOpenPianoRoll = [this] {
         // edit a channel that plays in this pattern
         const auto& song = engine.getSong();
-        const auto& notes = song.patterns[(std::size_t) song.currentPattern].notes;
+        const auto& notes = song.activePattern().notes;
         const auto channel = engine.getSelectedChannel();
         if (! notes.empty() && std::none_of (notes.begin(), notes.end(), [channel] (const Note& n) { return n.channel == channel; }))
             engine.setSelectedChannel (notes.front().channel);
@@ -3343,7 +3343,7 @@ void MainComponent::selectTabForSnapshot (int tab)
         const auto& song = engine.getSong();
         std::vector<int> counts (song.channels.size(), 0);
 
-        for (const auto& n : song.patterns[(std::size_t) song.currentPattern].notes)
+        for (const auto& n : song.activePattern().notes)
             if (n.channel >= 0 && n.channel < (int) counts.size())
                 ++counts[(std::size_t) n.channel];
 
@@ -4091,7 +4091,7 @@ void MainComponent::dumpScoreLog (int minutes)
             if (s.patterns.empty())
                 s.patterns.emplace_back();
             s.currentPattern = juce::jlimit (0, (int) s.patterns.size() - 1, s.currentPattern);
-            auto& pattern = s.patterns[(std::size_t) s.currentPattern];
+            auto& pattern = s.activePattern();
             if (replace)
                 pattern.notes.clear();
             pattern.notes.insert (pattern.notes.end(), logged.begin(), logged.end());
@@ -4330,7 +4330,7 @@ void MainComponent::refreshRackPatternSelector()
 {
     const auto& song = engine.getSong();
     const auto valid = song.currentPattern >= 0 && song.currentPattern < (int) song.patterns.size();
-    const auto text = valid ? juce::String::fromUTF8 (song.patterns[(std::size_t) song.currentPattern].name.c_str()) : juce::String();
+    const auto text = valid ? juce::String::fromUTF8 (song.activePattern().name.c_str()) : juce::String();
     const auto colour = valid ? PlaylistComponent::patternColour (song, song.currentPattern) : juce::Colour();
 
     if (text != rackPatternSelector.text || colour != rackPatternSelector.colour)
@@ -4416,7 +4416,7 @@ void MainComponent::refreshRackLengthBox()
     const auto& song = engine.getSong();
     if (song.currentPattern < 0 || song.currentPattern >= (int) song.patterns.size())
         return;
-    const auto& pattern = song.patterns[(std::size_t) song.currentPattern];
+    const auto& pattern = song.activePattern();
     const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
     const auto bars = (int) juce::jmax<std::int64_t> (1, (pattern.effectiveLength (song.beatsPerBar) + bar - 1) / bar);
     const auto automatic = pattern.lengthTicks == 0;
@@ -4433,7 +4433,7 @@ void MainComponent::refreshRackLengthBox()
 void MainComponent::showPatternLengthMenu()
 {
     const auto& song = engine.getSong();
-    const auto& pattern = song.patterns[(std::size_t) song.currentPattern];
+    const auto& pattern = song.activePattern();
     const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
     juce::PopupMenu menu;
     menu.addSectionHeader (tr ("Pattern length"));

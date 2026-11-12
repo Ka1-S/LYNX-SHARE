@@ -239,10 +239,37 @@ void Song::removePattern (int index)
         else if (c.loopStarterPattern > index)
             --c.loopStarterPattern;
 
-    if (patterns.empty())
-        patterns.emplace_back().name = "Pattern 1";
+    if (currentPattern > index)
+        --currentPattern;
+    keepOnePattern(); // (the last one: an empty "Pattern 1" stays, as in FL)
+}
 
-    currentPattern = std::clamp (currentPattern > index ? currentPattern - 1 : currentPattern, 0, (int) patterns.size() - 1);
+bool Song::keepOnePattern()
+{
+    bool changed = false;
+    if (patterns.empty())
+    {
+        patterns.emplace_back().name = "Pattern 1";
+        changed = true;
+    }
+    const auto clamped = std::clamp (currentPattern, 0, (int) patterns.size() - 1);
+    changed = changed || clamped != currentPattern;
+    currentPattern = clamped;
+    return changed;
+}
+
+const Pattern& Song::activePattern() const noexcept
+{
+    static const Pattern none;
+    if (patterns.empty())
+        return none;
+    return patterns[(std::size_t) std::clamp (currentPattern, 0, (int) patterns.size() - 1)];
+}
+
+Pattern& Song::activePattern()
+{
+    keepOnePattern();
+    return patterns[(std::size_t) currentPattern];
 }
 
 std::vector<MixerTrack> Song::defaultMixer (int inserts)

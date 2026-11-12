@@ -2763,7 +2763,7 @@ void AudioEngine::updateRecording()
         if (recorder.isActive())
             return;
 
-        const auto& pattern = song.patterns[(std::size_t) song.currentPattern];
+        const auto& pattern = std::as_const (song).activePattern();
         recorder.begin (pattern.effectiveLength (song.beatsPerBar));
         // Pattern mode with Loop record off (round 170e5, FL's "never" play end [DECOMP 0x11d4800]): the pattern plays
         // once from the start of this pass and on past its end; the notes stay where they were played, so it grows
@@ -3036,6 +3036,7 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     const auto auditioned = comp::auditionedTrack (song);
     const auto pluginsBefore = detachNewPluginsOn ? freshPluginCounts (song) : std::map<std::string, int>();
     edit (song);
+    song.keepOnePattern(); // (round 190ea: what follows, and every listener, may read the current pattern)
     if (detachNewPluginsOn)
         detachNewPlugins (pluginsBefore, song);
     comp::checkAudition (song, auditioned);
@@ -3867,6 +3868,10 @@ void AudioEngine::publishSong()
     } };
     ++songStamp;
     ++publishCount;
+    // round 190ea: FL's invariant, at the one place every song state passes (new / opened / imported project, edit, undo,
+    // redo, a live session's remote change): at least one pattern and the current one in range. A Song built without a
+    // pattern used to crash the docked Piano roll (its listener read the current pattern of an empty list).
+    song.keepOnePattern();
     // Online Sessions (round 168a): every entity has its stable id after any edit, import or load
     uids::normalize (song);
     // round 174d A3: the Video Player's clock follows the song's tempo map (FL: the song's real time)
@@ -3884,7 +3889,6 @@ void AudioEngine::publishSong()
     // the Master's hardware output target, read by the device callback
     masterOutChannel.store (song.mixer.empty() ? outputDefault : song.mixer[0].outputChannel, std::memory_order_relaxed);
     masterOutMode.store (song.mixer.empty() ? 0 : (int) song.mixer[0].outputMode, std::memory_order_relaxed);
-    song.currentPattern = juce::jlimit (0, juce::jmax (0, (int) song.patterns.size() - 1), song.currentPattern);
     selectedChannel = juce::jlimit (0, juce::jmax (0, (int) song.channels.size() - 1), selectedChannel);
     {
         const auto count = (int) song.channels.size();

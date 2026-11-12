@@ -8189,7 +8189,7 @@ countries: kr
 "Measuring the mix..." = "믹스 측정 중..."
 "The mix is silent: nothing to measure." = "믹스에 소리가 없습니다: 측정할 것이 없습니다."
 "Mix {0} LUFS: input level {1}" = "믹스 {0} LUFS: 입력 레벨 {1}"
-"The Master has no room for the look: it needs four free effect slots." = "마스터에 룩을 넣을 공간이 없습니다: 빈 이펙트 슬롯 4개가 필요합니다."
+"The Master has no room for the look: it needs five free effect slots." = "마스터에 룩을 넣을 공간이 없습니다: 빈 이펙트 슬롯 5개가 필요합니다."
 "Master looks: give the whole song a finished sound" = "마스터 룩: 곡 전체에 완성된 사운드를"
 "Balanced" = "균형"
 "Clarity" = "선명함"

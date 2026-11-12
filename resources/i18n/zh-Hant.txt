@@ -8189,7 +8189,7 @@ countries: tw hk mo
 "Measuring the mix..." = "正在測量混音..."
 "The mix is silent: nothing to measure." = "混音無聲：沒有可測量的內容。"
 "Mix {0} LUFS: input level {1}" = "混音 {0} LUFS：輸入電平 {1}"
-"The Master has no room for the look: it needs four free effect slots." = "主控沒有空間放置該風格：需要四個空閒效果插槽。"
+"The Master has no room for the look: it needs five free effect slots." = "主控沒有空間放置該風格：需要五個空閒效果插槽。"
 "Master looks: give the whole song a finished sound" = "母帶風格：讓整首歌曲聽起來完成度更高"
 "Balanced" = "均衡"
 "Clarity" = "清晰"

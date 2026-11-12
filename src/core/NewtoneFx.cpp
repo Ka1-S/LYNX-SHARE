@@ -1023,7 +1023,7 @@ int dumpScore (Song& song, int channel, const std::vector<DetectedNote>& notes, 
     if (song.patterns.empty())
         song.patterns.emplace_back();
     song.currentPattern = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
-    auto& pattern = song.patterns[(std::size_t) song.currentPattern];
+    auto& pattern = song.activePattern();
     pattern.notes.erase (std::remove_if (pattern.notes.begin(), pattern.notes.end(), [channel] (const lynx::Note& n) { return n.channel == channel; }),
                          pattern.notes.end());
     const auto ticksPerFrame = song.bpm / 60.0 * ppq / sampleRate;
