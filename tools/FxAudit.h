@@ -241,6 +241,8 @@ inline const char* skipReason (EffectKind k)
         case EffectKind::waveCandy: case EffectKind::visualizer: case EffectKind::bigClock: case EffectKind::htmlNotebook:
         case EffectKind::tuner:
             return "visual only: no sound, no control output";
+        case EffectKind::edison: // (round 190cd)
+            return "a recorder / editor: its controls act on its own recording and playback, the input passes through";
         default: return nullptr;
     }
 }

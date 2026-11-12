@@ -34,6 +34,7 @@
 #include "core/FruityBasicFx.h"
 #include "core/FruityFilters.h"
 #include "core/NewtoneFx.h"
+#include "core/EdisonFx.h"
 #include "core/FruityDelay.h"
 #include "core/FrequencySplitter.h"
 #include "core/HardcoreFx.h"
@@ -3173,6 +3174,7 @@ const EffectInfo& effectInfo (EffectKind kind)
             static const EffectInfo rackMixerInfo { "Chain mixer", { { "Volume", rack::unityVolume }, { "Pan", 0.5f }, { "Chain select", 1.0f } } };
             return rackMixerInfo;
         }
+        case EffectKind::edison: return edisonfx::info();
         case EffectKind::lynxTune: return lynxtune::info();
         case EffectKind::fruityPhaser: return fruityPhaserInfo;
         case EffectKind::epochVerb:
@@ -3613,6 +3615,9 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
                 }
             return text;
         }
+
+        case EffectKind::edison:
+            return edisonfx::paramText (param, v);
 
         case EffectKind::rackMixer: // (round 183c: Live's chain units)
             if (param == rack::mixerVolume)
@@ -4356,6 +4361,7 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::shellChannel:
         case EffectKind::strikeShaper: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
         case EffectKind::rackMixer: return rack::makeChainMixer(); // a rack chain's mixer (round 183c)
+        case EffectKind::edison: return std::make_unique<edisonfx::Processor>(); // without its slot: nothing to play (round 190cd)
         case EffectKind::lynxTune: return lynxtune::make(); // LYNX's own pitch corrector (REA_rodada95)
         case EffectKind::fruityPhaser: return phaserfx::make(); // FL's Fruity Phaser, exact (REA_rodada105_phaser)
         case EffectKind::epochVerb:

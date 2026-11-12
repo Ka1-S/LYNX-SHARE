@@ -123,6 +123,7 @@
 #include "core/PitchShifterFl.h"
 #include "core/FruityFilters.h"
 #include "core/NewtoneFx.h"
+#include "core/EdisonFx.h"
 #include "core/FruityDelay.h"
 #include "core/StereoFx.h"
 #include "core/FrequencySplitter.h"
@@ -17496,3 +17497,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "ShotScale190biTests.inc"
 #include "QaFix190bjATests.inc"
 #include "Demo190bmTests.inc"
+#include "Edison190cdTests.inc"

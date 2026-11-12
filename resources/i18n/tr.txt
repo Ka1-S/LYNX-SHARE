@@ -8280,7 +8280,6 @@ countries: tr
 "Deactivate input {0}" = "{0}. girişi devre dışı bırak"
 "Activate input {0}" = "{0}. girişi etkinleştir"
 "Input {0}" = "Giriş {0}"
-# Round 183c: Racks
 "Add chain" = "Zincir ekle"
 "Audio Effect Rack" = "Ses efekti rafı"
 "Chain Pan" = "Zincir panı"
@@ -8342,9 +8341,9 @@ countries: tr
 "Blend of the shaped signal with the dry one (parallel processing)" = "Biçimlendirilmiş sinyalin kuru sinyalle karışımı (paralel işleme)"
 "One gain for both channels, so the stereo image stays put" = "Stereo görüntü kaymasın diye iki kanal için tek bir kazanç"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "Pes notaları dedektörden uzak tutar (davul bus'ındaki bir kick)"
-
 "For a file with a true-peak ceiling: {0}" = "Gerçek tepe sınırı olan bir dosya için: {0}"
 "(look)" = "(görünüm)"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "Varsayılan şablon bulunamadı; onun yerine LYNX SHARE'in varsayılan projesi açıldı"
 "{0} could not be opened." = "{0} açılamadı."
@@ -8368,6 +8367,7 @@ countries: tr
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Tüm yeni eklentileri ayır"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Açık: eklediğiniz bir eklentinin penceresi ayrılmış olarak, panellerin üstünde açılır. Kapalı: masaüstüne yerleşik açılır, tıkladığınız bir panelin arkasına geçer. Her eklentinin pencere menüsü › Ayrılmış bunu o eklenti için değiştirir"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Diğer uygulamalar için..."
 "Export for other apps" = "Diğer uygulamalar için dışa aktar"
@@ -8542,10 +8542,6 @@ countries: tr
 "Can't freeze this channel" = "Bu kanal dondurulamaz"
 "Frozen: Unfreeze to edit" = "Dondurulmuş: düzenlemek için çözün"
 "A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "Bir kontrolcü bu enstrümanın düğmelerine bağlı ve onları canlı hareket ettiriyor: dondurulmuş ses onu takip edemez."
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "Şarkıyı dosya olarak kaydet"
@@ -8740,7 +8736,6 @@ countries: tr
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Bir oyun kumandası transportu yönetir ve bir MIDI denetleyicisi gibi herhangi bir kontrole bağlanabilir. MIDI sayfasında da var."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX'in kendi iyileştirmeleri. Hepsi varsayılan olarak kapalıdır; birini açana kadar LYNX SHARE, FL Studio gibi görünür ve davranır. Her anahtar, satırında adı geçen yerdeki ayarın aynısıdır."
 "LYNX extras..." = "LYNX ekstraları..."
-
 "Search your plugins" = "Plugin'lerinde ara"
 "Nothing is shared." = "Hiçbir şey paylaşılmıyor."
 "{0} shared with the session" = "Oturumla paylaşılan: {0}"
@@ -8883,7 +8878,6 @@ countries: tr
 "Channel 2" = "Kanal 2"
 "Channels 2-{0}" = "Kanallar 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE üye kanalları (alt bölge): her biri bir nota taşıyan MIDI kanalları"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "NEFES"
 "Motion blending" = "Hareket karışımı"
 "Load sprite sheet..." = "Sprite sayfası yükle..."
@@ -8931,3 +8925,37 @@ countries: tr
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (sayfanın son satırı), dansçı fareyle tutulurken gösterilir."
 "Show complete piano roll preview" = "Piano Roll önizlemesinin tamamını göster"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: bir kanalın nota önizlemesi, pattern rack'in gösterdiğinden uzun olsa bile pattern'in tamamını gösterir; kapalıyken adımlarla birlikte kayar"
+
+# --- Edison-style audio editor: record into a slot
+"Forever" = "Sınırsız"
+"{0} min" = "{0} dk"
+"Recording starts at once" = "Kayıt hemen başlar"
+"Records only while the input is heard (it pauses in silence)" = "Yalnızca girişte ses duyulurken kaydeder (sessizlikte duraklar)"
+"Records while the song plays" = "Şarkı çalarken kaydeder"
+"Record this slot's input" = "Bu slotun girişini kaydet"
+"On input" = "Girişte"
+"On play" = "Çalarken"
+"When / what to record" = "Ne zaman / ne kaydedilsin"
+"Maximum recording time" = "Azami kayıt süresi"
+"A new recording goes after the audio already here (off: it replaces it)" = "Yeni kayıt, buradaki sesin arkasına eklenir (kapalı: onun yerine geçer)"
+"Slave" = "Sync"
+"Slave playback to host: while the song plays, this audio plays at the song time" = "Çalmayı ana uygulamaya bağla: şarkı çalarken bu ses şarkı zamanında çalar"
+"Mute input" = "Girişi sustur"
+"Mute input: the slot's input is not passed on" = "Girişi sustur: slotun girişi iletilmez"
+"Recording..." = "Kaydediliyor..."
+"Waiting for project playback..." = "Projenin çalması bekleniyor..."
+"Waiting for audio input..." = "Ses girişi bekleniyor..."
+"This slot is not processing audio (the effect was removed)" = "Bu slot ses işlemiyor (efekt kaldırıldı)"
+"Playback" = "Çalma"
+"Slave playback to host" = "Çalmayı ana uygulamaya bağla"
+"Ignore own selection" = "Kendi seçimini yok say"
+"Set info..." = "Bilgi ayarla..."
+"Set info" = "Bilgi ayarla"
+"Rename all" = "Tümünü yeniden adlandır"
+"Noise threshold mark" = "Gürültü eşiği işareti"
+"No noise threshold yet: select a part with only the background noise, then Tools > Acquire noise threshold" = "Henüz gürültü eşiği yok: yalnızca arka plan gürültüsü olan bir bölümü seçin, sonra Araçlar > Gürültü eşiğini al"
+"Remove all Edison instances" = "Tüm Edison örneklerini kaldır"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"

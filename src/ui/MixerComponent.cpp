@@ -3252,8 +3252,20 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                                  : tr ("none");
         menu.addItem (tr ("Audio input: {0}...", { current }), [this, t] { mixerinput::showMenu (engine, t, this); });
     }
-    menu.addItem (tr ("Open audio editor") + "\tCtrl+E", [this] { openAudioEditor (engine); });
-    menu.addItem (tr ("Open audio editor and record") + "\tShift+E", [this] { openAudioEditorRecording (engine); });
+    // FL: the audio editor is loaded into the track's first empty slot (round 190cd); a full track gets the editor
+    // window as before
+    menu.addItem (tr ("Open audio editor") + "\tCtrl+E", [this, t] {
+        if (const auto at = addEdisonSlot (engine, t); at >= 0)
+            openEdisonSlot (engine, t, at);
+        else
+            openAudioEditor (engine);
+    });
+    menu.addItem (tr ("Open audio editor and record") + "\tShift+E", [this, t] {
+        if (const auto at = addEdisonSlot (engine, t); at >= 0)
+            openEdisonSlot (engine, t, at, true);
+        else
+            openAudioEditorRecording (engine);
+    });
     menu.addSeparator(); // (FL: a line before Reset)
     menu.addItem (tr ("Reset selected track(s) to default"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::resetToDefault (s, targets); }); });
 
@@ -4228,7 +4240,8 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       // the plugin's Default preset of the user's FL installation (core/NativeEngines.h)
                                       EffectKind::maximus, EffectKind::vocodex, EffectKind::equo, EffectKind::distructor, EffectKind::lovePhilter,
                                       EffectKind::grossBeat, EffectKind::convolver, EffectKind::flPitchShifter, EffectKind::vintagePhaser,
-                                      EffectKind::squeeze, EffectKind::rhythmGain, EffectKind::newtone, EffectKind::newtime };
+                                      EffectKind::squeeze, EffectKind::rhythmGain, EffectKind::newtone, EffectKind::newtime,
+                                      EffectKind::edison }; // round 190cd: FL's audio editor as a slot plugin
 } // namespace
 
 const std::vector<EffectKind>& addableEffects()

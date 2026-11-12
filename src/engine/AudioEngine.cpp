@@ -2,6 +2,7 @@
 #include "core/VideoPlayer.h"
 
 #include "core/Comping.h"
+#include "core/EdisonFx.h"
 #include "core/LiveSession.h"
 
 #include "core/SessionIds.h"
@@ -4474,6 +4475,7 @@ void AudioEngine::timerCallback()
     if (++hwTicks >= 5) // (6 times a second)
     {
         hwTicks = 0;
+        pumpEdisonRecordings(); // (round 190cd)
         applyHardwareInsertPings();
     }
     rt::promotePending(); // Linux: real-time priority for the audio threads seen since the last tick (round 161)
@@ -5022,9 +5024,89 @@ void AudioEngine::markCreatedNow()
         song.info.created = (double) juce::Time::currentTimeMillis() / 1000.0;
 }
 
+void AudioEngine::pumpEdisonRecordings()
+{
+    bool finished = false;
+    for (const auto& track : song.mixer)
+        for (const auto& fx : track.effects)
+            if (fx.kind == EffectKind::edison)
+                if (const auto session = edisonfx::findSession (fx.instance.id); session != nullptr && session->recording() && ! session->pump())
+                    finished = true; // (the maximum recording time, or its effect is gone)
+    if (finished)
+        flushEdisonAudio();
+}
+
+void AudioEngine::flushEdisonAudio()
+{
+    struct Change
+    {
+        std::uint64_t instance;
+        std::string path;
+        bool clearState;
+    };
+    std::vector<Change> changes;
+    for (const auto& track : song.mixer)
+        for (const auto& fx : track.effects)
+        {
+            if (fx.kind != EffectKind::edison)
+                continue;
+            const auto session = edisonfx::findSession (fx.instance.id);
+            if (session == nullptr || session->recording())
+                continue;
+            const auto wasDirty = session->dirty();
+            if (wasDirty)
+            {
+                if (session->document().audio.empty())
+                    session->save ({});
+                else
+                {
+                    auto folder = recordingFolder;
+                    if (! folder.createDirectory()) // e.g. a read-only project folder: the global recordings folder
+                        folder = defaultRecordingFolder(), folder.createDirectory();
+                    const auto name = (recordingStem.isNotEmpty() ? recordingStem + "_" : juce::String())
+                                      + juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H-%M-%S") + "_Edison";
+                    const auto file = folder.getNonexistentChildFile (name, ".wav", false);
+                    if (! session->save (file.getFullPathName().toStdString()))
+                    {
+                        recordingError = tr ("Could not write {0}", { file.getFullPathName() });
+                        continue; // (it stays unsaved: the next flush tries again)
+                    }
+                    sessionRecordings.push_back (file); // (a file this project may end up not using, like a take)
+                }
+            }
+            // the slot follows its session: after a write here, or one by another engine of the same project
+            if (wasDirty || (! session->path().empty() && session->path() != fx.samplePath))
+                changes.push_back ({ fx.instance.id, session->path(), wasDirty });
+        }
+    if (changes.empty())
+        return;
+    auto apply = [&changes] (Song& s) {
+        for (auto& track : s.mixer)
+            for (auto& fx : track.effects)
+                if (fx.kind == EffectKind::edison)
+                    for (const auto& c : changes)
+                        if (c.instance == fx.instance.id)
+                        {
+                            fx.samplePath = c.path;
+                            if (c.clearState)
+                                fx.state.clear(); // (an imported slot: FL's state held the audio that was replaced)
+                        }
+    };
+    const auto differs = std::any_of (changes.begin(), changes.end(), [this] (const Change& c) {
+        for (const auto& track : song.mixer)
+            for (const auto& fx : track.effects)
+                if (fx.kind == EffectKind::edison && fx.instance.id == c.instance)
+                    return fx.samplePath != c.path || (c.clearState && ! fx.state.empty());
+        return false;
+    });
+    if (differs)
+        editSong (apply, false);
+}
+
 void AudioEngine::capturePluginStates()
 {
     stampWorkTime();
+    flushEdisonAudio(); // (round 190cd: an Edison slot's audio is a file of the project)
     // Changes only the saved state (recreates nothing and doesn't enter the undo history).
     for (std::size_t i = 0; i < song.channels.size(); ++i)
         if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()))

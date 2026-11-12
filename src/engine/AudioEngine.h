@@ -148,6 +148,13 @@ public:
 
     // Copies the plugins' current state into the Song (before saving).
     void capturePluginStates(); // (before every save: also adds the working time so far, see stampWorkTime)
+    // Edison slots (round 190cd, core/EdisonFx.h): audio that changed since it was last written goes to a new WAV in
+    // the recording folder and the slot points at it (not an undo step). Called after a take, when an Edison window
+    // closes and before every save. UI thread.
+    void flushEdisonAudio();
+    // Recordings into Edison slots go on while their windows are closed (as FL's plugin does): this moves what the
+    // audio thread recorded into the takes (the engine's timer calls it) and flushes a take that ended by itself.
+    void pumpEdisonRecordings();
     // Round 190ao (Bitwig's "Reload plug-in"): a hosted plugin of a channel (track < 0) or a mixer slot that is down:
     // it crashed inside a call and was switched off, or its separate process died or stopped responding.
     struct HostedSlot

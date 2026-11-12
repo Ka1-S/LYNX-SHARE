@@ -46,6 +46,7 @@
 #include "core/Effects.h"
 #include "core/FlpImport.h"
 #include "core/NewtoneFx.h"
+#include "core/EdisonFx.h"
 #include "core/VisualFx.h"
 #include "core/FlExtraFx.h"
 #include "core/Scratcher.h"
@@ -1215,6 +1216,16 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
             slot.state = state;
             return slot;
         }
+    if (pluginName == "Edison") // round 190cd: the slot stays an Edison, with its switches; its audio is the WAV image in the state
+    {
+        auto slot = makeEffectSlot (EffectKind::edison);
+        if (const auto parsed = edisonfx::parseFlState (state))
+        {
+            edisonfx::toParams (*parsed, slot.params);
+            slot.state = state;
+        }
+        return slot;
+    }
     if (pluginName == "Newtone" || pluginName == "Newtime")
     {
         auto slot = makeEffectSlot (pluginName == "Newtone" ? EffectKind::newtone : EffectKind::newtime);

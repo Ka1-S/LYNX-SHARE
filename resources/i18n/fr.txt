@@ -8280,7 +8280,6 @@ countries: fr be ch ca lu
 "Deactivate input {0}" = "Désactiver l'entrée {0}"
 "Activate input {0}" = "Activer l'entrée {0}"
 "Input {0}" = "Entrée {0}"
-# Round 183c: Racks
 "Add chain" = "Ajouter une chaîne"
 "Audio Effect Rack" = "Rack d'effets audio"
 "Chain Pan" = "Panoramique de la chaîne"
@@ -8368,6 +8367,7 @@ countries: fr be ch ca lu
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Détacher tous les nouveaux plugins"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Activé : la fenêtre d'un plugin ajouté s'ouvre détachée, au-dessus des panneaux. Désactivé : elle s'ouvre ancrée dans le bureau, derrière un panneau cliqué. Le menu de la fenêtre de chaque plugin › Détaché le change pour ce plugin"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Pour d'autres applications..."
 "Export for other apps" = "Exporter pour d'autres applications"
@@ -8736,7 +8736,6 @@ countries: fr be ch ca lu
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Une manette de jeu pilote le transport et peut être liée à n'importe quel contrôle comme un contrôleur MIDI. Aussi dans la page MIDI."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Les améliorations propres à LYNX. Toutes sont désactivées par défaut : LYNX SHARE ressemble à FL Studio et se comporte comme lui tant que vous n'en activez aucune. Chaque interrupteur est le même réglage que celui de l'endroit indiqué sur sa ligne."
 "LYNX extras..." = "Extras LYNX..."
-
 "Search your plugins" = "Rechercher dans vos plugins"
 "Nothing is shared." = "Rien n'est partagé."
 "{0} shared with the session" = "{0} partagés avec la session"
@@ -8842,10 +8841,6 @@ countries: fr be ch ca lu
 "{0} min ago" = "il y a {0} min"
 "{0} h ago" = "il y a {0} h"
 "{0} d ago" = "il y a {0} j"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] ouvrir/fermer l'éditeur  [Alt]+[LMB] garder les autres ouverts  [Ctrl]+[LMB] écouter  [2xLMB] Piano Roll  [LMB] glisser haut/bas réordonne  [RMB] menu du canal"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Crêtemètre (gauche/droite) avec maintien de crête  [LMB] efface le voyant d'écrêtage"
 "Find similar samples" = "Trouver des samples similaires"
 "Similar to {0}" = "Similaire à {0}"
 "Listening to \"{0}\"..." = "Écoute de \"{0}\"..."
@@ -8883,7 +8878,6 @@ countries: fr be ch ca lu
 "Channel 2" = "Canal 2"
 "Channels 2-{0}" = "Canaux 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "Canaux membres MPE (zone inférieure) : les canaux MIDI qui portent une note chacun"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "SOUFFLE"
 "Motion blending" = "Fusion de mouvement"
 "Load sprite sheet..." = "Charger une feuille de sprites..."
@@ -8931,3 +8925,37 @@ countries: fr be ch ca lu
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (la dernière ligne de la planche) s'affiche pendant que le danseur est tenu avec la souris."
 "Show complete piano roll preview" = "Afficher l'aperçu complet du Piano Roll"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack : l'aperçu des notes d'un canal montre tout le pattern même s'il est plus long que la partie visible du rack ; désactivé, il défile avec les pas"
+
+# --- Edison-style audio editor: record into a slot
+"Forever" = "Sans limite"
+"{0} min" = "{0} min"
+"Recording starts at once" = "L'enregistrement démarre immédiatement"
+"Records only while the input is heard (it pauses in silence)" = "N'enregistre que lorsque l'entrée est audible (pause dans le silence)"
+"Records while the song plays" = "Enregistre pendant la lecture du morceau"
+"Record this slot's input" = "Enregistrer l'entrée de ce slot"
+"On input" = "Sur entrée"
+"On play" = "À la lecture"
+"When / what to record" = "Quand / quoi enregistrer"
+"Maximum recording time" = "Durée maximale d'enregistrement"
+"A new recording goes after the audio already here (off: it replaces it)" = "Un nouvel enregistrement s'ajoute après l'audio déjà présent (désactivé : il le remplace)"
+"Slave" = "Sync"
+"Slave playback to host: while the song plays, this audio plays at the song time" = "Synchroniser la lecture sur l'hôte : pendant la lecture du morceau, cet audio est lu au temps du morceau"
+"Mute input" = "Couper l'entrée"
+"Mute input: the slot's input is not passed on" = "Couper l'entrée : l'entrée du slot n'est pas transmise"
+"Recording..." = "Enregistrement..."
+"Waiting for project playback..." = "En attente de la lecture du projet..."
+"Waiting for audio input..." = "En attente de l'entrée audio..."
+"This slot is not processing audio (the effect was removed)" = "Ce slot ne traite pas d'audio (l'effet a été retiré)"
+"Playback" = "Lecture"
+"Slave playback to host" = "Synchroniser la lecture sur l'hôte"
+"Ignore own selection" = "Ignorer sa propre sélection"
+"Set info..." = "Définir l'info..."
+"Set info" = "Définir l'info"
+"Rename all" = "Tout renommer"
+"Noise threshold mark" = "Repère du seuil de bruit"
+"No noise threshold yet: select a part with only the background noise, then Tools > Acquire noise threshold" = "Pas encore de seuil de bruit : sélectionnez une partie ne contenant que le bruit de fond, puis Outils > Acquérir le seuil de bruit"
+"Remove all Edison instances" = "Retirer toutes les instances d'Edison"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] ouvrir/fermer l'éditeur  [Alt]+[LMB] garder les autres ouverts  [Ctrl]+[LMB] écouter  [2xLMB] Piano Roll  [LMB] glisser haut/bas réordonne  [RMB] menu du canal"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Crêtemètre (gauche/droite) avec maintien de crête  [LMB] efface le voyant d'écrêtage"
