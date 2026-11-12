@@ -1087,6 +1087,14 @@ enum class EffectKind : std::uint8_t
     pocketComb, // Pocket Comb Filter, FL Studio Mobile's Comb Filter (round 190by, core/PocketFxD.cpp): FLM's 11 values
     pocketMultiband, // Pocket Multiband Compressor, FL Studio Mobile's Multiband Compressor (round 190by, core/PocketFxD.cpp): FLM's 30 values
     pocketTapeStop, // Pocket Tape Stop, FL Studio Mobile's Tape Stop (round 190by, core/PocketFxD.cpp): FLM's 7 values
+    // --- round 190dw: FL Studio Mobile's EQ / filter / reverb modules as exact engines (core/PocketFxE.cpp, core/PocketReverb.cpp)
+    pocketEq,            // Pocket EQ, FL Studio Mobile's Equalizer ("Param EQ", module 3): FLM's 20 values
+    pocketGraphicEq,     // Pocket Graphic EQ, FL Studio Mobile's Graphic EQ (module 7): FLM's 8 values
+    pocketFilter,        // Pocket Filter, FL Studio Mobile's Filter (module 9): FLM's 4 values
+    pocketReverbClassic, // Pocket Reverb Classic, FL Studio Mobile's Reverb (legacy, module 12): FLM's 21 values
+    pocketReverb2,       // Pocket Reverb 2, FL Studio Mobile's Reverb 2 (module 35): FLM's 18 values
+    pocketReverb,        // Pocket Reverb, FL Studio Mobile's Reverb (module 32): FLM's 15 values
+    // --- end of round 190dw
     rackMixer,       // a rack chain's mixer (round 183c, core/Rack.h): volume (Live's chain taper), pan, chain-select gain; inside racks only
     edison           // FL's Edison (round 190cd, core/EdisonFx.h): an audio editor in the slot — records the slot's input, plays into it; its audio in samplePath
 };

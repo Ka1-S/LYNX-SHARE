@@ -3224,6 +3224,56 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                                  { "Sync", 0.0f } } };
             return info;
         }
+        // --- round 190dw: FLM's own defaults (each module's default-value function, REA_rodada182c / FLM_FORMAT §7.1)
+        case EffectKind::pocketEq:
+        {
+            static const EffectInfo info { "Pocket EQ", { { "Gain 1", 0.5f }, { "Frequency 1", 0.2f }, { "Bandwidth 1", 0.5f }, { "Kind 1", 0.51f },
+                                                          { "Gain 2", 0.5f }, { "Frequency 2", 0.4f }, { "Bandwidth 2", 0.5f }, { "Kind 2", 0.51f },
+                                                          { "Gain 3", 0.5f }, { "Frequency 3", 0.6f }, { "Bandwidth 3", 0.5f }, { "Kind 3", 0.51f },
+                                                          { "Gain 4", 0.5f }, { "Frequency 4", 0.8f }, { "Bandwidth 4", 0.5f }, { "Kind 4", 0.51f },
+                                                          { "Channel 1", 0.0f }, { "Channel 2", 0.0f }, { "Channel 3", 0.0f }, { "Channel 4", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketGraphicEq:
+        {
+            static const EffectInfo info { "Pocket Graphic EQ", { { "80 Hz", 0.5f }, { "160 Hz", 0.5f }, { "375 Hz", 0.5f }, { "750 Hz", 0.5f },
+                                                                  { "1.5 kHz", 0.5f }, { "3 kHz", 0.5f }, { "6 kHz", 0.5f }, { "12 kHz", 0.5f } } };
+            return info;
+        }
+        case EffectKind::pocketFilter:
+        {
+            static const EffectInfo info { "Pocket Filter", { { "Frequency", 0.7f }, { "Q", 0.0f }, { "Type", 0.0f }, { "Slope", 0.5f } } };
+            return info;
+        }
+        case EffectKind::pocketReverbClassic:
+        {
+            static const EffectInfo info { "Pocket Reverb Classic",
+                                           { { "Decay", 0.4f }, { "High damping", 0.8f }, { "Mix", 0.4f }, { "Predelay", 0.0f }, { "Room size", 1.0f },
+                                             { "Diffusion", 1.0f }, { "Width", 1.0f }, { "Low cut", 0.0f }, { "High cut", 1.0f }, { "Input", 1.0f },
+                                             { "ER", 0.25f }, { "Dry level", 0.0f }, { "Input off", 0.0f }, { "Dry off", 0.0f },
+                                             { "ER off", 0.0f }, { "Wet off", 0.0f }, { "Bass mult", 0.0f }, { "Crossover", 0.0f },
+                                             { "Mod rate", 0.499f }, { "Mod depth", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketReverb2:
+        {
+            static const EffectInfo info { "Pocket Reverb 2",
+                                           { { "High cut", 0.16f }, { "Low cut", 0.0187f }, { "Size", 0.5f }, { "Decay", 0.068f }, { "Diffusion", 1.0f },
+                                             { "Damping", 0.16f }, { "Dry", 0.8f }, { "ER", 0.8f }, { "Wet", 0.56f }, { "Side input", 0.0f },
+                                             { "Delay", 0.0f }, { "Tempo", 0.0f }, { "Mod", 0.0f }, { "Bass", 0.28f }, { "Separation", 0.5f },
+                                             { "Speed", 0.33f }, { "Crossover", 0.2405f }, { "Pan", 0.5f } } };
+            return info;
+        }
+        case EffectKind::pocketReverb:
+        {
+            static const EffectInfo info { "Pocket Reverb",
+                                           { { "Decay", 0.4f }, { "High damping", 0.8f }, { "Mix", 0.4f }, { "Pan", 0.5f }, { "ER", 0.25f },
+                                             { "Predelay", 0.0f }, { "Room size", 1.0f }, { "Diffusion", 1.0f }, { "Width", 1.0f }, { "Low cut", 0.0f },
+                                             { "High cut", 1.0f }, { "Mod rate", 0.499f }, { "Mod depth", 0.0f }, { "Wet gain", 1.0f },
+                                             { "Dry level", 1.0f } } };
+            return info;
+        }
+        // --- end of round 190dw
         case EffectKind::rackMixer:
         {
             static const EffectInfo rackMixerInfo { "Chain mixer", { { "Volume", rack::unityVolume }, { "Pan", 0.5f }, { "Chain select", 1.0f } } };
@@ -4086,6 +4136,12 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return pocket::multibandParamText (param, v);
         case EffectKind::pocketTapeStop:
             return pocket::tapeStopParamText (param, v);
+        case EffectKind::pocketEq: return pocket::eqParamText (param, v);                 // round 190dw
+        case EffectKind::pocketGraphicEq: return pocket::graphicEqParamText (param, v);
+        case EffectKind::pocketFilter: return pocket::filterParamText (param, v);
+        case EffectKind::pocketReverbClassic: return pocket::reverbClassicParamText (param, v);
+        case EffectKind::pocketReverb2: return pocket::reverb2ParamText (param, v);
+        case EffectKind::pocketReverb: return pocket::reverbParamText (param, v);
         case EffectKind::hardwareInsert:
             return hwinsert::paramText (param, v);
         case EffectKind::fruityMute2:
@@ -4521,6 +4577,12 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::pocketComb: return pocket::makeComb(); // round 190by
         case EffectKind::pocketMultiband: return pocket::makeMultiband();
         case EffectKind::pocketTapeStop: return pocket::makeTapeStop();
+        case EffectKind::pocketEq: return pocket::makeEq(); // round 190dw
+        case EffectKind::pocketGraphicEq: return pocket::makeGraphicEq();
+        case EffectKind::pocketFilter: return pocket::makeFilter();
+        case EffectKind::pocketReverbClassic: return pocket::makeReverbClassic();
+        case EffectKind::pocketReverb2: return pocket::makeReverb2();
+        case EffectKind::pocketReverb: return pocket::makeReverb();
         case EffectKind::hardwareInsert: return std::make_unique<hwinsert::HardwareInsertFx>(); // round 164d
         case EffectKind::fruityMute2: return flextra::mute2::make(); // round 165g
         case EffectKind::bigClock:

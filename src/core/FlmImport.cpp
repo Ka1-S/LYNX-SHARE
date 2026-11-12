@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstring>
+#include <deque> // round 190dw item 4
 #include <functional>
 #include <map>
 #include <optional>
@@ -538,6 +539,12 @@ float bendRangeOf (const flm::Module& m)
             static constexpr float ranges[] = { 1.0f, 2.0f, 7.0f, 12.0f };
             return std::isfinite (r) ? ranges[std::clamp ((int) std::lround (r * 3.0f), 0, 3)] : 2.0f;
         }
+        // --- round 190dw item 4 (FLM_FORMAT §7.4): SoundFont Player's slot 75 (0x1807f0800) keeps half the rack's
+        // 4v − 2 and its voices add it × 2 (a byte the constructor sets to 2, 0x1807ef331) semitones: ±2. Transistor
+        // Bass keeps the base's empty slot 75 (0x1803debb0): it does not bend at all (0 = exact, nothing to play)
+        case flm::module::soundFont: return 2.0f;
+        case flm::module::transistorBass: return 0.0f;
+        // --- end of round 190dw item 4
         default: return -1.0f;
     }
 }
@@ -596,6 +603,21 @@ void applyGeneratorWrapper (Ctx& ctx, const flm::Module& m, ChannelDef& c, bool 
 // - Pocket SuperSaw: FLM k → engine k − 1, as is; MiniSynth (FLM build): FLM k → desktop k − 1, as is (MW Dest with
 //   the import's two-step fold); GMSynth (FLM): FLM k → the engine's P[k], as is; Transistor Bass: the 13 knobs through
 //   transistorBassFlmState's map.
+// --- round 190dw item 4: SoundFont Player's envelope knob k (1 Attack, 2 Decay, 3 Sustain, 4 Release) at value v as
+// LYNX Soundfont's knob value — the laws of soundFontState below
+float soundFontEnvelopeValue (int k, float v) noexcept
+{
+    v = std::isfinite (v) ? std::clamp (v, 0.0f, 1.0f) : 0.0f;
+    if (k == 3)
+    {
+        const auto n = std::clamp ((int) std::lround (127.0 * (double) v), 1, 127);
+        return (float) std::max (1.0e-4, std::pow (10.0, -5.0 + 5.0 * std::pow (n / 127.0, 0.2)));
+    }
+    const auto t = 0.95 * (double) v + 0.05;
+    const auto seconds = std::max (0.005, t * t * t * 10.0) * (k == 1 ? 1.0 : 2.5);
+    return (float) std::clamp (std::log (seconds / 0.001) / std::log (20000.0), 1.0e-4, 1.0);
+}
+// --- end of round 190dw item 4
 struct GeneratorLaneTarget
 {
     AutomationTarget target;
@@ -652,6 +674,28 @@ std::optional<GeneratorLaneTarget> generatorLaneTarget (const Song& song, int in
                     out = engine (j, k == 9 ? std::function<float (float)> ([] (float v) { return std::sqrt (v); }) : same);
             break;
         }
+        // --- round 190dw item 4
+        case InstrumentKind::soundfont:
+            // SoundFont Player's Attack / Decay / Sustain / Release (FLM_FORMAT §7.3) through the import's own laws onto
+            // LYNX Soundfont's envelope knobs; they act only with Envelope = Custom, as in FLM (approximate: LYNX's
+            // envelope shape, and FLM's voices may take a new value at another moment)
+            if (m.type == flm::module::soundFont && param >= 1 && param <= 4 && m.params.size() > 5 && m.params[5] > 0.5f)
+            {
+                const int knob = param == 1 ? sf::pAttack : param == 2 ? sf::pDecay : param == 3 ? sf::pSustain : sf::pRelease;
+                out = GeneratorLaneTarget { { AutomationTargetKind::channelParam, index, 0, knob },
+                                            [param, knob] (float v) { return sf::normalise (knob, soundFontEnvelopeValue (param, v)); }, true };
+            }
+            break;
+        case InstrumentKind::threeosc:
+            // 3x Osc's Pan (113) is the channel's pan (threeOscState), plus the wrapper's Wet Pan
+            if (m.type == flm::module::threeOsc && param == 113)
+            {
+                const auto wet = m.reserved.size() > 2 && std::isfinite (m.reserved[2]) ? std::clamp (m.reserved[2], 0.0f, 1.0f) : 0.5f;
+                out = GeneratorLaneTarget { { AutomationTargetKind::channelPan, index, 0, 0 },
+                                            [wet] (float v) { return std::clamp (std::clamp (v, 0.0f, 1.0f) + wet - 0.5f, 0.0f, 1.0f); } };
+            }
+            break;
+        // --- end of round 190dw item 4
         default: break;
     }
     if (! out)
@@ -659,6 +703,52 @@ std::optional<GeneratorLaneTarget> generatorLaneTarget (const Song& song, int in
     return out;
 }
 // --- end of round 190de --------------------------------------------------------------------------------------------
+
+// --- round 190dw item 4: the file a module's CSTM "PATH" chunk names (u32 length + text, "@R@" = FLM's resources,
+// "@L@" = the project's folder; the Slicer's and 3x Osc's layout), resolved like the song's samples; "" = no PATH
+std::string flmCustomPath (Ctx& ctx, const flm::Module& m, const std::string& owner)
+{
+    const auto& b = m.custom;
+    const auto u32 = [&b] (std::size_t at) {
+        std::uint32_t v = 0;
+        for (int k = 0; k < 4; ++k)
+            v |= (std::uint32_t) b[at + (std::size_t) k] << (8 * k);
+        return v;
+    };
+    std::string root, rel;
+    for (std::size_t at = 0; at + 8 <= b.size();)
+    {
+        const auto size = (std::size_t) u32 (at + 4);
+        if (at + 8 + size > b.size())
+            break;
+        if (std::memcmp (b.data() + at, "PATH", 4) == 0 && size >= 4)
+        {
+            const auto n = std::min<std::size_t> (u32 (at + 8), size - 4);
+            std::string text ((const char*) b.data() + at + 12, n);
+            if (text.size() >= 4 && text[0] == '@' && text[2] == '@' && text[3] == '\0')
+                root = text.substr (0, 3), text = text.substr (4);
+            if (const auto zero = text.find ('\0'); zero != std::string::npos)
+                text.resize (zero);
+            std::replace (text.begin(), text.end(), '\\', '/');
+            rel = text;
+        }
+        at += 8 + size;
+    }
+    if (rel.empty())
+        return {};
+    std::vector<std::string> candidates;
+    if (root == "@R@" && ! ctx.options.resourceRoot.empty())
+        candidates.push_back (joinPath (ctx.options.resourceRoot, rel));
+    else if (root == "@L@")
+        candidates.push_back (joinPath (ctx.options.common.projectFolder, rel));
+    for (const auto& d : ctx.deviceCandidates (rel))
+        candidates.push_back (d);
+    if (root.empty())
+        candidates.push_back (rel);
+    candidates.push_back (joinPath (ctx.options.common.projectFolder, pathFileName (rel)));
+    return ctx.resolve (candidates, owner);
+}
+// --- end of round 190dw item 4
 
 // FLM's 3x Osc → LYNX's 3x Osc engine and FL's channel settings (F4, round 190u). FLM's module is the desktop
 // plugin plus the channel's voice processor, echo delay, arpeggiator, polyphony and tracking as 148 parameters 0…1,
@@ -746,6 +836,18 @@ bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     c.instrument = InstrumentKind::threeosc;
     c.pluginState = std::move (state);
     c.samplePath.clear();
+    // --- round 190dw item 4: the custom shape (shape 6) plays the file the module's CSTM names (one "PATH" chunk: u32
+    // length + text, written by 0x1807e8010 only when a file is set), as the desktop 3x Osc plays the channel's sample
+    bool customShape = false;
+    for (std::size_t k = 0; k < 3; ++k)
+        customShape = customShape || rnd (6.0 * v (1 + k)) == 6;
+    if (customShape)
+        if (const auto file = flmCustomPath (ctx, m, c.name); ! file.empty())
+        {
+            c.samplePath = file;
+            ctx.note (&FlpImportReport::converted, "FL Studio Mobile: 3x Osc custom shape");
+        }
+    // --- end of round 190dw item 4
     // the level: linear in the velocity, FLM's Volume multiplier (×2v) and volume-envelope amount (×2(v − ½))
     const auto gain = 2.0 * v (114) * std::clamp (2.0 * (v (106) - 0.5), 0.0, 1.0);
     c.modelParams = { (float) ppq, 1.0f, (float) (threeOscFlmLevel * gain) };
@@ -798,8 +900,8 @@ bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
             a.chord = { 0 };
         partial = chord > 0 || v (140) >= 1.0 || rnd (6.0 * v (142)) == 0 || rnd (6.0 * v (142)) > 4; // a named chord, Hold, ranges LYNX lacks
     }
-    for (std::size_t k = 0; k < 3; ++k)
-        partial = partial || rnd (6.0 * v (1 + k)) == 6 || v (146 + k) > 0.5; // a custom shape (its file is not read), Free Run
+    for (std::size_t k = 0; k < 3; ++k) // a custom shape without a file (round 190dw item 4: else it is read), Free Run
+        partial = partial || (rnd (6.0 * v (1 + k)) == 6 && c.samplePath.empty()) || v (146 + k) > 0.5;
     partial = partial || 2.0 * v (114) * threeOscFlmLevel > 4.0;
     ctx.note (&FlpImportReport::converted, "FL Studio Mobile: 3x Osc");
     if (partial)
@@ -1534,8 +1636,7 @@ void applyPad (Ctx& ctx, const flm::SampleRef& s, ChannelDef& c, bool soloElsewh
     }
     if (changed)
         ctx.note (&FlpImportReport::converted, "FL Studio Mobile: drum pad settings (level, pan, speed, mute, envelope)");
-    if (s.outputChannel >= 0)
-        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: drum pad sent to another channel (plays in its own)");
+    // (a pad's output link is applied once every channel's insert exists: round 190dw item 4, importFlmProject)
     // round 190de: the slot's stretch and pitch (STR1 / legacy STRC, FLM_FORMAT §6): FLM plays a copy of the file
     // ratio × as long (only with a stretch mode other than 0) shifted by whole semitones at the same length. LYNX: the
     // sampler's stretch to a fixed length with "keep pitch", whose pitch knob then shifts without changing the length;
@@ -1563,11 +1664,24 @@ void applyPad (Ctx& ctx, const flm::SampleRef& s, ChannelDef& c, bool soloElsewh
 // An automation lane on the rack itself (module 0) that LYNX has a target for: Level, Pan and the send levels
 // (FLM_FORMAT §3, the rack's parameter names PROVEN-REA 0x18059eb20). A module's parameters wait for their engines
 // (F4/F5); Mute, Solo, Pitch Bend, Aftertouch, the MIDI CCs and the send switches have no LYNX automation target.
+// --- round 190dw item 4: the rack's setter (0x18059e0c0) gives CC #7 the Level's storage and law and CC #8 / #10 the
+// Pan's: such a lane is that rack lane (−1 = no alias)
+int rackCcAlias (int param) noexcept
+{
+    namespace rp = flm::rackparam;
+    if (param == rp::firstMidiCc + 7)
+        return rp::level;
+    if (param == rp::firstMidiCc + 8 || param == rp::firstMidiCc + 10)
+        return rp::pan;
+    return -1;
+}
+// --- end of round 190dw item 4
 bool importableRackLane (const flm::Lane& lane) noexcept
 {
     namespace rp = flm::rackparam;
     return lane.targetModule == 0 && ! lane.clips.empty()
            && (lane.targetParam == rp::level || lane.targetParam == rp::pan
+               || rackCcAlias (lane.targetParam) >= 0 // round 190dw item 4
                || (lane.targetParam >= rp::sendLevelBase && lane.targetParam < rp::sendLevelBase + 0x1000));
 }
 
@@ -1582,8 +1696,10 @@ std::string skippedLaneLabel (const flm::Lane& lane)
         return "FL Studio Mobile: Mute/Solo automation (LYNX automates neither)";
     if (p == rp::pitchBend || p == rp::aftertouch)
         return "FL Studio Mobile: Pitch Bend/Aftertouch automation (not imported)";
-    if (p >= rp::firstMidiCc && p <= rp::lastMidiCc)
-        return "FL Studio Mobile: MIDI CC automation (not imported)";
+    if (p == rp::firstMidiCc + 64) // round 190dw item 4 (the rack releases sustained notes when it falls from above ½)
+        return "FL Studio Mobile: sustain pedal automation (not imported)";
+    if (p >= rp::firstMidiCc && p <= rp::lastMidiCc) // round 190dw item 4: other CCs only move controller-linked parameters
+        return "FL Studio Mobile: MIDI CC automation without a linked parameter (no effect in FL Studio Mobile)";
     if (p >= rp::sendEnableBase && p < rp::sendEnableBase + 0x1000)
         return "FL Studio Mobile: send on/off automation (not imported)";
     if (p >= rp::sendLevelBase && p < rp::sendLevelBase + 0x1000)
@@ -1758,6 +1874,39 @@ bool addBendLane (Ctx& ctx, const flm::Lane& lane, const std::vector<int>& chann
     return true;
 }
 // --- end of round 190de --------------------------------------------------------------------------------------------
+
+// --- round 190dw item 4 ----------------------------------------------------------------------------------------------
+// The mod wheel (FLM_FORMAT §7.4): the rack hands a CC #1 value as it is to every module's slot 74 (0x18059e0c0). Only
+// MiniSynth (0x1806aea00), GMSynth (0x18064db80) and SuperSaw (0x1807f8d20) keep their own; every other module has the
+// base's empty one. LYNX: the channel's CC #1 parameter on those engines' FLM builds (core/MiniSynth, GmsMobile,
+// PocketSuperSaw take it as the module's raw wheel).
+bool takesFlmModWheel (const ChannelDef& c) noexcept
+{
+    return (c.instrument == InstrumentKind::gms && gmsIsFlm (c)) || c.instrument == InstrumentKind::pocketSuperSaw
+           || (c.instrument == InstrumentKind::minisynth && miniSynthIsFlm (c));
+}
+bool addWheelLane (Ctx& ctx, const flm::Lane& lane, const std::vector<int>& channels, const std::string& rackName, std::string& why)
+{
+    if (channels.empty())
+        return false; // (no instrument of the rack reads the wheel: nothing to play)
+    bool approximate = false;
+    const auto ok = addLaneOnChannels (ctx, lane, channels, rackName, [] (int k) -> std::optional<GeneratorLaneTarget> {
+        return GeneratorLaneTarget { { AutomationTargetKind::channelParam, k, 0, midictl::ccBase + 1 }, [] (float v) { return std::clamp (v, 0.0f, 1.0f); } };
+    }, approximate);
+    if (! ok)
+    {
+        why = "FL Studio Mobile: mod-wheel automation on a rack of more than nine sounds (not imported)";
+        return false;
+    }
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: mod-wheel automation");
+    return true;
+}
+// true when the rack's CCLK links CC `cc` to a module parameter
+bool rackLinksCc (const flm::Rack& rack, int cc) noexcept
+{
+    return std::any_of (rack.ccLinks.begin(), rack.ccLinks.end(), [cc] (const flm::Rack::CcLink& l) { return l.cc == cc && l.module > 0; });
+}
+// --- end of round 190dw item 4 ---------------------------------------------------------------------------------------
 } // namespace
 
 std::string flmResourceRootIn (const std::string& flInstallFolder)
@@ -1827,6 +1976,8 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
         int insert, row;
     };
     std::vector<RackLane> rackLanes; // importable rack automation lanes (F6), filled after the routing
+    std::deque<flm::Lane> linkedLanes; // round 190dw item 4: a CC lane's copies on the parameters CCLK links to it
+    std::vector<std::pair<int, int>> outputLinks; // round 190dw item 4: (LYNX channel, FLM channel id) of linked drum pads
     std::map<int, int> insertOfId;                          // FLM channel id → insert
     std::vector<std::pair<int, const flm::Channel*>> routes; // insert, channel (its SEND chunks)
     for (const auto i : order)
@@ -1870,8 +2021,8 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             bendSemitones = std::clamp (48.0f * param (rp::pitchBend, 0.5f) - 24.0f, -24.0f, 24.0f);
             if (std::abs (bendSemitones) < 0.01f)
                 bendSemitones = 0.0f;
-            if (param (rp::aftertouch, 0.0f) > 1e-3f)
-                ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: channel aftertouch (not imported)");
+            // (round 190dw item 4: [5] Aftertouch reaches no sound — every module keeps the base's empty slot 76, and
+            // the rack stores it only: nothing to import)
         }
         if (ch.channelId >= 0)
             insertOfId[ch.channelId] = insert;
@@ -1971,6 +2122,11 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
         // is set to the same semitones.
         const auto bendThrow = bendSemitones / 24.0f;
         const auto bend = [&] (ChannelDef& c, float range) {
+            if (range == 0.0f) // round 190dw item 4: a module that ignores the rack's bend (the wheel does nothing either)
+            {
+                c.misc.pitchRange = 0;
+                return;
+            }
             if (range > 0.0f)
                 c.misc.pitchRange = (int) std::lround (range);
             if (bendThrow == 0.0f || bendLane)
@@ -2058,6 +2214,8 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     bend (c, 24.0f); // (drum slots: 2^(4v − 2))
                     song.channels.push_back (std::move (c));
                     kitChannels.push_back ((int) song.channels.size() - 1);
+                    if (s.outputChannel >= 0) // round 190dw item 4
+                        outputLinks.push_back ({ kitChannels.back(), s.outputChannel });
                     bendChannels.push_back (kitChannels.back());
                 }
                 // cut groups A / B / C: a hit silences the group's other pads (FLM_FORMAT §6.1). LYNX's cut groups
@@ -2118,8 +2276,29 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
         if (timeline && ch.kind == flm::kindNormal)
             timelinePattern = bakeTimeline (ctx, ch, noteModules, instrumentIndex(), keyLow, keyHigh, name);
 
-        for (const auto& lane : ch.lanes)
+        // --- round 190dw item 4: FLM's rack hands every CC to its modules' CC handler first (0x180799210), which sets
+        // the parameters CCLK links to that CC to the CC's value: such a lane also plays as a lane on each linked
+        // parameter (the copies follow the CC lane)
+        std::vector<const flm::Lane*> laneOrder;
+        for (const auto& l : ch.lanes)
         {
+            laneOrder.push_back (&l);
+            if (l.kind() == flm::LaneKind::automation && l.targetModule == 0 && l.targetParam >= flm::rackparam::firstMidiCc
+                && l.targetParam <= flm::rackparam::lastMidiCc)
+                for (const auto& link : rack.ccLinks)
+                    if (link.cc == l.targetParam - flm::rackparam::firstMidiCc && link.module > 0)
+                    {
+                        auto copy = l;
+                        copy.targetModule = link.module;
+                        copy.targetParam = link.param;
+                        linkedLanes.push_back (std::move (copy));
+                        laneOrder.push_back (&linkedLanes.back());
+                    }
+        }
+        for (const auto* lanePointer : laneOrder)
+        // --- end of round 190dw item 4
+        {
+            const auto& lane = *lanePointer;
             const auto kind = lane.kind();
             if (kind == flm::LaneKind::notes && timelinePattern != -1 && ! lane.clips.empty())
             {
@@ -2188,8 +2367,38 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                         ctx.note (&FlpImportReport::unsupported, why.empty() ? skippedLaneLabel (lane) : why);
                     continue;
                 }
+                // --- round 190dw item 4: Aftertouch and the mod wheel (FLM_FORMAT §7.4)
+                if (lane.targetModule == 0 && lane.targetParam == flm::rackparam::aftertouch)
+                {
+                    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: Aftertouch automation (no FL Studio Mobile instrument responds to it)");
+                    continue;
+                }
+                if (lane.targetModule == 0 && lane.targetParam == flm::rackparam::firstMidiCc + 1)
+                {
+                    std::vector<int> wheels;
+                    for (const auto& m : rack.modules)
+                        if (const auto gc = generatorChannels.find (m.instanceId); gc != generatorChannels.end())
+                            for (const auto k : gc->second)
+                                if (takesFlmModWheel (song.channels[(std::size_t) k]))
+                                    wheels.push_back (k);
+                    std::string why;
+                    if (! addWheelLane (ctx, lane, wheels, name, why))
+                        ctx.note (why.empty() ? &FlpImportReport::converted : &FlpImportReport::unsupported,
+                                  why.empty() ? "FL Studio Mobile: mod-wheel automation on instruments that ignore the wheel (nothing to play)" : why);
+                    continue;
+                }
+                // --- end of round 190dw item 4
                 if (! importableRackLane (lane))
                 {
+                    // round 190dw item 4: a CC lane plays through its linked parameters (above); one without a link and
+                    // without a role of its own (1 wheel, 7 level, 8 / 10 pan, 64 sustain) does nothing in FLM either
+                    const auto cc = lane.targetParam - flm::rackparam::firstMidiCc;
+                    if (lane.targetParam >= flm::rackparam::firstMidiCc && lane.targetParam <= flm::rackparam::lastMidiCc && cc != 64)
+                    {
+                        if (! rackLinksCc (rack, cc))
+                            ctx.note (&FlpImportReport::converted, skippedLaneLabel (lane));
+                        continue;
+                    }
                     ctx.note (&FlpImportReport::unsupported, skippedLaneLabel (lane));
                     continue;
                 }
@@ -2279,6 +2488,25 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     for (const auto& c : project.channels)
         if (c.kind == flm::kindMaster)
             masterId = c.channelId < 0 ? 0 : c.channelId;
+    // --- round 190dw item 4: a drum pad's output link (LINk's fourth word, FLM_FORMAT §6): FLM renders a linked pad
+    // into the target channel's buffer, with the sounds that channel receives (0x18075ba30, called from the channel
+    // mix 0x180778520), and not into its own rack (0x180747e56). LYNX: the pad's channel plays into the target's insert
+    for (const auto& [k, id] : outputLinks)
+    {
+        auto target = -1;
+        if (id == masterId)
+            target = 0;
+        else if (const auto it = insertOfId.find (id); it != insertOfId.end())
+            target = it->second;
+        if (target < 0)
+        {
+            ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: drum pad linked to a channel the song lacks (plays in its own)");
+            continue;
+        }
+        song.channels[(std::size_t) k].mixerTrack = target;
+        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: drum pad output link (plays through the target channel's insert)");
+    }
+    // --- end of round 190dw item 4
     for (const auto& [insert, ch] : routes)
     {
         if (insert <= 0 || ch->sends.empty())
@@ -2311,7 +2539,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     {
         namespace rp = flm::rackparam;
         const auto& rowName = song.playlistTracks[(std::size_t) row].name;
-        const auto p = lane->targetParam;
+        const auto p = rackCcAlias (lane->targetParam) >= 0 ? rackCcAlias (lane->targetParam) : lane->targetParam; // round 190dw item 4
         if (p == rp::level || p == rp::pan)
         {
             const auto kind = p == rp::level ? AutomationTargetKind::mixerVolume : AutomationTargetKind::mixerPan;

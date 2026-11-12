@@ -140,7 +140,7 @@ TEST (flm187d_mixer_and_rack_automation)
     const auto* keys = flm182c::channelNamed (s, "Keys");
     CHECK (keys != nullptr && keys->instrument == InstrumentKind::sampler && std::abs (keys->sampler.pitch - 1.5f) < 1e-4f);
     CHECK (report.converted.count ("FL Studio Mobile: channel pitch bend (on the channel's pitch)") == 1
-           && report.partialEffects.count ("FL Studio Mobile: channel aftertouch (not imported)") == 1);
+           && report.partialEffects.count ("FL Studio Mobile: channel aftertouch (not imported)") == 0); // (round 190dw: no FLM module reads it)
     // Vocal → Master and the bus at FLM's send levels
     CHECK (s.mixer[2].toMaster && s.mixer[2].sends.size() == 1 && s.mixer[2].sends[0].target == 3);
 
@@ -181,7 +181,8 @@ TEST (flm187d_mixer_and_rack_automation)
            && report.unsupported.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0
            && report.converted.count ("FL Studio Mobile: instrument parameter automation") == 1
            && report.unsupported.count ("FL Studio Mobile: send level automation without that route") == 1
-           && report.unsupported.count ("FL Studio Mobile: MIDI CC automation (not imported)") == 1);
+           // (round 190dw: CC #1 is the mod wheel, which no instrument of that empty rack reads: nothing to play)
+           && report.converted.count ("FL Studio Mobile: mod-wheel automation on instruments that ignore the wheel (nothing to play)") == 1);
     // the point shapes are FLM's saved samples, so no "straight lines" approximation is reported any more
     CHECK (report.partialEffects.count ("FL Studio Mobile: automation point shapes (straight lines)") == 0);
     // the rows: one per imported lane, in FLM's order, under the channel's name

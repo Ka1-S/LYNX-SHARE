@@ -246,7 +246,8 @@ TEST (flm190bs_drum_pads_take_their_settings)
     CHECK (report.converted.count ("FL Studio Mobile: drum pad settings (level, pan, speed, mute, envelope)") == 1
            && report.converted["FL Studio Mobile: drum pad settings (level, pan, speed, mute, envelope)"] == 7);
     CHECK (report.converted.count ("FL Studio Mobile: drum pad cut group") == 1 && report.converted.count ("FL Studio Mobile: drum pad time shift") == 1);
-    CHECK (report.partialEffects.count ("FL Studio Mobile: drum pad sent to another channel (plays in its own)") == 1
+    // (round 190dw: output links are applied; "Away" links to channel 3, which this song lacks)
+    CHECK (report.partialEffects.count ("FL Studio Mobile: drum pad linked to a channel the song lacks (plays in its own)") == 1
            && report.partialEffects.count ("FL Studio Mobile: drum pad time-stretch or pitch shift (played as recorded)") == 1);
 
     // Solo on one pad mutes the others; a lane that holds its notes hands every pad FLM's envelope

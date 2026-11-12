@@ -265,6 +265,12 @@ const char* effectId (EffectKind k)
         case EffectKind::pocketComb: return "pocketComb";
         case EffectKind::pocketMultiband: return "pocketMultiband";
         case EffectKind::pocketTapeStop: return "pocketTapeStop";
+        case EffectKind::pocketEq: return "pocketEq"; // round 190dw
+        case EffectKind::pocketGraphicEq: return "pocketGraphicEq"; // round 190dw
+        case EffectKind::pocketFilter: return "pocketFilter"; // round 190dw
+        case EffectKind::pocketReverbClassic: return "pocketReverbClassic"; // round 190dw
+        case EffectKind::pocketReverb2: return "pocketReverb2"; // round 190dw
+        case EffectKind::pocketReverb: return "pocketReverb"; // round 190dw
         case EffectKind::rackMixer: return "rackMixer";
         case EffectKind::edison: return "edison";
         case EffectKind::lynxTune: return "lynxTune";
@@ -1284,6 +1290,8 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::pocketComb, // round 190by
                     EffectKind::pocketMultiband, // round 190by
                     EffectKind::pocketTapeStop, // round 190by
+                    EffectKind::pocketEq, EffectKind::pocketGraphicEq, EffectKind::pocketFilter, EffectKind::pocketReverbClassic,
+                    EffectKind::pocketReverb2, EffectKind::pocketReverb, // round 190dw
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,

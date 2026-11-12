@@ -722,16 +722,13 @@ TEST (pocket190by_reverb32_and_tuned_eq_mappings)
     };
     {
         const auto m = with ({});
-        CHECK (m.label == "FL Studio Mobile: Reverb" && ! m.slots.empty() && m.slots[0].kind == EffectKind::reeverb2 && m.partial.empty());
-        // the same plate settings as module 12 gives for the same knobs (decay is the knob cubed)
-        const auto legacy = flmfx::map (flm188f::moduleOf (12, { 1.0f, 0.4f, 0.8f, 0.4f, 0.0f, 1.0f, 1.0f, 0.5f, 0.0f, 1.0f }));
-        CHECK (! legacy.slots.empty());
-        if (! m.slots.empty() && ! legacy.slots.empty())
-            for (const int k : { 0, 1, 2, 3, 4, 5, 6, 9 }) // low cut … damping, separation (bass and crossover are the legacy module's own knobs)
-                CHECK (m.slots[0].params[(std::size_t) k] == legacy.slots[0].params[(std::size_t) k]);
-        // what the mapping cannot play is listed
-        CHECK (with ({ { 4, 0.8f } }).partial.size() == 1 && with ({ { 13, 0.5f } }).partial.size() == 1 && with ({ { 9, 1.0f } }).partial.size() == 1);
-        CHECK (with ({ { 9, 1.0f }, { 5, 0.0f } }).partial.empty());
+        // round 190dw: FLM's own engine (Pocket Reverb) with the module's values; pan, width and modulation play, so
+        // nothing is listed any more
+        CHECK (m.label == "FL Studio Mobile: Reverb" && m.slots.size() == 1 && m.slots[0].kind == EffectKind::pocketReverb && m.partial.empty());
+        if (m.slots.size() == 1)
+            for (int k = 0; k < 15; ++k)
+                CHECK (m.slots[0].params[(std::size_t) k] == defaults[(std::size_t) k + 1]);
+        CHECK (with ({ { 4, 0.8f } }).partial.empty() && with ({ { 13, 0.5f } }).partial.empty() && with ({ { 9, 1.0f } }).partial.empty());
         CHECK (! with ({ { 0, 0.0f } }).slots[0].enabled);
     }
     {
@@ -820,7 +817,7 @@ TEST (pocket190by_reverb32_and_tuned_eq_mappings)
         if (tape != ts.end())
             CHECK (tape->params[0] == 0.1f && tape->params[4] == 0.0f && tape->params[5] == 0.8f && tape->params[6] == 1.0f);
         const auto rv = fx190by::importedSlots (32, defaults, &report);
-        CHECK (std::any_of (rv.begin(), rv.end(), [] (const EffectSlot& s) { return s.kind == EffectKind::reeverb2; }));
+        CHECK (std::any_of (rv.begin(), rv.end(), [] (const EffectSlot& s) { return s.kind == EffectKind::pocketReverb; })); // round 190dw
         const auto eq = fx190by::importedSlots (30, { 1.0f, 0.5f, 0.5f, 0.75f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.0f, 0.6f }, &report);
         CHECK (std::any_of (eq.begin(), eq.end(), [] (const EffectSlot& s) { return s.kind == EffectKind::parametricEq; }));
         for (const auto* name : { "FL Studio Mobile: Tape Stop", "FL Studio Mobile: Reverb", "FL Studio Mobile: Tuned EQ" })

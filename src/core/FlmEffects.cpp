@@ -9,7 +9,6 @@
 #include "core/VocalPitch.h"
 #include "core/ParametricEqFl.h"
 #include "core/PocketFx.h"
-#include "core/Reeverb2.h"
 
 // The laws below are FLM's, read in round 188f (REA_rodada182c.md "F5, round 188f"); the addresses are in that text.
 
@@ -97,264 +96,6 @@ Band cookbookBand (int kind, double hz, double shown, double octaves, double w, 
     return band;
 }
 
-void equalizer (const flm::Module& m, bool live, Mapped& out)
-{
-    out.label = "FL Studio Mobile: Equalizer";
-    std::vector<Band> bands;
-    bool channels = false;
-    for (int b = 0; b < 4; ++b)
-    {
-        const auto shown = ((double) param (m, 1 + 4 * b, 0.5f) - 0.5) * 24.0;
-        const auto hz = equalizerHz (param (m, 2 + 4 * b, 0.2f + 0.2f * (float) b));
-        const auto octaves = std::max ((double) param (m, 3 + 4 * b, 0.5f) * 7.0 + 0.25, 1e-4);
-        const auto kind = std::clamp ((int) (param (m, 4 + 4 * b, 0.51f) * 2.0f), 0, 2);
-        if ((int) (param (m, 17 + b, 0.0f) * 4.0f) != 0)
-            channels = true;
-        // FLM designs the band at twice the rate and runs it 2× oversampled; the slot keeps the band's width in octaves
-        // at the slot's own rate (the cookbook's bandwidth law is the same at either rate)
-        const auto w = std::clamp (2.0 * pi * hz / designRate, 0.0, 3.0);
-        auto band = cookbookBand (kind, hz, shown, octaves, w, out);
-        if (band.type != peq::BandType::off || live)
-        {
-            if (band.type == peq::BandType::off) // a live band keeps its place, flat
-                band = { kind == 1 ? peq::BandType::peak : kind == 0 ? peq::BandType::lowShelf : peq::BandType::highShelf, hz, 0.0,
-                         kind == 1 ? peakQ (octaves, w) : 1.0 };
-            bands.push_back (band);
-        }
-    }
-    if (channels)
-        out.partial.push_back ("FL Studio Mobile: Equalizer band on one channel / mid-side (played on both)");
-    out.slots.push_back (eqSlot (bands, 0.0));
-}
-
-void graphicEq (const flm::Module& m, bool live, Mapped& out)
-{
-    out.label = "FL Studio Mobile: Graphic EQ";
-    static constexpr double centres[8] { 80.0, 160.0, 375.0, 750.0, 1500.0, 3000.0, 6000.0, 12000.0 };
-    std::vector<Band> bands;
-    for (int b = 0; b < 8; ++b)
-    {
-        const auto shown = (double) param (m, 1 + b, 0.5f) * 24.0 - 12.0;
-        const auto kind = b == 0 ? 0 : b == 7 ? 2 : 1;
-        const auto w = 2.0 * pi * centres[b] / designRate;
-        auto band = cookbookBand (kind, centres[b], shown, 1.0, w, out);
-        if (band.type == peq::BandType::off && live)
-            band = { kind == 1 ? peq::BandType::peak : kind == 0 ? peq::BandType::lowShelf : peq::BandType::highShelf, centres[b], 0.0,
-                     kind == 1 ? peakQ (1.0, w) : 1.0 };
-        if (band.type != peq::BandType::off)
-            bands.push_back (band);
-    }
-    if (bands.size() <= (std::size_t) peq::bands)
-        out.slots.push_back (eqSlot (bands, 0.0));
-    else
-    {
-        out.slots.push_back (eqSlot ({ bands.begin(), bands.begin() + peq::bands }, 0.0));
-        out.slots.push_back (eqSlot ({ bands.begin() + peq::bands, bands.end() }, 0.0));
-    }
-}
-
-void filter (const flm::Module& m, Mapped& out)
-{
-    out.label = "FL Studio Mobile: Filter";
-    const auto hz = filterHz (param (m, 1, 0.7f));
-    const auto q = filterQ (param (m, 2, 0.0f));
-    const auto type = std::clamp ((int) (param (m, 3, 0.0f) * 2.0f), 0, 2);   // 0 low-pass, 1 band-pass, 2 high-pass
-    const auto pairs = std::array<int, 3> { 1, 2, 4 }[(std::size_t) std::clamp ((int) (param (m, 4, 0.5f) * 2.0f), 0, 2)];
-    const auto stages = 2 * pairs; // 24 / 48 / 96 dB per octave
-    // FLM's low- and high-pass biquads are the cookbook's at Q/2 with their feed-forward part normalised for Q (a level
-    // (1 + s/Q)/(1 + s/2Q) per biquad, s = sin ω); its low-pass output is then scaled by 0.8 per biquad pair; its
-    // band-pass is the cookbook's constant-skirt form (peak level Q)
-    const auto s = std::sin (2.0 * pi * std::min (hz, designRate * 0.5) / designRate);
-    Band band;
-    band.hz = hz;
-    double level = 1.0;
-    if (type == 1)
-    {
-        band.type = peq::BandType::bandPass;
-        band.q = q;
-        level = std::pow (q, stages);
-    }
-    else
-    {
-        band.type = type == 0 ? peq::BandType::highCut : peq::BandType::lowCut;
-        band.q = q * 0.5;
-        level = std::pow ((1.0 + s / q) / (1.0 + s / (2.0 * q)), stages) * (type == 0 ? std::pow (0.8, pairs) : 1.0);
-    }
-    auto db = 20.0 * std::log10 (level);
-    if (std::abs (db) > 18.0)
-    {
-        out.partial.push_back ("FL Studio Mobile: Filter level beyond ±18 dB (capped)");
-        db = std::clamp (db, -18.0, 18.0);
-    }
-    std::vector<Band> first (std::min (stages, peq::bands), band);
-    out.slots.push_back (eqSlot (first, db));
-    if (stages > peq::bands)
-        out.slots.push_back (eqSlot (std::vector<Band> ((std::size_t) (stages - peq::bands), band), 0.0));
-}
-
-// Autoduck (legacy): per beat, the duck envelope rises from 0 to 1 over the first a = 0.5·Attack + 0.001 of the beat,
-// then falls back to 0 at the next beat; the gain is 1 − Ducking²·env^((Curve + 1)/2), smoothed by a one-pole (0.01
-// per sample, not reproduced). LYNX: the curve with full depth as 12 points of the rhythm gain, Ducking² as the mix.
-void autoduck (const flm::Module& m, Mapped& out)
-{
-    out.label = "FL Studio Mobile: Autoduck (legacy)";
-    const auto ducking = (double) param (m, 1, 0.501f);
-    const auto a = std::clamp ((double) param (m, 2, 0.1f) * 0.5 + 0.001, 0.001, 0.999);
-    const auto gamma = ((double) param (m, 3, 0.501f) + 1.0) * 0.5;
-    auto slot = makeEffectSlot (EffectKind::rhythmGain);
-    slot.params[0] = 1.0f / 64.0f; // period: one beat
-    slot.params[1] = 1.0f;         // 12 points
-    const auto point = [&] (int k, double x, double env) {
-        slot.params[(std::size_t) (2 + 3 * k)] = (float) x;
-        slot.params[(std::size_t) (3 + 3 * k)] = (float) (1.0 - std::pow (std::clamp (env, 0.0, 1.0), gamma));
-        slot.params[(std::size_t) (4 + 3 * k)] = 0.5f; // straight segments
-    };
-    point (0, 0.0, 0.0);
-    for (int k = 1; k <= 4; ++k)
-        point (k, a * k / 4.0, k / 4.0);
-    for (int j = 1; j <= 7; ++j)
-        point (4 + j, a + (1.0 - a) * j / 7.0, 1.0 - j / 7.0);
-    slot.mix = (float) std::clamp (ducking * ducking, 0.0, 1.0);
-    out.slots.push_back (slot);
-    out.partial.push_back ("FL Studio Mobile: Autoduck (legacy) curve as 12 points, without FLM's 2 ms smoothing");
-}
-
-// FL's Reeverb 2 level law (REA_rodada49 §2): gain = (e^(2.3978953·x) − 1)·0.1, x = p/128 (dry) or p/256 (early
-// reflections, wet); its inverse, rounded to FL's integer control
-int levelControl (double gain, double scale) noexcept
-{
-    if (gain <= 0.0)
-        return 0;
-    return std::clamp ((int) std::lround (scale * std::log (10.0 * gain + 1.0) / 2.3978953), 0, 160);
-}
-
-// FLM's reverbs run the plate of FL's Reeverb 2 (the same line proportions, early-reflection taps, decay and filter laws:
-// fxReverb, 0x180737690), with FLM's own integer controls. Inner controls (min, max): 0 input (−361…0/60, tenths of
-// dB, the minimum = off), 1 low cut 19…3000 Hz, 2 high cut 5…221 (×100 Hz), 3 predelay 0…250/1000 ms, 4 room 1…100,
-// 5 diffusion 0…100, 6 bass 2…30 (×0.1), 7 crossover 25…2000 Hz, 8 decay 1…200 (×0.1 s), 9 damping 5…221,
-// 10 separation 0…200, 11 dry, 12 early reflections, 13 wet (tenths of dB); gains 10^(t/200), early reflections ×0.5,
-// wet ×0.3.
-struct Plate
-{
-    int input = 0, lowCut = 75, highCut = 40, predelayMs = 0, room = 50, diffusion = 100, bass = 10, crossover = 500, decay = 15,
-        damping = 40, separation = 100;
-    double dry = 1.0, early = 0.0, wet = 0.0; // linear, FLM's output gains (the input level included)
-};
-
-double tenthsDb (int t) noexcept { return t <= -361 ? 0.0 : std::pow (10.0, t / 200.0); }
-
-// FLM feeds its plate 0.5·(L + R) where FL feeds L + R, and ends with a mid/side stage on the wet and early-reflection
-// outputs (0x1807383d0): L = (l + r) + (l − r)·σ, R = (l + r) − (l − r)·σ, σ = separation/100; at the default σ = 1
-// that is 2l / 2r, which cancels the input's ½ (round 188h, REA_rodada182c "F5 effects, round 188h", which corrects
-// 188f's side swap and 2× gains). So FL's gains are FLM's, with FL's f = 1 − σ (FL: f = (5^s − 1)/4 for s > 0, f = s
-// below; s = control/64). FLM's input diffusers 2 and 4 differ slightly from FL's (a tilt of at most ~0.4 dB, not
-// reproduced). FL's controls can't reach every FLM level: the three gains are then lowered together and a LYNX utility
-// after the reverb gives the difference back.
-void plateSlots (const Plate& p, bool live, Mapped& out)
-{
-    reeverb2::Settings s;
-    s.p[0] = std::clamp (p.lowCut, 19, 3000);
-    s.p[1] = std::clamp (p.highCut, 5, 221);
-    s.p[2] = std::clamp ((int) std::lround (p.predelayMs * 0.384), 0, 384); // FL: predelay samples = p·fs/384
-    s.p[3] = std::clamp (p.room, 1, 100);
-    s.p[4] = std::clamp (p.diffusion, 0, 100);
-    s.p[5] = std::clamp (p.decay, 1, 200);
-    s.p[6] = std::clamp (p.damping, 5, 221);
-    s.p[7] = std::clamp (p.bass * 10, 20, 300);
-    s.p[8] = std::clamp (p.crossover, 25, 2000);
-    const auto f = 1.0 - std::clamp (p.separation / 100.0, 0.0, 2.0);
-    s.p[9] = f > 0.0 ? (int) std::lround (64.0 * std::log (4.0 * f + 1.0) / std::log (5.0)) : (int) std::lround (64.0 * f);
-    auto dry = p.dry, early = p.early, wet = p.wet;
-    constexpr double maxDry = 1.9031, maxSend = 0.34759; // FL's gains at control 160
-    const auto k = std::max ({ 1.0, dry / maxDry, early / maxSend, wet / maxSend });
-    auto makeup = 20.0 * std::log10 (k);
-    if (makeup > 24.0)
-    {
-        out.partial.push_back ("FL Studio Mobile: reverb level above LYNX's range (capped)");
-        makeup = 24.0;
-    }
-    s.p[10] = levelControl (dry / k, 128.0);
-    s.p[11] = levelControl (early / k, 256.0);
-    s.p[12] = levelControl (wet / k, 256.0);
-    s.p[13] = 684;
-    s.p[14] = 0;
-    auto slot = makeEffectSlot (EffectKind::reeverb2);
-    reeverb2::toParams (s, slot.params);
-    out.slots.push_back (slot);
-    if (k > 1.0 || live)
-    {
-        auto gain = makeEffectSlot (EffectKind::utility);
-        gain.params[0] = (float) std::clamp (makeup / 48.0 + 0.5, 0.0, 1.0);
-        out.slots.push_back (gain);
-    }
-}
-
-void reverbLegacy (const flm::Module& m, bool live, Mapped& out)
-{
-    out.label = "FL Studio Mobile: Reverb (legacy)";
-    const auto v = [&m] (int i, float fallback) { return param (m, i, fallback); };
-    Plate p;
-    const auto decay = v (1, 0.4f);
-    p.decay = rawControl (decay * decay * decay, 1, 200); // FLM cubes the DECAY knob
-    p.damping = rawControl (v (2, 0.8f), 5, 221);
-    const auto wet = rawControl (v (3, 0.4f), -361, 60);
-    p.predelayMs = rawControl (v (4, 0.0f), 0, 250);
-    p.room = rawControl (v (5, 1.0f), 1, 100);
-    p.diffusion = rawControl (v (6, 1.0f), 0, 100);
-    p.separation = rawControl (v (7, 0.5f), 0, 200);
-    p.lowCut = rawControl (v (8, 0.0f), 19, 3000);
-    p.highCut = rawControl (v (9, 1.0f), 5, 221);
-    const auto input = rawControl (v (10, 1.0f), -361, 60);
-    const auto early = rawControl (v (11, 0.25f), -361, 60);
-    const auto dry = rawControl (v (12, 0.0f), -361, 60);
-    const auto off = [&v] (int i) { return v (i, 0.0f) >= 0.5f; }; // 13…16: input / dry / early / wet off
-    p.bass = rawControl (v (17, 0.0f), 2, 30);
-    p.crossover = rawControl (v (18, 0.0f), 25, 2000);
-    const auto in = off (13) ? 0.0 : tenthsDb (input);
-    // the legacy wrapper runs the engine in place and the engine adds onto its buffer: the input always passes at unity
-    p.dry = 1.0 + (off (14) ? 0.0 : in * tenthsDb (dry));
-    p.early = off (15) ? 0.0 : in * 0.5 * tenthsDb (early);
-    p.wet = off (16) ? 0.0 : in * 0.3 * tenthsDb (wet);
-    if (v (20, 0.0f) > 1e-4f)
-        out.partial.push_back ("FL Studio Mobile: reverb modulation (not reproduced)");
-    plateSlots (p, live, out);
-}
-
-void reverb2 (const flm::Module& m, bool live, Mapped& out)
-{
-    out.label = "FL Studio Mobile: Reverb 2";
-    const auto v = [&m] (int i, float fallback) { return param (m, i, fallback); };
-    Plate p;
-    p.highCut = rawControl (v (1, 0.16f), 5, 221);
-    p.lowCut = rawControl (v (2, 0.0187f), 19, 3000);
-    p.room = rawControl (v (3, 0.5f), 1, 100);
-    p.decay = rawControl (v (4, 0.068f), 1, 200);
-    p.diffusion = rawControl (v (5, 1.0f), 0, 100);
-    p.damping = rawControl (v (6, 0.16f), 5, 221);
-    p.predelayMs = rawControl (v (11, 0.0f), 0, 1000);
-    p.bass = rawControl (v (14, 0.28f), 2, 30);
-    p.crossover = rawControl (v (17, 0.2405f), 25, 2000);
-    // Reverb 2 sets the engine's input / ER / wet to 0 dB and mixes two of its outputs itself, × 1.25: the full output
-    // (wet × 0.3 + early reflections × 0.5) × WET and the raw early reflections × ER (0x18073a430); SEPARATION 0.5 and
-    // PAN 0.5 leave them as they are. In FL's plate units: 0.375·WET wet, 0.625·(ER + WET) early reflections
-    p.dry = 1.25 * v (7, 0.8f);
-    p.wet = 0.375 * v (9, 0.56f);
-    p.early = 0.625 * ((double) v (8, 0.8f) + (double) v (9, 0.56f));
-    if (std::abs (v (15, 0.5f) - 0.5f) > 0.01f)
-        out.partial.push_back ("FL Studio Mobile: reverb width / separation (played at FL's normal width)");
-    if (std::abs (v (18, 0.5f) - 0.5f) > 0.01f)
-        out.partial.push_back ("FL Studio Mobile: Reverb 2 wet pan (not reproduced)");
-    if (v (13, 0.0f) > 1e-4f)
-        out.partial.push_back ("FL Studio Mobile: reverb modulation (not reproduced)");
-    if (v (12, 0.0f) >= 0.5f)
-        out.partial.push_back ("FL Studio Mobile: Reverb 2 tempo-synced predelay (played free)");
-    plateSlots (p, live, out);
-    if (v (10, 0.0f) >= 0.5f) // SIDE INPUT: FLM feeds the plate L − R, as FL's Mid/Side option (which also inverts the
-    {                         // right wet output; FLM's doesn't)
-        out.slots.front().params[16] = 1.0f;
-        out.partial.push_back ("FL Studio Mobile: Reverb 2 side input (right reverb output inverted)");
-    }
-}
 // FL Studio Mobile's own effects that LYNX runs exactly as Pocket engines (core/PocketFx.h, round 188h): the slot's
 // parameter k is the module's parameter k + 1 (its Enable is the slot's on switch), copied as it is; a value the file
 // doesn't hold keeps the engine's default (FLM's)
@@ -368,38 +109,26 @@ void pocket (const flm::Module& m, EffectKind kind, const char* label, Mapped& o
     out.slots.push_back (slot);
 }
 
-// --- round 190by (REA_rodada190by.md §4, §5)
-// Reverb (module 32): the plate of modules 12 and 35 with module 12's controls; the module mixes the dry signal, the
-// plate's output (early reflections at −3.5 dB and the plate at −12 dB, the engine's own defaults, through its width
-// stage) and the raw early reflections itself.
-void reverb32 (const flm::Module& m, bool live, Mapped& out)
+// --- round 190dw: Autoduck (legacy, module 10) is FLM's Autoduck (29) with its curve fixed — the same beat phase, rise
+// over a = 0.5·Attack + 0.001, fall to the next beat, power (Curve + 1)/2, one-pole of 0.01 per sample — and the depth
+// Ducking² where module 29 takes √Ducking: Pocket Autoduck with Ducking⁴, Time 1, Shift ½, Hold 0, Shape 0 is exact
+// (FLM_FORMAT §7.10).
+void autoduckLegacy (const flm::Module& m, Mapped& out)
 {
-    out.label = "FL Studio Mobile: Reverb";
-    const auto v = [&m] (int i, float fallback) { return param (m, i, fallback); };
-    Plate p;
-    const auto decay = v (1, 0.4f);
-    p.decay = rawControl (decay * decay * decay, 1, 200);
-    p.damping = rawControl (v (2, 0.8f), 5, 221);
-    const auto mix = (double) v (3, 0.4f), er = (double) v (5, 0.25f);
-    p.predelayMs = rawControl (v (6, 0.0f), 0, 250);
-    p.room = rawControl (v (7, 1.0f), 1, 100);
-    p.diffusion = rawControl (v (8, 1.0f), 0, 100);
-    p.separation = rawControl (v (9, 1.0f), 0, 200);
-    p.lowCut = rawControl (v (10, 0.0f), 19, 3000);
-    p.highCut = rawControl (v (11, 1.0f), 5, 221);
-    const auto w = (double) v (14, 1.0f) * std::min (2.0 * mix, 1.0);
-    p.dry = (double) v (15, 1.0f) * (mix <= 0.5 ? 1.0 : 2.0 - 2.0 * mix);
-    p.wet = 0.3 * tenthsDb (-120) * w;
-    p.early = 0.5 * tenthsDb (-35) * w + 0.5 * er * er;
-    if (std::fabs (v (4, 0.5f) - 0.5f) > 1e-3f)
-        out.partial.push_back ("FL Studio Mobile: reverb pan (not reproduced)");
-    if (p.separation != 100 && er > 1e-3)
-        out.partial.push_back ("FL Studio Mobile: reverb width on the early reflections (played with the plate's width)");
-    if (v (13, 0.0f) > 1e-4f)
-        out.partial.push_back ("FL Studio Mobile: reverb modulation (not reproduced)");
-    plateSlots (p, live, out);
+    out.label = "FL Studio Mobile: Autoduck (legacy)";
+    auto slot = makeEffectSlot (EffectKind::pocketAutoduck);
+    const auto d = (double) std::clamp (param (m, 1, 0.501f), 0.0f, 1.0f);
+    slot.params[0] = (float) (d * d * d * d);
+    slot.params[1] = std::clamp (param (m, 2, 0.1f), 0.0f, 1.0f);
+    slot.params[2] = std::clamp (param (m, 3, 0.501f), 0.0f, 1.0f);
+    slot.params[3] = 1.0f; // Time: the whole beat
+    slot.params[4] = 0.5f; // Shift: none
+    slot.params[5] = 0.0f; // Hold
+    slot.params[6] = 0.0f; // Shape: the rise's power law on the fall too
+    out.slots.push_back (slot);
 }
-
+// --- end of round 190dw
+// --- round 190by (REA_rodada190by.md §4, §5)
 // Tuned EQ (module 30): the Graphic EQ's eight bands (low shelf, six peaks, high shelf; a band moves twice the dB
 // its knob shows) on centres an octave apart from 110 Hz × the Tuning note (0 = C … 9 = A … 11 = B), all with the
 // Bandwidth's 10v³ + 0.1 octaves.
@@ -562,12 +291,15 @@ Mapped map (const flm::Module& m, bool live, bool postGainLive)
     Mapped out;
     switch (m.type)
     {
-        case 3: equalizer (m, live, out); break;
-        case 7: graphicEq (m, live, out); break;
-        case 9: filter (m, out); break;
-        case 10: autoduck (m, out); break;
-        case 12: reverbLegacy (m, live, out); break;
-        case 35: reverb2 (m, live, out); break;
+        // --- round 190dw: FLM's exact engines (they were the Parametric EQ, the rhythm gain and Reeverb 2 before)
+        case 3: pocket (m, EffectKind::pocketEq, "FL Studio Mobile: Equalizer", out); break;
+        case 7: pocket (m, EffectKind::pocketGraphicEq, "FL Studio Mobile: Graphic EQ", out); break;
+        case 9: pocket (m, EffectKind::pocketFilter, "FL Studio Mobile: Filter", out); break;
+        case 10: autoduckLegacy (m, out); break;
+        case 12: pocket (m, EffectKind::pocketReverbClassic, "FL Studio Mobile: Reverb (legacy)", out); break;
+        case 35: pocket (m, EffectKind::pocketReverb2, "FL Studio Mobile: Reverb 2", out); break;
+        case 32: pocket (m, EffectKind::pocketReverb, "FL Studio Mobile: Reverb", out); break;
+        // --- end of round 190dw
         case 5: pocket (m, EffectKind::pocketLimiterClassic, "FL Studio Mobile: Limiter (legacy)", out); break;
         case 6: pocket (m, EffectKind::pocketDistortion, "FL Studio Mobile: Distortion", out); break;
         case 28: pocket (m, EffectKind::pocketLimiter, "FL Studio Mobile: Limiter", out); break;
@@ -598,7 +330,6 @@ Mapped map (const flm::Module& m, bool live, bool postGainLive)
             out.slots[0].params[3] = 0.0f; // (FLM's [4] is a flag of its own editor, which solos nothing by itself)
             break;
         case 42: pocket (m, EffectKind::pocketTapeStop, "FL Studio Mobile: Tape Stop", out); break;
-        case 32: reverb32 (m, live, out); break;
         case 30: tunedEq (m, live, out); break;
         // --- end of round 190by
         case 25: pitcher (m, out); break;  // round 190de

@@ -58,7 +58,7 @@ constexpr int fxKind = 0, fxEnable = 1, fxSync = 2, fxShape = 3, fxAmount = 4, f
 namespace fx
 {
 constexpr int dist = 0, flanger = 1, phaser = 2, lowPass = 3, highPass = 4, delay = 5, reverb = 6, pan = 7, ring = 8, vox = 9;
-// true for the kinds this engine renders (the others pass the signal through)
+// true for the kinds this engine renders (all ten since round 190dw)
 bool implemented (int kind) noexcept;
 const char* name (int kind) noexcept;
 } // namespace fx
@@ -115,6 +115,9 @@ public:
     void note (int key, float velocity, float pan = 0.5f, float pitch = 0.0f) noexcept;
     // semitones added to every voice (the channel's pitch)
     void setPitchOffset (float semitones) noexcept;
+    // (round 190dw item 4) the mod wheel as FLM's slot 74 takes it (0x18064db80: the raw 0…1 value, read by the CSTM's
+    // MW destination × MW amount); the rack hands a CC #1 lane's value to it as it is (0x18059e0c0)
+    void setModWheel (float value) noexcept;
     void allNotesOff() noexcept;
     // adds n samples; songBeats ≥ 0 = the transport plays (the position at the first sample)
     void render (float* left, float* right, int n, double tempo, double songBeats) noexcept;

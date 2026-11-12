@@ -98,6 +98,8 @@ const std::vector<Allowed>& allowed()
         // round 190cm: FLM's Tape Stop held off is silence — the stop ramp ends on a ~11 ms decay to nothing and the input is
         // not heard until Play goes on (spec-tapestop.md §0, §3.3; FL render "Play off": silence, flmeng190by/fx/scores_all.txt)
         { "Pocket Tape Stop", "Play", "silent", "behaviour: FLM's Tape Stop is silent while Play is off (the tape has stopped); the ramps are checked by the Play-edge contexts of tools/FxAudit.h" },
+        // round 190dw: FLM's Filter changes the number of biquad pairs at once on a Slope change (FL renders: flm190dw/fx)
+        { "Pocket Filter", "Slope", "click", "behaviour: FLM switches the number of biquad pairs at once (the newly used pairs start from their old state, the level follows with the next coefficient change)" },
         { "Pocket Wow & Flutter", "Random rate", "inert", "not-in-programme: FLM writes the sync length after the free rate, so a loaded state takes its random interval from the sync length; the free rate acts when it is moved while playing" },
     };
     return a;

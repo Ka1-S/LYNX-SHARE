@@ -148,6 +148,14 @@ struct Rack
     std::vector<std::uint8_t> pads; // RSMP's PADS
     std::vector<SampleRef> kit;     // RSMP's samples (drum lanes play kit[key])
     std::vector<Module> modules;    // in slot order
+    // --- round 190dw item 4: CCLK, the rack's controller links (FLM_FORMAT §3: writer 0x18059af42, lookup 0x18059fa60,
+    // the base CC handler 0x180799210): a MIDI CC n sets parameter `param` of module instance `module` to its value
+    struct CcLink
+    {
+        int cc = 0, module = 0, param = 0;
+    };
+    std::vector<CcLink> ccLinks;
+    // --- end of round 190dw item 4
 };
 
 struct Project
