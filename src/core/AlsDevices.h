@@ -187,8 +187,10 @@ float echoformNoteValue (int index) noexcept; // 0 … 9
 // Dry/Wet → Echoform's equal-power Mix. Equal-loudness [ASSUMED: cos / sin, as Echoform's]: the same number. Linear
 // (dry 1 − x, wet x): the mix with the same wet : dry ratio, (2 / π) · atan (x / (1 − x)) — up to 3 dB louder at 50 %
 float echoformMixOf (double dryWet, bool equalLoudness) noexcept;
-// A resonance 0 … 1 (1.25) as a Q for LYNX's Filter [ASSUMED: the state-variable damping law Q = 1 / (2 (1 − r)),
-// 0.5 with no resonance], clamped to the Filter's 0.5 … 12
+// A resonance 0 … 1 (the older Auto Filter: 0 … 1.25) as a Q for LYNX's Filter (the cookbook biquad): Q = 0.7071 · 12.5^r,
+// clamped to the Filter's 0.5 … 12. [MEASURED 190cw r18 / r19: low pass at 1 kHz, resonance 0.5 — both tags give the
+// same curve (the new one 6.02 dB lower: its Output was 0.5), the cookbook low pass at Q 2.49 / 2.50 within 0.02 dB;
+// 0.7071 at no resonance is ASSUMED, so one point fixes the law]
 double filterQOfResonance (double resonance) noexcept;
 // LYNX's basic effects keep their laws inside Effects.cpp; the inverses used here, each pinned by a test against
 // formatEffectParam: Filter (type 0 low-pass, 1 high-pass, 2 band-pass; cutoff 20 Hz … 20 kHz log; Q 0.5 … 12 log),

@@ -580,7 +580,10 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
         // in Stereo mode band k is Facet's band k: its frequency, gain and Q follow (L/R and M/S pack the bands)
         if (ok && std::clamp ((int) device.number ("Mode", 0), 0, 2) == 0)
         {
-            const auto sign = manual (device, "Scale", 1.0) < 0.0 ? -1.0 : 1.0;
+            const auto scale = std::clamp (manual (device, "Scale", 1.0), -2.0, 2.0);
+            const auto sign = scale < 0.0 ? -1.0 : 1.0;
+            const auto adaptive = manualBool (device, "AdaptiveQ", false);
+            const auto factor = device.number ("AdaptiveQFactor", 1.12);
             for (int b = 0; b < facet::bands; ++b)
             {
                 const auto stem = "Bands." + std::to_string (b) + "/ParameterA/";
@@ -588,7 +591,9 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
                 t.links.push_back ({ stem + "Freq", facet::param (b, 1), [] (double hz) { return facet::hzValue (hz); } });
                 if (mode == Eq8Mode::bell || mode == Eq8Mode::lowShelf || mode == Eq8Mode::highShelf)
                     t.links.push_back ({ stem + "Gain", facet::param (b, 2), [sign] (double db) { return facet::gainValue (sign * db); } });
-                t.links.push_back ({ stem + "Q", facet::param (b, 3), [mode] (double q) { return facet::qValue (facetQ (mode, q)); } });
+                // (190cx) a bell under Adaptive Q keeps the narrowing of its stored gain (a moving gain leaves Q there)
+                const auto narrow = adaptive && mode == Eq8Mode::bell ? eq8AdaptiveQ (1.0, manual (device, stem + "Gain", 0.0) * std::abs (scale), factor) : 1.0;
+                t.links.push_back ({ stem + "Q", facet::param (b, 3), [mode, narrow] (double q) { return facet::qValue (facetQ (mode, q * narrow)); } });
             }
             link ("GlobalGain", facet::outputParam, [] (double db) { return linValue (db, -24.0, 24.0); });
         }
@@ -637,7 +642,8 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
         ok = utilityToUtility (device, t.slot, t.notes);
         if (ok && ! device.boolean ("LegacyMode", false))
             link ("Gain", 0, [] (double gain) { return gain <= 0.0 ? 0.0f : std::max (1.0e-4f, linValue (dbOfGain (gain), -24.0, 24.0)); });
-        link ("Balance", 1, [] (double v) { return linValue (v, -1.0, 1.0); });
+        // (190cx) no Balance link: Live's balance (constant power with a boost) sits in the Utility's matrix, which no
+        // single LYNX control moves — its automation / macros are listed as not carried instead of half-applied
     }
     else if (tag == "Reverb")
     {

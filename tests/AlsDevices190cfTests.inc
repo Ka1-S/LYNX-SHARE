@@ -147,8 +147,10 @@ TEST (als190cf_shared_laws)
     CHECK (shown (EffectKind::filter, 0, filterTypeValue (0)) == "Low-pass" && shown (EffectKind::filter, 0, filterTypeValue (1)) == "High-pass" &&
            shown (EffectKind::filter, 0, filterTypeValue (2)) == "Band-pass");
     CHECK (shown (EffectKind::filter, 1, filterCutoffValue (1000.0)) == "1000 Hz" && shown (EffectKind::filter, 1, filterCutoffValue (hzOfLiveNote (69.0))) == "440 Hz");
-    CHECK (shown (EffectKind::filter, 2, filterQValue (2.0)) == "Q 2.00" && shown (EffectKind::filter, 2, filterQValue (filterQOfResonance (0.0))) == "Q 0.50" &&
-           shown (EffectKind::filter, 2, filterQValue (filterQOfResonance (0.75))) == "Q 2.00" && shown (EffectKind::filter, 2, filterQValue (filterQOfResonance (1.25))) == "Q 12.00");
+    // (190cx) resonance 0.5 → Q 2.50, measured on both Auto Filter tags; 0 → 0.71 (assumed); the top clamps at 12
+    CHECK (shown (EffectKind::filter, 2, filterQValue (2.0)) == "Q 2.00" && shown (EffectKind::filter, 2, filterQValue (filterQOfResonance (0.0))) == "Q 0.71" &&
+           shown (EffectKind::filter, 2, filterQValue (filterQOfResonance (0.5))) == "Q 2.50" &&
+           shown (EffectKind::filter, 2, filterQValue (filterQOfResonance (0.75))) == "Q 4.70" && shown (EffectKind::filter, 2, filterQValue (filterQOfResonance (1.25))) == "Q 12.00");
     CHECK (shown (EffectKind::lofi, 0, lofiRateValue (22050.0)) == "22050 Hz" && shown (EffectKind::lofi, 0, lofiRateValue (44100.0)) == "44100 Hz" &&
            shown (EffectKind::lofi, 0, lofiRateValue (11025.0)) == "11025 Hz");
     CHECK (shown (EffectKind::lofi, 1, lofiBitsValue (8.0)) == "8.0 bits" && shown (EffectKind::lofi, 1, lofiBitsValue (16.0)) == "16.0 bits" &&
@@ -358,6 +360,14 @@ TEST (als190cf_limiter_gate_and_expand)
         // far under the threshold the gate is down by its floor
         CHECK (near (staticGainDb (p, -80.0), -40.0, 0.01));
     }
+    // (190cx) Gain −75 is "−inf dB" in Live 12.4: a full gate (Sentry's deepest floor); −74 is a 74 dB floor
+    for (const auto& [gain, floor] : { std::array<double, 2> { -75.0, 100.0 }, { -74.0, 74.0 }, { 0.0, 0.0 } })
+    {
+        const auto g = als190cf::translate ("<Gate Id=\"2\">" + als190cf::on() + par ("Threshold", 0.01) + par ("Hold", 20.0) + par ("Return", 0.0) + par ("Gain", gain) + "</Gate>");
+        CHECK (g && near (dyn::sentry::rangeDb (g->slot.params[dyn::sentry::range]), floor, 1.0e-3));
+        if (g && gain <= -75.0)
+            CHECK (dyn::sentry::staticGainDb (g->slot.params, -80.0) <= -99.99);
+    }
     // Compressor in Expand mode: 1 : 1.5 over −18 dB → Sentry's Upward style, the same static curve
     const auto expand = als190cf::translate ("<Compressor2 Id=\"3\">" + als190cf::on() + par ("Threshold", 0.125892541) + par ("Ratio", 4.0) + par ("ExpansionRatio", 1.5) +
                                              par ("Attack", 2.0) + par ("Release", 50.0) + par ("Gain", 0.0) + par ("DryWet", 1.0) + par ("Model", 2) + par ("Knee", 0.0) +
@@ -392,7 +402,8 @@ TEST (als190cf_filter_saturation_eq_chorus_pan_redux)
     CHECK (filter.has_value());
     if (filter)
     {
-        CHECK (filter->slot.kind == EffectKind::filter && shown (filter->slot, 0) == "High-pass" && shown (filter->slot, 1) == "880 Hz" && shown (filter->slot, 2) == "Q 2.00");
+        CHECK (filter->slot.kind == EffectKind::filter && shown (filter->slot, 0) == "High-pass" && shown (filter->slot, 1) == "880 Hz" && shown (filter->slot, 2) == "Q 4.70");
+        CHECK (als190cf::hasNote (filter->notes.approximated, "resonance 0.75 (Live's Q law measured at 0.5 only)"));
         CHECK (filter->slot.params[3] == 1.0f && als190cf::hasNote (filter->notes.dropped, "LFO") && als190cf::hasNote (filter->notes.approximated, "24 dB/oct"));
         const auto* cutoff = als190cf::linkOf (*filter, "Cutoff");
         CHECK (cutoff != nullptr && cutoff->param == 1 && formatEffectParam (EffectKind::filter, 1, cutoff->value (69.0), 120.0) == "440 Hz");
@@ -403,8 +414,8 @@ TEST (als190cf_filter_saturation_eq_chorus_pan_redux)
                                               par ("Lfo_Amount", 0.0) + par ("Envelope_Amount", 0.0) + par ("DryWet", 0.5) + "</AutoFilter2>");
     CHECK (filter2 && shown (filter2->slot, 0) == "Low-pass" && shown (filter2->slot, 1) == "8000 Hz" && filter2->slot.params[3] == 0.5f && filter2->notes.dropped.empty());
 
-    // Saturator: 12 dB of drive, Hard Curve, −6 dB out, 80 % wet
-    const auto sat = als190cf::translate ("<Saturator Id=\"2\">" + als190cf::on() + par ("PreDrive", 12.0) + par ("Type", 3) + flag ("ColorOn", true) + par ("BaseDrive", 0.0) +
+    // Saturator: 12 dB of drive, Hard Curve (type 4: the order seen in Live 12.4, round 190cw), −6 dB out, 80 % wet
+    const auto sat = als190cf::translate ("<Saturator Id=\"2\">" + als190cf::on() + par ("PreDrive", 12.0) + par ("Type", 4) + flag ("ColorOn", true) + par ("BaseDrive", 0.0) +
                                           par ("ColorDepth", 0.0) + par ("PostClip", 1) + par ("PostDrive", -6.0) + par ("DryWet", 0.8) + "</Saturator>");
     CHECK (sat.has_value());
     if (sat)
@@ -415,6 +426,15 @@ TEST (als190cf_filter_saturation_eq_chorus_pan_redux)
         CHECK (mixsuite::paramText (EffectKind::ember, output, p[output]) == "-6.0 dB");
         CHECK (als190cf::hasNote (sat->notes.approximated, "Hard Curve as Ember's transistor") && als190cf::hasNote (sat->notes.dropped, "output clip") &&
                ! als190cf::hasNote (sat->notes.dropped, "Color"));
+    }
+    // the curve table: 0 Analog Clip, 1 Soft Sine, 2 Bass Shaper, 3 Medium Curve, 4 Hard Curve, 5 Sinoid Fold, 6 Digital
+    // Clip, 7 Waveshaper → Ember's nearest
+    const char* const curveNotes[8] { "Analog Clip as Ember's tube", "Soft Sine as Ember's tape", "Bass Shaper as Ember's tube", "Medium Curve as Ember's tape",
+                                      "Hard Curve as Ember's transistor", "Sinoid Fold as Ember's fuzz", "Digital Clip as Ember's transistor", "Waveshaper as Ember's fuzz" };
+    for (int type = 0; type < 8; ++type)
+    {
+        const auto t = als190cf::translate ("<Saturator Id=\"2\">" + als190cf::on() + par ("PreDrive", 6.0) + par ("Type", type) + par ("PostDrive", 0.0) + par ("DryWet", 1.0) + "</Saturator>");
+        CHECK (t && als190cf::hasNote (t->notes.approximated, curveNotes[type]));
     }
     const auto quiet = als190cf::translate ("<Saturator Id=\"2\">" + als190cf::on() + par ("PreDrive", -6.0) + par ("Type", 0) + par ("PostDrive", 0.0) + par ("DryWet", 1.0) + "</Saturator>");
     CHECK (quiet && quiet->slot.params[mixsuite::ember::drive] == 0.0f && near (mixsuite::ember::inputDb (quiet->slot.params[mixsuite::ember::inputGain]), -6.0, 1.0e-4));
@@ -665,4 +685,61 @@ TEST (als190cf_automation_and_macros_follow_the_translated_device)
            ! als190cf::reportHas (report.partialEffects, "Macro mappings onto a converted Live device (not applied)"));
     CHECK (als190cf::reportHas (report.partialEffects, "Saturator -> Ember Saturator") && als190cf::reportHas (report.partialEffects, "Delay -> Echoform") &&
            report.converted.count ("EQ Eight -> Facet EQ") == 1 && report.droppedEffects.empty());
+}
+
+// (round 190cx) The Auto Filter law against Live 12.4's own renders (round 190cw: white noise through a low pass at
+// 1 kHz, resonance 0.5, 12 dB; the transfer function against the dry track, 48 kHz): LYNX's Filter as the importer sets
+// it, in dB at the same bins. The new tag's render had Output 0.5 (−6.02 dB at every bin); its curve is the older
+// tag's within 0.035 dB, so one law serves both.
+TEST (als190cx_auto_filter_matches_the_live_renders)
+{
+    using namespace lynx;
+    using als190cf::par;
+    using als190cf::flag;
+    const double hz[8] { 123.047, 251.953, 498.047, 708.984, 1001.953, 1412.109, 2003.906, 4001.953 };
+    const double legacy[8] { 0.12, 0.52, 2.19, 4.83, 7.93, -1.21, -9.98, -23.98 };
+    const double newer[8] { -5.90, -5.50, -3.84, -1.20, 1.88, -7.24, -16.00, -30.00 }; // with Output 0.5
+    const auto older = als190cf::translate ("<AutoFilter Id=\"6\">" + als190cf::on() + par ("FilterType", 0.0) + flag ("Slope", false) + par ("Cutoff", 83.213) +
+                                            par ("Resonance", 0.5) + par ("LfoAmount", 0.0) + "</AutoFilter>");
+    const auto af2 = als190cf::translate ("<AutoFilter2 Id=\"5\">" + als190cf::on() + par ("Filter_Type", 0.0) + par ("Filter_Slope", 0.0) + par ("Filter_Frequency", 1000.0) +
+                                          par ("Filter_Resonance", 0.5) + par ("Lfo_Amount", 0.0) + par ("Filter_Drive", 0.0) + par ("Filter_Circuit", 0.0) +
+                                          par ("DryWet", 1.0) + par ("Envelope_Amount", 0.0) + par ("Output", 0.5) + "</AutoFilter2>");
+    CHECK (older.has_value() && af2.has_value());
+    if (! older || ! af2)
+        return;
+    CHECK (als190cf::hasNote (af2->notes.dropped, "output gain -6.0 dB") && ! als190cf::hasNote (older->notes.approximated, "resonance"));
+    for (int which = 0; which < 2; ++which)
+    {
+        const auto& slot = which == 0 ? older->slot : af2->slot;
+        auto fx = makeEffect (slot);
+        fx->prepare (48000.0);
+        std::vector<float> l (8192, 0.0f), r (8192, 0.0f);
+        l[0] = 1.0f;
+        for (int at = 0; at < 8192; at += 512)
+            fx->process (l.data() + at, r.data() + at, 512, slot.params, 120.0);
+        double worst = 0.0;
+        for (int k = 0; k < 8; ++k)
+        {
+            std::complex<double> sum = 0.0;
+            for (int n = 0; n < 8192; ++n)
+                sum += (double) l[(std::size_t) n] * std::polar (1.0, -2.0 * 3.14159265358979323846 * hz[k] * n / 48000.0);
+            const auto live = which == 0 ? legacy[k] : newer[k] + 6.0206; // (LYNX's Filter has no output gain: listed)
+            worst = std::max (worst, std::abs (20.0 * std::log10 (std::abs (sum)) - live));
+        }
+        std::printf ("  Auto Filter %s, LP 1 kHz, resonance 0.5: worst %.3f dB\n", which == 0 ? "(older)" : "(new)", worst);
+        CHECK (worst < 0.1);
+    }
+    // EQ Eight's Q link (automation / macros) keeps a bell's Adaptive Q narrowing: Q 2 at +12 dB → Facet √2 · 3.948
+    lynx::xml::Document doc;
+    std::string bands;
+    for (int b = 0; b < 8; ++b)
+        bands += als190bq::eqBand (b, b == 0, 3, 1000.0, b == 0 ? 12.0 : 0.0, 2.0);
+    doc.parse ("<Eq8>" + als175a::v ("Mode", "0") + par ("GlobalGain", 0.0) + par ("Scale", 1.0) + bands + flag ("AdaptiveQ", true) + als175a::v ("AdaptiveQFactor", "1.12") + "</Eq8>");
+    const auto eq = alsdev::effectFromLiveDevice (doc.root());
+    const auto* q = eq ? als190cf::linkOf (*eq, "Bands.0/ParameterA/Q") : nullptr;
+    CHECK (q != nullptr && std::abs (facet::q (q->value (2.0)) - 1.41421356 * 3.948) < 0.01);
+    // and Utility's Balance has no link: Live's law sits in the matrix (automation / macros on it are listed)
+    doc.parse ("<StereoGain>" + par ("Gain", 1.0) + par ("Balance", 0.5) + "</StereoGain>");
+    const auto ut = alsdev::effectFromLiveDevice (doc.root());
+    CHECK (ut && als190cf::linkOf (*ut, "Balance") == nullptr && als190cf::linkOf (*ut, "Gain") != nullptr);
 }

@@ -157,8 +157,8 @@ float echoformMixOf (double dryWet, bool equalLoudness) noexcept
 
 double filterQOfResonance (double resonance) noexcept
 {
-    const auto r = std::clamp (resonance, 0.0, 0.999);
-    return std::clamp (1.0 / (2.0 * (1.0 - r)), 0.5, 12.0);
+    const auto r = std::clamp (resonance, 0.0, 1.25);
+    return std::clamp (std::sqrt (0.5) * std::pow (12.5, r), 0.5, 12.0);
 }
 
 float filterTypeValue (int type) noexcept { return ((float) std::clamp (type, 0, 2) + 0.5f) / 3.0f; }
@@ -492,7 +492,13 @@ bool autoFilterToFilter (const Element& device, Translated& out)
         put ("DryWet", 3, [] (double v) { return unit (v); }, 1.0);
     else
         p[3] = 1.0f;
-    out.notes.approximated.push_back ("resonance (as a Q, law fitted)");
+    const auto resonance = manual (device, newer ? "Filter_Resonance" : "Resonance", 0.0);
+    if (std::abs (resonance - 0.5) > 0.02)
+        out.notes.approximated.push_back (text ("resonance %.2f (Live's Q law measured at 0.5 only)", resonance));
+    // Output [MEASURED 190cw r18: a linear gain, 0.5 = −6.02 dB at every frequency; DATA: 1 in every saved device]
+    const auto outputGain = newer ? manual (device, "Output", 1.0) : 1.0;
+    if (std::abs (outputGain - 1.0) > 1.0e-3)
+        out.notes.dropped.push_back (text ("output gain %.1f dB", dbOfGain (outputGain)));
     const auto lfo = manual (device, newer ? "Lfo_Amount" : "LfoAmount", 0.0);
     if (std::abs (lfo) > 1.0e-4)
         out.notes.dropped.push_back ("LFO on the cutoff");
@@ -524,10 +530,10 @@ bool saturatorToEmber (const Element& device, Translated& out)
     put ("PreDrive", drive, [] (double db) { return linValue (db, 0.0, 36.0); }, 0.0);
     if (driveDb < 0.0)
         p[inputGain] = linValue (driveDb, -24.0, 24.0);
-    // Type [DATA 0 … 7; DOC order: Analog Clip, Soft Sine, Medium Curve, Hard Curve, Sinoid Fold, Digital Clip, then
-    // Waveshaper / Bass Shaper, ASSUMED]: the nearest of Ember's curves (tube, tape, transistor, fuzz)
-    static constexpr int nearest[8] { 0, 1, 1, 2, 3, 2, 3, 0 };
-    static const char* const curves[8] { "Analog Clip", "Soft Sine", "Medium Curve", "Hard Curve", "Sinoid Fold", "Digital Clip", "Waveshaper", "Bass Shaper" };
+    // Type [DATA 0 … 7; the order seen in Live 12.4's menu, round 190cw: Analog Clip, Soft Sine, Bass Shaper, Medium
+    // Curve, Hard Curve, Sinoid Fold, Digital Clip, Waveshaper]: the nearest of Ember's curves (tube, tape, transistor, fuzz)
+    static constexpr int nearest[8] { 0, 1, 0, 1, 2, 3, 2, 3 };
+    static const char* const curves[8] { "Analog Clip", "Soft Sine", "Bass Shaper", "Medium Curve", "Hard Curve", "Sinoid Fold", "Digital Clip", "Waveshaper" };
     static const char* const styleNames[4] { "tube", "tape", "transistor", "fuzz" };
     const auto type = std::clamp ((int) manual (device, "Type", 0), 0, 7);
     p[style] = (float) nearest[type] / (float) (styles - 1);
@@ -624,8 +630,9 @@ bool gateToSentry (const Element& device, Translated& out)
     put ("Release", release, [] (double ms) { return sentryReleaseValue (ms); }, 100.0); // ms [DATA 0.1 … 3000]
     if (manual (device, "Hold", 20.0) > 250.5)
         out.notes.approximated.push_back (text ("hold %.0f ms (Sentry: up to 250 ms)", manual (device, "Hold", 20.0)));
-    // Floor [DATA "Gain" −75 … 0 dB] → Sentry's range 0 … 100 dB
-    put ("Gain", range, [] (double db) { return linValue (-db, 0.0, 100.0); }, -40.0);
+    // Floor [DATA "Gain" −75 … 0 dB; Live 12.4 shows −75 as "−inf dB", round 190cw] → Sentry's range 0 … 100 dB; the
+    // bottom is a full gate: Sentry's deepest floor (−100 dB)
+    put ("Gain", range, [] (double db) { return db <= -74.95 ? 1.0f : linValue (-db, 0.0, 100.0); }, -40.0);
     p[knee] = 0.0f;
     out.notes.approximated.push_back (text ("Return %.1f dB (Sentry's Classic style has its own hysteresis)", manual (device, "Return", 0.0)));
     const auto la = gateLookaheadMs ((int) manual (device, "LookAhead", 1));
