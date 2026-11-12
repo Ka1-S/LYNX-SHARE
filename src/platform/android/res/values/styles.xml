@@ -1,0 +1,15 @@
+<resources>
+    <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:colorPrimaryDark">@color/primary_dark</item>
+        <item name="android:colorAccent">@color/accent</item>
+    </style>
+
+    <color name="background">#1E1E1E</color>
+    <color name="primary">#2D2D2D</color>
+    <color name="primary_dark">#1A1A1A</color>
+    <color name="accent">#FF6B35</color>
+</resources>

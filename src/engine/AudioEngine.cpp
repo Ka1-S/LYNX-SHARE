@@ -4612,6 +4612,20 @@ void AudioEngine::choosePreferredDriver()
         if (deviceManager.getCurrentAudioDevice() == nullptr) // it would not open: back to what worked
             deviceManager.initialise (0, 2, nullptr, true);
     }
+   #elif JUCE_ANDROID
+    // On Android, prefer AAudio over OpenSL ES
+    for (auto* type : deviceManager.getAvailableDeviceTypes())
+    {
+        type->scanForDevices();
+        if (type->getTypeName().containsIgnoreCase ("AAudio") && ! type->getDeviceNames (false).isEmpty())
+        {
+            if (type->getTypeName() != deviceManager.getCurrentAudioDeviceType())
+            {
+                deviceManager.setCurrentAudioDeviceType (type->getTypeName(), true);
+            }
+            break;
+        }
+    }
    #endif
 }
 

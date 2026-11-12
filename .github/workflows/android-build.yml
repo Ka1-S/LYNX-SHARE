@@ -1,0 +1,343 @@
+name: Build Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+      android_abi:
+        description: 'Android ABI'
+        required: true
+        default: 'arm64-v8a'
+        type: choice
+        options:
+          - arm64-v8a
+          - armeabi-v7a
+
+env:
+  ANDROID_NDK_VERSION: r27
+  ANDROID_API_LEVEL: 24
+  CMAKE_BUILD_TYPE: ${{ github.event.inputs.build_type || 'Release' }}
+  ANDROID_ABI: ${{ github.event.inputs.android_abi || 'arm64-v8a' }}
+
+jobs:
+  build-android:
+    name: Build Android (${{ env.ANDROID_ABI }}, ${{ env.CMAKE_BUILD_TYPE }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      # ---------------------------------------------------------
+      # 1. Checkout source code
+      # ---------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # ---------------------------------------------------------
+      # 2. Setup Java (for Gradle)
+      # ---------------------------------------------------------
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      # ---------------------------------------------------------
+      # 3. Setup Android NDK
+      # ---------------------------------------------------------
+      - name: Setup Android NDK
+        uses: android-actions/setup-ndk@v2
+        with:
+          ndk-version: ${{ env.ANDROID_NDK_VERSION }}
+
+      # ---------------------------------------------------------
+      # 4. Cache CMake/Ninja build
+      # ---------------------------------------------------------
+      - name: Cache CMake build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/cmake
+            build-android
+          key: ${{ runner.os }}-android-${{ env.ANDROID_ABI }}-${{ env.CMAKE_BUILD_TYPE }}-${{ hashFiles('**/CMakeLists.txt', '**/CMakePresets.json', 'cmake/*') }}
+          restore-keys: |
+            ${{ runner.os }}-android-${{ env.ANDROID_ABI }}-${{ env.CMAKE_BUILD_TYPE }}-
+
+      # ---------------------------------------------------------
+      # 5. Configure CMake with Android toolchain
+      # ---------------------------------------------------------
+      - name: Configure CMake
+        run: |
+          cmake -B build-android -S . \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=${{ env.ANDROID_ABI }} \
+            -DANDROID_PLATFORM=android-${{ env.ANDROID_API_LEVEL }} \
+            -DANDROID_STL=c++_shared \
+            -DLYNX_BUILD_APP=ON \
+            -DLYNX_BUILD_PLUGINS=OFF \
+            -DLYNX_LTO=OFF \
+            -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
+            -GNinja
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+
+      # ---------------------------------------------------------
+      # 6. Build native library (limit parallel jobs for memory)
+      # ---------------------------------------------------------
+      - name: Build native library
+        run: |
+          cmake --build build-android --parallel 2
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+
+      # ---------------------------------------------------------
+      # 7. Verify native library was built
+      # ---------------------------------------------------------
+      - name: Verify build output
+        run: |
+          ls -la build-android/
+          file build-android/LYNX || file build-android/libLYNX.so
+
+      # ---------------------------------------------------------
+      # 8. Setup Gradle for APK packaging
+      # ---------------------------------------------------------
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
+
+      # ---------------------------------------------------------
+      # 9. Prepare Android project structure
+      # ---------------------------------------------------------
+      - name: Prepare Android project
+        run: |
+          mkdir -p android/app/src/main/jniLibs/${{ env.ANDROID_ABI }}
+          
+          # Copy native library
+          if [ -f build-android/LYNX ]; then
+            cp build-android/LYNX android/app/src/main/jniLibs/${{ env.ANDROID_ABI }}/libLYNX.so
+          elif [ -f build-android/libLYNX.so ]; then
+            cp build-android/libLYNX.so android/app/src/main/jniLibs/${{ env.ANDROID_ABI }}/libLYNX.so
+          else
+            echo "ERROR: Native library not found!"
+            find build-android -name "*.so" -o -name "LYNX" | head -20
+            exit 1
+          fi
+          
+          # Copy Java sources
+          cp -r src/platform/android/java android/app/src/main/
+          
+          # Copy resources
+          cp -r src/platform/android/res android/app/src/main/
+          cp src/platform/android/AndroidManifest.xml android/app/src/main/
+          
+          # Verify structure
+          find android/app/src/main -type f | sort
+
+      # ---------------------------------------------------------
+      # 10. Create Gradle build files
+      # ---------------------------------------------------------
+      - name: Create Gradle build files
+        run: |
+          cat > android/settings.gradle.kts << 'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "LYNX SHARE"
+          include(":app")
+          EOF
+
+          cat > android/build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.application") version "8.2.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.20" apply false
+          }
+          EOF
+
+          cat > android/app/build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+
+          android {
+              namespace = "com.ka1_s.lynx"
+              compileSdk = 34
+
+              defaultConfig {
+                  applicationId = "com.ka1_s.lynx"
+                  minSdk = 24
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "0.1.26"
+              }
+
+              buildTypes {
+                  release {
+                      isMinifyEnabled = false
+                      signingConfig = signingConfigs.getByName("release")
+                  }
+                  debug {
+                      isMinifyEnabled = false
+                      isDebuggable = true
+                  }
+              }
+
+              sourceSets {
+                  main {
+                      jniLibs.srcDirs = ["src/main/jniLibs"]
+                  }
+              }
+
+              packagingOptions {
+                  jniLibs {
+                      useLegacyPackaging = true
+                  }
+              }
+
+              // Signing config (requires keystore in CI secrets)
+              signingConfigs {
+                  create("release") {
+                      storeFile = file(System.getenv("KEYSTORE_PATH") ?: "")
+                      storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+                      keyAlias = System.getenv("KEY_ALIAS") ?: ""
+                      keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+                  }
+              }
+          }
+
+          dependencies {
+              implementation("androidx.appcompat:appcompat:1.6.1")
+              implementation("androidx.core:core-ktx:1.12.0")
+              implementation("androidx.activity:activity-ktx:1.8.2")
+          }
+          EOF
+
+      # ---------------------------------------------------------
+      # 11. Build APK
+      # ---------------------------------------------------------
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assemble${{ env.CMAKE_BUILD_TYPE }} --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
+        env:
+          GRADLE_OPTS: "-Xmx2g"
+
+      # ---------------------------------------------------------
+      # 12. Upload APK as artifact
+      # ---------------------------------------------------------
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: lynx-share-android-${{ env.ANDROID_ABI }}-${{ env.CMAKE_BUILD_TYPE }}
+          path: android/app/build/outputs/apk/**/*.apk
+          retention-days: 30
+
+      # ---------------------------------------------------------
+      # 13. Create Release (on tag push)
+      # ---------------------------------------------------------
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: android/app/build/outputs/apk/**/*.apk
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------
+  # Multi-ABI Build Matrix (optional)
+  # ---------------------------------------------------------
+  build-multi-abi:
+    name: Build Multi-ABI
+    needs: build-android
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a]
+        build_type: [Release, Debug]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+      - name: Setup NDK
+        uses: android-actions/setup-ndk@v2
+        with:
+          ndk-version: ${{ env.ANDROID_NDK_VERSION }}
+      - name: Configure CMake
+        run: |
+          cmake -B build-android-${{ matrix.abi }} -S . \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=${{ matrix.abi }} \
+            -DANDROID_PLATFORM=android-${{ env.ANDROID_API_LEVEL }} \
+            -DANDROID_STL=c++_shared \
+            -DLYNX_BUILD_APP=ON \
+            -DLYNX_BUILD_PLUGINS=OFF \
+            -DLYNX_LTO=OFF \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -GNinja
+      - name: Build
+        run: |
+          cmake --build build-android-${{ matrix.abi }} --parallel 2
+      - name: Prepare Android project
+        run: |
+          mkdir -p android/app/src/main/jniLibs/${{ matrix.abi }}
+          cp build-android-${{ matrix.abi }}/LYNX android/app/src/main/jniLibs/${{ matrix.abi }}/libLYNX.so 2>/dev/null || \
+          cp build-android-${{ matrix.abi }}/libLYNX.so android/app/src/main/jniLibs/${{ matrix.abi }}/libLYNX.so
+          cp -r src/platform/android/java android/app/src/main/
+          cp -r src/platform/android/res android/app/src/main/
+          cp src/platform/android/AndroidManifest.xml android/app/src/main/
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assemble${{ matrix.build_type }} --no-daemon -Dorg.gradle.jvmargs="-Xmx2g"
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: lynx-android-${{ matrix.abi }}-${{ matrix.build_type }}
+          path: android/app/build/outputs/apk/**/*.apk
+          retention-days: 30

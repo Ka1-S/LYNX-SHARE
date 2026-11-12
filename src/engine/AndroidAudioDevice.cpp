@@ -1,0 +1,281 @@
+#include "engine/AndroidAudioDevice.h"
+
+#if JUCE_ANDROID || defined(LYNX_ANDROID)
+#include <aaudio/AAudio.h>
+#include <jni.h>
+#include <android/log.h>
+#include <android/native_activity.h>
+
+extern "C" {
+    extern JavaVM* android_jvm;
+    extern struct android_app* android_app;
+}
+
+#define LOG_TAG "LYNX_Audio"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
+namespace lynx::engine
+{
+
+AndroidAudioDevice::AndroidAudioDevice() : juce::AudioIODevice("AAudio", "AAudio")
+{
+    // Initialize AAudio
+    AAudio_createStreamBuilder(&builder);
+}
+
+AndroidAudioDevice::~AndroidAudioDevice()
+{
+    close();
+    if (builder)
+    {
+        AAudioStreamBuilder_delete(builder);
+        builder = nullptr;
+    }
+}
+
+int AndroidAudioDevice::getDefaultBufferSize()
+{
+    // Get the optimal buffer size from AAudio
+    if (builder)
+    {
+        int32_t framesPerBurst = AAudioStreamBuilder_getFramesPerBurst(builder);
+        if (framesPerBurst > 0)
+            return framesPerBurst;
+    }
+    return 256; // fallback
+}
+
+juce::StringArray AndroidAudioDevice::getAvailableSampleRates()
+{
+    juce::StringArray rates;
+    rates.add("44100");
+    rates.add("48000");
+    // Android commonly supports these rates
+    return rates;
+}
+
+juce::Array<juce::AudioIODeviceType::AudioDeviceInfo> AndroidAudioDevice::getAvailableDevices()
+{
+    juce::Array<juce::AudioIODeviceType::AudioDeviceInfo> devices;
+    juce::AudioIODeviceType::AudioDeviceInfo info;
+    info.name = "AAudio Default";
+    info.inputChannels = 2;
+    info.outputChannels = 2;
+    info.isDefaultInput = true;
+    info.isDefaultOutput = true;
+    devices.add(info);
+    return devices;
+}
+
+bool AndroidAudioDevice::open(const juce::String& inputDeviceName,
+                              const juce::String& outputDeviceName,
+                              int numberOfInputChannelsNeeded,
+                              int numberOfOutputChannelsNeeded,
+                              int sampleRate,
+                              int bufferSizeSamples)
+{
+    if (isOpened)
+        return true;
+
+    numInputChannels = numberOfInputChannelsNeeded;
+    numOutputChannels = numberOfOutputChannelsNeeded;
+    currentSampleRate = sampleRate;
+    currentBufferSize = bufferSizeSamples > 0 ? bufferSizeSamples : getDefaultBufferSize();
+
+    // Create output stream
+    AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_OUTPUT);
+    AAudioStreamBuilder_setSampleRate(builder, sampleRate);
+    AAudioStreamBuilder_setChannelCount(builder, numOutputChannels);
+    AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_FLOAT);
+    AAudioStreamBuilder_setBufferCapacityInFrames(builder, currentBufferSize * 4); // 4x buffer for safety
+    AAudioStreamBuilder_setDataCallback(builder, onAudioCallback, this);
+    AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+    AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE);
+
+    aaudio_result_t result = AAudioStreamBuilder_openStream(builder, &outputStream);
+    if (result != AAUDIO_OK)
+    {
+        LOGE("Failed to open output stream: %s", AAudio_convertResultToText(result));
+        return false;
+    }
+
+    // Create input stream if needed
+    if (numInputChannels > 0)
+    {
+        AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_INPUT);
+        AAudioStreamBuilder_setChannelCount(builder, numInputChannels);
+        result = AAudioStreamBuilder_openStream(builder, &inputStream);
+        if (result != AAUDIO_OK)
+        {
+            LOGE("Failed to open input stream: %s", AAudio_convertResultToText(result));
+            AAudioStream_close(outputStream);
+            outputStream = nullptr;
+            return false;
+        }
+    }
+
+    // Verify actual buffer size and sample rate
+    currentBufferSize = AAudioStream_getBufferSizeInFrames(outputStream);
+    currentSampleRate = AAudioStream_getSampleRate(outputStream);
+
+    // Prepare mixing buffer
+    mixingBuffer.setSize(juce::jmax(numInputChannels, numOutputChannels), currentBufferSize);
+
+    isOpened = true;
+    LOGI("AAudio opened: %d Hz, %d frames, %d in, %d out",
+         (int)currentSampleRate, currentBufferSize, numInputChannels, numOutputChannels);
+
+    return true;
+}
+
+void AndroidAudioDevice::close()
+{
+    if (!isOpened)
+        return;
+
+    stop();
+
+    if (outputStream)
+    {
+        AAudioStream_close(outputStream);
+        outputStream = nullptr;
+    }
+    if (inputStream)
+    {
+        AAudioStream_close(inputStream);
+        inputStream = nullptr;
+    }
+
+    isOpened = false;
+    currentCallback = nullptr;
+    LOGI("AAudio closed");
+}
+
+void AndroidAudioDevice::start(juce::AudioIODeviceCallback* callback)
+{
+    if (!isOpened || isStarted || !callback)
+        return;
+
+    currentCallback = callback;
+    callback->audioDeviceAboutToStart(this);
+
+    // Start output stream
+    aaudio_result_t result = AAudioStream_requestStart(outputStream);
+    if (result != AAUDIO_OK)
+    {
+        LOGE("Failed to start output stream: %s", AAudio_convertResultToText(result));
+        callback->audioDeviceStopped();
+        currentCallback = nullptr;
+        return;
+    }
+
+    // Start input stream if available
+    if (inputStream)
+    {
+        result = AAudioStream_requestStart(inputStream);
+        if (result != AAUDIO_OK)
+        {
+            LOGE("Failed to start input stream: %s", AAudio_convertResultToText(result));
+        }
+    }
+
+    isStarted = true;
+    LOGI("AAudio started");
+}
+
+void AndroidAudioDevice::stop()
+{
+    if (!isStarted)
+        return;
+
+    if (outputStream)
+    {
+        AAudioStream_requestStop(outputStream);
+    }
+    if (inputStream)
+    {
+        AAudioStream_requestStop(inputStream);
+    }
+
+    if (currentCallback)
+    {
+        currentCallback->audioDeviceStopped();
+        currentCallback = nullptr;
+    }
+
+    isStarted = false;
+    LOGI("AAudio stopped");
+}
+
+int AndroidAudioDevice::getOutputLatencyInSamples()
+{
+    if (outputStream)
+    {
+        return AAudioStream_getFramesPerBurst(outputStream) * 2; // estimate
+    }
+    return currentBufferSize;
+}
+
+int AndroidAudioDevice::getInputLatencyInSamples()
+{
+    if (inputStream)
+    {
+        return AAudioStream_getFramesPerBurst(inputStream) * 2; // estimate
+    }
+    return currentBufferSize;
+}
+
+aaudio_data_callback_result_t AndroidAudioDevice::onAudioCallback(AAudioStream* stream,
+                                                                   void* userData,
+                                                                   void* audioData,
+                                                                   int32_t numFrames)
+{
+    auto* device = static_cast<AndroidAudioDevice*>(userData);
+    if (!device || !device->currentCallback || !device->isStarted)
+        return AAUDIO_CALLBACK_RESULT_CONTINUE;
+
+    float* outputBuffer = static_cast<float*>(audioData);
+    const int numOutChannels = device->numOutputChannels;
+    const int numInChannels = device->numInputChannels;
+
+    // Clear mixing buffer
+    device->mixingBuffer.clear();
+
+    // Get input data if available
+    if (device->inputStream && numInChannels > 0)
+    {
+        // Read from input stream
+        aaudio_result_t result = AAudioStream_read(device->inputStream,
+                                                   device->mixingBuffer.getArrayOfWritePointers(),
+                                                   numFrames,
+                                                   0); // timeout = 0 (non-blocking)
+        if (result < 0)
+        {
+            device->xrunCount++;
+        }
+    }
+
+    // Call the JUCE callback
+    device->currentCallback->audioDeviceIOCallbackWithContext(
+        device->mixingBuffer.getArrayOfReadPointers(), numInChannels,
+        device->mixingBuffer.getArrayOfWritePointers(), numOutChannels,
+        numFrames, nullptr);
+
+    // Copy mixed output to AAudio buffer
+    for (int ch = 0; ch < numOutChannels; ++ch)
+    {
+        const float* src = device->mixingBuffer.getReadPointer(ch);
+        float* dst = outputBuffer + ch; // interleaved
+        for (int i = 0; i < numFrames; ++i)
+        {
+            dst[i * numOutChannels] = src[i];
+        }
+    }
+
+    return AAUDIO_CALLBACK_RESULT_CONTINUE;
+}
+
+} // namespace lynx::engine
+
+#endif // JUCE_ANDROID || defined(LYNX_ANDROID)

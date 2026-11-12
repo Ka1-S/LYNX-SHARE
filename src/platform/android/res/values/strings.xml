@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">LYNX SHARE</string>
+    <string name="audio_recording_permission_rationale">LYNX SHARE needs microphone access to record audio.</string>
+    <string name="storage_permission_rationale">LYNX SHARE needs storage access to save and load projects.</string>
+</resources>

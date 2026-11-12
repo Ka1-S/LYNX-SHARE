@@ -3,6 +3,16 @@ cmake_minimum_required(VERSION 3.22)
 # macOS: Big Sur or newer (universal builds pass -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"); set before project()
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
 
+# Android: API 24+ (Nougat) for AAudio support; set before project()
+if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    set(CMAKE_SYSTEM_VERSION 24 CACHE STRING "Minimum Android API level")
+    set(ANDROID_NDK ${ANDROID_NDK} CACHE PATH "Android NDK path")
+    set(CMAKE_ANDROID_NDK ${ANDROID_NDK})
+    set(CMAKE_ANDROID_API ${CMAKE_SYSTEM_VERSION})
+    set(CMAKE_ANDROID_STL_TYPE c++_shared)
+    set(CMAKE_ANDROID_ARCH_ABI arm64-v8a)
+endif()
+
 project(LYNX VERSION 0.1.26 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -600,6 +610,26 @@ if(LYNX_BUILD_APP)
         set_source_files_properties(src/ui/VideoMediaMac.mm PROPERTIES COMPILE_OPTIONS "-fno-objc-arc")
         target_link_libraries(LYNX PRIVATE "-framework AVFoundation" "-framework CoreMedia" "-framework CoreVideo")
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS}) # (libcurl loaded at run time: engine/LiveLink.cpp)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+        # Android: AAudio for low-latency audio, no VST/AU/LV2 plugins
+        target_compile_definitions(LYNX PRIVATE
+            JUCE_ANDROID=1
+            JUCE_PLUGINHOST_VST3=0
+            JUCE_PLUGINHOST_AU=0
+            JUCE_PLUGINHOST_LV2=0
+            LYNX_ANDROID=1)
+        # Android uses AAudio (API 26+) with OpenSL ES fallback
+        target_link_libraries(LYNX PRIVATE OpenSLES log android native_app_glue)
+        # Android-specific sources
+        target_sources(LYNX PRIVATE
+            src/platform/AndroidAudioDevice.cpp
+            src/platform/AndroidPaths.cpp
+            src/platform/AndroidLifecycle.cpp
+            src/platform/android/jni/AndroidJNI.cpp)
+        # Include Android JNI headers
+        target_include_directories(LYNX PRIVATE src/platform/android/jni)
+        # JUCE Android needs the native app glue
+        target_link_libraries(LYNX PRIVATE juce::juce_android_native_app_glue)
     else()
         # ALSA (linked) + JACK (loaded at run time; PipeWire serves JACK clients through pipewire-jack)
         target_compile_definitions(LYNX PRIVATE JUCE_ALSA=1 JUCE_JACK=1 JUCE_PLUGINHOST_LV2=1)
@@ -627,6 +657,11 @@ if(LYNX_BUILD_APP)
             juce::juce_opengl
         PUBLIC
             juce::juce_recommended_config_flags)
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+        # JUCE Android modules
+        target_link_libraries(LYNX PRIVATE juce::juce_android)
+    endif()
     # LTO for the shipped app; the Tests workflow builds without it (round speed185a: the LTO link was 7 of the 8.5
     # minutes of a cached CI App build). -DLYNX_LTO=OFF
     option(LYNX_LTO "Link the app with link-time optimisation" ON)
