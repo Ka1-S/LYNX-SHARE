@@ -9086,3 +9086,5 @@ countries: br
 "Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "Hot-swap: vincula o Browser a este dispositivo; o que você carregar lá toma o lugar dele (Q, de novo para encerrar)"
 "Save the device's settings as a preset" = "Salvar as configurações do dispositivo como preset"
 "Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "Clique: selecionar. Clique duplo: recolher / expandir. Arrastar: mover na cadeia (Ctrl + arrastar: copiar). Botão direito: seu menu"
+"Clear all colours" = "Limpar todas as cores"
+"Presets of {0}" = "Presets de {0}"

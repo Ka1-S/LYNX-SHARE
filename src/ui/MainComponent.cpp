@@ -2971,6 +2971,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     if (! clipLaunch && detailView != nullptr) // (round 183a: a docked Piano roll goes back to its panel)
         detailView->releaseEditor();
     layoutStyle = style;
+    browser.setLiveItemMenus (clipLaunch); // (round 190cy: Live's flat collection labels in the rows' menus)
     if (clipGridView != nullptr || clipLaunch)
     {
         playlistArea.setClipGrid (clipLaunch ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);

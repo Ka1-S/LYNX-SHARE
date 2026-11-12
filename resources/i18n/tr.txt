@@ -8965,6 +8965,8 @@ countries: tr
 "Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "Hot-swap: Browser'ı bu cihaza bağlar; orada yüklediğiniz şey onun yerini alır (Q, bitirmek için tekrar)"
 "Save the device's settings as a preset" = "Cihazın ayarlarını preset olarak kaydet"
 "Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "Tık: seç. Çift tık: katla / aç. Sürükle: zincirde taşı (Ctrl + sürükle: kopyala). Sağ tık: menüsü"
+"Clear all colours" = "Tüm renkleri temizle"
+"Presets of {0}" = "{0} ön ayarları"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"

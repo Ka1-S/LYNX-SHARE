@@ -8965,6 +8965,8 @@ countries: de at ch li lu
 "Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "Hot-swap: verknüpft den Browser mit diesem Gerät; was Sie dort laden, tritt an seine Stelle (Q, nochmal zum Beenden)"
 "Save the device's settings as a preset" = "Die Einstellungen des Geräts als Preset speichern"
 "Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "Klick: auswählen. Doppelklick: ein- / ausklappen. Ziehen: in der Kette verschieben (Strg + Ziehen: kopieren). Rechtsklick: sein Menü"
+"Clear all colours" = "Alle Farben entfernen"
+"Presets of {0}" = "Presets von {0}"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] Editor öffnen/schließen  [Alt]+[LMB] andere offen lassen  [Strg]+[LMB] vorhören  [2xLMB] Piano Roll  [LMB] hoch/runter ziehen sortiert um  [RMB] Kanalmenü"

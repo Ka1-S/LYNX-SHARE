@@ -8965,6 +8965,8 @@ countries: tw hk mo
 "Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "熱插拔：將瀏覽器連結到此裝置；在那裡載入的內容會取代它（Q，再按一次結束）"
 "Save the device's settings as a preset" = "將裝置的設定儲存為預設集"
 "Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "按一下：選取。按兩下：摺疊 / 展開。拖曳：在鏈中移動（Ctrl + 拖曳：複製）。按右鍵：其選單"
+"Clear all colours" = "清除所有顏色"
+"Presets of {0}" = "{0} 的預設"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"

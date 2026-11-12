@@ -8965,6 +8965,8 @@ countries: kr
 "Hot-swap: link the Browser to this device; what you load there takes its place (Q, again to end)" = "핫스왑: 브라우저를 이 장치에 연결합니다. 거기서 로드한 것이 이 장치를 대신합니다(Q, 다시 누르면 종료)"
 "Save the device's settings as a preset" = "장치 설정을 프리셋으로 저장"
 "Click: select. Double-click: fold / unfold. Drag: move it in the chain (Ctrl + drag: copy). Right-click: its menu" = "클릭: 선택. 더블 클릭: 접기 / 펼치기. 드래그: 체인에서 이동(Ctrl + 드래그: 복사). 우클릭: 메뉴"
+"Clear all colours" = "모든 색상 지우기"
+"Presets of {0}" = "{0} 프리셋"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
