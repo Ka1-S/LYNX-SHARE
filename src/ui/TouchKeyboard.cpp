@@ -224,14 +224,13 @@ public:
                     {
                         g.setColour (juce::Colour (0xff8a8f99));
                         g.setFont (theme::monoFont (theme::type::caption));
-                        g.drawText (letter, box.withTrimmedBottom (box.getHeight() * 0.62f - 2.0f).withTrimmedTop (box.getHeight() * 0.62f - 16.0f).toNearestInt(),
-                                    juce::Justification::centred);
+                        g.drawText (letter, box.withTrimmedTop (box.getHeight() * 0.64f).withHeight (16.0f).toNearestInt(), juce::Justification::centred);
                     }
                 }
                 else
                 {
                     g.setColour (held != pressed.end() ? theme::colour::accent.withMultipliedBrightness (0.6f + 0.4f * held->second)
-                                                       : off ? theme::colour::keyBlack.brighter (0.05f) : theme::colour::keyBlack);
+                                                       : off ? theme::colour::bg4 : theme::colour::keyBlack); // (locked out: a flat grey)
                     g.fillRoundedRectangle (box.withTrimmedTop (-3.0f), 3.0f);
                     g.setColour (juce::Colours::white.withAlpha (off ? 0.02f : 0.07f));
                     g.fillRect (box.reduced (3.0f, 0.0f).withTrimmedTop (box.getHeight() - 6.0f));
@@ -817,6 +816,7 @@ public:
         chordSet.setTooltip (tr ("The key's chords, or the project's own chord set (from an FL Studio Mobile project, or edited on the pads)"));
         chordSet.onChange = [this] {
             scalekeys::current().projectChords = chordSet.getSelectedItemIndex() == 1;
+            complexity.setEnabled (! scalekeys::current().projectChords);
             pads.repaint();
             settingsChanged();
         };
@@ -962,6 +962,7 @@ private:
         chordSet.addItem (tr ("Project chord set"), 2);
         chordSet.setItemEnabled (2, has);
         chordSet.setSelectedItemIndex (scalekeys::current().projectChords && has ? 1 : 0, juce::dontSendNotification);
+        complexity.setEnabled (! (scalekeys::current().projectChords && has)); // (a chord set's chords are as they are)
         chordSetHad = has;
     }
 

@@ -737,7 +737,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         // the letter of the typing key that plays `key` (FL's layout; the first key of the layout that does), Keys mode
         if (! typingPiano)
             return {};
-        for (const char letter : std::string ("ZSXDCVGBHNJM,L.;/Q2W3ER5T6Y7UI9O0P"))
+        for (const char letter : std::string ("ZSXDCVGBHNJMQ2W3ER5T6Y7UI9O0P,L.;/")) // (the Q row before its duplicates , . /)
             if (const auto notes = keys::typingPianoKey (letter, typingOctave, typingRoot, typingLayout).notes; ! notes.empty() && notes.front() == key)
                 return std::string (1, letter);
         return {};
@@ -3016,7 +3016,11 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         // round 190ds: the dock's Editor tab docks the Piano roll (as the Clip-launch detail view does; never both)
         host.dockPianoRoll = [this] (int pattern) { return dockPianoRoll (pattern); };
         host.undockPianoRoll = [this] { undockPianoRoll(); };
-        host.setFoldToKey = [this] (bool on) { pianoRoll.setFoldToScale (on); };
+        host.setFoldToKey = [this] (bool on) {
+            if (const auto key = projectkey::get (engine.getSong()); on && key) // (the rows show the project key, then fold)
+                pianoRoll.setScale (key->root, projectkey::lynxScale (*key));
+            pianoRoll.setFoldToScale (on);
+        };
         host.foldedToKey = [this] { return pianoRoll.isFoldedToScale(); };
         host.openPianoRollPanel = [this] { showPanel (Panel::pianoRoll); };
         workspace.onWillShow = [this] (Panel panel) { pianoRollPanelWillShow (panel); };

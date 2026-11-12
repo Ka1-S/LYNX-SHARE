@@ -1381,6 +1381,12 @@ public:
     }
 
     bool docked() const noexcept { return editor != nullptr; }
+    void clickFold (bool on)
+    {
+        fold.setToggleState (on, juce::dontSendNotification);
+        if (fold.onClick)
+            fold.onClick();
+    }
 
     void visibilityChanged() override { update(); }
     void parentHierarchyChanged() override
@@ -1565,6 +1571,7 @@ void SimpleDock::refresh()
 
 void SimpleDock::setTab (Tab t)
 {
+    tabChosen = true; // (a refresh keeps a tab that was asked for)
     if ((t == Tab::instrument && ! instrumentTab) || ((t == Tab::keyboard || t == Tab::editor) && ! playTabs))
         t = Tab::effects;
     tab = t;
@@ -1665,6 +1672,8 @@ void SimpleDock::clickFollowForCheck()
     updateFollow();
     repaint();
 }
+
+void SimpleDock::clickFoldForCheck (bool on) { editorPage->clickFold (on); }
 
 juce::Component* SimpleDock::keyboardPanelForSnapshot()
 {

@@ -15607,11 +15607,13 @@ private:
             offline.dispatchPendingMessages();
             check ("the Piano roll is docked in the Editor tab", dock->isEditorDocked());
             check ("on the track's pattern", offline.getSong().currentPattern == r.pattern);
+            ui.getPianoRollForSnapshot().scrollToNotes(); // (done asynchronously when it docks)
             shots ("editor");
-            ui.getPianoRollForSnapshot().setFoldToScale (true);
-            dock->refresh();
+            dock->clickFoldForCheck (true); // "Only notes in key"
+            check ("Only notes in key folds the rows to A minor", ui.getPianoRollForSnapshot().isFoldedToScale());
+            ui.getPianoRollForSnapshot().scrollToNotes();
             shots ("editor-in-key");
-            ui.getPianoRollForSnapshot().setFoldToScale (false);
+            dock->clickFoldForCheck (false);
 
             // --- the keyboard's modes ------------------------------------------------------------------------------
             auto& keyboard = lynx::scalekeys::current();
@@ -15638,7 +15640,7 @@ private:
             for (const auto& [mode, name, pressed] : { std::tuple { lynx::scalekeys::Mode::scaleKeys, juce::String ("window-scale-keys"), 4 },
                                                        std::tuple { lynx::scalekeys::Mode::chordPad, juce::String ("window-chord-pad"), 3 } })
             {
-                auto panel = lynx::makeKeyboardPanelForSnapshot (offline, mode, pressed, [] { return 0; });
+                auto panel = lynx::makeKeyboardPanelForSnapshot (offline, mode, pressed, [ch = r.channels.front()] { return ch; });
                 panel->setSize (1100, 260);
                 for (float scale : { 1.0f, 2.0f })
                     writeImage (panel->createComponentSnapshot (panel->getLocalBounds(), true, scale), name + (scale > 1.0f ? "@2x" : ""));
@@ -15652,7 +15654,7 @@ private:
                 offline.editSong ([set] (lynx::Song& s) { s.keyboardChords = set; });
                 keyboard.projectChords = true;
                 keyboard.complexity = lynx::scalekeys::Complexity::triad;
-                auto panel = lynx::makeKeyboardPanelForSnapshot (offline, lynx::scalekeys::Mode::chordPad, 5, [] { return 0; });
+                auto panel = lynx::makeKeyboardPanelForSnapshot (offline, lynx::scalekeys::Mode::chordPad, 5, [ch = r.channels.front()] { return ch; });
                 panel->setSize (1100, 260);
                 for (float scale : { 1.0f, 2.0f })
                     writeImage (panel->createComponentSnapshot (panel->getLocalBounds(), true, scale), juce::String ("window-chord-set") + (scale > 1.0f ? "@2x" : ""));

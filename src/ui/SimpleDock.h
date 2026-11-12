@@ -120,6 +120,7 @@ public:
     bool followShownForCheck() const;
     void clickFollowForCheck();
     juce::Component* keyboardPanelForSnapshot();
+    void clickFoldForCheck (bool on); // the Editor tab's "Only notes in key"
 
     void paint (juce::Graphics& g) override;
     void resized() override;
