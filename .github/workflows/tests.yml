@@ -196,3 +196,18 @@ jobs:
           LYNX_PROFILE_DIR="$PWD/crash-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --scantest "$PWD/crash-plugin" "$PWD/crash.txt" || true
           cat crash.txt
           grep -q 'blacklisted: .*crash.clap' crash.txt
+
+      # Issue #155: a VST3 that ignores bus activation (as every nih-plug plugin does) reads its sidechain bus while LYNX
+      # keeps that bus off; JUCE passed null sample pointers there (nih-plug: memcpy from null, LYNX crashed). The test
+      # plugin goes silent on a null pointer, so this fails (peak=0) unless the off bus holds silence (cmake fix 24).
+      - name: Inactive sidechain bus (VST3)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          V="$RUNNER_TEMP/juce/modules/juce_audio_processors/format_types/VST3_SDK"
+          B="sc-plugin/LYNX Test Sidechain.vst3/Contents/x86_64-linux"
+          mkdir -p "$B"
+          c++ -shared -fPIC -O2 -std=c++17 -I"$V" tools/testplugin/lynx_test_sidechain_vst3.cpp "$V/pluginterfaces/base/funknown.cpp" -o "$B/LYNX Test Sidechain.so"
+          LYNX_PROFILE_DIR="$PWD/sc-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --plugintest "$PWD/sc-plugin/LYNX Test Sidechain.vst3" "$PWD/sc.txt" || true
+          cat sc.txt
+          grep -q '^result=OK' sc.txt && grep -q '^plugin_crashes=0' sc.txt
