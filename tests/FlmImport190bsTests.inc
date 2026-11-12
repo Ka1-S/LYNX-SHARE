@@ -10,6 +10,7 @@
 namespace flm190bs
 {
 using namespace flm182c;
+using Bytes = flm182c::Bytes; // (tests.cpp has a Bytes of its own in its unnamed namespace: name it here)
 
 struct Pad
 {

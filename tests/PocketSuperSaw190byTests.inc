@@ -1,6 +1,8 @@
 // Round 190by: Pocket SuperSaw (core/PocketSuperSaw.h), LYNX's engine for FL Studio Mobile's SuperSaw module (type 23).
 // Uses the .flm builders of FlmImport182cTests.inc. No data file is needed: every test runs everywhere.
 
+#include "core/PocketSuperSaw.h"
+
 namespace saw190by
 {
 namespace ps = lynx::pocketsaw;
