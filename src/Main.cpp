@@ -4,6 +4,7 @@
 
 #include "core/KeyGuess.h"
 #include "core/Groove.h"
+#include "core/DrawMode.h"
 #include "core/SessionOps.h"
 #include "ui/ClipGridComponent.h"
 #include "ui/SessionMixer.h"
@@ -2034,6 +2035,16 @@ public:
             // swap and its undo, a duplicate, and the Browser's collections (STARRED tab, the Collections menu, a search
             // by a collection's name). Writes prefix-checks.txt.
             runLiveShot190ce (args[args.indexOf ("--liveshot190ce") + 1].unquoted());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--drawshot190ef"))
+        {
+            // LYNX.exe --drawshot190ef prefix: round 190ef off-screen, in the Clip-launch workflow: Draw Mode in an
+            // automation lane, steps at the grid width and an Alt (no grid) freehand stroke drawn through the Playlist's
+            // own mouse handlers, and the Options menu with "Draw Mode". Writes prefix-checks.txt.
+            runDrawShot190ef (args[args.indexOf ("--drawshot190ef") + 1].unquoted());
             quit();
             return;
         }
@@ -16641,6 +16652,150 @@ private:
         store = {};
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
         lib.deleteRecursively();
+    }
+
+    void runDrawShot190ef (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto write = [&prefix] (juce::Component& c, const char* name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (c), out);
+        };
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+
+        ui.setVisible (true);
+        ui.setClipLaunchWorkflow (true);
+        ui.setClipGridView (lynx::PlaylistArea::GridView::song);
+        ui.showPanelsForSnapshot ({ lynx::workspace::Panel::playlist });
+        lynx::autolanes::setShown (true);
+        offline.editSong ([] (lynx::Song& s) {
+            if (s.mixer.size() < 4)
+                s.mixer.resize (4);
+            s.mixer[1].name = "Bass";
+            s.mixer[2].name = "Pad";
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 6));
+            s.playlistTracks[0].name = "Bass";
+            s.playlistTracks[0].mode = lynx::PlaylistTrackMode::audio;
+            s.playlistTracks[0].mixerTrack = 1;
+            s.playlistTracks[1].name = "Pad";
+            s.playlistTracks[1].mode = lynx::PlaylistTrackMode::audio;
+            s.playlistTracks[1].mixerTrack = 2;
+        }, false);
+        lynx::createAutomationLane (offline, { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 }, 0);
+        lynx::createAutomationLane (offline, { lynx::AutomationTargetKind::mixerPan, 2, 0, 0 }, 1);
+        offline.editSong ([] (lynx::Song& s) {
+            for (int t = 0; t < 2; ++t)
+                if (! s.playlistTracks[(std::size_t) t].lanes.empty())
+                    s.playlistTracks[(std::size_t) t].lanes[0].height = 110;
+        }, false);
+        offline.dispatchPendingMessages();
+        auto& playlist = ui.getPlaylistForSnapshot();
+        playlist.setViewForSnapshot (180.0, 0, 0);
+        ui.resized();
+        offline.dispatchPendingMessages();
+
+        const auto& song = offline.getSong();
+        const auto laneA = song.playlistTracks[0].lanes.empty() ? -1 : song.playlistTracks[0].lanes[0].automation;
+        const auto laneB = song.playlistTracks[1].lanes.empty() ? -1 : song.playlistTracks[1].lanes[0].automation;
+        check ("two lanes made", laneA >= 0 && laneB >= 0);
+        if (laneA < 0 || laneB < 0)
+        {
+            juce::File (prefix + "-checks.txt").replaceWithText (checks);
+            return;
+        }
+        write (ui, "00-lanes-before");
+        const auto before = song.automations[(std::size_t) laneA].points;
+
+        // a drag through the Playlist's own handlers (the events a real mouse sends)
+        auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const auto now = juce::Time::getCurrentTime();
+        const auto stroke = [&] (int track, const std::vector<juce::Point<float>>& path, juce::ModifierKeys extra) {
+            const juce::ModifierKeys mods (juce::ModifierKeys::leftButtonModifier | extra.getRawFlags());
+            const auto event = [&] (juce::Point<float> p, juce::ModifierKeys m, bool dragged) {
+                return juce::MouseEvent (source, p, m, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &playlist, &playlist, now, path.front(), now, 1, dragged);
+            };
+            juce::ignoreUnused (track);
+            // (the engine joins the edits of one press into one undo step while a button is down)
+            const auto held = juce::ModifierKeys::currentModifiers;
+            juce::ModifierKeys::currentModifiers = mods;
+            playlist.mouseDown (event (path.front(), mods, false));
+            for (std::size_t i = 1; i < path.size(); ++i)
+                playlist.mouseDrag (event (path[i], mods, true));
+            juce::ModifierKeys::currentModifiers = held;
+            playlist.mouseUp (event (path.back(), extra, true));
+        };
+        const auto bodyA = playlist.laneBodyForSnapshot (0, 0), bodyB = playlist.laneBodyForSnapshot (1, 0);
+        const auto bar = (double) (4 * lynx::ppq);
+        const auto x = [&] (double bars) { return (float) playlist.xOfTickForSnapshot (bars * bar); };
+        const auto y = [] (juce::Rectangle<float> body, float v) { return body.getBottom() - v * body.getHeight(); };
+
+        lynx::drawmode::set (true);
+        // steps: a rise over bar 1 and a fall over bar 2, at the Playlist's grid (Line, at this zoom)
+        std::vector<juce::Point<float>> steps;
+        for (int k = 0; k <= 16; ++k)
+            steps.push_back ({ x (1.0 + k / 16.0) + 2.0f, y (bodyA, 0.15f + 0.05f * (float) k) });
+        for (int k = 0; k <= 16; ++k)
+            steps.push_back ({ x (2.0 + k / 16.0) + 2.0f, y (bodyA, 0.95f - 0.05f * (float) k) });
+        stroke (0, steps, {});
+        const auto& afterSteps = offline.getSong().automations[(std::size_t) laneA].points;
+        check ("Draw Mode drag made steps (" + juce::String ((int) afterSteps.size()) + " points)", afterSteps.size() > before.size() + 4);
+        bool unchangedOutside = true;
+        for (double t = 0.0; t < 6.0 * bar; t += 37.0)
+            if ((t < bar - 1.0 || t > 3.1 * bar) && std::abs (lynx::automationCurveAt (before, t) - lynx::automationCurveAt (afterSteps, t)) > 1.0e-4f)
+                unchangedOutside = false;
+        check ("the curve outside the drawn bars is unchanged", unchangedOutside);
+        {
+            // flat inside each drawn cell: the values in a cell's first and last tick are the same
+            int flatCells = 0, cells = 0;
+            for (double t = bar; t < 3.0 * bar; t += lynx::ppq / 4.0)
+            {
+                ++cells;
+                if (std::abs (lynx::automationCurveAt (afterSteps, t + 1.0) - lynx::automationCurveAt (afterSteps, t + lynx::ppq / 4.0 - 1.0)) < 1.0e-5f)
+                    ++flatCells;
+            }
+            check ("each sixteenth inside bars 2-3 is flat (" + juce::String (flatCells) + " / " + juce::String (cells) + ")", flatCells == cells);
+        }
+        // freehand: Alt (no grid) on the pad's pan lane, a wave over bars 1-4
+        const auto panBefore = offline.getSong().automations[(std::size_t) laneB].points;
+        std::vector<juce::Point<float>> wave;
+        for (int k = 0; k <= 60; ++k)
+            wave.push_back ({ x (1.0 + 3.0 * k / 60.0), y (bodyB, 0.5f + 0.4f * std::sin ((float) k * 0.3f)) });
+        stroke (1, wave, juce::ModifierKeys (juce::ModifierKeys::altModifier));
+        const auto& pan = offline.getSong().automations[(std::size_t) laneB].points;
+        check ("Alt drag drew freehand (" + juce::String ((int) pan.size()) + " points)", pan.size() > 30);
+        playlist.repaint();
+        write (ui, "01-draw-mode-steps-and-freehand");
+        if (auto* parent = playlist.getParentComponent())
+            write (*parent, "01b-playlist");
+
+        // one stroke is one undo step
+        offline.undo();
+        check ("one undo takes the whole freehand stroke back", offline.getSong().automations[(std::size_t) laneB].points == panBefore);
+
+        // Draw Mode off: the same press adds one point, as before
+        lynx::drawmode::set (false);
+        const auto countOff = offline.getSong().automations[(std::size_t) laneA].points.size();
+        stroke (0, { { x (4.5), y (bodyA, 0.8f) } }, {});
+        check ("Draw Mode off: a press adds one point", offline.getSong().automations[(std::size_t) laneA].points.size() == countOff + 1);
+
+        // the Options menu (Clip-launch layout) with the switch
+        lynx::drawmode::set (true);
+        {
+            const auto names = ui.getMenuNamesForSnapshot();
+            const auto index = names.indexOf (TRANS ("Options"));
+            if (index >= 0)
+                saveMenus (juce::StringArray { "Options" }, std::vector<juce::PopupMenu> { ui.getMenuForSnapshot (index) }, prefix + "-02-options-menu.png");
+            check ("Options menu found", index >= 0);
+        }
+        lynx::drawmode::set (false);
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
     void runLiveShot190dr (const juce::String& prefix)

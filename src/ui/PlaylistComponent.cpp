@@ -1,4 +1,5 @@
 #include "core/FlCurve.h"
+#include "core/DrawMode.h"
 #include "ui/CleanVoiceMenu.h"
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
@@ -2867,6 +2868,22 @@ bool PlaylistComponent::laneMouseDown (const juce::MouseEvent& e)
     const auto point = lanePointAt (hit.track, hit.lane, e.getPosition());
     const auto body = laneBody (hit.track, hit.lane);
 
+    // round 190ef, Draw Mode (the Clip-launch layout's B, core/DrawMode.h): a press draws the cell under the mouse at the
+    // grid width, a drag goes on drawing (freehand without a grid or with Alt, the Playlist's "no snap"); the right button
+    // keeps its point menu
+    if (drawmode::isOn() && ! flmods::popup (e.mods) && e.mods.isLeftButtonDown())
+    {
+        laneTrack = hit.track;
+        laneIndex = hit.lane;
+        setSelection ({});
+        drag = Drag::laneDraw;
+        drawFreehand = grid::resolve (snapBox).kind == grid::Kind::none || gridTicks() <= 1 || e.mods.isAltDown();
+        drawTick = juce::jmax<std::int64_t> (0, (std::int64_t) std::floor (xToTick (e.x)));
+        drawValue = laneValueOf (a, juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight())));
+        laneDrawTo (e);
+        return true;
+    }
+
     if (flmods::popup (e.mods) || (e.mods.isAltDown() && point >= 0)) // on a point: delete it (FL's Alt+click too)
     {
         if (point >= 0 && points.size() > 1)
@@ -2916,6 +2933,34 @@ bool PlaylistComponent::laneMouseDown (const juce::MouseEvent& e)
     drag = Drag::lanePoint;
     autoPoint = added;
     return true;
+}
+
+// round 190ef: one move of a Draw Mode drag, from the last position to the mouse (one undo step per press: editSong
+// joins the edits made while the button is held)
+void PlaylistComponent::laneDrawTo (const juce::MouseEvent& e)
+{
+    const auto a = laneAutomation (laneTrack, laneIndex);
+    if (a < 0)
+        return;
+    const auto body = laneBody (laneTrack, laneIndex);
+    const auto tick = juce::jmax<std::int64_t> (0, (std::int64_t) std::floor (xToTick (e.x)));
+    const auto value = laneValueOf (a, juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight())));
+    const auto from = drawTick;
+    const auto fromValue = drawValue;
+    if (drawFreehand)
+        engine.editSong ([a, from, fromValue, tick, value] (Song& s) {
+            drawmode::drawLine (s.automations[(std::size_t) a].points, from, fromValue, tick, value);
+        });
+    else
+    {
+        const auto steps = drawmode::stepsAlong (from, fromValue, tick, value, gridTicks());
+        engine.editSong ([a, steps] (Song& s) {
+            for (const auto& step : steps)
+                drawmode::drawStep (s.automations[(std::size_t) a].points, step.cell.from, step.cell.to, step.value);
+        });
+    }
+    drawTick = tick;
+    drawValue = value;
 }
 
 // round 190cg: a tempo lane shows the song's own range (Song::tempoViewLow / High, the reference's lowest / highest BPM
@@ -4504,6 +4549,10 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             repaint();
             return;
 
+        case Drag::laneDraw:
+            laneDrawTo (e);
+            return;
+
         case Drag::lanePoint:
         {
             const auto a = laneAutomation (laneTrack, laneIndex);
@@ -4964,6 +5013,9 @@ void PlaylistComponent::postDragHint()
         case Drag::warpMarker: hint.text = tr ("Moving the warp marker: the audio around it stretches  [Alt] no snap"); break;
         case Drag::autoPoint: hint.text = tr ("Moving the point: then [Shift] keeps time  [Ctrl] keeps value"); break;
         case Drag::autoTension: hint.text = tr ("Bending the segment: drag up / down  [Ctrl] fine"); break;
+        case Drag::laneDraw:
+            hint.text = drawFreehand ? tr ("Draw Mode: drawing freehand") : tr ("Draw Mode: drawing steps at the grid width  [Alt] freehand");
+            break;
         case Drag::lanePoint:
         case Drag::laneTension:
         {
@@ -8242,8 +8294,11 @@ void PlaylistComponent::updateCursor (juce::ModifierKeys mods)
     }
     if (const auto lane = laneAt (p); lane.track >= 0) // round 177b
     {
-        setMouseCursor (p.x >= headerWidth && lanePointAt (lane.track, lane.lane, p) >= 0 ? juce::MouseCursor::DraggingHandCursor
-                                                                                           : juce::MouseCursor::NormalCursor);
+        if (p.x >= headerWidth && drawmode::isOn()) // round 190ef: Draw Mode's pencil
+            setMouseCursor (editorCursor (gesture::Cursor::draw));
+        else
+            setMouseCursor (p.x >= headerWidth && lanePointAt (lane.track, lane.lane, p) >= 0 ? juce::MouseCursor::DraggingHandCursor
+                                                                                               : juce::MouseCursor::NormalCursor);
         return;
     }
     if (hover.header)
@@ -8277,7 +8332,8 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     {
         const auto a = laneAutomation (lane.track, lane.lane);
         hint.text = p.x < headerWidth ? tr ("Automation lane: [RMB] lane menu  [2xLMB] edit the points")
-                                      : tr ("Automation lane: [LMB] add or drag a point  [RMB] deletes a point  [Alt] drag bends the line  [Shift] adds on the line");
+                    : drawmode::isOn() ? tr ("Automation lane, Draw Mode: [LMB] drag draws steps at the grid width  [Alt] freehand  [RMB] deletes a point")
+                                       : tr ("Automation lane: [LMB] add or drag a point  [RMB] deletes a point  [Alt] drag bends the line  [Shift] adds on the line");
         hint.hasMenu = true;
         if (a >= 0)
         {

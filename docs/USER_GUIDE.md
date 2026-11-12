@@ -64,6 +64,10 @@ In the clip grid (Clip-launch workflow):
   a groove file you own), then pick it for a MIDI clip in the slot's menu › Groove. The clip plays through it without
   changing its notes. Each groove has Base, Quantize, Timing, Random and Velocity; **Global Amount** scales all grooves
   (0 to 130 %). **Commit groove** writes the result into the notes; **Extract groove** makes a groove from a clip.
+- **Draw Mode** (B, or Options › Draw Mode, in the Clip-launch layout): a drag in an automation lane draws steps as wide
+  as the Playlist's grid, each one at the height the mouse had over it; with the grid off (or Alt held) it draws
+  freehand. The automation outside what you drew stays as it was, and each stroke is one undo step. Press B again to go
+  back to adding and moving points. In the other layouts B stays the brush tool.
 
 ## Online sessions: make a song with a friend (phase 1, packages)
 
