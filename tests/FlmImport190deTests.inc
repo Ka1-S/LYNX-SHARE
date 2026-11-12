@@ -466,3 +466,122 @@ TEST (flm190de_dw_sampler_import_and_sound)
     CHECK (std::abs (y[4410] - at (0.1)) < 2e-3 && std::abs (y[22050] - at (0.5)) < 2e-3 && std::abs (y[33075] - 0.5f) < 2e-3f);
     CHECK (peak (z) == 0.0f);
 }
+
+// --- Pitcher / Pitcher 2 → LYNX Tune (FLM_FORMAT §7.6) and the Slicer (§7.7)
+#include "core/FlmSlicer.h"
+#include "core/LynxTune.h"
+
+TEST (flm190de_pitchers_become_lynx_tune)
+{
+    using namespace lynx;
+    namespace t = flm190de;
+    namespace lt = lynxtune;
+    // Pitcher: CSTM mask = C D E G A (a pentatonic), Speed 0.5, Pitch +5 (0.71), Mix 0.8, BYP on E
+    std::vector<float> p1 (23, 0.0f);
+    p1[0] = 1.0f, p1[1] = 0.5f, p1[2] = 0.71f, p1[3] = 0.5f, p1[7] = 0.5f, p1[9] = 0.8f, p1[14] = 1.0f;
+    flm182c::Bytes mask { 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0 };
+    flm182c::f32 (mask, 0.0f), flm182c::f32 (mask, 0.5f);
+    // Pitcher 2: its defaults (C minor) with Speed 0.25 and Formant Mode 0 (= formant correction on)
+    std::vector<float> p2 (27, 0.0f);
+    p2[0] = 1.0f;
+    for (const int k : { 1, 3, 4, 6, 8, 9, 11 })
+        p2[(std::size_t) k] = 1.0f;
+    p2[13] = 0.25f, p2[17] = 0.5f, p2[18] = 1.0f, p2[19] = 0.5f, p2[22] = 1.0f, p2[23] = 0.5f;
+    const auto bytes = flm190bs::song ({ t::rack (flm::kindMaster, {}),
+                                         t::rack (flm::kindNormal, { t::moduleWith (25, 2, p1, {}, mask), t::moduleWith (45, 3, p2) }),
+                                         t::channel (flm::kindMaster, "MASTER", 0, {}), t::channel (flm::kindNormal, "Voice", 1, {}) });
+    FlpImportReport report;
+    const auto s = importFlm (bytes, flm190bs::anyFile (&report));
+    CHECK (s.has_value());
+    if (! s)
+        return;
+    const auto& fx = s->mixer[1].effects;
+    CHECK (fx.size() == 2 && fx[0].kind == EffectKind::lynxTune && fx[1].kind == EffectKind::lynxTune);
+    if (fx.size() != 2)
+        return;
+    const auto& a = fx[0].params;
+    CHECK (a[lt::scale] == 1.0f && a[lt::noteC] == 1.0f && a[lt::noteC + 1] == 0.0f && a[lt::noteC + 4] == 1.0f && a[lt::noteC + 7] == 1.0f
+           && a[lt::noteC + 11] == 0.0f);
+    // Speed 0.5: τ = (3·0.125 + 0.001) / 8.82 s = 42.63 ms → retune √(42.63 / 400)
+    CHECK (std::abs (a[lt::retune] - 0.32646f) < 1e-4f);
+    CHECK (std::abs (a[lt::transpose] - (5.0f + 12.0f) / 24.0f) < 1e-6f && std::abs (a[lt::mix] - 0.8f) < 1e-6f);
+    CHECK (a[lt::bypassC + 4] == 1.0f && a[lt::bypassC] == 0.0f && a[lt::correction] == 1.0f && std::abs (a[lt::reference] - 0.5f) < 1e-6f);
+    const auto& b = fx[1].params;
+    CHECK (b[lt::noteC] == 1.0f && b[lt::noteC + 2] == 1.0f && b[lt::noteC + 3] == 1.0f && b[lt::noteC + 4] == 0.0f && b[lt::noteC + 10] == 1.0f
+           && b[lt::noteC + 11] == 0.0f);
+    CHECK (b[lt::formantPreserve] == 1.0f && std::abs (b[lt::toleranceCents] - 0.55f) < 1e-6f && b[lt::mix] == 1.0f);
+    // Speed 0.25: fc = (200^0.25 − 0.9)·2.29896 = 6.576 Hz → 5.30 / (2π fc) = 128.3 ms
+    CHECK (std::abs (b[lt::retune] - 0.5663f) < 2e-3f);
+    CHECK (report.converted.count ("FL Studio Mobile: Pitcher (LYNX Tune)") == 1 && report.converted.count ("FL Studio Mobile: Pitcher 2 (LYNX Tune)") == 1
+           && report.droppedEffects.empty());
+}
+
+TEST (flm190de_slicer_detects_and_plays)
+{
+    using namespace lynx;
+    namespace t = flm190de;
+    // four hits of noise (60 ms each, decaying) at 0, 0.25, 0.5, 0.75 s in silence
+    SampleData d;
+    d.sampleRate = 44100.0;
+    d.left.assign (44100, 0.0f);
+    std::uint32_t seed = 1;
+    for (const int at : { 0, 11025, 22050, 33075 })
+        for (int i = 0; i < 2646 * 2; ++i)
+        {
+            seed = seed * 1664525u + 1013904223u;
+            d.left[(std::size_t) (at + i)] = ((float) (seed >> 8) / 16777216.0f - 0.5f) * std::exp (-(float) i / 900.0f);
+        }
+    const auto starts = flmslicer::slices (d, 0.25f);
+    CHECK (starts.size() == 4);
+    if (starts.size() == 4)
+        CHECK (starts[0] == 0 && std::abs (starts[1] - 11025) < 64 && std::abs (starts[2] - 22050) < 64 && std::abs (starts[3] - 33075) < 64);
+    d.markerStarts = { 0, 22050 };
+    CHECK (flmslicer::slices (d, 0.0f) == std::vector<std::int64_t> ({ 0, 22050 }));
+
+    // the module: SENS 0.25, PATH, key range 48…51; key 49 plays the second slice
+    flm182c::Bytes cstm;
+    flm182c::Bytes sens;
+    flm182c::f32 (sens, 0.25f);
+    sens.push_back (1);
+    const auto senc = flm182c::chunk ("SENS", sens);
+    flm182c::put (cstm, senc.data(), senc.size());
+    flm182c::Bytes path;
+    const std::string where = std::string ("@R@") + '\0' + "Loop Samples\\Sliced Drums\\Hits.wav";
+    flm182c::u32 (path, (std::uint32_t) where.size());
+    flm182c::put (path, where.data(), where.size());
+    const auto pathc = flm182c::chunk ("PATH", path);
+    flm182c::put (cstm, pathc.data(), pathc.size());
+    const auto bytes = flm190bs::song ({ t::rack (flm::kindMaster, {}),
+                                         t::rack (flm::kindNormal, { t::moduleWith (33, 2, { 1.0f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f }, {}, cstm, {}, 48, 51) }),
+                                         t::channel (flm::kindMaster, "MASTER", 0, {}),
+                                         t::channel (flm::kindNormal, "Slices", 1, { t::lane (0, "Slices", { t::clip (0, 4, 4, 0, 1, { { 0, 1, 49, 255 } }) }) }) });
+    FlpImportReport report;
+    const auto s = importFlm (bytes, flm190bs::anyFile (&report));
+    CHECK (s.has_value());
+    if (! s)
+        return;
+    const auto* c = flm182c::channelNamed (*s, "Slices");
+    CHECK (c != nullptr && flmslicer::isChannel (*c) && c->samplePath == "C:/FLM/Loop Samples/Sliced Drums/Hits.wav" && c->modelParams[1] == 0.25f
+           && c->modelParams[2] == 48.0f && c->keyLow == 48 && c->keyHigh == 51);
+    CHECK (report.converted.count ("FL Studio Mobile: Slicer (FLM's engine)") == 1);
+    // play it on the hits: the second slice (one-shot, SUST 0) sounds for about a quarter second, then stops
+    auto inst = flmslicer::makeInstrument (std::make_shared<SampleData> (d));
+    inst->prepare (44100.0);
+    inst->configure (*c, 120.0);
+    inst->settleNew();
+    std::vector<float> l (44100, 0.0f), r (44100, 0.0f);
+    inst->noteOn (49, 1.0f);
+    inst->render (l.data(), r.data(), 44100, 1.0f, 1.0f);
+    int last = -1;
+    float first = 0.0f;
+    for (int i = 0; i < 44100; ++i)
+        if (std::abs (l[(std::size_t) i]) > 1e-4f)
+        {
+            last = i;
+            if (first == 0.0f)
+                first = (float) i;
+        }
+    // (at the slice's end the voice fades at 0.01 per sample while it reads on into the next hit: ~690 samples)
+    CHECK (first < 64.0f && last > 11025 + 400 && last < 11025 + 800);
+    CHECK (std::abs (l[100] - d.left[(std::size_t) (starts.size() == 4 ? starts[1] : 0) + 100]) < 0.05f);
+}

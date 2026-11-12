@@ -60,6 +60,7 @@ add_library(lynx_core STATIC
     src/core/FlmEffects.cpp
     src/core/FlmNoteFx.cpp
     src/core/FlmDwSampler.cpp
+    src/core/FlmSlicer.cpp
     src/core/AlsExport.cpp
     src/flp/FlpWrite.cpp
     src/core/Effects.cpp

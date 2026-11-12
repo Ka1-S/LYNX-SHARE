@@ -11,6 +11,7 @@
 
 #include "core/DirectWave.h"
 #include "core/FlmDwSampler.h"
+#include "core/FlmSlicer.h"
 #include "core/FlmEffects.h"
 #include "core/FlmNoteFx.h"
 #include "core/FlmPad.h"
@@ -689,6 +690,9 @@ std::optional<GeneratorLaneTarget> generatorLaneTarget (const Song& song, int in
                 out = engine (param - 1, same);
             break;
         case InstrumentKind::sampler:
+            if (flmslicer::isChannel (c) && param >= 1 && param < flmslicer::paramCount) // FLM's Slicer: its own values
+                out = GeneratorLaneTarget { { AutomationTargetKind::channelParam, index, 0, flmdw::automationBase + param },
+                                            [] (float v) { return std::clamp (v, 0.0f, 1.0f); } };
             if (flmdw::isChannel (c) && param < flmdw::paramCount) // FLM's DW Sampler: its own values
                 out = GeneratorLaneTarget { { AutomationTargetKind::channelParam, index, 0, flmdw::automationBase + param },
                                             [] (float v) { return std::clamp (v, 0.0f, 1.0f); } };
@@ -1069,6 +1073,60 @@ bool dwSamplerState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
         ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: DW Sampler without a sample (silent, as in FLM)");
     return true;
 }
+
+// FLM's Slicer → FLM's own engine (core/FlmSlicer.h, FLM_FORMAT §7.7) on a Sampler channel: the CSTM's SENS (the
+// detector's sensitivity; 0 = the file's markers) and PATH (the sample); slice 0 plays on the module's low key (FLM
+// saves the key range it gave the slices)
+bool slicerState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
+{
+    const auto& b = m.custom;
+    const auto u32 = [&b] (std::size_t at) {
+        std::uint32_t v = 0;
+        for (int k = 0; k < 4; ++k)
+            v |= (std::uint32_t) b[at + (std::size_t) k] << (8 * k);
+        return v;
+    };
+    float sensitivity = 0.25f;
+    std::string root, rel;
+    for (std::size_t at = 0; at + 8 <= b.size();)
+    {
+        const auto size = (std::size_t) u32 (at + 4);
+        if (at + 8 + size > b.size())
+            break;
+        if (std::memcmp (b.data() + at, "SENS", 4) == 0 && size >= 4)
+            std::memcpy (&sensitivity, b.data() + at + 8, 4);
+        else if (std::memcmp (b.data() + at, "PATH", 4) == 0 && size >= 4)
+        {
+            const auto n = std::min<std::size_t> (u32 (at + 8), size - 4);
+            std::string text ((const char*) b.data() + at + 12, n);
+            if (text.size() >= 4 && text[0] == '@' && text[2] == '@' && text[3] == '\0')
+                root = text.substr (0, 3), text = text.substr (4);
+            if (const auto zero = text.find ('\0'); zero != std::string::npos)
+                text.resize (zero);
+            std::replace (text.begin(), text.end(), '\\', '/');
+            rel = text;
+        }
+        at += 8 + size;
+    }
+    if (rel.empty())
+        return false;
+    std::vector<std::string> candidates;
+    if (root == "@R@" && ! ctx.options.resourceRoot.empty())
+        candidates.push_back (joinPath (ctx.options.resourceRoot, rel));
+    else if (root == "@L@")
+        candidates.push_back (joinPath (ctx.options.common.projectFolder, rel));
+    for (const auto& d : ctx.deviceCandidates (rel))
+        candidates.push_back (d);
+    if (root.empty())
+        candidates.push_back (rel);
+    candidates.push_back (joinPath (ctx.options.common.projectFolder, pathFileName (rel)));
+    c.instrument = InstrumentKind::sampler;
+    c.samplePath = ctx.resolve (candidates, c.name);
+    c.volume = 1.0f;
+    c.modelParams = flmslicer::channelParams (m.params, std::isfinite (sensitivity) ? sensitivity : 0.25f, m.keyLow);
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: Slicer (FLM's engine)");
+    return true;
+}
 // --- end of round 190de --------------------------------------------------------------------------------------------
 
 // The channel playing one of a rack's generators (F1: FLM's DW Sampler with one sample → a sampler, F3; any other
@@ -1119,6 +1177,8 @@ ChannelDef instrumentChannel (Ctx& ctx, const flm::Module* gen, const flm::Chann
     if (gen->type == flm::module::soundFont && soundFontState (ctx, *gen, c))
         return c;
     if (gen->type == flm::module::superSaw && superSawState (ctx, *gen, c)) // round 190by
+        return c;
+    if (gen->type == flm::module::slicer && slicerState (ctx, *gen, c)) // round 190de
         return c;
     ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: " + moduleLabel (gen->type) + (gen->type == flm::module::dwSampler ? " (multisample)" : ""));
     return c;
