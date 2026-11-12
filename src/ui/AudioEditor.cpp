@@ -1331,7 +1331,7 @@ public:
     // round 190ee: a marker's menu (with its Trigger note submenu) and FL's snap mode, for the off-screen checks
     juce::PopupMenu markerMenuForSnapshot (int index) { return juce::isPositiveAndBelow (index, (int) doc.markers.size()) ? markerMenu (index) : juce::PopupMenu(); }
     void setSnapForSnapshot (int mode) { setSnapMode (mode); }
-    juce::String snapTooltipForSnapshot() const { return snapButton.getTooltip() + (snapButton.getToggleState() ? " [on]" : " [off]"); }
+    juce::String snapTooltipForSnapshot() { return snapButton.getTooltip() + (snapButton.getToggleState() ? " [on]" : " [off]"); }
     std::int64_t snapFrameForSnapshot (std::int64_t f) const { return snapFrame (f); }
 
     // --- layout and painting ---------------------------------------------------------------------------------

@@ -753,7 +753,7 @@
             const auto b = r.reduced (1.0f * s);
             g.setColour (colour::bg3);
             g.fillRoundedRectangle (b, 3.0f * s);
-            g.setColour (fx.enabled ? colour::text : colour::textDisabled);
+            g.setColour (fx.enabled ? colour::textPrimary : colour::textDisabled);
             for (int i = 0; i < 3; ++i)
                 g.fillRect (juce::Rectangle<float> (b.getWidth() * 0.5f, 1.6f * s).withCentre ({ b.getCentreX(), b.getCentreY() + (float) (i - 1) * 4.0f * s }));
             return;
