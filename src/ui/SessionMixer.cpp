@@ -345,7 +345,7 @@ double SessionMixerComponent::valueFor (const Hit& hit) const
         case Part::fader: return m.volume;
         case Part::pan: return m.pan;
         case Part::send: return std::max (0.0f, sessionmixer::sendPosition (song, insert, hit.row < (int) rows.size() ? rows[(std::size_t) hit.row] : 0));
-        case Part::delay: return sessionmixer::trackDelayMs (song, insert);
+        case Part::delay: return sessionmixer::trackDelayMs (song, insert) + 0.0; // (+ 0.0: no "-0.00")
         default: break;
     }
     return 0.0;
@@ -473,7 +473,7 @@ void SessionMixerComponent::paintStrip (juce::Graphics& g, int column)
         const auto y = sections.io + sections.sends;
         drawLabel (g, { x0 + pad, y + 4, w - 2 * pad, 12 }, tr ("Track Delay"));
         const auto box = partBounds (column, Part::delay);
-        drawBox (g, box, juce::String (sessionmixer::trackDelayMs (song, strip.insert), 2), false, hot (Part::delay));
+        drawBox (g, box, juce::String (sessionmixer::trackDelayMs (song, strip.insert) + 0.0, 2), false, hot (Part::delay));
         g.setColour (c::textSecondary);
         g.setFont (theme::font (theme::type::caption));
         g.drawText ("ms", juce::Rectangle<int> (box.getRight() + 3, box.getY(), 18, box.getHeight()), juce::Justification::centredLeft, false);

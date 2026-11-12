@@ -265,7 +265,7 @@ struct Sections
     int io = 0, sends = 0, trackOptions = 0, volume = 0;
     int total() const noexcept { return io + sends + trackOptions + volume; }
 };
-constexpr int ioHeight = 96, sendRowHeight = 26, trackOptionsHeight = 40, volumeHeight = 120;
+constexpr int ioHeight = 112, sendRowHeight = 26, trackOptionsHeight = 40, volumeHeight = 120;
 inline Sections sectionHeights (const SessionMixerView& view, int sendRowCount, int available)
 {
     Sections s;

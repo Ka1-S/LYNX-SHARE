@@ -16158,6 +16158,7 @@ private:
         lynx::DetailView::shownSetting = true;
         lynx::DetailView::devicesPage = false;
         ui.setClipLaunchWorkflow (true);
+        ui.showPanelsForSnapshot ({ lynx::workspace::Panel::browser, lynx::workspace::Panel::playlist });
         ui.getPlaylistForSnapshot().addAudioClipAtPlayhead (wav);
         offline.dispatchPendingMessages();
         int audioChannel = -1;
@@ -16246,6 +16247,7 @@ private:
                     }
             if (audioChannel >= 0)
             {
+                lynx::clipsample::setWarp (s, audioChannel, true, 4.0); // (Warp on, as a dropped loop in Live)
                 audio.track = 4;
                 audio.start = 0;
                 lynx::launcher::setClip (s, 4, 0, audio);
