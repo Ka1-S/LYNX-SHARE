@@ -8,7 +8,7 @@
 <p>FL Studio의 제너레이터와 이펙트는 로드되지 않습니다. LYNX SHARE는 저장된 설정을 읽어 새로 만든 엔진으로 재생합니다. 각 엔진에는 품질 단계가 있으며, 테스트한 모든 상태에서 원본과 비트 단위로 같은 <code>Exact</code>부터 <code>Placeholder</code>(설정은 유지되지만 플러그인이 무음이거나 오디오를 그대로 통과시킴)까지입니다. 단계 설명은 <a href="/wiki/coming-from-fl-studio/">FL Studio에서 넘어오기</a>에 있습니다.</p>
 <p><code>.flp</code> 파일은 FL Studio가 설치되어 있지 않아도 열립니다. 일부 엔진은 웨이브, 샘플, 임펄스가 필요하며, 이는 실행 중에 사용자의 FL Studio 설치 폴더에서 읽어 옵니다.</p>
 <h2 id="missing-samples">누락된 샘플</h2>
-<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" alt="Samples 탭의 누락된 파일 창: 찾은 파일은 녹색, 없는 파일은 호박색이며 Search folder, Locate, Skip이 있다" loading="lazy" width="760" height="560"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" srcset="/assets/img/wiki/missing-files.webp 1x, /assets/img/wiki/missing-files@2x.webp 2x" alt="Samples 탭의 누락된 파일 창: 찾은 파일은 녹색, 없는 파일은 호박색이며 Search folder, Locate, Skip이 있다" loading="lazy" width="760" height="560"></a></figure>
 <p><code>샘플</code> 탭에는 찾지 못한 모든 샘플이 저장된 경로와 사용하는 곳과 함께 나열됩니다.</p>
 <div class="tablewrap"><table><thead><tr><th>명령</th><th>동작</th></tr></thead><tbody><tr><td><code>폴더 검색...</code></td><td>폴더와 그 하위 폴더에서 누락된 모든 샘플을 검색합니다</td></tr><tr><td><code>찾기...</code></td><td>샘플 하나의 위치를 묻습니다. 같은 폴더에서 발견된 다른 샘플도 함께 연결됩니다</td></tr><tr><td><code>건너뛰기</code></td><td>그 샘플을 제외합니다. 해당 채널은 무음이 됩니다</td></tr></tbody></table></div>
 <p><code>적용</code> 버튼은 찾은 파일을 사용합니다.</p>
@@ -20,7 +20,7 @@
 <p>이 스위치는 <code>옵션 › 일반 설정...</code> 메뉴의 <code>누락된 플러그인을 LYNX SHARE 대체 플러그인으로 교체</code> 옵션이며 기본값은 켜짐입니다. 끄면 누락된 이펙트의 슬롯은 믹서에서 빠집니다. 누락된 악기는 대체되지 않습니다. 채널 이름에 따라 고른 프리셋이 적용된 내장 신스가 됩니다.</p>
 <p>실제 플러그인을 되살리려면 플러그인을 설치하고 <code>옵션 › 플러그인 스캔</code> 메뉴를 선택한 다음 프로젝트를 다시 엽니다.</p>
 <h2 id="midi-files">MIDI 파일</h2>
-<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" alt="Import MIDI data 창: 트랙, 채널, 채널 유형, 옵션" loading="lazy" width="550" height="373"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" srcset="/assets/img/wiki/midi-import-dialog.webp 1x, /assets/img/wiki/midi-import-dialog@2x.webp 2x" alt="Import MIDI data 창: 트랙, 채널, 채널 유형, 옵션" loading="lazy" width="550" height="373"></a></figure>
 <p><code>파일 › 열기...</code> 메뉴는 MIDI 파일로 새 프로젝트를 만듭니다. <code>파일 › 가져오기 › MIDI 파일...</code> 메뉴는 먼저 <code>MIDI 데이터 가져오기</code> 창을 열어, 무엇을 가져올지 고를 수 있게 합니다.</p>
 <div class="tablewrap"><table><thead><tr><th>설정</th><th>동작</th></tr></thead><tbody><tr><td><code>가져올 트랙은?</code></td><td>모든 트랙 또는 트랙 하나</td></tr><tr><td><code>가져올 채널은?</code></td><td>MIDI 채널을 클릭하면 제외됩니다. 우클릭하면 그 채널만 남습니다</td></tr><tr><td><code>채널 유형</code></td><td><code>LYNX SHARE 신스</code> 또는 <code>MIDI Out</code></td></tr><tr><td><code>새 프로젝트 시작</code></td><td>빈 프로젝트로 시작합니다. 끄면 열려 있는 프로젝트에 추가합니다</td></tr><tr><td><code>트랙마다 채널 하나 만들기</code></td><td>끄면 MIDI 채널마다 채널 하나를 만듭니다</td></tr><tr><td><code>새 채널에 믹서 트랙 지정</code></td><td>새 채널을 연속된 믹서 인서트로 라우팅합니다</td></tr><tr><td><code>박자 가져오기</code></td><td>파일의 박자가 프로젝트의 박자가 됩니다</td></tr></tbody></table></div>
 <p><a href="/wiki/piano-roll/">피아노 롤</a>에서 <code>Ctrl+M</code> 키를 누르면 현재 채널로 MIDI 파일을 가져옵니다.</p>

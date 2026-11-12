@@ -1,4 +1,4 @@
-<figure><a class="shot" href="/assets/img/wiki/plugin-manager-scan.webp"><img src="/assets/img/wiki/plugin-manager-scan.webp" alt="插件管理器的下半部分，带有一条说明：每个插件文件都在独立进程中检查" loading="lazy" width="980" height="270"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/plugin-manager-scan.webp"><img src="/assets/img/wiki/plugin-manager-scan.webp" srcset="/assets/img/wiki/plugin-manager-scan.webp 1x, /assets/img/wiki/plugin-manager-scan@2x.webp 2x" alt="插件管理器的下半部分，带有一条说明：每个插件文件都在独立进程中检查" loading="lazy" width="980" height="270"></a></figure>
 <p>LYNX SHARE 可以承载其他厂商的乐器和效果器插件。它通过扫描插件文件夹来找到它们，<code>选项 › 插件管理器...</code> 会显示它找到了什么。LYNX SHARE 自己的乐器和效果器在<a href="/wiki/built-in/">内置乐器和效果器</a>中介绍。</p>
 <h2 id="scan-and-add-a-plugin">扫描并添加插件</h2>
 <ol><li>选择 <code>选项 › 扫描插件</code>。进度显示在提示栏中，你可以继续工作。</li><li>如果插件在它自己的文件夹中，请打开 <code>选项 › 插件管理器...</code>，单击 <code>插件文件夹...</code>，添加该文件夹，然后单击 <code>查找新插件</code>。</li><li>按 <code>F8</code> 打开插件选择器，输入插件名称的一部分。</li><li>双击它或按 <code>Enter</code>。乐器会变成新通道。效果器会进入所选的混音台插入轨。</li></ol>
@@ -24,7 +24,7 @@
 <h2 id="32-bit-plugins-windows-only">32 位插件（仅限 Windows）</h2>
 <p>在 Windows 上，32 位的 VST2 和 VST3 插件通过桥接程序（<code>LYNX-bridge32.exe</code>）运行。桥接不会增加延迟。在其中崩溃的插件会自行停止，而 LYNX SHARE 继续播放。桥接插件的编辑器在它自己的窗口中打开，不能停靠或固定。当一个插件同时安装了 32 位和 64 位版本时，插件窗口 <code>封装器设置</code> 中的 <code>位数</code> 决定加载哪一个。</p>
 <h2 id="plugin-performance-monitor">插件性能监视器</h2>
-<figure><a class="shot" href="/assets/img/wiki/plugin-monitor.webp"><img src="/assets/img/wiki/plugin-monitor.webp" alt="插件性能监视器：每个乐器和效果器占一行，显示其占用的处理时间份额" loading="lazy" width="720" height="380"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/plugin-monitor.webp"><img src="/assets/img/wiki/plugin-monitor.webp" srcset="/assets/img/wiki/plugin-monitor.webp 1x, /assets/img/wiki/plugin-monitor@2x.webp 2x" alt="插件性能监视器：每个乐器和效果器占一行，显示其占用的处理时间份额" loading="lazy" width="720" height="380"></a></figure>
 <p><code>工具 › 插件性能监视器...</code> 列出每个乐器和效果器所占用的处理时间：当前值、平均值和峰值。100% 表示在音频持续的整段时间里，一个处理器核心一直处于忙碌状态。</p>
 <div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>查找</code></td><td>按插件、通道或插入轨筛选</td></tr><tr><td><code>仅插件</code></td><td>隐藏 LYNX SHARE 自己的乐器和效果器</td></tr><tr><td><code>冻结</code></td><td>停止更新数字</td></tr><tr><td><code>播放时重置</code></td><td>每次开始播放时重新计算平均值和峰值</td></tr><tr><td><code>重置</code></td><td>立即清除平均值和峰值</td></tr></tbody></table></div>
 <h2 id="send-an-instrument-s-outputs-to-separate-inserts">把乐器的输出送到不同的插入轨</h2>

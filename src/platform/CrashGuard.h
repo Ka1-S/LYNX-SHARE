@@ -90,8 +90,31 @@ const char* describe (std::uint32_t code) noexcept;
 // build's map / PDB the offsets give the functions. Empty where not supported.
 std::string moduleBacktrace (int skip = 0);
 // The faulting thread's frames from a crash handler's exception pointers (Windows: EXCEPTION_POINTERS*, what JUCE's
-// crash handler receives), with the exception code and address on top; "" where not supported
+// crash handler receives), with the exception code and address on top; "" where not supported. Round 190ci: when the
+// frames do not reach the thread's first frame (see setUnwalkableFaultHandler), the words on the faulting stack that
+// point into loaded modules follow: the callers the walk could not find are among them.
 std::string exceptionBacktrace (void* exceptionPointers);
+// Round 190ci (Windows x64; nothing elsewhere). The crash handler (JUCE's setApplicationCrashHandler) is Windows'
+// top-level exception filter, which only runs after Windows has walked the faulting thread's stack to its first frame.
+// When the stack cannot be walked (code that ran off the end of a function into the next one, a smashed return
+// address), Windows' walk reads something that is not a frame and either gives up or faults itself (and the dispatch
+// of that fault faults again, until the stack is used up): the process ends without any handler having run, with no
+// crash file and no emergency save. The 0.1.26 release candidate's FPC fault was one of those. A first-chance hook
+// therefore looks at every processor fault (crashreport::processorFault) whose stack pointer is in the thread's own
+// stack and whose stack does not walk to the thread's first frame:
+// - the app's own (the fault, or its nearest caller outside Windows' modules, is in the .exe): `handler` (the function
+//   the crash handler calls) gets the fault's EXCEPTION_POINTERS* on the faulting thread, then the process ends with
+//   the fault's code, as it does after the top-level filter;
+// - anybody else's (a plugin's module, generated code) is only remembered: a plugin's copy protection may fault on
+//   purpose and handle it in a hook of its own. When the next fault of that thread is inside Windows' exception
+//   dispatch itself, nothing can handle either: `handler` gets the remembered fault and the process ends.
+// Once per run. A fault on a stack that walks is not touched: plugin guards and the top-level filter get it as always.
+// Not covered: somebody else's fault on an unwalkable stack when Windows' walk gives up without faulting.
+void setUnwalkableFaultHandler (void (*handler) (void* exceptionPointers)) noexcept;
+// --faulttest (round 190ci): ends the process by an access violation on purpose, for the test of the crash handler:
+// `unwalkable` = with the thread's stack above the fault overwritten first, so that it cannot be walked (Windows x64;
+// elsewhere a plain fault).
+[[noreturn]] void faultForTest (bool unwalkable) noexcept;
 // "module+0xoffset" of one code address ("" when unknown)
 std::string describeAddress (const void* address);
 

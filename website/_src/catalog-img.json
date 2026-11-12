@@ -14,6 +14,11 @@
 346,
 2
 ],
+"fx-audio-effect-rack": [
+900,
+560,
+2
+],
 "fx-auto-pan": [
 816,
 336,
@@ -30,8 +35,9 @@
 2
 ],
 "fx-control-surface": [
-189,
-128
+560,
+380,
+2
 ],
 "fx-crest-compressor": [
 860,
@@ -75,7 +81,8 @@
 ],
 "fx-emphasis": [
 560,
-222
+222,
+2
 ],
 "fx-emphasizer": [
 512,
@@ -113,8 +120,9 @@
 2
 ],
 "fx-formula-controller": [
-258,
-102
+592,
+234,
+2
 ],
 "fx-frequency-shifter": [
 460,
@@ -153,7 +161,8 @@
 ],
 "fx-fruity-big-clock": [
 420,
-150
+150,
+2
 ],
 "fx-fruity-blood-overdrive": [
 428,
@@ -232,7 +241,8 @@
 ],
 "fx-fruity-html-notebook": [
 560,
-460
+460,
+2
 ],
 "fx-fruity-limiter": [
 633,
@@ -271,7 +281,8 @@
 ],
 "fx-fruity-scratcher": [
 620,
-360
+360,
+2
 ],
 "fx-fruity-send": [
 317,
@@ -315,7 +326,8 @@
 ],
 "fx-hardware-insert": [
 784,
-282
+282,
+2
 ],
 "fx-horizon": [
 960,
@@ -384,11 +396,13 @@
 ],
 "fx-newtime": [
 960,
-480
+480,
+2
 ],
 "fx-newtone": [
 960,
-480
+480,
+2
 ],
 "fx-orbit": [
 470,
@@ -401,12 +415,14 @@
 2
 ],
 "fx-patcher": [
-206,
-128
+900,
+560,
+2
 ],
 "fx-peak-controller": [
 521,
-240
+240,
+2
 ],
 "fx-pitch-correction": [
 523,
@@ -421,6 +437,101 @@
 "fx-pitch-shifter": [
 744,
 306,
+2
+],
+"fx-pocket-autoduck": [
+456,
+206,
+2
+],
+"fx-pocket-chorus": [
+366,
+122,
+2
+],
+"fx-pocket-compressor": [
+456,
+206,
+2
+],
+"fx-pocket-distortion": [
+674,
+232,
+2
+],
+"fx-pocket-flanger": [
+456,
+206,
+2
+],
+"fx-pocket-gate": [
+674,
+314,
+2
+],
+"fx-pocket-leveller": [
+674,
+221,
+2
+],
+"fx-pocket-limiter": [
+674,
+244,
+2
+],
+"fx-pocket-limiter-classic": [
+674,
+244,
+2
+],
+"fx-pocket-multifx": [
+674,
+353,
+2
+],
+"fx-pocket-phaser": [
+456,
+206,
+2
+],
+"fx-pocket-spacer": [
+456,
+206,
+2
+],
+"fx-pocket-spreader": [
+375,
+122,
+2
+],
+"fx-pocket-stereoizer": [
+456,
+122,
+2
+],
+"fx-pocket-tape-delay": [
+674,
+238,
+2
+],
+"fx-pocket-trance-delay": [
+674,
+288,
+2
+],
+"fx-pocket-tremolo": [
+456,
+206,
+2
+],
+"fx-pocket-waveshaper": [
+604,
+290,
+2
+],
+"fx-pocket-wow-flutter": [
+456,
+206,
 2
 ],
 "fx-prism-multiband": [
@@ -485,11 +596,17 @@
 ],
 "fx-stereo-enhancer": [
 405,
-142
+142,
+2
 ],
 "fx-stereo-shaper": [
 363,
 342,
+2
+],
+"fx-strike-shaper": [
+580,
+754,
 2
 ],
 "fx-transient-processor": [
@@ -499,15 +616,18 @@
 ],
 "fx-transmitter": [
 620,
-458
+458,
+2
 ],
 "fx-transporter": [
 640,
-288
+288,
+2
 ],
 "fx-tuner": [
 360,
-330
+330,
+2
 ],
 "fx-utility": [
 420,
@@ -525,12 +645,14 @@
 2
 ],
 "fx-visualizer": [
-185,
-128
+960,
+665,
+2
 ],
 "fx-vocoder": [
 416,
-332
+332,
+2
 ],
 "fx-vocodex": [
 598,
@@ -548,16 +670,19 @@
 2
 ],
 "fx-wave-candy": [
-203,
-128
+760,
+480,
+2
 ],
 "fx-x-y-controller": [
-220,
-128
+592,
+344,
+2
 ],
 "fx-x-y-z-controller": [
-235,
-128
+632,
+344,
+2
 ],
 "gen-3x-osc": [
 800,
@@ -580,12 +705,14 @@
 2
 ],
 "gen-clap": [
-99,
-128
+416,
+672,
+2
 ],
 "gen-dashboard": [
-258,
-59
+580,
+132,
+2
 ],
 "gen-drumaxx": [
 960,
@@ -598,8 +725,9 @@
 2
 ],
 "gen-envelope-controller": [
-189,
-128
+752,
+508,
+2
 ],
 "gen-fl-keys": [
 800,
@@ -617,8 +745,9 @@
 2
 ],
 "gen-fruity-dance": [
-250,
-128
+656,
+446,
+2
 ],
 "gen-fruity-dx10": [
 800,
@@ -631,12 +760,14 @@
 2
 ],
 "gen-fruity-slicer": [
-150,
-128
+774,
+660,
+2
 ],
 "gen-fruity-video-player": [
-189,
-128
+620,
+420,
+2
 ],
 "gen-gms": [
 960,
@@ -654,8 +785,14 @@
 2
 ],
 "gen-hat": [
-99,
-128
+416,
+672,
+2
+],
+"gen-instrument-rack": [
+900,
+560,
+2
 ],
 "gen-kepler": [
 960,
@@ -668,25 +805,34 @@
 2
 ],
 "gen-keyboard-controller": [
-258,
-98
+760,
+290,
+2
 ],
 "gen-kick": [
-99,
-128
+416,
+672,
+2
 ],
 "gen-layer": [
-217,
-128
+592,
+350,
+2
 ],
 "gen-lynx-soundfont": [
 800,
 562,
 2
 ],
+"gen-midi-effect-rack": [
+900,
+560,
+2
+],
 "gen-midi-out": [
-203,
-128
+788,
+496,
+2
 ],
 "gen-minisynth": [
 913,
@@ -704,8 +850,9 @@
 2
 ],
 "gen-patcher": [
-206,
-128
+900,
+560,
+2
 ],
 "gen-plucked": [
 800,
@@ -732,9 +879,15 @@
 574,
 2
 ],
+"gen-slicex": [
+893,
+781,
+2
+],
 "gen-snare": [
-99,
-128
+416,
+672,
+2
 ],
 "gen-synth": [
 800,
@@ -757,36 +910,44 @@
 2
 ],
 "gen-vfx-color-mapper": [
-258,
-120
+720,
+334,
+2
 ],
 "gen-vfx-envelope": [
-201,
-128
+860,
+548,
+2
 ],
 "gen-vfx-key-mapper": [
-188,
-128
+640,
+436,
+2
 ],
 "gen-vfx-keyboard-splitter": [
-214,
-128
+860,
+514,
+2
 ],
 "gen-vfx-level-scaler": [
-210,
-128
+720,
+438,
+2
 ],
 "gen-vfx-script": [
-258,
-94
+780,
+284,
+2
 ],
 "gen-vfx-sequencer": [
-252,
-128
+960,
+487,
+2
 ],
 "gen-voltage-controller": [
-129,
-128
+620,
+616,
+2
 ],
 "gen-wave-traveller": [
 800,

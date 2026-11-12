@@ -8,7 +8,7 @@
 <p>FL Studio 的產生器和效果器不會被載入。LYNX SHARE 讀取它們儲存的設定，並用自己重新製作的引擎來播放。每個引擎都有一個品質等級，從 <code>Exact</code>（在所有測試過的狀態下與原版位元完全一致）到 <code>Placeholder</code>（設定會保留，但外掛靜音或讓音訊直通）。各等級的說明見<a href="/wiki/coming-from-fl-studio/">從 FL Studio 轉換</a>。</p>
 <p>開啟 <code>.flp</code> 不需要安裝 FL Studio。有些引擎需要的波形、取樣或脈衝響應，會在執行時從你自己的 FL Studio 安裝中讀取。</p>
 <h2 id="missing-samples">缺失的取樣</h2>
-<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" alt="「缺失的檔案」視窗的 Samples 分頁：找到的檔案為綠色，缺失的為琥珀色，並有 Search folder、Locate 和 Skip" loading="lazy" width="760" height="560"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/missing-files.webp"><img src="/assets/img/wiki/missing-files.webp" srcset="/assets/img/wiki/missing-files.webp 1x, /assets/img/wiki/missing-files@2x.webp 2x" alt="「缺失的檔案」視窗的 Samples 分頁：找到的檔案為綠色，缺失的為琥珀色，並有 Search folder、Locate 和 Skip" loading="lazy" width="760" height="560"></a></figure>
 <p><code>取樣</code> 分頁會列出每個找不到的取樣，以及它儲存的路徑和使用它的對象。</p>
 <div class="tablewrap"><table><thead><tr><th>指令</th><th>作用</th></tr></thead><tbody><tr><td><code>搜尋資料夾...</code></td><td>在一個資料夾及其子資料夾中搜尋所有缺失的取樣</td></tr><tr><td><code>定位...</code></td><td>詢問某一個取樣在哪裡。在同一個資料夾中找到的其他取樣也會一併套用</td></tr><tr><td><code>跳過</code></td><td>略過該取樣。它的通道保持靜音</td></tr></tbody></table></div>
 <p><code>套用</code> 會使用已找到的檔案。</p>
@@ -20,7 +20,7 @@
 <p>這個開關是 <code>選項 › 一般設定...</code> 中的 <code>用LYNX SHARE對應外掛替代缺失的外掛</code>，預設為開啟。關閉後，缺失效果器的插槽會從混音器中略去。缺失的樂器不會被替代，它會變成內建合成器，預設集依通道名稱選出。</p>
 <p>若要找回真正的外掛，請安裝它，選擇 <code>選項 › 掃描外掛</code>，然後重新開啟專案。</p>
 <h2 id="midi-files">MIDI 檔案</h2>
-<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" alt="「匯入 MIDI 資料」視窗：軌道、通道、通道類型和選項" loading="lazy" width="550" height="373"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/midi-import-dialog.webp"><img src="/assets/img/wiki/midi-import-dialog.webp" srcset="/assets/img/wiki/midi-import-dialog.webp 1x, /assets/img/wiki/midi-import-dialog@2x.webp 2x" alt="「匯入 MIDI 資料」視窗：軌道、通道、通道類型和選項" loading="lazy" width="550" height="373"></a></figure>
 <p><code>檔案 › 開啟...</code> 會從 MIDI 檔案建立一個新專案。<code>檔案 › 匯入 › MIDI檔案...</code> 會先開啟 <code>匯入MIDI資料</code> 視窗，讓你選擇要匯入的內容。</p>
 <div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>要匯入哪些軌道？</code></td><td>所有軌道，或單一軌道</td></tr><tr><td><code>要匯入哪些通道？</code></td><td>點擊某個 MIDI 通道可將其排除。按右鍵則只保留那一個</td></tr><tr><td><code>通道類型</code></td><td><code>LYNX SHARE合成器</code> 或 <code>MIDI Out</code></td></tr><tr><td><code>開始新專案</code></td><td>開始一個空白專案。關閉時：加入到已開啟的專案</td></tr><tr><td><code>每個軌道建立一個通道</code></td><td>關閉時：每個 MIDI 通道建立一個通道</td></tr><tr><td><code>為新通道設定混音軌道</code></td><td>把新通道路由到連續的混音插入軌</td></tr><tr><td><code>匯入拍號</code></td><td>檔案的拍號會成為專案的拍號</td></tr></tbody></table></div>
 <p>在<a href="/wiki/piano-roll/">鋼琴捲軸</a>中按 <code>Ctrl+M</code>，可把 MIDI 檔案匯入目前的通道。</p>

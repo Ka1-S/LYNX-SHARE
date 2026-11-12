@@ -294,6 +294,26 @@ TEST (report174a_editor_crash_step)
     CHECK (! editorFaultCatchable (0x40010006u)); // OutputDebugString
 }
 
+TEST (report190ci_processor_faults_are_the_ones_reported_from_an_unwalkable_stack)
+{
+    using namespace lynx::crashreport;
+    // round 190ci: the FPC fault of the 0.1.26 release candidate was an access violation on a stack Windows could not
+    // walk (a lambda without its return ran into the next function), so the crash handler never ran
+    CHECK (processorFault (0xC0000005u));   // access violation
+    CHECK (processorFault (0xC000001Du));   // illegal instruction
+    CHECK (processorFault (0xC0000094u));   // integer division by zero
+    CHECK (processorFault (0xC0000006u));   // in-page error
+    CHECK (! processorFault (0x20474343u)); // GCC / Clang C++ exception: thrown and caught all day
+    CHECK (! processorFault (0xE06D7363u)); // MSVC C++ exception
+    CHECK (! processorFault (0xC00000FDu)); // stack overflow: no stack left to write a report on
+    CHECK (! processorFault (0xC0000409u)); // fail-fast
+    CHECK (! processorFault (0xC0000374u)); // heap corruption
+    CHECK (! processorFault (0x80000003u)); // breakpoint
+    CHECK (! processorFault (0x80000004u)); // single step
+    CHECK (! processorFault (0x406D1388u)); // thread name
+    CHECK (! processorFault (0u));
+}
+
 TEST (report115_title_says_crash_only_with_a_crash_file)
 {
     using namespace lynx::crashreport;

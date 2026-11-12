@@ -45,6 +45,13 @@ juce::Image shrink (const juce::Image& image, float pixelsPerUnit = 1.0f);
 int renderNative (const juce::File& folder, const juce::StringArray& only, const std::function<void (const juce::String&)>& progress,
                   float fullScale = 0.0f);
 
+// --selftest (round 190ci: the 0.1.26 release candidate ended when an FPC channel was added, and no test opened that
+// editor): every LYNX generator and effect, made as the menus make it, its editor built as the Channel Rack / mixer
+// opens it and painted once off-screen. `before` gets each plugin's key before its editor is built (a run that dies
+// names the plugin). Returns "OK (N generators, M effects)" or "ERROR " and what failed (no editor, nothing painted,
+// an exception).
+juce::String checkEditors (const std::function<void (const juce::String&)>& before);
+
 // Starts the background drawing (a second LYNX process) when pictures are missing; at most one at a time, and only
 // once per run unless `again` (after a version change of the art, say). Returns whether one is running.
 bool ensureRendering (bool again = false);

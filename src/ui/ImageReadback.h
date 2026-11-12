@@ -112,8 +112,13 @@ inline juce::Image makePicture (int width, int height, bool software)
 inline void notePicture (const char* name, const juce::Image& picture, float scale, bool software, const juce::Component& owner, juce::String& last)
 {
     const auto drawn = owner.getPeer() == nullptr ? "no window" : windowDrawnByCpu (owner) ? "window drawn without the GPU" : "window drawn with the GPU";
+   #if JUCE_WINDOWS
+    const char* const nativeKind = "Direct2D image";
+   #else
+    const char* const nativeKind = "native image";
+   #endif
     const auto kind = picture.isNull() ? juce::String ("no picture (painted straight to the window)")
-                                       : juce::String (software ? "software image" : JUCE_WINDOWS ? "Direct2D image" : "native image");
+                                       : juce::String (software ? "software image" : nativeKind);
     const auto key = kind + ", " + drawn + " at " + juce::String (juce::roundToInt (scale * 100.0f)) + " %";
     if (key == last)
         return;

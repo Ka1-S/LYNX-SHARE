@@ -753,6 +753,26 @@ bool editorFaultCatchable (std::uint32_t code) noexcept
     }
 }
 
+bool processorFault (std::uint32_t code) noexcept
+{
+    switch (code)
+    {
+        case 0xC0000005u: // access violation
+        case 0xC0000006u: // in-page error
+        case 0xC000001Du: // illegal instruction
+        case 0xC0000096u: // privileged instruction
+        case 0xC0000094u: // integer division by zero
+        case 0xC0000095u: // integer overflow
+        case 0xC000008Cu: // array bounds exceeded
+        case 0x80000002u: // datatype misalignment
+        case 0xC000008Du: case 0xC000008Eu: case 0xC000008Fu: case 0xC0000090u: // floating point
+        case 0xC0000091u: case 0xC0000092u: case 0xC0000093u:
+            return true;
+        default:
+            return false;
+    }
+}
+
 std::string githubTitle (std::string_view kind, const std::string& lastStep)
 {
     if (kind == "hang")
