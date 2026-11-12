@@ -42,10 +42,11 @@ TEST (p190ca_valhalladelay_tape_echoes_at_the_measured_level)
 {
     namespace ef = lynx::echosuite::echoform;
     const char* cls = "64545356614c7679616c68616c6c6164";
-    // Tape (the default mode, 1/24): Output -1.67 dB = 0.5 - 1.67 / 36
+    // Tape (the default mode, 1/24): round 190ca's Output -1.67 dB is gone since round 190dl — the measured tape stage
+    // (Law = Measured, which a translated slot gets) has the level law itself
     const auto tape = p190ca::substituted (p190ca::vst3Named ("ValhallaDelay", "<ValhallaDelay Mode=\"0.0416666679084301\" Mix=\"0.5\"/>", cls));
     CHECK (tape.kind == lynx::EffectKind::echoform && ef::modeOf (tape.params[ef::mode]) == ef::Mode::tape);
-    CHECK (std::abs (tape.params[ef::output] - 0.4536f) < 1e-6f);
+    CHECK (std::abs (tape.params[ef::output] - 0.5f) < 1e-6f && tape.params[ef::engineLaw] >= 0.5f);
     CHECK (std::abs (tape.params[ef::mix] - 0.5f) < 1e-6f); // the dry/wet setting is the reference's own
     // every other mode stays at 0 dB, the tape variants (DuckTape 10/24, ChromeTape 16/24) included: not measured
     for (const char* value : { "0.10", "0.1875", "0.4375", "0.5625", "0.6875", "0.7291667" })

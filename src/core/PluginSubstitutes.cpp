@@ -307,11 +307,10 @@ map = xml:Era -> Era | steps 0:0 0.6662:0.5 0.9995:1
 # RevPitch (reverse), BBDuck (bucket), Clarity (clean), DuckTape (tape), PitchDuck (pitch), LoFi, Quartz (clean),
 # PhaserDDL (phaser), RichPitch (detune), ChromeTape (tape), Analog; the "duck" variants' built-in ducking is not kept
 map = xml:Mode -> Mode | steps 0:0.041667 0.0828:0.208333 0.1245:0.291667 0.1662:0.458333 0.2078:0.708333 0.2495:0.791667 0.2912:0.875 0.3328:0.291667 0.3745:0.541667 0.4162:0.041667 0.4578:0.791667 0.4995:0.125 0.5412:0.541667 0.5828:0.625 0.6245:0.958333 0.6662:0.041667 0.7078:0.375 0.7495:0.041667
-# round 190ca: through Echoform's Tape the echoes of drums, music and a vocal come out 2.1 / 1.2 / 1.8 dB louder than the
-# reference's (wet level of the tp172d programme renders at three Tape settings; a single impulse is 0.9 dB quieter - the
-# level laws differ with the signal). Output -1.67 dB in that mode, the mean over the programme material (Output acts on
-# the wet path only); the other modes were not measured: 0 dB
-map = xml:Mode -> Output | steps 0:0.4536 0.0828:0.5
+# round 190ca measured the Tape mode's echoes of drums, music and a vocal 2.1 / 1.2 / 1.8 dB louder than the reference's
+# while a single impulse came out 0.9 dB quieter (the level laws differ with the signal) and set Output -1.67 dB. Round
+# 190dl: Echoform's measured tape stage (Law = Measured, every new instance) has that level law itself (a record gain
+# with memory, fitted on the same renders), so the translation leaves Output at 0 dB again
 
 [valhalla-freqecho]
 product = ValhallaFreqEcho
@@ -627,7 +626,9 @@ default = VerbSuite Classics | Mix=1.0000; Predelay=0.1351; Decay=0.2780; Size=1
 product = delays (SSL X-Echo / X-Delay, Slate Stellar Echo SD-201, Harrison 3D Delay)
 vendor = Complete Access (role)
 lynx = Echoform
-preset = Mode=0.0415; Sync L=0.6248; Note L=0.4498; Feedback=0.125; Mix=0.25
+# round 190dl: these devices keep the Classic law (the measured tape stage is ValhallaDelay's; on the bank it lowered
+# the multi-head tape row's tail score 2.72 -> 2.28)
+preset = Mode=0.0415; Sync L=0.6248; Note L=0.4498; Feedback=0.125; Mix=0.25; Law=0
 names = SSL Native X-Echo; SSL X-Delay; Stellar Echo SD-201; Harrison_3DDelay
 
 [complete-access-saturators]
@@ -2424,7 +2425,18 @@ int translateWavesHDelay (const std::vector<std::uint8_t>& state, EffectSlot& sl
     const auto depth = wavesValue (rw, 19).value_or (0.0);
     p[e::modDepth] = (float) std::clamp (std::sqrt (std::max (0.0, depth) / 100.0), 0.0, 1.0);
     if (depth > 0.0)
-        p[e::modRate] = (float) std::clamp (std::pow ((std::clamp (wavesValue (rw, 20).value_or (0.1), 0.01, 10.0) - 0.01) / 9.99, 1.0 / 2.3277), 0.0, 1.0);
+    {
+        // round 190dl [EXEC] (tp172d bank, Depth 50 %, its stored rate 0.1, Sync own BPM 1/8 dotted = 375 ms, LoFi on): the
+        // echo time swings as a triangle of ± 87.5 ms (23.3 % of the time) about the set time, period 5.0 s, both sides in
+        // step (echo train of an impulse and of a noise burst, fitted to 3 ms). Echoform's Clock law: swing = ½ · depth of
+        // the time, the triangle, rate × 2. One depth and one rate were measured: the depth is taken as proportional to
+        // the time and linear in the percentage, as on a clocked line (the PCM42 lineage the vendor names)
+        const auto rate = 2.0 * std::clamp (wavesValue (rw, 20).value_or (0.1), 0.01, 5.0);
+        p[e::modClock] = 1.0f;
+        p[e::modShape] = 1.5f / 5.0f; // triangle
+        p[e::modDepth] = (float) std::clamp (0.932 * depth / 100.0, 0.0, 1.0);
+        p[e::modRate] = (float) std::clamp (std::pow ((rate - 0.01) / 9.99, 1.0 / 2.3277), 0.0, 1.0);
+    }
     return 8;
 }
 

@@ -4240,6 +4240,10 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::voicingStereo
         && slot.params.size() > (std::size_t) echosuite::echoform::voicingStereo)
         slot.params[(std::size_t) echosuite::echoform::voicingStereo] = 0.0f;
+    // round 190dl: … and before the measured tape stage keeps the classic tape characters, bit for bit
+    if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::engineLaw
+        && slot.params.size() > (std::size_t) echosuite::echoform::engineLaw)
+        slot.params[(std::size_t) echosuite::echoform::engineLaw] = 0.0f;
     // round 152: a Glow Leveler saved before the measured opto law keeps the round-123 Limit and no classic auto make-up
     if (slot.kind == EffectKind::glowLeveler && savedCount <= (std::size_t) mixsuite::glow::optoLaw)
         slot.params[(std::size_t) mixsuite::glow::optoLaw] = 0.0f;

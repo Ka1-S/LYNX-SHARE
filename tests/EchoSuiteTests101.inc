@@ -115,6 +115,7 @@ inline lynx::EffectParams echoform (es::echoform::Mode mode, double ms)
     p[ef::flutter] = 0.0f;
     p[ef::age] = 0.0f;
     p[ef::timeL] = p[ef::timeR] = ef::timeValue (ms);
+    p[ef::engineLaw] = 0.0f; // round 190dl: these laws are the classic characters' (the measured tape stage: Echo190dlTests)
     return p;
 }
 } // namespace es101
