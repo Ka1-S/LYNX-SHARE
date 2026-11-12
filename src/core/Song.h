@@ -1888,6 +1888,9 @@ struct PlaylistTrack
     int icon = 0; // FL's playlist track icon (.flp 0xEE u32 at 8, REA round 168j): FL's icon index, 0 = none. Kept and saved.
     std::vector<AutomationLane> lanes {}; // round 177b: optional automation lanes (shared by every arrangement)
     bool lanesFolded = false;          // the lanes are hidden under the track
+    // round 190cg (Live's track fold switch): the row is folded to a thin strip that still shows its clips as bars; its
+    // lanes hide with it. View only; saved with the project.
+    bool folded = false;
     bool operator== (const PlaylistTrack&) const = default;
 };
 
@@ -2101,6 +2104,13 @@ struct Song
     std::vector<PatternBlock> blocks;
     PlayMode mode = PlayMode::pattern;
     std::int64_t loopStart = 0, loopEnd = 0; // looped section in the Playlist (ticks); loopEnd <= loopStart = off
+    // round 190cg (Live's Arrangement Loop switch; FL has none): the range above stays (the time selection, the export
+    // range, the punch region) but playback does not loop it. False = FL's behaviour: a range loops. Saved with the project.
+    bool loopOff = false;
+    // The tempo lane's shown range in BPM (round 190cg; Live's range fields beside the tempo envelope): an automation
+    // lane of the tempo spans tempoViewLow…tempoViewHigh instead of the whole 10…522. View only: the values stay.
+    // 0 / 0 = the whole range (every project before this round). Saved with the project.
+    double tempoViewLow = 0.0, tempoViewHigh = 0.0;
 
     // Arrangements: `playlist` and the loop above belong to the current one; the others are stored here.
     std::vector<Arrangement> arrangements { Arrangement { "Arrangement 1", {}, 0, 0, {} } };
@@ -2169,6 +2179,7 @@ struct Song
     }
 
     bool hasLoop() const noexcept { return loopEnd > loopStart; }
+    bool loopPlays() const noexcept { return hasLoop() && ! loopOff; } // the range is looped by playback
 
     // FL's Performance mode (Playlist › Options › Performance mode, Ctrl+P; round 165m): the clips before the first
     // "Start" marker (the performance zone) don't play with the song; they are launched live (click, controller pads)

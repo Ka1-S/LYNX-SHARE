@@ -8280,7 +8280,6 @@ countries: es mx ar co cl pe ve
 "Deactivate input {0}" = "Desactivar entrada {0}"
 "Activate input {0}" = "Activar entrada {0}"
 "Input {0}" = "Entrada {0}"
-# Round 183c: Racks
 "Add chain" = "Añadir cadena"
 "Audio Effect Rack" = "Rack de efectos de audio"
 "Chain Pan" = "Panorama de la cadena"
@@ -8368,6 +8367,7 @@ countries: es mx ar co cl pe ve
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Separar todos los plugins nuevos"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Activado: la ventana de un plugin que añades se abre separada, encima de los paneles. Desactivado: se abre acoplada en el escritorio, detrás de un panel en el que hagas clic. El menú de la ventana de cada plugin › Separado lo cambia para ese plugin"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Para otras apps..."
 "Export for other apps" = "Exportar para otras apps"
@@ -8736,7 +8736,6 @@ countries: es mx ar co cl pe ve
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Un mando de juego maneja el transporte y puede vincularse a cualquier control como un controlador MIDI. También en la página MIDI."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Mejoras propias de LYNX. Todas vienen desactivadas, así que LYNX SHARE se ve y se comporta como FL Studio hasta que actives alguna. Cada interruptor es el mismo ajuste que en el lugar que indica su línea."
 "LYNX extras..." = "Extras de LYNX..."
-
 "Search your plugins" = "Buscar en tus plugins"
 "Nothing is shared." = "No se comparte nada."
 "{0} shared with the session" = "{0} compartidos con la sesión"
@@ -8842,10 +8841,6 @@ countries: es mx ar co cl pe ve
 "{0} min ago" = "hace {0} min"
 "{0} h ago" = "hace {0} h"
 "{0} d ago" = "hace {0} d"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"
 "Find similar samples" = "Buscar samples parecidos"
 "Similar to {0}" = "Parecido a {0}"
 "Listening to \"{0}\"..." = "Escuchando \"{0}\"..."
@@ -8883,7 +8878,6 @@ countries: es mx ar co cl pe ve
 "Channel 2" = "Canal 2"
 "Channels 2-{0}" = "Canales 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "Canales miembro MPE (zona inferior): los canales MIDI que llevan una nota cada uno"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "SOPLO"
 "Motion blending" = "Fusión de movimiento"
 "Load sprite sheet..." = "Cargar hoja de sprites..."
@@ -8931,3 +8925,49 @@ countries: es mx ar co cl pe ve
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (la última fila de la hoja) se muestra mientras el bailarín se sujeta con el ratón."
 "Show complete piano roll preview" = "Mostrar la vista previa completa del Piano Roll"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: la vista previa de notas de un canal muestra todo el pattern aunque sea más largo que la parte visible del rack; desactivado, se desplaza con los pasos"
+
+# --- Round 190cg: warp markers, time commands, folding
+"Automation follows clips on/off" = "La automatización sigue a los clips activada/desactivada"
+"Automation follows clips" = "La automatización sigue a los clips"
+"Clip pitch in semitones" = "Tono del clip en semitonos"
+"Clip pitch, fine: cents" = "Tono del clip, ajuste fino: cents"
+"Copy time" = "Copiar tiempo"
+"Crop clips to the time selection" = "Recortar los clips a la selección de tiempo"
+"Crop the selected clips to the time selection" = "Recortar los clips seleccionados a la selección de tiempo"
+"Cut time" = "Cortar tiempo"
+"Delete all time signature changes" = "Eliminar todos los cambios de compás"
+"Double the time selection" = "Duplicar la selección de tiempo"
+"Duplicate time" = "Duplicar tiempo"
+"Fold track" = "Plegar pista"
+"Group plays through its own mixer track" = "El grupo suena por su propia pista de mezclador"
+"Half the tempo: the audio plays twice as fast" = "Mitad de tempo: el audio suena el doble de rápido"
+"Halve the time selection" = "Reducir a la mitad la selección de tiempo"
+"How the audio is stretched. It belongs to the channel: every clip of this audio changes with it" = "Cómo se estira el audio. Pertenece al canal: todos los clips de este audio cambian con él"
+"Insert warp markers" = "Insertar marcadores de warp"
+"Loop the time selection on/off (the range stays)" = "Loop de la selección de tiempo activado/desactivado (el rango se mantiene)"
+"Loop the time selection" = "Hacer loop de la selección de tiempo"
+"No attack to quantize here" = "No hay ataque que cuantizar aquí"
+"Paste time" = "Pegar tiempo"
+"Plays the clip backwards" = "Reproduce el clip al revés"
+"Quantize audio" = "Cuantizar audio"
+"Quantize settings" = "Ajustes de cuantización"
+"Set 1.1.1 here" = "Fijar 1.1.1 aquí"
+"Tempo of the selected segment (BPM): type a value, or use the buttons beside it" = "Tempo del segmento seleccionado (BPM): escribe un valor o usa los botones de al lado"
+"Twice the tempo: the audio plays half as fast" = "Doble de tempo: el audio suena a la mitad de velocidad"
+"Unfold all tracks" = "Desplegar todas las pistas"
+"Warp as {0}-bar loop" = "Warp como loop de {0} compases"
+"Warp from here (start at {0} BPM)" = "Warp desde aquí (empieza a {0} BPM)"
+"Warp from here (straight)" = "Warp desde aquí (constante)"
+"Warp from here" = "Warp desde aquí"
+"Warp {0} BPM from here" = "Warp de {0} BPM desde aquí"
+"{0} warp markers placed" = "{0} marcadores de warp colocados"
+"Whole range" = "Rango completo"
+"Tempo range shown" = "Rango de tempo mostrado"
+"Set the range..." = "Definir el rango..."
+"Lowest and highest tempo of the tempo lane (BPM)" = "Tempo más bajo y más alto de la pista de tempo (BPM)"
+"Lowest" = "Mínimo"
+"Highest" = "Máximo"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"

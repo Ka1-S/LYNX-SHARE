@@ -8280,7 +8280,6 @@ countries: cn sg
 "Deactivate input {0}" = "停用输入 {0}"
 "Activate input {0}" = "启用输入 {0}"
 "Input {0}" = "输入 {0}"
-# Round 183c: Racks
 "Add chain" = "添加链"
 "Audio Effect Rack" = "音频效果机架"
 "Chain Pan" = "链声像"
@@ -8342,9 +8341,9 @@ countries: cn sg
 "Blend of the shaped signal with the dry one (parallel processing)" = "处理后信号与干信号的混合（并行处理）"
 "One gain for both channels, so the stereo image stays put" = "两个声道使用同一增益，立体声像保持不动"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "让低音不进入检测器（例如鼓总线上的底鼓）"
-
 "For a file with a true-peak ceiling: {0}" = "需要真峰值上限的文件：{0}"
 "(look)" = "（风格）"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "未找到默认模板；已改为打开 LYNX SHARE 的默认工程"
 "{0} could not be opened." = "无法打开 {0}。"
@@ -8368,6 +8367,7 @@ countries: cn sg
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "分离所有新插件"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "开：添加的插件窗口以分离方式打开，位于面板之上。关：在桌面中停靠打开，位于所点击的面板之后。每个插件的窗口菜单 › 已分离 可为该插件单独更改"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "用于其他应用..."
 "Export for other apps" = "导出给其他应用"
@@ -8542,10 +8542,6 @@ countries: cn sg
 "Can't freeze this channel" = "无法冻结此通道"
 "Frozen: Unfreeze to edit" = "已冻结：解冻以编辑"
 "A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "有控制器链接到此乐器的旋钮并实时移动它们：冻结的音频无法跟随。"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值电平表（左/右）带峰值保持  [LMB] 清除削波指示灯"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "将歌曲保存为文件"
@@ -8740,7 +8736,6 @@ countries: cn sg
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "游戏手柄可以控制走带，并能像 MIDI 控制器一样链接到任何控件。MIDI 页面中也有。"
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 自己的改进。它们默认全部关闭，因此在你打开其中一项之前，LYNX SHARE 的外观和行为都与 FL Studio 相同。每个开关与其所在行指明位置的设置是同一个设置。"
 "LYNX extras..." = "LYNX 附加功能..."
-
 "Search your plugins" = "搜索你的插件"
 "Nothing is shared." = "未共享任何内容。"
 "{0} shared with the session" = "已与会话共享 {0} 个"
@@ -8883,7 +8878,6 @@ countries: cn sg
 "Channel 2" = "通道 2"
 "Channels 2-{0}" = "通道 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE 成员通道（低音区）：各承载一个音符的 MIDI 通道"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "气声"
 "Motion blending" = "动作混合"
 "Load sprite sheet..." = "加载精灵表..."
@@ -8931,3 +8925,49 @@ countries: cn sg
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（表单的最后一行）在用鼠标按住舞者时显示。"
 "Show complete piano roll preview" = "显示完整的钢琴卷帘预览"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "通道机架：即使样式比机架显示的范围长，通道的音符预览也会显示整个样式；关闭时，预览会随步进一起滚动"
+
+# --- Round 190cg: warp markers, time commands, folding
+"Automation follows clips on/off" = "自动化跟随片段 开/关"
+"Automation follows clips" = "自动化跟随片段"
+"Clip pitch in semitones" = "片段音高(半音)"
+"Clip pitch, fine: cents" = "片段音高微调:音分"
+"Copy time" = "复制时间"
+"Crop clips to the time selection" = "将片段裁剪到时间选区"
+"Crop the selected clips to the time selection" = "将所选片段裁剪到时间选区"
+"Cut time" = "剪切时间"
+"Delete all time signature changes" = "删除所有拍号变化"
+"Double the time selection" = "时间选区加倍"
+"Duplicate time" = "复制时间段"
+"Fold track" = "折叠轨道"
+"Group plays through its own mixer track" = "组通过其自己的混音轨道播放"
+"Half the tempo: the audio plays twice as fast" = "速度减半:音频播放速度加倍"
+"Halve the time selection" = "时间选区减半"
+"How the audio is stretched. It belongs to the channel: every clip of this audio changes with it" = "音频的拉伸方式。它属于通道:此音频的所有片段都会随之改变"
+"Insert warp markers" = "插入变速标记"
+"Loop the time selection on/off (the range stays)" = "时间选区循环 开/关(范围保留)"
+"Loop the time selection" = "循环时间选区"
+"No attack to quantize here" = "此处没有可量化的起音"
+"Paste time" = "粘贴时间"
+"Plays the clip backwards" = "倒放该片段"
+"Quantize audio" = "量化音频"
+"Quantize settings" = "量化设置"
+"Set 1.1.1 here" = "在此处设为 1.1.1"
+"Tempo of the selected segment (BPM): type a value, or use the buttons beside it" = "所选段落的速度(BPM):输入数值,或使用旁边的按钮"
+"Twice the tempo: the audio plays half as fast" = "速度加倍:音频播放速度减半"
+"Unfold all tracks" = "展开所有轨道"
+"Warp as {0}-bar loop" = "变速为 {0} 小节循环"
+"Warp from here (start at {0} BPM)" = "从此处变速(起始 {0} BPM)"
+"Warp from here (straight)" = "从此处变速(匀速)"
+"Warp from here" = "从此处变速"
+"Warp {0} BPM from here" = "从此处按 {0} BPM 变速"
+"{0} warp markers placed" = "已放置 {0} 个变速标记"
+"Whole range" = "完整范围"
+"Tempo range shown" = "显示的速度范围"
+"Set the range..." = "设置范围..."
+"Lowest and highest tempo of the tempo lane (BPM)" = "速度轨道的最低和最高速度 (BPM)"
+"Lowest" = "最低"
+"Highest" = "最高"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值电平表（左/右）带峰值保持  [LMB] 清除削波指示灯"

@@ -295,3 +295,8 @@ Export:
 - Session clips have `Time` 0, the clip span as the loop region (`LoopOn` = the slot's Loop) and the slot's launch settings and follow actions. An empty slot without its LYNX stop button gets `HasStop` false (MIDI tracks use their channel's Playlist track).
 - Scenes: name, colour, tempo and n/4 time signature with their enable flags; `GlobalQuantisation` = grid quantisation − 1.
 - A song whose grid has clips but no Playlist clips exports no arrangement clip (the current-pattern fallback is for songs with neither).
+
+## 14. Time signature changes, the loop switch and the tempo lane range (round 190cg, 2026-11-11)
+- Signature changes: an `AutomationEnvelope` of the main track whose `PointeeId` is the `Id` of `DeviceChain/Mixer/TimeSignature/AutomationTarget`, holding `EnumEvent`s. The value is the signature code of §4 (99 × denominator exponent + numerator − 1, 201 = 4/4); the first event sits at −63072000 like every envelope [DATA]. Later events are taken to be in beats [inferred, needs a live check]. Import: each event after the start → a time-signature marker. Export: the start signature (with its denominator) in `TimeSignature/Manual`; the envelope is written only when the song has later signature markers.
+- `Transport/LoopOn` is the loop switch; `LoopStart` / `LoopLength` hold the brace whether the loop is on or off [DATA: a new set has LoopOn false, LoopStart 8, LoopLength 16]. Import keeps the range and sets `Song::loopOff` from the switch; export writes the range whenever the song has a time selection.
+- `Mixer/TempoAutomationViewBottom` / `Top` (60 / 200 in a new set) are the BPM range the tempo lane shows [DATA]. Kept both ways in `Song::tempoViewLow/High`; LYNX's lane does not draw with it yet.

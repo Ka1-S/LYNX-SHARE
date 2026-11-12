@@ -9,6 +9,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/ArrangeOps.h"
 #include "core/MagicLasso.h"
 #include "core/MeterBallistics.h"
 #include "core/PickerSelection.h"
@@ -189,6 +190,18 @@ public:
     // on the track's mixer insert (mute, solo, record arm, volume, pan, "+FX"), taller rows by default, a lane under
     // the tracks to drop files on, and a click that also selects the track's channel. Off: FL's headers, unchanged.
     void setSimpleHeaders (bool on);
+    // The Clip-launch workflow (round 190cg): track fold, "Group with above track" makes the group a bus, and automation
+    // follows clips unless set otherwise. The data is the Song's either way; the other layouts show it all the same.
+    void setLiveStyle (bool on);
+    bool hasLiveStyle() const noexcept { return liveStyle; }
+    static constexpr int liveFoldedHeight = 17; // a folded track: its title bar's height
+    bool automationFollows() const noexcept;
+    // 0 duplicate, 1 cut, 2 copy, 3 paste (at the time selection's start, else the song position), 4 crop the selected clips
+    void timeCommand (int which);
+    void setLoopSwitch (bool plays);
+    float laneShown (int automation, float value) const;   // a lane value as a fraction of the lane's height
+    float laneValueOf (int automation, float shown) const; // and back
+    void askTempoRange();
     bool hasSimpleHeaders() const noexcept { return simpleHeaders; }
     std::function<void (int insert)> onTrackEffects; // "+FX" on a Simple header: the insert's effects
     // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
@@ -408,6 +421,9 @@ private:
     juce::Rectangle<int> trackLed (int track) const;   // the mute LED on the right of a header (Simple headers: the M button)
     // the Simple headers' controls (round 184a): empty with FL's headers, a row too short or a track without an insert
     bool simpleHeaders = false;
+    bool liveStyle = false;
+    bool dragCopies = false; // the clips being moved are copies made at the press
+    arrange::TimeClip timeClipboard;
     static constexpr int simpleTrackHeight = 56, simpleTwoRows = 44; // the default row; the height that shows the second row
     juce::Rectangle<int> trackSolo (int track) const;
     juce::Rectangle<int> trackVolume (int track) const;

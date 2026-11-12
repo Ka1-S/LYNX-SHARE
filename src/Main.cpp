@@ -4,7 +4,9 @@
 
 #include "core/KeyGuess.h"
 #include "core/FlSamplers.h"
+#include "core/ArrangeOps.h"
 #include "core/PlaylistOps.h"
+#include "core/WarpTools.h"
 #include "core/Comping.h"
 #include "core/Drumaxx.h"
 #include "core/PatternBlocks.h"
@@ -1843,6 +1845,15 @@ public:
             return;
         }
 
+        if (args.contains ("--warpshot"))
+        {
+            // LYNX.exe --warpshot prefix: round 190cg's pictures (warp commands in the audio editor, the Clip page's
+            // Audio panel, the arrangement with the loop switched off, a folded track, signature changes), off-screen
+            const auto i = args.indexOf ("--warpshot");
+            runWarpShot (args[i + 1].unquoted());
+            quit();
+            return;
+        }
         if (args.contains ("--detailshot"))
         {
             // LYNX.exe --detailshot prefix: the Clip-launch workflow's detail view off-screen (round 183a): a track's chain
@@ -3909,6 +3920,30 @@ private:
                 lanesResult = "ERROR " + why;
         }
 
+        // round 190cg: the loop switch, folded tracks and the tempo lane's range come back from a project; a project
+        // without them loads as before (loop on, nothing folded, the whole range)
+        juce::String arrange190cgResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            juce::String why;
+            const auto plain = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            song.loopStart = 960;
+            song.loopEnd = 4800;
+            song.loopOff = true;
+            song.tempoViewLow = 80.0;
+            song.tempoViewHigh = 160.0;
+            song.playlistTracks.resize (std::max<std::size_t> (song.playlistTracks.size(), 6));
+            song.playlistTracks[2].folded = song.playlistTracks[5].folded = true;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            if (! plain || plain->loopOff || plain->tempoViewLow != 0.0 || plain->tempoViewHigh != 0.0
+                || std::any_of (plain->playlistTracks.begin(), plain->playlistTracks.end(), [] (const lynx::PlaylistTrack& t) { return t.folded; }))
+                arrange190cgResult = "ERROR defaults " + why;
+            else if (! back || ! back->loopOff || back->loopStart != 960 || back->loopEnd != 4800 || back->loopPlays() || back->tempoViewLow != 80.0
+                     || back->tempoViewHigh != 160.0 || back->playlistTracks.size() < 6 || ! back->playlistTracks[2].folded
+                     || ! back->playlistTracks[5].folded || back->playlistTracks[3].folded)
+                arrange190cgResult = "ERROR round trip " + why;
+        }
+
         const auto mixerBasics = lynx::mixerbasics::run();
         // issue #142: every font has a typeface, and one without does not crash (fonts get theirs through the
         // look and feel, as in the app)
@@ -3941,7 +3976,7 @@ private:
         const auto ok = mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK";
+                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK";
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -3986,6 +4021,7 @@ private:
                << "versions_panel=" << versionsResult << "\n"
                << "plugins_off=" << pluginsOffResult << "\n"
                << "lanes_saved=" << lanesResult << "\n"
+               << "arrange190cg_saved=" << arrange190cgResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -13434,6 +13470,141 @@ private:
         juce::File (prefix + "-counts.txt").replaceWithText ("simple workflows before " + juce::String (madeBefore) + ", in pattern workflow "
                                                              + juce::String (madePattern) + ", after " + juce::String (lynx::SimpleWorkflow::instances.load())
                                                              + "\nstyle after " + lynx::layoutstyle::id (ui.getLayoutStyle()) + "\n" + keyCounts);
+    }
+
+    void runWarpShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        ui.setSize (1600, 900);
+        const auto write = [&prefix] (juce::Component& c, const char* name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (c), out);
+        };
+        // a two-bar loop of clicks, a little off the grid (what Quantize is for)
+        const auto wav = juce::File (prefix + "-loop.wav");
+        wav.deleteFile();
+        {
+            const double rate = 44100.0;
+            juce::AudioBuffer<float> buffer (1, (int) (rate * 4.0));
+            buffer.clear();
+            for (int hit = 0; hit < 8; ++hit)
+            {
+                const auto at = (int) ((hit * 0.5 + (hit % 3) * 0.035) * rate);
+                for (int k = 0; k < 4000 && at + k < buffer.getNumSamples(); ++k)
+                    buffer.setSample (0, at + k, (float) (std::sin (k * (hit % 2 ? 0.25 : 0.06)) * std::exp (-k / 700.0) * 0.8));
+            }
+            if (auto out = std::unique_ptr<juce::FileOutputStream> (wav.createOutputStream()))
+                if (auto* writer = juce::WavAudioFormat().createWriterFor (out.get(), rate, 1, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> owned (writer);
+                    owned->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+                }
+        }
+        ui.setVisible (true);
+        lynx::DetailView::shownSetting = true;
+        ui.selectTabForSnapshot (2);
+        ui.setLayoutStyle (lynx::layoutstyle::Style::clipLaunch);
+        lynx::autolanes::setShown (true);
+        ui.getPlaylistForSnapshot().addAudioClipAtPlayhead (wav);
+        offline.dispatchPendingMessages();
+        int channel = -1;
+        offline.editSong ([&channel] (lynx::Song& s) {
+            if (s.playlist.empty())
+                return;
+            auto audio = s.playlist.front();
+            channel = audio.channel;
+            audio.track = 1;
+            s.playlist.front() = audio;
+            for (int k = 1; k < 3; ++k)
+            {
+                auto more = audio;
+                more.start = audio.start + k * 8 * lynx::ppq;
+                s.playlist.push_back (more);
+            }
+            while (s.patterns.size() < 1)
+                s.patterns.emplace_back();
+            for (int t = 2; t < 5; ++t)
+                for (int k = 0; k < 4; ++k)
+                {
+                    lynx::Clip c;
+                    c.pattern = 0;
+                    c.track = t;
+                    c.start = k * 4 * lynx::ppq;
+                    c.length = 4 * lynx::ppq;
+                    s.playlist.push_back (c);
+                }
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 6));
+            s.playlistTracks[1].name = "Loop";
+            s.playlistTracks[2].name = "Drums";
+            s.playlistTracks[3].name = "Kick";
+            s.playlistTracks[4].name = "Hats";
+            s.playlistTracks[4].folded = true;
+            lynx::noteedit::groupWithAbove (s, 3);
+            lynx::noteedit::groupWithAbove (s, 4);
+            lynx::arrange::makeGroupBus (s, 3);
+            lynx::autolanes::addLane (s, 1, { lynx::AutomationTargetKind::tempo, 0, 0, 0 }, "Tempo", lynx::valueFromTempo (s.bpm));
+            if (! s.automations.empty())
+                s.automations.back().points = { { 0, lynx::valueFromTempo (120.0), 0.0f }, { 8 * lynx::ppq, lynx::valueFromTempo (120.0), 0.0f },
+                                                { 12 * lynx::ppq, lynx::valueFromTempo (180.0), 0.0f }, { 16 * lynx::ppq, lynx::valueFromTempo (140.0), 0.0f } };
+            s.addMarker ({ 4 * lynx::ppq, "Verse", 0, 0 });
+            s.addMarker ({ 8 * lynx::ppq, {}, 3, 4 });
+            s.addMarker ({ 14 * lynx::ppq, {}, 4, 4 });
+            s.loopStart = 4 * lynx::ppq;
+            s.loopEnd = 12 * lynx::ppq;
+            s.loopOff = true;
+            s.tempoViewLow = 60.0; // the tempo lane's range
+            s.tempoViewHigh = 200.0;
+            std::stable_sort (s.playlist.begin(), s.playlist.end(), [] (const lynx::Clip& a, const lynx::Clip& b) { return a.start < b.start; });
+            // the same audio in the clip grid, for the Clip page
+            lynx::Clip slot = audio;
+            slot.start = 0;
+            slot.pitch = -2.25f;
+            slot.gain = 0.7f;
+            lynx::launcher::setClip (s, 1, 0, slot);
+            // a few warp markers, as Quantize leaves them
+            if (channel >= 0 && channel < (int) s.channels.size())
+            {
+                auto& sampler = s.channels[(std::size_t) channel].sampler;
+                lynx::warpedit::ensureMarkers (sampler, 4.0, s.bpm);
+                std::vector<double> attacks;
+                for (int hit = 1; hit < 8; ++hit)
+                    attacks.push_back (hit * 0.5 + (hit % 3) * 0.035);
+                lynx::warptools::quantize (sampler, attacks, 0.0, 4.0, 0.5, 1.0);
+                lynx::warpedit::syncLength (sampler, 4.0);
+            }
+        }, false);
+        offline.dispatchPendingMessages();
+        ui.resized();
+        write (ui, "arrangement-loop-off");
+        offline.editSong ([] (lynx::Song& s) { s.loopOff = false; }, false);
+        offline.dispatchPendingMessages();
+        write (ui, "arrangement-loop-on");
+        juce::String facts;
+        {
+            const auto& s = offline.getSong();
+            facts << "channel " << channel << ", warp markers " << (channel >= 0 ? (int) s.channels[(std::size_t) channel].sampler.warp.size() : -1)
+                  << ", group bus insert " << lynx::arrange::groupBus (s, 3) << ", folded track 4: " << (lynx::arrange::isFolded (s, 4) ? 1 : 0) << "\n";
+        }
+        if (auto* detail = ui.getDetailViewForSnapshot())
+        {
+            detail->showSelection (1, 0);
+            detail->setPage (lynx::DetailView::Page::clip);
+            offline.dispatchPendingMessages();
+            write (ui, "clip-audio");
+        }
+        if (channel >= 0)
+            if (auto editor = lynx::makeAudioEditorPanel (offline, channel, 0, true))
+            {
+                editor->setSize (1120, 600);
+                write (*editor, "audio-editor-warp");
+            }
+        juce::File (prefix + "-facts.txt").replaceWithText (facts);
+        lynx::autolanes::setShown (false);
     }
 
     void runDetailShot (const juce::String& prefix)

@@ -8280,7 +8280,6 @@ countries: tr
 "Deactivate input {0}" = "{0}. girişi devre dışı bırak"
 "Activate input {0}" = "{0}. girişi etkinleştir"
 "Input {0}" = "Giriş {0}"
-# Round 183c: Racks
 "Add chain" = "Zincir ekle"
 "Audio Effect Rack" = "Ses efekti rafı"
 "Chain Pan" = "Zincir panı"
@@ -8342,9 +8341,9 @@ countries: tr
 "Blend of the shaped signal with the dry one (parallel processing)" = "Biçimlendirilmiş sinyalin kuru sinyalle karışımı (paralel işleme)"
 "One gain for both channels, so the stereo image stays put" = "Stereo görüntü kaymasın diye iki kanal için tek bir kazanç"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "Pes notaları dedektörden uzak tutar (davul bus'ındaki bir kick)"
-
 "For a file with a true-peak ceiling: {0}" = "Gerçek tepe sınırı olan bir dosya için: {0}"
 "(look)" = "(görünüm)"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "Varsayılan şablon bulunamadı; onun yerine LYNX SHARE'in varsayılan projesi açıldı"
 "{0} could not be opened." = "{0} açılamadı."
@@ -8368,6 +8367,7 @@ countries: tr
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Tüm yeni eklentileri ayır"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Açık: eklediğiniz bir eklentinin penceresi ayrılmış olarak, panellerin üstünde açılır. Kapalı: masaüstüne yerleşik açılır, tıkladığınız bir panelin arkasına geçer. Her eklentinin pencere menüsü › Ayrılmış bunu o eklenti için değiştirir"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Diğer uygulamalar için..."
 "Export for other apps" = "Diğer uygulamalar için dışa aktar"
@@ -8542,10 +8542,6 @@ countries: tr
 "Can't freeze this channel" = "Bu kanal dondurulamaz"
 "Frozen: Unfreeze to edit" = "Dondurulmuş: düzenlemek için çözün"
 "A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "Bir kontrolcü bu enstrümanın düğmelerine bağlı ve onları canlı hareket ettiriyor: dondurulmuş ses onu takip edemez."
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "Şarkıyı dosya olarak kaydet"
@@ -8740,7 +8736,6 @@ countries: tr
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Bir oyun kumandası transportu yönetir ve bir MIDI denetleyicisi gibi herhangi bir kontrole bağlanabilir. MIDI sayfasında da var."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX'in kendi iyileştirmeleri. Hepsi varsayılan olarak kapalıdır; birini açana kadar LYNX SHARE, FL Studio gibi görünür ve davranır. Her anahtar, satırında adı geçen yerdeki ayarın aynısıdır."
 "LYNX extras..." = "LYNX ekstraları..."
-
 "Search your plugins" = "Plugin'lerinde ara"
 "Nothing is shared." = "Hiçbir şey paylaşılmıyor."
 "{0} shared with the session" = "Oturumla paylaşılan: {0}"
@@ -8883,7 +8878,6 @@ countries: tr
 "Channel 2" = "Kanal 2"
 "Channels 2-{0}" = "Kanallar 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE üye kanalları (alt bölge): her biri bir nota taşıyan MIDI kanalları"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "NEFES"
 "Motion blending" = "Hareket karışımı"
 "Load sprite sheet..." = "Sprite sayfası yükle..."
@@ -8931,3 +8925,49 @@ countries: tr
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0} (sayfanın son satırı), dansçı fareyle tutulurken gösterilir."
 "Show complete piano roll preview" = "Piano Roll önizlemesinin tamamını göster"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "Channel Rack: bir kanalın nota önizlemesi, pattern rack'in gösterdiğinden uzun olsa bile pattern'in tamamını gösterir; kapalıyken adımlarla birlikte kayar"
+
+# --- Round 190cg: warp markers, time commands, folding
+"Automation follows clips on/off" = "Otomasyon klipleri izler açık/kapalı"
+"Automation follows clips" = "Otomasyon klipleri izler"
+"Clip pitch in semitones" = "Klip perdesi (yarım ton)"
+"Clip pitch, fine: cents" = "Klip perdesi, ince ayar: cent"
+"Copy time" = "Zamanı kopyala"
+"Crop clips to the time selection" = "Klipleri zaman seçimine göre kırp"
+"Crop the selected clips to the time selection" = "Seçili klipleri zaman seçimine göre kırp"
+"Cut time" = "Zamanı kes"
+"Delete all time signature changes" = "Tüm ölçü işareti değişikliklerini sil"
+"Double the time selection" = "Zaman seçimini ikiye katla"
+"Duplicate time" = "Zamanı çoğalt"
+"Fold track" = "İzi katla"
+"Group plays through its own mixer track" = "Grup kendi mikser izinden çalar"
+"Half the tempo: the audio plays twice as fast" = "Yarı tempo: ses iki kat hızlı çalar"
+"Halve the time selection" = "Zaman seçimini yarıya indir"
+"How the audio is stretched. It belongs to the channel: every clip of this audio changes with it" = "Sesin nasıl esnetildiği. Kanala aittir: bu sesin tüm klipleri onunla birlikte değişir"
+"Insert warp markers" = "Warp işaretçileri ekle"
+"Loop the time selection on/off (the range stays)" = "Zaman seçimi döngüsü açık/kapalı (aralık kalır)"
+"Loop the time selection" = "Zaman seçimini döngüye al"
+"No attack to quantize here" = "Burada kuantize edilecek vuruş yok"
+"Paste time" = "Zamanı yapıştır"
+"Plays the clip backwards" = "Klibi tersten çalar"
+"Quantize audio" = "Sesi kuantize et"
+"Quantize settings" = "Kuantize ayarları"
+"Set 1.1.1 here" = "1.1.1'i buraya ayarla"
+"Tempo of the selected segment (BPM): type a value, or use the buttons beside it" = "Seçili bölümün temposu (BPM): bir değer yazın veya yandaki düğmeleri kullanın"
+"Twice the tempo: the audio plays half as fast" = "İki kat tempo: ses yarı hızda çalar"
+"Unfold all tracks" = "Tüm izleri aç"
+"Warp as {0}-bar loop" = "{0} ölçülük döngü olarak warp"
+"Warp from here (start at {0} BPM)" = "Buradan warp (başlangıç {0} BPM)"
+"Warp from here (straight)" = "Buradan warp (sabit)"
+"Warp from here" = "Buradan warp"
+"Warp {0} BPM from here" = "Buradan {0} BPM warp"
+"{0} warp markers placed" = "{0} warp işaretçisi yerleştirildi"
+"Whole range" = "Tüm aralık"
+"Tempo range shown" = "Gösterilen tempo aralığı"
+"Set the range..." = "Aralığı ayarla..."
+"Lowest and highest tempo of the tempo lane (BPM)" = "Tempo kanalının en düşük ve en yüksek temposu (BPM)"
+"Lowest" = "En düşük"
+"Highest" = "En yüksek"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
