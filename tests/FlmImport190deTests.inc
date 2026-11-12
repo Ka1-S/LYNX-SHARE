@@ -585,3 +585,97 @@ TEST (flm190de_slicer_detects_and_plays)
     CHECK (first < 64.0f && last > 11025 + 400 && last < 11025 + 800);
     CHECK (std::abs (l[100] - d.left[(std::size_t) (starts.size() == 4 ? starts[1] : 0) + 100]) < 0.05f);
 }
+
+// --- Arpeggiator and Note Echo, baked over the song (FLM_FORMAT §7.8)
+TEST (flm190de_arpeggiator_and_note_echo)
+{
+    using namespace lynx;
+    namespace nf = flmnotefx;
+    // the defaults with Arp 1 in a mode: Rate 1/8, Gate 50 %, Range 1, Octave 0, Start 0, Repeats inf, Arp 2 off
+    const auto arpParams = [] (int mode) {
+        std::vector<float> p (33, 0.0f);
+        p[0] = 1.0f, p[1] = 2.0f / 7.0f, p[2] = 4.0f / 19.0f, p[3] = 1.0f, p[7] = p[8] = 0.5f;
+        for (const int base : { 9, 20 })
+            p[(std::size_t) base] = 0.4444444f, p[(std::size_t) base + 3] = 0.5f, p[(std::size_t) base + 4] = 0.5f, p[(std::size_t) base + 6] = 0.5f;
+        p[31] = p[32] = 6.0f / 14.0f;
+        p[10] = (float) mode / 23.0f;
+        p[19] = 1.0f;
+        return p;
+    };
+    const std::vector<nf::TimedNote> chord { { 0.0, 4.0, 60, 0.8f, 0.5f }, { 0.0, 4.0, 64, 0.8f, 0.5f }, { 0.0, 4.0, 67, 0.8f, 0.5f } };
+    bool random = true;
+    const auto up = nf::arpeggiate (arpParams (2), chord, 120.0, 4, random);
+    CHECK (! random && up.size() == 8);
+    static constexpr int upKeys[] = { 60, 64, 67 };
+    if (up.size() == 8)
+        for (int i = 0; i < 8; ++i)
+            CHECK (std::abs (up[(std::size_t) i].start - 0.5 * i) < 1e-9 && std::abs (up[(std::size_t) i].end - up[(std::size_t) i].start - 0.25) < 1e-6
+                   && up[(std::size_t) i].key == upKeys[i % 3] && std::abs (up[(std::size_t) i].velocity - 0.8f) < 1e-6f);
+    // the spec's "Binary dance" Arp 1: Bass Up, rhythm R2 rotated by 2 → 0.5 60, 1.0 64, 2.0 60, 2.5 67, 3.5 60
+    auto dance = arpParams (9);
+    dance[14] = 2.0f / 21.0f, dance[15] = 1.0f;
+    const auto d = nf::arpeggiate (dance, chord, 120.0, 4, random);
+    CHECK (d.size() == 5);
+    if (d.size() == 5)
+    {
+        const double at[] = { 0.5, 1.0, 2.0, 2.5, 3.5 };
+        const int key[] = { 60, 64, 60, 67, 60 };
+        for (int i = 0; i < 5; ++i)
+            CHECK (std::abs (d[(std::size_t) i].start - at[i]) < 1e-9 && d[(std::size_t) i].key == key[i]);
+    }
+    // a chord that starts between grid points plays at the next one; the arp notes end at the release
+    const std::vector<nf::TimedNote> late { { 0.3, 1.2, 60, 1.0f, 0.5f } };
+    const auto l = nf::arpeggiate (arpParams (2), late, 120.0, 4, random);
+    CHECK (l.size() == 2 && std::abs (l[0].start - 0.5) < 1e-9 && std::abs (l[1].start - 1.0) < 1e-9 && std::abs (l[1].end - 1.2) < 1e-9);
+
+    // Note Echo: the spec's third vector (4 echoes of a 1/4 beat, ×0.55 velocity, +7 per echo, drift 1.15, length
+    // ×0.75, pan drift +0.25 with ping-pong)
+    std::vector<float> e (16, 0.5f);
+    e[0] = 1.0f, e[1] = 0.125f, e[2] = 0.24253564f, e[3] = 0.16568f, e[4] = 1.0f, e[7] = 0.25f, e[8] = 19.0f / 24.0f, e[9] = 0.75f, e[10] = 0.25f,
+    e[11] = 0.0f, e[13] = 0.75f, e[14] = 1.0f, e[15] = 0.0f;
+    const auto echoes = nf::echo (e, { { 0.0, 0.125, 60, 0.8f, 0.5f } }, 120.0, random);
+    CHECK (! random && echoes.size() == 5);
+    if (echoes.size() == 5)
+    {
+        const double start[] = { 0.25, 0.58058, 0.96079, 1.39804 }, end[] = { 0.34375, 0.65092, 1.01354, 1.43762 };
+        const int key[] = { 67, 74, 81, 88 };
+        const float vel[] = { 0.44f, 0.242f, 0.1331f, 0.0732f }, pan[] = { 0.5f, 0.375f, 0.75f, 0.125f };
+        CHECK (echoes[0].key == 60 && echoes[0].end == 0.125);
+        for (int i = 0; i < 4; ++i)
+        {
+            const auto& x = echoes[(std::size_t) i + 1];
+            CHECK (std::abs (x.start - start[i]) < 2e-4 && std::abs (x.end - end[i]) < 2e-4 && x.key == key[i] && std::abs (x.velocity - vel[i]) < 2e-4f
+                   && std::abs (x.pan - pan[i]) < 1e-6f);
+        }
+    }
+    // a dry note longer than the delay ends at its first echo
+    std::vector<float> plain (16, 0.5f);
+    plain[0] = 1.0f, plain[1] = 0.25f, plain[2] = plain[3] = 0.24253564f, plain[4] = 1.0f, plain[11] = plain[14] = plain[15] = 0.0f;
+    const auto held = nf::echo (plain, { { 0.0, 1.0, 60, 0.8f, 0.5f } }, 120.0, random);
+    CHECK (held.size() == 9 && std::abs (held[0].end - 0.5) < 1e-9 && std::abs (held[8].start - 4.0) < 1e-3);
+
+    // on import: a rack with an Arpeggiator plays its notes as one pattern over the song
+    namespace t = flm190de;
+    const auto bytes = flm190bs::song ({ t::rack (flm::kindMaster, {}), t::rack (flm::kindNormal, { t::moduleWith (23, 2, t::superSawDefaults()), t::moduleWith (51, 3, arpParams (2)) }),
+                                         t::channel (flm::kindMaster, "MASTER", 0, {}),
+                                         t::channel (flm::kindNormal, "Arp", 1, { t::lane (0, "Arp", { t::clip (0, 4, 4, 0, 1, { { 0, 4, 60 }, { 0, 4, 64 }, { 0, 4, 67 } }),
+                                                                                                    t::clip (8, 4, 4, 0, 1, {}) }) }) });
+    FlpImportReport report;
+    const auto s = importFlm (bytes, flm190bs::anyFile (&report));
+    CHECK (s.has_value());
+    if (! s)
+        return;
+    const Pattern* baked = nullptr;
+    for (const auto& p : s->patterns)
+        if (p.name == "Arp (note effects)")
+            baked = &p;
+    CHECK (baked != nullptr && baked->notes.size() == 16); // (both clips hold the chord: beats 0…4 and 8…12)
+    if (baked != nullptr && baked->notes.size() == 16)
+        CHECK (baked->notes[0].start == 0 && baked->notes[0].key == 60 && baked->notes[1].start == ppq / 2 && baked->notes[1].key == 64
+               && baked->notes[8].start == 8 * ppq && baked->notes[8].key == 60);
+    int clips = 0;
+    for (const auto& c : s->playlist)
+        clips += c.kind == ClipKind::pattern;
+    CHECK (clips == 1 && report.converted.count ("FL Studio Mobile: Arpeggiator (note effect, baked over the song)") == 1
+           && report.droppedEffects.empty());
+}

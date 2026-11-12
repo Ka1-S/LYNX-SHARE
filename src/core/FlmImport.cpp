@@ -1129,6 +1129,116 @@ bool slicerState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
 }
 // --- end of round 190de --------------------------------------------------------------------------------------------
 
+// --- round 190de ---------------------------------------------------------------------------------------------------
+// A rack with an Arpeggiator or a Note Echo (FLM_FORMAT §7.8): both act in song time — the arpeggiator's steps sit on
+// the song's grid from beat 0, echoes run past their clip — so the rack's notes are taken from every note lane as the
+// song plays them (each clip's loop passes), run through the rack's note effects in the rack's order (Transpose,
+// Scale and Randomizer per note, Arpeggiator and Note Echo on the whole timeline) and written as one pattern that
+// starts with the song. Returns the pattern (−1: no notes). Slide notes and note repeats are left out (listed).
+int bakeTimeline (Ctx& ctx, const flm::Channel& ch, const std::vector<const flm::Module*>& modules, int channel, int keyLow, int keyHigh,
+                  const std::string& name)
+{
+    std::vector<flmnotefx::TimedNote> notes;
+    int skipped = 0;
+    for (const auto& lane : ch.lanes)
+    {
+        if (lane.kind() != flm::LaneKind::notes)
+            continue;
+        std::map<std::uint32_t, const flm::Clip*> content; // (clips with one content id share the first one's events)
+        for (const auto& clip : lane.clips)
+        {
+            const auto* source = content.emplace (clip.contentId, &clip).first->second;
+            const auto start = (double) clip.startTick / flm::ticksPerBeat;
+            for (const auto& pass : passesOf (clip))
+                for (const auto& e : source->events)
+                {
+                    if (e.key < 0)
+                        continue;
+                    if (e.slide != 0 || e.repeat > 0)
+                        ++skipped;
+                    if (e.slide != 0)
+                        continue;
+                    const auto beat = (double) e.tick / flm::ticksPerBeat;
+                    if (beat < pass.from - 1e-9 || beat >= pass.from + pass.length - 1e-9)
+                        continue;
+                    const auto at = start + pass.at + beat - pass.from;
+                    const auto end = std::min (at + std::max (e.length, 1.0 / flm::ticksPerBeat), start + pass.at + pass.length);
+                    notes.push_back ({ at, end, e.key, velocityOf (e), e.pan == 127 ? 0.5f : (float) e.pan / 255.0f });
+                }
+        }
+    }
+    std::stable_sort (notes.begin(), notes.end(), [] (const flmnotefx::TimedNote& a, const flmnotefx::TimedNote& b) { return a.start < b.start; });
+    if (notes.empty())
+        return -1;
+    // the note effects in the rack's order
+    flmnotefx::Chain segment;
+    bool random = false;
+    const auto flush = [&] {
+        if (segment.empty())
+            return;
+        random = random || segment.random();
+        std::vector<flmnotefx::TimedNote> kept;
+        for (auto n : notes)
+        {
+            flmnotefx::Note one { n.key, n.velocity, n.pan };
+            if (! segment.apply (one))
+                continue;
+            n.key = one.key, n.velocity = one.velocity, n.pan = one.pan;
+            kept.push_back (n);
+        }
+        notes = std::move (kept);
+        segment = flmnotefx::Chain {};
+    };
+    for (const auto* m : modules)
+    {
+        if (flmnotefx::timeEffectActive (m->type, m->params))
+        {
+            flush();
+            bool drawn = false;
+            notes = m->type == flmnotefx::arpeggiator ? flmnotefx::arpeggiate (m->params, notes, ctx.song.bpm, ctx.song.beatsPerBar, drawn)
+                                                       : flmnotefx::echo (m->params, notes, ctx.song.bpm, drawn);
+            random = random || drawn;
+        }
+        else
+            segment.add (m->type, m->params);
+    }
+    flush();
+    Pattern p;
+    p.name = name + " (note effects)";
+    double last = 0.0;
+    int outside = 0;
+    for (const auto& n : notes)
+    {
+        if (n.key < keyLow || n.key > keyHigh)
+        {
+            ++outside;
+            continue;
+        }
+        Note out;
+        out.channel = channel;
+        out.key = std::clamp (n.key, 0, 127);
+        out.start = ticksOf (n.start);
+        out.length = std::max<std::int64_t> (1, ticksOf (n.end - n.start));
+        out.velocity = n.velocity;
+        out.pan = std::clamp (2.0f * n.pan - 1.0f, -1.0f, 1.0f);
+        p.notes.push_back (out);
+        last = std::max (last, n.end);
+    }
+    const auto bar = (double) std::max (1, ctx.song.beatsPerBar);
+    p.lengthTicks = std::max<std::int64_t> (ticksOf (bar), ticksOf (std::ceil (last / bar) * bar));
+    p.sortNotes();
+    ctx.song.patterns.push_back (std::move (p));
+    ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: notes of a rack with an Arpeggiator or Note Echo (one pattern over the song)");
+    if (random)
+        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: random note effect (drawn once at import; FLM draws at every playback)");
+    if (skipped > 0 && ctx.report != nullptr)
+        ctx.report->partialEffects["FL Studio Mobile: slide notes or note repeats in a rack with an Arpeggiator or Note Echo (not played)"] += skipped;
+    if (outside > 0 && ctx.report != nullptr)
+        ctx.report->converted["FL Studio Mobile: notes outside the instrument's key range (silent in FLM too)"] += outside;
+    return (int) ctx.song.patterns.size() - 1;
+}
+// --- end of round 190de --------------------------------------------------------------------------------------------
+
 // The channel playing one of a rack's generators (F1: FLM's DW Sampler with one sample → a sampler, F3; any other
 // generator → its LYNX engine, or the built-in synth listed in the report until its engine is mapped, F4).
 ChannelDef instrumentChannel (Ctx& ctx, const flm::Module* gen, const flm::Channel& ch, int insert)
@@ -1764,6 +1874,12 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
         std::vector<const flm::Module*> generators;
         flmnotefx::Chain noteFx;
         bool effectSeen = false, generatorAfterEffect = false;
+        // round 190de: an Arpeggiator or a Note Echo acts in time: the rack's notes are then baked over the song
+        // (bakeTimeline below), every note effect in its place in the rack's order
+        std::vector<const flm::Module*> noteModules;
+        const auto timeline = std::any_of (rack.modules.begin(), rack.modules.end(), [] (const flm::Module& m) {
+            return flmnotefx::timeEffectActive (m.type, m.params);
+        });
         for (const auto& m : rack.modules)
         {
             if (flm::isGenerator (m.type))
@@ -1775,6 +1891,15 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             if (flm::moduleCategory (m.type) == flm::ModuleCategory::noteEffect)
             {
                 const auto on = m.params.empty() || m.params[0] >= 0.5f;
+                noteModules.push_back (&m);
+                if (timeline)
+                {
+                    if (flmnotefx::timeEffectActive (m.type, m.params))
+                        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: " + moduleLabel (m.type) + " (note effect, baked over the song)");
+                    else if (on && (m.type == flmnotefx::transpose || m.type == flmnotefx::scale || m.type == flmnotefx::randomizer))
+                        ctx.note (&FlpImportReport::converted, "FL Studio Mobile: " + moduleLabel (m.type) + " (note effect)");
+                    continue;
+                }
                 if (noteFx.add (m.type, m.params))
                     ctx.note (&FlpImportReport::converted, "FL Studio Mobile: " + moduleLabel (m.type) + " (note effect)");
                 else if (on)
@@ -1973,9 +2098,37 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                 instrumentIndex();
         }
 
+        // round 190de: a rack with an Arpeggiator or a Note Echo: its note lanes' notes on the song timeline, through
+        // the rack's note effects in order, as one pattern over the song (placed on the first note lane's row)
+        int timelinePattern = -1;
+        if (timeline && ch.kind == flm::kindNormal)
+            timelinePattern = bakeTimeline (ctx, ch, noteModules, instrumentIndex(), keyLow, keyHigh, name);
+
         for (const auto& lane : ch.lanes)
         {
             const auto kind = lane.kind();
+            if (kind == flm::LaneKind::notes && timelinePattern != -1 && ! lane.clips.empty())
+            {
+                // (the rack's notes are in the baked pattern: its first note lane holds it, once, from the song's start)
+                PlaylistTrack row;
+                row.name = lane.name.empty() ? name : lane.name;
+                row.mixerTrack = insert;
+                row.mode = PlaylistTrackMode::instrument;
+                row.channel = instrument;
+                song.playlistTracks.push_back (row);
+                if (timelinePattern >= 0)
+                {
+                    Clip c;
+                    c.kind = ClipKind::pattern;
+                    c.pattern = timelinePattern;
+                    c.track = (int) song.playlistTracks.size() - 1;
+                    c.start = 0;
+                    c.length = song.patterns[(std::size_t) timelinePattern].lengthTicks;
+                    song.playlist.push_back (c);
+                    timelinePattern = -2; // (placed)
+                }
+                continue;
+            }
             if (kind == flm::LaneKind::automation)
             {
                 if (lane.clips.empty())
