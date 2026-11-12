@@ -52,7 +52,7 @@ TEST (echoform_voicing_stereo_params_round150a)
     using namespace lynx;
     namespace e = echosuite::echoform;
     CHECK ((int) effectInfo (EffectKind::echoform).params.size() == e::paramCount);
-    CHECK (e::voicingStereo == e::multiply + 1 && e::lrOffset == e::paramCount - 1); // appended after round 147's
+    CHECK (e::voicingStereo == e::multiply + 1 && e::lrOffset + 1 == e::engineLaw); // appended after round 147's (round 190dl appends after them)
     CHECK (e::paramCount <= maxEffectParams);
     auto slot = makeEffectSlot (EffectKind::echoform);
     CHECK (slot.params[e::voicingStereo] >= 0.5f);                          // new instances: the measured behaviour
