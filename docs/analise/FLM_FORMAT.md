@@ -543,6 +543,9 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
    Wet Pan (a balance of the wet). Left: Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor, Spreader,
    Stereoizer, Flanger, Autoduck (29), Tremolo, Note Echo and the Arpeggiator (Transpose, Scale and Randomizer:
    round 190bs, §7.2).
+   Round 190by: SuperSaw (Pocket SuperSaw), Comb Filter, Multiband Compressor and Tape Stop are LYNX engines; Reverb
+   (32) maps to Reeverb 2 and Tuned EQ (30) to the Parametric EQ (REA_rodada190by.md). Parameter counts read in the
+   code: 30 = 11, 32 = 16 (14 and 15 are unnamed wet and dry levels), 42 = 8.
 5. HEAD 272/280 (loop range).
 6. (round 190bs) The sample slot: the third `MAIN` tail field (f32 0.5) and `LINk`'s second word; where a slot with
    an output link plays; the stretch modes' algorithms (LYNX uses its own stretcher); how a kit sample's legacy `STRC`

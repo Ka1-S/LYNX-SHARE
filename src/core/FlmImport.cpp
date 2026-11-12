@@ -15,6 +15,7 @@
 #include "core/SoundFont.h"
 #include "core/GmsMobile.h"
 #include "core/MiniSynth.h"
+#include "core/PocketSuperSaw.h"
 #include "core/TransistorBass.h"
 #include "core/ThreeOsc.h"
 #include "core/MissingFiles.h"
@@ -541,6 +542,25 @@ bool gmSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     return true;
 }
 
+// --- round 190by ---------------------------------------------------------------------------------------------------
+// FLM's SuperSaw (module 23) → Pocket SuperSaw (core/PocketSuperSaw.h): the module's 60 parameters as they are (the
+// engine reads FLM's own 0…1 values; FLM's parameter 0, Enable, becomes the channel's mute). No data file needed.
+bool superSawState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
+{
+    auto values = pocketSuperSawParams (m.params);
+    if (values.empty())
+        return false;
+    c.instrument = InstrumentKind::pocketSuperSaw;
+    c.modelParams = std::move (values);
+    c.pluginState.clear();
+    c.samplePath.clear();
+    if (std::isfinite (m.params[0]) && m.params[0] < 0.5f)
+        c.muted = true;
+    ctx.note (&FlpImportReport::converted, "FL Studio Mobile: SuperSaw");
+    return true;
+}
+// --- end of round 190by --------------------------------------------------------------------------------------------
+
 // FLM's 3x Osc → LYNX's 3x Osc engine and FL's channel settings (F4, round 190u). FLM's module is the desktop
 // plugin plus the channel's voice processor, echo delay, arpeggiator, polyphony and tracking as 148 parameters 0…1,
 // and it carries its own converter from the desktop's raw values (REA spec of round 190n), so every parameter goes
@@ -816,6 +836,8 @@ ChannelDef instrumentChannel (Ctx& ctx, const flm::Module* gen, const flm::Chann
     if (gen->type == flm::module::gmSynth && gmSynthState (ctx, *gen, c))
         return c;
     if (gen->type == flm::module::soundFont && soundFontState (ctx, *gen, c))
+        return c;
+    if (gen->type == flm::module::superSaw && superSawState (ctx, *gen, c)) // round 190by
         return c;
     ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: " + moduleLabel (gen->type) + (gen->type == flm::module::dwSampler ? " (multisample)" : ""));
     return c;

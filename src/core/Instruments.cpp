@@ -22,6 +22,7 @@
 #include "core/SytrusEngine.h"
 #include "core/Harmor.h"
 #include "core/MiniSynth.h"
+#include "core/PocketSuperSaw.h"
 #include "core/SimSynth.h"
 #include "core/Wasp.h"
 #include "core/Plucked.h"
@@ -321,6 +322,7 @@ private:
             case InstrumentKind::fruityslicer:
             case InstrumentKind::slicex:
             case InstrumentKind::fpc:
+            case InstrumentKind::pocketSuperSaw:
             case InstrumentKind::drumaxx:
             case InstrumentKind::slayer:
             case InstrumentKind::fruitydance:
@@ -3690,6 +3692,8 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
         return makeSlicexInstrument (std::move (sample), nullptr); // (deck B's sample comes from RackRenderer)
     if (kind == InstrumentKind::fpc) // (without its channel: no pads; the rack builds it from the channel's kit)
         return makeFpcInstrument ({}, {});
+    if (kind == InstrumentKind::pocketSuperSaw)
+        return makePocketSuperSawInstrument();
     if (kind == InstrumentKind::drumaxx)
         return makeDrumaxxInstrument();
     if (kind == InstrumentKind::slayer)

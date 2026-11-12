@@ -529,6 +529,7 @@ public:
         drumaxx = def.instrument == InstrumentKind::drumaxx;
         slayer = def.instrument == InstrumentKind::slayer;
         fruityDance = def.instrument == InstrumentKind::fruitydance;
+        pocketSuperSaw = def.instrument == InstrumentKind::pocketSuperSaw; // round 190by
         // round 168q: the engines that run FL's own files say so when this computer lacks them
         engineFilesMissing = ((kepler || keplerExo) && ! keplerDllUsable (def.samplePath))
                           || (transistorBass && ! transistorBassIsFlm (def) && ! transistorBassDllUsable (def.samplePath)) // (FLM's build needs no file)
@@ -2178,6 +2179,7 @@ public:
                : drumaxx ? tr ("Drumaxx — FL's physical drum engine (pads on their keys; patterns not played)")
                : slayer ? tr ("FL Slayer — FL's engine with its effects, amp and cabinet (picks read from your FL installation; new settings restart the voices)")
                : sytrus ? tr ("Sytrus — FL's engine, main settings (operators, filters and effects keep the saved patch)")
+               : pocketSuperSaw ? tr ("Pocket SuperSaw — LYNX's engine for FL Studio Mobile's SuperSaw")
                : fruityDance ? tr ("Fruity Dance — a visual plugin: it makes no sound, the channel keeps its settings")
                : boobass ? tr ("BooBass — FL's engine, its sound read from your FL installation (knobs: 3-band EQ)")
                : sakura ? tr ("Sakura — physical strings (FL's engine; new parameters apply to the next note)")
@@ -2653,7 +2655,7 @@ private:
     std::unique_ptr<skin::ArtLayer> artLayer;      // the art's moving part (petals, a glowing trefoil...)
     bool sakura = true, boobass = false, drumsynth = false, harmless = false, harmor = false, gms = false, morphine = false, ogun = false, autogun = false, transistorBass = false, transistorBassMobile = false, miniSynth = false, dx10 = false, kepler = false, keplerExo = false, poizone = false,
          fruitkick = false, bassdrum = false, toxic = false, threeOsc = false, simSynth = false, wasp = false, plucked = false, beepMap = false,
-         sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, sytrus = false, wavesFound = false,
+         sawer = false, flKeys = false, granulizer = false, drumaxx = false, slayer = false, fruityDance = false, pocketSuperSaw = false, sytrus = false, wavesFound = false,
          engineFilesMissing = false;
     int editorKey = 60;
     int drumPart = 0; // round 168p: the Drumaxx pad / DrumSynth Live key the per-part knobs edit
@@ -5250,7 +5252,7 @@ bool isModelKind (InstrumentKind kind) noexcept
            || kind == InstrumentKind::simsynth || kind == InstrumentKind::wasp || kind == InstrumentKind::plucked
            || kind == InstrumentKind::beepmap || kind == InstrumentKind::sawer || kind == InstrumentKind::flkeys
            || kind == InstrumentKind::granulizer || kind == InstrumentKind::drumaxx
-           || kind == InstrumentKind::slayer || kind == InstrumentKind::fruitydance || kind == InstrumentKind::sytrus;
+           || kind == InstrumentKind::slayer || kind == InstrumentKind::fruitydance || kind == InstrumentKind::sytrus || kind == InstrumentKind::pocketSuperSaw;
 }
 
 // The instrument page of a channel or a Patcher node (null: none of its own)
@@ -5464,6 +5466,7 @@ bool hasChannelSettings (InstrumentKind kind) noexcept
         case InstrumentKind::fruityslicer:
         case InstrumentKind::slicex:
         case InstrumentKind::fpc:
+        case InstrumentKind::pocketSuperSaw:
             return true;
         default:
             return false;
@@ -5572,7 +5575,7 @@ std::unique_ptr<juce::Component> makeChannelSettingsPanel (AudioEngine& engine, 
                  || kind == InstrumentKind::simsynth || kind == InstrumentKind::wasp || kind == InstrumentKind::plucked
                  || kind == InstrumentKind::beepmap || kind == InstrumentKind::sawer || kind == InstrumentKind::flkeys
                  || kind == InstrumentKind::granulizer || kind == InstrumentKind::drumaxx
-                 || kind == InstrumentKind::slayer || kind == InstrumentKind::fruitydance || kind == InstrumentKind::sytrus)
+                 || kind == InstrumentKind::slayer || kind == InstrumentKind::fruitydance || kind == InstrumentKind::sytrus || kind == InstrumentKind::pocketSuperSaw)
         return std::make_unique<ModelPanel> (engine, ChannelRef::rack (channel));
 
     return std::make_unique<SettingsPanel> (engine, ChannelRef::rack (channel));

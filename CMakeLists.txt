@@ -111,6 +111,7 @@ add_library(lynx_core STATIC
     src/core/Harmor.cpp
     src/core/Gms.cpp
     src/core/GmsMobile.cpp
+    src/core/PocketSuperSaw.cpp
     src/core/Morphine.cpp
     src/core/FruitKick.cpp
     src/core/BassDrum.cpp
@@ -144,7 +145,7 @@ add_library(lynx_core STATIC
     src/core/FlLegacyFx.cpp
     src/core/PocketFx.cpp
     src/core/PocketMultiFx.cpp
-    src/core/PocketFxA.cpp src/core/PocketFxB.cpp src/core/PocketFxC.cpp
+    src/core/PocketFxA.cpp src/core/PocketFxB.cpp src/core/PocketFxC.cpp src/core/PocketFxD.cpp
     src/core/VisualFx.cpp
     src/core/FlExtraFx.cpp
     src/core/Scratcher.cpp

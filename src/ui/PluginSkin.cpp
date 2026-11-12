@@ -43,7 +43,7 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::epochVerb: case EffectKind::atrium: case EffectKind::foilPlate: case EffectKind::nebula: case EffectKind::halo:
         case EffectKind::horizon:
             return colour::violet;
-        case EffectKind::delay: case EffectKind::fruityDelay2: case EffectKind::fruityDelay3: case EffectKind::fruityDelayBank: case EffectKind::pocketTranceDelay: case EffectKind::pocketTapeDelay:
+        case EffectKind::delay: case EffectKind::fruityDelay2: case EffectKind::fruityDelay3: case EffectKind::fruityDelayBank: case EffectKind::pocketTranceDelay: case EffectKind::pocketTapeDelay: case EffectKind::pocketTapeStop:
         case EffectKind::multibandDelay: case EffectKind::echoform: case EffectKind::spiralEcho: case EffectKind::geminiDoubler:
         case EffectKind::newtime:
             return colour::azure;
@@ -57,7 +57,7 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor: case EffectKind::shellChannel: case EffectKind::strikeShaper:
         case EffectKind::maximus: case EffectKind::peakController: case EffectKind::pocketLimiterClassic: case EffectKind::pocketLimiter: case EffectKind::pocketLeveller: case EffectKind::pocketGate:
         case EffectKind::pocketAutoduck:
-        case EffectKind::pocketCompressor:
+        case EffectKind::pocketCompressor: case EffectKind::pocketMultiband:
             return colour::amber;
         case EffectKind::distortion: case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::ember: case EffectKind::kilnChannel: case EffectKind::fretChannel:
         case EffectKind::hardcore: case EffectKind::distructor: case EffectKind::fruityWaveShaper: case EffectKind::fruitySoftClipper:

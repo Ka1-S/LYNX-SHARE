@@ -152,8 +152,10 @@ enum class InstrumentKind : std::uint8_t
                    // the sample in samplePath; the sampler's voices play the slices
     slicex,        // FL's Slicex (rounds 190h / 190l, core/SlicexInstrument.h): FL's state in pluginState, deck A's sample in
                    // samplePath, deck B's in zones[0].path
-    fpc            // FL's FPC (round 190q, core/Fpc.h, core/FpcInstrument.h): the kit's FL state in pluginState, the files of its
+    fpc,           // FL's FPC (round 190q, core/Fpc.h, core/FpcInstrument.h): the kit's FL state in pluginState, the files of its
                    // layers in `zones` (one per layer with a sample, in the state's order; only `path` is used)
+    pocketSuperSaw // Pocket SuperSaw (round 190by, core/PocketSuperSaw.h): FL Studio Mobile's SuperSaw module; its 59
+                   // values 0…1 in modelParams (FLM's parameter k + 1 at index k)
 };
 
 // External plugin: format identifier (the app knows how to find the file) + saved state.
@@ -1064,6 +1066,9 @@ enum class EffectKind : std::uint8_t
     pocketWaveshaper,      // Pocket Waveshaper, FL Studio Mobile's Waveshaper, exact (round 189h, core/PocketFxC.cpp): FLM's 20 values
     pocketCompressor,      // Pocket Compressor, FL Studio Mobile's Compressor, exact (round 189h, core/PocketFxC.cpp): FLM's 9 values
     pocketSpreader,        // Pocket Spreader, FL Studio Mobile's Spreader, exact (round 189h, core/PocketFxC.cpp): FL's Spreader engine, FLM's 4 values
+    pocketComb, // Pocket Comb Filter, FL Studio Mobile's Comb Filter (round 190by, core/PocketFxD.cpp): FLM's 11 values
+    pocketMultiband, // Pocket Multiband Compressor, FL Studio Mobile's Multiband Compressor (round 190by, core/PocketFxD.cpp): FLM's 30 values
+    pocketTapeStop, // Pocket Tape Stop, FL Studio Mobile's Tape Stop (round 190by, core/PocketFxD.cpp): FLM's 7 values
     rackMixer        // a rack chain's mixer (round 183c, core/Rack.h): volume (Live's chain taper), pan, chain-select gain; inside racks only
 };
 // the last EffectKind (loops over every kind; update when one is appended)

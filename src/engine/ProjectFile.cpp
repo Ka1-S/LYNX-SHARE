@@ -136,6 +136,7 @@ const char* instrumentId (InstrumentKind k)
         case InstrumentKind::fruityslicer: return "fruityslicer";
         case InstrumentKind::slicex: return "slicex";
         case InstrumentKind::fpc: return "fpc";
+        case InstrumentKind::pocketSuperSaw: return "pocketsupersaw";
     }
     return "synth";
 }
@@ -150,7 +151,7 @@ InstrumentKind instrumentFromId (const juce::String& id)
                     InstrumentKind::fruitkick, InstrumentKind::bassdrum, InstrumentKind::toxic,
                     InstrumentKind::threeosc, InstrumentKind::autogun, InstrumentKind::transistorbass,
                     InstrumentKind::simsynth, InstrumentKind::wasp, InstrumentKind::plucked, InstrumentKind::beepmap, InstrumentKind::sawer, InstrumentKind::flkeys,
-                    InstrumentKind::granulizer, InstrumentKind::drumaxx, InstrumentKind::slayer, InstrumentKind::fruitydance, InstrumentKind::directwave, InstrumentKind::midiOut, InstrumentKind::patcher, InstrumentKind::soundfont, InstrumentKind::layer, InstrumentKind::dashboard, InstrumentKind::voltage, InstrumentKind::vfx, InstrumentKind::videoplayer, InstrumentKind::keplerExo, InstrumentKind::wavetraveller, InstrumentKind::fruityslicer, InstrumentKind::slicex, InstrumentKind::fpc })
+                    InstrumentKind::granulizer, InstrumentKind::drumaxx, InstrumentKind::slayer, InstrumentKind::fruitydance, InstrumentKind::directwave, InstrumentKind::midiOut, InstrumentKind::patcher, InstrumentKind::soundfont, InstrumentKind::layer, InstrumentKind::dashboard, InstrumentKind::voltage, InstrumentKind::vfx, InstrumentKind::videoplayer, InstrumentKind::keplerExo, InstrumentKind::wavetraveller, InstrumentKind::fruityslicer, InstrumentKind::slicex, InstrumentKind::fpc, InstrumentKind::pocketSuperSaw })
         if (id == instrumentId (k))
             return k;
 
@@ -259,6 +260,9 @@ const char* effectId (EffectKind k)
         case EffectKind::pocketWaveshaper: return "pocketWaveshaper";
         case EffectKind::pocketCompressor: return "pocketCompressor";
         case EffectKind::pocketSpreader: return "pocketSpreader";
+        case EffectKind::pocketComb: return "pocketComb";
+        case EffectKind::pocketMultiband: return "pocketMultiband";
+        case EffectKind::pocketTapeStop: return "pocketTapeStop";
         case EffectKind::rackMixer: return "rackMixer";
         case EffectKind::lynxTune: return "lynxTune";
         case EffectKind::fruityPhaser: return "fruityPhaser";
@@ -1267,6 +1271,9 @@ std::optional<EffectKind> effectFromId (const juce::String& id)
                     EffectKind::pocketAutoduck, EffectKind::pocketChorus, EffectKind::pocketSpacer, EffectKind::pocketStereoizer,
                     EffectKind::pocketWowFlutter, EffectKind::pocketPhaser, EffectKind::pocketFlanger, EffectKind::pocketTremolo,
                     EffectKind::pocketWaveshaper, EffectKind::pocketCompressor, EffectKind::pocketSpreader,
+                    EffectKind::pocketComb, // round 190by
+                    EffectKind::pocketMultiband, // round 190by
+                    EffectKind::pocketTapeStop, // round 190by
                     EffectKind::xyController, EffectKind::xyzController, EffectKind::controlSurface, EffectKind::hardwareInsert,
                     EffectKind::fruityMute2, EffectKind::bigClock, EffectKind::tuner, EffectKind::htmlNotebook,
                     EffectKind::scratcher, EffectKind::transmitter, EffectKind::flEmphasis, EffectKind::flTransporter,
