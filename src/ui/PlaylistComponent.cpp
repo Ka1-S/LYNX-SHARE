@@ -1,4 +1,6 @@
 #include "core/FlCurve.h"
+#include "core/LayoutStyle.h"
+#include "ui/ClipGridComponent.h"
 #include "ui/CleanVoiceMenu.h"
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
@@ -2845,6 +2847,39 @@ void PlaylistComponent::paintLaneHeaders (juce::Graphics& g, juce::Rectangle<int
     }
 }
 
+bool PlaylistComponent::dragOutToClipGrid (const juce::MouseEvent& e)
+{
+    // only in the Clip-launch layout, with the mouse off the Playlist and over the clip grid beside it
+    if (layoutstyle::current() != layoutstyle::Style::clipLaunch || getLocalBounds().contains (e.getPosition()))
+        return false;
+    const auto& song = engine.getSong();
+    if (dragClip < 0 || dragClip >= (int) song.playlist.size() || dragIndices.size() != dragOriginals.size())
+        return false;
+    const auto kind = song.playlist[(std::size_t) dragClip].kind;
+    if (kind != ClipKind::pattern && kind != ClipKind::audio)
+        return false;
+    if (! isClipGrid (juce::Desktop::getInstance().findComponentAt (e.getScreenPosition())))
+        return false;
+    auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this);
+    if (container == nullptr || container->isDragAndDropActive())
+        return false;
+    engine.editSong ([this] (Song& s) {
+        for (std::size_t j = 0; j < dragIndices.size(); ++j)
+            if (const auto i = dragIndices[j]; i >= 0 && i < (int) s.playlist.size())
+                s.playlist[(std::size_t) i] = dragOriginals[j];
+    });
+    juce::Image image (juce::Image::ARGB, 96, 22, true);
+    {
+        juce::Graphics g (image);
+        g.setColour (theme::colour::accent.withAlpha (0.85f));
+        g.fillRoundedRectangle (image.getBounds().toFloat().reduced (1.0f), 3.0f);
+    }
+    container->startDragging (playlistClipDragDescription (dragClip), this, juce::ScaledImage (image), false);
+    drag = Drag::none;
+    repaint();
+    return true;
+}
+
 bool PlaylistComponent::laneMouseDown (const juce::MouseEvent& e)
 {
     const auto hit = laneAt (e.getPosition());
@@ -4808,6 +4843,8 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 
         case Drag::move:
         {
+            if (dragOutToClipGrid (e)) // round 190ef
+                return;
             const auto grabbedAt = (std::size_t) (std::find (dragIndices.begin(), dragIndices.end(), dragClip) - dragIndices.begin());
             const auto& grabbed = dragOriginals[grabbedAt];
             auto deltaTicks = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn) + grabOffset) - grabbed.start;

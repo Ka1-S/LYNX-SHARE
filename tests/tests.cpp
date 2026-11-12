@@ -17520,6 +17520,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Edison190cdTests.inc"
 #include "Warp190cgTests.inc"
 #include "LiveScr190drTests.inc"
+#include "LiveWf190efScenesTests.inc"
 #include "BandlabExtras190chTests.inc"
 #include "DanceFix190cjTests.inc"
 #include "Reverb190bzTests.inc"

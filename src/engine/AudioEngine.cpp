@@ -12,6 +12,7 @@
 #include "engine/SessionPack.h"
 
 #include "core/ClipOps.h"
+#include "core/SessionOps.h"
 #include "core/MarkerPlan.h"
 #include "engine/AudioLogger.h"
 
@@ -1375,6 +1376,36 @@ CaptureResult AudioEngine::captureMidi()
         return {};
     CaptureResult result;
     editSong ([&] (Song& s) { result = lynx::captureMidi (s, log, o); });
+    if (result.newestMs > lastCaptureMs)
+        lastCaptureMs = result.newestMs;
+    return result;
+}
+
+CaptureResult AudioEngine::captureMidiToSlot (int track, int scene, const std::string& name, int& placed)
+{
+    placed = -1;
+    CaptureOptions o;
+    o.afterMs = lastCaptureMs;
+    o.nowMs = juce::Time::getMillisecondCounterHiRes();
+    o.gapMs = 2.0 * juce::jmax (1, song.beatsPerBar) * 60000.0 / juce::jmax (1.0, song.bpm);
+    const auto log = scoreLogSnapshot();
+    const auto phrase = capturePhrase (song, log, o);
+    if (phrase.empty() || track < 0 || track >= launcher::maxTracks)
+        return {};
+    std::int64_t length = 0;
+    auto notes = session::phraseNotes (phrase, o.nowMs, song.bpm, song.beatsPerBar, length);
+    CaptureResult result;
+    result.notes = (int) notes.size();
+    result.played = phrase.front().startTick >= 0.0;
+    for (const auto& e : phrase)
+        result.newestMs = juce::jmax (result.newestMs, e.startMs);
+    const auto row = session::captureSlot (song, track, scene);
+    editSong ([&] (Song& s) {
+        if (session::placeRecordedPattern (s, track, row, std::move (notes), length, name) >= 0)
+            placed = row;
+    });
+    if (placed < 0)
+        return {};
     if (result.newestMs > lastCaptureMs)
         lastCaptureMs = result.newestMs;
     return result;

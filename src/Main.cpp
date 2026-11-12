@@ -2038,6 +2038,16 @@ public:
             return;
         }
 
+        if (args.contains ("--sceneshot190ef"))
+        {
+            // LYNX.exe --sceneshot190ef prefix: round 190ef's scene work off-screen, in the Clip-launch workflow: the scene
+            // column with its tempo / time signature fields, the scene menu, a scene field's menu, the column title's menu
+            // (Rename, colours), a duplicated scene and a captured scene. Writes prefix-checks.txt.
+            runSceneShot190ef (args[args.indexOf ("--sceneshot190ef") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--liveshot190dr"))
         {
             // LYNX.exe --liveshot190dr prefix: round 190dr off-screen, in the Clip-launch workflow: the Session mixer
@@ -16641,6 +16651,119 @@ private:
         store = {};
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
         lib.deleteRecursively();
+    }
+
+    void runSceneShot190ef (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto write = [&prefix] (juce::Component& c, const char* name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (c), out);
+        };
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        ui.setVisible (true);
+        lynx::DetailView::shownSetting = false;
+        ui.setClipLaunchWorkflow (true);
+        ui.showPanelsForSnapshot ({ lynx::workspace::Panel::playlist });
+        offline.editSong ([] (lynx::Song& s) {
+            const int channels = (int) s.channels.size();
+            s.channels.resize ((std::size_t) channels + 3);
+            const char* names[] { "Drum kit", "Bass synth", "Keys" };
+            for (int k = 0; k < 3; ++k)
+            {
+                auto& ch = s.channels[(std::size_t) (channels + k)];
+                ch.name = names[k];
+                ch.instrument = k == 0 ? lynx::InstrumentKind::sampler : lynx::InstrumentKind::synth;
+            }
+            while (s.patterns.size() < 3)
+                s.patterns.emplace_back();
+            const char* patterns[] { "Beat", "Bassline", "Chords" };
+            for (int p = 0; p < 3; ++p)
+            {
+                auto& pattern = s.patterns[(std::size_t) p];
+                pattern.name = patterns[p];
+                lynx::Note n;
+                n.channel = channels + p;
+                n.key = 48 + p * 5;
+                pattern.notes = { n };
+                pattern.lengthTicks = 4 * lynx::ppq;
+            }
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 6));
+            const char* tracks[] { "Drums", "Bass", "Keys" };
+            const std::uint32_t colours[] { 0xFFE0533Bu, 0xFF3B8BE0u, 0xFF46C27Au };
+            for (int t = 0; t < 3; ++t)
+            {
+                s.playlistTracks[(std::size_t) t].name = tracks[t];
+                s.playlistTracks[(std::size_t) t].colour = colours[t];
+            }
+            for (int t = 0; t < 3; ++t)
+                for (int r = 0; r < 3; ++r)
+                    if (! (t == 2 && r == 0))
+                    {
+                        lynx::Clip clip;
+                        clip.pattern = t;
+                        clip.length = 4 * lynx::ppq;
+                        lynx::launcher::setClip (s, t, r, clip);
+                    }
+            auto& grid = lynx::launcher::ensureGrid (s);
+            grid.scenes.resize (4);
+            const char* scenes[] { "Intro", "Verse", "Drop" };
+            for (int r = 0; r < 3; ++r)
+                grid.scenes[(std::size_t) r].name = scenes[r];
+            lynx::session::setSceneTempo (s, 1, 128.0);
+            lynx::session::setSceneBeats (s, 2, 3);
+            grid.scenes[2].colour = 0xFF8E5BD6u;
+        }, false);
+        offline.dispatchPendingMessages();
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+        offline.dispatchPendingMessages();
+        ui.resized();
+        auto* gridView = ui.getClipGridForSnapshot();
+        if (gridView == nullptr)
+        {
+            juce::File (prefix + "-checks.txt").replaceWithText ("FAIL no grid\n");
+            return;
+        }
+        lynx::clipGridSceneTempoShown() = true;
+        lynx::refreshClipGrid (*gridView);
+        lynx::selectClipGridScene (*gridView, 1);
+        write (*gridView, "01-scene-fields");
+        saveMenus (juce::StringArray { "Scene menu (Verse)" }, std::vector<juce::PopupMenu> { lynx::clipGridSceneMenu (*gridView, 1) }, prefix + "-02-scene-menu.png");
+        saveMenus (juce::StringArray { "Scene tempo field", "Scene time signature field" },
+                   std::vector<juce::PopupMenu> { lynx::clipGridSceneFieldMenu (*gridView, 1, 1), lynx::clipGridSceneFieldMenu (*gridView, 2, 2) },
+                   prefix + "-03-field-menus.png");
+        saveMenus (juce::StringArray { "Column title (Bass)" }, std::vector<juce::PopupMenu> { lynx::clipGridHeaderMenu (*gridView, 1) }, prefix + "-04-title-menu.png");
+        const auto clipsIn = [&offline] (int row) {
+            int n = 0;
+            if (const auto& g = offline.getSong().clipGrid)
+                for (int t = 0; t < 8; ++t)
+                    n += lynx::launcher::clipAt (*g, t, row) != nullptr ? 1 : 0;
+            return n;
+        };
+        const auto before = clipsIn (1);
+        const auto dup = lynx::duplicateClipGridScene (*gridView, 1);
+        offline.dispatchPendingMessages();
+        const auto& scenesNow = offline.getSong().clipGrid->scenes;
+        check ("duplicate: Verse's copy is row 2, with its clips and tempo", dup == 2 && clipsIn (2) == before && scenesNow.size() > 2
+                                                                             && scenesNow[2].name == "Verse" && scenesNow[2].tempo == 128.0);
+        write (*gridView, "05-scene-duplicated");
+        const auto cap = lynx::captureClipGridScene (*gridView, 3, { 0, 2, 1 }); // Drums row 0, Bass row 2, Keys row 1
+        offline.dispatchPendingMessages();
+        check ("capture: a new row 4 with the three playing clips", cap == 4 && clipsIn (4) == 3);
+        check ("capture: nothing playing makes no row", lynx::captureClipGridScene (*gridView, 3, { -1, -1 }) == -1);
+        write (*gridView, "06-scene-captured");
+        write (ui, "07-window");
+        lynx::clipGridSceneTempoShown() = false;
+        lynx::refreshClipGrid (*gridView);
+        write (*gridView, "08-fields-off");
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
     void runLiveShot190dr (const juce::String& prefix)

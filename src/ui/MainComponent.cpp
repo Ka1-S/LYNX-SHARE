@@ -16,6 +16,7 @@
 #include "core/KeyGuess.h"
 #include "core/ProjectKey.h"
 #include "core/ScaleKeys.h"
+#include "core/SessionOps.h"
 #include "ui/FileChoosers.h"
 #include "ui/ProjectLoading.h"
 #include "ui/UiTrace.h"
@@ -1949,6 +1950,23 @@ bool MainComponent::runAction (const std::string& id)
     }
     else if (is ("record.captureMidi")) // round 170d (Ableton's Capture MIDI, Logic's Capture as Recording)
     {
+        // round 190ef: in the Clip-launch layout with the clip grid on screen, the phrase becomes a new clip in a slot of
+        // the grid's selected track (as the reference captures into its Session view); elsewhere into the pattern
+        if (isClipLaunchWorkflow() && clipGridView != nullptr && clipGridView->isShowing())
+        {
+            const auto [track, scene] = clipGridSelection (*clipGridView);
+            const auto& tracks = engine.getSong().playlistTracks;
+            const auto trackName = track < (int) tracks.size() && ! tracks[(std::size_t) track].name.empty()
+                                       ? tracks[(std::size_t) track].name
+                                       : tr ("Track {0}", { juce::String (track + 1) }).toStdString();
+            int placed = -1;
+            const auto r = engine.captureMidiToSlot (track, scene, session::recordedClipName (engine.getSong(), trackName), placed);
+            if (r.notes > 0 && placed >= 0)
+                ui::postHint ({ tr ("Capture MIDI: {0} notes put in a new clip", { juce::String (r.notes) }), {}, false, false }, 4000);
+            else
+                ui::postHint ({ tr ("Capture MIDI: nothing to capture (play some notes first, without recording)"), {}, false, false }, 4000);
+            return true;
+        }
         const auto r = engine.captureMidi();
         if (r.notes > 0)
             ui::postHint ({ tr ("Capture MIDI: {0} notes put in the pattern", { juce::String (r.notes) }), {}, false, false }, 4000);
@@ -2427,6 +2445,8 @@ void MainComponent::loadUiSettings()
             DetailView::preferredHeight = juce::jlimit (DetailView::minHeight, 2000, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "detailShown")
             DetailView::shownSetting = on;
+        else if (key == "sceneTempoShown") // round 190ef: the clip grid's scene tempo / time signature fields
+            clipGridSceneTempoShown() = on;
         else if (key == "simpleDockHeight") // round 190bu: the Simple workflow's track dock
             SimpleDock::preferredHeight = juce::jlimit (SimpleDock::minHeight, 2000, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "simpleDockShown")
@@ -2675,6 +2695,7 @@ void MainComponent::saveUiSettings()
                                       + "\nlanesBeforeClipLaunch=" + juce::String (lanesBeforeClipLaunch ? 1 : 0)
                                       + "\ndetailHeight=" + juce::String (DetailView::preferredHeight)
                                       + "\ndetailShown=" + juce::String (DetailView::shownSetting ? 1 : 0)
+                                      + "\nsceneTempoShown=" + juce::String (clipGridSceneTempoShown() ? 1 : 0)
                                       + "\nsimpleDockHeight=" + juce::String (SimpleDock::preferredHeight)
                                       + "\nsimpleDockShown=" + juce::String (SimpleDock::shownSetting ? 1 : 0)
                                       + "\nkeyboardMode=" + juce::String ((int) scalekeys::current().mode)
@@ -3161,6 +3182,13 @@ void MainComponent::addLayoutStyleItems (juce::PopupMenu& menu)
                       [this] { runAction ("view.detailDevices"); });
         menu.addItem (tr ("Switch between clip view and device view") + shortcutText ("view.detailSwitch"), [this] { runAction ("view.detailSwitch"); });
     }
+    // round 190ef: the reference's View › Scene Tempo And Time Signature
+    if (isClipLaunchWorkflow() && clipGridView != nullptr)
+        menu.addItem (tr ("Scene tempo and time signature"), true, clipGridSceneTempoShown(), [this] {
+            clipGridSceneTempoShown() = ! clipGridSceneTempoShown();
+            refreshClipGrid (*clipGridView);
+            saveUiSettings();
+        });
     // round 190bu: the Simple workflow's dock for the selected track (its sound and its effects)
     if (layoutStyle == Style::simple && simpleWorkflow != nullptr)
         menu.addItem (tr ("Track dock") + shortcutText ("view.detailToggle"), true, SimpleDock::shownSetting, [this] { runAction ("view.detailToggle"); });
@@ -3192,6 +3220,7 @@ void MainComponent::makeDetailView()
         saveUiSettings();
     };
     detailView = std::make_unique<DetailView> (engine, std::move (h));
+    setClipGridSceneFieldsListener (*clipGridView, [this] { saveUiSettings(); }); // round 190ef
     setClipGridPickListener (*clipGridView, [this] (int track, int scene, GridPick pick) {
         if (detailView == nullptr)
             return;

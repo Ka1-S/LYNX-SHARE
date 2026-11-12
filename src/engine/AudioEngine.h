@@ -354,6 +354,10 @@ public:
     // Record › Capture MIDI (round 170d, LYNX's own): the last phrase played without recording into the current pattern
     // (core/Recorder.h captureMidi), one undo step. UI thread.
     CaptureResult captureMidi();
+    // Round 190ef (the Clip-launch layout with the clip grid shown, as the reference captures into the Session view): the
+    // same phrase as a new clip in the grid, on `track` in the slot core session::captureSlot picks from `scene`, named
+    // `name`; one undo step. `placed`: the row it took (−1: nothing captured).
+    CaptureResult captureMidiToSlot (int track, int scene, const std::string& name, int& placed);
 
     // Per-insert record arm: each armed insert records its own audio input (Mixer › insert › input source) into
     // its own take (arming one turns audio recording on; disarming the last one turns it off). Not saved.

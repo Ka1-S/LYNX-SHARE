@@ -553,6 +553,9 @@ private:
     void paintLanes (juce::Graphics& g, juce::Rectangle<int> grid);
     void paintLaneHeaders (juce::Graphics& g, juce::Rectangle<int> headers);
     bool laneMouseDown (const juce::MouseEvent& e);        // true: the press was on a lane (handled)
+    // Round 190ef: in the Clip-launch layout, the clip being moved dragged off the Playlist over the clip grid: the clips go
+    // back where they were and the grabbed one becomes a drag the grid takes (a copy into a slot). True: done.
+    bool dragOutToClipGrid (const juce::MouseEvent& e);
     void showLaneMenu (int track, int lane);
     void showAddLaneMenu (int track);
     void toggleAutomationLanes();
