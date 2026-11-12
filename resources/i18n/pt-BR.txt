@@ -9589,3 +9589,4 @@ countries: br
 "The key's chords" = "Os acordes da tonalidade"
 "Project chord set" = "Conjunto de acordes do projeto"
 "Released notes sound on until Sustain is switched off" = "As notas soltas continuam soando até o Sustain ser desligado"
+"power chord" = "power chord"

@@ -406,8 +406,8 @@ void readHead (Bytes body, Project& p)
     r.pos += 4 * 8 + 16;     // view state and the project GUID
     if (! r.has (8))
         return;
+    p.root = r.u32(); // (round 190ds: +344 is the root 0..11, +348 the scale index; every file on disk agrees)
     p.scale = r.u32();
-    p.root = r.u32();
     r.u8();
     r.u8();
     r.u32(); // the channel-id counter

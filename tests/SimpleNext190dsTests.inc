@@ -310,16 +310,26 @@ TEST (simple190ds_strum_and_chord_sets)
     int dropped = -1;
     const auto set = scalekeys::parseFlmChordSet (keyb, &dropped);
     CHECK (set.size() == 4);
-    CHECK (dropped == 1); // (FLM's extension codes are unknown: counted, not played)
+    CHECK (dropped == 0);
     if (set.size() == 4)
     {
         CHECK (set[0].root == 0 && set[0].quality == 0 && set[0].octave == 3);
         CHECK (set[1].root == 2 && set[1].quality == 1);
-        CHECK (set[2].root == 11 && set[2].quality == 3 && set[2].extensions.empty());
+        CHECK (set[2].root == 11 && set[2].quality == 3 && set[2].extensions == std::vector<int> { 3 });
         CHECK (set[3].octave == 4);
         CHECK ((scalekeys::setChord (set, 0, 48, scalekeys::Spread::close) == std::vector<int> { 48, 52, 55 }));
         CHECK ((scalekeys::setChord (set, 2, 48, scalekeys::Spread::close) == std::vector<int> { 59, 62, 65 })); // B°
         CHECK ((scalekeys::setChord (set, 3, 48, scalekeys::Spread::close) == std::vector<int> { 60, 64, 67 }));  // C, an octave up
+    }
+    // KEYB extensions are semitones (REA 190ds: 10 = "7", 14 = "9"); power chords; out-of-range values are counted
+    const auto rich = scalekeys::parseFlmChordSet ("{\"chords\":[{\"baseNote\":7,\"extensions\":[10,14],\"octave\":3,\"quality\":0},"
+                                                   "{\"baseNote\":4,\"extensions\":[],\"octave\":3,\"quality\":6},{\"baseNote\":0,\"extensions\":[99],\"octave\":3,\"quality\":0}]}",
+                                                   &dropped);
+    CHECK (rich.size() == 3 && dropped == 1);
+    if (rich.size() == 3)
+    {
+        CHECK ((scalekeys::setChord (rich, 0, 48, scalekeys::Spread::close) == std::vector<int> { 55, 59, 62, 65, 69 })); // G9
+        CHECK ((scalekeys::setChord (rich, 1, 48, scalekeys::Spread::close) == std::vector<int> { 52, 59 }));             // E5
     }
     CHECK (scalekeys::parseFlmChordSet ("not json").empty());
     CHECK (scalekeys::parseFlmChordSet ("{\"chords\": []}").empty());
@@ -335,6 +345,34 @@ TEST (simple190ds_strum_and_chord_sets)
     // extensions are semitones over the root (LYNX's own edits)
     std::vector<KeyboardChord> own { { 7, 0, 4, { 10 } } };
     CHECK ((scalekeys::setChord (own, 0, 48, scalekeys::Spread::close) == std::vector<int> { 55, 59, 62, 65 })); // G7
+}
+
+TEST (simple190ds_flm_key_locker)
+{
+    using namespace lynx;
+    // FLM's HEAD root + scale index (REA 190ds), as the files on disk hold them
+    auto named = [] (std::uint32_t root, std::uint32_t scale) {
+        const auto k = scalekeys::flmKeyLocker (root, scale);
+        return k ? projectkey::name (*k) : std::string ("none");
+    };
+    CHECK (named (0, 0) == "none");                              // Chromatic: no lock
+    CHECK (named (2, 30) == "D Other Phrygian");                 // "Permich - Arabic"
+    CHECK (named (7, 10) == "G Minor Natural (Aeolian)");
+    CHECK (named (10, 1) == "A# Major (Ionian)");
+    CHECK (named (2, 4) == "D Major Pentatonic");
+    CHECK (named (9, 12) == "A Minor Pentatonic");
+    CHECK (named (0, 99) == "none" && named (12, 1) == "none");
+    // every FLM scale that maps lands on FL's scale with the same degrees
+    int mapped = 0;
+    for (std::uint32_t sc = 1; sc < 33; ++sc)
+        if (const auto k = scalekeys::flmKeyLocker (0, sc))
+        {
+            ++mapped;
+            CHECK (projectkey::contains (*k, 0));
+        }
+    if (simple190ds::report())
+        std::printf ("  FLM key locker scales FL's list has: %d of 32\n", mapped);
+    CHECK (mapped >= 12);
 }
 
 TEST (simple190ds_typing_keys_follow_the_mode)
@@ -570,7 +608,6 @@ TEST (simple190ds_simple_tracks_patterns_and_keyed_loops)
     namespace st = simpletracks;
     Song s = Song::makeDefault();
     s.playlist.clear();
-    s.playlistTracks.clear();
     st::Request q;
     q.kind = st::Kind::instrument;
     ChannelDef synth;

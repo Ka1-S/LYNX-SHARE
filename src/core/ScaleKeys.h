@@ -156,8 +156,8 @@ inline std::vector<int> diatonicChord (const projectkey::Key& key, int degree, i
 }
 
 // A chord of the project's own chord set (Song::keyboardChords): quality 0 major, 1 minor, 2 augmented, 3 diminished,
-// 4 sus2, 5 sus4 (0, 1 and 3 as FL Studio Mobile's KEYB: its default set is C Dm Em F G Am B°=3 C); extensions are
-// semitones above the root. `baseNote` = where the set's lowest octave plays.
+// 4 sus2, 5 sus4, 6 power (root and fifth) — FL Studio Mobile's KEYB numbering (REA 190ds: its quality name map);
+// extensions are semitones above the root, as KEYB's (9 "6", 10 "7", 11 "Maj7", 13 "b9", 14 "9", 17 "11", 18 "#11"). `baseNote` = where the set's lowest octave plays.
 inline std::vector<int> qualityIntervals (int quality)
 {
     switch (quality)
@@ -167,13 +167,14 @@ inline std::vector<int> qualityIntervals (int quality)
         case 3: return { 0, 3, 6 };
         case 4: return { 0, 2, 7 };
         case 5: return { 0, 5, 7 };
+        case 6: return { 0, 7 };
         default: return { 0, 4, 7 };
     }
 }
-constexpr int qualityCount = 6;
+constexpr int qualityCount = 7;
 inline const char* qualityName (int quality) noexcept
 {
-    static const char* names[] { TR_NOOP ("major"), TR_NOOP ("minor"), TR_NOOP ("augmented"), TR_NOOP ("diminished"), "sus2", "sus4" };
+    static const char* names[] { TR_NOOP ("major"), TR_NOOP ("minor"), TR_NOOP ("augmented"), TR_NOOP ("diminished"), "sus2", "sus4", TR_NOOP ("power chord") };
     return names[std::clamp (quality, 0, qualityCount - 1)];
 }
 
@@ -311,10 +312,9 @@ inline std::vector<std::pair<int, int>> strummed (std::vector<int> notes, const 
 }
 
 // FL Studio Mobile's keyboard chord set (an .flm file's KEYB chunk: {"chords": [{"baseNote", "extensions", "octave",
-// "quality"}...], "rootNote"}, docs/analise/FLM_FORMAT.md §2) as LYNX's. Its qualities 0 major, 1 minor and 3 diminished
-// are proven by FLM's default set (C Dm Em F G Am B°); 2 is taken as augmented, 4 / 5 as sus2 / sus4 (not seen in a
-// file). FLM's extension codes are not known: `droppedExtensions` counts the chords that had some (they play as
-// triads). A small scanner, not a JSON library: anything it doesn't understand is skipped. At most 24 chords.
+// "quality"}...], "rootNote"}, docs/analise/FLM_FORMAT.md §2) as LYNX's: the same numbering (qualities above,
+// extensions in semitones). `droppedExtensions` counts extension values outside 1…35 (skipped). A small scanner, not a
+// JSON library: anything it doesn't understand is skipped. At most 24 chords.
 inline std::vector<KeyboardChord> parseFlmChordSet (const std::string& json, int* droppedExtensions = nullptr)
 {
     std::vector<KeyboardChord> out;
@@ -351,8 +351,19 @@ inline std::vector<KeyboardChord> parseFlmChordSet (const std::string& json, int
         if (const auto e = obj.find ("\"extensions\""); e != std::string::npos)
         {
             const auto a = obj.find ('[', e), z = obj.find (']', e);
-            if (a != std::string::npos && z != std::string::npos && obj.find_first_of ("0123456789", a) < z && droppedExtensions != nullptr)
-                ++*droppedExtensions;
+            for (auto i = a; a != std::string::npos && z != std::string::npos && i < z;)
+            {
+                i = obj.find_first_of ("-0123456789", i);
+                if (i == std::string::npos || i >= z)
+                    break;
+                char* end = nullptr;
+                const auto v = (int) std::strtol (obj.c_str() + i, &end, 10);
+                i = (std::size_t) (end - obj.c_str());
+                if (v >= 1 && v <= 35)
+                    c.extensions.push_back (v);
+                else if (droppedExtensions != nullptr)
+                    ++*droppedExtensions;
+            }
         }
         out.push_back (std::move (c));
         pos = close + 1;
@@ -362,6 +373,29 @@ inline std::vector<KeyboardChord> parseFlmChordSet (const std::string& json, int
             break;
     }
     return out;
+}
+
+// FL Studio Mobile's key locker (an .flm HEAD's root and scale, REA 190ds: FLM's list of 33 scales, index → degrees) as
+// a project key: the FL reference scale with the same degrees, on that root. nullopt for Chromatic (0, no lock), an
+// index out of the list, or a scale FL's list doesn't have.
+inline std::optional<projectkey::Key> flmKeyLocker (std::uint32_t root, std::uint32_t scale)
+{
+    static const std::vector<std::vector<int>> flm {
+        { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 }, { 0, 2, 4, 5, 7, 9, 11 }, { 0, 2, 4, 5, 7, 8, 9, 11 }, { 0, 2, 5, 6, 8, 9, 11 },
+        { 0, 2, 4, 7, 9 }, { 0, 1, 4, 5, 6, 8, 11 }, { 0, 2, 3, 5, 6, 8, 10, 11 }, { 0, 2, 3, 5, 7, 8, 11 }, { 0, 1, 2, 3, 6, 7, 8, 11 },
+        { 0, 2, 3, 5, 7, 9, 11 }, { 0, 2, 3, 5, 7, 8, 10 }, { 0, 1, 3, 5, 7, 8, 11 }, { 0, 3, 5, 7, 10 }, { 0, 1, 2, 4, 5, 7, 8, 10 },
+        { 0, 2, 3, 6, 7, 9, 10 }, { 0, 1, 4, 5, 7, 8, 11 }, { 0, 3, 5, 6, 7, 10 }, { 0, 2, 3, 5, 6, 8, 9, 11 }, { 0, 2, 4, 5, 7, 9, 10, 11 },
+        { 0, 2, 3, 5, 7, 9, 10 }, { 0, 2, 5, 7, 10 }, { 0, 1, 4, 6, 8, 10, 11 }, { 0, 2, 3, 7, 8 }, { 0, 1, 5, 6, 10 }, { 0, 1, 5, 7, 10 },
+        { 0, 1, 3, 5, 6, 8, 10 }, { 0, 1, 3, 4, 6, 8, 10 }, { 0, 2, 4, 6, 7, 9, 11 }, { 0, 2, 4, 5, 7, 9, 10 }, { 0, 1, 3, 5, 7, 9, 11 },
+        { 0, 1, 3, 5, 7, 8, 10 }, { 0, 1, 4, 5, 7, 8, 10 }, { 0, 2, 4, 6, 8, 10 } };
+    if (scale == 0 || scale >= flm.size() || root > 11)
+        return std::nullopt;
+    const auto& want = flm[scale];
+    // the common scales first (Major before an identical mode's other name), then the rest of FL's list
+    for (const auto fl : projectkey::commonFirst())
+        if (projectkey::intervals ({ 0, fl }) == want)
+            return projectkey::Key { (int) root, fl };
+    return std::nullopt;
 }
 
 // The labels of the typing keys over the first degrees / pads (FL's layout: the Z row's white keys, then the Q row's)
