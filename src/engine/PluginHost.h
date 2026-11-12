@@ -48,6 +48,9 @@ struct PluginCrash
 {
     std::string plugin;
     std::uint32_t code = 0;
+    // round 190dt: it crashed while its saved settings were being loaded into it (a project opening, an undo, a
+    // reload): it was left out (the slot keeps those settings for the save) and reloading it would do the same again
+    bool onLoad = false;
 };
 int pluginCrashCount() noexcept;
 std::vector<PluginCrash> pluginCrashes();

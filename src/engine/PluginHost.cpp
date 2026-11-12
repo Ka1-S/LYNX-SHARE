@@ -208,11 +208,12 @@ struct CrashSlot
 {
     char name[128] {};
     std::uint32_t code = 0;
+    bool onLoad = false;
 };
 CrashSlot crashLog[crashSlots];
 std::atomic<int> crashCount { 0 };
 
-void recordCrash (const std::string& name, std::uint32_t code) noexcept
+void recordCrash (const std::string& name, std::uint32_t code, bool onLoad = false) noexcept
 {
     const auto index = crashCount.load (std::memory_order_relaxed);
     auto& slot = crashLog[index % crashSlots];
@@ -221,6 +222,7 @@ void recordCrash (const std::string& name, std::uint32_t code) noexcept
         slot.name[i] = name[i];
     slot.name[i] = 0;
     slot.code = code;
+    slot.onLoad = onLoad;
     crashCount.store (index + 1, std::memory_order_release); // (two plugins crashing in the same instant may share a slot)
 }
 
@@ -251,7 +253,7 @@ std::vector<PluginCrash> pluginCrashes()
     std::vector<PluginCrash> list;
     const auto count = pluginCrashCount();
     for (int i = std::max (0, count - crashSlots); i < count; ++i)
-        list.push_back ({ crashLog[i % crashSlots].name, crashLog[i % crashSlots].code });
+        list.push_back ({ crashLog[i % crashSlots].name, crashLog[i % crashSlots].code, crashLog[i % crashSlots].onLoad });
     return list;
 }
 
@@ -3009,7 +3011,22 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
         juce::MemoryBlock state;
 
         if (state.fromBase64Encoding (juce::String::fromUTF8 (ref.state.c_str())))
-            instance->setStateInformation (state.getData(), (int) state.getSize());
+        {
+            // round 190dt: guarded like the audio calls (a plugin that crashes on its own saved settings took LYNX down
+            // while the project opened). It is left out: the slot keeps those settings, so the project saves them.
+            auto* raw = instance.get();
+            if (const auto code = crashguard::run ([raw, &state] { raw->setStateInformation (state.getData(), (int) state.getSize()); }); code != 0)
+            {
+                (void) instance.release(); // never called again, not even to delete it (as after a crash in process)
+                recordCrash (description->name.toStdString(), code, true);
+                crashguard::note (("plugin " + description->name + " crashed while loading its saved settings (" + crashguard::describe (code)
+                                   + "): left out").toStdString());
+                if (error != nullptr)
+                    *error = tr ("{0} crashed and was switched off.", { juce::String::fromUTF8 (ref.name.c_str()) }) + " ("
+                             + crashguard::describe (code) + ")";
+                return nullptr;
+            }
+        }
     }
 
     return instance;

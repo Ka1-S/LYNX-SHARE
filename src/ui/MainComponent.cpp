@@ -5453,17 +5453,21 @@ void MainComponent::timerCallback()
         // round 190ao: "Reload" starts it again without reopening the project (only on request: a plugin that crashes
         // again shows this again)
         const auto crashedName = names[names.size() - 1];
-        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
-                                          .withIconType (juce::MessageBoxIconType::WarningIcon)
-                                          .withTitle (tr ("Plugin crashed"))
-                                          .withMessage (tr ("{0} crashed and was switched off.", { crashedName }) + "\n\n"
-                                                        + tr ("LYNX SHARE and your project kept running (an effect is bypassed, an instrument "
-                                                              "stays silent). Save your project.")
-                                                        + " " + tr ("Reload starts it again with the settings from the last save or backup."))
-                                          .withButton (tr ("Reload"))
-                                          .withButton (tr ("Close")),
-                                      [safe = juce::Component::SafePointer<MainComponent> (this), crashedName] (int result) {
-                                          if (safe != nullptr && result == 1)
+        // round 190dt: it crashed on its saved settings (it was left out as the project opened): the same settings would
+        // crash it again, so no Reload; the project keeps them for the save
+        const auto all = pluginCrashes();
+        const auto onLoad = ! all.empty() && all.back().onLoad;
+        auto message = tr ("{0} crashed and was switched off.", { crashedName }) + "\n\n"
+                       + tr ("LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project.");
+        auto options = juce::MessageBoxOptions().withIconType (juce::MessageBoxIconType::WarningIcon).withTitle (tr ("Plugin crashed"));
+        if (! onLoad)
+            options = options.withMessage (message + " " + tr ("Reload starts it again with the settings from the last save or backup."))
+                          .withButton (tr ("Reload"));
+        else
+            options = options.withMessage (message);
+        juce::AlertWindow::showAsync (options.withButton (tr ("Close")),
+                                      [safe = juce::Component::SafePointer<MainComponent> (this), crashedName, onLoad] (int result) {
+                                          if (safe != nullptr && result == 1 && ! onLoad)
                                               safe->reloadCrashedPlugins (crashedName);
                                       });
     }
