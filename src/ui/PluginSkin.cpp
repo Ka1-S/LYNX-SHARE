@@ -42,6 +42,7 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::reverb: case EffectKind::reeverb2: case EffectKind::reeverb1: case EffectKind::luxeVerb: case EffectKind::convolver:
         case EffectKind::epochVerb: case EffectKind::atrium: case EffectKind::foilPlate: case EffectKind::nebula: case EffectKind::halo:
         case EffectKind::horizon:
+        case EffectKind::pocketReverbClassic: case EffectKind::pocketReverb2: case EffectKind::pocketReverb: // round 190dw
             return colour::violet;
         case EffectKind::delay: case EffectKind::fruityDelay2: case EffectKind::fruityDelay3: case EffectKind::fruityDelayBank: case EffectKind::pocketTranceDelay: case EffectKind::pocketTapeDelay: case EffectKind::pocketTapeStop:
         case EffectKind::multibandDelay: case EffectKind::echoform: case EffectKind::spiralEcho: case EffectKind::geminiDoubler:

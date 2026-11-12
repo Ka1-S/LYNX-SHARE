@@ -202,4 +202,34 @@ int tapeStopSyncedStep (float v) noexcept;                   // round(9v): Off, 
 float tapeStopSyncedSeconds (float v, double bpm) noexcept;  // at the tempo's whole number, at least 5 ms
 float tapeStopBase (float warp) noexcept;                    // B = 200^(1 − 2·warp) (1 / 0.995 at the centre)
 float tapeStopSpeed (float base, float u) noexcept;          // (B^u − 1) / (B − 1): 0 at u = 0, 1 at u = 1
+// --- round 190dw: core/PocketFxE.cpp — Equalizer (module 3), Graphic EQ (7), Filter (9)
+constexpr int eqParams = 20, graphicEqParams = 8, filterParams = 4;
+std::unique_ptr<Effect> makeEq();
+std::unique_ptr<Effect> makeGraphicEq();
+std::unique_ptr<Effect> makeFilter();
+std::string eqParamText (int param, float v);
+std::string graphicEqParamText (int param, float v);
+std::string filterParamText (int param, float v);
+// laws (tests, editors): kind ⌊2v⌋, channel mode ⌊4v⌋, 2^(9.25v + 5) Hz, 7v + ¼ octaves; Filter 2^(10.3v + 4) Hz,
+// Q = 2v² + 0.8, type ⌊2v⌋ (LP, BP, HP), pairs 1 / 2 / 4
+int eqKind (float v) noexcept;
+int eqChannelMode (float v) noexcept;
+double eqHz (float v) noexcept;
+double eqOctaves (float v) noexcept;
+double filterHzOf (float v) noexcept;
+double filterQOf (float v) noexcept;
+int filterType (float v) noexcept;
+int filterPairs (float v) noexcept;
+// one Equalizer / Graphic EQ band as FLM designs it (b0, b1, b2, a1, a2; a0 = 1) at the given design rate
+std::array<double, 5> eqBandCoefficients (int kind, double hz, double shownDb, double octaves, double rate) noexcept;
+
+// --- round 190dw: core/PocketReverb.cpp — Reverb (legacy, module 12), Reverb 2 (35), Reverb (32) on FLM's plate
+constexpr int reverbClassicParams = 20, reverb2Params = 18, reverbParams = 15;
+std::unique_ptr<Effect> makeReverbClassic();
+std::unique_ptr<Effect> makeReverb2();
+std::unique_ptr<Effect> makeReverb();
+std::string reverbClassicParamText (int param, float v);
+std::string reverb2ParamText (int param, float v);
+std::string reverbParamText (int param, float v);
+// --- end of round 190dw
 } // namespace lynx::pocket

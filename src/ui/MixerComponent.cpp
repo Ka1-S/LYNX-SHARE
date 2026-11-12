@@ -4224,6 +4224,8 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::pocketComb, // Pocket (round 190by)
                                       EffectKind::pocketMultiband, // Pocket (round 190by)
                                       EffectKind::pocketTapeStop, // Pocket (round 190by)
+                                      EffectKind::pocketEq, EffectKind::pocketGraphicEq, EffectKind::pocketFilter, // Pocket (round 190dw)
+                                      EffectKind::pocketReverbClassic, EffectKind::pocketReverb2, EffectKind::pocketReverb, // Pocket (round 190dw)
                                       EffectKind::formulaController, EffectKind::peakController, EffectKind::xyController, EffectKind::xyzController,
                                       EffectKind::controlSurface, // controllers (link their output to any knob)
                                       EffectKind::patcher, // FL's Patcher: a graph of effects / instruments / plugins (REA_rodada141)
