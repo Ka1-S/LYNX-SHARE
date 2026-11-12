@@ -259,6 +259,8 @@ APP_SOURCES+=(src/core/DynamicsSuite.cpp src/core/FabFilterStates.cpp src/ui/Dyn
 APP_SOURCES+=(src/core/VoiceTools.cpp)
 # MIDI CC automation of hosted plugins, Formula Controller (round 133, issue #3)
 APP_SOURCES+=(src/core/MidiControls.cpp src/core/MidiOut.cpp src/core/FormulaController.cpp src/ui/ControllerEditors.cpp src/ui/MidiOutEditor.cpp)
+# controller links: Remote control settings window, mapping formula (round 190bt)
+APP_SOURCES+=(src/core/LinkFormula.cpp src/ui/RemoteControl.cpp)
 APP_SOURCES+=(src/core/VoiceShift.cpp)
 # FL engines usable in native projects (round 142, issue #5)
 APP_SOURCES+=(src/core/NativeEngines.cpp src/core/LynxBanks.cpp src/core/ModelParams.cpp src/core/ToxicBank.cpp src/core/PoiZoneBank.cpp src/core/ModelParamsSynths.cpp src/core/PluginLayoutSynths.cpp src/core/HarmlessBank.cpp src/core/Dx10Bank.cpp src/core/SimSynthBank.cpp src/core/BeepMapBank.cpp src/core/GranulizerBank.cpp src/core/EngineLayouts.cpp src/ui/NewtoneEditor.cpp)

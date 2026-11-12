@@ -2710,6 +2710,20 @@ is still slower than the reference's (−2.4 dB after 30 ms against −4.8).
 |---|---|---|---|
 | Sounds tab (FL Cloud, online) › a sound's menu › Find similar samples: FL Cloud ranks its own catalogue ("tone and rhythm"); Loop Starter's channel menu › Find similar samples... opens the same query. No local analysis, no index, no settings (`REA_rodada190as.md` §1) | Browser › right-click an audio file › Find similar samples: the samples of the Browser's own folders, most similar first, with a percentage, in the results list; search box "Similar to <name>" | ⚠️ | LYNX's own measure on local files (`core/SampleSimilarity.*`); FL's ranking can't be compared offline. On FL's packs the 10 nearest files sit in the query's own class folder 56 % of the time (chance 2.9 %) |
 | FL Cloud's online library | — | ❌ | no FL Cloud in LYNX |
+## Round 190bt: "Remote control settings" (the detailed controller link)
+
+REA: docs/analise/REA_rodada190bt.md. One-step learning stays the default way of linking.
+
+| FL | LYNX | State |
+|---|---|---|
+| Control menu › "Link to controller...": window "Remote control settings" (parameter, assignment "Link 1"... "New link", Port / Channel / Ctrl, Auto detect, Omni, internal controller, mapping formula with presets and curve, smoothing, Remove conflicts, Reset / Skip / Accept) | Right-click a control › *Link to controller...*: the same window, FL's fields, hints, ranges and defaults | Done (tests, shots). Left out: the Mode list and note links, the Ctrl menu's special sources, "Record automation" |
+| Mapping formula over `Input` with FL's functions (Tension, Min, Max, Int, Round, Frac, If*, Case...) and 25 presets | `core/LinkFormula`: same variable, functions and presets; own parser | Done (tests). Incremental presets apply to absolute controllers only; `inter`, `fold`, `warp`, `map` not built |
+| Smoothing per link: slider -1024...1024 (default 469, about 200 ms), 1 pole below 0, 3 poles above | Same slider, time law and pole count | Done; the filter's exact response needs a live check |
+| Port number per link and per input device | `MidiLink::port`, Settings › MIDI › input devices › *Port* | Done (tests) |
+| "Override global link...": window "Global link settings" | Same | Done |
+| Multilink menu: Link to controllers..., Override global links..., Init song with these positions, Create automation clips, Cancel | In the Multilink button's menu, on the queued controls | Done; Edit events, Init pattern, Randomize, Humanize left out |
+| Tempo menu: 80 BPM ... 160 BPM | Same nine items | Done |
+
 ## Round 190aw: MIDI controller profiles (phases A and B of the controller plan)
 
 REA: docs/analise/REA_rodada190aw.md; format: docs/CONTROLLERS.md.

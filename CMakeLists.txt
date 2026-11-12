@@ -214,6 +214,7 @@ add_library(lynx_core STATIC
     src/core/DynamicsSuite.cpp
     src/core/VoiceTools.cpp
     src/core/MidiControls.cpp
+    src/core/LinkFormula.cpp
     src/core/MidiOut.cpp
     src/core/FormulaController.cpp
     src/core/VoiceShift.cpp
@@ -484,6 +485,7 @@ if(LYNX_BUILD_APP)
         src/ui/OtherAppsExport.cpp
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
+        src/ui/RemoteControl.cpp
         src/ui/ControllerEditors.cpp
         src/ui/MidiOutEditor.cpp
         src/ui/VisualEditors.cpp

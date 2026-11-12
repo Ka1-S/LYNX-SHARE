@@ -2786,6 +2786,31 @@ juce::String toJson (const Song& song, bool stampVersion)
             links.add (juce::Array<juce::var> { l.cc, l.channel, targetKindName (l.target.kind), l.target.index, l.target.slot, l.target.param });
 
         root->setProperty ("midiLinks", links);
+
+        // round 190bt: a link's Remote control settings, beside the plain list (older versions read "midiLinks" as
+        // before and skip this); only the links that have any
+        juce::Array<juce::var> settings;
+        for (int i = 0; i < (int) song.midiLinks.size(); ++i)
+        {
+            const auto& l = song.midiLinks[(std::size_t) i];
+            if (! l.hasSettings())
+                continue;
+            auto o = std::make_unique<juce::DynamicObject>();
+            o->setProperty ("link", i);
+            if (l.port >= 0)
+                o->setProperty ("port", l.port);
+            if (! l.formula.empty())
+                o->setProperty ("formula", juce::String::fromUTF8 (l.formula.c_str()));
+            if (l.smooth)
+                o->setProperty ("smooth", true);
+            if (l.smoothing != 469)
+                o->setProperty ("smoothing", l.smoothing);
+            if (l.omni)
+                o->setProperty ("omni", true);
+            settings.add (juce::var (o.release()));
+        }
+        if (! settings.isEmpty())
+            root->setProperty ("midiLinkSettings", settings);
     }
 
     if (! song.initialValues.empty()) // FL's initialized controls (REA round 146)
@@ -3388,6 +3413,26 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
             if (l.isArray() && l.size() == 6)
                 song.midiLinks.push_back ({ juce::jlimit (0, 127, (int) l[0]), juce::jlimit (-1, 15, (int) l[1]),
                                             { targetKindFromName (l[2].toString()), (int) l[3], (int) l[4], (int) l[5] } });
+            else
+                song.midiLinks.push_back ({ -1, -1, {} }); // (keeps the places "midiLinkSettings" counts; dropped below)
+
+    if (auto* settings = root["midiLinkSettings"].getArray()) // round 190bt
+        for (const auto& o : *settings)
+        {
+            const auto i = o.isObject() && o.hasProperty ("link") ? (int) o["link"] : -1;
+            if (i < 0 || i >= (int) song.midiLinks.size())
+                continue;
+            auto& l = song.midiLinks[(std::size_t) i];
+            if (o.hasProperty ("port"))
+                l.port = juce::jlimit (-1, 255, (int) o["port"]);
+            l.formula = o["formula"].toString().toStdString();
+            l.smooth = (bool) o["smooth"];
+            if (o.hasProperty ("smoothing"))
+                l.smoothing = juce::jlimit (-1024, 1024, (int) o["smoothing"]);
+            l.omni = (bool) o["omni"];
+        }
+    song.midiLinks.erase (std::remove_if (song.midiLinks.begin(), song.midiLinks.end(), [] (const MidiLink& l) { return l.cc < 0; }),
+                          song.midiLinks.end());
 
     if (auto* values = root["initialValues"].getArray())
         for (const auto& v : *values)

@@ -2306,7 +2306,7 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     if (source != nullptr && controllerIo.take (deviceName, m.getRawData(), m.getRawDataSize(), linkedCcs))
     {
         if (m.isController()) // (still offered to MIDI learn)
-            controllerQueue.push ({ m.getControllerNumber(), m.getChannel() - 1, m.getControllerValue() });
+            controllerQueue.push ({ m.getControllerNumber(), m.getChannel() - 1, m.getControllerValue(), device.port });
         return;
     }
 
@@ -2388,7 +2388,7 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     if (m.isController())
     {
         const auto cc = m.getControllerNumber();
-        controllerQueue.push ({ cc, m.getChannel() - 1, m.getControllerValue() });
+        controllerQueue.push ({ cc, m.getChannel() - 1, m.getControllerValue(), device.port });
         // FL's "Foot pedal controls note off" (round 187a [DECOMP FUN_00fdb260]): with it on, CC 64 / CC 66 hold the
         // played channels' notes and don't reach the plugins
         if (const auto mode = PedalHold::modeFor (cc, m.getControllerValue()); mode >= 0 && footPedalNoteOff.load (std::memory_order_relaxed))
@@ -3986,7 +3986,14 @@ std::vector<MidiLink> AudioEngine::getGlobalLinks() const
 {
     std::vector<MidiLink> out;
     for (const auto& l : midiPrefs.globalLinks)
-        out.push_back ({ l.cc, l.channel, { (AutomationTargetKind) l.kind, l.index, l.slot, l.param } });
+    {
+        MidiLink link { l.cc, l.channel, { (AutomationTargetKind) l.kind, l.index, l.slot, l.param } };
+        link.port = l.port;
+        link.formula = l.formula;
+        link.smooth = l.smooth;
+        link.smoothing = l.smoothing;
+        out.push_back (std::move (link));
+    }
     return out;
 }
 
@@ -4015,6 +4022,61 @@ void AudioEngine::removeGlobalLink (const AutomationTarget& target)
                                          }),
                          p.globalLinks.end());
     setMidiPrefs (p, saveGlobalLinks);
+}
+
+void AudioEngine::setTargetLinks (const AutomationTarget& target, std::vector<MidiLink> links, bool removeConflicts)
+{
+    editSong ([&] (Song& s) { lynx::setTargetLinks (s.midiLinks, target, std::move (links), removeConflicts); });
+    linkSmoothing.clear();
+    sendChangeMessage();
+}
+
+void AudioEngine::setGlobalLink (const AutomationTarget& target, const std::optional<MidiLink>& link)
+{
+    auto p = midiPrefs;
+    p.globalLinks.erase (std::remove_if (p.globalLinks.begin(), p.globalLinks.end(),
+                                         [&] (const prefs::GlobalLink& l) {
+                                             return l.kind == (int) target.kind && l.index == target.index && l.slot == target.slot
+                                                 && l.param == target.param;
+                                         }),
+                         p.globalLinks.end());
+    if (link && link->cc >= 0)
+    {
+        prefs::GlobalLink g { link->cc, link->channel, (int) target.kind, target.index, target.slot, target.param };
+        g.port = link->port;
+        g.formula = link->formula;
+        g.smooth = link->smooth;
+        g.smoothing = link->smoothing;
+        p.globalLinks.push_back (std::move (g));
+    }
+    setMidiPrefs (p, saveGlobalLinks);
+    linkSmoothing.clear();
+    sendChangeMessage();
+}
+
+void AudioEngine::injectControllerForTest (int cc, int channel, int value, int port)
+{
+    controllerQueue.push ({ cc, channel, value, port });
+    applyControllers();
+}
+
+// The smoothing filters of the links being moved (FL's per-link "Smoothing"): each one walks towards the position its
+// controller last gave, at the timer's pace, until it has arrived.
+void AudioEngine::stepLinkSmoothing (std::vector<std::pair<AutomationTarget, float>>& changes)
+{
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    const auto elapsed = linkSmoothingClock > 0.0 ? juce::jlimit (0.0, 250.0, now - linkSmoothingClock) : 0.0;
+    linkSmoothingClock = now;
+    for (auto& s : linkSmoothing)
+    {
+        const auto v = s.filter.step (s.target, elapsed, s.link.smoothing);
+        const auto mixerTrack = selectedMixerTrackForLinks ? selectedMixerTrackForLinks() : -1;
+        changes.push_back ({ linkOmniTarget (s.link, selectedChannel, mixerTrack), v });
+    }
+    linkSmoothing.erase (std::remove_if (linkSmoothing.begin(), linkSmoothing.end(), [] (const LinkSmoothing& s) { return s.filter.settled (s.target); }),
+                         linkSmoothing.end());
+    if (linkSmoothing.empty())
+        linkSmoothingClock = 0.0;
 }
 
 void AudioEngine::setMultilink (bool on)
@@ -4328,16 +4390,18 @@ void AudioEngine::updateAutomationRecording (bool active)
 void AudioEngine::applyControllers()
 {
     ControllerEvent e;
-    std::map<std::pair<int, int>, int> latest; // (cc, channel) -> latest value this frame
+    std::map<std::tuple<int, int, int>, int> latest; // (cc, channel, port) -> latest value this frame
     controllerLearnTick = learning.kind != AutomationTargetKind::none || multilink.has_value();
 
     while (controllerQueue.pop (e))
     {
+        controllerSeen = { e.port, e.channel, e.cc, e.value, controllerSeen.serial + 1 };
         if (learning.kind != AutomationTargetKind::none && learningGlobal)
         {
             // "Override global link...": the link goes to the settings, for every project (REA round 146)
             auto p = midiPrefs;
-            const prefs::GlobalLink g { e.cc, e.channel, (int) learning.kind, learning.index, learning.slot, learning.param };
+            prefs::GlobalLink g { e.cc, e.channel, (int) learning.kind, learning.index, learning.slot, learning.param };
+            g.port = e.port; // (round 190bt: the device's port number, as FL's Auto detect fills it)
             p.globalLinks.erase (std::remove_if (p.globalLinks.begin(), p.globalLinks.end(),
                                                  [&] (const prefs::GlobalLink& l) {
                                                      return l.kind == g.kind && l.index == g.index && l.slot == g.slot && l.param == g.param;
@@ -4356,8 +4420,9 @@ void AudioEngine::applyControllers()
                 if (multilink->global) // "Override global links": as "Override global link...", for every project
                 {
                     auto p = midiPrefs;
-                    const prefs::GlobalLink g { link->cc, link->channel, (int) link->target.kind, link->target.index, link->target.slot,
-                                                link->target.param };
+                    prefs::GlobalLink g { link->cc, link->channel, (int) link->target.kind, link->target.index, link->target.slot,
+                                          link->target.param };
+                    g.port = e.port;
                     p.globalLinks.erase (std::remove_if (p.globalLinks.begin(), p.globalLinks.end(),
                                                          [&] (const prefs::GlobalLink& l) {
                                                              return l.kind == g.kind && l.index == g.index && l.slot == g.slot && l.param == g.param;
@@ -4367,10 +4432,12 @@ void AudioEngine::applyControllers()
                     setMidiPrefs (p, saveGlobalLinks);
                 }
                 else
-                    editSong ([l = *link] (Song& s) {
+                    editSong ([l = *link, port = e.port] (Song& s) {
                         s.midiLinks.erase (std::remove_if (s.midiLinks.begin(), s.midiLinks.end(), [&] (const MidiLink& m) { return m.target == l.target; }),
                                            s.midiLinks.end());
-                        s.midiLinks.push_back ({ l.cc, l.channel, l.target });
+                        MidiLink made { l.cc, l.channel, l.target };
+                        made.port = port;
+                        s.midiLinks.push_back (std::move (made));
                     });
                 if (multilink->complete())
                     multilink.reset(); // FL: "the process will auto-close once the number of hardware controls tweaked
@@ -4384,12 +4451,14 @@ void AudioEngine::applyControllers()
             editSong ([t = learning, e] (Song& s) {
                 s.midiLinks.erase (std::remove_if (s.midiLinks.begin(), s.midiLinks.end(), [&] (const MidiLink& l) { return l.target == t; }),
                                    s.midiLinks.end());
-                s.midiLinks.push_back ({ e.cc, e.channel, t });
+                MidiLink made { e.cc, e.channel, t };
+                made.port = e.port;
+                s.midiLinks.push_back (std::move (made));
             });
             learning = {};
         }
 
-        latest[{ e.cc, e.channel }] = e.value;
+        latest[{ e.cc, e.channel, e.port }] = e.value;
     }
 
     const auto links = linksWithGlobal (song.midiLinks, getGlobalLinks());
@@ -4401,30 +4470,59 @@ void AudioEngine::applyControllers()
         for (int w = 0; w < 2; ++w)
             linkedCcs[(std::size_t) w].store (bits[w], std::memory_order_relaxed);
     }
-    if (latest.empty() || links.empty())
+    if ((latest.empty() || links.empty()) && linkSmoothing.empty())
         return;
 
     // one snapshot per frame, outside the undo history (like turning the knob)
     std::vector<std::pair<AutomationTarget, float>> changes;
+    const auto mixerTrack = selectedMixerTrackForLinks ? selectedMixerTrackForLinks() : -1;
 
     for (const auto& [key, value] : latest)
         for (const auto& link : links)
-            if (link.cc == key.first && (link.channel < 0 || link.channel == key.second))
+            // (round 190bt: a link follows the devices with exactly its port number, as FL's controller id does)
+            if (link.cc == std::get<0> (key) && (link.channel < 0 || link.channel == std::get<1> (key)) && link.port == std::get<2> (key))
             {
-                const auto v = value / 127.0f;
-                const auto& t = link.target;
+                auto v = value / 127.0f;
+                if (! link.formula.empty()) // FL's mapping formula: Input = the controller's position, the result limited to 0..1
+                {
+                    auto found = linkFormulas.find (link.formula);
+                    if (found == linkFormulas.end())
+                    {
+                        if (linkFormulas.size() > 256)
+                            linkFormulas.clear();
+                        found = linkFormulas.emplace (link.formula, linkformula::Formula::compile (link.formula)).first;
+                    }
+                    v = found->second.map (v);
+                }
+                const auto t = linkOmniTarget (link, selectedChannel, mixerTrack); // "Omni": the selected channel / track
                 // takeover: only parameters the song holds (a plugin's own parameters have no value to compare here)
                 const auto songHeld = t.kind != AutomationTargetKind::channelParam && t.kind != AutomationTargetKind::effectParam;
                 if (midiPrefs.pickup && songHeld)
                 {
-                    auto& state = pickups[{ key.first, key.second, (int) t.kind, t.index, t.slot, t.param }];
+                    auto& state = pickups[{ std::get<0> (key), std::get<1> (key), (int) t.kind, t.index, t.slot, t.param }];
                     if (! prefs::pickupUpdate (state, song.targetValue (t), v))
                         continue;
                 }
-                changes.push_back ({ t, v });
                 noteTweaked (t); // a linked controller's move is a tweak (Last tweaked, automation recording)
+                if (link.smooth && link.smoothing != 0)
+                {
+                    auto s = std::find_if (linkSmoothing.begin(), linkSmoothing.end(), [&] (const LinkSmoothing& x) { return x.link == link; });
+                    if (s == linkSmoothing.end())
+                    {
+                        // starts from where the control is (a control the song does not hold starts at the new position)
+                        LinkSmoothing fresh { link, v, {} };
+                        if (const auto now = currentTargetValue (t); now >= 0.0f)
+                            fresh.filter.step (now, 0.0, link.smoothing);
+                        linkSmoothing.push_back (std::move (fresh));
+                    }
+                    else
+                        s->target = v;
+                    continue;
+                }
+                changes.push_back ({ t, v });
             }
 
+    stepLinkSmoothing (changes);
     applyTargetValues (changes);
 }
 

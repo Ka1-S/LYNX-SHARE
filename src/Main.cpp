@@ -47,6 +47,7 @@
 #include "engine/ClapFormat.h"
 #include "engine/ClapTeardownTest.h"
 #include "engine/ProjectFile.h"
+#include "ui/RemoteControl.h"
 #include "core/Sha256.h"
 #include "engine/SessionPack.h"
 #include "engine/LiveTest.h"
@@ -1857,6 +1858,16 @@ public:
         if (args.contains ("--versionsshot"))
         {
             runVersionsShot (args[args.indexOf ("--versionsshot") + 1].unquoted());
+            quit();
+            return;
+        }
+
+        // --linkshot <prefix> (round 190bt): FL's Remote control settings / Global link settings windows, the control
+        // menu with "Link to controller...", the formula presets and controller menus and the Multilink items,
+        // offscreen; prefix-checks.txt holds the round's checks of the engine, the project file and the settings
+        if (args.contains ("--linkshot"))
+        {
+            setApplicationReturnValue (runLinkShot (args[args.indexOf ("--linkshot") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -9645,6 +9656,208 @@ private:
     //   -pluginsoff-window.png / -pluginsoff-mixer.png   a project opened without its third-party plugins (the tags)
     //   -pluginsoff-panel.png / -pluginsoff-panel-one.png   the list, all off, then after "Switch on" for one
     //   -export-default.png / -export.png   the Export window as it opens, and with the additions in use
+    bool runLinkShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        const auto shoot = [&prefix] (juce::Component& c, const char* name) {
+            savePng (c.createComponentSnapshot (c.getLocalBounds()), prefix + "-" + name + ".png");
+        };
+        using lynx::AutomationTarget;
+        using lynx::AutomationTargetKind;
+        using lynx::MidiLink;
+
+        lynx::AudioEngine engine (false);
+        const AutomationTarget volume { AutomationTargetKind::channelVolume, 0 }, pan { AutomationTargetKind::channelPan, 0 },
+            insert { AutomationTargetKind::mixerVolume, 1 };
+
+        // ---- the window as it opens on a control with no link (FL's defaults)
+        {
+            auto panel = lynx::makeRemoteControlPanel (engine, { volume }, false);
+            shoot (*panel, "remote-default");
+            check ("default_state", lynx::remoteControlPanelState (*panel).startsWith ("-1|1|-1|Input|"), lynx::remoteControlPanelState (*panel));
+
+            // Auto detect: the controller that sends next fills the fields
+            engine.injectControllerForTest (74, 2, 100, 5);
+            lynx::remoteControlPanelPoll (*panel);
+            check ("auto_detect", lynx::remoteControlPanelState (*panel).startsWith ("5|3|74|"), lynx::remoteControlPanelState (*panel));
+
+            // a formula preset, smoothing; Accept writes the link
+            lynx::remoteControlPanelSetController (*panel, -1, 1, 7);
+            lynx::remoteControlPanelSetFormula (*panel, "Tension(Input,10)");
+            lynx::remoteControlPanelSetSmoothing (*panel, true, 469);
+            shoot (*panel, "remote-formula-smoothing");
+            lynx::remoteControlPanelPress (*panel, 2);
+            const auto& links = engine.getSong().midiLinks;
+            check ("accept_writes_link", links.size() == 1 && links[0].cc == 7 && links[0].channel == 0 && links[0].port == -1
+                                             && links[0].formula == "Tension(Input,10)" && links[0].smooth && links[0].target == volume);
+        }
+
+        // ---- a broken formula: the message, the red text
+        {
+            auto panel = lynx::makeRemoteControlPanel (engine, { volume }, false);
+            lynx::remoteControlPanelSetFormula (*panel, "Min(Input*2,");
+            shoot (*panel, "remote-formula-error");
+            check ("formula_error_shown", ! lynx::remoteControlPanelState (*panel).contains ("Compiled ok."), lynx::remoteControlPanelState (*panel));
+        }
+
+        // ---- the engine: formula, port, conflicts, omni
+        {
+            engine.editSong ([&] (lynx::Song& s) {
+                s.midiLinks.clear();
+                MidiLink inverted { 20, 0, volume };
+                inverted.formula = "1-Input";
+                MidiLink ported { 21, 0, pan };
+                ported.port = 3;
+                s.midiLinks = { inverted, ported };
+            });
+            engine.injectControllerForTest (20, 0, 127);
+            check ("formula_inverts", std::abs (engine.currentTargetValue (volume)) < 0.01f, juce::String (engine.currentTargetValue (volume)));
+            engine.injectControllerForTest (20, 0, 0);
+            check ("formula_inverts_back", std::abs (engine.currentTargetValue (volume) - 1.0f) < 0.01f, juce::String (engine.currentTargetValue (volume)));
+            const auto panBefore = engine.currentTargetValue (pan);
+            engine.injectControllerForTest (21, 0, 127); // no port: not this link's device
+            check ("port_must_match", std::abs (engine.currentTargetValue (pan) - panBefore) < 0.001f);
+            engine.injectControllerForTest (21, 0, 127, 3);
+            check ("port_matches", std::abs (engine.currentTargetValue (pan) - 1.0f) < 0.01f, juce::String (engine.currentTargetValue (pan)));
+
+            // the window on a control whose controller another control uses: Remove conflicts in red; Accept removes it
+            auto panel = lynx::makeRemoteControlPanel (engine, { insert }, false);
+            lynx::remoteControlPanelSetController (*panel, -1, 1, 20);
+            shoot (*panel, "remote-conflict");
+            check ("conflict_counted", lynx::remoteControlPanelState (*panel).contains ("|1|"), lynx::remoteControlPanelState (*panel));
+            lynx::remoteControlPanelPress (*panel, 2);
+            const auto& links = engine.getSong().midiLinks;
+            check ("conflict_removed", links.size() == 2
+                                           && std::none_of (links.begin(), links.end(), [&] (const MidiLink& l) { return l.target == volume; })
+                                           && std::any_of (links.begin(), links.end(), [&] (const MidiLink& l) { return l.target == insert && l.cc == 20; }));
+            engine.undo();
+            check ("accept_is_one_undo_step", engine.getSong().midiLinks.size() == 2 && engine.getSong().midiLinks[0].target == volume);
+        }
+
+        // ---- an existing link opened again: "Link 1" / "New link"
+        {
+            auto panel = lynx::makeRemoteControlPanel (engine, { volume }, false);
+            shoot (*panel, "remote-existing-link");
+            check ("existing_link_loaded", lynx::remoteControlPanelState (*panel).startsWith ("-1|1|20|1-Input|"), lynx::remoteControlPanelState (*panel));
+            // Reset, then Accept: a link without a controller is removed
+            lynx::remoteControlPanelPress (*panel, 0);
+            check ("reset_state", lynx::remoteControlPanelState (*panel).startsWith ("-1|1|-1|Input|"), lynx::remoteControlPanelState (*panel));
+            lynx::remoteControlPanelPress (*panel, 2);
+            const auto& links = engine.getSong().midiLinks;
+            check ("reset_accept_unlinks", std::none_of (links.begin(), links.end(), [&] (const MidiLink& l) { return l.target == volume; }));
+        }
+
+        // ---- several controls ("Link to controllers..."): Accept and Skip step through them
+        {
+            auto panel = lynx::makeRemoteControlPanel (engine, { volume, pan, insert }, false, [] {});
+            shoot (*panel, "remote-multilink");
+            const auto first = lynx::remoteControlPanelState (*panel).fromLastOccurrenceOf ("|", false, false);
+            lynx::remoteControlPanelSetController (*panel, -1, 1, 30);
+            lynx::remoteControlPanelPress (*panel, 2); // Accept: volume linked, on to pan
+            const auto second = lynx::remoteControlPanelState (*panel).fromLastOccurrenceOf ("|", false, false);
+            lynx::remoteControlPanelPress (*panel, 1); // Skip: pan untouched, on to the insert
+            const auto third = lynx::remoteControlPanelState (*panel).fromLastOccurrenceOf ("|", false, false);
+            const auto beforeLast = lynx::remoteControlPanelFinished (*panel);
+            lynx::remoteControlPanelPress (*panel, 1); // Skip on the last one: done
+            const auto closed = ! beforeLast && lynx::remoteControlPanelFinished (*panel);
+            const auto& links = engine.getSong().midiLinks;
+            check ("multilink_steps", first != second && second != third && closed
+                                          && std::any_of (links.begin(), links.end(), [&] (const MidiLink& l) { return l.target == volume && l.cc == 30; }),
+                   first + " > " + second + " > " + third);
+        }
+
+        // ---- Global link settings
+        {
+            auto panel = lynx::makeRemoteControlPanel (engine, { volume }, true);
+            shoot (*panel, "global-default");
+            lynx::remoteControlPanelSetController (*panel, 2, 1, 11);
+            lynx::remoteControlPanelSetFormula (*panel, "Input*0.5");
+            lynx::remoteControlPanelPress (*panel, 2);
+            const auto global = engine.globalLinkOf (volume);
+            check ("global_link_written", global && global->cc == 11 && global->port == 2 && global->formula == "Input*0.5");
+            const auto text = engine.getMidiPrefs().toText();
+            const auto back = lynx::prefs::MidiPrefs::fromText (text);
+            check ("global_link_settings_round_trip", back.globalLinks == engine.getMidiPrefs().globalLinks && text.find ("linkset=2|0|469|Input*0.5") != std::string::npos);
+            auto again = lynx::makeRemoteControlPanel (engine, { volume }, true);
+            shoot (*again, "global-existing-link");
+            engine.setGlobalLink (volume, std::nullopt);
+            check ("global_link_removed", ! engine.globalLinkOf (volume));
+        }
+
+        // ---- the project file: links with settings come back; a project of an older version loads the same
+        {
+            lynx::Song song = engine.getSong();
+            MidiLink plain { 7, -1, volume };
+            MidiLink rich { 74, 2, pan };
+            rich.port = 4;
+            rich.formula = "Min(Input*1.1,0.5)+Max(Input*1.1,0.6)-0.6";
+            rich.smooth = true;
+            rich.smoothing = -300;
+            rich.omni = true;
+            song.midiLinks = { plain, rich };
+            juce::String error;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            check ("project_round_trip", back && back->midiLinks == song.midiLinks, error);
+
+            // without settings the file holds only the list older versions wrote
+            song.midiLinks = { plain };
+            const auto plainJson = lynx::ProjectFile::toJson (song);
+            check ("plain_links_write_the_old_form", ! plainJson.contains ("midiLinkSettings") && plainJson.contains ("midiLinks"));
+            const auto plainBack = lynx::ProjectFile::fromJson (plainJson, error);
+            check ("old_project_loads_the_same", plainBack && plainBack->midiLinks.size() == 1 && plainBack->midiLinks[0] == plain
+                                                     && ! plainBack->midiLinks[0].hasSettings());
+            // what an older version does with a new file: it reads "midiLinks" alone, so the links stay (plain)
+            auto parsed = juce::JSON::parse (json);
+            if (auto* o = parsed.getDynamicObject())
+                o->removeProperty ("midiLinkSettings");
+            const auto stripped = lynx::ProjectFile::fromJson (juce::JSON::toString (parsed), error);
+            check ("older_version_keeps_the_links", stripped && stripped->midiLinks.size() == 2 && stripped->midiLinks[1].cc == 74
+                                                        && ! stripped->midiLinks[1].hasSettings());
+        }
+
+        // ---- menus: the control menu, the formula presets, the controller list, the Multilink items
+        {
+            juce::PopupMenu control;
+            lynx::addAutomationItem (control, engine, volume, true);
+            engine.setMultilink (true);
+            engine.noteTweaked (volume);
+            engine.noteTweaked (pan);
+            juce::PopupMenu multilink;
+            lynx::addMultilinkControlsItems (multilink, engine);
+            check ("multilink_queue", engine.multilinkTargets().size() == 2);
+            engine.setMultilink (false);
+            saveMenus (juce::StringArray { "Control menu", "Formula presets", "Multilink" },
+                       std::vector<juce::PopupMenu> { control, lynx::remoteControlFormulaMenu ([] (const juce::String&) {}), multilink },
+                       prefix + "-menus.png");
+            saveMenus (juce::StringArray { "Ctrl menu" }, std::vector<juce::PopupMenu> { lynx::remoteControlControllerMenu ([] (int) {}) },
+                       prefix + "-ctrl-menu.png");
+        }
+
+        // ---- Settings > MIDI: the input's Port box, the link list with a link's settings
+        {
+            engine.editSong ([&] (lynx::Song& s) {
+                MidiLink l { 74, 2, pan };
+                l.port = 4;
+                l.formula = "1-Input";
+                l.smooth = true;
+                s.midiLinks = { MidiLink { 7, 0, volume }, l };
+            });
+            auto page = lynx::makeMidiPage (engine, {}, false);
+            page->setSize (760, 900);
+            shoot (*page, "settings-midi");
+        }
+
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
+        return allOk;
+    }
+
     void runVersionsShot (const juce::String& prefix)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);

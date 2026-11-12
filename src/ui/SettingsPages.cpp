@@ -1,3 +1,5 @@
+#include "ui/RemoteControl.h"
+#include "ui/NumBox.h"
 #include "ui/SettingsPages.h"
 #include "platform/Paths.h"
 #include "platform/FileTypes.h"
@@ -1445,6 +1447,30 @@ public:
             styleCombo (*b);
             addAndMakeVisible (b);
         }
+        // FL's input "Port" (InPortSel, a number wheel -1...255, none by default; round 190bt): the port number the
+        // Remote control settings window's "Port" refers to
+        portLabel.setText (tr ("Port"), juce::dontSendNotification);
+        portLabel.setFont (theme::font (theme::type::small));
+        portLabel.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        portLabel.setJustificationType (juce::Justification::centredRight);
+        addAndMakeVisible (portLabel);
+        {
+            ui::ValueSpec spec;
+            spec.name = tr ("Port number: a controller link made with a port number follows only the devices with that port");
+            spec.minimum = -1.0;
+            spec.maximum = 255.0;
+            spec.defaultValue = -1.0;
+            spec.interval = 1.0;
+            spec.toText = [] (double v) { return v < 0.0 ? juce::String::fromUTF8 ("\xe2\x8b\xaf") : juce::String (juce::roundToInt (v)); };
+            port = std::make_unique<ui::NumBox> (ui::digitWheel (spec), [this] { return (double) prefsNow.port; }, [this] (double v) {
+                const auto now = juce::jlimit (-1, 255, juce::roundToInt (v));
+                if (now == prefsNow.port)
+                    return;
+                prefsNow.port = now;
+                update();
+            });
+            addAndMakeVisible (*port);
+        }
         update (false);
     }
 
@@ -1478,6 +1504,8 @@ public:
         typeLabel.setBounds (bottom.removeFromLeft (110));
         type.setBounds (bottom.removeFromLeft (juce::jmin (260, bottom.getWidth())));
         bottom.removeFromLeft (10);
+        port->setBounds (bottom.removeFromRight (48).reduced (0, 2));
+        portLabel.setBounds (bottom.removeFromRight (44));
         status.setBounds (bottom);
     }
 
@@ -1494,6 +1522,7 @@ private:
         zone.setEnabled (prefsNow.enabled);
         plays.setEnabled (prefsNow.enabled);
         type.setEnabled (prefsNow.enabled);
+        port->setEnabled (prefsNow.enabled);
         if (notify && onChange)
             onChange (prefsNow);
     }
@@ -1502,7 +1531,8 @@ private:
     std::function<void (const prefs::MidiInputPrefs&)> onChange;
     juce::ToggleButton enabled;
     juce::ComboBox channel, plays, type, zone;
-    juce::Label typeLabel, status;
+    juce::Label typeLabel, status, portLabel;
+    std::unique_ptr<ui::NumBox> port;
     std::vector<std::string> typeIds; // [item id − 3] the profile's id
     static constexpr int mpeItem = 100;
 
@@ -2027,6 +2057,16 @@ private:
     // links list
     int getNumRows() override { return juce::jmax (1, linkRows()); }
 
+    // round 190bt: a double-click opens the link in its Remote control settings / Global link settings window
+    void listBoxItemDoubleClicked (int row, const juce::MouseEvent&) override
+    {
+        const auto& project = engine.getSong().midiLinks;
+        if (juce::isPositiveAndBelow (row, (int) project.size()))
+            openRemoteControlSettings (engine, { project[(std::size_t) row].target }, false);
+        else if (const auto global = engine.getGlobalLinks(); juce::isPositiveAndBelow (row - (int) project.size(), (int) global.size()))
+            openRemoteControlSettings (engine, { global[(std::size_t) (row - (int) project.size())].target }, true);
+    }
+
     void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool selected) override
     {
         auto list = engine.getSong().midiLinks;
@@ -2051,8 +2091,19 @@ private:
         const auto source = "CC " + juce::String (link.cc) + (link.channel >= 0 ? juce::String::fromUTF8 (" \xc2\xb7 ") + tr ("ch. {0}", { juce::String (link.channel + 1) }) : juce::String());
         g.drawText (source, 10, 0, 110, height, juce::Justification::centredLeft);
         g.setColour (theme::colour::textPrimary);
-        g.drawText (describeAutomationTarget (engine, link.target) + (row >= projectLinks ? "  (" + tr ("global") + ")" : juce::String()), 124, 0,
-                    width - 134, height, juce::Justification::centredLeft, true);
+        // (round 190bt: what the Remote control settings window set on the link)
+        juce::StringArray extras;
+        if (link.port >= 0)
+            extras.add (tr ("Port") + " " + juce::String (link.port));
+        if (! link.formula.empty())
+            extras.add (juce::String::fromUTF8 (link.formula.c_str()));
+        if (link.smooth)
+            extras.add (tr ("Smoothing"));
+        if (link.omni)
+            extras.add (tr ("Omni"));
+        g.drawText (describeAutomationTarget (engine, link.target) + (row >= projectLinks ? "  (" + tr ("global") + ")" : juce::String())
+                        + (extras.isEmpty() ? juce::String() : juce::String::fromUTF8 ("  \xc2\xb7  ") + extras.joinIntoString (", ")),
+                    124, 0, width - 134, height, juce::Justification::centredLeft, true);
     }
 
     void selectedRowsChanged (int) override { removeLink.setEnabled (links.getSelectedRow() >= 0 && linkRows() > 0); }
