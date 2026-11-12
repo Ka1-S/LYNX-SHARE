@@ -3071,7 +3071,9 @@ recovers fast after a short burst and slowly after a long one (0.09 dB left 1.1 
 The memory law adds an exposure state E (0 … 1) that charges towards the light (drive / (1 + drive)) with 394 ms while
 lit and fades with 2.44 s; both conductances release (1 + 4.24 · E^1.23) times slower, with the round-123 cell refitted
 around it (optofit: Nelder-Mead, tc probe at D / S1 / X1 / X2): mean gain error 0.94 → 0.57 dB (D 0.77 → 0.29). Left
-after a 10 ms burst at 1.1 s: 0.07 dB (round 123's law 1.17); after 2 s: 1.29 dB (reference 2.00).
+after a 10 ms burst at 1.1 s: 0.07 dB (round 123's law 1.17); after 2 s: 1.29 dB (reference 2.00). The two other
+optical references whose maps also run round 123's release take it too, decided on their own tc probes (mean gain error
+SD-3A 1.31 → 0.97 dB, Custom Opto 0.99 → 0.85 dB).
 
 **Hush De-esser — Air and Mix** (appended; defaults off / 100 %). The E2-type reference passes a kit and a mix brighter,
 not darker: its wet path carries a static high shelf (on by default) — measured on the noise-burst and stereo probes
@@ -3106,6 +3108,8 @@ branch; per-file up / same / down):
 | Eiosis E2Deesser (programme) | Hush De-esser | prog182 | 5.90 → **6.95** | 13 / 6 / 1 | S2_drums 4→3 | |
 | VM FG-2A | Glow Leveler | tp172c | 3.42 → **3.75** | 3 / 9 / 0 | – | Opto memory on (v2 map + the switch) |
 | VM FG-2A (programme) | Glow Leveler | prog182 | 4.68 → **4.80** | 3 / 21 / 1 | S1_bass 5→3 | |
+| VM SD-3A | Glow Leveler | prog182 | 4.52 → **4.64** | 4 / 19 / 2 | X3_mix 5→4, X4_vocal 6→5 | Opto memory on (v3 map + the switch) |
+| VM Custom Opto | Glow Leveler | prog182 | 4.96 → 4.96 | 0 / 25 / 0 | – | Opto memory on (same scores) |
 
 Per plugin (the v3 rows; the G3 and MO-TT rows move to Prism):
 
@@ -3115,14 +3119,14 @@ Per plugin (the v3 rows; the G3 and MO-TT rows move to Prism):
 | Hush De-esser | 5 | 6.28 | **6.42** | 6.42 |
 | Crest Compressor | 13 | 5.10 | **5.28** | 5.22 (12 rows) |
 | Compressor | 10 | 4.76 | **4.87** | 4.96 (9 rows) |
-| Glow Leveler | 4 | 4.52 | **4.60** | 4.60 |
+| Glow Leveler | 4 | 4.52 | **4.64** | 4.64 |
 | Prism Multiband | 1 | 7.60 | 7.60 | 5.89 (3 rows: Pro-MB 7.60, G3 6.00, MO-TT 4.08) |
 
-The other 35 rows of the five plugins score exactly as before (same files, same scores).
+The other 33 rows of the five plugins score exactly as before (same files, same scores).
 
 Off = the base commit's sound: `tests/Dyn190dmTests.inc` renders 11 settings of the three effects (defaults and the
 other voicings / styles) hash-identical to the base commit (glibc ≥ 2.43 on x86-64; energy and samples within 1e-4 /
-2e-6 elsewhere), and every render of the 35 unchanged rows is byte-identical between the base and the branch (824 of 824 files; the 7
+2e-6 elsewhere), and every render of the rows whose map did not change is byte-identical between the base and the branch (824 of 824 files; the 7
 other Sentry rows again on the final binary, 165 of 165). CPU (user time, one instance, 35 s stereo programme, best of five, g++ −O2):
 level gate 0.43 s before and after, Transient 0.34 s; Hush 0.29 s before and after, with Air and Mix 0.29 s; Glow
 0.38 s before and after, with the memory 0.46 s; Prism with three bands 1.43 s where Crest took 0.35 s (the G3 row now
