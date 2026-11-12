@@ -1,0 +1,85 @@
+#pragma once
+
+// The clip grid as a place to work (round 190bv): recording into slots and moving clips about. Pure song operations
+// and the recorder's arithmetic; the launch engine is core/ClipLauncher.h, the engine side src/engine/AudioEngine.
+//
+// Recording into a slot follows the manual of the session-style program the Ableton-style layout studies (chapter
+// "Recording New Clips") and what its program file tells (docs/analise/REA_rodada190bv.md has every statement):
+//   - a recording starts on the next point of the global launch quantisation and ends on one ("correctly cut clips");
+//   - ended by the clip's launch button it goes straight on into loop playback; ended by a stop it just ends;
+//   - a fixed length ends it by itself and the clip plays on (a slot fired with a record length);
+//   - notes played into a clip that is already playing are added to it as it loops (overdub).
+
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "core/Recorder.h"
+#include "core/Song.h"
+
+namespace lynx::session
+{
+// --- recording: when ---------------------------------------------------------------------------------------------------
+// The next point of a grid of `quant` ticks at or after `now` (quant 0: now itself, on a whole tick).
+double nextPoint (double now, double quant) noexcept;
+// Where a recording asked for at `now` starts.
+inline double recordStart (double now, double quant) noexcept { return nextPoint (now, quant); }
+// Where a recording that started at `from` ends when asked to at `now`: the next grid point, at least one grid step
+// (or one tick without a grid) after its start. `fixedLength` > 0: exactly that long, whenever it is asked.
+double recordEnd (double from, double now, double quant, double fixedLength = 0.0) noexcept;
+
+// --- recording: what ---------------------------------------------------------------------------------------------------
+// The notes of a take. `events`: what was played, their `tick` on the launcher's clock. A new clip keeps the notes that
+// start in [from − early, until): those up to `early` ticks ahead of the start (a downbeat played a little soon) go on
+// its first tick, a note still held at the end is cut there. Starts are quantised to `grid` (<= 1: as played).
+// Positions are from the clip's start.
+std::vector<Note> takeNotes (const std::vector<RecordedEvent>& events, double from, double until, std::int64_t grid = 0,
+                             std::int64_t early = ppq / 8);
+// Overdub: the same events as notes of a clip that loops every `length` ticks from `anchor` on: each note lands where
+// the loop was when it was played; one held across the loop's end is cut at the end.
+std::vector<Note> overdubNotes (const std::vector<RecordedEvent>& events, double anchor, std::int64_t length, std::int64_t grid = 0);
+// Adds overdubbed notes to a pattern (sorted; a note that would double one already there, same channel, key and start,
+// replaces it).
+void mergeNotes (Pattern& pattern, const std::vector<Note>& notes);
+
+// A recorded MIDI clip in (track, scene): a new pattern of `length` ticks with `notes`, named as a new pattern is, and a
+// clip of it in the slot, in the track's colour. Returns the pattern's index (−1: the slot cannot take it).
+int placeRecordedPattern (Song& song, int track, int scene, std::vector<Note> notes, std::int64_t length);
+// A recorded audio clip in (track, scene): a new audio channel for `path` on mixer insert `insert` (≤ 0: a free one),
+// named `name`, and a clip of it: `length` ticks from `offset` (+ `offsetFraction`) ticks into the file.
+// Returns the channel's index (−1: the slot cannot take it).
+int placeRecordedAudio (Song& song, int track, int scene, const std::string& path, const std::string& name, int insert,
+                        std::int64_t length, std::int64_t offset, float offsetFraction = 0.0f);
+// A new, empty MIDI clip in an empty slot: one bar long. Returns the pattern's index (−1: the slot is taken).
+int insertEmptyClip (Song& song, int track, int scene);
+
+// --- clips between slots, and to and from the Playlist ---------------------------------------------------------------
+// What a slot holds: the clip and its settings (the clipboard's content).
+struct SlotClip
+{
+    Clip clip;
+    ClipGridSlot settings;
+};
+std::optional<SlotClip> copyOf (const Song& song, int track, int scene);
+// Puts a copied clip into (track, scene), replacing what is there; it keeps its name, colour, launch settings, follow
+// action and groove.
+bool paste (Song& song, int track, int scene, const SlotClip& content);
+// Cut: the copy, and the slot emptied.
+std::optional<SlotClip> cut (Song& song, int track, int scene);
+// Drag: the clip goes to the other slot (what was there is replaced); `copy` leaves the original where it was.
+bool moveClip (Song& song, int fromTrack, int fromScene, int toTrack, int toScene, bool copy = false);
+// Duplicate: a copy in the slot below (a new scene is added under the last one). Returns the copy's scene, −1: nothing.
+int duplicate (Song& song, int track, int scene);
+
+// A slot's clip on the Playlist: a copy on `playlistTrack` at `tick`, one pass long. False: nothing in the slot.
+bool toPlaylist (Song& song, int track, int scene, int playlistTrack, std::int64_t tick);
+// A copy of a Playlist-style clip (pattern or audio, as copied there) into a slot. False: not a clip a slot can hold.
+bool putClip (Song& song, Clip clip, int track, int scene);
+// A Playlist clip (pattern or audio; index into the current playlist) into a slot: a copy that starts where the clip
+// starts in its source and is as long as the clip. `move` takes it off the Playlist. False: not a clip a slot can hold.
+bool fromPlaylist (Song& song, std::size_t playlistIndex, int track, int scene, bool move = false);
+// A pattern, or an audio channel already in the project (a file dropped from the Browser, loaded by the caller), into a slot.
+bool putPattern (Song& song, int track, int scene, int pattern);
+bool putAudio (Song& song, int track, int scene, int channel, std::int64_t length);
+} // namespace lynx::session

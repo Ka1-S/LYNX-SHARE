@@ -1291,6 +1291,8 @@ void AudioEngine::sendLiveNote (int channel, int key, float velocity, bool on, b
 
     if (taking)
         uiRecorded.push_back ({ recordTickFor (now), channel, key, velocity, on });
+    if (record && slotTaking.load (std::memory_order_relaxed)) // a slot of the clip grid records (round 190bv)
+        uiSlotRecorded.push_back ({ recordTickFor (now), channel, key, velocity, on });
 }
 
 void AudioEngine::panic()
@@ -1462,7 +1464,8 @@ AudioEngine::LiveRecording AudioEngine::liveRecording() const
 
 void AudioEngine::updateAudioRecording()
 {
-    const auto wantTake = audioArmed && recordOptions.recordAudio && transport.recording.load();
+    // (round 190bv: a slot of the clip grid recording audio runs the armed inserts' takes too)
+    const auto wantTake = audioArmed && recordOptions.recordAudio && (transport.recording.load() || slotAudioWanted);
     const auto open = takeCount > 0;
 
     // the files are ready before Play: the very first block gets recorded
@@ -1950,6 +1953,24 @@ void AudioEngine::finishAudioTake()
     std::vector<double> wraps;
     for (int k = 0, count = takeWrapCount.exchange (0); k < count; ++k)
         wraps.push_back ((double) takeWraps[(std::size_t) k].load() * takeTicksPerSample);
+
+    // (round 190bv) takes made for slots of the clip grid go into those slots, not onto the Playlist
+    if (std::any_of (slotTakes.begin(), slotTakes.end(), [] (const SlotTake& t) { return t.audio; }) && frames > 0 && startTick >= 0.0
+        && ! discardAudioTakes)
+    {
+        std::vector<std::pair<juce::File, int>> files;
+        for (const auto& take : kept)
+            files.push_back ({ take->file, take->track });
+        const auto used = placeSlotAudio (files, takeTicksPerSample, takeLatency);
+        if (! used)
+            for (auto& take : done)
+            {
+                take->file.deleteFile();
+                forgetRecordings ({ take->file });
+            }
+        dropJournals();
+        return;
+    }
 
     if (frames <= 0 || startTick < 0.0 || discardAudioTakes) // (Cancel recording drops the takes, round 187a)
     {
@@ -2506,6 +2527,8 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
                                     mpe::modYOfPressure (mpeNote->pressure) });
         else if (taking)
             midiRecordQueue.push ({ tick, e.channel, e.key, e.velocity, noteOn });
+        if (slotTaking.load (std::memory_order_relaxed)) // a slot of the clip grid records (round 190bv)
+            slotRecordQueue.push ({ tick, e.channel, e.key, e.velocity, noteOn });
     };
 
     for (int i = 0; i < staleCount; ++i)
@@ -2823,8 +2846,9 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
     if (clipLauncher == nullptr || ! song.clipGrid)
         return;
     using T = launcher::Command::Type;
-    const auto starts = command.type == T::launch || command.type == T::launchScene;
-    if (! transport.playing.load() && ! starts && command.type != T::backToArrangement && command.type != T::reset)
+    const auto starts = command.type == T::launch || command.type == T::launchScene || command.type == T::record;
+    if (! transport.playing.load() && ! starts && command.type != T::backToArrangement && command.type != T::reset
+        && command.type != T::recordEnd) // (a recordEnd while stopped cancels a recording that never began)
         return;
     if (starts && song.mode != PlayMode::song) // the grid plays with the song
         editSong ([] (Song& s) { s.mode = PlayMode::song; }, false);
@@ -2837,8 +2861,15 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
                 if (bar > 0)
                     s.beatsPerBar = bar;
             }, false);
-    if (starts && ! transport.playing.load())
-        play();
+    if (starts && ! transport.playing.load() && ! isCountingIn())
+    {
+        // a recording into a slot counts in first, as the record options say (round 190bv)
+        if (command.type == T::record && recordOptions.countInBars > 0)
+            transport.countIn.store ((double) countInLength (song, recordOptions.countInBars, (std::int64_t) transport.positionTicks.load()));
+        else
+            play();
+        sendChangeMessage();
+    }
     clipLauncher->commands.push (command);
 }
 
@@ -4590,7 +4621,10 @@ void AudioEngine::timerCallback()
     updateRecording();
     updatePerformanceRecording();
     if (clipLauncher != nullptr)
+    {
         updateLauncherRecording();
+        updateSlotRecording();
+    }
     rackExchange.collectGarbage();
     if (levelsPending && ! juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
         flushLevels(); // a level drag ended: the full snapshot catches up (round 171c)
@@ -5448,7 +5482,7 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         // this block is pushed after the render, and every take must get every block.
         auto takesLocked = false;
         auto tappedTakes = false;
-        if (playing && transport.recording.load (std::memory_order_relaxed))
+        if (playing && (transport.recording.load (std::memory_order_relaxed) || slotAudioCapture.load (std::memory_order_relaxed)))
         {
             takesLocked = takeLock.tryEnter();
 
@@ -5473,7 +5507,14 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
                 }
 
                 if (takeStartTick.load (std::memory_order_relaxed) < 0.0)
+                {
                     takeStartTick.store (transport.positionTicks.load (std::memory_order_relaxed));
+                    // (round 190bv) the clip grid's clock at this sample: its own while it runs, else it starts at the song position
+                    takeStartClock.store (clipLauncher != nullptr && clipLauncher->running.load (std::memory_order_relaxed)
+                                              ? clipLauncher->clock
+                                              : transport.positionTicks.load (std::memory_order_relaxed),
+                                          std::memory_order_relaxed);
+                }
                 takeFrames.fetch_add (n, std::memory_order_relaxed);
                 takeTicks.store (takeTicks.load (std::memory_order_relaxed) + n * tps, std::memory_order_relaxed);
             }

@@ -1,6 +1,7 @@
 #include "core/Scheduler.h"
 
 #include "core/ClipOps.h"
+#include "core/Groove.h"
 #include "core/NoteChance.h"
 
 #include <algorithm>
@@ -440,6 +441,10 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
                             : std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
     const auto repeats = stretchedClipsLoop() && clip.offset + clip.length > period;
     const auto firstPass = repeats ? clip.offset / period : 0, lastPass = repeats ? (clip.offset + clip.length - 1) / period : 0;
+    // a clip of the grid may play through a groove of the pool (round 190bv, core/Groove.h): its notes sound moved and
+    // accented, the pattern stays as written. No groove (every Playlist clip, every project without a pool): nothing here.
+    const auto* clipGroove = clip.gridSlot >= 0 ? groove::ofClip (song, clip) : nullptr;
+    const auto grooveReach = clipGroove != nullptr ? (double) groove::maxShift (*clipGroove, song.grooves.amount) : 0.0;
 
     // one pass: the notes `shift` ticks later (pass ticks = pattern ticks + shift)
     auto playPass = [&] (std::int64_t shift) {
@@ -450,8 +455,8 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         if (index != nullptr && loopEnd <= (double) loop && (std::size_t) clip.pattern < index->maxNoteLength.size())
         {
             const auto local = (double) (clip.offset - clip.start - shift);
-            const auto from = loopStart + local - (double) (ticksPerStep + index->maxNoteLength[(std::size_t) clip.pattern] + index->maxShift) - 1.0;
-            const auto to = loopEnd + local + 1.0;
+            const auto from = loopStart + local - (double) (ticksPerStep + index->maxNoteLength[(std::size_t) clip.pattern] + index->maxShift) - 1.0 - grooveReach;
+            const auto to = loopEnd + local + 1.0 + grooveReach;
             if (to < 0.0 || (repeats && from >= (double) period))
                 return;
             first = std::lower_bound (notes.begin(), notes.end(), from, [] (const Note& n, double t) { return (double) n.start < t; });
@@ -473,7 +478,17 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
                 continue;
 
             const auto timing = noteTiming (note, song.swing, channelOf (&song.channels, note.channel));
-            auto on = std::min (clip.start + (start - clip.offset) + (timing.start - note.start), clip.end() - 1);
+            auto grooveShift = (std::int64_t) 0;
+            auto grooveVelocity = note.velocity;
+            if (clipGroove != nullptr)
+            {
+                const auto played = groove::apply (*clipGroove, song.grooves.amount, note.start, note.velocity,
+                                                   groove::randomBits (song.chanceSeed, (std::size_t) (it - notes.begin()),
+                                                                       clip.start - clip.offset + shift));
+                grooveShift = played.start - note.start;
+                grooveVelocity = played.velocity;
+            }
+            auto on = std::clamp (clip.start + (start - clip.offset) + (timing.start - note.start) + grooveShift, clip.start, clip.end() - 1);
             auto off = std::min (on + timing.length, clip.end());
 
             // FL's "Play truncated notes in clips" (FUN_010608a0): a note starting before the clip's offset keeps what is
@@ -491,7 +506,7 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
             e.type = NoteEvent::Type::on;
             e.channel = note.channel;
             e.key = note.key;
-            e.velocity = note.velocity;
+            e.velocity = grooveVelocity;
             e.pan = note.pan;
             e.cents = note.finePitch;
             e.porta = note.porta;

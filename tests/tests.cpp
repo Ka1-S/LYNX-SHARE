@@ -17393,6 +17393,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issues178aTests.inc"
 #include "Mixer177aTests.inc"
 #include "ClipLauncher181aTests.inc"
+#include "Session190bvTests.inc"
 #include "DetailView183aTests.inc"
 #include "Als181cTests.inc"
 #include "AlsDevices190bqTests.inc"

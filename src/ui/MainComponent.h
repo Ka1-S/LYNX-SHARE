@@ -112,6 +112,7 @@ public:
     SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
+    juce::Component* getClipGridForSnapshot() const noexcept { return clipGridView.get(); } // --gridshot (round 190bv)
     juce::PopupMenu getKeyMenuForSnapshot() { return makeKeyMenu(); } // --simpleshot (round 184a S11)
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
