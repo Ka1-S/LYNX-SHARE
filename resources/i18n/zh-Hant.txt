@@ -9466,6 +9466,20 @@ countries: tw hk mo
 "The groove this clip plays through (the Groove Pool)" = "此片段所用的律動 (律動池)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Warp 模式: 音訊的拉伸方式。Re-Pitch 同時改變速度和音高。屬於通道"
 
+# --- Round 190dx: FL's Automate / Preview, new instrument and audio tracks, one-click audio recording
+"Assign to new instrument track" = "指派到新的樂器軌道"
+"Unassign from instrument track" = "從樂器軌道取消指派"
+"I want to record audio..." = "我想錄製音訊..."
+"Into Edison audio editor/recorder" = "到 Edison 音訊編輯器/錄音器"
+"Into playlist as an audio clip" = "作為音訊片段到播放清單"
+"One-click audio recording" = "一鍵音訊錄製"
+"Latency compensation" = "延遲補償"
+"Add instrument track / Add audio track" = "新增樂器軌道 / 新增音訊軌道"
+"Use existing channel" = "使用現有通道"
+"More plugins..." = "更多外掛..."
+"Automate" = "自動化"
+"Add audio track" = "新增音訊軌道"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"

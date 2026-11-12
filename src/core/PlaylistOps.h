@@ -166,6 +166,29 @@ struct AudioTrackMenu
 AudioTrackMenu audioTrackMenu (const Song& song, int track);
 // "Track mode › Unassigned".
 void unassign (Song& song, int track);
+// --- FL's new audio / instrument tracks (round 190dx; FLEngine 2026 [DECOMP], /mnt/e/lynx-work/flpl190dx/FL-FACTS.md) ---
+// The first Playlist track that has no clip and is unassigned (FUN_012e8380: tracks 1..500 in FL's count), -1 when
+// all 500 are taken. New audio and instrument tracks go there.
+int firstFreeTrack (const Song& song);
+// The Playlist's "+" › "Add audio track" and its right click (AddAudioTrackMenuClick → FUN_012e3640): the first free
+// track, linked to a mixer track nothing uses (freeMixerTrack) as Track mode › Audio track links it (FUN_012ec590).
+// Returns the track, or -1 with nothing changed (no free track, or no free mixer track).
+int addAudioTrack (Song& song);
+// Whether `channel` can have an instrument track (FL: generators only; not audio clip or automation channels).
+bool canBeInstrumentTrack (const Song& song, int channel);
+// The Playlist tracks that are instrument tracks of `channel`.
+std::vector<int> instrumentTracksOf (const Song& song, int channel);
+// The Channel rack menu's "Assign to new instrument track" (LineAssignInstrTrackMenuClick Tag 0 → FUN_013036e0 with
+// track −1): the first free track becomes the channel's instrument track (makeInstrumentTrack). Returns the track, or
+// −1 with nothing changed.
+int assignToNewInstrumentTrack (Song& song, int channel);
+// The same item while the channel has an instrument track: "Unassign from instrument track" (Tag 1 → FUN_01303e30):
+// each of its instrument tracks goes back to unassigned. Returns how many.
+int unassignFromInstrumentTracks (Song& song, int channel);
+// A new instrument track playing a new channel of `generator` (the "+" menu's / Track mode › Instrument track's "More
+// plugins..." and generator list: FUN_012e34d0 / FUN_00e71980): on `track` (an unassigned or audio track), or on the
+// first free track when `track` < 0. Returns the new channel, or −1 with nothing changed.
+int addInstrumentTrack (Song& song, ChannelDef generator, int track = -1);
 // The pattern the pencil places on an instrument track (REA round 151 [EXEC FL 2026: drawing on an instrument track
 // places a pattern named after its channel, made on the first click, empty and one bar long; every later click
 // places the same pattern; its piano roll is that channel's]): the pattern named after the track's channel whose

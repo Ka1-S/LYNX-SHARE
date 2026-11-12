@@ -13,6 +13,9 @@
 #include "core/DetailChain.h"
 #include "core/SessionMixer.h"
 #include "core/PlaylistOps.h"
+#include "core/ClipOps.h"
+#include "core/FlTrackMenus.h"
+#include "core/OneClickRec.h"
 #include "core/WarpTools.h"
 #include "core/Comping.h"
 #include "core/Drumaxx.h"
@@ -1981,6 +1984,16 @@ public:
         if (args.contains ("--flctlshot"))
         {
             setApplicationReturnValue (runFlCtlShot (args[args.indexOf ("--flctlshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --flplshot <prefix> (round 190dx): the audio clip menu (Preview, Automate › Panning / Volume), the Playlist's "+"
+        // and its menu, Track mode › Instrument track, the Channel rack's "Assign to new instrument track", Tools › One-click
+        // audio recording and Mixer › Disk recording › Latency compensation, offscreen; prefix-checks.txt holds the checks
+        if (args.contains ("--flplshot"))
+        {
+            setApplicationReturnValue (runFlPlShot (args[args.indexOf ("--flplshot") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -10787,6 +10800,203 @@ private:
             check ("preset_load", loaded && fl.size() == 90 && fl[68 + 2] == 4000 && fl[68 + 14] == -70 && fl[68 + 16] == -40 && fl[88] == 96);
             engine.undo();
             check ("preset_load_undo", engine.getSong().channels[2].sampler.flChannel[68 + 14] != -70);
+        }
+
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
+        return allOk;
+    }
+
+    // --flplshot (round 190dx): see the dispatch above
+    bool runFlPlShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        const auto plain = [] (juce::String t) { return t.upToFirstOccurrenceOf ("\t", false, false).removeCharacters ("&_"); };
+        const auto findSub = [&plain] (const juce::PopupMenu& menu, const juce::String& text) -> const juce::PopupMenu* {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().subMenu != nullptr && plain (it.getItem().text) == plain (text))
+                    return it.getItem().subMenu.get();
+            return nullptr;
+        };
+        const auto texts = [&plain] (const juce::PopupMenu& menu, int count) {
+            juce::StringArray out;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next() && out.size() < count;)
+                out.add (it.getItem().isSeparator ? juce::String ("-") : it.getItem().isSectionHeader ? "[" + plain (it.getItem().text) + "]" : plain (it.getItem().text));
+            return out;
+        };
+        const auto modelTexts = [] (const std::vector<lynx::fltrackmenus::Entry>& model) {
+            juce::StringArray out;
+            for (const auto& e : model)
+                if (e.kind != lynx::fltrackmenus::Entry::Kind::list)
+                    out.add (e.kind == lynx::fltrackmenus::Entry::Kind::separator ? juce::String ("-")
+                             : e.kind == lynx::fltrackmenus::Entry::Kind::caption  ? "[" + lynx::tr (e.text) + "]"
+                                                                                    : lynx::tr (e.text));
+            return out;
+        };
+        const auto click = [&plain] (const juce::PopupMenu& menu, const juce::String& text) {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (plain (it.getItem().text) == plain (text) && it.getItem().isEnabled && it.getItem().action != nullptr)
+                {
+                    it.getItem().action();
+                    return true;
+                }
+            return false;
+        };
+
+        lynx::AudioEngine engine (false);
+        lynx::MainComponent ui (engine, false);
+        ui.setSize (1600, 900);
+        int vox = -1;
+        {
+            auto song = lynx::Song::makeDefault();
+            song.channels.push_back ({});
+            song.channels.back().name = "Vox";
+            song.channels.back().instrument = lynx::InstrumentKind::audioClip;
+            song.channels.back().volume = 0.6f;
+            song.channels.back().samplePath = writeShotSample (juce::File (prefix + "-vox.wav"), 330.0).getFullPathName().toStdString();
+            vox = (int) song.channels.size() - 1;
+            lynx::Clip c;
+            c.kind = lynx::ClipKind::audio;
+            c.channel = vox;
+            c.track = 3;
+            c.start = 4 * lynx::ppq;
+            c.length = 2 * lynx::ppq;
+            song.playlist.push_back (c);
+            engine.setSong (std::move (song));
+        }
+        engine.dispatchPendingMessages();
+        auto& playlist = ui.getPlaylistForSnapshot();
+
+        // ---- 1. the audio clip menu: Preview first, Automate › Panning / Volume
+        {
+            const auto menu = playlist.getClipMenuForSnapshot (0);
+            juce::PopupMenu::MenuItemIterator it (menu);
+            it.next(); // (the "Audio clip" title band)
+            it.next();
+            check ("clip_menu_preview_first", plain (it.getItem().text) == lynx::tr ("Preview"), it.getItem().text);
+            const auto* automate = findSub (menu, lynx::tr ("Automate"));
+            check ("clip_menu_automate", automate != nullptr && texts (*automate, 9) == modelTexts (lynx::fltrackmenus::automate()),
+                   automate != nullptr ? texts (*automate, 9).joinIntoString ("|") : juce::String ("missing"));
+            saveMenus (juce::StringArray { "Audio clip menu", "Automate" }, std::vector<juce::PopupMenu> { menu, automate != nullptr ? *automate : juce::PopupMenu() },
+                       prefix + "-clip-menu.png");
+            const auto before = engine.getSong().automations.size();
+            check ("automate_volume_runs", automate != nullptr && click (*automate, lynx::tr ("Volume")));
+            const auto& song = engine.getSong();
+            const auto ok = song.automations.size() == before + 1 && song.automations.back().target.kind == lynx::AutomationTargetKind::channelVolume
+                            && song.automations.back().target.index == vox && song.automations.back().points.size() == 2
+                            && song.automations.back().points[1].tick == 2 * lynx::ppq && std::abs (song.automations.back().points[0].value - 0.6f) < 1.0e-6f;
+            const auto* clip = ok ? &song.playlist.back() : nullptr;
+            check ("automate_volume_clip", ok && clip->kind == lynx::ClipKind::automation && clip->track == 3 && clip->start == 4 * lynx::ppq
+                                                && clip->length == 2 * lynx::ppq,
+                   ok ? juce::String::fromUTF8 (song.automations.back().name.c_str()) : juce::String());
+            engine.undo();
+            check ("automate_undo", engine.getSong().automations.size() == before);
+            // Preview: the clip's own audio (FL plays it through its channel); LYNX renders it for the preview output
+            const auto rendered = engine.renderClipAudio (0);
+            check ("preview_renders_the_clip", ! rendered.left.empty(), juce::String ((int) rendered.left.size()) + " frames");
+        }
+
+        // ---- 2. the Playlist's "+": its menu, a right click's audio track, the corner
+        {
+            const auto menu = playlist.getAddTrackMenuForSnapshot();
+            check ("add_menu_head", texts (menu, 5) == modelTexts (lynx::fltrackmenus::addTrack()), texts (menu, 5).joinIntoString ("|"));
+            saveMenus (juce::StringArray { "Playlist +" }, std::vector<juce::PopupMenu> { menu }, prefix + "-add-track-menu.png");
+            ui.selectTabForSnapshot (2);
+            engine.dispatchPendingMessages();
+            auto* button = playlist.getAddTrackButtonForSnapshot();
+            check ("add_button_in_corner", button != nullptr && button->isVisible() && button->getX() == 7 && button->getWidth() == 21 && button->getHeight() == 18
+                                               && button->getBottom() <= lynx::PlaylistComponent::headerHeight);
+            savePng (playlist.createComponentSnapshot (juce::Rectangle<int> (0, 0, juce::jmin (560, playlist.getWidth()), juce::jmin (260, playlist.getHeight()))),
+                     prefix + "-playlist-corner.png");
+            const auto track = playlist.addAudioTrackNow();
+            const auto& song = engine.getSong();
+            check ("add_audio_track", track == 0 && song.playlistTracks.size() > 0 && song.playlistTracks[0].mode == lynx::PlaylistTrackMode::audio
+                                          && song.playlistTracks[0].mixerTrack > 0,
+                   juce::String (track));
+            engine.undo();
+        }
+
+        // ---- 3. Track mode › Instrument track ›
+        {
+            const auto menu = playlist.getTrackMenuForSnapshot (5);
+            const auto* modes = findSub (menu, lynx::tr ("Track mode"));
+            const auto* instrument = modes != nullptr ? findSub (*modes, lynx::tr ("Instrument track")) : nullptr;
+            check ("instrument_track_head", instrument != nullptr && texts (*instrument, 4) == modelTexts (lynx::fltrackmenus::instrumentTrack()),
+                   instrument != nullptr ? texts (*instrument, 4).joinIntoString ("|") : juce::String ("missing"));
+            const auto* existing = instrument != nullptr ? findSub (*instrument, lynx::tr ("Use existing channel")) : nullptr;
+            check ("use_existing_lists_generators", existing != nullptr && existing->getNumItems() == 5, existing != nullptr ? juce::String (existing->getNumItems()) : juce::String());
+            std::vector<juce::PopupMenu> menus { modes != nullptr ? *modes : juce::PopupMenu(), instrument != nullptr ? *instrument : juce::PopupMenu(),
+                                                 existing != nullptr ? *existing : juce::PopupMenu() };
+            saveMenus (juce::StringArray { "Track mode", "Instrument track", "Use existing channel" }, menus, prefix + "-instrument-track-menu.png");
+            lynx::ChannelDef synth;
+            synth.name = "Lead";
+            synth.instrument = lynx::InstrumentKind::synth;
+            const auto channels = engine.getSong().channels.size();
+            int made = -1;
+            engine.editSong ([&] (lynx::Song& s) { made = lynx::trackmodes::addInstrumentTrack (s, synth, 5); });
+            check ("instrument_track_new_channel", made == (int) channels && engine.getSong().playlistTracks.size() > 5
+                                                       && engine.getSong().playlistTracks[5].channel == made);
+            engine.undo();
+        }
+
+        // ---- 4. the Channel rack menu: Assign to new instrument track / Unassign
+        {
+            auto& rack = ui.getRackForSnapshot();
+            const auto menu = rack.getChannelMenuForSnapshot (1);
+            saveMenus (juce::StringArray { "Channel menu" }, std::vector<juce::PopupMenu> { menu }, prefix + "-channel-menu.png");
+            check ("assign_runs", click (menu, lynx::tr ("Assign to new instrument track")));
+            const auto tracks = lynx::trackmodes::instrumentTracksOf (engine.getSong(), 1);
+            check ("assign_first_free_track", tracks == std::vector<int> { 0 }, juce::String (tracks.empty() ? -1 : tracks.front()));
+            const auto again = rack.getChannelMenuForSnapshot (1);
+            check ("unassign_offered", click (again, lynx::tr ("Unassign from instrument track")) && lynx::trackmodes::instrumentTracksOf (engine.getSong(), 1).empty());
+            bool greyed = false;
+            for (juce::PopupMenu::MenuItemIterator it (rack.getChannelMenuForSnapshot (vox)); it.next();)
+                if (plain (it.getItem().text) == plain (lynx::tr ("Assign to new instrument track")))
+                    greyed = ! it.getItem().isEnabled;
+            check ("assign_greyed_for_audio_clip_channel", greyed);
+        }
+
+        // ---- 5. Tools › One-click audio recording
+        {
+            const auto names = ui.getMenuNamesForSnapshot();
+            const auto tools = ui.getMenuForSnapshot (names.indexOf (lynx::tr ("Tools")));
+            const auto* oneClick = findSub (tools, lynx::tr ("One-click audio recording"));
+            check ("one_click_submenu", oneClick != nullptr && texts (*oneClick, 3) == modelTexts (lynx::fltrackmenus::oneClickRecording()),
+                   oneClick != nullptr ? texts (*oneClick, 3).joinIntoString ("|") : juce::String ("missing"));
+            saveMenus (juce::StringArray { "Tools", "One-click audio recording" }, std::vector<juce::PopupMenu> { tools, oneClick != nullptr ? *oneClick : juce::PopupMenu() },
+                       prefix + "-tools-one-click.png");
+            const auto plan = lynx::oneclick::plan (engine.getSong(), {}, 2, lynx::oneclick::Into::playlist);
+            check ("one_click_plan", plan.insert == 2 && plan.armInsert && plan.askInput && plan.songMode);
+        }
+
+        // ---- 6. Mixer › Disk recording › Latency compensation
+        {
+            auto& strips = ui.getMixerForSnapshot().getStripsForSnapshot();
+            const auto menu = strips.buildMenu (1);
+            const auto* disk = findSub (menu, lynx::tr ("Disk recording"));
+            int after = -1, at = -1, i = 0;
+            bool ticked = false;
+            if (disk != nullptr)
+                for (juce::PopupMenu::MenuItemIterator it (*disk); it.next(); ++i)
+                {
+                    if (plain (it.getItem().text) == plain (lynx::tr ("Auto-create audio clip (the rendered files go on the Playlist)")))
+                        after = i;
+                    if (plain (it.getItem().text) == plain (lynx::tr ("Latency compensation")))
+                    {
+                        at = i;
+                        ticked = it.getItem().isTicked;
+                    }
+                }
+            check ("latency_comp_item", disk != nullptr && after >= 0 && at == after + 1 && ticked && engine.getRecordOptions().latencyCompensation,
+                   juce::String (after) + " " + juce::String (at));
+            saveMenus (juce::StringArray { "Disk recording" }, std::vector<juce::PopupMenu> { disk != nullptr ? *disk : juce::PopupMenu() },
+                       prefix + "-disk-recording.png");
+            check ("latency_comp_toggles", disk != nullptr && click (*disk, lynx::tr ("Latency compensation")) && ! engine.getRecordOptions().latencyCompensation);
         }
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");

@@ -22,6 +22,10 @@
 #include <tuple>
 #include <vector>
 
+#include "core/FlTrackMenus.h" // round 190dx
+#include "core/OneClickRec.h"
+#include "core/TakeRecording.h"
+
 #if defined(__SSE__) || defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__) || defined(_M_ARM64) // x86 SSE, or ARM64 through core/Simd.h (sse2neon)
 #include "core/FlControlMenus.h"
 #include "core/LinkFormula.h"
@@ -17527,5 +17531,6 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "TrackLinkTests.inc"
 #include "Warp190dbTests.inc"
 #include "FlCtl190dfTests.inc"
+#include "FlPl190dxTests.inc"
 #include "Iss152Tests.inc"
 #include "Mod190doTests.inc"

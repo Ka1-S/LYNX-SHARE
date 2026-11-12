@@ -9466,6 +9466,20 @@ countries: tr
 "The groove this clip plays through (the Groove Pool)" = "Bu klibin içinden çaldığı groove (Groove Pool)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Warp modu: sesin nasıl esnetildiği. Re-Pitch hızı ve perdeyi birlikte değiştirir. Kanala aittir"
 
+# --- Round 190dx: FL's Automate / Preview, new instrument and audio tracks, one-click audio recording
+"Assign to new instrument track" = "Yeni enstrüman parçasına ata"
+"Unassign from instrument track" = "Enstrüman parçasından ayır"
+"I want to record audio..." = "Ses kaydetmek istiyorum..."
+"Into Edison audio editor/recorder" = "Edison ses düzenleyici/kaydediciye"
+"Into playlist as an audio clip" = "Ses klibi olarak çalma listesine"
+"One-click audio recording" = "Tek tıkla ses kaydı"
+"Latency compensation" = "Gecikme telafisi"
+"Add instrument track / Add audio track" = "Enstrüman parçası ekle / Ses parçası ekle"
+"Use existing channel" = "Mevcut kanalı kullan"
+"More plugins..." = "Daha fazla eklenti..."
+"Automate" = "Otomatikleştir"
+"Add audio track" = "Ses parçası ekle"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"

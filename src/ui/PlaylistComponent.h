@@ -76,6 +76,14 @@ public:
     std::function<void()> onOpenPianoRoll;
     std::function<void (int pattern)> onRenamePattern;  // clip menu: Rename and color (pattern clips)
     std::function<void (int channel)> onOpenInSampler;  // clip menu: the audio clip's file in a new Sampler channel
+    // round 190dx: a new instrument track's channel was made (or its generator replaced): the main window opens it as the
+    // Channel Rack opens a new generator
+    std::function<void (int channel, InstrumentKind kind)> onGeneratorAdded;
+    // FL's "+" at the top left of the track headers (AddInstrBtn, round 190dx): left click = this menu ("Audio track":
+    // Add audio track; "Instrument track": More plugins..., the generators), right click = addAudioTrackNow
+    juce::PopupMenu getAddTrackMenuForSnapshot() { return buildAddTrackMenu(); }
+    juce::Component* getAddTrackButtonForSnapshot() const noexcept { return addTrackButton.get(); }
+    int addAudioTrackNow(); // FL's Add audio track: the new track (selected, in view), −1 when none could be made
 
     // Double-click on a pattern clip opens it in: 0 = the Piano Roll when it has piano-roll notes, else the
     // Channel Rack; 1 = always the Channel Rack; 2 = always the Piano Roll. Alt+double-click opens the other one.
@@ -340,6 +348,8 @@ private:
     bool resizeAll = false;
     // Alt+right-click on a clip: hear it while the button is held (pattern clips play their pattern)
     void startPreview (int clip, int x);
+    // FL's audio clip menu › Preview (EEAUPreviewMenuClick, round 190dx): the clip's own audio, alone, once
+    void previewClipAudio (int clip);
     void stopPreview();
     bool previewRestoreSong = false;
     int previewPatternBefore = -1;
@@ -461,6 +471,12 @@ private:
     std::vector<int> selectedTracks; // Ctrl / Shift+click on headers: more selected tracks (round 165m)
     bool isTrackSelected (int track) const;
     std::vector<int> tracksForMenu (int track) const;
+    // round 190dx: FL's new instrument tracks (core trackmodes::addInstrumentTrack; on an instrument track the
+    // generator is replaced, FL's EEPLTrackMorePlugMenuClick)
+    juce::PopupMenu buildAddTrackMenu();
+    void instrumentForTrack (int track, ChannelDef generator);
+    void morePluginsForTrack (int track);
+    std::unique_ptr<juce::Component> addTrackButton;
 
     AudioEngine& engine;
     juce::ScrollBar hBar { false }, vBar { true }; // hBar is hidden: the overview strip scrolls sideways

@@ -905,4 +905,52 @@ inline float groupNormalizeGain (const std::vector<float>& peaks) noexcept
     return top == 0.0f ? 0.0f : 1.0f / top;
 }
 
+// FL's audio clip menu › Automate › Panning / Volume (EEAUAutoPanMenuClick 0x1244900, Tag 0 / 1; round 190dx,
+// /mnt/e/lynx-work/flpl190dx/FL-FACTS.md). FL makes an automation clip of a parameter of the clip's channel and puts it
+// where the audio clip is: same track, same start, same length, a flat line at the parameter's current value from the
+// clip's start to its end. FL's parameters are the channel's "Level adjustments" pan / volume (channel parameters 0x10 /
+// 0x11), which LYNX does not have: the clip channel's own Pan / Volume are the targets (the audible result is the same
+// while they are not set by hand). FL's Volume clip keeps the line at the top of a range that ends at unity; LYNX's
+// range is the channel volume's own, so the line starts at the current volume.
+enum class AutomateWhat : std::uint8_t { panning, volume };
+
+inline AutomationTarget automateTarget (const Song& song, int clip, AutomateWhat what)
+{
+    if (clip < 0 || clip >= (int) song.playlist.size())
+        return {};
+    const auto& c = song.playlist[(std::size_t) clip];
+    if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size())
+        return {};
+    AutomationTarget t;
+    t.kind = what == AutomateWhat::panning ? AutomationTargetKind::channelPan : AutomationTargetKind::channelVolume;
+    t.index = c.channel;
+    return t;
+}
+
+// Adds that automation clip (named `name`); returns the new automation's index, −1 when `clip` is no audio clip.
+inline int automateAudioClip (Song& song, int clip, AutomateWhat what, const std::string& name)
+{
+    const auto target = automateTarget (song, clip, what);
+    if (target.kind == AutomationTargetKind::none)
+        return -1;
+    const auto audio = song.playlist[(std::size_t) clip];
+    const auto value = std::clamp (song.targetValue (target), 0.0f, 1.0f);
+    const auto length = std::max<std::int64_t> (1, audio.length);
+
+    Automation a;
+    a.name = name;
+    a.target = target;
+    a.points = { { 0, value, 0.0f }, { length, value, 0.0f } };
+    song.automations.push_back (std::move (a));
+
+    Clip made;
+    made.kind = ClipKind::automation;
+    made.automation = (int) song.automations.size() - 1;
+    made.track = audio.track;
+    made.start = audio.start;
+    made.length = length;
+    song.playlist.push_back (made);
+    return made.automation;
+}
+
 } // namespace lynx::clipops

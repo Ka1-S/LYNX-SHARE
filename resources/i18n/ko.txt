@@ -9466,6 +9466,20 @@ countries: kr
 "The groove this clip plays through (the Groove Pool)" = "이 클립이 따르는 그루브 (그루브 풀)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "워프 모드: 오디오를 늘이는 방식. Re-Pitch는 속도와 음높이를 함께 바꿈. 채널에 속함"
 
+# --- Round 190dx: FL's Automate / Preview, new instrument and audio tracks, one-click audio recording
+"Assign to new instrument track" = "새 악기 트랙에 할당"
+"Unassign from instrument track" = "악기 트랙에서 할당 해제"
+"I want to record audio..." = "오디오를 녹음하고 싶어요..."
+"Into Edison audio editor/recorder" = "Edison 오디오 편집기/녹음기로"
+"Into playlist as an audio clip" = "오디오 클립으로 플레이리스트에"
+"One-click audio recording" = "원클릭 오디오 녹음"
+"Latency compensation" = "지연 보정"
+"Add instrument track / Add audio track" = "악기 트랙 추가 / 오디오 트랙 추가"
+"Use existing channel" = "기존 채널 사용"
+"More plugins..." = "더 많은 플러그인..."
+"Automate" = "자동화"
+"Add audio track" = "오디오 트랙 추가"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"

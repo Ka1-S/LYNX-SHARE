@@ -9466,6 +9466,20 @@ countries: ru by kz
 "The groove this clip plays through (the Groove Pool)" = "Грув, через который играет этот клип (Groove Pool)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Режим warp: как растягивается аудио. Re-Pitch меняет скорость и высоту вместе. Относится к каналу"
 
+# --- Round 190dx: FL's Automate / Preview, new instrument and audio tracks, one-click audio recording
+"Assign to new instrument track" = "Назначить новой инструментальной дорожке"
+"Unassign from instrument track" = "Отвязать от инструментальной дорожки"
+"I want to record audio..." = "Я хочу записать аудио..."
+"Into Edison audio editor/recorder" = "В аудиоредактор/рекордер Edison"
+"Into playlist as an audio clip" = "В плейлист как аудиоклип"
+"One-click audio recording" = "Запись аудио в один клик"
+"Latency compensation" = "Компенсация задержки"
+"Add instrument track / Add audio track" = "Добавить инструментальную дорожку / Добавить аудиодорожку"
+"Use existing channel" = "Использовать существующий канал"
+"More plugins..." = "Другие плагины..."
+"Automate" = "Автоматизировать"
+"Add audio track" = "Добавить аудиодорожку"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"

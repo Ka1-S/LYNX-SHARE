@@ -9586,3 +9586,17 @@ countries: br
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "Início: onde o clipe começa na origem (compasso. tempo. semicolcheia; segundos para áudio sem warp)"
 "The groove this clip plays through (the Groove Pool)" = "O groove pelo qual este clipe toca (o Groove Pool)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Modo de warp: como o áudio é esticado. Re-Pitch muda velocidade e afinação juntas. Pertence ao canal"
+
+# --- Round 190dx: FL's Automate / Preview, new instrument and audio tracks, one-click audio recording
+"Assign to new instrument track" = "Atribuir a uma nova faixa de instrumento"
+"Unassign from instrument track" = "Desatribuir da faixa de instrumento"
+"I want to record audio..." = "Quero gravar áudio..."
+"Into Edison audio editor/recorder" = "No editor/gravador de áudio Edison"
+"Into playlist as an audio clip" = "Na playlist como clipe de áudio"
+"One-click audio recording" = "Gravação de áudio com um clique"
+"Latency compensation" = "Compensação de latência"
+"Add instrument track / Add audio track" = "Adicionar faixa de instrumento / Adicionar faixa de áudio"
+"Use existing channel" = "Usar canal existente"
+"More plugins..." = "Mais plugins..."
+"Automate" = "Automatizar"
+"Add audio track" = "Adicionar faixa de áudio"

@@ -462,6 +462,9 @@ private:
     void openSampleBrowser();
     void toggleRecording();       // the record button: asks what to record first (unless told not to)
     void armSelectedInsertForAudio(); // "Audio, into the Playlist": arms the selected insert (asks for its input)
+    // FL's Tools › One-click audio recording › Into Edison audio editor/recorder | Into playlist as an audio clip (round
+    // 190dx, core/OneClickRec.h): `into` = 3 (Edison) or 2 (Playlist), FL's modes
+    void oneClickRecord (int into);
     void setControlHints(); // the hint bar text of every toolbar control (markup, see ui/HintBar.h)
     juce::String keyMarkup (const char* actionId) const; // "[Ctrl][S]" for the action's first key ("" when unbound)
 
