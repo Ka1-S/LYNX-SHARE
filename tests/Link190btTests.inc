@@ -145,7 +145,7 @@ TEST (link190bt_formula_mistakes_are_reported)
     CHECK (wrong ("Inputs", 0));
     CHECK (wrong ("Input 2", 6));
     CHECK (wrong ("(Input", -1));
-    CHECK (wrong ("Input)", 5));
+    CHECK (wrong ("Input)", -1));          // (FL counts the brackets first: "Unequal brackets")
     CHECK (wrong ("1 + # 2", 4));
     std::string deep (5000, '(');
     CHECK (wrong (deep.c_str(), -1));      // (no crash on absurd nesting)
@@ -225,7 +225,7 @@ TEST (link190bt_link_settings_and_conflicts)
 
     // Omni: a channel's control follows the selected channel, a mixer slot's the selected track; others stay
     CHECK (linkOmniAvailable (AutomationTargetKind::channelVolume) && linkOmniAvailable (AutomationTargetKind::effectParam));
-    CHECK (! linkOmniAvailable (AutomationTargetKind::tempo) && ! linkOmniAvailable (AutomationTargetKind::mixerVolume));
+    CHECK (! linkOmniAvailable (AutomationTargetKind::tempo) && linkOmniAvailable (AutomationTargetKind::mixerVolume)); // (190cs: FL live)
     MidiLink omni { 7, 0, volume };
     CHECK (linkOmniTarget (omni, 5, 9) == volume); // (off)
     omni.omni = true;

@@ -9095,3 +9095,18 @@ countries: br
 "Special" = "Especial"
 "Launchpad XY - X" = "Launchpad XY - X"
 "Launchpad XY - Y" = "Launchpad XY - Y"
+
+# --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
+"Inc" = "Inc"
+"How to treat a note or button link" = "Como tratar um link de nota ou botão"
+"Preserve controller default mode" = "Manter o modo padrão do controlador"
+"Hold to keep at velocity" = "Segure para manter na velocity"
+"Press again to switch" = "Pressione de novo para alternar"
+"Increment value" = "Incrementar o valor"
+"Keep at velocity" = "Manter na velocity"
+"Record automation" = "Gravar automação"
+"Allow recording of automation" = "Permitir a gravação de automação"
+"Channel volume" = "Volume do canal"
+"Channel panning" = "Pan do canal"
+"In: {0} out: {1}" = "Entrada: {0} saída: {1}"
+"Note C0" = "Nota C0"

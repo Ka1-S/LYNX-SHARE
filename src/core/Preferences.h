@@ -186,7 +186,8 @@ struct GlobalLink
     std::string formula;
     bool smooth = false;
     int smoothing = 469;
-    bool hasSettings() const noexcept { return port >= 0 || ! formula.empty() || smooth || smoothing != 469; }
+    int mode = 0; // FL's "Mode" (round 190cs; linkformula::LinkMode)
+    bool hasSettings() const noexcept { return port >= 0 || ! formula.empty() || smooth || smoothing != 469 || mode != 0; }
     bool operator== (const GlobalLink&) const = default;
 };
 

@@ -8975,6 +8975,21 @@ countries: nl be
 "Launchpad XY - X" = "Launchpad XY - X"
 "Launchpad XY - Y" = "Launchpad XY - Y"
 
+# --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
+"Inc" = "Inc"
+"How to treat a note or button link" = "Hoe een noot- of knoplink wordt behandeld"
+"Preserve controller default mode" = "Standaardmodus van de controller behouden"
+"Hold to keep at velocity" = "Ingedrukt houden om op de velocity te blijven"
+"Press again to switch" = "Nogmaals drukken om te wisselen"
+"Increment value" = "Waarde verhogen"
+"Keep at velocity" = "Op de velocity blijven"
+"Record automation" = "Automatisering opnemen"
+"Allow recording of automation" = "Opnemen van automatisering toestaan"
+"Channel volume" = "Kanaalvolume"
+"Channel panning" = "Kanaalpanorama"
+"In: {0} out: {1}" = "In: {0} uit: {1}"
+"Note C0" = "Noot C0"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"

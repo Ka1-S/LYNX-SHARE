@@ -8975,6 +8975,21 @@ countries: tw hk mo
 "Launchpad XY - X" = "Launchpad XY - X"
 "Launchpad XY - Y" = "Launchpad XY - Y"
 
+# --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
+"Inc" = "Inc"
+"How to treat a note or button link" = "如何處理音符或按鈕連結"
+"Preserve controller default mode" = "保留控制器的預設模式"
+"Hold to keep at velocity" = "按住以保持在力度值"
+"Press again to switch" = "再按一次切換"
+"Increment value" = "增加數值"
+"Keep at velocity" = "保持在力度值"
+"Record automation" = "錄製自動化"
+"Allow recording of automation" = "允許錄製自動化"
+"Channel volume" = "通道音量"
+"Channel panning" = "通道聲像"
+"In: {0} out: {1}" = "輸入: {0} 輸出: {1}"
+"Note C0" = "音符 C0"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"

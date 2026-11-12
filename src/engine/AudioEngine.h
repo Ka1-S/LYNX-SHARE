@@ -1042,11 +1042,17 @@ private:
     {
         int cc = 0, channel = 0, value = 0;
         int port = -1; // the input device's port number (Settings > MIDI; round 190bt), -1 = none
+        // round 190cs: `cc` 256 + n is key n (a note link; value = the velocity, 0 for its release). seenOnly: a key
+        // nothing links, offered to Auto detect only
+        bool seenOnly = false;
     };
     SpscQueue<ControllerEvent, 1024> controllerQueue; // MIDI thread -> UI (controllers)
     // the CCs a MIDI link (project or global) uses: they move their parameter and are not also played into the
     // selected channel's instrument (round 162); written by applyControllers, read by the MIDI thread
     std::array<std::atomic<std::uint64_t>, 2> linkedCcs {};
+    // the keys a link uses (round 190cs: FL's note links, controller number 256 + key): their presses and releases go
+    // to the link instead of the instrument. Written by applyControllers, read by the MIDI thread.
+    std::array<std::atomic<std::uint64_t>, 2> linkedNotes {};
     AutomationTarget learning;
     ControllerSeen controllerSeen;
     // round 190bt: a link's compiled mapping formula, and the smoothing filters of the links being moved
@@ -1076,6 +1082,7 @@ private:
         double lastMs = 0.0;
         bool held = false;
         std::vector<RecordedValue> pending; // sampled, not yet written
+        float liveValue = -1.0f; // an internal controller's value to write instead of the control's (round 190cs)
     };
     std::vector<Touch> touches;
     int automationCommitCountdown = 0;

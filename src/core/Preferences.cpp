@@ -449,8 +449,11 @@ std::string MidiPrefs::toText() const
     // above it, written only when the link has any (older versions skip the line and keep the plain link)
     for (const auto& l : globalLinks)
     {
-        out += "link=" + std::to_string (l.cc) + "|" + std::to_string (l.channel) + "|" + std::to_string (l.kind) + "|" + std::to_string (l.index)
-               + "|" + std::to_string (l.slot) + "|" + std::to_string (l.param) + "\n";
+        // notelink=<note>|... (round 190cs): a link to a key (FL's controller number 256 + note) has its own line, so
+        // older versions skip it instead of reading it as a controller link
+        const auto note = l.cc >= 256 && l.cc <= 383;
+        out += std::string (note ? "notelink=" : "link=") + std::to_string (note ? l.cc - 256 : l.cc) + "|" + std::to_string (l.channel) + "|"
+               + std::to_string (l.kind) + "|" + std::to_string (l.index) + "|" + std::to_string (l.slot) + "|" + std::to_string (l.param) + "\n";
         if (l.hasSettings())
         {
             auto formula = l.formula;
@@ -458,6 +461,10 @@ std::string MidiPrefs::toText() const
             std::replace (formula.begin(), formula.end(), '\r', ' ');
             out += "linkset=" + std::to_string (l.port) + "|" + (l.smooth ? "1" : "0") + "|" + std::to_string (l.smoothing) + "|" + formula + "\n";
         }
+        // linkmode=<mode> (round 190cs: FL's Default / Hold / Latch / Inc / Stay; only when not Default, its own line so
+        // older versions skip it)
+        if (l.mode != 0)
+            out += "linkmode=" + std::to_string (l.mode) + "\n";
     }
     return out;
 }
@@ -549,6 +556,11 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             l.smoothing = std::clamp (toInt (trim (parts[2]), 469), -1024, 1024);
             l.formula = trim (parts[3]);
         }
+        else if (key == "linkmode") // (the mode of the link read just before; round 190cs)
+        {
+            if (lastLinkKept)
+                p.globalLinks.back().mode = std::clamp (toInt (trim (value), 0), 0, 4);
+        }
         else if (key == "output")
         {
             const auto parts = split (value, '|', 5);
@@ -570,13 +582,16 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             p.clockOffsetMs = std::clamp (toInt (trim (parts[0]), 0), -1000, 1000);
             p.clockInput = parts[1];
         }
-        else if (key == "link")
+        else if (key == "link" || key == "notelink")
         {
             const auto parts = split (value, '|', 6);
             if (parts.size() != 6)
+            {
+                lastLinkKept = false;
                 continue;
+            }
             GlobalLink l;
-            l.cc = std::clamp (toInt (trim (parts[0]), 0), 0, 127);
+            l.cc = std::clamp (toInt (trim (parts[0]), 0), 0, 127) + (key == "notelink" ? 256 : 0);
             l.channel = std::clamp (toInt (trim (parts[1]), -1), -1, 15);
             l.kind = std::max (0, toInt (trim (parts[2]), 0));
             l.index = toInt (trim (parts[3]), 0);

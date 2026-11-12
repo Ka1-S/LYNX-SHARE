@@ -8975,6 +8975,21 @@ countries: tr
 "Launchpad XY - X" = "Launchpad XY - X"
 "Launchpad XY - Y" = "Launchpad XY - Y"
 
+# --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
+"Inc" = "Inc"
+"How to treat a note or button link" = "Nota veya düğme bağlantısı nasıl ele alınır"
+"Preserve controller default mode" = "Denetleyicinin varsayılan modunu koru"
+"Hold to keep at velocity" = "Velocity'de tutmak için basılı tutun"
+"Press again to switch" = "Değiştirmek için yeniden basın"
+"Increment value" = "Değeri artır"
+"Keep at velocity" = "Velocity'de tut"
+"Record automation" = "Otomasyon kaydet"
+"Allow recording of automation" = "Otomasyon kaydına izin ver"
+"Channel volume" = "Kanal sesi"
+"Channel panning" = "Kanal pan'ı"
+"In: {0} out: {1}" = "Giriş: {0} çıkış: {1}"
+"Note C0" = "Nota C0"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"

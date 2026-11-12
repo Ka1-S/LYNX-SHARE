@@ -20,12 +20,16 @@ void closeRemoteControlSettings();
 std::unique_ptr<juce::Component> makeRemoteControlPanel (AudioEngine& engine, std::vector<AutomationTarget> targets, bool global,
                                                          std::function<void()> close = {});
 // Offscreen drivers of that panel (--linkshot, selftest): what a user would do.
-void remoteControlPanelSetFormula (juce::Component& panel, const juce::String& formula);
+// (pressEnter false: typed but not compiled yet, as FL compiles on Enter)
+void remoteControlPanelSetFormula (juce::Component& panel, const juce::String& formula, bool pressEnter = true);
+void remoteControlPanelSetMode (juce::Component& panel, int mode); // FL's Mode: 0 Default ... 4 Stay
+void remoteControlPanelSetInternal (juce::Component& panel, int which, bool recordAutomation); // 0 = (none)
 void remoteControlPanelSetController (juce::Component& panel, int port, int channel, int cc);
 void remoteControlPanelSetSmoothing (juce::Component& panel, bool on, int position);
 void remoteControlPanelPoll (juce::Component& panel); // one Auto detect check, as the panel's timer does
 void remoteControlPanelPress (juce::Component& panel, int button); // 0 Reset, 1 Skip, 2 Accept
-juce::String remoteControlPanelState (juce::Component& panel);     // "port|channel|cc|formula|message|conflicts|parameter"
+// "port|channel|cc|formula|message|conflicts|parameter|mode=n|shown=<P A I O C S>|omni=on/off|h=<height>"
+juce::String remoteControlPanelState (juce::Component& panel);
 bool remoteControlPanelFinished (juce::Component& panel);           // the last control was accepted or skipped
 // FL's MLWheelMenu items that act on the controls queued by "Multilink to controllers" (round 190bt): Automation >
 // Init song with these positions, Create automation clips; Remote control > Link to controllers..., Override global

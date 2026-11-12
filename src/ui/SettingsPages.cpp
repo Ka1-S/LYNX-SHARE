@@ -1961,7 +1961,10 @@ private:
         const auto& link = list[(std::size_t) row];
         g.setFont (theme::font (theme::type::body));
         g.setColour (theme::colour::info);
-        const auto source = "CC " + juce::String (link.cc) + (link.channel >= 0 ? juce::String::fromUTF8 (" \xc2\xb7 ") + tr ("ch. {0}", { juce::String (link.channel + 1) }) : juce::String());
+        // (round 190cs: a key link reads as its note, FL's octaves: C5 = MIDI note 60)
+        const auto source = (isNoteLink (link.cc) ? tr ("Note") + " " + juce::MidiMessage::getMidiNoteName (link.cc - linkNoteBase, true, true, 5)
+                                                  : "CC " + juce::String (link.cc))
+                            + (link.channel >= 0 ? juce::String::fromUTF8 (" \xc2\xb7 ") + tr ("ch. {0}", { juce::String (link.channel + 1) }) : juce::String());
         g.drawText (source, 10, 0, 110, height, juce::Justification::centredLeft);
         g.setColour (theme::colour::textPrimary);
         // (round 190bt: what the Remote control settings window set on the link)
@@ -1974,6 +1977,11 @@ private:
             extras.add (tr ("Smoothing"));
         if (link.omni)
             extras.add (tr ("Omni"));
+        if (link.mode > 0 && link.mode < 5) // FL's link Mode (round 190cs)
+        {
+            static const char* const modes[] { "Default", "Hold", "Latch", "Inc", "Stay" };
+            extras.add (tr ("Mode") + " " + tr (modes[link.mode]));
+        }
         g.drawText (describeAutomationTarget (engine, link.target) + (row >= projectLinks ? "  (" + tr ("global") + ")" : juce::String())
                         + (extras.isEmpty() ? juce::String() : juce::String::fromUTF8 ("  \xc2\xb7  ") + extras.joinIntoString (", ")),
                     124, 0, width - 134, height, juce::Justification::centredLeft, true);

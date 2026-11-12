@@ -2659,6 +2659,8 @@ juce::String toJson (const Song& song, bool stampVersion)
             for (auto v : a.curve)
                 curve.add (juce::roundToInt (v * 10000.0f) / 10000.0);
             o->setProperty ("curve", curve);
+            if (a.recordLive) // "Record automation" (round 190cs)
+                o->setProperty ("recordLive", true);
         }
         if (const auto& l = a.lfo; ! l.isDefault()) // round 177b: FL's clip LFO
         {
@@ -2736,37 +2738,54 @@ juce::String toJson (const Song& song, bool stampVersion)
 
     if (! song.midiLinks.empty())
     {
-        juce::Array<juce::var> links;
+        juce::Array<juce::var> links, settings, noteLinks;
+        // a link's Remote control settings (round 190bt): "midiLinkSettings", beside the plain list (older versions read
+        // "midiLinks" as before and skip it); only the links that have any
+        const auto settingsOf = [] (const MidiLink& l, juce::DynamicObject& o) {
+            if (l.port >= 0)
+                o.setProperty ("port", l.port);
+            if (! l.formula.empty())
+                o.setProperty ("formula", juce::String::fromUTF8 (l.formula.c_str()));
+            if (l.smooth)
+                o.setProperty ("smooth", true);
+            if (l.smoothing != 469)
+                o.setProperty ("smoothing", l.smoothing);
+            if (l.omni)
+                o.setProperty ("omni", true);
+            if (l.mode != 0) // FL's link Mode (round 190cs)
+                o.setProperty ("mode", l.mode);
+        };
 
         for (const auto& l : song.midiLinks)
-            links.add (juce::Array<juce::var> { l.cc, l.channel, targetKindName (l.target.kind), l.target.index, l.target.slot, l.target.param });
-
-        root->setProperty ("midiLinks", links);
-
-        // round 190bt: a link's Remote control settings, beside the plain list (older versions read "midiLinks" as
-        // before and skip this); only the links that have any
-        juce::Array<juce::var> settings;
-        for (int i = 0; i < (int) song.midiLinks.size(); ++i)
         {
-            const auto& l = song.midiLinks[(std::size_t) i];
-            if (! l.hasSettings())
+            if (isNoteLink (l.cc))
+            {
+                // round 190cs: links to keys go to their own list, which older versions skip (in "midiLinks" they would
+                // read as controller links)
+                auto o = std::make_unique<juce::DynamicObject>();
+                o->setProperty ("note", l.cc - linkNoteBase);
+                o->setProperty ("channel", l.channel);
+                o->setProperty ("target", juce::Array<juce::var> { targetKindName (l.target.kind), l.target.index, l.target.slot, l.target.param });
+                settingsOf (l, *o);
+                noteLinks.add (juce::var (o.release()));
                 continue;
-            auto o = std::make_unique<juce::DynamicObject>();
-            o->setProperty ("link", i);
-            if (l.port >= 0)
-                o->setProperty ("port", l.port);
-            if (! l.formula.empty())
-                o->setProperty ("formula", juce::String::fromUTF8 (l.formula.c_str()));
-            if (l.smooth)
-                o->setProperty ("smooth", true);
-            if (l.smoothing != 469)
-                o->setProperty ("smoothing", l.smoothing);
-            if (l.omni)
-                o->setProperty ("omni", true);
-            settings.add (juce::var (o.release()));
+            }
+            if (l.hasSettings())
+            {
+                auto o = std::make_unique<juce::DynamicObject>();
+                o->setProperty ("link", links.size());
+                settingsOf (l, *o);
+                settings.add (juce::var (o.release()));
+            }
+            links.add (juce::Array<juce::var> { l.cc, l.channel, targetKindName (l.target.kind), l.target.index, l.target.slot, l.target.param });
         }
+
+        if (! links.isEmpty())
+            root->setProperty ("midiLinks", links);
         if (! settings.isEmpty())
             root->setProperty ("midiLinkSettings", settings);
+        if (! noteLinks.isEmpty())
+            root->setProperty ("midiNoteLinks", noteLinks);
     }
 
     if (! song.initialValues.empty()) // FL's initialized controls (REA round 146)
@@ -3278,6 +3297,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
 
             if (const auto& source = a["source"]; source.isArray() && source.size() >= 3)
                 automation.source = { (int) source[0], (int) source[1], (int) source[2], source.size() >= 4 ? (int) source[3] : -1 };
+            automation.recordLive = (bool) a["recordLive"];
             if (auto* curve = a["curve"].getArray())
                 for (const auto& v : *curve)
                     automation.curve.push_back (juce::jlimit (0.0f, 1.0f, (float) (double) v));
@@ -3371,20 +3391,34 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
             else
                 song.midiLinks.push_back ({ -1, -1, {} }); // (keeps the places "midiLinkSettings" counts; dropped below)
 
+    const auto readSettings = [] (const juce::var& o, MidiLink& l) {
+        if (o.hasProperty ("port"))
+            l.port = juce::jlimit (-1, 255, (int) o["port"]);
+        l.formula = o["formula"].toString().toStdString();
+        l.smooth = (bool) o["smooth"];
+        if (o.hasProperty ("smoothing"))
+            l.smoothing = juce::jlimit (-1024, 1024, (int) o["smoothing"]);
+        l.omni = (bool) o["omni"];
+        l.mode = juce::jlimit (0, 4, (int) o["mode"]); // (round 190cs)
+    };
     if (auto* settings = root["midiLinkSettings"].getArray()) // round 190bt
         for (const auto& o : *settings)
         {
             const auto i = o.isObject() && o.hasProperty ("link") ? (int) o["link"] : -1;
             if (i < 0 || i >= (int) song.midiLinks.size())
                 continue;
-            auto& l = song.midiLinks[(std::size_t) i];
-            if (o.hasProperty ("port"))
-                l.port = juce::jlimit (-1, 255, (int) o["port"]);
-            l.formula = o["formula"].toString().toStdString();
-            l.smooth = (bool) o["smooth"];
-            if (o.hasProperty ("smoothing"))
-                l.smoothing = juce::jlimit (-1024, 1024, (int) o["smoothing"]);
-            l.omni = (bool) o["omni"];
+            readSettings (o, song.midiLinks[(std::size_t) i]);
+        }
+    if (auto* notes = root["midiNoteLinks"].getArray()) // round 190cs: links to keys
+        for (const auto& o : *notes)
+        {
+            const auto* target = o["target"].getArray();
+            if (! o.isObject() || target == nullptr || target->size() != 4)
+                continue;
+            MidiLink l { linkNoteBase + juce::jlimit (0, 127, (int) o["note"]), juce::jlimit (-1, 15, (int) o["channel"]),
+                         { targetKindFromName ((*target)[0].toString()), (int) (*target)[1], (int) (*target)[2], (int) (*target)[3] } };
+            readSettings (o, l);
+            song.midiLinks.push_back (std::move (l));
         }
     song.midiLinks.erase (std::remove_if (song.midiLinks.begin(), song.midiLinks.end(), [] (const MidiLink& l) { return l.cc < 0; }),
                           song.midiLinks.end());

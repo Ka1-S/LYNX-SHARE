@@ -7,6 +7,7 @@
 // Clean-room: the function names, their argument counts and what each returns were read from FL's behaviour
 // (static study); the parser and evaluator are LYNX's own.
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -64,4 +65,26 @@ struct Smoother
     float step (float target, double elapsedMs, int position);
     bool settled (float target) const noexcept;
 };
+
+// FL's link "Mode" (NoteLinkModeBox "How to treat a note or button link": Default / Hold / Latch / Inc / Stay; round
+// 190cs, docs/analise/REA_rodada190bt.md section 7). The mode is stored in the link's flags and read by FL's link
+// dispatcher [H 0xfdaec0]: Default and Hold pass every event on as it is (a note: velocity / 127 while held, 0 on its
+// release); Latch, Inc and Stay act on presses only (an input above 0) and ignore releases. Latch switches to whichever
+// of f(0) and f(1) is farther from the control's position; Inc adds f(resolution) [H 0x1051370]; Stay sets f(input).
+enum class LinkMode : int
+{
+    standard = 0, // "Default": "Preserve controller default mode"
+    hold,         // "Hold to keep at velocity"
+    latch,        // "Press again to switch"
+    inc,          // "Increment value"
+    stay          // "Keep at velocity"
+};
+constexpr int linkModeCount = 5;
+// The increment an event carries unless its device says otherwise: FL's event record starts at 1/128 [H 0xfd82b0].
+constexpr double incrementResolution = 1.0 / 128.0;
+// What one event does to the linked control: `input` 0...1 (a controller's position, a note's velocity / 127, 0 for a
+// release); `current` the control's position now. Nothing = the event is ignored. The result is limited to 0...1.
+std::optional<float> linkModeValue (int mode, const Formula& formula, float input, float current);
+// Does the mode act on every event (as a plain controller does), or on presses only?
+inline bool linkModeIsAbsolute (int mode) noexcept { return mode <= (int) LinkMode::hold || mode >= linkModeCount; }
 } // namespace lynx::linkformula

@@ -435,7 +435,8 @@ std::vector<MidiLink> linksWithGlobal (const std::vector<MidiLink>& project, con
 bool linkOmniAvailable (AutomationTargetKind kind) noexcept
 {
     return kind == AutomationTargetKind::channelVolume || kind == AutomationTargetKind::channelPan || kind == AutomationTargetKind::channelParam
-        || kind == AutomationTargetKind::effectParam || kind == AutomationTargetKind::effectMix;
+        || kind == AutomationTargetKind::mixerVolume || kind == AutomationTargetKind::mixerPan || kind == AutomationTargetKind::effectParam
+        || kind == AutomationTargetKind::effectMix;
 }
 
 AutomationTarget linkOmniTarget (const MidiLink& link, int selectedChannel, int selectedMixerTrack) noexcept

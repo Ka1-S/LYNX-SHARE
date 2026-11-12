@@ -8975,6 +8975,21 @@ countries: kr
 "Launchpad XY - X" = "Launchpad XY - X"
 "Launchpad XY - Y" = "Launchpad XY - Y"
 
+# --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
+"Inc" = "Inc"
+"How to treat a note or button link" = "노트 또는 버튼 링크를 처리하는 방법"
+"Preserve controller default mode" = "컨트롤러 기본 모드 유지"
+"Hold to keep at velocity" = "누르고 있는 동안 벨로시티 유지"
+"Press again to switch" = "다시 눌러 전환"
+"Increment value" = "값 증가"
+"Keep at velocity" = "벨로시티 유지"
+"Record automation" = "오토메이션 녹음"
+"Allow recording of automation" = "오토메이션 녹음 허용"
+"Channel volume" = "채널 볼륨"
+"Channel panning" = "채널 팬"
+"In: {0} out: {1}" = "입력: {0} 출력: {1}"
+"Note C0" = "노트 C0"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
