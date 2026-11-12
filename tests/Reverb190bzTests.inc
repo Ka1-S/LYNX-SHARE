@@ -133,8 +133,12 @@ TEST (reverb190bz_new_instances_run_the_law_and_saved_projects_keep_the_classic_
             CHECK (loaded.params[law] == v);
         }
     }
-    // Nebula keeps one engine (its own port is a separate round): no law parameter
-    CHECK (std::string (effectInfo (EffectKind::nebula).params.back().name) == "Clear");
+    // Nebula is not one of this round's five: the shared engine's law does not reach it. Its own "Law" is round 190ca's
+    // cloud model, appended after "Clear" (rollup 0.1.27: both rounds together; tests/Nebula190caTests.inc)
+    {
+        const auto& nebula = effectInfo (EffectKind::nebula).params;
+        CHECK (nebula.size() == 15 && std::string (nebula[13].name) == "Clear" && std::string (nebula[14].name) == "Law");
+    }
 }
 
 TEST (reverb190bz_classic_law_renders_as_the_base_commit_did)
