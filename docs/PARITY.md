@@ -2449,6 +2449,24 @@ inside FL against LYNX's import of the same module (16-bit files: about −75 dB
 | Reeverb 2 (+ utility) by import | Reverb (32) | ⚠️ mapped: levels within 0.4 dB, decay and width equal; PAN, WIDTH on the raw early reflections and modulation not reproduced (reported) | 5 sets |
 | Parametric EQ (1–2 slots) by import | Tuned EQ (30) | ⚠️ mapped: exact when flat, −39 dB at the default bandwidth; bandwidths outside the EQ's range are reported; FLM's 8-sample delay not reproduced | 4 sets |
 
+## Round 190dw: FL Studio Mobile's Equalizer, Graphic EQ, Filter, Autoduck (legacy) and reverbs on FLM's own engines
+
+Laws: `docs/analise/REA_rodada190dw.md`, `docs/analise/FLM_FORMAT.md` §7.9–7.10. Measured = FL's command-line render of
+FL Studio Mobile inside FL against LYNX's import of the same module (16-bit files: about −75 dB is a null); settings
+mostly from FL's FLM sample songs. Before = the earlier mapping (Parametric EQ / rhythm gain / Reeverb 2), still what
+projects saved with it play.
+
+| LYNX | Role (FL Mobile) | Sound | Before → after (score, ESR) |
+|---|---|---|---|
+| Pocket EQ (`core/PocketFxE.cpp`) | Equalizer (3): 4 bands, ±24 dB, 2× design, channel modes | ✅ FLM's engine | 6 sets: 3–8 (−4…−41 dB) → 9–10 (−66…−83 dB) |
+| Pocket Graphic EQ (`core/PocketFxE.cpp`) | Graphic EQ (7): 8 bands, 8-sample pipeline | ✅ FLM's engine | 4 sets: 2–8 (−8…−44 dB, 8 samples late) → 9–10 (−62…−75 dB) |
+| Pocket Filter (`core/PocketFxE.cpp`) | Filter (9): LP / BP / HP, 24 / 48 / 96 dB | ✅ FLM's engine (Slope switches at once, as FLM) | 7 sets: 3–10 (−9…−71 dB) → 9–10 (−68…−85 dB) |
+| Pocket Autoduck (legacy curve) by import | Autoduck legacy (10) | ✅ exact (module 29's engine) | 4 sets: 5–8 (−19…−41 dB) → 10 (−71…−74 dB) |
+| Pocket Reverb Classic (`core/PocketReverb.cpp`) | Reverb legacy (12) | ✅ FLM's plate | 4 sets: 6–8 (−17…−20 dB) → 10 (−75…−77 dB) |
+| Pocket Reverb 2 (`core/PocketReverb.cpp`) | Reverb 2 (35): separation, pan, side input, tempo delay | ✅ FLM's plate | 4 sets: 3–7 (−5…−16 dB) → 10 (−74…−76 dB) |
+| Pocket Reverb (`core/PocketReverb.cpp`) | Reverb (32) | ✅ FLM's plate | 5 sets: 2–6 (−2…−6 dB) → 9–10 (−70…−76 dB) |
+| Pocket GMSynth effects (`core/GmsMobile.cpp`) | GMSynth's FLNG / F HP / RING / VOX (item 4) | ⚠️ level and spectrum within 0.03 dB / 0.8 dB; RING and VOX-with-LFO phase not matched (ESR −2 dB) | 6 sets, pass-through before |
+
 ## Round 190o: Live's MIDI Transformations (core) and Scale Mode in .als (LYNX extras, Ableton-style)
 
 | Item | FL Studio | Ableton Live 12 | LYNX |

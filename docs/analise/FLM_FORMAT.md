@@ -699,6 +699,24 @@ target channel's insert; SoundFont Player's held bend and lanes use ±2 semitone
 SoundFont Player's Attack / Decay / Sustain / Release lanes (Envelope = Custom) and 3x Osc's Pan lane import; 3x Osc's
 custom shape plays the file its PATH names.
 
+### 7.10 Equalizer, Graphic EQ, Filter, Autoduck (legacy) and the three reverbs on FLM's engines (round 190dw)
+
+Until round 190dw these seven modules were approximated (rounds 188f / 188h / 190by: the Parametric EQ, the rhythm gain
+and FL's Reeverb 2). They now play on FLM's own engines, laws in `docs/analise/REA_rodada190dw.md` (PROVEN-REA, every
+set rendered by FLM inside FL and nulled at the 16-bit floor):
+
+| Module | LYNX | What the old mapping missed |
+|---|---|---|
+| Equalizer (3) | Pocket EQ | the 2× hold / keep path (high bands up to 7 dB off), ±24 dB (capped at ±18), one-channel / opposite-gain channel modes, the 1-sample pipeline |
+| Graphic EQ (7) | Pocket Graphic EQ | the 8-sample pipeline, ±24 dB bands |
+| Filter (9) | Pocket Filter | 16 Hz…20.2 kHz (clamped to 20 Hz…20 kHz), the level offsets above ±18 dB, one sample per biquad pair |
+| Autoduck (legacy, 10) | Pocket Autoduck (module 29's engine) | the curve between 12 points, the 0.01 one-pole; depth Ducking² = √(Ducking⁴) |
+| Reverb (legacy, 12), Reverb 2 (35), Reverb (32) | Pocket Reverb Classic / Reverb 2 / Reverb | FLM's own plate: half-sum input, the second diffuser coefficient on stages 2 and 4, early reflections after stage 2 (FLM's long low end), truncated ER offsets, exact ms predelay, its gain glides; Reverb 2's separation, pan and side input; Reverb (32)'s raw ER bus |
+
+Every module copies its values (parameter k + 1 → LYNX k), so lanes on any parameter (a Filter's Slope included) are
+one LYNX lane each. A project saved before round 190dw keeps its Parametric EQ / rhythm gain / Reeverb 2 slots, whose
+engines are unchanged; re-importing the .flm gives FLM's engines.
+
 ## 8. Relation to FLM-exported .flp (issue #88)
 
 FL Studio desktop hosts FLM instruments as the "FL Studio Mobile Rack" generator (`FL Studio Mobile Rack_x64.dll`).
@@ -723,7 +741,8 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
    Stereoizer, Flanger, Autoduck (29), Tremolo (Transpose, Scale and Randomizer: round 190bs, §7.2; Note Echo and the
    Arpeggiator: round 190de, §7.8).
    Round 190by: SuperSaw (Pocket SuperSaw), Comb Filter, Multiband Compressor and Tape Stop are LYNX engines; Reverb
-   (32) maps to Reeverb 2 and Tuned EQ (30) to the Parametric EQ (REA_rodada190by.md). Parameter counts read in the
+   (32) maps to Reeverb 2 and Tuned EQ (30) to the Parametric EQ (REA_rodada190by.md). Round 190dw: Equalizer, Graphic
+   EQ, Filter, Autoduck (legacy) and the three reverbs on FLM's own engines (§7.10). Parameter counts read in the
    code: 30 = 11, 32 = 16 (14 and 15 are unnamed wet and dry levels), 42 = 8.
 5. HEAD 272/280 (loop range).
 6. (round 190bs) The sample slot: the third `MAIN` tail field (f32 0.5) and `LINk`'s second word; where a slot with

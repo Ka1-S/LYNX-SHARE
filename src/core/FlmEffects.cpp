@@ -112,7 +112,7 @@ void pocket (const flm::Module& m, EffectKind kind, const char* label, Mapped& o
 // --- round 190dw: Autoduck (legacy, module 10) is FLM's Autoduck (29) with its curve fixed — the same beat phase, rise
 // over a = 0.5·Attack + 0.001, fall to the next beat, power (Curve + 1)/2, one-pole of 0.01 per sample — and the depth
 // Ducking² where module 29 takes √Ducking: Pocket Autoduck with Ducking⁴, Time 1, Shift ½, Hold 0, Shape 0 is exact
-// (FLM_FORMAT §7.9).
+// (FLM_FORMAT §7.10).
 void autoduckLegacy (const flm::Module& m, Mapped& out)
 {
     out.label = "FL Studio Mobile: Autoduck (legacy)";
