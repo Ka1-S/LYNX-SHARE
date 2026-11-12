@@ -908,10 +908,11 @@ inline float groupNormalizeGain (const std::vector<float>& peaks) noexcept
 // FL's audio clip menu › Automate › Panning / Volume (EEAUAutoPanMenuClick 0x1244900, Tag 0 / 1; round 190dx,
 // /mnt/e/lynx-work/flpl190dx/FL-FACTS.md). FL makes an automation clip of a parameter of the clip's channel and puts it
 // where the audio clip is: same track, same start, same length, a flat line at the parameter's current value from the
-// clip's start to its end. FL's parameters are the channel's "Level adjustments" pan / volume (channel parameters 0x10 /
-// 0x11), which LYNX does not have: the clip channel's own Pan / Volume are the targets (the audible result is the same
-// while they are not set by hand). FL's Volume clip keeps the line at the top of a range that ends at unity; LYNX's
-// range is the channel volume's own, so the line starts at the current volume.
+// clip's start to its end. FL's parameters are the channel's Misc › "Levels adjustment" pan offset / volume multiplier
+// (channel parameters 0x10 / 0x11; round 190dz: LYNX's AutomationTargetKind::channelAdjust, the same parameters), so the
+// main Pan / Volume knobs stay free. FL's Volume clip sets its range top to unity (half of the multiplier's 0…200 %
+// travel) and the line at that top; LYNX's clips have no range of their own: the line sits at the multiplier's value on
+// its whole travel (0.5 = 100 %, neutral), which plays the same.
 enum class AutomateWhat : std::uint8_t { panning, volume };
 
 inline AutomationTarget automateTarget (const Song& song, int clip, AutomateWhat what)
@@ -922,8 +923,9 @@ inline AutomationTarget automateTarget (const Song& song, int clip, AutomateWhat
     if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size())
         return {};
     AutomationTarget t;
-    t.kind = what == AutomateWhat::panning ? AutomationTargetKind::channelPan : AutomationTargetKind::channelVolume;
+    t.kind = AutomationTargetKind::channelAdjust;
     t.index = c.channel;
+    t.param = what == AutomateWhat::panning ? leveladjust::pan : leveladjust::volume;
     return t;
 }
 

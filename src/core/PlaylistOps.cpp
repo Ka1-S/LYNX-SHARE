@@ -1091,6 +1091,7 @@ int trackFor (const Song& song, const AutomationTarget& target)
         case AutomationTargetKind::channelVolume:
         case AutomationTargetKind::channelPan:
         case AutomationTargetKind::channelParam:
+        case AutomationTargetKind::channelAdjust:
             channel = target.index;
             if (channel >= 0 && channel < (int) song.channels.size())
                 insert = song.channels[(std::size_t) channel].mixerTrack;

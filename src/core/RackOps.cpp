@@ -729,7 +729,7 @@ void permuteChannels (Song& song, const std::vector<int>& newOrder)
 
     song.forEachTarget ([&] (AutomationTarget& t) {
         if (t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-            || t.kind == AutomationTargetKind::channelParam)
+            || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust)
             t.index = map (t.index);
     });
 

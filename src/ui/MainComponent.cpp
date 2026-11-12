@@ -686,7 +686,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     // FL's "Edit events in piano roll" (REA round 146): the channel's own parameter selects its channel
     onEditEventsInPianoRoll = [this] (const AutomationTarget& t) {
         const auto onChannel = t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-                               || t.kind == AutomationTargetKind::channelParam;
+                               || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust;
         if (onChannel && t.index >= 0 && t.index < (int) engine.getSong().channels.size())
             engine.setSelectedChannel (t.index);
         openPianoRoll();

@@ -33,6 +33,7 @@ bool sameTarget (const AutomationTarget& a, const AutomationTarget& b) noexcept
 bool bipolarTarget (const AutomationTarget& t) noexcept
 {
     return t.kind == AutomationTargetKind::channelPan || t.kind == AutomationTargetKind::mixerPan
+        || (t.kind == AutomationTargetKind::channelAdjust && t.param != leveladjust::volume) // (Levels adjustment offsets, round 190dz)
         || ((t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::effectParam) && midictl::isPitchBend (t.param));
 }
 
@@ -213,7 +214,7 @@ public:
 
         // the channel's notes, faint, along the bottom (where the events will play)
         if (target.kind == AutomationTargetKind::channelVolume || target.kind == AutomationTargetKind::channelPan
-            || target.kind == AutomationTargetKind::channelParam)
+            || target.kind == AutomationTargetKind::channelParam || target.kind == AutomationTargetKind::channelAdjust)
         {
             g.setColour (colour::noteHard.withAlpha (0.35f));
             for (const auto& n : pattern.notes)

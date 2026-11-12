@@ -22,6 +22,7 @@
 
 namespace lynx
 {
+struct SampleData; // (core/Instruments.h)
 class PatternBlocksView;
 class VideoLanesView;
 
@@ -427,6 +428,11 @@ private:
     void pasteClips (std::int64_t at = -1);
     void normalizeClips (const std::vector<int>& targets, bool asGroup = false);
     juce::PopupMenu buildClipMenu (int index, int mouseX);
+    // FL's audio clip menu (round 190dz, core/FlClipMenu.h): FL's two columns and sections, LYNX's own items after them
+    juce::PopupMenu buildAudioClipMenu (int index, int mouseX);
+    std::function<void (float, bool)> clipFitter (int index, std::shared_ptr<const SampleData> sample);
+    juce::PopupMenu fitToTempoMenu (int index, std::shared_ptr<const SampleData> sample);
+    juce::PopupMenu detectTempoMenu (int index, std::shared_ptr<const SampleData> sample);
     void duplicateSelection();
     void seekTo (int x, bool snapOn = true); // Alt held while scrubbing: snapOn false (free position, FL)
     void paintAudioClip (juce::Graphics& g, const Clip& clip, juce::Rectangle<float> bounds);

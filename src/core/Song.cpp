@@ -373,7 +373,7 @@ void Song::removeChannel (int index)
 
     forEachTarget ([index] (AutomationTarget& t) {
         const auto onChannel = t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-                               || t.kind == AutomationTargetKind::channelParam;
+                               || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust;
 
         if (onChannel && t.index == index)
             t.kind = AutomationTargetKind::none;
@@ -436,7 +436,7 @@ std::vector<MidiLink> linksWithGlobal (const std::vector<MidiLink>& project, con
 bool linkOmniAvailable (AutomationTargetKind kind) noexcept
 {
     return kind == AutomationTargetKind::channelVolume || kind == AutomationTargetKind::channelPan || kind == AutomationTargetKind::channelParam
-        || kind == AutomationTargetKind::mixerVolume || kind == AutomationTargetKind::mixerPan || kind == AutomationTargetKind::effectParam
+        || kind == AutomationTargetKind::channelAdjust || kind == AutomationTargetKind::mixerVolume || kind == AutomationTargetKind::mixerPan || kind == AutomationTargetKind::effectParam
         || kind == AutomationTargetKind::effectMix;
 }
 
@@ -446,7 +446,7 @@ AutomationTarget linkOmniTarget (const MidiLink& link, int selectedChannel, int 
     if (! link.omni || ! linkOmniAvailable (t.kind))
         return t;
     const auto channelControl = t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-                                || t.kind == AutomationTargetKind::channelParam;
+                                || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust;
     const auto index = channelControl ? selectedChannel : selectedMixerTrack;
     if (index >= 0)
         t.index = index;
@@ -1246,6 +1246,14 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
     {
         case AutomationTargetKind::channelVolume: return validChannel ? channels[(std::size_t) t.index].volume : -1.0f;
         case AutomationTargetKind::channelPan: return validChannel ? (channels[(std::size_t) t.index].pan + 1.0f) * 0.5f : -1.0f;
+        case AutomationTargetKind::channelAdjust:
+        {
+            if (! validChannel || ! leveladjust::valid (t.param))
+                return -1.0f;
+            const auto& l = channels[(std::size_t) t.index].misc.levels;
+            return t.param == leveladjust::volume ? l.volume * 0.5f
+                                                  : ((t.param == leveladjust::pan ? l.pan : t.param == leveladjust::modX ? l.modX : l.modY) + 1.0f) * 0.5f;
+        }
         case AutomationTargetKind::mixerVolume: return validTrack ? mixer[(std::size_t) t.index].volume : -1.0f;
         case AutomationTargetKind::mixerPan: return validTrack ? (mixer[(std::size_t) t.index].pan + 1.0f) * 0.5f : -1.0f;
         case AutomationTargetKind::effectParam:
@@ -1304,6 +1312,14 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
     {
         case AutomationTargetKind::channelVolume: if (! validChannel) return false; channels[(std::size_t) t.index].volume = v; return true;
         case AutomationTargetKind::channelPan: if (! validChannel) return false; channels[(std::size_t) t.index].pan = v * 2.0f - 1.0f; return true;
+        case AutomationTargetKind::channelAdjust:
+        {
+            if (! validChannel || ! leveladjust::valid (t.param))
+                return false;
+            auto& l = channels[(std::size_t) t.index].misc.levels;
+            (t.param == leveladjust::volume ? l.volume : t.param == leveladjust::pan ? l.pan : t.param == leveladjust::modX ? l.modX : l.modY) = v * 2.0f - (t.param == leveladjust::volume ? 0.0f : 1.0f);
+            return true;
+        }
         case AutomationTargetKind::mixerVolume: if (! validTrack) return false; mixer[(std::size_t) t.index].volume = v; return true;
         case AutomationTargetKind::mixerPan: if (! validTrack) return false; mixer[(std::size_t) t.index].pan = v * 2.0f - 1.0f; return true;
         case AutomationTargetKind::tempo: bpm = tempoFromValue (v); return true;
@@ -1810,6 +1826,12 @@ float channelGain (float volume) noexcept
 {
     const auto v = std::clamp (volume, 0.0f, 1.0f);
     return (std::pow (11.0f, v) - 1.0f) / 10.0f;
+}
+
+float levelAdjustGain (float multiplier) noexcept
+{
+    const auto x = std::clamp (multiplier, 0.0f, 2.0f);
+    return x == 1.0f ? 1.0f : (std::pow (11.0f, x) - 1.0f) / 10.0f;
 }
 
 float faderGain (float position) noexcept

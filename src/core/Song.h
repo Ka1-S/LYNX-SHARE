@@ -795,8 +795,39 @@ struct ChannelMisc
     // FL's Root note › Fine tune (REA round 151 [DATA: .flp event 0x8E, signed cents]): every note this many cents away
     float fineTune = 0.0f;
 
+    // FL's Misc › "Levels adjustment" (round 190dz; TPluginForm OfsLevelsPanel, channel parameters 0x10 / 0x11 / 0x13 /
+    // 0x14, .flp 0xE5): offsets on top of the channel's own Pan / Volume / Mod X / Mod Y, so automation (the audio clip
+    // menu's Automate) can move the level without touching the main knobs. Neutral = the defaults (old projects).
+    struct LevelAdjust
+    {
+        float pan = 0.0f;    // "Panning offset" −1…1 (FL −6400…6400): added to the pan
+        float volume = 1.0f; // "Volume multiplier" 0…2 (FL 0…25600, 12800 = 100 %): gain f(volume)·f(this), FL's curve
+        float modX = 0.0f;   // "Modulation X offset" −1…1 (FL −256…256): added to Mod X (the filter cutoff knob's travel)
+        float modY = 0.0f;   // "Modulation Y offset" −1…1: added to Mod Y (the resonance)
+        bool neutral() const noexcept { return pan == 0.0f && volume == 1.0f && modX == 0.0f && modY == 0.0f; }
+        bool operator== (const LevelAdjust&) const = default;
+    } levels;
+
     bool operator== (const ChannelMisc&) const = default;
 };
+
+// FL's channel gain law for the Levels adjustment's Volume multiplier (REA_rodada3 §2, FUN_00fe9d20, round 190dz):
+// x = multiplier (0…2, FL's raw / 12800), f(x) = 1 at x = 1, else (11^x − 1) / 10 — up to +21.6 dB at 200 %.
+float levelAdjustGain (float multiplier) noexcept;
+// The channel's pan with its Levels adjustment (FL FUN_00fe9bf0: pan + offset), kept in −1…1.
+inline float adjustedPan (float pan, float offset) noexcept { return std::clamp (pan + offset, -1.0f, 1.0f); }
+// A Mod X / Mod Y knob position (0…1) with its offset (FL FUN_00fea140: the two raw values add up), kept in 0…1.
+inline float adjustedMod (float position, float offset) noexcept { return std::clamp (position + offset, 0.0f, 1.0f); }
+// LYNX's Mod X is the Sampler / Synth filter cutoff on the Misc knob's travel (20 Hz · 1000^position): the cutoff with
+// the Mod X offset; the resonance (Mod Y, 0…1) with the Mod Y offset. No offset = the value itself, bit for bit.
+inline float adjustedCutoff (float hz, float offset) noexcept
+{
+    if (offset == 0.0f)
+        return hz;
+    const auto position = std::clamp (std::log (std::max (hz, 1.0e-3f) / 20.0f) / std::log (1000.0f), 0.0f, 1.0f);
+    return 20.0f * std::pow (1000.0f, adjustedMod (position, offset));
+}
+inline float adjustedResonance (float resonance, float offset) noexcept { return offset == 0.0f ? resonance : adjustedMod (resonance, offset); }
 
 // FL's Layer channel (REA_rodada164a §1, FL's manual "Layer channel settings"): it makes no sound; every note played on
 // it (Piano roll, steps, keyboard) plays its children channels. A child played from its own notes is not affected.
@@ -1509,8 +1540,17 @@ enum class AutomationTargetKind : std::uint8_t
     tempo,         // song tempo: 0..1 = minTempo..maxTempo BPM
     effectMix,     // index = track, slot: slot dry/wet (0..1)
     mixerSend,     // index = source insert, slot = destination (0 = Master): the route's level knob (fader curve; issue #12)
-    vcaLevel       // index = VCA (Song::vcas): its fader (round 177a; LYNX's own, FL has no VCA)
+    vcaLevel,      // index = VCA (Song::vcas): its fader (round 177a; LYNX's own, FL has no VCA)
+    // index = channel, param = which Levels adjustment (round 190dz): FL's channel parameter 0x10 + param —
+    // 0 pan (0…1 = −1…1), 1 volume (0…1 = 0…200 %, FL's whole 0…25600 travel), 3 Mod X, 4 Mod Y (0…1 = −1…1)
+    channelAdjust
 };
+
+namespace leveladjust
+{
+constexpr int pan = 0, volume = 1, modX = 3, modY = 4; // AutomationTarget::param of channelAdjust (FL 0x10 + param)
+constexpr bool valid (int param) noexcept { return param == pan || param == volume || param == modX || param == modY; }
+} // namespace leveladjust
 
 constexpr double minTempo = 10.0, maxTempo = 522.0; // FL's range
 inline double tempoFromValue (float v) noexcept { return minTempo + (maxTempo - minTempo) * (double) v; }

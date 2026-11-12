@@ -1309,6 +1309,7 @@ const char* targetKindName (AutomationTargetKind k)
         case AutomationTargetKind::effectMix: return "effectMix";
         case AutomationTargetKind::mixerSend: return "mixerSend";
         case AutomationTargetKind::vcaLevel: return "vcaLevel";
+        case AutomationTargetKind::channelAdjust: return "channelAdjust";
         case AutomationTargetKind::none: break;
     }
     return "none";
@@ -1319,7 +1320,7 @@ AutomationTargetKind targetKindFromName (const juce::String& name)
     for (auto k : { AutomationTargetKind::channelVolume, AutomationTargetKind::channelPan, AutomationTargetKind::channelParam,
                     AutomationTargetKind::mixerVolume, AutomationTargetKind::mixerPan, AutomationTargetKind::effectParam,
                     AutomationTargetKind::tempo, AutomationTargetKind::effectMix, AutomationTargetKind::mixerSend,
-                    AutomationTargetKind::vcaLevel })
+                    AutomationTargetKind::vcaLevel, AutomationTargetKind::channelAdjust })
         if (name == targetKindName (k))
             return k;
 
@@ -1798,6 +1799,8 @@ juce::var channelToVar (const ChannelDef& c)
         misc->setProperty ("addToKey", m.addToKey);
         if (m.fineTune != 0.0f)
             misc->setProperty ("fineTune", m.fineTune);
+        if (! m.levels.neutral()) // FL's Levels adjustment (round 190dz): pan, volume multiplier, Mod X, Mod Y
+            misc->setProperty ("levels", juce::Array<juce::var> { m.levels.pan, m.levels.volume, m.levels.modX, m.levels.modY });
         o->setProperty ("misc", juce::var (misc.release()));
     }
     if (c.cutGroup != 0 || c.cutBy != 0)
@@ -2175,6 +2178,13 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         m.rootNote = juce::jlimit (0, 127, (int) misc.getProperty ("rootNote", 60));
         m.addToKey = (bool) misc.getProperty ("addToKey", false);
         m.fineTune = juce::jlimit (-100.0f, 100.0f, (float) (double) misc.getProperty ("fineTune", 0.0));
+        if (const auto& l = misc["levels"]; l.isArray() && l.size() >= 4)
+        {
+            m.levels.pan = juce::jlimit (-1.0f, 1.0f, (float) (double) l[0]);
+            m.levels.volume = juce::jlimit (0.0f, 2.0f, (float) (double) l[1]);
+            m.levels.modX = juce::jlimit (-1.0f, 1.0f, (float) (double) l[2]);
+            m.levels.modY = juce::jlimit (-1.0f, 1.0f, (float) (double) l[3]);
+        }
     }
 
     if (const auto& cut = c["cut"]; cut.isArray() && cut.size() == 2)

@@ -96,6 +96,9 @@ struct RackState
     std::vector<std::vector<int>> automationGroups;
     std::vector<char> automationFollowers;
     std::vector<int> channelVolumeAuto, channelPanAuto;
+    // FL's Levels adjustment (round 190dz): the automation slot of each channel's pan / volume offset ([channel][param],
+    // leveladjust::pan / volume; −1 = none). Mod X / Y offsets apply when the instrument is configured.
+    std::vector<std::array<int, 2>> channelAdjustAuto;
     std::vector<int> mixerVolumeAuto, mixerPanAuto;
     std::vector<std::vector<std::array<int, maxEffectParams>>> effectParamAuto; // [track][slot][param] (built-in)
     std::vector<std::vector<int>> effectMixAuto;                                 // [track][slot]: dry/wet

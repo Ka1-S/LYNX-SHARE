@@ -542,10 +542,12 @@ TEST (flp_channel_level_adjustments_and_stretched_clip_start)
     CHECK (song.channels.size() == 1 && song.playlist.size() == 1);
     if (song.channels.size() != 1 || song.playlist.size() != 1)
         return;
-    // gain = f(volume)·f(volAdj), pan = pan + panAdj
+    // gain = f(volume)·f(volAdj), pan = pan + panAdj (round 190dz: the adjustments are the channel's own Levels
+    // adjustment, the knobs read as in FL)
     const auto expected = lynx::channelGain (10000.0f / 12800.0f) * lynx::channelGain (7286.0f / 12800.0f);
-    CHECK (std::abs (lynx::channelGain (song.channels[0].volume) - expected) < 1e-5f);
-    CHECK (std::abs (song.channels[0].pan - 0.5f) < 1e-6f);
+    CHECK (std::abs (lynx::channelGain (song.channels[0].volume) * lynx::levelAdjustGain (song.channels[0].misc.levels.volume) - expected) < 1e-5f);
+    CHECK (std::abs (song.channels[0].volume - 10000.0f / 12800.0f) < 1e-6f);
+    CHECK (std::abs (lynx::adjustedPan (song.channels[0].pan, song.channels[0].misc.levels.pan) - 0.5f) < 1e-6f);
     // 788.46 sample ms / 1.056892 = 746.0 ms = 1.6164 beats into the clip
     CHECK (song.channels[0].sampler.stretchBeats > 0.0f);
     CHECK (std::llabs (song.playlist[0].offset - (std::int64_t) std::llround (1.61638 * lynx::ppq)) <= 1);
@@ -17532,5 +17534,6 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Warp190dbTests.inc"
 #include "FlCtl190dfTests.inc"
 #include "FlPl190dxTests.inc"
+#include "FlClip190dzTests.inc"
 #include "Iss152Tests.inc"
 #include "Mod190doTests.inc"

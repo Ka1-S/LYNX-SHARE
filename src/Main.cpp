@@ -15,6 +15,7 @@
 #include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
 #include "core/FlTrackMenus.h"
+#include "core/FlClipMenu.h"
 #include "core/OneClickRec.h"
 #include "core/WarpTools.h"
 #include "core/Comping.h"
@@ -1994,6 +1995,15 @@ public:
         if (args.contains ("--flplshot"))
         {
             setApplicationReturnValue (runFlPlShot (args[args.indexOf ("--flplshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --flclipshot <prefix> (round 190dz): FL's audio clip menu layout (two columns, FL's sections, LYNX's own items at
+        // the end) and the channel's Misc › Levels adjustment, offscreen; prefix-checks.txt holds the checks
+        if (args.contains ("--flclipshot"))
+        {
+            setApplicationReturnValue (runFlClipShot (args[args.indexOf ("--flclipshot") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -10893,9 +10903,11 @@ private:
             const auto before = engine.getSong().automations.size();
             check ("automate_volume_runs", automate != nullptr && click (*automate, lynx::tr ("Volume")));
             const auto& song = engine.getSong();
-            const auto ok = song.automations.size() == before + 1 && song.automations.back().target.kind == lynx::AutomationTargetKind::channelVolume
+            // (round 190dz: the Levels adjustment's volume multiplier, neutral = 0.5 of its 0…200 % travel)
+            const auto ok = song.automations.size() == before + 1 && song.automations.back().target.kind == lynx::AutomationTargetKind::channelAdjust
+                            && song.automations.back().target.param == lynx::leveladjust::volume
                             && song.automations.back().target.index == vox && song.automations.back().points.size() == 2
-                            && song.automations.back().points[1].tick == 2 * lynx::ppq && std::abs (song.automations.back().points[0].value - 0.6f) < 1.0e-6f;
+                            && song.automations.back().points[1].tick == 2 * lynx::ppq && std::abs (song.automations.back().points[0].value - 0.5f) < 1.0e-6f;
             const auto* clip = ok ? &song.playlist.back() : nullptr;
             check ("automate_volume_clip", ok && clip->kind == lynx::ClipKind::automation && clip->track == 3 && clip->start == 4 * lynx::ppq
                                                 && clip->length == 2 * lynx::ppq,
@@ -11005,6 +11017,263 @@ private:
             saveMenus (juce::StringArray { "Disk recording" }, std::vector<juce::PopupMenu> { disk != nullptr ? *disk : juce::PopupMenu() },
                        prefix + "-disk-recording.png");
             check ("latency_comp_toggles", disk != nullptr && click (*disk, lynx::tr ("Latency compensation")) && ! engine.getRecordOptions().latencyCompensation);
+        }
+
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
+        return allOk;
+    }
+
+    // --flclipshot (round 190dz): see the dispatch above
+    // a menu as JUCE lays it out with explicit column breaks (PopupMenu::addColumnBreak): the columns side by side on
+    // one menu background; custom items (the title band) are painted by their own component
+    static juce::Image columnMenuImage (const juce::PopupMenu& menu)
+    {
+        auto& lf = juce::LookAndFeel::getDefaultLookAndFeel();
+        const auto border = lf.getPopupMenuBorderSize();
+        struct Row
+        {
+            const juce::PopupMenu::Item* item;
+            int height;
+        };
+        std::vector<std::vector<Row>> columns (1);
+        std::vector<int> widths (1, 160);
+        for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+        {
+            const auto& item = it.getItem();
+            int w = 0, h = 0;
+            if (item.customComponent != nullptr)
+                item.customComponent->getIdealSize (w, h);
+            else
+            {
+                lf.getIdealPopupMenuItemSize (item.text.upToFirstOccurrenceOf ("\t", false, false), item.isSeparator, item.isSectionHeader ? -1 : 0, w, h);
+                if (item.isSectionHeader)
+                    h += h / 2; // as JUCE does
+                if (item.text.containsChar ('\t'))
+                    w += 90;
+            }
+            columns.back().push_back ({ &item, h });
+            widths.back() = juce::jmax (widths.back(), w + 10);
+            if (item.shouldBreakAfter)
+            {
+                columns.emplace_back();
+                widths.push_back (160);
+            }
+        }
+        int width = 0, height = 0;
+        for (std::size_t c = 0; c < columns.size(); ++c)
+        {
+            width += widths[c];
+            int h = 2 * border;
+            for (const auto& row : columns[c])
+                h += row.height;
+            height = juce::jmax (height, h);
+        }
+        auto image = lynx::shot::canvas (width, height);
+        juce::Graphics g (image);
+        lynx::shot::logical (g);
+        lf.drawPopupMenuBackground (g, width, height);
+        int x = 0;
+        for (std::size_t c = 0; c < columns.size(); ++c)
+        {
+            int y = border;
+            for (const auto& row : columns[c])
+            {
+                const auto& item = *row.item;
+                const juce::Rectangle<int> r (x, y, widths[c], row.height);
+                if (item.customComponent != nullptr)
+                {
+                    juce::Graphics::ScopedSaveState state (g);
+                    g.setOrigin (r.getPosition());
+                    item.customComponent->setSize (r.getWidth(), r.getHeight());
+                    item.customComponent->paintEntireComponent (g, false);
+                }
+                else if (item.isSectionHeader)
+                    lf.drawPopupMenuSectionHeader (g, r, item.text);
+                else
+                {
+                    juce::Graphics::ScopedSaveState state (g);
+                    g.setOrigin (r.getPosition());
+                    lf.drawPopupMenuItem (g, r.withPosition (0, 0), item.isSeparator, item.isEnabled, false, item.isTicked, item.subMenu != nullptr,
+                                          item.text.upToFirstOccurrenceOf ("\t", false, false), item.text.fromFirstOccurrenceOf ("\t", false, false),
+                                          item.image.get(), nullptr);
+                }
+                y += row.height;
+            }
+            x += widths[c];
+            if (c + 1 < columns.size()) // (JUCE's column separator)
+            {
+                g.setColour (lf.findColour (juce::PopupMenu::textColourId).withAlpha (0.15f));
+                g.fillRect (x - 1, border, 1, height - 2 * border);
+            }
+        }
+        return image;
+    }
+
+    bool runFlClipShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        const auto plain = [] (juce::String t) {
+            t = t.upToFirstOccurrenceOf ("\t", false, false);
+            if (const auto at = t.indexOf (juce::String (" (") + juce::String::charToString (1)); at >= 0)
+                t = t.substring (0, at);
+            return t.removeCharacters (juce::String ("&_") + juce::String::charToString (1));
+        };
+        const auto find = [&plain] (const juce::PopupMenu& menu, const juce::String& text) -> const juce::PopupMenu::Item* {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (plain (it.getItem().text) == plain (text))
+                    return &it.getItem();
+            return nullptr;
+        };
+        const auto click = [&find] (const juce::PopupMenu& menu, const juce::String& text) {
+            const auto* item = find (menu, text);
+            if (item == nullptr || ! item->isEnabled || item->action == nullptr)
+                return false;
+            item->action();
+            return true;
+        };
+
+        lynx::AudioEngine engine (false);
+        lynx::MainComponent ui (engine, false);
+        ui.setSize (1600, 900);
+        int vox = -1;
+        {
+            auto song = lynx::Song::makeDefault();
+            song.channels.push_back ({});
+            song.channels.back().name = "Vox";
+            song.channels.back().instrument = lynx::InstrumentKind::audioClip;
+            song.channels.back().samplePath = writeShotSample (juce::File (prefix + "-vox.wav"), 330.0).getFullPathName().toStdString();
+            vox = (int) song.channels.size() - 1;
+            lynx::Clip c;
+            c.kind = lynx::ClipKind::audio;
+            c.channel = vox;
+            c.track = 3;
+            c.start = 4 * lynx::ppq;
+            c.length = 2 * lynx::ppq;
+            c.fadeIn = lynx::ppq / 4;
+            song.playlist.push_back (c);
+            engine.setSong (std::move (song));
+        }
+        engine.dispatchPendingMessages();
+        auto& playlist = ui.getPlaylistForSnapshot();
+
+        // ---- 1. the audio clip menu: FL's order, sections and columns, then LYNX's own items
+        {
+            const auto menu = playlist.getClipMenuForSnapshot (0);
+            juce::StringArray got, want;
+            int breakAfter = -1;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+            {
+                const auto& item = it.getItem();
+                got.add (item.customComponent != nullptr ? "[" + lynx::tr ("Audio clip") + "]"
+                         : item.isSeparator              ? juce::String ("-")
+                         : item.isSectionHeader          ? "[" + plain (item.text) + "]"
+                                                         : plain (item.text));
+                if (item.shouldBreakAfter)
+                    breakAfter = got.size() - 1;
+            }
+            for (const auto& e : lynx::flclipmenu::shown (true, false))
+                if (e.kind != lynx::flclipmenu::Entry::Kind::columnBreak)
+                    want.add (e.kind == lynx::flclipmenu::Entry::Kind::separator ? juce::String ("-")
+                              : e.kind == lynx::flclipmenu::Entry::Kind::header  ? "[" + lynx::tr (e.text.c_str()) + "]"
+                                                                                 : lynx::tr (e.text.c_str()));
+            want.add ("-");
+            for (const auto& x : lynx::flclipmenu::lynxExtras())
+                want.add (lynx::tr (x.c_str()));
+            check ("clip_menu_fl_order", got == want, got.joinIntoString ("|"));
+            check ("clip_menu_two_columns", breakAfter >= 0 && got[breakAfter] == lynx::tr ("Chop") && got[breakAfter + 1] == "[" + lynx::tr ("Sample") + "]",
+                   juce::String (breakAfter));
+            const auto* crossfade = find (menu, lynx::tr ("Crossfade with"));
+            check ("crossfade_with_greyed", crossfade != nullptr && ! crossfade->isEnabled);
+            const auto* region = find (menu, lynx::tr ("Select region"));
+            const auto* full = region != nullptr && region->subMenu != nullptr ? find (*region->subMenu, lynx::tr ("Full")) : nullptr;
+            check ("select_region_full_ticked", full != nullptr && full->isTicked);
+            const auto* chop = find (menu, lynx::tr ("Chop"));
+            check ("chop_time_based", chop != nullptr && chop->subMenu != nullptr && find (*chop->subMenu, lynx::tr ("Chop in 32nd beats")) != nullptr
+                                          && find (*chop->subMenu, lynx::tr ("Chop to grid")) != nullptr);
+            savePng (columnMenuImage (menu), prefix + "-clip-menu.png");
+            std::fprintf (stderr, "flclipshot: menu saved\n");
+
+            // Muted is a check; Reset fades clears the fades; Select all similar clips selects
+            check ("muted_toggles", click (menu, lynx::tr ("Muted")) && engine.getSong().playlist[0].muted);
+            const auto again = playlist.getClipMenuForSnapshot (0);
+            const auto* muted = find (again, lynx::tr ("Muted"));
+            check ("muted_ticked", muted != nullptr && muted->isTicked);
+            check ("reset_fades", click (again, lynx::tr ("Reset fades")) && engine.getSong().playlist[0].fadeIn == 0);
+            engine.undo();
+            engine.undo();
+            engine.dispatchPendingMessages();
+
+            std::fprintf (stderr, "flclipshot: automate\n");
+            // Automate › Volume / Panning: the clip channel's Levels adjustment (FL's channel parameters 0x11 / 0x10)
+            const auto fresh = playlist.getClipMenuForSnapshot (0);
+            const auto* automate = find (fresh, lynx::tr ("Automate"));
+            const auto before = engine.getSong().automations.size();
+            check ("automate_volume_runs", automate != nullptr && automate->subMenu != nullptr && click (*automate->subMenu, lynx::tr ("Volume")));
+            const auto& song = engine.getSong();
+            const auto ok = song.automations.size() == before + 1 && song.automations.back().target.kind == lynx::AutomationTargetKind::channelAdjust
+                            && song.automations.back().target.param == lynx::leveladjust::volume && song.automations.back().target.index == vox
+                            && std::abs (song.automations.back().points[0].value - 0.5f) < 1.0e-6f;
+            check ("automate_volume_is_level_adjust", ok, ok ? juce::String::fromUTF8 (song.automations.back().name.c_str()) : juce::String());
+            engine.undo();
+            engine.dispatchPendingMessages();
+        }
+
+        std::fprintf (stderr, "flclipshot: overlap\n");
+        // ---- 2. a second channel's clip overlapping: Crossfade with leaves (FL would enable it; LYNX lacks it)
+        {
+            engine.editSong ([vox] (lynx::Song& s) {
+                auto copy = s.playlist[0]; // (another audio clip channel's clip, at the same time)
+                s.channels.push_back (s.channels[(std::size_t) vox]);
+                s.channels.back().name = "Vox 2";
+                copy.channel = (int) s.channels.size() - 1;
+                copy.track = 4;
+                s.playlist.push_back (copy);
+            });
+            engine.dispatchPendingMessages();
+            const auto overlapped = playlist.getClipMenuForSnapshot (0);
+            check ("crossfade_with_left_out_when_fl_enables", find (overlapped, lynx::tr ("Crossfade with")) == nullptr);
+            engine.undo();
+            engine.dispatchPendingMessages();
+        }
+
+        std::fprintf (stderr, "flclipshot: misc\n");
+        // ---- 3. the channel's Misc tab: Levels adjustment = the offsets (pan 0, volume 100 %, Mod X / Y 0 %)
+        {
+            engine.editSong ([vox] (lynx::Song& s) {
+                s.channels[(std::size_t) vox].misc.levels.volume = 0.5f;
+                s.channels[(std::size_t) vox].misc.levels.pan = -0.25f;
+            });
+            engine.dispatchPendingMessages();
+            auto frame = lynx::makeChannelFrame (engine, vox, -1);
+            frame->setSize (juce::jmax (frame->getWidth(), 800), juce::jmax (frame->getHeight(), 420));
+            savePng (frame->createComponentSnapshot (frame->getLocalBounds()), prefix + "-misc-levels.png");
+            auto synthFrame = lynx::makeChannelFrame (engine, 0, -1);
+            synthFrame->setSize (juce::jmax (synthFrame->getWidth(), 800), juce::jmax (synthFrame->getHeight(), 420));
+            savePng (synthFrame->createComponentSnapshot (synthFrame->getLocalBounds()), prefix + "-misc-levels-ch1.png");
+            std::fprintf (stderr, "flclipshot: round trip\n");
+            // the .lynx round trip of the adjustment and of an automation of it; an old project writes nothing new
+            juce::String error;
+            auto song = engine.getSong();
+            lynx::Automation a;
+            a.target = { lynx::AutomationTargetKind::channelAdjust, vox, 0, lynx::leveladjust::volume };
+            a.points = { { 0, 0.25f, 0.0f } };
+            song.automations.push_back (a);
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            check ("lynx_round_trip", back && back->channels[(std::size_t) vox].misc.levels == song.channels[(std::size_t) vox].misc.levels
+                                          && back->automations.back().target == a.target,
+                   error);
+            auto old = lynx::Song::makeDefault();
+            const auto json = lynx::ProjectFile::toJson (old, false);
+            const auto reloaded = lynx::ProjectFile::fromJson (json, error);
+            check ("old_project_unchanged", ! json.contains ("\"levels\"") && reloaded && lynx::ProjectFile::toJson (*reloaded, false) == json
+                                                && std::all_of (reloaded->channels.begin(), reloaded->channels.end(),
+                                                                [] (const lynx::ChannelDef& c) { return c.misc.levels.neutral(); }));
         }
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
@@ -19192,7 +19461,8 @@ private:
                                     auto& item = it.getItem();
                                     if (item.subMenu != nullptr && run (*item.subMenu, text))
                                         return true;
-                                    if (item.text.startsWith (text) && item.isEnabled && item.action)
+                                    // (without the menu mnemonic's mark: FL's underlined letters, round 190dz)
+                                    if (item.text.removeCharacters (juce::String::charToString (1)).startsWith (text) && item.isEnabled && item.action)
                                     {
                                         item.action();
                                         return true;

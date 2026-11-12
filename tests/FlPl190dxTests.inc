@@ -66,16 +66,21 @@ TEST (flpl190dx_automate_volume_and_panning_of_an_audio_clip)
     auto song = flpl190dx::songWithAudioClip (vox);
     const auto automations = song.automations.size();
 
-    // Volume: the clip's channel volume, a flat line at its current value over the clip, where the clip is
-    CHECK (clipops::automateTarget (song, 0, clipops::AutomateWhat::volume) == (AutomationTarget { AutomationTargetKind::channelVolume, vox }));
+    // Volume: the clip channel's Levels adjustment volume multiplier (FL's channel parameter 0x11; round 190dz), a flat
+    // line at its current value over the clip, where the clip is (80 % of the 0…200 % travel: 0.4)
+    song.channels[(std::size_t) vox].misc.levels.volume = 0.8f;
+    song.channels[(std::size_t) vox].misc.levels.pan = -0.5f;
+    CHECK (clipops::automateTarget (song, 0, clipops::AutomateWhat::volume)
+           == (AutomationTarget { AutomationTargetKind::channelAdjust, vox, 0, leveladjust::volume }));
     const auto v = clipops::automateAudioClip (song, 0, clipops::AutomateWhat::volume, "Vox - Volume");
     CHECK (v == (int) automations && song.automations.size() == automations + 1);
     if (v >= 0 && v < (int) song.automations.size())
     {
         const auto& a = song.automations[(std::size_t) v];
-        CHECK (a.name == "Vox - Volume" && a.target.kind == AutomationTargetKind::channelVolume && a.target.index == vox);
+        CHECK (a.name == "Vox - Volume" && a.target.kind == AutomationTargetKind::channelAdjust && a.target.index == vox
+               && a.target.param == leveladjust::volume);
         CHECK (a.points.size() == 2 && a.points[0].tick == 0 && a.points[1].tick == 3840);
-        CHECK (std::abs (a.points[0].value - 0.6f) < 1.0e-6f && std::abs (a.points[1].value - 0.6f) < 1.0e-6f);
+        CHECK (std::abs (a.points[0].value - 0.4f) < 1.0e-6f && std::abs (a.points[1].value - 0.4f) < 1.0e-6f);
         CHECK (a.points[0].tension == 0.0f && a.points[1].tension == 0.0f);
         // it plays what the channel had: no jump when the clip starts
         CHECK (std::abs (a.valueAt (1920.0) - song.targetValue (a.target)) < 1.0e-6f);
@@ -84,13 +89,13 @@ TEST (flpl190dx_automate_volume_and_panning_of_an_audio_clip)
     const auto& made = song.playlist.back();
     CHECK (made.kind == ClipKind::automation && made.automation == v && made.track == 3 && made.start == 960 && made.length == 3840);
 
-    // Panning: the channel pan, as automation's 0..1 (−0.5 → 0.25)
+    // Panning: the Levels adjustment's pan offset (0x10), as automation's 0..1 (−0.5 → 0.25)
     const auto p = clipops::automateAudioClip (song, 0, clipops::AutomateWhat::panning, "Vox - Pan");
     CHECK (p == v + 1);
     if (p >= 0 && p < (int) song.automations.size())
     {
         const auto& a = song.automations[(std::size_t) p];
-        CHECK (a.target.kind == AutomationTargetKind::channelPan && a.target.index == vox);
+        CHECK (a.target.kind == AutomationTargetKind::channelAdjust && a.target.index == vox && a.target.param == leveladjust::pan);
         CHECK (std::abs (a.points[0].value - 0.25f) < 1.0e-6f && a.points[1].tick == 3840);
     }
 
