@@ -180,8 +180,14 @@ inline Song base (double bpm, projectkey::Key key, int demo)
     return song;
 }
 
-// The Master look, then LYNX's Apex Limiter in true-peak mode (ceiling −1 dB) bringing the song to about −14 LUFS: the
-// look's own limiter works on samples, and the bright drums left inter-sample peaks up to +3 dBTP after it (measured)
+// The demos' last stage holds −1 dBTP on independent meters with this ceiling (round 190eb, the rollup's exports at
+// 44.1 and 48 kHz): at −1.00 dB the bright drums still measured −0.95 dBTP on ffmpeg's ebur128 and −0.90 on a 4x sinc
+// meter (the limiter's own BS.1770 estimator reads a little lower); at −1.1 dB the worst was −1.06 / −1.01
+constexpr float demoCeilingDb = -1.1f;
+
+// The Master look (its own true-peak stage included since round 190ea), then LYNX's Apex Limiter in true-peak mode
+// (ceiling demoCeilingDb) bringing the song to about −14 LUFS; the gain lives in this stage, so it stays when a look is
+// applied again
 inline void finish (Song& song, int look, float intensity, float inputDb, float limiterGainDb)
 {
     MasterLookSettings m;
@@ -191,7 +197,7 @@ inline void finish (Song& song, int look, float intensity, float inputDb, float 
     looks::apply (song, m);
     auto limiter = makeEffectSlot (EffectKind::apexLimiter);
     limiter.params[(std::size_t) apex::pGain] = limiterGainDb / 30.0f;      // (0 … 30 dB)
-    limiter.params[(std::size_t) apex::pCeiling] = 29.0f / 30.0f;           // −1 dB (−30 … 0 dB)
+    limiter.params[(std::size_t) apex::pCeiling] = (30.0f + demoCeilingDb) / 30.0f; // (−30 … 0 dB)
     limiter.params[(std::size_t) apex::pTruePeak] = 1.0f;
     song.mixer[0].effects.push_back (limiter);
     song.mode = PlayMode::song;
