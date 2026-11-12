@@ -62,7 +62,7 @@ const EffectInfo& info()
 {
     static const EffectInfo i { "Voice Shift",
                                 { { "Pitch", 0.5f }, { "Formant", 0.5f }, { "Link", 0.0f }, { "Mode", 0.0f }, { "Drive", 0.0f }, { "Mix", 1.0f },
-                                  { "MIDI", 0.0f } } };
+                                  { "MIDI", 0.0f }, { "Law", 1.0f } } };
     return i;
 }
 
@@ -81,6 +81,7 @@ std::string paramText (int param, float v)
         }
         case drive: std::snprintf (t, sizeof t, "%.1f", driveAmount (v)); return t;
         case mix: std::snprintf (t, sizeof t, "%.0f%%", 100.0 * std::clamp (v, 0.0f, 1.0f)); return t;
+        case law: return v >= 0.5f ? "Measured" : "Classic";
         case midi:
         {
             const auto c = midiChannelIndex (v);
@@ -167,6 +168,7 @@ public:
         const auto md = modeOf (p[mode]);
         const auto amount = driveAmount (p[drive]);
         const auto wet = std::clamp (p[mix], 0.0f, 1.0f);
+        const bool measured = p[law] >= 0.5f; // round 190dp
         const auto stereo = r != nullptr && r != l;
         const int channels = stereo ? 2 : 1;
         // Quantize: "as quickly as possible" — a 2 ms glide between notes, only to avoid clicks
@@ -187,6 +189,7 @@ public:
             for (int c = 0; c < channels; ++c)
             {
                 auto& v = voices[(std::size_t) c];
+                v.psola.setUnvoicedShift (measured);
                 if (v.det.push (xin[c]))
                 {
                     const auto& e = v.det.estimate();

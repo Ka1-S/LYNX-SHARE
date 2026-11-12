@@ -4243,6 +4243,12 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 152: a Glow Leveler saved before the measured opto law keeps the round-123 Limit and no classic auto make-up
     if (slot.kind == EffectKind::glowLeveler && savedCount <= (std::size_t) mixsuite::glow::optoLaw)
         slot.params[(std::size_t) mixsuite::glow::optoLaw] = 0.0f;
+    // round 190dp: a Quell saved before the matched engine's noise-floor tracker keeps round 124's fixed thresholds
+    if (slot.kind == EffectKind::quellDenoiser && savedCount <= (std::size_t) voicetools::quell::law)
+        slot.params[(std::size_t) voicetools::quell::law] = 0.0f;
+    // round 190dp: a Voice Shift saved before the measured unvoiced path keeps the classic one (unvoiced passes through)
+    if (slot.kind == EffectKind::voiceShift && savedCount <= (std::size_t) voiceshift::law)
+        slot.params[(std::size_t) voiceshift::law] = 0.0f;
     // round 165w: a Gemini Doubler saved before the measured shelves keeps round 124's (−30 … +12 dB, first order)
     if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::eqLaw)
         slot.params[(std::size_t) voicetools::gemini::eqLaw] = 0.0f;
