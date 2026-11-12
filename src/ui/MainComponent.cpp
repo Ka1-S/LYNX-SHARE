@@ -2248,6 +2248,7 @@ void MainComponent::loadUiSettings()
         auto o = engine.getRecordOptions();
         o.mode = startingRecordMode (uiSettingsFile().existsAsFile(), saved != lines.end(),
                                      saved != lines.end() && saved->fromFirstOccurrenceOf ("=", false, false).trim() == "1");
+        o.countInBars = countin::startingBars (uiSettingsFile().existsAsFile()); // (issue #152; saved keys below win)
         engine.setRecordOptions (o);
     }
 

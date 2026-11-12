@@ -35,6 +35,8 @@ TEST (iss152_count_in_settings_round_trip_in_any_order)
             CHECK (bars == saved);
             CHECK (length == savedLength);
         }
+    // a new install starts as FL's factory form (on, 1 bar); an older settings file without the keys keeps LYNX's off
+    CHECK (startingBars (false) == 1 && startingBars (true) == 0);
     int bars = 3, length = 3;
     CHECK (! readSetting ("recordPreRoll", 2, bars, length) && bars == 3 && length == 3); // another key: untouched
     CHECK (std::string (onKey) != std::string (lengthKey));

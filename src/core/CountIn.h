@@ -20,6 +20,11 @@ inline int toggled (int bars, int length) noexcept { return bars > 0 ? 0 : clamp
 // The length kept while the count-in is `bars` (a count-in that is on sets it; off keeps `length`).
 inline int lengthFor (int bars, int length) noexcept { return clampLength (bars > 0 ? bars : length); }
 
+// What the count-in starts as before the settings are read: a new install as FL's factory form does (the action
+// OptionsRecordingPrecountAction is "Checked" in FL's DFM, REA_rodada177c; 1 bar). A settings file from an older LYNX,
+// which never saved the count-in, keeps LYNX's old start (off) until the user sets it.
+constexpr int startingBars (bool settingsFileExists) noexcept { return settingsFileExists ? 0 : 1; }
+
 // The settings file's two keys (MainComponent's ui settings): "recordCountIn" = 0/1, "recordCountInBars" = the
 // length. Read in any order: returns false for another key. `bars` = the count-in (0 = off), `length` = the kept one.
 constexpr std::string_view onKey = "recordCountIn";
