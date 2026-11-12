@@ -83,6 +83,9 @@ enum Param
     // round 165w (appended): the shelves' law — 1 = measured on the 17.1 trials (gain −88 … +12 dB, two first-order
     // sections), 0 = round 124's (−30 … +12 dB, one first-order section): a project saved before keeps it
     eqLaw,
+    // round 190do (appended): the voices' read head with Align off — 1 = measured (one head that jumps back by a fixed
+    // range), 0 = two crossfaded taps half a window apart (projects saved before)
+    headLaw,
     paramCount
 };
 enum VoiceParam { vOn, vGain, vPan, vDelay, vFeedback, vDetune, vDepth, vRate, vOctave, vSource, voiceParams };

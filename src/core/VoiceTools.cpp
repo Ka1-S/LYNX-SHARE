@@ -518,6 +518,7 @@ public:
         {
             v.line.clear();
             v.offset = 495.0;
+            v.head = 0.0;
             v.second = -1.0;
             v.phase = 0.0;
             v.lfo = 0.0;
@@ -559,6 +560,8 @@ public:
         const auto alignSamples = aligned ? 320.0 : 0.0;
         const auto voiceExtra = (aligned ? 0.0103 * sr : 0.0) - 0.5 * window;
         const bool lowOnV = on (p[lowOn]), highOnV = on (p[highOn]);
+        const bool headLaw = p[gemini::headLaw] >= 0.5f;
+        const auto headRange = 252.0 * sr / 48000.0; // round 190do [EXEC]: the measured head's range (samples at 48 kHz)
 
         struct VoiceSetup
         {
@@ -650,6 +653,28 @@ public:
                     wetR += s.gr * y;
                     continue;
                 }
+                if (! s.octave && headLaw)
+                {
+                    // round 190do [EXEC] (tp172d renders, Align off: the voices' delays tracked over 8 s of music): ONE
+                    // read head at delay + offset; the offset drifts by (1 − ratio) per sample away from the delay (pitch
+                    // down: later, up to +R; pitch up: earlier, down to −R) and jumps back by R towards the delay, a
+                    // second head crossfading in over the last X samples of offset; linear reads
+                    v.head += 1.0 - ratio;
+                    if (v.head >= headRange)
+                        v.head -= headRange;
+                    else if (v.head <= -headRange)
+                        v.head += headRange;
+                    const auto edge = headRange - std::abs (v.head);
+                    const auto g1 = std::clamp (edge / headFade, 0.0, 1.0);
+                    const auto read = [&v, &s] (double o) { return v.line.linear (std::max (1.0, 1.0 + s.delay + o)); };
+                    auto y = (float) g1 * read (v.head);
+                    if (g1 < 1.0)
+                        y += (float) (1.0 - g1) * read (v.head - (v.head > 0.0 ? headRange : -headRange));
+                    v.last = y;
+                    wetL += s.gl * y;
+                    wetR += s.gr * y;
+                    continue;
+                }
                 // two read taps half a window apart sweep the window at (1 − ratio) samples per sample
                 v.phase += (1.0 - ratio) / window;
                 v.phase -= std::floor (v.phase);
@@ -698,6 +723,7 @@ public:
 private:
     std::atomic<float> meterIn { 0.0f }, meterOut { 0.0f };
     bool lastReset = false;
+    static constexpr double headFade = 2.0; // round 190do: the measured head's crossfade at a jump (samples of offset)
     void design (const EffectParams& p) noexcept
     {
         float key[6] { p[lowGain], p[lowFreq], p[highGain], p[highFreq], p[feedbackCut], p[eqLaw] };
@@ -780,6 +806,7 @@ private:
     {
         Line line;
         double offset = 495.0, second = -1.0;
+        double head = 0.0; // round 190do: the measured single head's offset (samples over the voice's delay)
         double phase = 0.0, lfo = 0.0;
         float last = 0.0f;
         Biquad fbHp;
@@ -830,7 +857,9 @@ const EffectInfo& geminiInfo()
                                      { "V4 octave", 0.0f }, { "V4 source", 0.1667f },
                                      { "Mod reset", 0.0f },
                                      // round 165w: the measured shelves (a project saved before keeps round 124's: upgradeLoadedEffectParams)
-                                     { "EQ law", 1.0f } } };
+                                     { "EQ law", 1.0f },
+                                     // round 190do: the measured single read head (Align off); projects saved before keep two
+                                     { "Head law", 1.0f } } };
     return info;
 }
 
@@ -892,6 +921,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case directPan: return fmt ("%+.1f°", panDegrees (v));
             case lowGain: case highGain: return fmt ("%+.1f dB", shelfDb (v));
             case eqLaw: return on (v) ? "measured" : "round 124";
+            case headLaw: return on (v) ? "Measured" : "Classic";
             case lowFreq: case highFreq: case feedbackCut: return hzText (freqHz (v));
             case range: return on (v) ? "20 Hz" : "80 Hz";
             default: return on (v) ? "on" : "off";

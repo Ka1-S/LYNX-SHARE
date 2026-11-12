@@ -232,7 +232,9 @@ const char* modeName (Mode m) noexcept;
 
 namespace spiral
 {
-enum Param { mix, shift, delay, sync, feedback, lowCut, highCut, stereo, paramCount };
+enum Param { mix, shift, delay, sync, feedback, lowCut, highCut, stereo,
+             law, // round 190do (appended): 0 = the classic loop (projects saved before), 1 = the measured loop
+             paramCount };
 double shiftHz (float v) noexcept;   // ±1000 Hz, |x|^5
 double delayMs (float v) noexcept;   // 0.01 .. 1000 ms (centre 100 ms)
 float delayValue (double ms) noexcept;
@@ -245,7 +247,9 @@ double highCutHz (float v) noexcept; // 50 .. 15000
 
 namespace orbit
 {
-enum Param { mix, rate, depth, feedback, manual, mode, paramCount };
+enum Param { mix, rate, depth, feedback, manual, mode,
+             law, // round 190do (appended): 0 = the classic voices (projects saved before), 1 = the measured sweep
+             paramCount };
 enum class Mode { rise, riseFall, throughZeroPlus, throughZeroMinus, tri, octo, doubler, driftRise, driftRiseFall, ensemble, symphonic };
 constexpr int modeCount = 11;
 double rateHz (float v) noexcept;    // ±10 Hz, |x|^3.333
@@ -270,6 +274,7 @@ enum Param
     delaySync, // round 144 (appended): the reference's DelaySync law, measured [EXEC] (REA_rodada144a §1): index
                // floor (17 v): 0–1 free, 2–7 1/16 … 2/1, 8–12 1/16. … 1/1., 13–17 1/16T … 1/1T; the synced delay is capped
                // at 2750 ms. Free (0, the default) leaves the older `sync` law in charge
+    law, // round 190do (appended): 0 = the classic detune depth (projects saved before), 1 = the measured one
     paramCount
 };
 int inputPanOf (float v) noexcept;  // 0 … 8
