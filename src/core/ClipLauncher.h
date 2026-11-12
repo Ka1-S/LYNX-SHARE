@@ -89,6 +89,9 @@ struct Command
     // record / recordEnd (round 190bv, core/SessionOps.h): a recording into the empty slot (track, scene) starts on the
     // next point of the global quantisation — what plays on the track ends there and the track is taken — and
     // recordEnd ends it on the next one (`scene` 1: the UI then launches the new clip; 0: the track stops).
+    // record on a track that already records into another slot (round 190cy, as Live 12.4.16 does): that recording
+    // ends on the next point and plays on in a loop, and the new slot records from there; a record the engine cannot
+    // take is told back as a cancelled take (until == from).
     // `at` > 0 on record: a fixed length in ticks, the recording ends by itself. `at` >= 0 on launch: the clip's
     // position 0 is at that point of the clock (the end of its recording), whenever the command arrives; the launch
     // waits for the clip to exist, since the song that holds it is published separately.
@@ -184,6 +187,10 @@ private:
         int recScene = -1;
         double recFrom = never, recUntil = never;
         bool recStarted = false, recThenPlay = false, recTold = false;
+        // another slot's record button pressed while recording (round 190cy, Live 12.4.16): the slot that records next,
+        // from the end of this recording (with its fixed length in ticks, 0: open)
+        int recNextScene = -1;
+        double recNextLength = 0.0;
         // a launch that waits for its clip to exist (the recorded clip arrives with the next published song)
         int wantScene = -1;
         double wantAnchor = 0.0;
@@ -210,6 +217,8 @@ private:
     void stopTrack (const Song& song, const ClipGrid& grid, TrackState& t, double now) noexcept;
     void endRecording (const Song& song, const ClipGrid& grid, TrackState& t, double now, bool thenPlay, Runtime* runtime) noexcept;
     void tellTake (TrackState& t, Runtime* runtime) noexcept;
+    void dropNextRecording (TrackState& t, Runtime* runtime) noexcept;
+    static void tellCancelled (Runtime* runtime, int track, int scene) noexcept;
     Runtime* commandRuntime = nullptr; // (while apply() runs)
     void apply (const Song& song, const ClipGrid& grid, const GridIndex& index, const Command& c, double now) noexcept;
     void addCut (const ClipGrid& grid, const GridIndex& index, const Play& p, double at) noexcept;

@@ -43,9 +43,17 @@ std::vector<Note> overdubNotes (const std::vector<RecordedEvent>& events, double
 // replaces it).
 void mergeNotes (Pattern& pattern, const std::vector<Note>& notes);
 
-// A recorded MIDI clip in (track, scene): a new pattern of `length` ticks with `notes`, named as a new pattern is, and a
-// clip of it in the slot, in the track's colour. Returns the pattern's index (−1: the slot cannot take it).
-int placeRecordedPattern (Song& song, int track, int scene, std::vector<Note> notes, std::int64_t length);
+// The name of a MIDI clip recorded into a slot (round 190cy; Live 12.4.16, live check 190cw: "rec MIDI 1", "rec MIDI 2"
+// on the track "rec MIDI"): the track's name and the first number from 1 that no pattern or slot of the song uses yet.
+// `trackName`: the track's name as the grid shows it.
+std::string recordedClipName (const Song& song, const std::string& trackName);
+// The length counter of a slot that records (round 190cy, Live 12.4.16): `ticks` recorded so far as
+// "bars.beats.sixteenths", each counted from 0 ("0.1.0" one beat in).
+std::string lengthCounter (double ticks, int beatsPerBar);
+// A recorded MIDI clip in (track, scene): a new pattern of `length` ticks with `notes`, named `name` (empty: as a new
+// pattern is), and a clip of it in the slot, in the track's colour. Returns the pattern's index (−1: the slot cannot
+// take it).
+int placeRecordedPattern (Song& song, int track, int scene, std::vector<Note> notes, std::int64_t length, const std::string& name = {});
 // A recorded audio clip in (track, scene): a new audio channel for `path` on mixer insert `insert` (≤ 0: a free one),
 // named `name`, and a clip of it: `length` ticks from `offset` (+ `offsetFraction`) ticks into the file.
 // Returns the channel's index (−1: the slot cannot take it).

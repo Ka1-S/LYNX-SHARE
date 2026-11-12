@@ -141,12 +141,33 @@ bool slotFree (const Song& song, int track, int scene) noexcept
 }
 } // namespace
 
-int placeRecordedPattern (Song& song, int track, int scene, std::vector<Note> notes, std::int64_t length)
+std::string recordedClipName (const Song& song, const std::string& trackName)
+{
+    const auto taken = [&song] (const std::string& name) {
+        if (std::any_of (song.patterns.begin(), song.patterns.end(), [&] (const Pattern& p) { return p.name == name; }))
+            return true;
+        return song.clipGrid && std::any_of (song.clipGrid->slots.begin(), song.clipGrid->slots.end(),
+                                             [&] (const ClipGridSlot& slot) { return slot.name == name; });
+    };
+    for (int n = 1;; ++n)
+        if (auto name = trackName + " " + std::to_string (n); ! taken (name))
+            return name;
+}
+
+std::string lengthCounter (double ticks, int beatsPerBar)
+{
+    const auto whole = (std::int64_t) std::floor (std::max (0.0, ticks) + 1.0e-6);
+    const auto bar = (std::int64_t) std::max (1, beatsPerBar) * ppq;
+    const auto inBar = whole % bar;
+    return std::to_string (whole / bar) + "." + std::to_string (inBar / ppq) + "." + std::to_string ((inBar % ppq) / (ppq / 4));
+}
+
+int placeRecordedPattern (Song& song, int track, int scene, std::vector<Note> notes, std::int64_t length, const std::string& name)
 {
     if (track < 0 || track >= launcher::maxTracks || scene < 0 || scene >= launcher::maxScenes || length <= 0)
         return -1;
     Pattern p;
-    p.name = newPatternName (song);
+    p.name = name.empty() ? newPatternName (song) : name;
     p.notes = std::move (notes);
     p.lengthTicks = length;
     p.sortNotes();

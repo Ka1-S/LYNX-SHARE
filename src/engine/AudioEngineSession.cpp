@@ -9,6 +9,7 @@
 
 #include "core/DetailChain.h"
 #include "core/SessionOps.h"
+#include "ui/I18n.h"
 
 namespace lynx
 {
@@ -81,8 +82,11 @@ bool AudioEngine::recordSlot (int track, int scene)
         return false;
     if (song.clipGrid && launcher::clipAt (*song.clipGrid, track, scene) != nullptr)
         return false;
-    if (std::any_of (slotTakes.begin(), slotTakes.end(), [track] (const SlotTake& t) { return t.track == track; }))
-        return false; // (one recording per track)
+    // one recording per track, and while it records one more slot that takes over from its end (round 190cy: Live
+    // 12.4.16 ends the first take into loop playback and records the clicked slot; the launch engine decides when)
+    if (std::any_of (slotTakes.begin(), slotTakes.end(), [track, scene] (const SlotTake& t) { return t.track == track && t.scene == scene; })
+        || std::count_if (slotTakes.begin(), slotTakes.end(), [track] (const SlotTake& t) { return t.track == track && ! t.known; }) >= 2)
+        return false;
     // the grid plays with the song, and the launch engine exists only in a project that has a grid
     if (! song.clipGrid || (int) song.clipGrid->scenes.size() <= scene)
         editSong ([scene] (Song& s) {
@@ -128,6 +132,15 @@ bool AudioEngine::recordSlot (int track, int scene)
     updateAudioRecording(); // (the files are open before the first block)
     sendChangeMessage();
     return true;
+}
+
+std::string AudioEngine::slotRecordingName (int track) const
+{
+    // the track's name as the grid shows it (an unnamed track: "Track N")
+    auto name = track >= 0 && track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].name : std::string();
+    if (name.empty())
+        name = tr ("Track {0}", { juce::String (track + 1) }).toStdString();
+    return session::recordedClipName (song, name);
 }
 
 void AudioEngine::endSlotRecording (int track, bool thenPlay)
@@ -275,7 +288,10 @@ void AudioEngine::updateSlotRecording()
         const auto track = take.track, scene = take.scene;
         if (! take.placed)
         {
-            editSong ([&] (Song& s) { session::placeRecordedPattern (s, track, scene, std::move (notes), length); });
+            // named as Live names a clip recorded into a slot, "<track> <n>" (round 190cy; the Pattern workflow never
+            // records into slots, so its pattern names are untouched)
+            const auto name = slotRecordingName (track);
+            editSong ([&] (Song& s) { session::placeRecordedPattern (s, track, scene, std::move (notes), length, name); });
             take.placed = true;
             if (take.thenPlay && playing)
                 runtime.commands.push ({ launcher::Command::Type::launch, track, scene, take.until });
