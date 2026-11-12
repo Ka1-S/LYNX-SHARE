@@ -36,8 +36,11 @@ struct SearchHit
     int score = 0;
 };
 
-// The .sf2 / .sf3 files under a folder (recursive, sorted, at most `max`)
-std::vector<std::string> findFontFiles (const std::string& folder, std::size_t max = 20000);
+// The .sf2 / .sf3 files under a folder (recursive, sorted, at most `max`). `stop` (optional) is polled at every entry
+// and ends the walk early; a folder or a name the system can't read is passed over, and the walk looks at no more than
+// `maxEntries` entries (issue #159: a whole HDD in the Browser's folders)
+std::vector<std::string> findFontFiles (const std::string& folder, std::size_t max = 20000, const std::atomic<bool>* stop = nullptr,
+                                        std::size_t maxEntries = 2000000);
 
 // Ranks and filters presets for a query (empty query: everything, by font then bank:program)
 std::vector<SearchHit> searchFonts (const std::vector<IndexedFont>& fonts, const std::string& query, std::size_t max = 1000);

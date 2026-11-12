@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <set>
 #include <sstream>
 
 #include "core/SearchQuery.h"
@@ -63,27 +64,42 @@ int wordRank (const std::string& text, const std::string& word)
 }
 } // namespace
 
-std::vector<std::string> findFontFiles (const std::string& folder, std::size_t max)
+std::vector<std::string> findFontFiles (const std::string& folder, std::size_t max, const std::atomic<bool>* stop, std::size_t maxEntries)
 {
     std::vector<std::string> out;
     std::error_code ec;
     if (folder.empty() || ! fs::is_directory (u8path (folder), ec))
         return out;
-    for (fs::recursive_directory_iterator it (u8path (folder), fs::directory_options::skip_permission_denied, ec), end; it != end && ! ec;
-         it.increment (ec))
+    std::size_t entries = 0;
+    try
     {
-        if (it.depth() > 12)
+        for (fs::recursive_directory_iterator it (u8path (folder), fs::directory_options::skip_permission_denied, ec), end; it != end && ! ec;
+             it.increment (ec))
         {
-            it.disable_recursion_pending();
-            continue;
-        }
-        std::error_code e2;
-        if (it->is_regular_file (e2) && isFontFile (it->path()))
-        {
-            out.push_back (utf8 (it->path()));
-            if (out.size() >= max)
+            if ((stop != nullptr && stop->load()) || (maxEntries > 0 && ++entries > maxEntries))
                 break;
+            if (it.depth() > 12)
+            {
+                it.disable_recursion_pending();
+                continue;
+            }
+            try // (a name the system can't convert to UTF-8 is passed over)
+            {
+                std::error_code e2;
+                if (it->is_regular_file (e2) && isFontFile (it->path()))
+                {
+                    out.push_back (utf8 (it->path()));
+                    if (out.size() >= max)
+                        break;
+                }
+            }
+            catch (...)
+            {
+            }
         }
+    }
+    catch (...) // (the walk itself failed: what it found so far)
+    {
     }
     std::sort (out.begin(), out.end());
     return out;
@@ -249,17 +265,29 @@ void PresetIndex::setFolders (const std::vector<std::string>& folders, bool forc
 
 void PresetIndex::run()
 {
-    do
+    for (;;)
     {
-        again = false;
-        std::vector<std::string> folders;
+        do
         {
-            std::lock_guard<std::mutex> g (lock);
-            folders = folderList;
-        }
-        scan (folders, &stopping);
-    } while (again && ! stopping);
-    running = false;
+            again = false;
+            std::vector<std::string> folders;
+            {
+                std::lock_guard<std::mutex> g (lock);
+                folders = folderList;
+            }
+            try // (the index thread never ends the app: issue #159)
+            {
+                scan (folders, &stopping);
+            }
+            catch (...)
+            {
+            }
+        } while (again && ! stopping);
+        running = false;
+        // a setFolders between the loop's last check and here asked for another pass (it saw `running` still set)
+        if (! again || stopping || running.exchange (true))
+            break;
+    }
 }
 
 void PresetIndex::refreshNow()
@@ -281,15 +309,14 @@ void PresetIndex::scan (const std::vector<std::string>& folders, const std::atom
             known[f.path] = f;
     }
     std::vector<IndexedFont> next;
-    std::vector<std::string> seen;
+    std::set<std::string> seen;
     for (const auto& folder : folders)
-        for (const auto& path : findFontFiles (folder))
+        for (const auto& path : findFontFiles (folder, 20000, stop))
         {
             if (stop != nullptr && stop->load())
                 return;
-            if (std::find (seen.begin(), seen.end(), path) != seen.end())
+            if (! seen.insert (path).second)
                 continue;
-            seen.push_back (path);
             IndexedFont f;
             f.path = path;
             if (! stamp (path, f.size, f.time))
@@ -308,7 +335,7 @@ void PresetIndex::scan (const std::vector<std::string>& folders, const std::atom
         }
     // fonts added one by one (loaded by the user) outside the folders stay
     for (const auto& [path, f] : known)
-        if (std::find (seen.begin(), seen.end(), path) == seen.end())
+        if (seen.count (path) == 0)
         {
             std::uint64_t size = 0;
             std::int64_t time = 0;

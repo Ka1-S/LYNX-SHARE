@@ -1,4 +1,11 @@
 #include "ui/MissingFilesDialog.h"
+
+#include <algorithm>
+#include <atomic>
+#include <mutex>
+#include <thread>
+#include <utility>
+
 #include "core/SearchIndex.h"
 
 #include "engine/PluginHost.h"
@@ -34,61 +41,89 @@ juce::String userName (const std::string& user)
 
 juce::File searchFoldersFile() { return PluginHost::settingsFolder().getChildFile ("search-folders.txt"); }
 
-// Recursive search of folders for the missing files' names, off the UI thread.
-class SearchThread final : public juce::Thread
+// Recursive search of folders for the missing files' names, on a thread of its own. Issue #159: the window waited up to
+// 4 s for the search thread when it closed or applied mid-search (and JUCE then killed the thread, which on Windows can
+// leave a lock held inside a directory call on a slow drive). Now nothing ever waits for it: the window only sets
+// `cancel` and lets go; the thread owns the job with it and ends on its own at the next entry. The matches are handed
+// over as they are found (`take`), so the window shows them, and Apply works, while a big HDD is still being walked.
+struct SearchJob
 {
-public:
-    SearchThread (std::vector<MissingFile> m, juce::StringArray f, std::function<void (std::vector<std::string>, bool)> done)
-        : juce::Thread ("LYNX missing-files search"), missing (std::move (m)), folders (std::move (f)), onDone (std::move (done))
-    {
-    }
-
-    ~SearchThread() override { stopThread (4000); }
-
+    std::atomic<bool> cancel { false }, finished { false };
     std::atomic<int> scanned { 0 };
 
-    void run() override
+    std::vector<std::string> take()
     {
-        std::vector<std::string> hits;
-        auto list = [this] (const std::string& folder, const std::function<bool (const std::string&, bool)>& onEntry) {
-           #if JUCE_MAC
-            // not JUCE's iterator on macOS: one name NSString rejects would end the app (issue #42)
-            const juce::File dir (u8 (folder));
-            for (const auto& name : search::listFolderNames (folder))
-            {
-                const auto f = dir.getChildFile (juce::String::fromUTF8 (name.data(), (int) name.size()).convertToPrecomposedUnicode());
-                if (f.isHidden() || name[0] == '.')
-                    continue;
-                ++scanned;
-                if (! onEntry (f.getFullPathName().toStdString(), f.isDirectory()))
-                    return;
-            }
-           #else
-            for (const auto& entry : juce::RangedDirectoryIterator (juce::File (u8 (folder)), false, "*",
-                                                                    juce::File::findFilesAndDirectories | juce::File::ignoreHiddenFiles))
-            {
-                ++scanned;
-                if (! onEntry (entry.getFile().getFullPathName().toStdString(), entry.isDirectory()))
-                    return;
-            }
-           #endif
-        };
-        for (const auto& folder : folders)
-        {
-            auto found = searchFolderForMissing (missing, folder.toStdString(), list, 2000000, [this] { return threadShouldExit(); });
-            hits.insert (hits.end(), found.begin(), found.end());
-            if (threadShouldExit())
-                break;
-        }
-        const auto cancelled = threadShouldExit();
-        juce::MessageManager::callAsync ([done = onDone, hits = std::move (hits), cancelled]() mutable { done (std::move (hits), cancelled); });
+        const std::scoped_lock l (lock);
+        return std::exchange (fresh, {});
+    }
+    void add (const std::string& path)
+    {
+        const std::scoped_lock l (lock);
+        fresh.push_back (path);
     }
 
 private:
-    std::vector<MissingFile> missing;
-    juce::StringArray folders;
-    std::function<void (std::vector<std::string>, bool)> onDone;
+    std::mutex lock;
+    std::vector<std::string> fresh;
 };
+
+void runSearch (SearchJob& job, const std::vector<MissingFile>& missing, const juce::StringArray& folders)
+{
+    auto list = [&job] (const std::string& folder, const std::function<bool (const std::string&, bool)>& onEntry) {
+       #if JUCE_MAC
+        // not JUCE's iterator on macOS: one name NSString rejects would end the app (issue #42)
+        const juce::File dir (u8 (folder));
+        for (const auto& name : search::listFolderNames (folder))
+        {
+            const auto f = dir.getChildFile (juce::String::fromUTF8 (name.data(), (int) name.size()).convertToPrecomposedUnicode());
+            if (f.isHidden() || name[0] == '.')
+                continue;
+            ++job.scanned;
+            if (! onEntry (f.getFullPathName().toStdString(), f.isDirectory()))
+                return;
+        }
+       #else
+        for (const auto& entry : juce::RangedDirectoryIterator (juce::File (u8 (folder)), false, "*",
+                                                                juce::File::findFilesAndDirectories | juce::File::ignoreHiddenFiles))
+        {
+            ++job.scanned;
+            if (! onEntry (entry.getFile().getFullPathName().toStdString(), entry.isDirectory()))
+                return;
+        }
+       #endif
+    };
+    for (const auto& folder : folders)
+    {
+        if (job.cancel)
+            break;
+        try // (a folder the system refuses, or a name it can't convert, ends that folder's walk, never the app)
+        {
+            searchFolderForMissing (missing, folder.toStdString(), list, 2000000, [&job] { return job.cancel.load(); },
+                                    [&job] (const std::string& hit) { job.add (hit); });
+        }
+        catch (...)
+        {
+        }
+    }
+}
+
+std::shared_ptr<SearchJob> startSearchJob (std::vector<MissingFile> missing, juce::StringArray folders)
+{
+    auto job = std::make_shared<SearchJob>();
+    try
+    {
+        std::thread ([job, missing = std::move (missing), folders = std::move (folders)] {
+            juce::Thread::setCurrentThreadName ("LYNX missing-files search");
+            runSearch (*job, missing, folders);
+            job->finished = true;
+        }).detach();
+    }
+    catch (...)
+    {
+        job->finished = true;
+    }
+    return job;
+}
 
 class MissingFilesPanel final : public juce::Component,
                                 private juce::ListBoxModel,
@@ -161,6 +196,7 @@ public:
     ~MissingFilesPanel() override
     {
         stopTimer();
+        stopSearch(); // (the search ends on its own thread: nothing waits for it here, issue #159)
         search.reset();
     }
 
@@ -299,7 +335,7 @@ private:
             status.setText (info.autoRelocated.empty() ? juce::String() : tr ("Already in use: nothing to do. Save the project to keep the new places."), juce::dontSendNotification);
 
         applyButton.setButtonText (found > 0 ? tr ("Apply ({0})", { juce::String (found) }) : tr ("Apply"));
-        applyButton.setEnabled (found > 0 && ! searching);
+        applyButton.setEnabled (found > 0); // (also while a search runs: Apply stops it and uses what it found so far)
         closeButton.setButtonText (found > 0 ? tr ("Close without changes") : tr ("Close"));
         rememberToggle.setVisible (! info.files.empty());
         list.updateContent();
@@ -496,13 +532,12 @@ private:
         if (search != nullptr)
             return;
         searchedBy = userPicked;
-        search = std::make_unique<SearchThread> (info.files, where,
-                                                 [safe = juce::Component::SafePointer<MissingFilesPanel> (this)] (std::vector<std::string> hits, bool cancelled) {
-                                                     if (safe != nullptr)
-                                                         safe->searchFinished (std::move (hits), cancelled);
-                                                 });
+        placedBySearch.assign (info.files.size(), false);
+        for (std::size_t i = 0; i < info.files.size(); ++i)
+            placedBySearch[i] = info.files[i].found.empty() && ! info.files[i].skipped;
+        candidates.clear();
+        search = startSearchJob (info.files, where);
         searchedFolders = where;
-        search->startThread();
         startTimerHz (8);
         refresh();
         timerCallback();
@@ -511,22 +546,53 @@ private:
     void stopSearch()
     {
         if (search != nullptr)
-            search->signalThreadShouldExit();
+            search->cancel = true;
+    }
+
+    // what the search found since the last look: the files placed again from every match so far
+    bool takeMatches()
+    {
+        auto fresh = search->take();
+        if (fresh.empty())
+            return false;
+        candidates.insert (candidates.end(), fresh.begin(), fresh.end());
+        relocateFromSearch (info.files, placedBySearch, candidates);
+        return true;
     }
 
     void timerCallback() override
     {
-        if (search != nullptr)
-            status.setText (tr ("Searching {0}... {1} files looked at",
-                                { searchedFolders.size() == 1 ? searchedFolders[0] : tr ("your search folders"), juce::String (search->scanned.load()) }),
-                            juce::dontSendNotification);
+        if (search == nullptr)
+            return;
+        const auto finished = search->finished.load(); // (read before the last take: nothing comes after it)
+        const auto changed = takeMatches();
+        if (finished)
+        {
+            searchFinished (search->cancel.load());
+            return;
+        }
+        if (changed)
+            refresh();
+        const auto found = foundBySearch();
+        status.setText (tr ("Searching {0}... {1} files looked at",
+                            { searchedFolders.size() == 1 ? searchedFolders[0] : tr ("your search folders"), juce::String (search->scanned.load()) })
+                            + (found > 0 ? "  " + tr ("{0} found, {1} still missing", { juce::String (found), juce::String (stillMissing()) }) : juce::String()),
+                        juce::dontSendNotification);
     }
 
-    void searchFinished (std::vector<std::string> hits, bool cancelled)
+    int foundBySearch() const
+    {
+        int found = 0;
+        for (std::size_t i = 0; i < info.files.size() && i < placedBySearch.size(); ++i)
+            found += placedBySearch[i] && ! info.files[i].found.empty() ? 1 : 0;
+        return found;
+    }
+
+    void searchFinished (bool cancelled)
     {
         stopTimer();
         search.reset();
-        const auto found = relocateByName (info.files, hits);
+        const auto found = foundBySearch();
         refresh();
         status.setText ((cancelled ? tr ("Search stopped.") + " " : juce::String())
                             + tr ("{0} found, {1} still missing", { juce::String (found), juce::String (stillMissing()) }),
@@ -535,6 +601,11 @@ private:
 
     void apply()
     {
+        if (search != nullptr) // Apply during a search: what it found so far
+        {
+            stopSearch();
+            takeMatches();
+        }
         const auto map = relocationMap (info.files);
         if (onApply && ! map.empty())
             onApply (map);
@@ -553,7 +624,9 @@ private:
     Page page = Page::samples;
     std::vector<std::string> folders;
     juce::StringArray searchedFolders;
-    std::unique_ptr<SearchThread> search;
+    std::shared_ptr<SearchJob> search;
+    std::vector<bool> placedBySearch;   // [file] the running search may place it (no place, not skipped when it began)
+    std::vector<std::string> candidates; // every match the running search found
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Rectangle<int> header, footer;
     int summaryLines = 1;
