@@ -1898,12 +1898,18 @@ struct MidiLink
     int smoothing = 469;  // the smoothing slider, -1024..1024 (FL's default 469: 3 poles, about 200 ms)
     bool omni = false;    // "Omni": the link moves this control of the selected channel / mixer track
     int mode = 0;         // FL's "Mode" (round 190cs): linkformula::LinkMode, 0 = Default
+    // The reference DAW's mapping range (round 190ef, core/RemoteMap.h; Live's Mapping Browser "Min" / "Max"): the
+    // controller's travel covers min..max of the control (0..1 positions); min above max inverts the mapping.
+    float min = 0.0f, max = 1.0f;
 
     MidiLink() = default;
     MidiLink (int controller, int midiChannel, AutomationTarget control) : cc (controller), channel (midiChannel), target (control) {}
 
     // Has the link anything a plain learned link lacks?
-    bool hasSettings() const noexcept { return port >= 0 || ! formula.empty() || smooth || smoothing != 469 || omni || mode != 0; }
+    bool hasSettings() const noexcept
+    {
+        return port >= 0 || ! formula.empty() || smooth || smoothing != 469 || omni || mode != 0 || min != 0.0f || max != 1.0f;
+    }
     bool operator== (const MidiLink&) const = default;
 };
 
@@ -1933,6 +1939,31 @@ int setTargetLinks (std::vector<MidiLink>& links, const AutomationTarget& target
 // The links a controller move follows: the project's, then the global ones (settings, every project) whose target
 // and controller the project does not link itself (REA round 146: a project link overrides a global one).
 std::vector<MidiLink> linksWithGlobal (const std::vector<MidiLink>& project, const std::vector<MidiLink>& global);
+
+// Round 190ef: the reference DAW's MIDI Map Mode and Key Map Mode (core/RemoteMap.h; docs/analise/REA_rodada190ef.md).
+// What a mapping that is not a MIDI link drives: a parameter (key mappings), a clip slot, a scene's launch button, a
+// track's clip stop button, Stop all clips, or a transport switch.
+enum class RemoteAction : std::uint8_t
+{
+    parameter, clipSlot, sceneLaunch, trackStop, stopAllClips, play, stop, record, sessionRecord, metronome
+};
+// A mapping of a computer key (Key Map Mode), or of a MIDI controller / key to something other than a parameter (MIDI
+// Map Mode; a parameter's MIDI mapping is a MidiLink, FL's storage). Saved with the project (the reference saves key
+// and MIDI mappings with the set).
+struct RemoteMapping
+{
+    enum class Source : std::uint8_t { midi, key };
+    Source source = Source::midi;
+    int channel = -1; // MIDI: 0..15, -1 = any
+    int number = -1;  // MIDI: a controller 0..127, or a key linkNoteBase + n
+    int port = -1;    // MIDI: the input device's port number (-1 = none), as MidiLink::port
+    int key = 0;      // computer key: its upper-case character or JUCE key code, no modifiers
+    RemoteAction action = RemoteAction::parameter;
+    AutomationTarget target; // parameter
+    int track = -1, scene = -1; // clipSlot: both; trackStop: track; sceneLaunch: scene
+    float min = 0.0f, max = 1.0f; // parameter: the range (a key toggles between them)
+    bool operator== (const RemoteMapping&) const = default;
+};
 
 enum class PlaylistTrackMode : std::uint8_t { unassigned, audio, instrument };
 
@@ -2287,6 +2318,9 @@ struct Song
             fn (a.target);
         for (auto& l : midiLinks)
             fn (l.target);
+        for (auto& m : remoteMappings) // round 190ef
+            if (m.action == RemoteAction::parameter)
+                fn (m.target);
         for (auto& v : initialValues)
             fn (v.target);
         for (auto& p : patterns)
@@ -2441,6 +2475,7 @@ struct Song
     VideoSettings video;
     AdrSession adr; // the ADR cue list, its takes and its settings (round 174d, core/Adr.h)
     std::vector<MidiLink> midiLinks;
+    std::vector<RemoteMapping> remoteMappings; // round 190ef: key mappings and MIDI mappings of slots, scenes, transport
     // FL's "initialized controls" (.flp 0xD8; the parameter menu's "Init song with this position", REA round 146):
     // values the targets are reset to whenever the song starts playing in song mode (from any position), before
     // the automation clips take over at their own position.

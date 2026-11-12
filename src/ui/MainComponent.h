@@ -20,6 +20,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/BrowserComponent.h"
+#include "ui/MapMode.h"
 #include "ui/Icons.h"
 #include "ui/ChannelRackComponent.h"
 #include "ui/PianoRollComponent.h"
@@ -107,6 +108,13 @@ public:
     void setClipLaunchWorkflow (bool on, bool swapLayout = true) { setLayoutStyle (on ? layoutstyle::Style::clipLaunch : layoutstyle::Style::pattern, swapLayout); }
     void setClipGridView (PlaylistArea::GridView view);
     bool isClipLaunchWorkflow() const noexcept { return layoutStyle == layoutstyle::Style::clipLaunch; }
+    // Round 190ef: the reference's MIDI Map Mode / Key Map Mode (ui/MapMode.h; Ctrl+M / Ctrl+K and the MIDI / Key
+    // switches), in the Clip-launch layout only (elsewhere it stays off).
+    void setMapMode (remotemap::Mode mode);
+    remotemap::Mode getMapMode() const noexcept { return mapOverlay != nullptr ? mapOverlay->getMode() : remotemap::Mode::off; }
+    mapmode::Overlay* mapOverlayForSnapshot() noexcept { return mapOverlay.get(); }
+    mapmode::MappingBrowser* mappingBrowserForSnapshot() noexcept { return mappingBrowser.get(); }
+    void fireRemote (const remotemap::Fire& fire); // a mapping acts (MIDI from the engine, keys from keyPressed)
     // View › Layout style (round 184a: Pattern, Clip-launch or Simple workflow; core/LayoutStyle.h). Moves panels only;
     // each style keeps its own workspace layout. The Simple workflow's parts are made when it is first chosen.
     void setLayoutStyle (layoutstyle::Style style, bool swapLayout = true);
@@ -670,6 +678,14 @@ private:
     bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to
     void addLayoutStyleItems (juce::PopupMenu& menu);
     std::unique_ptr<juce::Component> clipGridView, clipGridSwitch; // made when Clip-launch workflow is first chosen (round 181a)
+    // round 190ef: the map modes' overlay and Mapping Browser (made when a map mode is first switched on), and the
+    // computer keys held that fired a key mapping (their release fires it again)
+    std::unique_ptr<mapmode::Overlay> mapOverlay;
+    std::unique_ptr<mapmode::MappingBrowser> mappingBrowser;
+    std::vector<int> heldMappedKeys;
+    bool mapKeyPressed (const juce::KeyPress& key);
+    void layoutMapMode();
+    void syncClipLaunchSwitches();
     std::unique_ptr<SimpleWorkflow> simpleWorkflow; // made when Simple workflow is first chosen (round 184a)
     std::unique_ptr<DetailView> detailView; // made with the grid (round 183a); never in Pattern workflow
     void makeDetailView();

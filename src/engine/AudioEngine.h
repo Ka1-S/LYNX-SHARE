@@ -13,6 +13,7 @@
 
 #include "core/LinkFormula.h"
 #include "core/Multilink.h"
+#include "core/RemoteMap.h"
 #include "core/AutomationDisplay.h"
 #include "core/HeldNotes.h"
 #include "core/Mpe.h"
@@ -655,6 +656,15 @@ public:
     ControllerSeen lastControllerSeen() const noexcept { return controllerSeen; }
     // A controller message as if a device had sent it (tests, --snapshot). Message thread.
     void injectControllerForTest (int cc, int channel, int value, int port = -1);
+    // Round 190ef, the reference's MIDI Map Mode / Key Map Mode (core/RemoteMap.h). In MIDI Map Mode the controllers and
+    // keys received pick the control the map overlay selected instead of moving anything (no mapping acts, no key plays);
+    // takeMapCapture gives the last one (once). Message thread.
+    void setMapMode (remotemap::Mode mode);
+    remotemap::Mode getMapMode() const noexcept { return mapMode; }
+    std::optional<remotemap::MidiControl> takeMapCapture() { return std::exchange (mapCaptured, std::nullopt); }
+    // A MIDI mapping of a clip slot, a scene, a track's stop button, Stop all clips or a transport switch fired (its
+    // press or release); the main window acts on it. Message thread (from applyControllers).
+    std::function<void (const remotemap::Fire&)> onRemoteFire;
     // "Omni" links follow the mixer's selected track: the mixer reports it here (-1 = unknown).
     std::function<int()> selectedMixerTrackForLinks;
     std::optional<MidiLink> globalLinkOf (const AutomationTarget& target) const;
@@ -1104,6 +1114,13 @@ private:
     std::array<std::atomic<std::uint64_t>, 2> linkedNotes {};
     AutomationTarget learning;
     ControllerSeen controllerSeen;
+    // round 190ef: the map mode, the control it caught, and each controller's last value (a button's press / release)
+    remotemap::Mode mapMode = remotemap::Mode::off;
+    std::optional<remotemap::MidiControl> mapCaptured;
+    std::map<std::tuple<int, int, int>, int> remoteValues; // (number, channel, port) -> value
+public:
+    std::atomic<bool> mapCaptureNotes { false }; // (MIDI thread: in MIDI Map Mode every key goes to applyControllers)
+private:
     // round 190bt: a link's compiled mapping formula, and the smoothing filters of the links being moved
     std::map<std::string, linkformula::Formula> linkFormulas;
     struct LinkSmoothing

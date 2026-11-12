@@ -2330,7 +2330,8 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     {
         const auto key = m.getNoteNumber();
         const auto value = m.isNoteOn() ? (int) m.getVelocity() : 0;
-        if ((linkedNotes[(std::size_t) (key >> 6)].load (std::memory_order_relaxed) >> (key & 63) & 1u) != 0)
+        if ((linkedNotes[(std::size_t) (key >> 6)].load (std::memory_order_relaxed) >> (key & 63) & 1u) != 0
+            || mapCaptureNotes.load (std::memory_order_relaxed)) // (round 190ef: MIDI Map Mode takes every key)
         {
             controllerQueue.push ({ linkNoteBase + key, m.getChannel() - 1, value, device.port });
             return;
@@ -4119,6 +4120,13 @@ void AudioEngine::setGlobalLink (const AutomationTarget& target, const std::opti
     sendChangeMessage();
 }
 
+void AudioEngine::setMapMode (remotemap::Mode mode)
+{
+    mapMode = mode;
+    mapCaptured.reset();
+    mapCaptureNotes.store (mode == remotemap::Mode::midi, std::memory_order_relaxed);
+}
+
 void AudioEngine::injectControllerForTest (int cc, int channel, int value, int port)
 {
     controllerQueue.push ({ cc, channel, value, port });
@@ -4493,6 +4501,14 @@ void AudioEngine::applyControllers()
         // Auto detect of the Remote control settings window: controllers, and keys as they are pressed
         if (! isNoteLink (e.cc) || e.value > 0)
             controllerSeen = { e.port, e.channel, e.cc, e.value, controllerSeen.serial + 1 };
+        // round 190ef: in MIDI Map Mode a controller moved or a key pressed is caught for the selected control; nothing
+        // acts ("MIDI-mappings won't function while you're in MIDI Map Mode", the reference's lesson)
+        if (mapMode == remotemap::Mode::midi)
+        {
+            if (! isNoteLink (e.cc) || e.value > 0)
+                mapCaptured = remotemap::MidiControl { e.channel, e.cc, e.port };
+            continue;
+        }
         if (e.seenOnly)
             continue;
         if (isNoteLink (e.cc)) // (MIDI learn and Multilink take controllers, as before)
@@ -4575,12 +4591,28 @@ void AudioEngine::applyControllers()
                 bits[link.cc >> 6] |= std::uint64_t { 1 } << (link.cc & 63);
             else if (isNoteLink (link.cc))
                 notes[(link.cc - linkNoteBase) >> 6] |= std::uint64_t { 1 } << ((link.cc - linkNoteBase) & 63);
+        remotemap::usedNumbers (song, bits, notes); // (round 190ef: the MIDI mappings of slots, scenes, transport)
         for (int w = 0; w < 2; ++w)
         {
             linkedCcs[(std::size_t) w].store (bits[w], std::memory_order_relaxed);
             linkedNotes[(std::size_t) w].store (notes[w], std::memory_order_relaxed);
         }
     }
+    if (mapMode == remotemap::Mode::midi)
+        return;
+
+    // round 190ef: the MIDI mappings of clip slots, scenes, track stop buttons and transport switches (presses and releases)
+    if (! song.remoteMappings.empty())
+        for (const auto& ev : events)
+        {
+            auto& previous = remoteValues.try_emplace ({ ev.cc, ev.channel, ev.port }, -1).first->second;
+            const auto fires = remotemap::midiFires (song, ev.channel, ev.cc, ev.value, previous, ev.port);
+            previous = ev.value;
+            if (onRemoteFire != nullptr)
+                for (const auto& f : fires)
+                    onRemoteFire (f);
+        }
+
     if ((events.empty() || links.empty()) && linkSmoothing.empty())
         return;
 
@@ -4629,7 +4661,8 @@ void AudioEngine::applyControllers()
             const auto mapped = linkformula::linkModeValue (link.mode, *formula, (float) ev.value / 127.0f, current);
             if (! mapped)
                 continue; // (a release in Latch / Inc / Stay)
-            const auto v = *mapped;
+            // round 190ef: the mapping's Min / Max (the reference's range; 0 / 1 keeps the position as it was)
+            const auto v = absolute ? remotemap::applyRange (*mapped, link.min, link.max) : *mapped;
             // takeover: only parameters the song holds (a plugin's own parameters have no value to compare here), and
             // only for links that follow the controller's position
             const auto songHeld = t.kind != AutomationTargetKind::channelParam && t.kind != AutomationTargetKind::effectParam;

@@ -7,6 +7,7 @@
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
 #include "core/EditorLimit.h"
+#include "core/SessionKeys.h"
 #include "core/FlSettings.h"
 #include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
@@ -735,6 +736,13 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     engine.setControllerSurface (controllerBridge.get());
     // "Omni" links of mixer-slot controls follow the selected mixer track (round 190bt)
     engine.selectedMixerTrackForLinks = [this] { return mixer.getSelectedTrack(); };
+    // round 190ef: the MIDI mappings of slots, scenes and transport switches act here; the transport is mappable
+    engine.onRemoteFire = [this] (const remotemap::Fire& f) { fireRemote (f); };
+    mapmode::tag (playButton, remotemap::Target::of (RemoteAction::play));
+    mapmode::tag (stopButton, remotemap::Target::of (RemoteAction::stop));
+    mapmode::tag (recordButton, remotemap::Target::of (RemoteAction::record));
+    mapmode::tag (metronomeButton, remotemap::Target::of (RemoteAction::metronome));
+    mapmode::tag (tempoDisplay, remotemap::Target::parameter ({ AutomationTargetKind::tempo, 0, 0, 0 }));
     setTypingPiano (typingPiano);
     setKeyboardSettingsListener ([this] { saveUiSettings(); }); // round 190ds: the keyboards' modes are UI settings
     setTypingKeyLetters ([this] (int key) -> std::string {
@@ -892,6 +900,8 @@ MainComponent::~MainComponent()
     EffectsPanel::onHotSwapSlot = nullptr; // (round 190ce: it calls this window)
     engine.setControllerSurface (nullptr); // (the controllers get their closing messages)
     engine.selectedMixerTrackForLinks = nullptr;
+    engine.onRemoteFire = nullptr;
+    engine.setMapMode (remotemap::Mode::off);
     closeRemoteControlSettings();
     gamepadInput.reset();
     if (detailView != nullptr) // (round 183a: a docked Piano roll goes home while the workspace still exists)
@@ -1400,6 +1410,7 @@ void MainComponent::resized()
         nativechild::place (*setupOverlay, *this, getLocalBounds());
         setupOverlay->toFront (false);
     }
+    layoutMapMode(); // (round 190ef)
 }
 
 void MainComponent::hostSetupOverlayNatively()
@@ -1705,6 +1716,8 @@ void MainComponent::dragOperationStarted (const juce::DragAndDropTarget::SourceD
 
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
+    if (mapKeyPressed (key)) // round 190ef: the map modes' keys and the key mappings (Clip-launch layout only)
+        return true;
     const auto chord = chordFromKeyPress (key);
 
     // 1. the typing piano: the keys its layout takes (notes, FL's LOCK) win over the shortcuts; FL's FREE keys don't
@@ -2107,7 +2120,162 @@ bool MainComponent::keyStateChanged (bool)
         heldKeys.releaseTag (code);
     releaseTypingLaunches (false);
 
+    // round 190ef: a mapped computer key let go: its mappings get the release (a clip in Gate mode stops)
+    for (auto it = heldMappedKeys.begin(); it != heldMappedKeys.end();)
+        if (! juce::KeyPress::isKeyCurrentlyDown (*it))
+        {
+            for (const auto& f : remotemap::keyFires (engine.getSong(), *it, false))
+                fireRemote (f);
+            it = heldMappedKeys.erase (it);
+        }
+        else
+            ++it;
+
     return false;
+}
+
+// --- round 190ef: MIDI Map Mode / Key Map Mode (ui/MapMode.h, core/RemoteMap.h) ------------------------------------------
+void MainComponent::setMapMode (remotemap::Mode mode)
+{
+    if (layoutStyle != layoutstyle::Style::clipLaunch)
+        mode = remotemap::Mode::off;
+    if (mode != remotemap::Mode::off && mapOverlay == nullptr)
+    {
+        mapOverlay = std::make_unique<mapmode::Overlay> (engine, *this);
+        mapOverlay->onMessage = [] (const juce::String& text) { ui::postHint ({ text, {}, false, false }, 5000); };
+        addChildComponent (*mapOverlay);
+        mappingBrowser = std::make_unique<mapmode::MappingBrowser> (engine);
+        addChildComponent (*mappingBrowser);
+    }
+    if (mapOverlay == nullptr)
+        return;
+    const auto was = mapOverlay->getMode();
+    engine.setMapMode (mode);
+    mapOverlay->setMode (mode);
+    mapOverlay->setVisible (mode != remotemap::Mode::off);
+    mappingBrowser->setMode (mode);
+    mappingBrowser->setVisible (mode != remotemap::Mode::off);
+    layoutMapMode();
+    syncClipLaunchSwitches();
+    if (mode != was)
+        ui::postHint ({ mode == remotemap::Mode::midi  ? tr ("MIDI Map Mode: click an element, then move a control on your MIDI device (Ctrl+M ends it)")
+                        : mode == remotemap::Mode::key ? tr ("Key Map Mode: click an element, then press a computer key (Ctrl+K ends it)")
+                                                       : tr ("Map mode off: the mappings act"),
+                        {}, false, false },
+                      5000);
+}
+
+void MainComponent::layoutMapMode()
+{
+    if (mapOverlay == nullptr || ! mapOverlay->isVisible())
+        return;
+    mapOverlay->setBounds (getLocalBounds());
+    mapOverlay->toFront (false);
+    // the Mapping Browser takes the Browser's place (the reference: "available while a map mode is on"); with the Browser
+    // hidden, a strip at the left of the workspace
+    auto area = browser.isShowing() ? getLocalArea (&browser, browser.getLocalBounds())
+                                    : getLocalArea (&workspace, workspace.getLocalBounds()).removeFromLeft (juce::jmin (320, getWidth() / 3));
+    mappingBrowser->setBounds (area);
+    mappingBrowser->toFront (false);
+}
+
+bool MainComponent::mapKeyPressed (const juce::KeyPress& key)
+{
+    if (layoutStyle != layoutstyle::Style::clipLaunch)
+        return false;
+    const auto mods = key.getModifiers();
+    auto code = key.getKeyCode();
+    if (code >= 'a' && code <= 'z')
+        code -= 'a' - 'A';
+    const auto command = mods.isCommandDown() && ! mods.isAltDown() && ! mods.isShiftDown();
+    if (command && code == 'M' && sessionkeys::defaultKeyActs (sessionkeys::Command::midiMapMode))
+    {
+        setMapMode (getMapMode() == remotemap::Mode::midi ? remotemap::Mode::off : remotemap::Mode::midi);
+        return true;
+    }
+    if (command && code == 'K' && sessionkeys::defaultKeyActs (sessionkeys::Command::keyMapMode))
+    {
+        setMapMode (getMapMode() == remotemap::Mode::key ? remotemap::Mode::off : remotemap::Mode::key);
+        return true;
+    }
+    const auto plain = ! mods.isCommandDown() && ! mods.isAltDown() && ! mods.isCtrlDown();
+    if (getMapMode() != remotemap::Mode::off && mapOverlay->selection().has_value())
+    {
+        if (plain && (code == juce::KeyPress::deleteKey || code == juce::KeyPress::backspaceKey))
+        {
+            mapOverlay->unmapSelected();
+            return true;
+        }
+        if (getMapMode() == remotemap::Mode::key && plain && ! mods.isShiftDown() && code != juce::KeyPress::escapeKey)
+        {
+            mapOverlay->assignKey (code);
+            return true;
+        }
+    }
+    // the key mappings act while no map mode is on; a mapped key wins over the typing keyboard and the shortcuts
+    if (getMapMode() == remotemap::Mode::off && plain && ! mods.isShiftDown() && ! engine.getSong().remoteMappings.empty())
+    {
+        const auto fires = remotemap::keyFires (engine.getSong(), code, true);
+        if (fires.empty())
+            return false;
+        if (std::find (heldMappedKeys.begin(), heldMappedKeys.end(), code) == heldMappedKeys.end()) // (not the key's repeat)
+        {
+            heldMappedKeys.push_back (code);
+            for (const auto& f : fires)
+                fireRemote (f);
+        }
+        return true;
+    }
+    return false;
+}
+
+void MainComponent::fireRemote (const remotemap::Fire& f)
+{
+    const auto press = f.edge == remotemap::Edge::press;
+    const auto& t = f.target;
+    switch (t.action)
+    {
+        case RemoteAction::parameter:
+            if (press) // (a key toggles the parameter between Min and Max)
+                if (const auto now = engine.currentTargetValue (t.param); now >= 0.0f)
+                    engine.applyTargetValues ({ { t.param, remotemap::keyToggle (now, f.min, f.max) } });
+            break;
+        case RemoteAction::clipSlot:
+            engine.launcherCommand ({ press ? launcher::Command::Type::launch : launcher::Command::Type::release, t.track, t.scene });
+            break;
+        case RemoteAction::sceneLaunch:
+            if (press)
+                engine.launcherCommand ({ launcher::Command::Type::launchScene, 0, t.scene });
+            break;
+        case RemoteAction::trackStop:
+            if (press)
+                engine.launcherCommand ({ launcher::Command::Type::stopTrack, t.track });
+            break;
+        case RemoteAction::stopAllClips:
+            if (press)
+                engine.launcherCommand ({ launcher::Command::Type::stopAll });
+            break;
+        case RemoteAction::play:
+            if (press && ! engine.getTransport().playing.load())
+                playStop();
+            break;
+        case RemoteAction::stop:
+            if (press && engine.getTransport().playing.load())
+                playStop();
+            break;
+        case RemoteAction::record:
+            if (press)
+                runAction ("transport.record");
+            break;
+        case RemoteAction::sessionRecord:
+            if (press && clipGridView != nullptr)
+                engine.toggleSessionRecord (clipGridSelection (*clipGridView).second);
+            break;
+        case RemoteAction::metronome:
+            if (press)
+                runAction ("transport.metronome");
+            break;
+    }
 }
 
 juce::String MainComponent::shortcutText (const char* actionId) const
@@ -2944,14 +3112,38 @@ juce::PopupMenu MainComponent::layoutsMenu()
 
 namespace
 {
-// Both | Grid | Song, in the Playlist's title bar while Clip-launch workflow is on (round 181a)
+// Both | Grid | Song, in the Playlist's title bar while Clip-launch workflow is on (round 181a). Round 190ef: then the
+// reference's control-bar switches Draw Mode (pencil), Key and MIDI (Key / MIDI Map Mode), in its order.
 class ClipGridSwitch final : public juce::Component
 {
 public:
-    static constexpr int width = 132;
+    static constexpr int width = 132 + 8 + 26 + 4 + 40 + 4 + 44;
+
+    std::function<void()> onDraw, onKey, onMidi;
+    void setStates (bool drawOn, remotemap::Mode mode)
+    {
+        draw.setToggleState (drawOn, juce::dontSendNotification);
+        key.setToggleState (mode == remotemap::Mode::key, juce::dontSendNotification);
+        midi.setToggleState (mode == remotemap::Mode::midi, juce::dontSendNotification);
+    }
 
     explicit ClipGridSwitch (std::function<void (PlaylistArea::GridView)> pick)
     {
+        addAndMakeVisible (draw);
+        draw.setTooltip (tr ("Draw Mode") + sessionkeys::menuKey (sessionkeys::Command::drawMode, layoutstyle::Style::clipLaunch).replace ("\t", "  "));
+        draw.onClick = [this] { if (onDraw != nullptr) onDraw(); };
+        for (auto* b : { &key, &midi })
+        {
+            addAndMakeVisible (*b);
+            b->setColour (juce::TextButton::buttonOnColourId, b == &key ? theme::colour::warning : theme::colour::info);
+            b->setColour (juce::TextButton::textColourOnId, theme::colour::bg0);
+        }
+        key.setButtonText (tr ("Key"));
+        key.setTooltip (tr ("Key Map Mode: map computer keys to clips, scenes, buttons and controls (Ctrl+K)"));
+        key.onClick = [this] { if (onKey != nullptr) onKey(); };
+        midi.setButtonText ("MIDI");
+        midi.setTooltip (tr ("MIDI Map Mode: map MIDI controls to clips, scenes, buttons and controls (Ctrl+M)"));
+        midi.onClick = [this] { if (onMidi != nullptr) onMidi(); };
         const std::pair<juce::TextButton*, PlaylistArea::GridView> buttons[] { { &both, PlaylistArea::GridView::beside },
                                                                                { &grid, PlaylistArea::GridView::grid },
                                                                                { &song, PlaylistArea::GridView::song } };
@@ -2978,16 +3170,32 @@ public:
     void resized() override
     {
         auto r = getLocalBounds().reduced (0, 4);
+        auto switches = r.removeFromRight (26 + 4 + 40 + 4 + 44);
+        r.removeFromRight (8);
         const auto w = r.getWidth() / 3;
         both.setBounds (r.removeFromLeft (w));
         grid.setBounds (r.removeFromLeft (w));
         song.setBounds (r);
+        draw.setBounds (switches.removeFromLeft (26));
+        switches.removeFromLeft (4);
+        key.setBounds (switches.removeFromLeft (40));
+        switches.removeFromLeft (4);
+        midi.setBounds (switches);
     }
 
 private:
     juce::TextButton both, grid, song;
+    IconButton draw { "drawMode", Icon::draw };
+    juce::TextButton key, midi;
 };
 } // namespace
+
+void MainComponent::syncClipLaunchSwitches()
+{
+    if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get()))
+        flip->setStates (false, getMapMode());
+}
+
 
 void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
 {
@@ -3003,6 +3211,11 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     {
         clipGridView = makeClipGrid (engine);
         clipGridSwitch = std::make_unique<ClipGridSwitch> ([this] (PlaylistArea::GridView view) { setClipGridView (view); });
+        if (auto* flip = dynamic_cast<ClipGridSwitch*> (clipGridSwitch.get())) // (round 190ef)
+        {
+            flip->onKey = [this] { setMapMode (getMapMode() == remotemap::Mode::key ? remotemap::Mode::off : remotemap::Mode::key); };
+            flip->onMidi = [this] { setMapMode (getMapMode() == remotemap::Mode::midi ? remotemap::Mode::off : remotemap::Mode::midi); };
+        }
         makeDetailView();
     }
     if (style == Style::simple && simpleWorkflow == nullptr)
@@ -3106,6 +3319,8 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         detailView->releaseEditor();
     layoutStyle = style;
     layoutstyle::setCurrent (style); // (round 190cm: the clip grid's and the audio editor's Ableton-style keys follow it)
+    if (! clipLaunch && getMapMode() != remotemap::Mode::off) // (round 190ef: the map modes belong to the Clip-launch layout)
+        setMapMode (remotemap::Mode::off);
     browser.setLiveItemMenus (clipLaunch); // (round 190cy: Live's flat collection labels in the rows' menus)
     EditorGlobals::get().clipLaunchWorkflow = clipLaunch; // (round 190db: the audio editor's beat-time view)
     if (clipGridView != nullptr || clipLaunch)

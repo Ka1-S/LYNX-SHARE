@@ -2913,6 +2913,11 @@ juce::String toJson (const Song& song, bool stampVersion)
                 o.setProperty ("omni", true);
             if (l.mode != 0) // FL's link Mode (round 190cs)
                 o.setProperty ("mode", l.mode);
+            if (l.min != 0.0f || l.max != 1.0f) // the mapping range (round 190ef, Live's Min / Max)
+            {
+                o.setProperty ("min", l.min);
+                o.setProperty ("max", l.max);
+            }
         };
 
         for (const auto& l : song.midiLinks)
@@ -2945,6 +2950,38 @@ juce::String toJson (const Song& song, bool stampVersion)
             root->setProperty ("midiLinkSettings", settings);
         if (! noteLinks.isEmpty())
             root->setProperty ("midiNoteLinks", noteLinks);
+    }
+
+    if (! song.remoteMappings.empty()) // round 190ef: key mappings, MIDI mappings of slots / scenes / transport
+    {
+        juce::Array<juce::var> list;
+        for (const auto& m : song.remoteMappings)
+        {
+            auto o = std::make_unique<juce::DynamicObject>();
+            if (m.source == RemoteMapping::Source::key)
+                o->setProperty ("key", m.key);
+            else
+            {
+                o->setProperty ("number", m.number);
+                o->setProperty ("channel", m.channel);
+                if (m.port >= 0)
+                    o->setProperty ("port", m.port);
+            }
+            o->setProperty ("action", (int) m.action);
+            if (m.action == RemoteAction::parameter)
+                o->setProperty ("target", juce::Array<juce::var> { targetKindName (m.target.kind), m.target.index, m.target.slot, m.target.param });
+            if (m.track >= 0)
+                o->setProperty ("track", m.track);
+            if (m.scene >= 0)
+                o->setProperty ("scene", m.scene);
+            if (m.min != 0.0f || m.max != 1.0f)
+            {
+                o->setProperty ("min", m.min);
+                o->setProperty ("max", m.max);
+            }
+            list.add (juce::var (o.release()));
+        }
+        root->setProperty ("remoteMappings", list);
     }
 
     if (! song.initialValues.empty()) // FL's initialized controls (REA round 146)
@@ -3595,6 +3632,11 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
             l.smoothing = juce::jlimit (-1024, 1024, (int) o["smoothing"]);
         l.omni = (bool) o["omni"];
         l.mode = juce::jlimit (0, 4, (int) o["mode"]); // (round 190cs)
+        if (o.hasProperty ("min") || o.hasProperty ("max")) // (round 190ef)
+        {
+            l.min = juce::jlimit (0.0f, 1.0f, (float) (double) o.getProperty ("min", 0.0));
+            l.max = juce::jlimit (0.0f, 1.0f, (float) (double) o.getProperty ("max", 1.0));
+        }
     };
     if (auto* settings = root["midiLinkSettings"].getArray()) // round 190bt
         for (const auto& o : *settings)
@@ -3617,6 +3659,41 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
         }
     song.midiLinks.erase (std::remove_if (song.midiLinks.begin(), song.midiLinks.end(), [] (const MidiLink& l) { return l.cc < 0; }),
                           song.midiLinks.end());
+
+    if (auto* mappings = root["remoteMappings"].getArray()) // round 190ef
+        for (const auto& o : *mappings)
+        {
+            if (! o.isObject())
+                continue;
+            RemoteMapping m;
+            const auto action = (int) o.getProperty ("action", -1);
+            if (action < 0 || action > (int) RemoteAction::metronome)
+                continue; // (an action a newer version added)
+            m.action = (RemoteAction) action;
+            if (o.hasProperty ("key"))
+            {
+                m.source = RemoteMapping::Source::key;
+                m.key = (int) o["key"];
+            }
+            else
+            {
+                m.number = (int) o.getProperty ("number", -1);
+                m.channel = juce::jlimit (-1, 15, (int) o.getProperty ("channel", -1));
+                m.port = juce::jlimit (-1, 255, (int) o.getProperty ("port", -1));
+                if (! (m.number >= 0 && m.number < 128) && ! isNoteLink (m.number))
+                    continue;
+            }
+            if (const auto* target = o["target"].getArray(); target != nullptr && target->size() == 4)
+                m.target = { targetKindFromName ((*target)[0].toString()), (int) (*target)[1], (int) (*target)[2], (int) (*target)[3] };
+            m.track = (int) o.getProperty ("track", -1);
+            m.scene = (int) o.getProperty ("scene", -1);
+            m.min = juce::jlimit (0.0f, 1.0f, (float) (double) o.getProperty ("min", 0.0));
+            m.max = juce::jlimit (0.0f, 1.0f, (float) (double) o.getProperty ("max", 1.0));
+            if ((m.source == RemoteMapping::Source::key && m.key == 0)
+                || (m.action == RemoteAction::parameter && m.target.kind == AutomationTargetKind::none))
+                continue;
+            song.remoteMappings.push_back (m);
+        }
 
     if (auto* values = root["initialValues"].getArray())
         for (const auto& v : *values)

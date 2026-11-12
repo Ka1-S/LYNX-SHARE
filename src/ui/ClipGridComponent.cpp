@@ -13,6 +13,7 @@
 #include "ui/BrowserComponent.h"
 #include "ui/DetailView.h"
 #include "ui/HintBar.h"
+#include "ui/MapMode.h"
 #include "ui/GroovePoolComponent.h"
 #include "ui/SessionMixer.h"
 #include "ui/ExportDialog.h"
@@ -74,6 +75,7 @@ std::optional<session::SlotClip> copiedSlot;
 std::uint64_t copiedSlotStamp = 0;
 
 class ClipGridComponent final : public juce::Component,
+                                public mapmode::SpotSource,
                                 public juce::DragAndDropTarget,
                                 public juce::FileDragAndDropTarget,
                                 private juce::Timer,
@@ -112,6 +114,8 @@ public:
             menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&mixerButton));
         };
         stopAll.setButtonText (tr ("Stop all clips"));
+        mapmode::tag (stopAll, remotemap::Target::of (RemoteAction::stopAllClips)); // (round 190ef)
+        mapmode::tag (sessionRecord, remotemap::Target::of (RemoteAction::sessionRecord));
         stopAll.onClick = [this] { engine.launcherCommand ({ launcher::Command::Type::stopAll }); };
         backToPlaylist.setButtonText (tr ("Back to Playlist"));
         backToPlaylist.setTooltip (tr ("Tracks that launched a clip stay silent in the Playlist until this is pressed"));
@@ -455,6 +459,25 @@ public:
     // The Detail View's listener (round 183a; none in Pattern workflow, where no grid exists).
     std::function<void (int, int, GridPick)> onPick;
     std::pair<int, int> selection() const noexcept { return { selectedTrack, selectedScene }; }
+
+    // Round 190ef (MIDI / Key Map Mode): the clip slots (a mapping belongs to the slot, not to its clip), each scene's
+    // launch button, each track's clip stop button; Stop all clips and Session Record are tagged buttons.
+    void mapSpots (std::vector<mapmode::Spot>& out) override
+    {
+        const auto cells = cellArea();
+        const auto columns = columnCount(), scenes = rowCount();
+        for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+        {
+            for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
+                out.push_back ({ juce::Rectangle<int> (columnX (t), rowY (r), columnWidth, rowHeight).getIntersection (cells),
+                                 remotemap::Target::slot (t, r) });
+            out.push_back ({ juce::Rectangle<int> (columnX (t), cells.getBottom(), launchZone, statusHeight), remotemap::Target::trackStop (t) });
+        }
+        const juce::Rectangle<int> sceneColumn (cells.getRight(), cells.getY(), sceneWidth, cells.getHeight());
+        for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
+            out.push_back ({ juce::Rectangle<int> (sceneColumn.getX(), rowY (r), sceneWidth, rowHeight).getIntersection (sceneColumn),
+                             remotemap::Target::sceneLaunch (r) });
+    }
 
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
     {

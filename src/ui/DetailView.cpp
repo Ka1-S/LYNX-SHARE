@@ -1,4 +1,5 @@
 #include "ui/DetailView.h"
+#include "ui/MapMode.h"
 
 #include <algorithm>
 #include <array>
@@ -128,6 +129,7 @@ void drawSaveGlyph (juce::Graphics& g, juce::Rectangle<int> r, bool hot)
 // The Device View: the chain of cards.
 class DetailView::DeviceChain final : public juce::Component,
                                       public ui::HintSource,
+                                      public mapmode::SpotSource,
                                       public juce::DragAndDropTarget,
                                       private juce::ChangeListener,
                                       private juce::Timer,
@@ -494,6 +496,17 @@ public:
             return true;
         }
         return false;
+    }
+
+    // round 190ef: every device knob is mappable (MIDI / Key Map Mode)
+    void mapSpots (std::vector<mapmode::Spot>& out) override
+    {
+        for (const auto& c : cards)
+            if (c.kind != Card::add && c.custom == nullptr)
+                for (int k = 0; k < (int) c.knobs.size(); ++k)
+                    if (const auto r = knobBounds (c, k); ! r.isEmpty())
+                        if (const auto target = knobSpec (c, k).target)
+                            out.push_back ({ r, remotemap::Target::parameter (*target) });
     }
 
     // --- hints ---------------------------------------------------------------------------------------------------
