@@ -2737,3 +2737,30 @@ put one take a score step down (E alone: drive 8 3.6 → 4.0 and drive 10 3.0 �
 CPU and latency unchanged (one multiply-add per oversampled sample). Open: style E's ceilings give way above about
 −14 dBFS at drive 10 (their sum 1.45 → 0.62); a level-dependent ceiling scale did not lower the fit's error.
 Tools and tables: `/mnt/e/lynx-work/parity190ar/ember` (`emfit3.cpp`, `apply_tables.py`, `gatecmp.py`, `gate/`).
+
+## Round 190bp: the tail lab and the TAIL SCORE (measurement only, no DSP change)
+
+A reverb or a modulated effect cannot null against a second correct render of itself, so the waveform score
+(`scripts/fxparity.py`, unchanged) saturates near 3 ... 6 on those rows whatever the model. `scripts/taillab.py`
+adds a second number beside it, the **tail score**: per octave band the decay (T20 / T30 / late slope), early decay,
+clarity and pre-delay, the energy decay relief, echo-density build-up, band balance and L/R correlation in time
+slices, a time-variance index (how much the tail is modulated, blind to the modulators' phase), level and dry gain
+on the impulse render; long-term spectrum, wide-band envelopes, level and band correlation on programme renders;
+for modulation effects the modulation spectrum of the band transfer and of the L/R level difference. Each part
+loses a dead zone equal to the estimator's own noise between two phase-realisations of one reverb.
+Both scores are always reported; the tail score replaces nothing.
+
+Anchors on real renders: LYNX against itself at another modulator phase 9.6 ... 10.0 on dense reverbs (wave 4 ... 7
+for the same pairs), a reference against another setting of itself 0.7 ... 9.8 (median 5.8), unrelated references
+2.6 ... 6.6. Sparse cloud modes repeat only to 7.7 ... 9.1, on the reference too: that row's practical ceiling is
+about 8.4. Smallest step worth claiming: 0.15 on a dense reverb row, 0.5 on the cloud row.
+
+Baseline at d141370db (wave | tail): Epoch Verb 3.07 | 6.82, Atrium 3.50 | 7.92, Foil Plate 3.73 | 8.12 and
+3.42 | 7.55, Halo 3.25 | 6.02, Horizon 3.25 | 7.71, Nebula 3.33 | 5.84, LuxeVerb 3.83 | 7.72; Orbit 3.75 | 6.32,
+Lattice Mod 3.92 | 6.33, Gemini Doubler 4.44 | 7.89, Auto-pan 4.78 | 8.31, Spiral Echo 3.38 | 5.93; Echoform
+1.67 ... 5.92 | 1.90 ... 6.34 over seven references.
+
+Use: `python3 scripts/taillab.py dir <ref-dir> <lynx-dir> --stim <stim-dir> [--kind verb|delay|mod]`;
+`python3 scripts/taillab.py engine <fxrender> <effect> <probe-dir> <out-dir>` for one LYNX effect on the lab's own
+probes; `python3 scripts/taillab_test.py` (80 checks on synthetic decays, densities, correlations and modulations
+of known value). Tables, anchors and the per-plugin loss lists: `/mnt/e/lynx-work/parity190bp/BASELINE-TAIL.md`.
