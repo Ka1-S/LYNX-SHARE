@@ -606,6 +606,7 @@ bool Index::fromBytes (const std::string& bytes)
 
 Service::Service (Callbacks cb) : callbacks (std::move (cb))
 {
+    asker = std::thread ([this] { answer(); });
     worker = std::thread ([this] { run(); });
 }
 
@@ -617,8 +618,11 @@ Service::~Service()
         pending.reset();
     }
     wake.notify_all();
+    if (asker.joinable())
+        asker.join();
     if (worker.joinable())
         worker.join();
+    saveIndex(); // (both threads are gone: what either of them analysed is kept)
 }
 
 void Service::refresh (std::vector<std::string> roots)
@@ -629,7 +633,7 @@ void Service::refresh (std::vector<std::string> roots)
         const std::lock_guard<std::mutex> hold (lock);
         std::reverse (roots.begin(), roots.end()); // (a stack: the first root is walked first)
         passes.push_back (std::move (roots));
-        working = true;
+        state.busy = true; // (at once: an answer given before the worker starts is already "partial")
     }
     wake.notify_all();
 }
@@ -641,7 +645,6 @@ std::uint64_t Service::findSimilar (std::string path, std::vector<std::string> r
         const std::lock_guard<std::mutex> hold (lock);
         id = ++latest;
         pending = Query { id, std::move (path), std::move (roots), max, std::move (done) };
-        working = true;
     }
     wake.notify_all();
     return id;
@@ -649,9 +652,13 @@ std::uint64_t Service::findSimilar (std::string path, std::vector<std::string> r
 
 void Service::cancel()
 {
-    const std::lock_guard<std::mutex> hold (lock);
-    ++latest;
-    pending.reset();
+    {
+        const std::lock_guard<std::mutex> hold (lock);
+        ++latest;
+        pending.reset();
+    }
+    wake.notify_all(); // (a pass waiting for that query goes on)
+    idleWake.notify_all();
 }
 
 Status Service::status() const
@@ -660,10 +667,15 @@ Status Service::status() const
     return state;
 }
 
+bool Service::idleLocked() const
+{
+    return ! loading && ! pending && ! answering && ! passRunning && passes.empty();
+}
+
 bool Service::waitIdle (int timeoutMs)
 {
     std::unique_lock<std::mutex> hold (lock);
-    return idleWake.wait_for (hold, std::chrono::milliseconds (timeoutMs), [this] { return ! working; });
+    return idleWake.wait_for (hold, std::chrono::milliseconds (timeoutMs), [this] { return idleLocked(); });
 }
 
 void Service::setStatus (const std::function<void (Status&)>& change, bool notify)
@@ -679,7 +691,7 @@ void Service::setStatus (const std::function<void (Status&)>& change, bool notif
 bool Service::interrupted() const
 {
     const std::lock_guard<std::mutex> hold (lock);
-    return stopping || pending.has_value();
+    return stopping;
 }
 
 void Service::rest (double workedSeconds)
@@ -687,7 +699,7 @@ void Service::rest (double workedSeconds)
     if (! callbacks.throttle)
         return;
     std::unique_lock<std::mutex> hold (lock);
-    wake.wait_for (hold, std::chrono::duration<double> (std::clamp (workedSeconds, 0.002, 0.5)), [this] { return stopping || pending.has_value(); });
+    wake.wait_for (hold, std::chrono::duration<double> (std::clamp (workedSeconds, 0.002, 0.5)), [this] { return stopping; });
 }
 
 void Service::loadIndex()
@@ -708,7 +720,7 @@ void Service::loadIndex()
 
 void Service::saveIndex()
 {
-    if (! std::exchange (dirty, false) || ! callbacks.save)
+    if (! dirty.exchange (false) || ! callbacks.save)
         return;
     std::string bytes;
     {
@@ -818,11 +830,21 @@ bool Service::runPass (std::vector<std::string>& folders)
             {
                 setStatus ([] (Status& s) { s.paused = true; }, false);
                 std::unique_lock<std::mutex> hold (lock);
-                if (wake.wait_for (hold, std::chrono::milliseconds (250), [this] { return stopping || pending.has_value(); }))
+                if (wake.wait_for (hold, std::chrono::milliseconds (250), [this] { return stopping; }))
                     break;
+            }
+            // a query is served first: the pass goes on once it is answered (the answer has its own thread)
+            {
+                std::unique_lock<std::mutex> hold (lock);
+                wake.wait (hold, [this] { return stopping || (! pending && ! answering); });
             }
             if (interrupted())
                 return false;
+            {
+                const std::lock_guard<std::mutex> hold (indexLock);
+                if (index.find (path) != nullptr)
+                    continue; // (that query analysed it)
+            }
 
             const auto began = Clock::now();
             Entry entry;
@@ -865,71 +887,77 @@ bool Service::runPass (std::vector<std::string>& folders)
     return true;
 }
 
-void Service::run()
+void Service::answer()
 {
-    lowerThreadPriority();
     loadIndex();
+    {
+        const std::lock_guard<std::mutex> hold (lock);
+        loading = false;
+    }
+    wake.notify_all();
+    idleWake.notify_all();
     for (;;)
     {
         std::optional<Query> query;
-        bool havePass = false;
         {
             std::unique_lock<std::mutex> hold (lock);
-            if (! stopping && ! pending && passes.empty())
-            {
-                working = false;
-                idleWake.notify_all();
-                wake.wait (hold, [this] { return stopping || pending.has_value() || ! passes.empty(); });
-                working = true;
-            }
+            wake.wait (hold, [this] { return stopping || pending.has_value(); });
             if (stopping)
                 break;
-            if (pending)
-                query = std::exchange (pending, std::nullopt);
-            else
-                havePass = true;
+            query = std::exchange (pending, std::nullopt);
+            answering = true;
         }
-        if (query)
+        runQuery (*query);
         {
-            runQuery (*query);
-            continue;
+            const std::lock_guard<std::mutex> hold (lock);
+            answering = false;
         }
-        if (havePass)
-        {
-            std::vector<std::string> folders;
-            {
-                const std::lock_guard<std::mutex> hold (lock);
-                folders = passes.front();
-            }
-            setStatus ([] (Status& s) { s.busy = true; });
-            const auto finished = runPass (folders);
-            bool idle = false;
-            {
-                const std::lock_guard<std::mutex> hold (lock);
-                if (finished)
-                    passes.pop_front();
-                else if (! passes.empty())
-                    passes.front() = std::move (folders); // goes on from here after the query
-                idle = passes.empty();
-            }
-            if (finished || idle)
-                saveIndex();
-            setStatus ([idle] (Status& s) {
-                s.busy = ! idle;
-                s.paused = false;
-                if (idle)
-                {
-                    s.current.clear();
-                    s.analysed = 0;
-                }
-            });
-        }
+        wake.notify_all(); // (the pass goes on)
+        idleWake.notify_all();
     }
-    saveIndex();
+}
+
+void Service::run()
+{
+    lowerThreadPriority();
+    for (;;)
     {
-        const std::lock_guard<std::mutex> hold (lock);
-        working = false;
+        std::vector<std::string> folders;
+        {
+            std::unique_lock<std::mutex> hold (lock);
+            wake.wait (hold, [this] { return stopping || (! loading && ! passes.empty()); });
+            if (stopping)
+                break;
+            folders = passes.front();
+            passRunning = true;
+        }
+        setStatus ([] (Status& s) { s.busy = true; });
+        const auto finished = runPass (folders);
+        bool idle = false;
+        {
+            const std::lock_guard<std::mutex> hold (lock);
+            if (finished)
+                passes.pop_front();
+            else if (! passes.empty())
+                passes.front() = std::move (folders); // (closing: the pass goes on from here next time)
+            idle = passes.empty();
+        }
+        if (finished || idle)
+            saveIndex();
+        setStatus ([idle] (Status& s) {
+            s.busy = ! idle;
+            s.paused = false;
+            if (idle)
+            {
+                s.current.clear();
+                s.analysed = 0;
+            }
+        });
+        {
+            const std::lock_guard<std::mutex> hold (lock);
+            passRunning = false;
+        }
+        idleWake.notify_all();
     }
-    idleWake.notify_all();
 }
 } // namespace lynx::similarity
