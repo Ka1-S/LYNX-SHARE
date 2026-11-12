@@ -3263,7 +3263,8 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             openAudioEditor (engine);
     });
     menu.addItem (tr ("Open audio editor and record") + "\tShift+E", [this, t] {
-        if (const auto at = addEdisonSlot (engine, t); at >= 0)
+        // FL arms an Edison set to On play, 5 min, Append off, Slave on (live check 190cq, shot edison190cd-05b)
+        if (const auto at = addEdisonSlot (engine, t, true); at >= 0)
             openEdisonSlot (engine, t, at, true);
         else
             openAudioEditorRecording (engine);

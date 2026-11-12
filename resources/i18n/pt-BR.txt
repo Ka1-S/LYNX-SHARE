@@ -9492,3 +9492,5 @@ countries: br
 "Arabic" = "Árabe"
 "Enigmatic" = "Enigmática"
 "Neapolitan" = "Napolitana"
+"Remove Edison instances" = "Remover instâncias do Edison"
+"Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "Tem certeza de que deseja remover todas as instâncias do Edison do projeto?\n(Não pode ser desfeito)"

@@ -24,7 +24,7 @@ const EffectInfo& info()
                                   { "Mute input", 0.0f },
                                   { "Slave playback to host", 0.0f },
                                   { "Loop", 0.0f },
-                                  { "Maximum recording time", 3.0f / 6.0f },
+                                  { "Maximum recording time", 5.0f / 6.0f }, // 30 min (live FL check 190cq, shot edison190cd-05e)
                                   { "Noise threshold", defaultNoiseThreshold },
                                   { "Ignore own selection", 0.0f } } };
     return i;
@@ -60,6 +60,14 @@ Mode modeOf (const EffectParams& params) noexcept
 }
 
 float modeValue (Mode m) noexcept { return (float) (int) m / 3.0f; }
+
+void setOpenAndRecord (EffectParams& params) noexcept
+{
+    params[recordMode] = modeValue (Mode::onPlay);
+    params[maxTime] = 3.0f / (float) (maxTimeCount - 1); // 5 min
+    params[append] = 0.0f;
+    params[slave] = 1.0f;
+}
 
 int maxTimeIndexOf (const EffectParams& params) noexcept
 {
@@ -152,7 +160,12 @@ Gate::Decision Gate::block (float peak, int frames, bool hostPlaying, bool hostJ
         }
 
         case Mode::onPlay:
-            if (hostJumped && hostPlaying)
+        {
+            // FL writes a "Song jump" marker where each stretch of playback starts in the take (frame 0 of a new take,
+            // the join when it is appended, every restart of the song while armed) and at every jump while playing
+            // (live FL check 190cq, shot edison190cd-01-02)
+            const auto starts = hostPlaying && state != Phase::recording;
+            if ((hostJumped || starts) && hostPlaying)
                 jumpPending = true;
             d.write = hostPlaying;
             if (d.write && jumpPending)
@@ -161,6 +174,7 @@ Gate::Decision Gate::block (float peak, int frames, bool hostPlaying, bool hostJ
                 jumpPending = false;
             }
             break;
+        }
     }
     state = d.write ? Phase::recording : Phase::waiting;
     return d;

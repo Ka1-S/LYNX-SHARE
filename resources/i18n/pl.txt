@@ -9373,3 +9373,5 @@ countries: pl
 "Arabic" = "Arabska"
 "Enigmatic" = "Enigmatyczna"
 "Neapolitan" = "Neapolitańska"
+"Remove Edison instances" = "Usuń instancje Edisona"
+"Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "Czy na pewno usunąć wszystkie instancje Edisona z projektu?\n(Bez cofania)"

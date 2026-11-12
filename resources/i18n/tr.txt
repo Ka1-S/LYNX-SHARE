@@ -9373,3 +9373,5 @@ countries: tr
 "Arabic" = "Arap"
 "Enigmatic" = "Enigmatik"
 "Neapolitan" = "Napoliten"
+"Remove Edison instances" = "Edison örneklerini kaldır"
+"Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "Projedeki tüm Edison örnekleri kaldırılsın mı?\n(Geri alınamaz)"

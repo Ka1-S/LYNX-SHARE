@@ -9373,3 +9373,5 @@ countries: es mx ar co cl pe ve
 "Arabic" = "Árabe"
 "Enigmatic" = "Enigmática"
 "Neapolitan" = "Napolitana"
+"Remove Edison instances" = "Quitar instancias de Edison"
+"Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "¿Seguro que quieres quitar todas las instancias de Edison del proyecto?\n(No se puede deshacer)"

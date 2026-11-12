@@ -13179,6 +13179,94 @@ private:
             }
         }
 
+        // round 190ct (live FL check 190cq): the open-and-record preset, the fresh defaults and the question before
+        // "Remove all Edison instances", in the app
+        {
+            lynx::AudioEngine engine (false);
+            lynx::MainComponent ui (engine, false);
+            ui.setSize (1600, 900);
+            engine.dispatchPendingMessages();
+            const auto toolsMenu = [&ui] {
+                const auto names = ui.getMenuNamesForSnapshot();
+                for (int m = 0; m < names.size(); ++m)
+                    if (names[m] == lynx::tr ("Tools"))
+                        return ui.getMenuForSnapshot (m);
+                return juce::PopupMenu();
+            };
+            const auto removeItem = [&toolsMenu] (bool& found, bool& enabled) {
+                found = enabled = false;
+                const auto menu = toolsMenu(); // (the iterator keeps a reference)
+                for (juce::PopupMenu::MenuItemIterator it (menu, true); it.next();)
+                    if (it.getItem().text == lynx::tr ("Remove all Edison instances"))
+                    {
+                        found = true;
+                        enabled = it.getItem().isEnabled;
+                        if (enabled && it.getItem().action)
+                            it.getItem().action(); // asks: nothing may go before the answer
+                        return;
+                    }
+            };
+            const auto count = [&engine] {
+                int n = 0;
+                for (const auto& track : engine.getSong().mixer)
+                    for (const auto& fx : track.effects)
+                        n += fx.kind == lynx::EffectKind::edison ? 1 : 0;
+                return n;
+            };
+            bool found = false, enabled = false;
+            removeItem (found, enabled);
+            check ("remove_all_edison_enabled_with_none", found && enabled && count() == 0);
+
+            const auto plain = lynx::addEdisonSlot (engine, 1);
+            const auto armed = lynx::addEdisonSlot (engine, 2, true);
+            engine.dispatchPendingMessages();
+            if (plain >= 0 && armed >= 0)
+            {
+                const auto& a = engine.getSong().mixer[1].effects[(std::size_t) plain].params;
+                const auto& b = engine.getSong().mixer[2].effects[(std::size_t) armed].params;
+                check ("open_audio_editor_fresh_defaults", ef::modeOf (a) == ef::Mode::onInput && ef::maxTimeIndexOf (a) == 5 && a[ef::append] >= 0.5f
+                                                               && a[ef::slave] < 0.5f);
+                check ("open_audio_editor_and_record_preset", ef::modeOf (b) == ef::Mode::onPlay && ef::maxTimeIndexOf (b) == 3 && b[ef::append] < 0.5f
+                                                                  && b[ef::slave] >= 0.5f);
+            }
+            else
+                check ("open_audio_editor_slots_added", false);
+
+            removeItem (found, enabled);
+            engine.dispatchPendingMessages();
+            check ("remove_all_edison_asks_first", found && enabled && count() == 2);
+            const auto question = lynx::removeAllEdisonInstancesQuestion();
+            check ("remove_all_edison_question_is_fls", question.getTitle() == lynx::tr ("Remove Edison instances")
+                                                            && question.getMessage() == lynx::tr ("Are you sure you want to remove all Edison instances from the project ?\n(No undo)")
+                                                            && question.getNumButtons() == 2 && question.getButtonText (0) == lynx::tr ("Yes")
+                                                            && question.getButtonText (1) == lynx::tr ("No"));
+            {
+                juce::AlertWindow box (question.getTitle(), question.getMessage(), question.getIconType());
+                box.addButton (question.getButtonText (0), 1);
+                box.addButton (question.getButtonText (1), 0);
+                box.setSize (box.getWidth(), box.getHeight());
+                savePng (lynx::shot::paint (box, lynx::theme::panel), folder.getChildFile ("remove-all-edison-question.png").getFullPathName());
+            }
+            {
+                lynx::EffectSlot slot = lynx::makeEffectSlot (lynx::EffectKind::edison);
+                lynx::edisonfx::setOpenAndRecord (slot.params);
+                engine.editSong ([&slot] (lynx::Song& s) { s.mixer[3].effects.push_back (slot); });
+                engine.dispatchPendingMessages();
+                if (const auto editor = lynx::makeEdisonSlotEditor (engine, 3, 0))
+                {
+                    editor->setSize (1120, 600);
+                    engine.dispatchPendingMessages();
+                    shot (*editor, "slot-editor-open-and-record.png");
+                }
+                if (const auto editor = lynx::makeEdisonSlotEditor (engine, 1, plain))
+                {
+                    editor->setSize (1120, 600);
+                    engine.dispatchPendingMessages();
+                    shot (*editor, "slot-editor-fresh-defaults.png");
+                }
+            }
+        }
+
         report << (all ? "ALL OK\n" : "FAILURES\n");
         folder.getChildFile ("report.txt").replaceWithText (report);
         return all;

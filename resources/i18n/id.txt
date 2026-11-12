@@ -9373,3 +9373,5 @@ countries: id
 "Arabic" = "Arab"
 "Enigmatic" = "Enigmatik"
 "Neapolitan" = "Neapolitan"
+"Remove Edison instances" = "Hapus instance Edison"
+"Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "Yakin ingin menghapus semua instance Edison dari proyek?\n(Tidak bisa dibatalkan)"

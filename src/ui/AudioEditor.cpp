@@ -4747,18 +4747,40 @@ std::unique_ptr<juce::Component> makeEdisonSlotEditor (AudioEngine& engine, int 
     return std::make_unique<AudioEditor> (engine, *source);
 }
 
-int addEdisonSlot (AudioEngine& engine, int track)
+int addEdisonSlot (AudioEngine& engine, int track, bool openAndRecord)
 {
     int at = -1;
-    engine.editSong ([track, &at] (Song& song) {
+    engine.editSong ([track, openAndRecord, &at] (Song& song) {
         if (track < 0 || track >= (int) song.mixer.size() || (int) song.mixer[(std::size_t) track].effects.size() >= maxEffectSlots)
             return;
+        auto slot = makeEffectSlot (EffectKind::edison);
+        if (openAndRecord)
+            edisonfx::setOpenAndRecord (slot.params);
         auto& effects = song.mixer[(std::size_t) track].effects;
         for (int row = 0; row < maxEffectSlots && at < 0; ++row) // FL: the first empty slot of the track
             if (mixerops::effectAtRow (effects, row) < 0)
-                at = mixerops::insertEffectAtRow (song, track, makeEffectSlot (EffectKind::edison), row);
+                at = mixerops::insertEffectAtRow (song, track, slot, row);
     });
     return at;
+}
+
+juce::MessageBoxOptions removeAllEdisonInstancesQuestion()
+{
+    // FL's box, word for word (its "?" after a space included)
+    return juce::MessageBoxOptions()
+        .withIconType (juce::MessageBoxIconType::QuestionIcon)
+        .withTitle (tr ("Remove Edison instances"))
+        .withMessage (tr ("Are you sure you want to remove all Edison instances from the project ?\n(No undo)"))
+        .withButton (tr ("Yes"))
+        .withButton (tr ("No"));
+}
+
+void askRemoveAllEdisonInstances (AudioEngine& engine)
+{
+    juce::AlertWindow::showAsync (removeAllEdisonInstancesQuestion(), [&engine] (int result) {
+        if (result == 1)
+            engine.editSongStructural ([] (Song& song) { mixerops::removeEffectsOfKind (song, EffectKind::edison); });
+    });
 }
 
 std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine, audioedit::Document doc, bool spectrum)

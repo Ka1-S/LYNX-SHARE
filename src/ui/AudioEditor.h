@@ -40,8 +40,14 @@ void openEdisonSlot (AudioEngine& engine, int track, int slot, bool record = fal
 // The same editor without a window (thumbnails, snapshots); nullptr when the slot is not an Edison.
 std::unique_ptr<juce::Component> makeEdisonSlotEditor (AudioEngine& engine, int track, int slot);
 // Loads an Edison into the first empty slot of mixer track `track` (FL's "Open audio editor" of a mixer track).
-// Returns the effect's index, or -1 when the track is full.
-int addEdisonSlot (AudioEngine& engine, int track);
+// `openAndRecord`: FL's "Open audio editor and record" settings (edisonfx::setOpenAndRecord: On play, 5 min, Append off,
+// Slave on); otherwise a fresh Edison. Returns the effect's index, or -1 when the track is full.
+int addEdisonSlot (AudioEngine& engine, int track, bool openAndRecord = false);
+// Tools › Macros › "Remove all Edison instances": FL's question first (title "Remove Edison instances", Yes / No; live FL
+// check 190cq, shot edison190cd-07b), then every Edison slot is emptied on Yes (one undo step in LYNX). The question
+// alone, for --edisonslottest.
+juce::MessageBoxOptions removeAllEdisonInstancesQuestion();
+void askRemoveAllEdisonInstances (AudioEngine& engine);
 
 // --snapshot: the editor showing `doc` (selection = the second quarter), in the waveform or spectrogram view.
 std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine, audioedit::Document doc, bool spectrum);
