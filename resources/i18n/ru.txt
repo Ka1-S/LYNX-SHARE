@@ -8967,6 +8967,7 @@ countries: ru by kz
 "Lowest and highest tempo of the tempo lane (BPM)" = "Наименьший и наибольший темп дорожки темпа (BPM)"
 "Lowest" = "Наименьший"
 "Highest" = "Наибольший"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "Варп-маркеры: привязывают точки аудио к долям; аудио между ними растягивается (маркеры канала). Перетаскивание маркера: его аудио переходит на другую долю; Shift + перетаскивание: аудио скользит под ним"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"

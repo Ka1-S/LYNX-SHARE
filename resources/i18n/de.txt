@@ -8967,6 +8967,7 @@ countries: de at ch li lu
 "Lowest and highest tempo of the tempo lane (BPM)" = "Niedrigstes und höchstes Tempo der Tempospur (BPM)"
 "Lowest" = "Niedrigstes"
 "Highest" = "Höchstes"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "Warp-Marker: binden Stellen des Audios an Schläge; das Audio dazwischen wird gedehnt (die Marker des Kanals). Marker ziehen: sein Audio kommt auf einen anderen Schlag; Umschalt + Ziehen: das Audio gleitet unter ihm"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] Editor öffnen/schließen  [Alt]+[LMB] andere offen lassen  [Strg]+[LMB] vorhören  [2xLMB] Piano Roll  [LMB] hoch/runter ziehen sortiert um  [RMB] Kanalmenü"

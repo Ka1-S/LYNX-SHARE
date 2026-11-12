@@ -400,7 +400,7 @@ TEST (arrange190cg_time_commands_carry_clips_markers_and_lanes)
     CHECK (arrange::copyTime (song, 960, 960).empty());
 
     // Duplicate Time: the range again right after itself; the long clip is cut at the seam and its rest moves on, the
-    // later clip and marker move by the range's length, the marker inside is not repeated
+    // later clip and marker move by the range's length, the locator inside is repeated (round 190cy, Live 12.4.16)
     auto dup = song;
     arrange::duplicateTime (dup, 960, 2880);
     const auto at = [] (const Song& s, int track, std::int64_t start) -> const Clip* {
@@ -416,7 +416,8 @@ TEST (arrange190cg_time_commands_carry_clips_markers_and_lanes)
     CHECK (at (dup, 1, 2880) != nullptr && at (dup, 1, 2880)->length == 1920 && at (dup, 1, 2880)->offset == 0);
     CHECK (at (dup, 1, 4800) != nullptr && at (dup, 1, 4800)->length == 1920 && at (dup, 1, 4800)->offset == 1920);
     CHECK (at (dup, 2, 7680) != nullptr);
-    CHECK (dup.markers().size() == 2 && dup.markers()[0].tick == 1440 && dup.markers()[1].tick == 7680);
+    CHECK (dup.markers().size() == 3 && dup.markers()[0].tick == 1440 && dup.markers()[1].tick == 1440 + 1920
+           && dup.markers()[1].name == "Verse" && dup.markers()[2].tick == 7680);
     // the lane: the same curve twice (0.8 at tick 960 and again at 2880), the rest later
     const auto& lane = dup.automations[0];
     CHECK (std::abs (lane.valueAt (960.0) - 0.8f) < 1e-6 && std::abs (lane.valueAt (2880.0) - 0.8f) < 1e-6);
@@ -528,4 +529,99 @@ TEST (arrange190cg_group_is_a_bus)
     plain.playlistTracks[1].grouped = true;
     CHECK (arrange::makeGroupBus (plain, 0) == -1 && plain.mixer.empty());
     CHECK (arrange::makeGroupBus (song, 3) == -1);
+}
+
+// --- Round 190cy: what the live check of Live 12.4.16 (190cw) showed ------------------------------------------------
+
+TEST (warp190cy_halve_and_double_scale_the_clip_with_the_markers)
+{
+    using namespace lynx;
+    using warp190cg::near;
+    // Live: ÷2 on a 2-bar loop at 120 BPM: segment 120 -> 60 BPM, End 3.1.1 -> 2.1.1, Loop Length 2.0.0 -> 1.0.0
+    auto s = warp190cg::fourSeconds(); // 8 beats at 120
+    Clip c;
+    c.kind = ClipKind::audio;
+    c.length = 8 * ppq; // two bars
+    c.offset = ppq;     // starts one beat into the audio
+    c.fadeOut = 6 * ppq;
+    CHECK (warptools::scaleTempo (s, 0.5));
+    warpedit::syncLength (s, 4.0);
+    warptools::scaleClip (c, 0.5);
+    CHECK (near (warptools::segmentBpm (s.warp, 0), 60.0) && s.stretchBeats == 4.0f);
+    CHECK (c.length == 4 * ppq && c.offset == ppq / 2 && c.offsetFraction == 0.0f); // one bar: the same audio
+    CHECK (c.fadeOut == 4 * ppq); // (a fade stays inside the clip)
+    CHECK (warptools::scaleTempo (s, 2.0));
+    warptools::scaleClip (c, 2.0);
+    CHECK (c.length == 8 * ppq && c.offset == ppq);
+    // an offset with a sub-tick part keeps its exact place; nothing for a factor that is not one
+    c.offset = 3;
+    c.offsetFraction = 0.25f;
+    warptools::scaleClip (c, 0.5);
+    CHECK (c.offset == 2 && std::abs (c.offsetFraction - (-0.375f)) < 1.0e-6f);
+    const auto before = c;
+    warptools::scaleClip (c, 0.0);
+    CHECK (c == before);
+    Clip tiny;
+    tiny.length = 1;
+    warptools::scaleClip (tiny, 0.5);
+    CHECK (tiny.length == 1);
+}
+
+TEST (warp190cy_marker_drag_stretches_and_shift_drag_slides)
+{
+    using namespace lynx;
+    using warp190cg::near;
+    auto s = warp190cg::fourSeconds(); // 8 beats over 4 s
+    const auto m = warpedit::addMarker (s, 2.0); // on beat 4
+    CHECK (m == 1 && near (s.warp[1].beats, 4.0));
+    const auto before = s.warp;
+    // plain drag: the pointer at 3 s, where beat 6 played: the marker's audio (2 s) now plays on beat 6; the audio
+    // before it stretches (6 beats over 2 s = 180 BPM) and the audio after it squeezes (2 beats over 2 s = 60 BPM)
+    const auto beat = warptools::stretchDragBeat (before, 3.0);
+    CHECK (near (beat, 6.0));
+    warpedit::moveMarker (s, m, beat, 4.0);
+    CHECK (near (s.warp[1].seconds, 2.0) && near (s.warp[1].beats, 6.0));
+    CHECK (near (warptools::segmentBpm (s.warp, 0), 180.0) && near (warptools::segmentBpm (s.warp, 1), 60.0));
+    CHECK (near (s.warp.back().beats, 8.0)); // the end stays
+    // Shift + drag: the marker keeps beat 6 and is tied to the audio at 1 s instead (the audio slides under it)
+    CHECK (warptools::slideMarker (s, m, 1.0));
+    CHECK (near (s.warp[1].seconds, 1.0) && near (s.warp[1].beats, 6.0));
+    // kept between its neighbours; not the start marker
+    CHECK (warptools::slideMarker (s, m, 9.0) && s.warp[1].seconds < s.warp[2].seconds);
+    CHECK (! warptools::slideMarker (s, 0, 1.0) && ! warptools::slideMarker (s, 7, 1.0));
+}
+
+TEST (arrange190cy_duplicate_time_repeats_the_locators_in_the_range)
+{
+    using namespace lynx;
+    // Live: Duplicate Time on bars 3-5 holding locator L12 (bar 4): a second L12 two bars later; the 3/4 change after
+    // the range moves right
+    auto song = warp190cg::laneSong();
+    song.patterns.resize (1);
+    const std::int64_t bar = 4 * ppq;
+    Marker l12;
+    l12.tick = 3 * bar;
+    l12.name = "L12";
+    song.addMarker (l12);
+    Marker sig;
+    sig.tick = 6 * bar;
+    sig.numerator = 3;
+    sig.denominator = 4;
+    sig.action = Marker::timeSignature;
+    song.addMarker (sig);
+    Marker sigInside = sig;
+    sigInside.tick = 2 * bar + ppq;
+    song.addMarker (sigInside);
+    Marker loop;
+    loop.tick = 2 * bar + 2 * ppq;
+    loop.name = "Loop";
+    loop.action = Marker::markerLoop;
+    song.addMarker (loop);
+    arrange::duplicateTime (song, 2 * bar, 4 * bar);
+    std::vector<std::pair<std::int64_t, std::string>> got;
+    for (const auto& m : song.markers())
+        got.push_back ({ m.tick, m.isSignature() ? "sig" : m.name });
+    const std::vector<std::pair<std::int64_t, std::string>> want {
+        { 2 * bar + ppq, "sig" }, { 2 * bar + 2 * ppq, "Loop" }, { 3 * bar, "L12" }, { 5 * bar, "L12" }, { 8 * bar, "sig" } };
+    CHECK (got == want);
 }

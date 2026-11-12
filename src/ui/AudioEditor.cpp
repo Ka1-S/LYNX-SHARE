@@ -23,6 +23,7 @@
 #include "core/ValueMath.h"
 #include "core/WarpEdit.h"
 #include "core/WarpTools.h"
+#include "core/ClipLauncher.h"
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
 #include "platform/Paths.h"
@@ -231,6 +232,7 @@ struct Source
     int index = -1; // channel or insert
     juce::String path;
     int clip = -1; // a channel opened from a Playlist audio clip: that clip
+    int gridTrack = -1, gridScene = -1; // round 190cy: opened from a clip of the grid (the Detail View's Clip page)
 };
 
 class AudioEditor final : public juce::Component,
@@ -275,7 +277,7 @@ public:
 
         menuButton.onClick = [this] { mainMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton)); };
         warpButton.setButtonText (tr ("Warp markers")); // ("Warp" alone is a synth control's name in the tables)
-        warpButton.setTooltip (tr ("Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers)"));
+        warpButton.setTooltip (tr ("Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it"));
         warpButton.setClickingTogglesState (true);
         warpButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
         warpButton.onClick = [this] { setWarpMode (warpButton.getToggleState()); };
@@ -301,10 +303,10 @@ public:
         };
         warpHalveButton.setButtonText (juce::String::fromUTF8 ("\xc3\xb7" "2"));
         warpHalveButton.setTooltip (tr ("Half the tempo: the audio plays twice as fast"));
-        warpHalveButton.onClick = [this] { editWarp ([] (SamplerSettings& sampler, double) { warptools::scaleTempo (sampler, 0.5); }); };
+        warpHalveButton.onClick = [this] { scaleWarpTempo (0.5); };
         warpDoubleButton.setButtonText (juce::String::fromUTF8 ("\xc3\x97" "2"));
         warpDoubleButton.setTooltip (tr ("Twice the tempo: the audio plays half as fast"));
-        warpDoubleButton.onClick = [this] { editWarp ([] (SamplerSettings& sampler, double) { warptools::scaleTempo (sampler, 2.0); }); };
+        warpDoubleButton.onClick = [this] { scaleWarpTempo (2.0); };
         for (auto* c : std::initializer_list<juce::Component*> { &warpBpmBox, &warpHalveButton, &warpDoubleButton })
             addChildComponent (*c);
         warpButton.setVisible (source.kind == Source::Kind::channel);
@@ -504,6 +506,26 @@ public:
         return c != nullptr && c->sampler.keepPitch && c->sampler.warp.size() >= 2 ? c->sampler.warp : std::vector<WarpPoint> {};
     }
     void setWarpModeForPanel (bool on) { setWarpMode (on); }
+    // --warpshot (round 190cy): ÷2 / ×2 as the buttons do it; a marker held in the middle of a drag
+    void scaleWarpTempoForSnapshot (double factor) { scaleWarpTempo (factor); }
+    void holdWarpDragForSnapshot (int index, double beatOrSeconds, bool slides)
+    {
+        const auto markers = warpMarkers();
+        if (index <= 0 || index >= (int) markers.size())
+            return;
+        warpSelected = warpDrag = index;
+        warpDragSlides = slides;
+        warpDragBefore = markers;
+        warpDragBeat = slides ? markers[(std::size_t) index].beats : beatOrSeconds;
+        warpDragSeconds = slides ? beatOrSeconds : markers[(std::size_t) index].seconds;
+        drag = Drag::warp;
+        repaint();
+    }
+    void setGridClip (int track, int scene)
+    {
+        source.gridTrack = track;
+        source.gridScene = scene;
+    }
     void setWarpMode (bool on)
     {
         warpMode = on && source.kind == Source::Kind::channel;
@@ -515,13 +537,19 @@ public:
         resized();
         repaint();
     }
-    void editWarp (const std::function<void (SamplerSettings&, double)>& fn)
+    // ÷2 / ×2 (round 190cy, as Live 12.4.16): the markers' beats and the clip the editor was opened from (a Playlist
+    // clip or a clip of the grid) scale together, so the clip keeps the same audio in half / twice the beats
+    void scaleWarpTempo (double factor)
+    {
+        editWarp ([factor] (SamplerSettings& sampler, double) { warptools::scaleTempo (sampler, factor); }, factor);
+    }
+    void editWarp (const std::function<void (SamplerSettings&, double)>& fn, double clipFactor = 0.0)
     {
         const auto seconds = warpFileSeconds();
         if (source.kind != Source::Kind::channel || ! (seconds > 0.0))
             return;
         auto channel = source.index;
-        engine.editSong ([&, clip = source.clip] (Song& s) {
+        engine.editSong ([&, clip = source.clip, gridTrack = source.gridTrack, gridScene = source.gridScene] (Song& s) {
             if (clip >= 0)
                 if (const auto own = warpedit::channelForClipEdit (s, clip); own >= 0)
                     channel = own;
@@ -531,6 +559,14 @@ public:
             warpedit::ensureMarkers (sampler, seconds, s.bpm);
             fn (sampler, seconds);
             warpedit::syncLength (sampler, seconds);
+            if (clipFactor > 0.0)
+            {
+                if (juce::isPositiveAndBelow (clip, (int) s.playlist.size()) && s.playlist[(std::size_t) clip].kind == ClipKind::audio)
+                    warptools::scaleClip (s.playlist[(std::size_t) clip], clipFactor);
+                if (s.clipGrid)
+                    if (auto* c = const_cast<Clip*> (launcher::clipAt (*s.clipGrid, gridTrack, gridScene)); c != nullptr && c->kind == ClipKind::audio && c->channel == channel)
+                        warptools::scaleClip (*c, clipFactor);
+            }
         });
         source.index = channel;
         repaint();
@@ -602,7 +638,10 @@ public:
         g.setFont (font (type::small));
         for (std::size_t k = 0; k < markers.size(); ++k)
         {
-            const auto seconds = (int) k == warpDrag ? warpDragSeconds : markers[k].seconds;
+            const auto stretching = (int) k == warpDrag && ! warpDragSlides && ! warpDragBefore.empty();
+            const auto seconds = stretching ? warpedit::secondsAt (warpDragBefore, warpDragBeat) // (where its new beat is now)
+                                 : (int) k == warpDrag ? warpDragSeconds
+                                                       : markers[k].seconds;
             const auto x = (float) secondsToX (seconds);
             if (x < warpLane.getX() - 40.0f || x > warpLane.getRight() + 2.0f)
                 continue;
@@ -614,7 +653,7 @@ public:
             g.fillPath (flag);
             g.setColour (fill.withAlpha (selected ? 0.8f : 0.4f));
             g.drawVerticalLine ((int) std::round (x), (float) warpLane.getY() + 10.0f, (float) waveArea.getBottom());
-            const auto b = markers[k].beats;
+            const auto b = stretching ? warpDragBeat : markers[k].beats;
             const auto bar = (int) std::floor (b / perBar) + 1;
             const auto beat = b - (bar - 1) * perBar + 1.0;
             const auto label = juce::String (bar) + "." + (std::abs (beat - std::round (beat)) < 0.005 ? juce::String ((int) std::round (beat)) : juce::String (beat, 2));
@@ -638,6 +677,11 @@ public:
         {
             warpDrag = m;
             warpDragSeconds = warpMarkers()[(std::size_t) m].seconds;
+            // round 190cy (Live 12.4.16): a plain drag moves the marker with its audio to another beat (the audio
+            // stretches around it); Shift + drag slides the audio under the marker, which keeps its beat
+            warpDragSlides = e.mods.isShiftDown();
+            warpDragBefore = warpMarkers();
+            warpDragBeat = warpDragBefore[(std::size_t) m].beats;
             drag = Drag::warp;
         }
         else if (e.mods.isPopupMenu())
@@ -660,6 +704,20 @@ public:
         if (warpDrag <= 0 || warpDrag >= (int) markers.size())
             return;
         auto seconds = (double) xToFrame (e.x) / doc.audio.sampleRate;
+        if (! warpDragSlides)
+        {
+            // to the beat the pointer's place played on (onto a sixteenth within 6 px; Alt: free), between the neighbours
+            auto beat = warptools::stretchDragBeat (warpDragBefore, seconds);
+            if (const auto sixteenth = std::round (beat * 4.0) / 4.0;
+                ! e.mods.isAltDown() && std::abs (secondsToX (warpedit::secondsAt (warpDragBefore, sixteenth)) - e.x) <= 6.0)
+                beat = sixteenth;
+            const auto& w = warpDragBefore;
+            const auto lo = w[(std::size_t) warpDrag - 1].beats + warpedit::minBeatGap;
+            const auto hi = warpDrag + 1 < (int) w.size() ? w[(std::size_t) warpDrag + 1].beats - warpedit::minBeatGap : 1.0e6;
+            warpDragBeat = juce::jlimit (lo, juce::jmax (lo, hi), beat);
+            repaint();
+            return;
+        }
         if (! e.mods.isAltDown()) // onto an attack within 6 px
             for (const auto a : warpAttacks)
                 if (std::abs (secondsToX (a) - e.x) <= 6.0)
@@ -679,12 +737,18 @@ public:
         warpDrag = -1;
         drag = Drag::none;
         const auto markers = warpMarkers();
-        if (index > 0 && index < (int) markers.size() && std::abs (markers[(std::size_t) index].seconds - seconds) > 1.0e-6)
+        if (! warpDragSlides)
+        {
+            // the marker goes to its new beat with its audio: the audio on both sides stretches
+            if (const auto beat = warpDragBeat; index > 0 && index < (int) markers.size() && std::abs (markers[(std::size_t) index].beats - beat) > 1.0e-6)
+                editWarp ([at, beat] (SamplerSettings& s, double file) { warpedit::moveMarker (s, at, beat, file); });
+        }
+        else if (index > 0 && index < (int) markers.size() && std::abs (markers[(std::size_t) index].seconds - seconds) > 1.0e-6)
             editWarp ([at, seconds] (SamplerSettings& s, double) {
                 // the marker keeps its beat and ties it to another point of the audio
-                if (juce::isPositiveAndBelow (at, (int) s.warp.size()))
-                    s.warp[(std::size_t) at].seconds = seconds;
+                warptools::slideMarker (s, at, seconds);
             });
+        warpDragBefore.clear();
         repaint();
     }
     void warpDoubleClick (const juce::MouseEvent& e)
@@ -3680,6 +3744,11 @@ private:
     juce::Rectangle<int> warpLane;
     int warpDrag = -1, warpSelected = -1;   // marker index (in the channel's markers)
     double warpDragSeconds = 0.0;           // where the dragged marker goes (applied on release)
+    // round 190cy: Shift + drag slides the audio under the marker; a plain drag takes it to `warpDragBeat` (the beat of
+    // the pointer's place in `warpDragBefore`, the markers when the drag began)
+    bool warpDragSlides = false;
+    double warpDragBeat = 0.0;
+    std::vector<WarpPoint> warpDragBefore;
     std::vector<double> warpAttacks;        // the file's attacks (seconds): the transient ticks, and where drags snap
     const void* warpAttacksOf = nullptr;    // the audio they were found in
     // round 190cg: the pseudo marker under the mouse (index into warpAttacks), the segment tempo box with ÷2 / ×2,
@@ -4061,6 +4130,24 @@ std::unique_ptr<juce::Component> makeAudioEditorPanel (AudioEngine& engine, int 
     if (showWarp)
         editor->setWarpModeForPanel (true);
     return editor;
+}
+
+void scaleAudioEditorTempoForSnapshot (juce::Component& panel, double factor)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->scaleWarpTempoForSnapshot (factor);
+}
+
+void holdAudioEditorWarpDragForSnapshot (juce::Component& panel, int marker, double beatOrSeconds, bool slides)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->holdWarpDragForSnapshot (marker, beatOrSeconds, slides);
+}
+
+void setAudioEditorGridClip (juce::Component& panel, int track, int scene)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->setGridClip (track, scene);
 }
 
 void openAudioEditorRecording (AudioEngine& engine)

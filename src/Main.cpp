@@ -13602,7 +13602,60 @@ private:
             {
                 editor->setSize (1120, 600);
                 write (*editor, "audio-editor-warp");
+                // round 190cy (Live 12.4.16 live check 190cw shot 09): a plain drag of marker 3 holds it two sixteenths
+                // later (its audio goes there: the label shows the new beat); Shift + drag slides the audio under it
+                const auto& w = offline.getSong().channels[(std::size_t) channel].sampler.warp;
+                if (w.size() > 4)
+                {
+                    lynx::holdAudioEditorWarpDragForSnapshot (*editor, 3, w[3].beats + 0.5, false);
+                    write (*editor, "audio-editor-drag-stretch");
+                    lynx::holdAudioEditorWarpDragForSnapshot (*editor, 3, w[3].seconds + 0.12, true);
+                    write (*editor, "audio-editor-drag-slide");
+                }
             }
+        // round 190cy (Live 12.4.16 live check 190cw shot 02): ÷2 from the editor of the first Playlist clip halves that
+        // clip's length with the markers' beats; ÷2 on the grid clip's Clip page halves the grid clip
+        {
+            const auto lengthOf = [&offline] (int index) { return index < (int) offline.getSong().playlist.size() ? offline.getSong().playlist[(std::size_t) index].length : -1; };
+            const auto gridLength = [&offline] {
+                const auto& s = offline.getSong();
+                const auto* c = s.clipGrid ? lynx::launcher::clipAt (*s.clipGrid, 1, 0) : nullptr;
+                return c != nullptr ? c->length : (std::int64_t) -1;
+            };
+            const auto first = [&offline] {
+                const auto& s = offline.getSong();
+                for (int i = 0; i < (int) s.playlist.size(); ++i)
+                    if (s.playlist[(std::size_t) i].kind == lynx::ClipKind::audio)
+                        return i;
+                return -1;
+            }();
+            facts << "halve: playlist clip " << first << " length " << lengthOf (first);
+            if (first >= 0)
+                if (auto editor = lynx::makeAudioEditorPanel (offline, offline.getSong().playlist[(std::size_t) first].channel, first, true))
+                {
+                    lynx::scaleAudioEditorTempoForSnapshot (*editor, 0.5);
+                    offline.dispatchPendingMessages();
+                }
+            facts << " -> " << lengthOf (first) << "; grid clip length " << gridLength();
+            if (channel >= 0)
+                if (auto editor = lynx::makeAudioEditorPanel (offline, channel, -1, true))
+                {
+                    lynx::setAudioEditorGridClip (*editor, 1, 0);
+                    lynx::scaleAudioEditorTempoForSnapshot (*editor, 0.5);
+                    offline.dispatchPendingMessages();
+                }
+            facts << " -> " << gridLength() << "\n";
+            ui.resized();
+            write (ui, "arrangement-halved");
+            // Duplicate Time over beats 4-8 holding the locator "Verse" (beat 4): a second "Verse" at beat 8
+            offline.editSong ([] (lynx::Song& s) { lynx::arrange::duplicateTime (s, 4 * lynx::ppq, 8 * lynx::ppq); });
+            offline.dispatchPendingMessages();
+            int verses = 0;
+            for (const auto& m : offline.getSong().markers())
+                verses += m.name == "Verse" ? 1 : 0;
+            facts << "duplicate time: locators named Verse " << verses << "\n";
+            write (ui, "arrangement-duplicated-time");
+        }
         juce::File (prefix + "-facts.txt").replaceWithText (facts);
         lynx::autolanes::setShown (false);
     }

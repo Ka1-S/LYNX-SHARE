@@ -8967,6 +8967,7 @@ countries: kr
 "Lowest and highest tempo of the tempo lane (BPM)" = "템포 레인의 최저 및 최고 템포 (BPM)"
 "Lowest" = "최저"
 "Highest" = "최고"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "워프 마커: 오디오의 지점을 비트에 묶고 그 사이의 오디오를 늘입니다 (채널의 마커). 마커 드래그: 해당 오디오가 다른 비트로 이동; Shift + 드래그: 오디오가 마커 아래에서 미끄러집니다"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"

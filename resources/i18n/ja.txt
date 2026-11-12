@@ -8967,6 +8967,7 @@ countries: jp
 "Lowest and highest tempo of the tempo lane (BPM)" = "テンポレーンの最低テンポと最高テンポ (BPM)"
 "Lowest" = "最低"
 "Highest" = "最高"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "ワープマーカー: オーディオの位置を拍に結び付け、その間のオーディオを伸縮します (チャンネルのマーカー)。マーカーをドラッグ: そのオーディオが別の拍へ移ります。Shift + ドラッグ: オーディオがマーカーの下でスライドします"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"
