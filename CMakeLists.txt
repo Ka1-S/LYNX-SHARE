@@ -52,6 +52,7 @@ add_library(lynx_core STATIC
     src/core/Gzip.cpp
     src/core/AlsImport.cpp
     src/core/AlsDevices.cpp
+    src/core/AlsDevicesLot2.cpp
     src/core/FlmFormat.cpp
     src/core/FlmImport.cpp
     src/core/FlmEffects.cpp

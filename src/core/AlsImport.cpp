@@ -11,6 +11,7 @@
 #include <map>
 #include <set>
 #include <unordered_map>
+#include <utility>
 
 #include "core/ClipLauncher.h"
 #include "core/DynamicsSuite.h"
@@ -95,6 +96,8 @@ struct Target
     AutomationTarget target;
     ValueMap map = ValueMap::plain;
     std::string name;
+    // (round 190cf) a parameter of a Live device that became a LYNX effect: Live's own unit → LYNX's 0..1
+    std::function<float (double)> law;
 };
 
 struct Ctx
@@ -113,6 +116,10 @@ struct Ctx
     int pendingKeyShift = 0;
     std::map<int, int> keyShift;
     bool inDrumPad = false;
+    // round 190cf: Live's MIDI effects written into a channel's notes (in the chain's order), and how many leading
+    // MIDI effects of the next rack read were already taken by the track's channel (a one-chain Instrument Rack)
+    std::map<int, std::vector<alsdev::NoteEffect>> noteEffects;
+    int skipLeadingMidi = 0;
 
     // the scale of the first MIDI clip that has Live's clip scale switched on (round 190o)
     std::optional<projectkey::Key> clipKey;
@@ -393,11 +400,17 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth);
 // The report lists the pair — under "converted" when the maths is the same, under "kept but approximated" when the
 // pair is fitted — and every setting that is clamped, fitted or has no counterpart. False: not a device LYNX maps (or
 // its element lacks the parameters): the caller drops and lists it as before.
-bool nativeEffectFrom (Ctx& ctx, const Element& d, EffectSlot& slot)
+bool nativeEffectFrom (Ctx& ctx, const Element& d, EffectSlot& slot, std::vector<alsdev::ParamLink>* links = nullptr, std::string* name = nullptr)
 {
-    auto t = alsdev::effectFromLiveDevice (d);
+    alsdev::Context context;
+    context.bpm = ctx.song.bpm;
+    auto t = alsdev::effectFromLiveDevice (d, context);
     if (! t)
         return false;
+    if (links != nullptr)
+        *links = t->links;
+    if (name != nullptr)
+        *name = t->from;
     if (t->side.on)
     {
         const auto it = t->side.trackId >= 0 ? ctx.insertOfTrack.find (t->side.trackId) : ctx.insertOfTrack.end();
@@ -409,8 +422,9 @@ bool nativeEffectFrom (Ctx& ctx, const Element& d, EffectSlot& slot)
         }
         else
         {
-            t->slot.params[dyn::crest::scExternal] = 0.0f;
-            t->notes.dropped.push_back ("side-chain input (its source is not a track of the set; the compressor hears its own input)");
+            if (t->sideParam >= 0)
+                t->slot.params[(std::size_t) t->sideParam] = 0.0f;
+            t->notes.dropped.push_back ("side-chain input (its source is not a track of the set; the device hears its own input)");
         }
     }
     const auto pair = t->from + " -> " + t->to;
@@ -443,7 +457,8 @@ std::string spacedName (std::string_view tag)
 }
 
 // One device of a rack chain → a Patcher node (−1 = dropped and listed)
-int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool instrumentRack, int depth, bool* native = nullptr)
+int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool instrumentRack, int depth, bool* native = nullptr,
+                    std::set<std::string>* mappedLinks = nullptr)
 {
     const auto tag = std::string (d.name());
     PatchNode node;
@@ -531,12 +546,26 @@ int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool
         return -1;
     }
     // (round 190bq) Live's own effects LYNX has an engine for: the LYNX effect in the chain
-    if (! isInstrumentDevice (tag) && nativeEffectFrom (ctx, d, node.effect))
+    std::vector<alsdev::ParamLink> links;
+    if (! isInstrumentDevice (tag) && nativeEffectFrom (ctx, d, node.effect, &links))
     {
         node.label = d.value ("UserName");
         const auto n = rack::addDevice (doc, chain, std::move (node));
         if (n >= 0 && native != nullptr)
             *native = true;
+        // (round 190cf) the rack's macros drive the LYNX effect's parameters over the range the mapping holds, each
+        // end through the parameter's law (between the ends the macro moves LYNX's control in a straight line)
+        if (n >= 0)
+            for (const auto& l : links)
+                if (const auto m = mappingOf (d.path (l.live)))
+                {
+                    RackMapping target;
+                    target.node = n;
+                    target.param = l.param;
+                    mapInto (doc, *m, target, l.value (m->min), l.value (m->max));
+                    if (mappedLinks != nullptr)
+                        mappedLinks->insert (l.live);
+                }
         if (n >= 0)
             return n;
     }
@@ -564,6 +593,7 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
         return false;
     const auto instrumentRack = r->kind == RackDoc::Kind::instrument;
     std::array<std::vector<std::string>, rackMacroCount> droppedTargets;
+    auto skipMidi = std::exchange (ctx.skipLeadingMidi, 0); // (round 190cf) only for the rack this call reads
     while (! r->chains.empty())
     {
         rack::removeChain (doc, 0);
@@ -588,20 +618,28 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
         for (const auto* list : { "DeviceChain/AudioToAudioDeviceChain/Devices", "DeviceChain/MidiToAudioDeviceChain/Devices" })
             for (const auto& d : branch.path (list).children())
             {
-                bool native = false;
-                if (rackDeviceFrom (ctx, d, doc, c, instrumentRack, depth, &native) >= 0 && ! native)
+                // (round 190cf) the leading MIDI effects the track's channel already took (a one-chain Instrument Rack)
+                if (skipMidi > 0 && isMidiEffect (d.name()))
+                {
+                    --skipMidi;
                     continue;
-                // a dropped device's mapped parameters (for the macro names); a Live device that became a LYNX effect
-                // (round 190bq) keeps its stored settings, the macros do not move them yet
-                bool mapped = false;
+                }
+                skipMidi = 0;
+                bool native = false;
+                std::set<std::string> mappedLinks;
+                if (rackDeviceFrom (ctx, d, doc, c, instrumentRack, depth, &native, &mappedLinks) >= 0 && ! native)
+                    continue;
+                // a dropped device's mapped parameters (for the macro names); on a Live device that became a LYNX effect
+                // the macros drive the parameters that have a counterpart (round 190cf), the others are listed
+                bool unmapped = false;
                 for (const auto& parameter : d.children())
-                    if (const auto m = mappingOf (parameter))
+                    if (const auto m = mappingOf (parameter); m && mappedLinks.count (std::string (parameter.name())) == 0)
                     {
                         droppedTargets[(std::size_t) m->macro].push_back (spacedName (parameter.name()));
-                        mapped = true;
+                        unmapped = true;
                     }
-                if (native && mapped)
-                    ctx.note (&FlpImportReport::partialEffects, "Macro mappings onto a converted Live device (not applied)");
+                if (native && unmapped)
+                    ctx.note (&FlpImportReport::partialEffects, "Macro mapping onto a setting of a converted Live device that has no LYNX control (not applied)");
             }
         // macros on the chain's volume / pan (Live's linear gain and −1..1 → LYNX's 0..1 controls)
         if (const auto m = mappingOf (branch.path ("MixerDevice/Volume")))
@@ -847,6 +885,55 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
     return false;
 }
 
+// One of Live's MIDI effects in front of a track's instrument (round 190cf, core/AlsDevices.h): the Arpeggiator becomes
+// the channel's arpeggiator; Pitch, Velocity, Chord and Note Length are written into the notes of the track's clips
+// (LYNX has no live note processor inside a channel for them), in the chain's order. False = no counterpart, or a
+// setting that cannot be kept: the caller lists the device as unsupported, as before.
+bool midiEffectFrom (Ctx& ctx, const Element& d, ChannelDef& channel, std::vector<alsdev::NoteEffect>& effects)
+{
+    const auto tag = d.name();
+    if (tag != "MidiArpeggiator" && tag != "MidiPitcher" && tag != "MidiVelocity" && tag != "MidiChord" && tag != "MidiNoteLength")
+        return false;
+    alsdev::Context context;
+    context.bpm = ctx.song.bpm;
+    alsdev::Notes notes;
+    std::string name;
+    if (tag == "MidiArpeggiator")
+    {
+        ArpSettings arp;
+        if (channel.arp.enabled() || ! alsdev::arpeggiatorToArp (d, context, arp, notes))
+            return false;
+        name = "Arpeggiator";
+        if (! d.boolean ("On/Manual", true))
+        {
+            ctx.note (&FlpImportReport::approximated, name + " (switched off in the set: left out)");
+            return true;
+        }
+        channel.arp = arp;
+        ctx.note (&FlpImportReport::converted, "Arpeggiator -> channel arpeggiator");
+    }
+    else
+    {
+        const auto e = alsdev::noteEffectFromLiveDevice (d, context, notes);
+        // behind an arpeggiator only what gives the same notes either way round can be written into the clips
+        if (! e || (channel.arp.enabled() && (e->kind == alsdev::NoteEffect::Kind::chord || e->kind == alsdev::NoteEffect::Kind::length)))
+            return false;
+        name = e->name;
+        if (! d.boolean ("On/Manual", true))
+        {
+            ctx.note (&FlpImportReport::approximated, name + " (switched off in the set: left out)");
+            return true;
+        }
+        effects.push_back (*e);
+        ctx.note (&FlpImportReport::approximated, name + " (MIDI effect): written into the notes of the track's clips; notes played live are not changed");
+    }
+    for (const auto& n : notes.approximated)
+        ctx.note (&FlpImportReport::approximated, name + ": " + n);
+    for (const auto& n : notes.dropped)
+        ctx.note (&FlpImportReport::approximated, name + ": " + n + " (not applied)");
+    return true;
+}
+
 // Audio effects of a track (after its instrument): plugins carried over, the rest listed
 void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& insert)
 {
@@ -881,12 +968,24 @@ void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& ins
             continue;
         }
         // (round 190bq) Live's own effects LYNX has an engine for: the LYNX effect, settings translated
-        if (EffectSlot slot; insert.effects.size() < (std::size_t) maxEffectSlots && nativeEffectFrom (ctx, d, slot))
+        std::vector<alsdev::ParamLink> links;
+        std::string from;
+        if (EffectSlot slot; insert.effects.size() < (std::size_t) maxEffectSlots && nativeEffectFrom (ctx, d, slot, &links, &from))
         {
             insert.effects.push_back (std::move (slot));
+            // (round 190cf) automation of the device's parameters follows onto the LYNX effect's, by the same laws
+            const auto track = (int) (&insert - ctx.song.mixer.data());
+            for (auto& l : links)
+                if (const auto id = targetId (d.path (l.live)); ! id.empty())
+                    ctx.targets[id] = { AutomationTarget { AutomationTargetKind::effectParam, track, (int) insert.effects.size() - 1, l.param },
+                                        ValueMap::plain, from + " " + spacedName (pathFileName (l.live)), std::move (l.value) };
             continue;
         }
-        ctx.note (&FlpImportReport::droppedEffects, deviceName (d));
+        // (round 190cf) a device LYNX could hold, on an insert whose slots are all taken, is named with that reason
+        if (insert.effects.size() >= (std::size_t) maxEffectSlots && alsdev::effectFromLiveDevice (d).has_value())
+            ctx.note (&FlpImportReport::droppedEffects, deviceName (d) + " (no free effect slot: an insert holds " + std::to_string (maxEffectSlots) + ")");
+        else
+            ctx.note (&FlpImportReport::droppedEffects, deviceName (d));
     }
 }
 
@@ -1244,7 +1343,7 @@ void addAutomation (Ctx& ctx, const Element& envelopes, const std::string& owner
         a.target = it->second.target;
         const auto first = std::max (0.0, events.front().first);
         for (const auto& [t, v] : events)
-            a.points.push_back ({ ticksOf (std::max (0.0, t) - first), mapValue (it->second.map, v), 0.0f });
+            a.points.push_back ({ ticksOf (std::max (0.0, t) - first), it->second.law ? std::clamp (it->second.law (v), 0.0f, 1.0f) : mapValue (it->second.map, v), 0.0f });
         ctx.song.automations.push_back (std::move (a));
         Clip c;
         c.kind = ClipKind::automation;
@@ -1259,9 +1358,9 @@ void addAutomation (Ctx& ctx, const Element& envelopes, const std::string& owner
 void registerMixerTargets (Ctx& ctx, const Element& mixer, int insert, const std::string& name)
 {
     if (const auto id = targetId (mixer.child ("Volume")); ! id.empty())
-        ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerVolume, insert, 0, 0 }, ValueMap::fader, "volume" };
+        ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerVolume, insert, 0, 0 }, ValueMap::fader, "volume", {} };
     if (const auto id = targetId (mixer.child ("Pan")); ! id.empty())
-        ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerPan, insert, 0, 0 }, ValueMap::pan, "pan" };
+        ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerPan, insert, 0, 0 }, ValueMap::pan, "pan", {} };
     (void) name;
 }
 
@@ -1606,7 +1705,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
     const auto mainMixer = main.path ("DeviceChain/Mixer");
     song.bpm = std::clamp (mainMixer.number ("Tempo/Manual", 120), minTempo, maxTempo);
     if (const auto id = targetId (mainMixer.child ("Tempo")); ! id.empty())
-        ctx.targets[id] = { AutomationTarget { AutomationTargetKind::tempo, 0, 0, 0 }, ValueMap::tempo, "tempo" };
+        ctx.targets[id] = { AutomationTarget { AutomationTargetKind::tempo, 0, 0, 0 }, ValueMap::tempo, "tempo", {} };
     int num = 4, den = 4;
     alsTimeSignature ((int) mainMixer.number ("TimeSignature/Manual", 201), num, den);
     if (den == 4)
@@ -1690,7 +1789,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
                 continue;
             const auto level = sends[k].number ("Send/Manual", 0);
             if (const auto id = targetId (sends[k].child ("Send")); ! id.empty())
-                ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerSend, insertOf[i], returns[k], 0 }, ValueMap::fader, "send" };
+                ctx.targets[id] = { AutomationTarget { AutomationTargetKind::mixerSend, insertOf[i], returns[k], 0 }, ValueMap::fader, "send", {} };
             if (level > minusInfGain * 1.0001 && sends[k].boolean ("EnabledByUser", true))
                 m.sends.push_back ({ returns[k], (float) std::min (level, (double) maxFaderGain) });
         }
@@ -1728,25 +1827,40 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
             c.volume = 1.0f;
             c.mixerTrack = insertOf[i];
             std::size_t firstEffect = 0;
+            std::vector<alsdev::NoteEffect> noteEffects; // (round 190cf)
             for (std::size_t d = 0; d < devices.size(); ++d)
             {
                 const auto tag = devices[d].name();
                 if (isMidiEffect (tag))
                 {
-                    ctx.note (&FlpImportReport::unsupported, deviceName (devices[d]));
+                    if (! midiEffectFrom (ctx, devices[d], c, noteEffects))
+                        ctx.note (&FlpImportReport::unsupported, deviceName (devices[d]));
                     firstEffect = d + 1;
                     continue;
                 }
                 if (isInstrumentDevice (tag) || tag == "PluginDevice")
                 {
+                    // (round 190cf) an Instrument Rack with one chain: the MIDI effects at the head of that chain sit in
+                    // front of the instrument just as the track's own do
+                    ctx.skipLeadingMidi = 0;
+                    if (const auto branches = devices[d].path ("Branches").children(); tag == "InstrumentGroupDevice" && branches.size() == 1)
+                        for (const auto& inner : branches.front().path ("DeviceChain/MidiToAudioDeviceChain/Devices").children())
+                        {
+                            if (! isMidiEffect (inner.name()) || ! midiEffectFrom (ctx, inner, c, noteEffects))
+                                break;
+                            ++ctx.skipLeadingMidi;
+                        }
                     ctx.pendingKeyShift = 0;
                     instrumentFrom (ctx, devices[d], c, &drumPads[i]);
+                    ctx.skipLeadingMidi = 0;
                     firstEffect = d + 1;
                 }
                 break;
             }
             song.channels.push_back (std::move (c));
             channelOf[i] = (int) song.channels.size() - 1;
+            if (! noteEffects.empty())
+                ctx.noteEffects[channelOf[i]] = std::move (noteEffects);
             if (ctx.pendingKeyShift != 0)
                 ctx.keyShift[channelOf[i]] = ctx.pendingKeyShift;
             ctx.pendingKeyShift = 0;
@@ -1836,6 +1950,42 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
             for (auto& n : pattern.notes)
                 if (n.channel == channel)
                     n.key = std::clamp (n.key + shift, 0, 127);
+
+    // (round 190cf) Live's MIDI effects that LYNX keeps as notes: each note of the channel through the chain, in order
+    for (const auto& [channel, effects] : ctx.noteEffects)
+        for (auto& pattern : song.patterns)
+        {
+            std::vector<Note> made;
+            for (const auto& n : pattern.notes)
+            {
+                if (n.channel != channel)
+                {
+                    made.push_back (n);
+                    continue;
+                }
+                const auto lengthBeats = (double) n.length / (double) ppq;
+                std::vector<alsdev::NoteEdit> edits { { n.key, n.velocity, lengthBeats } };
+                for (const auto& effect : effects)
+                {
+                    std::vector<alsdev::NoteEdit> next;
+                    for (const auto& e : edits)
+                        for (const auto& o : alsdev::applyNoteEffect (effect, e))
+                            next.push_back (o);
+                    edits = std::move (next);
+                }
+                for (const auto& e : edits)
+                {
+                    auto note = n;
+                    note.key = std::clamp (e.key, 0, 127);
+                    note.velocity = e.velocity;
+                    if (e.lengthBeats != lengthBeats)
+                        note.length = std::max<std::int64_t> (1, ticksOf (e.lengthBeats));
+                    made.push_back (note);
+                }
+            }
+            pattern.notes = std::move (made);
+            pattern.sortNotes();
+        }
 
     // drum racks: one sampler channel per pad (as an FL drum sampler); later channels shift, so from the last one
     for (std::size_t i = tracks.size(); i-- > 0;)
