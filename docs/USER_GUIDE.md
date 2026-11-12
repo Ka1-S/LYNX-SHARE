@@ -46,6 +46,19 @@ In the clip grid (Clip-launch workflow):
   the Playlist, or drop an audio file or a pattern from the Browser on a slot. Copy and Paste also work between the
   grid and the Playlist. Ctrl+Shift+M puts a new empty MIDI clip in the selected slot (in the Clip-launch layout; in the
   other layouts the key stays Export › MIDI file and the command is in the slot's menu).
+- **Scenes**: click a scene to select it. Ctrl+D (or the scene's menu › Duplicate) puts a copy of the scene with all its
+  clips under it; **Capture and insert scene** (Ctrl+Shift+I) makes a new scene under the selected one with copies of
+  the clips playing now; Ctrl+I inserts an empty scene under it; Ctrl+R renames it; Delete removes it. The scene's menu
+  also has its colour. **Scene tempo and time signature** (View menu, or the grid's options) shows a tempo field and a
+  time signature field on every scene: drag one up or down (Ctrl: fine) or double-click to type; a greyed field is off
+  (the scene keeps the song's value), right-click › Disable switches it off again. Launching the scene sets the song's
+  tempo and bar length (n/4). Ctrl+I, Ctrl+Shift+I and Ctrl+R act this way in the Clip-launch layout only.
+- **Track titles**: right-click a column's title for Rename and Change color (Ctrl+R renames the title clicked last);
+  name and colour are the Playlist track's.
+- **Capture MIDI** (Ctrl+Shift+Alt+R) with the clip grid on screen: the notes you just played without recording become a
+  new clip in the selected slot of the selected track (the next empty slot below when that one is taken).
+- **A Playlist clip into a slot**: with the grid beside the Playlist, drag a pattern or audio clip out of the Playlist
+  onto a slot: a copy goes there, the Playlist keeps the clip.
 - **Mixer** (under the slots, as Live's Session mixer): each track has a strip for the mixer track it plays through:
   **In/Out** (Audio From with its input channel, Monitor In / Auto / Off, Audio To: Main or another mixer track),
   **Sends** (a knob per mixer track any track sends to; turning a knob up from zero makes the send), **Track Options**

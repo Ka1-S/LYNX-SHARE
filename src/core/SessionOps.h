@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "core/Recorder.h"
+#include "core/ScoreLog.h"
 #include "core/Song.h"
 
 namespace lynx::session
@@ -90,4 +91,30 @@ bool fromPlaylist (Song& song, std::size_t playlistIndex, int track, int scene, 
 // A pattern, or an audio channel already in the project (a file dropped from the Browser, loaded by the caller), into a slot.
 bool putPattern (Song& song, int track, int scene, int pattern);
 bool putAudio (Song& song, int track, int scene, int channel, std::int64_t length);
+
+// --- scenes (round 190ef; docs/analise/REA_rodada190ef.md) -------------------------------------------------------------
+// The reference's Duplicate on a selected scene: a new row under `scene` with a copy of every slot of the row (clips with
+// their settings, removed stop buttons) and the scene's name, colour, tempo and bar length. Returns the new row, −1 when
+// the grid is full or there is no such scene.
+int duplicateScene (Song& song, int scene);
+// The reference's "Capture and Insert Scene": a new row under `below` holding copies of the clips playing now.
+// `playing[t]` = the row whose clip track t plays (−1: none). Nothing plays: no row is made (−1).
+int captureScene (Song& song, int below, const std::vector<int>& playing);
+
+// A scene's own tempo and bar length (the reference's Scene Tempo / Scene Time Signature fields; LYNX keeps the
+// numerator only, n/4). A value <= 0 switches the field off (the reference's "Disable Scene Tempo"); others are clamped
+// to LYNX's tempo range and to 1..32 beats. False: no such scene.
+constexpr int sceneBeatsMin = 1, sceneBeatsMax = 32;
+bool setSceneTempo (Song& song, int scene, double bpm);
+bool setSceneBeats (Song& song, int scene, int beats);
+std::string sceneTempoText (double bpm);    // "120.00"
+std::string sceneSignatureText (int beats); // "3/4"
+
+// Capture MIDI into the clip grid (the Clip-launch layout): the slot that takes the captured clip on `track`: `scene`
+// when it is empty, else the first empty one below (a row past the last scene when every one below is taken).
+int captureSlot (const Song& song, int track, int scene);
+// The captured phrase as the notes of a new clip and its `length` (whole bars, at least one): played while the transport
+// ran, the notes keep their place in the bar of the first one; played while stopped, the first starts the clip, the
+// timing kept at `bpm`. `nowMs`: notes still held end there.
+std::vector<Note> phraseNotes (const std::vector<scorelog::Entry>& phrase, double nowMs, double bpm, int beatsPerBar, std::int64_t& length);
 } // namespace lynx::session

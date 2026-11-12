@@ -11,6 +11,7 @@
 #include "core/SessionOps.h"
 #include "engine/SampleLibrary.h"
 #include "ui/BrowserComponent.h"
+#include "ui/ColourPicker.h"
 #include "ui/DetailView.h"
 #include "ui/HintBar.h"
 #include "ui/MapMode.h"
@@ -29,12 +30,18 @@ namespace lynx
 {
 namespace
 {
-constexpr int headerHeight = 26, rowHeight = 24, footerHeight = 30, columnWidth = 104, sceneWidth = 128, launchZone = 20;
+constexpr int headerHeight = 26, rowHeight = 24, footerHeight = 30, columnWidth = 104, sceneBaseWidth = 128, launchZone = 20;
 constexpr int minColumns = 8, minRows = 8;
 // round 190bv: the row under the slots with each track's stop and arm buttons
 constexpr int statusHeight = 22, armWidth = 22;
 constexpr const char* gridDragDescription = "lynx-grid-clip";
 constexpr int fixedLengths[] = { 1, 2, 4, 8, 16, 32 };
+// round 190ef: the reference's View › "Scene Tempo And Time Signature" (a preference): each scene shows a tempo field
+// and a time signature field at its right; the scene column grows by their width
+constexpr int tempoFieldWidth = 46, signatureFieldWidth = 30, sceneFieldsWidth = tempoFieldWidth + signatureFieldWidth + 4;
+bool sceneFieldsOn = false;
+int sceneWidthNow() noexcept { return sceneBaseWidth + (sceneFieldsOn ? sceneFieldsWidth : 0); }
+constexpr const char* playlistDragDescription = "lynx-playlist-clip";
 
 const std::pair<LaunchQuant, const char*> quantNames[] = {
     { LaunchQuant::global, TR_NOOP ("Global") }, { LaunchQuant::none, TR_NOOP ("None") }, { LaunchQuant::bars8, TR_NOOP ("8 bars") },
@@ -139,7 +146,7 @@ public:
     void resized() override
     {
         auto foot = getLocalBounds().removeFromBottom (footerHeight).withTrimmedRight (0).reduced (4, 3);
-        auto right = foot.removeFromRight (sceneWidth - 8);
+        auto right = foot.removeFromRight (sceneWidthNow() - 8);
         globalQuant.setBounds (right);
         foot.removeFromRight (6);
         const auto small = getWidth() < 520;
@@ -190,7 +197,7 @@ public:
         }
 
         // the scene column stays in place
-        const juce::Rectangle<int> sceneColumn (cells.getRight(), 0, sceneWidth, cells.getBottom() + statusHeight);
+        const juce::Rectangle<int> sceneColumn (cells.getRight(), 0, sceneWidthNow(), cells.getBottom() + statusHeight);
         g.setColour (c::bg2);
         g.fillRect (sceneColumn);
         g.setColour (c::border);
@@ -202,7 +209,7 @@ public:
             juce::Graphics::ScopedSaveState rows (g);
             g.reduceClipRegion (sceneColumn.withTrimmedTop (headerHeight));
             for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
-                paintScene (g, *grid, r, { sceneColumn.getX(), rowY (r), sceneWidth, rowHeight });
+                paintScene (g, *grid, r, { sceneColumn.getX(), rowY (r), sceneWidthNow(), rowHeight });
         }
         g.setColour (c::border); // (the status row's top edge, across the tracks and the scene column)
         g.fillRect (0, cells.getBottom(), getWidth(), 1);
@@ -255,7 +262,12 @@ public:
             if (const auto t = headerTrackAt (e.getPosition()); t >= 0) // (round 190ay: the track's own menu)
                 showHeaderMenu (t);
             else if (hit.scene >= 0 && hit.track < 0)
-                showSceneMenu (hit.scene);
+            {
+                if (const auto field = sceneFieldAt (e.getPosition(), hit.scene); field != 0)
+                    showSceneFieldMenu (hit.scene, field);
+                else
+                    showSceneMenu (hit.scene);
+            }
             else if (hit.track >= 0 && hit.scene >= 0)
                 showSlotMenu (hit.track, hit.scene);
             return;
@@ -263,20 +275,33 @@ public:
         if (const auto t = headerTrackAt (e.getPosition()); t >= 0) // a column's title selects its track (round 183a)
         {
             selectedTrack = t;
+            sceneSelected = false;
+            titleSelected = true; // (round 190ef: Ctrl+R renames it)
             repaint();
             notify (GridPick::select);
             return;
         }
         if (hit.scene >= 0 && hit.track < 0)
         {
+            // round 190ef: a click on the scene selects it (Duplicate, Capture and Insert, Rename act on it); a drag on
+            // one of its fields sets its tempo / time signature
+            selectedScene = hit.scene;
+            sceneSelected = true;
+            titleSelected = false;
+            if (const auto field = sceneFieldAt (e.getPosition(), hit.scene); field != 0)
+            {
+                beginSceneFieldDrag (hit.scene, field);
+                repaint();
+                return;
+            }
             if (e.x < cellArea().getRight() + launchZone)
                 engine.launcherCommand ({ launcher::Command::Type::launchScene, 0, hit.scene });
-            selectedScene = hit.scene;
             repaint();
             return;
         }
         if (hit.track < 0 || hit.scene < 0)
             return;
+        sceneSelected = titleSelected = false;
         selectedTrack = hit.track;
         selectedScene = hit.scene;
         repaint();
@@ -311,6 +336,11 @@ public:
 
     void mouseDrag (const juce::MouseEvent& e) override
     {
+        if (fieldScene >= 0)
+        {
+            dragSceneField (e);
+            return;
+        }
         if (dragTrack < 0 || e.getDistanceFromDragStart() < 5)
             return;
         auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this);
@@ -325,7 +355,8 @@ public:
     bool isInterestedInDragSource (const SourceDetails& details) override
     {
         int t = 0, r = 0;
-        return clipGridDrag (details.description, t, r) || detailDeviceDrag (details.description, t, r) || BrowserComponent::draggedPattern (details) >= 0
+        return clipGridDrag (details.description, t, r) || detailDeviceDrag (details.description, t, r) || playlistClipDrag (details.description, t)
+               || BrowserComponent::draggedPattern (details) >= 0
                || SampleLibrary::isSampleFile (BrowserComponent::draggedFile (details));
     }
     void itemDragEnter (const SourceDetails& details) override { itemDragMove (details); }
@@ -383,6 +414,11 @@ public:
             const auto copy = juce::ModifierKeys::currentModifiers.isCommandDown();
             engine.editSong ([=] (Song& s) { session::moveClip (s, fromTrack, fromScene, hit.track, hit.scene, copy); });
         }
+        else if (int index = 0; playlistClipDrag (details.description, index))
+        {
+            // round 190ef: a Playlist clip dragged onto a slot: a copy of it there (the Playlist keeps it)
+            engine.editSong ([=] (Song& s) { session::fromPlaylist (s, (std::size_t) index, hit.track, hit.scene, false); });
+        }
         else if (const auto pattern = BrowserComponent::draggedPattern (details); pattern >= 0)
             putPattern (hit.track, hit.scene, pattern);
         else if (const auto file = BrowserComponent::draggedFile (details); file.existsAsFile())
@@ -429,6 +465,7 @@ public:
 
     void mouseUp (const juce::MouseEvent&) override
     {
+        fieldScene = -1;
         if (pressedTrack >= 0)
             engine.launcherCommand ({ launcher::Command::Type::release, pressedTrack, pressedScene });
         pressedTrack = pressedScene = -1;
@@ -436,6 +473,12 @@ public:
 
     void mouseDoubleClick (const juce::MouseEvent& e) override
     {
+        if (const auto hit = hitTestCell (e.getPosition()); hit.scene >= 0 && hit.track < 0)
+            if (const auto field = sceneFieldAt (e.getPosition(), hit.scene); field != 0)
+            {
+                typeSceneField (hit.scene, field); // (round 190ef: a double-click types the value)
+                return;
+            }
         if (const auto t = headerTrackAt (e.getPosition()); t >= 0) // (round 183a: the track's devices)
         {
             selectedTrack = t;
@@ -458,6 +501,8 @@ public:
 
     // The Detail View's listener (round 183a; none in Pattern workflow, where no grid exists).
     std::function<void (int, int, GridPick)> onPick;
+    // Round 190ef: the scene fields' switch changed (the main window saves its UI settings).
+    std::function<void()> onSceneFieldsChanged;
     std::pair<int, int> selection() const noexcept { return { selectedTrack, selectedScene }; }
 
     // Round 190ef (MIDI / Key Map Mode): the clip slots (a mapping belongs to the slot, not to its clip), each scene's
@@ -511,6 +556,11 @@ public:
                                                                        : launcher::Command { launcher::Command::Type::launch, selectedTrack, selectedScene });
             return true;
         }
+        if (code == juce::KeyPress::deleteKey && sceneSelected) // round 190ef: Delete on a selected scene deletes it
+        {
+            deleteScene (selectedScene);
+            return true;
+        }
         if (code == juce::KeyPress::deleteKey)
         {
             const int t = selectedTrack, r = selectedScene;
@@ -535,7 +585,28 @@ public:
             }
             if (! shift && letter == 'D')
             {
-                duplicateSlot (selectedTrack, selectedScene);
+                if (sceneSelected) // round 190ef: the selected scene's Duplicate
+                    duplicateScene (selectedScene);
+                else
+                    duplicateSlot (selectedTrack, selectedScene);
+                return true;
+            }
+            // round 190ef: the reference's Insert Scene (Ctrl+I), Capture and Insert Scene (Ctrl+Shift+I) and Rename
+            // (Ctrl+R), only in the Clip-launch layout (elsewhere the chords stay LYNX's global keys, core/SessionKeys.h)
+            if (letter == 'I' && sessionkeys::defaultKeyActs (shift ? sessionkeys::Command::gridCaptureInsertScene : sessionkeys::Command::gridInsertScene))
+            {
+                if (shift)
+                    captureAndInsertScene (selectedScene);
+                else
+                    insertSceneBelow (selectedScene);
+                return true;
+            }
+            if (! shift && letter == 'R' && sessionkeys::defaultKeyActs (sessionkeys::Command::gridRename) && (sceneSelected || titleSelected))
+            {
+                if (sceneSelected)
+                    renameScene (selectedScene);
+                else
+                    renameTrack (selectedTrack);
                 return true;
             }
             // (round 190cm: only in the Clip-launch layout; elsewhere Ctrl+Shift+M stays "Export a MIDI file")
@@ -561,6 +632,11 @@ private:
     int dragTrack = -1, dragScene = -1; // the clip a drag would take
     int dropTrack = -1, dropScene = -1; // the slot a drag is over
     int deviceDropTrack = -1;           // round 190dr: the track a dragged device is over
+    // round 190ef: a scene (its cell clicked) or a column's title is the selection Duplicate / Rename act on
+    bool sceneSelected = false, titleSelected = false;
+    // round 190ef: a scene field being dragged (scene −1: none; field 1 tempo, 2 time signature)
+    int fieldScene = -1, fieldKind = 0;
+    double fieldStart = 0.0;
 
     struct Cell
     {
@@ -587,7 +663,7 @@ private:
     }
     juce::Rectangle<int> cellArea() const
     {
-        return { 0, headerHeight, juce::jmax (0, getWidth() - sceneWidth),
+        return { 0, headerHeight, juce::jmax (0, getWidth() - sceneWidthNow()),
                  juce::jmax (0, getHeight() - headerHeight - footerHeight - statusHeight - poolHeight() - mixerHeight()) };
     }
     // the Session mixer's height (round 190dr): its shown sections, leaving the slots at least two rows
@@ -598,7 +674,7 @@ private:
     void syncMixer()
     {
         if (mixer != nullptr)
-            mixer->setColumns (columnCount(), columnWidth, scrollX, cellArea().getRight(), sceneWidth);
+            mixer->setColumns (columnCount(), columnWidth, scrollX, cellArea().getRight(), sceneWidthNow());
     }
     int poolHeight() const
     {
@@ -908,7 +984,46 @@ private:
         g.setColour (c::textPrimary);
         g.fillPath (triangle);
         g.setFont (theme::font (theme::type::small));
-        g.drawText (! scene.name.empty() ? utf8 (scene.name) : juce::String (row + 1), cell.withTrimmedLeft (launchZone), juce::Justification::centredLeft, true);
+        auto nameArea = cell.withTrimmedLeft (launchZone);
+        // round 190ef: the scene's tempo and time signature fields (greyed: off, showing the song's value)
+        if (sceneFieldsOn)
+        {
+            nameArea.removeFromRight (sceneFieldsWidth);
+            const auto& song = engine.getSong();
+            const auto field = [&] (juce::Rectangle<int> box, const juce::String& text, bool on) {
+                theme::fillRoundRect (g, box.toFloat().reduced (0.5f, 3.0f), 2.0f, on ? c::bg1 : c::bg2);
+                g.setColour (on ? c::textPrimary : c::textDisabled);
+                g.drawText (text, box, juce::Justification::centred, false);
+            };
+            field (sceneFieldBox (r, 1), utf8 (session::sceneTempoText (scene.tempo > 0.0 ? scene.tempo : song.bpm)), scene.tempo > 0.0);
+            field (sceneFieldBox (r, 2), utf8 (session::sceneSignatureText (scene.beatsPerBar > 0 ? scene.beatsPerBar : song.beatsPerBar)), scene.beatsPerBar > 0);
+            g.setColour (c::textPrimary);
+        }
+        g.drawText (! scene.name.empty() ? utf8 (scene.name) : juce::String (row + 1), nameArea, juce::Justification::centredLeft, true);
+        if (sceneSelected && row == selectedScene) // (round 190ef: a selected scene, as a selected slot)
+        {
+            g.setColour (c::accent);
+            g.drawRect (cell, 2);
+        }
+    }
+
+    // round 190ef: the scene cell's fields: 1 tempo, 2 time signature (in the cell `r`)
+    static juce::Rectangle<int> sceneFieldBox (juce::Rectangle<int> r, int field)
+    {
+        const auto right = r.getRight() - 3;
+        return field == 2 ? juce::Rectangle<int> (right - signatureFieldWidth, r.getY(), signatureFieldWidth, r.getHeight())
+                          : juce::Rectangle<int> (right - signatureFieldWidth - 2 - tempoFieldWidth, r.getY(), tempoFieldWidth, r.getHeight());
+    }
+    // the field of scene `scene` at p (0: none)
+    int sceneFieldAt (juce::Point<int> p, int scene) const
+    {
+        if (! sceneFieldsOn || scene < 0)
+            return 0;
+        const juce::Rectangle<int> r (cellArea().getRight(), rowY (scene), sceneWidthNow(), rowHeight);
+        for (int f = 1; f <= 2; ++f)
+            if (sceneFieldBox (r, f).contains (p))
+                return f;
+        return 0;
     }
 
     void putPattern (int track, int scene, int pattern)
@@ -1191,10 +1306,25 @@ private:
 
     void showHeaderMenu (int track)
     {
+        buildHeaderMenu (track).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    static juce::Rectangle<int> mouseArea()
+    {
+        const auto p = juce::Desktop::getMousePosition();
+        return { p.x, p.y, 1, 1 };
+    }
+
+public:
+    // A column title's menu: Rename and the colour (round 190ef, the reference's track title menu), Freeze (round 190ay).
+    juce::PopupMenu buildHeaderMenu (int track)
+    {
         const auto& song = engine.getSong();
         const auto channel = detailchain::forTrack (song, track).channel;
         const auto valid = channel >= 0 && channel < (int) song.channels.size();
         juce::PopupMenu menu;
+        menu.addItem (tr ("Rename") + sessionkeys::menuKey (sessionkeys::Command::gridRename), [this, track] { renameTrack (track); });
+        menu.addSeparator();
         if (! valid || ! song.channels[(std::size_t) channel].freeze.on())
             menu.addItem (trc ("@channel: Freeze"), valid, false, [this, channel] {
                 freezeChannel (engine, channel, [safe = juce::Component::SafePointer<juce::Component> (this)] (bool) {
@@ -1215,56 +1345,257 @@ private:
                 });
             });
         }
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+        menu.addSeparator();
+        const auto colour = track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].colour : 0u;
+        menu.addSubMenu (tr ("Change color"), ui::colourMenu (colour, [this, track] (std::uint32_t c) {
+            engine.editSong ([track, c] (Song& s) {
+                if ((int) s.playlistTracks.size() <= track)
+                    s.playlistTracks.resize ((std::size_t) track + 1);
+                s.playlistTracks[(std::size_t) track].colour = c;
+            });
+            repaint();
+        }, mouseArea()));
+        return menu;
     }
 
-    void showSceneMenu (int scene)
+    // A scene's menu (round 190ef adds the reference's Duplicate, Capture and Insert Scene and the colour).
+    juce::PopupMenu buildSceneMenu (int scene)
     {
         juce::PopupMenu menu;
-        menu.addItem (tr ("Insert scene"), [this, scene] {
+        menu.addItem (tr ("Insert scene") + sessionkeys::menuKey (sessionkeys::Command::gridInsertScene), [this, scene] {
             engine.editSong ([scene] (Song& s) { launcher::insertScene (s, scene); });
             clampScroll();
             repaint();
         });
-        menu.addItem (tr ("Add scene below"), [this, scene] {
-            engine.editSong ([scene] (Song& s) { launcher::insertScene (s, scene + 1); });
-            clampScroll();
-            repaint();
-        });
+        menu.addItem (tr ("Add scene below"), [this, scene] { insertSceneBelow (scene); });
+        menu.addItem (tr ("Capture and insert scene") + sessionkeys::menuKey (sessionkeys::Command::gridCaptureInsertScene),
+                      anyClipPlaying(), false, [this, scene] { captureAndInsertScene (scene); });
+        menu.addItem (tr ("Duplicate") + "\tCtrl+D", [this, scene] { duplicateScene (scene); });
         const auto* grid = gridOf();
-        menu.addItem (tr ("Delete scene"), grid != nullptr && grid->scenes.size() > 1, false, [this, scene] {
-            engine.editSong ([scene] (Song& s) { launcher::removeScene (s, scene); });
-            selectedScene = juce::jmax (0, selectedScene - (selectedScene >= scene ? 1 : 0));
-            clampScroll();
+        menu.addItem (tr ("Delete scene"), grid != nullptr && grid->scenes.size() > 1, false, [this, scene] { deleteScene (scene); });
+        menu.addSeparator();
+        menu.addItem (tr ("Rename scene...") + sessionkeys::menuKey (sessionkeys::Command::gridRename), [this, scene] { renameScene (scene); });
+        static const ClipGridScene unnamed;
+        const auto& info = grid != nullptr && scene < (int) grid->scenes.size() ? grid->scenes[(std::size_t) scene] : unnamed;
+        menu.addSubMenu (tr ("Change color"), ui::colourMenu (info.colour, [this, scene] (std::uint32_t c) {
+            engine.editSong ([scene, c] (Song& s) {
+                auto& g = launcher::ensureGrid (s);
+                while ((int) g.scenes.size() <= scene)
+                    g.scenes.emplace_back();
+                g.scenes[(std::size_t) scene].colour = c;
+            });
             repaint();
-        });
-        if (grid != nullptr && scene < (int) grid->scenes.size())
-        {
-            const auto& info = grid->scenes[(std::size_t) scene];
-            menu.addSeparator();
-            menu.addItem (tr ("Rename scene..."), [this, scene] { renameScene (scene); });
-            const auto tempo = engine.getSong().bpm;
-            menu.addItem (info.tempo > 0.0 ? tr ("Scene tempo: {0} (remove)", { juce::String (info.tempo, 2) })
-                                           : tr ("Scene tempo: take {0} when launched", { juce::String (tempo, 2) }),
-                          [this, scene, tempo, had = info.tempo > 0.0] {
-                              engine.editSong ([=] (Song& s) {
-                                  if (s.clipGrid && scene < (int) s.clipGrid->scenes.size())
-                                      s.clipGrid->scenes[(std::size_t) scene].tempo = had ? 0.0 : tempo;
-                              });
-                          });
-        }
+        }, mouseArea()));
+        const auto tempo = engine.getSong().bpm;
+        menu.addItem (info.tempo > 0.0 ? tr ("Scene tempo: {0} (remove)", { juce::String (info.tempo, 2) })
+                                       : tr ("Scene tempo: take {0} when launched", { juce::String (tempo, 2) }),
+                      [this, scene, tempo, had = info.tempo > 0.0] {
+                          engine.editSong ([=] (Song& s) { session::setSceneTempo (s, scene, had ? 0.0 : tempo); });
+                      });
+        if (info.beatsPerBar > 0)
+            menu.addItem (tr ("Disable scene time signature"), [this, scene] { engine.editSong ([scene] (Song& s) { session::setSceneBeats (s, scene, 0); }); });
         menu.addSeparator();
         addGridOptions (menu);
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+        return menu;
     }
 
+    // --- round 190ef: scene work ---------------------------------------------------------------------------------------
+    void selectSceneForSnapshot (int scene)
+    {
+        selectedScene = scene;
+        sceneSelected = true;
+        titleSelected = false;
+        repaint();
+    }
+    // Capture and Insert Scene with the given per-track playing rows (--sceneshot190ef: nothing plays off-screen)
+    int captureSceneForSnapshot (int scene, const std::vector<int>& playing) { return captureAndInsertScene (scene, &playing); }
+    int duplicateSceneForSnapshot (int scene) { return duplicateScene (scene); }
+
+private:
+    void showSceneMenu (int scene)
+    {
+        buildSceneMenu (scene).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+    void selectNewScene (int scene)
+    {
+        if (scene < 0)
+            return;
+        selectedScene = scene;
+        sceneSelected = true;
+        titleSelected = false;
+        clampScroll();
+        revealSelection();
+        repaint();
+    }
+
+    void insertSceneBelow (int scene)
+    {
+        auto at = -1;
+        engine.editSong ([scene, &at] (Song& s) { at = launcher::insertScene (s, scene + 1); });
+        selectNewScene (at);
+    }
+
+    int duplicateScene (int scene)
+    {
+        auto at = -1;
+        engine.editSong ([scene, &at] (Song& s) { at = session::duplicateScene (s, scene); });
+        selectNewScene (at);
+        return at;
+    }
+
+    void deleteScene (int scene)
+    {
+        const auto* grid = gridOf();
+        if (grid == nullptr || grid->scenes.size() <= 1 || scene >= (int) grid->scenes.size())
+            return;
+        engine.editSong ([scene] (Song& s) { launcher::removeScene (s, scene); });
+        selectedScene = juce::jmax (0, selectedScene - (selectedScene >= scene ? 1 : 0));
+        clampScroll();
+        repaint();
+    }
+
+    // the row each track plays now (−1: none)
+    std::vector<int> playingRows() const
+    {
+        std::vector<int> rows;
+        if (const auto* state = engine.launcherState())
+            for (int t = 0, n = columnCount(); t < n; ++t)
+                rows.push_back (state->tracks[(std::size_t) t].playing.load (std::memory_order_relaxed));
+        return rows;
+    }
+    bool anyClipPlaying() const
+    {
+        const auto rows = playingRows();
+        return std::any_of (rows.begin(), rows.end(), [] (int r) { return r >= 0; });
+    }
+
+    int captureAndInsertScene (int scene, const std::vector<int>* given = nullptr)
+    {
+        const auto playing = given != nullptr ? *given : playingRows();
+        auto at = -1;
+        if (std::none_of (playing.begin(), playing.end(), [] (int r) { return r >= 0; }))
+        {
+            ui::postHint ({ tr ("Capture and insert scene: no clip is playing"), {} }, 3000);
+            return -1;
+        }
+        engine.editSong ([&] (Song& s) { at = session::captureScene (s, scene, playing); });
+        selectNewScene (at);
+        return at;
+    }
+
+    // round 190ef: the scene fields (drag, type, disable)
+    void beginSceneFieldDrag (int scene, int field)
+    {
+        const auto* grid = gridOf();
+        const auto& song = engine.getSong();
+        static const ClipGridScene unnamed;
+        const auto& info = grid != nullptr && scene < (int) grid->scenes.size() ? grid->scenes[(std::size_t) scene] : unnamed;
+        fieldScene = scene;
+        fieldKind = field;
+        fieldStart = field == 1 ? (info.tempo > 0.0 ? info.tempo : song.bpm) : (double) (info.beatsPerBar > 0 ? info.beatsPerBar : song.beatsPerBar);
+    }
+    void dragSceneField (const juce::MouseEvent& e)
+    {
+        const auto dy = (double) -e.getDistanceFromDragStartY();
+        const auto scene = fieldScene;
+        if (fieldKind == 1)
+        {
+            // one BPM per 4 px, Ctrl: a hundredth per px
+            const auto bpm = e.mods.isCommandDown() ? fieldStart + dy * 0.01 : std::round (fieldStart + dy / 4.0);
+            engine.editSong ([scene, bpm] (Song& s) { session::setSceneTempo (s, scene, bpm); });
+        }
+        else
+        {
+            const auto beats = (int) std::lround (fieldStart + dy / 10.0); // one beat per 10 px
+            engine.editSong ([scene, beats] (Song& s) { session::setSceneBeats (s, scene, juce::jmax (1, beats)); });
+        }
+        repaint();
+    }
+    void typeSceneField (int scene, int field)
+    {
+        const auto* grid = gridOf();
+        static const ClipGridScene unnamed;
+        const auto& info = grid != nullptr && scene < (int) grid->scenes.size() ? grid->scenes[(std::size_t) scene] : unnamed;
+        const auto& song = engine.getSong();
+        const auto current = field == 1 ? utf8 (session::sceneTempoText (info.tempo > 0.0 ? info.tempo : song.bpm))
+                                        : juce::String (info.beatsPerBar > 0 ? info.beatsPerBar : song.beatsPerBar);
+        auto* window = new juce::AlertWindow (field == 1 ? tr ("Scene tempo") : tr ("Scene time signature"),
+                                              field == 1 ? juce::String ("BPM") : tr ("Beats per bar (n/4)"), juce::MessageBoxIconType::NoIcon, this);
+        window->addTextEditor ("value", current);
+        window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<ClipGridComponent> self (this);
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([self, window, scene, field] (int result) {
+            const std::unique_ptr<juce::AlertWindow> owned (window);
+            if (result != 1 || self == nullptr)
+                return;
+            const auto text = owned->getTextEditorContents ("value").trim().upToFirstOccurrenceOf ("/", false, false);
+            if (text.isEmpty() || ! text.containsAnyOf ("0123456789"))
+                return;
+            if (field == 1)
+                self->engine.editSong ([scene, v = text.getDoubleValue()] (Song& s) { session::setSceneTempo (s, scene, v); });
+            else
+                self->engine.editSong ([scene, v = text.getIntValue()] (Song& s) { session::setSceneBeats (s, scene, juce::jmax (1, v)); });
+            self->repaint();
+        }), false);
+    }
+    void showSceneFieldMenu (int scene, int field)
+    {
+        buildSceneFieldMenu (scene, field).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+public:
+    juce::PopupMenu buildSceneFieldMenu (int scene, int field)
+    {
+        const auto* grid = gridOf();
+        static const ClipGridScene unnamed;
+        const auto& info = grid != nullptr && scene < (int) grid->scenes.size() ? grid->scenes[(std::size_t) scene] : unnamed;
+        juce::PopupMenu menu;
+        if (field == 1)
+            menu.addItem (tr ("Disable scene tempo"), info.tempo > 0.0, false, [this, scene] {
+                engine.editSong ([scene] (Song& s) { session::setSceneTempo (s, scene, 0.0); });
+                repaint();
+            });
+        else
+            menu.addItem (tr ("Disable scene time signature"), info.beatsPerBar > 0, false, [this, scene] {
+                engine.editSong ([scene] (Song& s) { session::setSceneBeats (s, scene, 0); });
+                repaint();
+            });
+        return menu;
+    }
+
+private:
+    void renameTrack (int track)
+    {
+        const auto& tracks = engine.getSong().playlistTracks;
+        const auto current = track < (int) tracks.size() ? utf8 (tracks[(std::size_t) track].name) : juce::String();
+        auto* window = new juce::AlertWindow (tr ("Rename track"), {}, juce::MessageBoxIconType::NoIcon, this);
+        window->addTextEditor ("name", current.isNotEmpty() ? current : tr ("Track {0}", { juce::String (track + 1) }));
+        window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<ClipGridComponent> self (this);
+        window->enterModalState (true, juce::ModalCallbackFunction::create ([self, window, track] (int result) {
+            const std::unique_ptr<juce::AlertWindow> owned (window);
+            if (result == 1 && self != nullptr)
+            {
+                const auto name = owned->getTextEditorContents ("name").trim().toStdString();
+                self->engine.editSong ([=] (Song& s) {
+                    if ((int) s.playlistTracks.size() <= track)
+                        s.playlistTracks.resize ((std::size_t) track + 1);
+                    s.playlistTracks[(std::size_t) track].name = name;
+                });
+                self->repaint();
+            }
+        }), false);
+    }
     void renameScene (int scene)
     {
         const auto* grid = gridOf();
-        if (grid == nullptr || scene >= (int) grid->scenes.size())
+        if (grid == nullptr || scene < 0 || scene >= launcher::maxScenes)
             return;
         auto* window = new juce::AlertWindow (tr ("Rename scene"), {}, juce::MessageBoxIconType::NoIcon, this);
-        window->addTextEditor ("name", utf8 (grid->scenes[(std::size_t) scene].name));
+        window->addTextEditor ("name", scene < (int) grid->scenes.size() ? utf8 (grid->scenes[(std::size_t) scene].name) : juce::String());
         window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
         window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
         juce::Component::SafePointer<ClipGridComponent> self (this);
@@ -1274,8 +1605,10 @@ private:
             {
                 const auto name = owned->getTextEditorContents ("name").toStdString();
                 self->engine.editSong ([=] (Song& s) {
-                    if (s.clipGrid && scene < (int) s.clipGrid->scenes.size())
-                        s.clipGrid->scenes[(std::size_t) scene].name = name;
+                    auto& g = launcher::ensureGrid (s); // (a row shown under the last scene becomes one)
+                    while ((int) g.scenes.size() <= scene)
+                        g.scenes.emplace_back();
+                    g.scenes[(std::size_t) scene].name = name;
                 });
                 self->repaint();
             }
@@ -1284,6 +1617,14 @@ private:
 
     void addGridOptions (juce::PopupMenu& menu)
     {
+        // round 190ef: the reference's View › Scene Tempo And Time Signature (a preference, kept with the UI settings)
+        menu.addItem (tr ("Scene tempo and time signature"), true, sceneFieldsOn, [this] {
+            sceneFieldsOn = ! sceneFieldsOn;
+            if (onSceneFieldsChanged != nullptr)
+                onSceneFieldsChanged();
+            resized();
+            repaint();
+        });
         const auto* grid = gridOf();
         const auto on = grid != nullptr && grid->backOnStop;
         menu.addItem (tr ("Give tracks back to the Playlist when the transport stops"), true, on, [this, on] {
@@ -1415,5 +1756,83 @@ void setClipGridDeviceDropForSnapshot (juce::Component& grid, int track)
 {
     if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
         g->deviceDropForSnapshot (track);
+}
+// --- round 190ef ---------------------------------------------------------------------------------------------------------
+bool& clipGridSceneTempoShown()
+{
+    return sceneFieldsOn;
+}
+
+void refreshClipGrid (juce::Component& grid)
+{
+    grid.resized();
+    grid.repaint();
+}
+
+void setClipGridSceneFieldsListener (juce::Component& grid, std::function<void()> listener)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->onSceneFieldsChanged = std::move (listener);
+}
+
+juce::PopupMenu clipGridSceneMenu (juce::Component& grid, int scene)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        return g->buildSceneMenu (scene);
+    return {};
+}
+
+juce::PopupMenu clipGridHeaderMenu (juce::Component& grid, int track)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        return g->buildHeaderMenu (track);
+    return {};
+}
+
+juce::PopupMenu clipGridSceneFieldMenu (juce::Component& grid, int scene, int field)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        return g->buildSceneFieldMenu (scene, field);
+    return {};
+}
+
+void selectClipGridScene (juce::Component& grid, int scene)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->selectSceneForSnapshot (scene);
+}
+
+int duplicateClipGridScene (juce::Component& grid, int scene)
+{
+    auto* g = dynamic_cast<ClipGridComponent*> (&grid);
+    return g != nullptr ? g->duplicateSceneForSnapshot (scene) : -1;
+}
+
+int captureClipGridScene (juce::Component& grid, int scene, const std::vector<int>& playing)
+{
+    auto* g = dynamic_cast<ClipGridComponent*> (&grid);
+    return g != nullptr ? g->captureSceneForSnapshot (scene, playing) : -1;
+}
+
+bool isClipGrid (const juce::Component* component)
+{
+    for (auto* c = component; c != nullptr; c = c->getParentComponent())
+        if (dynamic_cast<const ClipGridComponent*> (c) != nullptr)
+            return true;
+    return false;
+}
+
+juce::String playlistClipDragDescription (int index)
+{
+    return juce::String (playlistDragDescription) + "|" + juce::String (index);
+}
+
+bool playlistClipDrag (const juce::var& description, int& index)
+{
+    const auto text = description.toString();
+    if (! text.startsWith (juce::String (playlistDragDescription) + "|"))
+        return false;
+    index = text.fromFirstOccurrenceOf ("|", false, false).getIntValue();
+    return index >= 0;
 }
 } // namespace lynx
