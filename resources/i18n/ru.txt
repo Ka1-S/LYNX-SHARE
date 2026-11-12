@@ -8189,7 +8189,7 @@ countries: ru by kz
 "Measuring the mix..." = "Измерение микса..."
 "The mix is silent: nothing to measure." = "Микс беззвучен: нечего измерять."
 "Mix {0} LUFS: input level {1}" = "Микс {0} LUFS: входной уровень {1}"
-"The Master has no room for the look: it needs four free effect slots." = "В мастере нет места для образа: нужны четыре свободных слота эффектов."
+"The Master has no room for the look: it needs five free effect slots." = "В мастере нет места для образа: нужно пять свободных слотов эффектов."
 "Master looks: give the whole song a finished sound" = "Мастер-образы: законченное звучание для всей песни"
 "Balanced" = "Сбалансированный"
 "Clarity" = "Чёткость"

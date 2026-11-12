@@ -203,7 +203,7 @@ int ChannelRackComponent::numSteps() const
     if (song.patterns.empty())
         return 16;
 
-    const auto& p = song.patterns[(std::size_t) song.currentPattern];
+    const auto& p = song.activePattern();
     const auto steps = (int) (p.effectiveLength (song.beatsPerBar) / ticksPerStep);
     return juce::jlimit (16, 512, steps);
 }
@@ -439,7 +439,7 @@ int ChannelRackComponent::loopStepsOf (int row) const
     const auto& song = engine.getSong();
     if (song.patterns.empty() || row < 0 || row >= (int) song.channels.size())
         return 0;
-    const auto& p = song.patterns[(std::size_t) song.currentPattern];
+    const auto& p = song.activePattern();
     if (! p.loopOn)
         return 0;
     const auto length = p.effectiveLength (song.beatsPerBar);
@@ -452,7 +452,7 @@ bool ChannelRackComponent::advancedLoopShown() const
     const auto& song = engine.getSong();
     if (song.patterns.empty())
         return false;
-    const auto& p = song.patterns[(std::size_t) song.currentPattern];
+    const auto& p = song.activePattern();
     return p.loopOn && p.loopMode == RackLoopMode::advanced;
 }
 
@@ -469,7 +469,7 @@ void ChannelRackComponent::paintLoopColumn (juce::Graphics& g)
 {
     using namespace theme::colour;
     const auto& song = engine.getSong();
-    const auto& p = song.patterns[(std::size_t) song.currentPattern];
+    const auto& p = song.activePattern();
     const auto first = loopBoxBounds (0);
     g.setColour (bg2);
     g.fillRect (first.getX() - 3, 0, loopColumnWidth, getHeight());
@@ -502,7 +502,7 @@ void ChannelRackComponent::setLoopPoint (int row, int setting)
     if (row < 0 || row >= (int) engine.getSong().channels.size())
         return;
     engine.editSong ([row, setting] (Song& s) {
-        auto& p = s.patterns[(std::size_t) s.currentPattern];
+        auto& p = s.activePattern();
         auto value = setting;
         // FL's "Set to next beat / bar": a fixed loop point, the steps to the boundary after the channel's last note
         if (setting == 1000 + ChannelLoop::nextBeat || setting == 1000 + ChannelLoop::nextBar)
@@ -524,7 +524,7 @@ void ChannelRackComponent::showLoopPointMenu (int row)
     const auto& song = engine.getSong();
     if (row < 0 || row >= (int) song.channels.size())
         return;
-    const auto& p = song.patterns[(std::size_t) song.currentPattern];
+    const auto& p = song.activePattern();
     const auto setting = channelloops::effectiveSetting (p, row);
     juce::PopupMenu menu;
     ui::addItemHeader (menu, tr ("Loop point"), channelName (song, row), {});
@@ -540,7 +540,7 @@ void ChannelRackComponent::showLoopPointMenu (int row)
         menu.addItem (tr ("Every {0} steps", { juce::String (setting) }), false, true, [] {});
     menu.addSectionHeader (tr ("Tools"));
     menu.addItem (tr ("Burn to pattern"), loopStepsOf (row) > 0, false, [this, row] {
-        engine.editSong ([row] (Song& s) { channelloops::burnChannel (s.patterns[(std::size_t) s.currentPattern], row, s.beatsPerBar); });
+        engine.editSong ([row] (Song& s) { channelloops::burnChannel (s.activePattern(), row, s.beatsPerBar); });
         repaint();
     });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (loopBoxBounds (row))));
@@ -549,13 +549,13 @@ void ChannelRackComponent::showLoopPointMenu (int row)
 bool ChannelRackComponent::isLoopingOn() const
 {
     const auto& song = engine.getSong();
-    return ! song.patterns.empty() && song.patterns[(std::size_t) song.currentPattern].loopOn;
+    return ! song.patterns.empty() && song.activePattern().loopOn;
 }
 
 void ChannelRackComponent::toggleLooping()
 {
     engine.editSong ([] (Song& s) {
-        auto& p = s.patterns[(std::size_t) s.currentPattern];
+        auto& p = s.activePattern();
         p.loopOn = ! p.loopOn;
     });
     updateSize();
@@ -568,7 +568,7 @@ void ChannelRackComponent::burnLoops (bool selectedOnly)
 {
     const auto rows = engine.getSelectedChannels();
     engine.editSong ([rows, selectedOnly] (Song& s) {
-        auto& p = s.patterns[(std::size_t) s.currentPattern];
+        auto& p = s.activePattern();
         if (selectedOnly)
         {
             for (auto r : rows)
@@ -585,7 +585,7 @@ void ChannelRackComponent::showLoopMenu (juce::Component* target)
     const auto& song = engine.getSong();
     if (song.patterns.empty())
         return;
-    const auto& p = song.patterns[(std::size_t) song.currentPattern];
+    const auto& p = song.activePattern();
     juce::PopupMenu menu;
     menu.addItem (tr ("Looping on"), true, p.loopOn, [this] { toggleLooping(); });
     menu.addSectionHeader (tr ("Loop type"));
@@ -595,7 +595,7 @@ void ChannelRackComponent::showLoopMenu (juce::Component* target)
     for (const auto& [mode, name] : types)
         menu.addItem (tr (name), true, p.loopMode == mode, [this, mode = mode] {
             engine.editSong ([mode] (Song& s) {
-                auto& q = s.patterns[(std::size_t) s.currentPattern];
+                auto& q = s.activePattern();
                 q.loopMode = mode;
                 q.loopOn = true; // (FL: picking a type switches the looping on)
             });
@@ -707,7 +707,7 @@ ChannelRackComponent::Area ChannelRackComponent::areaAt (int x, int y, int& row)
 bool ChannelRackComponent::cellHasNote (int channel, int step) const
 {
     const auto& song = engine.getSong();
-    const auto& p = song.patterns[(std::size_t) song.currentPattern];
+    const auto& p = song.activePattern();
     const auto from = (std::int64_t) step * ticksPerStep;
     const auto to = from + ticksPerStep;
 
@@ -723,7 +723,7 @@ bool ChannelRackComponent::channelHitsNow (int row) const
     if (playheadStep < 0 || playheadStep >= numSteps())
         return false;
     const auto& song = engine.getSong();
-    const auto& p = song.patterns[(std::size_t) song.currentPattern];
+    const auto& p = song.activePattern();
     const auto loopSteps = loopStepsOf (row);
     const auto step = loopSteps > 0 && playheadStep >= loopSteps ? playheadStep % loopSteps : playheadStep;
     return p.hasStep (row, step) || cellHasNote (row, step);
@@ -747,7 +747,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
     if (song.patterns.empty())
         return;
 
-    const auto& pattern = song.patterns[(std::size_t) song.currentPattern];
+    const auto& pattern = song.activePattern();
     const auto steps = shownSteps(), realSteps = numSteps();
     const auto clip = g.getClipBounds();
     const auto primary = engine.getSelectedChannel();
@@ -1565,7 +1565,7 @@ void ChannelRackComponent::paintLane (juce::Graphics& g)
         return;
 
     const auto& song = engine.getSong();
-    const auto& pattern = song.patterns[(std::size_t) song.currentPattern];
+    const auto& pattern = song.activePattern();
     const auto channel = graphRow();
     const auto level = (notetools::Level) graphLevel;
 
@@ -1646,7 +1646,7 @@ void ChannelRackComponent::setLaneValue (int step, float value)
     const auto channel = graphRow();
     const auto level = (notetools::Level) graphLevel;
     engine.editSong ([channel, step, value, level] (Song& s) {
-        auto& p = s.patterns[(std::size_t) s.currentPattern];
+        auto& p = s.activePattern();
         for (auto i : notesInStep (p, channel, step))
             notetools::setLevelValue (p.notes[(std::size_t) i], level, value);
     });
@@ -1665,7 +1665,7 @@ void ChannelRackComponent::applyLane (const juce::MouseEvent& e)
         const auto level = (notetools::Level) graphLevel;
         const auto v0 = laneDownStep <= step ? laneDownValue : value, v1 = laneDownStep <= step ? value : laneDownValue;
         engine.editSong ([=] (Song& s) {
-            auto& p = s.patterns[(std::size_t) s.currentPattern];
+            auto& p = s.activePattern();
             for (int st = from; st <= to; ++st)
             {
                 const auto t = to > from ? (float) (st - from) / (float) (to - from) : 0.0f;
@@ -1706,7 +1706,7 @@ void ChannelRackComponent::rotateSelected (int steps)
 {
     const auto rows = engine.getSelectedChannels();
     engine.editSong ([rows, steps] (Song& s) {
-        auto& p = s.patterns[(std::size_t) s.currentPattern];
+        auto& p = s.activePattern();
         const auto length = patternSteps (s, p);
         for (auto r : rows)
             rotateSteps (p, r, steps, length);
@@ -1716,7 +1716,7 @@ void ChannelRackComponent::rotateSelected (int steps)
 void ChannelRackComponent::copySelected()
 {
     const auto& song = engine.getSong();
-    stepClipboard = copyChannelSteps (song.patterns[(std::size_t) song.currentPattern], engine.getSelectedChannels(), (int) song.channels.size());
+    stepClipboard = copyChannelSteps (song.activePattern(), engine.getSelectedChannels(), (int) song.channels.size());
 }
 
 void ChannelRackComponent::cutSelected()
@@ -1724,9 +1724,9 @@ void ChannelRackComponent::cutSelected()
     copySelected();
     const auto rows = engine.getSelectedChannels();
     const auto& song = engine.getSong();
-    auto copy = song.patterns[(std::size_t) song.currentPattern];
+    auto copy = song.activePattern();
     if (clearChannelSteps (copy, rows)) // (nothing to cut: no undo step)
-        engine.editSong ([rows] (Song& s) { clearChannelSteps (s.patterns[(std::size_t) s.currentPattern], rows); });
+        engine.editSong ([rows] (Song& s) { clearChannelSteps (s.activePattern(), rows); });
 }
 
 void ChannelRackComponent::pasteSelected()
@@ -1734,7 +1734,7 @@ void ChannelRackComponent::pasteSelected()
     if (stepClipboard.empty() || engine.getSelectedChannels().empty())
         return;
     engine.editSong ([rows = engine.getSelectedChannels(), clip = stepClipboard] (Song& s) {
-        pasteChannelSteps (s.patterns[(std::size_t) s.currentPattern], clip, rows, (int) s.channels.size());
+        pasteChannelSteps (s.activePattern(), clip, rows, (int) s.channels.size());
     });
 }
 
@@ -1742,7 +1742,7 @@ void ChannelRackComponent::fillSelected (int every)
 {
     const auto rows = engine.getSelectedChannels();
     engine.editSong ([rows, every] (Song& s) {
-        auto& p = s.patterns[(std::size_t) s.currentPattern];
+        auto& p = s.activePattern();
         const auto length = patternSteps (s, p);
         for (auto r : rows)
             if (r < (int) s.channels.size() && s.channels[(std::size_t) r].instrument != InstrumentKind::audioClip)
@@ -1970,7 +1970,7 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
                 showLoopPointMenu (row);
                 return;
             }
-            const auto& p = song.patterns[(std::size_t) song.currentPattern];
+            const auto& p = song.activePattern();
             const auto setting = channelloops::effectiveSetting (p, row);
             const auto steps = loopStepsOf (row);
             loopDragRow = row;
@@ -2116,7 +2116,7 @@ void ChannelRackComponent::mouseDown (const juce::MouseEvent& e)
             auto step = (e.x - gridLeft()) / stepWidth;
             if (const auto loop = loopStepsOf (row); loop > 0 && step >= loop && step < numSteps())
                 step %= loop; // a loop repeat edits the step it repeats
-            const auto& pattern = song.patterns[(std::size_t) song.currentPattern];
+            const auto& pattern = song.activePattern();
 
             // Freeze (round 190ay): a frozen channel's steps cannot be edited; the miniature still opens the Piano Roll (read-only)
             if (! showsNotePreview (pattern, row, pianoRollView) && refuseFrozenEdit (row))
@@ -2150,7 +2150,7 @@ void ChannelRackComponent::mouseDrag (const juce::MouseEvent& e)
     if (loopDragRow >= 0)
     {
         const auto steps = juce::jlimit (1, numSteps(), loopDragStart + juce::roundToInt ((loopDragY - e.position.y) / 6.0f));
-        const auto& p = engine.getSong().patterns[(std::size_t) engine.getSong().currentPattern];
+        const auto& p = engine.getSong().activePattern();
         if (channelloops::storedSetting (p, loopDragRow) != steps)
             setLoopPoint (loopDragRow, steps);
         return;
@@ -2300,7 +2300,7 @@ void ChannelRackComponent::mouseWheelMove (const juce::MouseEvent& e, const juce
     if (area == Area::loop) // the loop point, a step at a time
     {
         const auto& song = engine.getSong();
-        const auto& p = song.patterns[(std::size_t) song.currentPattern];
+        const auto& p = song.activePattern();
         const auto setting = channelloops::effectiveSetting (p, row);
         const auto steps = setting > 0 ? setting : loopStepsOf (row) > 0 ? loopStepsOf (row) : numSteps();
         const auto delta = (wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX) > 0.0f ? 1 : -1;
@@ -2372,7 +2372,7 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
             h.text = name + " - " + tr ("Select: [LMB] one  [Ctrl]+[LMB] or [RMB] add/remove  [Shift]+[LMB] range  [LMB] drag range  [RMB] drag adds  [2xLMB] all  [Alt]+[Up]/[Down] moves the selection");
             break;
         case Area::grid:
-            if (! song.patterns.empty() && showsNotePreview (song.patterns[(std::size_t) song.currentPattern], row, pianoRollView))
+            if (! song.patterns.empty() && showsNotePreview (song.activePattern(), row, pianoRollView))
                 h.text = name + " - " + tr ("Piano Roll notes: [LMB] opens them in the Piano Roll");
             else
                 h.text = name + " - " + (hoverStep >= numSteps() ? tr ("After the pattern's end: [LMB] adds a step and makes the pattern longer")
@@ -2391,7 +2391,7 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
             h.hasMenu = true;
             if (row >= 0 && row < (int) song.channels.size() && ! song.patterns.empty())
             {
-                const auto setting = channelloops::effectiveSetting (song.patterns[(std::size_t) song.currentPattern], row);
+                const auto setting = channelloops::effectiveSetting (song.activePattern(), row);
                 h.value = setting == ChannelLoop::dontLoop ? tr ("Don't loop") : setting > 0 ? tr ("Every {0} steps", { juce::String (setting) })
                                                                                             : tr (channelloops::settingText (setting).c_str());
             }
@@ -2422,7 +2422,7 @@ void ChannelRackComponent::applyPaint (const juce::MouseEvent& e)
 
     if (row < 0 || row >= (int) song.channels.size() || step < 0 || step >= shownSteps() || e.x < stickyX + gridLeft()
         || song.channels[(std::size_t) row].instrument == InstrumentKind::audioClip
-        || showsNotePreview (song.patterns[(std::size_t) song.currentPattern], row, pianoRollView)) // drag-paint skips note rows
+        || showsNotePreview (song.activePattern(), row, pianoRollView)) // drag-paint skips note rows
         return;
 
     if (row == lastPaintedRow && step == lastPaintedStep)
@@ -2434,7 +2434,7 @@ void ChannelRackComponent::applyPaint (const juce::MouseEvent& e)
 
     // FL: setting a step is silent, stopped or playing (issue #11; Ctrl+click on the channel button auditions it)
     engine.editSong ([row, step, on, mute = muteRemovedSteps] (Song& s) {
-        auto& p = s.patterns[(std::size_t) s.currentPattern];
+        auto& p = s.activePattern();
         setStep (p, row, step, on, mute);
         // a ghost step of a pattern with a set length: the length grows to the bar holding it (automatic lengths
         // follow the notes by themselves)
@@ -2677,7 +2677,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
     {
         const auto& song = engine.getSong();
         const auto& selection = engine.getSelectedChannels();
-        const auto& notes = song.patterns[(std::size_t) song.currentPattern].notes;
+        const auto& notes = song.activePattern().notes;
         const auto hasNotes = std::any_of (notes.begin(), notes.end(), [&selection] (const Note& n) {
             return std::binary_search (selection.begin(), selection.end(), n.channel);
         });
@@ -2740,7 +2740,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         menu.addSubMenu (tr ("Burn MIDI to"), burn);
         // its loop point in this pattern (FL's advanced looping control menu)
         const auto& song = engine.getSong();
-        const auto& p = song.patterns[(std::size_t) song.currentPattern];
+        const auto& p = song.activePattern();
         const auto setting = channelloops::effectiveSetting (p, channel);
         juce::PopupMenu loop;
         loop.addItem (tr ("Don't loop"), true, setting == ChannelLoop::dontLoop && p.loopOn, [this, channel] { setLoopPoint (channel, ChannelLoop::dontLoop); });
@@ -2752,7 +2752,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         loop.addItem (tr ("Set to next bar"), [this, channel] { setLoopPoint (channel, 1000 + ChannelLoop::nextBar); });
         loop.addSeparator();
         loop.addItem (tr ("Burn to pattern"), loopStepsOf (channel) > 0, false, [this, channel] {
-            engine.editSong ([channel] (Song& s) { channelloops::burnChannel (s.patterns[(std::size_t) s.currentPattern], channel, s.beatsPerBar); });
+            engine.editSong ([channel] (Song& s) { channelloops::burnChannel (s.activePattern(), channel, s.beatsPerBar); });
             repaint();
         });
         menu.addSubMenu (setting > 0 && p.loopOn ? tr ("Loop point ({0} steps)", { juce::String (setting) }) : tr ("Loop point"), loop);
@@ -2765,7 +2765,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
                   [this, channel] { setSwingMixOfSelected (channel); });
     menu.addItem (tr ("Clear notes in this pattern"), [this, channel] {
         engine.editSong ([channel] (Song& s) {
-            auto& notes = s.patterns[(std::size_t) s.currentPattern].notes;
+            auto& notes = s.activePattern().notes;
             notes.erase (std::remove_if (notes.begin(), notes.end(), [channel] (const Note& n) { return n.channel == channel; }),
                          notes.end());
         });

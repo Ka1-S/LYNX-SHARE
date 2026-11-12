@@ -546,15 +546,15 @@ private:
 
     // --- model access ---------------------------------------------------------------------------
 
+    // (round 190ea: safe on a song without patterns too, Song::activePattern)
     const Pattern& currentPattern() const
     {
-        const auto& song = engine.getSong();
-        return song.patterns[(std::size_t) juce::jlimit (0, (int) song.patterns.size() - 1, song.currentPattern)];
+        return engine.getSong().activePattern();
     }
 
     static Pattern& currentPattern (Song& s)
     {
-        return s.patterns[(std::size_t) juce::jlimit (0, (int) s.patterns.size() - 1, s.currentPattern)];
+        return s.activePattern();
     }
 
     std::int64_t patternLength() const

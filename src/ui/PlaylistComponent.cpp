@@ -3611,7 +3611,7 @@ Clip PlaylistComponent::makeBrushClip (int track, std::int64_t start) const
     c.pattern = song.currentPattern;
     c.track = track;
     c.start = juce::jmax<std::int64_t> (0, start);
-    c.length = song.patterns[(std::size_t) song.currentPattern].effectiveLength (song.beatsPerBar);
+    c.length = song.activePattern().effectiveLength (song.beatsPerBar);
 
     if (brush.kind == ClipKind::audio && brush.index >= 0 && brush.index < (int) song.channels.size()
         && song.channels[(std::size_t) brush.index].instrument == InstrumentKind::audioClip)

@@ -2537,8 +2537,21 @@ struct Song
     // End of the last clip, exactly where FL loops Song mode (no clip: the current pattern's length, minimum 1 bar).
     std::int64_t songLength() const noexcept;
 
-    // Removes a pattern and fixes the clips and the current index.
+    // Removes a pattern and fixes the clips and the current index. The last one leaves an empty "Pattern 1" behind
+    // (keepOnePattern): FL never has a project without a pattern.
     void removePattern (int index);
+
+    // FL's invariant (round 190ea): a project always has a pattern, and the current one is in range. Adds an empty
+    // "Pattern 1" when there is none and clamps currentPattern; true when it changed anything. The engine applies it on
+    // every publish (AudioEngine::publishSong), so every song the UI sees has one; a Song built by hand (Song{}) has none
+    // until then.
+    bool keepOnePattern();
+
+    // The current pattern (round 190ea). Const: an empty pattern when the song has none (a hand-built Song{}), the
+    // clamped index otherwise, never out of range. Non-const: keeps one first (keepOnePattern), so an edit always has a
+    // pattern to write into.
+    const Pattern& activePattern() const noexcept;
+    Pattern& activePattern();
 
     // Removes a channel along with its notes and audio clips, and reindexes the others.
     // Automations of that channel lose their target.

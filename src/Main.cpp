@@ -1952,6 +1952,18 @@ public:
             return;
         }
 
+        if (args.contains ("--patterns190ea"))
+        {
+            // LYNX --patterns190ea <report.txt>: round 190ea off-screen (no window) — a song with no pattern at all
+            // reaching the engine in every layout (the Simple dock's Editor tab, the Piano roll panel of the Pattern
+            // layout, the Clip-launch layout), the last pattern deleted, all patterns cleared by an edit, undo / redo,
+            // a live session's remote song and an out-of-range current pattern; each must leave one pattern and not crash
+            const auto i = args.indexOf ("--patterns190ea");
+            setApplicationReturnValue (runPatterns190ea (args[i + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--simple190dsshot"))
         {
             // LYNX.exe --simple190dsshot prefix: round 190ds off-screen, at 1x and 2x — loops dropped in the Simple
@@ -16588,6 +16600,123 @@ private:
         }
         line (report.contains ("ERROR ") ? "RESULT ERROR" : "RESULT OK");
         juce::File (prefix + "-report.txt").replaceWithText (report);
+    }
+
+    // --patterns190ea (round 190ea): FL keeps at least one pattern; the engine now does too (AudioEngine::publishSong,
+    // Song::keepOnePattern). Before, a Song without a pattern crashed the docked Piano roll's listener.
+    bool runPatterns190ea (const juce::String& reportPath)
+    {
+        namespace st = lynx::simpletracks;
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        ui.setSize (1600, 900);
+        ui.setVisible (true); // (no window: the docked editor only needs its parents visible)
+        juce::String report;
+        bool ok = true;
+        const auto check = [&report, &ok] (const juce::String& what, bool good) {
+            report << (good ? "OK    " : "ERROR ") << what << "\n";
+            ok = ok && good;
+        };
+        const auto save = [&report, &reportPath] { juce::File (reportPath).replaceWithText (report); };
+        const auto settle = [&] { offline.dispatchPendingMessages(); ui.getPianoRollForSnapshot().repaint(); };
+        const auto onePattern = [&offline] {
+            const auto& s = offline.getSong();
+            return s.patterns.size() >= 1 && s.currentPattern >= 0 && s.currentPattern < (int) s.patterns.size();
+        };
+        // the hand-built songs the engine can be given: none of them has a pattern
+        const auto bare = [] {
+            lynx::Song s;
+            s.mixer = lynx::Song::defaultMixer();
+            return s;
+        };
+        // every way to reach "no pattern" in the current layout
+        const auto paths = [&] (const juce::String& where) {
+            offline.setSong (bare());
+            settle();
+            check (where + ": a song without a pattern opens with one empty \"Pattern 1\"",
+                   onePattern() && offline.getSong().patterns.size() == 1 && offline.getSong().patterns[0].name == "Pattern 1"
+                       && offline.getSong().patterns[0].notes.empty());
+            offline.editSong ([] (lynx::Song& s) { s.patterns.clear(); });
+            settle();
+            check (where + ": an edit that clears every pattern leaves one", onePattern());
+            offline.editSong ([] (lynx::Song& s) {
+                s.patterns.resize (2);
+                s.patterns[1].notes.push_back ({});
+                s.currentPattern = 1;
+            });
+            settle();
+            offline.editSong ([] (lynx::Song& s) { s.removePattern (s.currentPattern); });
+            offline.editSong ([] (lynx::Song& s) { s.removePattern (s.currentPattern); });
+            settle();
+            check (where + ": deleting the last pattern leaves an empty \"Pattern 1\" (FL's invariant)",
+                   onePattern() && offline.getSong().patterns.size() == 1 && offline.getSong().patterns[0].notes.empty());
+            for (int k = 0; k < 6; ++k)
+            {
+                offline.undo();
+                settle();
+            }
+            check (where + ": undo back over those steps keeps a pattern", onePattern());
+            for (int k = 0; k < 6; ++k)
+            {
+                offline.redo();
+                settle();
+            }
+            check (where + ": redo keeps a pattern", onePattern());
+            offline.applyRemote (bare());
+            settle();
+            check (where + ": a live session's remote song without a pattern gets one", onePattern());
+            offline.editSong ([] (lynx::Song& s) { s.currentPattern = 99; });
+            settle();
+            check (where + ": a current pattern out of range is put back in range", onePattern() && offline.getSong().currentPattern == 0);
+        };
+
+        // the Simple layout with the Piano roll docked in the Editor tab (round 190dv's crash)
+        ui.selectTabForSnapshot (2);
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        settle();
+        auto* simple = ui.getSimpleWorkflowForSnapshot();
+        check ("the Simple workflow is up", simple != nullptr);
+        if (simple == nullptr)
+        {
+            save();
+            return false;
+        }
+        simple->hideChooser();
+        st::Request q;
+        q.kind = st::Kind::instrument;
+        q.name = "Keys";
+        lynx::ChannelDef synth;
+        synth.instrument = lynx::InstrumentKind::synth;
+        q.channel = synth;
+        q.emptyBars = 4;
+        st::Result r;
+        offline.editSong ([&] (lynx::Song& s) { r = st::addTrack (s, q); });
+        settle();
+        ui.getPlaylistForSnapshot().selectTrack (r.track);
+        simple->trackSelected (r.track);
+        settle();
+        auto* dock = simple->dockForSnapshot();
+        check ("the instrument track's dock has the Editor tab", dock != nullptr && dock->hasPlayTabsForCheck());
+        if (dock != nullptr)
+            dock->setTab (lynx::SimpleDock::Tab::editor);
+        settle();
+        check ("the Piano roll is docked in the Editor tab", dock != nullptr && dock->isEditorDocked() && dock->isParentOf (&ui.getPianoRollForSnapshot()));
+        paths ("Simple, Editor tab");
+
+        // the Pattern layout with the Piano roll panel, then the Clip-launch layout
+        ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+        settle();
+        ui.showPanelsForSnapshot ({ lynx::workspace::Panel::pianoRoll });
+        settle();
+        paths ("Pattern layout, Piano roll");
+        ui.setLayoutStyle (lynx::layoutstyle::Style::clipLaunch);
+        settle();
+        paths ("Clip-launch layout");
+
+        report << (ok ? "RESULT OK\n" : "RESULT FAILED\n");
+        save();
+        return ok;
     }
 
     void runSimple190dsShot (const juce::String& prefix)

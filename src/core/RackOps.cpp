@@ -83,7 +83,7 @@ int gotoNextEmptyPattern (Song& song)
 
     if (index < 0)
     {
-        if (! song.patterns.empty() && isPatternEmpty (song.patterns[(std::size_t) song.currentPattern]))
+        if (! song.patterns.empty() && isPatternEmpty (song.activePattern()))
             return song.currentPattern;
 
         Pattern p;

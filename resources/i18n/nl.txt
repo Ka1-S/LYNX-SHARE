@@ -8189,7 +8189,7 @@ countries: nl be
 "Measuring the mix..." = "Mix wordt gemeten..."
 "The mix is silent: nothing to measure." = "De mix is stil: niets te meten."
 "Mix {0} LUFS: input level {1}" = "Mix {0} LUFS: ingangsniveau {1}"
-"The Master has no room for the look: it needs four free effect slots." = "De master heeft geen ruimte voor de look: er zijn vier vrije effectslots nodig."
+"The Master has no room for the look: it needs five free effect slots." = "De master heeft geen ruimte voor de look: er zijn vijf vrije effectslots nodig."
 "Master looks: give the whole song a finished sound" = "Master-looks: geef het hele nummer een afgewerkte klank"
 "Balanced" = "Gebalanceerd"
 "Clarity" = "Helderheid"
