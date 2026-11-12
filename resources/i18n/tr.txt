@@ -9374,7 +9374,7 @@ countries: tr
 "Enigmatic" = "Enigmatik"
 "Neapolitan" = "Napoliten"
 "Remove Edison instances" = "Edison örneklerini kaldır"
-"Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "Projedeki tüm Edison örnekleri kaldırılsın mı?\n(Geri alınamaz)"
+"Are you sure you want to remove all Edison instances from the project ?" = "Projedeki tüm Edison örnekleri kaldırılsın mı?"
 
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 "New mixer track(s)" = "Yeni mikser kanal(lar)ı"

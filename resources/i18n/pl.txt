@@ -9374,7 +9374,7 @@ countries: pl
 "Enigmatic" = "Enigmatyczna"
 "Neapolitan" = "Neapolitańska"
 "Remove Edison instances" = "Usuń instancje Edisona"
-"Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "Czy na pewno usunąć wszystkie instancje Edisona z projektu?\n(Bez cofania)"
+"Are you sure you want to remove all Edison instances from the project ?" = "Czy na pewno usunąć wszystkie instancje Edisona z projektu?"
 
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 "New mixer track(s)" = "Nowe ścieżki miksera"

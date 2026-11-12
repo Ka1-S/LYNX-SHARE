@@ -2371,7 +2371,7 @@ Proof: `docs/analise/REA_rodada181b.md`.
 | Tools › Macros › Prepare for MIDI export | same numbering (FPC on 10, others 1–16 without 10), names kept | ✅ | FL skips only automation clip channels (seen at runtime); LYNX's automation clips aren't channels |
 | Tools › Riff machine | opens LYNX's Riff machine on the selected channel | ⚠️ | FL inserts a new Sytrus channel from `Data\System\Riff machine\*.fst` first |
 | Tools › Chord progression tool | opens LYNX's chord progression generator | ⚠️ | FL's is its own Python window (`cpt.pyscript`), much larger |
-| Tools › Macros › Remove all Edison instances | same item, in FL's place (after "Reset empty playlist tracks") | ✅ | round 190cd; one undo step; greyed when the project has none (LYNX) |
+| Tools › Macros › Remove all Edison instances | same item, in FL's place (after "Reset empty playlist tracks") | ✅ | round 190cd/190ct; asks first with FL's question, enabled with none (FL); LYNX can undo it (one step), so no "(No undo)" line (rollup 190cv) |
 | Tools › Macros › Switch all / selected audio clip channels to | same items, place and texts, with LYNX's modes (Resample, stretch engine, Ableton-style warp) | ⚠️ | user's decision: no élastique / slice modes; no tempo detection for channels without a stretch length |
 | Tools › Clipboard › Save audio / MIDI clipboard to browser, greyed when empty | same, into the Browser's "Clipboard files" | ⚠️ | audio: CF_WAVE on Windows, else LYNX's audio editor clipboard; " (2)" naming INFERRED |
 | Tools › Score logger (Dump score log to selected pattern, Clear log) | same, moved from Options to Tools | ✅ | |

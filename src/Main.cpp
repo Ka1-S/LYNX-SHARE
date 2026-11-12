@@ -13237,9 +13237,24 @@ private:
             check ("remove_all_edison_asks_first", found && enabled && count() == 2);
             const auto question = lynx::removeAllEdisonInstancesQuestion();
             check ("remove_all_edison_question_is_fls", question.getTitle() == lynx::tr ("Remove Edison instances")
-                                                            && question.getMessage() == lynx::tr ("Are you sure you want to remove all Edison instances from the project ?\n(No undo)")
+                                                            && question.getMessage() == lynx::tr ("Are you sure you want to remove all Edison instances from the project ?")
                                                             && question.getNumButtons() == 2 && question.getButtonText (0) == lynx::tr ("Yes")
                                                             && question.getButtonText (1) == lynx::tr ("No"));
+            // LYNX keeps an undo for the removal (rollup 190cv), so the question may not promise "(No undo)" in any
+            // language, and the Yes action must come back with one undo
+            {
+                bool noUndoLine = false;
+                for (const auto& line : juce::StringArray::fromLines (question.getMessage()))
+                    noUndoLine = noUndoLine || line.trim().startsWithChar ('(');
+                check ("remove_all_edison_question_has_no_no_undo_line", ! noUndoLine && ! question.getMessage().contains ("No undo"));
+                const int before = count();
+                lynx::removeAllEdisonInstances (engine);
+                engine.dispatchPendingMessages();
+                const int removed = count();
+                engine.undo();
+                engine.dispatchPendingMessages();
+                check ("remove_all_edison_yes_removes_and_undo_restores", before == 2 && removed == 0 && count() == 2);
+            }
             {
                 juce::AlertWindow box (question.getTitle(), question.getMessage(), question.getIconType());
                 box.addButton (question.getButtonText (0), 1);

@@ -4766,20 +4766,26 @@ int addEdisonSlot (AudioEngine& engine, int track, bool openAndRecord)
 
 juce::MessageBoxOptions removeAllEdisonInstancesQuestion()
 {
-    // FL's box, word for word (its "?" after a space included)
+    // FL's box word for word (its "?" after a space included), less FL's second line "(No undo)": LYNX's removal is
+    // one undo step (removeAllEdisonInstances), so that line would be false here
     return juce::MessageBoxOptions()
         .withIconType (juce::MessageBoxIconType::QuestionIcon)
         .withTitle (tr ("Remove Edison instances"))
-        .withMessage (tr ("Are you sure you want to remove all Edison instances from the project ?\n(No undo)"))
+        .withMessage (tr ("Are you sure you want to remove all Edison instances from the project ?"))
         .withButton (tr ("Yes"))
         .withButton (tr ("No"));
+}
+
+void removeAllEdisonInstances (AudioEngine& engine)
+{
+    engine.editSongStructural ([] (Song& song) { mixerops::removeEffectsOfKind (song, EffectKind::edison); });
 }
 
 void askRemoveAllEdisonInstances (AudioEngine& engine)
 {
     juce::AlertWindow::showAsync (removeAllEdisonInstancesQuestion(), [&engine] (int result) {
         if (result == 1)
-            engine.editSongStructural ([] (Song& song) { mixerops::removeEffectsOfKind (song, EffectKind::edison); });
+            removeAllEdisonInstances (engine);
     });
 }
 

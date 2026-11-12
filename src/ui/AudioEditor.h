@@ -44,9 +44,11 @@ std::unique_ptr<juce::Component> makeEdisonSlotEditor (AudioEngine& engine, int 
 // Slave on); otherwise a fresh Edison. Returns the effect's index, or -1 when the track is full.
 int addEdisonSlot (AudioEngine& engine, int track, bool openAndRecord = false);
 // Tools › Macros › "Remove all Edison instances": FL's question first (title "Remove Edison instances", Yes / No; live FL
-// check 190cq, shot edison190cd-07b), then every Edison slot is emptied on Yes (one undo step in LYNX). The question
-// alone, for --edisonslottest.
+// check 190cq, shot edison190cd-07b), then every Edison slot is emptied on Yes. LYNX keeps this as one undo step
+// (coordinator decision, rollup 190cv: an undo is strictly better), so its text leaves out FL's second line "(No undo)".
+// The question alone and the Yes action alone, for --edisonslottest.
 juce::MessageBoxOptions removeAllEdisonInstancesQuestion();
+void removeAllEdisonInstances (AudioEngine& engine);
 void askRemoveAllEdisonInstances (AudioEngine& engine);
 
 // --snapshot: the editor showing `doc` (selection = the second quarter), in the waveform or spectrogram view.
