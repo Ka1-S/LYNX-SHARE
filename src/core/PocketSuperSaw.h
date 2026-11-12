@@ -19,7 +19,9 @@
 //
 // Differences from FLM, by design: one random generator per instance (FLM shares one between every SuperSaw of the
 // process), so start phases, table dither and the random LFO differ from any given FLM render; the channel's pitch
-// (knob, fine tune, main pitch, MIDI wheel through the channel's pitch range) is added to every voice.
+// (knob, fine tune, main pitch) is added to every voice, live; the MIDI wheel bends by the module's own Pitch bend
+// range; and LYNX's channel Mono / Porta and piano roll slide notes move the voices as they do FL's generators
+// (core/HostSlide.h), on top of the module's own Monophonic mode and Slide time.
 
 #include <array>
 #include <cstdint>
@@ -89,6 +91,9 @@ public:
     // velocity 0…1 (0 = note off), pan 0…1 (½ = centre), pitch = the note's own offset in semitones
     void note (int key, float velocity, float pan = 0.5f, float pitch = 0.0f) noexcept;
     void setPitchOffset (float semitones) noexcept; // added to every voice (the channel's pitch)
+    // a slide note of the host (LYNX's piano roll / channel Mono): the sounding voices glide to `key` + `cents` over
+    // `samples`, keeping their keys; a note started inside HostSlide::pendingGlide() glides in (channel Porta)
+    void slideTo (int key, float cents, float samples) noexcept;
     void setModWheel (float value) noexcept;        // 0…1
     void setPitchBend (float value) noexcept;       // −1…1 of the module's Pitch Bend Range
     void allNotesOff() noexcept;

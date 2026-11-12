@@ -3246,8 +3246,6 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         }
         menu.addSubMenu (tr ("File"), file);
     }
-    if (t > 0) // round 190ch (LYNX's own, not an FL item): the one-click vocal clean-up chain on this insert
-        menu.addSubMenu (tr ("Clean voice"), lynx::ui::cleanVoiceMenu (engine, t));
     if (t > 0)
     {
         const auto& mt = song.mixer[(std::size_t) t];
@@ -3439,6 +3437,10 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         });
         if (t > 0)
             menu.addItem (tr ("Render to audio (freeze)..."), [this, t] { bounceInsertToAudio (engine, t); });
+        // round 190ch (LYNX's own, not an FL item): the one-click vocal clean-up chain on this insert. Round 190cm: here
+        // with LYNX's other sound items, no longer between FL's own "File" and audio input rows
+        if (t > 0)
+            menu.addSubMenu (tr ("Clean voice"), lynx::ui::cleanVoiceMenu (engine, t));
     }
 
     // --- FL's "Group" section (REA round 146a) -----------------------------------------------------------

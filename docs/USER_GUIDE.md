@@ -39,7 +39,8 @@ In the clip grid (Clip-launch workflow):
 - **Fixed recording length** (right-click › grid options): the recording ends by itself after 1 to 32 bars.
 - **Clips**: Ctrl+C / X / V and Ctrl+D (duplicate into the slot below); drag a clip to another slot (Ctrl copies), onto
   the Playlist, or drop an audio file or a pattern from the Browser on a slot. Copy and Paste also work between the
-  grid and the Playlist. Ctrl+Shift+M puts a new empty MIDI clip in the selected slot.
+  grid and the Playlist. Ctrl+Shift+M puts a new empty MIDI clip in the selected slot (in the Clip-launch layout; in the
+  other layouts the key stays Export › MIDI file and the command is in the slot's menu).
 - **Grooves** (the Grooves button under the grid opens the Groove Pool): add one of LYNX's grooves with **+** (or import
   a groove file you own), then pick it for a MIDI clip in the slot's menu › Groove. The clip plays through it without
   changing its notes. Each groove has Base, Quantize, Timing, Random and Velocity; **Global Amount** scales all grooves

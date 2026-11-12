@@ -82,6 +82,7 @@ waves = RComp; CLA-2A                   # WaveShell sub-plugins, by the <PluginN
 preset = Dry=0; Wet=0.8                 # LYNX parameter (by name) = normalised value 0..1
 mix = 0.25                              # the substitute's slot dry/wet
 default = Some Verb | Decay=0.7; Mix=1  # one named device of a role entry: its own preset over `preset`, slot mix 100 % (round 190ca)
+default = Send Verb | Decay=0.5; mix=0.25   # … or with the slot's dry/wet given by a lower-case mix= item (round 190cm)
 vst2params = 12                         # VST2 parameters per program (to read "all programs" states)
 map = xml:Mix -> mix                    # translation: source -> target [| inLo inHi outLo outHi]
 map = xml:ReverbMode -> Mode | steps 0:0 0.0828:0.0476   # enumerations: breakpoints (round 100)

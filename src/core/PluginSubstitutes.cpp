@@ -615,10 +615,13 @@ mix = 0.25
 # each device's probe renders (decay per band, onset, dry gain, wet energy and band balance, echo density, L/R correlation,
 # band limit; the lab folder nebula190ca/maps, fitverb.py). FlexVerb and VerbSuite default to 100 % wet, the two SSL plates
 # to an even mix. Both shelves sit at 700 Hz: equal gains there are a flat wet gain (Foil has no wet level control).
+# round 190cm: FlexVerb and VerbSuite keep the role's 25 % wet (mix=0.25 = the slot's dry/wet, the effect itself all wet as
+# in `preset`): no state of theirs is translated, so the mix a project used is unknown, and before round 190ca their
+# stand-in opened at 25 % — an import must not suddenly get wetter. The fitted character (decay, size, EQ, type) stays.
 default = SSL PlateVerb | Mix=0.2687; Predelay=0.4168; Decay=0.3028; Size=1.0000; Width=0.5000; Mod rate=0.0000; Mod depth=1.0000; Low EQ freq=0.7420; Low EQ gain=0.7917; High EQ freq=0.0606; High EQ gain=1.0000; Type=0.2900; Low cut=0.3268; Voicing=1.0000
 default = SSL SpringVerb | Mix=0.1933; Predelay=0.0000; Decay=0.4877; Size=1.0000; Width=0.5000; Mod rate=0.0000; Mod depth=0.2309; Low EQ freq=0.7420; Low EQ gain=1.0000; High EQ freq=0.0606; High EQ gain=0.9915; Type=0.3750; Low cut=0.3764; Voicing=0.0000
-default = SSL Native FlexVerb | Mix=1.0000; Predelay=0.0000; Decay=0.0541; Size=0.2500; Width=0.4694; Mod rate=0.0000; Mod depth=0.0768; Low EQ freq=0.7420; Low EQ gain=0.8524; High EQ freq=0.0606; High EQ gain=0.9149; Type=0.8750; Low cut=0.5996; Voicing=0.0000
-default = VerbSuite Classics | Mix=1.0000; Predelay=0.1351; Decay=0.2780; Size=1.0000; Width=0.5000; Mod rate=0.0000; Mod depth=0.0000; Low EQ freq=0.7420; Low EQ gain=0.2242; High EQ freq=0.0606; High EQ gain=0.5054; Type=0.2900; Low cut=0.0000; Voicing=1.0000
+default = SSL Native FlexVerb | Mix=1.0000; Predelay=0.0000; Decay=0.0541; Size=0.2500; Width=0.4694; Mod rate=0.0000; Mod depth=0.0768; Low EQ freq=0.7420; Low EQ gain=0.8524; High EQ freq=0.0606; High EQ gain=0.9149; Type=0.8750; Low cut=0.5996; Voicing=0.0000; mix=0.25
+default = VerbSuite Classics | Mix=1.0000; Predelay=0.1351; Decay=0.2780; Size=1.0000; Width=0.5000; Mod rate=0.0000; Mod depth=0.0000; Low EQ freq=0.7420; Low EQ gain=0.2242; High EQ freq=0.0606; High EQ gain=0.5054; Type=0.2900; Low cut=0.0000; Voicing=1.0000; mix=0.25
 
 [complete-access-delays]
 product = delays (SSL X-Echo / X-Delay, Slate Stellar Echo SD-201, Harrison 3D Delay)
@@ -3178,10 +3181,14 @@ PluginIdentity pluginIdentity (const ForeignPlugin& plugin)
 // <preset items>` gives one of them its own starting preset (the values a setting map fitted on the device's probe
 // renders gives at the device's default setting); it is applied over `preset` when that plugin is replaced, with the slot
 // mix at 100 % (the effect's own Mix carries the device's dry/wet). Kept beside the table (entry key -> defaults).
+// Round 190cm: an item "mix=<0…1>" (lower case, like the `mix` key and a map's target) is the slot's dry/wet instead of
+// 100 %: for a device whose own default is all wet (a send reverb) while nothing in its saved state tells the mix it
+// was used at — the stand-in then opens at the role's wet amount, as it did before the device had a preset.
 struct DeviceDefault
 {
     std::string nameKey;
     std::vector<std::pair<int, float>> preset;
+    float slotMix = 1.0f;
 };
 std::mutex& deviceDefaultsLock()
 {
@@ -3250,6 +3257,11 @@ std::vector<SubstituteEntry> parseSubstituteTable (std::string_view text, int* e
             {
                 const auto eq = item.rfind ('=');
                 float v = 0;
+                if (eq != std::string::npos && trim (item.substr (0, eq)) == "mix" && parseFloat (trim (item.substr (eq + 1)), v))
+                {
+                    d.slotMix = std::clamp (v, 0.0f, 1.0f);
+                    continue;
+                }
                 const auto index = eq == std::string::npos ? -1 : paramNamed (*kind, item.substr (0, eq));
                 if (index < 0 || ! parseFloat (trim (item.substr (eq + 1)), v))
                 {
@@ -3488,7 +3500,7 @@ EffectSlot makeSubstituteSlot (const SubstituteEntry& entry, const PluginIdentit
                 for (const auto& [index, value] : d->preset)
                     if (index >= 0 && index < maxEffectParams)
                         slot.params[(std::size_t) index] = value;
-                slot.mix = 1.0f;
+                slot.mix = d->slotMix;
                 break;
             }
     }

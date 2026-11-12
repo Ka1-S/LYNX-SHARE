@@ -18,6 +18,7 @@
 #include "core/AutoWarp.h"
 #include "core/EdisonFx.h"
 #include "core/EdisonScript.h"
+#include "core/SessionKeys.h"
 #include "core/Instruments.h"
 #include "core/MixerOps.h"
 #include "core/NewtoneFx.h"
@@ -1087,8 +1088,9 @@ public:
         });
         menu.addItem (tr ("Set 1.1.1 here"), has, false, [this, seconds] { setWarpOneOneOne (seconds); });
         menu.addSeparator();
-        menu.addItem (tr ("Insert warp markers") + "\tCtrl+I", has && ! selection.empty(), false, [this] { insertWarpMarkers(); });
-        menu.addItem (tr ("Quantize audio") + "\tCtrl+U", has, false, [this] { quantizeWarp(); });
+        menu.addItem (tr ("Insert warp markers") + sessionkeys::menuKey (sessionkeys::Command::audioInsertWarpMarkers), has && ! selection.empty(), false,
+                      [this] { insertWarpMarkers(); });
+        menu.addItem (tr ("Quantize audio") + sessionkeys::menuKey (sessionkeys::Command::audioQuantize), has, false, [this] { quantizeWarp(); });
         juce::PopupMenu settings;
         const std::pair<const char*, double> grids[] = { { "1/4", 1.0 }, { "1/8", 0.5 }, { "1/8T", 1.0 / 3.0 }, { "1/16", 0.25 }, { "1/16T", 1.0 / 6.0 }, { "1/32", 0.125 } };
         for (const auto& [name, beats] : grids)
@@ -1507,12 +1509,16 @@ public:
             return true;
         }
         // round 190cg: Live's Insert Warp Markers and Quantize on a channel's audio
-        if (ctrl && ! shift && source.kind == Source::Kind::channel && (code == 'I' || c == 'i') && ! selection.empty())
+        // (round 190cm: default keys only in the Clip-launch layout, core/SessionKeys.h; elsewhere the chords are not
+        // taken, so Ctrl+I stays "Recording waits for input" and the commands are in the warp menu)
+        if (ctrl && ! shift && source.kind == Source::Kind::channel && (code == 'I' || c == 'i') && ! selection.empty()
+            && sessionkeys::defaultKeyActs (sessionkeys::Command::audioInsertWarpMarkers))
         {
             insertWarpMarkers();
             return true;
         }
-        if (ctrl && ! shift && source.kind == Source::Kind::channel && warpMode && (code == 'U' || c == 'u'))
+        if (ctrl && ! shift && source.kind == Source::Kind::channel && warpMode && (code == 'U' || c == 'u')
+            && sessionkeys::defaultKeyActs (sessionkeys::Command::audioQuantize))
         {
             quantizeWarp();
             return true;

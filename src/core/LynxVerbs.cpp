@@ -1930,7 +1930,12 @@ public:
     FoilFx() : VerbEffect (EffectKind::foilPlate, 0.2, 0.62) {}
 
 protected:
-    int structure (const EffectParams& p) const noexcept override { return choice (p[11], foil::typeCount) + (p[foil::engineLaw] >= 0.5f ? 1000 : 0); }
+    // (round 190cm: the measured plate voicing is another tank too — its own level (+6 … +16 dB), band edges, onset
+    // network and, under the Measured law, loop voicing — so switching it while playing takes the same fade as a type)
+    int structure (const EffectParams& p) const noexcept override
+    {
+        return choice (p[11], foil::typeCount) + (p[foil::engineLaw] >= 0.5f ? 1000 : 0) + (p[14] >= 0.5f ? 2000 : 0);
+    }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto& t = foilTypes[choice (p[11], foil::typeCount)];

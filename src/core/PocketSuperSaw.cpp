@@ -7,6 +7,7 @@
 #include <cstring>
 #include <optional>
 
+#include "core/HostSlide.h"
 #include "core/ModelParams.h"
 
 // Pocket SuperSaw (core/PocketSuperSaw.h). The numbered notes ("§3.2") refer to docs/analise/REA_rodada190by.md.
@@ -166,6 +167,8 @@ struct Voice
     std::uint32_t started = 0;
     float gL = -1.0f, gR = -1.0f, targetL = 0.0f, targetR = 0.0f; // (−1: takes the target at the first tick)
     float notePitch = 0.0f;
+    // the host's slide notes and channel porta (FL's workflow in LYNX, not FLM's): cents added to the voice's pitch
+    HostSlide slide;
 
     bool active() const noexcept { return velocity != 0.0f; }
 
@@ -182,6 +185,7 @@ struct Voice
         lfoPhase = 0.0;
         gL = gR = -1.0f;
         key = -1;
+        slide = HostSlide();
         lfoHold = m->rng.unit(); // (FLM draws with the dither generator here; one generator per instance in LYNX)
     }
 
@@ -426,7 +430,10 @@ struct Voice
             note = target;
         hz = note >= 1.0f ? pow2 ((note - 69.0f) / 12.0f) * 440.0f : 0.0f;
         const auto semis = ((float) m->bendRange * m->bend + (float) (int) (P[flm::transpose] * 24.0f)) - 12.0f;
-        hz = (float) (std::pow (2.0, (double) (semis * 0.083333336f + lfoTo (2)) + (double) (notePitch + m->pitchOffset) * 0.08333333333333333)
+        if (slide.moving())
+            slide.advance ((float) tickSamples);
+        hz = (float) (std::pow (2.0, (double) (semis * 0.083333336f + lfoTo (2))
+                                         + (double) (notePitch + m->pitchOffset + slide.cents * 0.01f) * 0.08333333333333333)
                       * (double) hz);
         cycles = (float) ((double) hz / m->fs);
         if (m->superSync)
@@ -778,7 +785,19 @@ struct Engine::Impl
         }
         voice->started = ++counter;
         voice->start (key, velocity, pan, from, retrigger, pitch);
+        // a new note: no slide of an older one; LYNX's channel porta (the rack set it around this note on) glides it in
+        voice->slide = HostSlide();
+        voice->slide.anchor (NAN);
         lastKey = key;
+    }
+
+    // a slide note of the host: every sounding, unreleased voice glides to `key` + `cents` over `samples`, keeping
+    // its key (HostSlide.h); `cents` is measured like the `pitch` its note on gave (× 100)
+    void slideTo (int key, float cents, float samples) noexcept
+    {
+        for (auto& v : voices)
+            if (v.active() && v.amp.stage != release)
+                v.slide.start (100.0f * (float) (key - v.key) + cents - v.notePitch * 100.0f, samples);
     }
 
     void noteOff (int key) noexcept
@@ -996,6 +1015,7 @@ void Engine::setParam (int index, float value) noexcept
 float Engine::param (int index) const noexcept { return index >= 0 && index < flmParamCount ? impl->m.P[(std::size_t) index] : 0.0f; }
 void Engine::note (int key, float velocity, float pan, float pitch) noexcept { impl->note (key, velocity, pan, pitch); }
 void Engine::setPitchOffset (float semitones) noexcept { impl->m.pitchOffset = semitones; }
+void Engine::slideTo (int key, float cents, float samples) noexcept { impl->slideTo (key, cents, samples); }
 
 void Engine::setModWheel (float value) noexcept
 {
@@ -1289,6 +1309,7 @@ public:
     {
         tempo.store (bpm > 0.0 ? (float) bpm : 120.0f);
         pitchCents.store (channel.sampler.pitch * 100.0f);
+        wheelRange.store ((float) std::max (1, channel.misc.pitchRange));
         const auto d = pocketSuperSawDefaults();
         bool changed = false;
         for (int i = 0; i < pocketsaw::paramCount; ++i)
@@ -1317,17 +1338,29 @@ public:
         nextCents = cents;
     }
 
-    // the channel's pitch reaches the voices at each render (the knob) and with each note (fine tune, main pitch)
-    void setChannelPitchNow (float, float) noexcept override {}
-    // the MIDI wheel, already in semitones of the channel's pitch range: every voice follows it at the next tick
-    void pitchBend (float semitones) noexcept override { wheelSemis = std::isfinite (semitones) ? semitones : 0.0f; }
+    // the channel's pitch as the rack gives it before every render (PITCH knob; fine tune + main pitch): every voice
+    // follows it at its next tick, sounding or new (FL's generators do, round 167a), the arpeggiator's notes too
+    void setChannelPitchNow (float knob, float rest) noexcept override { live.set (knob, rest); }
+    // the MIDI wheel: the rack gives it in semitones of the channel's pitch range; the module bends by its own Pitch
+    // bend range (as FLM's does), so the wheel's throw (−1…1) goes to the engine and every voice follows at its next tick
+    void pitchBend (float semitones) noexcept override
+    {
+        engine.setPitchBend (std::isfinite (semitones) ? semitones / wheelRange.load() : 0.0f);
+    }
+    // FL's channel Porta / Mono and slide notes (round 168l, issue #14): the voices take the rack's glide at note on
+    // and follow a slide note, each keeping its key
+    bool followsChannelPorta() const noexcept override { return true; }
+    void slideTo (int key, float cents, float samples) noexcept override
+    {
+        engine.slideTo (std::clamp (key, 0, 127), cents - liveRest(), samples);
+    }
 
     void noteOn (int key, float velocity) noexcept override
     {
         take();
         // FLM's note: the velocity as it is (0 would be a note off), pan 0…1
         engine.note (std::clamp (key, 0, 127), std::max (std::clamp (velocity, 0.0f, 1.0f), 1.0f / 255.0f),
-                     std::clamp (0.5f + 0.5f * nextPan, 0.0f, 1.0f), nextCents * 0.01f);
+                     std::clamp (0.5f + 0.5f * nextPan, 0.0f, 1.0f), (nextCents - liveRest()) * 0.01f);
         nextPan = 0.0f;
         nextCents = 0.0f;
     }
@@ -1354,7 +1387,7 @@ public:
         take();
         if (n <= 0 || engine.sampleRate() != rate)
             return;
-        engine.setPitchOffset (pitchCents.load() * 0.01f + wheelSemis);
+        engine.setPitchOffset ((std::isnan (live.knob) ? pitchCents.load() : live.now()) * 0.01f);
         const auto bpm = (double) tempo.load();
         for (int pos = 0; pos < n; pos += chunk)
         {
@@ -1371,6 +1404,9 @@ public:
     }
 
 private:
+    // the part of a note's cents that is the channel's (fine tune + main pitch): the voices get it live with the knob
+    float liveRest() const noexcept { return std::isnan (live.rest) ? 0.0f : live.rest; }
+
     void take() noexcept
     {
         const auto v = version.load();
@@ -1386,8 +1422,9 @@ private:
     std::array<std::atomic<float>, pocketsaw::paramCount> values {};
     std::atomic<std::uint32_t> version { 1 };
     std::uint32_t taken = 0;
-    std::atomic<float> tempo { 120.0f }, pitchCents { 0.0f };
-    float wheelSemis = 0.0f, nextPan = 0.0f, nextCents = 0.0f;
+    std::atomic<float> tempo { 120.0f }, pitchCents { 0.0f }, wheelRange { 2.0f };
+    LiveChannelPitch live; // (audio thread)
+    float nextPan = 0.0f, nextCents = 0.0f;
     double rate = 44100.0, lastTicks = -1.0, songBeats = 0.0;
     bool playing = false;
     float bufL[chunk] {}, bufR[chunk] {};

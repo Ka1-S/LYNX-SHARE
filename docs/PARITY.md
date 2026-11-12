@@ -2934,3 +2934,27 @@ Horizon −14 % (Chamber −10 %): the shelves run eight lines wide and the modu
 
 The devices that only borrow Foil Plate (rule `complete-access-reverbs`) stay on the Classic law (`Law=0` in the
 rule's preset): their maps were fitted on it, and their rows are unchanged.
+
+## Round 190cm — the 0.1.27 integration made green
+
+No sound law changed; what the full suite found in the new 0.1.27 code is closed in the product:
+
+- **Pocket SuperSaw** follows LYNX's channel workflow like FL's generators: channel Mono / Porta (the rack's glide is
+  taken at note on, `HostSlide`), piano roll slide notes (each sounding voice glides to the slide note and keeps its
+  key), the channel's PITCH knob, fine tune and main pitch live on sounding notes and on the arpeggiator's notes, and
+  the MIDI wheel through the module's own **Pitch bend range** (1…12 semitones; it was a stored value with no source).
+  The module's own Monophonic mode and Slide time are unchanged and stack with them. Parity against FL Studio Mobile:
+  the 37 A/B renders of round 190by are byte-identical before / after.
+- **Foil Plate**: switching **Voicing** (plate types ↔ the measured plate) while playing fades the wet signal out on
+  the old tank and in on the new one (11 ms each way, the fade a type or Law change already had), under both laws.
+  A steady setting renders the same samples as before (Classic: the 190bz goldens and the 135-render identity).
+- **Reverb stand-ins**: SSL Native FlexVerb and VerbSuite Classics keep their fitted starting presets of round 190ca
+  but open at the role's 25 % slot mix again (the effect all wet), since nothing in their saved state is translated;
+  `default = … ; mix=0.25` in the substitutes table. SSL PlateVerb / SpringVerb are unchanged (their own even mix).
+- **Keys**: Ctrl+Shift+M (new empty MIDI clip in the clip grid), Ctrl+I and Ctrl+U (insert warp markers, quantize
+  audio in the audio editor) act as default keys only in the Clip-launch layout (`core/SessionKeys.h`); in the Pattern
+  and Simple layouts the commands stay in their menus without a key, so Export › MIDI file keeps Ctrl+Shift+M and
+  "Recording waits for input" keeps Ctrl+I.
+- **Mixer insert menu**: "Clean voice" (LYNX's own) sits in the menu's Sound section with LYNX's other sound items.
+- Audits: the generator and effect control audits now know the contexts of the Pocket engines' conditional controls
+  (`tools/CtlWake.h`, `tools/FxAudit.h`); Pocket Tape Stop silent with Play off is FL Studio Mobile's behaviour.

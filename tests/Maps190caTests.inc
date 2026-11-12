@@ -59,13 +59,15 @@ TEST (p190ca_reverb_role_devices_start_at_their_own_default)
 {
     using namespace lynx;
     const auto paramOf = [] (const EffectSlot& s, const char* name) { return s.params[(std::size_t) p190ca::paramNamed (s.kind, name)]; };
-    struct Want { const char* name; float mix, decay, voicing, type, width; };
-    for (const auto& w : { Want { "SSL PlateVerb", 0.2687f, 0.3028f, 1.0f, 0.29f, 0.5f }, Want { "SSL SpringVerb", 0.1933f, 0.4877f, 0.0f, 0.375f, 0.5f },
-                           Want { "SSL Native FlexVerb", 1.0f, 0.0541f, 0.0f, 0.875f, 0.4694f }, Want { "VerbSuite Classics", 1.0f, 0.278f, 1.0f, 0.29f, 0.5f } })
+    // (round 190cm: FlexVerb and VerbSuite, all wet at their own default, keep the role's 25 % slot mix — a stand-in must
+    // not open wetter than it did before round 190ca; the two plates' even mix is Foil's own Mix at a slot mix of 100 %)
+    struct Want { const char* name; float mix, decay, voicing, type, width, slotMix; };
+    for (const auto& w : { Want { "SSL PlateVerb", 0.2687f, 0.3028f, 1.0f, 0.29f, 0.5f, 1.0f }, Want { "SSL SpringVerb", 0.1933f, 0.4877f, 0.0f, 0.375f, 0.5f, 1.0f },
+                           Want { "SSL Native FlexVerb", 1.0f, 0.0541f, 0.0f, 0.875f, 0.4694f, 0.25f }, Want { "VerbSuite Classics", 1.0f, 0.278f, 1.0f, 0.29f, 0.5f, 0.25f } })
     {
         const auto s = p190ca::substituted (p190ca::vst3Named (w.name));
         CHECK (s.kind == EffectKind::foilPlate && s.isSubstitute());
-        CHECK (s.mix == 1.0f); // Foil's own Mix carries the device's dry/wet
+        CHECK (s.mix == w.slotMix); // Foil's own Mix carries the device's dry/wet, or the role's slot mix when unknown
         CHECK (std::abs (paramOf (s, "Mix") - w.mix) < 1e-6f && std::abs (paramOf (s, "Decay") - w.decay) < 1e-6f);
         CHECK (std::abs (paramOf (s, "Voicing") - w.voicing) < 1e-6f && std::abs (paramOf (s, "Type") - w.type) < 1e-6f);
         CHECK (std::abs (paramOf (s, "Width") - w.width) < 1e-6f);
@@ -113,6 +115,17 @@ TEST (p190ca_device_defaults_parse_and_report_errors)
     CHECK (errors == 1);
     parseSubstituteTable ("[p190ca-test]\nlynx = Foil Plate\nnames = Some Verb\ndefault = Some Verb | Nope=0.7\n", &errors);
     CHECK (errors == 1);
+    // (round 190cm) a lower-case mix= item is the slot's dry/wet, "Mix" stays the effect's parameter
+    t = parseSubstituteTable ("[p190ca-test]\nlynx = Foil Plate\nnames = Send Verb\npreset = Mix=1\nmix = 0.25\ndefault = Send Verb | Decay=0.7; Mix=0.9; mix=0.3\n", &errors);
+    CHECK (errors == 0 && t.size() == 1);
+    if (t.size() == 1)
+    {
+        PluginIdentity a;
+        a.format = ForeignPlugin::Format::vst3;
+        a.name = "Send Verb";
+        const auto s = makeSubstituteSlot (t[0], &a);
+        CHECK (std::abs (s.mix - 0.3f) < 1e-6f && std::abs (s.params[(std::size_t) p190ca::paramNamed (EffectKind::foilPlate, "Mix")] - 0.9f) < 1e-6f);
+    }
     parseSubstituteTable ("[p190ca-test]\nlynx = Foil Plate\nnames = Some Verb\n", &errors); // leaves no default behind
     CHECK (errors == 0);
 }

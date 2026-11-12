@@ -95,6 +95,9 @@ const std::vector<Allowed>& allowed()
         { "Pocket Compressor", "RMS", "inert", "fl-inert: FLM's setter always clears the RMS flag (its RMS mode is unreachable), so the control does nothing there either" },
         { "Pocket Compressor", "Auto gain", "clip", "behaviour: with Auto gain off FLM's Level runs 0…+40 dB instead of −20…+20 dB, so the default Level is +20 dB" },
         { "Pocket Tremolo", "Stereo offset", "inert", "not-in-programme: the audit only tries the knob's end, 360°, a whole cycle = the same phase; 90° and 180° move the right channel (FlmImport189hBTests.inc)" },
+        // round 190cm: FLM's Tape Stop held off is silence — the stop ramp ends on a ~11 ms decay to nothing and the input is
+        // not heard until Play goes on (spec-tapestop.md §0, §3.3; FL render "Play off": silence, flmeng190by/fx/scores_all.txt)
+        { "Pocket Tape Stop", "Play", "silent", "behaviour: FLM's Tape Stop is silent while Play is off (the tape has stopped); the ramps are checked by the Play-edge contexts of tools/FxAudit.h" },
         { "Pocket Wow & Flutter", "Random rate", "inert", "not-in-programme: FLM writes the sync length after the free rate, so a loaded state takes its random interval from the sync length; the free rate acts when it is moved while playing" },
     };
     return a;

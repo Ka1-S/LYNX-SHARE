@@ -7,6 +7,7 @@
 #include "core/ClipLauncher.h"
 #include "core/DetailChain.h"
 #include "core/Groove.h"
+#include "core/SessionKeys.h"
 #include "core/SessionOps.h"
 #include "engine/SampleLibrary.h"
 #include "ui/BrowserComponent.h"
@@ -443,7 +444,8 @@ public:
                 duplicateSlot (selectedTrack, selectedScene);
                 return true;
             }
-            if (shift && letter == 'M')
+            // (round 190cm: only in the Clip-launch layout; elsewhere Ctrl+Shift+M stays "Export a MIDI file")
+            if (shift && letter == 'M' && sessionkeys::defaultKeyActs (sessionkeys::Command::gridNewMidiClip))
             {
                 insertEmptyClip (selectedTrack, selectedScene);
                 return true;
@@ -949,7 +951,8 @@ public:
         else
         {
             menu.addItem (tr ("Paste") + "\tCtrl+V", canPaste(), false, [this, track, scene] { pasteSlot (track, scene); });
-            menu.addItem (tr ("Insert empty MIDI clip") + "\tCtrl+Shift+M", [this, track, scene] { insertEmptyClip (track, scene); });
+            menu.addItem (tr ("Insert empty MIDI clip") + sessionkeys::menuKey (sessionkeys::Command::gridNewMidiClip),
+                          [this, track, scene] { insertEmptyClip (track, scene); });
             const auto has = launcher::hasStopButton (*grid, track, scene);
             menu.addItem (tr ("Stop button (a scene stops this track here)"), true, has, [this, track, scene, has] {
                 engine.editSong ([=] (Song& s) { launcher::setStopButton (s, track, scene, ! has); });
