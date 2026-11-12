@@ -1941,8 +1941,9 @@ public:
         target->stage = attackSeconds > 0.0f ? 0 : 1;
 
         // FL Studio Mobile's pad (core/FlmPad.h): the level starts at 0 and takes its first step before the first
-        // sample, as FLM's voice does; Sample Start moves the read position (seconds of the file) or delays the voice
-        target->padEnv = ! clipMode && padOn.load (std::memory_order_relaxed);
+        // sample, as FLM's voice does; Sample Start moves the read position (seconds of the file) or delays the voice.
+        // An imported FLM audio clip plays the same slot voice (round 190de): its clip channel may carry the envelope too
+        target->padEnv = padOn.load (std::memory_order_relaxed);
         target->padDelay = 0;
         if (target->padEnv)
         {

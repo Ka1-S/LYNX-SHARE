@@ -520,6 +520,88 @@ index follows the file's preset order is INFERRED; no sample project uses the mo
 LYNX imports it as LYNX Soundfont: the font and preset, the linear velocity curve, and for Custom the four overrides
 (decay and release as 2.5·T on LYNX's 100 dB time knobs). The level and the envelope's exact shape are approximations.
 
+### 7.4 The module wrapper on instruments; instrument and Pitch Bend automation (round 190de)
+
+PROVEN-REA 0x180799750 (the wrapper the rack's render 0x18059d3b0 calls for every module, generators included):
+- Enable (parameter 0) below 0.5, or Mix 0: the module's render is **not called** — a switched-off instrument makes
+  no sound and its voices stand still until it is switched on again.
+- Otherwise the module renders into its own buffer; the result × the Post Gain 10^(2g − 1) (40g − 20 dB) is mixed into
+  the rack's buffer at Mix, the wet side through the Wet Pan's balance (min(1, 2(1 − p)) left, min(1, 2p) right),
+  both smoothed per sample (one-pole 0.001). With Mix 1 and Wet Pan ½ the module renders straight into the rack's
+  buffer and the Post Gain then scales that whole buffer (what earlier modules and the drum slots put there too).
+- LYNX: a generator's channel is muted when its Enable is off; Post Gain × Mix is the channel's level (above 0 dB: the
+  sampler's gain, capped at 0 dB on other engines and listed); Wet Pan is added to the channel's pan. Exact for the
+  first generator of a rack without drum slots (its "dry" buffer is silent); with other sounds before it in the rack
+  a Mix below 1 would also lower them in FLM, which is listed. In FL's 20 sample projects: 3 generators switched off,
+  one Post Gain (−6 dB) and one Mix (0.045).
+
+Automation lanes on a generator's parameters (their names in §7.1, values the module's own 0…1): every FLM engine
+LYNX has keeps FLM's values, so a lane becomes LYNX automation of the same value — Pocket SuperSaw (FLM k → k − 1),
+MiniSynth's FLM build (FLM k → desktop k − 1; MW Dest folded as on import), GMSynth (FLM) (P[k]), Transistor Bass
+(the 13 knobs through the import's map). Enable lanes drive the channel's volume (on / silent): approximate, as
+FLM freezes the module's voices while LYNX's run on silently. The sample projects hold 22 such lanes: MiniSynth FLT
+Freq (13) and AMP Rel, SuperSaw Filter Cutoff, Transpose and Enable, GMSynth Transpose, DW Sampler Pitch.
+
+The rack's Pitch Bend (module 0, parameter 4; its held value and its lanes, PROVEN-REA 0x18059e0c0) is not one law:
+the rack hands b = 4v − 2 to every module's bend input and plays its drum slots at 2^b (±24 semitones). The modules
+bend by their own range: DW Sampler b/2 × its PB Range (CSTM `MIDI`, default 4; PROVEN-REA 0x18077f560), SuperSaw b/2 ×
+int(11·P37 + 1), GMSynth b/2 × its CSTM range {1, 2, 7, 12}, MiniSynth b semitones (PROVEN-REA 0x1806aea20: stored as
+is and added to the note). LYNX: the channel's bend range is set to that range (24 on drum slots); a held value moves
+the channel's PITCH knob by (2v − 1) × range, a lane becomes LYNX pitch-bend automation of every such channel (LYNX
+bends by (2v − 1) × the range: the same semitones). Modules whose bend was not traced (Transistor Bass, 3x Osc,
+SoundFont Player) are listed. Three sample projects bend this way (one lane holds 114 clips). Aftertouch and MIDI CC
+lanes stay listed.
+
+### 7.5 DW Sampler (round 190de)
+
+PROVEN-REA (class CSmpSynth, vtable 0x180a0ecd8: CSTM reader 0x180785550, preset loader 0x180787410, note slot
+0x180783980, render 0x180783e90, voice 0x18078bf00 / 0x18078b3f0, filter update 0x18078c440, setter 0x180784a50);
+PROVEN-FILE on the 42 CSTM bodies and 56 parameter sets of FL's sample projects and the 6 shipped `.dwp`. LYNX's
+code: `core/FlmDwSampler.h` (FLM's own engine on a Sampler channel's zones).
+
+**CSTM** = `10WD` + chunks (unknown tags skipped): one `ZONE` per zone **or** one `PATh` / `PATH`, then `MIDI`.
+- `ZONE` (1065 bytes): 1024-byte path (root marker `@R@` / `@L@`, NUL, relative path; bytes after the next NUL are
+  stale and ignored — 13 sample bodies carry such text), then root key, key low, key high (128 in a default zone),
+  velocity low, velocity high (u8 each), f32 gain (used only above 0.0001 **and with Loop on**; old files hold the
+  integer 63 here, i.e. gain 1), f32 pan (not used), i32 loop mode (loops only from 2), i32 loop start, i32 loop end
+  (exclusive; start = end → the file's own loop), f32 attack, decay (only its sign: ≤ 0 = instant decay), sustain (not
+  used), release.
+- `PATh`: lp32 path + f32 Attack + f32 Release (they replace parameters 1 and 2 after the file loads); `PATH`: path only.
+  The file is a `.dwp` (FLM reads it itself: `DwPr`, version > 35, entries u32 id + u64 size; program id 1, zone id 3,
+  end id 2; zone entries 500 = root / ranges / gain / pan, 502 = the sample's path, 503 = frames, channels, bits, rate,
+  loop mode / start / end, 509 = A / D / S / R; after loading, Attack / Release = the last zone's) or a single sample
+  (one zone: root 48, every key and velocity, looping on the file's own loop).
+- `MIDI`: [PB Range in semitones (default 4), smooth attack (default 1: an Attack of 0 still takes 1 ms)].
+
+**Parameters** (v = stored 0…1; float32 where it matters): 1 Attack, 2 Release, 5 Decay: T = 10·v⁴ + 0.001 s, fixed
+at the note's start; 3 Pitch = int(48v − 24) semitones (it also moves the key a zone is chosen with); 4 Fine Tune =
+2v − 1 semitones; 6 Sustain = the envelope's level; 7 Slide: glide time (v/2)³ s (none below 1e-5), re-planned every
+render call; 8 Reverse (no loop); 9 Loop (zone loops and zone gains); 10 Legato; 11 Mono (last-note priority, glides
+without retrigger); 12 Cutoff c, 13 Resonance (ladder feedback v, biquad Q = 16v³ + 0.5), 14 Kbd. Track, 15 Vel. Track
+(adds v × velocity to c); 16 Filter type = int(3v): off, 4-pole ladder low-pass, band-pass, high-pass (the corpus value
+0x3EAAAAAB is the ladder only in float32); 17…21 / 22…26 filter / pitch envelope attack, decay, sustain, release,
+amount; 27 LFO shape int(3v + 0.5): sine, falling saw, square, sample-and-hold; 28 rate 1 / ((1 − v)³·30 + 1/30) Hz;
+29 mode int(2v): free, one shot, tempo sync ({1/8 … 32} beats by 30, aligned to the song position); 31 amount ±(2v −
+1)²; 32 destination int(3v): cutoff, pitch, volume, pan; 33 LFO fade-in.
+
+**Voice**: zone = the one whose key and velocity ranges hold key + Pitch and int(127·velocity + 0.5) (several: a
+seeded draw, never the same twice in a row on a key; none: no sound); rate = 2^((key − root)/12) × file rate / output
+rate × 2^((Fine Tune + Pitch + bend)/12) × glide × pitch envelope × LFO, linear interpolation at the file's own rate;
+the level is the velocity (× the zone's gain with Loop on), **linear**; the amp envelope is linear and heard **squared**
+(attack 0→1 in TA, decay 1→S in (1 − S)·TD, release from the level in level·TR); filter and pitch envelopes are
+one-pole segments (rate 0.0002 / ((0.95v + 0.05)⁴ × 500 for attacks, 50 otherwise), per sample whatever the rate, the
+attack aiming at 4 and clipped at 1); the pitch envelope bends 2^(4·(2v − 1)³·e³); cutoff = min(22 kHz,
+2^((key + glide − 48)·kbd/12 + 10.4c + 4 + (2·amount − 1)·8·e)), filters and LFO updated every 16 samples; note pan is
+a balance. 128 voices, no stealing. A voice ends past its sample's end, or silent after its attack.
+
+LYNX: the channel is a Sampler channel whose zones carry the files, ranges, gain and loops, and whose `modelParams`
+start with the engine's marker, the PB Range, the smooth flag, the 34 values, then one decay flag per zone; the rack
+plays FLM's voice on it (`core/FlmDwSampler.h`). The module's values are automatable (`automationBase` + k; FL's sample
+projects automate Pitch). Editing the Sampler's envelope by hand drops the module's values (LYNX's own voice).
+Approximate: the shared random generator is one per channel; the render call is LYNX's block cut to 512 samples (FLM
+plans its glides per host call); reverse starts on the last frame. Not read: the old `INST` preset format and audio
+embedded in a `.dwp` (no sample file uses either).
+
 ## 8. Relation to FLM-exported .flp (issue #88)
 
 FL Studio desktop hosts FLM instruments as the "FL Studio Mobile Rack" generator (`FL Studio Mobile Rack_x64.dll`).

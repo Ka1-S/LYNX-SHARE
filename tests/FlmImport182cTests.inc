@@ -483,7 +483,7 @@ TEST (flm182c_imports_a_project)
         const auto clip = std::find_if (s.playlist.begin(), s.playlist.end(), [] (const Clip& c) { return c.kind == ClipKind::automation; });
         CHECK (clip != s.playlist.end() && clip->start == 8 * ppq && clip->length == 16 * ppq && clip->automation == 0);
     }
-    CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (one sample)") == 1);
+    CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (FLM's engine)") == 1); // (round 190de: FLM's own voice)
 
     // patterns: 808 content 1 and 2, the drum pattern, the lead's
     CHECK (s.patterns.size() == 4);

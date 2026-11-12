@@ -17390,6 +17390,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlmImport189hCTests.inc"
 #include "FlmImport190bsTests.inc"
 #include "PocketFx190byTests.inc" // round 190by
+#include "FlmImport190deTests.inc" // round 190de
 #include "Bridge176aTests.inc"
 #include "Issues178aTests.inc"
 #include "Mixer177aTests.inc"
