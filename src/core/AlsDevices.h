@@ -30,6 +30,11 @@
 //   Arpeggiator                    → the channel arpeggiator
 //   Pitch, Velocity, Chord, Note Length → written into the notes of the track's clips
 // and, for every translated device, which Live parameter drives which LYNX parameter (automation, rack macros).
+// Lot 3 (round 190ed):
+//   EQ Three                       → Prism Multiband (3 bands, crossover sum, no dynamics)
+//   Drum Buss                      → an Audio Effect Rack "Drum Buss": Ember Saturator → Shell Channel (+ a dry chain)
+//   Auto Filter's LFO / envelope follower / side chain → a Peak Controller linked to the Filter's cutoff
+//   Operator (no FM in use), Drift → the built-in synth
 
 #include <array>
 #include <functional>
@@ -317,10 +322,70 @@ struct Translated
     SideInput side;
     int sideParam = -1;            // (190cf) the LYNX parameter that switches the external side chain on (−1 = none)
     std::vector<ParamLink> links;  // (190cf) automation / macro routes
+    // (190ed) a modulation the effect needs from outside itself: a Peak Controller slot (FL's internal-controller link;
+    // its output 0 = peak + LFO) in front of the effect on the same insert — or, `onSideChain`, at the end of the
+    // side-chain source's insert — driving parameter `param` through `curve` (evenly spaced over the output's 0..1).
+    // A rack chain cannot hold the link: there the importer lists it instead.
+    struct Modulator
+    {
+        EffectSlot controller;
+        int param = 0;
+        std::vector<float> curve;
+        int sideTrackId = -1;           // the envelope follower listens to this track of the set (Live's track Id)
+        bool sideOther = false;         // a side-chain input whose source is not a track (the follower hears the input)
+        std::vector<std::string> notes; // the report lines when it is applied (laws)
+        std::string what;               // "LFO", "envelope follower", "LFO and envelope follower"
+    };
+    std::optional<Modulator> modulator;
 };
 // nullopt: not one of the devices above, or its element lacks the parameters (then the importer does what it did
 // before: the device is dropped and listed)
 std::optional<Translated> effectFromLiveDevice (const xml::Element& device, const Context& context = {});
+
+// ================================================================================================ lot 3 (190ed)
+// ---- EQ Three → Prism Multiband ---------------------------------------------------------------------------------
+// The kill switches and −inf gains: Prism's bands that still sound are soloed (Prism's solo passes only those bands); a
+// gain at Live's floor (−70 dB, shown as −inf) is a killed band [DATA: GainLo / GainMid / GainHi 0.000316 … 1.995]
+bool eqThreeToPrism (const xml::Element& device, Translated& out);
+// ---- Drum Buss → a rack -----------------------------------------------------------------------------------------
+// The generated rack's macros, in order (each mapped over the whole range of its LYNX control)
+enum DrumBussMacro { dbDrive, dbCrunch, dbDamping, dbTransients, dbBoom, dbBoomFreq, dbTrim, dbOutput, dbDryWet, dbMacros };
+// Live's Drive (0 … 1, shown 0 … 100 %) as Ember's drive in dB [ASSUMED: 24 dB at 100 %]
+double drumBussDriveDb (double drive) noexcept;
+// the Boom frequency (30 … 90 Hz) as Shell's Low freq. (its 6th-order low pass sits at 0.72 × that: the boom's pitch)
+double drumBussBoomLfHz (double boomHz) noexcept;
+bool drumBussToRack (const xml::Element& device, Translated& out);
+// ---- Auto Filter's modulation → a Peak Controller ---------------------------------------------------------------
+// The Peak Controller's controls for an amount (its laws, core/Effects.cpp PeakController): the peak's amount k (−2 … 2,
+// the output per unit of peak) and the LFO's (−1 … 1, the output per unit of wave)
+float peakAmountValue (double k) noexcept;
+float peakLfoAmountValue (double k) noexcept;
+// the LFO's period in quarter notes → its Speed control (period = (1001^(raw / 65536) − 1) · 0.128, raw = 200 + 65336 v)
+float peakLfoSpeedValue (double beats) noexcept;
+// a linear decay of the peak from 1 to 0 over `ms` at `bpm` → its Decay control ((10001^(d / 128) − 1) · 0.0192 per
+// quarter note, d = 5 + 123 v)
+float peakDecayValue (double ms, double bpm) noexcept;
+// The cutoff's modulation c(t) = c0 + L·w(t) + E·e(t) (cutoff in the Filter's 0..1, w the bipolar LFO, e the peak) as
+// the controller's settings and the link's curve; `invert` true = the LFO runs half a cycle later (a negative E flips
+// the curve)
+struct CutoffModulation
+{
+    float lfoAmount = 0.5f, peakAmount = 0.5f; // the controller's [5] and [1]
+    bool invert = false;
+    std::vector<float> curve;
+};
+CutoffModulation cutoffModulation (double c0, double lfoDepth, double envDepth) noexcept;
+// Fills `out.modulator` from the device's LFO / envelope follower / side chain (nothing when both are off)
+void autoFilterModulation (const xml::Element& device, const Context& context, Translated& out);
+
+// ---- Live's synths → the built-in synth -------------------------------------------------------------------------
+// Operator's coarse ratio [DOC: 0 = 0.5, then 1 … 48] and fine (thousandths of it) as semitones above the note
+double operatorRatioSemitones (int coarse, double fine) noexcept;
+// false: not translated (FM in use, a waveform LYNX's synth has no exact counterpart for): the caller lists the device
+bool operatorToSynth (const xml::Element& device, ChannelDef& channel, double bpm, Notes& notes);
+bool driftToSynth (const xml::Element& device, ChannelDef& channel, double bpm, Notes& notes);
+// The ratio's semitones as the synth's octave / semitones / cents (octave −3 … 3, semitones −11 … 11, cents ±100)
+void setOscillatorPitch (SynthOscillator& osc, double semitones) noexcept;
 
 // ---- Simpler ----------------------------------------------------------------------------------------------------
 // Voices [DOC: 1 … 8, 10, 12, 14, 16, 20, 24, 32; DATA: the stored index 0 … 14, 5 in a new Simpler = 6 voices]

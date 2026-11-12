@@ -708,6 +708,8 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
         t.to = "Filter";
         t.approximate = true;
         ok = autoFilterToFilter (device, t);
+        if (ok)
+            autoFilterModulation (device, context, t); // (190ed)
     }
     else if (tag == "Saturator")
     {
@@ -764,6 +766,21 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
         t.to = "Lo-fi";
         t.approximate = true;
         ok = reduxToLofi (device, t);
+    }
+    // ---- lot 3 (round 190ed) ----
+    else if (tag == "FilterEQ3")
+    {
+        t.from = "EQ Three";
+        t.to = "Prism Multiband";
+        t.approximate = true;
+        ok = eqThreeToPrism (device, t);
+    }
+    else if (tag == "DrumBuss")
+    {
+        t.from = "Drum Buss";
+        t.to = "Drum Buss rack (Ember Saturator, Shell Channel)";
+        t.approximate = true;
+        ok = drumBussToRack (device, t);
     }
     if (! ok)
         return std::nullopt;

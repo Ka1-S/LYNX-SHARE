@@ -180,9 +180,9 @@ PluginDevice{ IsExpanded, BreakoutIsExpanded, On{Manual, AutomationTarget, MidiC
 | Tempo / TimeSignature + automation | `Song::bpm`, `beatsPerBar` + tempo automation clip; signature changes → markers |
 | Locators | Playlist markers |
 | Session clips / Scenes | the clip grid (round 181c, section 13; the default by the user's choice of 2026-11-08); Settings › General › Workflow can put them on the Playlist after the arrangement instead, one section per scene (a marker per scene) |
-| Volume/Pan/Send/plugin-param automation | automation clips on the matching target |
+| Volume/Pan/Send/plugin-param automation | automation clips on the matching target (round 190ed, §18: rack macros, devices inside racks through a free macro, VST2 plugin parameters, a Simpler's filter; VST3 parameters listed) |
 | PluginDevice | `PluginRef.foreign` (vst2 id / vst3 class id + state), resolved like an .flp's plugins |
-| Native devices | the LYNX engine in the same role with its settings translated (slice N3, section 14: Simpler, Sampler zones, Drum Rack pads, racks, EQ Eight, Compressor, Glue Compressor, Utility, Reverb); every other device is dropped and listed in the import report |
+| Native devices | the LYNX engine in the same role with its settings translated (slice N3, section 14: Simpler, Sampler zones, Drum Rack pads, racks, EQ Eight, Compressor, Glue Compressor, Utility, Reverb; lot 2 §15; lot 3 §18: EQ Three, Drum Buss, Auto Filter's modulation, Operator without FM, Drift); every other device is dropped and listed in the import report |
 
 ## 9. What Live's loader requires (found by experiment, 2026-11-06) [LIVE]
 Live crashes on a set that is merely well-formed. It either exits or shows "A serious program error". A set written by another program must follow these rules:
@@ -383,3 +383,30 @@ device each, 48 kHz float); round 190da fitted the laws and ran every case throu
   output offsets fitted on the curves at drive 0 and +12 dB (`AlsDevicesLot2.cpp`, `saturatorFit`).
 - **Reverb**: Live's 1 kHz T30 ≈ 0.91 × Decay → Atrium's decay 0.94 × Decay; the loop's high shelf (gain g) → Atrium's
   High mult 1 / (1 + 0.08·(−20 log10 g)·Decay). Atrium's fully wet tail is louder than Live's (listed with the measured sizes).
+
+## 18. Live's own devices → LYNX's own, lot 3, and the envelopes of racks and plugins (round 190ed, 2026-11-12)
+Code: `src/core/AlsDevicesLot3.cpp` (laws and translators, declared in `AlsDevices.h`), `AlsDevices.cpp` (dispatch),
+`AlsImport.cpp` (rack / plugin envelopes, the Peak Controller links, the synths). No Live render of these devices
+exists yet: every law that is not plain unit maths is [ASSUMED] and listed in the round's handoff
+(`/mnt/e/lynx-work/als190ed/HANDOFF.md`, "needs live render").
+
+| Live device (tag) | LYNX | Translated | Listed in the report |
+|---|---|---|---|
+| EQ Three (`FilterEQ3`) | Prism Multiband, 3 bands, minimum-phase (the crossover sum), no dynamics | FreqLo / FreqHi → crossovers, Slope → 24 / 48 dB/oct, GainLo / Mid / Hi (linear) → band levels (dB), kill switches and −inf gains → the bands that still sound are soloed | the pair (fitted), gains under −30 dB, all bands off (Prism's lowest output) |
+| Drum Buss (`DrumBuss`) | an Audio Effect Rack "Drum Buss": Ember Saturator → Shell Channel, plus a "Dry" chain when Dry/Wet is under 100 % or can move | Drive (24 dB at 100 %) and Soft / Medium / Hard → Ember tube / tape / transistor; Damping → Ember's high cut; Input Trim → Ember's input; Transients → Shell's transient shaper (Amount, Invert below 0); Boom → Shell's low enhancer at the boom's pitch; Crunch → Shell's high enhancer; Comp → Shell's listen-mic compressor; Output → Shell's output; Dry/Wet → the chains' volumes. The rack's macros (Drive, Crunch, Damping, Transients, Boom, Boom Freq, Trim, Output, Dry/Wet) each span their control: Live's envelopes and macros reach them | every fitted part, Boom decay, negative transients under automation |
+| Auto Filter's LFO / envelope follower / side chain | a Peak Controller (FL's internal-controller link) in front of the Filter — or at the end of the side-chain source track's insert — whose output 0 (peak + LFO) drives the Filter's cutoff through a 33-point curve | LFO rate (Hz at the set's tempo, or synced), shape, phase offset, amount; the follower's amount and release (a straight fall); the cutoff's base | amounts (law assumed), the follower's attack, stereo LFO offset, falling saw, inside a rack (no link possible) |
+| Operator (`Operator`) | the built-in synth, only when no FM is in use: operator A alone (B … D off or at −inf), or algorithm 11's carriers (≤ 3) | waveforms Sine (0), White noise (21), User (22 → the synth's harmonic table), coarse / fine ratio → pitch, volume, A's envelope (ms → s), filter, glide, global volume / pan | the pair (fitted), envelope levels / slopes / loop, LFO, pitch envelope, spread, tone; with FM the device stays unsupported ("FM synthesis: no LYNX engine for it yet") |
+| Drift (`Drift`) | the built-in synth | oscillator 1 / 2 types → nearest waves, transposes, detune, levels, noise; filter I / II (12 dB / 24 dB ladder), frequency, resonance, key tracking; envelope 1 (amp ADSR); voice mode mono; glide; volume | the pair (fitted), shape, high pass, envelope 2 / LFO / cycling envelope / matrix, drift, stereo / unison voices |
+
+**Envelopes (arrangement automation).** Before lot 3 only envelopes on mixer, tempo, sends and the parameters of converted
+devices on a track's own chain came in. Now also:
+- a rack's own macro (Audio Effect Rack on an insert → `effectParam` slot parameter k; Instrument Rack on a channel →
+  `channelParam` k; 0 … 127 → 0 … 1);
+- a converted device inside a rack, a plugin inside a rack, a nested rack's macro: a free macro of the outer rack (no
+  mapping, no name, not under an envelope itself) is mapped over the target's whole range, set to the target's value
+  (nothing moves), excluded from Rand and variations and named after the parameter; the envelope drives that macro through
+  the device's law;
+- a VST2 plugin's parameter (`ParameterId` = its index [model]) on an insert or as the track's instrument;
+- a Simpler's filter frequency / resonance → the Sampler's Cutoff / Resonance knobs.
+A VST3 plugin's parameter keeps the plugin's own id, not LYNX's index: listed once with that reason. Envelopes of devices
+LYNX does not translate stay listed as "Automation of a device parameter (track)".

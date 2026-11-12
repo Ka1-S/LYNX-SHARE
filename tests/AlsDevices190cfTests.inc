@@ -419,7 +419,8 @@ TEST (als190cf_filter_saturation_eq_chorus_pan_redux)
     {
         CHECK (filter->slot.kind == EffectKind::filter && shown (filter->slot, 0) == "High-pass" && shown (filter->slot, 1) == "880 Hz" && shown (filter->slot, 2) == "Q 6.50");
         CHECK (! als190cf::hasNote (filter->notes.approximated, "resonance") && shown (filter->slot, 4) == "24 dB/oct");
-        CHECK (filter->slot.params[3] == 1.0f && als190cf::hasNote (filter->notes.dropped, "LFO") &&
+        // (round 190ed) the LFO is no longer dropped: a Peak Controller linked to the cutoff carries it
+        CHECK (filter->slot.params[3] == 1.0f && filter->modulator.has_value() && filter->modulator->what == "LFO" &&
                als190cf::hasNote (filter->notes.approximated, "24 dB/oct high pass (Live's measured on the low pass)"));
         const auto* cutoff = als190cf::linkOf (*filter, "Cutoff");
         CHECK (cutoff != nullptr && cutoff->param == 1 && formatEffectParam (EffectKind::filter, 1, cutoff->value (69.0), 120.0) == "440 Hz");
