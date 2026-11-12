@@ -79,12 +79,13 @@ std::unique_ptr<Effect> make (const Tuning& t);
 // dB above it; the larger of its reduction and the fixed law's is applied. Latency stays 0.
 // The constants below are fitted (round 190dp, /mnt/e/lynx-work/vqe190dp/qfit) on the reference's programme renders at
 // 0 / 20 / 35 / 50 / 100 % and its stimulus captures at 0 … 100 %: band-envelope distance 4.15 → 2.95 dB; then the
-// tracker got its own Q 8.5 bands (a tone sweeping by is not taken for its own floor).
+// tracker got its own Q 8.5 bands (a tone sweeping by is not taken for its own floor), on the channels' mean and
+// evaluated every 16 samples (its cost: within 10 % of the fixed law's), with off1 17 → 16 dB to match.
 struct Track
 {
     double smoothMs = 22.5;   // band power smoothing ahead of the minimum (ms)
     double windowS = 1.1;     // the minimum's window (s)
-    double off0 = -30.0, off1 = 17.0, offPow = 2.0; // threshold above the floor: off0 + (off1 − off0) · amount^offPow
+    double off0 = -30.0, off1 = 16.0, offPow = 2.0; // threshold above the floor: off0 + (off1 − off0) · amount^offPow
     double slope = 0.8875, knee = 32.5;             // dB of reduction per dB under it, soft knee (dB)
     double range0 = 0.0, range1 = 17.0;             // the tracker's largest reduction (dB) at amount 0 / 1
     double bias = 1.5;                              // the minimum's bias: added to it (dB; a minimum reads low)

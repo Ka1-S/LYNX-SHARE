@@ -13,6 +13,7 @@ struct Case
     double sr;
     std::uint64_t hash;
     double energy, a, b;
+    int saved = -1; // ≥ 0: loaded as a project saved with this many parameters (upgradeLoadedEffectParams)
 };
 
 struct Render
@@ -139,9 +140,10 @@ TEST (vqe190dp_law_parameters_are_appended_and_old_projects_keep_the_classic_law
 TEST (vqe190dp_classic_laws_render_as_the_base_commit_did)
 {
     using namespace lynx;
-    // Voice Shift / Quell with the classic law and LYNX Tune (it shares the TD-PSOLA shifter, whose new unvoiced path is
-    // off unless asked for): FNV-1a of the float bits, the energy and two samples, from the base commit 77026c3a2
-    // (golden: /mnt/e/lynx-work/vqe190dp/golden)
+    // Voice Shift / Quell with the classic law, and LYNX Tune as a new instance (default and two settings) and as a
+    // project saved before: Tune shares the TD-PSOLA shifter, whose new unvoiced path only Voice Shift asks for, so Tune
+    // has no law switch and sounds as before everywhere. FNV-1a of the float bits, the energy and two samples, from the
+    // base commit 77026c3a2's Psola users (golden: /mnt/e/lynx-work/vqe190dp/golden, mkt.sh)
     const vqe190dp::Case cases[] = {
         { EffectKind::voiceShift, 7, { -1, -1, -1, -1 }, {  }, 48000.0, 0x1314dc020b9b2a48ull, 3397.19714, -0.135365844, 0.227989152 }, // vs default
         { EffectKind::voiceShift, 7, { 0, -1, -1, -1 }, { 17.0f / 24.0f }, 48000.0, 0xc07450ca160f6651ull, 3334.94096, -0.224264145, -0.134423494 }, // vs pitch +5
@@ -153,11 +155,16 @@ TEST (vqe190dp_classic_laws_render_as_the_base_commit_did)
         { EffectKind::quellDenoiser, 4, { 0, 3, -1, -1 }, { 0.5f, 1.0f }, 44100.0, 0x7d50e4b19ba42b7eull, 5686.8071, 0.00172298297, 0.381973952 }, // quell matched 0.5
         { EffectKind::quellDenoiser, 4, { 0, 3, -1, -1 }, { 1.0f, 1.0f }, 48000.0, 0xafde312c82eb4ba1ull, 6102.93156, 0.00323212706, 0.350229144 }, // quell matched 1.0
         { EffectKind::lynxTune, -1, { -1, -1, -1, -1 }, {  }, 48000.0, 0xe135bcf9fa391efeull, 6355.39939, 0.0627515689, 0.0538308322 }, // tune default
+        { EffectKind::lynxTune, -1, { -1, -1, -1, -1 }, {  }, 48000.0, 0xe135bcf9fa391efeull, 6355.39939, 0.0627515689, 0.0538308322, 6 }, // tune old project
+        { EffectKind::lynxTune, -1, { 6, 5, 2, 4 }, { 17.0f / 24.0f, 9.0f / 14.0f, 0.3f, 1.0f }, 44100.0, 0x9ae869baf7a05c46ull, 4777.8601, 0.223027334, -0.273250163, -1 }, // tune +5 formant +2 retune
+        { EffectKind::lynxTune, -1, { 9, 0, -1, -1 }, { 1.0f, 2.0f / 11.0f }, 48000.0, 0xd1f9d54494ba43a0ull, 6390.72495, -0.0923300385, -0.0844917744, -1 }, // tune low latency
     };
     int sameBits = 0, n = 0;
     for (const auto& c : cases)
     {
         auto slot = makeEffectSlot (c.kind);
+        if (c.saved >= 0)
+            upgradeLoadedEffectParams (slot, (std::size_t) c.saved);
         if (c.lawIdx >= 0)
             slot.params[(std::size_t) c.lawIdx] = 0.0f;
         for (int k = 0; k < 4; ++k)

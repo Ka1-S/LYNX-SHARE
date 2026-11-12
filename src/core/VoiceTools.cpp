@@ -191,7 +191,9 @@ public:
         ringMin.fill (1e30);
         for (auto& ring : subMin)
             ring.fill (1e30);
-        subPos = subHead = 0;
+        subPos = subHead = blockPos = 0;
+        blockPow.fill (0.0);
+        trackRed.fill (0.0);
     }
     // in place; returns the mean reduction (dB) of the block for the meter. `tr` = the noise-floor tracker (round
     // 190dp), nullptr = round 124's fixed thresholds (bit for bit)
@@ -238,34 +240,18 @@ public:
                 lev[b] = 10.0 * std::log10 (e + 1e-30) + 3.0103;
                 if (tr != nullptr)
                 {
-                    auto pt = p;
+                    // the tracker's own narrower band on the channels' mean (round 190dp), its power summed over the block
                     if (narrow && b >= 1 && b <= fit.bands)
                     {
-                        // the tracker's own narrower band (round 190dp)
-                        const auto u0 = trackBand[(std::size_t) b - 1].run (a[0], 0), u1 = trackBand[(std::size_t) b - 1].run (a[1], 1);
-                        pt = pw (u0, u1);
-                        auto& en = trackEnv[(std::size_t) b];
-                        en = pt > en ? pt + (en - pt) * ea : pt + (en - pt) * er;
+                        const auto u = trackBand[(std::size_t) b - 1].run (0.5 * (a[0] + a[1]), 0);
+                        blockPow[(std::size_t) b] += u * u;
                     }
-                    followFloor (b, pt);
+                    else
+                        blockPow[(std::size_t) b] += p;
                 }
             }
-            if (tr != nullptr && ++subPos >= subLength)
-            {
-                // a sub-window ends: its minimum joins the window's, the oldest leaves
-                subPos = 0;
-                for (int b = 0; b < nb; ++b)
-                {
-                    auto& ring = subMin[(std::size_t) b];
-                    ring[(std::size_t) subHead] = curMin[(std::size_t) b];
-                    curMin[(std::size_t) b] = 1e30;
-                    auto lo = 1e30;
-                    for (const auto m : ring)
-                        lo = std::min (lo, m);
-                    ringMin[(std::size_t) b] = lo;
-                }
-                subHead = (subHead + 1) % subWindows;
-            }
+            if (tr != nullptr && ++blockPos >= trackBlock)
+                trackStep (*tr, nb, lev);
             for (int b = 0; b < nb; ++b)
             {
                 auto level = lev[b];
@@ -286,27 +272,7 @@ public:
                 }
                 auto reduce = std::min (range[(std::size_t) b], red);
                 if (tr != nullptr)
-                {
-                    // round 190dp: the floor's own expander (the same soft-knee law, its threshold `off` above the floor)
-                    // (in power ratios: a level well above the threshold costs no logarithm)
-                    const auto lowest = std::min (curMin[(std::size_t) b], ringMin[(std::size_t) b]);
-                    const auto thr = std::max (2.0 * lowest + 2e-30, 1e-12) * trackGain; // the floor (a sine's peak) + bias + off
-                    const auto mid = b >= 1 && b <= fit.bands;
-                    const auto here = narrow && mid ? 2.0 * trackEnv[(std::size_t) b] + 2e-30
-                                                    : (mid ? std::pow (10.0, 0.1 * level) : 2.0 * env[(std::size_t) b] + 2e-30);
-                    const auto dt = here >= thr * kneeRatio ? -tr->knee : 10.0 * std::log10 (thr / here);
-                    double rt;
-                    if (dt <= -tr->knee / 2)
-                        rt = 0.0;
-                    else if (dt >= tr->knee / 2 || tr->knee <= 0.0)
-                        rt = tr->slope * dt;
-                    else
-                    {
-                        const auto u = dt + tr->knee / 2;
-                        rt = tr->slope * u * u / (2 * tr->knee);
-                    }
-                    reduce = std::max (reduce, std::min (trackRange, std::max (0.0, rt)));
-                }
+                    reduce = std::max (reduce, trackRed[(std::size_t) b]); // round 190dp: the floor's expander
                 const auto target = -(reduce + staticCut[(std::size_t) b]);
                 auto& g = gdb[(std::size_t) b];
                 g = target > g ? target + (g - target) * go : target + (g - target) * gc;
@@ -340,7 +306,10 @@ private:
     {
         trackDesigned = &t;
         trackAmount = amt;
-        smoothK = coef (t.smoothMs, sr);
+        const auto blockRate = sr / trackBlock;
+        smoothK = coef (t.smoothMs, blockRate);
+        blockA = coef (fit.detA, blockRate);
+        blockR = coef (fit.detR, blockRate);
         subLength = std::max (1, (int) std::lround (t.windowS * sr / subWindows));
         trackOff = t.off0 + (t.off1 - t.off0) * std::pow (std::clamp (amt, 0.0, 1.0), t.offPow);
         trackRange = std::max (0.0, t.range0 + (t.range1 - t.range0) * amt);
@@ -351,19 +320,63 @@ private:
             for (int b = 0; b < fit.bands; ++b)
                 trackBand[(std::size_t) b].bp (sr, centre (b), t.q);
     }
-    void followFloor (int b, double p) noexcept
+    // round 190dp: one block of the tracker (every `trackBlock` samples: the block's mean band power is smoothed, its
+    // running minimum kept, the floor's own soft-knee expander evaluated; the gains still move every sample)
+    void trackStep (const Track& t, int nb, const double* lev) noexcept
     {
-        auto& sm = smoothPow[(std::size_t) b];
-        sm = p + (sm - p) * smoothK;
-        auto& cm = curMin[(std::size_t) b];
-        cm = std::min (cm, sm);
+        blockPos = 0;
+        for (int b = 0; b < nb; ++b)
+        {
+            const auto p = blockPow[(std::size_t) b] * (1.0 / trackBlock);
+            blockPow[(std::size_t) b] = 0.0;
+            auto& sm = smoothPow[(std::size_t) b];
+            sm = p + (sm - p) * smoothK;
+            auto& cm = curMin[(std::size_t) b];
+            cm = std::min (cm, sm);
+            auto& en = trackEnv[(std::size_t) b];
+            en = p > en ? p + (en - p) * blockA : p + (en - p) * blockR;
+            // the expander, in power ratios (a level well above the threshold costs no logarithm)
+            const auto lowest = std::min (cm, ringMin[(std::size_t) b]);
+            const auto thr = std::max (2.0 * lowest + 2e-30, 1e-12) * trackGain; // the floor (a sine's peak) + bias + off
+            const auto mid = b >= 1 && b <= fit.bands;
+            const auto here = narrow || ! mid ? 2.0 * en + 2e-30 : std::pow (10.0, 0.1 * lev[b]);
+            const auto dt = here >= thr * kneeRatio ? -t.knee : 10.0 * std::log10 (thr / here);
+            double rt;
+            if (dt <= -t.knee / 2)
+                rt = 0.0;
+            else if (dt >= t.knee / 2 || t.knee <= 0.0)
+                rt = t.slope * dt;
+            else
+            {
+                const auto u = dt + t.knee / 2;
+                rt = t.slope * u * u / (2 * t.knee);
+            }
+            trackRed[(std::size_t) b] = std::min (trackRange, std::max (0.0, rt));
+        }
+        if ((subPos += trackBlock) >= subLength)
+        {
+            // a sub-window ends: its minimum joins the window's, the oldest leaves
+            subPos = 0;
+            for (int b = 0; b < nb; ++b)
+            {
+                auto& ring = subMin[(std::size_t) b];
+                ring[(std::size_t) subHead] = curMin[(std::size_t) b];
+                curMin[(std::size_t) b] = 1e30;
+                auto lo = 1e30;
+                for (const auto m : ring)
+                    lo = std::min (lo, m);
+                ringMin[(std::size_t) b] = lo;
+            }
+            subHead = (subHead + 1) % subWindows;
+        }
     }
     double centre (int b) const noexcept { return fit.f0 * std::pow (2.0, b * fit.step); }
     // round 190dp: the tracker's state (smoothed band power, the running sub-window minimum, the last sub-windows')
     const Track* trackDesigned = nullptr;
-    double trackAmount = -1.0, smoothK = 0.0, trackOff = 0.0, trackRange = 0.0, trackGain = 1.0, kneeRatio = 1.0;
-    int subLength = 1, subPos = 0, subHead = 0;
-    std::array<double, maxBands + 2> smoothPow {}, curMin {}, ringMin {}, trackEnv {}; // power (linear)
+    static constexpr int trackBlock = 16;
+    double trackAmount = -1.0, smoothK = 0.0, blockA = 0.0, blockR = 0.0, trackOff = 0.0, trackRange = 0.0, trackGain = 1.0, kneeRatio = 1.0;
+    int subLength = 1, subPos = 0, subHead = 0, blockPos = 0;
+    std::array<double, maxBands + 2> smoothPow {}, curMin {}, ringMin {}, trackEnv {}, blockPow {}, trackRed {}; // power (linear), dB
     std::array<Bq, maxBands> trackBand;
     bool narrow = false;
     std::array<std::array<double, subWindows>, maxBands + 2> subMin {};
