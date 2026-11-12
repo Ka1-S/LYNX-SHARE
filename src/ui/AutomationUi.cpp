@@ -956,6 +956,12 @@ juce::String describeAutomationTarget (AudioEngine& engine, const AutomationTarg
     {
         case AutomationTargetKind::channelVolume: return channelName + " - " + tr ("Volume");
         case AutomationTargetKind::channelPan: return channelName + " - " + tr ("Pan");
+        case AutomationTargetKind::channelAdjust: // the Misc tab's Levels adjustment (round 190dz; FL's knob hints)
+            return channelName + " - "
+                   + (t.param == leveladjust::pan      ? tr ("Panning offset")
+                      : t.param == leveladjust::volume ? tr ("Volume multiplier")
+                      : t.param == leveladjust::modX   ? tr ("Modulation X offset")
+                                                       : tr ("Modulation Y offset"));
         case AutomationTargetKind::mixerVolume: return trackName + " - " + tr ("Volume");
         case AutomationTargetKind::mixerPan: return trackName + " - " + tr ("Pan");
 

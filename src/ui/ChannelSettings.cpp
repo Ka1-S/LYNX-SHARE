@@ -4441,7 +4441,9 @@ public:
             if (const auto v = engine.getAutomationDisplay().valueOf (*spec.target))
                 return spec.target->kind == AutomationTargetKind::channelPan || spec.target->kind == AutomationTargetKind::mixerPan
                            ? (double) *v * 2.0 - 1.0
-                           : (double) *v;
+                       // the Levels adjustment (round 190dz): automation's 0..1 over the knob's own range
+                       : spec.target->kind == AutomationTargetKind::channelAdjust ? spec.minimum + (double) *v * (spec.maximum - spec.minimum)
+                                                                                  : (double) *v;
         return getter();
     }
 
@@ -4813,20 +4815,23 @@ public:
             return knobs.back().get();
         };
 
-        // Levels adjustment
+        // FL's "Levels adjustment" (round 190dz; TPluginForm OfsLevelsPanel, channel parameters 0x10 / 0x11): the offsets on
+        // top of the channel's own Pan / Volume (those stay on the header), which Automate on an audio clip moves
         pan = knob ([this, name] {
-                        auto s = ui::panSpec (name() + " - " + tr ("Pan"));
-                        s.target = AutomationTarget { AutomationTargetKind::channelPan, channel };
+                        auto s = ui::panSpec (name() + " - " + tr ("Panning offset"));
+                        s.target = AutomationTarget { AutomationTargetKind::channelAdjust, channel, 0, leveladjust::pan };
                         return s;
                     },
-                    [] (const ChannelDef& d) { return (double) d.pan; }, [] (ChannelDef& d, double v) { d.pan = (float) v; }, TR_NOOP ("Pan"));
+                    [] (const ChannelDef& d) { return (double) d.misc.levels.pan; }, [] (ChannelDef& d, double v) { d.misc.levels.pan = (float) v; },
+                    TR_NOOP ("Pan"));
         volume = knob ([this, name] {
-                           auto s = ui::percentSpec (name() + " - " + tr ("Volume"), 0.78);
-                           s.target = AutomationTarget { AutomationTargetKind::channelVolume, channel };
+                           auto s = ui::percentSpec (name() + " - " + tr ("Volume multiplier"), 1.0);
+                           s.maximum = 2.0; // FL: 0…25600, 12800 = 100 % (FL's volume curve, up to +21.6 dB)
+                           s.target = AutomationTarget { AutomationTargetKind::channelAdjust, channel, 0, leveladjust::volume };
                            return s;
                        },
-                       [] (const ChannelDef& d) { return (double) d.volume; }, [] (ChannelDef& d, double v) { d.volume = (float) v; },
-                       TR_NOOP ("Vol"));
+                       [] (const ChannelDef& d) { return (double) d.misc.levels.volume; },
+                       [] (ChannelDef& d, double v) { d.misc.levels.volume = (float) v; }, TR_NOOP ("Vol"));
         // Polyphony
         maxPoly = knob ([name] { return countSpec (name() + " - " + tr ("Maximum polyphony (-- = no limit)"), 64, 0); },
                         [] (const ChannelDef& d) { return (double) d.maxPolyphony; },
@@ -4853,40 +4858,28 @@ public:
         swing = knob ([name] { return ui::percentSpec (name() + " - " + tr ("Swing mix"), 1.0); },
                       [] (const ChannelDef& d) { return (double) d.swingMix; }, [] (ChannelDef& d, double v) { d.swingMix = (float) v; },
                       TR_NOOP ("Swing"));
-        // Levels adjustment: Mod X / Mod Y = the channel filter's cutoff / resonance (sampler, synth)
-        modX = knob ([name] {
-                         ui::ValueSpec s;
-                         s.name = name() + " - " + tr ("Mod X (filter cutoff)");
-                         s.defaultValue = 1.0;
-                         s.toText = [] (double v) { const auto hz = 20.0 * std::pow (1000.0, v); return hz >= 1000.0 ? juce::String (hz / 1000.0, 1) + " kHz" : juce::String (juce::roundToInt (hz)) + " Hz"; };
-                         return s;
-                     },
-                     [] (const ChannelDef& d) {
-                         const auto hz = d.instrument == InstrumentKind::synth ? d.synth.cutoff : d.sampler.cutoff;
-                         return juce::jlimit (0.0, 1.0, std::log ((double) hz / 20.0) / std::log (1000.0));
-                     },
-                     [] (ChannelDef& d, double v) {
-                         const auto hz = (float) (20.0 * std::pow (1000.0, v));
-                         if (d.instrument == InstrumentKind::synth)
-                             d.synth.cutoff = hz;
-                         else if (d.instrument == InstrumentKind::sampler)
-                         {
-                             d.sampler.cutoff = hz;
-                             d.sampler.flChannel.clear(); // an edited filter replaces FL's whole sampler voice (REA_rodada76)
-                         }
-                     },
+        // Levels adjustment: Mod X / Mod Y offsets (FL 0x13 / 0x14, ±256) on the channel filter's cutoff / resonance knobs'
+        // travel (sampler, synth); the knobs themselves are on the Sampler / Synth pages
+        auto offsetSpec = [name] (const char* what) {
+            ui::ValueSpec s;
+            s.name = name() + " - " + tr (what);
+            s.minimum = -1.0;
+            s.maximum = 1.0;
+            s.defaultValue = 0.0;
+            s.toText = [] (double v) { return juce::String (juce::roundToInt (v * 100.0)) + "%"; };
+            s.fromText = [] (const juce::String& t) -> std::optional<double> {
+                const auto digits = t.retainCharacters ("-0123456789.,").replaceCharacter (',', '.');
+                if (digits.isEmpty())
+                    return std::nullopt;
+                return digits.getDoubleValue() / 100.0;
+            };
+            return s;
+        };
+        modX = knob ([offsetSpec] { return offsetSpec (TR_NOOP ("Modulation X offset")); },
+                     [] (const ChannelDef& d) { return (double) d.misc.levels.modX; }, [] (ChannelDef& d, double v) { d.misc.levels.modX = (float) v; },
                      TR_NOOP ("Mod X"));
-        modY = knob ([name] { return ui::percentSpec (name() + " - " + tr ("Mod Y (filter resonance)"), 0.0); },
-                     [] (const ChannelDef& d) { return (double) (d.instrument == InstrumentKind::synth ? d.synth.resonance : d.sampler.resonance); },
-                     [] (ChannelDef& d, double v) {
-                         if (d.instrument == InstrumentKind::synth)
-                             d.synth.resonance = (float) v;
-                         else if (d.instrument == InstrumentKind::sampler)
-                         {
-                             d.sampler.resonance = (float) v;
-                             d.sampler.flChannel.clear();
-                         }
-                     },
+        modY = knob ([offsetSpec] { return offsetSpec (TR_NOOP ("Modulation Y offset")); },
+                     [] (const ChannelDef& d) { return (double) d.misc.levels.modY; }, [] (ChannelDef& d, double v) { d.misc.levels.modY = (float) v; },
                      TR_NOOP ("Mod Y"));
         // Time: Gate and Shift on FL's time-knob scale (REA round 146b)
         auto timeSpec = [name] (const char* what, int maximum, int defaultValue, bool offAtMax) {

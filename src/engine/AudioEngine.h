@@ -290,6 +290,9 @@ public:
         // FL's Mixer › Disk recording › "Auto-create audio clip" (on by default, round 167a [SHOT s28–s37]): the files
         // "Render armed tracks to wave file(s)" writes go on the Playlist (mixerops::placeRenderedFiles)
         bool autoCreateClip = true;
+        // FL's Mixer › Disk recording › "Latency compensation" (round 190dx; checked by default in FL's form): off, takes
+        // are placed with no latency compensation at all (takes::compensation)
+        bool latencyCompensation = true;
         // FL's record menu "Quantize" section (REA round 139); `quantise` is the grid. quantiseStarts = "Note start
         // time", noteEnd = "Note end time" (quantize) / "Leave note duration" (keepLength) / neither (keepEnd),
         // toStepSequencer = "Record to step sequencer"

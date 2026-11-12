@@ -47,6 +47,21 @@ inline std::string valueText (const Song& song, const AutomationTarget& t, float
             break;
         }
         case AutomationTargetKind::tempo: std::snprintf (text, sizeof (text), "%.2f BPM", tempoFromValue (v)); break;
+        case AutomationTargetKind::channelAdjust: // Levels adjustment (round 190dz): the pan as FL writes it, the rest in %
+        {
+            if (t.param == leveladjust::pan)
+            {
+                const auto percent = (int) std::lround (std::abs (v * 2.0f - 1.0f) * 100.0f);
+                if (percent == 0)
+                    return "C";
+                std::snprintf (text, sizeof (text), "%c%d", v < 0.5f ? 'L' : 'R', percent);
+            }
+            else if (t.param == leveladjust::volume)
+                std::snprintf (text, sizeof (text), "%d%%", (int) std::lround (v * 200.0f));
+            else
+                std::snprintf (text, sizeof (text), "%d%%", (int) std::lround ((v * 2.0f - 1.0f) * 100.0f));
+            break;
+        }
         case AutomationTargetKind::effectParam:
         {
             if (t.index < 0 || t.index >= (int) song.mixer.size())

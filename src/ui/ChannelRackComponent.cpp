@@ -2571,6 +2571,23 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
             openEditorRow = -1;
         });
 
+    // FL's "Assign to new instrument track" after a line, the last item of the left column (LineAssignInstrTrackMenu,
+    // round 190dx; ChannelMenuPopup FUN_011f4450: "Unassign from instrument track" while the channel has one; enabled
+    // only for a generator that can have one)
+    menu.addSeparator();
+    if (const auto& song = engine.getSong(); trackmodes::instrumentTracksOf (song, channel).empty())
+        menu.addItem (theme::mnemonic (tr ("Assign to new instrument track"), 'A'), trackmodes::canBeInstrumentTrack (song, channel), false, [this, channel] {
+            int track = -1;
+            engine.editSong ([channel, &track] (Song& s) { track = trackmodes::assignToNewInstrumentTrack (s, channel); });
+            if (track < 0)
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Can't create new instrument track"),
+                                                        tr ("There are no available mixer tracks."));
+        });
+    else
+        menu.addItem (theme::mnemonic (tr ("Unassign from instrument track"), 'U'), [this, channel] {
+            engine.editSong ([channel] (Song& s) { trackmodes::unassignFromInstrumentTracks (s, channel); });
+        });
+
     // LYNX: the channel's settings windows and its arpeggiator
     menu.addSeparator();
     if (c.instrument == InstrumentKind::sampler)

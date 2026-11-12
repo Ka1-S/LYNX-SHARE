@@ -123,8 +123,10 @@ struct Channel
     int modX = 256, modY = 0, filterType = 0; // channel filter (0xDB with 24 B; docs/analise/REA_rodada4.md §3)
     // event 0xE5 (channel "level adjustments", REA_rodada3 §2): pan adjustment ±6400 (0 = neutral) added to the pan,
     // volume adjustment 0..12800 (12800 = neutral) that scales the volume with the same curve: f(volume)·f(volAdj)
+    // (round 190dz: the whole event — FL's Misc › Levels adjustment: pan offset ±6400, volume multiplier 0…25600, an
+    // unnamed value kept as it is, Mod X / Mod Y offsets ±256; TPluginForm OfsLevelsPanel)
     bool hasLevelAdjust = false;
-    int panAdj = 0, volAdj = 12800;
+    int panAdj = 0, volAdj = 12800, adjUnknown = 0, modXAdj = 0, modYAdj = 0;
 
     std::vector<std::uint8_t> pluginState; // the generator's 0xD5 (e.g. 3x Osc state)
     int wrapperFlags = -1;                 // the generator's 0xD4 u16 at +16 (0x10 generator, 0x20 smart disable; −1 = none)

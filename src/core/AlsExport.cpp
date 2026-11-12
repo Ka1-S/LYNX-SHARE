@@ -1048,8 +1048,8 @@ struct Exporter
             t.channel = (int) i;
             t.insert = std::clamp (ch.mixerTrack, 0, (int) song.mixer.size() - 1);
             // (a hosted plugin in a project with FL's levels plays √2 over the curve, round 190ad)
-            t.gain = channelGain (ch.volume) * (plugin && song.flPluginLevels ? 1.41421356f : 1.0f);
-            t.pan = ch.pan;
+            t.gain = channelGain (ch.volume) * (plugin && song.flPluginLevels ? 1.41421356f : 1.0f) * levelAdjustGain (ch.misc.levels.volume);
+            t.pan = adjustedPan (ch.pan, ch.misc.levels.pan); // (with the Misc tab's Levels adjustment, round 190dz)
             tracks.push_back (t);
             if (! plugin && ch.instrument != InstrumentKind::plugin)
                 note ("Instrument not exported (LYNX built-in, notes kept): " + ch.name);
@@ -1071,8 +1071,8 @@ struct Exporter
             const auto& ch = song.channels[(std::size_t) clips.front()->channel];
             t.insert = std::clamp (ch.mixerTrack, 0, (int) song.mixer.size() - 1);
             // a Playlist audio clip plays at unity at FL's default channel volume [Instruments.cpp audioClipUnity]
-            t.gain = channelGain (ch.volume) / channelGain (10000.0f / 12800.0f);
-            t.pan = ch.pan;
+            t.gain = channelGain (ch.volume) / channelGain (10000.0f / 12800.0f) * levelAdjustGain (ch.misc.levels.volume);
+            t.pan = adjustedPan (ch.pan, ch.misc.levels.pan); // (with the Misc tab's Levels adjustment, round 190dz)
             tracks.push_back (t);
             for (const auto* c : clips)
                 if (song.channels[(std::size_t) c->channel].mixerTrack != ch.mixerTrack)

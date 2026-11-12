@@ -223,6 +223,10 @@ std::int32_t rawValue (const AutomationTarget& t, float v)
     {
         case AutomationTargetKind::channelVolume:
         case AutomationTargetKind::channelPan: return iround (v * 12800.0);
+        case AutomationTargetKind::channelAdjust: // (round 190dz) FL's knob ranges: volume 0…25600, pan ±6400, Mod X / Y ±256
+            return t.param == leveladjust::volume ? iround (v * 25600.0)
+                 : t.param == leveladjust::pan    ? iround ((v * 2.0 - 1.0) * 6400.0)
+                                                  : iround ((v * 2.0 - 1.0) * 256.0);
         case AutomationTargetKind::mixerVolume:
         case AutomationTargetKind::mixerSend: return iround (v * 16000.0);
         case AutomationTargetKind::mixerPan: return iround ((v * 2.0 - 1.0) * 6400.0);
@@ -535,12 +539,14 @@ void applyFreeze (Song& song, int channel, const std::string& wav, std::int64_t 
                               p.channelLoops.end());
         for (auto& lane : p.events)
             if ((lane.target.kind == AutomationTargetKind::channelVolume || lane.target.kind == AutomationTargetKind::channelPan
-                 || lane.target.kind == AutomationTargetKind::channelParam) && lane.target.index == channel)
+                 || lane.target.kind == AutomationTargetKind::channelParam || lane.target.kind == AutomationTargetKind::channelAdjust)
+                && lane.target.index == channel)
                 lane.target.kind = AutomationTargetKind::none;
     }
     for (auto& a : song.automations)
         if ((a.target.kind == AutomationTargetKind::channelVolume || a.target.kind == AutomationTargetKind::channelPan
-             || a.target.kind == AutomationTargetKind::channelParam) && a.target.index == channel)
+             || a.target.kind == AutomationTargetKind::channelParam || a.target.kind == AutomationTargetKind::channelAdjust)
+            && a.target.index == channel)
             a.target.kind = AutomationTargetKind::none;
 
     int lane = 0;
@@ -926,6 +932,15 @@ struct Converter
         c.hasLevels = true;
         c.volume = std::clamp (iround (volume * 12800.0), 0, 12800);
         c.pan = std::clamp (iround (6400.0 + def.pan * 6400.0), 0, 12800);
+        // FL's Levels adjustment (0xE5, round 190dz): the Misc tab's offsets as FL's raw values
+        {
+            const auto& l = def.misc.levels;
+            c.hasLevelAdjust = true;
+            c.panAdj = std::clamp (iround (l.pan * 6400.0), -6400, 6400);
+            c.volAdj = std::clamp (iround (l.volume * 12800.0), 0, 25600);
+            c.modXAdj = std::clamp (iround (l.modX * 256.0), -256, 256);
+            c.modYAdj = std::clamp (iround (l.modY * 256.0), -256, 256);
+        }
         const auto root = std::clamp (def.misc.rootNote, 0, 127);
         // FL's stretch PITCH knob and the header pitch add up, but do not sound the same in FL's stretcher (Thief with all
         // of it in the header: xcorr 0.934 against FL's own, round 180d), so what came from the knob goes back to the knob
@@ -1162,6 +1177,11 @@ struct Converter
                 if (t.index < 0 || t.index >= (int) song.channels.size())
                     return std::nullopt;
                 id.raw = ((std::uint32_t) t.index << 16) | (t.kind == AutomationTargetKind::channelPan ? 1u : 0u);
+                return id;
+            case AutomationTargetKind::channelAdjust: // FL's channel parameters 0x10…0x14 (round 190dz)
+                if (t.index < 0 || t.index >= (int) song.channels.size() || ! leveladjust::valid (t.param))
+                    return std::nullopt;
+                id.raw = ((std::uint32_t) t.index << 16) | (std::uint32_t) (0x10 + t.param);
                 return id;
             case AutomationTargetKind::channelParam:
                 if (t.index < 0 || t.index >= (int) song.channels.size() || song.channels[(std::size_t) t.index].instrument != InstrumentKind::plugin

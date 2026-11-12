@@ -814,7 +814,15 @@ public:
         bpm.store (std::max (1.0, songBpm)); // first: the synced LFO uses it when reading the settings
         channelPitch.store (channel.sampler.pitch * 100.0f); // the channel's PITCH knob (issue #14)
         updateFrames (channel.synth);
-        mailbox.write (channel.synth);
+        if (const auto& l = channel.misc.levels; l.modX != 0.0f || l.modY != 0.0f) // Levels adjustment Mod X / Y (round 190dz)
+        {
+            auto adjusted = channel.synth;
+            adjusted.cutoff = adjustedCutoff (adjusted.cutoff, l.modX);
+            adjusted.resonance = adjustedResonance (adjusted.resonance, l.modY);
+            mailbox.write (adjusted);
+        }
+        else
+            mailbox.write (channel.synth);
     }
 
     ~SynthInstrument() override
@@ -1704,8 +1712,9 @@ public:
         startOffset.store (std::clamp (s.startOffset, 0.0f, 1.0f));
         porta.store (s.porta);
         portaBeats.store (std::max (0.0f, s.portaBeats));
-        knob (samplerparam::cutoff, s.cutoff);
-        knob (samplerparam::resonance, s.resonance);
+        // (with the Misc tab's Levels adjustment Mod X / Mod Y offsets, round 190dz)
+        knob (samplerparam::cutoff, adjustedCutoff (s.cutoff, channel.misc.levels.modX));
+        knob (samplerparam::resonance, adjustedResonance (s.resonance, channel.misc.levels.modY));
         filterType.store (std::clamp (s.filterType, 0, 3));
         outGain.store (samplerGain (s.gainDb));
         bpm.store (std::max (1.0, songBpm)); // before the mailbox: the synced LFO reads it when updating

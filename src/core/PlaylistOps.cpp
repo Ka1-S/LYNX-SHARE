@@ -647,6 +647,95 @@ void unassign (Song& song, int track)
     t.channel = -1;
 }
 
+int firstFreeTrack (const Song& song)
+{
+    std::vector<bool> used (500, false);
+    for (const auto& c : song.playlist)
+        if (c.track >= 0 && c.track < 500)
+            used[(std::size_t) c.track] = true;
+    for (int t = 0; t < 500; ++t)
+        if (! used[(std::size_t) t] && (t >= (int) song.playlistTracks.size() || song.playlistTracks[(std::size_t) t].mode == PlaylistTrackMode::unassigned))
+            return t;
+    return -1;
+}
+
+int addAudioTrack (Song& song)
+{
+    const auto track = firstFreeTrack (song);
+    if (track < 0)
+        return -1;
+    const auto mixerBefore = song.mixer.size();
+    const auto mixer = freeMixerTrack (song);
+    if (mixer <= 0 || assignAudioTracks (song, { track }, mixer) != 1)
+    {
+        if (song.mixer.size() > mixerBefore) // (an insert freeMixerTrack added for nothing goes again)
+            song.mixer.resize (mixerBefore);
+        return -1;
+    }
+    return track;
+}
+
+bool canBeInstrumentTrack (const Song& song, int channel)
+{
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return false;
+    const auto kind = song.channels[(std::size_t) channel].instrument;
+    return kind != InstrumentKind::audioClip && kind != InstrumentKind::controller;
+}
+
+std::vector<int> instrumentTracksOf (const Song& song, int channel)
+{
+    std::vector<int> tracks;
+    for (int i = 0; i < (int) song.playlistTracks.size(); ++i)
+        if (song.playlistTracks[(std::size_t) i].mode == PlaylistTrackMode::instrument && song.playlistTracks[(std::size_t) i].channel == channel)
+            tracks.push_back (i);
+    return tracks;
+}
+
+int assignToNewInstrumentTrack (Song& song, int channel)
+{
+    if (! canBeInstrumentTrack (song, channel))
+        return -1;
+    const auto track = firstFreeTrack (song);
+    if (track < 0)
+        return -1;
+    const auto before = song;
+    if (! makeInstrumentTrack (song, track, channel))
+    {
+        song = before;
+        return -1;
+    }
+    return track;
+}
+
+int unassignFromInstrumentTracks (Song& song, int channel)
+{
+    const auto tracks = instrumentTracksOf (song, channel);
+    for (const auto t : tracks)
+        unassign (song, t);
+    return (int) tracks.size();
+}
+
+int addInstrumentTrack (Song& song, ChannelDef generator, int track)
+{
+    if (generator.instrument == InstrumentKind::audioClip || generator.instrument == InstrumentKind::controller)
+        return -1;
+    if (track < 0)
+        track = firstFreeTrack (song);
+    if (track < 0 || track >= 500 || (track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].mode == PlaylistTrackMode::instrument))
+        return -1;
+    const auto before = song;
+    generator.mixerTrack = 0; // (makeInstrumentTrack gives it a free mixer track)
+    song.channels.push_back (std::move (generator));
+    const auto channel = (int) song.channels.size() - 1;
+    if (! makeInstrumentTrack (song, track, channel))
+    {
+        song = before;
+        return -1;
+    }
+    return channel;
+}
+
 std::string describe (const Song& song, int track)
 {
     if (track < 0 || track >= (int) song.playlistTracks.size())
@@ -1002,6 +1091,7 @@ int trackFor (const Song& song, const AutomationTarget& target)
         case AutomationTargetKind::channelVolume:
         case AutomationTargetKind::channelPan:
         case AutomationTargetKind::channelParam:
+        case AutomationTargetKind::channelAdjust:
             channel = target.index;
             if (channel >= 0 && channel < (int) song.channels.size())
                 insert = song.channels[(std::size_t) channel].mixerTrack;

@@ -297,6 +297,14 @@ std::optional<std::pair<int, int>> flRawRange (flp::ControlId id, const std::str
     {
         if (p == 0 || p == 1) // volume 0..12800 (10000 = default), pan 0..12800 (6400 = centre)
             return std::pair { 0, 12800 };
+        // Levels adjustment (round 190dz, TPluginForm OfsLevelsPanel): pan offset ±6400, volume multiplier 0..25600,
+        // Mod X / Y offsets ±256
+        if (p == 0x10)
+            return std::pair { -6400, 6400 };
+        if (p == 0x11)
+            return std::pair { 0, 25600 };
+        if (p == 0x13 || p == 0x14)
+            return std::pair { -256, 256 };
     }
     else if (id.isMixer())
     {
@@ -356,6 +364,11 @@ AutomationTarget automationTargetFor (flp::ControlId id, const std::map<int, int
             t.kind = AutomationTargetKind::channelVolume;
         else if (p == 1)
             t.kind = AutomationTargetKind::channelPan;
+        else if (p >= 0x10 && p <= 0x14 && leveladjust::valid (p - 0x10)) // Levels adjustment (round 190dz)
+        {
+            t.kind = AutomationTargetKind::channelAdjust;
+            t.param = p - 0x10;
+        }
         else if (p >= flp::ControlId::pluginParamBase)
         {
             t.kind = AutomationTargetKind::channelParam;
@@ -647,7 +660,7 @@ void splitDrumChannel (Song& song, int channel, const std::vector<DrumPad>& pads
 
     song.forEachTarget ([&] (AutomationTarget& t) {
         if ((t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-             || t.kind == AutomationTargetKind::channelParam) && t.index >= 0)
+             || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust) && t.index >= 0)
             t.index = shift (t.index);
     });
 }
@@ -1084,15 +1097,15 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         // level adjustments (0xE5): FL multiplies the channel volume by the adjustment through the same curve
         // (gain = f(volume)·f(volAdj), REA_rodada3 §2 [DECOMP]; an FL render of one channel with volAdj 7286 vs 12800
         // differs by −10.4 dB, f() gives −10.7 dB, a linear factor −4.9 dB) and adds the pan adjustment to the pan.
+        // Since round 190dz they are the channel's own Levels adjustment (Misc tab), no longer folded into its knobs: the
+        // knobs read as in FL and Automate's clips (channel parameters 0x10 / 0x11) move them.
         if (c.hasLevelAdjust)
         {
-            if (c.volAdj != 12800)
-            {
-                const auto g = channelGain (def.volume) * channelGain (std::clamp (c.volAdj / 12800.0f, 0.0f, 1.0f));
-                def.volume = std::clamp ((float) (std::log (10.0 * g + 1.0) / std::log (11.0)), 0.0f, 1.0f);
-            }
-            if (c.panAdj != 0)
-                def.pan = std::clamp (def.pan + c.panAdj / 6400.0f, -1.0f, 1.0f);
+            auto& l = def.misc.levels;
+            l.pan = std::clamp (c.panAdj / 6400.0f, -1.0f, 1.0f);
+            l.volume = std::clamp (c.volAdj / 12800.0f, 0.0f, 2.0f);
+            l.modX = std::clamp (c.modXAdj / 256.0f, -1.0f, 1.0f);
+            l.modY = std::clamp (c.modYAdj / 256.0f, -1.0f, 1.0f);
         }
 
         // sample root note: our sampler plays at the original pitch at C5 (60)

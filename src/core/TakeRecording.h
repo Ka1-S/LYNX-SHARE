@@ -37,6 +37,11 @@ struct Latency
     int total() const noexcept { return roundTrip() + manual + pdc; }
 };
 
+// FL's Mixer › Disk recording › "Latency compensation" (RecLatCompMenu, on by default; round 190dx, FLEngine 2026
+// FUN_0126c040: at record start the take offset is "switch on ? the latency : 0"): with it off a take lands where its
+// first sample arrived, nothing is moved (round trip, manual fine adjust and PDC all left out).
+inline int compensation (const Latency& latency, bool on) noexcept { return on ? latency.total() : 0; }
+
 // Key of a device setup a measurement belongs to ("type|device|input|rate|block"): another driver, device, rate or
 // buffer size has another round trip.
 std::string setupKey (const std::string& type, const std::string& output, const std::string& input, double sampleRate, int block);

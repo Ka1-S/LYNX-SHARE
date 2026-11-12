@@ -3585,6 +3585,10 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                       [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.unarmAfterRender = ! r.unarmAfterRender; }); });
         disk.addItem (tr ("Auto-create audio clip (the rendered files go on the Playlist)"), true, ro.autoCreateClip,
                       [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.autoCreateClip = ! r.autoCreateClip; }); });
+        // FL's "Latency compensation" (RecLatCompMenu, checked by default; round 190dx): off, recorded takes are not moved
+        // back by the round trip, the fine adjust and the PDC (Options › Audio › Recording)
+        disk.addItem (tr ("Latency compensation"), true, ro.latencyCompensation,
+                      [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.latencyCompensation = ! r.latencyCompensation; }); });
         disk.addItem (tr ("Disarm the inserts when recording stops"), true, ro.disarmOnStop,
                       [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.disarmOnStop = ! r.disarmOnStop; }); });
         // LYNX's own (round 190aq): also in the record button's menu

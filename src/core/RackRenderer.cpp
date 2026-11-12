@@ -1668,6 +1668,7 @@ void RackState::buildAutomationTables()
 
     channelVolumeAuto.assign (song.channels.size(), -1);
     channelPanAuto.assign (song.channels.size(), -1);
+    channelAdjustAuto.assign (song.channels.size(), { -1, -1 });
     mixerVolumeAuto.assign (song.mixer.size(), -1);
     mixerPanAuto.assign (song.mixer.size(), -1);
     vcaLevelAuto.assign (song.vcas.size(), -1);
@@ -1697,6 +1698,12 @@ void RackState::buildAutomationTables()
         {
             case AutomationTargetKind::channelVolume: if (channelOk) channelVolumeAuto[(std::size_t) t.index] = a; else used = false; break;
             case AutomationTargetKind::channelPan: if (channelOk) channelPanAuto[(std::size_t) t.index] = a; else used = false; break;
+            case AutomationTargetKind::channelAdjust: // (pan and volume move live; Mod X / Y offsets are not automatable yet)
+                if (channelOk && (t.param == leveladjust::pan || t.param == leveladjust::volume))
+                    channelAdjustAuto[(std::size_t) t.index][(std::size_t) t.param] = a;
+                else
+                    used = false;
+                break;
             case AutomationTargetKind::mixerVolume: if (trackOk) mixerVolumeAuto[(std::size_t) t.index] = a; else used = false; break;
             case AutomationTargetKind::mixerPan: if (trackOk) mixerPanAuto[(std::size_t) t.index] = a; else used = false; break;
 
@@ -1875,6 +1882,10 @@ void RackState::buildAutomationTables()
         {
             case AutomationTargetKind::channelVolume: return channelOk ? channelVolumeAuto[(std::size_t) t.index] : -1;
             case AutomationTargetKind::channelPan: return channelOk ? channelPanAuto[(std::size_t) t.index] : -1;
+            case AutomationTargetKind::channelAdjust:
+                return channelOk && (t.param == leveladjust::pan || t.param == leveladjust::volume)
+                           ? channelAdjustAuto[(std::size_t) t.index][(std::size_t) t.param]
+                           : -1;
             case AutomationTargetKind::mixerVolume: return trackOk ? mixerVolumeAuto[(std::size_t) t.index] : -1;
             case AutomationTargetKind::mixerPan: return trackOk ? mixerPanAuto[(std::size_t) t.index] : -1;
             case AutomationTargetKind::effectParam:
@@ -2653,8 +2664,21 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     const auto automation = state.hasAutomation;
     const auto knobVolume = liveLevel (state, &LiveLevels::channelVolume, i, c.volume);
     const auto knobPan = liveLevel (state, &LiveLevels::channelPan, i, c.pan);
-    const auto volume = channelGain (automation ? automated (state.channelVolumeAuto[(std::size_t) i], knobVolume) : knobVolume);
-    const auto pan = automation ? automated (state.channelPanAuto[(std::size_t) i], (knobPan + 1.0f) * 0.5f) * 2.0f - 1.0f : knobPan;
+    auto volume = channelGain (automation ? automated (state.channelVolumeAuto[(std::size_t) i], knobVolume) : knobVolume);
+    auto pan = automation ? automated (state.channelPanAuto[(std::size_t) i], (knobPan + 1.0f) * 0.5f) * 2.0f - 1.0f : knobPan;
+    // FL's Levels adjustment (round 190dz, REA_rodada3 §2 FUN_00fe9d20 / FUN_00fe9bf0): gain f(volume)·f(multiplier),
+    // pan + offset. Neutral (every project before it) costs one comparison and changes nothing.
+    if (const auto& adjust = c.misc.levels; automation || adjust.pan != 0.0f || adjust.volume != 1.0f)
+    {
+        const auto bound = automation && (std::size_t) i < state.channelAdjustAuto.size();
+        const auto multiplier = bound ? automated (state.channelAdjustAuto[(std::size_t) i][leveladjust::volume], adjust.volume * 0.5f) * 2.0f : adjust.volume;
+        const auto offset = bound ? automated (state.channelAdjustAuto[(std::size_t) i][leveladjust::pan], (adjust.pan + 1.0f) * 0.5f) * 2.0f - 1.0f
+                                  : adjust.pan;
+        if (multiplier != 1.0f)
+            volume *= levelAdjustGain (multiplier);
+        if (offset != 0.0f)
+            pan = adjustedPan (pan, offset);
+    }
     float gl = 0.0f, gr = 0.0f;
     if (c.instrument == InstrumentKind::plugin && state.song.flPluginLevels)
         flWrapperGains (pan, volume, state.song.panTriangular, gl, gr);

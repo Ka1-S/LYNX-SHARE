@@ -1259,6 +1259,12 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                     c.hasLevelAdjust = true;
                     c.panAdj = readLE<std::int32_t> (e.data, 0) * scale;
                     c.volAdj = readLE<std::int32_t> (e.data, 4) * scale;
+                    if (e.data.size() >= 20) // (round 190dz) the rest of FL's Levels adjustment
+                    {
+                        c.adjUnknown = readLE<std::int32_t> (e.data, 8);
+                        c.modXAdj = readLE<std::int32_t> (e.data, 12);
+                        c.modYAdj = readLE<std::int32_t> (e.data, 16);
+                    }
                 }
                 break;
 

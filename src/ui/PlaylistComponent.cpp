@@ -31,6 +31,7 @@
 #include "core/TransportEdit.h"
 
 #include "core/ClipOps.h"
+#include "core/FlClipMenu.h"
 
 #include "core/EditorPolish.h"
 
@@ -60,6 +61,8 @@
 #include "ui/Theme.h"
 #include "ui/WaveformView.h"
 #include "ui/AudioEditor.h"
+#include "ui/PluginPicker.h"
+#include "ui/QuickPick.h"
 
 #include <map>
 #include <unordered_map>
@@ -69,6 +72,40 @@ namespace lynx
 namespace
 {
 constexpr float clipTitleHeight = 13.0f;
+
+// FL's "+" at the top left of the track headers (TEVENTEDITFORM TLEventPanel.AddInstrBtn, 21 x 18, hint "Add instrument
+// track / Add audio track"; round 190dx): a left click opens its menu (AddInstrBtnBeforePopup), a right click adds an
+// audio track at once (AddInstrBtnMouseUp, right button -> FUN_012e3640)
+class AddTrackButton : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    std::function<void()> onMenu, onAddAudioTrack;
+    void paint (juce::Graphics& g) override
+    {
+        using namespace theme;
+        const auto over = isMouseOverOrDragging();
+        const auto r = getLocalBounds().toFloat().reduced (0.5f);
+        fillRoundRect (g, r, radius::sm, over ? colour::bg4 : colour::bg3);
+        g.setColour (over ? colour::accent : colour::textSecondary);
+        const auto c = r.getCentre();
+        g.fillRect (juce::Rectangle<float> (c.x - 4.5f, c.y - 0.75f, 9.0f, 1.5f));
+        g.fillRect (juce::Rectangle<float> (c.x - 0.75f, c.y - 4.5f, 1.5f, 9.0f));
+    }
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (! getLocalBounds().contains (e.getPosition()))
+            return;
+        if (flmods::popup (e.mods))
+        {
+            if (onAddAudioTrack)
+                onAddAudioTrack();
+        }
+        else if (e.mods.isLeftButtonDown() && onMenu)
+            onMenu();
+    }
+};
 
 // --- clip look -------------------------------------------------------------------------------------
 // One recipe for every clip kind (studied from FL's Playlist, drawn with LYNX's own code and palette): a muted
@@ -893,6 +930,17 @@ PlaylistComponent::PlaylistComponent (AudioEngine& e)
     stretchButton.setMouseClickGrabsKeyboardFocus (false);
     addAndMakeVisible (stretchButton);
 
+    {
+        auto button = std::make_unique<AddTrackButton>();
+        button->setTooltip (tr ("Add instrument track / Add audio track"));
+        button->onMenu = [this] {
+            buildAddTrackMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (addTrackButton.get()));
+        };
+        button->onAddAudioTrack = [this] { addAudioTrackNow(); };
+        addTrackButton = std::move (button);
+        addAndMakeVisible (*addTrackButton);
+    }
+
     arrangementBox.setTooltip (tr ("Arrangement (as in FL, a project can have several)"));
     arrangementBox.setWantsKeyboardFocus (false);
     arrangementBox.setMouseClickGrabsKeyboardFocus (false);
@@ -1343,6 +1391,12 @@ void PlaylistComponent::resized()
     for (auto* c : std::initializer_list<juce::Component*> { &snapBox, &followButton, &stretchButton })
         c->setVisible (! toolbarFitsNarrow || c->getRight() <= toolbarEnd);
     overview.setBounds (headerWidth, toolbarHeight, getWidth() - headerWidth - scrollBarSize, overviewHeight);
+    // FL's "+" (21 x 18 at 7 px from the left of the header panel), on the ruler's row; FL's headers only
+    if (addTrackButton != nullptr)
+    {
+        addTrackButton->setBounds (7, rulerTop + (timelineHeight - 18) / 2, 21, 18);
+        addTrackButton->setVisible (! simpleHeaders);
+    }
     const auto blocks = blocksSectionHeight();
     blocksShown = blocks > 0;
     vBar.setBounds (getWidth() - scrollBarSize, tracksTop(), scrollBarSize, getHeight() - tracksTop() - blocks);
@@ -5926,12 +5980,15 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
             audio.addItem (juce::String (item.mixer) + ". " + (item.name.empty() ? tr ("Insert {0}", { juce::String (item.mixer) }) : juce::String::fromUTF8 (item.name.c_str())),
                            item.enabled, item.ticked, [assign, m = item.mixer] { assign (m); });
         modes.addSubMenu (theme::mnemonic (tr ("Audio track"), 'A'), audio, true, nullptr, info.mode == PlaylistTrackMode::audio);
+        // FL's Instrument track › (EEPLTrackModeInstrMenu, round 190dx): "Use existing channel" ›, a line, "More
+        // plugins..." (FL's default item), a line, then the generator list of the Channel rack's Insert menu
+        juce::PopupMenu existing;
         for (int c = 0; c < (int) song.channels.size(); ++c)
         {
             const auto kind = song.channels[(std::size_t) c].instrument;
             if (kind == InstrumentKind::audioClip || kind == InstrumentKind::controller)
                 continue;
-            instruments.addItem (juce::String::fromUTF8 (song.channels[(std::size_t) c].name.c_str()), true,
+            existing.addItem (juce::String::fromUTF8 (song.channels[(std::size_t) c].name.c_str()), true,
                                  info.mode == PlaylistTrackMode::instrument && info.channel == c, [this, track, c] {
                                      bool ok = false;
                                      engine.editSong ([track, c, &ok] (Song& s) { ok = trackmodes::makeInstrumentTrack (s, track, c); });
@@ -5940,7 +5997,13 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
                                                                                  tr ("There are no available mixer tracks."));
                                  });
         }
-        modes.addSubMenu (theme::mnemonic (tr ("Instrument track"), 'I'), instruments, instruments.getNumItems() > 0, nullptr, info.mode == PlaylistTrackMode::instrument);
+        instruments.addSubMenu (theme::mnemonic (tr ("Use existing channel"), 'U'), existing, existing.getNumItems() > 0);
+        instruments.addSeparator();
+        instruments.addItem (tr ("More plugins..."), [this, track] { morePluginsForTrack (track); });
+        instruments.addSeparator();
+        quickpick::addGeneratorMenu (instruments, engine, [this, track] (ChannelDef c) { instrumentForTrack (track, std::move (c)); }, nullptr, nullptr, this);
+        quickpick::addFolderViewItems (instruments, engine);
+        modes.addSubMenu (theme::mnemonic (tr ("Instrument track"), 'I'), instruments, true, nullptr, info.mode == PlaylistTrackMode::instrument);
         menu.addSubMenu (theme::mnemonic (tr ("Track mode"), 'T'), modes);
     }
     {
@@ -6511,6 +6574,9 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         return menu;
 
     const auto clip = song.playlist[(std::size_t) index];
+    // FL's audio clip menu has its own layout (two columns, FL's sections; round 190dz)
+    if (clip.kind == ClipKind::audio && clip.channel >= 0 && clip.channel < (int) song.channels.size())
+        return buildAudioClipMenu (index, mouseX);
     const auto targets = isSelected (index) ? selection : std::vector<int> { index };
     const auto many = targets.size() > 1;
 
@@ -6538,6 +6604,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         }
         ui::addItemHeader (menu, many ? kind + " (" + juce::String ((int) targets.size()) + ")" : kind, sourceName, colour);
     }
+    // (an audio clip's menu: buildAudioClipMenu, FL's own layout)
     menu.addItem (tr ("Properties..."), [this, index, targets] {
         showClipProperties (engine, index, targets, [safe = juce::Component::SafePointer<PlaylistComponent> (this)] {
             if (safe != nullptr)
@@ -6545,24 +6612,9 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         });
     });
 
-    // round 190ds, Simple workflow only (LYNX's own): an audio clip follows the project key, and its loop's key
-    if (simpleHeaders && clip.kind == ClipKind::audio && clip.channel >= 0 && clip.channel < (int) song.channels.size())
-        addKeyFollowItems (menu, index, targets);
-
+    // (an audio clip's "Follow the project key" / "Loop key", round 190ds: in buildAudioClipMenu's LYNX items)
     if (clip.kind == ClipKind::pattern && onRenamePattern)
         menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R'), [this, p = clip.pattern] { onRenamePattern (p); });
-    else if (clip.kind == ClipKind::audio)
-        menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R'), [this, ch = clip.channel] {
-            const auto& c = engine.getSong().channels[(std::size_t) ch];
-            showNameAndColourDialog (tr ("Rename audio clip"), juce::String::fromUTF8 (c.name.c_str()), c.colour,
-                                     [this, ch] (const juce::String& name, std::uint32_t colour) {
-                                         if (ch < (int) engine.getSong().channels.size())
-                                             engine.editSong ([ch, n = name.toStdString(), colour] (Song& s) {
-                                                 s.channels[(std::size_t) ch].name = n;
-                                                 s.channels[(std::size_t) ch].colour = colour;
-                                             });
-                                     });
-        });
 
     // FL's "Change color..." / "Random color" (the clip's source: its pattern, or its audio channel)
     if (clip.kind != ClipKind::automation)
@@ -6592,37 +6644,17 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
             for (int p = 0; p < (int) song.patterns.size(); ++p)
                 sources.addItem (juce::String::fromUTF8 (song.patterns[(std::size_t) p].name.c_str()), true, p == clip.pattern,
                                  [this, targets, p] { engine.editSong ([targets, p] (Song& s) { clipops::setClipSource (s, targets, ClipKind::pattern, p); }); });
-        else if (clip.kind == ClipKind::audio)
-        {
-            for (int ch = 0; ch < (int) song.channels.size(); ++ch)
-                if (song.channels[(std::size_t) ch].instrument == InstrumentKind::audioClip)
-                    sources.addItem (juce::String::fromUTF8 (song.channels[(std::size_t) ch].name.c_str()), true, ch == clip.channel,
-                                     [this, targets, ch] { engine.editSong ([targets, ch] (Song& s) { clipops::setClipSource (s, targets, ClipKind::audio, ch); }); });
-        }
-        else
+        else if (clip.kind == ClipKind::automation)
             for (int a = 0; a < (int) song.automations.size(); ++a)
                 sources.addItem (juce::String::fromUTF8 (song.automations[(std::size_t) a].name.c_str()), true, a == clip.automation,
                                  [this, targets, a] { engine.editSong ([targets, a] (Song& s) { clipops::setClipSource (s, targets, ClipKind::automation, a); }); });
         menu.addSubMenu (clip.kind == ClipKind::pattern ? tr ("Select source pattern") : tr ("Select source channel"), sources, sources.getNumItems() > 1);
     }
-    if (clip.kind == ClipKind::audio && clip.channel >= 0 && clip.channel < (int) song.channels.size())
-        menu.addItem (tr ("Channel settings"), [this, ch = clip.channel] { openChannelSettings (engine, ch); });
 
     if (clip.kind == ClipKind::pattern)
         menu.addItem (tr ("Make unique") + "\tShift+V+drag", [this, targets] {
             engine.editSong ([targets] (Song& s) { polish::makeClipsUnique (s, targets); });
         });
-    else if (clip.kind == ClipKind::audio)
-    {
-        menu.addItem (tr ("Make unique"), [this, targets] {
-            engine.editSong ([targets] (Song& s) { clipops::makeAudioUnique (s, targets); });
-        });
-        // FL's audio clip menu › Sample › Make unique as sample (round 189g)
-        menu.addItem (tr ("Make unique as sample"), [this, targets] {
-            setSelection (targets);
-            makeSelectionUniqueAsSample();
-        });
-    }
     else if (clip.kind == ClipKind::automation)
         menu.addItem (tr ("Make unique"), [this, index] {
             engine.editSong ([index] (Song& s) {
@@ -6646,21 +6678,6 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
 
     menu.addItem (tr ("Select all clips of this source"), [this, index] { setSelection (clipops::sameSource (engine.getSong(), index)); });
     menu.addSeparator();
-
-    // --- comping (round 163): a take lane's clip onto its comp track (the group header above) ----------
-    if (const auto comp = takes::compTrackOf (song, clip.track); comp >= 0 && clip.kind == ClipKind::audio)
-    {
-        // the loop region where it covers the clip (comping a phrase), else the whole clip
-        const auto useLoop = song.hasLoop() && song.loopStart < clip.end() && song.loopEnd > clip.start;
-        const auto from = useLoop ? std::max (song.loopStart, clip.start) : clip.start;
-        const auto to = useLoop ? std::min (song.loopEnd, clip.end()) : clip.end();
-        menu.addItem (useLoop ? tr ("Promote this take in the loop region to the comp track") : tr ("Promote this take to the comp track"), [this, index, comp, from, to] {
-            setSelection ({});
-            engine.editSong ([index, comp, from, to] (Song& s) { takes::promoteTake (s, index, comp, from, to); });
-            sortClips();
-        });
-        menu.addSeparator();
-    }
 
     // --- cutting and joining -------------------------------------------------------------------------
     const auto splitAt = snap (xToTick (mouseX) + gridTicks() / 2.0, true);
@@ -6700,166 +6717,6 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         engine.editSong ([targets] (Song& s) { clipops::mergeClips (s, targets); });
         sortClips();
     });
-
-    // --- audio ---------------------------------------------------------------------------------------
-    if (clip.kind == ClipKind::audio && clip.channel >= 0 && clip.channel < (int) song.channels.size())
-    {
-        menu.addSeparator();
-        const auto& channel = song.channels[(std::size_t) clip.channel];
-        const auto path = juce::String::fromUTF8 (channel.samplePath.c_str());
-        const auto sample = engine.getSampleLibrary().load (path);
-        // the frames the clip plays (its Trim; round 180d), as the drawing and the playback count them
-        const auto frames = sample != nullptr ? (double) clipops::clipSpan (channel, sample).frames : 0.0;
-        const auto rate = sample != nullptr ? sample->sampleRate : 44100.0;
-
-        menu.addItem (tr ("Reverse"), sample != nullptr, channel.sampler.reverse, [this, index, frames, rate] {
-            engine.editSong ([index, frames, rate] (Song& s) {
-                const auto ch = s.playlist[(std::size_t) index].channel;
-                clipops::reverseAudio (s, index, clipops::fileTicks (s.channels[(std::size_t) ch], frames, rate, s.bpm));
-            });
-        });
-
-        menu.addItem (tr ("Extract stems from sample"), sample != nullptr, false,
-                      [this, index] { extractStemsFromClip (engine, index, [this] { sortClips(); }); });
-
-        // Live's Convert Melody / Harmony / Drums to New MIDI Track, the FL way: a new pattern on new channels (round a2m189b)
-        {
-            juce::PopupMenu convert;
-            const std::pair<const char*, a2m::Mode> modes[] = { { TR_NOOP ("Melody to new pattern"), a2m::Mode::melody },
-                                                                { TR_NOOP ("Harmony to new pattern"), a2m::Mode::harmony },
-                                                                { TR_NOOP ("Drums to new pattern"), a2m::Mode::drums } };
-            for (const auto& [label, mode] : modes)
-                convert.addItem (tr (label), [this, index, m = mode] { convertClipToMidi (engine, index, m, [this] { sortClips(); }); });
-            menu.addSubMenu (tr ("Convert to MIDI"), convert, sample != nullptr);
-        }
-
-        menu.addItem (tr ("Pitch... (semitones, cents, keep length)"), sample != nullptr, false,
-                      [this, ch = clip.channel] { showSamplePitchDialog (engine, ch); });
-        menu.addItem (tr ("Normalize"), [this, targets] { normalizeClips (targets); });
-
-        juce::PopupMenu gains;
-        for (auto db : { 6.0f, 3.0f, 0.0f, -3.0f, -6.0f, -12.0f })
-        {
-            const auto g = juce::Decibels::decibelsToGain (db);
-            gains.addItem ((db > 0 ? "+" : "") + juce::String (db, 0) + " dB", true, std::abs (clip.gain - g) < 0.01f, [this, targets, g] {
-                engine.editSong ([targets, g] (Song& s) {
-                    for (auto i : targets)
-                        if (i < (int) s.playlist.size() && s.playlist[(std::size_t) i].kind == ClipKind::audio)
-                            s.playlist[(std::size_t) i].gain = g;
-                });
-            });
-        }
-        menu.addSubMenu (tr ("Clip volume"), gains);
-
-        // stretching the channel's file to a whole number of beats at the project tempo
-        juce::PopupMenu fit;
-        const auto beats = tempodetect::fitBeatsOf (sample.get(), song.bpm);
-        auto fitTo = [this, index, frames, rate] (float toBeats, bool keepPitch) {
-            engine.editSong ([index, frames, rate, toBeats, keepPitch] (Song& s) {
-                const auto ch = s.playlist[(std::size_t) index].channel;
-                auto& channel = s.channels[(std::size_t) ch];
-                auto& sampler = channel.sampler;
-                const auto before = clipops::fileTicks (channel, frames, rate, s.bpm);
-                sampler.stretchBeats = toBeats;
-                // "Original speed" keeps a pitched clip's "keep length" (round 163)
-                sampler.keepPitch = keepPitch && (toBeats > 0.0f || sampler.pitch != 0.0f || channel.misc.fineTune != 0.0f);
-                // every clip of the file keeps showing the same audio: offsets and lengths scale with it
-                clipops::rescaleClipsOf (s, ch, before, clipops::fileTicks (channel, frames, rate, s.bpm));
-            });
-            sortClips();
-        };
-        if (beats > 0.0f)
-        {
-            const auto whole = std::abs (beats - std::round (beats)) < 0.005f;
-            const auto label = juce::String (beats, whole ? 0 : 2) + " " + (beats == 1.0f ? tr ("beat") : tr ("beats"));
-            fit.addItem (tr ("Fit to tempo, keep pitch ({0})", { label }), true, channel.sampler.stretchBeats == beats && channel.sampler.keepPitch,
-                         [fitTo, beats] { fitTo (beats, true); });
-            fit.addItem (tr ("Fit to tempo, resample ({0})", { label }), true, channel.sampler.stretchBeats == beats && ! channel.sampler.keepPitch,
-                         [fitTo, beats] { fitTo (beats, false); });
-            fit.addItem (tr ("Half as long"), channel.sampler.stretchBeats > 0.0f, false,
-                         [fitTo, b = channel.sampler.stretchBeats, kp = channel.sampler.keepPitch] { fitTo (juce::jmax (0.25f, b * 0.5f), kp); });
-            fit.addItem (tr ("Twice as long"), channel.sampler.stretchBeats > 0.0f, false,
-                         [fitTo, b = channel.sampler.stretchBeats, kp = channel.sampler.keepPitch] { fitTo (juce::jmin (1024.0f, b * 2.0f), kp); });
-            fit.addSeparator();
-        }
-        // FL's TIME presets (r168s c_f20): the whole file lasts exactly this long
-        for (const auto preset : clipops::timePresetBeats (song.beatsPerBar))
-        {
-            const auto bars = song.beatsPerBar > 0 && preset >= (float) song.beatsPerBar ? preset / (float) song.beatsPerBar : 0.0f;
-            const auto label = bars > 0.0f ? (bars == 1.0f ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars, 0) }))
-                                           : (preset == 1.0f ? tr ("1 beat") : tr ("{0} beats", { juce::String (preset, 0) }));
-            fit.addItem (label, true, channel.sampler.stretchBeats == preset, [fitTo, preset, kp = channel.sampler.keepPitch] { fitTo (preset, kp); });
-        }
-        fit.addSeparator();
-        fit.addItem (tr ("Original speed (no stretch)"), true, channel.sampler.stretchBeats <= 0.0f, [fitTo, kp = channel.sampler.keepPitch] { fitTo (0.0f, kp); });
-        menu.addSubMenu (tr ("Fit to tempo"), fit, sample != nullptr);
-
-        // FL's "Detect tempo" (REA round 153; LYNX's own detector, core/TempoDetect): a range to fold the result
-        // into, then fit the clip to the project tempo or take its tempo for the project
-        {
-            juce::PopupMenu detect;
-            struct Range { double low, high; };
-            for (const auto r : { Range { 50.0, 100.0 }, Range { 75.0, 150.0 }, Range { 100.0, 200.0 }, Range { 150.0, 300.0 } }) // FL's ranges (r168s)
-                detect.addItem (tr ("{0}-{1} BPM", { juce::String (r.low, 0), juce::String (r.high, 0) }), [this, sample, fitTo, r] {
-                    if (sample == nullptr)
-                        return;
-                    tempodetect::Options options;
-                    options.minBpm = r.low;
-                    options.maxBpm = r.high;
-                    const auto found = tempodetect::detect (sample->leftData(), sample->isStereo() ? sample->rightData() : nullptr,
-                                                            sample->frames(), sample->sampleRate, options);
-                    if (found.bpm <= 0.0)
-                    {
-                        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Detect tempo"),
-                                                                tr ("No steady tempo was found in this sample."));
-                        return;
-                    }
-                    const auto songBpm = engine.getSong().bpm;
-                    auto* window = new juce::AlertWindow (tr ("Detect tempo"),
-                                                          tr ("Detected tempo: {0} BPM ({1} beats in the sample). The project plays at {2} BPM.",
-                                                              { juce::String (found.bpm, 2), juce::String (found.beats, 2), juce::String (songBpm, 2) }),
-                                                          juce::MessageBoxIconType::NoIcon);
-                    window->addButton (tr ("Fit the clip to the project tempo"), 1);
-                    window->addButton (tr ("Use it as the project tempo"), 2);
-                    window->addButton (tr ("Use it, rounded to a whole BPM"), 3);
-                    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
-                    window->enterModalState (true, juce::ModalCallbackFunction::create ([this, found, fitTo] (int result) {
-                                                 if (result == 1)
-                                                     fitTo ((float) found.beats, true); // exact (issue #32 #7: was rounded to 1/4 beat)
-                                                 else if (result == 2 || result == 3)
-                                                 {
-                                                     const auto bpm = juce::jlimit (minTempo, maxTempo, result == 3 ? std::round (found.bpm) : found.bpm);
-                                                     engine.editSong ([bpm] (Song& s) { clipops::followTempo (s, bpm); });
-                                                 }
-                                             }),
-                                             true);
-                });
-            menu.addSubMenu (tr ("Detect tempo"), detect, sample != nullptr);
-        }
-
-        if (clip.fadeIn > 0 || clip.fadeOut > 0)
-            menu.addItem (tr ("Remove fades"), [this, targets] {
-                engine.editSong ([targets] (Song& s) {
-                    for (auto i : targets)
-                        if (i < (int) s.playlist.size())
-                            s.playlist[(std::size_t) i].fadeIn = s.playlist[(std::size_t) i].fadeOut = 0;
-                });
-            });
-        // FL's Fades › "Crossfade selected" (round 189o): only shown when the clicked clip is selected and a selected
-        // clip has a selected neighbour to cross; the same Create crossfade as the fade handle menu
-        if (clipops::showCrossfadeSelected (song.playlist, index, selection))
-            menu.addItem (tr ("Crossfade selected"), [this, index, chosen = selection] {
-                engine.editSong ([index, chosen] (Song& s) { clipops::createCrossfades (s.playlist, index, 0, chosen); });
-                repaint();
-            });
-
-        menu.addItem (tr ("Open in a new Sampler channel"), sample != nullptr, false, [this, ch = clip.channel] {
-            if (onOpenInSampler)
-                onOpenInSampler (ch);
-        });
-        menu.addItem (tr ("Edit in the audio editor..."), sample != nullptr, false, [this, ch = clip.channel, index] { openAudioEditorForChannel (engine, ch, index); });
-        menu.addItem (tr ("Show the file in Explorer"), juce::File (path).existsAsFile(), false, [path] { juce::File (path).revealToUser(); });
-    }
 
     // --- pattern -------------------------------------------------------------------------------------
     if (clip.kind == ClipKind::pattern)
@@ -6913,6 +6770,415 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
     });
 
     return menu;
+}
+
+// FL Studio 2026's audio clip menu (round 190dz; the model, FL's evidence and what LYNX leaves out: core/FlClipMenu.h):
+// two columns — "Audio clip" and "Region" on the left, "Sample", "Automation" and "Fades" on the right — in FL's order
+// and with FL's labels, then LYNX's own items (no FL counterpart) below a line at the end.
+juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
+{
+    const auto& song = engine.getSong();
+    juce::PopupMenu menu;
+    const auto clip = song.playlist[(std::size_t) index];
+    const auto targets = isSelected (index) ? selection : std::vector<int> { index };
+    const auto many = targets.size() > 1;
+    const auto ch = clip.channel;
+    const auto& channel = song.channels[(std::size_t) ch];
+    const auto path = juce::String::fromUTF8 (channel.samplePath.c_str());
+    const auto sample = engine.getSampleLibrary().load (path);
+    const auto span = sample != nullptr ? clipops::clipSpan (channel, sample) : precompute::PlayedSpan {};
+    // the frames the clip plays (its Trim; round 180d), as the drawing and the playback count them
+    const auto frames = sample != nullptr ? (double) span.frames : 0.0;
+    const auto rate = sample != nullptr ? sample->sampleRate : 44100.0;
+    const auto mouse = juce::Rectangle<int> (juce::Desktop::getMousePosition().x, juce::Desktop::getMousePosition().y, 1, 1);
+    const auto label = [] (const flclipmenu::Entry& e) { return e.mnemonic != 0 ? theme::mnemonic (tr (e.text.c_str()), e.mnemonic) : tr (e.text.c_str()); };
+    auto setColour = [this, ch] (std::uint32_t colour) {
+        engine.editSong ([ch, colour] (Song& s) {
+            if (ch < (int) s.channels.size())
+                s.channels[(std::size_t) ch].colour = colour;
+        });
+    };
+
+    // FL's Crossfade with › lists the other channels' audio clips that overlap this one in time (EEAUMenuPopup ->
+    // FUN_01236f10); with none it is greyed. LYNX has no crossfade-with yet: shown only in that greyed state.
+    const auto overlapped = std::any_of (song.playlist.begin(), song.playlist.end(), [&clip] (const Clip& c) {
+        return c.kind == ClipKind::audio && c.channel != clip.channel && c.start < clip.end() && clip.start < c.end();
+    });
+
+    for (const auto& e : flclipmenu::shown (! overlapped, clipops::showCrossfadeSelected (song.playlist, index, selection)))
+    {
+        using K = flclipmenu::Entry::Kind;
+        const auto& t = e.text;
+        if (e.kind == K::separator)
+            menu.addSeparator();
+        else if (e.kind == K::columnBreak)
+            menu.addColumnBreak();
+        else if (e.kind == K::header && t == "Audio clip")
+            ui::addItemHeader (menu, many ? tr ("Audio clip") + " (" + juce::String ((int) targets.size()) + ")" : tr ("Audio clip"),
+                               juce::String::fromUTF8 (channel.name.c_str()), audioClipColour (channel));
+        else if (e.kind == K::header)
+            menu.addSectionHeader (tr (t.c_str()));
+        else if (t == "Preview")
+            menu.addItem (label (e), [this, index] { previewClipAudio (index); });
+        else if (t == "Muted")
+            menu.addItem (label (e), true, clip.muted, [this, targets, m = ! clip.muted] {
+                engine.editSong ([targets, m] (Song& s) {
+                    for (auto i : targets)
+                        if (i < (int) s.playlist.size())
+                            s.playlist[(std::size_t) i].muted = m;
+                });
+            });
+        else if (t == "Rename and color...")
+            menu.addItem (label (e), [this, ch] {
+                const auto& c = engine.getSong().channels[(std::size_t) ch];
+                showNameAndColourDialog (tr ("Rename audio clip"), juce::String::fromUTF8 (c.name.c_str()), c.colour,
+                                         [this, ch] (const juce::String& name, std::uint32_t colour) {
+                                             if (ch < (int) engine.getSong().channels.size())
+                                                 engine.editSong ([ch, n = name.toStdString(), colour] (Song& s) {
+                                                     s.channels[(std::size_t) ch].name = n;
+                                                     s.channels[(std::size_t) ch].colour = colour;
+                                                 });
+                                         });
+            });
+        else if (t == "Change color...") // (FL: the name dialog with its colour selector, EEAUSetNameMenuClick flag 8)
+            menu.addItem (label (e), [setColour, mouse, current = channel.colour] {
+                ui::showColourPickerPopup (mouse, tr ("Change color..."), current != 0 ? juce::Colour (current) : juce::Colour (lynxPalette()[0]), {},
+                                           [setColour] (juce::Colour c) { setColour (c.getARGB()); }, {}, [setColour] { setColour (0); });
+            });
+        else if (t == "Random color")
+            menu.addItem (label (e), [setColour] {
+                const auto& palette = lynxPalette();
+                setColour (palette[(std::size_t) juce::Random::getSystemRandom().nextInt ((int) palette.size())]);
+            });
+        else if (t == "Change icon...") // (FL: the clip channel's icon, EEAUSetNameMenuClick flag 2; LYNX's own icon set)
+            menu.addItem (label (e), [this, ch, mouse, current = channel.icon] {
+                ui::showTrackIconPicker (mouse, current, [this, ch] (int icon) {
+                    if (ch < (int) engine.getSong().channels.size())
+                        engine.editSong ([ch, icon] (Song& s) { s.channels[(std::size_t) ch].icon = icon; });
+                });
+            });
+        else if (t == "Select source channel")
+        {
+            juce::PopupMenu sources;
+            for (int c = 0; c < (int) song.channels.size(); ++c)
+                if (song.channels[(std::size_t) c].instrument == InstrumentKind::audioClip)
+                    sources.addItem (juce::String::fromUTF8 (song.channels[(std::size_t) c].name.c_str()), true, c == ch,
+                                     [this, targets, c] { engine.editSong ([targets, c] (Song& s) { clipops::setClipSource (s, targets, ClipKind::audio, c); }); });
+            menu.addSubMenu (label (e), sources, sources.getNumItems() > 1);
+        }
+        else if (t == "Channel settings")
+            menu.addItem (label (e), [this, ch] { openChannelSettings (engine, ch); });
+        else if (t == "Make unique")
+            menu.addItem (label (e), [this, targets] { engine.editSong ([targets] (Song& s) { clipops::makeAudioUnique (s, targets); }); });
+        else if (t == "Select all similar clips")
+            menu.addItem (label (e), [this, index] { setSelection (clipops::sameSource (engine.getSong(), index)); });
+        else if (t == "Delete")
+            menu.addItem (label (e), [this, targets] {
+                setSelection (targets);
+                deleteSelection();
+            });
+        else if (t == "Properties...")
+            menu.addItem (label (e), [this, index, targets] {
+                showClipProperties (engine, index, targets, [safe = juce::Component::SafePointer<PlaylistComponent> (this)] {
+                    if (safe != nullptr)
+                        safe->sortClips();
+                });
+            });
+        else if (t == "Select region")
+        {
+            // "Full" (FL's Default radio item) and the file's regions (its cue markers): the clip plays that part
+            juce::PopupMenu regions;
+            const auto perTick = sample != nullptr ? clipops::framesPerTick (channel, clip, frames, rate, song.bpm) : 0.0;
+            std::vector<flclipmenu::ClipWindow> windows;
+            if (sample != nullptr)
+                for (const auto& r : flclipmenu::sampleRegions (sample->markerStarts, (std::int64_t) sample->frames()))
+                    if (const auto w = flclipmenu::regionWindow (r, span.first, span.frames, perTick))
+                        windows.push_back (*w);
+            const auto current = flclipmenu::currentRegion (windows, clip);
+            auto setWindow = [this, targets] (flclipmenu::ClipWindow w) {
+                engine.editSong ([targets, w] (Song& s) {
+                    for (auto i : targets)
+                        if (i < (int) s.playlist.size() && s.playlist[(std::size_t) i].kind == ClipKind::audio)
+                        {
+                            s.playlist[(std::size_t) i].offset = w.offset;
+                            s.playlist[(std::size_t) i].offsetFraction = 0.0;
+                            s.playlist[(std::size_t) i].length = w.length;
+                        }
+                });
+                sortClips();
+            };
+            // (FL's radio check, FUN_00ffa400: "Full" while the clip has no start / end of its own — it plays its source
+            // from the start to the end, however long the clip is drawn — a region when it plays exactly that region,
+            // none otherwise)
+            const auto full = flclipmenu::fullWindow (span.frames, perTick);
+            const auto isFull = current < 0 && clip.offset == 0 && clip.length >= full.length - 1;
+            regions.addItem (tr ("Full"), sample != nullptr, isFull, [setWindow, full] { setWindow (full); });
+            for (int r = 0; r < (int) windows.size(); ++r)
+                regions.addItem (tr ("Region {0}", { juce::String (r + 1) }), true, r == current, [setWindow, w = windows[(std::size_t) r]] { setWindow (w); });
+            menu.addSubMenu (label (e), regions);
+        }
+        else if (t == "Chop")
+        {
+            // FL's Chop › "Time based" group (FUN_01236260), then LYNX's chop to the grid
+            juce::PopupMenu chop;
+            auto chopBy = [this, targets] (std::int64_t grid) {
+                setSelection ({});
+                engine.editSong ([targets, grid] (Song& s) {
+                    for (auto i : targets) // chopping adds clips at the end: indices below stay valid
+                        noteedit::chopClip (s.playlist, i, grid);
+                });
+                sortClips();
+            };
+            chop.addSectionHeader (tr ("Time based"));
+            const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+            for (const auto& c : flclipmenu::timeBasedChops())
+                chop.addItem (tr (c.text), [chopBy, ticks = c.beatDivisor == 0 ? bar : (std::int64_t) ppq / c.beatDivisor] { chopBy (ticks); });
+            chop.addSeparator();
+            chop.addItem (tr ("Chop to grid"), [chopBy, grid = gridTicks()] { chopBy (grid); });
+            menu.addSubMenu (label (e), chop);
+        }
+        else if (t == "Make unique as sample") // (round 189g)
+            menu.addItem (label (e), [this, targets] {
+                setSelection (targets);
+                makeSelectionUniqueAsSample();
+            });
+        else if (t == "Edit sample") // (FL: the clip's channel sample into its editor, EEAUEditSampleMenuClick)
+            menu.addItem (label (e), sample != nullptr, false, [this, ch, index] { openAudioEditorForChannel (engine, ch, index); });
+        else if (t == "Extract stems from sample")
+            menu.addItem (label (e), sample != nullptr, false, [this, index] { extractStemsFromClip (engine, index, [this] { sortClips(); }); });
+        else if (t == "Detect tempo")
+            menu.addSubMenu (label (e), detectTempoMenu (index, sample), sample != nullptr);
+        else if (t == "Fit to tempo")
+            menu.addSubMenu (label (e), fitToTempoMenu (index, sample), sample != nullptr);
+        else if (t == "Automate")
+        {
+            // EEAUAutoMenu (round 190dx, core clipops::automateAudioClip): an automation clip of the clip channel's Levels
+            // adjustment pan / volume (round 190dz) where the audio clip is (same track, start and length)
+            juce::PopupMenu automate;
+            const auto add = [this, index, &automate] (const juce::String& text, clipops::AutomateWhat what) {
+                automate.addItem (text, [this, index, what] {
+                    const auto target = clipops::automateTarget (engine.getSong(), index, what);
+                    if (target.kind == AutomationTargetKind::none)
+                        return;
+                    const auto name = describeAutomationTarget (engine, target).toStdString();
+                    engine.editSong ([index, what, &name] (Song& s) { clipops::automateAudioClip (s, index, what, name); });
+                    sortClips();
+                });
+            };
+            add (theme::mnemonic (tr ("Panning"), 'P'), clipops::AutomateWhat::panning);
+            add (theme::mnemonic (tr ("Volume"), 'V'), clipops::AutomateWhat::volume); // (FL's default item)
+            menu.addSubMenu (label (e), automate);
+        }
+        else if (t == "Crossfade with")
+            menu.addSubMenu (label (e), juce::PopupMenu(), false);
+        else if (t == "Reset fades") // (FL: "Reset fade times to 0"; Tag 1 into the fade handle's reset, FUN_00d01bc0 ->
+                                         // FUN_00cfb460, as the handle's Reset fade in / out: the times and their tension)
+            menu.addItem (label (e), [this, targets] {
+                engine.editSong ([targets] (Song& s) {
+                    for (auto i : targets)
+                        if (i < (int) s.playlist.size())
+                        {
+                            auto& c = s.playlist[(std::size_t) i];
+                            c.fadeIn = c.fadeOut = 0;
+                            c.fadeInTension = c.fadeOutTension = 0.0f;
+                        }
+                });
+            });
+        else if (t == "Crossfade selected") // (round 189o: the same Create crossfade as the fade handle menu)
+            menu.addItem (label (e), [this, index, chosen = selection] {
+                engine.editSong ([index, chosen] (Song& s) { clipops::createCrossfades (s.playlist, index, 0, chosen); });
+                repaint();
+            });
+    }
+
+    // --- LYNX's own items (no FL counterpart), core flclipmenu::lynxExtras --------------------------------------------
+    menu.addSeparator();
+    // round 190ds, Simple workflow only (LYNX's own): the clip follows the project key, and its loop's key
+    if (simpleHeaders)
+        addKeyFollowItems (menu, index, targets);
+    // comping (round 163): a take lane's clip onto its comp track (the group header above)
+    if (const auto comp = takes::compTrackOf (song, clip.track); comp >= 0)
+    {
+        // the loop region where it covers the clip (comping a phrase), else the whole clip
+        const auto useLoop = song.hasLoop() && song.loopStart < clip.end() && song.loopEnd > clip.start;
+        const auto from = useLoop ? std::max (song.loopStart, clip.start) : clip.start;
+        const auto to = useLoop ? std::min (song.loopEnd, clip.end()) : clip.end();
+        menu.addItem (useLoop ? tr ("Promote this take in the loop region to the comp track") : tr ("Promote this take to the comp track"), [this, index, comp, from, to] {
+            setSelection ({});
+            engine.editSong ([index, comp, from, to] (Song& s) { takes::promoteTake (s, index, comp, from, to); });
+            sortClips();
+        });
+    }
+    menu.addSubMenu (tr ("Color palette"), ui::colourMenu (channel.colour, setColour, mouse));
+    const auto splitAt = snap (xToTick (mouseX) + gridTicks() / 2.0, true);
+    menu.addItem (tr ("Split here"), splitAt > clip.start && splitAt < clip.end(), false, [this, index, splitAt] {
+        setSelection ({});
+        engine.editSong ([index, splitAt] (Song& s) {
+            if (index < (int) s.playlist.size() && splitAt > s.playlist[(std::size_t) index].start && splitAt < s.playlist[(std::size_t) index].end())
+                s.playlist.push_back (splitClip (s.playlist[(std::size_t) index], splitAt));
+        });
+        sortClips();
+    });
+    menu.addItem (tr ("Merge clips"), clipops::canMerge (song, targets), false, [this, targets] {
+        setSelection ({});
+        engine.editSong ([targets] (Song& s) { clipops::mergeClips (s, targets); });
+        sortClips();
+    });
+    menu.addItem (tr ("Reverse"), sample != nullptr, channel.sampler.reverse, [this, index, frames, rate] {
+        engine.editSong ([index, frames, rate] (Song& s) {
+            const auto c = s.playlist[(std::size_t) index].channel;
+            clipops::reverseAudio (s, index, clipops::fileTicks (s.channels[(std::size_t) c], frames, rate, s.bpm));
+        });
+    });
+    // Live's Convert Melody / Harmony / Drums to New MIDI Track, the FL way: a new pattern on new channels (round a2m189b)
+    {
+        juce::PopupMenu convert;
+        const std::pair<const char*, a2m::Mode> modes[] = { { TR_NOOP ("Melody to new pattern"), a2m::Mode::melody },
+                                                            { TR_NOOP ("Harmony to new pattern"), a2m::Mode::harmony },
+                                                            { TR_NOOP ("Drums to new pattern"), a2m::Mode::drums } };
+        for (const auto& [text, mode] : modes)
+            convert.addItem (tr (text), [this, index, m = mode] { convertClipToMidi (engine, index, m, [this] { sortClips(); }); });
+        menu.addSubMenu (tr ("Convert to MIDI"), convert, sample != nullptr);
+    }
+    menu.addItem (tr ("Pitch... (semitones, cents, keep length)"), sample != nullptr, false, [this, ch] { showSamplePitchDialog (engine, ch); });
+    menu.addItem (tr ("Normalize"), [this, targets] { normalizeClips (targets); });
+    {
+        juce::PopupMenu gains;
+        for (auto db : { 6.0f, 3.0f, 0.0f, -3.0f, -6.0f, -12.0f })
+        {
+            const auto g = juce::Decibels::decibelsToGain (db);
+            gains.addItem ((db > 0 ? "+" : "") + juce::String (db, 0) + " dB", true, std::abs (clip.gain - g) < 0.01f, [this, targets, g] {
+                engine.editSong ([targets, g] (Song& s) {
+                    for (auto i : targets)
+                        if (i < (int) s.playlist.size() && s.playlist[(std::size_t) i].kind == ClipKind::audio)
+                            s.playlist[(std::size_t) i].gain = g;
+                });
+            });
+        }
+        menu.addSubMenu (tr ("Clip volume"), gains);
+    }
+    menu.addItem (tr ("Open in a new Sampler channel"), sample != nullptr, false, [this, ch] {
+        if (onOpenInSampler)
+            onOpenInSampler (ch);
+    });
+    menu.addItem (tr ("Show the file in Explorer"), juce::File (path).existsAsFile(), false, [path] { juce::File (path).revealToUser(); });
+    menu.addItem (theme::mnemonic (tr ("Cut"), 't') + "\tCtrl+X", [this, targets] {
+        setSelection (targets);
+        copySelection();
+        deleteSelection();
+    });
+    menu.addItem (theme::mnemonic (tr ("Copy"), 'C') + "\tCtrl+C", [this, targets] {
+        setSelection (targets);
+        copySelection();
+    });
+    menu.addItem (theme::mnemonic (tr ("Paste here"), 'P') + "\tCtrl+V", ! clipboard.empty(), false, [this, at = snap (xToTick (mouseX), true)] { pasteClips (at); });
+    return menu;
+}
+
+// The "Fit to tempo" / "Detect tempo" fit of an audio clip's file to a number of beats (keeping its pitch or not)
+std::function<void (float, bool)> PlaylistComponent::clipFitter (int index, std::shared_ptr<const SampleData> sample)
+{
+    const auto& song = engine.getSong();
+    const auto& channel = song.channels[(std::size_t) song.playlist[(std::size_t) index].channel];
+    // the frames the clip plays (its Trim; round 180d), as the drawing and the playback count them
+    const auto frames = sample != nullptr ? (double) clipops::clipSpan (channel, sample).frames : 0.0;
+    const auto rate = sample != nullptr ? sample->sampleRate : 44100.0;
+    return [this, index, frames, rate] (float toBeats, bool keepPitch) {
+        engine.editSong ([index, frames, rate, toBeats, keepPitch] (Song& s) {
+            const auto ch = s.playlist[(std::size_t) index].channel;
+            auto& channel = s.channels[(std::size_t) ch];
+            auto& sampler = channel.sampler;
+            const auto before = clipops::fileTicks (channel, frames, rate, s.bpm);
+            sampler.stretchBeats = toBeats;
+            // "Original speed" keeps a pitched clip's "keep length" (round 163)
+            sampler.keepPitch = keepPitch && (toBeats > 0.0f || sampler.pitch != 0.0f || channel.misc.fineTune != 0.0f);
+            // every clip of the file keeps showing the same audio: offsets and lengths scale with it
+            clipops::rescaleClipsOf (s, ch, before, clipops::fileTicks (channel, frames, rate, s.bpm));
+        });
+        sortClips();
+    };
+}
+
+// The audio clip menu's "Fit to tempo" submenu (round 190dz: out of buildClipMenu, unchanged)
+juce::PopupMenu PlaylistComponent::fitToTempoMenu (int index, std::shared_ptr<const SampleData> sample)
+{
+    const auto& song = engine.getSong();
+    const auto& channel = song.channels[(std::size_t) song.playlist[(std::size_t) index].channel];
+    // stretching the channel's file to a whole number of beats at the project tempo
+    juce::PopupMenu fit;
+    const auto beats = tempodetect::fitBeatsOf (sample.get(), song.bpm);
+    const auto fitTo = clipFitter (index, sample);
+    if (beats > 0.0f)
+    {
+        const auto whole = std::abs (beats - std::round (beats)) < 0.005f;
+        const auto label = juce::String (beats, whole ? 0 : 2) + " " + (beats == 1.0f ? tr ("beat") : tr ("beats"));
+        fit.addItem (tr ("Fit to tempo, keep pitch ({0})", { label }), true, channel.sampler.stretchBeats == beats && channel.sampler.keepPitch,
+                     [fitTo, beats] { fitTo (beats, true); });
+        fit.addItem (tr ("Fit to tempo, resample ({0})", { label }), true, channel.sampler.stretchBeats == beats && ! channel.sampler.keepPitch,
+                     [fitTo, beats] { fitTo (beats, false); });
+        fit.addItem (tr ("Half as long"), channel.sampler.stretchBeats > 0.0f, false,
+                     [fitTo, b = channel.sampler.stretchBeats, kp = channel.sampler.keepPitch] { fitTo (juce::jmax (0.25f, b * 0.5f), kp); });
+        fit.addItem (tr ("Twice as long"), channel.sampler.stretchBeats > 0.0f, false,
+                     [fitTo, b = channel.sampler.stretchBeats, kp = channel.sampler.keepPitch] { fitTo (juce::jmin (1024.0f, b * 2.0f), kp); });
+        fit.addSeparator();
+    }
+    // FL's TIME presets (r168s c_f20): the whole file lasts exactly this long
+    for (const auto preset : clipops::timePresetBeats (song.beatsPerBar))
+    {
+        const auto bars = song.beatsPerBar > 0 && preset >= (float) song.beatsPerBar ? preset / (float) song.beatsPerBar : 0.0f;
+        const auto label = bars > 0.0f ? (bars == 1.0f ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars, 0) }))
+                                       : (preset == 1.0f ? tr ("1 beat") : tr ("{0} beats", { juce::String (preset, 0) }));
+        fit.addItem (label, true, channel.sampler.stretchBeats == preset, [fitTo, preset, kp = channel.sampler.keepPitch] { fitTo (preset, kp); });
+    }
+    fit.addSeparator();
+    fit.addItem (tr ("Original speed (no stretch)"), true, channel.sampler.stretchBeats <= 0.0f, [fitTo, kp = channel.sampler.keepPitch] { fitTo (0.0f, kp); });
+    return fit;
+}
+
+// The audio clip menu's "Detect tempo" submenu (round 190dz: out of buildClipMenu, unchanged)
+juce::PopupMenu PlaylistComponent::detectTempoMenu (int index, std::shared_ptr<const SampleData> sample)
+{
+    const auto fitTo = clipFitter (index, sample);
+    // FL's "Detect tempo" (REA round 153; LYNX's own detector, core/TempoDetect): a range to fold the result
+    // into, then fit the clip to the project tempo or take its tempo for the project
+    juce::PopupMenu detect;
+    struct Range { double low, high; };
+    for (const auto r : { Range { 50.0, 100.0 }, Range { 75.0, 150.0 }, Range { 100.0, 200.0 }, Range { 150.0, 300.0 } }) // FL's ranges (r168s)
+        detect.addItem (tr ("{0}-{1} BPM", { juce::String (r.low, 0), juce::String (r.high, 0) }), [this, sample, fitTo, r] {
+            if (sample == nullptr)
+                return;
+            tempodetect::Options options;
+            options.minBpm = r.low;
+            options.maxBpm = r.high;
+            const auto found = tempodetect::detect (sample->leftData(), sample->isStereo() ? sample->rightData() : nullptr,
+                                                    sample->frames(), sample->sampleRate, options);
+            if (found.bpm <= 0.0)
+            {
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Detect tempo"),
+                                                        tr ("No steady tempo was found in this sample."));
+                return;
+            }
+            const auto songBpm = engine.getSong().bpm;
+            auto* window = new juce::AlertWindow (tr ("Detect tempo"),
+                                                  tr ("Detected tempo: {0} BPM ({1} beats in the sample). The project plays at {2} BPM.",
+                                                      { juce::String (found.bpm, 2), juce::String (found.beats, 2), juce::String (songBpm, 2) }),
+                                                  juce::MessageBoxIconType::NoIcon);
+            window->addButton (tr ("Fit the clip to the project tempo"), 1);
+            window->addButton (tr ("Use it as the project tempo"), 2);
+            window->addButton (tr ("Use it, rounded to a whole BPM"), 3);
+            window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+            window->enterModalState (true, juce::ModalCallbackFunction::create ([this, found, fitTo] (int result) {
+                                         if (result == 1)
+                                             fitTo ((float) found.beats, true); // exact (issue #32 #7: was rounded to 1/4 beat)
+                                         else if (result == 2 || result == 3)
+                                         {
+                                             const auto bpm = juce::jlimit (minTempo, maxTempo, result == 3 ? std::round (found.bpm) : found.bpm);
+                                             engine.editSong ([bpm] (Song& s) { clipops::followTempo (s, bpm); });
+                                         }
+                                     }),
+                                     true);
+        });
+    return detect;
 }
 
 void PlaylistComponent::normalizeClips (const std::vector<int>& targets, bool asGroup)
@@ -7032,6 +7298,121 @@ void PlaylistComponent::startPreview (int clip, int x)
     engine.play();
     setMouseCursor (editorCursor (gesture::Cursor::listen));
     ui::postHint ({ tr ("Previewing the clip: release the mouse to stop"), {}, false, false }, 60000);
+}
+
+juce::PopupMenu PlaylistComponent::buildAddTrackMenu()
+{
+    // FL's AddInstrumentMenu (round 190dx [FORM]): "Audio track": Add audio track (FL's default item); "Instrument
+    // track": More plugins..., a line, the generator list (FUN_01195420, the Channel rack's Insert list)
+    juce::PopupMenu menu;
+    menu.addSectionHeader (tr ("Audio track"));
+    menu.addItem (tr ("Add audio track"), [this] { addAudioTrackNow(); });
+    menu.addSectionHeader (tr ("Instrument track"));
+    menu.addItem (tr ("More plugins..."), [this] { morePluginsForTrack (-1); });
+    menu.addSeparator();
+    quickpick::addGeneratorMenu (menu, engine, [this] (ChannelDef c) { instrumentForTrack (-1, std::move (c)); }, nullptr, nullptr, this);
+    quickpick::addFolderViewItems (menu, engine);
+    return menu;
+}
+
+int PlaylistComponent::addAudioTrackNow()
+{
+    int track = -1;
+    engine.editSong ([&track] (Song& s) { track = trackmodes::addAudioTrack (s); });
+    if (track < 0)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Can't create new audio track"),
+                                                tr ("There are no available mixer tracks."));
+        return -1;
+    }
+    selectTrack (track); // FL: the new track alone is selected, scrolled into view
+    repaint();
+    return track;
+}
+
+void PlaylistComponent::instrumentForTrack (int track, ChannelDef generator)
+{
+    const auto& song = engine.getSong();
+    const auto kind = generator.instrument;
+    int channel = -1;
+    // FL (EEPLTrackMorePlugMenuClick): on an instrument track the chosen generator replaces its channel's
+    if (track >= 0 && track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].mode == PlaylistTrackMode::instrument
+        && song.playlistTracks[(std::size_t) track].channel >= 0 && song.playlistTracks[(std::size_t) track].channel < (int) song.channels.size())
+    {
+        channel = song.playlistTracks[(std::size_t) track].channel;
+        bool ok = false;
+        engine.editSong ([channel, &generator, &ok] (Song& s) { ok = replaceGenerator (s, channel, std::move (generator)); });
+        if (! ok)
+            return;
+    }
+    else
+    {
+        if (kind == InstrumentKind::audioClip || kind == InstrumentKind::controller)
+        {
+            // FL's error (LineAssignInstrTrackMenuClick, round 190dx)
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                    tr ("This generator can't be used as an instrument track."));
+            return;
+        }
+        engine.editSong ([&] (Song& s) { channel = trackmodes::addInstrumentTrack (s, std::move (generator), track); });
+        if (channel < 0)
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Can't create new instrument track"),
+                                                    tr ("There are no available mixer tracks."));
+            return;
+        }
+        const auto tracks = trackmodes::instrumentTracksOf (engine.getSong(), channel);
+        if (! tracks.empty())
+            selectTrack (tracks.front());
+    }
+    repaint();
+    if (onGeneratorAdded)
+        onGeneratorAdded (channel, kind);
+}
+
+void PlaylistComponent::morePluginsForTrack (int track)
+{
+    // FL's More plugins...: its plugin dialog for generators (FUN_010dc760); LYNX's plugin picker
+    juce::Component::SafePointer<PlaylistComponent> safe (this);
+    showPluginPicker (
+        engine, true,
+        [safe, track] (PluginRef ref) {
+            if (safe == nullptr)
+                return;
+            ChannelDef c;
+            c.name = ref.name;
+            c.instrument = InstrumentKind::plugin;
+            c.plugin = ref;
+            safe->instrumentForTrack (track, std::move (c));
+        },
+        [safe, track] (ChannelDef c) {
+            if (safe != nullptr)
+                safe->instrumentForTrack (track, std::move (c));
+        });
+}
+
+void PlaylistComponent::previewClipAudio (int clip)
+{
+    // FL plays the clip through its channel as the clip plays it (offset, pitch, stretch; FUN_01239e40 → FUN_00ffa0a0).
+    // LYNX: the clip's own audio as its channel's instrument renders it (renderClipAudio), at the clip's and the
+    // channel's volume, through the preview output (the insert's effects are not heard)
+    const auto& song = engine.getSong();
+    if (clip < 0 || clip >= (int) song.playlist.size() || song.playlist[(std::size_t) clip].kind != ClipKind::audio)
+        return;
+    const auto& c = song.playlist[(std::size_t) clip];
+    if (c.channel < 0 || c.channel >= (int) song.channels.size())
+        return;
+    // (with the channel's Levels adjustment volume, round 190dz: FL's channel gain includes it)
+    const auto& channel = song.channels[(std::size_t) c.channel];
+    const auto gain = c.gain * channelGain (channel.volume) * levelAdjustGain (channel.misc.levels.volume);
+    auto audio = engine.renderClipAudio ((std::size_t) clip);
+    if (audio.left.empty())
+        return;
+    auto sample = std::make_shared<SampleData>();
+    sample->sampleRate = audio.sampleRate;
+    sample->left = std::move (audio.left);
+    sample->right = std::move (audio.right);
+    engine.previewSample (std::move (sample), false, gain);
 }
 
 void PlaylistComponent::stopPreview()

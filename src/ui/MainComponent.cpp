@@ -11,6 +11,7 @@
 #include "core/FlSettings.h"
 #include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
+#include "core/OneClickRec.h"
 #include "core/CountIn.h"
 #include "core/MixerOps.h"
 #include "core/NoteNames.h"
@@ -591,6 +592,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     picker.onPatternMenu = [this] { makePatternMenu (picker.pickedPatterns()).showMenuAsync (juce::PopupMenu::Options().withMousePosition()); };
     picker.onNewPattern = [this] { newPatternButton.onClick(); };
     playlist.onRenamePattern = [this] (int p) { showRenamePattern (p); };
+    playlist.onGeneratorAdded = [this] (int channel, InstrumentKind kind) { rack.openGeneratorWindow (channel, kind); }; // round 190dx
     playlist.onViewOptionChanged = [this] { saveUiSettings(); };
     playlist.onOpenInSampler = [this] (int channel) {
         // the audio clip's file in a new Sampler channel (to play it from notes), its settings open
@@ -686,7 +688,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     // FL's "Edit events in piano roll" (REA round 146): the channel's own parameter selects its channel
     onEditEventsInPianoRoll = [this] (const AutomationTarget& t) {
         const auto onChannel = t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-                               || t.kind == AutomationTargetKind::channelParam;
+                               || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust;
         if (onChannel && t.index >= 0 && t.index < (int) engine.getSong().channels.size())
             engine.setSelectedChannel (t.index);
         openPianoRoll();
@@ -2520,11 +2522,12 @@ void MainComponent::loadUiSettings()
         else if (key == "undoLevels")
             engine.setUndoLevels (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "askWhatToRecord" || key == "recordNotes" || key == "recordAudio" || key == "recordStartsPlayback" || key == "disarmOnStop"
-                 || key == "recordOffOnStop" || key == "unarmAfterRender" || key == "renderAutoClip" || key == "lowLatencyRecording")
+                 || key == "recordOffOnStop" || key == "unarmAfterRender" || key == "renderAutoClip" || key == "lowLatencyRecording"
+                 || key == "recLatencyCompensation")
         {
             auto o = engine.getRecordOptions();
             (key == "askWhatToRecord" ? o.askWhatToRecord : key == "recordNotes" ? o.recordNotes : key == "recordAudio" ? o.recordAudio
-             : key == "lowLatencyRecording" ? o.lowLatencyRecording
+             : key == "lowLatencyRecording" ? o.lowLatencyRecording : key == "recLatencyCompensation" ? o.latencyCompensation
              : key == "disarmOnStop" ? o.disarmOnStop : key == "recordOffOnStop" ? o.recordOffOnStop : key == "unarmAfterRender" ? o.unarmAfterRender
              : key == "renderAutoClip"                                                                                         ? o.autoCreateClip
                                                                                                                                   : o.startsPlayback) = on;
@@ -2728,6 +2731,7 @@ void MainComponent::saveUiSettings()
                                       + "\nrecordOffOnStop=" + juce::String (engine.getRecordOptions().recordOffOnStop ? 1 : 0)
                                       + "\nunarmAfterRender=" + juce::String (engine.getRecordOptions().unarmAfterRender ? 1 : 0)
                                       + "\nrenderAutoClip=" + juce::String (engine.getRecordOptions().autoCreateClip ? 1 : 0)
+                                      + "\nrecLatencyCompensation=" + juce::String (engine.getRecordOptions().latencyCompensation ? 1 : 0)
                                       + "\nrecordQuantiseStarts=" + juce::String (recordQuantiseOn ? 1 : 0)
                                       + "\nrecordNoteEnd=" + juce::String ((int) engine.getRecordOptions().noteEnd)
                                       + "\nrecordToStepSequencer=" + juce::String (engine.getRecordOptions().toStepSequencer ? 1 : 0)
@@ -4014,6 +4018,52 @@ void MainComponent::quickRecordAudio()
     engine.setRecording (true);
     if (! transport.playing.load())
         engine.startPlayback();
+}
+
+void MainComponent::oneClickRecord (int into)
+{
+    // FL: FUN_0120d380 (round 190dx, /mnt/e/lynx-work/flpl190dx/FL-FACTS.md item 20)
+    const auto plan = oneclick::plan (engine.getSong(), engine.getArmedInserts(), this->mixer.getStripsForSnapshot().getSelectedTrack(),
+                                      (oneclick::Into) into);
+    if (plan.insert > 0)
+    {
+        showPanel (Panel::mixer);
+        this->mixer.selectTrack (plan.insert);
+    }
+    if (plan.loadEdison)
+    {
+        // FL loads Edison set to record on play on the selected mixer track (its "Open audio editor and record"), then plays
+        this->mixer.runAction ("mixer.audioEditorRecord");
+        if (! engine.getTransport().playing.load())
+            engine.startPlayback();
+        return;
+    }
+    if (! plan.recordOn)
+        return;
+    const auto start = [this] {
+        if (engine.getSong().mode != PlayMode::song) // FL switches to Song mode
+            engine.editSong ([] (Song& s) { s.mode = PlayMode::song; }, false);
+        if (auto o = engine.getRecordOptions(); ! o.recordAudio)
+        {
+            o.recordAudio = true;
+            engine.setRecordOptions (o);
+        }
+        engine.setRecording (true);
+        if (! engine.getTransport().playing.load())
+            engine.startPlayback();
+    };
+    if (plan.armInsert && plan.askInput)
+    {
+        // FL asks for the selected mixer track's input first; nothing records until one is picked
+        mixerinput::showMenu (engine, plan.insert, &this->mixer, [this, insert = plan.insert, start] {
+            engine.setInsertArmed (insert, true);
+            start();
+        });
+        return;
+    }
+    if (plan.armInsert)
+        engine.setInsertArmed (plan.insert, true);
+    start();
 }
 
 void MainComponent::armSelectedInsertForAudio()
@@ -7661,7 +7711,15 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
             showPanel (Panel::browser);
             browser.focusSearch();
         });
-        menu.addItem (tr ("One-click audio recording: arm the selected insert..."), [this] { armSelectedInsertForAudio(); });
+        {
+            // FL's One-click audio recording submenu (OneClickRecMenu, round 190dx; [FORM] and live 190cq): a caption, then
+            // Into Edison (FL's default item) and Into playlist
+            juce::PopupMenu oneClick;
+            oneClick.addSectionHeader (tr ("I want to record audio..."));
+            oneClick.addItem (tr ("Into Edison audio editor/recorder"), [this] { oneClickRecord ((int) oneclick::Into::edison); });
+            oneClick.addItem (tr ("Into playlist as an audio clip"), [this] { oneClickRecord ((int) oneclick::Into::playlist); });
+            menu.addSubMenu (tr ("One-click audio recording"), oneClick);
+        }
         // FL's Tools menu has these two here; they work on the selected channel's Piano Roll (round 181b)
         menu.addItem (tr ("Riff machine..."), [this] {
             openPianoRoll();

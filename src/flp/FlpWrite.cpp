@@ -412,8 +412,9 @@ void writeChannel (Out& out, const Channel& c)
         Blob a;
         a.put<std::int32_t> (c.panAdj);
         a.put<std::int32_t> (c.volAdj);
-        for (int k = 0; k < 3; ++k)
-            a.put<std::int32_t> (0);
+        a.put<std::int32_t> (c.adjUnknown); // (round 190dz: FL's Levels adjustment, whole)
+        a.put<std::int32_t> (c.modXAdj);
+        a.put<std::int32_t> (c.modYAdj);
         out.data (evChannelLevelAdjust, a.b);
     }
     {

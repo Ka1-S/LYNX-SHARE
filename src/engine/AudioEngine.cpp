@@ -1731,7 +1731,7 @@ void AudioEngine::startAudioTake()
     if (! folder.createDirectory()) // e.g. a read-only project folder: the global recordings folder
         folder = defaultRecordingFolder(), folder.createDirectory();
     takeSampleRate = device->getCurrentSampleRate();
-    takeLatency = currentLatency().total();
+    takeLatency = takes::compensation (currentLatency(), recordOptions.latencyCompensation);
     takeTicksPerSample = transport.ticksPerSample();
     const auto format = recordingSettings.format;
 

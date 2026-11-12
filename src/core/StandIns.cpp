@@ -108,9 +108,13 @@ void soloChannelRaw (Song& s, int channel)
     auto& c = s.channels[(std::size_t) channel];
     c.volume = 1.0f; // channelGain (1) = 1
     c.pan = 0.0f;
+    c.misc.levels.pan = 0.0f; // (the Levels adjustment's level and pan too, round 190dz)
+    c.misc.levels.volume = 1.0f;
     c.mixerTrack = 0;
     auto own = [channel] (const AutomationTarget& t) {
-        return (t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan) && t.index == channel;
+        return (t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
+                || (t.kind == AutomationTargetKind::channelAdjust && (t.param == leveladjust::pan || t.param == leveladjust::volume)))
+               && t.index == channel;
     };
     for (auto& a : s.automations)
         if (own (a.target))
@@ -157,6 +161,8 @@ ChannelDef standInChannel (const ChannelDef& c, const std::string& path)
     f.samplePath = path;
     f.volume = c.volume;
     f.pan = c.pan;
+    f.misc.levels.pan = c.misc.levels.pan; // (the Levels adjustment's level and pan too, round 190dz; not Mod X / Y)
+    f.misc.levels.volume = c.misc.levels.volume;
     f.muted = c.muted;
     f.mixerTrack = c.mixerTrack;
     f.colour = c.colour;
@@ -489,7 +495,10 @@ Song project (const Song& song, const std::function<bool (const PluginRef&)>& mi
                 for (int a = 0, count = (int) song.automations.size(); a < count; ++a)
                 {
                     const auto& target = song.automations[(std::size_t) a].target;
-                    if ((target.kind != AutomationTargetKind::channelVolume && target.kind != AutomationTargetKind::channelPan) || target.index != c)
+                    if ((target.kind != AutomationTargetKind::channelVolume && target.kind != AutomationTargetKind::channelPan
+                         && ! (target.kind == AutomationTargetKind::channelAdjust
+                               && (target.param == leveladjust::pan || target.param == leveladjust::volume)))
+                        || target.index != c)
                         continue;
                     for (const auto& [pattern, h] : stemChannel)
                     {
@@ -654,7 +663,7 @@ void lighten (Song& s, int channel)
     // what drove the swapped units has nothing to drive
     auto gone = [channel] (const AutomationTarget& t) {
         const bool ofChannel = t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-                               || t.kind == AutomationTargetKind::channelParam;
+                               || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust;
         return (ofChannel && t.index != channel) || refs::targetsInsert (t);
     };
     for (auto& a : s.automations)
