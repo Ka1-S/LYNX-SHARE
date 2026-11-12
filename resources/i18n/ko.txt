@@ -9469,3 +9469,8 @@ countries: kr
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "셀 메모리"
+"Level|Transient" = "레벨|트랜지언트"
+"Smooth|Mid|Sharp" = "부드럽게|중간|가파르게"

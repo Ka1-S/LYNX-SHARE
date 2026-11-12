@@ -2040,6 +2040,9 @@ Layout glowLeveler()
     v.push_back (when (tabs (14, 36, 112, 14, "Opto law", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
     v.push_back (when (label (14, 54, 112, 9, TR_NOOP ("Attack / release"), dim), "Voicing", 0.5f, 1.0f)); // round 165x: both measured
     v.push_back (when (tabs (14, 64, 112, 14, "Opto release", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    // round 190dm: the cell's memory (release slower after long exposure; Compress)
+    v.push_back (when (label (14, 82, 112, 9, TR_NOOP ("Cell memory"), dim), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (tabs (14, 92, 112, 14, "Opto memory", TR_NOOP ("Off|On"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
     // COMPRESS / LIMIT: a bat toggle (up = compress), its two words above and under it
     v.push_back (tabs (40, 136, 52, 84, "Limit", TR_NOOP ("Compress|Limit"), {}, batToggle));
     // the two big knobs, their printed 0 … 100 round them; no value text (the drag tip shows it)
@@ -2077,9 +2080,9 @@ Layout hushDeEsser()
 {
     Layout l;
     l.width = 460;
-    l.height = 376; // round 165x: + the extended law's row
+    l.height = 432; // round 165x: + the extended law's row; round 190dm: + Air / Mix
     auto& v = l.items;
-    v.push_back (section (4, 4, 452, 368, TR_NOOP ("De-esser")));
+    v.push_back (section (4, 4, 452, 424, TR_NOOP ("De-esser")));
     v.push_back (display (12, 26, 200, 78, "hushband"));
     v.push_back (meter (12, 110, 200, 12, 0, TR_NOOP ("Reduction")));
     v.push_back (tabs (12, 130, 98, 20, "Wideband", TR_NOOP ("Split|Wide")));
@@ -2115,6 +2118,9 @@ Layout hushDeEsser()
     v.push_back (tabs (12, 318, 200, 20, "Range law", TR_NOOP ("Old ranges|Extended")));
     v.push_back (tabs (222, 318, 110, 20, "Link only side", TR_NOOP ("Mid only|Side only")));
     v.push_back (dial (380, 330, 24, "Link only", TR_NOOP ("Link only")));
+    // round 190dm: Air (a high shelf on the processed signal) and Mix (dry / processed)
+    v.push_back (dial (290, 390, 24, "Air", TR_NOOP ("Air")));
+    v.push_back (dial (380, 390, 24, "Mix", TR_NOOP ("Mix")));
     return l;
 }
 
@@ -2800,7 +2806,7 @@ Layout sentryGate()
 {
     Layout l;
     l.width = 680;
-    l.height = 510;
+    l.height = 564; // round 190dm: + the trigger row
     auto& v = l.items;
     // left: threshold (big) with ratio and range under it
     v.push_back (dial (86, 84, 92, "Threshold", TR_NOOP ("Threshold"), big));
@@ -2844,6 +2850,12 @@ Layout sentryGate()
     // round 190v: the Vocal style's noise reduction (classic = none, what a project saved before loads with)
     v.push_back (label (300, 482, 56, 22, TR_NOOP ("Model")));
     v.push_back (tabs (360, 482, 180, 22, "Law", TR_NOOP ("Classic|Measured")));
+    // round 190dm: the trigger (Transient = a drum gate: an onset opens it, it closes along the release shape)
+    v.push_back (label (8, 514, 90, 22, TR_NOOP ("Trigger")));
+    v.push_back (tabs (96, 514, 176, 22, "Trigger", TR_NOOP ("Level|Transient")));
+    v.push_back (when (label (300, 514, 56, 22, TR_NOOP ("Shape")), "Trigger", 0.5f, 1.0f));
+    v.push_back (when (tabs (360, 514, 180, 22, "Release shape", TR_NOOP ("Smooth|Mid|Sharp")), "Trigger", 0.5f, 1.0f));
+    v.push_back (when (dial (612, 520, 22, "Sensitivity", TR_NOOP ("Sensitivity")), "Trigger", 0.5f, 1.0f));
     return l;
 }
 

@@ -2818,6 +2818,44 @@ double gateCurve (const EffectParams& p, double x, double gap = 0.0) noexcept
 
 double hysteresisDb (Style s) noexcept { return styleDefs[(int) s].offsetDb; }
 
+// round 190dm [EXEC] (trial190k's tone / stair / pink / stereo probes through a drum-gate reference, black-box; docs/PARITY.md
+// "Round 190dm"): an onset over the threshold opens the gate at once and its gain then follows the same curve whatever the
+// input does — a hold of 18.75 ms + 5.6 % of the release, then −slope · u dB (u = time / release) times a fade to silence
+// (1 − (u / end)^power) for Mid and Sharp; Smooth is a straight line in dB. The curve is clamped at the range (range 40 and
+// 100 run the same curve until −40). Fitted on 6 recoveries (release 52 ms … 3.5 s, the three shapes): rms 0.06 … 0.31 dB.
+namespace
+{
+struct ShapeDef
+{
+    double slopeDb, end, power;
+};
+constexpr ShapeDef shapeDefs[3] { { 16.1, 0.0, 1.0 }, { 15.8, 1.45, 3.5 }, { 10.0, 0.86, 2.5 } };
+// the transient detector (fitted on the same probes: which onsets open it and which do not): the side chain's first
+// difference (normalised to unity at 1 kHz — or at the side chain's low-pass when lower — so a 100 Hz note's onset counts
+// 20 dB less and a click or a hat's much more),
+// a peak follower (fast) and a slower follower of it (slow); an onset is fast over max (slow, threshold) by more than
+// `ratioDb` (the default sensitivity's), re-armed once that falls `hysteresisDb` lower
+constexpr double detFastAttackMs = 0.0, detFastReleaseMs = 10.0, detSlowAttackMs = 5.0, detSlowReleaseMs = 50.0;
+constexpr double detRatioDb = 8.0, detHysteresisDb = 3.0, detEmphasis = 0.85;
+} // namespace
+
+bool transientTrigger (const EffectParams& p) noexcept { return on (p[trigger]); }
+double sensitivityOf (float v) noexcept { return lin (std::clamp (v, 0.0f, 1.0f), 1.0, 10.0); }
+float sensitivityValue (double s) noexcept { return (float) ((std::clamp (s, 1.0, 10.0) - 1.0) / 9.0); }
+Shape shapeOf (float v) noexcept { return (Shape) pick (v, 3); }
+
+double transientCurveDb (Shape s, double tau, double releaseSec) noexcept
+{
+    if (tau <= 0.0)
+        return 0.0;
+    const auto& d = shapeDefs[(int) s];
+    const auto u = tau / std::max (1.0e-4, releaseSec);
+    auto g = -d.slopeDb * u;
+    if (d.end > 0.0)
+        g += 20.0 * std::log10 (std::max (1.0e-6, 1.0 - std::pow (std::min (1.0, u / d.end), d.power)));
+    return std::max (-120.0, g);
+}
+
 double staticGainDb (const EffectParams& p, double inputDb, bool)
 {
     const auto g = gateCurve (p, inputDb);
@@ -2868,6 +2906,10 @@ public:
         nrGapMs = 1e9;
         nrTarget = nrGain = 1.0;
         nrCount = 0;
+        tFast = tSlow = 0.0;
+        tPrev[0] = tPrev[1] = 0.0;
+        tSince = -1.0;
+        tArmed = true;
     }
 
     int latencySamples() const noexcept override { return latency.load (std::memory_order_relaxed); }
@@ -2949,8 +2991,31 @@ private:
         gainDelay.setLength (std::max (0, laSamples - (int) std::lround (la * 0.001 * sr)));
         double maxGr = 0.0;
         const bool over = osFactor > 1;
+        // round 190dm: the transient trigger (a drum gate); off = the level gate below, untouched
+        const bool trans = transientTrigger (p);
+        double tAttack = 0.0, tFastA = 0.0, tFastR = 0.0, tSlowA = 0.0, tSlowR = 0.0, tThr = 0.0, tRatio = 0.0, tHold = 0.0;
+        double tRelease = 0.0, tFloor = 0.0, tEmph = 0.0, tStep = 1.0 / sr;
+        Shape tShape = Shape::mid;
+        if (trans)
+        {
+            tAttack = coef (std::max (0.01, attackMs (p[attack])), sr);
+            tFastA = coef (detFastAttackMs, sr);
+            tFastR = coef (detFastReleaseMs, sr);
+            tSlowA = coef (detSlowAttackMs, sr);
+            tSlowR = coef (detSlowReleaseMs, sr);
+            tThr = dbToGain (thresholdDb (p[threshold]));
+            // sensitivity 5 is the measured onset ratio; more sensitive asks less of an onset (own law)
+            tRatio = detRatioDb * 10.0 / (sensitivityOf (p[sensitivity]) + 5.0);
+            tHold = holdMs (p[hold]) * 0.001;
+            tRelease = releaseMs (p[release]) * 0.001;
+            tFloor = -rangeDb (p[range]);
+            // the first difference is unity at 1 kHz, or at the side chain's low-pass when that is lower (a kick's side
+            // chain low-passed at 150 Hz still sees its onsets; the reference's probes agree with both, see PARITY.md)
+            tEmph = detEmphasis * sr / (2.0 * pi * (lpOn ? std::min (1000.0, std::min (lpHz, sr * 0.45)) : 1000.0));
+            tShape = shapeOf (p[releaseShape]);
+        }
         // round 190v: the Vocal style's noise reduction (vocalNr above); nothing of it runs in the other styles
-        const bool nr = st == Style::vocal && ! duck && on (p[law]);
+        const bool nr = st == Style::vocal && ! duck && ! trans && on (p[law]);
         double nrDepthScale = 0.0, nrRange = 0.0, nrArmMs = 0.0, nrMsCoef = 0.0, nrPeakCoef = 0.0, nrSmooth = 0.0;
         if (nr)
         {
@@ -3034,6 +3099,48 @@ private:
             // peak detector: instant attack, 5 ms release
             const auto m = (double) std::max (std::abs (sa), std::abs (sb));
             level = m > level ? m : levelRel * level + (1.0 - levelRel) * m;
+            if (trans)
+            {
+                // round 190dm: the onset detector on the side chain's first difference (unity at 1 kHz)
+                const auto dl = (double) sa - tPrev[0], dr = (double) sb - tPrev[1];
+                tPrev[0] = sa;
+                tPrev[1] = sb;
+                const auto e = std::max (std::abs ((1.0 - detEmphasis) * sa + tEmph * dl), std::abs ((1.0 - detEmphasis) * sb + tEmph * dr));
+                tFast = e > tFast ? tFastA * tFast + (1.0 - tFastA) * e : tFastR * tFast + (1.0 - tFastR) * e;
+                tSlow = tFast > tSlow ? tSlowA * tSlow + (1.0 - tSlowA) * tFast : tSlowR * tSlow + (1.0 - tSlowR) * tFast;
+                const auto rise = gainToDb (tFast / std::max (tSlow, tThr));
+                if (tArmed && tFast > tThr && rise > tRatio)
+                {
+                    tSince = 0.0;
+                    tArmed = false;
+                }
+                else if (! tArmed && rise < tRatio - detHysteresisDb)
+                    tArmed = true;
+                double targetDb = tFloor;
+                if (tSince >= 0.0)
+                {
+                    targetDb = std::max (tFloor, transientCurveDb (tShape, tSince - tHold, tRelease));
+                    tSince = targetDb <= tFloor ? -1.0 : tSince + tStep; // closed: it waits for the next onset
+                }
+                auto target = dbToGain (targetDb);
+                if (duck)
+                    target = duckFloor / std::max (1e-9, target);
+                gain = target > gain ? tAttack * gain + (1.0 - tAttack) * target : target;
+                const auto g = gainDelay.process ((float) gain);
+                maxGr = std::max (maxGr, -gainToDb (gain));
+                float a = l[i], b = r[i];
+                delay.process (a, b);
+                if (over)
+                {
+                    gains[(std::size_t) i] = g;
+                    l[i] = a;
+                    r[i] = b;
+                    continue;
+                }
+                l[i] = panned ? (a * g * wetA + a * dryGain * dryA) * outGain : (a * g + a * dryGain) * outGain;
+                r[i] = panned ? (b * g * wetB + b * dryGain * dryB) * outGain : (b * g + b * dryGain) * outGain;
+                continue;
+            }
             // round tp172b: hysteresis — the gate opens on the opening curve and, once open, follows the curve shifted
             // down by the style's gap until the level falls under it
             const auto levelDb = gainToDb (level);
@@ -3155,6 +3262,10 @@ private:
     double level = 0.0, gain = 0.0;
     bool isOpen = false; // round tp172b: past the opening point (the hysteresis)
     int holdLeft = 0;
+    // round 190dm: the transient trigger — the detector's followers, the last side-chain samples, the time since the
+    // onset (s; −1 = closed, waiting), whether a new onset may open it
+    double tFast = 0.0, tSlow = 0.0, tPrev[2] {}, tSince = -1.0;
+    bool tArmed = true;
     const float* scL = nullptr;
     const float* scR = nullptr;
     LiveMeters meters;
@@ -3294,7 +3405,10 @@ const EffectInfo& sentryInfo()
                                      { "Input", 0.5f },
                                      { "Oversampling", 0.0f }, // round 135
                                      // round 190v: the Vocal style's noise reduction (new instances; projects saved before have none)
-                                     { "Law", 1.0f } } };
+                                     { "Law", 1.0f },
+                                     // round 190dm: the trigger (Level = every gate before), the transient detector's
+                                     // sensitivity (5 of 1 … 10) and the transient gate's release shape (Mid)
+                                     { "Trigger", 0.0f }, { "Sensitivity", 4.0f / 9.0f }, { "Release shape", 0.5f } } };
     return info;
 }
 
@@ -3490,6 +3604,13 @@ std::string paramText (EffectKind kind, int param, float v)
             case output: case input: return db (lin (v, -24.0, 24.0));
             case oversampling: return crest::oversamplingOf (v) == 1 ? "off" : std::to_string (crest::oversamplingOf (v)) + "x";
             case law: return on (v) ? "measured" : "classic";
+            case trigger: return on (v) ? "transient" : "level";
+            case sensitivity: return fmt ("%.1f", sensitivityOf (v));
+            case releaseShape:
+            {
+                static const char* names[3] { "smooth", "mid", "sharp" };
+                return names[(int) shapeOf (v)];
+            }
             case channelMode: return on (v) ? "Mid/Side" : "Left/Right";
             case scGainL: case scGainR: return db (scGainDb (v));
             case scMixL: case scMixR: return fmt ("%+.2f", mixOf (v));

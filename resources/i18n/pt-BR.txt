@@ -9586,3 +9586,8 @@ countries: br
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "Início: onde o clipe começa na origem (compasso. tempo. semicolcheia; segundos para áudio sem warp)"
 "The groove this clip plays through (the Groove Pool)" = "O groove pelo qual este clipe toca (o Groove Pool)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Modo de warp: como o áudio é esticado. Re-Pitch muda velocidade e afinação juntas. Pertence ao canal"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Memória da célula"
+"Level|Transient" = "Nível|Transiente"
+"Smooth|Mid|Sharp" = "Suave|Médio|Brusco"

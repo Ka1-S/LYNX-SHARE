@@ -9469,3 +9469,8 @@ countries: fr be ch ca lu
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] ouvrir/fermer l'éditeur  [Alt]+[LMB] garder les autres ouverts  [Ctrl]+[LMB] écouter  [2xLMB] Piano Roll  [LMB] glisser haut/bas réordonne  [RMB] menu du canal"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Crêtemètre (gauche/droite) avec maintien de crête  [LMB] efface le voyant d'écrêtage"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Mémoire de la cellule"
+"Level|Transient" = "Niveau|Transitoire"
+"Smooth|Mid|Sharp" = "Doux|Moyen|Raide"
