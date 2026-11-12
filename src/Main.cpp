@@ -16372,7 +16372,12 @@ private:
             offline.undo();
             offline.dispatchPendingMessages();
         }
-        // a MIDI clip's Clip page too (the Set buttons are there for every clip)
+        // a MIDI clip's Clip page too (the Set buttons are there for every clip), playing through a groove of the pool
+        offline.editSong ([] (lynx::Song& s) {
+            const auto& bank = lynx::groove::factoryBank();
+            if (bank.size() > 9)
+                lynx::groove::setClipGroove (s, 0, 1, lynx::groove::add (s.grooves, bank[9].groove));
+        }, false);
         detail->showSelection (0, 1);
         offline.editSong ([] (lynx::Song&) {}, false);
         offline.dispatchPendingMessages();

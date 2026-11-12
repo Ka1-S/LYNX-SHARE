@@ -10,7 +10,9 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
+#include <vector>
 
 #include "core/Song.h"
 #include "core/WarpEdit.h"
@@ -95,6 +97,168 @@ inline bool setEndAt (Clip& c, std::int64_t tick) noexcept
     c.fadeIn = std::min (c.fadeIn, c.length);
     c.fadeOut = std::min (c.fadeOut, c.length - c.fadeIn);
     return true;
+}
+
+// Position (Live's Loop Position): the clip's part of its content moves to start at `tick`, keeping its length. LYNX's
+// loop starts where the clip starts, so this is the start marker moved together with the end. False for a negative tick.
+inline bool setPositionAt (Clip& c, std::int64_t tick) noexcept
+{
+    if (tick < 0)
+        return false;
+    c.offset = tick;
+    c.offsetFraction = 0.0f;
+    return true;
+}
+
+// --- the Clip section's fields, as Live writes them (round 190dr-2) ----------------------------------------------------
+// A place in the content: "bar. beat. sixteenth" from 1 ("1. 1. 1"); a length from 0 ("8. 0. 0") [SHOT
+// live-clipview-audio-panel.png: Start 1. 1. 1, End 9. 1. 1, Length 8. 0. 0]. An unwarped audio clip shows seconds
+// instead, "m:ss:mmm" (its content has no beats).
+inline std::string positionText (std::int64_t ticks, int beatsPerBar, bool asLength = false)
+{
+    const auto bpb = (std::int64_t) std::max (1, beatsPerBar);
+    const auto sixteenth = std::max<std::int64_t> (1, ppq / 4);
+    ticks = std::max<std::int64_t> (0, ticks);
+    const auto bar = ticks / (bpb * ppq), beat = (ticks % (bpb * ppq)) / ppq, six = (ticks % ppq) / sixteenth;
+    const auto base = asLength ? 0 : 1;
+    char text[48];
+    std::snprintf (text, sizeof (text), "%lld. %lld. %lld", (long long) (bar + base), (long long) (beat + base), (long long) (six + base));
+    return text;
+}
+inline std::string secondsText (std::int64_t ticks, double bpm)
+{
+    const auto ms = (long long) std::llround ((double) std::max<std::int64_t> (0, ticks) / ppq * 60.0 / std::max (1.0, bpm) * 1000.0);
+    char text[48];
+    std::snprintf (text, sizeof (text), "%lld:%02lld:%03lld", ms / 60000, (ms / 1000) % 60, ms % 1000);
+    return text;
+}
+// The ticks a typed field means (-1: not readable). Bars-beats-sixteenths: "9. 1. 1", "9.1.1", "9 1 1" or "9" (missing
+// parts are the first beat / sixteenth); seconds: "m:ss:mmm", "ss:mmm" or plain seconds "1.25".
+inline std::int64_t parsePosition (const std::string& text, int beatsPerBar, bool asLength = false)
+{
+    long long part[3] = { 0, 0, 0 };
+    int count = 0;
+    std::string digits;
+    const auto flush = [&] {
+        if (! digits.empty() && count < 3)
+            part[count++] = std::atoll (digits.c_str());
+        digits.clear();
+    };
+    for (const auto ch : text)
+    {
+        if (ch >= '0' && ch <= '9')
+            digits += ch;
+        else if (ch == '.' || ch == ' ' || ch == ':' || ch == ',')
+            flush();
+        else if (ch == '-')
+            return -1;
+        else
+            return -1;
+    }
+    flush();
+    if (count == 0)
+        return -1;
+    const auto base = asLength ? 0 : 1;
+    for (int i = count; i < 3; ++i)
+        part[i] = base;
+    if (! asLength && (part[0] < 1 || part[1] < 1 || part[2] < 1))
+        return -1;
+    const auto bpb = (std::int64_t) std::max (1, beatsPerBar);
+    return (part[0] - base) * bpb * ppq + (part[1] - base) * ppq + (part[2] - base) * std::max<std::int64_t> (1, ppq / 4);
+}
+inline std::int64_t parseSeconds (const std::string& text, double bpm)
+{
+    double seconds = 0.0;
+    if (text.find (':') == std::string::npos)
+    {
+        char* end = nullptr;
+        seconds = std::strtod (text.c_str(), &end);
+        if (end == text.c_str() || seconds < 0.0)
+            return -1;
+    }
+    else
+    {
+        std::vector<double> parts;
+        std::size_t from = 0;
+        while (from <= text.size())
+        {
+            const auto to = text.find (':', from);
+            const auto piece = text.substr (from, to == std::string::npos ? std::string::npos : to - from);
+            char* end = nullptr;
+            const auto v = std::strtod (piece.c_str(), &end);
+            if (end == piece.c_str() || v < 0.0)
+                return -1;
+            parts.push_back (v);
+            if (to == std::string::npos)
+                break;
+            from = to + 1;
+        }
+        if (parts.size() == 2)
+            seconds = parts[0] + parts[1] / 1000.0;
+        else if (parts.size() == 3)
+            seconds = parts[0] * 60.0 + parts[1] + parts[2] / 1000.0;
+        else
+            return -1;
+    }
+    return (std::int64_t) std::llround (seconds * std::max (1.0, bpm) / 60.0 * ppq);
+}
+
+// --- the Audio section's BPM box and its ÷2 / ×2 (round 190dr-2; warp190cg's commands) -------------------------------
+// The tempo the warped sample is read at: its beats per minute of file time (0 while it is not warped).
+inline double fileBpm (const SamplerSettings& s, double fileSeconds) noexcept
+{
+    return isWarped (s) && fileSeconds > 0.0 ? (double) s.stretchBeats * 60.0 / fileSeconds : 0.0;
+}
+// The sample read `factor` times as fast in beats (÷2 = 0.5: the BPM halves and the clip plays it in half the beats):
+// the warp markers' beats (or the channel's length in beats) and the grid clip (track, scene) scale together, as the
+// audio editor's ÷2 / ×2 do. False when it is not warped.
+inline bool scaleWarpedTempo (Song& song, int channel, int track, int scene, double fileSeconds, double factor)
+{
+    if (channel < 0 || channel >= (int) song.channels.size() || ! (factor > 0.0) || ! (fileSeconds > 0.0))
+        return false;
+    auto& sampler = song.channels[(std::size_t) channel].sampler;
+    if (! isWarped (sampler))
+        return false;
+    if (sampler.warp.size() >= 2)
+    {
+        for (auto& m : sampler.warp)
+            m.beats *= factor;
+        warpedit::syncLength (sampler, fileSeconds);
+    }
+    else
+        sampler.stretchBeats = (float) std::max (warpedit::minBeatGap, (double) sampler.stretchBeats * factor);
+    if (song.clipGrid)
+        for (auto& c : song.clipGrid->clips)
+            if (c.track == track && c.kind == ClipKind::audio && c.channel == channel && c.gridSlot >= 0 && c.gridSlot < (int) song.clipGrid->slots.size()
+                && song.clipGrid->slots[(std::size_t) c.gridSlot].scene == scene)
+            {
+                c.length = std::max<std::int64_t> (1, (std::int64_t) std::llround ((double) c.length * factor));
+                const auto exact = ((double) c.offset + (double) c.offsetFraction) * factor;
+                c.offset = std::max<std::int64_t> (0, (std::int64_t) std::floor (exact));
+                c.offsetFraction = (float) (exact - (double) c.offset);
+                c.fadeIn = std::min (c.fadeIn, c.length);
+                c.fadeOut = std::min (c.fadeOut, c.length - c.fadeIn);
+            }
+    return true;
+}
+// The BPM box: the sample read at `bpm`.
+inline bool setFileBpm (Song& song, int channel, int track, int scene, double fileSeconds, double bpm)
+{
+    if (channel < 0 || channel >= (int) song.channels.size() || ! (bpm > 0.0))
+        return false;
+    const auto now = fileBpm (song.channels[(std::size_t) channel].sampler, fileSeconds);
+    return now > 0.0 && std::abs (bpm - now) > 1.0e-9 && scaleWarpedTempo (song, channel, track, scene, fileSeconds, bpm / now);
+}
+
+// --- the Fade switch (Live's clip Fade: short fades at the clip's edges) ------------------------------------------------
+// LYNX uses the clip's own fade-in and fade-out, `ms` long at the song tempo (at least one tick).
+constexpr double edgeFadeMs = 4.0;
+inline bool hasEdgeFades (const Clip& c) noexcept { return c.fadeIn > 0 || c.fadeOut > 0; }
+inline void setEdgeFades (Clip& c, bool on, double bpm)
+{
+    const auto ticks = std::max<std::int64_t> (1, (std::int64_t) std::llround (edgeFadeMs / 1000.0 * std::max (1.0, bpm) / 60.0 * ppq));
+    c.fadeIn = on ? std::min (ticks, c.length / 2) : 0;
+    c.fadeOut = on ? std::min (ticks, c.length / 2) : 0;
 }
 
 // --- the sample's title -----------------------------------------------------------------------------------------------

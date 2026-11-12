@@ -300,3 +300,73 @@ TEST (live190dr_sample_title_reads_like_the_reference)
     CHECK (infoText ("x.mp3", 44100.0, 0, 2) == "x.mp3  44.1 kHz \xc2\xb7 2 Ch");
     CHECK (infoText ("missing.wav", 0.0, 0, 0) == "missing.wav");
 }
+
+// --- round 190dr-2: the Clip section's fields, the BPM box and Fade -------------------------------------------------
+
+TEST (live190dr2_fields_read_bars_beats_sixteenths_like_the_reference)
+{
+    using namespace lynx::clipsample;
+    const auto bar = 4 * lynx::ppq;
+    CHECK (positionText (0, 4) == "1. 1. 1");                       // Start 1. 1. 1
+    CHECK (positionText (8 * bar, 4) == "9. 1. 1");                 // End 9. 1. 1
+    CHECK (positionText (8 * bar, 4, true) == "8. 0. 0");           // Length 8. 0. 0
+    CHECK (positionText (bar + 2 * lynx::ppq + lynx::ppq / 4 * 3, 4) == "2. 3. 4");
+    CHECK (positionText (7 * lynx::ppq, 3) == "3. 2. 1");           // 3/4: a bar is three beats
+    CHECK (parsePosition ("9. 1. 1", 4) == 8 * bar && parsePosition ("9.1.1", 4) == 8 * bar && parsePosition ("9", 4) == 8 * bar);
+    CHECK (parsePosition ("2. 3. 4", 4) == bar + 2 * lynx::ppq + lynx::ppq / 4 * 3);
+    CHECK (parsePosition ("8. 0. 0", 4, true) == 8 * bar && parsePosition ("0. 2", 4, true) == 2 * lynx::ppq);
+    CHECK (parsePosition ("0. 1. 1", 4) == -1 && parsePosition ("abc", 4) == -1 && parsePosition ("", 4) == -1 && parsePosition ("-1", 4, true) == -1);
+    // unwarped audio: seconds at the song tempo (120 BPM: one beat = 0.5 s)
+    CHECK (secondsText (0, 120.0) == "0:00:000" && secondsText (3 * lynx::ppq, 120.0) == "0:01:500" && secondsText (250 * lynx::ppq, 120.0) == "2:05:000");
+    CHECK (parseSeconds ("0:01:500", 120.0) == 3 * lynx::ppq && parseSeconds ("1.5", 120.0) == 3 * lynx::ppq && parseSeconds ("01:500", 120.0) == 3 * lynx::ppq);
+    CHECK (parseSeconds ("x", 120.0) == -1);
+}
+
+TEST (live190dr2_position_moves_the_loop_keeping_its_length)
+{
+    using namespace lynx::clipsample;
+    lynx::Clip c;
+    c.offset = lynx::ppq;
+    c.length = 8 * lynx::ppq;
+    CHECK (setPositionAt (c, 4 * lynx::ppq) && c.offset == 4 * lynx::ppq && c.length == 8 * lynx::ppq);
+    CHECK (! setPositionAt (c, -1));
+}
+
+TEST (live190dr2_bpm_box_and_halve_double_scale_the_clip)
+{
+    using namespace lynx::clipsample;
+    lynx::Song s;
+    s.bpm = 120.0;
+    s.channels.resize (1);
+    s.channels[0].instrument = lynx::InstrumentKind::audioClip;
+    s.channels[0].sampler.stretchBeats = 8.0f; // a 4 s file read at 120 BPM
+    lynx::Clip clip;
+    clip.kind = lynx::ClipKind::audio;
+    clip.channel = 0;
+    clip.length = 8 * lynx::ppq;
+    lynx::launcher::setClip (s, 0, 0, clip);
+    CHECK (std::abs (fileBpm (s.channels[0].sampler, 4.0) - 120.0) < 1.0e-9);
+    // ÷2 (Live: 120 -> 60 BPM, the 2-bar clip becomes one bar)
+    CHECK (scaleWarpedTempo (s, 0, 0, 0, 4.0, 0.5));
+    CHECK (std::abs (fileBpm (s.channels[0].sampler, 4.0) - 60.0) < 1.0e-9 && lynx::launcher::clipAt (*s.clipGrid, 0, 0)->length == 4 * lynx::ppq);
+    CHECK (setFileBpm (s, 0, 0, 0, 4.0, 120.0)); // the box typed back to 120
+    CHECK (s.channels[0].sampler.stretchBeats == 8.0f && lynx::launcher::clipAt (*s.clipGrid, 0, 0)->length == 8 * lynx::ppq);
+    // with warp markers: they scale, the length follows them
+    s.channels[0].sampler.warp = { { 0.0, 0.0 }, { 2.0, 3.0 }, { 4.0, 8.0 } };
+    CHECK (scaleWarpedTempo (s, 0, 0, 0, 4.0, 2.0) && s.channels[0].sampler.warp[1].beats == 6.0 && s.channels[0].sampler.stretchBeats == 16.0f);
+    s.channels[0].sampler.stretchBeats = 0.0f; // unwarped: no BPM, no ÷2
+    CHECK (fileBpm (s.channels[0].sampler, 4.0) == 0.0 && ! scaleWarpedTempo (s, 0, 0, 0, 4.0, 0.5));
+}
+
+TEST (live190dr2_fade_switch_sets_short_edge_fades)
+{
+    using namespace lynx::clipsample;
+    lynx::Clip c;
+    c.length = 8 * lynx::ppq;
+    CHECK (! hasEdgeFades (c));
+    setEdgeFades (c, true, 120.0);
+    const auto expect = (std::int64_t) std::llround (edgeFadeMs / 1000.0 * 2.0 * lynx::ppq);
+    CHECK (hasEdgeFades (c) && c.fadeIn == std::max<std::int64_t> (1, expect) && c.fadeOut == c.fadeIn);
+    setEdgeFades (c, false, 120.0);
+    CHECK (! hasEdgeFades (c));
+}

@@ -9,6 +9,7 @@
 #include "core/ClipLauncher.h"
 #include "core/ClipSample.h"
 #include "core/DetailChain.h"
+#include "core/Groove.h"
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/HotSwap.h"
@@ -1602,6 +1603,7 @@ public:
         notesTitle.setText (tr ("Notes"), juce::dontSendNotification);
         const std::pair<juce::Label*, const char*> labels[] = { { &nameLabel, TR_NOOP ("Name") }, { &startLabel, TR_NOOP ("Start") },
                                                                  { &endLabel, TR_NOOP ("End") }, { &lengthLabel, TR_NOOP ("Length") },
+                                                                 { &positionLabel, TR_NOOP ("Position") }, { &grooveLabel, TR_NOOP ("Groove") },
                                                                  { &signatureLabel, TR_NOOP ("Signature") }, { &modeLabel, TR_NOOP ("Launch mode") },
                                                                  { &quantLabel, TR_NOOP ("Launch quantisation") }, { &scaleLabel, TR_NOOP ("Scale") } };
         for (const auto& [l, text] : labels)
@@ -1611,7 +1613,7 @@ public:
             l->setColour (juce::Label::textColourId, colour::textSecondary);
             addAndMakeVisible (*l);
         }
-        for (auto* ed : { &name, &start, &end, &length })
+        for (auto* ed : { &name, &start, &end, &position, &length })
         {
             addAndMakeVisible (*ed);
             ed->setFont (font (type::small));
@@ -1619,22 +1621,38 @@ public:
             ed->onFocusLost = [this] { apply(); };
             ed->onEscapeKey = [this] { load(); };
         }
-        start.setTooltip (tr ("Where the clip starts in its source (bars:beats:ticks)"));
-        // round 190dr: Live's Set buttons beside Start and End [SHOT live-clipview-audio-panel.png]: the marker goes to where
-        // the playing clip is now; dim while the clip does not play (core/ClipSample.h)
-        for (auto* b : { &setStart, &setEnd })
+        // round 190dr-2: Live's fields [SHOT live-clipview-audio-panel.png] in bars. beats. sixteenths ("1. 1. 1"; lengths
+        // "8. 0. 0"), seconds for an unwarped audio clip; LYNX's loop starts where the clip starts, so Position is the start
+        // moved with the end and Length is the clip's length (core/ClipSample.h)
+        start.setTooltip (tr ("Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)"));
+        end.setTooltip (tr ("End: where the clip ends in its source"));
+        position.setTooltip (tr ("Loop Position: moves the looped part, its length stays (the loop starts where the clip starts)"));
+        length.setTooltip (tr ("Loop Length (bars. beats. sixteenths)"));
+        // round 190dr: Live's Set buttons beside the fields: the marker goes to where the playing clip is now; dim while
+        // the clip does not play
+        for (auto* b : { &setStart, &setEnd, &setPosition, &setLength })
         {
             b->setButtonText (tr ("Set"));
             b->setConnectedEdges (0);
             b->setEnabled (false);
-            b->onClick = [this, b] { setHere (b == &setStart); };
+            b->onClick = [this, b] { setHere (b == &setStart ? 0 : b == &setEnd ? 1 : b == &setPosition ? 2 : 3); };
             addAndMakeVisible (*b);
         }
         setStart.setTooltip (tr ("Set: the clip starts where it plays now"));
         setEnd.setTooltip (tr ("Set: the clip ends where it plays now"));
+        setPosition.setTooltip (tr ("Set: the loop moves to start where the clip plays now"));
+        setLength.setTooltip (tr ("Set: the loop ends where the clip plays now"));
         showingTimer = std::make_unique<ui::TimerWhileShowing> (*this, static_cast<juce::Timer&> (*this), 10);
-        end.setTooltip (tr ("Where the clip ends in its source (bars:beats:ticks)"));
-        length.setTooltip (tr ("bars:beats:ticks"));
+        // the Groove chooser: the project's Groove Pool (round 190bv), for MIDI clips (LYNX's grooves act on MIDI clips)
+        groove.onChange = [this] {
+            if (loading)
+                return;
+            const auto& pool = engine.getSong().grooves.grooves;
+            const auto index = groove.getSelectedId() - 2;
+            const auto id = index >= 0 && index < (int) pool.size() ? pool[(std::size_t) index].id : 0u;
+            engine.editSong ([t = track, sc = scene, id] (Song& s) { groove::setClipGroove (s, t, sc, id); });
+        };
+        addAndMakeVisible (groove);
         signature.setFont (font (type::small));
         signature.setColour (juce::Label::textColourId, colour::textPrimary);
         signature.setTooltip (tr ("The project's time signature (clips have no signature of their own in LYNX SHARE)"));
@@ -1745,11 +1763,11 @@ public:
     ~ClipColumn() override { engine.removeChangeListener (this); }
 
     // the reference's Clip / Launch / Notes panels side by side under the clip's name [SHOT d08]
-    static constexpr int clipPanel = 164, launchPanel = 136, notesPanel = 172, gap = 8;
+    static constexpr int clipPanel = 164, clipPanel2 = 164, launchPanel = 136, notesPanel = 172, gap = 8;
     static constexpr int foldedTools = 20;
     int preferredWidth() const
     {
-        return gap + clipPanel + gap + launchPanel + gap + (hasNotes ? notesPanel + gap + (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth) + gap : 0);
+        return gap + clipPanel + gap + clipPanel2 + gap + launchPanel + gap + (hasNotes ? notesPanel + gap + (toolsFolded ? foldedTools : MidiToolsPanel::panelWidth) + gap : 0);
     }
     // the docked Piano roll (nullptr while it is not docked here): the MIDI Tools work on its selection
     std::function<PianoRollComponent*()> editorOf;
@@ -1814,10 +1832,25 @@ public:
         }
         halves (take (c, 20), start, end);
         loop.setBounds (take (c, 20));
-        halves (take (c, 14), lengthLabel, signatureLabel);
-        halves (take (c, 20), length, signature);
-        scaleLabel.setBounds (take (c, 14));
-        halves (take (c, 20), scaleRoot, scaleName);
+        {
+            // Position [Set] | Length [Set]
+            auto row = take (c, 16);
+            const auto w = (row.getWidth() - 6) / 2;
+            auto a = row.removeFromLeft (w);
+            row.removeFromLeft (6);
+            setPosition.setBounds (a.removeFromRight (30));
+            positionLabel.setBounds (a);
+            setLength.setBounds (row.removeFromRight (30));
+            lengthLabel.setBounds (row);
+        }
+        halves (take (c, 20), position, length);
+        // Signature | Groove, then Scale: a second column beside them (Live stacks them below; the dock is lower)
+        auto c2 = r.removeFromLeft (clipPanel2);
+        r.removeFromLeft (gap);
+        halves (take (c2, 14), signatureLabel, grooveLabel);
+        halves (take (c2, 20), signature, groove);
+        scaleLabel.setBounds (take (c2, 14));
+        halves (take (c2, 20), scaleRoot, scaleName);
 
         // Launch: mode, quantisation, legato
         auto l = r.removeFromLeft (launchPanel);
@@ -1874,16 +1907,43 @@ private:
         for (auto* b : { &setStart, &setEnd })
             if (b->isEnabled() != on)
                 b->setEnabled (on);
+        for (auto* b : { &setPosition, &setLength }) // (the loop's: only with Loop on)
+            if (b->isEnabled() != (on && loop.getToggleState()))
+                b->setEnabled (on && loop.getToggleState());
     }
-    void setHere (bool startMarker)
+    // 0 Start, 1 End, 2 Position, 3 Length (Length's Set ends the loop there: LYNX's loop ends where the clip does)
+    void setHere (int which)
     {
         float progress = 0.0f;
         if (! clipPlays (&progress))
             return;
-        editClip ([startMarker, progress] (Clip& c, ClipGridSlot&) {
+        editClip ([which, progress] (Clip& c, ClipGridSlot&) {
             const auto at = clipsample::playPosition (c, progress);
-            startMarker ? clipsample::setStartAt (c, at) : clipsample::setEndAt (c, at);
+            if (which == 0)
+                clipsample::setStartAt (c, at);
+            else if (which == 2)
+                clipsample::setPositionAt (c, at);
+            else
+                clipsample::setEndAt (c, at);
         });
+    }
+    // The clip's content is in seconds (an unwarped audio clip) rather than in beats
+    bool inSeconds (const Clip& c) const
+    {
+        const auto& song = engine.getSong();
+        return c.kind == ClipKind::audio && c.channel >= 0 && c.channel < (int) song.channels.size()
+               && ! clipsample::isWarped (song.channels[(std::size_t) c.channel].sampler);
+    }
+    juce::String fieldText (std::int64_t ticks, bool asLength, bool seconds) const
+    {
+        const auto& song = engine.getSong();
+        return juce::String (seconds ? clipsample::secondsText (ticks, song.bpm) : clipsample::positionText (ticks, song.beatsPerBar, asLength));
+    }
+    std::int64_t fieldTicks (const juce::TextEditor& ed, bool asLength, bool seconds) const
+    {
+        const auto& song = engine.getSong();
+        const auto text = ed.getText().trim().toStdString();
+        return seconds ? clipsample::parseSeconds (text, song.bpm) : clipsample::parsePosition (text, song.beatsPerBar, asLength);
     }
 
     // the grid clip of the slot (const) and its settings
@@ -1905,16 +1965,39 @@ private:
         const auto n = juce::dontSendNotification;
         if (! name.hasKeyboardFocus (false))
             name.setText (slot != nullptr ? utf8 (slot->name) : juce::String(), false);
+        const auto secs = inSeconds (*c);
         if (! start.hasKeyboardFocus (false))
-            start.setText (clipprops::formatLength (c->offset, bpb), false);
+            start.setText (fieldText (c->offset, false, secs), false);
         if (! end.hasKeyboardFocus (false))
-            end.setText (clipprops::formatLength (c->offset + c->length, bpb), false);
+            end.setText (fieldText (c->offset + c->length, false, secs), false);
+        if (! position.hasKeyboardFocus (false))
+            position.setText (fieldText (c->offset, false, secs), false);
         if (! length.hasKeyboardFocus (false))
-            length.setText (clipprops::formatLength (c->length, bpb), false);
-        signature.setText (juce::String (bpb) + "/4", n);
+            length.setText (fieldText (c->length, true, secs), false);
+        signature.setText (juce::String (bpb) + " / 4", n);
+        {
+            // the Groove chooser: None + the pool's grooves; MIDI clips only
+            const juce::ScopedValueSetter<bool> guard (loading, true);
+            groove.clear (n);
+            groove.addItem (tr ("None"), 1);
+            const auto& pool = song.grooves.grooves;
+            for (int i = 0; i < (int) pool.size(); ++i)
+                groove.addItem (utf8 (pool[(std::size_t) i].name), i + 2);
+            int selected = 1;
+            if (slot != nullptr && slot->groove != 0)
+                for (int i = 0; i < (int) pool.size(); ++i)
+                    if (pool[(std::size_t) i].id == slot->groove)
+                        selected = i + 2;
+            groove.setSelectedId (selected, n);
+            groove.setEnabled (c->kind == ClipKind::pattern);
+            groove.setTooltip (c->kind == ClipKind::pattern ? tr ("The groove this clip plays through (the Groove Pool)")
+                                                            : tr ("Grooves play on MIDI clips only in LYNX SHARE"));
+        }
         if (slot != nullptr)
         {
             loop.setToggleState (slot->loop, n);
+            for (auto* ed : { &position, &length }) // (Live: the loop's fields are off with Loop off)
+                ed->setEnabled (slot->loop);
             legato.setToggleState (slot->legato, n);
             mode.setSelectedId ((int) slot->mode + 1, n);
             quant.setSelectedId ((int) slot->quant + 1, n);
@@ -1963,14 +2046,33 @@ private:
         const auto* c = clip();
         if (c == nullptr)
             return;
-        const auto bpb = engine.getSong().beatsPerBar;
+        // the field that was typed in decides (Start keeps the end, Position keeps the length)
+        const auto secs = inSeconds (*c);
+        const auto end0 = c->offset + c->length;
         auto offset = c->offset, len = c->length;
-        if (const auto t = clipprops::parseLength (start.getText().toStdString(), bpb); t >= 0)
-            offset = t;
-        if (const auto t = clipprops::parseLength (length.getText().toStdString(), bpb); t > 0 && length.getText() != juce::String (clipprops::formatLength (c->length, bpb)))
-            len = t;
-        else if (const auto e = clipprops::parseLength (end.getText().toStdString(), bpb); e > offset)
-            len = e - offset;
+        if (start.getText() != fieldText (c->offset, false, secs))
+        {
+            if (const auto t = fieldTicks (start, false, secs); t >= 0 && t < end0)
+            {
+                offset = t;
+                len = end0 - t;
+            }
+        }
+        else if (position.getText() != fieldText (c->offset, false, secs))
+        {
+            if (const auto t = fieldTicks (position, false, secs); t >= 0)
+                offset = t;
+        }
+        else if (end.getText() != fieldText (end0, false, secs))
+        {
+            if (const auto e = fieldTicks (end, false, secs); e > offset)
+                len = e - offset;
+        }
+        else if (length.getText() != fieldText (c->length, true, secs))
+        {
+            if (const auto t = fieldTicks (length, true, secs); t > 0)
+                len = t;
+        }
         const auto newName = name.getText().trim().toStdString();
         const int t = track, sc = scene;
         engine.editSong ([t, sc, offset, len, newName] (Song& song) {
@@ -2065,8 +2167,11 @@ private:
     juce::String rangeText;
     int transposed = 0, interval = 0;
     juce::Label clipTitle, launchTitle, notesTitle, nameLabel, startLabel, endLabel, lengthLabel, signatureLabel, modeLabel, quantLabel, signature;
-    juce::TextEditor name, start, end, length;
-    juce::TextButton setStart, setEnd; // round 190dr
+    juce::TextEditor name, start, end, position, length;
+    juce::TextButton setStart, setEnd, setPosition, setLength; // round 190dr
+    juce::Label positionLabel, grooveLabel;
+    juce::ComboBox groove;
+    bool loading = false;
     std::unique_ptr<ui::TimerWhileShowing> showingTimer;
     juce::ToggleButton loop, legato;
     juce::ComboBox mode, quant;
