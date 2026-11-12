@@ -8926,6 +8926,7 @@ countries: jp
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（シートの最後の行）はダンサーをマウスでつかんでいる間に表示されます。"
 "Show complete piano roll preview" = "ピアノロールのプレビュー全体を表示"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "チャンネルラック: パターンがラックの表示幅より長くても、チャンネルのノートプレビューにパターン全体を表示します。オフの場合はステップと一緒にスクロールします"
+
 # --- round 190by: Pocket SuperSaw and FL Studio Mobile's remaining effects
 "Pocket SuperSaw" = "Pocket SuperSaw"
 "Pocket SuperSaw — LYNX's engine for FL Studio Mobile's SuperSaw" = "Pocket SuperSaw — FL Studio Mobile の SuperSaw 用の LYNX エンジン"
@@ -9341,6 +9342,8 @@ countries: jp
 "Start from" = "開始元"
 "Opens as a new, untitled project." = "タイトルなしの新規プロジェクトとして開きます。"
 "The result is {0} from the reference's loudness. Match again to correct the level." = "結果はリファレンスのラウドネスから {0} ずれています。もう一度マッチしてレベルを補正してください。"
+"Match adds two Master effects, Facet EQ and Apex Limiter, with the preset name \"Reference match\". Open them to change any band or the level." = "マッチは Master に Facet EQ と Apex Limiter の 2 つのエフェクトをプリセット名「\"Reference match\"」で追加します。開いてバンドやレベルを変更できます。"
+
 # --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
 "Inc" = "Inc"
 "How to treat a note or button link" = "ノートまたはボタンのリンクの扱い方"
@@ -9355,15 +9358,6 @@ countries: jp
 "Channel panning" = "チャンネルパン"
 "In: {0} out: {1}" = "入力: {0} 出力: {1}"
 "Note C0" = "ノート C0"
-"Clear all colours" = "すべての色をクリア"
-"Presets of {0}" = "{0} のプリセット"
-"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "ワープマーカー: オーディオの位置を拍に結び付け、その間のオーディオを伸縮します (チャンネルのマーカー)。マーカーをドラッグ: そのオーディオが別の拍へ移ります。Shift + ドラッグ: オーディオがマーカーの下でスライドします"
-"Show the audio in beats" = "オーディオを拍で表示"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "ピークメーター (左/右) とピークホールド  [LMB] クリップランプをクリア"
-"Match adds two Master effects, Facet EQ and Apex Limiter, with the preset name \"Reference match\". Open them to change any band or the level." = "マッチは Master に Facet EQ と Apex Limiter の 2 つのエフェクトをプリセット名「\"Reference match\"」で追加します。開いてバンドやレベルを変更できます。"
 "Flip horizontally" = "左右反転"
 "Key / scale" = "キー / スケール"
 "Scales" = "スケール"
@@ -9383,3 +9377,20 @@ countries: jp
 
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 "New mixer track(s)" = "新しいミキサートラック"
+"Clear all colours" = "すべての色をクリア"
+"Presets of {0}" = "{0} のプリセット"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "ワープマーカー: オーディオの位置を拍に結び付け、その間のオーディオを伸縮します (チャンネルのマーカー)。マーカーをドラッグ: そのオーディオが別の拍へ移ります。Shift + ドラッグ: オーディオがマーカーの下でスライドします"
+"Show the audio in beats" = "オーディオを拍で表示"
+
+# --- Round 190dg: the Simple dock's installed plugins and favourite chain presets
+"Synths and samplers" = "シンセとサンプラー"
+"My plugins" = "自分のプラグイン"
+"The instrument plugins installed on this computer" = "このコンピューターにインストールされているインストゥルメントプラグイン"
+"No instrument plugins found yet. Scan for plugins in the Plugin manager." = "インストゥルメントプラグインはまだ見つかっていません。プラグインマネージャーでプラグインをスキャンしてください。"
+"Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "クリックでこのプラグインをトラックに読み込んで試聴します (Ctrl+Z で元に戻します)"
+"Add \"{0}\" to favourites" = "「{0}」をお気に入りに追加"
+"Remove \"{0}\" from favourites" = "「{0}」をお気に入りから削除"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "ピークメーター (左/右) とピークホールド  [LMB] クリップランプをクリア"

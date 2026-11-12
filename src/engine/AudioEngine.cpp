@@ -5425,6 +5425,19 @@ bool AudioEngine::auditionPreset (const juce::AudioPluginInstance& plugin)
     return true;
 }
 
+bool AudioEngine::auditionChannelSound (int channel)
+{
+    if (channel < 0 || channel >= (int) song.channels.size()
+        || ! pluginpresets::auditionPlays (true, true, transport.playing.load(), transport.recording.load()))
+        return false;
+    if (auditionChannel >= 0 && auditionSounding) // the last one still sounds: it ends now
+        sendLiveNote (auditionChannel, pluginpresets::auditionKey, 0.0f, false);
+    auditionChannel = channel;
+    auditionSounding = false;
+    auditionAtMs = juce::Time::getMillisecondCounterHiRes() + pluginpresets::auditionDelayMs;
+    return true;
+}
+
 void AudioEngine::updateAudition()
 {
     if (auditionChannel < 0 || juce::Time::getMillisecondCounterHiRes() < auditionAtMs)

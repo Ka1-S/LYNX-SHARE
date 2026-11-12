@@ -1896,6 +1896,18 @@ public:
             return;
         }
 
+        if (args.contains ("--simple190dgshot"))
+        {
+            // LYNX.exe --simple190dgshot prefix: round 190dg's additions to the Simple dock off-screen, at 1x and 2x —
+            // the Effects tab with all eight one-knob cards and each card alone, a chain preset with Blend, the
+            // favourites in the Preset menu, the sound picker (a search, My plugins with a made-up plugin list) — and a
+            // text report of the checks
+            const auto i = args.indexOf ("--simple190dgshot");
+            runSimple190dgShot (args[i + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--simplefxshot"))
         {
             // LYNX.exe --simplefxshot prefix: round 190bu's track dock of the Simple workflow off-screen, at 1x and 2x —
@@ -15109,6 +15121,183 @@ private:
         simple->cycleDockTab();
         check ("Shift+Tab goes to the Instrument tab", dock->getTab() == lynx::SimpleDock::Tab::instrument);
         line ("Simple workflow objects: " + juce::String (madeBefore) + " before, " + juce::String (lynx::SimpleWorkflow::instances.load()) + " after");
+        line (report.contains ("ERROR ") ? "RESULT ERROR" : "RESULT OK");
+        juce::File (prefix + "-report.txt").replaceWithText (report);
+    }
+
+    void runSimple190dgShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto writeImage = [&prefix] (const juce::Image& image, const juce::String& name) {
+            const auto file = juce::File (prefix + "-" + name + ".png");
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        juce::String report;
+        const auto line = [&report] (const juce::String& text) { report << text << "\n"; };
+        const auto check = [&report] (const juce::String& what, bool ok) { report << (ok ? "OK    " : "ERROR ") << what << "\n"; };
+
+        ui.selectTabForSnapshot (2);
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        offline.dispatchPendingMessages();
+        auto* simple = ui.getSimpleWorkflowForSnapshot();
+        if (simple == nullptr)
+        {
+            juce::File (prefix + "-report.txt").replaceWithText ("ERROR no Simple workflow\n");
+            return;
+        }
+        simple->hideChooser();
+        offline.editSong ([] (lynx::Song& s) {
+            namespace st = lynx::simpletracks;
+            st::Request q;
+            q.kind = st::Kind::voice;
+            q.name = "Lead vocal";
+            st::addTrack (s, q);
+            q = {};
+            q.kind = st::Kind::instrument;
+            q.name = "Keys";
+            lynx::ChannelDef keys;
+            keys.instrument = lynx::InstrumentKind::synth;
+            q.channel = keys;
+            st::addTrack (s, q);
+        });
+        offline.dispatchPendingMessages();
+        simple->hideChooser();
+        auto& playlist = ui.getPlaylistForSnapshot();
+        int voiceTrack = -1, keysTrack = -1;
+        {
+            const auto& song = offline.getSong();
+            for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+                if (const auto kind = lynx::simpletracks::kindOf (song, t))
+                {
+                    if (*kind == lynx::simpletracks::Kind::audio && voiceTrack < 0)
+                        voiceTrack = t;
+                    else if (*kind == lynx::simpletracks::Kind::instrument && keysTrack < 0)
+                        keysTrack = t;
+                }
+        }
+        check ("two Simple tracks (voice, keys)", voiceTrack >= 0 && keysTrack >= 0);
+        playlist.selectTrack (voiceTrack);
+        offline.dispatchPendingMessages();
+        auto* dock = simple->dockForSnapshot();
+        if (dock == nullptr)
+        {
+            juce::File (prefix + "-report.txt").replaceWithText (report + "ERROR no dock\n");
+            return;
+        }
+        const auto shots = [&] (const juce::String& name) {
+            offline.dispatchPendingMessages();
+            for (float scale : { 1.0f, 2.0f })
+            {
+                const auto suffix = scale > 1.0f ? juce::String ("@2x") : juce::String();
+                writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, scale), name + suffix);
+                writeImage (dock->createComponentSnapshot (dock->getLocalBounds(), true, scale), "dock-" + name + suffix);
+            }
+        };
+        const auto menuShot = [&] (const juce::PopupMenu& menu, const juce::String& title, const juce::String& subTitle, const juce::String& name) {
+            juce::StringArray names { title };
+            std::vector<juce::PopupMenu> menus { menu };
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().subMenu != nullptr && it.getItem().text == subTitle)
+                {
+                    names.add (subTitle);
+                    menus.push_back (*it.getItem().subMenu);
+                }
+            saveMenus (names, menus, prefix + "-" + name + ".png");
+        };
+        const auto insert = dock->insertForCheck();
+
+        // --- every one-knob effect as a card, each at a knob position of its own -------------------------------------
+        const float at[] { 0.0f, 0.55f, 0.40f, 0.70f, 0.30f, 0.60f, 0.45f, 0.35f, 0.80f };
+        for (int id = 1; id <= lynx::goals::count; ++id)
+            dock->addOneKnobForCheck (id);
+        offline.dispatchPendingMessages();
+        for (int id = 1; id <= lynx::goals::count; ++id)
+            dock->turnKnobForCheck (id - 1, at[id]);
+        offline.dispatchPendingMessages();
+        check ("eight one-knob cards on the insert", dock->cardCountForCheck() == 8 && dock->oneKnobCardsForCheck() == 8);
+        {
+            const auto& fx = offline.getSong().mixer[(std::size_t) insert].effects;
+            bool turned = fx.size() == 8;
+            for (std::size_t i = 0; turned && i < fx.size(); ++i)
+                turned = lynx::goals::active (fx[i]) && std::abs (fx[i].goalAmount - at[i + 1]) < 1.0e-6f;
+            check ("each knob wrote its effect's parameters", turned);
+        }
+        shots ("effects-all");
+        offline.dispatchPendingMessages();
+        for (int card = 0; card < dock->cardCountForCheck(); ++card)
+        {
+            const auto area = dock->cardBoundsForSnapshot (card);
+            const auto name = juce::String (lynx::goals::name (card + 1)).toLowerCase();
+            check ("card " + juce::String (card + 1) + " (" + name + ") is on screen", ! area.isEmpty() && dock->getLocalBounds().contains (area));
+            for (float scale : { 1.0f, 2.0f })
+                writeImage (dock->createComponentSnapshot (area.expanded (4), true, scale), "card-" + name + (scale > 1.0f ? "@2x" : ""));
+        }
+
+        // --- a chain preset with Blend --------------------------------------------------------------------------------
+        if (const auto* preset = lynx::chains::find ("Canyon"))
+            offline.editSongStructural ([insert, preset] (lynx::Song& s) { lynx::chains::apply (s, insert, *preset); });
+        offline.dispatchPendingMessages();
+        dock->setBlendForCheck (0.6f);
+        offline.dispatchPendingMessages();
+        check ("preset Canyon with Blend 60 % (shown as edited)", offline.getSong().mixer[(std::size_t) insert].chainPreset == "Canyon"
+                                                                      && std::abs (offline.getSong().mixer[(std::size_t) insert].chainBlend - 0.6f) < 1.0e-6f
+                                                                      && ! lynx::chains::unchanged (offline.getSong(), insert));
+        shots ("effects-preset-blend");
+        // favourites: the track's preset starred; the menu lists it first
+        const auto favFile = lynx::SimpleDock::favouritesFile();
+        const auto hadFavourites = favFile.existsAsFile();
+        const auto oldFavourites = favFile.loadFileAsString();
+        lynx::SimpleDock::setFavouritePreset ("Canyon", true);
+        lynx::SimpleDock::setFavouritePreset ("Clear Voice", true);
+        lynx::SimpleDock::setFavouritePreset ("Canyon", true); // (twice: once in the list)
+        check ("two favourites kept, in order", lynx::SimpleDock::favouritePresets() == juce::StringArray { "Canyon", "Clear Voice" });
+        {
+            bool first = false, toggle = false;
+            const auto menu = dock->presetMenuForSnapshot();
+            juce::PopupMenu::MenuItemIterator it (menu);
+            if (it.next())
+                first = it.getItem().subMenu != nullptr && it.getItem().text.contains (lynx::tr ("Favourites"));
+            for (juce::PopupMenu::MenuItemIterator all (menu); all.next();)
+                toggle = toggle || all.getItem().text == lynx::tr ("Remove \"{0}\" from favourites", { "Canyon" });
+            check ("the Preset menu starts with the favourites and offers to unstar the track's preset", first && toggle);
+            menuShot (menu, lynx::tr ("Preset"), juce::String::fromUTF8 ("\xe2\x98\x85 ") + lynx::tr ("Favourites"), "menu-preset-favourites");
+        }
+        lynx::SimpleDock::setFavouritePreset ("Canyon", false);
+        check ("unstarred", lynx::SimpleDock::favouritePresets() == juce::StringArray { "Clear Voice" });
+        if (hadFavourites)
+            favFile.replaceWithText (oldFavourites);
+        else
+            favFile.deleteFile();
+
+        // --- the sound picker: a search, and the installed plugins -----------------------------------------------------
+        playlist.selectTrack (keysTrack);
+        offline.dispatchPendingMessages();
+        check ("the Keys track opens on its sound", dock->getTab() == lynx::SimpleDock::Tab::instrument);
+        dock->showCategoryForSnapshot ((int) lynx::soundlib::Category::bass);
+        dock->setSearchForSnapshot ("sub");
+        offline.dispatchPendingMessages();
+        line ("search \"sub\" in Bass: " + juce::String (dock->soundRowsForCheck()) + " rows");
+        check ("a search narrows the category", dock->soundRowsForCheck() > 0 && dock->soundRowsForCheck() < (int) lynx::soundlib::filter (lynx::soundlib::builtIn(), lynx::soundlib::Category::bass).size());
+        shots ("picker-search");
+        dock->setSearchForSnapshot ({});
+        // a made-up list of installed plugins (nothing is scanned or loaded)
+        dock->setPluginsForSnapshot ({ { "VST3-demo-1", "Analog Mono", "Example Audio", "VST3", "Instrument|Synth" },
+                                       { "VST3-demo-2", "Grand Upright", "Example Audio", "VST3", "Instrument|Piano" },
+                                       { "VST3-demo-3", "Beat Kit 808", "Sample Lab", "VST3", "Instrument|Drum" },
+                                       { "CLAP-demo-4", "Orchestra Strings", "Sample Lab", "CLAP", "Instrument|Sampler" },
+                                       { "VST3-demo-5", "Wave Table One", "Example Audio", "VST3", "Instrument|Synth" },
+                                       { "VST-demo-6", "Sub Bass Machine", "Low End", "VST", "Synth" },
+                                       { "VST3-demo-7", "Sample Player", "Sample Lab", "VST3", "Instrument|Sampler" } });
+        dock->showCategoryForSnapshot ((int) lynx::soundlib::Category::synths);
+        offline.dispatchPendingMessages();
+        check ("My plugins: the generic synths and samplers in their own category (" + juce::String (dock->soundRowsForCheck()) + " of 7)", dock->soundRowsForCheck() == 3);
+        shots ("picker-plugins");
         line (report.contains ("ERROR ") ? "RESULT ERROR" : "RESULT OK");
         juce::File (prefix + "-report.txt").replaceWithText (report);
     }

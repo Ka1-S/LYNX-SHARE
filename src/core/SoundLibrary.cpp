@@ -60,6 +60,7 @@ const char* categoryName (Category c) noexcept
         case Category::lead: return "Lead";
         case Category::pad: return TR_NOOP ("Pad");
         case Category::pluck: return TR_NOOP ("Pluck");
+        case Category::synths: return TR_NOOP ("Synths and samplers");
         case Category::bells: return TR_NOOP ("Bells");
         case Category::organ: return TR_NOOP ("Organ");
         case Category::strings: return TR_NOOP ("Strings");
@@ -190,6 +191,49 @@ std::vector<Sound> fromFonts (const std::vector<sf::IndexedFont>& fonts)
     return out;
 }
 
+Category pluginCategory (const std::string& category, const std::string& name)
+{
+    // a word in the name says most ("Grand Piano", "808 Studio", "Strings Ensemble"); "Synth" or nothing in it falls
+    // through to the plugin's own category
+    const auto byName = categoryFor ({}, name);
+    const auto n = lower (name);
+    const bool nameSays = byName != Category::keys || has (n, "piano") || has (n, "keys") || has (n, "rhodes") || has (n, "wurli");
+    if (nameSays)
+        return byName;
+    const auto c = lower (category);
+    if (has (c, "drum") || has (c, "percussion"))
+        return Category::drums;
+    if (has (c, "piano") || has (c, "keys"))
+        return Category::keys;
+    if (has (c, "organ"))
+        return Category::organ;
+    if (has (c, "string"))
+        return Category::strings;
+    if (has (c, "bass"))
+        return Category::bass;
+    return Category::synths;
+}
+
+std::vector<Sound> fromPlugins (const std::vector<InstalledPlugin>& plugins)
+{
+    std::vector<Sound> out;
+    for (const auto& p : plugins)
+    {
+        if (p.id.empty())
+            continue;
+        Sound s;
+        s.name = p.name.empty() ? p.id : p.name;
+        s.category = pluginCategory (p.category, s.name);
+        s.source = Source::plugin;
+        s.kind = InstrumentKind::plugin;
+        s.pluginId = p.id;
+        s.origin = p.vendor.empty() ? p.format : p.format.empty() ? p.vendor : p.vendor + " \xc2\xb7 " + p.format;
+        out.push_back (std::move (s));
+    }
+    sortSounds (out);
+    return out;
+}
+
 std::vector<int> filter (const std::vector<Sound>& list, Category category, const std::string& query)
 {
     std::vector<std::string> words;
@@ -252,6 +296,17 @@ std::optional<ChannelDef> channelFor (const Sound& sound)
             def.name = sound.name;
             return def;
         }
+        case Source::plugin:
+        {
+            if (sound.pluginId.empty())
+                return std::nullopt;
+            ChannelDef def;
+            def.name = sound.name;
+            def.instrument = InstrumentKind::plugin;
+            def.plugin.id = sound.pluginId;
+            def.plugin.name = sound.name;
+            return def;
+        }
     }
     return std::nullopt;
 }
@@ -291,6 +346,12 @@ int find (const std::vector<Sound>& list, const ChannelDef& channel)
             continue;
         if (list[i].source == Source::soundFont && list[i].fontPath != channel.samplePath)
             continue;
+        if (list[i].source == Source::plugin) // (a running plugin's saved state is its own: the plugin is the sound)
+        {
+            if (channel.plugin.id == list[i].pluginId)
+                return (int) i;
+            continue;
+        }
         if (const auto c = channelFor (list[i]); c && sameSound (*c, channel))
             return (int) i;
     }

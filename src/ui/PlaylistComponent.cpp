@@ -13,6 +13,7 @@
 #include "ui/ImageReadback.h"
 #include "ui/TextCache.h"
 #include "ui/PlaylistComponent.h"
+#include "core/ChainPresets.h"
 
 #include "core/EventEdit.h"
 #include "ui/EventEditor.h"
@@ -8276,6 +8277,9 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
             hint.value = juce::String (juce::Decibels::gainToDecibels (m.volume / unityFader), 1) + " dB";
         else if (h.pan)
             hint.value = juce::String (juce::roundToInt (m.pan * 100.0f));
+        else if (h.fx && ! m.chainPreset.empty()) // round 190dg: the track's chain preset, as the dock names it
+            hint.value = juce::String::fromUTF8 (m.chainPreset.c_str())
+                         + (chains::unchanged (song, simpleInsert (h.track)) ? juce::String() : " " + tr ("(edited)"));
         else
             hint.value = trackName (h.track);
         return hint;

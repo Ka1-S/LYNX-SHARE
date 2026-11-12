@@ -3,7 +3,8 @@
 // The Simple workflow's sound picker (round 190bu, Simple layout S6, decision I of WHAT-LYNX-LACKS.md): one list of
 // ready sounds by category, made only of what LYNX has itself — the built-in synth's presets (core/SynthPresets.h) and
 // LYNX's own preset banks of its engines (core/LynxBanks.h) — plus the presets of the user's own SoundFont files
-// (core/SoundFontIndex.h). No sampled content ships with LYNX. A sound is a recipe for a channel: picking one puts its
+// (core/SoundFontIndex.h) and, since round 190dg, the instrument plugins installed on the computer (the plugin host's
+// scanned list; one entry per plugin, its own presets stay in its own window). No sampled content ships with LYNX. A sound is a recipe for a channel: picking one puts its
 // instrument and settings on the track's channel and leaves the channel's own settings (name, level, pan, insert,
 // colour, arpeggiator…) alone, so the Channel rack and every other layout show an ordinary channel.
 // No JUCE.
@@ -17,10 +18,10 @@
 
 namespace lynx::soundlib
 {
-enum class Category : int { keys, bass, lead, pad, pluck, bells, organ, strings, brass, voices, guitar, drums, effects, count };
+enum class Category : int { keys, bass, lead, pad, pluck, synths, bells, organ, strings, brass, voices, guitar, drums, effects, count };
 const char* categoryName (Category c) noexcept; // English (the UI translates it)
 
-enum class Source : int { synth, bank, soundFont };
+enum class Source : int { synth, bank, soundFont, plugin };
 
 struct Sound
 {
@@ -31,10 +32,12 @@ struct Sound
     int index = 0;                      // synth: the preset in synthPresets(); bank: the preset in banks::bankOf (kind)
     std::string fontPath;               // soundFont: the file and its preset
     int bank = 0, program = 0;
+    std::string pluginId;               // plugin: the plugin host's identifier (JUCE's createIdentifierString)
     std::string origin;                 // what it is made with, for the list's second column ("LYNX synth", the font's name)
     bool operator== (const Sound& o) const
     {
-        return source == o.source && kind == o.kind && index == o.index && fontPath == o.fontPath && bank == o.bank && program == o.program;
+        return source == o.source && kind == o.kind && index == o.index && fontPath == o.fontPath && bank == o.bank && program == o.program
+               && pluginId == o.pluginId;
     }
 };
 
@@ -47,6 +50,19 @@ Category categoryFor (const std::string& family, const std::string& name, const 
 const std::vector<Sound>& builtIn();
 // The presets of the user's SoundFont files, by category then name
 std::vector<Sound> fromFonts (const std::vector<sf::IndexedFont>& fonts);
+
+// An installed instrument plugin as the plugin host lists it (round 190dg)
+struct InstalledPlugin
+{
+    std::string id, name, vendor, format;
+    std::string category; // the plugin's own ("Instrument|Synth", "Instrument|Drum", "Synth"…; may be empty)
+};
+// The category of an installed instrument: words in its name first ("808", "Piano", "Strings"…), then its own category
+// (Drum, Piano, Organ…), else Synths and samplers.
+Category pluginCategory (const std::string& category, const std::string& name);
+// The installed instrument plugins as sounds (one each, named as the plugin, the vendor and format in the second
+// column), by category then name. Picking one loads the plugin on the channel with its own default sound.
+std::vector<Sound> fromPlugins (const std::vector<InstalledPlugin>& plugins);
 
 // The indices of the sounds of `list` in `category` whose name or origin holds every word of `query` (case-insensitive;
 // "" = all of the category), in list order.

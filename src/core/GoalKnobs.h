@@ -8,15 +8,17 @@
 //   Brighter  Aether            the two dynamic air bands
 //   Echo      Echoform          mix, feedback, darker repeats; tempo-synced
 //   Punch     Strike Shaper     attack up, sustain a little down, guard on
-//   Room      Atrium            mix, decay, size, pre-delay; lows kept out
+//   Room      Atrium            mix and decay; lows kept out
 //   Bass      Facet EQ          a low shelf up, a little cut above it
 //   Level     Glow Leveler      peak reduction with auto make-up
 //   Dirty     Ember Saturator   hard drive, level-matched
 //   Warm      Ember Saturator   gentle drive, softer highs
 //
 // Every knob at 0 leaves the sound as it was (wet 0, 0 dB or no drive). The laws are piecewise linear over the
-// effect's own 0..1 parameter values; the values are LYNX's own, tuned by measurement (round notes: loudness on pink
-// noise per goal). No JUCE.
+// effect's own 0..1 parameter values; the values are LYNX's own, tuned by measurement (round 190bu: loudness on pink
+// noise; round 190dg's gate: at every position on five test sounds the level stays within −6 … +3 dB of the clean
+// sound, moves at most 1.5 dB per eighth of a turn, peaks rise at most 3 dB, and a knob turned while a sound plays makes
+// no click — RackRenderer glides it; tests/SimpleGate190dgTests.inc). No JUCE.
 
 #include <string>
 #include <vector>
@@ -43,6 +45,10 @@ struct Move
 // The parameters goal `id` writes with its knob at `amount` (0..1), in the table's order. Empty for a bad id.
 std::vector<Move> mapping (int id, float amount);
 
+// The same written into `params` (the effect's other parameters untouched). No allocation: the renderer glides a
+// turned knob through it on the audio thread (round 190dg).
+void writeParams (int id, float amount, EffectParams& params) noexcept;
+
 // A new slot of the goal's effect with the knob at `amount` (< 0: the goal's default). An ordinary slot (kind eq, goal
 // 0) for a bad id.
 EffectSlot make (int id, float amount = -1.0f);
@@ -52,5 +58,5 @@ void setAmount (EffectSlot& slot, float amount);
 // The slot is still a one-knob effect: it has a goal, holds the goal's effect, and the mapped parameters are where the
 // knob put them (a parameter moved by hand in the full editor makes it an ordinary slot again; the fields stay, so
 // turning the knob once more takes it back).
-bool active (const EffectSlot& slot) noexcept;
+bool active (const EffectSlot& slot) noexcept; // (no allocation)
 } // namespace lynx::goals

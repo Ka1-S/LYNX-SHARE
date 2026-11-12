@@ -177,6 +177,10 @@ public:
     // still sounding from the last call ends first. False when nothing will play (an effect, a plugin outside the
     // Channel rack, the song playing or recording). auditionState: 0 idle, 1 waiting to start, 2 sounding (tests).
     bool auditionPreset (const juce::AudioPluginInstance& plugin);
+    // Round 190dg (the Simple sound picker's installed plugins): the same short note on channel `channel`, whatever it
+    // plays (a plugin just loaded there is heard as it is; it can't be rendered aside the way auditionSound does). The
+    // same conditions: only while the song is stopped and not recording.
+    bool auditionChannelSound (int channel);
     int auditionState() const noexcept { return auditionChannel < 0 ? 0 : auditionSounding ? 2 : 1; }
     // Round 190bu (the Simple workflow's sound picker): `channel`'s instrument heard alone through the preview output,
     // without touching the song — the notes `keys` in turn (core/RackRenderer.h renderAudition). False when the

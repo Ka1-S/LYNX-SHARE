@@ -22,6 +22,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include "core/SoundFontIndex.h"
+#include "core/SoundLibrary.h"
 
 namespace lynx
 {
@@ -62,6 +63,10 @@ public:
 
     // The folder of the user's own chain presets (.lynxtrack files)
     static juce::File userPresetFolder();
+    // The favourite chain presets (factory or the user's, by name; round 190dg), kept in that folder's Favourites.txt
+    static juce::File favouritesFile();
+    static juce::StringArray favouritePresets();
+    static bool setFavouritePreset (const juce::String& name, bool on);
     // Saves insert `insert`'s chain as the user preset `name` (its slots and Blend; plugin states captured first) and
     // names the insert's chain after it. False when the file can't be written.
     static bool saveUserPreset (AudioEngine& engine, int insert, const juce::String& name);
@@ -77,6 +82,7 @@ public:
     juce::PopupMenu presetMenuForSnapshot();
     juce::PopupMenu addMenuForSnapshot();
     void setFontsForSnapshot (std::vector<sf::IndexedFont> fonts); // shows "My SoundFonts" with these
+    void setPluginsForSnapshot (std::vector<soundlib::InstalledPlugin> plugins); // shows "My plugins" with these
     void showCategoryForSnapshot (int category);
     int soundRowsForCheck() const;
     juce::String soundNameForCheck() const;
@@ -87,6 +93,9 @@ public:
     void removeCardForCheck (int card);
     void addOneKnobForCheck (int goal);
     void setBlendForCheck (float value);
+    // round 190dg (--simple190dgshot): where card `card` is in the dock, and a search typed into the sound list
+    juce::Rectangle<int> cardBoundsForSnapshot (int card) const;
+    void setSearchForSnapshot (const juce::String& text);
 
     void paint (juce::Graphics& g) override;
     void resized() override;

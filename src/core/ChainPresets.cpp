@@ -53,7 +53,7 @@ const std::vector<Preset>& factory()
     // clang-format off
     static const std::vector<Preset> list {
         { "Clear Voice", "Voice", TR_NOOP ("Even, bright and a little room"), 1.0f,
-          { knob (level, 0.45f), knob (brighter, 0.35f), knob (room, 0.18f) } },
+          { knob (level, 0.40f), knob (brighter, 0.30f), knob (room, 0.18f) } }, // (190dg: Level 0.45 → 0.40, Brighter 0.35 → 0.30: peaks)
         { "Radio Booth", "Voice", TR_NOOP ("Close, warm and steady"), 1.0f,
           { knob (level, 0.60f), plain (K::hushDeEsser, 1.0f), knob (warm, 0.30f) } },
         { "Big Chorus", "Voice", TR_NOOP ("Doubled and wide, with space"), 1.0f,

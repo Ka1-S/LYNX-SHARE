@@ -24,6 +24,7 @@
 #include "core/HostSlide.h"
 #include "core/Vfx.h"
 #include "core/FacetEq.h"
+#include "core/GoalKnobs.h"
 #include "core/MidiControls.h"
 #include "core/MidiOut.h"
 #include "core/Patcher.h"
@@ -1368,7 +1369,17 @@ void RackState::buildPdc (const RackState* previous)
     for (std::size_t t = 0; t < song.mixer.size() && t < slotLatency.size(); ++t)
     {
         const auto& track = song.mixer[t];
-        if (track.chainBlend >= 1.0f || track.effects.empty())
+        // round 190dg: a one-knob slot's table is made here, on this thread, not first by the renderer's glide
+        for (const auto& slot : track.effects)
+            if (slot.goal != 0)
+                goals::defaultAmount (slot.goal);
+        const auto* before = previous != nullptr && t < previous->chainBlends.size() ? previous->chainBlends[t].get() : nullptr;
+        // (a first build — an export, a render, a test — starts at its Blend; a live one from where the audio was: no
+        // stage before = 100 %)
+        const auto lastWet = before != nullptr ? before->lastWet.load (std::memory_order_relaxed)
+                             : previous == nullptr ? std::clamp (track.chainBlend, 0.0f, 1.0f) : 1.0f;
+        // (at 100 % no stage, unless the audio is still on its way back from a lower Blend: one more chunk ramps it up)
+        if (track.effects.empty() || (track.chainBlend >= 1.0f && lastWet >= 1.0f))
             continue;
         int latency = 0;
         for (std::size_t s = 0; s < track.effects.size() && s < slotLatency[t].size(); ++s)
@@ -1381,6 +1392,8 @@ void RackState::buildPdc (const RackState* previous)
         }
         auto stage = std::make_shared<ChainBlendStage>();
         stage->latency = latency;
+        stage->lastWet.store (lastWet, std::memory_order_relaxed);
+        stage->warmup = previous != nullptr ? latency : 0;
         if (latency > 0)
             stage->delay = std::make_shared<DelayLine> (latency);
         chainBlends[t] = std::move (stage);
@@ -2192,6 +2205,8 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
 {
     lastPreGain.fill (std::numeric_limits<float>::quiet_NaN());
     lowLatencySkipped.assign ((std::size_t) maxMixerTracks * maxEffectSlots, 0);
+    goalGlideAmount.assign ((std::size_t) maxMixerTracks * maxEffectSlots, std::numeric_limits<float>::quiet_NaN());
+    goalGlideEffect.assign ((std::size_t) maxMixerTracks * maxEffectSlots, nullptr);
     automationValues.fill (std::numeric_limits<float>::quiet_NaN());
     lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
@@ -2952,6 +2967,39 @@ void RackRenderer::connect (const RackState& state, const SlotConnections& c, Ef
         effect.setSidechain (sounding (c.sideSource) ? trackBuffer (c.sideSource, 0) : nullptr, sounding (c.sideSource) ? trackBuffer (c.sideSource, 1) : nullptr);
 }
 
+void RackRenderer::runGoalSlot (const EffectSlot& slot, Effect& effect, std::size_t key, float* l, float* r, int n, const EffectParams& params,
+                                double bpm) noexcept
+{
+    if (slot.goal == 0 || key >= goalGlideAmount.size())
+    {
+        effect.process (l, r, n, params, bpm);
+        return;
+    }
+    // round 190dg: a one-knob slot whose knob moved since the last block, on the same effect: the knob glides from where
+    // it was to where it is now over this block, in short steps (every parameter the knob drives follows it; the rest
+    // are the slot's as they are)
+    const auto from = goalGlideAmount[key];
+    const bool same = goalGlideEffect[key] == &effect;
+    goalGlideEffect[key] = &effect;
+    if (! same || ! std::isfinite (from) || from == slot.goalAmount || ! goals::active (slot))
+    {
+        goalGlideAmount[key] = slot.goalAmount;
+        effect.process (l, r, n, params, bpm);
+        return;
+    }
+    // (at most the whole range in fullTurnSeconds: a jump becomes a glide over the next blocks)
+    const auto most = (float) (n / (fullTurnSeconds * sampleRate));
+    const auto to = std::abs (slot.goalAmount - from) <= most ? slot.goalAmount : from + std::copysign (most, slot.goalAmount - from);
+    goalGlideAmount[key] = to;
+    auto moving = params; // (a copy on the stack, no allocation)
+    for (int at = 0; at < n; at += goalGlideStep)
+    {
+        const auto m = std::min (goalGlideStep, n - at);
+        goals::writeParams (slot.goal, from + (to - from) * (float) (at + m) / (float) n, moving);
+        effect.process (l + at, r + at, m, moving, bpm);
+    }
+}
+
 void RackRenderer::runEffects (const RackState& state, int track, int n) noexcept
 {
     if (track >= (int) state.effects.size())
@@ -3173,7 +3221,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             setSidechain (state, slots[i], *effects[i], track);
             if (connections != nullptr)
                 connect (state, *connections, *effects[i], track, l, r);
-            timed (key, [&] { effects[i]->process (l, r, n, params, bpm); });
+            timed (key, [&] { runGoalSlot (slots[i], *effects[i], key, l, r, n, params, bpm); });
         }
         else
         {
@@ -3184,7 +3232,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             if (connections != nullptr)
                 connect (state, *connections, *effects[i], track, l, r);
             const auto& shown = overrideParams != nullptr && track == overrideTrack && (int) i == overrideSlot ? *overrideParams : slots[i].params;
-            timed (key, [&] { effects[i]->process (l, r, n, shown, bpm); });
+            timed (key, [&] { runGoalSlot (slots[i], *effects[i], key, l, r, n, shown, bpm); });
         }
 
         // an effect that output NaN / inf (an unstable setting): this block of it is muted and its state reset, so the
@@ -3246,10 +3294,30 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         if (blend->delay != nullptr)
             blend->delay->process (dl, dr, n);
         const auto wet = std::clamp (state.song.mixer[(std::size_t) track].chainBlend, 0.0f, 1.0f);
-        for (int k = 0; k < n; ++k)
+        const auto from = blend->lastWet.load (std::memory_order_relaxed);
+        // round 190dg: a moved Blend ramps (a step of a dry / wet mix clicks), at most the whole range in
+        // fullTurnSeconds, and only once a new stage's dry path is filled
+        auto to = from;
+        if (blend->warmup > 0)
+            blend->warmup -= n;
+        else
+            to = from + std::clamp (wet - from, -(float) (n / (fullTurnSeconds * sampleRate)), (float) (n / (fullTurnSeconds * sampleRate)));
+        if (from == to || n <= 0)
+            for (int k = 0; k < n; ++k)
+            {
+                l[k] = dl[k] + (l[k] - dl[k]) * to;
+                r[k] = dr[k] + (r[k] - dr[k]) * to;
+            }
+        else
         {
-            l[k] = dl[k] + (l[k] - dl[k]) * wet;
-            r[k] = dr[k] + (r[k] - dr[k]) * wet;
+            const auto step = (to - from) / (float) n;
+            for (int k = 0; k < n; ++k)
+            {
+                const auto w = from + step * (float) (k + 1);
+                l[k] = dl[k] + (l[k] - dl[k]) * w;
+                r[k] = dr[k] + (r[k] - dr[k]) * w;
+            }
+            blend->lastWet.store (std::abs (to - wet) < 1.0e-6f ? wet : to, std::memory_order_relaxed);
         }
     }
 }

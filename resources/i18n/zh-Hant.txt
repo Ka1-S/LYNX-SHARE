@@ -8926,6 +8926,7 @@ countries: tw hk mo
 "{0} (the sheet's last row) shows while the dancer is held with the mouse." = "{0}（表單的最後一列）在用滑鼠按住舞者時顯示。"
 "Show complete piano roll preview" = "顯示完整的鋼琴捲軸預覽"
 "Channel Rack: a channel's note preview shows the whole pattern even when the pattern is longer than the rack shows; off, it scrolls with the steps" = "通道機架：即使樣式比機架顯示的範圍長，通道的音符預覽也會顯示整個樣式；關閉時，預覽會隨步進一起捲動"
+
 # --- round 190by: Pocket SuperSaw and FL Studio Mobile's remaining effects
 "Pocket SuperSaw" = "Pocket SuperSaw"
 "Pocket SuperSaw — LYNX's engine for FL Studio Mobile's SuperSaw" = "Pocket SuperSaw — 用於 FL Studio Mobile 的 SuperSaw 的 LYNX 引擎"
@@ -9341,6 +9342,8 @@ countries: tw hk mo
 "Start from" = "開始於"
 "Opens as a new, untitled project." = "作為無標題的新專案開啟。"
 "The result is {0} from the reference's loudness. Match again to correct the level." = "結果與參考的響度相差 {0}。再次比對以校正電平。"
+"Match adds two Master effects, Facet EQ and Apex Limiter, with the preset name \"Reference match\". Open them to change any band or the level." = "比對會在 Master 上加入兩個效果器 Facet EQ 和 Apex Limiter，預設名稱為 \"Reference match\"。開啟它們即可變更任意頻段或電平。"
+
 # --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
 "Inc" = "Inc"
 "How to treat a note or button link" = "如何處理音符或按鈕連結"
@@ -9355,15 +9358,6 @@ countries: tw hk mo
 "Channel panning" = "通道聲像"
 "In: {0} out: {1}" = "輸入: {0} 輸出: {1}"
 "Note C0" = "音符 C0"
-"Clear all colours" = "清除所有顏色"
-"Presets of {0}" = "{0} 的預設"
-"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "變速標記：把音訊中的位置固定到節拍上，其間的音訊隨之拉伸（聲道的標記）。拖曳標記：其音訊移到另一拍；Shift + 拖曳：音訊在標記下滑動"
-"Show the audio in beats" = "按拍顯示音訊"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"
-"Match adds two Master effects, Facet EQ and Apex Limiter, with the preset name \"Reference match\". Open them to change any band or the level." = "比對會在 Master 上加入兩個效果器 Facet EQ 和 Apex Limiter，預設名稱為 \"Reference match\"。開啟它們即可變更任意頻段或電平。"
 "Flip horizontally" = "水平翻轉"
 "Key / scale" = "調 / 音階"
 "Scales" = "音階"
@@ -9383,3 +9377,20 @@ countries: tw hk mo
 
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 "New mixer track(s)" = "新增混音軌道"
+"Clear all colours" = "清除所有顏色"
+"Presets of {0}" = "{0} 的預設"
+"Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it" = "變速標記：把音訊中的位置固定到節拍上，其間的音訊隨之拉伸（聲道的標記）。拖曳標記：其音訊移到另一拍；Shift + 拖曳：音訊在標記下滑動"
+"Show the audio in beats" = "按拍顯示音訊"
+
+# --- Round 190dg: the Simple dock's installed plugins and favourite chain presets
+"Synths and samplers" = "合成器與取樣器"
+"My plugins" = "我的外掛"
+"The instrument plugins installed on this computer" = "這部電腦上安裝的樂器外掛"
+"No instrument plugins found yet. Scan for plugins in the Plugin manager." = "尚未找到樂器外掛。請在外掛管理器中掃描外掛。"
+"Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "按一下以將此外掛載入到音軌上並試聽（Ctrl+Z 可復原）"
+"Add \"{0}\" to favourites" = "將「{0}」新增到我的最愛"
+"Remove \"{0}\" from favourites" = "將「{0}」從我的最愛中移除"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"
