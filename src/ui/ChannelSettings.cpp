@@ -3,6 +3,7 @@
 #include "core/NoteNames.h"
 #include "ui/ChannelSettings.h"
 #include "core/FlControlMenus.h"
+#include "core/FlmDwSampler.h"
 #include "ui/FileChoosers.h"
 #include "ui/Icons.h"
 #include "ui/LayerEditor.h"
@@ -3480,6 +3481,7 @@ private:
         for (const auto& [slider, param] : tweakTargets)
             if (slider != changed && std::find (automatedShown.begin(), automatedShown.end(), slider) != automatedShown.end())
                 keepSongValue (s, current()->sampler, param);
+        bool dropFlmVoice = false;
         {
             // an ADSR edited by hand replaces FL's imported volume envelope
             const auto& old = current()->sampler;
@@ -3489,6 +3491,7 @@ private:
             {
                 s.flVolumeEnvelope.clear();
                 s.flmPad.clear(); // and FL Studio Mobile's pad envelope (round 190bs)
+                dropFlmVoice = flmdw::isChannel (*current()); // and FL Studio Mobile's DW Sampler voice (round 190de)
             }
             // so does an edited envelope or filter for FL's whole sampler voice (REA_rodada76)
             if (adsr || moved (s.cutoff, old.cutoff) || moved (s.resonance, old.resonance) || s.filterType != old.filterType)
@@ -3498,8 +3501,10 @@ private:
             return;
 
         const auto before = current()->sampler;
-        ref.edit (engine, [s, cutChanged, index = ref.index] (ChannelDef& channelDef) {
+        ref.edit (engine, [s, cutChanged, dropFlmVoice, index = ref.index] (ChannelDef& channelDef) {
             channelDef.sampler = s;
+            if (dropFlmVoice) // (the Sampler's own voice from now on: the module's values go, its zones stay)
+                channelDef.modelParams.clear();
             if (cutChanged)
                 setChannelCutsItself (channelDef, index, s.cut);
         });

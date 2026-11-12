@@ -2,6 +2,7 @@
 // tests, field by field as the format page describes them; no file of Image-Line's or of a user is committed. Real
 // projects (FL's FLM demos, a user's share-zip) are imported only by the opt-in test at the end (LYNX_FLM_DIR).
 
+#include "core/FlmDwSampler.h"
 #include "core/FlmFormat.h"
 #include "core/FlmImport.h"
 #include "core/MiniSynth.h"
@@ -483,7 +484,7 @@ TEST (flm182c_imports_a_project)
         const auto clip = std::find_if (s.playlist.begin(), s.playlist.end(), [] (const Clip& c) { return c.kind == ClipKind::automation; });
         CHECK (clip != s.playlist.end() && clip->start == 8 * ppq && clip->length == 16 * ppq && clip->automation == 0);
     }
-    CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (one sample)") == 1);
+    CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (FLM's engine)") == 1); // (round 190de: FLM's own voice)
 
     // patterns: 808 content 1 and 2, the drum pattern, the lead's
     CHECK (s.patterns.size() == 4);
@@ -600,7 +601,7 @@ TEST (flm182c_real_projects)
         for (const auto& c : song->channels)
         {
             samplers += c.instrument == InstrumentKind::sampler && ! c.samplePath.empty();
-            directWaves += c.instrument == InstrumentKind::directwave;
+            directWaves += c.instrument == InstrumentKind::directwave || flmdw::isChannel (c);
         }
         std::printf ("  %s: %.1f ms, bpm %.3f %d/4, %zu inserts, %zu channels (%d samplers with a sample, %d DirectWave), %zu patterns (%d notes), "
                      "%zu clips (%d audio), end %.3f beats, %d samples missing, %zu dropped effects, %zu unsupported\n",
@@ -611,7 +612,8 @@ TEST (flm182c_real_projects)
 }
 
 // Opt-in (LYNX_FLM_RESOURCES = FL's "…/FL Studio Mobile/Installed"): a DW Sampler playing one of the DirectWave programs
-// FL ships there becomes LYNX's DirectWave with the program's zones (slice F3)
+// FL ships there plays the program's zones (slice F3; since round 190de on FLM's own DW Sampler voice, which reads the
+// program itself, core/FlmDwSampler.h)
 TEST (flm182c_directwave_program)
 {
     using namespace lynx;
@@ -637,8 +639,8 @@ TEST (flm182c_directwave_program)
     o.resourceRoot = resources;
     const auto song = importFlm (bytes, o);
     const auto* keys = song ? t::channelNamed (*song, "Keys") : nullptr;
-    CHECK (keys != nullptr && keys->instrument == InstrumentKind::directwave && keys->zones.size() > 1);
-    CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (DirectWave program)") == 1 && report.missingSamples == 0);
+    CHECK (keys != nullptr && keys->instrument == InstrumentKind::sampler && flmdw::isChannel (*keys) && keys->zones.size() > 1);
+    CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (multisample, FLM's engine)") == 1 && report.missingSamples == 0);
     if (keys != nullptr)
         std::printf ("  Electric.dwp: %zu zones, first %s\n", keys->zones.size(), keys->zones.empty() ? "-" : keys->zones[0].path.c_str());
 }

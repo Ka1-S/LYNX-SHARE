@@ -19,7 +19,7 @@
 //   below), a custom set looks upwards first.
 // - Randomizer (type 49): 1 Pitch (range = round(24v) semitones either way), 2 Velocity (± v), 3 Pan (± v of the
 //   whole width), 4 Gate (the chance a note plays; 0 = none).
-// Note Echo (47) and Arpeggiator (51) are not converted.
+// Note Echo (47) and Arpeggiator (51) act in time: see arpeggiate() and echo() below (round 190de).
 
 #include <cstdint>
 #include <span>
@@ -91,4 +91,22 @@ private:
     std::uint32_t state = 0x190B5u; // the draws repeat from import to import
     double uniform() noexcept;      // 0 ≤ x < 1
 };
+// --- round 190de (FLM_FORMAT §7.8): the note effects that act in time, baked on the rack's song timeline. A note in
+// song beats; pan 0…1.
+struct TimedNote
+{
+    double start = 0.0, end = 0.0;
+    int key = 60;
+    float velocity = 0.8f, pan = 0.5f;
+};
+// The Arpeggiator (type 51): both arps over the notes the rack receives (all of them, in song time from 0 at `bpm`,
+// `beatsPerBar` beats a bar); the input notes are replaced by what the arps play. `random` = a random mode was used
+// (LYNX draws with its own seed; FLM's draws change at every playback).
+std::vector<TimedNote> arpeggiate (std::span<const float> params, const std::vector<TimedNote>& in, double bpm, int beatsPerBar, bool& random);
+// Note Echo (type 47): the dry notes (a dry note still held at its first echo ends there) and their echoes.
+// `random` = Delay Rand. is above 0 (LYNX draws with its own seed).
+std::vector<TimedNote> echo (std::span<const float> params, const std::vector<TimedNote>& in, double bpm, bool& random);
+// The module does something to the notes: Note Echo with repetitions, an Arpeggiator (a module switched off passes
+// them; an Arpeggiator with both arps off is silent)
+bool timeEffectActive (std::uint32_t type, std::span<const float> params) noexcept;
 } // namespace lynx::flmnotefx

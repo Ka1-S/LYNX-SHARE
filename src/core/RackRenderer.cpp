@@ -8,6 +8,8 @@
 #include "core/SlicexInstrument.h"
 #include "core/TempoMap.h"
 #include "core/ModelParams.h"
+#include "core/FlmDwSampler.h"
+#include "core/FlmSlicer.h"
 #include "core/SamplePrecompute.h"
 #include "core/TimeStretch.h"
 #include "core/MetronomeVoice.h"
@@ -260,6 +262,28 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
     {
         const loadtrace::Scope timing ("rack_zoned");
         std::shared_ptr<Instrument> instrument = makeFpcInstrument (channel, samples);
+        instrument->prepare (sampleRate);
+        instrument->configure (channel, bpm);
+        return instrument;
+    }
+
+    // FL Studio Mobile's Slicer (round 190de, core/FlmSlicer.h): FLM's slices of the decoded sample, FLM's voice
+    if (kind == InstrumentKind::sampler && flmslicer::isChannel (channel))
+    {
+        std::shared_ptr<Instrument> instrument = flmslicer::makeInstrument (samples && ! channel.samplePath.empty() ? samples (channel.samplePath) : nullptr);
+        instrument->prepare (sampleRate);
+        instrument->configure (channel, bpm);
+        instrument->settleNew();
+        return instrument;
+    }
+
+    // FL Studio Mobile's DW Sampler (round 190de, core/FlmDwSampler.h): FLM's own voice on the channel's zones
+    if (kind == InstrumentKind::sampler && flmdw::isChannel (channel))
+    {
+        std::vector<flmdw::EngineZone> zones;
+        for (const auto& z : channel.zones)
+            zones.push_back ({ z, true, samples && ! z.path.empty() ? samples (z.path) : nullptr });
+        std::shared_ptr<Instrument> instrument = flmdw::makeInstrument (std::move (zones));
         instrument->prepare (sampleRate);
         instrument->configure (channel, bpm);
         return instrument;
@@ -1698,7 +1722,16 @@ void RackState::buildAutomationTables()
                                   || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::sampler && t.param >= 0
                                       && t.param < samplerparam::count)
                                   // the knobs of an FL engine kept in the channel's state (round 168n)
-                                  || modelparams::find (song.channels[(std::size_t) t.index].instrument, t.param) != nullptr))
+                                  || modelparams::find (song.channels[(std::size_t) t.index].instrument, t.param) != nullptr
+                                  // FL Studio Mobile's DW Sampler: its own 34 values (round 190de)
+                                  || (flmdw::isChannel (song.channels[(std::size_t) t.index]) && t.param >= flmdw::automationBase
+                                      && t.param < flmdw::automationBase + flmdw::paramCount)
+                                  || (flmslicer::isChannel (song.channels[(std::size_t) t.index]) && t.param >= flmslicer::automationBase
+                                      && t.param < flmslicer::automationBase + flmslicer::paramCount)
+                                  // FL Studio Mobile's GMSynth: its own 75 values P[k] (an imported .flm's lanes, round 190de)
+                                  || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::gms
+                                      && song.channels[(std::size_t) t.index].modelParams.size() == 1
+                                      && song.channels[(std::size_t) t.index].modelParams[0] == 1.0f && t.param >= 0 && t.param < 75)))
                     pluginParams.push_back ({ a, t.index, 0, 0, t.param });
                 else
                     used = false;

@@ -600,7 +600,10 @@ TEST (flm190bs_note_effects_and_key_ranges_on_import)
         // an effect, the instrument (keys 36…96), then the note effects: they still run before the instrument
         t::rack (flm::kindNormal, { flm182c::module (7, 5), t::moduleOf (1, 2, {}, 36, 96, {}, "/storage/emulated/0/Android/data/com.imageline.FLM/files/My Samples/808.wav"),
                                     t::moduleOf (48, 3, { 1.0f, 0.625f, 0.5f }), t::moduleOf (50, 4, scale),
-                                    t::moduleOf (51, 6, std::vector<float> (31, 1.0f)), t::moduleOf (47, 7, std::vector<float> (16, 0.0f)) }),
+                                    // (round 190de: the Arpeggiator switched off — an active one now bakes the rack's notes, see
+                                    // FlmImport190deTests.inc)
+                                    t::moduleOf (51, 6, [] { std::vector<float> v (31, 1.0f); v[0] = 0.0f; return v; }()),
+                                    t::moduleOf (47, 7, std::vector<float> (16, 0.0f)) }),
         t::rack (flm::kindNormal, {}, { t::sampleOf ({ "Kick", {} }) }),
         t::channel (flm::kindMaster, "MASTER", 0, {}),
         t::channel (flm::kindNormal, "Keys", 1, { t::lane (0, "Keys", { t::clip (0, 4, 4, 0, 1, notes) }) }),
@@ -624,8 +627,8 @@ TEST (flm190bs_note_effects_and_key_ranges_on_import)
     CHECK (report.converted.count ("FL Studio Mobile: Transpose (note effect)") == 1 && report.converted.count ("FL Studio Mobile: Scale (note effect)") == 1);
     CHECK (report.converted["FL Studio Mobile: notes a note effect holds back (silent in FLM too)"] == 1
            && report.converted["FL Studio Mobile: notes outside the instrument's key range (silent in FLM too)"] == 1);
-    // the Arpeggiator (on) is listed; the Note Echo is switched off: nothing to say
-    CHECK (report.droppedEffects.count ("FL Studio Mobile: Arpeggiator (note effect, not converted)") == 1
+    // the Arpeggiator and the Note Echo are switched off: nothing to say (round 190de: both are converted when on)
+    CHECK (report.droppedEffects.count ("FL Studio Mobile: Arpeggiator (note effect, not converted)") == 0
            && report.droppedEffects.count ("FL Studio Mobile: Note Echo (note effect, not converted)") == 0
            && report.droppedEffects.count ("FL Studio Mobile: Transpose") == 0 && report.droppedEffects.count ("FL Studio Mobile: Scale") == 0);
     CHECK (report.partialEffects.count ("FL Studio Mobile: an instrument placed after an effect in its rack (the effect processes it too)") == 1);

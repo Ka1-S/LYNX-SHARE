@@ -503,7 +503,7 @@ inside its key range (`ADD1`), so a rack with two generators is a layer or a key
 - **Randomizer**: Pitch = round(24v) semitones either way (a whole number, drawn evenly), Velocity ± v, Pan ± v of the
   whole width, Gate = the chance a note plays (0 = none). Defaults 0, 0, 0, 1: nothing. FLM draws at every playback;
   LYNX draws once at import (listed in the report).
-- **Note Echo** and **Arpeggiator** are not converted (listed in the report).
+- **Note Echo** and **Arpeggiator** act in time: §7.8 (round 190de).
 
 ### 7.3 SoundFont Player (round 190bs)
 
@@ -519,6 +519,150 @@ index follows the file's preset order is INFERRED; no sample project uses the mo
 
 LYNX imports it as LYNX Soundfont: the font and preset, the linear velocity curve, and for Custom the four overrides
 (decay and release as 2.5·T on LYNX's 100 dB time knobs). The level and the envelope's exact shape are approximations.
+
+### 7.4 The module wrapper on instruments; instrument and Pitch Bend automation (round 190de)
+
+PROVEN-REA 0x180799750 (the wrapper the rack's render 0x18059d3b0 calls for every module, generators included):
+- Enable (parameter 0) below 0.5, or Mix 0: the module's render is **not called** — a switched-off instrument makes
+  no sound and its voices stand still until it is switched on again.
+- Otherwise the module renders into its own buffer; the result × the Post Gain 10^(2g − 1) (40g − 20 dB) is mixed into
+  the rack's buffer at Mix, the wet side through the Wet Pan's balance (min(1, 2(1 − p)) left, min(1, 2p) right),
+  both smoothed per sample (one-pole 0.001). With Mix 1 and Wet Pan ½ the module renders straight into the rack's
+  buffer and the Post Gain then scales that whole buffer (what earlier modules and the drum slots put there too).
+- LYNX: a generator's channel is muted when its Enable is off; Post Gain × Mix is the channel's level (above 0 dB: the
+  sampler's gain, capped at 0 dB on other engines and listed); Wet Pan is added to the channel's pan. Exact for the
+  first generator of a rack without drum slots (its "dry" buffer is silent); with other sounds before it in the rack
+  a Mix below 1 would also lower them in FLM, which is listed. In FL's 20 sample projects: 3 generators switched off,
+  one Post Gain (−6 dB) and one Mix (0.045).
+
+Automation lanes on a generator's parameters (their names in §7.1, values the module's own 0…1): every FLM engine
+LYNX has keeps FLM's values, so a lane becomes LYNX automation of the same value — Pocket SuperSaw (FLM k → k − 1),
+MiniSynth's FLM build (FLM k → desktop k − 1; MW Dest folded as on import), GMSynth (FLM) (P[k]), Transistor Bass
+(the 13 knobs through the import's map). Enable lanes drive the channel's volume (on / silent): approximate, as
+FLM freezes the module's voices while LYNX's run on silently. The sample projects hold 19 such lanes: MiniSynth FLT
+Freq (9) and AMP Rel, SuperSaw Filter Cutoff, Transpose and Enable (2), GMSynth Transpose (2), DW Sampler Pitch (3).
+
+The rack's Pitch Bend (module 0, parameter 4; its held value and its lanes, PROVEN-REA 0x18059e0c0) is not one law:
+the rack hands b = 4v − 2 to every module's bend input and plays its drum slots at 2^b (±24 semitones). The modules
+bend by their own range: DW Sampler b/2 × its PB Range (CSTM `MIDI`, default 4; PROVEN-REA 0x18077f560), SuperSaw b/2 ×
+int(11·P37 + 1), GMSynth b/2 × its CSTM range {1, 2, 7, 12}, MiniSynth b semitones (PROVEN-REA 0x1806aea20: stored as
+is and added to the note). LYNX: the channel's bend range is set to that range (24 on drum slots); a held value moves
+the channel's PITCH knob by (2v − 1) × range, a lane becomes LYNX pitch-bend automation of every such channel (LYNX
+bends by (2v − 1) × the range: the same semitones). Modules whose bend was not traced (Transistor Bass, 3x Osc,
+SoundFont Player) are listed. Three sample projects bend this way (one lane holds 114 clips). Aftertouch and MIDI CC
+lanes stay listed.
+
+### 7.5 DW Sampler (round 190de)
+
+PROVEN-REA (class CSmpSynth, vtable 0x180a0ecd8: CSTM reader 0x180785550, preset loader 0x180787410, note slot
+0x180783980, render 0x180783e90, voice 0x18078bf00 / 0x18078b3f0, filter update 0x18078c440, setter 0x180784a50);
+PROVEN-FILE on the 42 CSTM bodies and 56 parameter sets of FL's sample projects and the 6 shipped `.dwp`. LYNX's
+code: `core/FlmDwSampler.h` (FLM's own engine on a Sampler channel's zones).
+
+**CSTM** = `10WD` + chunks (unknown tags skipped): one `ZONE` per zone **or** one `PATh` / `PATH`, then `MIDI`.
+- `ZONE` (1065 bytes): 1024-byte path (root marker `@R@` / `@L@`, NUL, relative path; bytes after the next NUL are
+  stale and ignored — 13 sample bodies carry such text), then root key, key low, key high (128 in a default zone),
+  velocity low, velocity high (u8 each), f32 gain (used only above 0.0001 **and with Loop on**; old files hold the
+  integer 63 here, i.e. gain 1), f32 pan (not used), i32 loop mode (loops only from 2), i32 loop start, i32 loop end
+  (exclusive; start = end → the file's own loop), f32 attack, decay (only its sign: ≤ 0 = instant decay), sustain (not
+  used), release.
+- `PATh`: lp32 path + f32 Attack + f32 Release (they replace parameters 1 and 2 after the file loads); `PATH`: path only.
+  The file is a `.dwp` (FLM reads it itself: `DwPr`, version > 35, entries u32 id + u64 size; program id 1, zone id 3,
+  end id 2; zone entries 500 = root / ranges / gain / pan, 502 = the sample's path, 503 = frames, channels, bits, rate,
+  loop mode / start / end, 509 = A / D / S / R; after loading, Attack / Release = the last zone's) or a single sample
+  (one zone: root 48, every key and velocity, looping on the file's own loop).
+- `MIDI`: [PB Range in semitones (default 4), smooth attack (default 1: an Attack of 0 still takes 1 ms)].
+
+**Parameters** (v = stored 0…1; float32 where it matters): 1 Attack, 2 Release, 5 Decay: T = 10·v⁴ + 0.001 s, fixed
+at the note's start; 3 Pitch = int(48v − 24) semitones (it also moves the key a zone is chosen with); 4 Fine Tune =
+2v − 1 semitones; 6 Sustain = the envelope's level; 7 Slide: glide time (v/2)³ s (none below 1e-5), re-planned every
+render call; 8 Reverse (no loop); 9 Loop (zone loops and zone gains); 10 Legato; 11 Mono (last-note priority, glides
+without retrigger); 12 Cutoff c, 13 Resonance (ladder feedback v, biquad Q = 16v³ + 0.5), 14 Kbd. Track, 15 Vel. Track
+(adds v × velocity to c); 16 Filter type = int(3v): off, 4-pole ladder low-pass, band-pass, high-pass (the corpus value
+0x3EAAAAAB is the ladder only in float32); 17…21 / 22…26 filter / pitch envelope attack, decay, sustain, release,
+amount; 27 LFO shape int(3v + 0.5): sine, falling saw, square, sample-and-hold; 28 rate 1 / ((1 − v)³·30 + 1/30) Hz;
+29 mode int(2v): free, one shot, tempo sync ({1/8 … 32} beats by 30, aligned to the song position); 31 amount ±(2v −
+1)²; 32 destination int(3v): cutoff, pitch, volume, pan; 33 LFO fade-in.
+
+**Voice**: zone = the one whose key and velocity ranges hold key + Pitch and int(127·velocity + 0.5) (several: a
+seeded draw, never the same twice in a row on a key; none: no sound); rate = 2^((key − root)/12) × file rate / output
+rate × 2^((Fine Tune + Pitch + bend)/12) × glide × pitch envelope × LFO, linear interpolation at the file's own rate;
+the level is the velocity (× the zone's gain with Loop on), **linear**; the amp envelope is linear and heard **squared**
+(attack 0→1 in TA, decay 1→S in (1 − S)·TD, release from the level in level·TR); filter and pitch envelopes are
+one-pole segments (rate 0.0002 / ((0.95v + 0.05)⁴ × 500 for attacks, 50 otherwise), per sample whatever the rate, the
+attack aiming at 4 and clipped at 1); the pitch envelope bends 2^(4·(2v − 1)³·e³); cutoff = min(22 kHz,
+2^((key + glide − 48)·kbd/12 + 10.4c + 4 + (2·amount − 1)·8·e)), filters and LFO updated every 16 samples; note pan is
+a balance. 128 voices, no stealing. A voice ends past its sample's end, or silent after its attack.
+
+LYNX: the channel is a Sampler channel whose zones carry the files, ranges, gain and loops, and whose `modelParams`
+start with the engine's marker, the PB Range, the smooth flag, the 34 values, then one decay flag per zone; the rack
+plays FLM's voice on it (`core/FlmDwSampler.h`). The module's values are automatable (`automationBase` + k; FL's sample
+projects automate Pitch). Editing the Sampler's envelope by hand drops the module's values (LYNX's own voice).
+Approximate: the shared random generator is one per channel; the render call is LYNX's block cut to 512 samples (FLM
+plans its glides per host call); reverse starts on the last frame. Not read: the old `INST` preset format and audio
+embedded in a `.dwp` (no sample file uses either).
+
+### 7.6 Pitcher and Pitcher 2 (round 190de)
+
+PROVEN-REA (Pitcher: vtable 0x1809fd4c8, CSTM 0x1806359f0 / 0x180635aa0, target choice 0x1806347c0; Pitcher 2:
+vtable 0x1809e6ed0, engine setter 0x18072f7f0, note choice 0x18078ee90). Both correct the sung pitch towards the
+nearest of twelve allowed pitch classes. **Pitcher** (25): 1 Speed (a one-pole of τ = (3(1 − v)³ + 0.001) / 8.82 s,
+instant from 0.99), 2 Pitch (int(24(v − ½)) semitones), 3 Fine Tune (int(100(v − ½)) cents), 4 formant mode, 5 formant
+shift 2^(2v − 1), 6 detector input (left, sum, right), 7 Base Freq (A4 = 440·2^((2v − 1)/12)), 8 Stability, 9 Mix,
+10…21 per-note bypass (on at 1), 22 bypass snapping; CSTM = 12 mask bytes (C…B) + Key and Scale menu floats (the mask
+is what plays; its "Pentatonic" holds four notes). **Pitcher 2** (45): 1…12 the notes (default C minor), 13 Speed (four
+one-poles at (200^v − 0.9)·2.29896 Hz), 16 Formant Mode (inverted), 17 formant ratio, 18 detector input (labels rotated
+against the engine), 19 Stability, 20 Humanization, 22 Mix, 23 Sensitivity, 24 Vibrato, 25 low latency; 14, 15 unused;
+CSTM = Key and Scale menu floats only.
+
+LYNX: LYNX Tune with Scale = Custom and the same twelve note switches (exact), the retune time from the Speed law
+(Pitcher: the same one-pole; Pitcher 2: matched at its half-way time), transpose, mix, formant preserve / shift
+(wide range), per-note bypass, bypass snapping (correction 0), the reference pitch from Base Freq and the fine tune
+(430…450 Hz), Pitcher 2's Stability as LYNX's tolerance. Approximate and listed: the detectors and shifters (LYNX's
+own), Pitcher's Stability, Pitcher 2's Humanization and Vibrato. No shipped file uses either module.
+
+### 7.7 Slicer (round 190de)
+
+PROVEN-REA (class CSynthSlicer: setter 0x1807d54f0, CSTM 0x1807d6540 / 0x1807d5f40, detector 0x180591160 /
+0x1805915d0, voice 0x1807d6e60 / 0x1807d4ec0). Parameters: 1 PITCH int(48v − 24), 3 ATTACK and 4 DECAY (the drum
+pad's laws, §6.1; DECAY above 0.99 holds), 5 SUST int(2v): one-shot slice / to the sample's end while held / to the
+end, 6 MONO (a note fades the others at 0.01). CSTM: `SENS` (f32 sensitivity, 0 = the file's markers; u8 editor
+flag) and `PATH` (u32 n + path). Slicing: the left channel normalised, three float passes of a gentle high-pass,
+128-point frames every 16 samples with a periodic Hamming window, power in bins 1…5 and 6…63, per band a hold (55 / 41
+frames), release (0.9761 / 0.9644) and a rise above the held level (× 0.9 / 1.0, floor 1e-10 / 1.8 or 20), the
+strength × sensitivity; an onset where it reaches 1, started at the earliest frame of the last 28 above 0.75 and then
+at the first sample louder than 5 % of the peak, at least 60 ms apart, at most 128. Slice i plays on the saved low key
++ i (FLM saves the key range it gave the slices). Voice: linear interpolation, linear velocity and balance, every note
+its own voice, a 512-sample dip before the slice's end, a fade at 0.01 per sample at the end point.
+
+LYNX: a Sampler channel with the sample and `modelParams` = { marker, sensitivity, first key, the 7 values }; the rack
+slices the decoded sample and plays FLM's voice (`core/FlmSlicer.h`). The shipped break (`Parrik - Initiated`) slices
+at 0.25 into the 11 starts FLM saved (also the starts at 0.05, 0.5 and 1.0 of round 190de's simulation, to the frame).
+
+### 7.8 Arpeggiator and Note Echo (round 190de)
+
+PROVEN-REA (Arpeggiator: vtable 0x1809e5c50, engine 0x18044a2c0, sequence builder 0x18044b610, grid 0x18044d510;
+Note Echo: vtable 0x1809e69b0, scheduler 0x18045ffc0, emit 0x180460380). Both run on the rack's notes before its
+instruments, in the rack's order with the other note effects (§7.2), and both act **in time**:
+- **Arpeggiator** (51): two independent arps fed the same notes, which they replace. Global: 1 Rate (1/16 … 1/2, or
+  one bar), 2 Rate in ms (50 + 950v, Sync off), 3 Sync, 4 Swing, 5 swing rate (1/8, 1/16), 6 Latch, 7 / 8 the arps'
+  velocity (× 2v). Per arp (arp 1 at 9…15, 31, 17…19; arp 2 at 20…26, 32, 28…30): Gate 0.1 + 0.9v, Arp = one of 24
+  modes (As Played, Chord, Up, Down, Up-Down, Down-Up, Outward, Inward, Anchor, Bass Up, Bass Up-Down, Treble Down,
+  Treble Down-Up, Jump Up, Jump Down, Jump Up-Down, SuperSaw, Cascade Up / Down / Up-Down, Random, Random No Repeat,
+  Random Once, Random Walk), Range 1…4 octaves, Octave shift ±3, Start note ±8, Rhythm (21 patterns) and Rotate, a
+  rate multiplier ×1/8…×8 (31-value files keep it at 16 / 27 in 11 steps), Repeats, Retrig (notes, 1/8 … 8 bars),
+  Enable. Steps sit on multiples of the step from song position 0; a chord plays from the next grid point; releasing
+  every key ends the arp's notes.
+- **Note Echo** (47): the dry notes pass; up to 32 echoes, the first after D (beats: 1/32 + 7.96875v², or the nearest of
+  1/8 … 8 with Sync), the next gaps D·d², D·d³… (Time Drift d = 0.7…1.3), each echo + Pitch semitones and × Velocity,
+  the first with the offsets, pan drift and ping-pong, lengths × Length Drift (capped by the gaps); the chain stops at
+  velocity ≤ 1/127 or a length under 1/128 beat; a dry note still held at its first echo ends there.
+
+LYNX bakes them: a rack with an active Arpeggiator or Note Echo takes its notes from every note lane as the song plays
+them, runs the rack's note effects in order and writes one pattern over the song, on its first note lane's row.
+Exact for every mode but the random ones (Random… and Delay Rand.: one seeded draw, listed) and up to FLM's audio-block
+jitter. Left out: slide notes and note repeats in such a rack, the same-key rules of Note Echo (an echo under a held
+dry note of its key), the editor's Stop.
 
 ## 8. Relation to FLM-exported .flp (issue #88)
 
@@ -541,13 +685,13 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
    Round 188h added MultiFX, Trance Delay, Distortion, both Limiters, Leveller, Gate and Tape Delay (the Pocket
    engines) and proved how the module wrapper applies Mix (linear dry/wet), Post Gain (40g − 20 dB on the output) and
    Wet Pan (a balance of the wet). Left: Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor, Spreader,
-   Stereoizer, Flanger, Autoduck (29), Tremolo, Note Echo and the Arpeggiator (Transpose, Scale and Randomizer:
-   round 190bs, §7.2).
+   Stereoizer, Flanger, Autoduck (29), Tremolo (Transpose, Scale and Randomizer: round 190bs, §7.2; Note Echo and the
+   Arpeggiator: round 190de, §7.8).
    Round 190by: SuperSaw (Pocket SuperSaw), Comb Filter, Multiband Compressor and Tape Stop are LYNX engines; Reverb
    (32) maps to Reeverb 2 and Tuned EQ (30) to the Parametric EQ (REA_rodada190by.md). Parameter counts read in the
    code: 30 = 11, 32 = 16 (14 and 15 are unnamed wet and dry levels), 42 = 8.
 5. HEAD 272/280 (loop range).
 6. (round 190bs) The sample slot: the third `MAIN` tail field (f32 0.5) and `LINk`'s second word; where a slot with
    an output link plays; the stretch modes' algorithms (LYNX uses its own stretcher); how a kit sample's legacy `STRC`
-   stretch sounds (two samples of one demo song; LYNX plays them as recorded and says so); the module's octave shift
+   stretch sounds (two samples of one demo song; since round 190de LYNX stretches them with its own stretcher); the module's octave shift
    and the second dispatch switch next to the key range (0x420 / 0x42c in the module object: not found in the file).
