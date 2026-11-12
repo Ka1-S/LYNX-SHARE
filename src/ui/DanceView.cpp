@@ -1484,6 +1484,31 @@ juce::String danceWindowSelfTest (juce::String* detail)
             saveSettings (engine, channel, s, false);
             engine.dispatchPendingMessages();
         };
+        // the mouse (asked as the system asks the window): Solid on, the body takes it and the rest of the window lets
+        // it through; Solid off, the whole dancer lets it through
+        {
+            arrange (1.0f, { 108, 31 }, { 0.5f, 0.7f });
+            stage.update();
+            frame();
+            const auto origin = nativechild::nativeRectInParent (*w).getPosition(); // (zoom 100 %: the stage's units)
+            const auto body = stage.bodyOf (channel).getCentre() - origin;
+            const auto onBody = nativechild::hitCodeAt (*w, body);
+            const auto beside = nativechild::hitCodeAt (*w, { 1, 1 });
+            auto s = dance::Settings();
+            s.scale = 0.6f;
+            s.x = juce::roundToInt ((float) stage.getWidth() * 0.5f);
+            s.y = juce::roundToInt ((float) stage.getHeight() * 0.7f);
+            s.solid = false;
+            saveSettings (engine, channel, s, false);
+            engine.dispatchPendingMessages();
+            stage.update();
+            const auto notSolid = nativechild::hitCodeAt (*w, body);
+            log << "hit test: body " << onBody << ", corner " << beside << ", body with Solid off " << notSolid << "; ";
+            if (onBody != 1)
+                fail ("the dancer's body does not take the mouse (hit code " + juce::String (onBody) + ")");
+            else if (beside != -1 || notSolid != -1)
+                fail ("clicks do not go through the dancer's window (corner " + juce::String (beside) + ", Solid off " + juce::String (notSolid) + ")");
+        }
         const auto frames = 40;
         for (int e = engines.size(); --e >= 0;) // (JUCE 8: the last one is Direct2D, 0 the software renderer)
         {

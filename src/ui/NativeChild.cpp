@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <vector>
 
 #if JUCE_WINDOWS
@@ -240,6 +241,61 @@ private:
     juce::Image backdrop;
 };
 
+#if JUCE_WINDOWS
+// Round 190cj: a transparent child window (a dancer) takes the mouse wherever its picture is not fully transparent:
+// the system decides that from the pixels, before JUCE's hitTest is asked, and a click JUCE then finds no component
+// for is simply lost. So the window answers the system's own hit test: where the component's hitTest says no (FL's
+// "Solid" off, the dancer's arms and reflection) it is "transparent", and the click goes to the window under it.
+struct ClickThrough
+{
+    WNDPROC original = nullptr;
+    juce::Component::SafePointer<juce::Component> component;
+};
+
+std::map<HWND, ClickThrough>& clickThroughWindows()
+{
+    static std::map<HWND, ClickThrough> windows;
+    return windows;
+}
+
+LRESULT CALLBACK clickThroughProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    auto& windows = clickThroughWindows();
+    const auto it = windows.find (hwnd);
+    if (it == windows.end())
+        return DefWindowProc (hwnd, message, wParam, lParam);
+    const auto original = it->second.original;
+    if (message == WM_NCHITTEST)
+    {
+        if (auto* c = it->second.component.getComponent())
+            if (auto* peer = c->getPeer())
+            {
+                POINT p { (int) (short) LOWORD (lParam), (int) (short) HIWORD (lParam) };
+                ScreenToClient (hwnd, &p);
+                const auto scale = juce::jmax (0.01, peer->getPlatformScaleFactor() * (double) c->getDesktopScaleFactor());
+                if (! c->hitTest (juce::roundToInt (std::floor (p.x / scale)), juce::roundToInt (std::floor (p.y / scale))))
+                    return HTTRANSPARENT;
+            }
+    }
+    else if (message == WM_NCDESTROY)
+    {
+        SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR) original);
+        windows.erase (it);
+    }
+    return CallWindowProc (original, hwnd, message, wParam, lParam);
+}
+
+void passMissedClicksThrough (juce::Component& c)
+{
+    auto* hwnd = static_cast<HWND> (c.getWindowHandle());
+    if (hwnd == nullptr || clickThroughWindows().count (hwnd) != 0)
+        return;
+    auto& entry = clickThroughWindows()[hwnd];
+    entry.component = &c;
+    entry.original = (WNDPROC) SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR) clickThroughProc);
+}
+#endif
+
 struct KeyForwarder final : juce::KeyListener
 {
     bool keyPressed (const juce::KeyPress& key, juce::Component*) override { return runSecondaryWindowKey (key); }
@@ -270,6 +326,10 @@ bool attach (juce::Component& c, juce::Component& area)
     c.addToDesktop (0, handle);
     c.getProperties().set ("lynxNativeChild", true);
     c.getProperties().set ("lynxNativeParent", (juce::int64) (juce::pointer_sized_int) handle);
+   #if JUCE_WINDOWS
+    if (! c.isOpaque()) // (a floater: per-pixel transparency)
+        passMissedClicksThrough (c);
+   #endif
     place (c, area, bounds);
     return true;
 }
@@ -585,6 +645,23 @@ void* windowAt (const juce::Component& c, juce::Point<int> localPoint)
    #else
     juce::ignoreUnused (c, localPoint);
     return nullptr;
+   #endif
+}
+
+int hitCodeAt (const juce::Component& c, juce::Point<int> localPoint)
+{
+   #if JUCE_WINDOWS
+    auto* peer = c.getPeer();
+    auto* hwnd = peer != nullptr ? static_cast<HWND> (peer->getNativeHandle()) : nullptr;
+    if (hwnd == nullptr)
+        return 0;
+    const auto scale = peer->getPlatformScaleFactor() * (double) c.getDesktopScaleFactor();
+    POINT p { juce::roundToInt ((localPoint.x + 0.5) * scale), juce::roundToInt ((localPoint.y + 0.5) * scale) };
+    ClientToScreen (hwnd, &p);
+    return (int) SendMessage (hwnd, WM_NCHITTEST, 0, MAKELPARAM (p.x, p.y));
+   #else
+    juce::ignoreUnused (c, localPoint);
+    return 0;
    #endif
 }
 

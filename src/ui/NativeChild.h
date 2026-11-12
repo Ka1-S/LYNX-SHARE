@@ -63,6 +63,8 @@ void raiseOverlays();
 // transparency (a component that is not opaque becomes a layered child window on Windows, a transparent subview on
 // macOS) that stay in front of the native panels and docked plugin windows, under the overlays. Clicks on their
 // transparent pixels reach the window under them. raiseOverlays raises the floaters first, then the overlays.
+// On Windows that holds for every point the component's hitTest refuses, opaque pixels too (round 190cj: the dancer
+// with FL's "Solid" off, its arms and its reflection): the system asks the window, which answers "transparent" there.
 // Elsewhere (Linux: X11 child windows are drawn without blending) supportsFloaters() is false and the caller keeps
 // drawing in the main window's components.
 bool supportsFloaters();
@@ -96,4 +98,8 @@ void* ownerOf (void* window);
 // window's transparent pixels let it through), and whether a native window is layered (per-pixel transparency).
 void* windowAt (const juce::Component& c, juce::Point<int> localPoint);
 bool isLayered (void* window);
+// Tests (Windows; elsewhere 0): the system's hit test of the component's own native window at its local point: 1
+// (HTCLIENT) = the window takes the mouse there, -1 (HTTRANSPARENT) = the click goes to the window under it. (Round
+// 190cj: an attached component that is not opaque answers "transparent" wherever its hitTest says no.)
+int hitCodeAt (const juce::Component& c, juce::Point<int> localPoint);
 } // namespace lynx::nativechild
