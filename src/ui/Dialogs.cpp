@@ -1,5 +1,6 @@
 #include "ui/Dialogs.h"
 
+#include <cmath>
 #include <functional>
 
 #include <set>
@@ -137,15 +138,32 @@ private:
     ui::ColourPicker picker { juce::Colours::grey, true };
 };
 
-// One big choice of the record dialog: a title line and a note below it.
+// One big choice of the record dialog: a title line and a note below it. The note is never cut (round 190cj: the
+// Russian notes ended in "..."): the dialog gives every choice the width its texts need, up to `maxWidth`, and a
+// note longer than that goes on as many lines as it takes (the choice grows).
 class RecordChoiceButton final : public juce::Button
 {
 public:
+    static constexpr int minWidth = 380, maxWidth = 620, pad = 12;
+
     RecordChoiceButton (const juce::String& title, const juce::String& note)
         : juce::Button ({}), noteText (note) // (no component name: the alert window would print it above)
     {
         setButtonText (title);
-        setSize (380, 46);
+        fit (minWidth);
+    }
+
+    // the width at which neither text is cut nor wrapped
+    int wantedWidth() const
+    {
+        using namespace theme;
+        return 2 * pad + 4 + juce::jmax (juce::GlyphArrangement::getStringWidthInt (font (type::body, true), getButtonText()),
+                                         juce::GlyphArrangement::getStringWidthInt (font (type::small), noteText));
+    }
+
+    void fit (int width)
+    {
+        setSize (width, 24 + noteHeight (width) + 6);
     }
 
     void paintButton (juce::Graphics& g, bool over, bool down) override
@@ -158,13 +176,24 @@ public:
         g.drawRoundedRectangle (r.reduced (0.5f), radius::md, 1.0f);
         g.setColour (colour::textPrimary);
         g.setFont (font (type::body, true));
-        g.drawText (getButtonText(), getLocalBounds().reduced (12, 0).withTrimmedTop (5).withHeight (18), juce::Justification::centredLeft, true);
-        g.setColour (colour::textSecondary);
-        g.setFont (font (type::small));
-        g.drawText (noteText, getLocalBounds().reduced (12, 0).withTrimmedTop (24).withHeight (16), juce::Justification::centredLeft, true);
+        g.drawText (getButtonText(), getLocalBounds().reduced (pad, 0).withTrimmedTop (5).withHeight (18), juce::Justification::centredLeft, true);
+        noteLayout (getWidth()).draw (g, getLocalBounds().reduced (pad, 0).withTrimmedTop (24).toFloat());
     }
 
 private:
+    juce::TextLayout noteLayout (int width) const
+    {
+        juce::AttributedString text;
+        text.append (noteText, theme::font (theme::type::small), theme::colour::textSecondary);
+        text.setWordWrap (juce::AttributedString::byWord);
+        text.setJustification (juce::Justification::topLeft);
+        juce::TextLayout layout;
+        layout.createLayout (text, (float) juce::jmax (40, width - 2 * pad));
+        return layout;
+    }
+
+    int noteHeight (int width) const { return juce::jmax (16, (int) std::ceil (noteLayout (width).getHeight())); }
+
     juce::String noteText;
 };
 
@@ -174,15 +203,22 @@ public:
     RecordChoiceWindow()
         : juce::AlertWindow (tr ("Recording"), tr ("What would you like to record?"), juce::MessageBoxIconType::NoIcon)
     {
+        dontAsk.setButtonText (tr ("Don't ask again (right-click the record button for the recording filter)"));
+        // as wide as the longest text needs (round 190cj), within the choices' limits; longer notes wrap
+        auto width = juce::jmax ((int) RecordChoiceButton::minWidth,
+                                 juce::GlyphArrangement::getStringWidthInt (getLookAndFeel().getAlertWindowMessageFont(), dontAsk.getButtonText()) + 44);
+        for (auto* b : { &audio, &notes, &everything, &editor })
+            width = juce::jmax (width, b->wantedWidth());
+        width = juce::jmin ((int) RecordChoiceButton::maxWidth, width);
         int result = recordChoiceAudio;
         for (auto* b : { &audio, &notes, &everything, &editor })
         {
+            b->fit (width);
             b->onClick = [this, result] { exitModalState (result); };
             addCustomComponent (b);
             ++result;
         }
-        dontAsk.setButtonText (tr ("Don't ask again (right-click the record button for the recording filter)"));
-        dontAsk.setSize (380, 24);
+        dontAsk.setSize (width, 24);
         addCustomComponent (&dontAsk);
         addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     }
