@@ -1820,6 +1820,16 @@ public:
             return;
         }
 
+        if (args.contains ("--trackmodeshot"))
+        {
+            // LYNX --trackmodeshot prefix: rollup 190cv (UI gate of PR #151) — Playlist track header › Track mode › Audio
+            // track, off-screen, in three states of FL's live check 190cu (q1-01 fresh, q1-02 one insert linked
+            // elsewhere and one renamed, q1-07 the full state), plus a report that compares each list with FL's
+            setApplicationReturnValue (runTrackModeShot (args[args.indexOf ("--trackmodeshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--curveshot"))
         {
             // LYNX.exe --curveshot prefix: round 190bw — an automation clip with one segment per FL curve mode in the
@@ -13791,6 +13801,89 @@ private:
     }
 
     // round 190bw: FL's 13 curve modes of an automation clip's points (see --curveshot)
+    bool runTrackModeShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        bool all = true;
+        juce::String report;
+        {
+            lynx::MainComponent ui (offline, false);
+            ui.setSize (1600, 900);
+            offline.dispatchPendingMessages();
+            auto& playlist = ui.getPlaylistForSnapshot();
+            // the track's menu, Track mode and Audio track side by side; the Audio track entries as FL writes them
+            // ("-" in front = greyed, "v" = ticked)
+            const auto shoot = [&] (int track, const juce::String& name, const juce::StringArray& fl) {
+                const auto menu = playlist.getTrackMenuForSnapshot (track);
+                juce::StringArray names { "Track " + juce::String (track + 1) };
+                std::vector<juce::PopupMenu> menus { menu };
+                for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                    if (it.getItem().subMenu != nullptr && it.getItem().text == lynx::theme::mnemonic (lynx::tr ("Track mode"), 'T'))
+                    {
+                        names.add (lynx::tr ("Track mode"));
+                        menus.push_back (*it.getItem().subMenu);
+                    }
+                if (menus.size() == 2)
+                    for (juce::PopupMenu::MenuItemIterator it (menus[1]); it.next();)
+                        if (it.getItem().subMenu != nullptr && it.getItem().text == lynx::theme::mnemonic (lynx::tr ("Audio track"), 'A'))
+                        {
+                            names.add (lynx::tr ("Audio track"));
+                            menus.push_back (*it.getItem().subMenu);
+                        }
+                juce::StringArray lynxList;
+                if (menus.size() == 3)
+                    for (juce::PopupMenu::MenuItemIterator it (menus[2]); it.next();)
+                        lynxList.add (it.getItem().isSeparator ? juce::String ("|")
+                                                               : (it.getItem().isTicked ? "v " : "") + juce::String (it.getItem().isEnabled ? "" : "- ") + it.getItem().text);
+                saveMenus (names, menus, prefix + "-" + name + ".png");
+                const auto same = menus.size() == 3 && lynxList == fl;
+                all = all && same;
+                report << name << ": " << (same ? "SAME AS FL" : "DIFFERENT") << "\n  LYNX: " << lynxList.joinIntoString (" / ")
+                       << "\n  FL:   " << fl.joinIntoString (" / ") << "\n";
+            };
+            const auto flList = [] (int inserts, std::map<int, juce::String> named, std::set<int> greyed) {
+                juce::StringArray l { "New mixer track(s)", "|" };
+                for (int i = 1; i <= inserts; ++i)
+                    l.add ((greyed.count (i) ? "- " : "") + juce::String (i) + ". " + (named.count (i) ? named[i] : "Insert " + juce::String (i)));
+                return l;
+            };
+            // q1-01: a fresh project, Track 1 unassigned
+            shoot (0, "fresh", flList (16, {}, {}));
+            // q1-02: Track 1 linked to insert 6, insert 7 renamed "Vox chain"; Track 2's menu
+            offline.editSong ([] (lynx::Song& s) {
+                lynx::trackmodes::assignAudioTracks (s, { 0 }, 6);
+                s.mixer[7].name = "Vox chain";
+            });
+            offline.dispatchPendingMessages();
+            shoot (1, "linked-renamed", flList (16, { { 7, "Vox chain" } }, { 6 }));
+            // q1-07: the rest of FL's session (live 190cu Q2): Track 3 → 7; Track 4 → New mixer track (17), insert 9
+            // renamed "Vox chain", Track 4 → 9; Track 5 "Lead" → 11, insert 12 "Vox chain", Track 5 → 12; Track 6 "Lead"
+            // (unassigned), insert 13 "Vox chain", Track 6 → 13. Track 7's menu
+            offline.editSong ([] (lynx::Song& s) {
+                namespace tm = lynx::trackmodes;
+                if (s.playlistTracks.size() < 8)
+                    s.playlistTracks.resize (8);
+                tm::assignAudioTracks (s, { 2 }, 7);
+                tm::assignAudioTracks (s, { 3 }, tm::newMixerTrack);
+                s.mixer[9].name = "Vox chain";
+                tm::assignAudioTracks (s, { 3 }, 9);
+                s.playlistTracks[4].name = "Lead";
+                tm::assignAudioTracks (s, { 4 }, 11);
+                s.mixer[12].name = "Vox chain";
+                tm::assignAudioTracks (s, { 4 }, 12);
+                s.playlistTracks[5].name = "Lead";
+                s.mixer[13].name = "Vox chain";
+                tm::assignAudioTracks (s, { 5 }, 13);
+            });
+            offline.dispatchPendingMessages();
+            shoot (6, "full-state", flList (17, { { 7, "Vox chain" }, { 9, "Insert 17" }, { 12, "Lead" }, { 13, "Vox chain" } }, { 6, 7, 9, 12, 13 }));
+        }
+        report << (all ? "ALL SAME AS FL\n" : "FAILURES\n");
+        juce::File (prefix + "-report.txt").replaceWithText (report);
+        return all;
+    }
+
     void runCurveShot (const juce::String& prefix)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
