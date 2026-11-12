@@ -74,6 +74,10 @@ const Table reverb2Table { { { -361, 0, 0 }, { 19, 3000, 75 }, { 5, 221, 40 }, {
 constexpr int idControl (int id) noexcept { return id == 10 ? dry : id == 11 ? early : id == 12 ? wet : id == 13 ? separation : id; }
 constexpr int idModAmount = 18, idModSpeed = 19;
 
+// a room length × one of FLM's line / tap constants / 20000, in 64 bits: at device rates above ~480 kHz the 32-bit product
+// wrapped (round 190eb: issue134's 768 kHz run read before a line's start); the same values below that
+constexpr int scaled (int room, int n) noexcept { return (int) ((long long) room * n / 20000); }
+
 // FLM's integer control from a 0…1 value: ⌊(hi − lo)·v + lo + ½⌋ in single precision
 int control (const Range& r, float v) noexcept
 {
@@ -97,7 +101,7 @@ public:
         fsI = (int) fsD;
         const int maxRoom = (115 * fsI) / 115;
         for (int k = 0; k < 12; ++k)
-            line[(std::size_t) k].assign ((std::size_t) std::max (1, maxRoom * lineN[k] / 20000), 0.0f);
+            line[(std::size_t) k].assign ((std::size_t) std::max (1, scaled (maxRoom, lineN[k])), 0.0f);
         pre.assign ((std::size_t) std::max (1, (int) ((long long) fsI * (long long) table[predelay].hi / 1000)) + 1, 0.0f);
         int need = (int) (0.316 * fsD) + 2, size = 1;
         while (size < need)
@@ -183,17 +187,17 @@ private:
         }
         else
             cHc = 1.0f;
-        preLen = std::clamp (fsI * ctl[predelay] / 1000, 1, (int) pre.size());
+        preLen = std::clamp ((int) ((long long) fsI * ctl[predelay] / 1000), 1, (int) pre.size());
         preP %= preLen;
 
         const int rs = ((ctl[room] + 15) * fsI) / 115;
         for (int k = 0; k < 12; ++k)
         {
-            L[(std::size_t) k] = std::clamp (rs * lineN[k] / 20000, 1, (int) line[(std::size_t) k].size());
+            L[(std::size_t) k] = std::clamp (scaled (rs, lineN[k]), 1, (int) line[(std::size_t) k].size());
             P[(std::size_t) k] %= L[(std::size_t) k];
         }
         for (int k = 0; k < 7; ++k)
-            tl[(std::size_t) k] = rs * tapLN[k] / 20000, tr[(std::size_t) k] = rs * tapRN[k] / 20000;
+            tl[(std::size_t) k] = scaled (rs, tapLN[k]), tr[(std::size_t) k] = scaled (rs, tapRN[k]);
         const float x8 = (float) (((ctl[room] + 3) * fsI) / 103);
         for (int k = 0; k < 8; ++k)
         {
