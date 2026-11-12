@@ -13,6 +13,7 @@
 #include "core/DirectWave.h"
 #include "core/FlSynths.h"
 #include "core/FlResampler.h"
+#include "core/FlSettings.h"
 #include "core/TimeStretch.h"
 #include "core/FlVoiceProcessor.h"
 #include "core/DrumSynthLive.h"
@@ -1647,7 +1648,8 @@ public:
     void prepare (double sr) noexcept override
     {
         sampleRate = sr;
-        quality = offlineRendering() ? flrs::renderQuality : flrs::liveQuality;
+        preparedOffline = offlineRendering();
+        quality = preparedOffline ? flrs::renderQuality : flsettings::options().interpolation.load (std::memory_order_relaxed);
         fadeStep = (float) (1.0 / (0.003 * sr)); // 3 ms
         updateModulation();
         allNotesOff();
@@ -1910,6 +1912,11 @@ public:
         }
         // the render quality is read at each note (round 160): the export engine prepares its instruments before it
         // switches to offline rendering, so a value taken in prepare() kept the playback quality in most exports
+        // ...and the playback quality too (round 190bx): FL's Settings › Audio › Mixer › "Resampling quality" applies to the
+        // notes played from then on (core/FlSettings.h; 24-point sinc unless changed)
+        // (an instrument prepared for an export keeps the export's quality, as before)
+        if (! preparedOffline)
+            quality = flsettings::options().interpolation.load (std::memory_order_relaxed);
         target->kernel.setQuality (offlineRendering() ? flrs::renderQuality : quality);
 
         // portamento (channel porta, inverted by the note): starts from the previous note's pitch
@@ -3146,6 +3153,7 @@ private:
     double lastFactor = 1.0; // the last shifted note's transposition (where its portamento starts)
     double bendMul = 1.0;    // the pitch wheel (pitchBend), audio thread
     int quality = flrs::liveQuality;        // FL's interpolation index (prepare)
+    bool preparedOffline = false;           // prepare() ran for an export: `quality` stays the export's
     std::array<float, 1024> tapL {}, tapR {}; // kernel taps gathered near the region edges and loops
     static constexpr int flBlock = 512;       // FL voices: longest segment rendered at once
     std::array<float, 2 * flBlock> flX {}, flY {};

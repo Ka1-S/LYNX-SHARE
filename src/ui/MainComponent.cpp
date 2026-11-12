@@ -7,6 +7,7 @@
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
 #include "core/EditorLimit.h"
+#include "core/FlSettings.h"
 #include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
 #include "core/NoteNames.h"
@@ -2373,6 +2374,10 @@ void MainComponent::loadUiSettings()
             engine.getTransport().metronomeSound.store (metronome::soundFromLegacy (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
         else if (key == "metronomeSoundFl") // FL's order: 0 Hi-hat, 1 Tick, 2 Beep, 3 Cowbell, 4 Pulse
             engine.getTransport().metronomeSound.store (metronome::clampSound (line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
+        // FL's Settings options of round 190bx (core/FlSettings.h: resampling quality, CPU switches, auto close...)
+        else if (flsettings::parse (key.toStdString(), line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString()))
+        {
+        }
         else if (key == "metronomeTrack")
             engine.getTransport().metronomeTrack.store (juce::jlimit (0, maxMixerTracks - 1, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
         else if (key == "playTruncatedOnTransport")
@@ -2562,6 +2567,7 @@ void MainComponent::saveUiSettings()
                                       + "\nmetronomeTrack=" + juce::String (engine.getTransport().metronomeTrack.load())
                                       + "\nplayTruncatedOnTransport=" + juce::String (engine.getTransport().playTruncatedOnTransport.load() ? 1 : 0)
                                       + "\nresetPluginsOnTransport=" + juce::String (engine.getTransport().resetPluginsOnTransport.load() ? 1 : 0)
+                                      + juce::String (flsettings::serialise())
                                       + "\npreviewVolume=" + juce::String (engine.getPreviewVolume(), 2)
                                       + "\npreviewInTime=" + juce::String (engine.isPreviewInTime() ? 1 : 0)
                                       + "\neditorVolume=" + juce::String (engine.getEditorVolume(), 2)
@@ -5085,6 +5091,35 @@ void MainComponent::readPluginDatabaseAgain()
         browser.pluginDatabaseChanged();
 }
 
+// FL's Settings › Audio › "Auto close" (round 190bx, core/FlSettings.h): the audio device is free for other programs
+// while LYNX is not in front and has no use for it; it opens again when LYNX comes back or needs it.
+void MainComponent::autoCloseDevice()
+{
+    if (! persistent)
+        return;
+    auto& devices = engine.getDeviceManager();
+    flsettings::DeviceUse use;
+    use.foreground = juce::Process::isForegroundProcess();
+    use.busy = engine.getTransport().playing.load() || engine.isRecording() || engine.isLiveRecording() || engine.isCountingIn()
+               || engine.isWaitingForInput() || engine.isAudioRecordingArmed() || engine.isBouncing() || engine.isPinging();
+    const auto open = devices.getCurrentAudioDevice() != nullptr;
+    switch (flsettings::autoCloseAction (flsettings::options().autoCloseDevice.load(), use, open, deviceClosedByAutoClose))
+    {
+        case flsettings::DeviceAction::close:
+            devices.closeAudioDevice();
+            deviceClosedByAutoClose = true;
+            break;
+        case flsettings::DeviceAction::reopen:
+            devices.restartLastAudioDevice();
+            deviceClosedByAutoClose = false;
+            break;
+        case flsettings::DeviceAction::none:
+            if (open)
+                deviceClosedByAutoClose = false; // (opened again by something else: the Settings page, a device change)
+            break;
+    }
+}
+
 void MainComponent::timerCallback()
 {
     const uitrace::Scope trace ("MainComponent timer", false);
@@ -5196,6 +5231,8 @@ void MainComponent::timerCallback()
         if (! all.empty())
             announceEditorCrash (all.back().plugin);
     }
+
+    autoCloseDevice();
 
     // back from another app (the file manager, perhaps: issue #104): the Plugin database folder is read again
     if (const auto foreground = juce::Process::isForegroundProcess(); foreground != wasForeground)

@@ -783,14 +783,16 @@ int repairChannels (Song& song)
     return changed;
 }
 
-void loadSampleInto (ChannelDef& channel, const std::string& path, const std::string& name)
+void loadSampleInto (ChannelDef& channel, const std::string& path, const std::string& name, bool autoName)
 {
     channel.samplePath = path;
     if (channel.instrument == InstrumentKind::granulizer || channel.instrument == InstrumentKind::wavetraveller)
         return; // FL's Granulizer keeps its engine and plays the file (round 142); so does Wave Traveller
     if (channel.instrument != InstrumentKind::audioClip)
         channel.instrument = InstrumentKind::sampler;
-    channel.name = name;
+    // FL's General › "Auto name channels" (round 190bx): off = a channel that has a name keeps it
+    if (autoName || channel.name.empty())
+        channel.name = name;
 }
 } // namespace lynx::audioclips
 

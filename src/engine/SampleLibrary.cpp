@@ -1,5 +1,6 @@
 #include "engine/FileSort.h"
 #include "engine/SampleLibrary.h"
+#include "core/FlSettings.h"
 #include "core/CacheBudget.h"
 #include "platform/Paths.h"
 
@@ -726,7 +727,8 @@ void readWavExtras (const juce::File& file, SampleData& data)
         return;
     const auto x = audioedit::decodeWavExtras (riff.data(), riff.size(), (std::int64_t) data.frames());
     data.markerStarts = x.markerStarts;
-    data.acidBeats = x.acidBeats;
+    // (FL's General › "Read sample tempo information", round 190bx: off = the tempo stored in the file is ignored)
+    data.acidBeats = flsettings::sampleTempoBeats (x.acidBeats);
 }
 } // namespace
 

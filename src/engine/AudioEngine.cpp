@@ -2,6 +2,7 @@
 #include "core/VideoPlayer.h"
 
 #include "core/Comping.h"
+#include "core/FlSettings.h"
 #include "core/LiveSession.h"
 
 #include "core/SessionIds.h"
@@ -2899,6 +2900,7 @@ void AudioEngine::setSong (Song newSong)
     sessionAfterOpen = false;
     song = std::move (newSong);
     workSince = (double) juce::Time::currentTimeMillis();
+    flsettings::forgetSolos(); // (round 190bx: a solo's remembered mute states belong to the project that had it)
     clipops::updateCrossfades (song);
     selectedChannel = 0;
     selectedChannels = { 0 };
@@ -5014,6 +5016,17 @@ double AudioEngine::workSecondsNow() const
 {
     const auto now = (double) juce::Time::currentTimeMillis();
     return song.info.workSeconds + (workSince > 0.0 && now > workSince ? (now - workSince) / 1000.0 : 0.0);
+}
+
+// FL's Project info › "Reset working time" (round 190bx; its handler stores "now" as the project's start and restarts
+// the clock, without a question): the project counts from this moment on. Not an undo step, as the clock itself.
+void AudioEngine::resetWorkTime()
+{
+    const auto now = (double) juce::Time::currentTimeMillis();
+    lynx::resetWorkTime (song.info, now / 1000.0);
+    workSince = now;
+    modified = true;
+    sendChangeMessage(); // (the Info page; nothing the audio thread plays changed)
 }
 
 void AudioEngine::markCreatedNow()

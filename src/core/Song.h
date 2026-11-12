@@ -2017,6 +2017,13 @@ struct ProjectInfo
     bool operator== (const ProjectInfo&) const = default;
 };
 
+// FL's Project info › "Reset working time" (round 190bx): the project starts counting now (`nowSeconds` since 1970, UTC).
+inline void resetWorkTime (ProjectInfo& info, double nowSeconds) noexcept
+{
+    info.created = nowSeconds;
+    info.workSeconds = 0.0;
+}
+
 // Online Sessions (docs/design/ONLINE_SESSIONS.md §2, round 168a): who works on a project. The host (the project's
 // owner) has tag 1; each friend the project is sent to gets the next tag, and the entities he creates carry it in
 // their uid (uids::tagOf), so "his area" needs no table. Inserts and Playlist rows are positional: each guest gets a

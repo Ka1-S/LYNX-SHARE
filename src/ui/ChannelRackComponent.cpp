@@ -1,3 +1,4 @@
+#include "core/FlSettings.h"
 #include "core/RackLayout.h"
 #include "core/RackFilter.h"
 #include "ui/FlMods.h"
@@ -1396,7 +1397,11 @@ void ChannelRackComponent::solo (int row)
 
     // only this channel plays (the channels with "Lock active/mute state" keep theirs); repeating on the soloed channel
     // unmutes them (FL's channel solo, REA_rodada167l §5)
-    engine.editSong ([row] (Song& s) { noteedit::soloChannel (s, row); });
+    // (round 190bx: FL's General › "Restore previous state after solo" — the un-solo then puts back the mute switches
+    // from before the solo; core/FlSettings.h)
+    engine.editSong ([row] (Song& s) {
+        noteedit::soloChannel (s, row, &flsettings::channelSoloMemory(), flsettings::options().restoreStateAfterSolo.load());
+    });
 }
 
 // --- channel editors ---------------------------------------------------------------------------
@@ -2901,7 +2906,7 @@ void ChannelRackComponent::assignSampleNow (int channel, const juce::File& file)
         if (isNew)
             c.mixerTrack = freeInsert;
         // (an audio clip channel stays one: as a Sampler its Playlist clips went silent, round 190ax)
-        audioclips::loadSampleInto (c, path, name);
+        audioclips::loadSampleInto (c, path, name, flsettings::options().autoNameChannels.load());
     });
 
     if (channel < 0)
