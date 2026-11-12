@@ -1,18 +1,26 @@
-/* A CLAP effect that crashes on purpose, for testing LYNX's crash protection (round 111):
- *   zig cc -shared -O2 -target x86_64-windows-gnu -Ithird_party/clap/include tools/testplugin/lynx_test_crash.c -luser32 -lgdi32 \
- *       -o "LYNX Test Crash.clap"
+/* A CLAP effect that crashes on purpose, for testing LYNX's crash protection (round 111; Linux / macOS: round 190dt):
+ *   Windows: zig cc -shared -O2 -target x86_64-windows-gnu -Ithird_party/clap/include tools/testplugin/lynx_test_crash.c -luser32 -lgdi32 \
+ *                -o "LYNX Test Crash.clap"
+ *   Linux / macOS: cc -shared -fPIC -O2 -Ithird_party/clap/include tools/testplugin/lynx_test_crash.c -o "LYNX Test Crash.clap"
+ * Otherwise a 0.5 gain (in -> out), with a 4-byte state ("LXC1").
  * Environment variable LYNX_TEST_CRASH:
- *   "process" - an access violation in the 20th process() call (LYNX.exe --plugintest: the slot must be switched off,
- *               the render must finish)
- *   "exit"    - a fail-fast (0xC0000409) when the DLL is unloaded at process exit, like the Waves shell whose teardown
- *               crashed LYNX's scan child (LYNX.exe --scantest: the plugin must be found, not blacklisted)
- *   "editor"  - (issue #32, round 174a) an access violation in its own editor window's procedure, on the window's
- *               first WM_TIMER (~0.3 s after it opens), like the synth editor that took LYNX down
+ *   "process" - a null-pointer write (access violation / SIGSEGV) in the Nth process() call, N = LYNX_TEST_CRASH_AFTER
+ *               (default 20); counted per loaded module, so an instance made again later does not crash again
+ *               (LYNX --plugintest / --crashguardtest: the slot must be switched off, the render must finish)
+ *   "memcpy"  - the same, but as a memcpy from a null pointer (the fault is inside the C library, issue #155)
+ *   "state"   - a null-pointer write when a saved state is loaded into it (state extension load)
+ *   "exit"    - (Windows) a fail-fast (0xC0000409) when the DLL is unloaded at process exit, like the Waves shell whose
+ *               teardown crashed LYNX's scan child (LYNX.exe --scantest: the plugin must be found, not blacklisted)
+ *   "editor"  - (Windows; issue #32, round 174a) an access violation in its own editor window's procedure, on the
+ *               window's first WM_TIMER (~0.3 s after it opens), like the synth editor that took LYNX down
  *               (LYNX.exe --editorcrashtest: the editor must be closed, LYNX must keep running)
- * Its editor (CLAP gui, Win32 child window) is a plain grey 240x120 window.
+ * Its editor (CLAP gui, Win32 child window; Windows only) is a plain grey 240x120 window.
  */
-#include <windows.h>
+#if defined(_WIN32)
+ #include <windows.h>
+#endif
 #include <clap/clap.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -48,21 +56,57 @@ static void p_stop (const clap_plugin_t* p) { (void) p; }
 static void p_reset (const clap_plugin_t* p) { (void) p; }
 static int crash_mode (const char* what)
 {
+#if defined(_WIN32)
     char value[32] = { 0 };
     return GetEnvironmentVariableA ("LYNX_TEST_CRASH", value, sizeof (value)) > 0 && strcmp (value, what) == 0;
+#else
+    const char* value = getenv ("LYNX_TEST_CRASH");
+    return value != NULL && strcmp (value, what) == 0;
+#endif
+}
+static int crash_after (void)
+{
+#if defined(_WIN32)
+    char value[32] = { 0 };
+    const int n = GetEnvironmentVariableA ("LYNX_TEST_CRASH_AFTER", value, sizeof (value)) > 0 ? atoi (value) : 0;
+#else
+    const char* value = getenv ("LYNX_TEST_CRASH_AFTER");
+    const int n = value != NULL ? atoi (value) : 0;
+#endif
+    return n > 0 ? n : 20;
+}
+static volatile int sink = 0;
+static void null_write (void)
+{
+    volatile uintptr_t address = 0; /* (opaque: a compiler may drop a write to a constant null) */
+    *(volatile int*) address = 1;
+}
+static void null_copy (void)
+{
+    char to[64];
+    const char* volatile from = NULL;
+    volatile size_t size = sizeof (to); /* (a real call into the C library) */
+    memcpy (to, (const char*) from, size);
+    sink = to[0];
 }
 static clap_process_status p_process (const clap_plugin_t* p, const clap_process_t* proc)
 {
     static int calls = 0;
     (void) p;
-    if (++calls == 20 && crash_mode ("process"))
-        *(volatile int*) (uintptr_t) 0 = 1;
+    if (++calls == crash_after())
+    {
+        if (crash_mode ("process"))
+            null_write();
+        if (crash_mode ("memcpy"))
+            null_copy();
+    }
     if (proc->audio_inputs_count < 1 || proc->audio_outputs_count < 1) return CLAP_PROCESS_CONTINUE;
     for (uint32_t c = 0; c < 2 && c < proc->audio_inputs[0].channel_count && c < proc->audio_outputs[0].channel_count; ++c)
         for (uint32_t i = 0; i < proc->frames_count; ++i)
             proc->audio_outputs[0].data32[c][i] = 0.5f * proc->audio_inputs[0].data32[c][i];
     return CLAP_PROCESS_CONTINUE;
 }
+#if defined(_WIN32)
 /* the editor: one child window; "editor" mode crashes in its window procedure */
 static HWND editor_window = NULL;
 static LRESULT CALLBACK editor_proc (HWND h, UINT m, WPARAM w, LPARAM l)
@@ -121,11 +165,33 @@ static bool g_hide (const clap_plugin_t* p) { (void) p; if (editor_window != NUL
 static const clap_plugin_gui_t gui = { g_api, g_preferred, g_create, g_destroy, g_scale, g_size, g_can_resize, g_hints, g_adjust,
                                        g_set_size, g_parent, g_transient, g_title, g_show, g_hide };
 
+#endif
+
+/* state: 4 bytes; "state" mode crashes when one is loaded */
+static bool s_save (const clap_plugin_t* p, const clap_ostream_t* stream)
+{
+    (void) p;
+    return stream->write (stream, "LXC1", 4) == 4;
+}
+static bool s_load (const clap_plugin_t* p, const clap_istream_t* stream)
+{
+    char data[4];
+    (void) p;
+    if (crash_mode ("state"))
+        null_write();
+    return stream->read (stream, data, 4) == 4;
+}
+static const clap_plugin_state_t state_ext = { s_save, s_load };
+
 static const void* p_extension (const clap_plugin_t* p, const char* id)
 {
     (void) p;
+#if defined(_WIN32)
     if (strcmp (id, CLAP_EXT_GUI) == 0)
         return &gui;
+#endif
+    if (strcmp (id, CLAP_EXT_STATE) == 0)
+        return &state_ext;
     return strcmp (id, CLAP_EXT_AUDIO_PORTS) == 0 ? &audio_ports : NULL;
 }
 static void p_main_thread (const clap_plugin_t* p) { (void) p; }
@@ -151,6 +217,7 @@ static const void* e_factory (const char* id) { return strcmp (id, CLAP_PLUGIN_F
 
 CLAP_EXPORT const clap_plugin_entry_t clap_entry = { CLAP_VERSION_INIT, e_init, e_deinit, e_factory };
 
+#if defined(_WIN32)
 BOOL WINAPI DllMain (HINSTANCE instance, DWORD reason, LPVOID reserved)
 {
     (void) instance;
@@ -158,3 +225,4 @@ BOOL WINAPI DllMain (HINSTANCE instance, DWORD reason, LPVOID reserved)
         __fastfail (7);
     return TRUE;
 }
+#endif
