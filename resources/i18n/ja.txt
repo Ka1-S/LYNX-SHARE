@@ -8924,7 +8924,6 @@ countries: jp
 "New link" = "新規リンク"
 "MIDI controller" = "MIDIコントローラー"
 "Ctrl" = "Ctrl"
-"MIDI input port number" = "MIDI入力ポート番号"
 "MIDI channel number" = "MIDIチャンネル番号"
 "Continuous Controller number" = "Continuous Controller番号"
 "Auto detect" = "自動検出"

@@ -8924,7 +8924,6 @@ countries: tw hk mo
 "New link" = "新增關聯"
 "MIDI controller" = "MIDI控制器"
 "Ctrl" = "Ctrl"
-"MIDI input port number" = "MIDI輸入連接埠號"
 "MIDI channel number" = "MIDI通道編號"
 "Continuous Controller number" = "Continuous Controller編號"
 "Auto detect" = "自動偵測"

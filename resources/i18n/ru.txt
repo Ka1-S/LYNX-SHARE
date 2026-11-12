@@ -8924,7 +8924,6 @@ countries: ru by kz
 "New link" = "Новая привязка"
 "MIDI controller" = "MIDI-контроллер"
 "Ctrl" = "Ctrl"
-"MIDI input port number" = "Номер MIDI-порта входа"
 "MIDI channel number" = "Номер MIDI-канала"
 "Continuous Controller number" = "Номер Continuous Controller"
 "Auto detect" = "Автоопределение"

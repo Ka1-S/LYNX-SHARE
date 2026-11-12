@@ -8924,7 +8924,6 @@ countries: fr be ch ca lu
 "New link" = "Nouveau lien"
 "MIDI controller" = "Contrôleur MIDI"
 "Ctrl" = "Ctrl"
-"MIDI input port number" = "Numéro du port d'entrée MIDI"
 "MIDI channel number" = "Numéro de canal MIDI"
 "Continuous Controller number" = "Numéro de Continuous Controller"
 "Auto detect" = "Détection automatique"
