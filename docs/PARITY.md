@@ -2371,7 +2371,7 @@ Proof: `docs/analise/REA_rodada181b.md`.
 | Tools › Macros › Prepare for MIDI export | same numbering (FPC on 10, others 1–16 without 10), names kept | ✅ | FL skips only automation clip channels (seen at runtime); LYNX's automation clips aren't channels |
 | Tools › Riff machine | opens LYNX's Riff machine on the selected channel | ⚠️ | FL inserts a new Sytrus channel from `Data\System\Riff machine\*.fst` first |
 | Tools › Chord progression tool | opens LYNX's chord progression generator | ⚠️ | FL's is its own Python window (`cpt.pyscript`), much larger |
-| Tools › Macros › Remove all Edison instances | — | ❌ | not added: LYNX has no Edison instances |
+| Tools › Macros › Remove all Edison instances | same item, in FL's place (after "Reset empty playlist tracks") | ✅ | round 190cd; one undo step; greyed when the project has none (LYNX) |
 | Tools › Macros › Switch all / selected audio clip channels to | same items, place and texts, with LYNX's modes (Resample, stretch engine, Ableton-style warp) | ⚠️ | user's decision: no élastique / slice modes; no tempo detection for channels without a stretch length |
 | Tools › Clipboard › Save audio / MIDI clipboard to browser, greyed when empty | same, into the Browser's "Clipboard files" | ⚠️ | audio: CF_WAVE on Windows, else LYNX's audio editor clipboard; " (2)" naming INFERRED |
 | Tools › Score logger (Dump score log to selected pattern, Clear log) | same, moved from Options to Tools | ✅ | |
@@ -2859,3 +2859,24 @@ laws; one or two rounds), and the factory presets, which were written on the cla
 | Hot-swap (Q): the Browser replaces the linked device, preset or sample in place | Replace in the slot / channel menus (unchanged) | Hot-Swap mode | ✅ `core/HotSwap.h`: effects, instruments, effect / synth presets, samples; bar in the Browser, button on the device card. ❌ rack chains, drum pads, similar-sample swap |
 | Device Cut / Copy / Paste / Duplicate, Ctrl-drag copy, 0 = on / off, Ctrl+G / Ctrl+Shift+G | slot menu, Alt-drag in the Mixer | Device View edit commands | ✅ effect cards of the Device View (Ableton-style layout). ❌ several cards at once, drag to another track |
 | MIDI / Key Map Mode overlay | Link to controller, Multilink | Ctrl+M / Ctrl+K | ❌ not built (REA_rodada190ce.md §4) |
+
+## Round 190cd: the audio editor as a mixer-slot plugin (FL's Edison)
+Static study of FL's own Edison plugin (docs/analise/REA_rodada190cd.md). The plugin is LYNX's existing audio editor
+in a slot mode: one editor, no fork.
+
+| FL | LYNX | Status | Notes |
+|---|---|---|---|
+| Edison loads in a mixer insert slot, several instances | effect "Edison" in the effect list, any slot, several per track | ✅ | its window is the audio editor |
+| Record modes Now / On input / Input / On play, default On input | same names, order, default; hold 1 s, pre-roll 0.1 s, threshold 0.02 | ✅ | the 0.2 s trimming step of FL's buffer is not reproduced |
+| Maximum recording time: Forever, 1, 3, 5, 10, 30, 60 min, default 5; megabyte limits | the seven time choices, default 5 min | ⚠️ | megabyte limits left out |
+| APPEND (on by default) | Append: on = after the audio, off = replaces it | ⚠️ | what FL does at the moment Record is pressed with Append off: needs a live check |
+| Input passes through; Mute input; own playback added to the slot | same; pass-through bit-exact | ✅ | |
+| Slave playback to host, Ignore host / own selection | Slave: plays at the song time from the selection start; "Ignore own selection" | ⚠️ | host selection not used; time unit needs a live check |
+| On play: "Song jump" marker when the song position jumps | same marker, one per jump (loop passes included) | ✅ | |
+| Sample saved inside the project (embedded) | saved as a WAV in the project's recordings folder, path in .lynx | ⚠️ | deliberate: the rule of takes; small project files and undo steps |
+| Edison slot in an .flp | kept as Edison with its settings; audio, markers, regions and loop decoded from the state | ✅ | envelopes of the state not read |
+| Mixer track: open audio editor (Ctrl+E) / and record (Shift+E) load Edison in the first empty slot | same | ✅ | a full track opens the plain editor window |
+| Send to playlist / to channel | Send menu from the slot window, plus "Send to the selected channel" | ✅ | no mouse drag out of the editor |
+| Select menu: before / after selection, zoomed part, previous / next region; Zoom on left / right of selection | same commands in every audio editor window | ✅ | |
+| Regions: Rename all..., Set info..., Clone as region | same | ✅ | Quick rename all, Auto rename all, trigger-note assignment: left out (flows not established) |
+| View: regions / markers / loop switch, noise threshold mark | View menu switches "Regions", "Loop", "Noise threshold mark" | ⚠️ | menu items, not FL's toolbar buttons |

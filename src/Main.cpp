@@ -51,6 +51,7 @@
 #include "engine/Bridge32Test.h"
 #include "engine/ClapFormat.h"
 #include "engine/ClapTeardownTest.h"
+#include "core/EdisonFx.h"
 #include "engine/ProjectFile.h"
 #include "ui/RemoteControl.h"
 #include "core/Sha256.h"
@@ -1703,6 +1704,18 @@ public:
             // editor before / after some of them, as PNGs (a synthetic drum loop without a file)
             const auto i = args.indexOf ("--edisonshot");
             runEdisonShot (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--edisonslottest"))
+        {
+            // LYNX.exe --edisonslottest folder [project.flp]: round 190cd — the audio editor as a mixer-slot plugin through
+            // the engine and the project file (report.txt: one "name=ok|FAIL" per check), its window as slot-*.png, and
+            // the Edison slots of an FL project (what was read of each)
+            const auto i = args.indexOf ("--edisonslottest");
+            const auto ok = runEdisonSlotTest (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String());
+            setApplicationReturnValue (ok ? 0 : 1);
             quit();
             return;
         }
@@ -12364,6 +12377,249 @@ private:
                 if (w->getName().startsWith ("Formula") && w->getContentComponent() != nullptr)
                     savePng (lynx::shot::snapshot (*w->getContentComponent()), prefix + "-formula-controller.png");
         lynx::FormulaControllerWindows::closeAll();
+    }
+
+    bool runEdisonSlotTest (const juce::String& folderPath, const juce::String& flp)
+    {
+        namespace ae = lynx::audioedit;
+        namespace ef = lynx::edisonfx;
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::File folder (folderPath);
+        folder.createDirectory();
+        juce::String report;
+        bool all = true;
+        auto check = [&] (const juce::String& name, bool ok, const juce::String& note = {}) {
+            report << name << "=" << (ok ? "ok" : "FAIL") << (note.isNotEmpty() ? "  (" + note + ")" : juce::String()) << "\n";
+            all = all && ok;
+        };
+        auto shot = [&folder] (juce::Component& c, const juce::String& name) {
+            savePng (lynx::shot::paint (c, lynx::theme::panel), folder.getChildFile (name).getFullPathName());
+        };
+        auto findSlot = [] (const lynx::Song& song, int& track, int& slot) {
+            for (track = 0; track < (int) song.mixer.size(); ++track)
+                for (slot = 0; slot < (int) song.mixer[(std::size_t) track].effects.size(); ++slot)
+                    if (song.mixer[(std::size_t) track].effects[(std::size_t) slot].kind == lynx::EffectKind::edison)
+                        return true;
+            return false;
+        };
+
+        {
+            lynx::AudioEngine engine (false);
+            engine.setRecordingTarget (folder.getChildFile ("Audio").getChildFile ("Recorded"), "Test");
+
+            // a project without the plugin is written as before: nothing of it in the file, and it reads back the same
+            const auto before = lynx::ProjectFile::toJson (engine.getSong(), false);
+            juce::String error;
+            const auto same = lynx::ProjectFile::fromJson (before, error);
+            check ("old_project_text_has_no_trace", ! before.containsIgnoreCase ("edison"));
+            check ("old_project_round_trip_stable", same.has_value() && lynx::ProjectFile::toJson (*same, false) == before);
+
+            const auto at = lynx::addEdisonSlot (engine, 1);
+            engine.dispatchPendingMessages();
+            check ("slot_added_to_first_empty_slot", at == 0 && engine.getSong().mixer[1].effects.size() == 1
+                                                       && engine.getSong().mixer[1].effects[0].kind == lynx::EffectKind::edison);
+            if (at < 0)
+            {
+                folder.getChildFile ("report.txt").replaceWithText (report);
+                return false;
+            }
+            const auto second = lynx::addEdisonSlot (engine, 1); // several instances on a track
+            engine.dispatchPendingMessages();
+            check ("second_instance_on_the_same_track", second == 1);
+
+            engine.editSong ([at] (lynx::Song& s) {
+                s.mixer[1].effects[(std::size_t) at].params[ef::recordMode] = ef::modeValue (ef::Mode::now);
+            });
+            engine.dispatchPendingMessages();
+            const auto slotOf = [&engine, at] { return engine.getSong().mixer[1].effects[(std::size_t) at]; };
+            const auto fx = engine.getEffect (1, at);
+            const auto p = std::dynamic_pointer_cast<ef::Processor> (fx);
+            const auto session = ef::findSession (slotOf().instance.id);
+            check ("engine_built_the_effect_with_its_session", p != nullptr && session != nullptr);
+            const auto other = ef::findSession (engine.getSong().mixer[1].effects[1].instance.id);
+            check ("instances_have_their_own_audio", other != nullptr && other != session);
+            if (p == nullptr || session == nullptr)
+            {
+                folder.getChildFile ("report.txt").replaceWithText (report);
+                return false;
+            }
+
+            // idle: the audio passes through bit for bit
+            const auto rate = p->sampleRate();
+            std::vector<float> l (512), r (512);
+            auto fill = [&] (int block) {
+                for (int k = 0; k < 512; ++k)
+                {
+                    const auto t = (double) (block * 512 + k) / rate;
+                    l[(std::size_t) k] = 0.6f * (float) std::sin (2.0 * 3.141592653589793 * 220.0 * t);
+                    r[(std::size_t) k] = 0.4f * (float) std::sin (2.0 * 3.141592653589793 * 330.0 * t);
+                }
+            };
+            fill (0);
+            auto inL = l, inR = r;
+            p->process (l.data(), r.data(), 512, slotOf().params, 120.0);
+            check ("idle_pass_through_bit_exact", l == inL && r == inR);
+
+            // a take through the slot (Now), then the flush that makes it a file of the project
+            std::vector<float> wantL, wantR;
+            check ("record_starts", session->start (p, true));
+            for (int block = 0; block < 60; ++block)
+            {
+                fill (block);
+                wantL.insert (wantL.end(), l.begin(), l.end());
+                wantR.insert (wantR.end(), r.begin(), r.end());
+                p->process (l.data(), r.data(), 512, slotOf().params, 120.0);
+            }
+            session->stop();
+            check ("take_is_the_input", session->document().audio.numChannels() == 2 && session->document().audio.channels[0] == wantL
+                                          && session->document().audio.channels[1] == wantR);
+            ae::Document withMarkers = session->document();
+            ae::addMarker (withMarkers, 4000, "Verse");
+            ae::addMarker (withMarkers, 12000);
+            ae::setLoop (withMarkers, { 2000, 20000 });
+            session->setDocument (withMarkers);
+            engine.flushEdisonAudio();
+            engine.dispatchPendingMessages();
+            const juce::File file (juce::String::fromUTF8 (slotOf().samplePath.c_str()));
+            check ("audio_written_to_the_project_folder", file.existsAsFile() && file.isAChildOf (folder.getChildFile ("Audio").getChildFile ("Recorded")),
+                   file.getFullPathName());
+            check ("file_listed_with_the_session_recordings", std::find (engine.getSessionRecordings().begin(), engine.getSessionRecordings().end(), file)
+                                                                != engine.getSessionRecordings().end());
+            check ("effect_kept_running_through_the_flush", engine.getEffect (1, at) == fx);
+            check ("nothing_unsaved_after_the_flush", ! session->dirty());
+            engine.flushEdisonAudio(); // (a second flush writes nothing new)
+            check ("second_flush_keeps_the_file", juce::File (juce::String::fromUTF8 (slotOf().samplePath.c_str())) == file);
+
+            // the project file: saved, loaded, the same slot with the same audio
+            engine.editSong ([at] (lynx::Song& s) {
+                auto& params = s.mixer[1].effects[(std::size_t) at].params;
+                params[ef::recordMode] = ef::modeValue (ef::Mode::onPlay);
+                params[ef::append] = 0.0f;
+                params[ef::muteInput] = 1.0f;
+                params[ef::slave] = 1.0f;
+                params[ef::maxTime] = 5.0f / 6.0f;
+            });
+            engine.capturePluginStates();
+            const auto project = folder.getChildFile ("edison-slot.lynx");
+            check ("project_saved", lynx::ProjectFile::save (engine.getSong(), project, error), error);
+            auto loaded = lynx::ProjectFile::load (project, error);
+            check ("project_loaded", loaded.has_value(), error);
+            if (loaded)
+            {
+                const auto& a = slotOf();
+                const auto& b = loaded->mixer[1].effects[(std::size_t) at];
+                check ("slot_kind_kept", b.kind == lynx::EffectKind::edison && loaded->mixer[1].effects.size() == 2);
+                check ("slot_settings_kept", ef::modeOf (b.params) == ef::Mode::onPlay && b.params[ef::append] < 0.5f && b.params[ef::muteInput] >= 0.5f
+                                               && b.params[ef::slave] >= 0.5f && ef::maxTimeIndexOf (b.params) == 5
+                                               && std::abs (b.params[ef::noiseThreshold] - a.params[ef::noiseThreshold]) < 1.0e-6f);
+                check ("slot_audio_path_kept", b.samplePath == a.samplePath);
+                check ("project_text_round_trip_stable", lynx::ProjectFile::toJson (*loaded, false) == lynx::ProjectFile::toJson (engine.getSong(), false));
+
+                lynx::AudioEngine second (false);
+                second.setSong (std::move (*loaded));
+                second.dispatchPendingMessages();
+                const auto reopened = ef::findSession (second.getSong().mixer[1].effects[(std::size_t) at].instance.id);
+                check ("reopened_project_has_the_audio", reopened != nullptr && reopened != session
+                                                           && reopened->document().audio.channels == withMarkers.audio.channels
+                                                           && reopened->document().audio.sampleRate == withMarkers.audio.sampleRate);
+                check ("reopened_project_has_markers_and_loop", reopened != nullptr && reopened->document().markers.size() == 2
+                                                                  && reopened->document().markers[0].name == "Verse"
+                                                                  && reopened->document().loopStart == 2000 && reopened->document().loopEnd == 20000);
+                check ("reopened_empty_instance_is_empty", ef::findSession (second.getSong().mixer[1].effects[1].instance.id) != nullptr
+                                                             && ef::findSession (second.getSong().mixer[1].effects[1].instance.id)->document().audio.empty());
+                if (auto editor = lynx::makeEdisonSlotEditor (second, 1, at))
+                {
+                    editor->setSize (1120, 600);
+                    second.dispatchPendingMessages();
+                    shot (*editor, "slot-editor-reopened.png");
+                }
+            }
+
+            // the plugin's window: the audio editor on the slot (empty instance, then the one with the take)
+            if (auto editor = lynx::makeEdisonSlotEditor (engine, 1, 1))
+            {
+                editor->setSize (1120, 600);
+                engine.dispatchPendingMessages();
+                shot (*editor, "slot-editor-empty.png");
+            }
+            auto editor = lynx::makeEdisonSlotEditor (engine, 1, at);
+            check ("slot_window_is_the_audio_editor", editor != nullptr);
+            if (editor != nullptr)
+            {
+                editor->setSize (1120, 600);
+                engine.dispatchPendingMessages();
+                shot (*editor, "slot-editor.png");
+                juce::File (folder.getChildFile ("slot-menu.txt")).replaceWithText (lynx::audioEditorMenuForSnapshot (*editor).joinIntoString ("\n") + "\n");
+            }
+            check ("no_editor_for_other_slots", lynx::makeEdisonSlotEditor (engine, 0, 0) == nullptr);
+            editor.reset();
+
+            // deleting the slot leaves the song without it (the file stays for the unused-recordings prompt)
+            engine.editSong ([at] (lynx::Song& s) { s.mixer[1].effects.erase (s.mixer[1].effects.begin() + at); });
+            engine.dispatchPendingMessages();
+            check ("deleted_slot_is_gone", engine.getSong().mixer[1].effects.size() == 1 && file.existsAsFile());
+        }
+
+        if (flp.isNotEmpty())
+        {
+            lynx::AudioEngine engine (false);
+            juce::String error;
+            const auto imported = engine.importFlpFile (juce::File (flp), error);
+            engine.dispatchPendingMessages();
+            check ("flp_imported", imported, error);
+            int count = 0, withAudio = 0;
+            const auto& song = engine.getSong();
+            for (int t = 0; t < (int) song.mixer.size(); ++t)
+                for (int s = 0; s < (int) song.mixer[(std::size_t) t].effects.size(); ++s)
+                {
+                    const auto& fx = song.mixer[(std::size_t) t].effects[(std::size_t) s];
+                    if (fx.kind != lynx::EffectKind::edison)
+                        continue;
+                    ++count;
+                    const auto session = ef::findSession (fx.instance.id);
+                    const auto frames = session != nullptr ? session->document().audio.frames() : -1;
+                    withAudio += frames > 0 ? 1 : 0;
+                    report << "flp_slot track " << t << " slot " << s << ": mode " << ef::modeName (ef::modeOf (fx.params))
+                           << ", append " << (fx.params[ef::append] >= 0.5f ? "on" : "off") << ", mute input " << (fx.params[ef::muteInput] >= 0.5f ? "on" : "off")
+                           << ", slave " << (fx.params[ef::slave] >= 0.5f ? "on" : "off") << ", loop " << (fx.params[ef::loopPlay] >= 0.5f ? "on" : "off")
+                           << ", max time index " << ef::maxTimeIndexOf (fx.params) << ", threshold " << juce::String (fx.params[ef::noiseThreshold], 4)
+                           << ", state " << (int) fx.state.size() << " bytes, audio " << (juce::int64) frames << " frames"
+                           << (session != nullptr && frames > 0 ? " at " + juce::String (session->document().audio.sampleRate, 0) + " Hz, "
+                                                                      + juce::String (session->document().audio.numChannels()) + " ch, "
+                                                                      + juce::String ((int) session->document().markers.size()) + " markers"
+                                                                : juce::String())
+                           << "\n";
+                    if (count == 1 || (frames > 0 && withAudio == 1))
+                        if (auto editor = lynx::makeEdisonSlotEditor (engine, t, s))
+                        {
+                            editor->setSize (1120, 600);
+                            engine.dispatchPendingMessages();
+                            shot (*editor, frames > 0 ? "slot-editor-flp-audio.png" : "slot-editor-flp.png");
+                        }
+                }
+            check ("flp_edison_slots_kept_as_the_plugin", count > 0, juce::String (count) + " slots, " + juce::String (withAudio) + " with audio");
+
+            // saved as .lynx and read again: still the plugin, FL's state (the audio) with it
+            int t = 0, s = 0;
+            if (findSlot (song, t, s))
+            {
+                const auto project = folder.getChildFile ("edison-flp.lynx");
+                const auto saved = lynx::ProjectFile::save (song, project, error);
+                std::optional<lynx::Song> loaded;
+                if (saved)
+                    loaded = lynx::ProjectFile::load (project, error);
+                check ("flp_slot_survives_the_project_file", loaded.has_value() && t < (int) loaded->mixer.size()
+                                                               && s < (int) loaded->mixer[(std::size_t) t].effects.size()
+                                                               && loaded->mixer[(std::size_t) t].effects[(std::size_t) s].kind == lynx::EffectKind::edison
+                                                               && loaded->mixer[(std::size_t) t].effects[(std::size_t) s].state == song.mixer[(std::size_t) t].effects[(std::size_t) s].state
+                                                               && loaded->mixer[(std::size_t) t].effects[(std::size_t) s].params == song.mixer[(std::size_t) t].effects[(std::size_t) s].params,
+                       error);
+            }
+        }
+
+        report << (all ? "ALL OK\n" : "FAILURES\n");
+        folder.getChildFile ("report.txt").replaceWithText (report);
+        return all;
     }
 
     void runEdisonShot (const juce::String& prefix, const juce::String& file)

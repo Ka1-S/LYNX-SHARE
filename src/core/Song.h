@@ -1069,10 +1069,11 @@ enum class EffectKind : std::uint8_t
     pocketComb, // Pocket Comb Filter, FL Studio Mobile's Comb Filter (round 190by, core/PocketFxD.cpp): FLM's 11 values
     pocketMultiband, // Pocket Multiband Compressor, FL Studio Mobile's Multiband Compressor (round 190by, core/PocketFxD.cpp): FLM's 30 values
     pocketTapeStop, // Pocket Tape Stop, FL Studio Mobile's Tape Stop (round 190by, core/PocketFxD.cpp): FLM's 7 values
-    rackMixer        // a rack chain's mixer (round 183c, core/Rack.h): volume (Live's chain taper), pan, chain-select gain; inside racks only
+    rackMixer,       // a rack chain's mixer (round 183c, core/Rack.h): volume (Live's chain taper), pan, chain-select gain; inside racks only
+    edison           // FL's Edison (round 190cd, core/EdisonFx.h): an audio editor in the slot — records the slot's input, plays into it; its audio in samplePath
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::rackMixer;
+constexpr EffectKind lastEffectKind = EffectKind::edison;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).

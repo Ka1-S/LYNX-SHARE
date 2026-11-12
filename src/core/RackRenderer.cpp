@@ -41,6 +41,7 @@
 #include "core/DirectWave.h"
 #include "core/SoundFont.h"
 #include "core/NewtoneFx.h"
+#include "core/EdisonFx.h"
 #include "core/Dvs.h"
 #include "core/Scratcher.h"
 
@@ -391,6 +392,11 @@ std::shared_ptr<Effect> buildEffect (const EffectSlot& slot, double sampleRate, 
         effect = newtonefx::make (factories.samples && ! slot.samplePath.empty() ? factories.samples (slot.samplePath) : nullptr,
                                   slot.state);
         effect->prepare (sampleRate);
+    }
+    else if (kind == EffectKind::edison)
+    {
+        // Edison (round 190cd): the slot's own audio, found again by the slot's instance (core/EdisonFx.h)
+        effect = edisonfx::make (slot, sampleRate, factories.samples);
     }
     else if (kind == EffectKind::scratcher)
     {
@@ -875,7 +881,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 && pi < previous->song.mixer[pt].effects.size() && pi < previous->effects[pt].size()
                 && previous->song.mixer[pt].effects[pi].kind == kind && kind != EffectKind::patcher
                 && (kind != EffectKind::parallel || sameContainer (previous->song.mixer[pt].effects[pi], slots[i])) // children are built in
-                && previous->song.mixer[pt].effects[pi].samplePath == slots[i].samplePath
+                // (Edison keeps running when its audio gets a new file: the audio is already in it, round 190cd)
+                && (previous->song.mixer[pt].effects[pi].samplePath == slots[i].samplePath || kind == EffectKind::edison)
                 // round 144: Facet EQ's buffers are sized by its linear-phase resolution: a new one, a new instance
                 && (kind != EffectKind::facetEq
                     || facet::resolution (previous->song.mixer[pt].effects[pi].params[(std::size_t) facet::resolutionParam])
@@ -887,6 +894,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 && (previous->song.mixer[pt].effects[pi].state == slots[i].state
                     || (previous->sampleRate == sampleRate && previous->effects[pt][pi] != nullptr && previous->effects[pt][pi]->acceptState (slots[i].state))))
             {
+                if (kind == EffectKind::edison && previous->song.mixer[pt].effects[pi].samplePath != slots[i].samplePath)
+                    edisonfx::followPath (slots[i], factories.samples); // (a relocated or undone file)
                 state->effects[t].push_back (previous->effects[pt][pi]);
                 continue;
             }
@@ -3034,6 +3043,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             && slots[i].kind != EffectKind::grossBeat && slots[i].kind != EffectKind::newtone
             && slots[i].kind != EffectKind::newtime
             && slots[i].kind != EffectKind::scratcher // (nor the Scratcher: its turntable plays whatever the input)
+            && slots[i].kind != EffectKind::edison // (nor Edison: it records silence and plays whatever the input, round 190cd)
             && slots[i].kind != EffectKind::hardwareInsert // (nor the hardware insert: outboard gear has its own tails and noise)
             && ! (slots[i].kind == EffectKind::patcher && patcher::usesHardwareIo (slots[i].patcher)) // (nor a Patcher holding one, round 165c)
             // (nor a controller: its outputs move whatever the sound — a silent insert is their usual place; round 164)

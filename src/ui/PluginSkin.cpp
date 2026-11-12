@@ -64,7 +64,7 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::lofi: case EffectKind::squeeze: case EffectKind::pocketDistortion: case EffectKind::pocketWaveshaper:
             return colour::ember;
         case EffectKind::lynxTune: case EffectKind::pitchCorrect: case EffectKind::pitchShift: case EffectKind::flPitchShifter:
-        case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::quellDenoiser: case EffectKind::aether: case EffectKind::newtone:
+        case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::quellDenoiser: case EffectKind::aether: case EffectKind::newtone: case EffectKind::edison:
         case EffectKind::voiceShift:
             return colour::rose;
         case EffectKind::utility: case EffectKind::stereoShaper: case EffectKind::stereoEnhancer: case EffectKind::spreader:

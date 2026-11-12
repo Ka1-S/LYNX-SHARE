@@ -16,8 +16,10 @@
 #include "core/AudioCapture.h"
 #include "core/AudioEditTools.h"
 #include "core/AutoWarp.h"
+#include "core/EdisonFx.h"
 #include "core/EdisonScript.h"
 #include "core/Instruments.h"
+#include "core/MixerOps.h"
 #include "core/NewtoneFx.h"
 #include "core/WaveAnalysis.h"
 #include "core/ValueMath.h"
@@ -224,12 +226,14 @@ struct Source
         none,
         file,
         channel,
-        insert
+        insert,
+        slot // an Edison effect slot (round 190cd): the editor is that plugin's window, its audio is the slot's
     };
     Kind kind = Kind::none;
     int index = -1; // channel or insert
     juce::String path;
     int clip = -1; // a channel opened from a Playlist audio clip: that clip
+    std::uint64_t instance = 0; // slot: the slot's runtime identity (EffectSlot::instance), wherever it moves
 };
 
 class AudioEditor final : public juce::Component,
@@ -309,6 +313,8 @@ public:
         loopButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
         loopButton.onClick = [this] {
             loopPlay = loopButton.getToggleState();
+            if (slotMode())
+                setSlotParam (edisonfx::loopPlay, loopPlay ? 1.0f : 0.0f);
             if (playing)
                 startPlayback();
         };
@@ -377,19 +383,245 @@ public:
         }
 
         setWantsKeyboardFocus (true);
-        setSize (1120, 600);
+        setSize (1120, slotMode() ? 630 : 600);
         history.reset (doc, tr ("Empty").toStdString());
+        if (slotMode())
+            setupSlotMode();
         updateButtons();
         startTimerHz (30);
     }
 
     ~AudioEditor() override
     {
+        if (slotMode())
+        {
+            // the plugin goes on without its window: a recording continues (AudioEngine::pumpEdisonRecordings), the audio stays in the slot
+            if (playing)
+                if (const auto p = processor())
+                    p->play (nullptr, false);
+            if (session != nullptr && ! session->recording())
+                engine.flushEdisonAudio();
+            return;
+        }
         if (playing)
             engine.previewSample (nullptr);
         if (recState != RecState::idle)
             engine.getMeters().capture.setSource (AudioCapture::off);
         releaseInput();
+    }
+
+    // --- an Edison slot (round 190cd) -------------------------------------------------------------------------
+    bool slotMode() const noexcept { return source.kind == Source::Kind::slot; }
+
+    // where the slot is now (it may have moved): { track, slot }, { -1, -1 } when it is gone
+    std::pair<int, int> slotPlace() const
+    {
+        const auto& mixer = engine.getSong().mixer;
+        for (std::size_t t = 0; t < mixer.size(); ++t)
+            for (std::size_t i = 0; i < mixer[t].effects.size(); ++i)
+                if (mixer[t].effects[i].kind == EffectKind::edison && mixer[t].effects[i].instance.id == source.instance)
+                    return { (int) t, (int) i };
+        return { -1, -1 };
+    }
+
+    const EffectSlot* slotDef() const
+    {
+        const auto [t, i] = slotPlace();
+        return t < 0 ? nullptr : &engine.getSong().mixer[(std::size_t) t].effects[(std::size_t) i];
+    }
+
+    std::shared_ptr<edisonfx::Processor> processor() const
+    {
+        const auto [t, i] = slotPlace();
+        return t < 0 ? nullptr : std::dynamic_pointer_cast<edisonfx::Processor> (engine.getEffect (t, i));
+    }
+
+    float slotParam (int param) const
+    {
+        const auto* fx = slotDef();
+        return fx != nullptr ? fx->params[(std::size_t) param] : edisonfx::info().params[(std::size_t) param].defaultValue;
+    }
+
+    void setSlotParam (int param, float value)
+    {
+        const auto [t, i] = slotPlace();
+        if (t < 0 || slotParam (param) == value)
+            return;
+        engine.editSong ([t = t, i = i, param, value] (Song& song) {
+            if (t < (int) song.mixer.size() && i < (int) song.mixer[(std::size_t) t].effects.size())
+                song.mixer[(std::size_t) t].effects[(std::size_t) i].params[(std::size_t) param] = value;
+        });
+        syncSlotControls();
+    }
+
+    static juce::String maxTimeName (int index)
+    {
+        const auto minutes = edisonfx::maxMinutes[juce::jlimit (0, edisonfx::maxTimeCount - 1, index)];
+        return minutes == 0 ? tr ("Forever") : tr ("{0} min", { juce::String (minutes) });
+    }
+
+    static juce::String modeHelp (edisonfx::Mode m)
+    {
+        switch (m)
+        {
+            case edisonfx::Mode::now: return tr ("Recording starts at once");
+            case edisonfx::Mode::onInput: return tr ("Recording starts when the input is heard");
+            case edisonfx::Mode::input: return tr ("Records only while the input is heard (it pauses in silence)");
+            case edisonfx::Mode::onPlay: return tr ("Records while the song plays");
+        }
+        return {};
+    }
+
+    void setupSlotMode()
+    {
+        session = edisonfx::findSession (source.instance);
+        if (session == nullptr)
+            if (const auto* fx = slotDef())
+                session = edisonfx::sessionFor (*fx);
+        recordMenuButton.setVisible (false);
+        recordButton.setTooltip (tr ("Record this slot's input") + " (R)");
+
+        // FL's four record modes, by FL's names (the plugin's mode list)
+        static const char* const modeNames[] = { TR_NOOP ("Now"), TR_NOOP ("On input"), TR_NOOP ("Input"), TR_NOOP ("On play") };
+        for (int m = 0; m < edisonfx::modeCount; ++m)
+            recModeBox.addItem (tr (modeNames[m]), m + 1);
+        recModeBox.setTooltip (tr ("When / what to record"));
+        recModeBox.onChange = [this] {
+            const auto m = (edisonfx::Mode) juce::jlimit (0, edisonfx::modeCount - 1, recModeBox.getSelectedItemIndex());
+            setSlotParam (edisonfx::recordMode, edisonfx::modeValue (m));
+            setStatus (modeHelp (m), false);
+        };
+        for (int i = 0; i < edisonfx::maxTimeCount; ++i)
+            maxTimeBox.addItem (maxTimeName (i), i + 1);
+        maxTimeBox.setTooltip (tr ("Maximum recording time"));
+        maxTimeBox.onChange = [this] {
+            setSlotParam (edisonfx::maxTime, (float) maxTimeBox.getSelectedItemIndex() / (float) (edisonfx::maxTimeCount - 1));
+        };
+        for (auto* box : { &recModeBox, &maxTimeBox })
+        {
+            box->setWantsKeyboardFocus (false);
+            addAndMakeVisible (*box);
+        }
+        auto setupSwitch = [this] (juce::TextButton& b, const juce::String& text, const juce::String& tip, int param) {
+            b.setButtonText (text);
+            b.setTooltip (tip);
+            b.setClickingTogglesState (true);
+            b.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
+            b.setWantsKeyboardFocus (false);
+            b.onClick = [this, &b, param] { setSlotParam (param, b.getToggleState() ? 1.0f : 0.0f); };
+            addAndMakeVisible (b);
+        };
+        setupSwitch (appendButton, tr ("Append"), tr ("A new recording goes after the audio already here (off: it replaces it)"), edisonfx::append);
+        setupSwitch (slaveButton, tr ("Slave"), tr ("Slave playback to host: while the song plays, this audio plays at the song time") + " (H)", edisonfx::slave);
+        setupSwitch (muteInputButton, tr ("Mute input"), tr ("Mute input: the slot's input is not passed on") + " (I)", edisonfx::muteInput);
+        syncSlotControls();
+
+        if (session != nullptr)
+        {
+            adoptSession ({}, true);
+            if (session->recording()) // (a recording started before this window was opened)
+            {
+                beforeRecording = doc;
+                recState = session->phase() == edisonfx::Phase::recording ? RecState::recording : RecState::waiting;
+                recordButton.setToggleState (true, juce::dontSendNotification);
+                showSlotPhase();
+            }
+        }
+    }
+
+    // the switches show the slot's parameters (they also change by undo, or from another window)
+    void syncSlotControls()
+    {
+        const auto* fx = slotDef();
+        if (fx == nullptr)
+            return;
+        recModeBox.setSelectedItemIndex ((int) edisonfx::modeOf (fx->params), juce::dontSendNotification);
+        maxTimeBox.setSelectedItemIndex (edisonfx::maxTimeIndexOf (fx->params), juce::dontSendNotification);
+        appendButton.setToggleState (fx->params[edisonfx::append] >= 0.5f, juce::dontSendNotification);
+        slaveButton.setToggleState (fx->params[edisonfx::slave] >= 0.5f, juce::dontSendNotification);
+        muteInputButton.setToggleState (fx->params[edisonfx::muteInput] >= 0.5f, juce::dontSendNotification);
+        loopPlay = fx->params[edisonfx::loopPlay] >= 0.5f;
+        loopButton.setToggleState (loopPlay, juce::dontSendNotification);
+        shownParams.assign (fx->params.begin(), fx->params.begin() + edisonfx::paramCount);
+    }
+
+    // the editor shows the session's document (`label` empty: as a newly opened one, else one more history step)
+    void adoptSession (const juce::String& label, bool opening = false)
+    {
+        const juce::ScopedValueSetter<bool> guard (adopting, true);
+        doc = session->document();
+        seenRevision = session->revision();
+        if (opening)
+        {
+            history.reset (doc, tr ("Open").toStdString());
+            selection = {};
+            cursor = 0;
+            modified = false;
+            documentChanged();
+            zoomToFit();
+        }
+        else
+        {
+            history.commit (doc, label.toStdString());
+            modified = true;
+            documentChanged();
+        }
+    }
+
+    void showSlotPhase()
+    {
+        if (recState == RecState::recording)
+            setStatus (tr ("Recording..."), false);
+        else if (recState == RecState::waiting)
+            setStatus (edisonfx::modeOf (slotDef() != nullptr ? slotDef()->params : EffectParams {}) == edisonfx::Mode::onPlay
+                           ? tr ("Waiting for project playback...")
+                           : tr ("Waiting for audio input..."),
+                       false);
+    }
+
+    void startSlotRecording()
+    {
+        stopPlayback();
+        const auto p = processor();
+        if (session == nullptr || p == nullptr)
+        {
+            setStatus (tr ("This slot is not processing audio (the effect was removed)"), true);
+            return;
+        }
+        const auto appendTake = slotParam (edisonfx::append) >= 0.5f;
+        if (! session->start (p, appendTake))
+            return;
+        beforeRecording = doc;
+        if (! appendTake)
+        {
+            beforeRecording = {};
+            beforeRecording.title = doc.title;
+        }
+        recState = edisonfx::modeOf (slotDef()->params) == edisonfx::Mode::now ? RecState::recording : RecState::waiting;
+        recordButton.setToggleState (true, juce::dontSendNotification);
+        showSlotPhase();
+        repaint();
+    }
+
+    // the recording ended (Record, Stop, or the maximum recording time): the take is in the session's document
+    void finishSlotRecording()
+    {
+        recState = RecState::idle;
+        recordButton.setToggleState (false, juce::dontSendNotification);
+        if (session->revision() != seenRevision)
+        {
+            adoptSession (tr ("Record"));
+            const auto lost = session->droppedFrames();
+            setStatus (tr ("Recorded {0}", { formatTime (selection.length()) }) + (lost > 0 ? "  (" + tr ("{0} frames lost", { juce::String (lost) }) + ")" : ""), lost > 0);
+            engine.flushEdisonAudio(); // a take is in the project's recording folder as soon as it exists
+        }
+        else
+        {
+            const juce::ScopedValueSetter<bool> guard (adopting, true);
+            doc = session->document();
+            documentChanged();
+            setStatus (tr ("Nothing was recorded"), false);
+        }
     }
 
     // --- opening ---------------------------------------------------------------------------------------------
@@ -723,6 +955,21 @@ public:
         sendButton.setBounds (bar.removeFromRight (70));
         bar.removeFromRight (6);
         saveButton.setBounds (bar.removeFromRight (28));
+
+        if (slotMode()) // the plugin's own switches, under the transport (FL: next to its Record button)
+        {
+            auto row = area.removeFromTop (30).reduced (6, 3);
+            row.removeFromLeft (112); // (they start under the Record button)
+            auto put = [&row] (juce::Component& c, int w, int gap = 4) {
+                c.setBounds (row.removeFromLeft (w));
+                row.removeFromLeft (gap);
+            };
+            put (recModeBox, 104);
+            put (maxTimeBox, 96);
+            put (appendButton, 72, 14);
+            put (slaveButton, 64);
+            put (muteInputButton, 96);
+        }
 
         // each button gets the width its text needs, plus an equal share of what is left (round 165o: translated
         // labels such as "Normalisieren" or "Ausschneiden" are never cut). When one row cannot hold them all (German,
@@ -1082,6 +1329,12 @@ public:
             setEnvMode ((EnvMode) (((int) envMode + 1) % 4));
         else if (! ctrl && c == 'f')
             zoomToFit();
+        else if (slotMode() && ! ctrl && c == 'h')
+            slaveButton.triggerClick();
+        else if (slotMode() && ! ctrl && c == 'i')
+            muteInputButton.triggerClick();
+        else if (slotMode() && ! ctrl && c == 'a')
+            followButton.triggerClick();
         else if (c == '+' || c == '=')
             zoomAround ((float) waveArea.getCentreX(), 0.5);
         else if (c == '-')
@@ -1120,7 +1373,8 @@ public:
         {
             stopPlayback();
             const auto previous = source;
-            source = { Source::Kind::file, -1, files[0] };
+            if (! slotMode()) // (an Edison slot stays that slot: the file becomes its audio)
+                source = { Source::Kind::file, -1, files[0] };
             if (! loadFile (juce::File (files[0])))
                 source = previous;
             return;
@@ -1225,7 +1479,7 @@ private:
 
     int markerAt (int x) const
     {
-        for (int i = (int) doc.markers.size() - 1; i >= 0; --i)
+        for (int i = viewRegions ? (int) doc.markers.size() - 1 : -1; i >= 0; --i)
             if (std::abs (frameToX ((double) doc.markers[(std::size_t) i].start) - (float) x) < 5.0f)
                 return i;
         return -1;
@@ -1316,6 +1570,13 @@ private:
             g.drawHorizontalLine ((int) (centre + half * 0.5f), r.getX(), r.getRight());
             g.setColour (colour::gridBar);
             g.drawHorizontalLine ((int) centre, r.getX(), r.getRight());
+            if (const auto mark = shownNoiseThreshold(); viewNoiseMark && mark > 0.0f && mark < 1.0f)
+            {
+                // the noise threshold (what "Acquire noise threshold" measured; in a slot, what the input must exceed)
+                g.setColour (colour::warning.withAlpha (0.55f));
+                g.drawHorizontalLine ((int) (centre - half * mark), r.getX(), r.getRight());
+                g.drawHorizontalLine ((int) (centre + half * mark), r.getX(), r.getRight());
+            }
             if (lane > 0)
             {
                 g.setColour (colour::border);
@@ -1389,7 +1650,7 @@ private:
     {
         using namespace theme;
         for (const auto& m : doc.markers)
-            if (m.isRegion())
+            if (viewRegions && m.isRegion())
             {
                 g.setColour (colour::warning.withAlpha (0.07f));
                 g.fillRect (juce::Rectangle<float>::leftTopRightBottom (frameToX ((double) m.start), (float) waveArea.getY(), frameToX ((double) m.end),
@@ -1542,6 +1803,8 @@ private:
         // regions and markers: flags with their names; the loop: a bar along the bottom
         for (const auto& m : doc.markers)
         {
+            if (! viewRegions)
+                break;
             const auto x = frameToX ((double) m.start);
             if (m.isRegion())
             {
@@ -1557,7 +1820,7 @@ private:
                 g.drawText (juce::String::fromUTF8 (m.name.c_str()), juce::Rectangle<float> (x + 8.0f, (float) rulerArea.getY() + 12.0f, 120.0f, 8.0f),
                             juce::Justification::centredLeft);
         }
-        if (doc.hasLoop())
+        if (doc.hasLoop() && viewLoop)
         {
             const auto a = frameToX ((double) doc.loopStart), b = frameToX ((double) doc.loopEnd);
             g.setColour (colour::accent);
@@ -1577,6 +1840,8 @@ private:
 
         for (const auto& m : doc.markers)
         {
+            if (! viewRegions)
+                break;
             g.setColour (colour::warning.withAlpha (0.55f));
             g.drawVerticalLine ((int) frameToX ((double) m.start), (float) waveArea.getY(), (float) waveArea.getBottom());
             if (m.isRegion())
@@ -1585,7 +1850,7 @@ private:
                 g.drawVerticalLine ((int) frameToX ((double) m.end), (float) waveArea.getY(), (float) waveArea.getBottom());
             }
         }
-        if (doc.hasLoop())
+        if (doc.hasLoop() && viewLoop)
         {
             g.setColour (colour::accent.withAlpha (0.6f));
             const float dash[] = { 4.0f, 3.0f };
@@ -1741,6 +2006,11 @@ private:
 
     void documentChanged()
     {
+        if (slotMode() && session != nullptr && ! adopting && recState == RecState::idle)
+        {
+            session->setDocument (doc); // the slot plays and keeps what the editor shows
+            seenRevision = session->revision();
+        }
         ++docVersion;
         selection = ae::clamp (doc, selection);
         cursor = juce::jlimit<std::int64_t> (0, doc.audio.frames(), cursor);
@@ -2414,12 +2684,23 @@ private:
     {
         if (audio.empty())
             return;
-        auto data = std::make_shared<SampleData>();
-        data->sampleRate = audio.sampleRate;
-        data->left = audio.channels[0];
-        if (audio.numChannels() > 1)
-            data->right = audio.channels[1];
-        engine.previewSample (data, loop, 1.0f, true); // (at the volume knob's level)
+        if (slotMode())
+        {
+            // an Edison slot plays into its own insert, after the slot (round 190cd)
+            const auto p = processor();
+            if (p == nullptr)
+                return;
+            p->play (std::make_shared<const ae::Audio> (audio), loop, (float) engine.getEditorVolume());
+        }
+        else
+        {
+            auto data = std::make_shared<SampleData>();
+            data->sampleRate = audio.sampleRate;
+            data->left = audio.channels[0];
+            if (audio.numChannels() > 1)
+                data->right = audio.channels[1];
+            engine.previewSample (data, loop, 1.0f, true); // (at the volume knob's level)
+        }
         playing = true;
         playFrom = from;
         playStartedMs = juce::Time::getMillisecondCounterHiRes();
@@ -2457,7 +2738,13 @@ private:
     {
         if (! playing)
             return;
-        engine.previewSample (nullptr);
+        if (slotMode())
+        {
+            if (const auto p = processor())
+                p->play (nullptr, false);
+        }
+        else
+            engine.previewSample (nullptr);
         playing = false;
         playhead = -1;
         playButton.setIcon (Icon::play);
@@ -2475,6 +2762,11 @@ private:
 
     void startRecording()
     {
+        if (slotMode())
+        {
+            startSlotRecording();
+            return;
+        }
         stopPlayback();
         auto* device = engine.getDeviceManager().getCurrentAudioDevice();
         if (device == nullptr)
@@ -2522,6 +2814,21 @@ private:
 
     void drainRecording()
     {
+        if (slotMode())
+        {
+            if (! session->pump())
+            {
+                finishSlotRecording();
+                return;
+            }
+            const auto now = session->phase() == edisonfx::Phase::recording ? RecState::recording : RecState::waiting;
+            if (now != recState)
+            {
+                recState = now;
+                showSlotPhase();
+            }
+            return;
+        }
         std::vector<float> l, r;
         engine.getMeters().capture.pull (l, r);
         if (l.empty())
@@ -2563,15 +2870,23 @@ private:
     // the document = what it was, with the recording inserted at the cursor
     void showRecording()
     {
-        doc = beforeRecording;
-        const auto rec = recordedAudio();
-        if (doc.audio.empty())
+        if (slotMode())
         {
-            doc.audio = rec;
-            doc.title = tr ("Recording").toStdString();
+            doc = session->preview(); // (what the document will be when the recording stops now)
+            recordAt = session->takeStart();
         }
         else
-            ae::insert (doc, recordAt, rec);
+        {
+            doc = beforeRecording;
+            const auto rec = recordedAudio();
+            if (doc.audio.empty())
+            {
+                doc.audio = rec;
+                doc.title = tr ("Recording").toStdString();
+            }
+            else
+                ae::insert (doc, recordAt, rec);
+        }
         const auto length = doc.audio.frames() - beforeRecording.audio.frames();
         selection = { recordAt, recordAt + length };
         cursor = recordAt + length;
@@ -2603,6 +2918,12 @@ private:
     {
         if (recState == RecState::idle)
             return;
+        if (slotMode())
+        {
+            session->stop();
+            finishSlotRecording();
+            return;
+        }
         drainRecording();
         engine.getMeters().capture.setSource (AudioCapture::off);
         releaseInput();
@@ -2639,6 +2960,13 @@ private:
     }
 
 public:
+    // Record on, if it is not (the mixer's "Open audio editor and record")
+    void armRecording()
+    {
+        if (recState == RecState::idle)
+            startRecording();
+    }
+
     void recordInputWithSong()
     {
         recordSource = AudioCapture::input;
@@ -2716,7 +3044,8 @@ private:
             if (self == nullptr || ! fc.getResult().existsAsFile())
                 return;
             self->stopPlayback();
-            self->source = { Source::Kind::file, -1, fc.getResult().getFullPathName() };
+            if (! self->slotMode())
+                self->source = { Source::Kind::file, -1, fc.getResult().getFullPathName() };
             self->loadFile (fc.getResult());
         });
     }
@@ -2902,6 +3231,33 @@ private:
         updateTitle();
     }
 
+    // FL's "Send to selected channel": the Channel Rack's selected channel plays the audio, when it plays a sample
+    int selectedSamplerChannel() const
+    {
+        const auto ch = engine.getSelectedChannel();
+        const auto& channels = engine.getSong().channels;
+        if (! juce::isPositiveAndBelow (ch, (int) channels.size()))
+            return -1;
+        const auto kind = channels[(std::size_t) ch].instrument;
+        return kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip ? ch : -1;
+    }
+
+    void sendToSelectedChannel()
+    {
+        const auto ch = selectedSamplerChannel();
+        if (doc.audio.empty() || ch < 0)
+            return;
+        const auto file = writeEditFile();
+        if (file == juce::File {})
+            return;
+        const auto path = file.getFullPathName().toStdString();
+        engine.editSong ([=] (Song& s) {
+            if (ch < (int) s.channels.size())
+                s.channels[(std::size_t) ch].samplePath = path;
+        });
+        setStatus (tr ("The channel now plays the edited audio"), false);
+    }
+
     // --- menus ----------------------------------------------------------------------------------------------
     juce::PopupMenu historyMenu()
     {
@@ -2935,6 +3291,32 @@ private:
     juce::PopupMenu recordMenu()
     {
         juce::PopupMenu menu;
+        if (slotMode()) // the plugin records its slot's input: when, how long, and what its playback does
+        {
+            const auto* fx = slotDef();
+            const auto mode = fx != nullptr ? edisonfx::modeOf (fx->params) : edisonfx::Mode::onInput;
+            const auto limit = fx != nullptr ? edisonfx::maxTimeIndexOf (fx->params) : 0;
+            menu.addSectionHeader (tr ("When / what to record"));
+            for (int m = 0; m < edisonfx::modeCount; ++m)
+                menu.addItem (tr (edisonfx::modeName ((edisonfx::Mode) m)), true, (int) mode == m,
+                              [this, m] { setSlotParam (edisonfx::recordMode, edisonfx::modeValue ((edisonfx::Mode) m)); });
+            menu.addItem (tr ("Append"), true, slotParam (edisonfx::append) >= 0.5f,
+                          [this] { setSlotParam (edisonfx::append, slotParam (edisonfx::append) >= 0.5f ? 0.0f : 1.0f); });
+            juce::PopupMenu time;
+            for (int i = 0; i < edisonfx::maxTimeCount; ++i)
+                time.addItem (maxTimeName (i), true, limit == i,
+                              [this, i] { setSlotParam (edisonfx::maxTime, (float) i / (float) (edisonfx::maxTimeCount - 1)); });
+            menu.addSubMenu (tr ("Maximum recording time"), time);
+            menu.addSectionHeader (tr ("Playback"));
+            menu.addItem (tr ("Mute input") + "\tI", true, slotParam (edisonfx::muteInput) >= 0.5f,
+                          [this] { setSlotParam (edisonfx::muteInput, slotParam (edisonfx::muteInput) >= 0.5f ? 0.0f : 1.0f); });
+            menu.addItem (tr ("Slave playback to host") + "\tH", true, slotParam (edisonfx::slave) >= 0.5f,
+                          [this] { setSlotParam (edisonfx::slave, slotParam (edisonfx::slave) >= 0.5f ? 0.0f : 1.0f); });
+            menu.addItem (tr ("Ignore own selection"), true, slotParam (edisonfx::ignoreOwnSelection) >= 0.5f, [this] {
+                setSlotParam (edisonfx::ignoreOwnSelection, slotParam (edisonfx::ignoreOwnSelection) >= 0.5f ? 0.0f : 1.0f);
+            });
+            return menu;
+        }
         menu.addSectionHeader (tr ("Record from"));
         menu.addItem (tr ("Audio input"), true, recordSource == AudioCapture::input, [this] { recordSource = AudioCapture::input; });
         menu.addItem (tr ("Master output"), true, recordSource == 0, [this] { recordSource = 0; });
@@ -2955,6 +3337,7 @@ private:
         juce::PopupMenu menu;
         const auto has = ! doc.audio.empty();
         menu.addItem (tr ("Send to the Playlist as an audio clip"), has, false, [this] { sendToPlaylist(); });
+        menu.addItem (tr ("Send to the selected channel"), has && selectedSamplerChannel() >= 0, false, [this] { sendToSelectedChannel(); });
         menu.addItem (tr ("Send to a new Sampler channel"), has, false, [this] { sendToNewSampler(); });
         menu.addItem (tr ("Send the selection to a new Sampler channel"), has && ! selection.empty(), false,
                       [this] { sendRangeToNewSampler (selection); });
@@ -2975,6 +3358,8 @@ private:
         const auto m = doc.markers[(std::size_t) index];
         menu.addSectionHeader (m.name.empty() ? (m.isRegion() ? tr ("Region") : tr ("Marker")) : juce::String::fromUTF8 (m.name.c_str()));
         menu.addItem (tr ("Rename..."), [this, index] { renameMarker (index); });
+        menu.addItem (tr ("Set info..."), [this, index] { setMarkerInfo (index); });
+        menu.addItem (tr ("Clone as region"), [this, index] { cloneRegion (index); });
         if (m.isRegion())
         {
             menu.addItem (tr ("Select"), [this, m] {
@@ -3037,13 +3422,63 @@ private:
     void updateTitle()
     {
         if (auto* window = findParentComponentOfClass<juce::DocumentWindow>())
-            window->setName (tr ("Audio editor") + (doc.title.empty() ? juce::String() : " - " + juce::String::fromUTF8 (doc.title.c_str())) + (modified ? " *" : ""));
+        {
+            auto name = tr ("Audio editor");
+            if (slotMode()) // the plugin's window: its name, then where it sits (like every effect window)
+            {
+                const auto [t, i] = slotPlace();
+                name = utf8 (edisonfx::info().name);
+                if (t >= 0)
+                {
+                    const auto track = t == 0 ? tr ("Master") : juce::String::fromUTF8 (engine.getSong().mixer[(std::size_t) t].name.c_str());
+                    name += " - " + (track.isNotEmpty() ? track : tr ("Insert {0}", { juce::String (t) })) + " (" + tr ("slot {0}", { juce::String (i + 1) }) + ")";
+                }
+            }
+            window->setName (name + (doc.title.empty() ? juce::String() : " - " + juce::String::fromUTF8 (doc.title.c_str())) + (modified && ! slotMode() ? " *" : ""));
+        }
     }
 
     void parentHierarchyChanged() override { updateTitle(); }
 
     void timerCallback() override
     {
+        if (slotMode() && session != nullptr)
+        {
+            const auto* fx = slotDef();
+            if (fx == nullptr) // the slot was deleted: its window goes with it
+            {
+                stopTimer();
+                juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<AudioEditor> (this)] {
+                    if (safe != nullptr)
+                        closeToolWindowOf (*safe);
+                });
+                return;
+            }
+            if (! std::equal (shownParams.begin(), shownParams.end(), fx->params.begin()))
+                syncSlotControls();
+            if (recState == RecState::idle && session->recording()) // (armed from outside: the mixer's "…and record")
+            {
+                beforeRecording = doc;
+                recState = RecState::waiting;
+                recordButton.setToggleState (true, juce::dontSendNotification);
+                showSlotPhase();
+            }
+            else if (recState == RecState::idle && session->revision() != seenRevision) // (changed behind the window)
+                adoptSession (tr ("Record"));
+            session->setSlaveOffset (selection.empty() ? 0 : selection.start);
+            // slaved to the song: the playback marker shows where the content is being played
+            if (! playing && recState == RecState::idle)
+            {
+                const auto p = processor();
+                const auto pos = p != nullptr && fx->params[edisonfx::slave] >= 0.5f && engine.getTransport().playing.load() ? p->playPosition() : -1.0;
+                const auto shown = pos >= 0.0 ? (std::int64_t) pos : (std::int64_t) -1;
+                if (shown != playhead)
+                {
+                    playhead = shown;
+                    repaint();
+                }
+            }
+        }
         if (recState != RecState::idle)
         {
             drainRecording();
@@ -3055,7 +3490,8 @@ private:
         }
         if (playing)
         {
-            const auto pos = engine.getPreviewPosition();
+            const auto slotPlayer = slotMode() ? processor() : nullptr;
+            const auto pos = slotMode() ? (slotPlayer != nullptr ? slotPlayer->playPosition() : -1.0) : engine.getPreviewPosition();
             if (pos < 0.0)
             {
                 if (juce::Time::getMillisecondCounterHiRes() - playStartedMs > 250.0)
@@ -3365,11 +3801,159 @@ private:
         }
         noiseThreshold = ae::acquireNoiseThreshold (doc.audio, selection);
         setStatus (tr ("Noise threshold: {0} dB", { juce::String (juce::Decibels::gainToDecibels (noiseThreshold, -120.0f), 1) }), false);
+        if (slotMode()) // FL: the plugin has one noise threshold, which "On input" / "Input" recording waits for too
+            setSlotParam (edisonfx::noiseThreshold, juce::jlimit (0.0f, 1.0f, noiseThreshold));
         repaint();
+    }
+
+    // the threshold to show: the one acquired here, else the slot's own
+    float shownNoiseThreshold() const
+    {
+        return noiseThreshold >= 0.0f ? noiseThreshold : slotMode() ? slotParam (edisonfx::noiseThreshold) : -1.0f;
+    }
+
+    // --- FL's Select / Zoom / region commands of the editor (round 190cd; the same commands as Slicex's wave editor) ---
+    void selectBeside (bool before)
+    {
+        if (selection.empty())
+            return;
+        selection = before ? ae::Range { 0, selection.start } : ae::Range { selection.end, doc.audio.frames() };
+        cursor = selection.start;
+        repaint();
+    }
+
+    void selectZoomedPart()
+    {
+        if (doc.audio.empty())
+            return;
+        const auto from = juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (viewStart));
+        const auto to = juce::jlimit<std::int64_t> (from, doc.audio.frames(), (std::int64_t) std::llround (viewStart + (double) waveArea.getWidth() * fpp));
+        selection = { from, to };
+        cursor = from;
+        repaint();
+    }
+
+    // the region before / after the selected one (round the ends), shown and selected
+    void selectRegionStep (int step)
+    {
+        std::vector<int> regions;
+        for (int i = 0; i < (int) doc.markers.size(); ++i)
+            if (doc.markers[(std::size_t) i].isRegion())
+                regions.push_back (i);
+        if (regions.empty())
+            return;
+        const auto n = (int) regions.size();
+        int at = -1;
+        for (int i = 0; i < n && at < 0; ++i)
+            if (const auto& m = doc.markers[(std::size_t) regions[(std::size_t) i]]; m.start == selection.start && m.end == selection.end)
+                at = i;
+        const auto to = step > 0 ? (at + 1) % n : (at <= 0 ? n - 1 : at - 1);
+        const auto& m = doc.markers[(std::size_t) regions[(std::size_t) to]];
+        selection = { m.start, m.end };
+        cursor = m.start;
+        if ((double) m.start < viewStart || (double) m.end > viewStart + (double) waveArea.getWidth() * fpp)
+        {
+            if ((double) (m.end - m.start) > (double) waveArea.getWidth() * fpp)
+                zoomTo ({ m.start, m.end });
+            else
+            {
+                viewStart = (double) m.start - ((double) waveArea.getWidth() * fpp - (double) (m.end - m.start)) * 0.5;
+                clampView();
+            }
+        }
+        repaint();
+    }
+
+    // the view at its closest zoom around one end of the selection
+    void zoomOnSelectionEdge (bool left)
+    {
+        if (selection.empty())
+            return;
+        const auto frame = (double) (left ? selection.start : selection.end);
+        fpp = 1.0 / 32.0;
+        clampView();
+        viewStart = frame - (double) waveArea.getWidth() * fpp * 0.5;
+        clampView();
+        repaint();
+    }
+
+    // FL names the copy "<name> #2" and keeps its start and length; the trigger note stays with the first
+    void cloneRegion (int index)
+    {
+        if (! juce::isPositiveAndBelow (index, (int) doc.markers.size()))
+            return;
+        auto copy = doc.markers[(std::size_t) index];
+        if (copy.name.empty())
+            copy.name = (copy.isRegion() ? tr ("Region") : tr ("Marker")).toStdString();
+        copy.name += " #2";
+        copy.keyNum = -1;
+        if (! copy.isRegion()) // (a marker cloned "as region": to the next marker, else to the end)
+        {
+            copy.end = doc.audio.frames();
+            for (const auto& m : doc.markers)
+                if (m.start > copy.start)
+                    copy.end = std::min (copy.end, m.start);
+        }
+        doc.markers.insert (doc.markers.begin() + index + 1, copy);
+        commit (tr ("Clone as region"));
+    }
+
+    void setMarkerInfo (int index)
+    {
+        auto* box = new juce::AlertWindow (tr ("Set info"), {}, juce::MessageBoxIconType::NoIcon, this);
+        box->addTextEditor ("info", juce::String::fromUTF8 (doc.markers[(std::size_t) index].info.c_str()));
+        box->addButton (tr ("Accept"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<AudioEditor> self (this);
+        box->enterModalState (true, juce::ModalCallbackFunction::create ([self, box, index] (int result) {
+                                  if (self != nullptr && result == 1 && juce::isPositiveAndBelow (index, (int) self->doc.markers.size()))
+                                  {
+                                      self->doc.markers[(std::size_t) index].info = box->getTextEditorContents ("info").toStdString();
+                                      self->commit (tr ("Set info"));
+                                  }
+                              }),
+                              true);
+    }
+
+    // "Rename all...": one name box after the other, from marker `index` on (Cancel stops the round)
+    void renameAllMarkers (int index, bool changed = false)
+    {
+        if (! juce::isPositiveAndBelow (index, (int) doc.markers.size()))
+        {
+            if (changed)
+                commit (tr ("Rename all"));
+            return;
+        }
+        const auto& m = doc.markers[(std::size_t) index];
+        selection = m.isRegion() ? ae::Range { m.start, m.end } : selection;
+        repaint();
+        auto* box = new juce::AlertWindow (tr ("Rename") + " (" + juce::String (index + 1) + "/" + juce::String ((int) doc.markers.size()) + ")", {},
+                                           juce::MessageBoxIconType::NoIcon, this);
+        box->addTextEditor ("name", juce::String::fromUTF8 (m.name.c_str()));
+        box->addButton (tr ("Accept"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<AudioEditor> self (this);
+        box->enterModalState (true, juce::ModalCallbackFunction::create ([self, box, index, changed] (int result) {
+                                  if (self == nullptr)
+                                      return;
+                                  if (result != 1 || ! juce::isPositiveAndBelow (index, (int) self->doc.markers.size()))
+                                  {
+                                      if (changed)
+                                          self->commit (tr ("Rename all"));
+                                      return;
+                                  }
+                                  const auto name = box->getTextEditorContents ("name").toStdString();
+                                  const auto differs = name != self->doc.markers[(std::size_t) index].name;
+                                  self->doc.markers[(std::size_t) index].name = name;
+                                  self->renameAllMarkers (index + 1, changed || differs);
+                              }),
+                              true);
     }
 
     float gateThreshold()
     {
+        if (noiseThreshold < 0.0f && slotMode()) // the plugin's own threshold (FL: 0.02 until one is acquired)
+            return slotParam (edisonfx::noiseThreshold);
         if (noiseThreshold >= 0.0f)
             return noiseThreshold * 1.12f; // a little over what was measured
         // not acquired: -48 dB under the peak
@@ -3411,6 +3995,8 @@ private:
     juce::String spectrumKey;
     TimeFormat timeFormat = TimeFormat::automatic;
     bool snapZero = false;
+    // FL's view switches (round 190cd): regions and markers, the loop, the noise threshold mark
+    bool viewRegions = true, viewLoop = true, viewNoiseMark = false;
     ae::Curve fadeCurve = ae::Curve::smooth;
 
     bool playing = false, loopPlay = false;
@@ -3431,6 +4017,14 @@ private:
     double recordRate = 44100.0;
     bool recordStereo = true;
     int recordTicks = 0;
+
+    // an Edison slot (round 190cd): the slot's document and take, and the plugin's switches
+    std::shared_ptr<edisonfx::Session> session;
+    std::uint64_t seenRevision = 0;
+    bool adopting = false; // the editor is taking the session's document (not the other way round)
+    std::vector<float> shownParams;
+    juce::ComboBox recModeBox, maxTimeBox;
+    juce::TextButton appendButton, slaveButton, muteInputButton;
 
     juce::String status;
     bool statusIsError = false;
@@ -3525,7 +4119,8 @@ juce::PopupMenu AudioEditor::mainMenu()
     juce::PopupMenu file;
     file.addItem (tr ("New (empty)"), [this] {
         stopPlayback();
-        source = {};
+        if (! slotMode())
+            source = {};
         setDocument ({}, tr ("Empty"));
     });
     file.addItem (tr ("Open audio file..."), [this] { openFileDialog(); });
@@ -3691,6 +4286,7 @@ juce::PopupMenu AudioEditor::mainMenu()
         ae::setLoop (doc, {});
         commit (tr ("Remove loop"));
     });
+    regions.addItem (tr ("Rename all..."), has && ! doc.markers.empty(), false, [this] { renameAllMarkers (0); });
     regions.addItem (tr ("Delete markers in the selection"), has && ! doc.markers.empty(), false, [this] {
         if (ae::removeMarkers (doc, ae::orAll (doc, selection)) > 0)
             commit (tr ("Delete markers"));
@@ -3736,11 +4332,40 @@ juce::PopupMenu AudioEditor::mainMenu()
     view.addItem (tr ("Zoom out") + "\t-", has, false, [this] { zoomAround ((float) waveArea.getCentreX(), 2.0); });
     view.addItem (tr ("Zoom out full") + "\tF", has, false, [this] { zoomToFit(); });
     view.addItem (tr ("Zoom on the selection"), has && ! selection.empty(), false, [this] { zoomTo (selection); });
+    view.addItem (tr ("Zoom on left of selection"), has && ! selection.empty(), false, [this] { zoomOnSelectionEdge (true); });
+    view.addItem (tr ("Zoom on right of selection"), has && ! selection.empty(), false, [this] { zoomOnSelectionEdge (false); });
+    view.addSeparator();
+    view.addItem (tr ("Regions"), true, viewRegions, [this] {
+        viewRegions = ! viewRegions;
+        repaint();
+    });
+    view.addItem (tr ("Loop"), true, viewLoop, [this] {
+        viewLoop = ! viewLoop;
+        repaint();
+    });
+    view.addItem (tr ("Noise threshold mark"), true, viewNoiseMark, [this] {
+        viewNoiseMark = ! viewNoiseMark;
+        if (viewNoiseMark && shownNoiseThreshold() <= 0.0f)
+            setStatus (tr ("No noise threshold yet: select a part with only the background noise, then Tools > Acquire noise threshold"), false);
+        repaint();
+    });
+    view.addSeparator();
     view.addItem (tr ("Snap to zero crossings"), true, snapZero, [this] { snapButton.setToggleState (! snapZero, juce::sendNotification); });
+
+    // FL's Select menu (the commands Slicex's wave editor has too)
+    juce::PopupMenu select;
+    const auto anyRegion = std::any_of (doc.markers.begin(), doc.markers.end(), [] (const ae::Marker& m) { return m.isRegion(); });
+    select.addItem (tr ("Select before current selection"), has && ! selection.empty(), false, [this] { selectBeside (true); });
+    select.addItem (tr ("Select after current selection"), has && ! selection.empty(), false, [this] { selectBeside (false); });
+    select.addItem (tr ("Select zoomed part"), has, false, [this] { selectZoomedPart(); });
+    select.addSeparator();
+    select.addItem (tr ("Select previous region"), has && anyRegion, false, [this] { selectRegionStep (-1); });
+    select.addItem (tr ("Select next region"), has && anyRegion, false, [this] { selectRegionStep (1); });
 
     juce::PopupMenu menu;
     menu.addSubMenu (tr ("File"), file);
     menu.addSubMenu (tr ("Edit"), editMenu (false));
+    menu.addSubMenu (tr ("Select"), select, has);
     menu.addSubMenu (tr ("Tools"), tools, has);
     menu.addSubMenu (tr ("Regions"), regions, has);
     menu.addSubMenu (tr ("View"), view);
@@ -3766,6 +4391,7 @@ juce::String windowKey (const Source& s)
         case Source::Kind::file: return "audioeditor:" + s.path;
         case Source::Kind::channel: return "audioeditor:channel:" + juce::String (s.index);
         case Source::Kind::insert: return "audioeditor:insert:" + juce::String (s.index);
+        case Source::Kind::slot: return "audioeditor:slot:" + juce::String ((juce::int64) s.instance);
         case Source::Kind::none: break;
     }
     return "audioeditor";
@@ -3830,6 +4456,61 @@ void openAudioEditorForInsert (AudioEngine& engine, int insert)
 {
     auto* editor = openWindow (engine, { Source::Kind::insert, insert, {} });
     editor->setRecordSource (insert);
+}
+
+namespace
+{
+std::optional<Source> slotSource (AudioEngine& engine, int track, int slot)
+{
+    const auto& mixer = engine.getSong().mixer;
+    if (! juce::isPositiveAndBelow (track, (int) mixer.size()) || ! juce::isPositiveAndBelow (slot, (int) mixer[(std::size_t) track].effects.size())
+        || mixer[(std::size_t) track].effects[(std::size_t) slot].kind != EffectKind::edison)
+        return std::nullopt;
+    Source s;
+    s.kind = Source::Kind::slot;
+    s.index = track;
+    s.instance = mixer[(std::size_t) track].effects[(std::size_t) slot].instance.id;
+    return s;
+}
+} // namespace
+
+void openEdisonSlot (AudioEngine& engine, int track, int slot, bool record)
+{
+    const auto source = slotSource (engine, track, slot);
+    if (! source)
+        return;
+    AudioEditor* editor = nullptr;
+    if (auto* open = findToolWindow (windowKey (*source)))
+    {
+        open->toFront (true);
+        editor = dynamic_cast<AudioEditor*> (open->getContentComponent());
+    }
+    else
+        editor = openWindow (engine, *source);
+    if (editor != nullptr && record)
+        editor->armRecording();
+}
+
+std::unique_ptr<juce::Component> makeEdisonSlotEditor (AudioEngine& engine, int track, int slot)
+{
+    const auto source = slotSource (engine, track, slot);
+    if (! source)
+        return {};
+    return std::make_unique<AudioEditor> (engine, *source);
+}
+
+int addEdisonSlot (AudioEngine& engine, int track)
+{
+    int at = -1;
+    engine.editSong ([track, &at] (Song& song) {
+        if (track < 0 || track >= (int) song.mixer.size() || (int) song.mixer[(std::size_t) track].effects.size() >= maxEffectSlots)
+            return;
+        auto& effects = song.mixer[(std::size_t) track].effects;
+        for (int row = 0; row < maxEffectSlots && at < 0; ++row) // FL: the first empty slot of the track
+            if (mixerops::effectAtRow (effects, row) < 0)
+                at = mixerops::insertEffectAtRow (song, track, makeEffectSlot (EffectKind::edison), row);
+    });
+    return at;
 }
 
 std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine, audioedit::Document doc, bool spectrum)

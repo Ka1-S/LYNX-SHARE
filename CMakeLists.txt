@@ -192,6 +192,7 @@ add_library(lynx_core STATIC
     src/core/FruityPhaser.cpp
     src/core/FruityFilters.cpp
     src/core/NewtoneFx.cpp
+    src/core/EdisonFx.cpp
     src/core/MixSuite.cpp
     src/core/EmberClassic.cpp
     src/core/VoxStrip.cpp

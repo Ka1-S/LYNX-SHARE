@@ -33,6 +33,16 @@ void openAudioEditorRecording (AudioEngine& engine);
 // A mixer insert (0 = Master): opens with the recording source set to it, like an editor sitting in a mixer slot.
 void openAudioEditorForInsert (AudioEngine& engine, int insert);
 
+// An Edison effect slot (round 190cd, core/EdisonFx.h): the editor as that plugin's window. It records the slot's
+// input, plays into the slot and edits the slot's own audio, which is kept with the project. One window per slot;
+// `record`: Record is switched on too. The window follows its slot when the slot moves and closes when it is deleted.
+void openEdisonSlot (AudioEngine& engine, int track, int slot, bool record = false);
+// The same editor without a window (thumbnails, snapshots); nullptr when the slot is not an Edison.
+std::unique_ptr<juce::Component> makeEdisonSlotEditor (AudioEngine& engine, int track, int slot);
+// Loads an Edison into the first empty slot of mixer track `track` (FL's "Open audio editor" of a mixer track).
+// Returns the effect's index, or -1 when the track is full.
+int addEdisonSlot (AudioEngine& engine, int track);
+
 // --snapshot: the editor showing `doc` (selection = the second quarter), in the waveform or spectrogram view.
 std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine, audioedit::Document doc, bool spectrum);
 // --snapshot: the items of the editor's main menu, one per line ("Section > Item"), for the menu check.

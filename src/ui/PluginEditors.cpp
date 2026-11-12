@@ -4,6 +4,7 @@
 #include "ui/ControllerEditors.h"
 #include "ui/Controllers164.h"
 #include "ui/NewtoneEditor.h"
+#include "ui/AudioEditor.h"
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
 #include "ui/PluginEditors.h"
@@ -5812,6 +5813,11 @@ void open (AudioEngine& engine, int track, int slot)
     if (Controller164Windows::handles (kind)) // the X-Y / X-Y-Z pad, the Control Surface's panel (round 164)
     {
         Controller164Windows::open (engine, track, slot);
+        return;
+    }
+    if (kind == EffectKind::edison) // the audio editor as the slot's plugin window (round 190cd)
+    {
+        openEdisonSlot (engine, track, slot);
         return;
     }
     if (NewtoneWindows::handles (kind)) // load a sample, edit its notes / warp markers, hear it (round 142)
