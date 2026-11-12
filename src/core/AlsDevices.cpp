@@ -107,7 +107,7 @@ double eq8CutSectionScale (double liveQ) noexcept
 
 double eq8ShelfCookbookQ (double liveQ) noexcept
 {
-    return std::sqrt (0.5) * std::pow (root2 * std::max (liveQ, 1.0e-3), 0.3966);
+    return 0.71 * std::pow (std::max (liveQ, 1.0e-3) / 0.71, 0.394);
 }
 
 double eq8AdaptiveQ (double liveQ, double gainDb, double factor) noexcept
