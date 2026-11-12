@@ -116,6 +116,11 @@ enum Param
                    // repeats (odd repeats left early / right late, even ones the other way round), Ping-Pong: the
                    // summed input, the right echo a copy of the left one, the pair tone once per left-right pair
     lrOffset,      // that offset, 0 … 25 ms (EchoBoy's L/R Offset; default 8 ms, the trial's default)
+    // ---- round 190dl (docs/PARITY.md "Round 190dl"), appended
+    engineLaw,     // Law: Classic (0, the engine of projects saved before) / Measured (1, the default of new instances):
+                   // the tape characters' measured tape stage (output and loop tone apart, hiss, the wow's mean lag)
+    modClock,      // Clock: the LFO swings the echo time by a fraction of itself (0 … 50 % at Depth 100 %, linear), both
+                   // sides in step — a clocked line's modulation (H-Delay's, measured); off (default) = the ms law
     paramCount
 };
 enum class Style { single, ratio, quad, dual, pingPong }; // the two-time styles last (the panel shows the right time for both)

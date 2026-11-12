@@ -3173,3 +3173,66 @@ own probe lab and five map refits: a round of its own. Prism has no upward branc
 drum gate's Debleed is not modelled (its release sweep changes nothing on the probes; a bass line at D still opens LYNX on
 note onsets the reference ignores). No state translators were added for these references (their saved states were never
 captured); the missing-plugin table uses the measured defaults instead.
+
+## Round 190dl: Echoform — H-Delay's clocked modulation, the measured tape stage (Law: Classic | Measured)
+
+Roadmap item 3 of the 0.1.27 parity plan (Echoform, 10 reference rows). Black-box only: every number below comes from
+the reference renders already in the tp172d / tp172c / refcap182 banks; nothing was captured, no third-party binary was
+opened, no open-source code was ported (the open BBD / tape models were reading material; the fitted structure is
+LYNX's own).
+
+**S2-class diagnosis (H-Delay, wave 2–3 on S2).** The failing setting is the only one with modulation (Depth 50 %,
+stored rate 0.1, LoFi on). Its impulse and noise-burst echo trains show the echo time swinging as a **triangle of
+± 87.5 ms (23 % of the 375 ms time) with a 5.0 s period, both sides in step** (fitted to 3 ms rms over 12 echoes);
+LYNX translated it to its ms law (± 5 ms, a quarter period between the sides). The LFO keeps running between the
+capture's files (its phase follows the processed-sample count, not a reset), so the waveform cannot null; the
+statistics can. New appended parameter **Mod clock** (off by default = the ms law): the swing is ½ · Depth of the echo
+time, the sides in step; the H-Delay translator turns it on with the triangle, Depth × 0.932 and rate × 2 (one depth
+and one rate measured: proportional-to-time and linear-in-percent are assumptions, the clocked-line reading of the
+vendor's PCM42 lineage).
+
+**Tape stage (ValhallaDelay's Tape mode, the setting with Wow / Flutter 0 is deterministic).** Echo-train system
+identification: the first echo is a record tone, each further pass adds a feedback-only tone that loses the lows
+(−9 dB at 63 Hz against 1.3 kHz per pass, where Echoform's write-path shelf lost 4 dB), both minimum phase within
+0.02 rad, plus **0.102 ms** more delay per pass. Programme came out 2 … 4 dB under the impulse gain (round 190ca's
+−1.67 dB Output trim covered it on average): a level law with memory. Built as Echoform's **Measured** law for the
+Tape character: record level law (mean-square, fast attack, 44 ms release, ratio 1.06 above −47.5 dB), a harder head
+curve, the record tone, the feedback tone, the extra delay, and the measured **hiss** (−91.5 dBFS at Mix 100 %, pink
+through 4.5 kHz, uncorrelated sides; it plays while the tape holds anything and fades when the insert is idle — an idle
+Echoform still outputs exact zeros). Constants: cookbook sections fitted on the impulse first, then all of it by
+Nelder-Mead on that setting's four renders (ESR + level + third-octave spectrum; mean ESR −3.1 → −11.2 dB); the other
+three settings (default wow, other feedback) only validate it. The translator's Tape trim is back at 0 dB.
+
+**Old projects.** Appended parameter **Law** (Classic | Measured): new instances Measured, a project saved before loads
+Classic; the Classic path is the unchanged code (tape `[[fallthrough]]` into the old case). 10 / 10 classic renders
+hash-identical to the base commit (test, guarded to glibc ≥ 2.43 like round 190bz, with energy / sample tolerances
+everywhere) and 131 / 131 bank renders of the untouched rows byte-identical. The Complete Access delay role (Stellar
+Echo, X-Echo, X-Delay, 3D Delay) keeps Classic (`Law=0` in its preset): the measured stage lowered the multi-head tape
+row's tail score 2.72 → 2.28 because it is another device.
+
+| Row (bank) | files | wave before → after | tail before → after |
+|---|---|---|---|
+| H-Delay (tp172d) | 12 | 5.92 → **6.17** | 5.54 → **6.15** (S2 3.08 → 4.90) |
+| EchoBoy (tp172d) | 20 | 5.15 → 5.15 | 6.34 → 6.34 |
+| EchoBoy Jr (prog182) | 25 | 4.56 → 4.56 | 8.08 → 8.08 (programme only) |
+| ValhallaDelay (tp172d) | 16 | 4.25 → **4.56** | 5.90 → **6.22** (D 6.32 → 6.62, S1 6.71 → 7.08, S3 6.58 → 7.18) |
+| PrimalTap (prog182) | 25 | 3.64 → 3.64 | 7.40 → 7.40 |
+| Stellar Echo (tp172c) | 6 | 3.33 → 3.33 | 2.72 → 2.72 |
+| Little PrimalTap (prog182) | 25 | 2.84 → 2.84 | 6.23 → 6.23 |
+| X-Echo (tp172c) | 9 | 2.78 → 2.78 | 4.55 → 4.55 |
+| 3D Delay (tp172c) | 6 | 1.67 → 1.67 | 2.47 → 2.47 |
+| X-Delay (tp172c) | 3 | 1.67 → 1.67 | 1.90 → 1.90 |
+| **Family mean** | | **3.58 → 3.64** (10 rows) | **4.20 → 4.34** (7 impulse-bank rows) |
+
+Baseline = this branch's base (rollup027 77026c3a2; ValhallaDelay already 4.25 with round 190ca's trim). No file went
+down on the wave score and no setting on the tail score; the 16 renders that changed all moved up on the tail score
+(ValhallaDelay S3 music ESR −7.5 → −16.1 dB, S1 drums / music 4 → 6; H-Delay S2 spectrum 3.7 / 5.6 / 3.2 / 10.0 →
+0.7 / 3.0 / 1.0 / 5.0 dB). CPU per instance (48 kHz, 20 s of bursts, blocks of 512, ten interleaved runs against the
+base build's binary): Tape Classic min 1.32 / median 1.44 % of one core, Tape Measured min 1.34 / median 1.52 %
+(+ 2 … 6 %). That needed: both sides recorded at once (2-double sections), one level follower for the pair whose gain is
+worked out again on a 0.5 dB rise or every 16 samples (polynomial log2 / exp2 from the bits), coefficients only when the
+time / Era / rate change, the hiss read from a 2.7 s table made in prepare () (+ 1 MB per instance), and two weak fitted
+sections left out (the bank scores the same or higher without them). Clean with Mod clock = the ms law within noise.
+Latency: 0 samples reported, unchanged. Not done (next): Hi-Fi tape / the other ValhallaDelay modes (S2 still
+4.0, its wow is random per render), wow / flutter depth law (EchoBoy's mod part), BBD clock stage (no bank row runs a
+BBD mode through the maps), the structure rows (3 taps, multi-head + spring). Lab: `/mnt/e/lynx-work/echo190dl`.
