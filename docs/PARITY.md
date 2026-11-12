@@ -3039,3 +3039,99 @@ to 7.417. The map now carries the switch (core/FittedMaps.inc, by hand until the
 `/mnt/e/lynx-work/parity190ar/maps/FG_X_2.json` has it): 7.750.
 Tools and tables: `/mnt/e/lynx-work/apexfix190co` (`tp.py`, `bank.py`, `pb.py`, `partp.py`, `scorediff.py`,
 `metertable.py`; round 190co2's variant search and final runs in `var/`, `parity_final/`, `table.py`).
+
+## Round 190dm: dynamics parity — Sentry's transient trigger, Glow's cell memory, Hush's Air and Mix, the three-band bus compressor on Prism
+
+Roadmap item 6 of the 0.1.27 parity plan (research190bl §3.15–3.17, §3.19), highest gain per row first. Everything
+was measured black-box on the references' recorded probes (trial190k: `tc`, `stairs`, `pinkst`, `stereo`, `ess`,
+`nburst`); the programme banks were only scored, never fitted. No third-party code. Tooling and logs:
+`/mnt/e/lynx-work/dyn190dm/` (`lab/`, `fit/`, `bank.py`, `runs/`).
+
+**Sentry Gate — Trigger: Level | Transient** (appended `Trigger`, `Sensitivity`, `Release shape`; default Level = every
+gate before, sample for sample). The drum-gate reference is not a level gate: an onset over the threshold opens it at
+once, and its gain then follows one curve whatever the input does, down to the range — a steady tone that jumps from
+−40 to −6 dBFS opens it and is gone 0.8 s later, a stair of +6 dB steps never reopens it, range 40 and 100 run the same
+curve until −40. Measured on the tone-burst probe at six release / shape settings:
+- hold = 18.75 ms + 5.6 % of the release, then −slope · u dB (u = time / release) times a fade to silence
+  (1 − (u / end)^power): Smooth 16.1 dB per release, no fade; Mid 15.8 dB, end 1.45, power 3.5; Sharp 10.0 dB, end 0.86,
+  power 2.5 (rms 0.06 … 0.31 dB over release 52 ms … 3.5 s);
+- the onset detector: the side chain's first difference (unity at 1 kHz — or at the side chain's low-pass when lower —
+  85 %) plus 15 % of the side chain itself, a peak follower (instant / 10 ms) and a slower follower of it (5 / 50 ms);
+  an onset is the fast one over
+  max (slow, threshold) by 8 dB (sensitivity 5), re-armed 3 dB lower. On all 30 probe captures (D, S1, X1–X3 and the
+  release / slope / threshold sweeps) the gain trace is within 0.06 dB mean (a 100 Hz note at −48 dBFS from silence
+  does not open it, 8 kHz at the same level does; clicks on a pink bed do, pink steps do not).
+Sensitivity 1 … 10 scales the 8 dB (own law: 8 · 10 / (s + 5)); the reference's other values were not captured. The
+normalisation at a lower side-chain low-pass is not pinned by the probes (the reference never opens on the X3 probes,
+detection low-pass 150 Hz, and neither law does): it is chosen so a kick's low-passed side chain still sees its onsets,
+and the programme rows at X3 agree (prog182 4.32 → 4.76 with it, every other file the same).
+
+**Glow Leveler — Opto memory** (appended, Opto classic voicing, Compress; default off). The FG-2A-type reference
+recovers fast after a short burst and slowly after a long one (0.09 dB left 1.1 s after a 10 ms burst, 2.0 dB after 2 s).
+The memory law adds an exposure state E (0 … 1) that charges towards the light (drive / (1 + drive)) with 394 ms while
+lit and fades with 2.44 s; both conductances release (1 + 4.24 · E^1.23) times slower, with the round-123 cell refitted
+around it (optofit: Nelder-Mead, tc probe at D / S1 / X1 / X2): mean gain error 0.94 → 0.57 dB (D 0.77 → 0.29). Left
+after a 10 ms burst at 1.1 s: 0.07 dB (round 123's law 1.17); after 2 s: 1.29 dB (reference 2.00).
+
+**Hush De-esser — Air and Mix** (appended; defaults off / 100 %). The E2-type reference passes a kit and a mix brighter,
+not darker: its wet path carries a static high shelf (on by default) — measured on the noise-burst and stereo probes
+at Dry/Wet 100 %: an RBJ high shelf at 8151 Hz, S 0.5, +8.5 dB (0.05 dB rms, 500 Hz … 16 kHz) — and its default Dry/Wet
+is 50 %. Air (0 … +12 dB) puts that shelf on the processed signal; Mix blends the dry signal back, delayed by the
+latency (Mix 0 nulls with the input below −100 dB). This is what round 190ar's relative detector could not find: the
+kit rows were 1.2 dB low because Hush cut what the reference lifts.
+
+**Re-paired: the two three-band compressors → Prism Multiband** (maps only, no DSP change; plan §3.17 item 5, §7
+question 7, owner: "do the recommended"). SSL G3 MultiBusComp was paired with Crest and MO-TT with Compressor (one band
+each); Prism runs three bands on the reference's own crossovers (120 Hz / 6 kHz, 88 Hz / 2.5 kHz), the three bands set
+alike as the references' settings move them (a tied map, fitted on the probes with parity190ar's fitter;
+`fit/fit190.py`, `fit/specs190dm.py`). MO-TT's upward half has no Prism counterpart in the same band (a band compresses
+up or down by the sign of its range): the fit chose deep downward bands with a high make-up, which levels the bands from
+both sides on programme material; an upward branch per band (plan §3.17) stays open. The missing-plugin table follows
+where the stand-in at its measured default is better on every bank setting (core/PluginSubstitutes.cpp): G3 on Prism
+(2.50 / 2.36 → 4.25 / 2.76, tp172c / programme), the drum gate on Sentry's transient trigger (2.25 / 1.73 → 4.12 / 3.41);
+MO-TT stays on the Compressor (its Prism default would score 2.92 / 2.48 against 3.08 / 2.56).
+
+Scores (same banks and score as SCOREBOARD-v3; before = origin/wip/rollup027 77026c3a2 with the v3 maps, after = the
+branch; per-file up / same / down):
+
+| reference | LYNX plugin | bank | before → after | up / same / down | went down | change |
+|---|---|---|---|---|---|---|
+| VM Gate Drums | Sentry Gate | tp172c | 1.88 → **5.00** | 5 / 3 / 0 | – | Trigger = Transient (map from the probe laws) |
+| VM Gate Drums (programme) | Sentry Gate | prog182 | 1.18 → **4.76** | 18 / 6 / 1 | X2_bass 3→2 | |
+| SSL G3 MultiBusComp | Crest → **Prism Multiband** | tp172c | 3.62 → **6.00** | 7 / 1 / 0 | – | re-paired, three tied bands |
+| SSL G3 MultiBusComp (programme) | Crest → Prism | prog182 | 3.32 → **5.16** | 22 / 3 / 0 | – | |
+| MO-TT | Compressor → **Prism Multiband** | tp172c | 2.92 → **4.08** | 8 / 4 / 0 | – | re-paired, three tied bands |
+| MO-TT (programme) | Compressor → Prism | prog182 | 2.76 → **4.36** | 17 / 7 / 1 | D_drums 4→3 | |
+| Eiosis E2Deesser | Hush De-esser | tp172b | 4.44 → **5.12** | 6 / 5 / 5 | S1/S2/S3_sweep 5→4, S2_drums 3→2, S2_music 5→3 | Air + Mix, map refitted on the probes |
+| Eiosis E2Deesser (programme) | Hush De-esser | prog182 | 5.90 → **6.95** | 13 / 6 / 1 | S2_drums 4→3 | |
+| VM FG-2A | Glow Leveler | tp172c | 3.42 → **3.75** | 3 / 9 / 0 | – | Opto memory on (v2 map + the switch) |
+| VM FG-2A (programme) | Glow Leveler | prog182 | 4.68 → **4.80** | 3 / 21 / 1 | S1_bass 5→3 | |
+
+Per plugin (the v3 rows; the G3 and MO-TT rows move to Prism):
+
+| LYNX plugin | v3 rows | mean before | mean after (same rows) | after, re-paired rows moved to Prism |
+|---|---|---|---|---|
+| Sentry Gate | 8 | 6.35 | **6.74** | 6.74 |
+| Hush De-esser | 5 | 6.28 | **6.42** | 6.42 |
+| Crest Compressor | 13 | 5.10 | **5.28** | 5.22 (12 rows) |
+| Compressor | 10 | 4.76 | **4.87** | 4.96 (9 rows) |
+| Glow Leveler | 4 | 4.52 | **4.60** | 4.60 |
+| Prism Multiband | 1 | 7.60 | 7.60 | 5.89 (3 rows: Pro-MB 7.60, G3 6.00, MO-TT 4.08) |
+
+The other 35 rows of the five plugins score exactly as before (same files, same scores).
+
+Off = the base commit's sound: `tests/Dyn190dmTests.inc` renders 11 settings of the three effects (defaults and the
+other voicings / styles) hash-identical to the base commit (glibc ≥ 2.43 on x86-64; energy and samples within 1e-4 /
+2e-6 elsewhere), and every render of the 35 unchanged rows is byte-identical between the base and the branch (824 of 824 files; the 7
+other Sentry rows again on the final binary, 165 of 165). CPU (user time, one instance, 35 s stereo programme, best of five, g++ −O2):
+level gate 0.43 s before and after, Transient 0.34 s; Hush 0.29 s before and after, with Air and Mix 0.29 s; Glow
+0.38 s before and after, with the memory 0.46 s; Prism with three bands 1.43 s where Crest took 0.35 s (the G3 row now
+runs a multiband: about 4 % of one core) No latency changes (Transient and Air / Mix add none; Mix uses the voicing's own latency).
+
+Not done, and why: the Compressor / Crest feedback detector and grey-box refit (plan §3.17 items 1–4) — by gain per row
+it came last (a few tenths per row against +0.3 … +3.1 for the items above), and the remaining FET-family gaps are level
+errors at settings the maps cannot express (FG-116 Modern X2: side-chain HP on, LYNX +4 … 6 dB loud), so it needs its
+own probe lab and five map refits: a round of its own. Prism has no upward branch per band (MO-TT's upward half). The
+drum gate's Debleed is not modelled (its release sweep changes nothing on the probes; a bass line at D still opens LYNX on
+note onsets the reference ignores). No state translators were added for these references (their saved states were never
+captured); the missing-plugin table uses the measured defaults instead.

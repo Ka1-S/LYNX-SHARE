@@ -2831,7 +2831,8 @@ struct ShapeDef
 };
 constexpr ShapeDef shapeDefs[3] { { 16.1, 0.0, 1.0 }, { 15.8, 1.45, 3.5 }, { 10.0, 0.86, 2.5 } };
 // the transient detector (fitted on the same probes: which onsets open it and which do not): the side chain's first
-// difference (normalised to unity at 1 kHz, so a 100 Hz note's onset counts 20 dB less and a click or a hat's much more),
+// difference (normalised to unity at 1 kHz — or at the side chain's low-pass when lower — so a 100 Hz note's onset counts
+// 20 dB less and a click or a hat's much more),
 // a peak follower (fast) and a slower follower of it (slow); an onset is fast over max (slow, threshold) by more than
 // `ratioDb` (the default sensitivity's), re-armed once that falls `hysteresisDb` lower
 constexpr double detFastAttackMs = 0.0, detFastReleaseMs = 10.0, detSlowAttackMs = 5.0, detSlowReleaseMs = 50.0;
@@ -3008,7 +3009,9 @@ private:
             tHold = holdMs (p[hold]) * 0.001;
             tRelease = releaseMs (p[release]) * 0.001;
             tFloor = -rangeDb (p[range]);
-            tEmph = detEmphasis * sr / (2.0 * pi * 1000.0);
+            // the first difference is unity at 1 kHz, or at the side chain's low-pass when that is lower (a kick's side
+            // chain low-passed at 150 Hz still sees its onsets; the reference's probes agree with both, see PARITY.md)
+            tEmph = detEmphasis * sr / (2.0 * pi * (lpOn ? std::min (1000.0, std::min (lpHz, sr * 0.45)) : 1000.0));
             tShape = shapeOf (p[releaseShape]);
         }
         // round 190v: the Vocal style's noise reduction (vocalNr above); nothing of it runs in the other styles

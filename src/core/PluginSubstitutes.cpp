@@ -563,7 +563,7 @@ vendor = Complete Access (role)
 lynx = Crest Compressor
 # round 190ar: the references with a fitted setting map load at the mapped settings (core/FittedMaps.inc)
 translate = fitted-map
-names = SSL Native Bus Compressor 2; SSL G3 MultiBusComp; SSL 360 Link Bus Compressor; SSL Native X-Comp v6; SSL Fusion HF Compressor; VBC FG-Grey; VBC FG-MU; VBC FG-Red; smartcomp3; smartcomp2; purecomp; learncomp; Harrison_LookaheadCompressor; Harrison_MPCCompressor; VM FG-Stress; VM FG-Bomber
+names = SSL Native Bus Compressor 2; SSL 360 Link Bus Compressor; SSL Native X-Comp v6; SSL Fusion HF Compressor; VBC FG-Grey; VBC FG-MU; VBC FG-Red; smartcomp3; smartcomp2; purecomp; learncomp; Harrison_LookaheadCompressor; Harrison_MPCCompressor; VM FG-Stress; VM FG-Bomber
 
 [complete-access-vintage-comps]
 product = vintage compressor models (Slate FG-116 / FG-76 / FG-401 / FG-A / FG-Dynamics, SSL X-ValveComp)
@@ -602,7 +602,28 @@ product = gates (SSL X-Gate, Slate Gate Classic / Drums, Harrison Spectral Gate)
 vendor = Complete Access (role)
 lynx = Sentry Gate
 translate = fitted-map
-names = SSL X-Gate; VM Gate Classic; VM Gate Drums; Harrison_SpectralGate
+names = SSL X-Gate; VM Gate Classic; Harrison_SpectralGate
+
+# round 190dm: the three-band bus compressor stands in on Prism Multiband (three bands on its crossovers, set alike), at its
+# setting map's default (fitted black-box on its probes, /mnt/e/lynx-work/dyn190dm/fit): every bank setting played
+# through this preset scores 4.25 / 2.76 (tp172c / programme) against Crest's defaults 2.50 / 2.36. (MO-TT stays on the
+# Compressor: on Prism its map wins at matched settings, but its default as a stand-in scores 2.92 / 2.48 against 3.08 / 2.56.)
+[three-band-bus-compressor]
+product = three-band bus compressor (SSL G3 MultiBusComp)
+vendor = Complete Access (role)
+lynx = Prism Multiband
+names = SSL G3 MultiBusComp
+preset = Bands=0.4; Band layout=0; Crossover 1=0.216712; Crossover 2=0.828259; Slope=0.5; Mix=1; Processing=1; B1 threshold=0.97449; B1 ratio=0.47828; B1 range=0.0; B1 knee=0.5; B1 attack=0.33953; B1 release=0.53006; B1 level=0.48994; B2 threshold=0.97449; B2 ratio=0.47828; B2 range=0.0; B2 knee=0.5; B2 attack=0.33953; B2 release=0.53006; B2 level=0.48994; B3 threshold=0.97449; B3 ratio=0.47828; B3 range=0.0; B3 knee=0.5; B3 attack=0.33953; B3 release=0.53006; B3 level=0.48994
+
+# round 190dm: the drum gate stands in on Sentry Gate's transient trigger, at the reference's default settings (its laws
+# measured on its probes: threshold -60 dB, range 100 dB, release 500 ms, hold 46.75 ms, Mid shape, sensitivity 5): every
+# bank setting played through this preset scores 4.12 / 3.41 (tp172c / programme) against the level gate's 2.25 / 1.73
+[drum-gate]
+product = drum gate (Slate Gate Drums)
+vendor = Complete Access (role)
+lynx = Sentry Gate
+names = VM Gate Drums
+preset = Trigger=1; Threshold=0; Range=1; Attack=0.1316; Release=0.46416; Hold=0.43243; Knee=0; Release shape=0.5; Sensitivity=0.44444
 
 [complete-access-reverbs]
 product = reverbs (LiquidSonics Lustrous Plates / Seventh Heaven / Cinematic Rooms, Slate VerbSuite Classics, SSL FlexVerb / PlateVerb / SpringVerb, sonible smart:reverb)

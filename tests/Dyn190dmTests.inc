@@ -224,6 +224,12 @@ TEST (dyn190dm_transient_gate_opens_on_onsets_and_follows_its_curve)
     const auto lo = toneAt (100.0, -48.0, 0.3, 0.5, 1.0), hi = toneAt (8000.0, -48.0, 0.3, 0.5, 1.0);
     CHECK (gainAt (lo, dyn108::run (EffectKind::sentryGate, transientGate(), lo), 0.35) < -90.0);
     CHECK (gainAt (hi, dyn108::run (EffectKind::sentryGate, transientGate(), hi), 0.35) > -0.5);
+    // with the side chain low-passed (a kick's), the first difference is unity at the low-pass: a 100 Hz burst opens it
+    auto kick = transientGate();
+    kick[s::lowPass] = s::filterValue (150.0);
+    kick[s::threshold] = (float) ((-25.0 + 60.0) / 60.0);
+    const auto k60 = toneAt (100.0, -6.0, 0.3, 0.3, 1.0);
+    CHECK (gainAt (k60, dyn108::run (EffectKind::sentryGate, kick, k60), 0.36) > -0.5);
     // under the threshold nothing opens it
     auto quiet = transientGate();
     quiet[s::threshold] = 0.5f; // −30 dB
