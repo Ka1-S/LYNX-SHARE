@@ -9390,8 +9390,6 @@ countries: nl be
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Klik om deze plugin op het spoor te laden en te beluisteren (Ctrl+Z maakt het ongedaan)"
 "Add \"{0}\" to favourites" = "\"{0}\" toevoegen aan favorieten"
 "Remove \"{0}\" from favourites" = "\"{0}\" verwijderen uit favorieten"
-"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Er is een externe ingang gekozen. Overschakelen naar \"Alleen externe ingang\" om geen interne audio op dit spoor op te nemen?"
-"The input of a mixer track can't be changed while recording." = "De ingang van een mixerspoor kan niet worden gewijzigd tijdens het opnemen."
 
 # --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
 "{0} parameters selected" = "{0} parameters geselecteerd"
@@ -9414,6 +9412,8 @@ countries: nl be
 "Spare state" = "Reservestatus"
 "Store in spare state" = "Opslaan in reservestatus"
 "Flip with spare state" = "Wisselen met reservestatus"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Er is een externe ingang gekozen. Overschakelen naar \"Alleen externe ingang\" om geen interne audio op dit spoor op te nemen?"
+"The input of a mixer track can't be changed while recording." = "De ingang van een mixerspoor kan niet worden gewijzigd tijdens het opnemen."
 "All Ins" = "Alle ingangen"
 "Arm Recording (Ctrl-click: arm several tracks)" = "Opname inschakelen (Ctrl-klik: meerdere sporen)"
 "Audio From" = "Audio van"
@@ -9465,6 +9465,11 @@ countries: nl be
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "Start: waar de clip in zijn bron begint (maat. tel. zestiende; seconden voor audio zonder warp)"
 "The groove this clip plays through (the Groove Pool)" = "De groove waardoor deze clip speelt (de Groove Pool)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Warp-modus: hoe de audio wordt uitgerekt. Re-Pitch verandert snelheid en toonhoogte samen. Hoort bij het kanaal"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Celgeheugen"
+"Level|Transient" = "Niveau|Transiënt"
+"Smooth|Mid|Sharp" = "Zacht|Middel|Steil"
 "Follow the project key" = "Projecttoonsoort volgen"
 "Loop key" = "Looptoonsoort"
 "Edit chord" = "Akkoord bewerken"
@@ -9521,13 +9526,25 @@ countries: nl be
 "The key's chords" = "De akkoorden van de toonsoort"
 "Project chord set" = "Akkoordenset van het project"
 "Released notes sound on until Sustain is switched off" = "Losgelaten noten blijven klinken tot Sustain wordt uitgeschakeld"
+"power chord" = "powerchord"
+"Drum Rack" = "Drumrack"
+"Choke" = "Choke"
+"All Notes" = "Alle noten"
+"Empty chain" = "Lege keten"
+"Add return chain" = "Returnketen toevoegen"
+"Delete return chain" = "Returnketen verwijderen"
+"Drop an instrument or sample here" = "Zet hier een instrument of sample neer"
+"Slice to Drum Rack" = "Slicen naar Drum Rack"
+"Slice to New MIDI Track..." = "Slicen naar nieuw MIDI-spoor..."
+"Slice to New MIDI Track" = "Slicen naar nieuw MIDI-spoor"
+"Only the first {0} slices got a pad." = "Alleen de eerste {0} slices kregen een pad."
+"1 Bar" = "1 maat"
+"Warp Marker" = "Warp-marker"
+"Create one slice per" = "Eén slice maken per"
+"Default (choke, gated)" = "Standaard (choke, gate)"
+"One-shot" = "One-shot"
+"Slicing template" = "Slice-sjabloon"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"
-
-# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
-"Cell memory" = "Celgeheugen"
-"Level|Transient" = "Niveau|Transiënt"
-"Smooth|Mid|Sharp" = "Zacht|Middel|Steil"
-"power chord" = "powerchord"

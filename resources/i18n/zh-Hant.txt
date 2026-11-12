@@ -9390,8 +9390,6 @@ countries: tw hk mo
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "按一下以將此外掛載入到音軌上並試聽（Ctrl+Z 可復原）"
 "Add \"{0}\" to favourites" = "將「{0}」新增到我的最愛"
 "Remove \"{0}\" from favourites" = "將「{0}」從我的最愛中移除"
-"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "已選擇外部輸入。是否切換到\"僅外部輸入\"，以免在此軌道上錄入內部音訊？"
-"The input of a mixer track can't be changed while recording." = "錄音時無法變更混音器軌道的輸入。"
 
 # --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
 "{0} parameters selected" = "已選擇 {0} 個參數"
@@ -9414,6 +9412,8 @@ countries: tw hk mo
 "Spare state" = "備用狀態"
 "Store in spare state" = "存入備用狀態"
 "Flip with spare state" = "與備用狀態互換"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "已選擇外部輸入。是否切換到\"僅外部輸入\"，以免在此軌道上錄入內部音訊？"
+"The input of a mixer track can't be changed while recording." = "錄音時無法變更混音器軌道的輸入。"
 "All Ins" = "所有輸入"
 "Arm Recording (Ctrl-click: arm several tracks)" = "錄音預備 (Ctrl+點按: 多個軌道)"
 "Audio From" = "音訊來源"
@@ -9465,6 +9465,11 @@ countries: tw hk mo
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "開始: 片段在來源中開始的位置 (小節. 拍. 十六分; 未 warp 的音訊用秒)"
 "The groove this clip plays through (the Groove Pool)" = "此片段所用的律動 (律動池)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Warp 模式: 音訊的拉伸方式。Re-Pitch 同時改變速度和音高。屬於通道"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "光電池記憶"
+"Level|Transient" = "電平|瞬態"
+"Smooth|Mid|Sharp" = "平滑|中等|陡峭"
 "Follow the project key" = "跟隨專案調"
 "Loop key" = "循環的調"
 "Edit chord" = "編輯和弦"
@@ -9521,13 +9526,25 @@ countries: tw hk mo
 "The key's chords" = "該調的和弦"
 "Project chord set" = "專案和弦組"
 "Released notes sound on until Sustain is switched off" = "放開後的音持續發聲，直到關閉延音"
+"power chord" = "強力和弦"
+"Drum Rack" = "鼓機架"
+"Choke" = "互斥"
+"All Notes" = "所有音符"
+"Empty chain" = "空鏈"
+"Add return chain" = "新增返回鏈"
+"Delete return chain" = "刪除返回鏈"
+"Drop an instrument or sample here" = "將樂器或取樣拖放到此處"
+"Slice to Drum Rack" = "切片到 Drum Rack"
+"Slice to New MIDI Track..." = "切片到新 MIDI 軌道..."
+"Slice to New MIDI Track" = "切片到新 MIDI 軌道"
+"Only the first {0} slices got a pad." = "僅前 {0} 個切片分配了打擊墊。"
+"1 Bar" = "1 小節"
+"Warp Marker" = "變速標記"
+"Create one slice per" = "每個切片按"
+"Default (choke, gated)" = "預設（互斥，門控）"
+"One-shot" = "單次觸發"
+"Slicing template" = "切片範本"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"
-
-# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
-"Cell memory" = "光電池記憶"
-"Level|Transient" = "電平|瞬態"
-"Smooth|Mid|Sharp" = "平滑|中等|陡峭"
-"power chord" = "強力和弦"

@@ -22,6 +22,7 @@
 #include "core/Patcher.h"
 #include "core/Rack.h"
 #include "ui/RackEditor.h"
+#include "ui/DrumRackShot.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
 #include "core/VideoPlayer.h"
@@ -2038,6 +2039,17 @@ public:
             return;
         }
 
+        if (args.contains ("--drumshot190ec"))
+        {
+            // LYNX.exe --drumshot190ec prefix: round 190ec off-screen: a demo Drum Rack's pad view (default and scrolled), its
+            // chain list with I-O, sends and return chains, a new empty Drum Rack and the Piano roll's pad names. Writes
+            // prefix-checks.txt (hit tests: C1 bottom-left, overview scroll, a pad dragged onto another swaps them).
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            lynx::drumshot::run (args[args.indexOf ("--drumshot190ec") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--liveshot190dr"))
         {
             // LYNX.exe --liveshot190dr prefix: round 190dr off-screen, in the Clip-launch workflow: the Session mixer
@@ -3969,6 +3981,40 @@ private:
             else if (const auto once = juce::JSON::toString (lynx::ProjectFile::mixerTrackToVar (back->mixer[1]), true);
                      once != juce::JSON::toString (lynx::ProjectFile::mixerTrackToVar (lynx::ProjectFile::mixerTrackFromVar (juce::JSON::parse (once))), true))
                 rackResult = "ERROR rack stored form not stable";
+        }
+        // Round 190ec, Drum Rack: pads (Receive / Play / Choke / Audio To / sends), return chains and the views survive save /
+        // load with their compiled zones and cables
+        if (rackResult == "OK")
+        {
+            lynx::Song song;
+            song.mixer.resize (2);
+            lynx::ChannelDef ch;
+            ch.name = "Drums";
+            ch.instrument = lynx::InstrumentKind::patcher;
+            ch.patcher = lynx::rack::makeDrumRack();
+            lynx::PatchNode synth;
+            synth.generator = true;
+            synth.channel.instrument = lynx::InstrumentKind::synth;
+            const auto kick = lynx::rack::addPad (ch.patcher, 36, "Kick", synth);
+            const auto hat = lynx::rack::addPad (ch.patcher, 42, "Hat", synth);
+            lynx::rack::addPad (ch.patcher, -1, "Every note");
+            lynx::rack::addReturn (ch.patcher, "A Verb");
+            lynx::rack::setPlay (ch.patcher, kick, 64);
+            lynx::rack::setChoke (ch.patcher, hat, 2);
+            lynx::rack::setSend (ch.patcher, hat, 0, 0.25f, false);
+            lynx::rack::setAudioTo (ch.patcher, kick, 0);
+            lynx::rack::rackOf (ch.patcher)->showIO = true;
+            lynx::rack::rackOf (ch.patcher)->padScroll = 17;
+            song.channels.push_back (ch);
+            juce::String error;
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            const auto& got = back && ! back->channels.empty() ? back->channels.back().patcher : lynx::PatcherDoc {};
+            if (! back || ! lynx::rack::isDrumRack (got))
+                rackResult = "ERROR drum rack not loaded";
+            else if (got.rack != ch.patcher.rack)
+                rackResult = "ERROR drum rack model";
+            else if (got.zones != ch.patcher.zones || got.wires != ch.patcher.wires)
+                rackResult = "ERROR drum rack cables";
         }
 
         // FL engines in a native project (round 142, issue #5): every engine this PC can make survives save / load and

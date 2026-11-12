@@ -17448,6 +17448,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Playlist189nTests.inc"
 #include "PlaylistKeys190agTests.inc"
 #include "Rack183cTests.inc"
+#include "DrumRack190ecTests.inc"
+#include "DrumRackSlice190ecTests.inc"
 #include "Gamepad184aTests.inc"
 #include "ExportBundle184aTests.inc"
 #include "MultiOut188dTests.inc"

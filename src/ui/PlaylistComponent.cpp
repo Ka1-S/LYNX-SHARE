@@ -31,6 +31,8 @@
 #include "core/TransportEdit.h"
 
 #include "core/ClipOps.h"
+#include "core/Rack.h"
+#include "core/Slicer.h"
 
 #include "core/EditorPolish.h"
 
@@ -6503,6 +6505,89 @@ void PlaylistComponent::addKeyFollowItems (juce::PopupMenu& menu, int index, con
     menu.addSeparator();
 }
 
+namespace
+{
+// Live's audio clip › Slice to New MIDI Track (round 190ec): a dialog "Create one slice per" (transients, a bar or a
+// note division, warp markers) and a slicing template, then a new channel holding a Drum Rack with one pad per slice
+// (C1 up) and a pattern that replays the slices where they were, on a new track under the clip (core/Rack.h). The
+// templates are LYNX's own (Live's slicing presets are Live content): gated with choke (the facts of Live's Default)
+// or one-shot.
+void sliceClipToNewTrack (AudioEngine& engine, int clipIndex, int per, bool oneShot, std::function<void()> done)
+{
+    const auto& song = engine.getSong();
+    if (clipIndex < 0 || clipIndex >= (int) song.playlist.size())
+        return;
+    const auto clip = song.playlist[(std::size_t) clipIndex];
+    if (clip.kind != ClipKind::audio || clip.channel < 0 || clip.channel >= (int) song.channels.size())
+        return;
+    const auto channel = song.channels[(std::size_t) clip.channel];
+    const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (channel.samplePath.c_str()));
+    if (sample == nullptr || sample->frames() == 0 || sample->sampleRate <= 0.0 || clipops::playsBackwards (channel, clip))
+        return;
+    // the part of the file the clip plays, as fractions of the file (the clip's own timing: its trim, stretch and pitch)
+    const auto fileFrames = (double) sample->frames();
+    const auto span = clipops::clipSpan (channel, sample);
+    const auto perTick = clipops::framesPerTick (channel, clip, (double) span.frames, sample->sampleRate, song.bpm);
+    if (perTick <= 0.0)
+        return;
+    const auto from = (float) std::clamp (((double) span.first + (double) clip.offset * perTick) / fileFrames, 0.0, 1.0);
+    const auto to = (float) std::clamp (((double) span.first + (double) (clip.offset + clip.length) * perTick) / fileFrames, (double) from, 1.0);
+    std::vector<float> slices;
+    if (per == 0) // transients
+        slices = rack::slicesInRegion (detectSlices (*sample, 0.5f, rack::drumPadCount), from, to);
+    else if (per == 7) // warp markers (seconds of the file)
+    {
+        std::vector<float> marks;
+        for (const auto& w : channel.sampler.warp)
+            marks.push_back ((float) (w.seconds * sample->sampleRate / fileFrames));
+        slices = rack::slicesInRegion (marks, from, to);
+    }
+    else // one bar, 1/2 … 1/32 (a whole note = 4 beats), in the clip's time
+    {
+        const double beats[] { (double) std::max (1, song.beatsPerBar), 2.0, 1.0, 0.5, 0.25, 0.125 };
+        const auto secondsPerSlice = beats[std::clamp (per - 1, 0, 5)] * ppq * perTick / sample->sampleRate;
+        slices = rack::gridSlices (fileFrames / sample->sampleRate, from, to, secondsPerSlice);
+    }
+    const auto tickOf = [&] (float fraction) { return ((double) fraction * fileFrames - (double) span.first) / perTick - (double) clip.offset; };
+    auto notes = rack::sliceNotes (slices, to, tickOf, 0);
+    const auto stem = juce::File (juce::String::fromUTF8 (channel.samplePath.c_str())).getFileNameWithoutExtension().toStdString();
+    auto drum = rack::sliceToDrumRack (channel.samplePath, slices, stem, oneShot ? rack::SliceTemplate::oneShot : rack::SliceTemplate::gated, to);
+    drum.colour = channel.colour;
+    const auto capped = (int) slices.size() > rack::maxSlicePads;
+    auto added = -1;
+    engine.editSong ([&] (Song& s) {
+        added = rack::addSliceTrack (s, clipIndex, std::move (drum), std::move (notes), stem);
+        if (added >= 0)
+            s.currentPattern = (int) s.patterns.size() - 1;
+    });
+    if (capped && added >= 0)
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Slice to New MIDI Track"),
+                                                tr ("Only the first {0} slices got a pad.", { juce::String (rack::maxSlicePads) }));
+    if (done)
+        done();
+}
+
+void showSliceToNewTrackDialog (AudioEngine& engine, juce::Component& owner, int clipIndex, bool hasWarpMarkers, std::function<void()> done)
+{
+    auto* box = new juce::AlertWindow (tr ("Slice to New MIDI Track"), {}, juce::MessageBoxIconType::NoIcon, &owner);
+    juce::StringArray per { tr ("Transient"), tr ("1 Bar"), "1/2", "1/4", "1/8", "1/16", "1/32" };
+    if (hasWarpMarkers)
+        per.add (tr ("Warp Marker"));
+    box->addComboBox ("per", per, tr ("Create one slice per"));
+    box->addComboBox ("preset", { tr ("Default (choke, gated)"), tr ("One-shot") }, tr ("Slicing template"));
+    box->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    box->enterModalState (true, juce::ModalCallbackFunction::create ([box, &engine, clipIndex, done] (int result) {
+                              if (result != 1)
+                                  return;
+                              const auto per = box->getComboBoxComponent ("per")->getSelectedItemIndex();
+                              const auto oneShot = box->getComboBoxComponent ("preset")->getSelectedItemIndex() == 1;
+                              sliceClipToNewTrack (engine, clipIndex, per, oneShot, done);
+                          }),
+                          true);
+}
+} // namespace
+
 juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
 {
     const auto& song = engine.getSong();
@@ -6732,6 +6817,9 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
                 convert.addItem (tr (label), [this, index, m = mode] { convertClipToMidi (engine, index, m, [this] { sortClips(); }); });
             menu.addSubMenu (tr ("Convert to MIDI"), convert, sample != nullptr);
         }
+        // Live's Slice to New MIDI Track (round 190ec): a Drum Rack with a pad per slice and a pattern that replays them
+        menu.addItem (tr ("Slice to New MIDI Track..."), sample != nullptr && ! clipops::playsBackwards (channel, clip), false,
+                      [this, index, warp = ! channel.sampler.warp.empty()] { showSliceToNewTrackDialog (engine, *this, index, warp, [this] { sortClips(); }); });
 
         menu.addItem (tr ("Pitch... (semitones, cents, keep length)"), sample != nullptr, false,
                       [this, ch = clip.channel] { showSamplePitchDialog (engine, ch); });

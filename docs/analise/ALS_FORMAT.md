@@ -383,3 +383,36 @@ device each, 48 kHz float); round 190da fitted the laws and ran every case throu
   output offsets fitted on the curves at drive 0 and +12 dB (`AlsDevicesLot2.cpp`, `saturatorFit`).
 - **Reverb**: Live's 1 kHz T30 ≈ 0.91 × Decay → Atrium's decay 0.94 × Decay; the loop's high shelf (gain g) → Atrium's
   High mult 1 / (1 + 0.08·(−20 log10 g)·Decay). Atrium's fully wet tail is louder than Live's (listed with the measured sizes).
+
+## 18. Drum Racks in and out (round 190ec, 2026-11-12) [DATA]
+
+Read from the Drum Racks of the 19 shipped Live 12 / 11 sets and the Core Library's Slicing and pad defaults (format
+only; nothing of their content is used). `DrumGroupDevice` has every member of the other racks (`Branches`, macros,
+variations, the chain selector) plus:
+
+- `ReturnBranches/ReturnBranch` (the return chains: `DeviceChain/AudioToAudioDeviceChain/Devices`, a `MixerDevice` whose
+  `SendInfos` hold one `AudioBranchSendInfo` per return, all at the floor with `EnabledByUser` false);
+- views: `ArePadsVisible`, `IsMidiSectionVisible` (the chain list's I/O), `AreSendsVisible`, `IsReturnBranchesListVisible`,
+  `PadScrollPosition` (the pad view's top row counted from the top of 32 rows of 4: 19 shows C1…D#2 at the bottom),
+  `ShowsZonesInsteadOfNoteNames`, `RangeTypeIndex`.
+
+A `DrumBranch` adds `BranchInfo {ReceivingNote = 128 − key (0 = all notes), SendingNote = the key its devices get (60 in
+every kit but Drums Lesson's tuned pads), ChokeGroup 0 none / 1…16}`, and in its `MixerDevice`:
+
+- `SendInfos/AudioBranchSendInfo {Send (linear gain, Min 0.0003162277571 = −70 dB = off, Max 1 = 0 dB), EnabledByUser,
+  Index (the return chain)}`;
+- `RoutingHelper/Routable/Target`: `AudioOut/None` = the rack's output; `AudioOut/Track.<track Id>/DeviceIn.<device Id>.R<k>,ChainIn`
+  = into return chain k of that Drum Rack (Drums Lesson sends all 16 pads into "a Mix Bus" this way, their send to that
+  return switched off: `EnabledByUser` false). The display strings beside it are not reliable ("No Output" for both).
+
+LYNX (core/Rack.h `drum`): a pad chain's zone takes its Receive key (or all keys) and hands its devices the Play note; a
+note into a pad of a choke group cuts the instrument of every other pad of the group; a chain's mixer feeds the rack's
+output or a return chain, and one cable per return carries its send (post the chain's volume and pan: a live check). The
+import builds that rack (option `drumPadsAsChannels` keeps the import before 190ec: one sampler channel per pad); the
+pads' Simplers become full Samplers (§14) and a Slice-mode Simpler on a pad no longer moves the track's notes. The
+export writes the Drum Rack from its own skeletons (tools/als_skeleton.py `--drum12`): pads, sends, Audio To, return
+chains, views, and a pad's LYNX Sampler as a Simpler (One-Shot when it plays the whole sample, else Classic with its
+envelope; volume, pan, transpose, reverse; one sample part per zone or the sample with its region in frames, from
+`AlsExportOptions::sampleFormat`). Live's Slicing defaults (Defaults/Slicing) hold one `DrumBranchPreset` each: "Default"
+is a Classic Simpler with a 50 ms release, one voice, `ChokeGroup` 1; the drum ones are One-Shot, polyphonic, no choke;
+LYNX's Slice to Drum Rack templates follow those facts with its own names.

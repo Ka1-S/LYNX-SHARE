@@ -143,6 +143,20 @@ juce::File writeAlsProject (const Song& song, PluginHost* host, AlsVersion versi
             seconds = (double) reader->lengthInSamples / reader->sampleRate;
         return lengths[path] = seconds;
     };
+    std::map<std::string, std::pair<double, double>> formatsSeen; // (round 190ec: a Drum Rack pad's Simpler region)
+    options.sampleFormat = [&] (const std::string& path, double& frames, double& rate) {
+        auto it = formatsSeen.find (path);
+        if (it == formatsSeen.end())
+        {
+            std::pair<double, double> f { 0.0, 0.0 };
+            if (std::unique_ptr<juce::AudioFormatReader> reader { formats.createReaderFor (juce::File (fromUtf8 (path))) }; reader != nullptr && reader->sampleRate > 0)
+                f = { (double) reader->lengthInSamples, reader->sampleRate };
+            it = formatsSeen.emplace (path, f).first;
+        }
+        frames = it->second.first;
+        rate = it->second.second;
+        return frames > 0.0 && rate > 0.0;
+    };
     options.samplePath = [&] (const std::string& path, bool& relative) -> std::string {
         relative = false;
         const juce::File source (fromUtf8 (path));

@@ -9390,8 +9390,6 @@ countries: kr
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "클릭하면 이 플러그인을 트랙에 불러와 들려줍니다 (Ctrl+Z로 되돌리기)"
 "Add \"{0}\" to favourites" = "\"{0}\"을(를) 즐겨찾기에 추가"
 "Remove \"{0}\" from favourites" = "\"{0}\"을(를) 즐겨찾기에서 제거"
-"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "외부 입력을 선택했습니다. 이 트랙에서 내부 오디오가 녹음되지 않도록 \"외부 입력만\"으로 전환할까요?"
-"The input of a mixer track can't be changed while recording." = "녹음 중에는 믹서 트랙의 입력을 바꿀 수 없습니다."
 
 # --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
 "{0} parameters selected" = "매개변수 {0}개 선택됨"
@@ -9414,6 +9412,8 @@ countries: kr
 "Spare state" = "예비 상태"
 "Store in spare state" = "예비 상태에 저장"
 "Flip with spare state" = "예비 상태와 교체"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "외부 입력을 선택했습니다. 이 트랙에서 내부 오디오가 녹음되지 않도록 \"외부 입력만\"으로 전환할까요?"
+"The input of a mixer track can't be changed while recording." = "녹음 중에는 믹서 트랙의 입력을 바꿀 수 없습니다."
 "All Ins" = "모든 입력"
 "Arm Recording (Ctrl-click: arm several tracks)" = "녹음 대기 (Ctrl+클릭: 여러 트랙)"
 "Audio From" = "오디오 입력"
@@ -9465,6 +9465,11 @@ countries: kr
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "시작: 소스에서 클립이 시작하는 위치 (마디. 박. 16분음표, 워프 없는 오디오는 초)"
 "The groove this clip plays through (the Groove Pool)" = "이 클립이 따르는 그루브 (그루브 풀)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "워프 모드: 오디오를 늘이는 방식. Re-Pitch는 속도와 음높이를 함께 바꿈. 채널에 속함"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "셀 메모리"
+"Level|Transient" = "레벨|트랜지언트"
+"Smooth|Mid|Sharp" = "부드럽게|중간|가파르게"
 "Follow the project key" = "프로젝트 키 따라가기"
 "Loop key" = "루프 키"
 "Edit chord" = "코드 편집"
@@ -9521,13 +9526,25 @@ countries: kr
 "The key's chords" = "키의 코드"
 "Project chord set" = "프로젝트 코드 세트"
 "Released notes sound on until Sustain is switched off" = "서스테인을 끌 때까지 뗀 음이 계속 울림"
+"power chord" = "파워 코드"
+"Drum Rack" = "드럼 랙"
+"Choke" = "초크"
+"All Notes" = "모든 노트"
+"Empty chain" = "빈 체인"
+"Add return chain" = "리턴 체인 추가"
+"Delete return chain" = "리턴 체인 삭제"
+"Drop an instrument or sample here" = "여기에 악기나 샘플을 놓으세요"
+"Slice to Drum Rack" = "Drum Rack으로 슬라이스"
+"Slice to New MIDI Track..." = "새 MIDI 트랙으로 슬라이스..."
+"Slice to New MIDI Track" = "새 MIDI 트랙으로 슬라이스"
+"Only the first {0} slices got a pad." = "처음 {0}개 슬라이스에만 패드가 할당되었습니다."
+"1 Bar" = "1마디"
+"Warp Marker" = "워프 마커"
+"Create one slice per" = "슬라이스 단위"
+"Default (choke, gated)" = "기본 (초크, 게이트)"
+"One-shot" = "원샷"
+"Slicing template" = "슬라이스 템플릿"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
-
-# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
-"Cell memory" = "셀 메모리"
-"Level|Transient" = "레벨|트랜지언트"
-"Smooth|Mid|Sharp" = "부드럽게|중간|가파르게"
-"power chord" = "파워 코드"

@@ -15,6 +15,7 @@
 #include "core/MarkerPlan.h"
 #include "core/NoteEdit.h"
 #include "core/NoteTools.h"
+#include "core/Rack.h"
 
 #include <array>
 #include "engine/MidiFileIo.h"
@@ -1282,8 +1283,17 @@ void PianoRollComponent::paint (juce::Graphics& g)
         const auto blackWidth = keyboardWidth * 3 / 5;
         static const std::map<int, std::string> noLabels;
         const auto selectedChannel = engine.getSelectedChannel();
-        const auto& labels = selectedChannel >= 0 && selectedChannel < (int) song.channels.size()
-                                 ? song.channels[(std::size_t) selectedChannel].keyLabels : noLabels;
+        const auto& ownLabels = selectedChannel >= 0 && selectedChannel < (int) song.channels.size()
+                                    ? song.channels[(std::size_t) selectedChannel].keyLabels : noLabels;
+        // a Drum Rack's pad names on its keys (round 190ec, Live's note editor); a key label of the user's wins
+        std::map<int, std::string> padLabels;
+        if (selectedChannel >= 0 && selectedChannel < (int) song.channels.size() && rack::isDrumRack (song.channels[(std::size_t) selectedChannel]))
+        {
+            padLabels = rack::padNames (*rack::rackOf (song.channels[(std::size_t) selectedChannel].patcher));
+            for (const auto& [key, label] : ownLabels)
+                padLabels[key] = label;
+        }
+        const auto& labels = padLabels.empty() ? ownLabels : padLabels;
 
         // folded to the scale (round 166d) the keys no longer alternate like a piano: one full-width named row each
         const auto list = folded();

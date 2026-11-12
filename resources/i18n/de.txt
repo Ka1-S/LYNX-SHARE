@@ -9390,8 +9390,6 @@ countries: de at ch li lu
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Klicken, um dieses Plugin auf die Spur zu laden und es zu hören (Strg+Z macht es rückgängig)"
 "Add \"{0}\" to favourites" = "„{0}“ zu Favoriten hinzufügen"
 "Remove \"{0}\" from favourites" = "„{0}“ aus Favoriten entfernen"
-"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Ein externer Eingang wurde gewählt. Zu \"Nur externer Eingang\" wechseln, damit auf dieser Spur kein internes Audio aufgenommen wird?"
-"The input of a mixer track can't be changed while recording." = "Der Eingang einer Mixer-Spur kann während der Aufnahme nicht geändert werden."
 
 # --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
 "{0} parameters selected" = "{0} Parameter ausgewählt"
@@ -9414,6 +9412,8 @@ countries: de at ch li lu
 "Spare state" = "Reservezustand"
 "Store in spare state" = "Im Reservezustand speichern"
 "Flip with spare state" = "Mit Reservezustand tauschen"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Ein externer Eingang wurde gewählt. Zu \"Nur externer Eingang\" wechseln, damit auf dieser Spur kein internes Audio aufgenommen wird?"
+"The input of a mixer track can't be changed while recording." = "Der Eingang einer Mixer-Spur kann während der Aufnahme nicht geändert werden."
 "All Ins" = "Alle Eingänge"
 "Arm Recording (Ctrl-click: arm several tracks)" = "Aufnahme scharf schalten (Strg-Klick: mehrere Spuren)"
 "Audio From" = "Audio von"
@@ -9465,6 +9465,11 @@ countries: de at ch li lu
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "Start: wo der Clip in seiner Quelle beginnt (Takt. Schlag. Sechzehntel; Sekunden für ungewarptes Audio)"
 "The groove this clip plays through (the Groove Pool)" = "Der Groove, durch den dieser Clip spielt (der Groove Pool)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Warp-Modus: wie das Audio gedehnt wird. Re-Pitch ändert Tempo und Tonhöhe zusammen. Er gehört zum Kanal"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Zellgedächtnis"
+"Level|Transient" = "Pegel|Transient"
+"Smooth|Mid|Sharp" = "Weich|Mittel|Steil"
 "Follow the project key" = "Der Projekt-Tonart folgen"
 "Loop key" = "Loop-Tonart"
 "Edit chord" = "Akkord bearbeiten"
@@ -9521,13 +9526,25 @@ countries: de at ch li lu
 "The key's chords" = "Die Akkorde der Tonart"
 "Project chord set" = "Akkordsatz des Projekts"
 "Released notes sound on until Sustain is switched off" = "Losgelassene Töne klingen weiter, bis Sustain ausgeschaltet wird"
+"power chord" = "Powerchord"
+"Drum Rack" = "Drum-Rack"
+"Choke" = "Choke"
+"All Notes" = "Alle Noten"
+"Empty chain" = "Leere Kette"
+"Add return chain" = "Return-Kette hinzufügen"
+"Delete return chain" = "Return-Kette löschen"
+"Drop an instrument or sample here" = "Instrument oder Sample hier ablegen"
+"Slice to Drum Rack" = "In Drum Rack zerschneiden"
+"Slice to New MIDI Track..." = "In neue MIDI-Spur zerschneiden..."
+"Slice to New MIDI Track" = "In neue MIDI-Spur zerschneiden"
+"Only the first {0} slices got a pad." = "Nur die ersten {0} Slices haben ein Pad bekommen."
+"1 Bar" = "1 Takt"
+"Warp Marker" = "Warp-Marker"
+"Create one slice per" = "Ein Slice erzeugen pro"
+"Default (choke, gated)" = "Standard (Choke, gegatet)"
+"One-shot" = "One-Shot"
+"Slicing template" = "Slicing-Vorlage"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] Editor öffnen/schließen  [Alt]+[LMB] andere offen lassen  [Strg]+[LMB] vorhören  [2xLMB] Piano Roll  [LMB] hoch/runter ziehen sortiert um  [RMB] Kanalmenü"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak-Anzeige (links/rechts) mit Peak-Hold  [LMB] löscht die Übersteuerungsanzeige"
-
-# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
-"Cell memory" = "Zellgedächtnis"
-"Level|Transient" = "Pegel|Transient"
-"Smooth|Mid|Sharp" = "Weich|Mittel|Steil"
-"power chord" = "Powerchord"

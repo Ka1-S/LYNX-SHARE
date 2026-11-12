@@ -30,6 +30,7 @@
 #include "core/MidiControls.h"
 #include "ui/ToolWindow.h"
 #include "ui/LoopStarterWindow.h"
+#include "core/Rack.h"
 #include "core/Slicer.h"
 #include "ui/ChannelSettings.h"
 
@@ -58,6 +59,8 @@ namespace lynx
 {
 namespace
 {
+void sliceChannelToDrumRack (AudioEngine& engine, int channel); // (round 190ec, below)
+
 // English name (used for new channel names stored in the song)
 juce::String instrumentName (InstrumentKind k)
 {
@@ -2587,6 +2590,8 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
             menu.addItem (tr ("Undo slices ({0})", { juce::String ((int) c.sampler.slices.size()) }), [this, channel] {
                 engine.editSong ([channel] (Song& s) { s.channels[(std::size_t) channel].sampler.slices.clear(); });
             });
+        // Live's Simpler › Slice to Drum Rack (round 190ec): the channel becomes a Drum Rack, one pad per slice from C1
+        menu.addItem (tr ("Slice to Drum Rack"), ! c.samplePath.empty() && c.zones.empty(), false, [this, channel] { sliceChannelToDrumRack (engine, channel); });
     }
     else if (c.instrument == InstrumentKind::audioClip)
         menu.addItem (tr ("Pitch... (semitones, cents, keep length)"), ! c.samplePath.empty(), false,
@@ -2979,6 +2984,45 @@ void ChannelRackComponent::rename (int channel)
                                      });
                              });
 }
+
+namespace
+{
+// Live's "Slice to Drum Rack" (round 190ec): Simpler in Slicing mode → a Drum Rack on the same track, one pad per slice
+// (Live's Default slicing facts: gated, choke group 1), no clip. LYNX: the Sampler channel's own slices if it has them,
+// else its transients (a .speech sample: its words), inside its played region; the channel keeps its name, insert,
+// levels and colour.
+void sliceChannelToDrumRack (AudioEngine& engine, int channel)
+{
+    const auto& song = engine.getSong();
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return;
+    const auto& c = song.channels[(std::size_t) channel];
+    const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (c.samplePath.c_str()));
+    if (sample == nullptr || sample->frames() == 0)
+        return;
+    std::vector<float> starts = c.sampler.slices;
+    if (starts.empty())
+    {
+        if (juce::File (juce::String::fromUTF8 (c.samplePath.c_str())).hasFileExtension ("speech") && ! sample->markerStarts.empty())
+            for (const auto start : sample->markerStarts)
+                starts.push_back ((float) ((double) start / (double) sample->frames()));
+        else
+            starts = detectSlices (*sample, 0.5f, rack::maxSlicePads);
+    }
+    const auto from = std::clamp (c.sampler.regionStart, 0.0f, 1.0f), to = std::clamp (c.sampler.regionEnd, from, 1.0f);
+    const auto slices = rack::slicesInRegion (starts, from, to);
+    const auto stem = juce::File (juce::String::fromUTF8 (c.samplePath.c_str())).getFileNameWithoutExtension().toStdString();
+    auto drum = rack::sliceToDrumRack (c.samplePath, slices, stem.empty() ? c.name : stem, rack::SliceTemplate::gated, to);
+    engine.editSong ([channel, patcher = std::move (drum.patcher)] (Song& s) {
+        if (channel >= (int) s.channels.size())
+            return;
+        auto& ch = s.channels[(std::size_t) channel];
+        ch.instrument = InstrumentKind::patcher;
+        ch.patcher = patcher;
+        ch.sampler.slices.clear();
+    });
+}
+} // namespace
 
 void ChannelRackComponent::sliceChannel (int channel)
 {

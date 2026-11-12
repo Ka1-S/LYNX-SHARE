@@ -228,4 +228,21 @@ constexpr int maxSlicePads = drumPadCount - drumFirstPad;
 // (the last at `end`). `baseName`: the pads are "<baseName> 1", "<baseName> 2"…
 ChannelDef sliceToDrumRack (const std::string& samplePath, const std::vector<float>& slices, const std::string& baseName,
                             SliceTemplate preset = SliceTemplate::gated, float end = 1.0f);
+// Slicing helpers (round 190ec: Slice to Drum Rack on a Sampler channel, Slice to New MIDI Track on an audio clip).
+// Slice starts are fractions of the sample file.
+// The starts that fall in the played part [from, to) (sorted, duplicates dropped), with `from` itself as the first
+// (a slice always starts where the part starts)
+std::vector<float> slicesInRegion (const std::vector<float>& starts, float from, float to);
+// A start every `secondsPerSlice` from `from` to `to` (a file `fileSeconds` long): Live's "one slice per" bar / beat
+// division; a single slice when the division or the file length is unknown
+std::vector<float> gridSlices (double fileSeconds, float from, float to, double secondsPerSlice);
+// The notes that replay the slices where they were: slice i on pad C1 + i (the first maxSlicePads only), from `tickOf`
+// its start to the next slice's start (the last one to `end`), on channel `channel`. Notes before tick 0 are left out.
+std::vector<Note> sliceNotes (const std::vector<float>& starts, float end, const std::function<double (float fraction)>& tickOf, int channel);
+// Slice to New MIDI Track as LYNX lays it out: `drumRack` becomes a new channel with its own mixer insert, `notes` (their
+// channel set to it) a new pattern named `patternName`, played by a pattern clip on a new Playlist track right under the
+// audio clip `clipIndex`, at its start and as long (as the audio clip's Convert to MIDI does). Run inside
+// AudioEngine::editSong (one undo step). Returns the new channel's index, or -1 (song untouched) when the clip is not an
+// audio clip or no note is left.
+int addSliceTrack (Song& song, int clipIndex, ChannelDef drumRack, std::vector<Note> notes, const std::string& patternName);
 } // namespace lynx::rack

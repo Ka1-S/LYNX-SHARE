@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "core/Effects.h"
+#include "core/NoteEdit.h"
 
 namespace lynx::rack
 {
@@ -1613,7 +1614,8 @@ ChannelDef sliceToDrumRack (const std::string& samplePath, const std::vector<flo
         // template plays each slice to its end (LYNX's Sampler: release 0 = one-shot)
         s.sampler.release = preset == SliceTemplate::gated ? 0.05f : 0.0f;
         s.sampler.cut = preset == SliceTemplate::gated; // (one voice: a new note on the pad cuts the last)
-        const auto chain = addPad (channel.patcher, drumFirstPad + i, s.name, std::move (n));
+        const auto name = s.name; // (copied first: the pad's node is moved into addPad)
+        const auto chain = addPad (channel.patcher, drumFirstPad + i, name, std::move (n));
         if (preset == SliceTemplate::gated)
             rackOf (channel.patcher)->chains[(std::size_t) chain].choke = 1;
     }
@@ -1621,6 +1623,87 @@ ChannelDef sliceToDrumRack (const std::string& samplePath, const std::vector<flo
     r->selectedChain = 0;
     r->padScroll = drumDefaultScroll;
     compile (channel.patcher);
+    return channel;
+}
+// ---------------------------------------------------------------------------------------------------------------
+// Slicing helpers (round 190ec)
+
+std::vector<float> slicesInRegion (const std::vector<float>& starts, float from, float to)
+{
+    from = std::clamp (from, 0.0f, 1.0f);
+    to = std::clamp (to, from, 1.0f);
+    std::vector<float> sorted;
+    for (const auto x : starts)
+        if (x > from && x < to)
+            sorted.push_back (x);
+    std::sort (sorted.begin(), sorted.end());
+    std::vector<float> out { from };
+    for (const auto x : sorted)
+        if (x - out.back() > 1.0e-6f)
+            out.push_back (x);
+    return out;
+}
+
+std::vector<float> gridSlices (double fileSeconds, float from, float to, double secondsPerSlice)
+{
+    from = std::clamp (from, 0.0f, 1.0f);
+    to = std::clamp (to, from, 1.0f);
+    std::vector<float> out { from };
+    if (! (fileSeconds > 0.0) || ! (secondsPerSlice > 0.0))
+        return out;
+    const auto step = secondsPerSlice / fileSeconds;
+    const auto count = (int) std::ceil (((double) to - (double) from) / step - 1.0e-6);
+    for (int i = 1; i < count && (int) out.size() < drumPadCount; ++i)
+        out.push_back ((float) ((double) from + step * i));
+    return out;
+}
+
+std::vector<Note> sliceNotes (const std::vector<float>& starts, float end, const std::function<double (float)>& tickOf, int channel)
+{
+    std::vector<Note> notes;
+    const auto count = std::min ((int) starts.size(), maxSlicePads);
+    for (int i = 0; i < count; ++i)
+    {
+        const auto a = tickOf (starts[(std::size_t) i]);
+        const auto b = tickOf (i + 1 < (int) starts.size() ? starts[(std::size_t) i + 1] : end);
+        if (b <= 0.0 || b <= a)
+            continue;
+        Note n;
+        n.start = (std::int64_t) std::llround (std::max (0.0, a));
+        n.length = std::max<std::int64_t> (1, (std::int64_t) std::llround (b) - n.start);
+        n.key = drumFirstPad + i;
+        n.channel = channel;
+        notes.push_back (n);
+    }
+    return notes;
+}
+
+int addSliceTrack (Song& song, int clipIndex, ChannelDef drumRack, std::vector<Note> notes, const std::string& patternName)
+{
+    if (clipIndex < 0 || clipIndex >= (int) song.playlist.size() || notes.empty())
+        return -1;
+    const auto source = song.playlist[(std::size_t) clipIndex];
+    if (source.kind != ClipKind::audio)
+        return -1;
+    const auto channel = (int) song.channels.size();
+    drumRack.mixerTrack = song.claimFreeInsert();
+    song.channels.push_back (std::move (drumRack));
+    Pattern pattern;
+    pattern.name = patternName;
+    for (auto& n : notes)
+        n.channel = channel;
+    pattern.notes = std::move (notes);
+    pattern.sortNotes();
+    song.patterns.push_back (std::move (pattern));
+    const auto track = source.track + 1;
+    noteedit::insertTrack (song, track);
+    Clip clip;
+    clip.kind = ClipKind::pattern;
+    clip.pattern = (int) song.patterns.size() - 1;
+    clip.track = track;
+    clip.start = source.start;
+    clip.length = source.length;
+    song.playlist.push_back (clip);
     return channel;
 }
 } // namespace lynx::rack

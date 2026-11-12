@@ -9390,8 +9390,6 @@ countries: ru by kz
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Щёлкните, чтобы загрузить этот плагин на дорожку и послушать его (Ctrl+Z — отменить)"
 "Add \"{0}\" to favourites" = "Добавить «{0}» в избранное"
 "Remove \"{0}\" from favourites" = "Убрать «{0}» из избранного"
-"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Выбран внешний вход. Переключиться на \"Только внешний вход\", чтобы не записывать внутренний звук на этой дорожке?"
-"The input of a mixer track can't be changed while recording." = "Вход дорожки микшера нельзя менять во время записи."
 
 # --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
 "{0} parameters selected" = "Выбрано параметров: {0}"
@@ -9414,6 +9412,8 @@ countries: ru by kz
 "Spare state" = "Запасное состояние"
 "Store in spare state" = "Сохранить в запасное состояние"
 "Flip with spare state" = "Поменять с запасным состоянием"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Выбран внешний вход. Переключиться на \"Только внешний вход\", чтобы не записывать внутренний звук на этой дорожке?"
+"The input of a mixer track can't be changed while recording." = "Вход дорожки микшера нельзя менять во время записи."
 "All Ins" = "Все входы"
 "Arm Recording (Ctrl-click: arm several tracks)" = "Подготовка к записи (Ctrl+щелчок: несколько дорожек)"
 "Audio From" = "Аудио из"
@@ -9465,6 +9465,11 @@ countries: ru by kz
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "Начало: где клип начинается в источнике (такт. доля. шестнадцатая; секунды для аудио без warp)"
 "The groove this clip plays through (the Groove Pool)" = "Грув, через который играет этот клип (Groove Pool)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Режим warp: как растягивается аудио. Re-Pitch меняет скорость и высоту вместе. Относится к каналу"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Память ячейки"
+"Level|Transient" = "Уровень|Транзиент"
+"Smooth|Mid|Sharp" = "Плавно|Средне|Резко"
 "Follow the project key" = "Следовать тональности проекта"
 "Loop key" = "Тональность лупа"
 "Edit chord" = "Изменить аккорд"
@@ -9521,13 +9526,25 @@ countries: ru by kz
 "The key's chords" = "Аккорды тональности"
 "Project chord set" = "Набор аккордов проекта"
 "Released notes sound on until Sustain is switched off" = "Отпущенные ноты звучат, пока не выключен Сустейн"
+"power chord" = "пауэр-аккорд"
+"Drum Rack" = "Драм-рэк"
+"Choke" = "Глушение"
+"All Notes" = "Все ноты"
+"Empty chain" = "Пустая цепь"
+"Add return chain" = "Добавить возвратную цепь"
+"Delete return chain" = "Удалить возвратную цепь"
+"Drop an instrument or sample here" = "Перетащите сюда инструмент или сэмпл"
+"Slice to Drum Rack" = "Нарезать в Drum Rack"
+"Slice to New MIDI Track..." = "Нарезать в новую MIDI-дорожку..."
+"Slice to New MIDI Track" = "Нарезать в новую MIDI-дорожку"
+"Only the first {0} slices got a pad." = "Пэды получили только первые {0} фрагментов."
+"1 Bar" = "1 такт"
+"Warp Marker" = "Маркер варпа"
+"Create one slice per" = "Один фрагмент на"
+"Default (choke, gated)" = "По умолчанию (choke, гейт)"
+"One-shot" = "Однократно (one-shot)"
+"Slicing template" = "Шаблон нарезки"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"
-
-# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
-"Cell memory" = "Память ячейки"
-"Level|Transient" = "Уровень|Транзиент"
-"Smooth|Mid|Sharp" = "Плавно|Средне|Резко"
-"power chord" = "пауэр-аккорд"
