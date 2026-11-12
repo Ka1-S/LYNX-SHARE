@@ -2203,7 +2203,10 @@ void MainComponent::layoutMapMode()
     mapOverlay->toFront (false);
     // the Mapping Browser takes the Browser's place (the reference: "available while a map mode is on"); with the Browser
     // hidden, a strip at the left of the workspace
-    auto area = browser.isShowing() ? getLocalArea (&browser, browser.getLocalBounds())
+    auto browserShown = browser.getWidth() > 0;
+    for (const juce::Component* c = &browser; c != nullptr && c != this; c = c->getParentComponent())
+        browserShown = browserShown && c->isVisible();
+    auto area = browserShown ? getLocalArea (&browser, browser.getLocalBounds())
                                     : getLocalArea (&workspace, workspace.getLocalBounds()).removeFromLeft (juce::jmin (320, getWidth() / 3));
     mappingBrowser->setBounds (area);
     mappingBrowser->toFront (false);

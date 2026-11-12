@@ -16846,6 +16846,7 @@ private:
             assignKey (s, Target::parameter ({ lynx::AutomationTargetKind::mixerVolume, 2, 0, 0 }), 'V');
         }, false);
         offline.dispatchPendingMessages();
+        ui.showPanelsForSnapshot ({ lynx::workspace::Panel::playlist, lynx::workspace::Panel::browser }); // (no floating Channel Rack over the grid)
         ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
         offline.dispatchPendingMessages();
         ui.resized();
@@ -16896,6 +16897,11 @@ private:
                                                       overlay, overlay, now, at, now, 1, false));
                 break;
             }
+        if (spots.empty())
+        {
+            juce::File (prefix + "-checks.txt").replaceWithText (checks + "FAIL no spots\n");
+            return;
+        }
         check ("a click selects the slot", overlay->selection() == std::optional<Target> (Target::slot (2, 0)));
         check ("the overlay takes clicks only on elements", overlay->hitTest (spots.front().area.getCentreX(), spots.front().area.getCentreY()) && ! overlay->hitTest (2, ui.getHeight() - 2));
         check ("a pad assigns it", overlay->assignMidi ({ 0, lynx::linkNoteBase + 38, -1 }) && midiOf (offline.getSong(), Target::slot (2, 0)).number == lynx::linkNoteBase + 38);
@@ -17164,6 +17170,9 @@ private:
         }
         // freehand: Alt (no grid) on the pad's pan lane, a wave over bars 1-4
         const auto panBefore = offline.getSong().automations[(std::size_t) laneB].points;
+        // (off-screen every press has the same mouse-down time, which the undo history uses to join one press's edits:
+        // an edit with no button down in between separates the two strokes, as a real second press does)
+        offline.editSong ([] (lynx::Song&) {});
         std::vector<juce::Point<float>> wave;
         for (int k = 0; k <= 60; ++k)
             wave.push_back ({ x (1.0 + 3.0 * k / 60.0), y (bodyB, 0.5f + 0.4f * std::sin ((float) k * 0.3f)) });

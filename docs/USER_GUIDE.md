@@ -81,6 +81,20 @@ In the clip grid (Clip-launch workflow):
   as the Playlist's grid, each one at the height the mouse had over it; with the grid off (or Alt held) it draws
   freehand. The automation outside what you drew stays as it was, and each stroke is one undo step. Press B again to go
   back to adding and moving points. In the other layouts B stays the brush tool.
+- **MIDI Map Mode and Key Map Mode** (Ctrl+M / Ctrl+K, or the **MIDI** / **Key** switches beside Both | Grid | Song,
+  in the Clip-launch layout): every element you can map is tinted (blue for MIDI, orange for keys) and shows what is
+  mapped to it ("1/19" = MIDI channel 1, controller 19; a note name; a key). Click an element, then move a knob or
+  press a pad / key on your MIDI device (MIDI) or press a computer key (Key): it is mapped. You can map clip slots (the
+  mapping belongs to the slot, whatever clip is in it), scene launch buttons, each track's clip stop button, Stop all
+  clips, Session Record, Play, Stop, Record, the metronome, the tempo, the Session mixer's volume, pan and sends, and
+  the Device View's knobs. One control can launch slots on several tracks, but not two slots of one track, and a control
+  on a slot can't also launch a scene. While a map mode is on, the Browser shows the **mapping list** (MIDI: Channel,
+  Note/Control, Path, Name, Min, Max; Key: Key, Path, Name, Min, Max): drag Min or Max up or down (or double-click to
+  type) to give a mapping a range; Min above Max inverts it (right-click › Invert Range); Delete removes the selected
+  mappings (Delete over a selected element removes its mapping too). Mappings do nothing while a map mode is on; switch
+  it off and they act: a key on a knob switches it between Min and Max. Mappings are saved with the project; a MIDI
+  mapping of a knob is the same link as **Link to controller**. In the other layouts
+  Ctrl+M stays the metronome.
 
 ## Online sessions: make a song with a friend (phase 1, packages)
 

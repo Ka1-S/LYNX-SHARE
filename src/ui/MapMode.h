@@ -94,6 +94,8 @@ private:
     juce::Component& root;
     remotemap::Mode mode = remotemap::Mode::off;
     std::vector<Spot> found;
+    std::vector<juce::Component*> owners; // (while collecting: the component each spot belongs to)
+    bool collecting = false;
     std::optional<remotemap::Target> selected;
 };
 

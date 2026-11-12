@@ -203,19 +203,26 @@ bool Overlay::unmapSelected()
 
 void Overlay::collect (juce::Component& c, std::vector<Spot>& out)
 {
-    if (! c.isVisible() || &c == this || dynamic_cast<MappingBrowser*> (&c) != nullptr)
+    // (visibility is walked down from the root, so this works off-screen too, where nothing "is showing")
+    if (! c.isVisible() || c.getWidth() <= 0 || c.getHeight() <= 0 || &c == this || dynamic_cast<MappingBrowser*> (&c) != nullptr)
         return;
-    if (auto* source = dynamic_cast<SpotSource*> (&c); source != nullptr && c.isShowing())
+    if (auto* source = dynamic_cast<SpotSource*> (&c); source != nullptr)
     {
         std::vector<Spot> own;
         source->mapSpots (own);
         const auto visible = getLocalArea (&c, c.getLocalBounds());
         for (auto& s : own)
             if (const auto area = getLocalArea (&c, s.area).getIntersection (visible); ! area.isEmpty() && remotemap::valid (s.target))
+            {
                 out.push_back ({ area, s.target });
+                owners.push_back (&c);
+            }
     }
-    else if (const auto t = tagOf (c); t && c.isShowing() && remotemap::valid (*t))
+    else if (const auto t = tagOf (c); t && remotemap::valid (*t))
+    {
         out.push_back ({ getLocalArea (&c, c.getLocalBounds()), *t });
+        owners.push_back (&c);
+    }
     for (auto* child : c.getChildren())
         collect (*child, out);
 }
@@ -223,9 +230,25 @@ void Overlay::collect (juce::Component& c, std::vector<Spot>& out)
 void Overlay::refresh()
 {
     found.clear();
+    owners.clear();
     if (mode != remotemap::Mode::off)
+    {
+        std::vector<Spot> all;
         for (auto* child : root.getChildren())
-            collect (*child, found);
+            collect (*child, all);
+        // only what is not covered: the component under the element's middle must be its own (a floating panel in front
+        // of the grid hides the slots behind it)
+        collecting = true;
+        for (std::size_t i = 0; i < all.size(); ++i)
+        {
+            const auto centre = all[i].area.getCentre();
+            const auto* top = root.getComponentAt (root.getLocalPoint (this, centre));
+            if (top == owners[i] || (top != nullptr && owners[i]->isParentOf (top)))
+                found.push_back (all[i]);
+        }
+        collecting = false;
+        owners.clear();
+    }
     // a selection whose element went away (deleted track, scrolled out) stays selected; it just isn't drawn
     repaint();
 }
@@ -253,7 +276,7 @@ int Overlay::spotAt (juce::Point<int> p) const
 
 bool Overlay::hitTest (int x, int y)
 {
-    return mode != remotemap::Mode::off && spotAt ({ x, y }) >= 0;
+    return ! collecting && mode != remotemap::Mode::off && spotAt ({ x, y }) >= 0;
 }
 
 void Overlay::mouseDown (const juce::MouseEvent& e)
@@ -354,15 +377,16 @@ void MappingBrowser::timerCallback()
 std::vector<int> MappingBrowser::columnWidths() const
 {
     // MIDI: Channel, Note/Control, Path, Name, Min, Max; Key: Key, Path, Name, Min, Max (the lesson's picture)
+    // (narrow fixed columns, so Path and Name get what is left; the Browser is often ~250 px wide)
     const auto w = getWidth();
-    const auto range = juce::jmax (44, w / 7);
+    const auto range = juce::jlimit (40, 64, w / 8);
     if (mode == remotemap::Mode::key)
     {
-        const auto key = juce::jmax (40, w / 8), rest = juce::jmax (40, w - key - 2 * range);
-        return { key, rest / 2, rest - rest / 2, range, range };
+        const auto key = juce::jlimit (30, 56, w / 10), rest = juce::jmax (40, w - key - 2 * range);
+        return { key, rest * 2 / 5, rest - rest * 2 / 5, range, range };
     }
-    const auto channel = juce::jmax (44, w / 9), control = juce::jmax (56, w / 7), rest = juce::jmax (40, w - channel - control - 2 * range);
-    return { channel, control, rest / 2, rest - rest / 2, range, range };
+    const auto channel = juce::jlimit (22, 56, w / 12), control = juce::jlimit (40, 80, w / 9), rest = juce::jmax (40, w - channel - control - 2 * range);
+    return { channel, control, rest * 2 / 5, rest - rest * 2 / 5, range, range };
 }
 
 bool MappingBrowser::isMinMaxColumn (int column, bool& isMax) const
@@ -409,7 +433,7 @@ void MappingBrowser::paint (juce::Graphics& g)
     const auto widths = columnWidths();
     const juce::StringArray heads = mode == remotemap::Mode::key
                                         ? juce::StringArray { tr ("Key"), tr ("Path"), tr ("Name"), tr ("Min"), tr ("Max") }
-                                        : juce::StringArray { tr ("Channel"), tr ("Note/Control"), tr ("Path"), tr ("Name"), tr ("Min"), tr ("Max") };
+                                        : juce::StringArray { widths[0] < 44 ? juce::String ("Ch") : tr ("Channel"), tr ("Note/Control"), tr ("Path"), tr ("Name"), tr ("Min"), tr ("Max") };
     auto header = area.removeFromTop (headerHeight);
     g.setColour (c::bg4);
     g.fillRect (header);
