@@ -8280,7 +8280,6 @@ countries: kr
 "Deactivate input {0}" = "입력 {0} 비활성화"
 "Activate input {0}" = "입력 {0} 활성화"
 "Input {0}" = "입력 {0}"
-# Round 183c: Racks
 "Add chain" = "체인 추가"
 "Audio Effect Rack" = "오디오 이펙트 랙"
 "Chain Pan" = "체인 팬"
@@ -8342,9 +8341,9 @@ countries: kr
 "Blend of the shaped signal with the dry one (parallel processing)" = "다듬은 신호와 드라이 신호의 혼합 (병렬 처리)"
 "One gain for both channels, so the stereo image stays put" = "두 채널에 하나의 게인을 적용해 스테레오 이미지가 움직이지 않게 합니다"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "낮은 음을 검출기에서 제외합니다 (드럼 버스의 킥 등)"
-
 "For a file with a true-peak ceiling: {0}" = "트루 피크 상한이 있는 파일은: {0}"
 "(look)" = "(룩)"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "기본 템플릿을 찾을 수 없어 대신 LYNX SHARE의 기본 프로젝트를 열었습니다"
 "{0} could not be opened." = "{0}을(를) 열 수 없습니다."
@@ -8368,6 +8367,7 @@ countries: kr
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "새 플러그인 모두 분리"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "켜짐: 추가한 플러그인의 창이 분리된 상태로 패널 위에 열립니다. 꺼짐: 데스크톱에 도킹되어 열리며 클릭한 패널 뒤로 갑니다. 각 플러그인 창 메뉴 › 분리됨에서 플러그인별로 바꿀 수 있습니다"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "다른 앱용..."
 "Export for other apps" = "다른 앱용으로 내보내기"
@@ -8542,10 +8542,6 @@ countries: kr
 "Can't freeze this channel" = "이 채널은 프리즈할 수 없습니다"
 "Frozen: Unfreeze to edit" = "프리즈됨: 프리즈 해제하여 편집"
 "A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "컨트롤러가 이 악기의 노브에 연결되어 라이브로 움직입니다: 프리즈된 오디오는 따라갈 수 없습니다."
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "곡을 파일로 저장"
@@ -8740,7 +8736,6 @@ countries: kr
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "게임 컨트롤러로 트랜스포트를 조작하고 MIDI 컨트롤러처럼 어떤 컨트롤에도 연결할 수 있습니다. MIDI 페이지에도 있습니다."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX만의 개선 기능입니다. 모두 기본적으로 꺼져 있어, 하나를 켜기 전까지 LYNX SHARE는 FL Studio처럼 보이고 동작합니다. 각 스위치는 해당 줄에 적힌 곳에 있는 설정과 같은 설정입니다."
 "LYNX extras..." = "LYNX 추가 기능..."
-
 "Search your plugins" = "플러그인 검색"
 "Nothing is shared." = "공유 중인 항목이 없습니다."
 "{0} shared with the session" = "세션과 공유 중: {0}개"
@@ -8883,7 +8878,6 @@ countries: kr
 "Channel 2" = "채널 2"
 "Channels 2-{0}" = "채널 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE 멤버 채널(하위 존): 각각 노트 하나를 담당하는 MIDI 채널"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "숨소리"
 "Motion blending" = "모션 블렌딩"
 "Load sprite sheet..." = "스프라이트 시트 불러오기..."
@@ -8918,3 +8912,27 @@ countries: kr
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "레벨링: 느린 어택으로 실링 아래의 스레숄드에 레벨을 유지하고 나머지는 실링이 잡습니다 (기본값은 꺼짐)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "레벨링 스레숄드: 실링 아래에 유지되는 레벨 (Off: 레벨링 없음)"
 "Levelling attack: how much of a transient passes before the level is held" = "레벨링 어택: 레벨이 유지되기 전에 트랜지언트가 얼마나 통과하는지"
+"Session Record" = "세션 녹음"
+"Session Record: armed tracks record into the selected scene; while their clips play, notes are added to them (overdub)" = "세션 녹음: 녹음 준비된 트랙이 선택한 씬에 녹음되며, 클립이 재생되는 동안 노트가 추가됩니다(오버더브)"
+"Grooves" = "그루브"
+"Show or hide the Groove Pool" = "Groove Pool 표시 또는 숨기기"
+"Add a groove" = "그루브 추가"
+"Show the Groove Pool" = "Groove Pool 표시"
+"Commit groove" = "노트에 그루브 적용"
+"Extract groove" = "그루브 추출"
+"Insert empty MIDI clip" = "빈 MIDI 클립 삽입"
+"Fixed recording length" = "고정 녹음 길이"
+"Could not read the groove file" = "그루브 파일을 읽을 수 없습니다"
+"Groove Pool" = "Groove Pool"
+"Add a groove to the project" = "프로젝트에 그루브 추가"
+"Global Amount" = "전체 양"
+"Groove Name" = "그루브 이름"
+"No grooves in this project: add one with +" = "이 프로젝트에 그루브가 없습니다: +로 추가하세요"
+"Remove (used by {0} clips)" = "제거 ({0}개 클립에서 사용 중)"
+"Rename groove" = "그루브 이름 바꾸기"
+"Import a groove file..." = "그루브 파일 가져오기..."
+"Import a groove file" = "그루브 파일 가져오기"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"

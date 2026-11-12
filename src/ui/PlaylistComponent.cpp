@@ -45,6 +45,8 @@
 #include "ui/MixerComponent.h"
 #include "engine/Text.h"
 #include "ui/BrowserComponent.h"
+#include "ui/ClipGridComponent.h"
+#include "core/SessionOps.h"
 #include "ui/AutomationUi.h"
 #include "ui/ChannelSettings.h"
 #include "ui/Dialogs.h"
@@ -7514,6 +7516,7 @@ void PlaylistComponent::deleteSelection()
 void PlaylistComponent::copySelection()
 {
     clipboard.clear();
+    ++clipboardStamp;
 
     for (auto i : selection)
         clipboard.push_back (engine.getSong().playlist[(std::size_t) i]);
@@ -8877,11 +8880,22 @@ void PlaylistComponent::zoomOnPerformanceClips()
 
 bool PlaylistComponent::isInterestedInDragSource (const SourceDetails& details)
 {
-    return BrowserComponent::isBrowserDrag (details) || BrowserComponent::draggedPattern (details) >= 0;
+    int gridTrack = 0, gridScene = 0;
+    return BrowserComponent::isBrowserDrag (details) || BrowserComponent::draggedPattern (details) >= 0
+           || clipGridDrag (details.description, gridTrack, gridScene);
 }
 
 void PlaylistComponent::itemDropped (const SourceDetails& details)
 {
+    // a clip dragged out of the clip grid (round 190bv): a copy of it where it is dropped, one pass long
+    if (int gridTrack = 0, gridScene = 0; clipGridDrag (details.description, gridTrack, gridScene))
+    {
+        const auto start = juce::jmax<std::int64_t> (0, snap (xToTick (details.localPosition.x), true));
+        const auto track = juce::jmax (0, yToTrack (details.localPosition.y));
+        engine.editSong ([=] (Song& s) { session::toPlaylist (s, gridTrack, gridScene, track, start); });
+        return;
+    }
+
     // a pattern from the Browser's "Current project": a clip of it where it is dropped
     if (const auto pattern = BrowserComponent::draggedPattern (details); pattern >= 0 && pattern < (int) engine.getSong().patterns.size())
     {

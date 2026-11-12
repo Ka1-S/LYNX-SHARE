@@ -39,6 +39,8 @@ add_library(lynx_core STATIC
     src/core/MarkerPlan.cpp
     src/core/Performance.cpp
     src/core/ClipLauncher.cpp
+    src/core/SessionOps.cpp
+    src/core/Groove.cpp
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
     src/core/RackRenderer.cpp
@@ -413,6 +415,7 @@ if(LYNX_BUILD_APP)
         src/platform/Package.cpp
         src/platform/NativeEmbed.cpp
         src/engine/AudioEngine.cpp
+        src/engine/AudioEngineSession.cpp
         src/engine/ChannelRackProcessor.cpp
         src/engine/Metronome.cpp
         src/engine/SampleLibrary.cpp
@@ -557,6 +560,7 @@ if(LYNX_BUILD_APP)
         src/ui/ClipProperties.cpp
         src/ui/PluginMonitorWindow.cpp
         src/ui/ClipGridComponent.cpp
+        src/ui/GroovePoolComponent.cpp
         src/ui/DetailView.cpp
         src/ui/MidiToolsPanel.cpp
         src/ui/TouchKeyboard.cpp

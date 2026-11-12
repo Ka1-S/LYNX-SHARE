@@ -8280,7 +8280,6 @@ countries: tw hk mo
 "Deactivate input {0}" = "停用輸入 {0}"
 "Activate input {0}" = "啟用輸入 {0}"
 "Input {0}" = "輸入 {0}"
-# Round 183c: Racks
 "Add chain" = "新增鏈"
 "Audio Effect Rack" = "音訊效果機架"
 "Chain Pan" = "鏈聲像"
@@ -8342,9 +8341,9 @@ countries: tw hk mo
 "Blend of the shaped signal with the dry one (parallel processing)" = "處理後訊號與乾訊號的混合（並行處理）"
 "One gain for both channels, so the stereo image stays put" = "兩個聲道使用同一增益，立體聲像保持不動"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "讓低音不進入偵測器（例如鼓匯流排上的大鼓）"
-
 "For a file with a true-peak ceiling: {0}" = "需要真峰值上限的檔案：{0}"
 "(look)" = "（風格）"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "找不到預設範本；已改為開啟 LYNX SHARE 的預設專案"
 "{0} could not be opened." = "無法開啟 {0}。"
@@ -8368,6 +8367,7 @@ countries: tw hk mo
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "分離所有新外掛"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "開：新增的外掛視窗以分離方式開啟，位於面板之上。關：在桌面中停駐開啟，位於所點擊的面板之後。每個外掛的視窗選單 › 已分離 可為該外掛單獨變更"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "用於其他應用程式..."
 "Export for other apps" = "匯出給其他應用程式"
@@ -8542,10 +8542,6 @@ countries: tw hk mo
 "Can't freeze this channel" = "無法凍結此通道"
 "Frozen: Unfreeze to edit" = "已凍結：解凍以編輯"
 "A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "有控制器連結到此樂器的旋鈕並即時移動它們：凍結的音訊無法跟隨。"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "將歌曲儲存為檔案"
@@ -8740,7 +8736,6 @@ countries: tw hk mo
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "遊戲手把可以控制走帶，並能像 MIDI 控制器一樣連結到任何控制項。MIDI 頁面中也有。"
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "LYNX 自己的改進。它們預設全部關閉，因此在你開啟其中一項之前，LYNX SHARE 的外觀和行為都與 FL Studio 相同。每個開關與其所在行指明位置的設定是同一個設定。"
 "LYNX extras..." = "LYNX 附加功能..."
-
 "Search your plugins" = "搜尋你的外掛"
 "Nothing is shared." = "未共用任何內容。"
 "{0} shared with the session" = "已與工作階段共用 {0} 個"
@@ -8883,7 +8878,6 @@ countries: tw hk mo
 "Channel 2" = "通道 2"
 "Channels 2-{0}" = "通道 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "MPE 成員通道（低音區）：各承載一個音符的 MIDI 通道"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "氣聲"
 "Motion blending" = "動作混合"
 "Load sprite sheet..." = "載入精靈表..."
@@ -8918,3 +8912,27 @@ countries: tw hk mo
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "電平平衡：以較慢的起音把電平保持在上限以下的臨界值，其餘由上限攔住（預設關閉）"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "電平平衡臨界值：保持在上限以下的電平（Off：不做電平平衡）"
 "Levelling attack: how much of a transient passes before the level is held" = "電平平衡起音：電平被保持之前有多少瞬態通過"
+"Session Record" = "會話錄音"
+"Session Record: armed tracks record into the selected scene; while their clips play, notes are added to them (overdub)" = "會話錄音：已啟用錄音的軌道會錄入所選場景；其片段播放時，音符會疊加到片段中（overdub）"
+"Grooves" = "律動"
+"Show or hide the Groove Pool" = "顯示或隱藏 Groove Pool"
+"Add a groove" = "新增律動"
+"Show the Groove Pool" = "顯示 Groove Pool"
+"Commit groove" = "將律動套用到音符"
+"Extract groove" = "擷取律動"
+"Insert empty MIDI clip" = "插入空白 MIDI 片段"
+"Fixed recording length" = "固定錄音長度"
+"Could not read the groove file" = "無法讀取律動檔案"
+"Groove Pool" = "Groove Pool"
+"Add a groove to the project" = "向專案新增律動"
+"Global Amount" = "全域量"
+"Groove Name" = "律動名稱"
+"No grooves in this project: add one with +" = "此專案中沒有律動：點擊 + 新增"
+"Remove (used by {0} clips)" = "移除（被 {0} 個片段使用）"
+"Rename groove" = "重新命名律動"
+"Import a groove file..." = "匯入律動檔案..."
+"Import a groove file" = "匯入律動檔案"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"

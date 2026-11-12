@@ -6,6 +6,11 @@
 
 #include "core/ClipLauncher.h"
 #include "core/DetailChain.h"
+#include "core/Groove.h"
+#include "core/SessionOps.h"
+#include "engine/SampleLibrary.h"
+#include "ui/BrowserComponent.h"
+#include "ui/GroovePoolComponent.h"
 #include "ui/ExportDialog.h"
 #include "engine/AudioEngine.h"
 #include "ui/I18n.h"
@@ -21,6 +26,10 @@ namespace
 {
 constexpr int headerHeight = 26, rowHeight = 24, footerHeight = 30, columnWidth = 104, sceneWidth = 128, launchZone = 20;
 constexpr int minColumns = 8, minRows = 8;
+// round 190bv: the row under the slots with each track's stop and arm buttons
+constexpr int statusHeight = 22, armWidth = 22;
+constexpr const char* gridDragDescription = "lynx-grid-clip";
+constexpr int fixedLengths[] = { 1, 2, 4, 8, 16, 32 };
 
 const std::pair<LaunchQuant, const char*> quantNames[] = {
     { LaunchQuant::global, TR_NOOP ("Global") }, { LaunchQuant::none, TR_NOOP ("None") }, { LaunchQuant::bars8, TR_NOOP ("8 bars") },
@@ -40,7 +49,29 @@ const std::pair<FollowKind, const char*> followNames[] = {
 
 juce::String utf8 (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); }
 
+// The Session Record button (round 190bv): a ring on a square button, red while slots record or overdub.
+class RingButton final : public juce::Button
+{
+public:
+    RingButton() : juce::Button ({}) {}
+    void paintButton (juce::Graphics& g, bool over, bool down) override
+    {
+        namespace c = theme::colour;
+        const auto box = getLocalBounds().toFloat().reduced (0.5f);
+        theme::fillRoundRect (g, box, 3.0f, down ? c::bg6 : over ? c::bg5 : c::bg4);
+        const auto ring = box.withSizeKeepingCentre (11.0f, 11.0f);
+        g.setColour (getToggleState() ? c::record : c::textPrimary);
+        g.drawEllipse (ring, 2.2f);
+    }
+};
+
+// (what the grid copied last, with its slot settings; the Playlist's clipboard holds the same clip for a paste there)
+std::optional<session::SlotClip> copiedSlot;
+std::uint64_t copiedSlotStamp = 0;
+
 class ClipGridComponent final : public juce::Component,
+                                public juce::DragAndDropTarget,
+                                public juce::FileDragAndDropTarget,
                                 private juce::Timer,
                                 private juce::ComponentMovementWatcher
 {
@@ -50,11 +81,22 @@ public:
         setWantsKeyboardFocus (true);
         setTitle (tr ("Clip grid"));
         setAccessible (true);
-        for (auto* b : { &stopAll, &backToPlaylist })
+        for (auto* b : { &stopAll, &backToPlaylist, &grooves })
         {
             addAndMakeVisible (*b);
             b->setConnectedEdges (0);
         }
+        addAndMakeVisible (sessionRecord);
+        sessionRecord.setTitle (tr ("Session Record"));
+        sessionRecord.setTooltip (tr ("Session Record: armed tracks record into the selected scene; while their clips play, notes are added to them (overdub)"));
+        sessionRecord.onClick = [this] {
+            engine.toggleSessionRecord (selectedScene);
+            syncControls();
+        };
+        grooves.setButtonText (tr ("Grooves"));
+        grooves.setTooltip (tr ("Show or hide the Groove Pool"));
+        grooves.setClickingTogglesState (true);
+        grooves.onClick = [this] { showGroovePool (grooves.getToggleState()); };
         stopAll.setButtonText (tr ("Stop all clips"));
         stopAll.onClick = [this] { engine.launcherCommand ({ launcher::Command::Type::stopAll }); };
         backToPlaylist.setButtonText (tr ("Back to Playlist"));
@@ -86,6 +128,12 @@ public:
         stopAll.setBounds (foot.removeFromLeft (small ? 84 : 110));
         foot.removeFromLeft (6);
         backToPlaylist.setBounds (foot.removeFromLeft (small ? 104 : 124));
+        foot.removeFromLeft (6);
+        sessionRecord.setBounds (foot.removeFromLeft (foot.getHeight()));
+        foot.removeFromLeft (6);
+        grooves.setBounds (foot.removeFromLeft (juce::jmin (72, juce::jmax (0, foot.getWidth()))));
+        if (groovePool != nullptr && groovePool->isVisible())
+            groovePool->setBounds (0, getHeight() - footerHeight - poolHeight(), getWidth(), poolHeight());
         clampScroll();
         syncControls();
     }
@@ -111,6 +159,7 @@ public:
             {
                 const auto x = columnX (t);
                 paintHeader (g, song, state, t, { x, 0, columnWidth, headerHeight });
+                paintStatus (g, t, { x, cells.getBottom(), columnWidth, statusHeight });
                 juce::Graphics::ScopedSaveState rows (g);
                 g.reduceClipRegion (juce::Rectangle<int> (x, headerHeight, columnWidth, cells.getHeight()));
                 for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
@@ -119,7 +168,7 @@ public:
         }
 
         // the scene column stays in place
-        const juce::Rectangle<int> sceneColumn (cells.getRight(), 0, sceneWidth, getHeight() - footerHeight);
+        const juce::Rectangle<int> sceneColumn (cells.getRight(), 0, sceneWidth, getHeight() - footerHeight - poolHeight());
         g.setColour (c::bg2);
         g.fillRect (sceneColumn);
         g.setColour (c::border);
@@ -133,6 +182,16 @@ public:
             for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
                 paintScene (g, *grid, r, { sceneColumn.getX(), rowY (r), sceneWidth, rowHeight });
         }
+        g.setColour (c::border); // (the status row's top edge, across the tracks and the scene column)
+        g.fillRect (0, cells.getBottom(), getWidth(), 1);
+        // a clip or a file dragged over a slot: where it would land
+        if (dropTrack >= 0 && dropScene >= 0)
+        {
+            juce::Graphics::ScopedSaveState save (g);
+            g.reduceClipRegion (cells);
+            g.setColour (c::accent);
+            g.drawRect (juce::Rectangle<int> (columnX (dropTrack), rowY (dropScene), columnWidth, rowHeight).reduced (1), 2);
+        }
 
         // the footer: controls on the scene side and the buttons, on a band
         const auto foot = getLocalBounds().removeFromBottom (footerHeight);
@@ -145,7 +204,21 @@ public:
     void mouseDown (const juce::MouseEvent& e) override
     {
         grabKeyboardFocus();
+        dragTrack = dragScene = -1;
         const auto hit = hitTestCell (e.getPosition());
+        // the status row (round 190bv): a track's stop button and its arm button (Ctrl: without disarming the others)
+        if (const auto t = statusTrackAt (e.getPosition()); t >= 0)
+        {
+            if (e.mods.isPopupMenu())
+                return;
+            const auto x = e.x - columnX (t);
+            if (x >= columnWidth - armWidth - 6)
+                engine.setGridTrackArmed (t, ! engine.isGridTrackArmed (t), ! e.mods.isCommandDown());
+            else if (x < launchZone)
+                engine.launcherCommand ({ launcher::Command::Type::stopTrack, t });
+            repaint();
+            return;
+        }
         if (e.mods.isPopupMenu())
         {
             if (const auto t = headerTrackAt (e.getPosition()); t >= 0) // (round 190ay: the track's own menu)
@@ -189,9 +262,96 @@ public:
                 pressedTrack = hit.track;
                 pressedScene = hit.scene;
             }
+            else if (recordingScene (hit.track) == hit.scene)
+                engine.endSlotRecording (hit.track, true); // the recording clip's launch button: on into loop playback
+            else if (engine.isGridTrackArmed (hit.track) && recordingScene (hit.track) < 0)
+                engine.recordSlot (hit.track, hit.scene); // an armed track's empty slot: its record button
             else
                 engine.launcherCommand ({ launcher::Command::Type::stopTrack, hit.track }); // an empty slot's stop button
         }
+        else if (filled)
+        {
+            dragTrack = hit.track; // (a drag from the clip's name moves it, with Ctrl copies it)
+            dragScene = hit.scene;
+        }
+    }
+
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (dragTrack < 0 || e.getDistanceFromDragStart() < 5)
+            return;
+        auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this);
+        if (container == nullptr || container->isDragAndDropActive())
+            return;
+        const juce::Rectangle<int> cell (columnX (dragTrack), rowY (dragScene), columnWidth, rowHeight);
+        container->startDragging (juce::String (gridDragDescription) + "|" + juce::String (dragTrack) + "|" + juce::String (dragScene), this,
+                                  juce::ScaledImage (createComponentSnapshot (cell)), false);
+    }
+
+    // --- drops: a clip of the grid, a pattern or a file from the Browser, files from outside (round 190bv) ---
+    bool isInterestedInDragSource (const SourceDetails& details) override
+    {
+        int t = 0, r = 0;
+        return clipGridDrag (details.description, t, r) || BrowserComponent::draggedPattern (details) >= 0
+               || SampleLibrary::isSampleFile (BrowserComponent::draggedFile (details));
+    }
+    void itemDragEnter (const SourceDetails& details) override { itemDragMove (details); }
+    void itemDragMove (const SourceDetails& details) override { setDropCell (details.localPosition); }
+    void itemDragExit (const SourceDetails&) override { setDropCell ({ -1, -1 }); }
+    void itemDropped (const SourceDetails& details) override
+    {
+        const auto hit = hitTestCell (details.localPosition);
+        setDropCell ({ -1, -1 });
+        if (hit.track < 0 || hit.scene < 0)
+            return;
+        int fromTrack = 0, fromScene = 0;
+        if (clipGridDrag (details.description, fromTrack, fromScene))
+        {
+            const auto copy = juce::ModifierKeys::currentModifiers.isCommandDown();
+            engine.editSong ([=] (Song& s) { session::moveClip (s, fromTrack, fromScene, hit.track, hit.scene, copy); });
+        }
+        else if (const auto pattern = BrowserComponent::draggedPattern (details); pattern >= 0)
+            putPattern (hit.track, hit.scene, pattern);
+        else if (const auto file = BrowserComponent::draggedFile (details); file.existsAsFile())
+            putAudioFile (file, hit.track, hit.scene);
+        selectedTrack = hit.track;
+        selectedScene = hit.scene;
+        repaint();
+        notify (GridPick::select);
+    }
+    bool isInterestedInFileDrag (const juce::StringArray& files) override
+    {
+        return std::any_of (files.begin(), files.end(), [] (const juce::String& f) { return SampleLibrary::isSampleFile (juce::File (f)); });
+    }
+    void fileDragEnter (const juce::StringArray&, int x, int y) override { setDropCell ({ x, y }); }
+    void fileDragMove (const juce::StringArray&, int x, int y) override { setDropCell ({ x, y }); }
+    void fileDragExit (const juce::StringArray&) override { setDropCell ({ -1, -1 }); }
+    void filesDropped (const juce::StringArray& files, int x, int y) override
+    {
+        const auto hit = hitTestCell ({ x, y });
+        setDropCell ({ -1, -1 });
+        if (hit.track < 0 || hit.scene < 0)
+            return;
+        auto scene = hit.scene; // (several files: one below the other in the track)
+        for (const auto& f : files)
+            if (scene < launcher::maxScenes && putAudioFile (juce::File (f), hit.track, scene))
+                ++scene;
+        repaint();
+    }
+
+    // The Groove Pool under the grid (made the first time it is shown).
+    void showGroovePool (bool show)
+    {
+        if (show && groovePool == nullptr)
+        {
+            groovePool = makeGroovePool (engine);
+            addChildComponent (*groovePool);
+        }
+        if (groovePool != nullptr)
+            groovePool->setVisible (show);
+        grooves.setToggleState (show, juce::dontSendNotification);
+        resized();
+        repaint();
     }
 
     void mouseUp (const juce::MouseEvent&) override
@@ -263,16 +423,46 @@ public:
             repaint();
             return true;
         }
+        // round 190bv: the clipboard, duplicate and a new empty MIDI clip
+        if (key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown())
+        {
+            const auto shift = key.getModifiers().isShiftDown();
+            const auto letter = juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) code);
+            if (! shift && (letter == 'C' || letter == 'X'))
+            {
+                copySlot (selectedTrack, selectedScene, letter == 'X');
+                return true;
+            }
+            if (! shift && letter == 'V')
+            {
+                pasteSlot (selectedTrack, selectedScene);
+                return true;
+            }
+            if (! shift && letter == 'D')
+            {
+                duplicateSlot (selectedTrack, selectedScene);
+                return true;
+            }
+            if (shift && letter == 'M')
+            {
+                insertEmptyClip (selectedTrack, selectedScene);
+                return true;
+            }
+        }
         return false;
     }
 
 private:
     AudioEngine& engine;
-    juce::TextButton stopAll, backToPlaylist;
+    juce::TextButton stopAll, backToPlaylist, grooves;
+    RingButton sessionRecord;
     juce::ComboBox globalQuant;
+    std::unique_ptr<juce::Component> groovePool;
     int scrollX = 0, scrollY = 0;
     int selectedTrack = 0, selectedScene = 0;
     int pressedTrack = -1, pressedScene = -1;
+    int dragTrack = -1, dragScene = -1; // the clip a drag would take
+    int dropTrack = -1, dropScene = -1; // the slot a drag is over
 
     struct Cell
     {
@@ -299,7 +489,44 @@ private:
     }
     juce::Rectangle<int> cellArea() const
     {
-        return { 0, headerHeight, juce::jmax (0, getWidth() - sceneWidth), juce::jmax (0, getHeight() - headerHeight - footerHeight) };
+        return { 0, headerHeight, juce::jmax (0, getWidth() - sceneWidth),
+                 juce::jmax (0, getHeight() - headerHeight - footerHeight - statusHeight - poolHeight()) };
+    }
+    int poolHeight() const
+    {
+        if (groovePool == nullptr || ! groovePool->isVisible())
+            return 0;
+        return juce::jmin (groovePoolHeight (engine), juce::jmax (0, getHeight() - headerHeight - footerHeight - statusHeight - 3 * rowHeight));
+    }
+    // the track whose status cell (stop and arm buttons) is at p, or -1
+    int statusTrackAt (juce::Point<int> p) const
+    {
+        const auto cells = cellArea();
+        if (p.y < cells.getBottom() || p.y >= cells.getBottom() + statusHeight || p.x < 0 || p.x >= cells.getRight())
+            return -1;
+        const auto t = (p.x + scrollX) / columnWidth;
+        return t >= 0 && t < columnCount() ? t : -1;
+    }
+    // the scene the track records into, or waits to (-1: none)
+    int recordingScene (int track) const
+    {
+        const auto* state = engine.launcherState();
+        if (state == nullptr || track < 0 || track >= launcher::maxTracks)
+            return -1;
+        const auto& view = state->tracks[(std::size_t) track];
+        const auto recording = view.recording.load (std::memory_order_relaxed);
+        return recording >= 0 ? recording : view.recordPending.load (std::memory_order_relaxed);
+    }
+    void setDropCell (juce::Point<int> p)
+    {
+        const auto hit = hitTestCell (p);
+        const auto t = hit.track >= 0 && hit.scene >= 0 ? hit.track : -1, r = t >= 0 ? hit.scene : -1;
+        if (t != dropTrack || r != dropScene)
+        {
+            dropTrack = t;
+            dropScene = r;
+            repaint();
+        }
     }
     int columnX (int t) const noexcept { return t * columnWidth - scrollX; }
     int rowY (int r) const noexcept { return headerHeight + r * rowHeight - scrollY; }
@@ -412,10 +639,33 @@ private:
 
         if (clip == nullptr)
         {
-            g.setColour (c::bg2);
+            const auto* view = state != nullptr ? &state->tracks[(std::size_t) t] : nullptr;
+            const auto recording = view != nullptr && view->recording.load (std::memory_order_relaxed) == row;
+            const auto waiting = view != nullptr && ! recording && view->recordPending.load (std::memory_order_relaxed) == row;
+            g.setColour (recording ? c::accentMuted : c::bg2);
             g.fillRect (cell);
-            g.setColour (c::textSecondary.withAlpha (0.55f));
-            g.fillRect (zone.withSizeKeepingCentre (7.0f, 7.0f));
+            if (recording || waiting)
+            {
+                // a slot that records: its launch button in the record colour (blinking until the recording starts);
+                // pressing it sends the new clip on into loop playback
+                const auto blinkOn = (juce::Time::getMillisecondCounter() / 150) % 2 == 0;
+                juce::Path triangle;
+                const auto a = zone.withSizeKeepingCentre (9.0f, 11.0f);
+                triangle.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
+                g.setColour (recording || blinkOn ? c::record : c::record.withAlpha (0.3f));
+                g.fillPath (triangle);
+            }
+            else if (engine.isGridTrackArmed (t))
+            {
+                // an armed track's empty slots: round record buttons in place of the stop squares
+                g.setColour (c::textSecondary.withAlpha (0.8f));
+                g.fillEllipse (zone.withSizeKeepingCentre (8.0f, 8.0f));
+            }
+            else
+            {
+                g.setColour (c::textSecondary.withAlpha (0.55f));
+                g.fillRect (zone.withSizeKeepingCentre (7.0f, 7.0f));
+            }
         }
         else
         {
@@ -460,6 +710,28 @@ private:
         }
     }
 
+    // The status cell under a track's slots (round 190bv): its stop button and its arm button.
+    void paintStatus (juce::Graphics& g, int t, juce::Rectangle<int> r) const
+    {
+        namespace c = theme::colour;
+        g.setColour (c::bg3);
+        g.fillRect (r);
+        g.setColour (c::border);
+        g.fillRect (r.getRight() - 1, r.getY(), 1, r.getHeight());
+        g.setColour (c::textPrimary.withAlpha (0.8f));
+        g.fillRect (r.withWidth (launchZone).toFloat().withSizeKeepingCentre (8.0f, 8.0f));
+        const auto armed = engine.isGridTrackArmed (t);
+        const auto arm = juce::Rectangle<int> (r.getRight() - armWidth - 4, r.getY(), armWidth, r.getHeight()).withSizeKeepingCentre (armWidth, 15).toFloat();
+        theme::fillRoundRect (g, arm, 2.0f, armed ? c::record : c::bg4);
+        if (! armed)
+        {
+            g.setColour (c::borderStrong);
+            g.drawRoundedRectangle (arm.reduced (0.5f), 2.0f, 1.0f);
+        }
+        g.setColour (armed ? c::bg0 : c::textSecondary);
+        g.fillEllipse (arm.withSizeKeepingCentre (7.0f, 7.0f));
+    }
+
     void paintScene (juce::Graphics& g, const ClipGrid& grid, int row, juce::Rectangle<int> r) const
     {
         namespace c = theme::colour;
@@ -490,12 +762,134 @@ private:
         repaint();
     }
 
+    // An audio file (from the Browser or from outside) as a clip in a slot: one pass of the file at the project's tempo.
+    bool putAudioFile (const juce::File& file, int track, int scene)
+    {
+        if (! SampleLibrary::isSampleFile (file))
+            return false;
+        const auto data = engine.getSampleLibrary().load (file.getFullPathName());
+        if (data == nullptr)
+            return false;
+        const auto seconds = (double) data->frames() / data->sampleRate;
+        const auto length = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * engine.getSong().bpm / 60.0 * ppq));
+        const auto path = file.getFullPathName().toStdString();
+        const auto name = file.getFileNameWithoutExtension().toStdString();
+        engine.editSong ([=] (Song& s) {
+            int channel = -1;
+            for (int c = 0; c < (int) s.channels.size(); ++c)
+                if (s.channels[(std::size_t) c].instrument == InstrumentKind::audioClip && s.channels[(std::size_t) c].samplePath == path)
+                    channel = c;
+            const auto made = channel < 0;
+            if (made)
+            {
+                ChannelDef c;
+                c.name = name;
+                c.instrument = InstrumentKind::audioClip;
+                c.sampler.declickMode = audioClipDeclickMode;
+                c.samplePath = path;
+                c.mixerTrack = s.claimFreeInsert();
+                s.channels.push_back (c);
+                channel = (int) s.channels.size() - 1;
+            }
+            if (! session::putAudio (s, track, scene, channel, length) && made)
+                s.channels.pop_back();
+        });
+        return true;
+    }
+
+    // --- the clipboard (round 190bv): shared with the Playlist, so a clip goes both ways -----------------------------
+    void copySlot (int track, int scene, bool cutToo)
+    {
+        auto content = session::copyOf (engine.getSong(), track, scene);
+        if (! content)
+            return;
+        auto clip = content->clip;
+        clip.gridSlot = -1;
+        clip.uid = 0;
+        clip.start = 0;
+        PlaylistComponent::setCopiedClips ({ clip });
+        copiedSlot = std::move (content);
+        copiedSlotStamp = PlaylistComponent::copiedStamp();
+        if (cutToo)
+            engine.editSong ([=] (Song& s) { launcher::clearClip (s, track, scene); });
+        repaint();
+    }
+    static bool canPaste()
+    {
+        if (copiedSlot && copiedSlotStamp == PlaylistComponent::copiedStamp())
+            return true;
+        const auto& clips = PlaylistComponent::copiedClips();
+        return std::any_of (clips.begin(), clips.end(), [] (const Clip& c) { return c.kind == ClipKind::pattern || c.kind == ClipKind::audio; });
+    }
+    void pasteSlot (int track, int scene)
+    {
+        if (copiedSlot && copiedSlotStamp == PlaylistComponent::copiedStamp())
+            engine.editSong ([=, content = *copiedSlot] (Song& s) { session::paste (s, track, scene, content); });
+        else
+        {
+            // copied in the Playlist: its first pattern or audio clip
+            const auto& clips = PlaylistComponent::copiedClips();
+            const auto it = std::find_if (clips.begin(), clips.end(), [] (const Clip& c) { return c.kind == ClipKind::pattern || c.kind == ClipKind::audio; });
+            if (it == clips.end())
+                return;
+            engine.editSong ([=, clip = *it] (Song& s) { session::putClip (s, clip, track, scene); });
+        }
+        repaint();
+    }
+    void duplicateSlot (int track, int scene)
+    {
+        auto to = -1;
+        engine.editSong ([&] (Song& s) { to = session::duplicate (s, track, scene); });
+        if (to >= 0)
+        {
+            selectedScene = to;
+            revealSelection();
+            notify (GridPick::select);
+        }
+        repaint();
+    }
+    void insertEmptyClip (int track, int scene)
+    {
+        engine.editSong ([=] (Song& s) { session::insertEmptyClip (s, track, scene); });
+        repaint();
+    }
+
+    // The clip's groove (round 190bv): none, one of the project's grooves, or one added to the pool now.
+    juce::PopupMenu grooveMenu (int track, int scene, std::uint32_t current)
+    {
+        juce::PopupMenu menu;
+        const auto set = [this, track, scene] (std::uint32_t id) {
+            engine.editSong ([=] (Song& s) { groove::setClipGroove (s, track, scene, id); });
+            repaint();
+        };
+        menu.addItem (tr ("None"), true, current == 0, [set] { set (0); });
+        for (const auto& gr : engine.getSong().grooves.grooves)
+            menu.addItem (utf8 (gr.name), true, current == gr.id, [set, id = gr.id] { set (id); });
+        menu.addSeparator();
+        juce::PopupMenu add;
+        addGrooveMenuItems (add, engine, this, [safe = juce::Component::SafePointer<ClipGridComponent> (this), track, scene] (std::uint32_t id) {
+            if (safe == nullptr)
+                return;
+            safe->engine.editSong ([=] (Song& s) { groove::setClipGroove (s, track, scene, id); }, false);
+            safe->repaint();
+        });
+        menu.addSubMenu (tr ("Add a groove"), add);
+        menu.addItem (tr ("Show the Groove Pool"), [this] { showGroovePool (true); });
+        return menu;
+    }
+
     void showSlotMenu (int track, int scene)
     {
+        buildSlotMenu (track, scene).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+    }
+
+public:
+    juce::PopupMenu buildSlotMenu (int track, int scene)
+    {
+        juce::PopupMenu menu;
         const auto* grid = gridOf();
         if (grid == nullptr)
-            return;
-        juce::PopupMenu menu;
+            return menu;
         const auto& song = engine.getSong();
         juce::PopupMenu patterns;
         for (int p = 0; p < (int) song.patterns.size(); ++p)
@@ -523,7 +917,30 @@ private:
                 editSlot (track, scene, [on] (ClipGridSlot& s) { s.loop = ! on; });
             });
             menu.addSubMenu (tr ("Follow action"), followMenu (track, scene, slot->follow));
+            // grooves play on the notes of MIDI clips (round 190bv)
+            if (const auto* clip = launcher::clipAt (*grid, track, scene); clip != nullptr && clip->kind == ClipKind::pattern)
+            {
+                menu.addSubMenu (tr ("Groove"), grooveMenu (track, scene, slot->groove));
+                menu.addItem (tr ("Commit groove"), slot->groove != 0, false, [this, track, scene] {
+                    engine.editSong ([=] (Song& s) { groove::commit (s, track, scene); });
+                    repaint();
+                });
+                menu.addItem (tr ("Extract groove"), [this, track, scene] {
+                    engine.editSong ([=] (Song& s) {
+                        const auto* c = s.clipGrid ? launcher::clipAt (*s.clipGrid, track, scene) : nullptr;
+                        if (c == nullptr || c->pattern < 0 || c->pattern >= (int) s.patterns.size())
+                            return;
+                        const auto& pattern = s.patterns[(std::size_t) c->pattern];
+                        groove::add (s.grooves, groove::extract (pattern, c->length, GrooveBase::sixteenth, pattern.name));
+                    });
+                    showGroovePool (true);
+                });
+            }
             menu.addSeparator();
+            menu.addItem (tr ("Cut") + "\tCtrl+X", [this, track, scene] { copySlot (track, scene, true); });
+            menu.addItem (tr ("Copy") + "\tCtrl+C", [this, track, scene] { copySlot (track, scene, false); });
+            menu.addItem (tr ("Paste") + "\tCtrl+V", canPaste(), false, [this, track, scene] { pasteSlot (track, scene); });
+            menu.addItem (tr ("Duplicate") + "\tCtrl+D", [this, track, scene] { duplicateSlot (track, scene); });
             menu.addItem (tr ("Delete"), [this, track, scene] {
                 engine.editSong ([=] (Song& s) { launcher::clearClip (s, track, scene); });
                 repaint();
@@ -531,6 +948,8 @@ private:
         }
         else
         {
+            menu.addItem (tr ("Paste") + "\tCtrl+V", canPaste(), false, [this, track, scene] { pasteSlot (track, scene); });
+            menu.addItem (tr ("Insert empty MIDI clip") + "\tCtrl+Shift+M", [this, track, scene] { insertEmptyClip (track, scene); });
             const auto has = launcher::hasStopButton (*grid, track, scene);
             menu.addItem (tr ("Stop button (a scene stops this track here)"), true, has, [this, track, scene, has] {
                 engine.editSong ([=] (Song& s) { launcher::setStopButton (s, track, scene, ! has); });
@@ -539,9 +958,10 @@ private:
         }
         menu.addSeparator();
         addGridOptions (menu);
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+        return menu;
     }
 
+private:
     juce::PopupMenu followMenu (int track, int scene, const ClipFollow& f)
     {
         const auto edit = [this, track, scene] (std::function<void (ClipFollow&)> fn) {
@@ -706,6 +1126,13 @@ private:
         menu.addItem (tr ("Give tracks back to the Playlist when the transport stops"), true, on, [this, on] {
             engine.editSong ([on] (Song& s) { launcher::ensureGrid (s).backOnStop = ! on; }, false);
         });
+        // round 190bv: a recording into a slot ends by itself after this many bars and the clip plays on
+        juce::PopupMenu fixed;
+        const auto bars = engine.getSlotRecordBars();
+        fixed.addItem (tr ("Off"), true, bars == 0, [this] { engine.setSlotRecordBars (0); });
+        for (const auto n : fixedLengths)
+            fixed.addItem (n == 1 ? tr ("1 bar") : tr ("{0} bars", { juce::String (n) }), true, bars == n, [this, n] { engine.setSlotRecordBars (n); });
+        menu.addSubMenu (tr ("Fixed recording length"), fixed);
         const auto follow = grid == nullptr || grid->followActions;
         menu.addItem (tr ("Follow actions on the whole grid"), true, follow, [this, follow] {
             engine.editSong ([follow] (Song& s) { launcher::ensureGrid (s).followActions = ! follow; }, false);
@@ -732,6 +1159,7 @@ private:
         if (state != nullptr)
             for (int t = 0, n = columnCount(); t < n && ! taken; ++t)
                 taken = state->tracks[(std::size_t) t].taken.load (std::memory_order_relaxed);
+        sessionRecord.setToggleState (engine.isSessionRecording(), juce::dontSendNotification);
         if (backToPlaylist.getToggleState() != taken)
         {
             backToPlaylist.setToggleState (taken, juce::dontSendNotification);
@@ -769,6 +1197,32 @@ void setClipGridPickListener (juce::Component& grid, std::function<void (int, in
 {
     if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
         g->onPick = std::move (listener);
+}
+
+void setClipGridGroovePoolShown (juce::Component& grid, bool shown)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        g->showGroovePool (shown);
+}
+
+juce::PopupMenu clipGridSlotMenu (juce::Component& grid, int track, int scene)
+{
+    if (auto* g = dynamic_cast<ClipGridComponent*> (&grid))
+        return g->buildSlotMenu (track, scene);
+    return {};
+}
+
+bool clipGridDrag (const juce::var& description, int& track, int& scene)
+{
+    const auto text = description.toString();
+    if (! text.startsWith (juce::String (gridDragDescription) + "|"))
+        return false;
+    const auto parts = juce::StringArray::fromTokens (text, "|", {});
+    if (parts.size() != 3)
+        return false;
+    track = parts[1].getIntValue();
+    scene = parts[2].getIntValue();
+    return track >= 0 && scene >= 0;
 }
 
 std::pair<int, int> clipGridSelection (juce::Component& grid)

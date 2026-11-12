@@ -25,6 +25,25 @@ instruments and effects are rendered to audio or replaced in an `.flp`, and are 
 **Clip-launch workflow** (an Ableton Live-style clip grid with scenes beside the Playlist). Switching moves panels only;
 the project stays the same.
 
+In the clip grid (Clip-launch workflow):
+
+- **Record into a slot**: arm a track with the button under its slots (Ctrl-click arms more than one); its empty slots
+  show round record buttons. Click one: the recording starts on the next point of the launch quantisation (after the
+  count-in when the transport was stopped). Click the recording slot's launch button to end it and let the new clip
+  loop; the track's stop button ends it without playing. MIDI tracks record notes; a track that plays through a mixer
+  insert with an audio input records that input.
+- **Session Record** (the ring button under the grid): records into the selected scene on every armed track; press it
+  again and the new clips loop. While armed MIDI clips are playing it switches overdub on and off: what you play is
+  added to the clip as it loops.
+- **Fixed recording length** (right-click › grid options): the recording ends by itself after 1 to 32 bars.
+- **Clips**: Ctrl+C / X / V and Ctrl+D (duplicate into the slot below); drag a clip to another slot (Ctrl copies), onto
+  the Playlist, or drop an audio file or a pattern from the Browser on a slot. Copy and Paste also work between the
+  grid and the Playlist. Ctrl+Shift+M puts a new empty MIDI clip in the selected slot.
+- **Grooves** (the Grooves button under the grid opens the Groove Pool): add one of LYNX's grooves with **+** (or import
+  a groove file you own), then pick it for a MIDI clip in the slot's menu › Groove. The clip plays through it without
+  changing its notes. Each groove has Base, Quantize, Timing, Random and Velocity; **Global Amount** scales all grooves
+  (0 to 130 %). **Commit groove** writes the result into the notes; **Extract groove** makes a groove from a clip.
+
 ## Online sessions: make a song with a friend (phase 1, packages)
 
 Send your project to a friend, who records their part in their own LYNX SHARE with their own plugins and sends it back; you

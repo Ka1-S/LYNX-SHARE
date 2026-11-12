@@ -205,6 +205,32 @@ public:
     void launcherCommand (const launcher::Command& command);
     // What plays per track, or nullptr while no project has had a grid (never with Pattern workflow).
     const launcher::Runtime* launcherState() const noexcept { return clipLauncher.get(); }
+
+    // --- recording into the clip grid's slots (round 190bv; core/SessionOps.h, docs/analise/REA_rodada190bv.md) ---
+    // A column of the grid is a Playlist track. Armed, it records what is played on its instrument's channel (a track
+    // without one: on any channel), or, a track that plays through a mixer insert with an input, that input's audio
+    // (the insert is armed with it). Arming is not saved. `exclusive`: the other tracks are disarmed.
+    enum class GridInput : std::uint8_t { midi, audio };
+    GridInput gridTrackInput (int track) const;
+    void setGridTrackArmed (int track, bool armed, bool exclusive = true);
+    bool isGridTrackArmed (int track) const noexcept;
+    // The record button of an empty slot on an armed track: the recording starts on the next point of the global launch
+    // quantisation (the transport starts if it was stopped, after the count-in of the record options), stops what the
+    // track plays there, and runs until endSlotRecording, or for the fixed length. False: the slot has a clip, or the
+    // track is not armed.
+    bool recordSlot (int track, int scene);
+    // Ends the track's recording on the next quantisation point. `thenPlay`: the new clip plays on in a loop from
+    // there (the recording clip's launch button); otherwise the track stops (a stop button).
+    void endSlotRecording (int track, bool thenPlay);
+    // The Session Record button. Nothing recording: every armed track records into `scene` where its slot is empty,
+    // and armed tracks whose MIDI clip is playing take what is played into that clip as it loops (overdub).
+    // Recording or overdubbing: the recordings go on into loop playback and overdub ends.
+    void toggleSessionRecord (int scene);
+    bool isSessionRecording() const noexcept { return ! slotTakes.empty() || sessionOverdub; }
+    bool isSessionOverdubbing() const noexcept { return sessionOverdub; }
+    // A fixed recording length in bars (0 = until it is ended). Not saved.
+    void setSlotRecordBars (int bars) { slotRecordBars = juce::jlimit (0, 32, bars); }
+    int getSlotRecordBars() const noexcept { return slotRecordBars; }
     launcher::Runtime* launcherStateForSnapshot() noexcept { return clipLauncher.get(); } // --gridshot: a sample of what plays
     perf::Live& performanceStateForSnapshot() noexcept { return *performanceLive; } // --perfshot: a sample of what plays
     void stop() noexcept; // also cancels a count-in or a wait for the first note
@@ -1072,6 +1098,34 @@ private:
     bool perfTakeHasUndoStep = false; // the first clip a performance recording writes is the take's undo step
     void updatePerformanceRecording();
     void updateLauncherRecording();
+    // recording into slots (round 190bv): UI thread
+    struct SlotTake
+    {
+        int track = 0, scene = 0;
+        bool audio = false;
+        int channel = -1;   // MIDI: the channel whose notes it takes (−1: any)
+        int insert = -1;    // audio: the armed insert
+        bool known = false; // its end is known: [from, until) on the launcher's clock
+        double from = 0.0, until = 0.0;
+        bool thenPlay = false, placed = false;
+        std::size_t placedEvents = 0;
+        std::vector<RecordedEvent> events;
+    };
+    std::vector<SlotTake> slotTakes;
+    std::vector<int> gridArmed;
+    bool sessionOverdub = false, overdubHasUndoStep = false;
+    std::vector<std::pair<int, RecordedEvent>> overdubEvents; // (track, event) not yet written
+    int slotRecordBars = 0;
+    SpscQueue<RecordedEvent, 1024> slotRecordQueue; // MIDI thread -> UI: notes while a slot records (tick: song position)
+    std::vector<RecordedEvent> uiSlotRecorded;
+    std::atomic<bool> slotTaking { false };       // a slot records or overdubs MIDI: the played notes are queued
+    bool slotAudioWanted = false;                 // a slot records audio: the armed inserts' takes run
+    std::atomic<bool> slotAudioCapture { false }; // (the audio thread's view of it)
+    std::atomic<double> takeStartClock { -1.0 };  // the launcher's clock at the take's first sample
+    void updateSlotRecording();
+    void readSlotTakeMessages();
+    bool placeSlotAudio (const std::vector<std::pair<juce::File, int>>& files, double ticksPerSample, int latency);
+    double slotClockNow() const noexcept;
     bool launcherTakeHasUndoStep = false;
     RecordOptions recordOptions;
     std::vector<int> takeClearedChannels; // replace mode: channels already cleared in this take

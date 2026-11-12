@@ -2,6 +2,7 @@
 #include "core/Preferences.h"
 
 #include "core/ClipLauncher.h"
+#include "core/Groove.h"
 #include "core/PatternBlocks.h"
 #include "core/SessionIds.h"
 
@@ -1543,6 +1544,8 @@ juce::var clipGridToVar (const ClipGrid& grid)
             o->setProperty ("loop", false);
         if (slot.noStop)
             o->setProperty ("noStop", true);
+        if (slot.groove != 0)
+            o->setProperty ("groove", (juce::int64) slot.groove);
         if (slot.follow != ClipFollow {})
         {
             const auto& f = slot.follow;
@@ -1589,6 +1592,7 @@ std::optional<ClipGrid> clipGridFromVar (const juce::var& v, const Song& song)
             slot.legato = (bool) o.getProperty ("legato", false);
             slot.loop = (bool) o.getProperty ("loop", true);
             slot.noStop = (bool) o.getProperty ("noStop", false);
+            slot.groove = (std::uint32_t) (juce::int64) o.getProperty ("groove", 0);
             if (const auto f = o["follow"]; f.isArray() && f.size() >= 10)
             {
                 const auto kind = [] (const juce::var& k) { return (FollowKind) juce::jlimit (0, (int) FollowKind::jump, (int) k); };
@@ -1605,6 +1609,66 @@ std::optional<ClipGrid> clipGridFromVar (const juce::var& v, const Song& song)
     if (grid.scenes.empty())
         grid.scenes.emplace_back();
     return grid;
+}
+
+// The groove pool (round 190bv): only in a project that has one.
+juce::var groovePoolToVar (const GroovePool& pool)
+{
+    auto root = std::make_unique<juce::DynamicObject>();
+    root->setProperty ("amount", pool.amount);
+    juce::Array<juce::var> grooves;
+    for (const auto& g : pool.grooves)
+    {
+        auto o = std::make_unique<juce::DynamicObject>();
+        o->setProperty ("id", (juce::int64) g.id);
+        o->setProperty ("name", str (g.name));
+        o->setProperty ("base", (int) g.base);
+        o->setProperty ("quantize", g.quantize);
+        o->setProperty ("timing", g.timing);
+        o->setProperty ("random", g.random);
+        o->setProperty ("velocity", g.velocity);
+        o->setProperty ("length", (juce::int64) g.length);
+        juce::Array<juce::var> points; // tick, velocity, tick, velocity…
+        for (const auto& p : g.points)
+        {
+            points.add ((juce::int64) p.tick);
+            points.add (p.velocity);
+        }
+        o->setProperty ("points", points);
+        grooves.add (juce::var (o.release()));
+    }
+    root->setProperty ("grooves", grooves);
+    return juce::var (root.release());
+}
+
+GroovePool groovePoolFromVar (const juce::var& v)
+{
+    GroovePool pool;
+    if (! v.isObject())
+        return pool;
+    pool.amount = juce::jlimit (0.0f, groove::maxAmount, (float) (double) v.getProperty ("amount", 1.0));
+    if (const auto* grooves = v["grooves"].getArray())
+        for (const auto& o : *grooves)
+        {
+            Groove g;
+            g.id = (std::uint32_t) (juce::int64) o.getProperty ("id", 0);
+            if (g.id == 0 || groove::find (pool, g.id) != nullptr)
+                continue;
+            g.name = o["name"].toString().toStdString();
+            g.base = (GrooveBase) juce::jlimit (0, (int) GrooveBase::thirtySecond, (int) o.getProperty ("base", (int) GrooveBase::sixteenth));
+            g.quantize = juce::jlimit (0.0f, 1.0f, (float) (double) o.getProperty ("quantize", 0.0));
+            g.timing = juce::jlimit (0.0f, 1.0f, (float) (double) o.getProperty ("timing", 1.0));
+            g.random = juce::jlimit (0.0f, 1.0f, (float) (double) o.getProperty ("random", 0.0));
+            g.velocity = juce::jlimit (-1.0f, 1.0f, (float) (double) o.getProperty ("velocity", 0.0));
+            g.length = juce::jmax<juce::int64> (groove::baseTicks (g.base), (juce::int64) o.getProperty ("length", 4 * ppq));
+            if (const auto* points = o["points"].getArray())
+                for (int i = 0; i + 1 < points->size(); i += 2)
+                    g.points.push_back ({ juce::jlimit<juce::int64> (0, g.length - 1, (juce::int64) (*points)[i]),
+                                          juce::jlimit (0.0f, 1.0f, (float) (double) (*points)[i + 1]) });
+            std::stable_sort (g.points.begin(), g.points.end(), [] (const GroovePoint& a, const GroovePoint& b) { return a.tick < b.tick; });
+            pool.grooves.push_back (std::move (g));
+        }
+    return pool;
 }
 
 juce::var channelToVar (const ChannelDef& c)
@@ -2856,6 +2920,8 @@ juce::String toJson (const Song& song, bool stampVersion)
     root->setProperty ("clipFadesPerClip", true); // round 180d: a project without it has linear clip fades
     if (song.clipGrid) // the Clip-launch workflow's grid (round 181a): only in a project that has one
         root->setProperty ("clipGrid", clipGridToVar (*song.clipGrid));
+    if (song.grooves != GroovePool {}) // the groove pool (round 190bv)
+        root->setProperty ("grooves", groovePoolToVar (song.grooves));
     if (song.patternBlocksOn)
         root->setProperty ("patternBlocks", true);
     if (! song.blocks.empty())
@@ -3313,6 +3379,11 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     };
     keepOldClipFades (song.playlist);
     song.clipGrid = clipGridFromVar (root["clipGrid"], song);
+    song.grooves = groovePoolFromVar (root["grooves"]);
+    if (song.clipGrid) // (a clip never points at a groove the pool does not have)
+        for (auto& slot : song.clipGrid->slots)
+            if (slot.groove != 0 && groove::find (song.grooves, slot.groove) == nullptr)
+                slot.groove = 0;
     song.patternBlocksOn = (bool) root.getProperty ("patternBlocks", false);
     song.blocks = blocksFromVar (root["blocks"], song);
 

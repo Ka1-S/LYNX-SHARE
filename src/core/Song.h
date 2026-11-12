@@ -1924,6 +1924,38 @@ struct Arrangement
     bool operator== (const Arrangement&) const = default;
 };
 
+// The groove pool (round 190bv; logic in core/Groove.h): timing and accent templates a clip of the grid plays through
+// without its notes changing. The numbers of GrooveBase are those a groove file stores as its grid (0..5).
+enum class GrooveBase : std::uint8_t { quarter, eighth, eighthTriplet, sixteenth, sixteenthTriplet, thirtySecond };
+
+struct GroovePoint
+{
+    std::int64_t tick = 0;  // where the template's note is, from the template's start
+    float velocity = 1.0f;  // 0..1
+    bool operator== (const GroovePoint&) const = default;
+};
+
+struct Groove
+{
+    std::uint32_t id = 0;   // > 0, unique in the pool: what a clip refers to
+    std::string name;
+    GrooveBase base = GrooveBase::sixteenth;
+    float quantize = 0.0f;  // 0..1: straight quantisation to the base, before the template
+    float timing = 1.0f;    // 0..1: how far the template moves the notes
+    float random = 0.0f;    // 0..1: random timing, drawn again on every pass
+    float velocity = 0.0f;  // -1..1: how far the template's accents change the notes' velocity (negative: reversed)
+    std::int64_t length = 4 * ppq; // the template repeats every `length` ticks
+    std::vector<GroovePoint> points; // sorted by tick
+    bool operator== (const Groove&) const = default;
+};
+
+struct GroovePool
+{
+    std::vector<Groove> grooves;
+    float amount = 1.0f;    // 0..1.3: scales Timing, Random and Velocity of every groove
+    bool operator== (const GroovePool&) const = default;
+};
+
 // The clip grid of the Clip-launch workflow (round 181a; logic in core/ClipLauncher.h). Absent (Song::clipGrid empty) until
 // the workflow or the grid is first used: a project without one carries nothing but the empty optional.
 // LaunchQuant, LaunchMode and FollowKind keep the numbers a Live set stores (docs/ALS_FORMAT.md §5), read in Live 12's own
@@ -1962,6 +1994,7 @@ struct ClipGridSlot
     bool loop = true;               // off: plays once, then the track stops
     bool noStop = false;            // an empty slot without its stop button (a scene leaves that track alone): its Clip has length 0
     ClipFollow follow;
+    std::uint32_t groove = 0;       // the groove of the project's pool this clip plays through (Groove::id; 0 = none; core/Groove.h)
     bool operator== (const ClipGridSlot&) const = default;
 };
 
@@ -2175,6 +2208,7 @@ struct Song
     // and loop on their track by its Performance settings, while the song plays from the Start marker on.
     bool performanceMode = false;
     std::optional<ClipGrid> clipGrid; // the Clip-launch workflow's grid (round 181a); empty until it is first used
+    GroovePool grooves; // the groove pool (round 190bv); empty in every project that never used one
     // The end of the performance zone: the first Start marker's tick, or 0 (no zone) without one / when off.
     std::int64_t performanceZoneEnd() const noexcept;
     bool inPerformanceZone (const Clip& clip) const noexcept { return performanceMode && clip.start < performanceZoneEnd(); }

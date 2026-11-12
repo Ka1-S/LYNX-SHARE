@@ -8280,7 +8280,6 @@ countries: pl
 "Deactivate input {0}" = "Wyłącz wejście {0}"
 "Activate input {0}" = "Włącz wejście {0}"
 "Input {0}" = "Wejście {0}"
-# Round 183c: Racks
 "Add chain" = "Dodaj łańcuch"
 "Audio Effect Rack" = "Rack efektów audio"
 "Chain Pan" = "Panorama łańcucha"
@@ -8342,9 +8341,9 @@ countries: pl
 "Blend of the shaped signal with the dry one (parallel processing)" = "Mieszanka ukształtowanego sygnału z suchym (przetwarzanie równoległe)"
 "One gain for both channels, so the stereo image stays put" = "Jedno wzmocnienie dla obu kanałów, żeby obraz stereo się nie przesuwał"
 "Keeps low notes out of the detector (a kick on a drum bus)" = "Nie wpuszcza niskich dźwięków do detektora (stopa na szynie perkusji)"
-
 "For a file with a true-peak ceiling: {0}" = "Plik z limitem true peak: {0}"
 "(look)" = "(look)"
+
 # --- Default template (issue #123, round 186a)
 "The default template was not found; LYNX SHARE's default project opened instead" = "Nie znaleziono domyślnego szablonu; zamiast niego otwarto domyślny projekt LYNX SHARE"
 "{0} could not be opened." = "Nie udało się otworzyć {0}."
@@ -8368,6 +8367,7 @@ countries: pl
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Odłączaj wszystkie nowe wtyczki"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Wł.: okno dodanej wtyczki otwiera się odłączone, nad panelami. Wył.: otwiera się zadokowane na pulpicie, za klikniętym panelem. Menu okna każdej wtyczki › Odłączony zmienia to dla tej wtyczki"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Dla innych aplikacji..."
 "Export for other apps" = "Eksport dla innych aplikacji"
@@ -8542,10 +8542,6 @@ countries: pl
 "Can't freeze this channel" = "Nie można zamrozić tego kanału"
 "Frozen: Unfreeze to edit" = "Zamrożony: odmroź, aby edytować"
 "A controller is linked to this instrument's knobs and moves them live: frozen audio could not follow it." = "Kontroler jest powiązany z pokrętłami tego instrumentu i porusza nimi na żywo: zamrożone audio nie mogłoby za nim nadążyć."
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] otwórz/zamknij edytor  [Alt]+[LMB] nie zamykaj innych  [Ctrl]+[LMB] odsłuch  [2xLMB] Piano Roll  [LMB] przeciągnij w górę/dół zmienia kolejność  [RMB] menu kanału"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Miernik szczytowy (lewy/prawy) z podtrzymaniem  [LMB] gasi lampkę przesterowania"
 
 # --- Simple workflow: save rows in the Finish dock, backup status (round 190t)
 "Save the song as a file" = "Zapisz utwór jako plik"
@@ -8740,7 +8736,6 @@ countries: pl
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Kontroler do gier steruje transportem i można go powiązać z dowolną kontrolką jak kontroler MIDI. Także na stronie MIDI."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Własne ulepszenia LYNX. Wszystkie są domyślnie wyłączone, więc LYNX SHARE wygląda i działa jak FL Studio, dopóki którejś nie włączysz. Każdy przełącznik to to samo ustawienie co w miejscu wskazanym w jego wierszu."
 "LYNX extras..." = "Dodatki LYNX..."
-
 "Search your plugins" = "Szukaj w swoich pluginach"
 "Nothing is shared." = "Nic nie jest udostępnione."
 "{0} shared with the session" = "Udostępnione sesji: {0}"
@@ -8883,7 +8878,6 @@ countries: pl
 "Channel 2" = "Kanał 2"
 "Channels 2-{0}" = "Kanały 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "Kanały członkowskie MPE (dolna strefa): kanały MIDI, z których każdy niesie jedną nutę"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "ODDECH"
 "Motion blending" = "Przenikanie ruchu"
 "Load sprite sheet..." = "Wczytaj arkusz sprite'ów..."
@@ -8918,3 +8912,27 @@ countries: pl
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Poziomowanie: utrzymuje poziom na progu poniżej sufitu z wolnym atakiem, sufit zatrzymuje resztę (domyślnie wyłączone)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Próg poziomowania: poziom utrzymywany poniżej sufitu (Off: bez poziomowania)"
 "Levelling attack: how much of a transient passes before the level is held" = "Atak poziomowania: jaka część transjentu przechodzi, zanim poziom zostanie utrzymany"
+"Session Record" = "Nagrywanie sesji"
+"Session Record: armed tracks record into the selected scene; while their clips play, notes are added to them (overdub)" = "Nagrywanie sesji: uzbrojone ścieżki nagrywają do wybranej sceny; gdy ich klipy grają, nuty są do nich dodawane (overdub)"
+"Grooves" = "Grooves"
+"Show or hide the Groove Pool" = "Pokaż lub ukryj Groove Pool"
+"Add a groove" = "Dodaj groove"
+"Show the Groove Pool" = "Pokaż Groove Pool"
+"Commit groove" = "Zastosuj groove do nut"
+"Extract groove" = "Wyodrębnij groove"
+"Insert empty MIDI clip" = "Wstaw pusty klip MIDI"
+"Fixed recording length" = "Stała długość nagrania"
+"Could not read the groove file" = "Nie można odczytać pliku groove"
+"Groove Pool" = "Groove Pool"
+"Add a groove to the project" = "Dodaj groove do projektu"
+"Global Amount" = "Ilość globalna"
+"Groove Name" = "Nazwa groove"
+"No grooves in this project: add one with +" = "Brak groove w tym projekcie: dodaj go za pomocą +"
+"Remove (used by {0} clips)" = "Usuń (używany w {0} klipach)"
+"Rename groove" = "Zmień nazwę groove"
+"Import a groove file..." = "Importuj plik groove..."
+"Import a groove file" = "Importuj plik groove"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] otwórz/zamknij edytor  [Alt]+[LMB] nie zamykaj innych  [Ctrl]+[LMB] odsłuch  [2xLMB] Piano Roll  [LMB] przeciągnij w górę/dół zmienia kolejność  [RMB] menu kanału"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Miernik szczytowy (lewy/prawy) z podtrzymaniem  [LMB] gasi lampkę przesterowania"

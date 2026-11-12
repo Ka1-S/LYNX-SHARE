@@ -387,6 +387,18 @@ private:
     void moveTimeSelection (int direction);
     void deleteSelection();
     void copySelection();
+public:
+    // round 190bv: the clipboard is shared with the clip grid (a clip copied in a slot pastes here and the other way);
+    // the stamp tells the grid whether its own copy is still the newest
+    static void setCopiedClips (std::vector<Clip> clips)
+    {
+        clipboard = std::move (clips);
+        ++clipboardStamp;
+    }
+    static const std::vector<Clip>& copiedClips() noexcept { return clipboard; }
+    static std::uint64_t copiedStamp() noexcept { return clipboardStamp; }
+
+private:
     void pasteClips (std::int64_t at = -1);
     void normalizeClips (const std::vector<int>& targets, bool asGroup = false);
     juce::PopupMenu buildClipMenu (int index, int mouseX);
@@ -468,6 +480,7 @@ private:
     juce::Point<int> knifeFrom, knifeTo;
     std::size_t knownClipCount = 0;
     static inline std::vector<Clip> clipboard;
+    static inline std::uint64_t clipboardStamp = 0;
     std::int64_t grabOffset = 0;
     double playheadTick = -1.0;
 

@@ -3,6 +3,9 @@
 #include "platform/Paths.h"
 
 #include "core/KeyGuess.h"
+#include "core/Groove.h"
+#include "core/SessionOps.h"
+#include "ui/ClipGridComponent.h"
 #include "core/FlSamplers.h"
 #include "core/PlaylistOps.h"
 #include "core/Comping.h"
@@ -2551,6 +2554,23 @@ private:
             original.clipGrid->scenes[0].name = "Intro";
             original.clipGrid->globalQuant = lynx::LaunchQuant::bars2;
         }
+        std::uint32_t savedGroove = 0;
+        { // round 190bv: the groove pool, a groove on the slot's clip, and that clip copied and the copy moved
+            lynx::Groove g;
+            g.name = "Balanço";
+            g.base = lynx::GrooveBase::eighth;
+            g.quantize = 0.25f;
+            g.timing = 0.8f;
+            g.random = 0.1f;
+            g.velocity = -0.5f;
+            g.length = 1920;
+            g.points = { { 0, 1.0f }, { 560, 0.5f } };
+            savedGroove = lynx::groove::add (original.grooves, g);
+            original.grooves.amount = 1.2f;
+            lynx::groove::setClipGroove (original, 1, 2, savedGroove);
+            lynx::session::moveClip (original, 1, 2, 0, 1, true);
+            lynx::session::moveClip (original, 0, 1, 2, 0, false);
+        }
         original.playlistTracks[2].grouped = true;      // track groups and rack filter groups (round 104)
         original.playlistTracks[1].collapsed = true;
         original.channelGroups = { "Drums", "Keys" };
@@ -2574,6 +2594,20 @@ private:
                                       const auto* slot = lynx::launcher::settingsAt (grid, 1, 2);
                                       return slot != nullptr && slot->name == "Clip ação" && slot->mode == lynx::LaunchMode::toggle
                                              && slot->quant == lynx::LaunchQuant::eighthTriplet && slot->legato && ! slot->loop;
+                                  }()
+                               && [&reloaded, &original, savedGroove] { // round 190bv
+                                      auto grid = *reloaded->clipGrid;
+                                      const auto* kept = lynx::launcher::settingsAt (grid, 1, 2);
+                                      const auto* moved = lynx::launcher::settingsAt (grid, 2, 0);
+                                      const auto* clip = lynx::launcher::clipAt (grid, 2, 0);
+                                      return reloaded->grooves == original.grooves && reloaded->grooves.grooves.size() == 1
+                                             && reloaded->grooves.amount == 1.2f && reloaded->grooves.grooves[0].name == "Balanço"
+                                             && reloaded->grooves.grooves[0].points.size() == 2 && savedGroove != 0
+                                             && kept != nullptr && kept->groove == savedGroove
+                                             && lynx::launcher::clipAt (grid, 0, 1) == nullptr
+                                             && clip != nullptr && clip->pattern == 0 && clip->length == 1920
+                                             && moved != nullptr && moved->groove == savedGroove && moved->name == "Clip ação"
+                                             && moved->mode == lynx::LaunchMode::toggle && moved->legato && ! moved->loop;
                                   }()
                                && reloaded->playlist[1].kind == lynx::ClipKind::automation && reloaded->playlist[1].automation == 0
                                && reloaded->automations.size() == 1 && reloaded->automations[0].target == automation.target
@@ -13293,6 +13327,55 @@ private:
         write ("both");
         ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
         write ("grid");
+        // round 190bv: recording into slots and the Groove Pool. Two tracks armed (round record buttons in their empty
+        // slots, their arm buttons lit), one of them recording and one waiting for its start; then a clip through a
+        // groove with the pool shown, and the slot menus
+        if (auto* gridView = ui.getClipGridForSnapshot())
+        {
+            offline.setGridTrackArmed (4, true);
+            offline.setGridTrackArmed (5, true, false);
+            offline.dispatchPendingMessages();
+            write ("rec-armed");
+            if (auto* runtime = offline.launcherStateForSnapshot())
+            {
+                runtime->tracks[4].recording.store (1);
+                runtime->tracks[5].recordPending.store (1);
+            }
+            write ("rec-recording");
+            if (auto* runtime = offline.launcherStateForSnapshot())
+            {
+                runtime->tracks[4].recording.store (-1);
+                runtime->tracks[5].recordPending.store (-1);
+            }
+            offline.editSong ([] (lynx::Song& s) {
+                const auto& bank = lynx::groove::factoryBank();
+                std::uint32_t first = 0;
+                for (const auto index : { std::size_t (9), std::size_t (20), std::size_t (27) })
+                    if (index < bank.size())
+                    {
+                        const auto id = lynx::groove::add (s.grooves, bank[index].groove);
+                        first = first == 0 ? id : first;
+                    }
+                lynx::groove::setClipGroove (s, 0, 0, first);
+            }, false);
+            offline.dispatchPendingMessages();
+            lynx::setClipGridGroovePoolShown (*gridView, true);
+            write ("groove-pool");
+            saveMenus ({ "Clip slot", "Groove", "Empty slot" },
+                       { lynx::clipGridSlotMenu (*gridView, 0, 0), [&] {
+                            juce::PopupMenu found;
+                            const auto menu = lynx::clipGridSlotMenu (*gridView, 0, 0);
+                            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                                if (it.getItem().subMenu != nullptr && it.getItem().text == lynx::tr ("Groove"))
+                                    found = *it.getItem().subMenu;
+                            return found;
+                        }(), lynx::clipGridSlotMenu (*gridView, 4, 1) },
+                       prefix + "-rec-menus.png");
+            lynx::setClipGridGroovePoolShown (*gridView, false);
+            offline.setGridTrackArmed (4, false);
+            offline.setGridTrackArmed (5, false);
+            offline.dispatchPendingMessages();
+        }
         ui.setClipGridView (lynx::PlaylistArea::GridView::song);
         write ("song");
         ui.setClipLaunchWorkflow (false);
