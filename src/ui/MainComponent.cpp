@@ -6,6 +6,8 @@
 #include "ui/GamepadInput.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
+#include "core/DrawMode.h"
+#include "core/SessionKeys.h"
 #include "core/EditorLimit.h"
 #include "core/SessionKeys.h"
 #include "core/FlSettings.h"
@@ -1774,6 +1776,16 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     // (issue #12: Metronome on 'C' did nothing while the Playlist, whose Knife is 'C', had the focus)
     if (const auto own = keyMap.findUserBound (chord, focusContext(), pianoKeys); ! own.empty() && runAction (own))
         return true;
+
+    // round 190ef: B is the reference's Draw Mode switch in the Clip-launch layout (core/SessionKeys.h); in the other
+    // layouts it stays the Playlist's and Piano roll's brush tool
+    if (key.getKeyCode() == 'B' || key.getKeyCode() == 'b')
+        if (isPlainKey (chord) && sessionkeys::defaultKeyActs (sessionkeys::Command::drawMode)
+            && dynamic_cast<juce::TextEditor*> (juce::Component::getCurrentlyFocusedComponent()) == nullptr)
+        {
+            drawmode::toggle();
+            return true;
+        }
 
     // 3. the focused panel's own keys
     const auto focused = workspace.getFocused();
@@ -8228,6 +8240,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         // round 177b-4): the controls moved while it is on link, in that order, to the controllers moved next
         menu.addItem (tr ("Multilink to controllers") + shortcutText ("options.multilink"), true, engine.isMultilinkOn(),
                       [this] { runAction ("options.multilink"); });
+        // round 190ef: the reference's Options › Draw Mode (B), in the Clip-launch layout: a drag in an automation lane
+        // draws steps at the grid width, or freehand without a grid (core/DrawMode.h)
+        if (layoutStyle == layoutstyle::Style::clipLaunch)
+            menu.addItem (tr ("Draw Mode") + sessionkeys::menuKey (sessionkeys::Command::drawMode), true, drawmode::isOn(), [] { drawmode::toggle(); });
         {
             juce::PopupMenu recording;
             addRecordOptions (recording);

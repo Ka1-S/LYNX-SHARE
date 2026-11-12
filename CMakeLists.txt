@@ -41,6 +41,7 @@ add_library(lynx_core STATIC
     src/core/ClipLauncher.cpp
     src/core/SessionOps.cpp
     src/core/RemoteMap.cpp
+    src/core/DrawMode.cpp
     src/core/Groove.cpp
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
