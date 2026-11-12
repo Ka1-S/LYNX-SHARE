@@ -28,6 +28,7 @@
 #include "core/SoundFont.h"
 #include "core/BeepMap.h"
 #include "core/Sawer.h"
+#include "core/FlmPad.h"
 #include "core/Drumaxx.h"
 #include "core/Granulizer.h"
 #include "core/WaveTraveller.h"
@@ -1526,6 +1527,11 @@ struct SamplerVoice
     int key = 60;
     float env = 1.0f;      // envelope
     float envStep = 0.0f;  // attack step (> 0) or release step (< 0)
+    // FL Studio Mobile's pad envelope (core/FlmPad.h, round 190bs): `env` moves towards padTarget by padRate each sample
+    bool padEnv = false;
+    float padTarget = 0.0f, padRate = 1.0f;
+    int padCount = 0, padLength = 0; // samples played, and the count at which the release starts (0 = never)
+    int padDelay = 0;                // samples of silence before the sample starts (a negative Sample Start)
     int stage = 1;         // 0 attack, 1 decay, 2 sustain, 3 release
     double first = 0.0, last = 0.0; // played region: first and last frame (inclusive)
     double regionFirst = 0.0, regionLast = 0.0; // the whole region, before the start offset and slicing (round 190w: the locator)
@@ -1664,6 +1670,18 @@ public:
         knob (samplerparam::decay, s.decay);
         knob (samplerparam::sustain, s.sustain);
         knob (samplerparam::release, s.release);
+        {
+            const auto on = s.flmPad.size() == (std::size_t) flmpad::count;
+            const auto pad = [&s, on] (int k, float fallback) { return on ? std::clamp (s.flmPad[(std::size_t) k], 0.0f, 1.0f) : fallback; };
+            padAttack.store (pad (flmpad::attack, 0.0f));
+            padDecay.store (pad (flmpad::decay, 1.0f));
+            padSustain.store (pad (flmpad::sustain, 1.0f));
+            padRelease.store (pad (flmpad::release, 1.0f));
+            padLength.store (pad (flmpad::length, 0.0f));
+            padStart.store (pad (flmpad::start, 0.5f));
+            padHold.store (pad (flmpad::hold, 0.0f) >= 0.5f);
+            padOn.store (on);
+        }
         reverse.store (s.reverse);
         cutSelf.store (s.cut);
         useLoops.store (s.useLoopPoints);
@@ -1912,6 +1930,28 @@ public:
         target->env = attackSeconds > 0.0f ? 0.0f : 1.0f;
         target->envStep = attackSeconds > 0.0f ? (float) (1.0 / (attackSeconds * sampleRate)) : 0.0f;
         target->stage = attackSeconds > 0.0f ? 0 : 1;
+
+        // FL Studio Mobile's pad (core/FlmPad.h): the level starts at 0 and takes its first step before the first
+        // sample, as FLM's voice does; Sample Start moves the read position (seconds of the file) or delays the voice
+        target->padEnv = ! clipMode && padOn.load (std::memory_order_relaxed);
+        target->padDelay = 0;
+        if (target->padEnv)
+        {
+            target->env = 0.0f;
+            target->envStep = 0.0f;
+            target->stage = 1;
+            target->padTarget = 5.0f;
+            target->padRate = flmpad::rateAt (flmpad::attackRate (padAttack.load (std::memory_order_relaxed)), sampleRate);
+            target->padCount = 0;
+            const auto fileRate = base * sampleRate; // the file's frames per second
+            target->padLength = (int) ((double) data->frames() * (double) padLength.load (std::memory_order_relaxed) * sampleRate / std::max (1.0, fileRate));
+            if (const auto seconds = flmpad::startSeconds (padStart.load (std::memory_order_relaxed)); seconds > 0.0)
+                target->position = backwards ? std::max (target->first, target->position - seconds * fileRate)
+                                             : std::min (target->last, target->position + seconds * fileRate);
+            else if (seconds < 0.0)
+                target->padDelay = (int) (-seconds * fileRate / std::max (1.0e-6, target->rate));
+            padStep (*target);
+        }
 
         // FL's volume articulator: starts at its initial level and is stepped on the voice's first block (FLEngine
         // FUN_00d24ae0 steps a new voice at once, then once per sequencer tick)
@@ -2319,6 +2359,16 @@ public:
                 v.stage = 3; // released (stops "while held" loops); the ADSR level stays at 1
             }
 
+        // FL Studio Mobile's pad: the note's end starts the release only on a lane that holds its notes (core/FlmPad.h)
+        if (padHold.load (std::memory_order_relaxed))
+            for (auto& v : voices)
+                if (v.active && v.key == key && v.padEnv && v.stage < 3)
+                {
+                    v.stage = 3;
+                    v.padTarget = 0.0f;
+                    v.padRate = flmpad::rateAt (flmpad::decayRate (padRelease.load (std::memory_order_relaxed)), sampleRate);
+                }
+
         // with release, the released note decays; without release the sample plays in full (one-shot)
         const auto seconds = release.load();
 
@@ -2327,7 +2377,7 @@ public:
 
         // linear release from the current level (like FL)
         for (auto& v : voices)
-            if (v.active && v.key == key && v.stage < 3 && ! v.flEnvelope && ! v.flVoice)
+            if (v.active && v.key == key && v.stage < 3 && ! v.flEnvelope && ! v.flVoice && ! v.padEnv)
             {
                 v.stage = 3;
                 v.envStep = -(float) (std::max (v.env, 0.001f) / (seconds * sampleRate));
@@ -2582,6 +2632,13 @@ public:
                     break;
                 }
 
+                if (v.padDelay > 0) // FLM's pad before its sample starts: silence, the envelope already running
+                {
+                    --v.padDelay;
+                    padAdvance (v);
+                    continue;
+                }
+
                 float shapeL = 1.0f, shapeR = 1.0f;
                 if (shaper != nullptr && ! shaper->voiceGains ((int) (&v - voices.data()), shapeL, shapeR))
                 {
@@ -2701,7 +2758,9 @@ public:
                 }
 
                 // envelope: 0 attack, 1 decay, 2 sustain, 3 release
-                if (v.stage == 0)
+                if (v.padEnv)
+                    padAdvance (v);
+                else if (v.stage == 0)
                 {
                     v.env += v.envStep;
 
@@ -2742,6 +2801,33 @@ public:
                     stepFade (v);
             }
         }
+    }
+
+    // FL Studio Mobile's pad envelope (core/FlmPad.h): one step of the level; reaching the top starts the decay
+    void padStep (SamplerVoice& v) const noexcept
+    {
+        v.env += (v.padTarget - v.env) * v.padRate;
+        if (v.env > 1.0f)
+        {
+            v.env = 1.0f;
+            v.padTarget = padSustain.load (std::memory_order_relaxed);
+            v.padRate = flmpad::rateAt (flmpad::decayRate (padDecay.load (std::memory_order_relaxed)), sampleRate);
+        }
+    }
+    // after a sample: Length's release point, the voice's end (below −80 dB on its way to 0), the next step
+    void padAdvance (SamplerVoice& v) const noexcept
+    {
+        if (++v.padCount == v.padLength)
+        {
+            v.padTarget = 0.0f;
+            v.padRate = flmpad::rateAt (flmpad::decayRate (padRelease.load (std::memory_order_relaxed)), sampleRate);
+        }
+        if (v.env < 0.0001f && v.padTarget == 0.0f)
+        {
+            v.env = 0.0f; // (ends the voice at the next sample)
+            return;
+        }
+        padStep (v);
     }
 
     // One sequencer tick of FL's sampler voice (FLEngine FUN_00d24ae0 / FUN_00d24500 / FUN_00d24650, REA_rodada76
@@ -3178,6 +3264,9 @@ private:
     bool nextPorta = false;
     std::atomic<bool> reverse { false }, cutSelf { false };
     std::atomic<bool> useLoops { true }, fastDeclick { false }, panTriangular { false };
+    // FL Studio Mobile's pad (SamplerSettings::flmPad, core/FlmPad.h)
+    std::atomic<bool> padOn { false }, padHold { false };
+    std::atomic<float> padAttack { 0.0f }, padDecay { 1.0f }, padSustain { 1.0f }, padRelease { 1.0f }, padLength { 0.0f }, padStart { 0.5f };
     std::atomic<bool> flVelocityLaw { false }; // SamplerSettings::flVelocityLaw
     std::atomic<int> declickMode { 0 };
 };

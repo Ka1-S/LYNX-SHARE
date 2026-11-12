@@ -448,6 +448,11 @@ struct SamplerSettings
     // (core/FlVoiceProcessor.h); ADSR, cutoff/resonance/type, the modulation envelopes and LFOs above are then unused.
     // Editing the envelope or the filter by hand clears it.
     std::vector<std::int32_t> flChannel;
+    // FL Studio Mobile's sample slot as the .flm stored it (round 190bs, core/FlmPad.h): EG A, EG D, EG S, EG R, Length
+    // and Sample Start (0…1 each), then 1 when the lane holds its notes — 7 values. When present the sampler runs FLM's
+    // pad envelope (one-pole segments, a hit is a one-shot unless the lane holds notes) instead of
+    // attack / decay / sustain / release; editing the ADSR by hand clears it.
+    std::vector<float> flmPad;
 
     SamplePrecompute precompute;
     bool useLoopPoints = true; // FL's "Use loop points": the file's own loop (WAV smpl) plays (.flp 0x8F bit 3)

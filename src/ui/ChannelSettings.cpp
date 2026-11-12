@@ -3350,7 +3350,10 @@ private:
             auto moved = [] (float a, float b) { return std::abs (a - b) > 1.0e-4f; };
             const auto adsr = moved (s.attack, old.attack) || moved (s.decay, old.decay) || moved (s.sustain, old.sustain) || moved (s.release, old.release);
             if (adsr)
+            {
                 s.flVolumeEnvelope.clear();
+                s.flmPad.clear(); // and FL Studio Mobile's pad envelope (round 190bs)
+            }
             // so does an edited envelope or filter for FL's whole sampler voice (REA_rodada76)
             if (adsr || moved (s.cutoff, old.cutoff) || moved (s.resonance, old.resonance) || s.filterType != old.filterType)
                 s.flChannel.clear();

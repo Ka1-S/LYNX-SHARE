@@ -55,6 +55,7 @@ add_library(lynx_core STATIC
     src/core/FlmFormat.cpp
     src/core/FlmImport.cpp
     src/core/FlmEffects.cpp
+    src/core/FlmNoteFx.cpp
     src/core/AlsExport.cpp
     src/flp/FlpWrite.cpp
     src/core/Effects.cpp
