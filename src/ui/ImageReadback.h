@@ -113,7 +113,11 @@ inline void notePicture (const char* name, const juce::Image& picture, float sca
 {
     const auto drawn = owner.getPeer() == nullptr ? "no window" : windowDrawnByCpu (owner) ? "window drawn without the GPU" : "window drawn with the GPU";
     const auto kind = picture.isNull() ? juce::String ("no picture (painted straight to the window)")
-                                       : juce::String (software ? "software image" : JUCE_WINDOWS ? "Direct2D image" : "native image");
+#if JUCE_WINDOWS
+                                       : juce::String (software ? "software image" : "Direct2D image");
+#else
+                                       : juce::String (software ? "software image" : "native image"); // (JUCE_WINDOWS is not defined here)
+#endif
     const auto key = kind + ", " + drawn + " at " + juce::String (juce::roundToInt (scale * 100.0f)) + " %";
     if (key == last)
         return;
