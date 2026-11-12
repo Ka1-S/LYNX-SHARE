@@ -1,4 +1,5 @@
 #include "core/FruityDance.h"
+#include "core/FruitySlicer.h"
 #include "core/Instruments.h"
 #include "core/FpcInstrument.h"
 #include "core/ControlSurface.h"
@@ -1663,7 +1664,27 @@ public:
         allNotesOff();
     }
 
+    // Fruity Slicer (round 180c): the sampler's voices on the slices of the sample the rack prepared
+    bool slicer = false;
+
     void configure (const ChannelDef& channel, double songBpm) noexcept override
+    {
+        // a Slicer's slices, key table, PLAY TO END and voice block come from its state, not from the channel (issue
+        // #160): every configure takes them from it again. Before, the rack's next edit (a kept instrument is configured
+        // with the bare channel) emptied the slice table and every key played the sample from its start. A channel
+        // whose state isn't a Slicer's (tests hand a configured one) is taken as it is.
+        if (slicer && sample != nullptr)
+            if (const auto state = fslicer::parse (channel.pluginState))
+            {
+                auto def = channel;
+                fslicer::configureSampler (def, *state, (std::int64_t) sample->frames());
+                configureChannel (def, songBpm);
+                return;
+            }
+        configureChannel (channel, songBpm);
+    }
+
+    void configureChannel (const ChannelDef& channel, double songBpm) noexcept
     {
         const auto& s = channel.sampler;
         pitch.store (std::clamp (s.pitch, -24.0f, 24.0f));
@@ -1747,6 +1768,9 @@ public:
         for (int i = 0; i < table.count; ++i)
             table.starts[(std::size_t) i] = std::clamp (s.slices[(std::size_t) i], 0.0f, 1.0f);
         table.firstKey = s.sliceFirstKey;
+        table.keyed = s.sliceKeys.size() == table.keys.size();
+        for (std::size_t k = 0; k < table.keys.size(); ++k)
+            table.keys[k] = (std::int16_t) (table.keyed ? std::clamp (s.sliceKeys[k], -1, 32767) : -1);
         table.toEnd = s.slicesToEnd;
         table.cutAtEnd = s.slicesCutAtEnd;
         sliceMailbox.write (table);
@@ -1810,10 +1834,13 @@ public:
             first += offset * (last - first + 1.0); // FL: a fraction of the region's frames (not floored, FL render §4)
         auto sliced = false;
 
-        // sliced sample: each key from C5 up plays one slice, at the original pitch
+        // sliced sample: each key from C5 up plays one slice, at the original pitch; Fruity Slicer: the slice FL's key
+        // table gives the key (issue #160)
         if (! clipMode && slices.count > 0)
         {
-            const auto index = key - slices.firstKey;
+            const auto index = ! slices.keyed                                 ? key - slices.firstKey
+                               : key >= 0 && key < (int) slices.keys.size() ? (int) slices.keys[(std::size_t) key]
+                                                                              : -1;
 
             if (index < 0 || index >= slices.count)
                 return;
@@ -3273,6 +3300,8 @@ private:
         std::array<float, 128> starts {};
         int count = 0;
         int firstKey = 60;   // Fruity Slicer: the key of slice 1
+        std::array<std::int16_t, 125> keys {}; // Fruity Slicer: FL's key table, key → slice (−1 none), when `keyed`
+        bool keyed = false;
         bool toEnd = false;  // Fruity Slicer's "play to end"
         bool cutAtEnd = false; // Fruity Slicer: the voice stops dead at the slice's end
     };
@@ -3705,7 +3734,11 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
     if (kind == InstrumentKind::wavetraveller)
         return makeWaveTravellerInstrument (std::move (sample));
     if (kind == InstrumentKind::fruityslicer) // the sampler's voices on the slices (the rack prepares the sample)
-        return makeInstrument (InstrumentKind::sampler, std::move (sample));
+    {
+        auto slicer = std::make_unique<SamplerInstrument> (std::move (sample), false);
+        slicer->slicer = true;
+        return slicer;
+    }
     if (kind == InstrumentKind::slicex)
         return makeSlicexInstrument (std::move (sample), nullptr); // (deck B's sample comes from RackRenderer)
     if (kind == InstrumentKind::fpc) // (without its channel: no pads; the rack builds it from the channel's kit)
