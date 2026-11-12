@@ -170,6 +170,7 @@ public:
         for (int b = 0; b < fit.bands; ++b)
             detector[(std::size_t) b].bp (sr, centre (b), fit.q);
         designedAmount = -1.0;
+        trackDesigned = nullptr; // the tracker's coefficients follow the rate too
         reset();
     }
     void reset() noexcept
@@ -182,10 +183,24 @@ public:
             f.reset();
         env.fill (0.0);
         gdb.fill (0.0);
+        smoothPow.fill (0.0);
+        trackEnv.fill (0.0);
+        for (auto& f : trackBand)
+            f.reset();
+        curMin.fill (1e30);
+        ringMin.fill (1e30);
+        for (auto& ring : subMin)
+            ring.fill (1e30);
+        subPos = subHead = blockPos = 0;
+        blockPow.fill (0.0);
+        trackRed.fill (0.0);
     }
-    // in place; returns the mean reduction (dB) of the block for the meter
-    double process (float* l, float* r, int n, double amt, bool listenOnly, float out) noexcept
+    // in place; returns the mean reduction (dB) of the block for the meter. `tr` = the noise-floor tracker (round
+    // 190dp), nullptr = round 124's fixed thresholds (bit for bit)
+    double process (float* l, float* r, int n, double amt, bool listenOnly, float out, const Track* tr = nullptr) noexcept
     {
+        if (tr != nullptr && (tr != trackDesigned || amt != trackAmount))
+            designTrack (*tr, amt);
         const int nb = fit.bands + 2;
         if (amt != designedAmount)
         {
@@ -223,7 +238,20 @@ public:
                 auto& e = env[(std::size_t) b];
                 e = p > e ? p + (e - p) * ea : p + (e - p) * er;
                 lev[b] = 10.0 * std::log10 (e + 1e-30) + 3.0103;
+                if (tr != nullptr)
+                {
+                    // the tracker's own narrower band on the channels' mean (round 190dp), its power summed over the block
+                    if (narrow && b >= 1 && b <= fit.bands)
+                    {
+                        const auto u = trackBand[(std::size_t) b - 1].run (0.5 * (a[0] + a[1]), 0);
+                        blockPow[(std::size_t) b] += u * u;
+                    }
+                    else
+                        blockPow[(std::size_t) b] += p;
+                }
             }
+            if (tr != nullptr && ++blockPos >= trackBlock)
+                trackStep (*tr, nb, lev);
             for (int b = 0; b < nb; ++b)
             {
                 auto level = lev[b];
@@ -242,7 +270,10 @@ public:
                     const auto u = d + fit.knee / 2;
                     red = fit.slope * u * u / (2 * fit.knee);
                 }
-                const auto target = -(std::min (range[(std::size_t) b], red) + staticCut[(std::size_t) b]);
+                auto reduce = std::min (range[(std::size_t) b], red);
+                if (tr != nullptr)
+                    reduce = std::max (reduce, trackRed[(std::size_t) b]); // round 190dp: the floor's expander
+                const auto target = -(reduce + staticCut[(std::size_t) b]);
                 auto& g = gdb[(std::size_t) b];
                 g = target > g ? target + (g - target) * go : target + (g - target) * gc;
             }
@@ -271,7 +302,84 @@ public:
     }
 
 private:
+    void designTrack (const Track& t, double amt) noexcept
+    {
+        trackDesigned = &t;
+        trackAmount = amt;
+        const auto blockRate = sr / trackBlock;
+        smoothK = coef (t.smoothMs, blockRate);
+        blockA = coef (fit.detA, blockRate);
+        blockR = coef (fit.detR, blockRate);
+        subLength = std::max (1, (int) std::lround (t.windowS * sr / subWindows));
+        trackOff = t.off0 + (t.off1 - t.off0) * std::pow (std::clamp (amt, 0.0, 1.0), t.offPow);
+        trackRange = std::max (0.0, t.range0 + (t.range1 - t.range0) * amt);
+        trackGain = std::pow (10.0, 0.1 * (t.bias + trackOff));
+        kneeRatio = std::pow (10.0, 0.1 * 0.5 * t.knee);
+        narrow = t.q > 0.0;
+        if (narrow)
+            for (int b = 0; b < fit.bands; ++b)
+                trackBand[(std::size_t) b].bp (sr, centre (b), t.q);
+    }
+    // round 190dp: one block of the tracker (every `trackBlock` samples: the block's mean band power is smoothed, its
+    // running minimum kept, the floor's own soft-knee expander evaluated; the gains still move every sample)
+    void trackStep (const Track& t, int nb, const double* lev) noexcept
+    {
+        blockPos = 0;
+        for (int b = 0; b < nb; ++b)
+        {
+            const auto p = blockPow[(std::size_t) b] * (1.0 / trackBlock);
+            blockPow[(std::size_t) b] = 0.0;
+            auto& sm = smoothPow[(std::size_t) b];
+            sm = p + (sm - p) * smoothK;
+            auto& cm = curMin[(std::size_t) b];
+            cm = std::min (cm, sm);
+            auto& en = trackEnv[(std::size_t) b];
+            en = p > en ? p + (en - p) * blockA : p + (en - p) * blockR;
+            // the expander, in power ratios (a level well above the threshold costs no logarithm)
+            const auto lowest = std::min (cm, ringMin[(std::size_t) b]);
+            const auto thr = std::max (2.0 * lowest + 2e-30, 1e-12) * trackGain; // the floor (a sine's peak) + bias + off
+            const auto mid = b >= 1 && b <= fit.bands;
+            const auto here = narrow || ! mid ? 2.0 * en + 2e-30 : std::pow (10.0, 0.1 * lev[b]);
+            const auto dt = here >= thr * kneeRatio ? -t.knee : 10.0 * std::log10 (thr / here);
+            double rt;
+            if (dt <= -t.knee / 2)
+                rt = 0.0;
+            else if (dt >= t.knee / 2 || t.knee <= 0.0)
+                rt = t.slope * dt;
+            else
+            {
+                const auto u = dt + t.knee / 2;
+                rt = t.slope * u * u / (2 * t.knee);
+            }
+            trackRed[(std::size_t) b] = std::min (trackRange, std::max (0.0, rt));
+        }
+        if ((subPos += trackBlock) >= subLength)
+        {
+            // a sub-window ends: its minimum joins the window's, the oldest leaves
+            subPos = 0;
+            for (int b = 0; b < nb; ++b)
+            {
+                auto& ring = subMin[(std::size_t) b];
+                ring[(std::size_t) subHead] = curMin[(std::size_t) b];
+                curMin[(std::size_t) b] = 1e30;
+                auto lo = 1e30;
+                for (const auto m : ring)
+                    lo = std::min (lo, m);
+                ringMin[(std::size_t) b] = lo;
+            }
+            subHead = (subHead + 1) % subWindows;
+        }
+    }
     double centre (int b) const noexcept { return fit.f0 * std::pow (2.0, b * fit.step); }
+    // round 190dp: the tracker's state (smoothed band power, the running sub-window minimum, the last sub-windows')
+    const Track* trackDesigned = nullptr;
+    static constexpr int trackBlock = 16;
+    double trackAmount = -1.0, smoothK = 0.0, blockA = 0.0, blockR = 0.0, trackOff = 0.0, trackRange = 0.0, trackGain = 1.0, kneeRatio = 1.0;
+    int subLength = 1, subPos = 0, subHead = 0, blockPos = 0;
+    std::array<double, maxBands + 2> smoothPow {}, curMin {}, ringMin {}, trackEnv {}, blockPow {}, trackRed {}; // power (linear), dB
+    std::array<Bq, maxBands> trackBand;
+    bool narrow = false;
+    std::array<std::array<double, subWindows>, maxBands + 2> subMin {};
     double sr = 48000.0, designedAmount = -1.0;
     Bq ap1, ap2, lpA, lpB, ap2low, lp2A, lp2B, lsh, hsh;
     std::array<Bq, maxBands> detector, peaking;
@@ -282,7 +390,7 @@ private:
 class Quell final : public Effect
 {
 public:
-    explicit Quell (const Tuning& t) : tuning (t) {}
+    explicit Quell (const Tuning& t, const Track* tr = nullptr) : tuning (t), track (tr != nullptr ? *tr : measuredTrack()) {}
 
     void prepare (double sampleRate) noexcept override
     {
@@ -323,7 +431,7 @@ public:
                 matchedEngine.prepare (sr);
                 matchedOn = true;
             }
-            const auto red = matchedEngine.process (l, r, n, amt, listenOnly, out);
+            const auto red = matchedEngine.process (l, r, n, amt, listenOnly, out, on (p[law]) ? &track : nullptr);
             meter[0].store ((float) std::clamp (red / 30.0, 0.0, 1.0), std::memory_order_relaxed);
             return;
         }
@@ -384,6 +492,7 @@ public:
 
 private:
     Tuning tuning;
+    Track track;
     double sr = 48000.0, detA = 0.0, detR = 0.0, openC = 0.0, closeC = 0.0;
     std::array<LrSplit, bands - 1> splitters;
     // comp[j][k]: split j's all-pass applied to band k (k < j)
@@ -396,6 +505,13 @@ private:
 } // namespace
 
 std::unique_ptr<Effect> make (const Tuning& t) { return std::make_unique<Quell> (t); }
+std::unique_ptr<Effect> makeTracked (const Track& t) { return std::make_unique<Quell> (defaultTuning(), &t); }
+
+const Track& measuredTrack() noexcept
+{
+    static const Track t;
+    return t;
+}
 } // namespace quell
 
 // =====================================================================================================================
@@ -827,7 +943,7 @@ private:
 // =====================================================================================================================
 const EffectInfo& quellInfo()
 {
-    static const EffectInfo info { "Quell Denoiser", { { "Amount", 0.3f }, { "Listen", 0.0f }, { "Output", 0.5f }, { "Matched", 0.0f } } };
+    static const EffectInfo info { "Quell Denoiser", { { "Amount", 0.3f }, { "Listen", 0.0f }, { "Output", 0.5f }, { "Matched", 0.0f }, { "Law", 1.0f } } };
     return info;
 }
 
@@ -885,6 +1001,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case quell::amount: return fmt ("%.1f%%", 100.0 * v);
             case quell::listen: return on (v) ? "removed noise" : "off";
             case quell::output: return fmt ("%+.1f dB", quell::outputDb (v));
+            case quell::law: return on (v) ? "Measured" : "Classic";
             default: return fmt ("%.2f", v);
         }
     }

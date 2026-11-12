@@ -2878,6 +2878,8 @@ Layout quellDenoiser()
     v.push_back (value (170, 372, 70, 20, "Amount", 0));
     v.push_back (toggle (22, 372, 96, 22, "Listen", TR_NOOP ("Listen")));
     v.push_back (toggle (22, 342, 96, 22, "Matched", TR_NOOP ("Matched"))); // round 124: the engine fitted to NS1
+    // round 190dp: projects saved before the matched engine's noise-floor tracker keep the fixed law until switched
+    v.push_back (when (tabs (22, 396, 112, 16, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys), "Law", 0.0f, 0.5f));
     v.push_back (dial (256, 378, 28, "Output", TR_NOOP ("Output"), bipolar));
     return l;
 }
@@ -3203,6 +3205,8 @@ Layout voiceShiftLayout()
     v.push_back (label (548, 140, 36, 14, TR_NOOP ("Dry"), dim));
     v.push_back (label (586, 140, 36, 14, TR_NOOP ("Wet"), dim));
     v.push_back (label (14, 226, 300, 34, "voice|shift", plugui::wordmark));
+    // round 190dp: projects saved before the measured unvoiced path keep the classic one until switched
+    v.push_back (when (tabs (446, 232, 180, 22, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys), "Law", 0.0f, 0.5f));
     return l;
 }
 

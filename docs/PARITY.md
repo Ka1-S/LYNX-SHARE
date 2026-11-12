@@ -3236,3 +3236,62 @@ sections left out (the bank scores the same or higher without them). Clean with 
 Latency: 0 samples reported, unchanged. Not done (next): Hi-Fi tape / the other ValhallaDelay modes (S2 still
 4.0, its wow is random per render), wow / flutter depth law (EchoBoy's mod part), BBD clock stage (no bank row runs a
 BBD mode through the maps), the structure rows (3 taps, multi-head + spring). Lab: `/mnt/e/lynx-work/echo190dl`.
+
+## Round 190dp: Voice Shift's unvoiced path, Quell's noise-floor tracker (Ember: two-stage E tried, not shipped)
+Black-box on the trials' renders (tp172d, trial187b, refcap182's 35 s programme bank, refcap0124's stimulus captures);
+nothing of the reference binaries was opened. Gate: every file of the same banks before (rollup027 77026c3a2) and
+after, through the same translator / fitted settings. New behaviour sits behind an appended `Law` parameter
+(Measured for new instances, Classic for projects saved before); Classic renders hash-identical to the base commit
+(Voice Shift and Quell, 9 cases). LYNX Tune is not changed: it shares the TD-PSOLA shifter, whose new unvoiced path
+only Voice Shift asks for (`Psola::setUnvoicedShift`, off by default), so Tune has no law switch; new Tune instances
+(default, +5 st with Formant +2 and a slow retune, low latency) and a Tune loaded from an older project render
+hash-identical to the base commit's own Psola users (4 of 4 cases in the test).
+
+**Voice Shift.** The reference's sine sweep comes out at exactly the Formant shift wherever its detector finds no
+pitch (above ~1.6 kHz: −2.9 … −3.2 st at Formant −3, +1.7 … +2.0 st at Formant +2, unshifted at Pitch +5 alone);
+drums and a full mix move the same way. LYNX passed unvoiced grains through. Now they are read at the formant factor
+(Link: pitch × formant), in longer flat-topped grains (9.5 ms hop, 60 % crossfade): the first try (3 ms Hann grains)
+combed noise near 1.4 kHz and folded a voice's 250 … 500 Hz energy into the lowest bands.
+
+| Bank | Files | Score before → after | Spectrum error | Up / same / down |
+|---|---|---|---|---|
+| tp172d (Pitch +5, Formant −3, −7 / +2 / Drive 3) | 12 | 3.00 → 3.17 | 3.29 → 3.16 dB | 2 / 10 / 0 |
+| trial187b (13 settings) | 78 | 3.12 → 3.27 | 3.31 → 3.01 dB | 12 / 66 / 0 |
+| refcap182 programme (35 s, 5 signals) | 20 | 3.60 → 3.80 | 2.37 → 2.21 dB | 5 / 14 / 1 |
+
+The one file down: refcap182 Formant −3 vocal 3 → 2 (spectrum 3.56 → 4.34 dB over the 4 dB step; its 63 … 130 Hz
+bands +4 … +6 dB, the grain joins' sidebands). Every constant tried for the grains left one such file on a step edge
+(`vsx/`: Hann grains put tp172d's −7 / +2 music down instead). CPU: 2.15 … 2.74 → 2.20 … 2.56 s per 35 s stereo take
+(inside the noise); latency unchanged (1376 samples at 48 kHz).
+
+**Quell (matched engine).** At a high setting the reference takes a steady programme down more and more over the
+first seconds (a dense mix 10 … 24 dB at 100 %, nothing at 35 … 50 %): a noise floor estimated from the signal. Now
+each band's floor is the minimum of its smoothed power over 1.1 s (minimum statistics, R. Martin, IEEE TSAP 9(5),
+2001; eight sub-windows), seen through its own Q 8.5 band-pass on the channels' mean (a tone sweeping by is not its
+own floor), and sets a second soft-knee expander `off(amount)` dB above it, evaluated every 16 samples; the larger of
+its reduction and the fixed law's is applied (the gains still move every sample).
+Constants fitted (`qfit/`) on refcap182's programme takes at 0 / 20 / 35 / 50 / 100 % and refcap0124's stimulus at
+0 … 100 %: band-envelope distance 4.15 → 2.95 dB. Latency stays 0.
+
+| Bank | Files | Score before → after | Level error | Spectrum error | Up / same / down |
+|---|---|---|---|---|---|
+| tp172d (0 / 50 / 100 %) | 9 | 4.00 → 4.11 | 0.87 → 0.60 dB | 1.67 → 1.80 dB | 1 / 8 / 0 |
+| refcap182 programme (0 / 20 / 35 / 50 / 100 %, 35 s) | 25 | 4.68 → 4.84 | 0.85 → 0.33 dB | 1.34 → 1.08 dB | 2 / 23 / 0 |
+
+At 100 % the level error falls where the reference's floor tracker acts (tp172d music +3.6 → +0.6 dB, refcap182
+guitar +7.7 → +0.5, mix +6.5 → +3.2, bass +2.8 → −0.0 dB); at 0 … 50 % nothing moves (the offset's law,
+−30 + 46 · amount² dB, keeps the floor's threshold under programme there); tp172d's sweep is now 1.6 dB low instead of
+1.0 dB loud (same score). A first version tracked every sample on both channels (refcap182 4.88, tp172d 4.00) at
++35 % CPU; this one: the matched engine on a 35 s stereo take 1.65 … 1.70 → 1.73 … 1.81 s at 100 % (+5 %),
+1.72 … 1.78 → 1.77 … 1.80 s at 50 % (+3 %); the default (Matched off) and old projects cost what they did.
+
+**Ember.** Style E driven hard as two cascaded curve stages with a coupling high-pass (the plan's §3.18 item 1) was
+built in the lab and fitted from two starts on the 22 E takes (`ember/emfit5.cpp`): −4.00 dB (shipped one-stage table)
+→ −3.98 dB at best, the other start diverged. No gain, so nothing shipped; the engine is unchanged (every Ember row
+of the gate identical: tp172b Saturn 2 5.10, tp172d / trial187b Decapitator 5.00 / 3.91, tp172c and refcap182
+X-Saturator, Revival, Fusion rows, Harrison Tape 2.67 / 2.76, Heatwave 3.08 / 3.04). Found for the tape rows (no
+DSP yet): on the 1 kHz stairs the Harrison tape reference is flat at default (−0.0 … −0.3 dB up to −3 dBFS) and
+at Drive 15 / fast tape a hard ceiling (−0.6 / −5.3 / −10.5 dB at −15 / −9 / −3 dBFS), while the fitted Ember map
+loses 2.7 dB flat at default and stays almost linear at Drive 15: Ember's own Tape curve cannot be fitted to that
+law. A tape style with a level-dependent ceiling (hysteresis core) is the next step there.
+Tools and tables: `/mnt/e/lynx-work/vqe190dp` (`bank.sh`, `gate.py`, `vsx/`, `qfit/`, `qv/`, `ember/`, `golden/`).
