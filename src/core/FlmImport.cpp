@@ -24,6 +24,7 @@
 #include "core/MissingFiles.h"
 #include "core/MidiControls.h"
 #include "core/ModelParams.h"
+#include "core/ScaleKeys.h"
 
 // FL Studio Mobile → LYNX, round 182c (docs/analise/FLM_FORMAT.md, REA_rodada182c.md §5). Times: FLM clips and events
 // count 128 ticks per beat and their lengths in beats; LYNX counts `ppq` (960) ticks per beat.
@@ -1788,6 +1789,17 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     song.arrangements = { Arrangement { "Arrangement", {}, 0, 0, {} } };
     song.info.title = project.title;
     song.bpm = std::clamp (project.tempo > 0.0 ? project.tempo : 120.0, minTempo, maxTempo);
+    // KEYB: the keyboard's chord set becomes the project's chord set for LYNX's Chord pad (round 190ds, core/ScaleKeys.h)
+    if (! project.chordSetJson.empty())
+    {
+        int dropped = 0;
+        song.keyboardChords = scalekeys::parseFlmChordSet (project.chordSetJson, &dropped);
+        if (dropped > 0)
+            ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile: chord set extensions outside two octaves");
+    }
+    // HEAD's key locker: the project key (round 190ds; Chromatic / a scale FL's list lacks: no key)
+    if (const auto key = scalekeys::flmKeyLocker (project.root, project.scale))
+        projectkey::set (song, key);
     // TDIV: beats per bar and the grid's steps per beat (FLM_FORMAT §TDIV, round 190ab: the second byte is not a note
     // value; LYNX's own grid stays at four steps per beat)
     ctx.stepsPerBeat = project.denominator;

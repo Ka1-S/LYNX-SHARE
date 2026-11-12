@@ -46,6 +46,12 @@ public:
         std::function<void (int channel)> toggleChannelWindow; // the instrument's own window
         std::function<int()> selectedTrack;                // the Playlist's current track (-1: none)
         std::function<void()> settingsChanged;             // the dock's height or shown state changed: save the UI settings
+        // round 190ds: the dock's Editor tab docks the main window's Piano roll (ui/SimpleDock.h Hooks)
+        std::function<juce::Component* (int pattern)> dockPianoRoll;
+        std::function<void()> undockPianoRoll;
+        std::function<void (bool)> setFoldToKey;
+        std::function<bool()> foldedToKey;
+        std::function<void()> openPianoRollPanel;
     };
 
     SimpleWorkflow (AudioEngine& engine, Host host);
@@ -90,6 +96,13 @@ public:
     void cycleDockTab();                 // Shift+Tab
     bool isDockShowing() const noexcept;
     SimpleDock* dockForSnapshot();       // (made and shown if needed)
+    // round 190ds: the Piano roll docked in the Editor tab was taken back by its own panel / must be given back
+    void editorTakenBack();
+    void releaseEditor();
+    // round 190ds: what a dropped keyed loop asks when the project has no key ("Set the project key to D minor?");
+    // `answer` (tests, --snapshot) answers it at once instead of a dialog: 1 yes, 0 no, -1 ask
+    static inline int answerForSnapshot = -1;
+    juce::String lastKeyQuestionForCheck() const { return lastKeyQuestion; }
 
     // --simpleshot: the chooser's two pages, as drawn
     juce::Component* chooserForSnapshot();
@@ -112,6 +125,8 @@ private:
     void addDrums (const std::string& genre, bool steps, bool useTempo);
     void addAudio (simpletracks::Kind kind);
     void updateDock(); // shows or hides the dock as the setting says, on the Playlist's current track
+    void showKeysForNewTrack(); // a new instrument: the dock's Keyboard tab (or the Touch keyboard window, dock hidden)
+    void offerProjectKey (int root, bool minor); // a keyed loop came into a project without a key
 
     AudioEngine& engine;
     Host host;
@@ -123,6 +138,8 @@ private:
     std::unique_ptr<juce::Component> finishDock;
     std::unique_ptr<SimpleDock> dock;
     int dockTrack = -1;
+    int lastAddedTrack = -1;
+    juce::String lastKeyQuestion;
     std::unique_ptr<juce::FileChooser> fileChooser;
     juce::File sampleFolder; // where the last sample for a Sampler track came from (this session)
 };

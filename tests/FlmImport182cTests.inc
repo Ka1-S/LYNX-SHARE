@@ -59,8 +59,8 @@ inline Bytes head (const std::string& title, double tempo)
     for (int k = 0; k < 4; ++k)
         f64 (b, 0.5);
     b.resize (b.size() + 16, 0x11); // GUID
-    u32 (b, 5);                     // scale
-    u32 (b, 2);                     // root
+    u32 (b, 5);                     // root (F; round 190ds: +344 is the root, every file on disk agrees)
+    u32 (b, 2);                     // scale (FLM's list: 2 = Major Bebop)
     u8 (b, 1);
     u8 (b, 1);
     u32 (b, 9); // channel-id counter
@@ -337,7 +337,7 @@ TEST (flm182c_reads_the_structure)
         return;
     }
     CHECK (p->title == "Test Song" && p->tempo == 130.0 && p->numerator == 3 && p->denominator == 4);
-    CHECK (p->scale == 5 && p->root == 2 && p->appVersion == "5.0.4");
+    CHECK (p->root == 5 && p->scale == 2 && p->appVersion == "5.0.4");
     CHECK (p->created == "2025-07-06 11-39-10" && p->saved == "2026-11-08 02:09:36" && p->originalName == "New Song (1)");
     CHECK (p->racks.size() == 6 && p->channels.size() == 6);
     CHECK (p->racks[1].params.size() == 6 && std::abs (p->racks[1].params[0] - 0.9f) < 1e-6f);

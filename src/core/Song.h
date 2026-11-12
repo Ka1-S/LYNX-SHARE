@@ -405,6 +405,12 @@ struct SamplerSettings
     int flStretchMode = 0;     // FL's own mode from an imported .flp (0 = none known): the export writes it back
     int flStretchPitch = 0;    // the part of `pitch` that came from FL's stretch PITCH knob (cents): it goes back there
     float stretchPitch = 0.0f; // Beats: semitones each piece is resampled by, offline (a Live clip's transpose; round 175a)
+    // audio clips, round 190ds (core/KeyFollow.h): the musical key of the audio (a loop's key read from its name or
+    // detected), −1 = not known; minor = the key is minor; how it was found (0 none, 1 the file's name, 2 detected from
+    // the audio, 3 set by the user)
+    int loopKeyRoot = -1;
+    bool loopKeyMinor = false;
+    std::uint8_t loopKeySource = 0;
     // with keepPitch and stretchBeats: the file's warp markers (seconds → beats, increasing). The file still lasts
     // stretchBeats; inside it each stretch of audio between two markers gets its own speed (rendered offline, like the
     // rest of the stretch). Fewer than 2 markers, or markers in a straight line: one speed (round 175a, M1)
@@ -1764,6 +1770,17 @@ struct Modulator
     static bool canModulate (const Song& song, const AutomationTarget& target) noexcept; // LYNX's own controls
 };
 
+// One chord of a keyboard chord set (round 190ds; FL Studio Mobile's KEYB entries {baseNote, extensions, octave,
+// quality}, docs/analise/FLM_FORMAT.md §2): root pitch class, quality (0 major, 1 minor, 2 augmented, 3 diminished,
+// 4 sus2, 5 sus4), octave (relative: the set's lowest octave plays where the pad keyboard is) and added notes (semitones
+// above the root).
+struct KeyboardChord
+{
+    int root = 0, quality = 0, octave = 4;
+    std::vector<int> extensions;
+    bool operator== (const KeyboardChord&) const = default;
+};
+
 // A block in the Playlist: a section of a pattern, or a section of an audioClip channel's audio.
 struct Clip
 {
@@ -1805,6 +1822,11 @@ struct Clip
     // the fade-out (cos). Set where a comp switches takes: the two clips overlap by the fade and their gains sum to
     // constant power. Saved with the project.
     std::uint8_t fadeCurve = 0;
+    // audio clips, round 190ds (core/KeyFollow.h): the clip follows the project key — its channel's loop key is moved to
+    // the project's by `keyShift` semitones, which are part of `pitch` (so every export plays it as heard). Both in the
+    // padding after fadeCurve: Clip stays the same size.
+    bool followKey = false;
+    std::int8_t keyShift = 0;
 
     std::int64_t end() const noexcept { return start + length; }
     std::int64_t effectiveFadeIn() const noexcept { return crossfadeIn > 0 ? crossfadeIn : fadeIn; }
@@ -2403,6 +2425,9 @@ struct Song
         bool operator== (const ScaleHighlight&) const = default;
     };
     ScaleHighlight scaleHighlight;
+    // The project's own chord set for the keyboard's Chord pad (round 190ds, core/ScaleKeys.h): from an FL Studio Mobile
+    // project's KEYB chunk, or edited on a pad. Empty = the pads play the project key's diatonic chords.
+    std::vector<KeyboardChord> keyboardChords;
     // FL's Options › Project › Data folder (.flp 0xCA, ProjDataPathBtnClick "Select the directory where your project data
     // is to be stored..."): kept and saved (empty = FL's default next to the project)
     std::string dataFolder;

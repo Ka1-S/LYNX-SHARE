@@ -15,6 +15,7 @@
 #include "core/NoteNames.h"
 #include "core/KeyGuess.h"
 #include "core/ProjectKey.h"
+#include "core/ScaleKeys.h"
 #include "ui/FileChoosers.h"
 #include "ui/ProjectLoading.h"
 #include "ui/UiTrace.h"
@@ -735,6 +736,16 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     // "Omni" links of mixer-slot controls follow the selected mixer track (round 190bt)
     engine.selectedMixerTrackForLinks = [this] { return mixer.getSelectedTrack(); };
     setTypingPiano (typingPiano);
+    setKeyboardSettingsListener ([this] { saveUiSettings(); }); // round 190ds: the keyboards' modes are UI settings
+    setTypingKeyLetters ([this] (int key) -> std::string {
+        // the letter of the typing key that plays `key` (FL's layout; the first key of the layout that does), Keys mode
+        if (! typingPiano)
+            return {};
+        for (const char letter : std::string ("ZSXDCVGBHNJMQ2W3ER5T6Y7UI9O0P,L.;/")) // (the Q row before its duplicates , . /)
+            if (const auto notes = keys::typingPianoKey (letter, typingOctave, typingRoot, typingLayout).notes; ! notes.empty() && notes.front() == key)
+                return std::string (1, letter);
+        return {};
+    });
     refreshRecordOptionButtons();
     refreshToolbar();
     refreshPanelButtons();
@@ -885,6 +896,10 @@ MainComponent::~MainComponent()
     gamepadInput.reset();
     if (detailView != nullptr) // (round 183a: a docked Piano roll goes home while the workspace still exists)
         detailView->releaseEditor();
+    if (simpleWorkflow != nullptr) // (round 190ds: the same for the Simple dock's Editor tab)
+        simpleWorkflow->releaseEditor();
+    setKeyboardSettingsListener (nullptr);
+    setTypingKeyLetters (nullptr);
     juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
     workspace.onWillShow = nullptr;
     engine.onSessionUndoSkipped = nullptr;
@@ -1710,9 +1725,26 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
                 typingLaunches[code] = typed.notes;
             }
             else
+            {
+                // round 190ds: Scale keys / Chord pad / Lock to key (core/ScaleKeys.h): the white keys play the project
+                // key's degrees or chords; nothing changes in Keys mode without the lock, or with no project key
+                auto notes = typed.notes;
+                const auto& mode = scalekeys::current();
+                if (mode.mode != scalekeys::Mode::keys || mode.lockToKey)
+                {
+                    const auto zRow = keys::typingPianoKey ('Z', typingOctave, 0, 0).notes; // (FL's own layout: Z = C)
+                    const auto baseC = zRow.empty() ? 60 : zRow.front();
+                    std::vector<int> mapped;
+                    for (auto note : typed.notes)
+                        for (auto n : scalekeys::typedNotes (engine.getSong(), mode, mode.mode == scalekeys::Mode::keys ? note : note - typingRoot, baseC))
+                            if (std::find (mapped.begin(), mapped.end(), n) == mapped.end())
+                                mapped.push_back (n);
+                    notes = std::move (mapped);
+                }
                 for (auto c : engine.getSelectedChannels())
-                    for (auto note : typed.notes) // (a chord layout's key plays several)
+                    for (auto note : notes) // (a chord layout's key plays several)
                         heldKeys.press (c, note, 0.8f, code);
+            }
         }
         return true;
     }
@@ -2399,6 +2431,20 @@ void MainComponent::loadUiSettings()
             SimpleDock::preferredHeight = juce::jlimit (SimpleDock::minHeight, 2000, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
         else if (key == "simpleDockShown")
             SimpleDock::shownSetting = on;
+        else if (key == "keyboardMode") // round 190ds: the keyboards' modes (core/ScaleKeys.h)
+            scalekeys::current().mode = (scalekeys::Mode) juce::jlimit (0, 2, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "keyboardLock")
+            scalekeys::current().lockToKey = on;
+        else if (key == "chordComplexity")
+            scalekeys::current().complexity = (scalekeys::Complexity) juce::jlimit (0, scalekeys::complexityCount - 1, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "chordSpread")
+            scalekeys::current().spread = (scalekeys::Spread) juce::jlimit (0, scalekeys::spreadCount - 1, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "chordStrum")
+            scalekeys::current().strumMs = juce::jlimit (0, scalekeys::maxStrumMs, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue());
+        else if (key == "chordStrumDown")
+            scalekeys::current().strumDown = on;
+        else if (key == "chordProjectSet")
+            scalekeys::current().projectChords = on;
         else if (key == "detailDevices")
             DetailView::devicesPage = on;
         else if (key == "detailExtraWindowKey")
@@ -2631,6 +2677,13 @@ void MainComponent::saveUiSettings()
                                       + "\ndetailShown=" + juce::String (DetailView::shownSetting ? 1 : 0)
                                       + "\nsimpleDockHeight=" + juce::String (SimpleDock::preferredHeight)
                                       + "\nsimpleDockShown=" + juce::String (SimpleDock::shownSetting ? 1 : 0)
+                                      + "\nkeyboardMode=" + juce::String ((int) scalekeys::current().mode)
+                                      + "\nkeyboardLock=" + juce::String (scalekeys::current().lockToKey ? 1 : 0)
+                                      + "\nchordComplexity=" + juce::String ((int) scalekeys::current().complexity)
+                                      + "\nchordSpread=" + juce::String ((int) scalekeys::current().spread)
+                                      + "\nchordStrum=" + juce::String (scalekeys::current().strumMs)
+                                      + "\nchordStrumDown=" + juce::String (scalekeys::current().strumDown ? 1 : 0)
+                                      + "\nchordProjectSet=" + juce::String (scalekeys::current().projectChords ? 1 : 0)
                                       + "\ndetailDevices=" + juce::String (DetailView::devicesPage ? 1 : 0)
                                       + "\ndetailExtraWindowKey=" + juce::String (DetailView::extraWindowKey ? 1 : 0)
                                       + "\ndetailExtraSelectInMixer=" + juce::String (DetailView::extraSelectInMixer ? 1 : 0)
@@ -2984,6 +3037,17 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         host.toggleChannelWindow = [this] (int channel) { rack.toggleEditor (channel, true); };
         host.selectedTrack = [this] { return playlist.getCurrentTrack(); };
         host.settingsChanged = [this] { saveUiSettings(); };
+        // round 190ds: the dock's Editor tab docks the Piano roll (as the Clip-launch detail view does; never both)
+        host.dockPianoRoll = [this] (int pattern) { return dockPianoRoll (pattern); };
+        host.undockPianoRoll = [this] { undockPianoRoll(); };
+        host.setFoldToKey = [this] (bool on) {
+            if (const auto key = projectkey::get (engine.getSong()); on && key) // (the rows show the project key, then fold)
+                pianoRoll.setScale (key->root, projectkey::lynxScale (*key));
+            pianoRoll.setFoldToScale (on);
+        };
+        host.foldedToKey = [this] { return pianoRoll.isFoldedToScale(); };
+        host.openPianoRollPanel = [this] { showPanel (Panel::pianoRoll); };
+        workspace.onWillShow = [this] (Panel panel) { pianoRollPanelWillShow (panel); };
         simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
         // the Simple headers' "+FX": the dock's Effects tab on that track (round 190bu; the Mixer shows the same slots)
         playlist.onTrackEffects = [this] (int insert) {
@@ -3120,14 +3184,7 @@ void MainComponent::makeDetailView()
     h.hotSwapTarget = [this] { return browser.hotSwapTarget(); };
     h.typingKeyboardOn = [this] { return typingPiano; };
     // any way the Piano roll panel comes up (F7, its button, a layout) takes the docked editor back first
-    workspace.onWillShow = [this] (Panel panel) {
-        if (panel == Panel::pianoRoll && pianoRollDocked)
-        {
-            undockPianoRoll();
-            if (detailView != nullptr)
-                detailView->editorTakenBack();
-        }
-    };
+    workspace.onWillShow = [this] (Panel panel) { pianoRollPanelWillShow (panel); };
     h.layoutChanged = [this] {
         if (detailView != nullptr)
             detailView->setVisible (isClipLaunchWorkflow() && DetailView::shownSetting);
@@ -3146,6 +3203,19 @@ void MainComponent::makeDetailView()
     });
     const auto selected = clipGridSelection (*clipGridView);
     detailView->showSelection (selected.first, selected.second);
+}
+
+// Any way the Piano roll panel comes up (F7, its button, a layout) takes a docked editor back first: from the Clip-launch
+// detail view (round 183a) or the Simple dock's Editor tab (round 190ds)
+void MainComponent::pianoRollPanelWillShow (Panel panel)
+{
+    if (panel != Panel::pianoRoll || ! pianoRollDocked)
+        return;
+    undockPianoRoll();
+    if (detailView != nullptr)
+        detailView->editorTakenBack();
+    if (simpleWorkflow != nullptr)
+        simpleWorkflow->editorTakenBack();
 }
 
 juce::Component* MainComponent::dockPianoRoll (int pattern)

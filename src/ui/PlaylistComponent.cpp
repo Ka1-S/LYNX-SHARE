@@ -39,6 +39,7 @@
 #include "core/NoteEdit.h"
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
+#include "core/KeyFollow.h"
 #include "core/SimpleTracks.h"
 #include "core/QuickRender.h"
 #include "core/TempoDetect.h"
@@ -6460,6 +6461,48 @@ juce::PopupMenu PlaylistComponent::getClipMenuForSnapshot (int index)
     return buildClipMenu (index, (int) tickToX ((double) c.start + (double) c.length / 2.0));
 }
 
+// "Follow the project key" (with what it does now) and "Loop key ▸" for an audio clip (round 190ds, core/KeyFollow.h)
+void PlaylistComponent::addKeyFollowItems (juce::PopupMenu& menu, int index, const std::vector<int>& targets)
+{
+    const auto& song = engine.getSong();
+    const auto& clip = song.playlist[(std::size_t) index];
+    const auto key = keyfollow::loopKeyOf (song, clip.channel);
+    const auto keyText = [] (const keyfollow::LoopKey& k) {
+        return juce::String (projectkey::rootName (k.root)) + " " + (k.minor ? tr ("minor") : tr ("major"));
+    };
+    juce::String state;
+    if (! key)
+        state = tr ("the loop's key is not known");
+    else if (! projectkey::get (song))
+        state = tr ("no project key");
+    else if (clip.followKey)
+    {
+        const auto shift = keyfollow::shiftOf (song, clip);
+        state = shift == 0 ? tr ("already in key") : tr ("moved {0} semitones", { (shift > 0 ? "+" : "") + juce::String (shift) });
+    }
+    menu.addSeparator();
+    menu.addItem (tr ("Follow the project key") + (state.isEmpty() ? juce::String() : "  (" + state + ")"), key.has_value(), clip.followKey,
+                  [this, targets, on = ! clip.followKey] { engine.editSong ([targets, on] (Song& s) { keyfollow::setFollow (s, targets, on); }); });
+    juce::PopupMenu keys;
+    const auto channel = clip.channel;
+    for (const bool minor : { false, true })
+    {
+        juce::PopupMenu roots;
+        for (int r = 0; r < 12; ++r)
+            roots.addItem (juce::String (projectkey::rootName (r)), true, key && key->root == r && key->minor == minor, [this, channel, r, minor] {
+                engine.editSong ([channel, r, minor] (Song& s) { keyfollow::setLoopKey (s, channel, keyfollow::LoopKey { r, minor }, 3); });
+            });
+        keys.addSubMenu (minor ? tr ("Minor") : tr ("Major"), roots);
+    }
+    keys.addSeparator();
+    keys.addItem (tr ("Not known"), true, ! key, [this, channel] { engine.editSong ([channel] (Song& s) { keyfollow::setLoopKey (s, channel, std::nullopt, 0); }); });
+    const auto source = song.channels[(std::size_t) channel].sampler.loopKeySource;
+    menu.addSubMenu (tr ("Loop key") + (key ? ": " + keyText (*key) + (source == 1 ? " (" + tr ("from its name") + ")" : source == 2 ? " (" + tr ("detected") + ")" : juce::String())
+                                            : juce::String()),
+                     keys);
+    menu.addSeparator();
+}
+
 juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
 {
     const auto& song = engine.getSong();
@@ -6501,6 +6544,10 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
                 safe->sortClips();
         });
     });
+
+    // round 190ds, Simple workflow only (LYNX's own): an audio clip follows the project key, and its loop's key
+    if (simpleHeaders && clip.kind == ClipKind::audio && clip.channel >= 0 && clip.channel < (int) song.channels.size())
+        addKeyFollowItems (menu, index, targets);
 
     if (clip.kind == ClipKind::pattern && onRenamePattern)
         menu.addItem (theme::mnemonic (tr ("Rename and color..."), 'R'), [this, p = clip.pattern] { onRenamePattern (p); });

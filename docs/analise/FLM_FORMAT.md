@@ -53,7 +53,7 @@ PROVEN-REA (0x18076b9e0); the meanings are INFERRED where marked.
 | 288 | 8 bytes | skipped by the reader (a legacy field) |
 | 296 | 4 × f64 | view state. INFERRED: playlist zoom/scroll; not needed for import |
 | 328 | 16 bytes | project GUID |
-| 344 | u32, u32 | **scale and root note of the "key locker"** (the reader's log calls them "scale / root note") |
+| 344 | u32, u32 | **root note (0..11) and scale of the "key locker"** (the reader's log calls them "scale / root note"; round 190ds: every file on disk has the root first, the scale = index into FLM's list of 33 scales, see `scalekeys::flmKeyLocker`) |
 | 352 | u8 | sharp/flat display flag ("#/b key locker") |
 | 353 | u8 | flag (unknown) |
 | 354 | u32 | channel-id counter (must be ≤ 0xFFF, else the reader warns) |
@@ -65,6 +65,9 @@ Older files end earlier, and the reader stops at the first missing field.
 
 u32 length + JSON text: the keyboard's chord set, an array of `{baseNote, extensions[], octave, quality}`. The keyboard
 settings loader reads it. PROVEN-REA (0x18076b9e0 calls the keyboard-settings loader); the JSON shape is PROVEN-FILE.
+Round 190ds (REA on the FL Studio Mobile plugin DLL): `quality` 0 Maj, 1 min, 2 aug, 3 dim, 4 Sus2, 5 Sus4, 6 power;
+`extensions` are semitones above the root (9 "6", 10 "7", 11 "Maj7", 13 "b9", 14 "9", 17 "11", 18 "#11"). LYNX imports
+the set as the project's Chord pad set (`Song::keyboardChords`).
 
 ### META (3081 bytes)
 
