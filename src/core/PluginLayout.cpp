@@ -2901,7 +2901,7 @@ Layout geminiDoubler()
     v.push_back (tabs (656, 168, 132, 18, "EQ law", TR_NOOP ("Old|Measured")));
     // round 190do: the voices' read head with Align off (Measured: one head, the default of new instances; Classic: two
     // crossfaded taps, kept by older projects)
-    v.push_back (tabs (520, 168, 132, 18, "Head law", TR_NOOP ("Classic|Measured")));
+    v.push_back (tabs (520, 168, 132, 18, "Head law", TR_NOOP ("Classic|Measured"), {}, compactKeys));
     // one row per voice; round 135w: voices 3 and 4 (the four-voice doubler's) on a second page of the same rows
     v.push_back (section (4, 264, 680, 192, TR_NOOP ("Voices")));
     l.pages = { TR_NOOP ("Voices 1-2"), TR_NOOP ("Voices 3-4") };
