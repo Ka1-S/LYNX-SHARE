@@ -8280,7 +8280,6 @@ countries: es mx ar co cl pe ve
 "Deactivate input {0}" = "Desactivar entrada {0}"
 "Activate input {0}" = "Activar entrada {0}"
 "Input {0}" = "Entrada {0}"
-# Round 183c: Racks
 "Add chain" = "Añadir cadena"
 "Audio Effect Rack" = "Rack de efectos de audio"
 "Chain Pan" = "Panorama de la cadena"
@@ -8368,6 +8367,7 @@ countries: es mx ar co cl pe ve
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Separar todos los plugins nuevos"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Activado: la ventana de un plugin que añades se abre separada, encima de los paneles. Desactivado: se abre acoplada en el escritorio, detrás de un panel en el que hagas clic. El menú de la ventana de cada plugin › Separado lo cambia para ese plugin"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Para otras apps..."
 "Export for other apps" = "Exportar para otras apps"
@@ -8736,7 +8736,6 @@ countries: es mx ar co cl pe ve
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Un mando de juego maneja el transporte y puede vincularse a cualquier control como un controlador MIDI. También en la página MIDI."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Mejoras propias de LYNX. Todas vienen desactivadas, así que LYNX SHARE se ve y se comporta como FL Studio hasta que actives alguna. Cada interruptor es el mismo ajuste que en el lugar que indica su línea."
 "LYNX extras..." = "Extras de LYNX..."
-
 "Search your plugins" = "Buscar en tus plugins"
 "Nothing is shared." = "No se comparte nada."
 "{0} shared with the session" = "{0} compartidos con la sesión"
@@ -8842,10 +8841,6 @@ countries: es mx ar co cl pe ve
 "{0} min ago" = "hace {0} min"
 "{0} h ago" = "hace {0} h"
 "{0} d ago" = "hace {0} d"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"
 "Find similar samples" = "Buscar samples parecidos"
 "Similar to {0}" = "Parecido a {0}"
 "Listening to \"{0}\"..." = "Escuchando \"{0}\"..."
@@ -8883,7 +8878,6 @@ countries: es mx ar co cl pe ve
 "Channel 2" = "Canal 2"
 "Channels 2-{0}" = "Canales 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "Canales miembro MPE (zona inferior): los canales MIDI que llevan una nota cada uno"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "SOPLO"
 "Motion blending" = "Fusión de movimiento"
 "Load sprite sheet..." = "Cargar hoja de sprites..."
@@ -8918,3 +8912,14 @@ countries: es mx ar co cl pe ve
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Nivelación: mantiene el nivel en un umbral bajo el techo con un ataque lento, el techo atrapa el resto (desactivada por defecto)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Umbral de nivelación: el nivel que se mantiene bajo el techo (Off: sin nivelación)"
 "Levelling attack: how much of a transient passes before the level is held" = "Ataque de nivelación: cuánto de un transitorio pasa antes de que se mantenga el nivel"
+"Preserve start times" = "Conservar los tiempos de inicio"
+"Key / scale restriction" = "Restricción de tonalidad / escala"
+"Above" = "Arriba"
+"Under" = "Abajo"
+"Keyboard range / transpose" = "Rango del teclado / transposición"
+"Wrap to top / bottom" = "Envolver hacia arriba / abajo"
+"{0} steps" = "{0} pasos"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"

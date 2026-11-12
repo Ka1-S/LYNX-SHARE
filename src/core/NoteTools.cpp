@@ -411,14 +411,14 @@ std::vector<int> arpeggiate (Pattern& pattern, const std::vector<int>& indices, 
 
 // --- flip -------------------------------------------------------------------------------------
 
-void flip (Pattern& pattern, const std::vector<int>& indices, bool horizontal, bool vertical)
+void flip (Pattern& pattern, const std::vector<int>& indices, bool horizontal, bool vertical, bool preserveStarts)
 {
     const auto targets = validSorted (pattern, indices);
 
     if (targets.empty())
         return;
 
-    std::int64_t from = INT64_MAX, to = INT64_MIN;
+    std::int64_t from = INT64_MAX, to = INT64_MIN, lastStart = INT64_MIN;
     int low = 127, high = 0;
 
     for (auto i : targets)
@@ -426,6 +426,7 @@ void flip (Pattern& pattern, const std::vector<int>& indices, bool horizontal, b
         const auto& n = pattern.notes[(std::size_t) i];
         from = std::min (from, n.start);
         to = std::max (to, n.start + n.length);
+        lastStart = std::max (lastStart, n.start);
         low = std::min (low, n.key);
         high = std::max (high, n.key);
     }
@@ -435,7 +436,8 @@ void flip (Pattern& pattern, const std::vector<int>& indices, bool horizontal, b
         auto& n = pattern.notes[(std::size_t) i];
 
         if (horizontal)
-            n.start = from + (to - (n.start + n.length));
+            n.start = std::max<std::int64_t> (0, preserveStarts ? lastStart - (n.start - from)
+                                                                : from + (to - (n.start + n.length)));
         if (vertical)
             n.key = std::clamp (low + high - n.key, 0, 127);
     }
@@ -454,12 +456,15 @@ void randomise (Pattern& pattern, const std::vector<int>& indices, const Randomi
         const auto rv = random.bipolar (o.bipolar), rp = random.bipolar (true), rf = random.bipolar (true);
         const auto rx = random.bipolar (true), ry = random.bipolar (true), rt = random.bipolar (o.bipolar);
         const auto rl = random.bipolar (true);
+        const auto rr = random.bipolar (true); // drawn last: the older amounts keep their values for a seed
 
         n.velocity = std::clamp (n.velocity + o.velocity * rv, 0.0f, 1.0f);
         n.pan = std::clamp (n.pan + 2.0f * o.pan * rp, -1.0f, 1.0f);
         n.finePitch = std::clamp (n.finePitch + 120.0f * o.finePitch * rf, -120.0f, 120.0f);
         n.modX = std::clamp (n.modX + o.modX * rx, 0.0f, 1.0f);
         n.modY = std::clamp (n.modY + o.modY * ry, 0.0f, 1.0f);
+        if (o.release != 0.0f)
+            setLevelValue (n, Level::release, levelValue (n, Level::release) + o.release * rr);
 
         if (o.timing > 0)
             n.start = std::max<std::int64_t> (0, n.start + (std::int64_t) std::llround ((double) o.timing * (o.bipolar ? rt : -rt)));
@@ -496,6 +501,52 @@ void scaleLevels (Pattern& pattern, const std::vector<int>& indices, Level level
     }
 }
 
+double flLevelScale (double x, double center, double multiply, double offset, double tension) noexcept
+{
+    center = std::clamp (center, 0.0, 1.0);
+    const auto reach = std::max (center, 1.0 - center);
+    const auto delta = (float) (x - center); // FL takes the side from the single-precision difference
+    const auto side = delta > 0.0f ? 1.0 : delta < 0.0f ? -1.0 : 0.0;
+    auto f = std::abs (x - center) / reach;
+
+    // the bend: single-precision parameters, as FL keeps them
+    const auto amount = std::abs (std::clamp (tension, -1.0, 1.0));
+    const auto p = (float) (std::exp (amount * std::log (1001.0)) - 1.0);
+    if (p != 0.0f)
+    {
+        const auto inverse = (double) (float) (1.0 / (double) p);
+        const auto log = (double) (float) std::log ((double) p + 1.0);
+        f = tension > 0.0 ? 1.0 - (std::exp ((1.0 - f) * log) - 1.0) * inverse : (std::exp (f * log) - 1.0) * inverse;
+    }
+
+    return std::clamp (side * f * (multiply * reach) + (offset + center), 0.0, 1.0);
+}
+
+void scaleLevels (Pattern& pattern, const std::vector<int>& indices, Level level, float scaleStart, float scaleEnd, float offset,
+                  float center, float tension)
+{
+    const auto targets = validSorted (pattern, indices);
+
+    if (targets.empty())
+        return;
+
+    std::int64_t first = INT64_MAX, last = INT64_MIN;
+    for (auto i : targets)
+    {
+        first = std::min (first, pattern.notes[(std::size_t) i].start);
+        last = std::max (last, pattern.notes[(std::size_t) i].start);
+    }
+
+    for (auto i : targets)
+    {
+        auto& n = pattern.notes[(std::size_t) i];
+        const auto t = last > first ? (float) (n.start - first) / (float) (last - first) : 0.0f;
+        const auto scale = scaleStart + (scaleEnd - scaleStart) * t;
+        setLevelValue (n, level, (float) flLevelScale ((double) levelValue (n, level), (double) center, (double) scale, (double) offset,
+                                                       (double) tension));
+    }
+}
+
 // --- limit ------------------------------------------------------------------------------------
 
 void limit (Pattern& pattern, const std::vector<int>& indices, const LimitOptions& o)
@@ -504,20 +555,48 @@ void limit (Pattern& pattern, const std::vector<int>& indices, const LimitOption
     const auto high = std::clamp (std::max (o.lowKey, o.highKey), 0, 127);
     const auto minV = std::clamp (std::min (o.minVelocity, o.maxVelocity), 0.0f, 1.0f);
     const auto maxV = std::clamp (std::max (o.minVelocity, o.maxVelocity), 0.0f, 1.0f);
+    const auto restricted = o.scale > 0 && o.scale < (int) scales().size();
+    unsigned ties = 0;
 
     for (auto i : validSorted (pattern, indices))
     {
         auto& n = pattern.notes[(std::size_t) i];
+        auto key = std::clamp (n.key, 0, 127);
 
-        if (high - low >= 11) // an octave fits: keep the pitch class
+        if (restricted && ! inScale (key, o.root, o.scale))
         {
-            while (n.key < low)
-                n.key += 12;
-            while (n.key > high)
-                n.key -= 12;
+            // the nearest scale key; FL's search stops at the ends of the keyboard, whatever key is there
+            auto down = key, up = key;
+            do { --down; } while (down >= 1 && ! inScale (down, o.root, o.scale));
+            do { ++up; } while (up <= 126 && ! inScale (up, o.root, o.scale));
+            down = std::max (down, 0);
+            up = std::min (up, 127);
+
+            const auto below = key - down, over = up - key;
+            if (over < below)
+                key = up;
+            else if (over > below)
+                key = down;
+            else if (o.snap == LimitOptions::under)
+                key = down;
+            else if (o.snap == LimitOptions::alternate)
+                key = (ties++ & 1u) != 0 ? down : up;
+            else
+                key = up;
         }
 
-        n.key = std::clamp (n.key, low, high);
+        if (key > high)
+            key -= ((o.wrap ? key - low : key - high + 11) / 12) * 12;
+        else if (key < low)
+            key += ((o.wrap ? high - key : low - key + 11) / 12) * 12;
+
+        key = std::clamp (key, low, high) + o.transpose;
+        while (key < 0)
+            key += 12;
+        while (key > 127)
+            key -= 12;
+
+        n.key = key;
         n.velocity = std::clamp (n.velocity, minV, maxV);
     }
 }

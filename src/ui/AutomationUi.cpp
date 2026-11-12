@@ -1,3 +1,4 @@
+#include "core/FlCurve.h"
 #include "ui/FlMods.h"
 #include "ui/WindowOwner.h"
 #include "ui/AutomationUi.h"
@@ -197,7 +198,9 @@ public:
         const auto& points = editedPoints (*a);
         const auto lfo = a->lfo.on;
 
-        for (auto x = area.getX(); x <= area.getRight(); x += lfo ? 1 : 2)
+        // (a sample per pixel; round 190bw: Hold, Stairs and Pulse segments keep square corners)
+        auto lastY = 0.0f, lastAmpY = 0.0f;
+        for (auto x = area.getX(); x <= area.getRight(); ++x)
         {
             const auto tick = xToTick (x);
             // FL draws the LFO alone around the middle: 0.5 + the swing (half the waveform × the amplitude) / 2
@@ -205,8 +208,11 @@ public:
 
             if (x == area.getX())
                 curve.startNewSubPath ((float) x, y);
-            else
+            else if (lfo)
                 curve.lineTo ((float) x, y);
+            else
+                automationLineTo (curve, (float) x - 1.0f, lastY, (float) x, y, [&] { return valueToY (curveAt (*a, xToTick ((double) x - 0.5))); });
+            lastY = y;
 
             // FL draws the amplitude line from the first point to the last one, nothing past it
             if (lfo && ! points.empty() && tick >= (double) points.front().tick && tick <= (double) points.back().tick)
@@ -215,7 +221,8 @@ public:
                 if (! ampStarted)
                     amp.startNewSubPath ((float) x, ya), ampStarted = true;
                 else
-                    amp.lineTo ((float) x, ya);
+                    automationLineTo (amp, (float) x - 1.0f, lastAmpY, (float) x, ya, [&] { return valueToY (curveAt (*a, xToTick ((double) x - 0.5))); });
+                lastAmpY = ya;
             }
         }
 
@@ -241,7 +248,7 @@ public:
             g.fillPath (fill);
         }
         g.setColour (colour::automation);
-        g.strokePath (curve, juce::PathStrokeType (lfo ? 1.5f : 2.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+        g.strokePath (curve, juce::PathStrokeType (lfo ? 1.5f : 2.0f, lfo ? juce::PathStrokeType::curved : juce::PathStrokeType::mitered, juce::PathStrokeType::rounded));
         if (lfo)
         {
             g.setColour (colour::textSecondary.withAlpha (0.45f));
@@ -374,10 +381,8 @@ public:
             }
             if (handle >= 0) // FL: right-click on the tension handle = straight segment
             {
-                edit ([handle] (Automation& x) {
-                    if (handle < (int) editedPoints (x).size())
-                        editedPoints (x)[(std::size_t) handle].tension = 0.0f;
-                });
+                automationPointMemory().tension = 0.0f; // FL's "default tension" also clears the editor's memory
+                edit ([handle] (Automation& x) { setAutomationSegmentTension (editedPoints (x), handle, 0.0f); });
                 return;
             }
             // FL: right-click adds a point there, dragged while the button is held (Shift: on the curve, keeping its
@@ -398,6 +403,7 @@ public:
         if (handle >= 0) // the tension handle: up / down bends the segment
         {
             tensionPoint = handle;
+            rememberSegment (editedPoints (*a)[(std::size_t) handle]);
             tensionStart = editedPoints (*a)[(std::size_t) handle].tension;
             tensionSign = editedPoints (*a)[(std::size_t) handle + 1].value >= editedPoints (*a)[(std::size_t) handle].value ? -1.0f : 1.0f;
             return;
@@ -415,6 +421,7 @@ public:
 
             if (tensionPoint >= 0)
             {
+                rememberSegment (editedPoints (*a)[(std::size_t) tensionPoint]);
                 tensionStart = editedPoints (*a)[(std::size_t) tensionPoint].tension;
                 tensionSign = editedPoints (*a)[(std::size_t) tensionPoint + 1].value >= editedPoints (*a)[(std::size_t) tensionPoint].value ? -1.0f : 1.0f;
             }
@@ -433,16 +440,19 @@ public:
         addAndDrag (p);
     }
 
+    // FL: a new point takes the mode and tension last used in the editor (the segment that ends at it); the rest of
+    // the segment it splits keeps its curve
     void addAndDrag (const AutomationPoint& p)
     {
-        edit ([p] (Automation& x) {
-            editedPoints (x).push_back (p);
-            std::stable_sort (editedPoints (x).begin(), editedPoints (x).end(), [] (auto& l, auto& r) { return l.tick < r.tick; });
-        });
+        int added = -1;
+        edit ([p, &added, m = automationPointMemory()] (Automation& x) { added = insertAutomationPoint (editedPoints (x), p, m.mode, m.tension); });
+        dragPoint = added;
+    }
 
-        for (int i = 0; i < (int) editedPoints (*current()).size(); ++i)
-            if (editedPoints (*current())[(std::size_t) i].tick == p.tick && editedPoints (*current())[(std::size_t) i].value == p.value)
-                dragPoint = i;
+    // the tension drag: FL's editor remembers the dragged segment's mode and tension for the next new point
+    static void rememberSegment (const AutomationPoint& p)
+    {
+        automationPointMemory() = { p.mode < flcurve::modeCount ? (int) p.mode : 0, p.tension };
     }
 
     void mouseDrag (const juce::MouseEvent& e) override
@@ -463,7 +473,8 @@ public:
         {
             const auto up = -(float) e.getDistanceFromDragStartY() / (flmods::ctrl (e.mods) ? 400.0f : 100.0f);
             const auto tension = juce::jlimit (-1.0f, 1.0f, tensionStart + tensionSign * up); // the segment follows the mouse
-            edit ([i = tensionPoint, tension] (Automation& x) { editedPoints (x)[(std::size_t) i].tension = tension; });
+            automationPointMemory().tension = tension;
+            edit ([i = tensionPoint, tension] (Automation& x) { setAutomationSegmentTension (editedPoints (x), i, tension); });
             return;
         }
 
@@ -527,11 +538,21 @@ private:
 
     void showPointMenu (int point)
     {
+        // FL's point menu [RES FLEngine EEACPointMenu; the look: the envelope editor's menu, shot fl-lp-point-menu]:
+        // Delete, the Mode block, then Copy value / Paste value / Type in value...; LYNX's own commands follow
         const auto* a = current();
         const auto value = editedPoints (*a)[(std::size_t) point].value;
         juce::PopupMenu menu;
         menu.addSectionHeader (valueText (value));
-        menu.addItem (tr ("Type value..."), [this, point] { typeValue (point); });
+        menu.addItem (tr ("Delete"), editedPoints (*a).size() > 1, false, [this, point] {
+            edit ([point] (Automation& x) {
+                if (editedPoints (x).size() > 1)
+                    eraseAutomationPoint (editedPoints (x), point);
+            });
+        });
+        addAutomationModeItems (menu, automationPointMode (editedPoints (*a), point), point > 0,
+                                [this, point] (int mode) { edit ([point, mode] (Automation& x) { setAutomationPointMode (editedPoints (x), point, mode); }); });
+        menu.addSeparator();
         menu.addItem (tr ("Copy value"), [value] { copiedAutomationValue() = value; });
         menu.addItem (tr ("Paste value"), copiedAutomationValue() >= 0.0f, false, [this, point] {
             edit ([point, v = copiedAutomationValue()] (Automation& x) {
@@ -539,20 +560,11 @@ private:
                     editedPoints (x)[(std::size_t) point].value = v;
             });
         });
+        menu.addItem (tr ("Type in value..."), [this, point] { typeValue (point); });
+        menu.addSeparator();
         menu.addItem (tr ("Straight segment (reset the curve)"), [this, point] {
-            edit ([point] (Automation& x) {
-                if (point < (int) editedPoints (x).size())
-                    editedPoints (x)[(std::size_t) point].tension = 0.0f;
-            });
+            edit ([point] (Automation& x) { setAutomationSegmentTension (editedPoints (x), point, 0.0f); });
         });
-        menu.addSeparator();
-        menu.addItem (tr ("Delete point"), editedPoints (*a).size() > 1, false, [this, point] {
-            edit ([point] (Automation& x) {
-                if (point < (int) editedPoints (x).size() && editedPoints (x).size() > 1)
-                    editedPoints (x).erase (editedPoints (x).begin() + point);
-            });
-        });
-        menu.addSeparator();
         menu.addSubMenu (tr ("Whole curve"), curveMenu());
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
     }
@@ -571,8 +583,8 @@ private:
         });
         menu.addItem (tr ("All segments straight"), [this] {
             edit ([] (Automation& x) {
-                for (auto& p : editedPoints (x))
-                    p.tension = 0.0f;
+                for (int i = 0; i < (int) editedPoints (x).size(); ++i)
+                    setAutomationSegmentTension (editedPoints (x), i, 0.0f);
             });
         });
         return menu;
@@ -727,7 +739,7 @@ private:
     std::vector<ctlui::Knob*> lfoKnobs;
     bool lfoShown = false;
     double tickToX (double tick) const { return plotArea().getX() + (tick - scroll) * pixelsPerTick; }
-    double xToTick (int x) const { return juce::jmax (0.0, (x - plotArea().getX()) / pixelsPerTick + scroll); }
+    double xToTick (double x) const { return juce::jmax (0.0, (x - plotArea().getX()) / pixelsPerTick + scroll); }
     float valueToY (float v) const { return (float) plotArea().getBottom() - v * (float) plotArea().getHeight(); }
     float yToValue (int y) const { return juce::jlimit (0.0f, 1.0f, (float) (plotArea().getBottom() - y) / (float) plotArea().getHeight()); }
 
@@ -873,6 +885,32 @@ float& copiedAutomationValue()
 {
     static float value = -1.0f;
     return value;
+}
+
+AutomationPointMemory& automationPointMemory()
+{
+    static AutomationPointMemory memory;
+    return memory;
+}
+
+void addAutomationModeItems (juce::PopupMenu& menu, int current, bool enabled, std::function<void (int)> pick)
+{
+    // FL's order [RES FLEngine TFruityLoopsMainForm.EEACPointMenu: PtCurve10Menu, 2, 0, 7, 11, 1, 8, 12, 9, 3, 4, 5, 6]
+    static const int order[] = { flcurve::smooth, flcurve::hold, flcurve::singleCurve, flcurve::singleCurve2, flcurve::singleCurve3,
+                                 flcurve::doubleCurve, flcurve::doubleCurve2, flcurve::doubleCurve3, flcurve::halfSine, flcurve::stairs,
+                                 flcurve::smoothStairs, flcurve::pulse, flcurve::wave };
+    menu.addSectionHeader (tr ("Mode"));
+    for (const auto mode : order)
+    {
+        juce::PopupMenu::Item item (tr (flcurve::modeName (mode)));
+        item.setEnabled (enabled);
+        item.setTicked (mode == current);
+        item.setAction ([pick, mode] {
+            automationPointMemory().mode = mode;
+            pick (mode);
+        });
+        menu.addItem (item);
+    }
 }
 
 void typeAutomationPointValue (AudioEngine& engine, int automation, int point)

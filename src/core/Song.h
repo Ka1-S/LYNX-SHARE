@@ -1603,14 +1603,38 @@ enum class ClipKind : std::uint8_t
 
 struct AutomationPoint
 {
+    // LYNX's bend law before round 190bw (x^(2^(3·tension))): the mode of a bent segment loaded from an older project,
+    // so that it plays as it did. Never offered in a menu; bending the segment again makes it a Single curve.
+    static constexpr std::uint8_t legacyCurve = 255;
+
     std::int64_t tick = 0; // from the start of the automation
     float value = 0.5f;    // 0..1
-    float tension = 0.0f;  // curve to the next point: -1..1 (0 = straight)
+    float tension = 0.0f;  // curve to the next point: -1..1 (0 = straight); the opposite sign of FL's tension
+    // FL's curve mode of the segment to the next point (flcurve::Mode: Single curve, Hold, Stairs…; round 190bw). FL
+    // keeps a segment's mode and tension on the point where it ENDS, LYNX on the point where it starts: the .flp
+    // import / export and the point menu shift by one point.
+    std::uint8_t mode = 0;
     bool operator== (const AutomationPoint&) const = default;
 };
 
-// Value of a point list at `tick` (before the first point = first value; after the last = last; tension bends a segment).
+// Value of a point list at `tick` (before the first point = first value; after the last = last; each segment follows
+// its mode and tension, FL's point curve law in core/FlCurve).
 float automationCurveAt (const std::vector<AutomationPoint>& points, double tick) noexcept;
+// The fraction 0..1 of the way from point `segment` to the next one at `x` 0..1 of the segment's time (its mode and
+// tension; Smooth looks at the two neighbouring segments).
+double automationSegmentShape (const std::vector<AutomationPoint>& points, std::size_t segment, double x) noexcept;
+// FL's point menu acts on the segment that ends at a point: the mode shown for point `point` (−1 for the first point,
+// which ends no segment) and its change (the tension stays, as in FL; a legacy bend becomes the new mode's).
+int automationPointMode (const std::vector<AutomationPoint>& points, int point) noexcept;
+void setAutomationPointMode (std::vector<AutomationPoint>& points, int point, int mode) noexcept;
+// Adding and deleting a point the way FL's envelope editor does [DECOMP FLEngine 0xcce3b0, 0xcd3180; round 190bw]:
+// the segment that ENDS at the new point takes `mode` and `tension` (the editor's last used ones; LYNX's tension
+// sign), the rest of the split segment keeps its curve; deleting a point hands the curve of the segment that started
+// at it to the joined segment. Returns the new point's index.
+int insertAutomationPoint (std::vector<AutomationPoint>& points, AutomationPoint p, int mode = 0, float tension = 0.0f);
+void eraseAutomationPoint (std::vector<AutomationPoint>& points, int point);
+// Bending segment `segment` by hand: its tension; an older project's bend becomes a Single curve.
+void setAutomationSegmentTension (std::vector<AutomationPoint>& points, int segment, float tension) noexcept;
 
 // FL's automation clip LFO ("LFO mode", REA round 177b: TACArticulator's TMLFO, .flp event 0xEA after the points;
 // docs/analise/REA_rodada177b.md §LFO). Off: the clip plays its points only. On: a waveform (triangle bent by tension,

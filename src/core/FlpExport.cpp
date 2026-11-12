@@ -1,3 +1,4 @@
+#include "core/FlCurve.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
 #include "core/Fpc.h"
@@ -25,6 +26,13 @@ namespace lynx::flpexport
 {
 namespace
 {
+// FL's curve mode byte of a LYNX segment (an older project's bend, LYNX's own law, goes out as a Single curve with the
+// same tension: the nearest FL shape)
+std::uint8_t flCurveOf (const AutomationPoint& p) noexcept
+{
+    return p.mode < flcurve::modeCount ? p.mode : (std::uint8_t) flcurve::singleCurve;
+}
+
 // ---- small helpers ----
 int iround (double v) noexcept { return (int) std::lround (v); }
 
@@ -1367,7 +1375,8 @@ struct Converter
                 fp.position = (double) pt.tick / ppq;
                 fp.value = std::clamp ((double) (map ? map (pt.value) : pt.value), 0.0, 1.0);
                 // FL's curve sits on the segment ending at the point (FlpImport: previous.tension = −p.tension)
-                fp.tension = i > 0 ? -src.points[i - 1].tension : 0.0f;
+                fp.tension = i > 0 ? 0.0f - src.points[i - 1].tension : 0.0f; // (0 − t: a straight segment writes +0)
+                fp.curve = i > 0 ? flCurveOf (src.points[i - 1]) : (std::uint8_t) 0;
                 c.automation.push_back (fp);
             }
             if (c.automation.empty())
@@ -1398,7 +1407,7 @@ struct Converter
                 f.points.clear();
                 for (std::size_t i = 0; i < lfo.amp.size(); ++i)
                     f.points.push_back ({ (double) lfo.amp[i].tick / ppq, (double) std::clamp (lfo.amp[i].value, 0.0f, 1.0f),
-                                          i > 0 ? -lfo.amp[i - 1].tension : 0.0f, 0 });
+                                          i > 0 ? 0.0f - lfo.amp[i - 1].tension : 0.0f, i > 0 ? flCurveOf (lfo.amp[i - 1]) : (std::uint8_t) 0 });
                 if (lfo.amp == lfo.fl.rawAmp && lfo.fl.rawPoints.size() == lfo.amp.size() * 24)
                     f.rawPoints = lfo.fl.rawPoints; // unchanged since the import: its records byte for byte
             }

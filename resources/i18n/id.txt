@@ -8280,7 +8280,6 @@ countries: id
 "Deactivate input {0}" = "Nonaktifkan input {0}"
 "Activate input {0}" = "Aktifkan input {0}"
 "Input {0}" = "Input {0}"
-# Round 183c: Racks
 "Add chain" = "Tambah rantai"
 "Audio Effect Rack" = "Rak efek audio"
 "Chain Pan" = "Pan rantai"
@@ -8368,6 +8367,7 @@ countries: id
 # --- Detach all new plugins (issue #116, round 188a)
 "Detach all new plugins" = "Lepaskan semua plugin baru"
 "On: the window of a plugin you add opens detached, on top of the panels. Off: it opens docked in the desktop, behind a panel you click. Each plugin's window menu › Detached changes it for that plugin" = "Aktif: jendela plugin yang ditambahkan terbuka terlepas, di atas panel. Nonaktif: terbuka tertambat di desktop, di belakang panel yang diklik. Menu jendela setiap plugin › Terlepas mengubahnya untuk plugin itu"
+
 # --- Export for other apps (round 184a, S9)
 "For other apps..." = "Untuk aplikasi lain..."
 "Export for other apps" = "Ekspor untuk aplikasi lain"
@@ -8736,7 +8736,6 @@ countries: id
 "A game controller plays the transport and can be linked to any control like a MIDI controller. Also on the MIDI page." = "Pengontrol game menjalankan transport dan dapat ditautkan ke kontrol apa pun seperti pengontrol MIDI. Juga ada di halaman MIDI."
 "LYNX's own improvements. All of them are off by default, so LYNX SHARE looks and behaves like FL Studio until you switch one on. Each switch is the same setting as in the place its line names." = "Penyempurnaan milik LYNX sendiri. Semuanya mati secara bawaan, sehingga LYNX SHARE tampil dan bekerja seperti FL Studio sampai Anda menyalakan salah satunya. Setiap sakelar adalah pengaturan yang sama dengan yang ada di tempat yang disebut barisnya."
 "LYNX extras..." = "Ekstra LYNX..."
-
 "Search your plugins" = "Cari di plugin Anda"
 "Nothing is shared." = "Tidak ada yang dibagikan."
 "{0} shared with the session" = "{0} dibagikan ke sesi"
@@ -8842,10 +8841,6 @@ countries: id
 "{0} min ago" = "{0} mnt lalu"
 "{0} h ago" = "{0} jam lalu"
 "{0} d ago" = "{0} hari lalu"
-
-# --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"
 "Find similar samples" = "Cari sampel serupa"
 "Similar to {0}" = "Serupa dengan {0}"
 "Listening to \"{0}\"..." = "Mendengarkan \"{0}\"..."
@@ -8883,7 +8878,6 @@ countries: id
 "Channel 2" = "Kanal 2"
 "Channels 2-{0}" = "Kanal 2-{0}"
 "MPE member channels (lower zone): the MIDI channels that carry one note each" = "Kanal anggota MPE (zona bawah): kanal MIDI yang masing-masing membawa satu not"
-# round 190bb (LYNX Tune: Breathiness, issue #103)
 "BREATH" = "NAPAS"
 "Motion blending" = "Pembauran gerakan"
 "Load sprite sheet..." = "Muat lembar sprite..."
@@ -8918,3 +8912,14 @@ countries: id
 "Levelling: holds the level at a threshold under the ceiling with a slow attack, the ceiling catches the rest (off by default)" = "Perataan level: menahan level pada ambang di bawah batas atas dengan attack lambat, batas atas menangkap sisanya (mati secara default)"
 "Levelling threshold: the level held under the ceiling (Off: no levelling)" = "Ambang perataan: level yang ditahan di bawah batas atas (Off: tanpa perataan)"
 "Levelling attack: how much of a transient passes before the level is held" = "Attack perataan: seberapa banyak transien yang lewat sebelum level ditahan"
+"Preserve start times" = "Pertahankan waktu mulai"
+"Key / scale restriction" = "Pembatasan kunci / tangga nada"
+"Above" = "Di atas"
+"Under" = "Di bawah"
+"Keyboard range / transpose" = "Rentang keyboard / transposisi"
+"Wrap to top / bottom" = "Lipat ke atas / bawah"
+"{0} steps" = "{0} langkah"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"

@@ -152,6 +152,47 @@ struct Control
     juce::StringArray choices;
     juce::String initialText;
     std::function<void()> onChange; // runs before the preview (presets that set other controls)
+    // a slider's right-click menu of fixed values (FL's wheel popup menus, e.g. the LFO tool's SpeedWheelMenu)
+    std::vector<std::pair<juce::String, double>> presets;
+};
+
+// A slider whose right-click opens a menu of fixed values (round 190bw).
+class PresetSlider final : public juce::Slider
+{
+public:
+    using juce::Slider::Slider;
+    std::vector<std::pair<juce::String, double>> presets;
+
+    juce::PopupMenu presetMenu()
+    {
+        juce::PopupMenu menu;
+        for (const auto& [text, v] : presets)
+            menu.addItem (text, [safe = juce::Component::SafePointer<PresetSlider> (this), v = v] {
+                if (safe != nullptr)
+                    safe->setValue (v, juce::sendNotificationSync);
+            });
+        return menu;
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (e.mods.isPopupMenu() && ! presets.empty())
+        {
+            presetMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
+            return;
+        }
+        juce::Slider::mouseDown (e);
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        if (! (e.mods.isPopupMenu() && ! presets.empty()))
+            juce::Slider::mouseDrag (e);
+    }
+    void mouseUp (const juce::MouseEvent& e) override
+    {
+        if (! (e.mods.isPopupMenu() && ! presets.empty()))
+            juce::Slider::mouseUp (e);
+    }
 };
 
 class NoteToolPanel final : public juce::Component
@@ -284,7 +325,8 @@ private:
 
         if (c.kind == Control::slider)
         {
-            auto s = std::make_unique<juce::Slider> (juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight);
+            auto s = std::make_unique<PresetSlider> (juce::Slider::LinearHorizontal, juce::Slider::TextBoxRight);
+            s->presets = c.presets;
             s->setTextBoxStyle (juce::Slider::TextBoxRight, false, 78, 20);
             s->setRange (c.minimum, c.maximum, c.interval);
             s->setValue (c.initial, juce::dontSendNotification);
@@ -445,6 +487,7 @@ private:
             case NoteTool::flip:
                 add ({ Control::toggle, tr ("Flip in time"), 0, 1, 1, 1 });
                 add ({ Control::toggle, tr ("Flip in pitch"), 0, 1, 1, 0 });
+                add ({ Control::toggle, tr ("Preserve start times"), 0, 1, 1, 0 });
                 break;
             case NoteTool::randomise:
                 add ({ Control::slider, tr ("Velocity"), 0.0, 1.0, 0.01, 0.2, percent });
@@ -453,18 +496,47 @@ private:
                 add ({ Control::slider, tr ("Timing"), 0.0, 0.5, 0.01, 0.0, steps });
                 add ({ Control::slider, tr ("Length"), 0.0, 1.0, 0.01, 0.0, percent });
                 add ({ Control::toggle, tr ("Both directions"), 0, 1, 1, 1 });
+                // FL's randomizer also has strengths for Mod X, Mod Y and Release (round 190bw)
+                add ({ Control::slider, tr ("Mod X"), 0.0, 1.0, 0.01, 0.0, percent });
+                add ({ Control::slider, tr ("Mod Y"), 0.0, 1.0, 0.01, 0.0, percent });
+                add ({ Control::slider, tr ("Release"), 0.0, 1.0, 0.01, 0.0, percent });
                 break;
             case NoteTool::scaleLevels:
                 add ({ Control::choice, tr ("Level"), 0, (double) notetools::levelCount - 1, 1, 0, {}, levelNames() });
-                add ({ Control::slider, tr ("Scale at the start"), 0.0, 2.0, 0.01, 1.0, percent });
-                add ({ Control::slider, tr ("Scale at the end"), 0.0, 2.0, 0.01, 1.0, percent });
+                add ({ Control::slider, tr ("Scale at the start"), -2.0, 2.0, 0.01, 1.0, percent }); // FL's Multiply: -200 % ... 200 %
+                add ({ Control::slider, tr ("Scale at the end"), -2.0, 2.0, 0.01, 1.0, percent });
                 add ({ Control::slider, tr ("Offset"), -1.0, 1.0, 0.01, 0.0, signedPercent });
+                // FL's level scaling: Center (the value the scaling turns around) and Tension (bends the distance
+                // from the centre). FL's Center starts at 0 for every level; LYNX starts it on the centre line for
+                // pan and fine pitch, which is how this tool always scaled them.
+                add ({ Control::slider, tr ("Center"), 0.0, 1.0, 0.01, 0.0, percent });
+                add ({ Control::slider, tr ("Tension"), -1.0, 1.0, 0.01, 0.0, signedPercent });
+                controls[0].onChange = [this] {
+                    setValue (4, notetools::levelIsBipolar ((notetools::Level) intValue (0)) ? 0.5 : 0.0);
+                };
                 break;
             case NoteTool::limit:
                 add ({ Control::slider, tr ("Lowest note"), 0.0, 127.0, 1.0, 36.0, [] (double v) { return keyName (juce::roundToInt (v)); } });
                 add ({ Control::slider, tr ("Highest note"), 0.0, 127.0, 1.0, 84.0, [] (double v) { return keyName (juce::roundToInt (v)); } });
                 add ({ Control::slider, tr ("Lowest velocity"), 0.0, 1.0, 0.01, 0.0, percent });
                 add ({ Control::slider, tr ("Highest velocity"), 0.0, 1.0, 0.01, 1.0, percent });
+                // FL's limiter / transposer: "Key / scale restriction" (base key, scale, Snap) and "Keyboard range /
+                // transpose" (Wrap to top / bottom, the transposition FL sets with the keyboard's marked key)
+                add ({ Control::header, tr ("Key / scale restriction") });
+                add ({ Control::choice, tr ("Base key"), 0, 11, 1, 0, {}, pitchClassNames() });
+                {
+                    juce::StringArray scaleNames { tr ("(none)") };
+                    for (std::size_t s = 1; s < notetools::scales().size(); ++s)
+                        scaleNames.add (tr (notetools::scales()[s].name));
+                    add ({ Control::choice, tr ("Scale"), 0, (double) scaleNames.size() - 1, 1, 0, {}, scaleNames });
+                }
+                add ({ Control::choice, tr ("Snap"), 0, 2, 1, 0, {}, { tr ("Above"), tr ("Under"), tr ("Alternate") } });
+                add ({ Control::header, tr ("Keyboard range / transpose") });
+                add ({ Control::toggle, tr ("Wrap to top / bottom"), 0, 1, 1, 0 });
+                add ({ Control::slider, tr ("Transpose"), -48.0, 48.0, 1.0, 0.0, [] (double v) {
+                    const auto n = juce::roundToInt (v);
+                    return (n > 0 ? "+" : "") + juce::String (n);
+                } });
                 break;
 
             case NoteTool::quantize:
@@ -526,12 +598,17 @@ private:
                 header (tr ("Start"));
                 add ({ Control::slider, tr ("Value"), 0.0, 1.0, 0.01, 0.5, percent });
                 add ({ Control::slider, tr ("Range"), -1.0, 1.0, 0.01, 0.25, signedPercent });
-                add ({ Control::slider, tr ("Period"), 0.0, 40960.0, 1.0, 20480.0, speed });
+                // FL's SpeedWheelMenu on both speed wheels [RES FLEngine TPRLFOForm: "1 step" … "512 steps", tags 9 … 0;
+                // DECOMP 0xde93e0: wheel = tag × maximum / 10 = tag × 4096, a period of 2^(9 − tag) steps]
+                Control period { Control::slider, tr ("Period"), 0.0, 40960.0, 1.0, 20480.0, speed };
+                for (int tag = 9; tag >= 0; --tag)
+                    period.presets.push_back ({ tag == 9 ? tr ("1 step") : tr ("{0} steps", { juce::String (1 << (9 - tag)) }), 40960.0 - 4096.0 * tag });
+                add (period);
                 header (tr ("End"));
                 add ({ Control::toggle, tr ("Change toward the end"), 0, 1, 1, 0 });
                 add ({ Control::slider, tr ("Value"), 0.0, 1.0, 0.01, 0.5, percent });
                 add ({ Control::slider, tr ("Range"), -1.0, 1.0, 0.01, 0.25, signedPercent });
-                add ({ Control::slider, tr ("Period"), 0.0, 40960.0, 1.0, 20480.0, speed });
+                add (period);
                 add ({ Control::toggle, tr ("Logarithmic speed change"), 0, 1, 1, 0 });
                 break;
             }
@@ -731,7 +808,7 @@ private:
                 break;
             }
             case NoteTool::flip:
-                flip (p, indices, on (0), on (1));
+                flip (p, indices, on (0), on (1), on (2));
                 break;
             case NoteTool::randomise:
             {
@@ -742,12 +819,16 @@ private:
                 o.timing = (std::int64_t) std::llround (value (3) * ticksPerStep);
                 o.length = (float) value (4);
                 o.bipolar = on (5);
+                o.modX = (float) value (6);
+                o.modY = (float) value (7);
+                o.release = (float) value (8);
                 o.seed = seed;
                 randomise (p, indices, o);
                 break;
             }
             case NoteTool::scaleLevels:
-                scaleLevels (p, indices, (Level) intValue (0), (float) value (1), (float) value (2), (float) value (3));
+                scaleLevels (p, indices, (Level) intValue (0), (float) value (1), (float) value (2), (float) value (3),
+                             (float) value (4), (float) value (5));
                 break;
             case NoteTool::limit:
             {
@@ -756,6 +837,11 @@ private:
                 o.highKey = intValue (1);
                 o.minVelocity = (float) value (2);
                 o.maxVelocity = (float) value (3);
+                o.root = intValue (5);
+                o.scale = intValue (6);
+                o.snap = intValue (7);
+                o.wrap = on (9);
+                o.transpose = intValue (10);
                 limit (p, indices, o);
                 break;
             }
@@ -1142,6 +1228,18 @@ bool noteToolGenerates (NoteTool tool) noexcept
 std::unique_ptr<juce::Component> makeNoteToolPanel (AudioEngine& engine, NoteTool tool, std::vector<int> indices, std::int64_t grid)
 {
     return std::make_unique<NoteToolPanel> (engine, tool, std::move (indices), grid);
+}
+
+juce::PopupMenu noteToolPresetMenuForSnapshot (juce::Component& panel)
+{
+    for (auto* child : panel.getChildren())
+    {
+        if (auto* slider = dynamic_cast<PresetSlider*> (child); slider != nullptr && ! slider->presets.empty())
+            return slider->presetMenu();
+        if (auto menu = noteToolPresetMenuForSnapshot (*child); menu.getNumItems() > 0)
+            return menu;
+    }
+    return {};
 }
 
 void showNoteTool (AudioEngine& engine, NoteTool tool, std::vector<int> indices, std::int64_t grid, std::function<void()> onFinished)

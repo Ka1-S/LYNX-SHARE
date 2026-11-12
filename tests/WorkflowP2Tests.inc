@@ -197,9 +197,10 @@ TEST (p2_scale_levels_and_limit)
     CHECK (q.notes[0].key == 54 && q.notes[1].key == 64 && q.notes[2].key == 60); // moved by octaves (pitch class kept)
     CHECK (q.notes[0].velocity == 0.2f && q.notes[1].velocity == 0.9f && q.notes[2].velocity == 0.5f);
     o.lowKey = 60;
-    o.highKey = 64; // narrower than an octave: clamped
+    o.highKey = 64; // narrower than an octave: moved by octaves as far as needed, then clamped (FL's law, round 190bw:
+                    // 54 goes one octave up to 66 and is clamped to the top)
     limit (q, p2test::all (q), o);
-    CHECK (q.notes[0].key == 60 && q.notes[1].key == 64);
+    CHECK (q.notes[0].key == 64 && q.notes[1].key == 64);
 }
 
 TEST (p2_euclidean_and_fill)

@@ -1,3 +1,4 @@
+#include "core/FlCurve.h"
 #include "core/FlpImport.h"
 #include "core/FruityDance.h"
 #include "core/FlpExport.h"
@@ -3575,6 +3576,12 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         }
     }
 
+    // an FL point's curve (the segment that ends at it) onto LYNX's point where that segment starts
+    const auto flCurveOnto = [] (AutomationPoint& previous, const flp::AutomationPoint& p) {
+        previous.mode = p.curve < flcurve::modeCount ? p.curve : (std::uint8_t) flcurve::singleCurve;
+        previous.tension = std::isfinite (p.tension) ? std::clamp (0.0f - p.tension, -1.0f, 1.0f) : 0.0f;
+    };
+
     // Automation clips: one Automation per FL automation channel, with the target from the 0xE3 link.
     std::map<int, int> automationMap; // FL channel -> index into song.automations
 
@@ -3615,16 +3622,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             else if (valueMap)
                 value = std::clamp (valueMap (value), 0.0f, 1.0f);
 
-            // FL's curve belongs to the segment ending at the point; ours sits on the left point
+            // FL's curve mode and tension belong to the segment ending at the point; ours sit on the left point, the
+            // tension with the opposite sign (round 190bw: every mode, played by FL's own law)
             if (i > 0)
-            {
-                auto& previous = a.points.back();
-
-                if (p.curve == 0 || p.curve == 1) // single/double curve: exponential by tension
-                    previous.tension = std::clamp (-p.tension, -1.0f, 1.0f);
-                else if (p.curve == 2 && tick - previous.tick > 1) // hold: step right before the point
-                    a.points.push_back ({ tick - 1, previous.value, 0.0f });
-            }
+                flCurveOnto (a.points.back(), p);
 
             a.points.push_back ({ tick, value, 0.0f });
         }
@@ -3649,13 +3650,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 const auto& p = f.points[i];
                 const auto tick = (std::int64_t) std::llround (p.position * ppq);
                 if (i > 0)
-                {
-                    auto& previous = lfo.amp.back();
-                    if (p.curve == 0 || p.curve == 1)
-                        previous.tension = std::clamp (-p.tension, -1.0f, 1.0f);
-                    else if (p.curve == 2 && tick - previous.tick > 1)
-                        lfo.amp.push_back ({ tick - 1, previous.value, 0.0f });
-                }
+                    flCurveOnto (lfo.amp.back(), p);
                 lfo.amp.push_back ({ tick, (float) std::clamp (p.value, 0.0, 1.0), 0.0f });
             }
             if (lfo.amp.empty())
