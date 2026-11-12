@@ -539,8 +539,8 @@ Automation lanes on a generator's parameters (their names in §7.1, values the m
 LYNX has keeps FLM's values, so a lane becomes LYNX automation of the same value — Pocket SuperSaw (FLM k → k − 1),
 MiniSynth's FLM build (FLM k → desktop k − 1; MW Dest folded as on import), GMSynth (FLM) (P[k]), Transistor Bass
 (the 13 knobs through the import's map). Enable lanes drive the channel's volume (on / silent): approximate, as
-FLM freezes the module's voices while LYNX's run on silently. The sample projects hold 22 such lanes: MiniSynth FLT
-Freq (13) and AMP Rel, SuperSaw Filter Cutoff, Transpose and Enable, GMSynth Transpose, DW Sampler Pitch.
+FLM freezes the module's voices while LYNX's run on silently. The sample projects hold 19 such lanes: MiniSynth FLT
+Freq (9) and AMP Rel, SuperSaw Filter Cutoff, Transpose and Enable (2), GMSynth Transpose (2), DW Sampler Pitch (3).
 
 The rack's Pitch Bend (module 0, parameter 4; its held value and its lanes, PROVEN-REA 0x18059e0c0) is not one law:
 the rack hands b = 4v − 2 to every module's bend input and plays its drum slots at 2^b (±24 semitones). The modules
