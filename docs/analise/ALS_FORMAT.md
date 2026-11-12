@@ -182,7 +182,7 @@ PluginDevice{ IsExpanded, BreakoutIsExpanded, On{Manual, AutomationTarget, MidiC
 | Session clips / Scenes | the clip grid (round 181c, section 13; the default by the user's choice of 2026-11-08); Settings › General › Workflow can put them on the Playlist after the arrangement instead, one section per scene (a marker per scene) |
 | Volume/Pan/Send/plugin-param automation | automation clips on the matching target |
 | PluginDevice | `PluginRef.foreign` (vst2 id / vst3 class id + state), resolved like an .flp's plugins |
-| Native devices | closest LYNX engine (slice N3 table), otherwise dropped and listed in the import report |
+| Native devices | the LYNX engine in the same role with its settings translated (slice N3, section 14: Simpler, Sampler zones, Drum Rack pads, racks, EQ Eight, Compressor, Glue Compressor, Utility, Reverb); every other device is dropped and listed in the import report |
 
 ## 9. What Live's loader requires (found by experiment, 2026-11-06) [LIVE]
 Live crashes on a set that is merely well-formed. It either exits or shows "A serious program error". A set written by another program must follow these rules:
@@ -295,3 +295,28 @@ Export:
 - Session clips have `Time` 0, the clip span as the loop region (`LoopOn` = the slot's Loop) and the slot's launch settings and follow actions. An empty slot without its LYNX stop button gets `HasStop` false (MIDI tracks use their channel's Playlist track).
 - Scenes: name, colour, tempo and n/4 time signature with their enable flags; `GlobalQuantisation` = grid quantisation − 1.
 - A song whose grid has clips but no Playlist clips exports no arrangement clip (the current-pattern fallback is for songs with neither).
+
+## 14. Live's own devices → LYNX's own (slice N3, round 190bq, 2026-11-11)
+Code: `src/core/AlsDevices.{h,cpp}` (the laws, one function per device) and `AlsImport.cpp` (`nativeEffectFrom`, the Simpler branch of `instrumentFrom`). Tests: `tests/AlsDevices190bqTests.inc`. Sources: the device elements of the 19 sets Live 12.4 ships (181 EQ Eight, 149 Compressor, 24 Glue Compressor, 38 Utility, 98 Reverb, 330 Simpler) [DATA], each parameter's own range in `MidiControllerRange` [DATA], Ableton's manual from memory [DOC]. Live was not run and its binary was not read in this round, so every statement about how Live *sounds* is [ASSUMED] until an A/B in Live; the list is in round 190bq's handoff and as [ASSUMED] tags in `AlsDevices.h` / `.cpp`.
+
+A device parameter is `<Name><Manual Value="…"/>…</Name>`; switches are `true` / `false`; enumerations are indices.
+
+| Live device (tag) | LYNX | Translated | Listed in the report |
+|---|---|---|---|
+| EQ Eight (`Eq8`) | Facet EQ | per band (curve A): on, type, frequency, gain, Q; Scale; output gain; L/R and M/S modes (curve B → right / side bands) | Adaptive Q, 48 dB/oct corner shape, a ninth band in L/R or M/S, Q beyond Facet's range |
+| Compressor (`Compressor2`) | Crest Compressor, Clean style | threshold, ratio (inf : 1 = Crest's limit), attack, release, auto release, knee, look-ahead, output gain, makeup switch, dry/wet, side-chain input track + gain + EQ + listen | RMS detection, values outside Crest's ranges, linear release, side-chain tap point, side-chain dry/wet; Expand mode is not translated (device dropped and listed) |
+| Glue Compressor (`GlueCompressor`) | Crest Compressor, Bus style | threshold, ratio 2 / 4 / 10, attack and release steps, Auto release, range, makeup, dry/wet, oversampling, side chain | Soft clip |
+| Utility (`StereoGain`) | Utility | gain, mute, phase L / R, channel mode, Mono, width, mid/side balance, balance | exact: gain within ±24 dB, mute, phase, channel mode, Mono, width 0 % / 100 %; approximated: balance, other widths, gain beyond ±24 dB; not applied: Bass Mono, DC filter |
+| Reverb (`Reverb`) | Atrium | dry/wet, predelay, decay, size, input filter → low / high cut, Reflect / Diffuse → early/late, Chorus → late modulation, Spin → early modulation, shelves → bass / high decay multipliers, density → diffusion | Freeze, Stereo, Shape, Scale |
+| Simpler (`OriginalSimpler`) | Sampler channel | (besides zones and volume envelope) transpose, volume, pan, filter type / frequency / resonance, filter and pitch envelopes, LFO → volume / pan / cutoff, voices, glide, One-Shot fades and Gate, Classic loop and region, Slice mode (stored points, by region), Warp (one tempo) | filter slope / circuit / drive / key tracking, velocity sensitivity, LFO → pitch, synced LFO rate, Spread, random pan, loop crossfade |
+
+Laws that carry a unit conversion:
+- **EQ Eight Q → Facet Q** (Facet's prototypes, `MEASURE_fabfilter.md` §1): bell and notch `√2·Q`; 12 dB cuts `Q/0.7071`; shelves `(Q/0.7071)^(1/0.4697)`; 48 dB cuts `√2·Q⁴` with Facet's 48 dB slope (Live's "x4" taken as four equal 12 dB sections: the same level at the cut frequency and the same stop-band line). Mode order 0…7 = low cut 48, low cut 12, low shelf, bell, notch, high shelf, high cut 12, high cut 48. Scale −200…200 % → Facet's 0…200 % with the gains turned over when negative.
+- **Compressor**: Threshold is a linear gain (0.000316…1.995) → dB; Ratio's largest float = inf : 1; times in ms; look-ahead index 0 / 1 / 2 = 0 / 1 / 10 ms; side chain `AudioIn/Track.<id>/<tap>` → `EffectSlot::sidechain` = that track's insert.
+- **Glue**: attack index → 0.01 / 0.1 / 0.3 / 1 / 3 / 10 / 30 ms; release index → 0.1 / 0.2 / 0.4 / 0.6 / 0.8 / 1.2 s, 6 = Auto; ratio index → 2 / 4 / 10; Range 70 dB = no limit.
+- **Utility**: `out = gain · W · A · in`, A = phase switches then channel mode (0 Left, 1 Stereo, 2 Right, 3 Swap), W = Mono or `M ± width·S` with M = (L+R)/2, S = (L−R)/2.
+- **Simpler**: voices index 0…14 → 1…8, 10, 12, 14, 16, 20, 24, 32; envelope times ms → s; filter-envelope amount semitones → octaves; a Slice-mode Simpler plays its first slice on C1 in Live and on key 60 in LYNX, so its notes move up 24 keys on import.
+
+Drum Rack pads keep the pad Simpler's sample, tuning, volume and pan only (one report line). A device element without its parameters (another Live version, a stub) is not translated and is dropped and listed as before. Macro mappings and automation onto a converted device's parameters are not carried over (one report line for macros).
+
+**Export:** no Live-native device is written yet. `alsdev::liveUtilityOf` gives a LYNX Utility's exact Live settings (gain / mute / phase / channel mode / Mono, balance centred) and is tested, but a new device kind needs a skeleton and a load test in Live (§9), which this round could not run.
