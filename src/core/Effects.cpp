@@ -4223,6 +4223,22 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // (round 124) keeps the shelf + exciter it was set up with
     if (slot.kind == EffectKind::aether && savedCount <= (std::size_t) mixsuite::aether::dynamic)
         slot.params[(std::size_t) mixsuite::aether::dynamic] = 0.0f;
+    // round 190bz: a LYNX reverb saved before the 0.1.27 engine law (per-band decay, tone corrector, onset network)
+    // keeps the classic engine, bit for bit
+    {
+        int law = -1;
+        switch (slot.kind)
+        {
+            case EffectKind::epochVerb: law = verbs::epoch::engineLaw; break;
+            case EffectKind::atrium: law = verbs::atrium::engineLaw; break;
+            case EffectKind::foilPlate: law = verbs::foil::engineLaw; break;
+            case EffectKind::halo: law = verbs::halo::engineLaw; break;
+            case EffectKind::horizon: law = verbs::horizon::engineLaw; break;
+            default: break;
+        }
+        if (law >= 0 && savedCount <= (std::size_t) law)
+            slot.params[(std::size_t) law] = 0.0f;
+    }
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)
         slot.params[18] = 0.0f;

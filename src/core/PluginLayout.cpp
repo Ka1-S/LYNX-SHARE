@@ -3287,6 +3287,9 @@ Layout epochVerbLayout()
                              TR_NOOP ("Concert Hall|Plate|Room|Chamber|Random Space|Chorus Space|Ambience|Bright Hall|Nave|Grit Hall|Grit Plate|Smooth Plate|Smooth Room|Smooth Space|Gated|Drift Chamber|Drift Hall|Drift Space|Cathedral|Grand Hall|Vintage Chamber|Vintage Hall")));
     v.push_back (label (290, 264, 52, 24, TR_NOOP ("Color"), alignLeft));
     v.push_back (choiceMenu (342, 264, 120, 24, "Color", TR_NOOP ("Color"), TR_NOOP ("1970s|1980s|Now")));
+    // round 190bz: the engine law (Measured = the 0.1.27 law, the default of new instances; Classic = the engine of
+    // projects saved before it)
+    v.push_back (tabs (630, 265, 158, 22, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys));
     return l;
 }
 
@@ -3329,6 +3332,9 @@ Layout atriumLayout()
     v.push_back (label (8, 264, 92, 24, TR_NOOP ("Reverb mode"), alignLeft));
     v.push_back (choiceMenu (102, 264, 200, 24, "Type", TR_NOOP ("Type"),
                              TR_NOOP ("Large Room|Medium Room|Bright Room|Large Chamber|Dark Room|Dark Chamber|Dark Space|Deep Space|Mirror Space|Vast Space|Distant Space|Dense Room")));
+    // round 190bz: the engine law (Measured = the 0.1.27 law, the default of new instances; Classic = the engine of
+    // projects saved before it)
+    v.push_back (tabs (474, 265, 158, 22, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys));
     return l;
 }
 
@@ -3375,6 +3381,9 @@ Layout foilPlateLayout()
     plate (dial (556, 176, 44, "Mix", TR_NOOP ("Mix")));
     plate (toggle (24, 222, 150, 22, "Voicing", TR_NOOP ("Measured plate")));
     v.push_back (tabs (560, 292, 150, 20, "View", TR_NOOP ("Full|Plate")));
+    // round 190bz: the engine law (Measured = the 0.1.27 law, the default of new instances; Classic = the engine of
+    // projects saved before it)
+    v.push_back (tabs (60, 292, 150, 20, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys));
     return l;
 }
 
@@ -3443,6 +3452,9 @@ Layout haloLayout()
     auto color = choiceMenu (594, 216, 100, 28, "Color", TR_NOOP ("Color"), TR_NOOP ("Bright|Dark"));
     color.style = plugui::plainMenu;
     v.push_back (color);
+    // round 190bz: the engine law (Measured = the 0.1.27 law, the default of new instances; Classic = the engine of
+    // projects saved before it)
+    v.push_back (tabs (540, 246, 154, 14, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys));
     return l;
 }
 
@@ -3494,6 +3506,9 @@ Layout horizonLayout()
     v.push_back (choiceMenu (522, 264, 150, 24, "Reverb mode", TR_NOOP ("Reverb mode"), TR_NOOP ("Room|Chamber|Plate|Hall|Cathedral|Space|Freeze|Gated")));
     v.push_back (label (752, 264, 52, 24, TR_NOOP ("Color"), alignLeft));
     v.push_back (choiceMenu (806, 264, 166, 24, "Color", TR_NOOP ("Color"), TR_NOOP ("Bright|Neutral|Dark|Studio")));
+    // round 190bz: the engine law (Measured = the 0.1.27 law, the default of new instances; Classic = the engine of
+    // projects saved before it)
+    v.push_back (tabs (272, 265, 148, 22, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys));
     return l;
 }
 

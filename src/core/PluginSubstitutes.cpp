@@ -609,7 +609,7 @@ product = reverbs (LiquidSonics Lustrous Plates / Seventh Heaven / Cinematic Roo
 vendor = Complete Access (role)
 lynx = Foil Plate
 names = Lustrous Plates; Seventh Heaven; Seventh Heaven Professional; Cinematic Rooms; Cinematic Rooms Professional; Illusion; VerbSuite Classics; SSL Native FlexVerb; SSL PlateVerb; SSL SpringVerb; SSL GateVerb; smartreverb2; smartreverb; pureverb; learnreverb; Vocal Reverb
-preset = Decay=0.3; Mix=1
+preset = Decay=0.3; Mix=1; Law=0
 mix = 0.25
 # round 190ca: four of these devices at their own default setting, from Foil setting maps fitted on physical measurements of
 # each device's probe renders (decay per band, onset, dry gain, wet energy and band balance, echo density, L/R correlation,

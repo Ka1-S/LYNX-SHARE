@@ -87,7 +87,7 @@ TEST (foil_plate_view_round152)
     using namespace lynx;
     // round 152: Foil Plate's appended View (Full | Plate): the Plate view is the Little Plate role's one-knob panel
     const auto& info = effectInfo (EffectKind::foilPlate);
-    CHECK (info.params.size() == 16 && std::string (info.params[15].name) == "View" && info.params[15].defaultValue == 0.0f);
+    CHECK (info.params.size() == 17 && std::string (info.params[15].name) == "View" && info.params[15].defaultValue == 0.0f); // (16: Law, round 190bz)
     CHECK (formatEffectParam (EffectKind::foilPlate, 15, 1.0f, 120.0) == "Plate" && formatEffectParam (EffectKind::foilPlate, 15, 0.0f, 120.0) == "Full");
     const auto& l = plugui::layoutFor (EffectKind::foilPlate);
     for (const float view : { 0.0f, 1.0f })

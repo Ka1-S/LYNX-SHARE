@@ -2880,3 +2880,57 @@ in a slot mode: one editor, no fork.
 | Select menu: before / after selection, zoomed part, previous / next region; Zoom on left / right of selection | same commands in every audio editor window | ✅ | |
 | Regions: Rename all..., Set info..., Clone as region | same | ✅ | Quick rename all, Auto rename all, trigger-note assignment: left out (flows not established) |
 | View: regions / markers / loop switch, noise threshold mark | View menu switches "Regions", "Loop", "Noise threshold mark" | ⚠️ | menu items, not FL's toolbar buttons |
+
+## Round 190bz: the measured engine law of the reverbs (R1, R4, R5; new instances only)
+
+The 8-line network of `core/LynxVerbs.cpp` (Epoch Verb, Atrium, Foil Plate, Halo, Horizon) has a second engine law.
+Each of the five effects got an appended parameter **Law** (Classic | Measured, default Measured): a project saved
+before this round ends one parameter short, so `upgradeLoadedEffectParams` loads it as Classic and it renders bit for
+bit as before (135 of 135 bank renders byte-identical to the base commit with Law = Classic, 44.1 / 48 / 96 kHz
+included; ten render hashes in `tests/Reverb190bzTests.inc`). Nebula keeps its one engine (its port is a round of its
+own); LuxeVerb runs on its own 16-line engine (`core/SpaceVerb.h`) and is not touched.
+
+What the Measured law adds (law 1 in `verbs::Settings`, all neutral unless a mode's table says otherwise):
+
+| Part | What | Plan item |
+|---|---|---|
+| Per-band decay | the three-band absorption is replaced by six first-order shelves + a gain per line, fitted (least squares) so the loss per pass at eight octave bands is the classic law's divided by a per-band multiplier (`bandRtMult`); the T60 per band follows `verbs::bandTargets` within 10 % on the test rows (125 Hz … 8 kHz at 44.1 / 48 / 96 kHz); line lengths are whole samples, so a still line is read without interpolation loss | R1 |
+| Tone corrector | an eight-band proportional equaliser after the loop (`bandDb`, gains solved through the bands' interaction) + three optional narrow bells | R1 |
+| Onset | a three-step diffusion network (delay, polarity, 4-point mix per step: 64 arrivals inside `onsetSec`) beside the tank, at the input's energy per unit level | R4 |
+| Density | the mixing angle inside the halves (`mixAngle` × 45°; 1 = the classic Hadamard) | R2 / R7 |
+| Modulation | `mod` scales the delay modulation per mode; `matrixModDepth` swings the rotations of the mixing matrix (orthogonal at any depth), which moves low and mid bands as well | R5 |
+| Wet level | `gainDb` per mode | level laws |
+
+Fitted with `scripts/taillab.py` against the black-box reference renders of bank tp172d (closed loop on the lab's
+signed differences: T30 per band, band spectra of impulse and programme, level, onset level by grid). Tables
+`epochLaw` (Concert Hall, Room), `atriumLaw` (Large Room, Bright Room), `foilLaw` (Silver, Pewter), `foilMeasuredLaw`
+(the measured plate voicing at 1 / 3 / 10 s decay, blended on the decay's logarithm), `haloLaw`, `horizonLaw`
+(Chamber). Every other mode runs the new loop with neutral numbers (decay per band and level within the classic
+law's; test `reverb190bz_unfitted_modes_stay_close_to_the_classic_law`).
+
+Rows (wave | tail, base d141370db + 190bp → this round; the lab's anchors: a reference against its own second
+recording 9.57 median, other settings of the same reference 5.80, unrelated references 3.83):
+
+| Row | Wave | Tail | Per setting (tail) |
+|---|---|---|---|
+| Epoch Verb | 3.07 → 3.73 | 6.82 → **7.99** | D 7.65 → 8.20, S1 6.16 → 7.12, S2 4.82 → 7.95, S3 7.44 → 8.49, S4 8.00 → 8.17 |
+| Atrium | 3.50 → 3.58 | 7.92 → **8.72** | D 8.01 → 8.81, S1 8.11 → 8.84, S2 7.66 → 8.75, S3 7.90 → 8.47 |
+| Foil Plate (hall plate reference) | 3.73 → 3.73 | 8.12 → **8.84** | D 8.34 → 8.95, S1 8.09 → 8.88, S2 7.69 → 8.55, S3 8.16 → 8.87, S4 8.33 → 8.95 |
+| Foil Plate (small plate reference) | 3.42 → 3.50 | 7.55 → **8.46** | D 8.00 → 8.76, S1 6.29 → 8.28, S2 8.31 → 8.56, S3 7.61 → 8.23 |
+| Halo | 3.25 → 3.50 | 6.02 → **7.02** | D 6.70 → 7.80, S1 5.04 → 6.51, S2 6.56 → 7.44, S3 5.78 → 6.31 |
+| Horizon | 3.25 → 3.58 | 7.71 → **8.25** | D 7.78 → 8.29, S1 7.70 → 8.31, S2 7.61 → 8.10, S3 7.77 → 8.30 |
+| Nebula, LuxeVerb, the 18 other rows | unchanged | unchanged | renders identical |
+
+What moved: decay 7.1 → 8.1 / 7.6 → 9.5 / 8.2 → 9.7 / 9.1 → 9.7 / 5.1 → 6.4 / 9.0 → 9.6 (Epoch, Atrium, the two plate
+rows, Halo, Horizon), early energy (C80) 8.0 → 8.8 / 8.2 → 8.7 / 7.9 → 9.1 / 7.3 → 8.9 / – / 5.8 → 7.6, impulse level
+7.2 → 8.8 / 8.8 → 9.7 / 8.9 → 9.7 / 7.5 → 10.0 / 5.3 → 8.4 / 9.2 → 9.8, Halo's modulation part 1.8 → 7.2 (delay
+modulation × 6: its reference moves in every band). What did not: echo density (4.9 on Epoch, 5.5 on Halo: the
+build-up law of the references is not the mixing angle's; the angle gave under 0.15 per row and was taken only on
+Atrium's Bright Room and Horizon's Chamber), Halo's shimmer spectrum per setting (S1, S3).
+
+CPU (thread time, 20 s of noise bursts at 48 kHz, blocks of 512, Measured against Classic): Epoch −31 % (Room mode
+−20 %), Atrium −16 % (Bright Room −16 %), Foil −16 % (measured plate −15 %), Halo −30 % (with shimmer −15 %),
+Horizon −14 % (Chamber −10 %): the shelves run eight lines wide and the modulators are rotations instead of `sin` calls.
+
+The devices that only borrow Foil Plate (rule `complete-access-reverbs`) stay on the Classic law (`Law=0` in the
+rule's preset): their maps were fitted on it, and their rows are unchanged.
