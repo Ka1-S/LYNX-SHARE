@@ -9600,3 +9600,4 @@ countries: br
 "More plugins..." = "Mais plugins..."
 "Automate" = "Automatizar"
 "Add audio track" = "Adicionar faixa de áudio"
+"This generator can't be used as an instrument track." = "Este gerador não pode ser usado como faixa de instrumento."

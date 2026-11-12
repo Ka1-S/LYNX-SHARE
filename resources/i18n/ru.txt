@@ -9480,6 +9480,7 @@ countries: ru by kz
 "Automate" = "Автоматизировать"
 "Add audio track" = "Добавить аудиодорожку"
 
+"This generator can't be used as an instrument track." = "Этот генератор нельзя использовать как инструментальную дорожку."
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"

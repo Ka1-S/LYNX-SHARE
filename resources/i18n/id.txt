@@ -9480,6 +9480,7 @@ countries: id
 "Automate" = "Otomatiskan"
 "Add audio track" = "Tambah trek audio"
 
+"This generator can't be used as an instrument track." = "Generator ini tidak dapat digunakan sebagai trek instrumen."
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"

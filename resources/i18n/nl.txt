@@ -9480,6 +9480,7 @@ countries: nl be
 "Automate" = "Automatiseren"
 "Add audio track" = "Audiospoor toevoegen"
 
+"This generator can't be used as an instrument track." = "Deze generator kan niet als instrumentspoor worden gebruikt."
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"

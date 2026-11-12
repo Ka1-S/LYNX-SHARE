@@ -95,7 +95,7 @@ public:
     {
         if (! getLocalBounds().contains (e.getPosition()))
             return;
-        if (e.mods.isPopupMenu())
+        if (flmods::popup (e.mods))
         {
             if (onAddAudioTrack)
                 onAddAudioTrack();
@@ -6873,6 +6873,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
             add (tr ("Panning"), clipops::AutomateWhat::panning);
             add (tr ("Volume"), clipops::AutomateWhat::volume); // (FL's default item)
             menu.addSubMenu (tr ("Automate"), automate);
+            menu.addSeparator(); // (the section ends here, as FL's)
         }
 
         if (clip.fadeIn > 0 || clip.fadeOut > 0)
@@ -7119,6 +7120,13 @@ void PlaylistComponent::instrumentForTrack (int track, ChannelDef generator)
     }
     else
     {
+        if (kind == InstrumentKind::audioClip || kind == InstrumentKind::controller)
+        {
+            // FL's error (LineAssignInstrTrackMenuClick, round 190dx)
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                    tr ("This generator can't be used as an instrument track."));
+            return;
+        }
         engine.editSong ([&] (Song& s) { channel = trackmodes::addInstrumentTrack (s, std::move (generator), track); });
         if (channel < 0)
         {

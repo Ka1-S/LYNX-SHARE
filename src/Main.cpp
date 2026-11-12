@@ -10816,7 +10816,13 @@ private:
             report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
             allOk = allOk && ok;
         };
-        const auto plain = [] (juce::String t) { return t.upToFirstOccurrenceOf ("\t", false, false).removeCharacters ("&_"); };
+        const auto plain = [] (juce::String t) {
+            // (without the shortcut column and the mnemonic: the mark, or the " (K)" a translation without the letter gets)
+            t = t.upToFirstOccurrenceOf ("\t", false, false);
+            if (const auto at = t.indexOf (juce::String (" (") + juce::String::charToString (1)); at >= 0)
+                t = t.substring (0, at);
+            return t.removeCharacters (juce::String ("&_") + juce::String::charToString (1));
+        };
         const auto findSub = [&plain] (const juce::PopupMenu& menu, const juce::String& text) -> const juce::PopupMenu* {
             for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
                 if (it.getItem().subMenu != nullptr && plain (it.getItem().text) == plain (text))
@@ -10955,13 +10961,15 @@ private:
             const auto again = rack.getChannelMenuForSnapshot (1);
             check ("unassign_offered", click (again, lynx::tr ("Unassign from instrument track")) && lynx::trackmodes::instrumentTracksOf (engine.getSong(), 1).empty());
             bool greyed = false;
-            for (juce::PopupMenu::MenuItemIterator it (rack.getChannelMenuForSnapshot (vox)); it.next();)
+            const auto voxMenu = rack.getChannelMenuForSnapshot (vox);
+            for (juce::PopupMenu::MenuItemIterator it (voxMenu); it.next();)
                 if (plain (it.getItem().text) == plain (lynx::tr ("Assign to new instrument track")))
                     greyed = ! it.getItem().isEnabled;
             check ("assign_greyed_for_audio_clip_channel", greyed);
         }
 
         // ---- 5. Tools › One-click audio recording
+        std::fprintf (stderr, "flplshot: tools\n");
         {
             const auto names = ui.getMenuNamesForSnapshot();
             const auto tools = ui.getMenuForSnapshot (names.indexOf (lynx::tr ("Tools")));
