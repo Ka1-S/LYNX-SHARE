@@ -3106,6 +3106,14 @@ juce::String toJson (const Song& song, bool stampVersion)
                 icons.add (juce::Array<juce::var> { (int) i, song.playlistTracks[i].icon });
         if (! icons.isEmpty())
             root->setProperty ("playlistTrackIcons", icons);
+
+        // folded tracks (round 190cg): the indices
+        juce::Array<juce::var> foldedTracks;
+        for (std::size_t i = 0; i < song.playlistTracks.size(); ++i)
+            if (song.playlistTracks[i].folded)
+                foldedTracks.add ((int) i);
+        if (! foldedTracks.isEmpty())
+            root->setProperty ("playlistTracksFolded", foldedTracks);
     }
 
     const auto anyMarkers = std::any_of (song.arrangements.begin(), song.arrangements.end(),
@@ -3163,6 +3171,10 @@ juce::String toJson (const Song& song, bool stampVersion)
 
     if (song.hasLoop())
         root->setProperty ("loop", juce::Array<juce::var> { (juce::int64) song.loopStart, (juce::int64) song.loopEnd });
+    if (song.loopOff) // round 190cg: the loop switch (only when off: older versions loop the range, as before)
+        root->setProperty ("loopOff", true);
+    if (song.tempoViewHigh > song.tempoViewLow) // round 190cg: the tempo lane's shown range (BPM)
+        root->setProperty ("tempoView", juce::Array<juce::var> { song.tempoViewLow, song.tempoViewHigh });
 
     // Online Sessions (round 168a): the lineage, the uid counter, the arrangements' uids (the arrangements list itself
     // is only written when there is more than one) and who works on the project
@@ -3753,6 +3765,16 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 song.playlistTracks[index].icon = juce::jlimit (0, 0xFFFF, (int) t[1]);
             }
 
+    if (auto* foldedTracks = root["playlistTracksFolded"].getArray())
+        for (const auto& t : *foldedTracks)
+            if ((int) t >= 0 && (int) t < 500)
+            {
+                const auto index = (std::size_t) (int) t;
+                if (song.playlistTracks.size() <= index)
+                    song.playlistTracks.resize (index + 1);
+                song.playlistTracks[index].folded = true;
+            }
+
     if (auto* arrangements = root["arrangements"].getArray(); arrangements != nullptr && ! arrangements->isEmpty())
     {
         song.arrangements.clear();
@@ -3793,6 +3815,12 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     {
         song.loopStart = juce::jmax<juce::int64> (0, (juce::int64) loop[0]);
         song.loopEnd = juce::jmax<juce::int64> (song.loopStart, (juce::int64) loop[1]);
+    }
+    song.loopOff = (bool) root.getProperty ("loopOff", false);
+    if (const auto& view = root["tempoView"]; view.isArray() && view.size() == 2 && (double) view[1] > (double) view[0])
+    {
+        song.tempoViewLow = juce::jlimit (minTempo, maxTempo, (double) view[0]);
+        song.tempoViewHigh = juce::jlimit (song.tempoViewLow + 1.0, maxTempo, (double) view[1]);
     }
 
     if (auto* mixer = root["mixer"].getArray())

@@ -1327,14 +1327,14 @@ private:
     std::int64_t punchStopAt = -1;                 // post-roll end: playback stops there (-1: none)
     bool linearRecording() const noexcept
     {
-        return recordloop::linear (song.mode, song.hasLoop(), recordOptions.loopRecord, recordOptions.punchLoopRegion);
+        return recordloop::linear (song.mode, song.loopPlays(), recordOptions.loopRecord, recordOptions.punchLoopRegion);
     }
     // the audio thread's view of the above while takes record (false when none is open)
     void updateLinearSong() noexcept
     {
         const auto on = (takeCount > 0 || automationLinear || noteTakeLinear) && linearRecording();
         liveInput.linearSong.store (on || bouncing);
-        liveInput.noLoopRegion.store ((on && song.hasLoop()) || bouncing);
+        liveInput.noLoopRegion.store ((on && song.loopPlays()) || bouncing);
     }
     takes::LatencyPing ping;                       // audio thread while running (UI starts it, reads the result)
     juce::int64 lostFrames = 0;

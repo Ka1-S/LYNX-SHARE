@@ -2323,6 +2323,8 @@ void MainComponent::loadUiSettings()
             EditorGlobals::get().manualFades = on;
         else if (key == "plSnapFadeHandles")
             EditorGlobals::get().snapFadeHandles = on;
+        else if (key == "plAutomationFollowsClips") // round 190cg (absent = as the layout)
+            EditorGlobals::get().automationFollowsClips = on ? 1 : 0;
         else if (key == "plMagicLasso")
             EditorGlobals::get().magicLasso = on;
         else if (key == "dropAudioOnHeaders") // round 189e: FL's Edit › Drop audio on track headers (DropAudioToPLMode)
@@ -2578,6 +2580,8 @@ void MainComponent::saveUiSettings()
                                       + "\nplWheelNudging=" + juce::String (EditorGlobals::get().wheelNudging ? 1 : 0)
                                       + "\nplManualFades=" + juce::String (EditorGlobals::get().manualFades ? 1 : 0)
                                       + "\nplSnapFadeHandles=" + juce::String (EditorGlobals::get().snapFadeHandles ? 1 : 0)
+                                      + (EditorGlobals::get().automationFollowsClips < 0 ? juce::String()
+                                             : "\nplAutomationFollowsClips=" + juce::String (EditorGlobals::get().automationFollowsClips))
                                       + "\nplMagicLasso=" + juce::String (EditorGlobals::get().magicLasso ? 1 : 0)
                                       + "\ndropAudioOnHeaders=" + juce::String ((int) trackmodes::headerDropOptions().mode)
                                       + "\ndropLocksToContent=" + juce::String (trackmodes::headerDropOptions().lockToContent ? 1 : 0)
@@ -3016,6 +3020,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     }
     // the Simple workflow's track headers and no pattern picker (no-ops for the other two styles: nothing changes there)
     playlist.setSimpleHeaders (style == Style::simple);
+    playlist.setLiveStyle (style == Style::clipLaunch);
     playlistArea.setPickerHidden (style == Style::simple);
     if (style == Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->entered(); // (after the grid's title accessory is gone: the Add track button takes its place)

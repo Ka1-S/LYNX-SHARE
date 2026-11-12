@@ -120,6 +120,7 @@ struct Ctx
     // MIDI effects of the next rack read were already taken by the track's channel (a one-chain Instrument Rack)
     std::map<int, std::vector<alsdev::NoteEffect>> noteEffects;
     int skipLeadingMidi = 0;
+    std::string signatureTarget; // the main track's TimeSignature AutomationTarget Id (round 190cg)
 
     // the scale of the first MIDI clip that has Live's clip scale switched on (round 190o)
     std::optional<projectkey::Key> clipKey;
@@ -1319,6 +1320,26 @@ void addAutomation (Ctx& ctx, const Element& envelopes, const std::string& owner
     for (const auto& env : envelopes.path ("Envelopes").children ("AutomationEnvelope"))
     {
         const auto id = env.path ("EnvelopeTarget/PointeeId").attr ("Value");
+        // the time signature and its changes along the Arrangement (round 190cg): EnumEvents holding the signature
+        // code, the first one "before the song" [DATA: every stored set has that one event, Value = Manual]; each later
+        // one becomes a time signature marker [INFERRED: Time in beats as in every other envelope]
+        if (! id.empty() && id == ctx.signatureTarget)
+        {
+            for (const auto& e : env.path ("Automation/Events").children())
+            {
+                int num = 4, den = 4;
+                const auto time = numberAttr (e, "Time");
+                if (e.name() != "EnumEvent" || time <= 0.0 || ! alsTimeSignature ((int) numberAttr (e, "Value"), num, den))
+                    continue;
+                Marker m;
+                m.tick = ticksOf (time);
+                m.numerator = num;
+                m.denominator = den;
+                m.action = Marker::timeSignature;
+                ctx.song.addMarker (m);
+            }
+            continue;
+        }
         const auto it = ctx.targets.find (id);
         if (it == ctx.targets.end())
         {
@@ -1706,6 +1727,13 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
     song.bpm = std::clamp (mainMixer.number ("Tempo/Manual", 120), minTempo, maxTempo);
     if (const auto id = targetId (mainMixer.child ("Tempo")); ! id.empty())
         ctx.targets[id] = { AutomationTarget { AutomationTargetKind::tempo, 0, 0, 0 }, ValueMap::tempo, "tempo", {} };
+    ctx.signatureTarget = targetId (mainMixer.child ("TimeSignature"));
+    // the tempo envelope's shown range [DATA: Mixer/TempoAutomationViewBottom / Top, 60 and 200 in every stored set]
+    if (const auto low = mainMixer.number ("TempoAutomationViewBottom", 0), high = mainMixer.number ("TempoAutomationViewTop", 0); high > low && low > 0)
+    {
+        song.tempoViewLow = std::clamp (low, minTempo, maxTempo);
+        song.tempoViewHigh = std::clamp (high, song.tempoViewLow + 1.0, maxTempo);
+    }
     int num = 4, den = 4;
     alsTimeSignature ((int) mainMixer.number ("TimeSignature/Manual", 201), num, den);
     if (den == 4)
@@ -2001,10 +2029,13 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         song.addMarker (m);
     }
     // the arrangement loop
-    if (const auto tr = set.child ("Transport"); tr.boolean ("LoopOn", false))
+    // (round 190cg: with the Loop switch off the brace keeps its place [DATA: LoopOn false with LoopStart / LoopLength
+    // in every stored set]; LYNX keeps the range too, switched off)
+    if (const auto tr = set.child ("Transport"); tr.number ("LoopLength", 0) > 0)
     {
-        song.loopStart = ticksOf (tr.number ("LoopStart", 0));
+        song.loopStart = ticksOf (std::max (0.0, tr.number ("LoopStart", 0)));
         song.loopEnd = song.loopStart + ticksOf (tr.number ("LoopLength", 0));
+        song.loopOff = ! tr.boolean ("LoopOn", false);
     }
 
     // automation (rows under the tracks)

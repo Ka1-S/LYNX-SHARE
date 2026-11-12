@@ -1322,7 +1322,7 @@ void AudioEngine::stopSound()
 double AudioEngine::songPlayheadTicks() const noexcept
 {
     const auto tick = juce::jmax (0.0, transport.positionTicks.load (std::memory_order_relaxed));
-    if (song.hasLoop() || liveInput.linearSong.load (std::memory_order_relaxed))
+    if (song.loopPlays() || liveInput.linearSong.load (std::memory_order_relaxed))
         return tick;
     return std::fmod (tick, (double) juce::jmax<std::int64_t> (1, song.songLength()));
 }
@@ -1433,7 +1433,7 @@ AudioEngine::LiveRecording AudioEngine::liveRecording() const
     if (! openTakes.empty() && startTick >= 0.0 && frames > 0)
     {
         const auto wraps = takeWrapCount.load();
-        const auto lastWrap = song.mode == PlayMode::song && song.hasLoop() && wraps > 0 ? (std::int64_t) takeWraps[(std::size_t) wraps - 1].load() : -1;
+        const auto lastWrap = song.mode == PlayMode::song && song.loopPlays() && wraps > 0 ? (std::int64_t) takeWraps[(std::size_t) wraps - 1].load() : -1;
         const auto span = liverec::audioSpan (startTick, frames, takeTicksPerSample, takeLatency, lastWrap, song.loopStart);
         if (liveTakeTracks.size() != openTakes.size())
         {
@@ -1993,7 +1993,7 @@ void AudioEngine::finishAudioTake()
     std::vector<takes::Part> parts;
     if (keepPunch.has_value()) // pre-roll / punch in-out: only the range (the rest stays in the file)
         parts = takes::punch (placement, { *keepPunch });
-    else if (song.mode == PlayMode::song && song.hasLoop())
+    else if (song.mode == PlayMode::song && song.loopPlays())
         // one part per pass of the loop; FL keeps a pass of any length (REA round 177c: a 1-tick pass got its own track),
         // round 163's option drops one a 1/16 note long or less
         parts = takes::loopPasses (placement, song.loopStart, song.loopEnd, recordOptions.lastLoopPassPlays ? ppq / 4 : 0, wraps);
@@ -2018,7 +2018,7 @@ void AudioEngine::finishAudioTake()
         made.push_back ({ take->file.getFullPathName().toStdString(), take->file.getFileNameWithoutExtension().toStdString(), take->playThrough });
 
     // FL: Loop record over a loop region, without a punch
-    const auto loopRecorded = recordOptions.loopRecord && ! keepPunch.has_value() && song.mode == PlayMode::song && song.hasLoop();
+    const auto loopRecorded = recordOptions.loopRecord && ! keepPunch.has_value() && song.mode == PlayMode::song && song.loopPlays();
     const takes::TakeOptions takeOptions { loopRecorded, recordOptions.mode == RecordMode::overdub, recordOptions.lastLoopPassPlays };
     editSong ([made, parts, takeOptions] (Song& s) { takes::placeTakeClips (s, made, parts, takeOptions); });
     dropJournals();
@@ -2763,7 +2763,7 @@ void AudioEngine::updateRecording()
         // round 168k [EXEC]: a 1-bar song recorded from bar 1 counted on to bar 8 instead of going back to bar 1), so
         // the notes stay where they were played
         // (Loop record off, round 170e3: through the loop region as well)
-        if (recordloop::notesLinear (song.mode, song.hasLoop(), recordOptions.loopRecord))
+        if (recordloop::notesLinear (song.mode, song.loopPlays(), recordOptions.loopRecord))
         {
             noteTakeLinear = true;
             recorder.setLinear (true);
@@ -2784,7 +2784,7 @@ void AudioEngine::updateRecording()
         if (punch.empty() || ! ev.on)
             return false;
         auto tick = ev.tick;
-        if (! song.hasLoop() && ! noteTakeLinear)
+        if (! song.loopPlays() && ! noteTakeLinear)
             tick = std::fmod (std::max (0.0, tick), (double) std::max<std::int64_t> (1, song.songLength()));
         return ! inPunchRanges (punch, tick);
     };
@@ -3921,8 +3921,8 @@ void AudioEngine::publishSong()
         transport.signatureVersion.fetch_add (1, std::memory_order_acq_rel); // even: ready
     }
     transport.songMode.store (song.mode == PlayMode::song);
-    transport.loopStart.store ((double) song.loopStart);
-    transport.loopEnd.store ((double) song.loopEnd);
+    transport.loopStart.store (song.loopPlays() ? (double) song.loopStart : 0.0); // (round 190cg: the loop switch off = the range stays in the Song, playback runs through)
+    transport.loopEnd.store (song.loopPlays() ? (double) song.loopEnd : 0.0);
     transport.songEnd.store ((double) song.songLength());
     transport.publishMarkers (makeMarkerPlan (song)); // FL's marker actions (loop, skip, pause, start...)
     transport.songStart.store ((double) song.performanceZoneEnd());
@@ -4413,7 +4413,7 @@ void AudioEngine::updateAutomationRecording (bool active)
 
     // song mode without a loop region: from the first move on, the song plays on past its end until recording stops
     if (! takeWrites.empty() || ! touches.empty())
-        if (! automationLinear && song.mode == PlayMode::song && ! song.hasLoop())
+        if (! automationLinear && song.mode == PlayMode::song && ! song.loopPlays())
         {
             automationLinear = true;
             updateLinearSong();

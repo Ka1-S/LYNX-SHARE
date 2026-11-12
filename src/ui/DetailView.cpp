@@ -22,6 +22,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/FlStudio.h"
 #include "ui/BrowserComponent.h"
+#include "ui/ClipAudioPanel.h"
 #include "ui/ColourPicker.h"
 #include "ui/EditorTools.h"
 #include "ui/EventEditor.h"
@@ -2079,6 +2080,8 @@ public:
         if (column.isVisible())
             column.setBounds (area.removeFromLeft (column.preferredWidth()));
         open.setBounds (area.withSizeKeepingCentre (240, 26).translated (0, 16));
+        if (audioPanel != nullptr) // round 190cg (ui/ClipAudioPanel)
+            audioPanel->setBounds (area);
         if (notesTab.isVisible())
         {
             // the clip's tabs, top right, as the reference's Notes | Envelopes [SHOT d08]
@@ -2211,6 +2214,26 @@ private:
         if (editor != nullptr && (! onScreen() || clip == nullptr || clip->kind != ClipKind::pattern))
             release();
 
+        // round 190cg: an audio clip shows its Audio panel and the audio editor (ui/ClipAudioPanel)
+        const auto audioKey = clip != nullptr && clip->kind == ClipKind::audio && onScreen() ? (track * 2000 + scene) * 4096 + (clip->channel & 4095) : -1;
+        if (audioKey != audioPanelKey)
+        {
+            audioPanel.reset();
+            audioPanelKey = audioKey;
+            if (audioKey >= 0)
+                if (audioPanel = makeClipAudioPanel (engine, track, scene); audioPanel != nullptr)
+                {
+                    addAndMakeVisible (*audioPanel);
+                    resized();
+                }
+        }
+        if (audioPanel != nullptr)
+        {
+            open.setVisible (false);
+            repaint();
+            return;
+        }
+
         if (clip == nullptr)
         {
             text = tr ("Select a clip in the clip grid to see it here");
@@ -2243,6 +2266,8 @@ private:
     std::unique_ptr<juce::Component> events; // the Envelopes tab's Event editor
     int eventsTrack = -1, eventsScene = -1;
     juce::Component* editor = nullptr; // the docked Piano roll (not owned)
+    std::unique_ptr<juce::Component> audioPanel; // round 190cg: an audio clip's panel and editor
+    int audioPanelKey = -1;
     int dockedTrack = -1, dockedScene = -1;
     bool takenBack = false;
     int track = -1, scene = -1;

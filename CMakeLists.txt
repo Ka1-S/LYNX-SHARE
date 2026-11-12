@@ -574,6 +574,7 @@ if(LYNX_BUILD_APP)
         src/ui/ClipGridComponent.cpp
         src/ui/GroovePoolComponent.cpp
         src/ui/DetailView.cpp
+        src/ui/ClipAudioPanel.cpp
         src/ui/MidiToolsPanel.cpp
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp

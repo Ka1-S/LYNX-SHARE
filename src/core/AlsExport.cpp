@@ -941,7 +941,9 @@ struct Exporter
     }
 
     // ---- automation
-    void addEnvelope (Node& owner, const std::string& pointee, const std::vector<std::pair<double, double>>& events, int& envelopeId)
+    // `eventName` "EnumEvent": whole-number values at exact times, the first event already the "before the song" one
+    void addEnvelope (Node& owner, const std::string& pointee, const std::vector<std::pair<double, double>>& events, int& envelopeId,
+                      const char* eventName = "FloatEvent")
     {
         auto* list = owner.at ("AutomationEnvelopes/Envelopes");
         if (list == nullptr || events.empty() || pointee.empty())
@@ -953,12 +955,13 @@ struct Exporter
         {
             ev->kids.clear();
             int id = 0;
+            const auto enums = std::string (eventName) == "EnumEvent";
             auto add = [&] (double t, double v) {
                 Node e;
-                e.name = "FloatEvent";
+                e.name = eventName;
                 e.set ("Id", num (id++));
                 e.set ("Time", num (t));
-                e.set ("Value", num (v));
+                e.set ("Value", enums ? num ((int) std::lround (v)) : num (v));
                 ev->add (std::move (e));
             };
             // Live's own envelopes open with the "before the song" event; a point at the very start is that event [DATA]
@@ -1318,7 +1321,20 @@ struct Exporter
         if (main != nullptr)
         {
             main->value ("DeviceChain/Mixer/Tempo/Manual", num (song.bpm));
-            main->value ("DeviceChain/Mixer/TimeSignature/Manual", num (alsTimeSignatureCode (song.beatsPerBar, 4)));
+            // the signature at the song start: a signature marker there, else the project's n/4 (round 190cg)
+            int startNum = song.beatsPerBar, startDen = 4;
+            for (const auto& m : song.markers())
+                if (m.isSignature() && m.tick <= 0)
+                {
+                    startNum = m.numerator;
+                    startDen = m.denominator;
+                }
+            main->value ("DeviceChain/Mixer/TimeSignature/Manual", num (alsTimeSignatureCode (startNum, startDen)));
+            if (song.tempoViewHigh > song.tempoViewLow) // the tempo envelope's shown range [DATA]
+            {
+                main->value ("DeviceChain/Mixer/TempoAutomationViewBottom", num (song.tempoViewLow));
+                main->value ("DeviceChain/Mixer/TempoAutomationViewTop", num (song.tempoViewHigh));
+            }
             if (! song.mixer.empty())
             {
                 main->value ("DeviceChain/Mixer/Volume/Manual", num (std::clamp ((double) faderGain (song.mixer[0].volume), minGain, maxGain)));
@@ -1406,8 +1422,9 @@ struct Exporter
         writeLiveScale (set, song, "InKey");
         if (auto* tr = set.child ("Transport"))
         {
+            // (round 190cg: the range goes over with the Loop switch off too, as Live keeps its brace)
             const auto loop = song.loopEnd > song.loopStart;
-            tr->value ("LoopOn", boolean (loop));
+            tr->value ("LoopOn", boolean (song.loopPlays()));
             if (loop)
             {
                 tr->value ("LoopStart", num (beats (song.loopStart)));
@@ -1482,6 +1499,31 @@ struct Exporter
             std::stable_sort (entry.second.begin(), entry.second.end(), [] (const auto& x, const auto& y) { return x.first < y.first; });
             addEnvelope (*entry.first, pointee, entry.second, envelopeId);
         }
+        // time signature changes along the Arrangement (round 190cg): the main track's envelope of signature codes, the
+        // first event "before the song" [DATA: the stored sets' own envelope], one event per signature marker after it
+        if (main != nullptr)
+            if (const auto* target = main->at ("DeviceChain/Mixer/TimeSignature/AutomationTarget"); target != nullptr && target->has ("Id"))
+            {
+                int num = song.beatsPerBar, den = 4;
+                std::vector<std::pair<double, double>> changes;
+                for (const auto& m : song.markers())
+                {
+                    if (! m.isSignature())
+                        continue;
+                    if (m.tick <= 0)
+                    {
+                        num = m.numerator;
+                        den = m.denominator;
+                    }
+                    else
+                        changes.push_back ({ beats (m.tick), (double) alsTimeSignatureCode (m.numerator, m.denominator) });
+                }
+                if (! changes.empty())
+                {
+                    changes.insert (changes.begin(), { beforeSong, (double) alsTimeSignatureCode (num, den) });
+                    addEnvelope (*main, target->get ("Id"), changes, envelopeId, "EnumEvent");
+                }
+            }
 
         int maxId = next;
         std::function<void (const Node&)> scan = [&] (const Node& e) {

@@ -1128,6 +1128,8 @@ int PlaylistComponent::heightOf (int track) const
     const auto& tracks = engine.getSong().playlistTracks;
     if (noteedit::isFoldedAway (engine.getSong(), track))
         return foldedHeight;
+    if (arrange::isFolded (engine.getSong(), track)) // round 190cg: a folded track is its title bar
+        return liveFoldedHeight;
     const auto h = track >= 0 && track < (int) tracks.size() ? tracks[(std::size_t) track].height : 0;
     // "Lock to this size" (FL +0x14, round 168f): the row keeps its px height whatever the vertical zoom
     if (const auto locked = track >= 0 && track < (int) tracks.size() ? tracks[(std::size_t) track].lockedHeight : -1; locked > 0)
@@ -1460,9 +1462,10 @@ void PlaylistComponent::paint (juce::Graphics& g)
         if (song.hasLoop())
         {
             const auto lx0 = (float) tickToX ((double) song.loopStart), lx1 = (float) tickToX ((double) song.loopEnd);
-            g.setColour (colour::accent.withAlpha (0.06f));
+            const auto tint = song.loopOff ? colour::textSecondary : colour::accent; // (round 190cg: grey while the loop is switched off)
+            g.setColour (tint.withAlpha (0.06f));
             g.fillRect (juce::Rectangle<float> (lx0, (float) grid.getY(), lx1 - lx0, (float) grid.getHeight()));
-            g.setColour (colour::accent.withAlpha (0.45f));
+            g.setColour (tint.withAlpha (0.45f));
             g.drawVerticalLine ((int) lx0, (float) grid.getY(), (float) grid.getBottom());
             g.drawVerticalLine ((int) lx1, (float) grid.getY(), (float) grid.getBottom());
         }
@@ -1735,9 +1738,10 @@ void PlaylistComponent::paint (juce::Graphics& g)
         if (song.hasLoop()) // the time selection
         {
             const auto lx0 = (float) tickToX ((double) song.loopStart), lx1 = (float) tickToX ((double) song.loopEnd);
-            g.setColour (colour::accent.withAlpha (0.16f));
+            const auto tint = song.loopOff ? colour::textSecondary : colour::accent;
+            g.setColour (tint.withAlpha (0.16f));
             g.fillRect (juce::Rectangle<float> (lx0, 0.0f, lx1 - lx0, (float) timelineHeight));
-            g.setColour (colour::accent.withAlpha (0.75f));
+            g.setColour (tint.withAlpha (0.75f));
             g.fillRect (juce::Rectangle<float> (lx0, 0.0f, lx1 - lx0, 4.0f));
         }
 
@@ -2615,7 +2619,7 @@ int PlaylistComponent::laneBlockHeight (int track) const
     if (! autolanes::shown() || track < 0 || track >= (int) song.playlistTracks.size())
         return 0;
     const auto& t = song.playlistTracks[(std::size_t) track];
-    if (t.lanes.empty() || t.lanesFolded || noteedit::isFoldedAway (song, track))
+    if (t.lanes.empty() || t.lanesFolded || t.folded || noteedit::isFoldedAway (song, track))
         return 0;
     int h = 0;
     for (const auto& lane : t.lanes)
@@ -2678,7 +2682,7 @@ int PlaylistComponent::lanePointAt (int track, int lane, juce::Point<int> p) con
     for (int i = 0; i < (int) points.size(); ++i)
     {
         const auto x = (float) tickToX ((double) points[(std::size_t) i].tick);
-        const auto y = body.getBottom() - points[(std::size_t) i].value * body.getHeight();
+        const auto y = body.getBottom() - laneShown (a, points[(std::size_t) i].value) * body.getHeight();
         if (const auto d = juce::Point<float> (x, y).getDistanceFrom (p.toFloat()); d <= bestDistance)
         {
             bestDistance = d;
@@ -2763,7 +2767,7 @@ void PlaylistComponent::paintLanes (juce::Graphics& g, juce::Rectangle<int> grid
             auto lastY = 0.0f;
             for (auto x = from; x <= to; x += 2.0f)
             {
-                const auto yAt = [&] (int sx) { return body.getBottom() - automation.valueAt (xToTick (sx)) * body.getHeight(); };
+                const auto yAt = [&] (int sx) { return body.getBottom() - laneShown (a, automation.valueAt (xToTick (sx))) * body.getHeight(); };
                 const auto y = yAt ((int) x);
                 if (! started)
                 {
@@ -2795,7 +2799,7 @@ void PlaylistComponent::paintLanes (juce::Graphics& g, juce::Rectangle<int> grid
                 const auto x = (float) tickToX ((double) p.tick);
                 if (x < from - 4.0f || x > to + 4.0f)
                     continue;
-                const auto y = body.getBottom() - p.value * body.getHeight();
+                const auto y = body.getBottom() - laneShown (a, p.value) * body.getHeight();
                 g.setColour (colour::bg0);
                 g.fillEllipse (x - 3.5f, y - 3.5f, 7.0f, 7.0f);
                 g.setColour (muted ? colour::textDisabled : colour::automation.brighter (0.5f));
@@ -2903,12 +2907,32 @@ bool PlaylistComponent::laneMouseDown (const juce::MouseEvent& e)
     AutomationPoint p;
     p.tick = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), true));
     p.value = e.mods.isShiftDown() ? engine.getSong().automations[(std::size_t) a].valueAt ((double) p.tick)
-                                   : juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight()));
+                                   : laneValueOf (a, juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight())));
     int added = -1;
     engine.editSong ([a, p, &added] (Song& s) { added = insertAutomationPoint (s.automations[(std::size_t) a].points, p); });
     drag = Drag::lanePoint;
     autoPoint = added;
     return true;
+}
+
+// round 190cg: a tempo lane shows the song's own range (Song::tempoViewLow / High, the reference's lowest / highest BPM
+// of the tempo lane) when one is set; every other lane, and a tempo lane without a range, shows 0 … 1 as before
+float PlaylistComponent::laneShown (int automation, float value) const
+{
+    const auto& song = engine.getSong();
+    if (automation < 0 || automation >= (int) song.automations.size() || song.automations[(std::size_t) automation].target.kind != AutomationTargetKind::tempo
+        || ! (song.tempoViewHigh > song.tempoViewLow))
+        return value;
+    return (float) juce::jlimit (0.0, 1.0, (tempoFromValue (value) - song.tempoViewLow) / (song.tempoViewHigh - song.tempoViewLow));
+}
+
+float PlaylistComponent::laneValueOf (int automation, float shown) const
+{
+    const auto& song = engine.getSong();
+    if (automation < 0 || automation >= (int) song.automations.size() || song.automations[(std::size_t) automation].target.kind != AutomationTargetKind::tempo
+        || ! (song.tempoViewHigh > song.tempoViewLow))
+        return shown;
+    return juce::jlimit (0.0f, 1.0f, valueFromTempo (song.tempoViewLow + (double) shown * (song.tempoViewHigh - song.tempoViewLow)));
 }
 
 void PlaylistComponent::showLaneMenu (int track, int lane)
@@ -2918,6 +2942,20 @@ void PlaylistComponent::showLaneMenu (int track, int lane)
         return;
     juce::PopupMenu menu;
     menu.addSectionHeader (juce::String::fromUTF8 (engine.getSong().automations[(std::size_t) a].name.c_str()));
+    if (engine.getSong().automations[(std::size_t) a].target.kind == AutomationTargetKind::tempo)
+    {
+        // the lane's range [xml TempoAutomationViewBottom / Top: 60 / 200 in a new set of the reference]
+        juce::PopupMenu range;
+        const auto& song = engine.getSong();
+        const auto whole = ! (song.tempoViewHigh > song.tempoViewLow);
+        range.addItem (tr ("Whole range"), true, whole, [this] { engine.editSong ([] (Song& s) { s.tempoViewLow = s.tempoViewHigh = 0.0; }); });
+        for (const auto [low, high] : { std::pair { 60.0, 200.0 }, { 40.0, 120.0 }, { 80.0, 160.0 }, { 100.0, 200.0 }, { 20.0, 300.0 } })
+            range.addItem (juce::String ((int) low) + " - " + juce::String ((int) high) + " BPM", true,
+                           ! whole && song.tempoViewLow == low && song.tempoViewHigh == high,
+                           [this, low = low, high = high] { engine.editSong ([low, high] (Song& s) { s.tempoViewLow = low; s.tempoViewHigh = high; }); });
+        range.addItem (tr ("Set the range..."), [this] { askTempoRange(); });
+        menu.addSubMenu (tr ("Tempo range shown"), range);
+    }
     menu.addItem (tr ("Edit points..."), [this, a] { openAutomationEditor (engine, a); });
     menu.addItem (tr ("To automation clip"), [this, track, lane] {
         engine.editSong ([track, lane] (Song& s) { autolanes::laneToClip (s, track, lane); });
@@ -3589,6 +3627,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 {
     downMods = e.mods;
     startedOnEmpty = erasedSomething = holdExpired = false;
+    dragCopies = false;
     hover = {};
     gliding = false;
 
@@ -4266,6 +4305,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         setSelection (added);
         dragIndices = added;
         dragOriginals = copies;
+        dragCopies = true;
         dragClip = added[grabbedAt];
         drag = Drag::move;
         grabOffset = copies[grabbedAt].start - snap (xToTick (e.x), snapOn);
@@ -4475,7 +4515,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             const auto hi = autoPoint + 1 < (int) points.size() ? points[(std::size_t) autoPoint + 1].tick : std::numeric_limits<std::int64_t>::max();
             tick = juce::jlimit (lo, hi, tick);
             const auto body = laneBody (laneTrack, laneIndex);
-            auto value = juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight()));
+            auto value = laneValueOf (a, juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight())));
             if (e.mods.isShiftDown() && ! downMods.isShiftDown())
                 tick = points[(std::size_t) autoPoint].tick;
             if (flmods::ctrl (e.mods) && ! flmods::ctrl (downMods))
@@ -5083,7 +5123,31 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
             if (i >= 0 && i < (int) playlist.size() && playlist[(std::size_t) i].track != dragOriginals[j].track)
                 moved.push_back (i);
         }
+        // round 190cg: the lane automation under a clip goes along its track with it (same-track moves and copies)
+        if (automationFollows())
+        {
+            struct Carry
+            {
+                int track;
+                std::int64_t from, to, delta;
+            };
+            std::vector<Carry> carries;
+            for (std::size_t j = 0; j < dragIndices.size() && j < dragOriginals.size(); ++j)
+            {
+                const auto i = dragIndices[j];
+                const auto& o = dragOriginals[j];
+                if (i >= 0 && i < (int) playlist.size() && playlist[(std::size_t) i].track == o.track && playlist[(std::size_t) i].start != o.start
+                    && o.kind != ClipKind::automation)
+                    carries.push_back ({ o.track, o.start, o.end(), playlist[(std::size_t) i].start - o.start });
+            }
+            if (! carries.empty() && ! arrange::laneAutomations (engine.getSong()).empty())
+                engine.editSong ([carries, copy = dragCopies] (Song& s) {
+                    for (const auto& c : carries)
+                        arrange::carryLaneAutomation (s, c.track, c.from, c.to, c.delta, copy);
+                });
+        }
         sortClips (moved);
+        dragCopies = false;
     }
     else if (drag == Drag::paint)
     {
@@ -5212,6 +5276,83 @@ void PlaylistComponent::deleteTimeSelection()
     setSelection ({});
     engine.editSong ([from = song.loopStart, to = song.loopEnd] (Song& s) { noteedit::deleteTime (s.playlist, s.markers(), from, to); });
     sortClips();
+}
+
+// --- round 190cg (core/ArrangeOps.h) ---------------------------------------------------------------------------------
+void PlaylistComponent::setLiveStyle (bool on)
+{
+    if (on == liveStyle)
+        return;
+    liveStyle = on;
+    repaint();
+}
+
+bool PlaylistComponent::automationFollows() const noexcept
+{
+    const auto set = EditorGlobals::get().automationFollowsClips;
+    return set < 0 ? liveStyle : set > 0;
+}
+
+void PlaylistComponent::setLoopSwitch (bool plays)
+{
+    if (engine.getSong().hasLoop())
+        engine.editSong ([plays] (Song& s) { s.loopOff = ! plays; }, false);
+    repaint();
+}
+
+void PlaylistComponent::timeCommand (int which)
+{
+    const auto& song = engine.getSong();
+    const auto time = song.hasLoop();
+    const auto from = song.loopStart, to = song.loopEnd;
+    if (which == 3)
+    {
+        if (timeClipboard.length <= 0)
+            return;
+        setSelection ({});
+        engine.editSong ([at = time ? from : snap ((double) songPositionTick(), true), clip = timeClipboard] (Song& s) { arrange::pasteTime (s, at, clip); });
+    }
+    else if (! time)
+        return;
+    else if (which == 2)
+        timeClipboard = arrange::copyTime (song, from, to);
+    else if (which == 4)
+        engine.editSong ([from, to, clips = selection] (Song& s) { arrange::cropClips (s, clips, from, to); });
+    else
+    {
+        setSelection ({});
+        if (which == 1)
+            timeClipboard = arrange::copyTime (song, from, to);
+        engine.editSong ([from, to, which] (Song& s) {
+            if (which == 0)
+                arrange::duplicateTime (s, from, to);
+            else
+            {
+                arrange::deleteTime (s, from, to);
+                s.loopEnd = s.loopStart; // the range is gone
+            }
+        });
+    }
+    sortClips();
+    repaint();
+}
+
+void PlaylistComponent::askTempoRange()
+{
+    const auto& song = engine.getSong();
+    const auto set = song.tempoViewHigh > song.tempoViewLow;
+    auto* box = new juce::AlertWindow (tr ("Tempo range shown"), tr ("Lowest and highest tempo of the tempo lane (BPM)"), juce::MessageBoxIconType::NoIcon, this);
+    box->addTextEditor ("low", juce::String (set ? song.tempoViewLow : 60.0), tr ("Lowest"));
+    box->addTextEditor ("high", juce::String (set ? song.tempoViewHigh : 200.0), tr ("Highest"));
+    box->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    box->enterModalState (true, juce::ModalCallbackFunction::create ([this, box] (int result) {
+        const auto low = juce::jlimit (minTempo, maxTempo, box->getTextEditorContents ("low").replaceCharacter (',', '.').getDoubleValue());
+        const auto high = juce::jlimit (minTempo, maxTempo, box->getTextEditorContents ("high").replaceCharacter (',', '.').getDoubleValue());
+        if (result == 1 && high > low + 1.0)
+            engine.editSong ([low, high] (Song& s) { s.tempoViewLow = low; s.tempoViewHigh = high; });
+        repaint();
+    }), true);
 }
 
 void PlaylistComponent::sliceInsertTimeSelection()
@@ -5467,6 +5608,20 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addItem (tr ("Slice & insert space") + "\tCtrl+Alt+Ins", time, false, [this] { runAction ("playlist.sliceInsertSpace"); });
     m.addItem (tr ("Delete space") + "\tCtrl+Del", time, false, [this] { deleteTimeSelection(); });
     m.addItem (tr ("Trim selection") + key ("playlist.trimSpace"), time, false, [this] { runAction ("playlist.trimSpace"); });
+    // round 190cg: Live's time commands and loop switch on the same time selection [live-exe-strings.txt:1645342…1645365
+    // sMenuTextCutTime / CopyTime / sMenuPasteTime / DuplicateTime; 1645321 sMenuActivateLoop; 1636009 sMenuTextCrop]
+    m.addItem (tr ("Duplicate time") + key ("playlist.duplicateTime"), time, false, [this] { timeCommand (0); });
+    m.addItem (tr ("Cut time") + key ("playlist.cutTime"), time, false, [this] { timeCommand (1); });
+    m.addItem (tr ("Copy time") + key ("playlist.copyTime"), time, false, [this] { timeCommand (2); });
+    m.addItem (tr ("Paste time") + key ("playlist.pasteTime"), timeClipboard.length > 0, false, [this] { timeCommand (3); });
+    m.addItem (tr ("Crop clips to the time selection") + key ("playlist.cropClips"), time && any, false, [this] { timeCommand (4); });
+    m.addSeparator();
+    m.addItem (tr ("Loop the time selection") + key ("playlist.loopSwitch"), time, song.loopPlays(), [this] { runAction ("playlist.loopSwitch"); });
+    m.addItem (tr ("Halve the time selection") + key ("playlist.loopHalve"), time, false, [this] { runAction ("playlist.loopHalve"); });
+    m.addItem (tr ("Double the time selection") + key ("playlist.loopDouble"), time, false, [this] { runAction ("playlist.loopDouble"); });
+    m.addSeparator();
+    m.addItem (tr ("Automation follows clips") + key ("playlist.automationFollowsClips"), true, automationFollows(),
+               [this] { runAction ("playlist.automationFollowsClips"); });
     m.addSeparator();
     m.addItem (tr ("Merge selected clips") + key ("playlist.mergePatternClips"), [this] { runAction ("playlist.mergePatternClips"); });
     m.addItem (tr ("Merge similar pattern clips") + key ("playlist.mergeSimilarClips"), [this] { runAction ("playlist.mergeSimilarClips"); });
@@ -5845,8 +6000,38 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         const auto member = info.grouped && track > 0;
         const auto folded = header >= 0 && header < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) header].collapsed;
         menu.addItem (theme::mnemonic (tr ("Group with above track"), 'G'), track > 0 && ! member, member, [this, track] {
-            engine.editSong ([track] (Song& s) { noteedit::groupWithAbove (s, track); });
+            // (round 190cg) in the Clip-launch workflow the group is a bus: its members play through the header's mixer track
+            if (liveStyle)
+                engine.editSongStructural ([track] (Song& s) {
+                    noteedit::groupWithAbove (s, track);
+                    arrange::makeGroupBus (s, track);
+                });
+            else
+                engine.editSong ([track] (Song& s) { noteedit::groupWithAbove (s, track); });
         });
+        // the same for a group made in another layout; ticked while the group plays through its header's mixer track
+        if (const auto group = arrange::groupOf (song, track); group.valid() && (liveStyle || arrange::groupBus (song, track) >= 0))
+            menu.addItem (tr ("Group plays through its own mixer track"), arrange::groupBus (song, track) < 0, arrange::groupBus (song, track) >= 0,
+                          [this, track] { engine.editSongStructural ([track] (Song& s) { arrange::makeGroupBus (s, track); }); });
+        // round 190cg: Live's track fold [live-exe-strings.txt:1645415…1645430 sMenuFoldSelectedTrack(s) / sMenuUnfoldAllTracks]
+        {
+            const auto anyFolded = std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(), [] (const PlaylistTrack& t) { return t.folded; });
+            if (liveStyle || anyFolded)
+            {
+                const auto isFolded = arrange::isFolded (song, track);
+                menu.addItem (tr ("Fold track"), true, isFolded, [this, track, isFolded] {
+                    auto tracks = selectedTracks;
+                    if (std::find (tracks.begin(), tracks.end(), track) == tracks.end())
+                        tracks = { track };
+                    engine.editSong ([tracks, isFolded] (Song& s) { arrange::setFolded (s, std::vector<int> (tracks.begin(), tracks.end()), ! isFolded); });
+                    resized();
+                });
+                menu.addItem (tr ("Unfold all tracks"), anyFolded, false, [this] {
+                    engine.editSong ([] (Song& s) { arrange::setAllFolded (s, false); });
+                    resized();
+                });
+            }
+        }
         menu.addItem (theme::mnemonic (tr ("Ungroup"), 'n'), member, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::ungroupTrack (s, track); }); });
         menu.addItem (tr ("Auto color group"), header >= 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::colourGroup (s, track); }); });
         menu.addItem (tr ("Collapse grouped tracks"), header >= 0, folded, [this, track, folded] {
@@ -6028,6 +6213,16 @@ void PlaylistComponent::showRulerMenu (int x)
             engine.editSong ([tick, n, d] (Song& s) { s.addMarker ({ tick, {}, n, d }); });
         });
     menu.addSubMenu (tr ("Time signature change here"), signatures);
+    {
+        // round 190cg [live-exe-strings.txt:1667947 sMenuClearTimeSignatureChanges]: the one at the song's start stays
+        const auto later = std::any_of (song.markers().begin(), song.markers().end(), [] (const Marker& m) { return m.numerator > 0 && m.tick > 0; });
+        menu.addItem (tr ("Delete all time signature changes"), later, false, [this] {
+            engine.editSong ([] (Song& s) {
+                auto& m = s.markers();
+                m.erase (std::remove_if (m.begin(), m.end(), [] (const Marker& x) { return x.numerator > 0 && x.tick > 0; }), m.end());
+            });
+        });
+    }
     // FL's marker actions "Start recording" / "Stop recording" (punch in / out; Record menu › Enable recording markers)
     menu.addItem (tr ("Add a Start recording marker here"), [this, tick] {
         engine.editSong ([tick] (Song& s) {
@@ -6166,6 +6361,8 @@ void PlaylistComponent::showRulerMenu (int x)
     {
         menu.addSeparator();
         menu.addItem (tr ("Remove loop"), [this] { engine.editSong ([] (Song& s) { s.loopStart = s.loopEnd = 0; }, false); });
+        // round 190cg: the loop switched off keeps its range
+        menu.addItem (tr ("Loop the time selection"), true, song.loopPlays(), [this] { runAction ("playlist.loopSwitch"); });
     }
 
     menu.addSeparator();
@@ -6927,6 +7124,24 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.nudgeRight")) shiftSelectedClips (1, 0, true);
     else if (is ("playlist.sliceInsertSpace")) sliceInsertTimeSelection();
     else if (is ("playlist.trimSpace")) trimTimeSelection();
+    else if (is ("playlist.loopSwitch")) setLoopSwitch (! engine.getSong().loopPlays());
+    else if (is ("playlist.loopHalve") || is ("playlist.loopDouble"))
+    {
+        if (engine.getSong().hasLoop())
+            engine.editSong ([factor = is ("playlist.loopHalve") ? 0.5 : 2.0] (Song& s) { arrange::scaleLoop (s, factor); }, false);
+    }
+    else if (is ("playlist.duplicateTime")) timeCommand (0);
+    else if (is ("playlist.cutTime")) timeCommand (1);
+    else if (is ("playlist.copyTime")) timeCommand (2);
+    else if (is ("playlist.pasteTime")) timeCommand (3);
+    else if (is ("playlist.cropClips")) timeCommand (4);
+    else if (is ("playlist.automationFollowsClips"))
+    {
+        auto& g = EditorGlobals::get();
+        g.automationFollowsClips = automationFollows() ? 0 : 1;
+        if (g.onOptionsChanged)
+            g.onOptionsChanged();
+    }
     else if (is ("playlist.deselect"))
     {
         setSelection ({}); // (FL's EEDeselAction, FUN_00eb1a90: the clips and the time selection)
