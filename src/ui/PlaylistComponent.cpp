@@ -3132,7 +3132,7 @@ juce::PopupMenu PlaylistComponent::getAutomationPointMenuForSnapshot (int clip, 
     const auto& automation = song.automations[(std::size_t) a];
     const auto value = automation.points[(std::size_t) point].value;
     juce::PopupMenu menu;
-    menu.addSectionHeader (automationPointValueText (automation.target, value));
+    menu.addSectionHeader (automationPointMenuHeader (point, (int) automation.points.size())); // FL: "Point 2/14"
     menu.addItem (tr ("Delete"), automation.points.size() > 1, false, [this, a, point] {
         engine.editSong ([a, point] (Song& s) {
             auto& points = s.automations[(std::size_t) a].points;

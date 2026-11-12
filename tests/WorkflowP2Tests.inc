@@ -166,13 +166,13 @@ TEST (p2_randomise_is_deterministic_and_bounded)
     randomise (b, p2test::all (b), o);
     CHECK (b.notes[3].velocity != a.notes[3].velocity || b.notes[5].velocity != a.notes[5].velocity);
 
-    // one-sided: velocities only go down
+    // one-sided (FL's Bipolar off, live check 190cq): velocities only go up
     lynx::Pattern c;
     c.notes = { p2test::note (0, 60, 240, 0, 0.5f), p2test::note (240, 60, 240, 0, 0.5f), p2test::note (480, 60, 240, 0, 0.5f) };
     o.bipolar = false;
     o.timing = 0;
     randomise (c, p2test::all (c), o);
-    CHECK (c.notes[0].velocity <= 0.5f && c.notes[1].velocity <= 0.5f && c.notes[2].velocity <= 0.5f);
+    CHECK (c.notes[0].velocity >= 0.5f && c.notes[1].velocity >= 0.5f && c.notes[2].velocity >= 0.5f);
 }
 
 TEST (p2_scale_levels_and_limit)

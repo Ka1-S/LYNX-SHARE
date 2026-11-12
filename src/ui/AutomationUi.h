@@ -39,6 +39,9 @@ struct AutomationPointMemory
     float tension = 0.0f;
 };
 AutomationPointMemory& automationPointMemory();
+// The header of FL's automation point menu: the point's number and the clip's point count, "Point 2/14" (`point` is
+// 0-based) [live FL check 190cq, shot curves190bw-01].
+juce::String automationPointMenuHeader (int point, int count);
 // The "Mode" block of FL's automation point menu (EEACPointMenu): the header and the 13 modes as radio items in FL's
 // order (Smooth, Hold, Single curve, Single curve 2, Single curve 3, Double curve…, Wave). `current`: the mode of the
 // segment that ends at the point (−1: none ticked); `enabled` false on the first point, which ends no segment.

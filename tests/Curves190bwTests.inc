@@ -485,7 +485,7 @@ TEST (curves190bw_limit_follows_fls_limiter)
     LimitOptions o;
     o.lowKey = 0;
     o.highKey = 127;
-    o.scale = 1; // Major, on C
+    o.scale = limitRestrictionIndex ("Major", LimitRestriction::scale); // Major, on C
     // C# and D# and F# sit exactly between two scale keys; A# too. E stays.
     CHECK (run ({ 61, 63, 64, 66, 70 }, o) == (std::vector<int> { 62, 64, 64, 67, 71 }));
     o.snap = LimitOptions::under;
@@ -496,7 +496,7 @@ TEST (curves190bw_limit_follows_fls_limiter)
     o = {};
     o.lowKey = 0;
     o.highKey = 127;
-    o.scale = 5; // Minor pentatonic on A (9): A C D E G; F (65) is one from E and two from G, B (71) one from C
+    o.scale = limitRestrictionIndex ("Minor pentatonic", LimitRestriction::scale); // on A (9): A C D E G; F (65) is one from E and two from G, B (71) one from C
     o.root = 9;
     CHECK (run ({ 65, 71, 66 }, o) == (std::vector<int> { 64, 72, 67 }));
 
@@ -524,7 +524,7 @@ TEST (curves190bw_limit_follows_fls_limiter)
     o = {};
     o.lowKey = 60;
     o.highKey = 71;
-    o.scale = 1;
+    o.scale = limitRestrictionIndex ("Major", LimitRestriction::scale);
     o.transpose = 1;
     CHECK (run ({ 49 }, o) == (std::vector<int> { 63 })); // C#3 -> D (50) -> 62 -> +1
 }
@@ -621,4 +621,135 @@ TEST (curves190bw_randomise_reaches_mod_and_release)
         movedY += after.notes[i].modY != 0.5f;
     }
     CHECK (movedRelease >= 6 && movedX >= 6 && movedY >= 6);
+}
+
+// Round 190ct (live FL check 190cq, shot curves190bw-05f): the limiter's list is FL's System/Config/Chords.map —
+// (none), 66 chords in six groups, 22 scales — and the allowed keys are marked FL's way (octaves −1…10, steps added).
+TEST (curves190ct_limit_list_is_fls_chords_and_scales)
+{
+    using namespace lynx;
+    using namespace lynx::notetools;
+    const auto& list = limitRestrictions();
+    CHECK (list.size() == 89);
+    int chords = 0, scaleCount = 0, groups = 0;
+    for (const auto& e : list)
+    {
+        chords += e.kind == LimitRestriction::chord;
+        scaleCount += e.kind == LimitRestriction::scale;
+        groups += e.groupStart && e.kind == LimitRestriction::chord;
+    }
+    CHECK (chords == 66 && scaleCount == 22 && groups == 6);
+    CHECK (list[0].kind == LimitRestriction::none && std::string (list[0].name) == "(none)");
+    CHECK (std::string (list[1].name) == "Major" && list[1].kind == LimitRestriction::chord && list[1].groupStart);
+    CHECK (std::string (list[9].name) == "tri" && std::string (list[10].name) == "6" && list[10].groupStart);
+    CHECK (std::string (list[66].name) == "m-Maj13" && std::string (list[67].name) == "Major" && list[67].kind == LimitRestriction::scale
+           && list[67].groupStart);
+    CHECK (std::string (list[88].name) == "Locrian");
+    const char* flScales[] = { "Major", "Major pentatonic", "Major bebop", "Minor Harmonic", "Minor Melodic", "Minor pentatonic",
+                               "Minor Natural (Aeolian)", "Minor Neapolitan", "Minor Hungarian", "Whole tone", "Diminished",
+                               "Dominant bebop", "Jap in sen", "Blues", "Arabic", "Enigmatic", "Neapolitan", "Dorian", "Phrygian",
+                               "Lydian", "Mixolydian", "Locrian" };
+    for (int i = 0; i < 22; ++i)
+        CHECK (limitRestrictionIndex (flScales[i], LimitRestriction::scale) == 67 + i);
+    CHECK (limitRestrictionIndex ("Major", LimitRestriction::chord) == 1 && limitRestrictionIndex ("nope", LimitRestriction::chord) == 0);
+
+    const auto pitchClasses = [] (int root, int index) {
+        const auto allowed = limitAllowedKeys (root, index);
+        std::set<int> pcs;
+        for (int k = 24; k < 120; ++k) // away from the ends
+            if (allowed[(std::size_t) k])
+                pcs.insert (k % 12);
+        return pcs;
+    };
+    CHECK (pitchClasses (0, limitRestrictionIndex ("Major", LimitRestriction::scale)) == (std::set<int> { 0, 2, 4, 5, 7, 9, 11 }));
+    CHECK (pitchClasses (0, limitRestrictionIndex ("Major", LimitRestriction::chord)) == (std::set<int> { 0, 4, 7 }));
+    CHECK (pitchClasses (2, limitRestrictionIndex ("9", LimitRestriction::chord)) == (std::set<int> { 2, 6, 9, 0, 4 })); // D 9th
+    CHECK (pitchClasses (0, limitRestrictionIndex ("Jap in sen", LimitRestriction::scale)) == (std::set<int> { 0, 1, 5, 7, 10 }));
+    // FL's marking at the bottom: m-Maj13 on B reaches pitch class G# only through its +21 step, so key 8 (two
+    // octaves below the first B it starts from) stays out while 20 is in
+    const auto mm13 = limitAllowedKeys (11, limitRestrictionIndex ("m-Maj13", LimitRestriction::chord));
+    CHECK (! mm13[8] && mm13[20] && mm13[11] && mm13[128] && ! mm13[129]);
+    const auto none = limitAllowedKeys (0, 0);
+    CHECK (std::all_of (none.begin(), none.end(), [] (bool b) { return b; }));
+
+    // a chord restriction in the limiter: C major triad, Above / Under on a tie
+    Pattern p;
+    for (int k : { 61, 62, 65, 66, 69 })
+    {
+        Note n;
+        n.key = k;
+        n.length = 24;
+        p.notes.push_back (n);
+    }
+    std::vector<int> all { 0, 1, 2, 3, 4 };
+    LimitOptions o;
+    o.lowKey = 0;
+    o.highKey = 127;
+    o.scale = limitRestrictionIndex ("Major", LimitRestriction::chord);
+    auto q = p;
+    limit (q, all, o);
+    CHECK (q.notes[0].key == 60 && q.notes[1].key == 64 && q.notes[2].key == 64 && q.notes[3].key == 67 && q.notes[4].key == 67);
+    o.snap = LimitOptions::under;
+    q = p;
+    limit (q, all, o);
+    CHECK (q.notes[1].key == 60 && q.notes[0].key == 60 && q.notes[4].key == 67);
+}
+
+// Round 190ct (live FL check 190cq, shot curves190bw-07b): FL's Bipolar box covers every level. Off, the levels only
+// go up (pan to the right, pitch up) and timing only later; on, they spread both ways, the same draws as before.
+TEST (curves190ct_randomise_bipolar_off_moves_every_level_up)
+{
+    using namespace lynx;
+    using namespace lynx::notetools;
+    Pattern p;
+    for (int i = 0; i < 32; ++i)
+    {
+        Note n;
+        n.start = 960 + i * 96;
+        n.length = 48;
+        n.velocity = 0.5f;
+        n.pan = 0.0f;
+        n.release = 0.5f;
+        n.finePitch = 0.0f;
+        n.modX = 0.5f;
+        n.modY = 0.5f;
+        p.notes.push_back (n);
+    }
+    std::vector<int> all;
+    for (int i = 0; i < 32; ++i)
+        all.push_back (i);
+    RandomiseOptions o;
+    o.velocity = 0.4f;
+    o.pan = 0.5f;
+    o.finePitch = 0.5f;
+    o.modX = 0.4f;
+    o.modY = 0.4f;
+    o.release = 0.4f;
+    o.timing = 40;
+    o.seed = 11;
+
+    auto both = p;
+    randomise (both, all, o);
+    o.bipolar = false;
+    auto up = p;
+    randomise (up, all, o);
+
+    int downBoth = 0, upBoth = 0, wrong = 0, moved = 0;
+    for (std::size_t i = 0; i < p.notes.size(); ++i)
+    {
+        const auto& b = both.notes[i];
+        const auto& u = up.notes[i];
+        downBoth += (b.velocity < 0.5f) + (b.pan < 0.0f) + (b.finePitch < 0.0f) + (b.modX < 0.5f) + (b.modY < 0.5f) + (b.release < 0.5f);
+        upBoth += (b.velocity > 0.5f) + (b.pan > 0.0f) + (b.finePitch > 0.0f) + (b.modX > 0.5f) + (b.modY > 0.5f) + (b.release > 0.5f);
+        wrong += (u.velocity < 0.5f) + (u.pan < 0.0f) + (u.finePitch < 0.0f) + (u.modX < 0.5f) + (u.modY < 0.5f) + (u.release < 0.5f)
+                 + (u.start < p.notes[i].start);
+        moved += (u.velocity > 0.5f) + (u.pan > 0.0f) + (u.finePitch > 0.0f) + (u.modX > 0.5f) + (u.modY > 0.5f) + (u.release > 0.5f)
+                 + (u.start > p.notes[i].start);
+        // pan moves as far as its bipolar draw, only to the right
+        CHECK (std::abs (u.pan - std::abs (b.pan)) < 1e-6f);
+        CHECK (u.velocity <= 0.9f + 1e-6f && u.pan <= 1.0f && u.finePitch <= 60.0f + 1e-3f);
+    }
+    CHECK (wrong == 0);
+    CHECK (moved >= 32 * 7 - 8);
+    CHECK (downBoth > 40 && upBoth > 40); // Bipolar on: both ways
 }

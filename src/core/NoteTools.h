@@ -128,7 +128,8 @@ struct RandomiseOptions
     float release = 0.0f;     // (round 190bw; FL's randomizer has Release beside Mod X and Mod Y)
     std::int64_t timing = 0;  // maximum start shift in ticks (never before 0)
     float length = 0.0f;      // maximum relative length change (0..1)
-    bool bipolar = true;      // changes go both ways; otherwise only down (velocity) / only later (timing)
+    bool bipolar = true;      // FL's "Bipolar": changes go both ways; off, every level only goes up (pan to the
+                              // right, pitch up) and timing only later (live FL check 190cq, round 190ct)
     std::uint32_t seed = 1;
 };
 
@@ -161,7 +162,7 @@ struct LimitOptions
 
     // FL's "Key / scale restriction" and "Keyboard range / transpose" (round 190bw, FL's limiter / transposer):
     int root = 0;                    // base key, 0 = C ... 11 = B
-    int scale = 0;                   // index into scales(); 0 = no restriction
+    int scale = 0;                   // index into limitRestrictions() (FL's chord / scale list); 0 = (none)
     enum Snap { above, under, alternate };
     int snap = above;                // where a note exactly between two scale keys goes (alternate: up first)
     bool wrap = false;               // "Wrap to top / bottom": notes above the range go to its lowest octave,
@@ -171,6 +172,25 @@ struct LimitOptions
 
 // The order is FL's: scale restriction on the note's own key, then the range, then the transposition.
 void limit (Pattern& pattern, const std::vector<int>& indices, const LimitOptions& options);
+
+// FL's chord / scale list of the limiter (and of the Stamp tool): FL's own data file System/Config/Chords.map, in its
+// order — (none), then the 66 chords in six groups (triads, 6, 7, 9, 11, 13), then the 22 scales (round 190ct, list
+// seen in FL: live check 190cq shot curves190bw-05f). Each entry is the steps in semitones between its notes, above
+// the base key, as the file gives them (a chord may span more than an octave).
+struct LimitRestriction
+{
+    enum Kind { none, chord, scale };
+    const char* name; // as FL shows it; scale names are English for tr(), chord symbols stay as they are
+    Kind kind;
+    bool groupStart;  // the first entry of a group (FL draws a separator, or the "Chords" / "Scales" heading)
+    std::vector<int> steps;
+};
+const std::vector<LimitRestriction>& limitRestrictions();
+// The index of the entry with this name and kind; 0 when there is none.
+int limitRestrictionIndex (const char* name, LimitRestriction::Kind kind) noexcept;
+// The keys the restriction allows, worked out as FL's limiter does [REA FLEngine 0xded3b0]: for the octaves −1…10 the
+// base key and the keys reached by adding the steps one by one, on FL's 132-key range (0…131). Index 0 allows all.
+std::array<bool, 132> limitAllowedKeys (int root, int restriction);
 
 // --- LYNX's own versions of the tools FL ships as piano roll scripts (REA round 143: Tools › Scripts) -----------
 
