@@ -108,13 +108,14 @@ TEST (als190bq_eq_eight_q_laws_match_the_analog_prototypes)
     using namespace lynx;
     using alsdev::Eq8Mode;
     // the Q conversions (round 190cx, measured in Live 12.4): bell, notch and 12 dB cuts √2·Q; shelves through the
-    // cookbook Q 0.7071·(√2·Q)^0.3966; 48 dB cuts = the scale of all four Butterworth section Qs, 1 + 0.2611·ln(Q / 0.714)
+    // cookbook Q 0.71·(Q / 0.71)^0.394; 48 dB cuts = the scale of all four Butterworth section Qs, 1 + 0.2611·ln(Q / 0.714)
     CHECK (std::abs (alsdev::facetQ (Eq8Mode::bell, 0.7071) - 1.0) < 1e-3);
     CHECK (std::abs (alsdev::facetQ (Eq8Mode::notch, 2.0) - 2.8284) < 1e-3);
     CHECK (std::abs (alsdev::facetQ (Eq8Mode::lowCut12, 0.7071) - 1.0) < 1e-3 && std::abs (alsdev::facetQ (Eq8Mode::highCut12, 2.0) - 2.8284) < 1e-3);
-    CHECK (std::abs (alsdev::facetQ (Eq8Mode::lowShelf, 0.7071) - 1.0) < 1e-3 && std::abs (alsdev::facetQ (Eq8Mode::highShelf, 1.0) - std::pow (1.41421356, 0.3966 / 0.4697)) < 1e-3);
-    // the measured points: shelf Q 0.71 → cookbook 0.709, Q 2 → 1.068; 48 dB cut Q 0.5 / 0.71 / 1 → sections × 0.907 / 0.999 / 1.088
-    CHECK (std::abs (alsdev::eq8ShelfCookbookQ (0.71) - 0.709) < 0.002 && std::abs (alsdev::eq8ShelfCookbookQ (2.0) - 1.068) < 0.002);
+    CHECK (std::abs (alsdev::facetQ (Eq8Mode::lowShelf, 0.71) - std::pow (0.71 / 0.70710678, 1.0 / 0.4697)) < 1e-3 &&
+           std::abs (alsdev::facetQ (Eq8Mode::highShelf, 1.0) - std::pow (0.71 * std::pow (1.0 / 0.71, 0.394) / 0.70710678, 1.0 / 0.4697)) < 1e-3);
+    // the measured points: shelf Q 0.71 → cookbook 0.709 (best fit; 0.71 is as close), Q 2 → 1.068; 48 dB cut Q 0.5 / 0.71 / 1 → sections × 0.907 / 0.999 / 1.088
+    CHECK (std::abs (alsdev::eq8ShelfCookbookQ (0.71) - 0.709) < 0.0015 && std::abs (alsdev::eq8ShelfCookbookQ (2.0) - 1.068) < 0.002);
     CHECK (std::abs (alsdev::facetQ (Eq8Mode::lowCut48, 0.5) - 0.907) < 0.002 && std::abs (alsdev::facetQ (Eq8Mode::highCut48, 0.71) - 0.999) < 0.002 &&
            std::abs (alsdev::facetQ (Eq8Mode::lowCut48, 1.0) - 1.088) < 0.002);
     // Adaptive Q: a bell at Q 2, ±12 dB acts as Q 3.97 / 3.95 (factor 1.12 → 3.95)
@@ -216,7 +217,8 @@ TEST (als190bq_eq_eight_q_laws_match_the_analog_prototypes)
             want += als190bq::analogDb (1, 0, 0, 1, 1 / (bw8[k] * (k == 3 ? 2.0 : 1.0)), 1, r);
         oldWorst = std::max (oldWorst, std::abs (facet::analogDb (old, 0, 100.0 * r) - want));
     }
-    CHECK (oldWorst < 1e-6);
+    std::printf ("  48 dB cut, default law (top section): worst %.2e dB\n", oldWorst);
+    CHECK (oldWorst < 1e-3); // (float parameter rounding only; the other law is dB away)
 }
 
 // The importer's EQ Eight against Live 12.4's own renders (round 190cw: white noise through one band at 1 kHz, the

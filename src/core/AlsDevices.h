@@ -49,14 +49,14 @@ enum class Eq8Mode { lowCut48, lowCut12, lowShelf, bell, notch, highShelf, highC
 // Live 12.4's EQ Eight as rendered in round 190cw (noise through one band at 1 kHz, transfer function vs the dry track):
 //   bell / notch   Qb = Qfacet / √2 in the constant-Q biquad; Live = the textbook bell (0.03 … 0.08 dB) → Qfacet = √2 · Q
 //   12 dB cuts     section Q = 0.7071 · Qfacet; Live = the textbook 2nd order (0.08 dB)            → Qfacet = √2 · Q
-//   shelves        Qs = 0.7071 · Qfacet^0.4697; Live's Q 0.71 / 2 act as cookbook Q 0.709 / 1.068 →
+//   shelves        Qs = 0.7071 · Qfacet^0.4697; Live's Q 0.71 / 2 act as cookbook Q 0.71 / 1.068 →
 //                  Qs = eq8ShelfCookbookQ (Q), Qfacet = (Qs / 0.7071)^(1 / 0.4697)
 //   48 dB cuts     Live = an 8th-order Butterworth at Q 0.71 with all four section Qs scaled by
 //                  eq8CutSectionScale (Q) (Q 0.5 / 0.71 / 1 → × 0.907 / 0.999 / 1.088, fit 0.14 dB); Facet holds it
 //                  with its cut law "all sections" (facet::cutLawParam) and Qfacet = that scale
 // (clamped to Facet's 0.025 … 40)
 double eq8CutSectionScale (double liveQ) noexcept;  // 1 + 0.2611·ln(Q / 0.714), at least 0.05
-double eq8ShelfCookbookQ (double liveQ) noexcept;   // 0.7071·(√2·Q)^0.3966
+double eq8ShelfCookbookQ (double liveQ) noexcept;   // 0.71·(Q / 0.71)^0.394
 // Adaptive Q on a bell: Q × factor^(|gain dB| / 2) (factor = the device's AdaptiveQFactor, 1.12 in every saved set)
 double eq8AdaptiveQ (double liveQ, double gainDb, double factor) noexcept;
 double facetQ (Eq8Mode mode, double liveQ) noexcept;
