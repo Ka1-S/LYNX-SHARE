@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <vector>
 
 #if JUCE_WINDOWS
@@ -44,10 +45,31 @@ struct PeerScaleListeners : juce::ComponentPeer
     }
 };
 
+// `bounds` (the component's bounds: in the main window's client area, LYNX's zoomed units) in the parent's physical
+// pixels (times the UI zoom = the peer's logical pixels, times the display's scale = physical)
+#if JUCE_WINDOWS
+RECT physicalRect (const juce::Component& c, const juce::ComponentPeer& peer, juce::Rectangle<int> bounds)
+{
+    const auto scale = peer.getPlatformScaleFactor() * (double) c.getDesktopScaleFactor();
+    const auto b = bounds.toDouble() * scale;
+    return { juce::roundToInt (b.getX()), juce::roundToInt (b.getY()), juce::roundToInt (b.getRight()), juce::roundToInt (b.getBottom()) };
+}
+
+// the native window's place in its parent's client area, physical pixels
+RECT rectInParent (HWND hwnd, HWND parent)
+{
+    RECT now {};
+    GetWindowRect (hwnd, &now);
+    MapWindowPoints (nullptr, parent, reinterpret_cast<POINT*> (&now), 2);
+    return now;
+}
+#endif
+
 // JUCE places a child window from its logical bounds with the scale of the display at that point taken as a screen
-// point, which is not the parent's when the main window is on another display: put it at its bounds in the parent's own
-// scale (JUCE reads the child's bounds back that way: client pixels / the parent's scale).
-void placePhysically (juce::Component& c)
+// point, which is not the parent's when the main window is on another display: put it at `bounds` in the parent's own
+// scale. `bounds` is what the caller wants, not what JUCE reads back: for a transparent (layered) child JUCE 8.0.4 adds
+// the parent's screen position when it places it, and its read-back then replaces the component's bounds (round 190cj).
+void placePhysically (juce::Component& c, juce::Rectangle<int> bounds)
 {
    #if JUCE_WINDOWS
     auto* peer = c.getPeer();
@@ -55,22 +77,17 @@ void placePhysically (juce::Component& c)
     auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
     if (parent == nullptr)
         return;
-    // (component bounds are in LYNX's zoomed units: times the UI zoom = the peer's logical pixels, times the display's
-    // scale = physical)
-    const auto scale = peer->getPlatformScaleFactor() * (double) c.getDesktopScaleFactor();
-    const auto b = c.getBounds().toDouble() * scale;
-    const auto x = juce::roundToInt (b.getX()), y = juce::roundToInt (b.getY());
-    const auto w = juce::roundToInt (b.getRight()) - x, h = juce::roundToInt (b.getBottom()) - y;
-    RECT now {};
-    GetWindowRect (hwnd, &now);
-    MapWindowPoints (nullptr, parent, reinterpret_cast<POINT*> (&now), 2);
-    if (now.left == x && now.top == y && now.right - now.left == w && now.bottom - now.top == h)
+    const auto want = physicalRect (c, *peer, bounds);
+    const auto now = rectInParent (hwnd, parent);
+    if (now.left == want.left && now.top == want.top && now.right == want.right && now.bottom == want.bottom)
         return;
-    SetWindowPos (hwnd, nullptr, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    SetWindowPos (hwnd, nullptr, want.left, want.top, want.right - want.left, want.bottom - want.top, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
    #else
-    juce::ignoreUnused (c);
+    juce::ignoreUnused (c, bounds);
    #endif
 }
+
+void placePhysically (juce::Component& c) { placePhysically (c, c.getBounds()); }
 
 // the attached children of one native window, from the bottom of their stacking order up
 std::vector<juce::Component*> attachedChildrenOf (void* parent, const juce::Component* except = nullptr)
@@ -224,6 +241,61 @@ private:
     juce::Image backdrop;
 };
 
+#if JUCE_WINDOWS
+// Round 190cj: a transparent child window (a dancer) takes the mouse wherever its picture is not fully transparent:
+// the system decides that from the pixels, before JUCE's hitTest is asked, and a click JUCE then finds no component
+// for is simply lost. So the window answers the system's own hit test: where the component's hitTest says no (FL's
+// "Solid" off, the dancer's arms and reflection) it is "transparent", and the click goes to the window under it.
+struct ClickThrough
+{
+    WNDPROC original = nullptr;
+    juce::Component::SafePointer<juce::Component> component;
+};
+
+std::map<HWND, ClickThrough>& clickThroughWindows()
+{
+    static std::map<HWND, ClickThrough> windows;
+    return windows;
+}
+
+LRESULT CALLBACK clickThroughProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    auto& windows = clickThroughWindows();
+    const auto it = windows.find (hwnd);
+    if (it == windows.end())
+        return DefWindowProc (hwnd, message, wParam, lParam);
+    const auto original = it->second.original;
+    if (message == WM_NCHITTEST)
+    {
+        if (auto* c = it->second.component.getComponent())
+            if (auto* peer = c->getPeer())
+            {
+                POINT p { (int) (short) LOWORD (lParam), (int) (short) HIWORD (lParam) };
+                ScreenToClient (hwnd, &p);
+                const auto scale = juce::jmax (0.01, peer->getPlatformScaleFactor() * (double) c->getDesktopScaleFactor());
+                if (! c->hitTest (juce::roundToInt (std::floor (p.x / scale)), juce::roundToInt (std::floor (p.y / scale))))
+                    return HTTRANSPARENT;
+            }
+    }
+    else if (message == WM_NCDESTROY)
+    {
+        SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR) original);
+        windows.erase (it);
+    }
+    return CallWindowProc (original, hwnd, message, wParam, lParam);
+}
+
+void passMissedClicksThrough (juce::Component& c)
+{
+    auto* hwnd = static_cast<HWND> (c.getWindowHandle());
+    if (hwnd == nullptr || clickThroughWindows().count (hwnd) != 0)
+        return;
+    auto& entry = clickThroughWindows()[hwnd];
+    entry.component = &c;
+    entry.original = (WNDPROC) SetWindowLongPtr (hwnd, GWLP_WNDPROC, (LONG_PTR) clickThroughProc);
+}
+#endif
+
 struct KeyForwarder final : juce::KeyListener
 {
     bool keyPressed (const juce::KeyPress& key, juce::Component*) override { return runSecondaryWindowKey (key); }
@@ -254,6 +326,10 @@ bool attach (juce::Component& c, juce::Component& area)
     c.addToDesktop (0, handle);
     c.getProperties().set ("lynxNativeChild", true);
     c.getProperties().set ("lynxNativeParent", (juce::int64) (juce::pointer_sized_int) handle);
+   #if JUCE_WINDOWS
+    if (! c.isOpaque()) // (a floater: per-pixel transparency)
+        passMissedClicksThrough (c);
+   #endif
     place (c, area, bounds);
     return true;
 }
@@ -285,7 +361,24 @@ void place (juce::Component& c, const juce::Component& area, juce::Rectangle<int
     c.getProperties().set ("lynxNativeX", origin.x);
     c.getProperties().set ("lynxNativeY", origin.y);
     c.setBounds (boundsInArea + origin);
-    placePhysically (c);
+    placePhysically (c, boundsInArea + origin);
+}
+
+bool isPlacedAt (const juce::Component& c, const juce::Component& area, juce::Rectangle<int> boundsInArea)
+{
+   #if JUCE_WINDOWS
+    auto* peer = c.getPeer();
+    auto* hwnd = peer != nullptr ? static_cast<HWND> (peer->getNativeHandle()) : nullptr;
+    auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
+    if (parent == nullptr || ! isAttached (c))
+        return true; // (no native window to move)
+    const auto want = physicalRect (c, *peer, boundsInArea + originOf (area));
+    const auto now = rectInParent (hwnd, parent);
+    return now.left == want.left && now.top == want.top && now.right == want.right && now.bottom == want.bottom;
+   #else
+    juce::ignoreUnused (c, area, boundsInArea);
+    return true;
+   #endif
 }
 
 juce::Rectangle<int> boundsIn (const juce::Component& c, const juce::Component&)
@@ -472,6 +565,51 @@ bool isAbove (void* a, void* b)
     return false;
 }
 
+juce::Rectangle<int> nativeRectInParent (const juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    auto* hwnd = static_cast<HWND> (c.getWindowHandle());
+    auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
+    if (parent == nullptr)
+        return {};
+    const auto r = rectInParent (hwnd, parent);
+    return { (int) r.left, (int) r.top, (int) (r.right - r.left), (int) (r.bottom - r.top) };
+   #else
+    juce::ignoreUnused (c);
+    return {};
+   #endif
+}
+
+juce::Rectangle<int> nativeParentClientSize (const juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    auto* hwnd = static_cast<HWND> (c.getWindowHandle());
+    auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
+    if (parent == nullptr)
+        return {};
+    RECT r {};
+    GetClientRect (parent, &r);
+    return { 0, 0, (int) (r.right - r.left), (int) (r.bottom - r.top) };
+   #else
+    juce::ignoreUnused (c);
+    return {};
+   #endif
+}
+
+juce::Rectangle<int> nativeScreenRect (void* window)
+{
+   #if JUCE_WINDOWS
+    if (window == nullptr)
+        return {};
+    RECT r {};
+    GetWindowRect (static_cast<HWND> (window), &r);
+    return { (int) r.left, (int) r.top, (int) (r.right - r.left), (int) (r.bottom - r.top) };
+   #else
+    juce::ignoreUnused (window);
+    return {};
+   #endif
+}
+
 void* parentOf (void* window)
 {
    #if JUCE_WINDOWS
@@ -507,6 +645,23 @@ void* windowAt (const juce::Component& c, juce::Point<int> localPoint)
    #else
     juce::ignoreUnused (c, localPoint);
     return nullptr;
+   #endif
+}
+
+int hitCodeAt (const juce::Component& c, juce::Point<int> localPoint)
+{
+   #if JUCE_WINDOWS
+    auto* peer = c.getPeer();
+    auto* hwnd = peer != nullptr ? static_cast<HWND> (peer->getNativeHandle()) : nullptr;
+    if (hwnd == nullptr)
+        return 0;
+    const auto scale = peer->getPlatformScaleFactor() * (double) c.getDesktopScaleFactor();
+    POINT p { juce::roundToInt ((localPoint.x + 0.5) * scale), juce::roundToInt ((localPoint.y + 0.5) * scale) };
+    ClientToScreen (hwnd, &p);
+    return (int) SendMessage (hwnd, WM_NCHITTEST, 0, MAKELPARAM (p.x, p.y));
+   #else
+    juce::ignoreUnused (c, localPoint);
+    return 0;
    #endif
 }
 

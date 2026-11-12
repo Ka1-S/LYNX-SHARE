@@ -337,12 +337,16 @@ COMMIT="$(git rev-parse --short=10 HEAD 2>/dev/null || true)"
 [[ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]] && COMMIT="$COMMIT-dirty"
 printf '#pragma once\n#define LYNX_GIT_COMMIT "%s"\n' "$COMMIT" > "$OUT/lynx_build.h"
 
+# -Werror=return-type (round 190ci): a value-returning function or lambda that can end without a return is undefined
+# behaviour that clang compiles to "fall into the next function". A merge that dropped one `return` line shipped that
+# way in the 0.1.26 release candidate (the FPC editor's channel lookup: adding an FPC channel ended LYNX) with only a
+# warning in the log. It is an error in LYNX's own sources.
 echo "Compiling the app..."
 printf '%s\n' "${APP_SOURCES[@]}" | xargs -P "$JOBS" -I{} bash -c '
     src={}; obj="$OUT/app/$(echo "$src" | tr / _).o"
     extra=""; [[ "$src" == src/platform/CrashGuard.cpp ]] && extra="-fms-extensions"
     [[ "$src" == src/ui/CrashReporter.cpp ]] && extra="-iquote $OUT"
-    cached_pp "$obj" -- $ZIG c++ $COMMON_STR $extra -Wall -Wextra -c "$src" -o "$obj"'
+    cached_pp "$obj" -- $ZIG c++ $COMMON_STR $extra -Wall -Wextra -Werror=return-type -c "$src" -o "$obj"'
 
 # 2026-11-04: an object whose source left APP_SOURCES (another branch's build in this folder) must not be linked
 # by the app/*.o glob below: it broke unrelated landings with undefined symbols.

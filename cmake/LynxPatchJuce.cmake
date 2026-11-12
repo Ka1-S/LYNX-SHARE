@@ -115,6 +115,14 @@
 #    the moment the copy is needed. The flag applies to one image (`lynxNoReadbackImage`), not to every Graphics made
 #    meanwhile. A picture whose device is gone is counted (`lynxImageContentLost`; the caches repaint), and reading
 #    from such a device returns false instead of reading through a null mapping.
+# 23. Windows only, juce_gui_basics/native/juce_Windowing_windows.cpp (round 190cj; the LYNX Dance dancer was never on
+#    the stage): a transparent (per-pixel alpha, layered) CHILD window, which LYNX's dancers are. (a) Every repaint ends
+#    in UpdateLayeredWindow with the window's SCREEN position as its "new position"; for a child window the system
+#    takes that position in the parent's client area, so each repaint moved the window by the parent's client offset
+#    on the screen (116, 62 for a window at 108, 31: after a minute the dancer was 95900 pixels away). A child window
+#    now gets no position there (it stays where it is). (b) setBounds added the parent's screen position to such a
+#    child's place and then read the result back as the component's bounds; a child window is now placed like any
+#    other child, in its parent's client area. Top-level windows are untouched.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -277,6 +285,13 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("VST3 menu item by index" "LYNX patch (round 190an): getItem takes an index"
             "        tresult PLUGIN_API getItem (Steinberg::int32 tag, Item& result, IContextMenuTarget** target) override|NL|        {|NL|"
             "        tresult PLUGIN_API getItem (Steinberg::int32 tag, Item& result, IContextMenuTarget** target) override|NL|        {|NL|            // LYNX patch (round 190an): getItem takes an index (the SDK's IContextMenu::getItem (index, item, target)):|NL|            // a plugin that copies the host's items into its own menu walks 0 .. getItemCount() - 1. JUCE only|NL|            // compared tags, so such a plugin found nothing (or the wrong item).|NL|            if (isPositiveAndBelow ((int) tag, items.size()))|NL|            {|NL|                auto& indexed = items.getReference ((int) tag);|NL|                result = indexed.item;|NL||NL|                if (target != nullptr)|NL|                    *target = indexed.target.get();|NL||NL|                return kResultTrue;|NL|            }|NL||NL|")
+    elseif(file MATCHES "juce_Windowing_windows.cpp$")
+        lynx_juce_fix("layered child window keeps its place when repainted" "LYNX patch (round 190cj): a child window's position"
+            "        UpdateLayeredWindow (hwnd, nullptr, &pos, &size, sourceHdc, &p, 0, &bf, ULW_ALPHA);"
+            "        // LYNX patch (round 190cj): a child window's position is in its parent's client area, not on the screen:|NL|        // given the screen position, each repaint moved a transparent child window by the parent's client offset.|NL|        // No position: it stays where it is.|NL|        const auto lynxIsChild = (GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) != 0;|NL|        UpdateLayeredWindow (hwnd, nullptr, lynxIsChild ? nullptr : &pos, &size, sourceHdc, &p, 0, &bf, ULW_ALPHA);")
+        lynx_juce_fix("layered child window placed in its parent's client area" "LYNX patch (round 190cj): a child window is placed"
+            "            if (auto parentHwnd = GetParent (hwnd))|NL|            {|NL|                auto parentRect = convertPhysicalScreenRectangleToLogical"
+            "            // LYNX patch (round 190cj): a child window is placed in its parent's client area like any other child|NL|            // (the parent's screen position was added to it); other windows as before|NL|            if (auto parentHwnd = (GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) != 0 ? HWND {} : GetParent (hwnd))|NL|            {|NL|                auto parentRect = convertPhysicalScreenRectangleToLogical")
     elseif(file MATCHES "juce_FileChooser_windows.cpp$")
         lynx_juce_fix("file dialog keys only into LYNX" "LYNX patch (round 180a): only into LYNX"
             "                    SendInput ((UINT) std::size (inputs), inputs, sizeof (INPUT));"
@@ -319,6 +334,7 @@ function(lynx_patch_juce juce_dir)
     # (Windows only, so a Linux or macOS configure never rewrites it in a JUCE checkout that others share)
     if(WIN32 OR CMAKE_SCRIPT_MODE_FILE)
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_FileChooser_windows.cpp")
+        lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_Windowing_windows.cpp")
         lynx_patch_juce_file("${juce_dir}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")
     endif()
 endfunction()

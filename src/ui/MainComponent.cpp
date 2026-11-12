@@ -3376,6 +3376,13 @@ void MainComponent::addPanelMenuItems (Panel panel, juce::PopupMenu& menu)
                 ChannelRackComponent::muteRemovedSteps = ! ChannelRackComponent::muteRemovedSteps;
                 saveUiSettings();
             });
+            // FL's place for it (round 190cj, seen in FL 2026: Channel rack menu > Options, after "Mute removed steps" and
+            // "Show mixer track selectors"; it was in Settings > General): a row's miniature shows the whole pattern
+            menu.addItem (tr ("Show complete piano roll preview"), true, ChannelRackComponent::completePreview.load(), [this] {
+                ChannelRackComponent::completePreview.store (! ChannelRackComponent::completePreview.load());
+                rack.repaint();
+                saveUiSettings();
+            });
             break;
         }
         case Panel::playlist:
@@ -6807,7 +6814,6 @@ void MainComponent::openSettings (int page)
         o.noteNamesEveryKey = notenames::everyKey.load();
         o.rackPlayheadColumn = ChannelRackComponent::playheadColumn.load();
         o.rackStepsChannelColour = ChannelRackComponent::stepsChannelColour.load();
-        o.rackCompletePreview = ChannelRackComponent::completePreview.load();
         o.reducedEffects = skin::reducedEffects();
         o.animationRate = ui::FrameTicker::rateLimit();
         o.artMotion = skin::artMotion();
@@ -6880,10 +6886,8 @@ void MainComponent::openSettings (int page)
                 if (auto* c = juce::Desktop::getInstance().getComponent (i)) c->repaint();
         }
         if (o.rackPlayheadColumn != ChannelRackComponent::playheadColumn.load()
-            || o.rackStepsChannelColour != ChannelRackComponent::stepsChannelColour.load()
-            || o.rackCompletePreview != ChannelRackComponent::completePreview.load())
+            || o.rackStepsChannelColour != ChannelRackComponent::stepsChannelColour.load())
         {
-            ChannelRackComponent::completePreview.store (o.rackCompletePreview);
             ChannelRackComponent::playheadColumn.store (o.rackPlayheadColumn);
             ChannelRackComponent::stepsChannelColour.store (o.rackStepsChannelColour);
             self.rack.repaint();

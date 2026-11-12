@@ -6,7 +6,8 @@
 // the Playlist's, the Mixer's, the Piano Roll's) an item of the first column then opens its submenu OVER the second
 // column, and JUCE grows it upwards whenever the item is in the lower half of the screen, far from the item. LYNX puts
 // it beside the parent menu's outer edge instead, its first item level with the item that opened it, growing
-// downwards; it moves up only as much as the screen needs, and goes to the parent's left when the right has no room.
+// downwards; it moves up only as much as the screen needs, and goes to the left (of the parent, or of the item's column
+// when that is not the first one) when the right has no room.
 
 #include <algorithm>
 #include <cstdint>
@@ -27,8 +28,12 @@ inline Box placeSubmenu (Box parent, Box item, int w, int h, int border, Box scr
     int x;
     if (parent.x + parent.w + w <= right)
         x = parent.x + parent.w;           // beside the outer edge (the usual case)
-    else if (parent.x - w >= screen.x)
-        x = parent.x - w;                  // no room on the right: beside the left edge
+    else if (const auto left = item.x - parent.x > border + item.w / 2 ? item.x : parent.x; left - w >= screen.x)
+        // no room on the right: beside the left edge of the parent, or of the item's own column when the item is not
+        // in the first one (round 190cj: the Mixer's "Disk recording", in the second column, had its submenu on the
+        // far side of the first column, 700 px from the item; over the first column it is next to its item, as a
+        // system menu's)
+        x = left - w;
     else
         x = std::max (screen.x, right - w); // no room on either side: as far right as it fits
     auto y = item.y - border;               // first item level with the item

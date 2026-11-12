@@ -28,6 +28,10 @@ bool isAttached (const juce::Component& c);
 // these are its plain bounds in its parent.
 void place (juce::Component& c, const juce::Component& area, juce::Rectangle<int> boundsInArea);
 juce::Rectangle<int> boundsIn (const juce::Component& c, const juce::Component& area);
+// Is the attached component's native window exactly at `boundsInArea`, read from the system (not from JUCE's idea of
+// its bounds)? True for a component that has no native window of its own. (Round 190cj: the dancers' windows are
+// checked twice a second and put back when a zoom or display change, or anything else, left them elsewhere.)
+bool isPlacedAt (const juce::Component& c, const juce::Component& area, juce::Rectangle<int> boundsInArea);
 // After the main window's native window was made again, or `area` moved inside it: attached again if needed, and put
 // back at the same place in `area`.
 void refresh (juce::Component& c, juce::Component& area);
@@ -59,6 +63,8 @@ void raiseOverlays();
 // transparency (a component that is not opaque becomes a layered child window on Windows, a transparent subview on
 // macOS) that stay in front of the native panels and docked plugin windows, under the overlays. Clicks on their
 // transparent pixels reach the window under them. raiseOverlays raises the floaters first, then the overlays.
+// On Windows that holds for every point the component's hitTest refuses, opaque pixels too (round 190cj: the dancer
+// with FL's "Solid" off, its arms and its reflection): the system asks the window, which answers "transparent" there.
 // Elsewhere (Linux: X11 child windows are drawn without blending) supportsFloaters() is false and the caller keeps
 // drawing in the main window's components.
 bool supportsFloaters();
@@ -82,9 +88,18 @@ bool isAbove (void* a, void* b);
 bool placedPhysically (const juce::Component& c);
 void notifyScaleListenersForTest (juce::Component& top);
 void* parentOf (void* window);
+// Tests (Windows; elsewhere empty): an attached component's native window in its parent's client area, that client
+// area (at 0,0), and any native window's rectangle on the screen; all in physical pixels, read from the system.
+juce::Rectangle<int> nativeRectInParent (const juce::Component& c);
+juce::Rectangle<int> nativeParentClientSize (const juce::Component& c);
+juce::Rectangle<int> nativeScreenRect (void* window);
 void* ownerOf (void* window);
 // Tests (Windows; elsewhere false / nullptr): the native window the mouse would reach at `c`'s local point (a layered
 // window's transparent pixels let it through), and whether a native window is layered (per-pixel transparency).
 void* windowAt (const juce::Component& c, juce::Point<int> localPoint);
 bool isLayered (void* window);
+// Tests (Windows; elsewhere 0): the system's hit test of the component's own native window at its local point: 1
+// (HTCLIENT) = the window takes the mouse there, -1 (HTTRANSPARENT) = the click goes to the window under it. (Round
+// 190cj: an attached component that is not opaque answers "transparent" wherever its hitTest says no.)
+int hitCodeAt (const juce::Component& c, juce::Point<int> localPoint);
 } // namespace lynx::nativechild

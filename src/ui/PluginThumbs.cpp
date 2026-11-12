@@ -463,6 +463,71 @@ int renderNative (const juce::File& folder, const juce::StringArray& only, const
     return drawn;
 }
 
+juce::String checkEditors (const std::function<void (const juce::String&)>& before)
+{
+    AudioEngine engine (false);
+    int generators = 0, effects = 0;
+    juce::StringArray problems;
+    auto paint = [&] (const std::string& key, std::unique_ptr<juce::Component> editor) {
+        const auto name = juce::String::fromUTF8 (key.c_str());
+        if (editor == nullptr || editor->getWidth() <= 0 || editor->getHeight() <= 0)
+        {
+            problems.add (name + ": no editor");
+            return false;
+        }
+        const auto picture = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+        if (! picture.isValid())
+        {
+            problems.add (name + ": nothing painted");
+            return false;
+        }
+        return true;
+    };
+    auto guarded = [&] (const std::string& key, const std::function<void()>& open) {
+        if (before)
+            before (juce::String::fromUTF8 (key.c_str()));
+        try
+        {
+            open();
+        }
+        catch (const std::exception& e)
+        {
+            problems.add (juce::String::fromUTF8 (key.c_str()) + ": " + e.what());
+        }
+    };
+    for (const auto& g : quickpick::generatorEntries (engine))
+    {
+        if (g.folder == 3 || ! g.available || ! g.make)
+            continue;
+        guarded (g.key, [&] {
+            auto channel = g.make();
+            if (! channel.has_value())
+                return;
+            const auto patcher = channel->instrument == InstrumentKind::patcher;
+            addDemoContent (*channel);
+            auto frame = generatorEditor (engine, std::move (*channel));
+            // (a Patcher channel: its page, and the node graph the Channel Rack opens)
+            if (paint (g.key, std::move (frame)) && (! patcher || paint (g.key, PatcherWindows::makeChannelEditor (engine, 0))))
+                ++generators;
+        });
+    }
+    for (const auto& f : quickpick::effectEntries (engine))
+    {
+        if (f.folder == 3 || ! f.available || ! f.make)
+            continue;
+        guarded (f.key, [&] {
+            auto slot = f.make();
+            if (slot.has_value() && paint (f.key, effectEditor (engine, std::move (*slot))))
+                ++effects;
+        });
+    }
+    engine.setSong (Song {});
+    if (generators == 0 || effects == 0)
+        problems.add ("nothing opened");
+    return problems.isEmpty() ? "OK (" + juce::String (generators) + " generators, " + juce::String (effects) + " effects)"
+                              : "ERROR " + problems.joinIntoString ("; ");
+}
+
 bool rendering()
 {
     auto& p = child();

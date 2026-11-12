@@ -64,6 +64,9 @@ public:
     juce::Component* windowOf (int channel) const;
     juce::Rectangle<int> bodyOf (int channel) const;
     int windowCount() const;
+    // tests (round 190cj): how often a dancer's window was placed natively, and how often one painted itself
+    int placementsForTest() const noexcept { return placements; }
+    int windowPaintsForTest() const noexcept { return windowPaints; }
 
     void paint (juce::Graphics& g) override;
     bool hitTest (int x, int y) override;
@@ -121,7 +124,15 @@ private:
     int dragging = -1;
     bool hadWindows = false;
     juce::Point<int> dragOffset;
+    int placements = 0, windowPaints = 0;
 };
+
+// --selftest (round 190cj, Windows; elsewhere "OK"): a dancer's own window stays where the stage put it. A hidden
+// main window with a stage and one dance channel: after the stage settles the dancer's native window lies inside the
+// main window's client area, exactly at its place, and stays there over many repaints with no further native move;
+// with both renderers (Direct2D, software), at UI zooms 100 / 125 / 150 / 200 %, after the main window moved and
+// resized, and after "Put the dancer back". `detail`: the numbers.
+juce::String danceWindowSelfTest (juce::String* detail = nullptr);
 
 // The dance channel's settings: a live preview, the move, mirrored / shown, size, speed, the outfit colour, the keys,
 // and "Load sprite sheet..." (FL's button of that name in Fruity Dance's editor)
