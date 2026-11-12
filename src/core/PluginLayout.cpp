@@ -3406,6 +3406,9 @@ Layout nebulaLayout()
     v.push_back (label (8, 264, 52, 24, TR_NOOP ("Mode"), alignLeft));
     v.push_back (choiceMenu (60, 264, 180, 24, "Mode", TR_NOOP ("Mode"),
                              TR_NOOP ("Ripple|Swell|Fold|Drift|Abyss|Vortex|Glint|Pulse|Expanse|Haze|Veil|Mist|Monolith|Eternity|Tide|Shoal|Spark|Plateau|Dusk|Mirage|Cluster|Beacon")));
+    // round 190ca: the cloud law (six of the modes run on core/NebulaCloud; classic = what a project saved before loads with)
+    v.push_back (label (264, 264, 56, 24, TR_NOOP ("Model"), alignLeft));
+    v.push_back (tabs (320, 264, 180, 24, "Law", TR_NOOP ("Classic|Measured")));
     return l;
 }
 

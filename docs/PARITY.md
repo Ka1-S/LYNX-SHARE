@@ -2764,3 +2764,58 @@ Use: `python3 scripts/taillab.py dir <ref-dir> <lynx-dir> --stim <stim-dir> [--k
 `python3 scripts/taillab.py engine <fxrender> <effect> <probe-dir> <out-dir>` for one LYNX effect on the lab's own
 probes; `python3 scripts/taillab_test.py` (80 checks on synthetic decays, densities, correlations and modulations
 of known value). Tables, anchors and the per-plugin loss lists: `/mnt/e/lynx-work/parity190bp/BASELINE-TAIL.md`.
+
+## Round 190ca: Nebula's cloud law (a port of an MIT-licensed model of six networks)
+
+The tail lab's candidate (round 190bp: the Faust Libraries function `re.valhallaSupermassive` by David Braun, MIT,
+transcribed outside the product) scored 7.91 tail / 6.20 wave against Nebula's 5.84 / 3.33, above the owner's bar
+for outside code (at least + 1.0). It is now Nebula's **Measured** model, written as native C++
+(`src/core/NebulaCloud.h` / `.cpp`; no Faust code or runtime; MIT notice in the header and in `THIRD_PARTY.md`).
+Provenance: github.com/grame-cncm/faustlibraries, `reverbs.lib` 1.6.2 (pull requests 256 and 328); the structures
+follow the diagrams their designer presented at DAFx26, the laws were matched to the reference by black-box
+measurement — the method LYNX allows itself.
+
+| Mode (LYNX name) | Network |
+|---|---|
+| 1 Ripple | sixteen modulated lines scattered by a butterfly of rotations |
+| 3 Fold | four four-channel matrix all-passes in series |
+| 4 Drift | eight stereo matrix all-passes in series |
+| 5 Abyss | a plain four-channel stage and three matrix all-passes inside one feedback loop |
+| 7 Glint | four modulated lines with a four-channel scattering matrix |
+| 20 Mirage | the same with both cuts inside the loop |
+
+Laws (the model's, in the reference's own units, which Nebula's parameters already use): line length
+D · r^k + 33 samples with r = 1 − warp³ / √8; scattering angle π · density / 4 (no mixing at 0); loop gain √feedback
+(feedback networks) or all-pass coefficient 0.91 · feedback (all-pass networks); one quadrature modulator low-passed
+at 0.25 Hz, excursion 500 / 48000 s · depth², one phase per line; lines read through a moving first-order all-pass
+interpolator; first-order cuts. LYNX's own part: controls are glided (line lengths at 0.25 samples per sample, as
+the classic network; coefficients over 5 ms), the signal path is single precision, and the looped network's global
+gain is capped at 0.9995 like the others (the model lets it reach 1).
+
+**What changes for whom.** Parameter 14, "Law" (panel: Model, Classic | Measured). New instances and the factory
+presets run the Measured model in the six modes above; the other sixteen modes have no published structure and keep
+the classic network under either setting (same samples, tested). A project or user preset saved before the round
+loads with Classic in every mode (`upgradeLoadedEffectParams`): its renders are byte-identical to the build before
+the round (78 of 78 fxrender pairs: 22 modes × 3 settings, six modes at 44.1 and 96 kHz). A change of model or mode
+while playing fades the wet signal out on the old network and in on the new one (11 ms each way).
+
+**Score, from the product's fxrender through LYNX's own state translator** (reference bank tp172d, five settings ×
+impulse / drums / music; the practical ceiling of this row is about 8.4 — the reference against its own second
+recording reads 7.7 and 9.1):
+
+| | wave | tail | D | S1 | S2 | S3 | S4 |
+|---|---|---|---|---|---|---|---|
+| Classic (before) | 3.33 | 5.84 | 6.19 | 6.08 | 4.13 | 5.38 | 7.41 |
+| Measured (the bank's render) | **6.27** | **8.43** | 8.09 | 8.06 | 9.07 | 8.19 | 8.71 |
+| Measured, three other modulator phases | 6.13 … 6.33 | 8.01 … 8.25 | 8.26 … 8.63 | 8.66 … 9.14 | 6.87 … 7.06 | 7.34 … 7.86 | 8.71 |
+| Classic, the same phases | 3.33 | 5.87 … 5.92 | 6.09 … 6.30 | 6.06 … 6.29 | 4.27 … 4.34 | 5.33 … 5.47 | 7.41 |
+
+All fifteen files rise on both scores; the worst Measured phase is above the best Classic phase on every setting.
+One part of the impulse half falls at two settings (L/R correlation of the single-impulse answer at Density 0:
+4.9 → 1.0 and 5.0 → 1.3 at the bank's phase, 5.4 … 6.8 over the row at the other phases): a handful of modulated
+echoes has no stable correlation, on the reference either.
+
+CPU and memory: see `/mnt/e/lynx-work/nebula190ca/HANDOFF.md` (the Measured model costs less than the classic
+network in every one of the six modes); + 8.4 MB per instance at 48 kHz for the sixteen 2.1 s lines.
+Open: the other sixteen modes (classify each from black-box impulses into one of the five structures and fit its
+laws; one or two rounds), and the factory presets, which were written on the classic network.

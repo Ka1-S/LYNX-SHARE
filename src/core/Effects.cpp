@@ -4186,6 +4186,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)
         slot.params[18] = 0.0f;
+    // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
+    if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
+        slot.params[(std::size_t) verbs::nebula::law] = 0.0f;
 }
 
 std::unique_ptr<Effect> makeParallelEffect (const EffectSlot& slot)

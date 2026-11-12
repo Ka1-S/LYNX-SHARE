@@ -17487,6 +17487,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Snap190axTests.inc"
 #include "PluginState190azTests.inc"
 #include "Parity190arTests.inc"
+#include "Maps190caTests.inc"
 #include "Mpe190bbTests.inc"
 #include "Mpe190bbLiveTests.inc"
 #include "PluginDb190baTests.inc"
@@ -17496,3 +17497,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "ShotScale190biTests.inc"
 #include "QaFix190bjATests.inc"
 #include "Demo190bmTests.inc"
+#include "Nebula190caTests.inc"
