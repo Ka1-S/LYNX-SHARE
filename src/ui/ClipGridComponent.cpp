@@ -160,7 +160,7 @@ public:
             {
                 const auto x = columnX (t);
                 paintHeader (g, song, state, t, { x, 0, columnWidth, headerHeight });
-                paintStatus (g, t, { x, cells.getBottom(), columnWidth, statusHeight });
+                paintStatus (g, song, state, t, { x, cells.getBottom(), columnWidth, statusHeight });
                 juce::Graphics::ScopedSaveState rows (g);
                 g.reduceClipRegion (juce::Rectangle<int> (x, headerHeight, columnWidth, cells.getHeight()));
                 for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
@@ -257,16 +257,18 @@ public:
         const auto filled = launcher::clipAt (*grid, hit.track, hit.scene) != nullptr;
         if (e.x - columnX (hit.track) < launchZone)
         {
-            if (filled)
+            if (recordingScene (hit.track) == hit.scene)
+                engine.endSlotRecording (hit.track, true); // the recording clip's launch button: on into loop playback
+            else if (filled)
             {
                 engine.launcherCommand ({ launcher::Command::Type::launch, hit.track, hit.scene });
                 pressedTrack = hit.track;
                 pressedScene = hit.scene;
             }
-            else if (recordingScene (hit.track) == hit.scene)
-                engine.endSlotRecording (hit.track, true); // the recording clip's launch button: on into loop playback
-            else if (engine.isGridTrackArmed (hit.track) && recordingScene (hit.track) < 0)
-                engine.recordSlot (hit.track, hit.scene); // an armed track's empty slot: its record button
+            // an armed track's empty slot: its record button; while the track records another slot, that take ends and
+            // plays on and this slot records from there (round 190cy, as Live 12.4.16)
+            else if (engine.isGridTrackArmed (hit.track))
+                engine.recordSlot (hit.track, hit.scene);
             else
                 engine.launcherCommand ({ launcher::Command::Type::stopTrack, hit.track }); // an empty slot's stop button
         }
@@ -638,23 +640,46 @@ private:
         const auto zone = cell.withWidth (launchZone).toFloat();
         const auto playing = state != nullptr && state->tracks[(std::size_t) t].playing.load (std::memory_order_relaxed) == row;
         const auto pending = state != nullptr && state->tracks[(std::size_t) t].pending.load (std::memory_order_relaxed) == row;
+        const auto* view = state != nullptr ? &state->tracks[(std::size_t) t] : nullptr;
+        const auto recording = view != nullptr && view->recording.load (std::memory_order_relaxed) == row;
 
-        if (clip == nullptr)
+        if (recording)
         {
-            const auto* view = state != nullptr ? &state->tracks[(std::size_t) t] : nullptr;
-            const auto recording = view != nullptr && view->recording.load (std::memory_order_relaxed) == row;
-            const auto waiting = view != nullptr && ! recording && view->recordPending.load (std::memory_order_relaxed) == row;
-            g.setColour (recording ? c::accentMuted : c::bg2);
+            // a slot that records shows the new clip at once (round 190cy, Live 12.4.16 live check 190cw): its name, the
+            // track's colour and a red launch button; pressing it sends the clip on into loop playback
+            const auto trackColour = t < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) t].colour : 0u;
+            const auto fill = clip != nullptr ? (grid.slots[(std::size_t) clip->gridSlot].colour != 0 ? juce::Colour (grid.slots[(std::size_t) clip->gridSlot].colour)
+                                                                                                      : theme::tame (PlaylistComponent::patternColour (song, clip->pattern)))
+                              : trackColour != 0 ? juce::Colour (trackColour)
+                                                 : theme::tame (PlaylistComponent::patternColour (song, (int) song.patterns.size()));
+            g.setColour (fill);
             g.fillRect (cell);
-            if (recording || waiting)
+            const auto ink = fill.getPerceivedBrightness() > 0.62f ? c::bg1 : juce::Colours::white;
+            juce::Path triangle;
+            const auto a = zone.withSizeKeepingCentre (9.0f, 11.0f);
+            triangle.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
+            g.setColour (c::record);
+            g.fillPath (triangle);
+            g.setColour (ink);
+            g.setFont (theme::font (theme::type::small));
+            // (an audio take is named after its file, known only when it closes)
+            g.drawText (clip != nullptr ? clipName (song, grid, *clip)
+                        : engine.gridTrackInput (t) == AudioEngine::GridInput::midi ? utf8 (engine.slotRecordingName (t)) : juce::String(),
+                        cell.withTrimmedLeft (launchZone).withTrimmedRight (3), juce::Justification::centredLeft, true);
+        }
+        else if (clip == nullptr)
+        {
+            const auto waiting = view != nullptr && view->recordPending.load (std::memory_order_relaxed) == row;
+            g.setColour (c::bg2);
+            g.fillRect (cell);
+            if (waiting)
             {
-                // a slot that records: its launch button in the record colour (blinking until the recording starts);
-                // pressing it sends the new clip on into loop playback
+                // a slot that waits for its recording to start: its launch button blinks in the record colour
                 const auto blinkOn = (juce::Time::getMillisecondCounter() / 150) % 2 == 0;
                 juce::Path triangle;
                 const auto a = zone.withSizeKeepingCentre (9.0f, 11.0f);
                 triangle.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
-                g.setColour (recording || blinkOn ? c::record : c::record.withAlpha (0.3f));
+                g.setColour (blinkOn ? c::record : c::record.withAlpha (0.3f));
                 g.fillPath (triangle);
             }
             else if (engine.isGridTrackArmed (t))
@@ -713,7 +738,7 @@ private:
     }
 
     // The status cell under a track's slots (round 190bv): its stop button and its arm button.
-    void paintStatus (juce::Graphics& g, int t, juce::Rectangle<int> r) const
+    void paintStatus (juce::Graphics& g, const Song& song, const launcher::Runtime* state, int t, juce::Rectangle<int> r) const
     {
         namespace c = theme::colour;
         g.setColour (c::bg3);
@@ -724,6 +749,18 @@ private:
         g.fillRect (r.withWidth (launchZone).toFloat().withSizeKeepingCentre (8.0f, 8.0f));
         const auto armed = engine.isGridTrackArmed (t);
         const auto arm = juce::Rectangle<int> (r.getRight() - armWidth - 4, r.getY(), armWidth, r.getHeight()).withSizeKeepingCentre (armWidth, 15).toFloat();
+        // while the track records into a slot: a green counter of the length recorded so far, bars.beats.sixteenths
+        // from 0.0.0 (round 190cy, Live 12.4.16 live check 190cw: "0.1.0" one beat in, "2.0.2")
+        if (const auto* view = state != nullptr ? &state->tracks[(std::size_t) t] : nullptr; view != nullptr && view->recording.load (std::memory_order_relaxed) >= 0)
+        {
+            const auto elapsed = std::max (0.0, state->clockNow.load (std::memory_order_relaxed) - view->recordFrom.load (std::memory_order_relaxed));
+            const auto box = juce::Rectangle<float> ((float) r.getX() + (float) launchZone, (float) r.getY(), arm.getX() - 4.0f - ((float) r.getX() + (float) launchZone), (float) r.getHeight())
+                                 .withSizeKeepingCentre (arm.getX() - 4.0f - ((float) r.getX() + (float) launchZone), 15.0f);
+            theme::fillRoundRect (g, box, 2.0f, c::ledOn);
+            g.setColour (c::bg0);
+            g.setFont (theme::font (theme::type::small));
+            g.drawText (juce::String (session::lengthCounter (elapsed, song.beatsPerBar)), box, juce::Justification::centred, false);
+        }
         theme::fillRoundRect (g, arm, 2.0f, armed ? c::record : c::bg4);
         if (! armed)
         {

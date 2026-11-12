@@ -91,6 +91,16 @@ Recorded in the REA unknown ledger (domains `live-session-record`, `live-groove-
   as soon as the file is closed (some milliseconds after the end).
 - U5. The exact pictures of the pending / recording slot and of the pool rows (shots of the real program).
 
+Answered by the live check of Live 12.4.16 (round 190cw, /mnt/e/lynx-work/live190cw/ANSWERS.md) and built in round 190cy:
+U1 quantised (as built); U3 a recorded MIDI clip is named "<track> <n>" ("rec MIDI 1", "rec MIDI 2") in the track's
+colour, Duplicate replaces (as built), and a second record button on the recording track ends the take into loop
+playback and records the clicked slot from that point (built: `Command::Type::record` on a recording track queues
+the slot; audio takes are placed when the shared take file closes, so on an audio track the first take is heard only
+after the second ends); U5 the recording slot shows the new clip at once with its name, the track's colour and a red
+launch triangle, and the track status shows a green length counter (built; the waiting slot keeps the blinking red
+triangle: Live's waiting picture was not shot). Audio clip names stay the take file's name (Live's audio naming was not
+checked).
+
 ## 5. Best way?
 
 - **FL**: records into the Playlist or the pattern; its Performance Mode launches clips but does not record into

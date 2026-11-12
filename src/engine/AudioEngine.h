@@ -235,6 +235,9 @@ public:
     // Ends the track's recording on the next quantisation point. `thenPlay`: the new clip plays on in a loop from
     // there (the recording clip's launch button); otherwise the track stops (a stop button).
     void endSlotRecording (int track, bool thenPlay);
+    // The name the next MIDI clip recorded on a track gets (round 190cy, Live's "<track> <n>"; the grid shows it on the
+    // recording slot before the clip exists).
+    std::string slotRecordingName (int track) const;
     // The Session Record button. Nothing recording: every armed track records into `scene` where its slot is empty,
     // and armed tracks whose MIDI clip is playing take what is played into that clip as it loops (overdub).
     // Recording or overdubbing: the recordings go on into loop playback and overdub ends.

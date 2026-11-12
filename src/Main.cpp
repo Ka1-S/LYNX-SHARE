@@ -14703,6 +14703,8 @@ private:
             if (auto* runtime = offline.launcherStateForSnapshot())
             {
                 runtime->tracks[4].recording.store (1);
+                runtime->tracks[4].recordFrom.store (0.0); // (round 190cy: one beat recorded, the counter reads 0.1.0)
+                runtime->clockNow.store ((double) lynx::ppq);
                 runtime->tracks[5].recordPending.store (1);
             }
             write ("rec-recording");
@@ -14736,6 +14738,32 @@ private:
                         }(), lynx::clipGridSlotMenu (*gridView, 4, 1) },
                        prefix + "-rec-menus.png");
             lynx::setClipGridGroovePoolShown (*gridView, false);
+            // round 190cy: a second record button pressed while recording: the first take ("Vocals 1") plays on, the
+            // clicked slot records "Vocals 2" with its counter at 2.0.2 (as Live 12.4.16, live check 190cw shot 03b)
+            {
+                const auto name = offline.slotRecordingName (4);
+                offline.editSong ([&name] (lynx::Song& s) { lynx::session::placeRecordedPattern (s, 4, 0, {}, 8 * lynx::ppq, name); }, false);
+                offline.dispatchPendingMessages();
+                if (auto* runtime = offline.launcherStateForSnapshot())
+                {
+                    runtime->tracks[4].playing.store (0);
+                    runtime->tracks[4].progress.store (0.3f);
+                    runtime->tracks[4].recording.store (1);
+                    runtime->tracks[4].recordFrom.store (0.0);
+                    runtime->clockNow.store (8.0 * lynx::ppq + 2.0 * lynx::ppq / 4.0);
+                }
+                write ("rec-second");
+                if (auto* runtime = offline.launcherStateForSnapshot())
+                {
+                    runtime->tracks[4].playing.store (-1);
+                    runtime->tracks[4].recording.store (-1);
+                }
+                offline.editSong ([] (lynx::Song& s) {
+                    if (lynx::session::cut (s, 4, 0) && ! s.patterns.empty())
+                        s.patterns.pop_back();
+                }, false);
+                offline.dispatchPendingMessages();
+            }
             offline.setGridTrackArmed (4, false);
             offline.setGridTrackArmed (5, false);
             offline.dispatchPendingMessages();

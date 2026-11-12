@@ -963,3 +963,151 @@ TEST (session190bv_projects_without_grooves_or_slot_recording_play_as_before)
     Clip playlist = grid181a::patternClip (0);
     CHECK (groove::ofClip (song, playlist) == nullptr);
 }
+
+// --- Round 190cy: what the live check of Live 12.4.16 (190cw) showed ------------------------------------------------
+
+TEST (session190cy_second_record_button_ends_the_take_into_playback_and_records_the_new_slot)
+{
+    using namespace lynx;
+    using namespace session190bv;
+    grid181a::Run run (emptyGridSong()); // global quantisation: 1 bar
+    run.runtime.commands.push ({ launcher::Command::Type::record, 0, 0 });
+    run.until (bar * 1.5);
+    CHECK (run.runtime.tracks[0].recording.load() == 0);
+
+    // the record button of slot (0, 2) in the middle of bar 2: slot 0 ends at bar 3 and plays on, slot 2 records from there
+    run.runtime.commands.push ({ launcher::Command::Type::record, 0, 2 });
+    run.until (bar * 1.75);
+    auto told = takesOf (run.runtime);
+    CHECK (told.size() == 1);
+    if (told.size() == 1)
+        CHECK (told[0].track == 0 && told[0].scene == 0 && told[0].from == 0.0 && told[0].until == 2.0 * bar && told[0].thenPlay);
+    CHECK (run.runtime.tracks[0].recording.load() == 0);     // the first take records up to its end
+    CHECK (run.runtime.tracks[0].recordPending.load() == 2); // the clicked slot waits for it
+    CHECK (run.runtime.player.recordingOn (0) == 0);
+
+    // the UI makes the first clip and launches it at its end (as for the clip's own launch button)
+    Note n;
+    n.key = 74;
+    n.start = 0;
+    n.length = ppq / 2;
+    session::placeRecordedPattern (run.song, 0, 0, { n }, 2 * bar);
+    run.index = launcher::makeIndex (*run.song.clipGrid);
+    run.schedule = makeScheduleIndex (run.song);
+    run.runtime.commands.push ({ launcher::Command::Type::launch, 0, 0, 2.0 * bar });
+    run.until (bar * 2.25);
+    CHECK (run.runtime.tracks[0].recording.load() == 2);
+    CHECK (run.runtime.tracks[0].recordPending.load() == -1);
+    CHECK (run.runtime.tracks[0].recordFrom.load() == 2.0 * bar);
+    CHECK (run.runtime.player.recordingOn (0) == 2);
+    CHECK (run.runtime.tracks[0].playing.load() == 0); // the first take plays while the second records
+    CHECK (takesOf (run.runtime).empty());
+
+    // the second take ends by its own launch button: cut on the grid, told as any take
+    run.until (bar * 3.5);
+    run.runtime.commands.push ({ launcher::Command::Type::recordEnd, 0, 1 });
+    run.until (bar * 3.75);
+    told = takesOf (run.runtime);
+    CHECK (told.size() == 1);
+    if (told.size() == 1)
+        CHECK (told[0].scene == 2 && told[0].from == 2.0 * bar && told[0].until == 4.0 * bar && told[0].thenPlay);
+    const auto ons = run.onsOf (74);
+    CHECK (ons.size() == 1 && closeTo (ons[0], 2.0 * bar)); // the first take plays from its end, its position 0 there
+}
+
+TEST (session190cy_second_record_button_edge_cases)
+{
+    using namespace lynx;
+    using namespace session190bv;
+    {
+        // pressed while the first recording still waits for its start: the wait moves to the new slot
+        grid181a::Run run (emptyGridSong());
+        run.until (bar * 0.2);
+        run.runtime.commands.push ({ launcher::Command::Type::record, 1, 0 });
+        run.until (bar * 0.4);
+        run.runtime.commands.push ({ launcher::Command::Type::record, 1, 3 });
+        run.until (bar * 0.6);
+        const auto told = takesOf (run.runtime);
+        CHECK (told.size() == 1 && told[0].scene == 0 && told[0].until <= told[0].from); // cancelled
+        CHECK (run.runtime.tracks[1].recordPending.load() == 3);
+        run.until (bar * 1.5);
+        CHECK (run.runtime.tracks[1].recording.load() == 3 && run.runtime.tracks[1].recordFrom.load() == (double) bar);
+    }
+    {
+        // a third slot while one is already queued: refused and told back as cancelled; a stop drops the queued slot
+        grid181a::Run run (emptyGridSong());
+        run.runtime.commands.push ({ launcher::Command::Type::record, 0, 0 });
+        run.until (bar * 1.3);
+        run.runtime.commands.push ({ launcher::Command::Type::record, 0, 1 });
+        run.runtime.commands.push ({ launcher::Command::Type::record, 0, 2 });
+        run.until (bar * 1.5);
+        auto told = takesOf (run.runtime);
+        CHECK (told.size() == 2);
+        if (told.size() == 2)
+        {
+            CHECK (told[0].scene == 0 && told[0].until == 2.0 * bar && told[0].thenPlay);
+            CHECK (told[1].scene == 2 && told[1].until <= told[1].from);
+        }
+        CHECK (run.runtime.tracks[0].recordPending.load() == 1);
+        run.command (launcher::Command::Type::stopTrack, 0);
+        run.until (bar * 1.7);
+        told = takesOf (run.runtime);
+        CHECK (told.size() == 2);
+        if (told.size() == 2)
+        {
+            CHECK (told[0].scene == 1 && told[0].until <= told[0].from); // the queued slot is given up
+            CHECK (told[1].scene == 0 && told[1].until == 2.0 * bar && ! told[1].thenPlay); // the take stops at its end
+        }
+        run.until (bar * 2.5);
+        CHECK (run.runtime.tracks[0].recording.load() == -1 && run.runtime.tracks[0].recordPending.load() == -1);
+        CHECK (run.runtime.player.recordingOn (0) == -1);
+    }
+    {
+        // a fixed length carries over to the queued slot: it ends by itself and plays on
+        grid181a::Run run (emptyGridSong());
+        run.runtime.commands.push ({ launcher::Command::Type::record, 0, 0 });
+        run.until (bar * 0.5);
+        launcher::Command c { launcher::Command::Type::record, 0, 1 };
+        c.at = 2.0 * bar;
+        run.runtime.commands.push (c);
+        run.until (bar * 1.25);
+        auto told = takesOf (run.runtime);
+        CHECK (told.size() == 2);
+        if (told.size() == 2)
+        {
+            CHECK (told[0].scene == 0 && told[0].until == (double) bar && told[0].thenPlay);
+            CHECK (told[1].scene == 1 && told[1].from == (double) bar && told[1].until == 3.0 * bar && told[1].thenPlay);
+        }
+        run.until (bar * 3.5);
+        CHECK (run.runtime.player.recordingOn (0) == -1);
+    }
+}
+
+TEST (session190cy_recorded_clips_are_named_after_the_track_and_the_counter_reads_bars_beats_sixteenths)
+{
+    using namespace lynx;
+    using namespace session190bv;
+    auto s = grid181a::patternSong();
+    CHECK (session::recordedClipName (s, "rec MIDI") == "rec MIDI 1");
+    const auto first = session::placeRecordedPattern (s, 1, 0, {}, bar, session::recordedClipName (s, "rec MIDI"));
+    CHECK (first >= 0 && s.patterns[(std::size_t) first].name == "rec MIDI 1");
+    CHECK (session::recordedClipName (s, "rec MIDI") == "rec MIDI 2");
+    // a slot name counts as taken too (an audio clip, a renamed slot)
+    const auto second = session::placeRecordedPattern (s, 1, 1, {}, bar, "rec MIDI 2");
+    CHECK (second >= 0);
+    if (auto* grid = s.clipGrid ? &*s.clipGrid : nullptr; grid != nullptr)
+        if (const auto* clip = launcher::clipAt (*grid, 1, 1))
+            grid->slots[(std::size_t) clip->gridSlot].name = "rec MIDI 3";
+    CHECK (session::recordedClipName (s, "rec MIDI") == "rec MIDI 4");
+    CHECK (session::recordedClipName (s, "Bass") == "Bass 1");
+    // no name given: a new pattern's name, as before (the Pattern workflow's convention)
+    const auto plain = session::placeRecordedPattern (s, 2, 0, {}, bar);
+    CHECK (plain >= 0 && s.patterns[(std::size_t) plain].name.rfind ("Pattern ", 0) == 0);
+
+    CHECK (session::lengthCounter (0.0, 4) == "0.0.0");
+    CHECK (session::lengthCounter ((double) ppq, 4) == "0.1.0");
+    CHECK (session::lengthCounter (8.0 * ppq + 2.0 * ppq / 4.0, 4) == "2.0.2");
+    CHECK (session::lengthCounter (4.0 * ppq + 3.0 * ppq + 3.0 * ppq / 4.0 + 100.0, 4) == "1.3.3");
+    CHECK (session::lengthCounter (3.0 * ppq, 3) == "1.0.0"); // 3/4
+    CHECK (session::lengthCounter (-5.0, 4) == "0.0.0");
+}

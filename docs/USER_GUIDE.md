@@ -31,8 +31,12 @@ In the clip grid (Clip-launch workflow):
 - **Record into a slot**: arm a track with the button under its slots (Ctrl-click arms more than one); its empty slots
   show round record buttons. Click one: the recording starts on the next point of the launch quantisation (after the
   count-in when the transport was stopped). Click the recording slot's launch button to end it and let the new clip
-  loop; the track's stop button ends it without playing. MIDI tracks record notes; a track that plays through a mixer
-  insert with an audio input records that input.
+  loop; the track's stop button ends it without playing. While a slot records, it shows the new clip (its name, the
+  track's colour, a red launch button) and the status cell under the track counts the length recorded
+  (bars.beats.sixteenths). Click another empty slot's record button on the recording track: the take ends on the next
+  point and plays on, and that slot records the next take from there. A recorded MIDI clip is named after its track
+  ("Keys 1", "Keys 2", ...). MIDI tracks record notes; a track that plays through a mixer insert with an audio input
+  records that input.
 - **Session Record** (the ring button under the grid): records into the selected scene on every armed track; press it
   again and the new clips loop. While armed MIDI clips are playing it switches overdub on and off: what you play is
   added to the clip as it loops.
