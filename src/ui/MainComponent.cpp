@@ -3163,7 +3163,7 @@ public:
     explicit ClipGridSwitch (std::function<void (PlaylistArea::GridView)> pick)
     {
         addAndMakeVisible (draw);
-        draw.setTooltip (tr ("Draw Mode") + sessionkeys::menuKey (sessionkeys::Command::drawMode, layoutstyle::Style::clipLaunch).replace ("\t", "  "));
+        draw.setTooltip (tr ("Draw Mode") + juce::String (sessionkeys::menuKey (sessionkeys::Command::drawMode, layoutstyle::Style::clipLaunch)).replace ("\t", "  "));
         draw.onClick = [this] { if (onDraw != nullptr) onDraw(); };
         for (auto* b : { &key, &midi })
         {

@@ -2039,6 +2039,17 @@ public:
             return;
         }
 
+        if (args.contains ("--mapshot190ef"))
+        {
+            // LYNX.exe --mapshot190ef prefix: round 190ef's map modes off-screen, in the Clip-launch workflow: MIDI Map Mode
+            // (the overlay over the grid, the Session mixer, the Device View and the transport; the Mapping Browser with
+            // Min / Max), Key Map Mode, the row menu, the title bar's Draw / Key / MIDI switches, Ctrl+M / Ctrl+K and the
+            // Pattern layout keeping Ctrl+M. Writes prefix-checks.txt.
+            runMapShot190ef (args[args.indexOf ("--mapshot190ef") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--sceneshot190ef"))
         {
             // LYNX.exe --sceneshot190ef prefix: round 190ef's scene work off-screen, in the Clip-launch workflow: the scene
@@ -4361,6 +4372,77 @@ private:
                 livescr190drResult = "ERROR warp undo";
         }
 
+        // round 190ef: the map modes' storage (.lynx round trip of key / MIDI mappings and a link's Min / Max; an older
+        // reader keeps the plain link), and in a real engine: a link's range, MIDI Map Mode catching the control instead
+        // of moving anything, a slot's MIDI mapping firing on its press and release
+        juce::String livewf190efResult = "OK";
+        {
+            using namespace lynx::remotemap;
+            auto song = lynx::Song::makeDefault();
+            lynx::launcher::ensureGrid (song);
+            const lynx::AutomationTarget vol { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 };
+            assignMidi (song, Target::parameter (vol), { 0, 20, -1 });
+            assignMidi (song, Target::slot (0, 0), { 0, lynx::linkNoteBase + 36, 2 });
+            assignKey (song, Target::sceneLaunch (0), 'S');
+            assignKey (song, Target::parameter ({ lynx::AutomationTargetKind::tempo, 0, 0, 0 }), 'T');
+            setRange (song, rows (song, Mode::midi)[0], 0.25f, 0.75f);
+            setRange (song, rows (song, Mode::key)[1], 0.9f, 0.1f);
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, why);
+            if (! back || back->remoteMappings != song.remoteMappings || back->midiLinks != song.midiLinks)
+                livewf190efResult = "ERROR round trip " + why;
+            auto parsed = juce::JSON::parse (json);
+            if (auto* o = parsed.getDynamicObject())
+            {
+                o->removeProperty ("remoteMappings");
+                o->removeProperty ("midiLinkSettings");
+            }
+            const auto older = lynx::ProjectFile::fromJson (juce::JSON::toString (parsed), why);
+            if (livewf190efResult == "OK" && (! older || ! older->remoteMappings.empty() || older->midiLinks.size() != 1 || older->midiLinks[0].max != 1.0f))
+                livewf190efResult = "ERROR older reader";
+            const auto plain = lynx::ProjectFile::toJson (lynx::Song::makeDefault());
+            if (livewf190efResult == "OK" && plain.contains ("remoteMappings"))
+                livewf190efResult = "ERROR written without mappings";
+
+            lynx::AudioEngine e (false);
+            e.editSong ([vol] (lynx::Song& s) {
+                if (s.mixer.size() < 3)
+                    s.mixer.resize (3);
+                lynx::MidiLink l { 20, 0, vol };
+                l.min = 0.25f;
+                l.max = 0.75f;
+                s.midiLinks = { l };
+                lynx::launcher::ensureGrid (s);
+                assignMidi (s, Target::slot (0, 0), { 0, 21, -1 });
+            });
+            e.injectControllerForTest (20, 0, 127);
+            const auto top = e.currentTargetValue (vol);
+            e.injectControllerForTest (20, 0, 0);
+            const auto bottom = e.currentTargetValue (vol);
+            if (livewf190efResult == "OK" && (std::abs (top - 0.75f) > 0.01f || std::abs (bottom - 0.25f) > 0.01f))
+                livewf190efResult = "ERROR range " + juce::String (bottom) + " " + juce::String (top);
+            std::vector<Fire> fired;
+            e.onRemoteFire = [&fired] (const Fire& f) { fired.push_back (f); };
+            e.injectControllerForTest (21, 0, 127);
+            e.injectControllerForTest (21, 0, 127); // (still down: no new press)
+            e.injectControllerForTest (21, 0, 0);
+            if (livewf190efResult == "OK"
+                && (fired.size() != 2 || fired[0].edge != Edge::press || fired[1].edge != Edge::release || ! (fired[0].target == Target::slot (0, 0))))
+                livewf190efResult = "ERROR slot fire " + juce::String ((int) fired.size());
+            e.setMapMode (Mode::midi);
+            fired.clear();
+            e.injectControllerForTest (20, 0, 127);
+            e.injectControllerForTest (21, 0, 127);
+            const auto caught = e.takeMapCapture();
+            if (livewf190efResult == "OK" && (std::abs (e.currentTargetValue (vol) - 0.25f) > 0.01f || ! fired.empty()))
+                livewf190efResult = "ERROR mappings acted in MIDI Map Mode";
+            else if (livewf190efResult == "OK" && (! caught || caught->number != 21 || caught->channel != 0 || e.takeMapCapture().has_value()))
+                livewf190efResult = "ERROR map capture";
+            e.setMapMode (Mode::off);
+            e.onRemoteFire = nullptr;
+        }
+
         const auto mixerBasics = lynx::mixerbasics::run();
         // issue #142: every font has a typeface, and one without does not crash (fonts get theirs through the
         // look and feel, as in the app)
@@ -4403,7 +4485,7 @@ private:
                         && mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
+                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
                         && danceWindowResult == "OK";
 
         juce::String report;
@@ -4455,6 +4537,7 @@ private:
                << "lanes_saved=" << lanesResult << "\n"
                << "arrange190cg_saved=" << arrange190cgResult << "\n"
                << "livescr190dr=" << livescr190drResult << "\n"
+               << "livewf190ef=" << livewf190efResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -16662,6 +16745,199 @@ private:
         store = {};
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
         lib.deleteRecursively();
+    }
+
+    void runMapShot190ef (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto write = [&prefix] (juce::Component& c, const char* name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (c), out);
+        };
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        using namespace lynx::remotemap;
+
+        ui.setVisible (true);
+        // the Pattern layout first: Ctrl+M stays FL's metronome there and no map mode starts
+        {
+            const auto before = offline.getTransport().metronome.load();
+            ui.keyPressed (juce::KeyPress ('M', juce::ModifierKeys::ctrlModifier, 0));
+            check ("Pattern layout: Ctrl+M is the metronome, no map mode", ui.getMapMode() == Mode::off && offline.getTransport().metronome.load() != before);
+            ui.keyPressed (juce::KeyPress ('M', juce::ModifierKeys::ctrlModifier, 0));
+            ui.setMapMode (Mode::midi);
+            check ("Pattern layout: setMapMode stays off", ui.getMapMode() == Mode::off);
+        }
+
+        ui.setClipLaunchWorkflow (true);
+        offline.editSong ([] (lynx::Song& s) {
+            if (s.mixer.size() < 6)
+                s.mixer.resize (6);
+            const char* inserts[] { "Master", "Drums", "Bass", "Keys", "Vox", "Reverb" };
+            for (int i = 1; i < 6; ++i)
+                s.mixer[(std::size_t) i].name = inserts[i];
+            const int channels = (int) s.channels.size();
+            s.channels.resize ((std::size_t) channels + 3);
+            const char* names[] { "Drum kit", "Bass synth", "Keys" };
+            for (int k = 0; k < 3; ++k)
+            {
+                auto& ch = s.channels[(std::size_t) (channels + k)];
+                ch.name = names[k];
+                ch.instrument = k == 0 ? lynx::InstrumentKind::sampler : lynx::InstrumentKind::synth;
+                ch.mixerTrack = k + 1;
+            }
+            s.mixer[2].effects.clear();
+            for (auto kind : { lynx::EffectKind::eq, lynx::EffectKind::compressor })
+            {
+                lynx::EffectSlot fx;
+                fx.kind = kind;
+                const auto& info = lynx::effectInfo (kind);
+                for (std::size_t k = 0; k < info.params.size() && k < fx.params.size(); ++k)
+                    fx.params[k] = info.params[k].defaultValue;
+                s.mixer[2].effects.push_back (fx);
+            }
+            while (s.patterns.size() < 3)
+                s.patterns.emplace_back();
+            const char* patterns[] { "Beat", "Bassline", "Chords" };
+            for (int p = 0; p < 3; ++p)
+            {
+                auto& pattern = s.patterns[(std::size_t) p];
+                pattern.name = patterns[p];
+                lynx::Note n;
+                n.channel = channels + p;
+                n.key = 48 + p * 5;
+                pattern.notes = { n };
+                pattern.lengthTicks = 4 * lynx::ppq;
+            }
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 8));
+            const char* tracks[] { "Drums", "Bass", "Keys", "Vox" };
+            for (int t = 0; t < 4; ++t)
+                s.playlistTracks[(std::size_t) t].name = tracks[t];
+            for (int t = 0; t < 3; ++t)
+                for (int r = 0; r < 3; ++r)
+                {
+                    lynx::Clip clip;
+                    clip.pattern = t;
+                    clip.length = 4 * lynx::ppq;
+                    lynx::launcher::setClip (s, t, r, clip);
+                }
+            auto& grid = lynx::launcher::ensureGrid (s);
+            const char* scenes[] { "Intro", "Verse", "Drop" };
+            grid.scenes.resize (4);
+            for (int r = 0; r < 3; ++r)
+                grid.scenes[(std::size_t) r].name = scenes[r];
+            // some mappings, as the lesson's pictures show them (pads on slots and scenes, knobs on volume and pan)
+            assignMidi (s, Target::slot (0, 0), { 0, lynx::linkNoteBase + 36, -1 });
+            assignMidi (s, Target::slot (1, 0), { 0, lynx::linkNoteBase + 37, -1 });
+            assignMidi (s, Target::sceneLaunch (1), { 0, lynx::linkNoteBase + 44, -1 });
+            assignMidi (s, Target::parameter ({ lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 }), { 0, 17, -1 });
+            assignMidi (s, Target::parameter ({ lynx::AutomationTargetKind::mixerPan, 1, 0, 0 }), { 0, 16, -1 });
+            assignMidi (s, Target::of (lynx::RemoteAction::play), { 0, 118, -1 });
+            setRange (s, rows (s, Mode::midi)[0], 0.0f, 0.85f);
+            assignKey (s, Target::slot (0, 1), 'A');
+            assignKey (s, Target::slot (1, 1), 'S');
+            assignKey (s, Target::sceneLaunch (2), '3');
+            assignKey (s, Target::parameter ({ lynx::AutomationTargetKind::mixerVolume, 2, 0, 0 }), 'V');
+        }, false);
+        offline.dispatchPendingMessages();
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+        offline.dispatchPendingMessages();
+        ui.resized();
+        if (auto* detail = ui.getDetailViewForSnapshot())
+        {
+            detail->showSelection (1, 0);
+            detail->setPage (lynx::DetailView::Page::devices);
+        }
+        ui.resized();
+        offline.dispatchPendingMessages();
+        write (ui, "00-clip-launch-before");
+
+        // Ctrl+M in the Clip-launch layout: MIDI Map Mode (the metronome stays as it was)
+        const auto metronome = offline.getTransport().metronome.load();
+        ui.keyPressed (juce::KeyPress ('M', juce::ModifierKeys::ctrlModifier, 0));
+        check ("Clip-launch layout: Ctrl+M starts MIDI Map Mode", ui.getMapMode() == Mode::midi && offline.getTransport().metronome.load() == metronome);
+        auto* overlay = ui.mapOverlayForSnapshot();
+        auto* list = ui.mappingBrowserForSnapshot();
+        if (overlay == nullptr || list == nullptr)
+        {
+            juce::File (prefix + "-checks.txt").replaceWithText (checks + "FAIL no overlay\n");
+            return;
+        }
+        overlay->refresh();
+        const auto& spots = overlay->spots();
+        const auto count = [&] (lynx::RemoteAction a) { return (int) std::count_if (spots.begin(), spots.end(), [a] (const lynx::mapmode::Spot& p) { return p.target.action == a; }); };
+        const auto params = [&] (lynx::AutomationTargetKind k) {
+            return (int) std::count_if (spots.begin(), spots.end(), [k] (const lynx::mapmode::Spot& p) { return p.target.action == lynx::RemoteAction::parameter && p.target.param.kind == k; });
+        };
+        check ("overlay: clip slots (" + juce::String (count (lynx::RemoteAction::clipSlot)) + ")", count (lynx::RemoteAction::clipSlot) >= 12);
+        check ("overlay: scene launch buttons (" + juce::String (count (lynx::RemoteAction::sceneLaunch)) + ")", count (lynx::RemoteAction::sceneLaunch) >= 4);
+        check ("overlay: track stop buttons", count (lynx::RemoteAction::trackStop) >= 4);
+        check ("overlay: Stop all clips, Session Record", count (lynx::RemoteAction::stopAllClips) == 1 && count (lynx::RemoteAction::sessionRecord) == 1);
+        check ("overlay: transport play / stop / record / metronome", count (lynx::RemoteAction::play) == 1 && count (lynx::RemoteAction::stop) == 1
+                                                                          && count (lynx::RemoteAction::record) == 1 && count (lynx::RemoteAction::metronome) == 1);
+        check ("overlay: tempo", params (lynx::AutomationTargetKind::tempo) == 1);
+        check ("overlay: mixer volume / pan (" + juce::String (params (lynx::AutomationTargetKind::mixerVolume)) + " / " + juce::String (params (lynx::AutomationTargetKind::mixerPan)) + ")",
+               params (lynx::AutomationTargetKind::mixerVolume) >= 3 && params (lynx::AutomationTargetKind::mixerPan) >= 3);
+        check ("overlay: device knobs (" + juce::String (params (lynx::AutomationTargetKind::effectParam)) + ")", params (lynx::AutomationTargetKind::effectParam) >= 2);
+        // a click on Keys' first slot selects it; a MIDI control assigns it (as the engine's catch would)
+        for (const auto& spot : spots)
+            if (spot.target == Target::slot (2, 0))
+            {
+                auto source = juce::Desktop::getInstance().getMainMouseSource();
+                const auto now = juce::Time::getCurrentTime();
+                const auto at = spot.area.getCentre().toFloat();
+                overlay->mouseDown (juce::MouseEvent (source, at, juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                                                      overlay, overlay, now, at, now, 1, false));
+                break;
+            }
+        check ("a click selects the slot", overlay->selection() == std::optional<Target> (Target::slot (2, 0)));
+        check ("the overlay takes clicks only on elements", overlay->hitTest (spots.front().area.getCentreX(), spots.front().area.getCentreY()) && ! overlay->hitTest (2, ui.getHeight() - 2));
+        check ("a pad assigns it", overlay->assignMidi ({ 0, lynx::linkNoteBase + 38, -1 }) && midiOf (offline.getSong(), Target::slot (2, 0)).number == lynx::linkNoteBase + 38);
+        check ("the same pad again on track 0 is refused", ! (overlay->select (Target::slot (0, 2)), overlay->assignMidi ({ 0, lynx::linkNoteBase + 36, -1 })));
+        overlay->select (Target::slot (2, 0));
+        list->setMode (Mode::midi);
+        list->selectRow (0);
+        ui.resized();
+        overlay->refresh();
+        write (ui, "01-midi-map-mode");
+        check ("Mapping Browser rows (MIDI): " + juce::String ((int) list->rowsShown().size()), list->rowsShown().size() == 7);
+        write (*list, "02-mapping-browser-midi");
+        saveMenus (juce::StringArray { "Row" }, std::vector<juce::PopupMenu> { list->rowMenu (0) }, prefix + "-03-row-menu.png");
+        // Ctrl+K: Key Map Mode; a key assigns the selected element
+        ui.keyPressed (juce::KeyPress ('K', juce::ModifierKeys::ctrlModifier, 0));
+        check ("Ctrl+K switches to Key Map Mode", ui.getMapMode() == Mode::key && offline.getMapMode() == Mode::key);
+        overlay->select (Target::sceneLaunch (0));
+        ui.keyPressed (juce::KeyPress ('1', {}, '1'));
+        check ("a key assigns the selected scene", keyOf (offline.getSong(), Target::sceneLaunch (0)).key == '1');
+        overlay->select (Target::sceneLaunch (1));
+        ui.keyPressed (juce::KeyPress ('A', {}, 'a'));
+        check ("a key already on a slot is refused for a scene", ! keyOf (offline.getSong(), Target::sceneLaunch (1)).found);
+        overlay->refresh();
+        write (ui, "04-key-map-mode");
+        write (*list, "05-mapping-browser-key");
+        // off again: the key mapping on a parameter toggles it between Min and Max
+        ui.keyPressed (juce::KeyPress ('K', juce::ModifierKeys::ctrlModifier, 0));
+        check ("Ctrl+K again ends it", ui.getMapMode() == Mode::off && ! overlay->isVisible() && ! list->isVisible());
+        const lynx::AutomationTarget keysVolume { lynx::AutomationTargetKind::mixerVolume, 2, 0, 0 };
+        ui.keyPressed (juce::KeyPress ('V', {}, 'v'));
+        check ("the mapped key V moves Bass's volume to Max", std::abs (offline.currentTargetValue (keysVolume) - 1.0f) < 0.01f);
+        ui.keyStateChanged (false); // (V is not down any more: its release)
+        ui.keyPressed (juce::KeyPress ('V', {}, 'v'));
+        check ("again: to Min", std::abs (offline.currentTargetValue (keysVolume)) < 0.01f);
+        ui.keyStateChanged (false);
+        // the title bar switches
+        ui.setMapMode (Mode::midi);
+        write (ui, "06-switches-midi-on");
+        ui.setMapMode (Mode::off);
+        ui.setClipLaunchWorkflow (false);
+        check ("leaving the Clip-launch layout ends the map mode", ui.getMapMode() == Mode::off);
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
     void runSceneShot190ef (const juce::String& prefix)

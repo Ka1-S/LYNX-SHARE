@@ -518,9 +518,9 @@ public:
                                  remotemap::Target::slot (t, r) });
             out.push_back ({ juce::Rectangle<int> (columnX (t), cells.getBottom(), launchZone, statusHeight), remotemap::Target::trackStop (t) });
         }
-        const juce::Rectangle<int> sceneColumn (cells.getRight(), cells.getY(), sceneWidth, cells.getHeight());
+        const juce::Rectangle<int> sceneColumn (cells.getRight(), cells.getY(), sceneWidthNow(), cells.getHeight());
         for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
-            out.push_back ({ juce::Rectangle<int> (sceneColumn.getX(), rowY (r), sceneWidth, rowHeight).getIntersection (sceneColumn),
+            out.push_back ({ juce::Rectangle<int> (sceneColumn.getX(), rowY (r), sceneBaseWidth, rowHeight).getIntersection (sceneColumn),
                              remotemap::Target::sceneLaunch (r) });
     }
 
