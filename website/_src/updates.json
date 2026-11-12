@@ -2,7 +2,7 @@
   {
     "version": "0.1.26-alpha",
     "tag": "v0.1.26-alpha",
-    "date": "2026-11-11",
+    "date": "2026-11-12",
     "url": "https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.26-alpha",
     "title": "Simple workflow, racks and Clip View, Slicex and FPC, freeze, controller profiles",
     "summary": "A third layout, the Simple workflow, joins the Pattern and Clip-launch workflows. The Clip-launch side gains a Clip View, a Device View, racks, note chance and Live's MIDI tools. Slicex and FPC are instruments with FL Studio's editors, FL Studio Mobile projects come in with instruments, effects and automation, plugin windows dock, channels can be frozen and common MIDI controllers work from profiles.",
@@ -91,7 +91,7 @@
     ],
     "shots": [
       {
-        "src": "/assets/img/cliplaunch.webp?v=0.1.25",
+        "src": "/assets/img/cliplaunch.webp?v=0.1.26",
         "alt": "Clip-launch workflow"
       }
     ]
