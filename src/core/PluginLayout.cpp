@@ -736,6 +736,7 @@ Layout grossBeat()
     v.push_back (label (56, 20, 70, 20, TR_NOOP ("Time"), alignLeft));
     v.push_back (display (189, 12, 72, 72, "gbjog"));
     v.push_back (toggle (113, 62, 62, 28, "Hold", TR_NOOP ("Hold"), boxed));
+    v.push_back (display (9, 66, 20, 20, "gbopts")); // round 190ee: FL's Options button (DFM OptionsBtn at 7, 66)
     // round 168m: the two slot grids draw each slot's name over a thumbnail of its envelope (FL's grids of 4 × 9)
     v.push_back (display (13, 103, 246, 162, "gbtimegrid"));
     v.push_back (display (13, 276, 246, 162, "gbvolumegrid"));

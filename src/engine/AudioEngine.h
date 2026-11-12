@@ -408,6 +408,8 @@ public:
     // The keys held right now on MIDI inputs and the typing piano (as played, before the scale snap), ascending; for
     // the Piano Roll's chord readout (any thread).
     std::vector<int> heldInputKeys() const;
+    // Round 190ee: the key played last on a MIDI input or the typing piano (C5 = 60 before any): Edison's "Last hit"
+    int lastPlayedKey() const noexcept { return lastHitKey.load (std::memory_order_relaxed); }
     // The same for one MIDI channel (0-15; the typing keyboard plays on 0), as two 64-bit masks: the chord panel (round
     // 181b) counts each channel's keys on its own, as FL does.
     std::array<std::uint64_t, 2> heldInputKeyBits (int midiChannel) const noexcept;
@@ -1079,6 +1081,7 @@ private:
     std::atomic<std::uint64_t> heldKeyBits[16][2] {}; // keys held per MIDI channel on inputs / the typing piano (chord readout)
     std::atomic<std::uint8_t> heldKeyCount[16][128] {};
     void markHeldKey (int midiChannel, int key, bool on) noexcept;
+    std::atomic<int> lastHitKey { 60 };
     KeyLedger playedKeys;        // UI thread: the keys the typing piano started (after the scale snap)
     SpscQueue<RecordedEvent, 1024> midiRecordQueue; // MIDI thread -> UI (recording)
     // a controller's pitch wheel while recording (MIDI thread -> UI): key = its MIDI channel 0…15, velocity = 0..1;

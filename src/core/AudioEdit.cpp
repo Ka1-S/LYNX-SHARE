@@ -915,6 +915,7 @@ bool parseMarkers (const std::uint8_t* data, std::size_t size, Document& out, st
     {
         std::uint32_t id = 0, position = 0, length = 0;
         std::string name;
+        int key = -1;
     };
     std::vector<Cue> cues;
     gotAny = false;
@@ -989,6 +990,15 @@ bool parseMarkers (const std::uint8_t* data, std::size_t size, Document& out, st
                     q = sb + subLen + (subLen & 1);
                 }
             }
+            else if (pass == 1 && std::memcmp (tag, "lxkn", 4) == 0) // round 190ee: LYNX's region trigger notes
+            {
+                for (std::size_t q = body; q + 8 <= body + len; q += 8)
+                    if (auto* c = findCue (get32 (data + q)))
+                    {
+                        const auto key = (int) get32 (data + q + 4);
+                        c->key = key >= 0 && key < 128 ? key : -1;
+                    }
+            }
             p = body + len + (len & 1);
         }
     }
@@ -999,6 +1009,7 @@ bool parseMarkers (const std::uint8_t* data, std::size_t size, Document& out, st
         m.start = std::min<std::int64_t> (c.position, (std::int64_t) frames);
         m.end = std::min<std::int64_t> (m.start + c.length, (std::int64_t) frames);
         m.name = c.name;
+        m.keyNum = c.key;
         out.markers.push_back (std::move (m));
         gotAny = true;
     }
@@ -1006,6 +1017,30 @@ bool parseMarkers (const std::uint8_t* data, std::size_t size, Document& out, st
     return gotAny;
 }
 } // namespace
+
+void assignTriggerNotes (Document& doc, NoteLayout layout)
+{
+    const auto count = (int) doc.markers.size();
+    auto key = count - 0x41 < 1 ? 60 : std::max (0, 60 - ((count - 54) / 12) * 12); // (FL's start, 0x62b0b0)
+    if (layout == NoteLayout::none)
+        key = -1;
+    else if (layout == NoteLayout::c5)
+        key = 60;
+    // black keys of an octave (C = bit 0): C#, D#, F#, G#, A#
+    auto black = [] (int k) { return ((0x54a >> (k % 12)) & 1) != 0; };
+    for (auto& m : doc.markers)
+    {
+        if (layout == NoteLayout::whiteNotes)
+            while (black (key))
+                ++key;
+        if (layout == NoteLayout::blackNotes)
+            while (! black (key))
+                ++key;
+        m.keyNum = std::min (key, 124);
+        if (layout == NoteLayout::wholeKeyboard || layout == NoteLayout::whiteNotes || layout == NoteLayout::blackNotes)
+            ++key;
+    }
+}
 
 std::vector<std::uint8_t> encodeWav (const Document& doc, WavFormat format)
 {
@@ -1116,6 +1151,21 @@ std::vector<std::uint8_t> encodeWav (const Document& doc, WavFormat format)
             }
         }
         endChunk (o, at);
+
+        // round 190ee: the regions' trigger notes (Edison's Region › Trigger note) in a chunk of LYNX's own — cue id,
+        // key — written only when a region has one, so files without them stay as they were (FL's way of keeping
+        // them in a WAV is not known)
+        if (std::any_of (doc.markers.begin(), doc.markers.end(), [] (const Marker& m) { return m.keyNum >= 0; }))
+        {
+            at = beginChunk (o, "lxkn");
+            for (std::size_t i = 0; i < doc.markers.size(); ++i)
+                if (doc.markers[i].keyNum >= 0)
+                {
+                    put32 (o, (std::uint32_t) i + 1);
+                    put32 (o, (std::uint32_t) doc.markers[i].keyNum);
+                }
+            endChunk (o, at);
+        }
     }
 
     set32 (o, 4, (std::uint32_t) (o.size() - 8));

@@ -241,7 +241,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Fruity Delay (v1) | Fruity Delay | Insert | Exact | all 7 installation states and 40 random ones (three modes, host / fixed tempo, control changes, 1–512-frame calls) at 22.05–96 kHz bit-identical; Tempo = host follows the song tempo (round 165k) |
 | Fruity Center | Fruity Center | Insert | Exact | bit-identical at 22.05–96 kHz (round 165k) |
 | Fruity Phase Inverter | Fruity Phase Inverter | Insert | Exact | bit-identical; FL's default inverts the right side only (round 165k) |
-| Gross Beat | Gross Beat | Import | Exact | all 41 states; MIDI control of the slots and spline curves missing |
+| Gross Beat | Gross Beat | Import | Exact | all 41 states; slots triggered by MIDI notes on its MIDI input port (time C5–B7, volume C2–B4, Key-held) and Smooth points (round 190ee) |
 | Squeeze | Fruity Squeeze | Import | Near-exact | within 5·10⁻⁹ of the reference model, which is bit-exact with FL |
 | Effector | Effector | Insert | Near-exact | all 12 algorithms; reverb −100 dB |
 | Maximus † | Maximus | Import | Near-exact | 96/100 demo states within −139 dB; v15 linear-phase split and Master Mid keep an approximation |
@@ -250,7 +250,7 @@ instruments (built-in synth, sampler, drums) or any VST3/CLAP plugin.
 | Distructor † | Distructor | Import | Near-exact | bit-identical except the Harmor shapes and the cabinet |
 | Vocodex † | Vocodex | Import | Near-exact | −136…−145 dB (internal Sytrus carrier −112 dB); all 13 maps read, edited and played (≤ −141 dB, round 173d3) |
 | Vintage Phaser | Vintage Phaser | Import | Near-exact | within −121 dB |
-| Pitch correction | Pitcher | Insert | Close | bit-exact with the reference model; MIDI mode / Harmonize get no MIDI in LYNX SHARE |
+| Pitch correction | Pitcher | Insert | Close | bit-exact with the reference model; MIDI mode / Harmonize take the notes of the MIDI Out channels on its MIDI port, as in FL (round 190ee) |
 | Newtone | Newtone | Import | Close | pass-through as FL; in slave mode the note edits (pitch offsets and transitions, drift, vibrato, tremolo, ramps, formant, volume, timing, disabled notes) rendered by LYNX SHARE's own pitch engine: against FL's own engine on 135 states every note's level within 0.4 dB and its median pitch within 9 cents, unedited notes bit-identical; legato glides with long smooth times (up to 40 c) and FL's sample re-alignment after edits differ (round 165g) |
 | Newtime | Newtime | Import | Close | pass-through as FL; in slave mode the sample warped by its markers (LYNX SHARE's own markers or FL's imported Newtime warp markers) with LYNX SHARE's own time-stretch: against FL's own engine on mono drums, stereo drums and a sung vowel (moved markers, 0.75x/1.3x/1.5x) onsets within 54 samples, 10 ms envelopes median 0.0 dB (90% within 1.1 dB), pitch kept; FL's élastique colouring of unmoved audio (about 1 dB) is not reproduced (round 167b) |
 | Emphasis | Emphasis | Insert | Exact | FL's own engine (the shared library's limiter): bit-identical to the installation's DLL on its 26 states and 690 more cases (44.1–96 kHz, any block size, every mode, envelope order, hardness, oversampling 1–16×, true peak, M/S, delta, bypass, level matching, the three options, control changes mid-stream); its latency reported for PDC; the panel's meters are LYNX's own (round 167f) |

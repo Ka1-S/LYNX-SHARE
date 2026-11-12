@@ -1129,6 +1129,8 @@ juce::var effectToVar (const EffectSlot& slot)
 
     if (slot.kind == EffectKind::plugin)
         e->setProperty ("plugin", pluginToVar (slot.plugin));
+    else if (slot.kind == EffectKind::grossBeat && slot.plugin.midiInPort >= 0) // round 190ee: FL's wrapper MIDI port
+        e->setProperty ("midiInPort", slot.plugin.midiInPort);
     else if (slot.isSubstitute()) // a LYNX substitute: the original plugin travels with it, unchanged
         e->setProperty ("substituteFor", pluginToVar (slot.substituteFor));
 
@@ -1200,6 +1202,8 @@ std::optional<EffectSlot> effectFromVar (const juce::var& e)
         slot.params[3] = flbasic::rescaleSendTrackValue (slot.params[3], sendSpan);
 
     slot.plugin = pluginFromVar (e["plugin"]);
+    if (*kind == EffectKind::grossBeat) // round 190ee
+        slot.plugin.midiInPort = juce::jlimit (-1, 255, (int) e.getProperty ("midiInPort", -1));
     if (*kind != EffectKind::plugin && e.hasProperty ("substituteFor"))
         slot.substituteFor = pluginFromVar (e["substituteFor"]);
     slot.sidechain = juce::jlimit (-1, maxMixerTracks - 1, (int) e.getProperty ("sidechain", -1));

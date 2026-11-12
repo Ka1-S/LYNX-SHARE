@@ -16,6 +16,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "core/Effects.h"
@@ -51,6 +52,97 @@ struct State
     std::array<int, 9> params {};      // FL's raw parameters 0…8
     std::array<std::uint8_t, 9> options {}; // option bytes (state offsets 0x168…0x170 of the plugin object)
     std::array<Slot, 2 * slotsPerKind> slots; // 0…35 time travel, 36…71 volume
+    // Options › "Trigger slots from MIDI notes" (round 190ee; Gross Beat_x64.dll: plugin field 0x731, state loader
+    // 0x83f890). FL saves it as one byte after the slots in its version-9 state; every older state (all demo projects
+    // and presets) reads as on. A bare new FL instance (constructor 0x83fcf0) has it off.
+    bool midiTrigger = true;
+};
+
+// MIDI control of the slots (round 190ee, the editor's MIDI handler 0x848330): the 36 time slots answer the keys
+// 60…95 (C5…B7), the 36 volume slots the keys 24…59 (C2…B4) — FL's fixed per-kind base keys (constructor 0x83fcf0).
+constexpr int timeBaseKey = 60, volumeBaseKey = 24;
+// The slot a key selects: kind 0 time / 1 volume and the slot index, or {-1, -1} for a key outside both ranges.
+std::pair<int, int> slotForKey (int key) noexcept;
+
+// What FL's editor does with MIDI notes (0x848330), without the engine: which slot each note selects, the key-held
+// stack (a Key-held slot goes back to the previous slot when its key is released) and the notes that are held.
+class MidiSlots
+{
+public:
+    // a note on (velocity > 0) or off on MIDI channel `channel` (0…15); returns the (kind, slot) to select, or
+    // {-1, -1} when nothing changes. `current` = the slot each kind plays now; `keyHeld(kind, slot)` = that slot's
+    // Key-held switch.
+    template <typename KeyHeld>
+    std::pair<int, int> note (bool on, int channel, int key, const std::array<int, 2>& current, KeyHeld&& keyHeld) noexcept
+    {
+        const auto id = (std::size_t) (((channel & 15) << 8 | (key & 127)) & 0xfff);
+        const auto [kind, slot] = slotForKey (key);
+        if (on)
+        {
+            held[id] = true;
+            if (kind < 0)
+                return { -1, -1 };
+            auto& st = stacks[(std::size_t) kind];
+            if (keyHeld (kind, slot))
+            {
+                if (st.count == 0)
+                    push (st, current[(std::size_t) kind]);
+                if (! contains (st, slot))
+                    push (st, slot);
+            }
+            return { kind, slot };
+        }
+        if (! held[id]) // a release FL never saw pressed is ignored
+            return { -1, -1 };
+        held[id] = false;
+        if (kind < 0 || ! keyHeld (kind, slot))
+            return { -1, -1 };
+        auto& st = stacks[(std::size_t) kind];
+        remove (st, slot);
+        if (st.count == 0)
+            return { -1, -1 };
+        const auto back = st.items[(std::size_t) st.count - 1];
+        if (st.count == 1)
+            st.count = 0;
+        return { kind, back };
+    }
+    void clear() noexcept
+    {
+        held.fill (false);
+        stacks = {};
+    }
+
+private:
+    struct Stack
+    {
+        std::array<int, slotsPerKind + 1> items {};
+        int count = 0;
+    };
+    static bool contains (const Stack& s, int v) noexcept
+    {
+        for (int i = 0; i < s.count; ++i)
+            if (s.items[(std::size_t) i] == v)
+                return true;
+        return false;
+    }
+    static void push (Stack& s, int v) noexcept
+    {
+        if (s.count < (int) s.items.size())
+            s.items[(std::size_t) s.count++] = v;
+    }
+    static void remove (Stack& s, int v) noexcept
+    {
+        for (int i = 0; i < s.count; ++i)
+            if (s.items[(std::size_t) i] == v)
+            {
+                for (int j = i + 1; j < s.count; ++j)
+                    s.items[(std::size_t) j - 1] = s.items[(std::size_t) j];
+                --s.count;
+                return;
+            }
+    }
+    std::array<bool, 4096> held {};
+    std::array<Stack, 2> stacks {};
 };
 
 // FL's state (0xD5) → parsed slots; nullopt when it is not a Gross Beat state this engine reads.
