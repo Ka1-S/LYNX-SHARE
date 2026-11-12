@@ -178,3 +178,57 @@ shown for "none" in the Port and Ctrl wheels; which controls enable Omni; `Input
 controllers; the smoothing filter's step response; what Accept does with a formula that does not compile; the
 parser's precedence and messages; `inter` / `internoswap` / `fold` / `warp` / `map`; the note-link modes; where the
 multilink menu appears and how much Randomize / Humanize move; the "Set..." item of the tweak menu.
+
+## 9. Round 190cs: FL-exact after the live check (round 190cq) and a second static read
+
+Evidence: the live FL session of round 190cq (FL Studio 2026 v26.1.7, shots `link190bt-*` in its work folder) and
+static reads of FLEngine_x64.dll (headless Ghidra, read-only, decompile scratch deleted). Facts in our own words.
+
+**Parser** [H 0xbaec40, operator table]: each operator is registered with a priority, a lower number binding
+tighter: 10 prefix minus and plus, postfix `!` (factorial of the rounded value) and `%` (hundredths), `in`; 20 `^`;
+30 `*` `/` `div` `mod` `fmod`; 40 `+` `-`; 50 `>` `>=` `<=` `<` `<>` `=`; 60 `not`; 70 `or` `and` `xor` `shl` `shr`.
+So `-Input^2` is `(-Input)^2` (live: FL draws +x²). `=` compares with a 1e-30 tolerance [H 0xbae410]. The checks run
+in this order [H 0xbab340]: names (`Invalid identifier: <name>`, [H 0xbacb80]), brackets by count (`Unequal
+brackets`, [H 0xba9ee0]), neighbours (`Empty brackets ()`, `Missing operand between )(`, `Missing operand between )
+and constant/variable`, `Missing operand between constant/variable and (`, `<operand> two space limited
+variables/constants`), then the tree (`Syntax error: function or operand has too few arguments`, `Too many
+arguments`, `Syntax error`). The window's message line shows one line: the live "Syntax error: function or operand"
+and "input two space limited" are the first lines of the full texts. The message and curve change on Enter only
+(live); the store at Accept compiles the edit's text again and keeps nothing when it does not compile [H 0xf8bc70]:
+the link maps 1:1 and reopens as "Input" (live).
+
+**Functions** [H 0xbae920 ... 0xbaec10]: `inter(x, a, b)` 1 when x lies between a and b in either order, else 0,
+comparing values rounded to thousandths; `internoswap` the same for a <= b only; `fold(x)` a triangle 0 → 1 → 0 over
+0 → 1 → 2 (any x); `warp(x, p)` leaves 0...1 alone (1 wraps to 0) and gives FMod(x + p, 1) outside, FMod keeping
+the sign (x − Trunc(x / y)·y, [H 0x477690]); `map(x, lo, hi)` = lo + (hi − lo)·x. The live curves agree point for
+point, including the drop at the right edge of `warp(Input, p)`.
+
+**Mode** (NoteLinkModeBox, both windows): stored in bits 8...15 of the link's flags [H 0xf8bc70, 0xf8beb0]; Reset
+clears it with the rest of the MIDI controller group [H 0xf8a060]. The link dispatcher [H 0xfdaec0]: Default and
+Hold pass the event on unchanged; Latch, Inc and Stay act only on events with a value above 0 (presses) and ignore
+releases; Stay passes the value, Latch and Inc go through the relative path [H 0x1051370] with step 0 / 1: Latch
+switches to whichever of f(0) and f(1) is farther from the control's position, Inc adds f(resolution) (an event's
+resolution starts at 1/128, [H 0xfd82b0]), limited to the range. Key events reach links with controller number
+256 + key and value velocity / 127, 0 on release [H 0xfda230; scale 1/127 at the global it reads]. The Ctrl menu's
+"Note C0" is number 256 [FORM CtrlMenu Tag 256]; 253 / 254 / 255 are channel aftertouch, key aftertouch, pitch bend.
+
+**Layout and colours** (live): no assignment list until the control has a link; Skip only while several controls
+are queued; the Internal controller group only when the project has an internal controller, with "Record
+automation" (hint "Allow recording of automation", off) at its bottom right; picking a controller clears Ctrl. The
+global window has no parameter list, Omni, Remove conflicts or Skip, and no gap above its buttons. Omni is enabled
+on a mixer track's volume, greyed on the tempo. Curve preview: background #363f45, the 1:1 line #b8bec3, a compiled
+curve #f2d99f, an error #fe3820; hovering reads "In: 0.48 out: 0.48". The smoothing hint reads "286ms  3 poles" /
+"7ms 1 pole". The parameter caption is FL's event name ("Channel volume"; "Insert 1 - Volume").
+
+**Built in LYNX**: all of the above. Key links: a linked key's presses and releases go to its link instead of the
+instrument (any channel / port the link names); in `.lynx` they sit in their own list `midiNoteLinks` (older
+versions skip it instead of reading a controller link), the mode in `midiLinkSettings` / `mode`; global ones on a
+`notelink=` line, the mode on `linkmode=`. "Record automation" writes the internal controller's mapped output into
+the target's automation while automation is recorded (`Automation::recordLive`, saved only when on).
+
+**Not proven, so not claimed**: Default versus Hold differ nowhere in the dispatcher read here (a device script may
+mark its own controls; plain MIDI keys behave the same in both); the resolution of a plain-MIDI key's event is taken
+as the record's starting 1/128 (the plain-MIDI record builder itself was not found); `2Input-1` gives "Invalid
+identifier: 1" in FL and a "two space limited" message in LYNX; the associativity of `^` (LYNX: left to right);
+`and` / `or` / `xor` / `shl` / `shr` on non-whole values; what Auto detect shows for a key in FL's Ctrl wheel (LYNX:
+the number, 256 + key).

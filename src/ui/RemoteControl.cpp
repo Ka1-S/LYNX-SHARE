@@ -95,19 +95,27 @@ private:
     ui::ValueDrag drag;
 };
 
-// FL's FGraph: the mapping's curve, input left to right, output bottom to top, over a grid of quarters.
-class MappingGraph final : public juce::Component
+// FL's FGraph: the mapping's curve, input left to right, output bottom to top, over a grid of quarters. FL's colours
+// (live check 190cq, sampled): background #363f45 with a grid that barely shows, the 1:1 line #b8bec3, a compiled
+// formula's curve cream #f2d99f, a formula with a mistake red #fe3820. Hovering reads "In: 0.48 out: 0.48".
+class MappingGraph final : public juce::Component, public ui::HintSource
 {
 public:
+    enum class State { standard, compiled, error };
     linkformula::Formula formula;
-    juce::Colour curve = theme::colour::textSecondary;
+    State state = State::standard;
+
+    static juce::Colour curveColour (State s)
+    {
+        return s == State::compiled ? juce::Colour (0xfff2d99f) : s == State::error ? juce::Colour (0xfffe3820) : juce::Colour (0xffb8bec3);
+    }
 
     void paint (juce::Graphics& g) override
     {
         const auto area = getLocalBounds().toFloat().reduced (1.0f);
-        g.setColour (theme::colour::bg0);
-        g.fillRoundedRectangle (area, theme::radius::sm);
-        g.setColour (theme::colour::border);
+        g.setColour (juce::Colour (0xff363f45));
+        g.fillRect (area);
+        g.setColour (juce::Colour (0xff3d474e));
         for (int i = 1; i < 4; ++i)
         {
             const auto x = area.getX() + area.getWidth() * (float) i / 4.0f;
@@ -129,12 +137,64 @@ public:
             else
                 path.lineTo (x, y);
         }
-        g.setColour (curve);
+        g.setColour (curveColour (state));
         g.strokePath (path, juce::PathStrokeType (1.6f));
-        g.setColour (theme::colour::borderStrong);
-        g.drawRoundedRectangle (area, theme::radius::sm, 1.0f);
+    }
+
+    ui::Hint hintAt (juce::Point<int> position) override
+    {
+        const auto inner = getLocalBounds().toFloat().reduced (4.0f);
+        const auto in = juce::jlimit (0.0f, 1.0f, ((float) position.x - inner.getX()) / juce::jmax (1.0f, inner.getWidth()));
+        return { tr ("In: {0} out: {1}", { juce::String (in, 2), juce::String (formula.map (in), 2) }) };
+    }
+    void mouseMove (const juce::MouseEvent&) override { repaint(); }
+};
+
+// FL's ErrorLabel: one line under the formula, cut where the line ends (FL's "Syntax error: function or operand has
+// too few arguments" reads "Syntax error: function or operand").
+class MessageLine final : public juce::Component
+{
+public:
+    juce::String text;
+    juce::Colour colour = theme::colour::textSecondary;
+    void set (const juce::String& t, juce::Colour c)
+    {
+        text = t;
+        colour = c;
+        repaint();
+    }
+    void paint (juce::Graphics& g) override
+    {
+        const juce::Font font (theme::font (theme::type::caption, true));
+        g.setFont (font);
+        g.setColour (colour);
+        juce::GlyphArrangement line;
+        line.addJustifiedText (font, text, 0.0f, font.getAscent(), (float) getWidth(), juce::Justification::left);
+        const auto lineHeight = font.getHeight();
+        juce::Graphics::ScopedSaveState save (g);
+        g.reduceClipRegion (0, 0, getWidth(), (int) std::ceil (lineHeight));
+        line.draw (g);
     }
 };
+
+// The smoothing "Time" slider with FL's read-out in its hint ("286ms  3 poles", "7ms 1 pole") [H 0xf8b6b0].
+class SmoothingSlider final : public juce::Slider, public ui::HintSource
+{
+public:
+    juce::String readOut;
+    ui::Hint hintAt (juce::Point<int>) override { return { tr ("Smoothing envelope time"), readOut }; }
+};
+
+// The caption FL gives a control in the window: its event name ("Channel volume", "Channel panning"; FL's own words,
+// live check 190cq), the mixer's "Insert 1 - Volume" as LYNX names them elsewhere.
+juce::String parameterCaption (AudioEngine& engine, const AutomationTarget& t)
+{
+    if (t.kind == AutomationTargetKind::channelVolume)
+        return tr ("Channel volume");
+    if (t.kind == AutomationTargetKind::channelPan)
+        return tr ("Channel panning");
+    return describeAutomationTarget (engine, t);
+}
 
 class RemoteControlPanel final : public juce::Component, private juce::Timer
 {
@@ -145,13 +205,14 @@ public:
         if (targets.empty())
             targets.push_back ({});
 
-        // --- "Current parameter" / "Current assignment"
+        // --- "Current parameter" / "Current assignment" (FL shows the assignment list only once the control has a
+        // link, and the parameter list of the global window only while several controls are queued; live check 190cq)
         ui::setHint (eventSelect, tr ("Current parameter"));
         eventSelect.onChange = [this] {
             if (eventSelect.getSelectedId() - 1 != index)
                 showTarget (eventSelect.getSelectedId() - 1);
         };
-        addAndMakeVisible (eventSelect);
+        addChildComponent (eventSelect);
         ui::setHint (entrySelect, tr ("Current assignment"));
         entrySelect.onChange = [this] {
             if (entrySelect.getSelectedId() - 1 != entry)
@@ -160,11 +221,10 @@ public:
                 showEntry (entrySelect.getSelectedId() - 1);
             }
         };
-        if (! global)
-            addAndMakeVisible (entrySelect);
+        addChildComponent (entrySelect);
 
         // --- MIDI controller
-        for (auto* l : { &portLabel, &channelLabel, &ctrlLabel, &timeLabel })
+        for (auto* l : { &portLabel, &channelLabel, &ctrlLabel, &modeLabel, &timeLabel, &recordLabel })
         {
             l->setFont (theme::font (theme::type::small));
             l->setColour (juce::Label::textColourId, theme::colour::textSecondary);
@@ -176,7 +236,9 @@ public:
         portLabel.setText (tr ("Port"), juce::dontSendNotification);
         channelLabel.setText (tr ("Channel"), juce::dontSendNotification);
         ctrlLabel.setText (tr ("Ctrl"), juce::dontSendNotification);
+        modeLabel.setText (tr ("Mode"), juce::dontSendNotification);
         timeLabel.setText (tr ("Time"), juce::dontSendNotification);
+        recordLabel.setText (tr ("Record automation"), juce::dontSendNotification);
 
         const auto wheel = [this] (const juce::String& hint, int minimum, int maximum, int standard, int& value, bool noneBelowZero, int noneAt) {
             ui::ValueSpec spec;
@@ -190,7 +252,11 @@ public:
                 return (noneBelowZero && n < 0) || n == noneAt ? noneText : juce::String (n);
             };
             auto box = std::make_unique<WheelBox> (spec, [&value] { return (double) value; }, [this, &value, minimum, maximum] (double v) {
-                const auto now = juce::jlimit (minimum, maximum, juce::roundToInt (v));
+                auto now = juce::jlimit (minimum, maximum, juce::roundToInt (v));
+                // the Ctrl wheel: controllers 0...127, then keys from 256 (FL's numbers between are what LYNX cannot
+                // link: aftertouch, pitch bend)
+                if (&value == &cc && now > 127 && now < linkNoteBase)
+                    now = now > value ? linkNoteBase : 127;
                 if (now == value)
                     return;
                 value = now;
@@ -202,7 +268,7 @@ public:
         portBox = wheel (tr ("MIDI input port number"), -1, 255, -1, port, true, -1000);
         // (FL's channel wheel runs 1...16; 0 = any channel is LYNX's own, for the links older versions made that way)
         channelBox = wheel (tr ("MIDI channel number"), 0, 16, 1, channel, false, 0);
-        ctrlBox = wheel (tr ("Continuous Controller number"), -1, 127, -1, cc, true, -1000);
+        ctrlBox = wheel (tr ("Continuous Controller number"), -1, linkNoteLast, -1, cc, true, -1000);
         ctrlBox->onMenu = [this] {
             remoteControlControllerMenu ([safe = juce::Component::SafePointer<RemoteControlPanel> (this)] (int number) {
                 if (safe != nullptr)
@@ -223,20 +289,36 @@ public:
         if (! global)
             addAndMakeVisible (omni);
 
-        // --- Internal controller
-        ui::setHint (internalSelect, tr ("Internal controller"));
-        if (! global)
-            addAndMakeVisible (internalSelect);
+        // FL's NoteLinkModeBox (round 190cs): Default / Hold / Latch / Inc / Stay, in both windows
+        for (int m = 0; m < linkformula::linkModeCount; ++m)
+            modeSelect.addItem (tr (modeName (m)), m + 1);
+        modeSelect.setSelectedId (1, juce::dontSendNotification);
+        modeSelect.onChange = [this] { modeChanged(); };
+        addAndMakeVisible (modeSelect);
+        modeChanged();
 
-        // --- Mapping formula
+        // --- Internal controller (FL shows the group only when the project has one; live check 190cq)
+        ui::setHint (internalSelect, tr ("Internal controller"));
+        internalSelect.onChange = [this] {
+            if (internalSelect.getSelectedId() > 1) // FL: picking a controller clears the MIDI controller number
+            {
+                cc = -1;
+                edited();
+            }
+        };
+        addChildComponent (internalSelect);
+        ui::setHint (recordAutomation, tr ("Allow recording of automation"));
+        ui::setHint (recordLabel, tr ("Allow recording of automation"));
+        addChildComponent (recordAutomation);
+
+        // --- Mapping formula (FL compiles it when Enter is pressed, not while typing; live check 190cq)
         addAndMakeVisible (graph);
         formulaEdit.setFont (theme::font (theme::type::small));
         formulaEdit.setSelectAllWhenFocused (false);
-        formulaEdit.onTextChange = [this] { formulaChanged(); };
         formulaEdit.onReturnKey = [this] { formulaChanged(); };
         ui::setHint (formulaEdit, tr ("Input to output mapping formula"));
         addAndMakeVisible (formulaEdit);
-        presetsButton.setButtonText (juce::String::fromUTF8 ("\xe2\x96\xbe"));
+        presetsButton.setButtonText (juce::String::fromUTF8 ("\xe2\x96\xb8"));
         ui::setHint (presetsButton, tr ("Presets"));
         presetsButton.onClick = [this] {
             remoteControlFormulaMenu ([safe = juce::Component::SafePointer<RemoteControlPanel> (this)] (const juce::String& text) {
@@ -248,11 +330,7 @@ public:
             }).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&presetsButton));
         };
         addAndMakeVisible (presetsButton);
-        errorLabel.setFont (theme::font (theme::type::caption));
-        errorLabel.setJustificationType (juce::Justification::topLeft);
-        errorLabel.setBorderSize ({});
-        errorLabel.setMinimumHorizontalScale (0.75f);
-        addAndMakeVisible (errorLabel);
+        addAndMakeVisible (message);
 
         // --- Smoothing
         smoothOn.setButtonText (tr ("Smoothing"));
@@ -266,14 +344,8 @@ public:
         smoothTime.setValue (linkformula::smoothingDefault, juce::dontSendNotification);
         smoothTime.onValueChange = [this] { smoothingChanged (true); };
         addAndMakeVisible (smoothTime);
-        smoothValue.setFont (theme::font (theme::type::caption));
-        smoothValue.setColour (juce::Label::textColourId, theme::colour::textSecondary);
-        smoothValue.setJustificationType (juce::Justification::centredLeft);
-        smoothValue.setBorderSize ({});
-        smoothValue.setMinimumHorizontalScale (0.7f);
-        addAndMakeVisible (smoothValue);
 
-        // --- Remove conflicts, Reset / Skip / Accept
+        // --- Remove conflicts, Reset / Skip / Accept (FL: Skip only while several controls are queued)
         conflicts.setButtonText (tr ("Remove conflicts"));
         conflicts.setToggleState (true, juce::dontSendNotification);
         ui::setHint (conflicts, tr ("Auto-remove other conflicting assignments"));
@@ -286,58 +358,73 @@ public:
         skipButton.onClick = [this] { next(); };
         acceptButton.setButtonText (tr ("Accept"));
         acceptButton.onClick = [this] { accept(); };
-        for (auto* b : { &resetButton, &skipButton, &acceptButton })
-            addAndMakeVisible (b);
+        addAndMakeVisible (resetButton);
+        addChildComponent (skipButton);
+        addAndMakeVisible (acceptButton);
 
-        for (int i = 0; i < (int) targets.size(); ++i)
-            eventSelect.addItem (describeAutomationTarget (engine, targets[(std::size_t) i]), i + 1);
+        const auto queued = (int) targets.size();
+        for (int i = 0; i < queued; ++i)
+            eventSelect.addItem ((queued > 1 ? juce::String (i + 1) + "/" + juce::String (queued) + "  " : juce::String())
+                                     + parameterCaption (engine, targets[(std::size_t) i]),
+                                 i + 1);
 
         seenSerial = engine.lastControllerSeen().serial;
-        setSize (juce::roundToInt (256.0f * formScale), juce::roundToInt ((float) ((global ? 377 : 490) - captionHeight) * formScale));
         showTarget (0);
         startTimerHz (20);
     }
 
-    // FL's layout: the project form as it is; the global form has no assignment list, internal controller or
-    // Remove conflicts, and its boxes move up.
+    // FL's layout: the form's places; the groups FL hides close up (the window gets shorter, as FL's does).
     void resized() override
     {
-        const auto up = global ? 113 : 0; // (the global form's boxes sit this much higher from the formula box on)
+        auto y = 0; // how much the hidden groups above have taken away (form units)
+        if (! eventSelect.isVisible())
+            y += 37;
         eventSelect.setBounds (form (0, 26, 256, 26).reduced (4, 2));
-        entrySelect.setBounds (form (0, 63, 256, 23).reduced (4, 0));
-        midiBox = form (1, global ? 63 : 93, 254, 96);
-        const auto m = [this] (int x, int y, int w, int h) {
-            return form (1 + x, (global ? 63 : 93) + y, w, h);
-        };
+        entrySelect.setBounds (form (0, 63 - y, 256, 23).reduced (4, 0));
+        if (! entrySelect.isVisible())
+            y += 30;
+        const auto midiTop = 93 - y;
+        midiBox = form (1, midiTop, 254, 96);
+        const auto m = [midiTop] (int x, int yy, int w, int h) { return form (1 + x, midiTop + yy, w, h); };
         portLabel.setBounds (m (2, 33, 28, 15));
         portBox->setBounds (m (34, 28, 40, 25));
         channelLabel.setBounds (m (78, 33, 55, 15));
         channelBox->setBounds (m (137, 28, 32, 25));
         ctrlLabel.setBounds (m (173, 33, 31, 15));
         ctrlBox->setBounds (m (208, 28, 40, 25));
-        autoDetect.setBounds (m (3, 66, 100, 21));
-        omni.setBounds (m (105, 66, 70, 21));
+        autoDetect.setBounds (m (3, 66, 88, 21));
+        omni.setBounds (m (91, 66, 58, 21));
+        modeLabel.setBounds (m (147, 69, 35, 15));
+        modeSelect.setBounds (m (186, 65, 62, 23));
 
-        internalBox = form (1, 197, 254, 75);
-        internalSelect.setBounds (form (1 + 6, 197 + 26, 242, 23));
+        const auto internalTop = 197 - y;
+        internalBox = form (1, internalTop, 254, 75);
+        internalSelect.setBounds (form (1 + 6, internalTop + 26, 242, 23));
+        recordLabel.setBounds (form (1 + 120, internalTop + 54, 108, 18));
+        recordAutomation.setBounds (form (1 + 230, internalTop + 54, 20, 18));
+        if (! internalSelect.isVisible())
+            y += 83;
 
-        graph.setBounds (form (3, 280 - up, 76, 75));
-        formulaBox = form (79, 280 - up, 176, 77);
-        formulaEdit.setBounds (form (79 + 6, 280 - up + 24, 149, 22));
-        presetsButton.setBounds (form (79 + 157, 280 - up + 24, 15, 22));
-        errorLabel.setBounds (form (79 + 6, 280 - up + 50, 164, 25));
+        const auto formulaTop = 280 - y;
+        graph.setBounds (form (3, formulaTop, 76, 75));
+        formulaBox = form (79, formulaTop, 176, 77);
+        formulaEdit.setBounds (form (79 + 6, formulaTop + 24, 149, 22));
+        presetsButton.setBounds (form (79 + 157, formulaTop + 24, 15, 22));
+        message.setBounds (form (79 + 6, formulaTop + 50, 164, 25));
 
-        smoothingBox = form (1, 365 - up, 254, 42);
-        smoothOn.setBounds (form (1 + 2, 365 - up + 1, 100, 19));
-        timeLabel.setBounds (form (1 + 96, 365 - up + 15, 34, 15));
-        smoothTime.setBounds (form (1 + 130, 365 - up + 8, 97, 26));
-        smoothValue.setBounds (form (1 + 4, 365 - up + 22, 92, 15));
+        const auto smoothingTop = 365 - y;
+        smoothingBox = form (1, smoothingTop, 254, 42);
+        smoothOn.setBounds (form (1 + 2, smoothingTop + 1, 100, 19));
+        timeLabel.setBounds (form (1 + 96, smoothingTop + 15, 34, 15));
+        smoothTime.setBounds (form (1 + 130, smoothingTop + 8, 97, 26));
 
-        conflicts.setBounds (form (2, 415, 150, 21));
-        const auto buttons = global ? 344 : 457;
+        conflicts.setBounds (form (2, 415 - y, 150, 21));
+        // (the global window has no Remove conflicts: its buttons follow the smoothing group; FL 269 x 306)
+        const auto buttons = global ? smoothingTop + 47 : 457 - y;
         resetButton.setBounds (form (1, buttons, 68, 33).reduced (2, 3));
         skipButton.setBounds (form (81, buttons, 68, 33).reduced (2, 3));
         acceptButton.setBounds (form (170, buttons, 84, 33).reduced (2, 3));
+        panelHeight = form (0, buttons + 33, 1, 1).getY() + 4;
     }
 
     void paint (juce::Graphics& g) override
@@ -356,23 +443,24 @@ public:
             }
         };
         box (midiBox, tr ("MIDI controller"));
-        if (! global)
+        if (internalSelect.isVisible())
             box (internalBox, tr ("Internal controller"));
         box (formulaBox, tr ("Mapping formula"));
         box (smoothingBox, {}); // (its caption is the Smoothing switch, as on FL's form)
     }
 
     // --- offscreen drivers
-    void setFormulaText (const juce::String& text)
+    void setFormulaText (const juce::String& text, bool pressEnter)
     {
         formulaEdit.setText (text, juce::dontSendNotification);
-        formulaChanged();
+        if (pressEnter)
+            formulaChanged();
     }
     void setController (int newPort, int newChannel, int newCc)
     {
         port = juce::jlimit (-1, 255, newPort);
         channel = juce::jlimit (0, 16, newChannel);
-        cc = juce::jlimit (-1, 127, newCc);
+        cc = juce::jlimit (-1, linkNoteLast, newCc);
         edited();
     }
     void setSmoothing (bool on, int position)
@@ -380,6 +468,16 @@ public:
         smoothTime.setValue (position, juce::dontSendNotification);
         smoothOn.setToggleState (on, juce::dontSendNotification);
         smoothingChanged (false);
+    }
+    void setMode (int mode)
+    {
+        modeSelect.setSelectedId (juce::jlimit (0, linkformula::linkModeCount - 1, mode) + 1, juce::dontSendNotification);
+        modeChanged();
+    }
+    void setInternal (int which, bool record)
+    {
+        internalSelect.setSelectedId (which + 1, juce::sendNotificationSync);
+        recordAutomation.setToggleState (record, juce::dontSendNotification);
     }
     void poll() { timerCallback(); }
     void press (int button)
@@ -394,19 +492,40 @@ public:
     bool isFinished() const noexcept { return finished; }
     juce::String state() const
     {
-        return juce::String (port) + "|" + juce::String (channel) + "|" + juce::String (cc) + "|" + formulaEdit.getText() + "|" + errorLabel.getText()
-             + "|" + juce::String (conflictCount) + "|" + eventSelect.getText();
+        return juce::String (port) + "|" + juce::String (channel) + "|" + juce::String (cc) + "|" + formulaEdit.getText() + "|" + message.text + "|"
+             + juce::String (conflictCount) + "|" + eventSelect.getText() + "|mode=" + juce::String (modeSelect.getSelectedId() - 1)
+             + "|shown=" + (eventSelect.isVisible() ? "P" : "") + (entrySelect.isVisible() ? "A" : "") + (internalSelect.isVisible() ? "I" : "")
+             + (omni.isVisible() ? "O" : "") + (conflicts.isVisible() ? "C" : "") + (skipButton.isVisible() ? "S" : "")
+             + "|omni=" + (omni.isEnabled() ? "on" : "off") + "|h=" + juce::String (getHeight());
     }
 
 private:
     const AutomationTarget& target() const { return targets[(std::size_t) index]; }
+
+    static const char* modeName (int mode)
+    {
+        static const char* const names[] { "Default", "Hold", "Latch", "Inc", "Stay" };
+        return names[juce::jlimit (0, linkformula::linkModeCount - 1, mode)];
+    }
+    static const char* modeHint (int mode)
+    {
+        static const char* const hints[] { "Preserve controller default mode", "Hold to keep at velocity", "Press again to switch",
+                                           "Increment value", "Keep at velocity" };
+        return hints[juce::jlimit (0, linkformula::linkModeCount - 1, mode)];
+    }
+    void modeChanged()
+    {
+        const auto mode = modeSelect.getSelectedId() - 1;
+        ui::setHint (modeSelect, tr ("How to treat a note or button link") + " - " + tr (modeHint (mode)));
+    }
 
     // The current control's links: the project's (or its global one), then FL's "New link".
     void showTarget (int which)
     {
         index = juce::jlimit (0, (int) targets.size() - 1, which);
         eventSelect.setSelectedId (index + 1, juce::dontSendNotification);
-        eventSelect.setEnabled (targets.size() > 1);
+        eventSelect.setVisible (! global || targets.size() > 1);
+        skipButton.setVisible (targets.size() > 1);
         entries.clear();
         if (global)
         {
@@ -428,15 +547,16 @@ private:
         for (int i = 0; i < existing; ++i)
             entrySelect.addItem (tr ("Link {0}", { juce::String (i + 1) }), i + 1);
         entrySelect.addItem (tr ("New link"), existing + 1);
-        entrySelect.setEnabled (entrySelect.getNumItems() > 1);
+        entrySelect.setVisible (! global && existing > 0);
 
-        // FL: Omni for a channel's controls and a mixer slot's controls
+        // FL: Omni for a channel's controls and a mixer track's controls (not the tempo)
         omni.setEnabled (linkOmniAvailable (target().kind));
 
         outputs = target().kind == AutomationTargetKind::tempo ? std::vector<ControllerOutput>() : controllerOutputs (engine.getSong());
         internalSelect.clear (juce::dontSendNotification);
         internalSelect.addItem (tr ("(none)"), 1);
         internalNow = 0;
+        recordNow = false;
         const auto& automations = engine.getSong().automations;
         const auto live = std::find_if (automations.begin(), automations.end(), [this] (const Automation& a) { return a.isLive() && a.target == target(); });
         for (int i = 0; i < (int) outputs.size(); ++i)
@@ -445,13 +565,23 @@ private:
             internalSelect.addItem (o.label, i + 2);
             if (live != automations.end() && live->source.track == o.track && live->source.slot == o.slot && live->source.output == o.output
                 && live->source.channel == o.channel)
+            {
                 internalNow = i + 1;
+                recordNow = live->recordLive;
+            }
         }
         internalSelect.setSelectedId (internalNow + 1, juce::dontSendNotification);
-        internalSelect.setEnabled (! outputs.empty());
+        recordAutomation.setToggleState (recordNow, juce::dontSendNotification);
+        const auto internal = ! global && ! outputs.empty();
+        internalSelect.setVisible (internal);
+        recordAutomation.setVisible (internal);
+        recordLabel.setVisible (internal);
 
         entry = -1;
         showEntry (0);
+        resized();
+        setSize (juce::roundToInt (256.0f * formScale), panelHeight);
+        repaint();
     }
 
     void showEntry (int which)
@@ -463,6 +593,8 @@ private:
         channel = l.channel + 1; // (0 = any channel)
         cc = l.cc;
         omni.setToggleState (l.omni && omni.isEnabled(), juce::dontSendNotification);
+        modeSelect.setSelectedId (juce::jlimit (0, linkformula::linkModeCount - 1, l.mode) + 1, juce::dontSendNotification);
+        modeChanged();
         formulaEdit.setText (l.formula.empty() ? juce::String ("Input") : juce::String::fromUTF8 (l.formula.c_str()), juce::dontSendNotification);
         smoothTime.setValue (l.smoothing, juce::dontSendNotification);
         smoothOn.setToggleState (l.smooth, juce::dontSendNotification);
@@ -479,8 +611,13 @@ private:
         l.channel = channel - 1;
         l.cc = cc;
         l.omni = ! global && omni.isEnabled() && omni.getToggleState();
+        l.mode = modeSelect.getSelectedId() - 1;
+        // FL's store compiles the edit's text: a formula with a mistake is not kept, the link maps 1:1 ("Input" when
+        // the window opens again; live check 190cq, [H 0xf8bc70])
         const auto text = formulaEdit.getText().trim().toStdString();
-        l.formula = linkformula::isDefaultMapping (text) ? std::string() : text;
+        int at = -1;
+        linkformula::Formula::compile (text, nullptr, &at);
+        l.formula = at == -1 ? text : std::string();
         l.smooth = smoothOn.getToggleState();
         l.smoothing = juce::roundToInt (smoothTime.getValue());
         return l;
@@ -502,58 +639,64 @@ private:
         conflicts.setColour (juce::ToggleButton::textColourId, conflictCount > 0 ? theme::colour::record : theme::colour::textPrimary);
     }
 
+    // FL's compile (Enter, a preset, Reset): the message, the curve's colour, and on a mistake the edit's text marked red
     void formulaChanged()
     {
         const auto text = formulaEdit.getText().toStdString();
-        std::string message;
+        std::string error;
         int at = -1;
-        graph.formula = linkformula::Formula::compile (text, &message, &at);
+        graph.formula = linkformula::Formula::compile (text, &error, &at);
+        const juce::Colour red (0xfffe3820);
         if (at == -2)
         {
-            errorLabel.setText (tr ("(default 1:1 mapping)"), juce::dontSendNotification);
-            graph.curve = theme::colour::textSecondary;
+            message.set (tr ("(default 1:1 mapping)"), theme::colour::textSecondary);
+            graph.state = MappingGraph::State::standard;
         }
         else if (at == -1)
         {
-            errorLabel.setText (tr ("Compiled ok."), juce::dontSendNotification);
-            graph.curve = theme::colour::info;
+            message.set (tr ("Compiled ok."), theme::colour::textSecondary);
+            graph.state = MappingGraph::State::compiled;
         }
         else
         {
-            errorLabel.setText (juce::String::fromUTF8 (message.c_str()), juce::dontSendNotification);
-            graph.curve = theme::colour::record;
+            message.set (juce::String::fromUTF8 (error.c_str()), red);
+            graph.state = MappingGraph::State::error;
         }
         const auto bad = at >= 0;
-        errorLabel.setColour (juce::Label::textColourId, bad ? theme::colour::record : theme::colour::textSecondary);
-        formulaEdit.applyColourToAllText (bad ? theme::colour::record : theme::colour::textPrimary);
+        formulaEdit.setColour (juce::TextEditor::highlightColourId, bad ? red : theme::colour::selectionFill);
+        formulaEdit.setColour (juce::TextEditor::highlightedTextColourId, bad ? juce::Colours::white : theme::colour::textPrimary);
+        formulaEdit.applyColourToAllText (theme::colour::textPrimary);
+        if (bad)
+            formulaEdit.selectAll();
+        else
+            formulaEdit.setHighlightedRegion ({});
         graph.repaint();
     }
 
     // FL: moving the slider to 0 switches smoothing off, any other position switches it on; the hint gives the
-    // filter's poles and time.
+    // filter's time and poles as FL writes them ("286ms  3 poles", "7ms 1 pole").
     void smoothingChanged (bool fromSlider)
     {
         const auto position = juce::roundToInt (smoothTime.getValue());
         if (fromSlider)
             smoothOn.setToggleState (position != 0, juce::dontSendNotification);
-        juce::String text;
-        if (! smoothOn.getToggleState() || position == 0)
-            text = tr ("Disabled");
-        else
-            text = (linkformula::smoothingPoles (position) == 1 ? tr ("1 pole") : tr ("3 poles")) + " "
-                 + juce::String (juce::roundToInt (linkformula::smoothingMs (position))) + "ms";
-        smoothValue.setText (text, juce::dontSendNotification);
-        ui::setHint (smoothTime, tr ("Smoothing envelope time") + ": " + text);
+        smoothTime.readOut = position == 0 ? tr ("Disabled")
+                                           : juce::String (juce::roundToInt (linkformula::smoothingMs (position))) + "ms"
+                                                 + (linkformula::smoothingPoles (position) == 1 ? " " + tr ("1 pole") : "  " + tr ("3 poles"));
     }
 
-    // FL's Reset: no controller, no internal controller, the 1:1 formula, smoothing off at its default time.
+    // FL's Reset clears both groups (MIDI controller with its Mode, internal controller), the formula to "Input" and
+    // smoothing off at its default time [H 0xf8a060].
     void reset()
     {
         port = -1;
         channel = 1;
         cc = -1;
         omni.setToggleState (false, juce::dontSendNotification);
+        modeSelect.setSelectedId (1, juce::dontSendNotification);
+        modeChanged();
         internalSelect.setSelectedId (1, juce::dontSendNotification);
+        recordAutomation.setToggleState (false, juce::dontSendNotification);
         formulaEdit.setText ("Input", juce::dontSendNotification);
         smoothTime.setValue (linkformula::smoothingDefault, juce::dontSendNotification);
         smoothOn.setToggleState (false, juce::dontSendNotification);
@@ -583,6 +726,14 @@ private:
                                 s.removeAutomation (i);
                     });
             }
+            // "Record automation" of the internal controller link
+            const auto record = recordAutomation.getToggleState();
+            if (chosen > 0 && (chosen != internalNow || record != recordNow))
+                engine.editSong ([t, record] (Song& s) {
+                    for (auto& a : s.automations)
+                        if (a.isLive() && a.target == t)
+                            a.recordLive = record;
+                });
         }
         next();
     }
@@ -601,7 +752,7 @@ private:
             juce::MessageManager::callAsync ([close = onClose] { close(); });
     }
 
-    // FL's Auto detect: the controller that sends next fills port, channel and controller number.
+    // FL's Auto detect: the controller (or key) that sends next fills port, channel and controller number.
     void timerCallback() override
     {
         const auto seen = engine.lastControllerSeen();
@@ -609,7 +760,7 @@ private:
             return;
         seenSerial = seen.serial;
         if (! autoDetect.getToggleState() || seen.cc < 0 || eventSelect.isPopupActive() || entrySelect.isPopupActive()
-            || internalSelect.isPopupActive())
+            || internalSelect.isPopupActive() || modeSelect.isPopupActive())
             return;
         if (port == seen.port && channel == seen.channel + 1 && cc == seen.cc)
             return;
@@ -631,16 +782,19 @@ private:
     int conflictCount = 0;
     std::vector<ControllerOutput> outputs;
     int internalNow = 0; // 0 = none, else 1 + index into `outputs`
+    bool recordNow = false;
     std::uint64_t seenSerial = 0;
+    int panelHeight = 0;
 
-    juce::ComboBox eventSelect, entrySelect, internalSelect;
-    juce::Label portLabel, channelLabel, ctrlLabel, timeLabel, errorLabel, smoothValue;
+    juce::ComboBox eventSelect, entrySelect, internalSelect, modeSelect;
+    juce::Label portLabel, channelLabel, ctrlLabel, modeLabel, timeLabel, recordLabel;
     std::unique_ptr<WheelBox> portBox, channelBox, ctrlBox;
-    juce::ToggleButton autoDetect, omni, smoothOn, conflicts;
+    juce::ToggleButton autoDetect, omni, smoothOn, conflicts, recordAutomation;
     MappingGraph graph;
+    MessageLine message;
     juce::TextEditor formulaEdit;
     juce::TextButton presetsButton, resetButton, skipButton, acceptButton;
-    juce::Slider smoothTime;
+    SmoothingSlider smoothTime;
     juce::Rectangle<int> midiBox, internalBox, formulaBox, smoothingBox;
 };
 
@@ -690,10 +844,22 @@ std::unique_ptr<juce::Component> makeRemoteControlPanel (AudioEngine& engine, st
     return std::make_unique<RemoteControlPanel> (engine, std::move (targets), global, std::move (close));
 }
 
-void remoteControlPanelSetFormula (juce::Component& panel, const juce::String& formula)
+void remoteControlPanelSetFormula (juce::Component& panel, const juce::String& formula, bool pressEnter)
 {
     if (auto* p = dynamic_cast<RemoteControlPanel*> (&panel))
-        p->setFormulaText (formula);
+        p->setFormulaText (formula, pressEnter);
+}
+
+void remoteControlPanelSetMode (juce::Component& panel, int mode)
+{
+    if (auto* p = dynamic_cast<RemoteControlPanel*> (&panel))
+        p->setMode (mode);
+}
+
+void remoteControlPanelSetInternal (juce::Component& panel, int which, bool recordAutomation)
+{
+    if (auto* p = dynamic_cast<RemoteControlPanel*> (&panel))
+        p->setInternal (which, recordAutomation);
 }
 
 void remoteControlPanelSetController (juce::Component& panel, int port, int channel, int cc)
@@ -791,6 +957,10 @@ juce::PopupMenu remoteControlFormulaMenu (std::function<void (const juce::String
 juce::PopupMenu remoteControlControllerMenu (std::function<void (int)> pick)
 {
     juce::PopupMenu menu;
+    // "Special": of FL's four, the key link (Note C0 = number 256; round 190cs). Channel / key aftertouch and the pitch
+    // bend wheel are left out: LYNX's links cannot follow them.
+    menu.addSectionHeader (tr ("Special"));
+    menu.addItem (tr ("Note C0"), [pick] { pick (linkNoteBase); });
     menu.addSectionHeader (tr ("Standard Continuous Controllers"));
     for (int n = 0; n < 128; ++n)
     {

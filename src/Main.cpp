@@ -9991,12 +9991,16 @@ private:
         {
             auto panel = lynx::makeRemoteControlPanel (engine, { volume, pan, insert }, false, [] {});
             shoot (*panel, "remote-multilink");
-            const auto first = lynx::remoteControlPanelState (*panel).fromLastOccurrenceOf ("|", false, false);
+            const auto parameter = [&panel] { return juce::StringArray::fromTokens (lynx::remoteControlPanelState (*panel), "|", "")[6]; };
+            const auto first = parameter();
+            check ("multilink_caption_and_skip", first.startsWith ("1/3") && first.contains (lynx::tr ("Channel volume"))
+                                                     && lynx::remoteControlPanelState (*panel).contains ("S|omni"),
+                   lynx::remoteControlPanelState (*panel));
             lynx::remoteControlPanelSetController (*panel, -1, 1, 30);
             lynx::remoteControlPanelPress (*panel, 2); // Accept: volume linked, on to pan
-            const auto second = lynx::remoteControlPanelState (*panel).fromLastOccurrenceOf ("|", false, false);
+            const auto second = parameter();
             lynx::remoteControlPanelPress (*panel, 1); // Skip: pan untouched, on to the insert
-            const auto third = lynx::remoteControlPanelState (*panel).fromLastOccurrenceOf ("|", false, false);
+            const auto third = parameter();
             const auto beforeLast = lynx::remoteControlPanelFinished (*panel);
             lynx::remoteControlPanelPress (*panel, 1); // Skip on the last one: done
             const auto closed = ! beforeLast && lynx::remoteControlPanelFinished (*panel);
@@ -10056,6 +10060,142 @@ private:
                                                         && ! stripped->midiLinks[1].hasSettings());
         }
 
+        // ---- round 190cs: FL's live answers (live check 190cq) and the note / button link modes
+        {
+            const auto state = [] (juce::Component& p) { return lynx::remoteControlPanelState (p); };
+            engine.editSong ([] (lynx::Song& s) { s.midiLinks.clear(); });
+            // the layout FL shows: no assignment list without a link, no Skip outside Multilink, no internal
+            // controller group without a controller in the project; the parameter caption in FL's words
+            auto fresh = lynx::makeRemoteControlPanel (engine, { volume }, false);
+            shoot (*fresh, "cs-remote-default");
+            check ("cs_layout_without_link", state (*fresh).contains ("|" + lynx::tr ("Channel volume") + "|") && state (*fresh).contains ("|shown=POC|"), state (*fresh));
+            // Omni: enabled on a mixer track's volume (FL: "Insert 1 - Volume"), greyed on the tempo
+            auto onInsert = lynx::makeRemoteControlPanel (engine, { insert }, false);
+            auto onTempo = lynx::makeRemoteControlPanel (engine, { AutomationTarget { AutomationTargetKind::tempo, 0 } }, false);
+            shoot (*onInsert, "cs-remote-omni-insert");
+            check ("cs_omni_mixer_track", state (*onInsert).contains ("|omni=on|") && state (*onTempo).contains ("|omni=off|"),
+                   state (*onInsert) + " / " + state (*onTempo));
+            // the formula compiles on Enter only; FL's messages and colours
+            lynx::remoteControlPanelSetFormula (*fresh, "1-Input^2", false);
+            check ("cs_no_compile_while_typing", state (*fresh).contains ("|" + lynx::tr ("(default 1:1 mapping)") + "|"), state (*fresh));
+            lynx::remoteControlPanelSetFormula (*fresh, "-Input^2");
+            shoot (*fresh, "cs-remote-compiled");
+            check ("cs_compiled_on_enter", state (*fresh).contains ("|" + lynx::tr ("Compiled ok.") + "|"), state (*fresh));
+            const std::pair<const char*, const char*> errors[] { { "Input*", "Syntax error: function or operand" },
+                                                                 { "foo(Input)", "Invalid identifier: foo" },
+                                                                 { "Sin(Input", "Unequal brackets" },
+                                                                 { "Input 2", "input two space limited" } };
+            for (const auto& [text, expected] : errors)
+            {
+                lynx::remoteControlPanelSetFormula (*fresh, text);
+                check ("cs_fl_error_text", state (*fresh).contains (expected), state (*fresh));
+            }
+            lynx::remoteControlPanelSetFormula (*fresh, "foo(Input)");
+            shoot (*fresh, "cs-remote-error");
+            // Accept with that formula: the link is made, the formula is not kept (FL reopens it as "Input")
+            lynx::remoteControlPanelSetController (*fresh, -1, 1, 7);
+            lynx::remoteControlPanelPress (*fresh, 2);
+            check ("cs_bad_formula_accept_is_input", engine.getSong().midiLinks.size() == 1 && engine.getSong().midiLinks[0].cc == 7
+                                                         && engine.getSong().midiLinks[0].formula.empty());
+            auto reopened = lynx::makeRemoteControlPanel (engine, { volume }, false);
+            shoot (*reopened, "cs-remote-reopened");
+            check ("cs_reopened_shows_input_and_link_list", state (*reopened).startsWith ("-1|1|7|Input|" + lynx::tr ("(default 1:1 mapping)") + "|")
+                                                               && state (*reopened).contains ("|shown=PAOC|"),
+                   state (*reopened));
+            // the internal controller group appears with a controller in the project, with "Record automation"
+            engine.editSong ([] (lynx::Song& s) {
+                lynx::EffectSlot peak;
+                peak.kind = lynx::EffectKind::peakController;
+                s.mixer[0].effects.push_back (peak);
+            });
+            auto withController = lynx::makeRemoteControlPanel (engine, { volume }, false);
+            lynx::remoteControlPanelSetInternal (*withController, 1, true);
+            shoot (*withController, "cs-remote-internal");
+            check ("cs_internal_group_shown", state (*withController).contains ("|shown=PAIOC|") && state (*withController).startsWith ("-1|1|-1|"),
+                   state (*withController));
+            lynx::remoteControlPanelPress (*withController, 2);
+            const auto& autos = engine.getSong().automations;
+            check ("cs_record_automation_kept", std::any_of (autos.begin(), autos.end(), [&] (const lynx::Automation& a) {
+                       return a.isLive() && a.target == volume && a.recordLive;
+                   }));
+            engine.editSong ([] (lynx::Song& s) {
+                s.mixer[0].effects.pop_back();
+                s.automations.clear();
+                s.midiLinks.clear();
+            });
+            // the global window: no parameter list, Omni, Remove conflicts or Skip; Mode is there
+            auto globalPanel = lynx::makeRemoteControlPanel (engine, { volume }, true);
+            shoot (*globalPanel, "cs-global-default");
+            check ("cs_global_layout", state (*globalPanel).contains ("|shown=|"), state (*globalPanel));
+
+            // a key link in each Mode: note 60 = FL's controller number 256 + 60
+            const auto key = lynx::linkNoteBase + 60;
+            auto modePanel = lynx::makeRemoteControlPanel (engine, { volume }, false);
+            lynx::remoteControlPanelSetController (*modePanel, -1, 1, key);
+            lynx::remoteControlPanelSetMode (*modePanel, 2);
+            shoot (*modePanel, "cs-remote-note-latch");
+            lynx::remoteControlPanelPress (*modePanel, 2);
+            check ("cs_note_link_written", engine.getSong().midiLinks.size() == 1 && engine.getSong().midiLinks[0].cc == key
+                                               && engine.getSong().midiLinks[0].mode == 2);
+            const auto play = [&engine, key, volume] (int velocity) {
+                engine.injectControllerForTest (key, 0, velocity);
+                return engine.currentTargetValue (volume);
+            };
+            const auto setMode = [&engine] (int mode) {
+                engine.editSong ([mode] (lynx::Song& s) { s.midiLinks[0].mode = mode; });
+                engine.editSong ([] (lynx::Song& s) { s.setTargetValue ({ AutomationTargetKind::channelVolume, 0 }, 0.25f); });
+            };
+            setMode (2); // Latch: press switches, release does nothing
+            const auto l1 = play (100), l1off = play (0), l2 = play (90), l2off = play (0);
+            check ("cs_mode_latch", std::abs (l1 - 1.0f) < 1e-4f && std::abs (l1off - 1.0f) < 1e-4f && l2 < 1e-4f && l2off < 1e-4f,
+                   juce::String (l1) + " " + juce::String (l1off) + " " + juce::String (l2) + " " + juce::String (l2off));
+            setMode (1); // Hold: the velocity while held, back to 0 on release
+            const auto h1 = play (100), h1off = play (0);
+            check ("cs_mode_hold", std::abs (h1 - 100.0f / 127.0f) < 1e-4f && h1off < 1e-4f, juce::String (h1) + " " + juce::String (h1off));
+            setMode (0); // Default: as Hold for a key
+            const auto d1 = play (64), d1off = play (0);
+            check ("cs_mode_default", std::abs (d1 - 64.0f / 127.0f) < 1e-4f && d1off < 1e-4f, juce::String (d1) + " " + juce::String (d1off));
+            setMode (3); // Inc: each press adds 1/128
+            const auto i1 = play (100), i1off = play (0), i2 = play (20);
+            check ("cs_mode_inc", std::abs (i1 - (0.25f + 1.0f / 128.0f)) < 1e-4f && std::abs (i1off - i1) < 1e-6f
+                                      && std::abs (i2 - (0.25f + 2.0f / 128.0f)) < 1e-4f,
+                   juce::String (i1) + " " + juce::String (i2));
+            setMode (4); // Stay: the velocity, kept after the release
+            const auto s1 = play (100), s1off = play (0);
+            check ("cs_mode_stay", std::abs (s1 - 100.0f / 127.0f) < 1e-4f && std::abs (s1off - s1) < 1e-6f, juce::String (s1) + " " + juce::String (s1off));
+
+            // the project file keeps the key link and its mode; an older reader skips it
+            lynx::Song song = engine.getSong();
+            song.midiLinks[0].mode = 2;
+            MidiLink cc7 { 7, 0, pan };
+            cc7.mode = 4;
+            song.midiLinks.insert (song.midiLinks.begin(), cc7);
+            juce::String error;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            check ("cs_note_link_round_trip", back && back->midiLinks == song.midiLinks && json.contains ("midiNoteLinks"), error);
+            auto parsed = juce::JSON::parse (json);
+            if (auto* o = parsed.getDynamicObject())
+            {
+                o->removeProperty ("midiNoteLinks");
+                o->removeProperty ("midiLinkSettings");
+            }
+            const auto older = lynx::ProjectFile::fromJson (juce::JSON::toString (parsed), error);
+            check ("cs_older_reader_keeps_cc_links_only", older && older->midiLinks.size() == 1 && older->midiLinks[0].cc == 7);
+            // "Record automation" of an internal-controller link, saved only when on
+            lynx::Automation live;
+            live.target = volume;
+            live.source.track = 0;
+            live.recordLive = true;
+            song.automations = { live };
+            const auto withLive = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            live.recordLive = false;
+            song.automations = { live };
+            check ("cs_record_automation_round_trip", withLive && withLive->automations.size() == 1 && withLive->automations[0].recordLive
+                                                          && ! lynx::ProjectFile::toJson (song).contains ("recordLive"));
+            engine.editSong ([] (lynx::Song& s) { s.midiLinks.clear(); });
+        }
+
         // ---- menus: the control menu, the formula presets, the controller list, the Multilink items
         {
             juce::PopupMenu control;
@@ -10072,6 +10212,11 @@ private:
                        prefix + "-menus.png");
             saveMenus (juce::StringArray { "Ctrl menu" }, std::vector<juce::PopupMenu> { lynx::remoteControlControllerMenu ([] (int) {}) },
                        prefix + "-ctrl-menu.png");
+            // the Mode list as its box pops it up (round 190cs)
+            juce::PopupMenu modes;
+            for (const char* m : { "Default", "Hold", "Latch", "Inc", "Stay" })
+                modes.addItem (lynx::tr (m), true, juce::String (m) == "Default", [] {});
+            saveMenus (juce::StringArray { "Mode" }, std::vector<juce::PopupMenu> { modes }, prefix + "-mode-menu.png");
         }
 
         // ---- Settings > MIDI: the input's Port box, the link list with a link's settings

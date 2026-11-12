@@ -9340,6 +9340,20 @@ countries: ru by kz
 "Start from" = "Начать с"
 "Opens as a new, untitled project." = "Открывается как новый проект без названия."
 "The result is {0} from the reference's loudness. Match again to correct the level." = "Результат отличается на {0} от громкости референса. Подгоните ещё раз, чтобы исправить уровень."
+# --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
+"Inc" = "Inc"
+"How to treat a note or button link" = "Как обрабатывать привязку ноты или кнопки"
+"Preserve controller default mode" = "Сохранять режим контроллера по умолчанию"
+"Hold to keep at velocity" = "Удерживайте, чтобы держать по velocity"
+"Press again to switch" = "Нажмите ещё раз для переключения"
+"Increment value" = "Увеличивать значение"
+"Keep at velocity" = "Оставлять по velocity"
+"Record automation" = "Записывать автоматизацию"
+"Allow recording of automation" = "Разрешить запись автоматизации"
+"Channel volume" = "Громкость канала"
+"Channel panning" = "Панорама канала"
+"In: {0} out: {1}" = "Вход: {0} выход: {1}"
+"Note C0" = "Нота C0"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"

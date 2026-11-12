@@ -9340,6 +9340,20 @@ countries: es mx ar co cl pe ve
 "Start from" = "Empezar desde"
 "Opens as a new, untitled project." = "Se abre como un proyecto nuevo, sin título."
 "The result is {0} from the reference's loudness. Match again to correct the level." = "El resultado está a {0} del volumen de la referencia. Iguala de nuevo para corregir el nivel."
+# --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
+"Inc" = "Inc"
+"How to treat a note or button link" = "Cómo tratar un enlace de nota o botón"
+"Preserve controller default mode" = "Conservar el modo por defecto del controlador"
+"Hold to keep at velocity" = "Mantén pulsado para quedarse en la velocidad"
+"Press again to switch" = "Pulsa otra vez para alternar"
+"Increment value" = "Incrementar el valor"
+"Keep at velocity" = "Quedarse en la velocidad"
+"Record automation" = "Grabar automatización"
+"Allow recording of automation" = "Permitir grabar automatización"
+"Channel volume" = "Volumen del canal"
+"Channel panning" = "Panorama del canal"
+"In: {0} out: {1}" = "Entrada: {0} salida: {1}"
+"Note C0" = "Nota C0"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"

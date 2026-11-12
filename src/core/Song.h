@@ -1717,6 +1717,9 @@ struct Automation
         bool operator== (const LiveSource&) const = default;
     } source;
     std::vector<float> curve;
+    // FL's "Record automation" of an internal-controller link (CanAutomateBox "Allow recording of automation", off by
+    // default; round 190cs): while automation is recorded, the controller's moves are written into the target's clip
+    bool recordLive = false;
     bool isLive() const noexcept { return source.track >= 0 || source.channel >= 0; }
     std::uint64_t uid = 0; // stable id (Online Sessions, round 168a)
     float mapLive (float v) const noexcept; // applies the curve
@@ -1872,21 +1875,29 @@ struct MidiLink
     bool smooth = false;  // "Smoothing" on
     int smoothing = 469;  // the smoothing slider, -1024..1024 (FL's default 469: 3 poles, about 200 ms)
     bool omni = false;    // "Omni": the link moves this control of the selected channel / mixer track
+    int mode = 0;         // FL's "Mode" (round 190cs): linkformula::LinkMode, 0 = Default
 
     MidiLink() = default;
     MidiLink (int controller, int midiChannel, AutomationTarget control) : cc (controller), channel (midiChannel), target (control) {}
 
     // Has the link anything a plain learned link lacks?
-    bool hasSettings() const noexcept { return port >= 0 || ! formula.empty() || smooth || smoothing != 469 || omni; }
+    bool hasSettings() const noexcept { return port >= 0 || ! formula.empty() || smooth || smoothing != 469 || omni || mode != 0; }
     bool operator== (const MidiLink&) const = default;
 };
+
+// FL's controller numbers (CtrlMenu "Special" [FORM]; round 190cs): 0...127 are the continuous controllers, 256 + n is
+// note n ("Note C0" = 256, FL's C0 being MIDI note 0). A link with a note number follows that key's presses and releases.
+constexpr int linkNoteBase = 256;
+constexpr int linkNoteLast = linkNoteBase + 127;
+inline bool isNoteLink (int number) noexcept { return number >= linkNoteBase && number <= linkNoteLast; }
 
 // The same hardware control (FL compares port, channel and controller number as one id).
 inline bool sameController (const MidiLink& a, const MidiLink& b) noexcept
 {
     return a.port == b.port && a.channel == b.channel && a.cc == b.cc;
 }
-// "Omni" exists for a channel's controls (the selected channel) and a mixer slot's controls (the selected track).
+// "Omni" exists for a channel's controls (the selected channel) and a mixer track's controls: its volume and pan and its
+// slots' controls (the selected track; FL live check 190cq: enabled on "Insert 1 - Volume", greyed on Tempo).
 bool linkOmniAvailable (AutomationTargetKind kind) noexcept;
 // What an Omni link moves now: the same control on the selected channel / mixer track.
 AutomationTarget linkOmniTarget (const MidiLink& link, int selectedChannel, int selectedMixerTrack) noexcept;

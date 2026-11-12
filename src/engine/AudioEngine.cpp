@@ -2323,6 +2323,20 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
         return;
     }
 
+    // FL's note links (round 190cs; controller number 256 + key): a linked key moves its control instead of playing
+    if (m.isNoteOnOrOff())
+    {
+        const auto key = m.getNoteNumber();
+        const auto value = m.isNoteOn() ? (int) m.getVelocity() : 0;
+        if ((linkedNotes[(std::size_t) (key >> 6)].load (std::memory_order_relaxed) >> (key & 63) & 1u) != 0)
+        {
+            controllerQueue.push ({ linkNoteBase + key, m.getChannel() - 1, value, device.port });
+            return;
+        }
+        if (value > 0) // (and offered to the link window's Auto detect)
+            controllerQueue.push ({ linkNoteBase + key, m.getChannel() - 1, value, device.port, true });
+    }
+
     // a controller profile's buttons, knobs and faders (round 190aw): to the message thread, not into the instruments.
     // Controllers linked by hand stay with their links.
     if (source != nullptr && controllerIo.take (deviceName, m.getRawData(), m.getRawDataSize(), linkedCcs))
@@ -4039,6 +4053,7 @@ std::vector<MidiLink> AudioEngine::getGlobalLinks() const
         link.formula = l.formula;
         link.smooth = l.smooth;
         link.smoothing = l.smoothing;
+        link.mode = l.mode;
         out.push_back (std::move (link));
     }
     return out;
@@ -4094,6 +4109,7 @@ void AudioEngine::setGlobalLink (const AutomationTarget& target, const std::opti
         g.formula = link->formula;
         g.smooth = link->smooth;
         g.smoothing = link->smoothing;
+        g.mode = link->mode;
         p.globalLinks.push_back (std::move (g));
     }
     setMidiPrefs (p, saveGlobalLinks);
@@ -4395,11 +4411,38 @@ void AudioEngine::updateAutomationRecording (bool active)
     }
 
     const auto tick = estimatedPositionNow();
+
+    // FL's "Record automation" of an internal-controller link (round 190cs): the controller's output, as the link maps
+    // it, is written like a hand move for as long as automation is recorded
+    for (const auto& a : song.automations)
+    {
+        if (! a.isLive() || ! a.recordLive)
+            continue;
+        auto output = -1.0f;
+        if (a.source.channel >= 0)
+        {
+            if (const auto instrument = getChannelInstrument (a.source.channel))
+                output = instrument->controlOutput (a.source.output);
+        }
+        else if (const auto effect = getEffect (a.source.track, a.source.slot))
+            output = effect->controlOutput (a.source.output);
+        if (output < 0.0f || std::isnan (output))
+            continue;
+        auto it = std::find_if (touches.begin(), touches.end(), [&] (const Touch& t) { return t.target == a.target; });
+        if (it == touches.end())
+        {
+            touches.push_back ({ a.target, now, false, {} });
+            it = touches.end() - 1;
+        }
+        it->lastMs = now;
+        it->liveValue = juce::jlimit (0.0f, 1.0f, a.mapLive (juce::jlimit (0.0f, 1.0f, output)));
+    }
+
     std::vector<AutomationTarget> ended;
     for (auto& t : touches)
     {
         const auto alive = t.held || now - t.lastMs < 350.0;
-        const auto value = currentTargetValue (t.target);
+        const auto value = t.liveValue >= 0.0f ? t.liveValue : currentTargetValue (t.target);
         if (value < 0.0f)
         {
             ended.push_back (t.target);
@@ -4437,12 +4480,25 @@ void AudioEngine::updateAutomationRecording (bool active)
 void AudioEngine::applyControllers()
 {
     ControllerEvent e;
-    std::map<std::tuple<int, int, int>, int> latest; // (cc, channel, port) -> latest value this frame
+    // this frame's events in their order (round 190cs: a key or button link in Latch / Inc / Stay mode acts on each
+    // press, so presses are not merged); a plain controller still moves its control once, to its last value
+    std::vector<ControllerEvent> events;
+    std::map<std::tuple<int, int, int>, std::size_t> last; // (number, channel, port) -> its last event this frame
     controllerLearnTick = learning.kind != AutomationTargetKind::none || multilink.has_value();
 
     while (controllerQueue.pop (e))
     {
-        controllerSeen = { e.port, e.channel, e.cc, e.value, controllerSeen.serial + 1 };
+        // Auto detect of the Remote control settings window: controllers, and keys as they are pressed
+        if (! isNoteLink (e.cc) || e.value > 0)
+            controllerSeen = { e.port, e.channel, e.cc, e.value, controllerSeen.serial + 1 };
+        if (e.seenOnly)
+            continue;
+        if (isNoteLink (e.cc)) // (MIDI learn and Multilink take controllers, as before)
+        {
+            last[{ e.cc, e.channel, e.port }] = events.size();
+            events.push_back (e);
+            continue;
+        }
         if (learning.kind != AutomationTargetKind::none && learningGlobal)
         {
             // "Override global link...": the link goes to the settings, for every project (REA round 146)
@@ -4505,69 +4561,102 @@ void AudioEngine::applyControllers()
             learning = {};
         }
 
-        latest[{ e.cc, e.channel, e.port }] = e.value;
+        last[{ e.cc, e.channel, e.port }] = events.size();
+        events.push_back (e);
     }
 
     const auto links = linksWithGlobal (song.midiLinks, getGlobalLinks());
     {
-        std::uint64_t bits[2] {};
+        std::uint64_t bits[2] {}, notes[2] {};
         for (const auto& link : links)
             if (link.cc >= 0 && link.cc < 128)
                 bits[link.cc >> 6] |= std::uint64_t { 1 } << (link.cc & 63);
+            else if (isNoteLink (link.cc))
+                notes[(link.cc - linkNoteBase) >> 6] |= std::uint64_t { 1 } << ((link.cc - linkNoteBase) & 63);
         for (int w = 0; w < 2; ++w)
+        {
             linkedCcs[(std::size_t) w].store (bits[w], std::memory_order_relaxed);
+            linkedNotes[(std::size_t) w].store (notes[w], std::memory_order_relaxed);
+        }
     }
-    if ((latest.empty() || links.empty()) && linkSmoothing.empty())
+    if ((events.empty() || links.empty()) && linkSmoothing.empty())
         return;
 
     // one snapshot per frame, outside the undo history (like turning the knob)
     std::vector<std::pair<AutomationTarget, float>> changes;
     const auto mixerTrack = selectedMixerTrackForLinks ? selectedMixerTrackForLinks() : -1;
 
-    for (const auto& [key, value] : latest)
+    std::map<std::tuple<int, int, int, int>, float> moved; // a control's position after this frame's events so far
+
+    for (std::size_t i = 0; i < events.size(); ++i)
+    {
+        const auto& ev = events[i];
+        const auto lastOfKey = last[{ ev.cc, ev.channel, ev.port }] == i;
         for (const auto& link : links)
+        {
             // (round 190bt: a link follows the devices with exactly its port number, as FL's controller id does)
-            if (link.cc == std::get<0> (key) && (link.channel < 0 || link.channel == std::get<1> (key)) && link.port == std::get<2> (key))
+            if (link.cc != ev.cc || ! (link.channel < 0 || link.channel == ev.channel) || link.port != ev.port)
+                continue;
+            const auto absolute = linkformula::linkModeIsAbsolute (link.mode);
+            if (absolute && ! lastOfKey)
+                continue; // (a controller's earlier values this frame: only the last one moves the control)
+            static const linkformula::Formula oneToOne;
+            const auto* formula = &oneToOne;
+            if (! link.formula.empty()) // FL's mapping formula: Input = the controller's position, the result limited to 0..1
             {
-                auto v = value / 127.0f;
-                if (! link.formula.empty()) // FL's mapping formula: Input = the controller's position, the result limited to 0..1
+                auto found = linkFormulas.find (link.formula);
+                if (found == linkFormulas.end())
                 {
-                    auto found = linkFormulas.find (link.formula);
-                    if (found == linkFormulas.end())
-                    {
-                        if (linkFormulas.size() > 256)
-                            linkFormulas.clear();
-                        found = linkFormulas.emplace (link.formula, linkformula::Formula::compile (link.formula)).first;
-                    }
-                    v = found->second.map (v);
+                    if (linkFormulas.size() > 256)
+                        linkFormulas.clear();
+                    found = linkFormulas.emplace (link.formula, linkformula::Formula::compile (link.formula)).first;
                 }
-                const auto t = linkOmniTarget (link, selectedChannel, mixerTrack); // "Omni": the selected channel / track
-                // takeover: only parameters the song holds (a plugin's own parameters have no value to compare here)
-                const auto songHeld = t.kind != AutomationTargetKind::channelParam && t.kind != AutomationTargetKind::effectParam;
-                if (midiPrefs.pickup && songHeld)
-                {
-                    auto& state = pickups[{ std::get<0> (key), std::get<1> (key), (int) t.kind, t.index, t.slot, t.param }];
-                    if (! prefs::pickupUpdate (state, song.targetValue (t), v))
-                        continue;
-                }
-                noteTweaked (t); // a linked controller's move is a tweak (Last tweaked, automation recording)
-                if (link.smooth && link.smoothing != 0)
-                {
-                    auto s = std::find_if (linkSmoothing.begin(), linkSmoothing.end(), [&] (const LinkSmoothing& x) { return x.link == link; });
-                    if (s == linkSmoothing.end())
-                    {
-                        // starts from where the control is (a control the song does not hold starts at the new position)
-                        LinkSmoothing fresh { link, v, {} };
-                        if (const auto now = currentTargetValue (t); now >= 0.0f)
-                            fresh.filter.step (now, 0.0, link.smoothing);
-                        linkSmoothing.push_back (std::move (fresh));
-                    }
-                    else
-                        s->target = v;
-                    continue;
-                }
-                changes.push_back ({ t, v });
+                formula = &found->second;
             }
+            const auto t = linkOmniTarget (link, selectedChannel, mixerTrack); // "Omni": the selected channel / track
+            const std::tuple<int, int, int, int> id { (int) t.kind, t.index, t.slot, t.param };
+            // FL's Mode (round 190cs): Latch and Inc start from where the control is now
+            auto current = 0.0f;
+            if (! absolute)
+            {
+                if (const auto m = moved.find (id); m != moved.end())
+                    current = m->second;
+                else if (const auto now = currentTargetValue (t); now >= 0.0f)
+                    current = now;
+            }
+            const auto mapped = linkformula::linkModeValue (link.mode, *formula, (float) ev.value / 127.0f, current);
+            if (! mapped)
+                continue; // (a release in Latch / Inc / Stay)
+            const auto v = *mapped;
+            // takeover: only parameters the song holds (a plugin's own parameters have no value to compare here), and
+            // only for links that follow the controller's position
+            const auto songHeld = t.kind != AutomationTargetKind::channelParam && t.kind != AutomationTargetKind::effectParam;
+            if (midiPrefs.pickup && songHeld && absolute)
+            {
+                auto& state = pickups[{ ev.cc, ev.channel, (int) t.kind, t.index, t.slot, t.param }];
+                if (! prefs::pickupUpdate (state, song.targetValue (t), v))
+                    continue;
+            }
+            moved[id] = v;
+            noteTweaked (t); // a linked controller's move is a tweak (Last tweaked, automation recording)
+            if (link.smooth && link.smoothing != 0)
+            {
+                auto s = std::find_if (linkSmoothing.begin(), linkSmoothing.end(), [&] (const LinkSmoothing& x) { return x.link == link; });
+                if (s == linkSmoothing.end())
+                {
+                    // starts from where the control is (a control the song does not hold starts at the new position)
+                    LinkSmoothing fresh { link, v, {} };
+                    if (const auto now = currentTargetValue (t); now >= 0.0f)
+                        fresh.filter.step (now, 0.0, link.smoothing);
+                    linkSmoothing.push_back (std::move (fresh));
+                }
+                else
+                    s->target = v;
+                continue;
+            }
+            changes.push_back ({ t, v });
+        }
+    }
 
     stepLinkSmoothing (changes);
     applyTargetValues (changes);

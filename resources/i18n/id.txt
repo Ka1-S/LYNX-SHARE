@@ -9340,6 +9340,20 @@ countries: id
 "Start from" = "Mulai dari"
 "Opens as a new, untitled project." = "Terbuka sebagai proyek baru tanpa judul."
 "The result is {0} from the reference's loudness. Match again to correct the level." = "Hasilnya berjarak {0} dari kenyaringan referensi. Cocokkan lagi untuk mengoreksi level."
+# --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
+"Inc" = "Inc"
+"How to treat a note or button link" = "Cara memperlakukan link not atau tombol"
+"Preserve controller default mode" = "Pertahankan mode bawaan controller"
+"Hold to keep at velocity" = "Tahan untuk tetap di velocity"
+"Press again to switch" = "Tekan lagi untuk beralih"
+"Increment value" = "Naikkan nilai"
+"Keep at velocity" = "Tetap di velocity"
+"Record automation" = "Rekam otomasi"
+"Allow recording of automation" = "Izinkan perekaman otomasi"
+"Channel volume" = "Volume channel"
+"Channel panning" = "Pan channel"
+"In: {0} out: {1}" = "Masuk: {0} keluar: {1}"
+"Note C0" = "Not C0"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"

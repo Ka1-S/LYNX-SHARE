@@ -131,10 +131,96 @@ const Function functions[] = {
     { "radtodeg", 1, [] (const double* a) { return a[0] * 180.0 / pi; } },
 };
 
+// FL's own expression functions (round 190cs, [H 0xbaec40] registrations, laws read from each handler):
+// inter (x, a, b): 1 when x lies between a and b (either order), else 0; internoswap: the same with a <= b only. Both
+// compare at 1/1000 steps (each value is rounded to thousandths first) [H 0xbae920, 0xbae9c0].
+double interValue (double x, double a, double b, bool swap)
+{
+    const auto r = [] (double v) { return std::nearbyint (v * 1000.0); };
+    const auto xi = r (x), ai = r (a), bi = r (b);
+    if (swap && ! (ai < bi))
+        return truth (! (xi < bi || ai < xi));
+    return truth (! (xi < ai || bi < xi));
+}
+
+// fold (x): a triangle that goes 0 -> 1 -> 0 as x runs 0 -> 1 -> 2 (period 2, any x) [H 0xbaea40].
+double foldValue (double x)
+{
+    const auto v = x * 2.0 - 1.0;
+    auto t = std::fabs (v) * 0.25;
+    t -= std::floor (t);
+    double r;
+    if (t < 0.25)
+        r = t * 4.0;
+    else if (t < 0.75)
+        r = 1.0 - (t - 0.25) * 4.0;
+    else
+        r = (t - 0.75) * 4.0 - 1.0;
+    if (v < 0.0)
+        r = -r;
+    return r / 2.0 + 0.5;
+}
+
+// FL's FMod: x - Trunc (x / y) * y (keeps the sign of x) [H 0x477690].
+double flMod (double x, double y)
+{
+    const auto q = x / y;
+    if (! std::isfinite (q))
+        return std::nan ("");
+    return x - std::trunc (q) * y;
+}
+
+// warp (x, p): x inside 0...1 stays (1 itself wraps to 0); outside, x + p wrapped by FMod 1 [H 0xbaebb0].
+double warpValue (double x, double p)
+{
+    if (x > 1.0 || x < 0.0)
+        x += p;
+    return flMod (x, 1.0);
+}
+
+// x! (the factorial of x rounded) [H 0xbae800].
+double factorial (double x)
+{
+    const auto n = std::nearbyint (x);
+    if (n < 0.0)
+        return std::nan ("");
+    if (n > 170.0)
+        return HUGE_VAL;
+    double r = 1.0;
+    for (int i = 2; i <= (int) n; ++i)
+        r *= i;
+    return r;
+}
+
+// FL compares with a tiny tolerance: |a - b| < 1e-30 [H 0xbae410].
+bool same (double a, double b) { return std::fabs (a - b) < 1.0e-30; }
+
+double interFn (const double* a) { return interValue (a[0], a[1], a[2], true); }
+double interNoSwapFn (const double* a) { return interValue (a[0], a[1], a[2], false); }
+
+const Function laterFunctions[] = {
+    { "inter", 3, interFn },
+    { "internoswap", 3, interNoSwapFn },
+    { "fold", 1, [] (const double* a) { return foldValue (a[0]); } },
+    { "warp", 2, [] (const double* a) { return warpValue (a[0], a[1]); } },
+    { "map", 3, [] (const double* a) { return a[0] * (a[2] - a[1]) + a[1]; } },
+};
+
+const Function* findFunction (const std::string& name)
+{
+    for (const auto& f : functions)
+        if (name == f.name)
+            return &f;
+    for (const auto& f : laterFunctions)
+        if (name == f.name)
+            return &f;
+    return nullptr;
+}
+
 enum class Op : std::uint8_t
 {
     number, input, call,
-    add, sub, mul, div, intDiv, mod, power, neg, logicalNot,
+    add, sub, mul, div, intDiv, mod, fmod, power, neg, logicalNot, factorial, percent,
     logicalAnd, logicalOr, logicalXor, shl, shr,
     equal, notEqual, less, greater, lessEqual, greaterEqual
 };
@@ -184,16 +270,19 @@ struct Formula::Program
                 const auto d = whole (b());
                 return d == 0 ? std::nan ("") : (double) (whole (a()) % d);
             }
+            case Op::fmod: return flMod (a(), b());
             case Op::power: return std::pow (a(), b());
             case Op::neg: return -a();
-            case Op::logicalNot: return truth (a() == 0.0);
+            case Op::logicalNot: return truth (std::nearbyint (a()) == 0.0);
+            case Op::factorial: return factorial (a());
+            case Op::percent: return a() * 0.01;
             case Op::logicalAnd: return truth (a() != 0.0 && b() != 0.0);
             case Op::logicalOr: return truth (a() != 0.0 || b() != 0.0);
             case Op::logicalXor: return truth ((a() != 0.0) != (b() != 0.0));
             case Op::shl: return (double) (whole (a()) << std::clamp<std::int64_t> (whole (b()), 0, 62));
             case Op::shr: return (double) (whole (a()) >> std::clamp<std::int64_t> (whole (b()), 0, 62));
-            case Op::equal: return truth (a() == b());
-            case Op::notEqual: return truth (a() != b());
+            case Op::equal: return truth (same (a(), b()));
+            case Op::notEqual: return truth (! same (a(), b()));
             case Op::less: return truth (a() < b());
             case Op::greater: return truth (a() > b());
             case Op::lessEqual: return truth (a() <= b());
@@ -205,7 +294,37 @@ struct Formula::Program
 
 namespace
 {
-// Pascal-style precedence: comparisons, then + - or xor, then * / div mod and shl shr, then unary, then ^.
+// FL's expression parser, as its operator table registers it ([H 0xbaec40]; a lower number binds tighter):
+//   10  prefix - and +, postfix ! (factorial) and % (hundredths), "in" (equality)
+//   20  ^
+//   30  * / div mod fmod
+//   40  + -
+//   50  > >= <= < <> =
+//   60  not
+//   70  or and xor shl shr
+// So the unary minus binds tighter than ^: -Input^2 = (-Input)^2, as FL draws it. Equal levels group from the left.
+// Its checks run in FL's order: names first ("Invalid identifier: "), then brackets ("Unequal brackets"), then the
+// neighbours of brackets and operands, then the tree ("Syntax error: function or operand has too few arguments",
+// "Too many arguments", "Syntax error") [H 0xbab340, 0xbacb80, 0xba9ee0, strings near 0xbadab0].
+struct Token
+{
+    enum Kind { number, name, symbol } kind = symbol;
+    std::string text;  // as typed (names), the symbol
+    std::string lower; // names in lower case
+    double value = 0.0;
+    std::size_t at = 0;
+};
+
+bool isOperatorWord (const std::string& w)
+{
+    for (const char* o : { "div", "mod", "fmod", "and", "or", "xor", "not", "shl", "shr", "in" })
+        if (w == o)
+            return true;
+    return false;
+}
+
+bool isOperandName (const std::string& w) { return w == "input" || w == "pi"; }
+
 class Parser
 {
 public:
@@ -213,10 +332,11 @@ public:
 
     int parse()
     {
-        const auto root = comparison();
-        skipSpace();
-        if (! failed && at < text.size())
-            fail ("Unexpected '" + std::string (1, text[at]) + "'");
+        if (! tokenize() || ! checkNames() || ! checkBrackets() || ! checkNeighbours())
+            return -1;
+        const auto root = level70();
+        if (! failed && pos < tokens.size())
+            fail ("Syntax error", tokens[pos].at);
         return failed ? -1 : root;
     }
 
@@ -225,46 +345,205 @@ public:
     int errorAt = 0;
 
 private:
-    void fail (const std::string& what)
+    void fail (const std::string& what, std::size_t where)
     {
         if (failed)
             return;
         failed = true;
         message = what;
-        errorAt = (int) std::min (at, text.size());
+        errorAt = (int) std::min (where, text.size());
     }
 
-    void skipSpace()
+    bool tokenize()
     {
-        while (at < text.size() && std::isspace ((unsigned char) text[at]))
+        std::size_t at = 0;
+        while (at < text.size())
+        {
+            const auto c = text[at];
+            if (std::isspace ((unsigned char) c))
+            {
+                ++at;
+                continue;
+            }
+            Token t;
+            t.at = at;
+            if (std::isdigit ((unsigned char) c) || c == '.' || c == '$')
+            {
+                t.kind = Token::number;
+                if (! number (at, t.value))
+                    return false;
+            }
+            else if (std::isalpha ((unsigned char) c) || c == '_')
+            {
+                t.kind = Token::name;
+                while (at < text.size() && (std::isalnum ((unsigned char) text[at]) || text[at] == '_'))
+                    ++at;
+                t.text = text.substr (t.at, at - t.at);
+                t.lower = lower (t.text);
+            }
+            else
+            {
+                t.kind = Token::symbol;
+                for (const char* two : { "<>", "<=", ">=" })
+                    if (text.compare (at, 2, two) == 0)
+                        t.text = two;
+                if (t.text.empty())
+                {
+                    if (std::strchr ("+-*/^()!%,<>=", c) == nullptr)
+                    {
+                        fail ("Syntax error", at);
+                        return false;
+                    }
+                    t.text = std::string (1, c);
+                }
+                at += t.text.size();
+            }
+            tokens.push_back (std::move (t));
+        }
+        if (tokens.empty())
+        {
+            fail ("Syntax error: function or operand has too few arguments", 0);
+            return false;
+        }
+        return true;
+    }
+
+    bool number (std::size_t& at, double& value)
+    {
+        const auto start = at;
+        if (text[at] == '$') // hexadecimal
+        {
             ++at;
-    }
-
-    bool symbol (const char* s)
-    {
-        skipSpace();
-        const auto n = std::strlen (s);
-        if (text.compare (at, n, s) != 0)
-            return false;
-        at += n;
-        return true;
-    }
-
-    // a word operator (div, mod, and...): matched whole, any letter case
-    bool word (const char* w)
-    {
-        skipSpace();
-        const auto n = std::strlen (w);
-        if (at + n > text.size())
-            return false;
-        for (std::size_t i = 0; i < n; ++i)
-            if (std::tolower ((unsigned char) text[at + i]) != w[i])
+            const auto digits = at;
+            while (at < text.size() && std::isxdigit ((unsigned char) text[at]))
+                ++at;
+            if (at == digits)
+            {
+                fail ("Syntax error", start);
                 return false;
-        if (at + n < text.size() && (std::isalnum ((unsigned char) text[at + n]) || text[at + n] == '_'))
+            }
+            value = (double) std::strtoull (text.substr (digits, at - digits).c_str(), nullptr, 16);
+            return true;
+        }
+        while (at < text.size() && std::isdigit ((unsigned char) text[at]))
+            ++at;
+        if (at < text.size() && text[at] == '.')
+        {
+            ++at;
+            while (at < text.size() && std::isdigit ((unsigned char) text[at]))
+                ++at;
+        }
+        if (at < text.size() && (text[at] == 'e' || text[at] == 'E'))
+        {
+            auto p = at + 1;
+            if (p < text.size() && (text[p] == '+' || text[p] == '-'))
+                ++p;
+            if (p < text.size() && std::isdigit ((unsigned char) text[p]))
+            {
+                while (p < text.size() && std::isdigit ((unsigned char) text[p]))
+                    ++p;
+                at = p;
+            }
+        }
+        const auto token = text.substr (start, at - start);
+        if (token == ".")
+        {
+            fail ("Syntax error", start);
             return false;
-        at += n;
+        }
+        value = std::strtod (token.c_str(), nullptr); // (the C locale: '.' is the decimal point)
         return true;
     }
+
+    bool checkNames()
+    {
+        for (const auto& t : tokens)
+            if (t.kind == Token::name && ! isOperandName (t.lower) && ! isOperatorWord (t.lower) && findFunction (t.lower) == nullptr)
+            {
+                fail ("Invalid identifier: " + t.text, t.at);
+                return false;
+            }
+        return true;
+    }
+
+    bool checkBrackets()
+    {
+        int depthNow = 0;
+        for (const auto& t : tokens)
+            if (t.kind == Token::symbol && t.text == "(")
+                ++depthNow;
+            else if (t.kind == Token::symbol && t.text == ")")
+                --depthNow;
+        if (depthNow != 0)
+        {
+            fail ("Unequal brackets", 0);
+            return false;
+        }
+        return true;
+    }
+
+    static bool isOperand (const Token& t)
+    {
+        return t.kind == Token::number || (t.kind == Token::name && isOperandName (t.lower));
+    }
+    static bool isSymbol (const Token& t, const char* s) { return t.kind == Token::symbol && t.text == s; }
+
+    bool checkNeighbours()
+    {
+        for (std::size_t i = 0; i + 1 < tokens.size(); ++i)
+        {
+            const auto& a = tokens[i];
+            const auto& b = tokens[i + 1];
+            const auto callBefore = i > 0 && tokens[i - 1].kind == Token::name && findFunction (tokens[i - 1].lower) != nullptr;
+            std::string what;
+            if (isSymbol (a, "(") && isSymbol (b, ")") && ! callBefore)
+                what = "Empty brackets ()";
+            else if (isSymbol (a, ")") && isSymbol (b, "("))
+                what = "Missing operand between )(";
+            else if (isSymbol (a, ")") && isOperand (b))
+                what = "Missing operand between ) and constant/variable";
+            else if (isOperand (a) && isSymbol (b, "("))
+                what = "Missing operand between constant/variable and (";
+            else if (isOperand (a) && isOperand (b))
+                what = (a.kind == Token::name ? a.lower : text.substr (a.at, b.at - a.at)) + " two space limited variables/constants";
+            if (! what.empty())
+            {
+                while (! what.empty() && what.front() == ' ')
+                    what.erase (0, 1);
+                fail (singleSpaced (what), b.at);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static std::string singleSpaced (std::string s)
+    {
+        // ("2 " + " two space ..." reads with one space)
+        std::string out;
+        for (auto c : s)
+            if (! (c == ' ' && ! out.empty() && out.back() == ' '))
+                out += c;
+        return out;
+    }
+
+    bool peekSymbol (const char* s) const { return pos < tokens.size() && isSymbol (tokens[pos], s); }
+    bool peekWord (const char* w) const { return pos < tokens.size() && tokens[pos].kind == Token::name && tokens[pos].lower == w; }
+    bool takeSymbol (const char* s)
+    {
+        if (! peekSymbol (s))
+            return false;
+        ++pos;
+        return true;
+    }
+    bool takeWord (const char* w)
+    {
+        if (! peekWord (w))
+            return false;
+        ++pos;
+        return true;
+    }
+    std::size_t hereAt() const { return pos < tokens.size() ? tokens[pos].at : text.size(); }
 
     int add (Op op, int a = -1, int b = -1)
     {
@@ -276,78 +555,129 @@ private:
         return (int) nodes.size() - 1;
     }
 
-    int comparison()
-    {
-        auto left = additive();
-        while (! failed)
-        {
-            Op op;
-            if (symbol ("<>")) op = Op::notEqual;
-            else if (symbol ("<=")) op = Op::lessEqual;
-            else if (symbol (">=")) op = Op::greaterEqual;
-            else if (symbol ("<")) op = Op::less;
-            else if (symbol (">")) op = Op::greater;
-            else if (symbol ("=")) op = Op::equal;
-            else break;
-            left = add (op, left, additive());
-        }
-        return left;
-    }
-
-    int additive()
-    {
-        auto left = multiplicative();
-        while (! failed)
-        {
-            Op op;
-            if (symbol ("+")) op = Op::add;
-            else if (symbol ("-")) op = Op::sub;
-            else if (word ("or")) op = Op::logicalOr;
-            else if (word ("xor")) op = Op::logicalXor;
-            else break;
-            left = add (op, left, multiplicative());
-        }
-        return left;
-    }
-
-    int multiplicative()
-    {
-        auto left = unary();
-        while (! failed)
-        {
-            Op op;
-            if (symbol ("*")) op = Op::mul;
-            else if (symbol ("/")) op = Op::div;
-            else if (word ("div")) op = Op::intDiv;
-            else if (word ("mod")) op = Op::mod;
-            else if (word ("and")) op = Op::logicalAnd;
-            else if (word ("shl")) op = Op::shl;
-            else if (word ("shr")) op = Op::shr;
-            else break;
-            left = add (op, left, unary());
-        }
-        return left;
-    }
-
-    int unary()
+    bool enter()
     {
         if (++depth > 200)
         {
-            fail ("Formula too deep");
-            return -1;
+            fail ("Syntax error", hereAt());
+            return false;
         }
+        return true;
+    }
+
+    int level70()
+    {
+        if (! enter())
+            return -1;
+        auto left = level60();
+        while (! failed)
+        {
+            Op op;
+            if (takeWord ("or")) op = Op::logicalOr;
+            else if (takeWord ("and")) op = Op::logicalAnd;
+            else if (takeWord ("xor")) op = Op::logicalXor;
+            else if (takeWord ("shl")) op = Op::shl;
+            else if (takeWord ("shr")) op = Op::shr;
+            else break;
+            left = add (op, left, level60());
+        }
+        --depth;
+        return left;
+    }
+
+    int level60()
+    {
+        if (takeWord ("not"))
+        {
+            if (! enter())
+                return -1;
+            const auto r = add (Op::logicalNot, level60());
+            --depth;
+            return r;
+        }
+        return level50();
+    }
+
+    int level50()
+    {
+        auto left = level40();
+        while (! failed)
+        {
+            Op op;
+            if (takeSymbol ("<>")) op = Op::notEqual;
+            else if (takeSymbol ("<=")) op = Op::lessEqual;
+            else if (takeSymbol (">=")) op = Op::greaterEqual;
+            else if (takeSymbol ("<")) op = Op::less;
+            else if (takeSymbol (">")) op = Op::greater;
+            else if (takeSymbol ("=")) op = Op::equal;
+            else break;
+            left = add (op, left, level40());
+        }
+        return left;
+    }
+
+    int level40()
+    {
+        auto left = level30();
+        while (! failed)
+        {
+            Op op;
+            if (takeSymbol ("+")) op = Op::add;
+            else if (takeSymbol ("-")) op = Op::sub;
+            else break;
+            left = add (op, left, level30());
+        }
+        return left;
+    }
+
+    int level30()
+    {
+        auto left = level20();
+        while (! failed)
+        {
+            Op op;
+            if (takeSymbol ("*")) op = Op::mul;
+            else if (takeSymbol ("/")) op = Op::div;
+            else if (takeWord ("div")) op = Op::intDiv;
+            else if (takeWord ("mod")) op = Op::mod;
+            else if (takeWord ("fmod")) op = Op::fmod;
+            else break;
+            left = add (op, left, level20());
+        }
+        return left;
+    }
+
+    int level20()
+    {
+        auto left = level10();
+        while (! failed && takeSymbol ("^"))
+            left = add (Op::power, left, level10());
+        return left;
+    }
+
+    int level10()
+    {
+        if (! enter())
+            return -1;
         int result;
-        if (symbol ("-"))
-            result = add (Op::neg, unary());
-        else if (symbol ("+"))
-            result = unary();
-        else if (word ("not"))
-            result = add (Op::logicalNot, unary());
+        if (takeSymbol ("-"))
+            result = add (Op::neg, level10());
+        else if (takeSymbol ("+"))
+            result = level10();
         else
         {
             result = primary();
-            if (! failed && symbol ("^"))
-                result = add (Op::power, result, unary());
+            while (! failed)
+            {
+                if (takeSymbol ("!"))
+                    result = add (Op::factorial, result);
+                else if (takeSymbol ("%"))
+                    result = add (Op::percent, result);
+                else if (takeWord ("in"))
+                    result = add (Op::equal, result, primary());
+                else
+                    break;
+            }
         }
         --depth;
         return result;
@@ -355,76 +685,86 @@ private:
 
     int primary()
     {
-        skipSpace();
-        if (at >= text.size())
+        if (failed)
+            return -1;
+        if (pos >= tokens.size())
         {
-            fail ("Unexpected end of formula");
+            fail ("Syntax error: function or operand has too few arguments", text.size());
             return -1;
         }
-        const auto c = text[at];
-        if (c == '(')
+        const auto& t = tokens[pos];
+        if (t.kind == Token::number)
         {
-            ++at;
-            const auto inner = comparison();
-            if (! failed && ! symbol (")"))
-                fail ("Missing ')'");
+            ++pos;
+            const auto n = add (Op::number);
+            nodes[(std::size_t) n].value = t.value;
+            return n;
+        }
+        if (isSymbol (t, "("))
+        {
+            ++pos;
+            const auto inner = level70();
+            if (! failed && ! takeSymbol (")"))
+                fail (pos < tokens.size() ? "Syntax error" : "Syntax error: function or operand has too few arguments", hereAt());
             return inner;
         }
-        if (std::isdigit ((unsigned char) c) || c == '.' || c == '$')
-            return number();
-        if (std::isalpha ((unsigned char) c) || c == '_')
+        if (t.kind == Token::name)
         {
-            const auto start = at;
-            while (at < text.size() && (std::isalnum ((unsigned char) text[at]) || text[at] == '_'))
-                ++at;
-            const auto name = lower (text.substr (start, at - start));
-            if (name == "input")
-                return add (Op::input);
-            if (name == "pi")
+            if (t.lower == "input")
             {
+                ++pos;
+                return add (Op::input);
+            }
+            if (t.lower == "pi")
+            {
+                ++pos;
                 const auto n = add (Op::number);
                 nodes[(std::size_t) n].value = pi;
                 return n;
             }
-            for (const auto& f : functions)
-                if (name == f.name)
-                    return call (f, start);
-            at = start;
-            fail ("Unknown name '" + text.substr (start, name.size()) + "'");
-            return -1;
+            if (const auto* f = findFunction (t.lower))
+            {
+                ++pos;
+                return call (*f, t.at);
+            }
         }
-        fail ("Unexpected '" + std::string (1, c) + "'");
+        // an operator where an operand belongs ("Input*", "*2", "(,)")
+        fail ("Syntax error: function or operand has too few arguments", t.at);
         return -1;
     }
 
-    int call (const Function& f, std::size_t nameStart)
+    int call (const Function& f, std::size_t nameAt)
     {
         int args[3] { -1, -1, -1 };
         int count = 0;
-        if (symbol ("("))
+        if (takeSymbol ("("))
         {
-            if (! symbol (")"))
+            if (! takeSymbol (")"))
             {
                 while (! failed)
                 {
-                    const auto a = comparison();
+                    const auto a = level70();
                     if (count < 3)
                         args[count] = a;
                     ++count;
-                    if (symbol (","))
+                    if (takeSymbol (","))
                         continue;
-                    if (! symbol (")"))
-                        fail ("Missing ')'");
+                    if (! takeSymbol (")"))
+                        fail ("Syntax error", hereAt());
                     break;
                 }
             }
         }
         if (failed)
             return -1;
-        if (count != f.arity)
+        if (count < f.arity)
         {
-            at = nameStart;
-            fail (std::string (f.name) + ": " + std::to_string (f.arity) + (f.arity == 1 ? " value expected" : " values expected"));
+            fail ("Syntax error: function or operand has too few arguments", nameAt);
+            return -1;
+        }
+        if (count > f.arity)
+        {
+            fail ("Too many arguments", nameAt);
             return -1;
         }
         const auto n = add (Op::call);
@@ -435,62 +775,10 @@ private:
         return n;
     }
 
-    int number()
-    {
-        const auto start = at;
-        double value = 0.0;
-        if (text[at] == '$') // hexadecimal
-        {
-            ++at;
-            const auto digits = at;
-            while (at < text.size() && std::isxdigit ((unsigned char) text[at]))
-                ++at;
-            if (at == digits)
-            {
-                fail ("Number expected");
-                return -1;
-            }
-            value = (double) std::strtoull (text.substr (digits, at - digits).c_str(), nullptr, 16);
-        }
-        else
-        {
-            while (at < text.size() && std::isdigit ((unsigned char) text[at]))
-                ++at;
-            if (at < text.size() && text[at] == '.')
-            {
-                ++at;
-                while (at < text.size() && std::isdigit ((unsigned char) text[at]))
-                    ++at;
-            }
-            if (at < text.size() && (text[at] == 'e' || text[at] == 'E'))
-            {
-                auto p = at + 1;
-                if (p < text.size() && (text[p] == '+' || text[p] == '-'))
-                    ++p;
-                if (p < text.size() && std::isdigit ((unsigned char) text[p]))
-                {
-                    while (p < text.size() && std::isdigit ((unsigned char) text[p]))
-                        ++p;
-                    at = p;
-                }
-            }
-            const auto token = text.substr (start, at - start);
-            if (token == ".")
-            {
-                at = start;
-                fail ("Number expected");
-                return -1;
-            }
-            value = std::strtod (token.c_str(), nullptr); // (the C locale: '.' is the decimal point)
-        }
-        const auto n = add (Op::number);
-        nodes[(std::size_t) n].value = value;
-        return n;
-    }
-
     const std::string& text;
     std::vector<Node>& nodes;
-    std::size_t at = 0;
+    std::vector<Token> tokens;
+    std::size_t pos = 0;
     int depth = 0;
 };
 } // namespace
@@ -626,5 +914,31 @@ float Smoother::step (float target, double elapsedMs, int position)
 bool Smoother::settled (float target) const noexcept
 {
     return started && std::fabs (stage[2] - (double) target) < 0.0005;
+}
+std::optional<float> linkModeValue (int mode, const Formula& formula, float input, float current)
+{
+    if (linkModeIsAbsolute (mode))
+        return formula.map (input);
+    if (! (input > 0.0f)) // (a release, or a button's "off")
+        return std::nullopt;
+    const auto clamp01 = [] (double v) { return std::isnan (v) ? 0.0f : (float) std::clamp (v, 0.0, 1.0); };
+    switch ((LinkMode) mode)
+    {
+        case LinkMode::latch:
+        {
+            const auto off = clamp01 (formula.evaluate (0.0)), on = clamp01 (formula.evaluate (1.0));
+            // (FL keeps f(1) when both are as far)
+            return std::fabs (current - on) < std::fabs (current - off) ? off : on;
+        }
+        case LinkMode::inc:
+        {
+            const auto step = formula.evaluate (incrementResolution);
+            if (std::isnan (step))
+                return std::nullopt;
+            return clamp01 ((double) current + step);
+        }
+        case LinkMode::stay: return formula.map (input);
+        default: return formula.map (input);
+    }
 }
 } // namespace lynx::linkformula

@@ -9340,6 +9340,20 @@ countries: cn sg
 "Start from" = "开始于"
 "Opens as a new, untitled project." = "作为无标题的新项目打开。"
 "The result is {0} from the reference's loudness. Match again to correct the level." = "结果与参考的响度相差 {0}。再次匹配以校正电平。"
+# --- Round 190cs: link Mode (note / button links), internal controller recording, FL's captions
+"Inc" = "Inc"
+"How to treat a note or button link" = "如何处理音符或按钮链接"
+"Preserve controller default mode" = "保留控制器的默认模式"
+"Hold to keep at velocity" = "按住以保持在力度值"
+"Press again to switch" = "再按一次切换"
+"Increment value" = "增加数值"
+"Keep at velocity" = "保持在力度值"
+"Record automation" = "录制自动化"
+"Allow recording of automation" = "允许录制自动化"
+"Channel volume" = "通道音量"
+"Channel panning" = "通道声像"
+"In: {0} out: {1}" = "输入: {0} 输出: {1}"
+"Note C0" = "音符 C0"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"
