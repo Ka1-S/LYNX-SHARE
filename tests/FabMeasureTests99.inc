@@ -146,7 +146,8 @@ TEST (apex_limiter_ceiling_latency_and_release)
     p[0] = 10.0f / 30.0f; // +10 dB into the limiter
     const double sr = 48000.0;
     fx->prepare (sr);
-    CHECK (fx->latencySamples() == latencyAt (sr) && latencyAt (sr) == 244);
+    // (round 190co: True peak, on by default, adds the true-peak guard's 95 samples; off, the latency is the old one)
+    CHECK (fx->latencySamples() == latencyAt (sr) && latencyAt (sr, false) == 244 && latencyAt (sr) == 244 + guardLatency (sr));
     const int n = (int) sr * 3;
     for (int st = 0; st < styleCount; ++st)
         for (int tp = 0; tp < 2; ++tp)
@@ -174,7 +175,9 @@ TEST (apex_limiter_ceiling_latency_and_release)
     const auto in = l;
     fx->process (l.data(), r.data(), 4096, p, 120.0);
     double err = 0.0;
-    for (int i = 244; i < 4096; ++i) err = std::max (err, (double) std::abs (l[(std::size_t) i] - in[(std::size_t) i - 244]));
+    const int lat = fx->latencySamples(); // (True peak is on here: 244 + the guard)
+    CHECK (lat == latencyAt (sr, true));
+    for (int i = lat; i < 4096; ++i) err = std::max (err, (double) std::abs (l[(std::size_t) i] - in[(std::size_t) (i - lat)]));
     CHECK (err < 1e-6);
     // true peak: an fs/4 sine at 45° (true peak 3 dB above its samples) is held under the ceiling between samples too
     p[0] = 6.0f / 30.0f; p[5] = 1.0f; p[1] = 1.0f; // ceiling 0 dB

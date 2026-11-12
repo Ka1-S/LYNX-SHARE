@@ -23,6 +23,7 @@ void measure (const std::vector<float>& left, const std::vector<float>& right, d
     constexpr std::size_t block = 4096;
     for (std::size_t i = 0; i < n; i += block)
         meter.process (left.data() + i, right.data() + i, (int) std::min (block, n - i));
+    meter.flushTruePeak(); // (round 190co: the estimator answers 68 samples late; the file's last samples count too)
     lufs = meter.integratedLoudness();
     truePeakDb = meter.truePeakDb();
 }

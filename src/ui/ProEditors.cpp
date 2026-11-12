@@ -516,13 +516,13 @@ private:
                 g.drawHorizontalLine ((int) ad.getY() + 98, ad.getX() + 10.0f, ad.getRight() - 10.0f);
             }
         }
-        // latency (constant: the maximum look-ahead, + the oversampler)
+        // latency (constant: the maximum look-ahead, + the oversampler, + the true-peak guard with True peak on)
         {
             // on a dark plate at the top left of the display, right of the GAIN slider
             const auto lr = juce::Rectangle<float> (p.getX() + 64.0f, p.getY() + 2.0f, 132.0f, 15.0f);
             g.setColour (colour::textDisabled); // round tp172b4: plain dim text (the reference has no plate there)
             g.setFont (font (type::caption));
-            g.drawText (tr ("latency {0} samples", { juce::String (apex::latencyFor (48000.0, apex::oversamplingFactor (v (apex::pOversampling)))) }),
+            g.drawText (tr ("latency {0} samples", { juce::String (apex::latencyFor (48000.0, apex::oversamplingFactor (v (apex::pOversampling)), v (apex::pTruePeak) >= 0.5f)) }),
                         lr.reduced (5.0f, 0.0f), juce::Justification::centredLeft, true);
         }
         if (loudnessShown()) paintLoudness (g);
