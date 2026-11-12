@@ -11,6 +11,7 @@
 
 #include "core/FlmDwSampler.h"
 #include "core/FlmSlicer.h"
+#include "core/SoundLibrary.h"
 #include "core/FlmEffects.h"
 #include "core/FlmNoteFx.h"
 #include "core/FlmPad.h"
@@ -896,6 +897,66 @@ bool soundFontState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
 // on the file's own loop if it has one) — and without CSTM from the module's preset file. A module with no zone is
 // silent, as in FLM. The zones' files: "@R@" = FLM's resources (FL's copy, then its "… EXP" content-pack folders),
 // "@L@" = the user's library (the project's folder in a share-zip); a program's zones next to the program.
+// A stand-in for a DW Sampler whose every sample is missing on this PC (FLM's content packs are not in FL's copy of
+// FLM; coordinator's decision, round 190de): the closest of LYNX's own sounds (core/SoundLibrary.h) in the category
+// the program's name, folder and the channel's name give (a "Grand Piano" → keys, preferring a piano), on an engine
+// that needs no file. A song never goes silent because a content pack is absent; the import report names the
+// missing files and the stand-in. The module's Pitch and Fine Tune stay on the channel's pitch.
+bool dwStandIn (Ctx& ctx, const flm::Module& m, ChannelDef& c, const std::string& hint, const std::string& shown)
+{
+    namespace sl = soundlib;
+    auto words = hint + " " + c.name;
+    std::transform (words.begin(), words.end(), words.begin(), [] (unsigned char ch) { return (char) std::tolower (ch); });
+    std::replace (words.begin(), words.end(), '/', ' ');
+    std::replace (words.begin(), words.end(), '_', ' ');
+    if (words.find ("sfx") != std::string::npos)
+        words += " fx"; // ("Misc SFX", "Cops SFX": effects)
+    const auto category = sl::categoryFor ({}, words);
+    static constexpr InstrumentKind selfContained[] = { InstrumentKind::synth, InstrumentKind::harmless, InstrumentKind::sytrus, InstrumentKind::harmor,
+                                                        InstrumentKind::ogun, InstrumentKind::dx10, InstrumentKind::poizone, InstrumentKind::simsynth,
+                                                        InstrumentKind::plucked, InstrumentKind::sakura };
+    const auto& list = sl::builtIn();
+    const sl::Sound* best = nullptr;
+    int bestScore = -1;
+    for (const auto i : sl::filter (list, category))
+    {
+        const auto& sound = list[(std::size_t) i];
+        if (std::find (std::begin (selfContained), std::end (selfContained), sound.kind) == std::end (selfContained))
+            continue;
+        auto name = sound.name;
+        std::transform (name.begin(), name.end(), name.begin(), [] (unsigned char ch) { return (char) std::tolower (ch); });
+        int score = 0;
+        // a word of the instrument in the sound's name ("piano", "strings", "bass"…), then a piano for keys
+        for (std::size_t at = 0; at < words.size();)
+        {
+            const auto end = words.find (' ', at);
+            const auto word = words.substr (at, end == std::string::npos ? std::string::npos : end - at);
+            if (word.size() >= 4 && name.find (word) != std::string::npos)
+                score += 10;
+            if (end == std::string::npos)
+                break;
+            at = end + 1;
+        }
+        if (category == sl::Category::keys && name.find ("piano") != std::string::npos)
+            score += 5;
+        if (score > bestScore)
+            best = &sound, bestScore = score;
+    }
+    if (best == nullptr)
+        return false;
+    auto standIn = sl::withSound (c, *best);
+    if (! standIn)
+        return false;
+    const auto keyLow = c.keyLow, keyHigh = c.keyHigh;
+    c = std::move (*standIn);
+    c.keyLow = keyLow, c.keyHigh = keyHigh;
+    const auto v = [&m] (std::size_t k, float fallback) { return k < m.params.size() && std::isfinite (m.params[k]) ? m.params[k] : fallback; };
+    c.sampler.pitch = std::clamp ((float) flmdw::pitchSemitones (v (3, 0.5f)) + 2.0f * v (4, 0.5f) - 1.0f, -24.0f, 24.0f);
+    ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: DW Sampler \"" + (shown.empty() ? c.name : shown) + "\": every sample missing, plays LYNX's \""
+                                                    + best->name + "\" as a stand-in until they are found (re-import then)");
+    return true;
+}
+
 bool dwSamplerState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
 {
     const auto& o = ctx.options.common;
@@ -989,6 +1050,30 @@ bool dwSamplerState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
             values[flmdw::param::release] = std::clamp (custom->pathRelease, 0.0f, 1.0f);
         }
     }
+    // every sample missing (or the program file): a stand-in; some missing: the others play, the report lists them
+    const auto found = (int) std::count_if (paths.begin(), paths.end(), [] (const std::string& p) { return ! p.empty(); });
+    const auto programMissing = zones.empty() && custom->hasPath && ! custom->path.empty();
+    if ((! zones.empty() && found == 0) || programMissing)
+    {
+        // what the instrument is: the program's name, else the first zone's folder and file
+        auto shown = custom->hasPath ? fileStem (custom->path) : std::string(), hint = shown;
+        if (shown.empty() && ! zones.empty())
+        {
+            const auto& z = zones.front().path;
+            const auto cut = z.find_last_of ('/');
+            hint = cut == std::string::npos ? fileStem (z) : z.substr (0, cut);
+            shown = hint;
+            if (const auto program = hint.find_last_of ('/'); program != std::string::npos)
+                shown = hint.substr (program + 1), hint = shown + " " + hint.substr (0, program);
+        }
+        c.keyLow = m.keyLow;
+        c.keyHigh = m.keyHigh;
+        c.volume = 1.0f;
+        if (dwStandIn (ctx, m, c, hint, shown))
+            return true;
+    }
+    if (found > 0 && found < (int) zones.size() && ctx.report != nullptr)
+        ctx.report->partialEffects["FL Studio Mobile: DW Sampler with some samples missing (the others play; the missing ones are listed)"] += 1;
     const auto mixer = c.mixerTrack;
     const auto name = c.name;
     c = ChannelDef {};
@@ -1008,9 +1093,7 @@ bool dwSamplerState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     c.keyHigh = m.keyHigh;
     c.modelParams = flmdw::channelParams (values, custom->pbRange, custom->smoothAttack, decays);
     ctx.note (&FlpImportReport::converted, zones.size() > 1 ? "FL Studio Mobile: DW Sampler (multisample, FLM's engine)" : "FL Studio Mobile: DW Sampler (FLM's engine)");
-    if (zones.empty() && custom->hasPath && ! custom->path.empty())
-        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: DW Sampler whose program or sample is missing (silent until it is found)");
-    else if (zones.empty())
+    if (zones.empty())
         ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: DW Sampler without a sample (silent, as in FLM)");
     return true;
 }

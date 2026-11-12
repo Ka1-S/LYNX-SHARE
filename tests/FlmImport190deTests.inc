@@ -679,3 +679,49 @@ TEST (flm190de_arpeggiator_and_note_echo)
     CHECK (clips == 1 && report.converted.count ("FL Studio Mobile: Arpeggiator (note effect, baked over the song)") == 1
            && report.droppedEffects.empty());
 }
+
+// Coordinator's decision (round 190de): a DW Sampler whose every sample is missing on this PC (FLM's content packs) plays
+// a LYNX stand-in of its category, named in the report; one with some samples missing plays the others
+TEST (flm190de_dw_sampler_missing_samples)
+{
+    using namespace lynx;
+    namespace t = flm190de;
+    const auto piano = t::dwCustom ({ t::zoneOf ("DirectWave Samples EXP/Keyboard/Grand Piano/GP C3.wav", 48, 0, 59, 0, 127),
+                                      t::zoneOf ("DirectWave Samples EXP/Keyboard/Grand Piano/GP C5.wav", 72, 60, 127, 0, 127), t::midiChunk (2, 0) });
+    const auto pad = t::dwCustom ({ t::zoneOf ("DirectWave Samples/Pad/here.wav", 60, 0, 59, 0, 127),
+                                    t::zoneOf ("DirectWave Samples/Pad/gone.wav", 72, 60, 127, 0, 127), t::midiChunk (2, 0) });
+    auto prms = t::dwDefaults();
+    prms[flmdw::param::pitch] = 0.6042f; // +5 semitones
+    const auto bytes = flm190bs::song ({ t::rack (flm::kindMaster, {}), t::rack (flm::kindNormal, { t::moduleWith (1, 2, prms, {}, piano) }),
+                                         t::rack (flm::kindNormal, { t::moduleWith (1, 2, t::dwDefaults(), {}, pad) }),
+                                         t::channel (flm::kindMaster, "MASTER", 0, {}),
+                                         t::channel (flm::kindNormal, "Keys", 1, { t::lane (0, "Keys", { t::clip (0, 4, 4, 0, 1, { { 0, 2, 60, 255 } }) }) }),
+                                         t::channel (flm::kindNormal, "Pad", 2, { t::lane (0, "Pad", { t::clip (0, 4, 4, 0, 1, { { 0, 2, 50, 255 } }) }) }) });
+    FlpImportReport report;
+    auto o = flm190bs::anyFile (&report);
+    o.common.fileExists = [] (const std::string& p) { return p.find ("C:/FLM/") == 0 && p.find ("EXP") == std::string::npos && p.find ("gone") == std::string::npos; };
+    const auto s = importFlm (bytes, o);
+    CHECK (s.has_value());
+    if (! s)
+        return;
+    const auto* keys = flm182c::channelNamed (*s, "Keys");
+    const auto* padc = flm182c::channelNamed (*s, "Pad");
+    CHECK (keys != nullptr && padc != nullptr);
+    if (keys == nullptr || padc == nullptr)
+        return;
+    // every zone missing: a LYNX sound of the keys category (a piano when there is one), the module's Pitch kept
+    CHECK (! flmdw::isChannel (*keys) && keys->instrument != InstrumentKind::sampler && keys->mixerTrack == 1 && keys->sampler.pitch == 5.0f);
+    bool line = false;
+    for (const auto& [what, n] : report.partialEffects)
+        line = line || (what.find ("DW Sampler \"Grand Piano\": every sample missing, plays LYNX's") != std::string::npos);
+    CHECK (line && report.missingSamples >= 2);
+    // the keys play (not silent)
+    const auto sound = flm190bs::rendered (*s, 1.0);
+    float peak = 0.0f;
+    for (const auto x : sound)
+        peak = std::max (peak, std::abs (x));
+    CHECK (peak > 1.0e-3f);
+    // some zones missing: FLM's engine on the zones there are, the missing one listed
+    CHECK (flmdw::isChannel (*padc) && padc->zones.size() == 2 && ! padc->zones[0].path.empty() && padc->zones[1].path.empty());
+    CHECK (report.partialEffects.count ("FL Studio Mobile: DW Sampler with some samples missing (the others play; the missing ones are listed)") == 1);
+}
