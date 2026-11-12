@@ -26,6 +26,14 @@ instruments and effects are rendered to audio or replaced in an `.flp`, and are 
 View) or **Simple workflow** (one window with the tracks and the timeline, for a first song; the setup wizard offers
 all three). Switching moves panels only; the project stays the same.
 
+The first time the Simple workflow opens on an empty project it shows a **Welcome** screen: **Make my first song** (a
+short guided tour), **Open a demo song** or **Start empty**. The **first-song tour** builds one song with you in seven
+steps (a beat, the key, an instrument, chords, a voice or a loop, a one-knob effect, Finish): a ring shows the control
+to use, and the tour moves on when the step is done. **Do it for me** does a step for you, **Next** moves on, **Skip
+tour** ends it, and closing the card pauses it: Help › First-song tour continues it later (also after a restart), and
+Help › Welcome screen... shows the Welcome screen again. Three short demo songs made with LYNX's own instruments
+(electronic, hip hop and pop) are in the Start from list; the two newer ones are also in `resources/demos/`.
+
 In the clip grid (Clip-launch workflow):
 
 - **Record into a slot**: arm a track with its Arm button (in the mixer under the slots, or under its slots while the

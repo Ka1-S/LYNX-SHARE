@@ -726,6 +726,8 @@ public:
         modeButtons[0].setTooltip (tr ("The usual piano"));
         modeButtons[1].setTooltip (tr ("One key per note of the project key: nothing out of key can be played. The typing keys Z X C V... play the notes of the scale"));
         modeButtons[2].setTooltip (tr ("One pad per chord of the project key. The typing keys Z X C V... play the chords; right-click a pad to change its chord"));
+        modeButtons[2].setComponentID ("keyboard.chordPad"); // (round 190dv: the first-song tour's ring)
+        keyButton.setComponentID ("keyboard.key");
         keyButton.setTooltip (tr ("The project key (the same as the toolbar's Key)"));
         keyButton.onClick = [this] { showKeyMenu (engine, &keyButton); };
         addAndMakeVisible (keyButton);

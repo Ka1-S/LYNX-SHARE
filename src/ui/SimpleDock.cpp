@@ -262,6 +262,7 @@ public:
         addAndMakeVisible (view);
 
         addCard.setTooltip (tr ("Add an effect"));
+        addCard.setComponentID ("simple.dock.addEffect"); // (round 190dv: the tour's ring)
         addCard.onClick = [this] { addMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&addCard)); };
         strip.addAndMakeVisible (addCard);
 
@@ -1489,6 +1490,10 @@ SimpleDock::SimpleDock (AudioEngine& e, Hooks h) : engine (e), hooks (std::move 
     editorButton.setButtonText (tr ("Editor"));
     editorButton.setTooltip (tr ("Write the track's notes"));
     effectsButton.setButtonText (tr ("Effects"));
+    // round 190dv: what the first-song tour's ring finds
+    keyboardButton.setComponentID ("simple.dock.keyboard");
+    editorButton.setComponentID ("simple.dock.editor");
+    effectsButton.setComponentID ("simple.dock.effects");
     const std::pair<juce::TextButton*, Tab> tabs[] { { &instrumentButton, Tab::instrument }, { &keyboardButton, Tab::keyboard },
                                                      { &editorButton, Tab::editor }, { &effectsButton, Tab::effects } };
     for (auto [b, t] : tabs)

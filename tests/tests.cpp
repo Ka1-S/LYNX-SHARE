@@ -17516,6 +17516,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "SimpleFx190buTests.inc"
 #include "SimpleGate190dgTests.inc"
 #include "SimpleNext190dsTests.inc"
+#include "FirstSongTour190dvTests.inc"
 #include "Rollup027Tests.inc"
 #include "Edison190cdTests.inc"
 #include "Warp190cgTests.inc"

@@ -2,7 +2,7 @@
 
 #include <thread>
 
-#include "core/ShowcaseSong.h"
+#include "core/DemoSongs.h"
 #include "engine/AudioEngine.h"
 #include "engine/Exporter.h"
 #include "ui/I18n.h"
@@ -31,18 +31,23 @@ void describe (Entry& entry, const Song& song)
 std::optional<Song> songOf (const Entry& entry)
 {
     if (entry.kind == Entry::Kind::demo)
-        return makeShowcaseSong (0);
+        return demos::make (entry.demo);
     return makeFromTemplate (entry.choice);
 }
 
 std::vector<Entry> entries()
 {
     std::vector<Entry> out;
-    Entry demo;
-    demo.kind = Entry::Kind::demo;
-    demo.name = tr ("LYNX demo song");
-    describe (demo, makeShowcaseSong (0));
-    out.push_back (demo);
+    for (int d = 0; d < demos::count; ++d)
+    {
+        Entry demo;
+        demo.kind = Entry::Kind::demo;
+        demo.demo = d;
+        // round 190dv: two more short demos in other genres, made with LYNX's own instruments and starter kit
+        demo.name = d == 0 ? tr ("LYNX demo song") : tr ("LYNX demo: {0} ({1})", { juce::String (demos::name (d)), tr (demos::genre (d)) });
+        describe (demo, demos::make (d));
+        out.push_back (demo);
+    }
     for (const auto& choice : availableTemplates())
     {
         Entry e;

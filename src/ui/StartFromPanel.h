@@ -29,12 +29,13 @@ struct Entry
     Kind kind = Kind::demo;
     juce::String name;      // shown
     TemplateChoice choice;  // (not for the demo)
+    int demo = 0;           // which demo song (core/DemoSongs.h; round 190dv: 0 the showcase, 1 hip hop, 2 pop)
     double bpm = 0.0;       // 0 = not read yet (a user's file is read when it is first needed)
     int channels = 0, bars = 0;
     bool playable = false;  // it has notes or clips: there is something to preview
 };
 
-// Everything the list offers, in order: the demo song, LYNX's default song, the built-in templates, the user's.
+// Everything the list offers, in order: the demo songs (round 190dv: three), LYNX's default song, the built-in templates, the user's.
 std::vector<Entry> entries();
 // The song of an entry; nullopt when a user's file is gone or unreadable.
 std::optional<Song> songOf (const Entry& entry);

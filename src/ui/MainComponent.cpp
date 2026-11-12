@@ -7,6 +7,7 @@
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
 #include "core/EditorLimit.h"
+#include "core/FirstSongTour.h"
 #include "core/FlSettings.h"
 #include "core/PlaylistOps.h"
 #include "core/ClipOps.h"
@@ -756,6 +757,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     addChildComponent (chordNearHint);
     chordPanel.onMenu = [this] { showChordPanelMenu(); };
     keyPanel.onClick = [this] { showKeyMenu(); };
+    keyPanel.setComponentID ("toolbar.key"); // (round 190dv: the first-song tour's ring)
     refreshKeyPanel();
     PianoRollComponent::onSelectedKeys = [this] (const std::vector<int>& keys) {
         if (! chordPanel.isVisible())
@@ -3048,6 +3050,27 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         host.foldedToKey = [this] { return pianoRoll.isFoldedToScale(); };
         host.openPianoRollPanel = [this] { showPanel (Panel::pianoRoll); };
         workspace.onWillShow = [this] (Panel panel) { pianoRollPanelWillShow (panel); };
+        // round 190dv: the Welcome screen (by itself only in a real session) and the first-song tour
+        host.window = [this] { return static_cast<juce::Component*> (this); };
+        host.offerWelcome = persistent;
+        host.newProjectForTour = [this] (std::function<void()> then) {
+            auto go = [this, then] {
+                confirmDiscard ([this, then] {
+                    startNewProject (makeDefaultTemplateProject (nullptr), {});
+                    if (then)
+                        then();
+                });
+            };
+            juce::AlertWindow::showYesNoCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("First-song tour"),
+                                                   tr ("The tour builds a song from the start. Start it in a new project?"), tr ("New project"),
+                                                   tr ("This project"), tr ("Cancel"), nullptr,
+                                                   juce::ModalCallbackFunction::create ([go, then] (int result) {
+                                                       if (result == 1)
+                                                           go();
+                                                       else if (result == 2 && then)
+                                                           then();
+                                                   }));
+        };
         simpleWorkflow = std::make_unique<SimpleWorkflow> (engine, std::move (host));
         // the Simple headers' "+FX": the dock's Effects tab on that track (round 190bu; the Mixer shows the same slots)
         playlist.onTrackEffects = [this] (int insert) {
@@ -8050,6 +8073,22 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
     }
     else
     {
+        // round 190dv: the Simple workflow's Welcome screen and first-song tour (only in that workflow)
+        if (layoutStyle == layoutstyle::Style::simple && simpleWorkflow != nullptr)
+        {
+            menu.addItem (simpleWorkflow->tourCanContinue() ? tr ("Continue the first-song tour (step {0} of {1})", { juce::String (simpleWorkflow->tourStep() + 1),
+                                                                                                                      juce::String (tour::stepCount) })
+                                                            : tr ("First-song tour"),
+                          [this] {
+                              if (simpleWorkflow != nullptr)
+                                  simpleWorkflow->startOrContinueTour();
+                          });
+            menu.addItem (tr ("Welcome screen..."), [this] {
+                if (simpleWorkflow != nullptr)
+                    simpleWorkflow->showWelcome();
+            });
+            menu.addSeparator();
+        }
         menu.addItem (tr ("Shortcuts") + shortcutText ("help.shortcuts"), [this] { showHelp(); });
         menu.addItem (tr ("Missing files..."), [this] { showMissingFiles (false); });
         menu.addItem (tr ("Last project import report"), [this] {
