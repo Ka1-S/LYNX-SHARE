@@ -7329,22 +7329,10 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Lock all playlist tracks to content"), [this] { playlist.runAction ("playlist.lockAllToContent"); });
         menu.addItem (tr ("Unlock all playlist tracks from content"), [this] { playlist.runAction ("playlist.unlockAllFromContent"); });
         menu.addItem (tr ("Reset empty playlist tracks"), [this] { playlist.runAction ("playlist.resetEmptyTracks"); });
-        {
-            // FL's next item (round 190cd; FL's main menu, rea190bc mainmenu_toolbar-0262): every audio editor loaded in
-            // a mixer slot is taken out, its slot left empty. One undo step; greyed when there is none (LYNX).
-            int instances = 0;
-            for (const auto& track : engine.getSong().mixer)
-                for (const auto& fx : track.effects)
-                    instances += fx.kind == EffectKind::edison ? 1 : 0;
-            menu.addItem (tr ("Remove all Edison instances"), instances > 0, false, [this] {
-                engine.editSongStructural ([] (Song& song) {
-                    for (int t = 0; t < (int) song.mixer.size(); ++t)
-                        for (int i = (int) song.mixer[(std::size_t) t].effects.size() - 1; i >= 0; --i)
-                            if (song.mixer[(std::size_t) t].effects[(std::size_t) i].kind == EffectKind::edison)
-                                mixerops::removeEffectKeepRows (song, t, i);
-                });
-            });
-        }
+        // FL's next item (round 190cd; FL's main menu, rea190bc mainmenu_toolbar-0262): every audio editor loaded in a
+        // mixer slot is taken out, its slot left empty. FL asks first and keeps the item enabled with no instance (live
+        // check 190cq, shots edison190cd-07a / 07b); LYNX keeps it one undo step.
+        menu.addItem (tr ("Remove all Edison instances"), [this] { askRemoveAllEdisonInstances (engine); });
         // greyed until the project has a file, as in FL 2026 (seen in an unsaved project, round 181b)
         menu.addItem (tr ("Delete unused files and save project"), currentFile != juce::File(), false, [this] { deleteUnusedRecordingsAndSave(); });
         // FL's next item (round 190i, issue #116; FL 2026's Tools menu, shots fl2-01 / fl2-02): every plugin editor

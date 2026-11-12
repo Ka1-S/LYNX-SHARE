@@ -74,6 +74,10 @@ const char* modeName (Mode m) noexcept;       // "Now", "On input", "Input", "On
 const char* modeHint (Mode m) noexcept;       // FL's own descriptions of the four
 Mode modeOf (const EffectParams& params) noexcept;
 float modeValue (Mode m) noexcept;
+// The settings FL gives the Edison that a mixer track's "Open audio editor and record" (Shift+E) loads: On play, 5 min,
+// Append off, Slave playback on (live FL check 190cq, shot edison190cd-05b; it is armed as well). A plain "Open audio
+// editor" and a fresh slot keep info()'s defaults: On input, 30 min, Append on, Slave off.
+void setOpenAndRecord (EffectParams& params) noexcept;
 int maxTimeIndexOf (const EffectParams& params) noexcept;
 // Frames a take may hold at `sampleRate` (0 = no limit).
 std::int64_t maxFramesOf (const EffectParams& params, double sampleRate) noexcept;
@@ -198,8 +202,9 @@ private:
 };
 
 // --- the slot's document -------------------------------------------------------------------------------------------
-// `base` with a take: Append on → after the audio already there, with a marker where it starts when there was audio
-// before; off → the take alone (the title is kept). `jumps`: take frames that get a "Song jump" marker.
+// `base` with a take: Append on → after the audio already there; off → the take alone (the title is kept). `jumps`: take
+// frames that get a "Song jump" marker (On play: where each stretch of playback starts, so frame 0 / the join too, and
+// every jump of the song).
 audioedit::Document withTake (const audioedit::Document& base, const audioedit::Audio& take, const std::vector<std::int64_t>& jumps,
                               bool appendTake);
 
@@ -286,7 +291,7 @@ struct FlState
     Mode mode = Mode::onInput;
     bool newProject = false; // = Append off
     bool loop = false, muteInput = false, noAutoScroll = false;
-    int maxTime = 3;
+    int maxTime = 5; // (only for states too old to hold it: FL's default, 30 min)
     bool slave = false, ignoreHostSelection = false, ignoreOwnSelection = false;
     float noiseThreshold = defaultNoiseThreshold;
     std::size_t wavOffset = 0, wavSize = 0; // the RIFF/WAVE image of the sample inside the state

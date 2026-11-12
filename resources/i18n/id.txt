@@ -8959,3 +8959,5 @@ countries: id
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"
+"Remove Edison instances" = "Hapus instance Edison"
+"Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "Yakin ingin menghapus semua instance Edison dari proyek?\n(Tidak bisa dibatalkan)"

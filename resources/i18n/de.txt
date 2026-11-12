@@ -8959,3 +8959,5 @@ countries: de at ch li lu
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] Editor öffnen/schließen  [Alt]+[LMB] andere offen lassen  [Strg]+[LMB] vorhören  [2xLMB] Piano Roll  [LMB] hoch/runter ziehen sortiert um  [RMB] Kanalmenü"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak-Anzeige (links/rechts) mit Peak-Hold  [LMB] löscht die Übersteuerungsanzeige"
+"Remove Edison instances" = "Edison-Instanzen entfernen"
+"Are you sure you want to remove all Edison instances from the project ?\n(No undo)" = "Alle Edison-Instanzen wirklich aus dem Projekt entfernen?\n(Nicht rückgängig zu machen)"

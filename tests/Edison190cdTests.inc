@@ -91,15 +91,16 @@ TEST (edison190cd_the_plugin_is_a_slot_kind_with_fl_defaults)
     namespace ef = lynx::edisonfx;
     const auto slot = lynx::makeEffectSlot (lynx::EffectKind::edison);
     CHECK (slot.kind == lynx::EffectKind::edison);
-    // FL: the mode list opens on "On input", Append is on, the longest recording is the fourth choice, threshold 0.02
+    // FL: the mode list opens on "On input", Append is on, the longest recording is 30 minutes (the sixth choice; live FL
+    // check 190cq, shot edison190cd-05e), threshold 0.02
     CHECK (ef::modeOf (slot.params) == ef::Mode::onInput);
     CHECK (slot.params[ef::append] >= 0.5f);
     CHECK (slot.params[ef::muteInput] < 0.5f);
     CHECK (slot.params[ef::slave] < 0.5f);
-    CHECK (ef::maxTimeIndexOf (slot.params) == 3);
-    CHECK (ef::maxMinutes[3] == 5);
+    CHECK (ef::maxTimeIndexOf (slot.params) == 5);
+    CHECK (ef::maxMinutes[5] == 30);
     CHECK (std::abs (slot.params[ef::noiseThreshold] - 0.02f) < 1.0e-6f);
-    CHECK (ef::maxFramesOf (slot.params, 48000.0) == 5 * 60 * 48000);
+    CHECK (ef::maxFramesOf (slot.params, 48000.0) == 30 * 60 * 48000);
     auto forever = slot.params;
     forever[ef::maxTime] = 0.0f;
     CHECK (ef::maxFramesOf (forever, 48000.0) == 0);
@@ -205,15 +206,18 @@ TEST (edison190cd_gate_on_play_follows_the_transport_and_marks_song_jumps)
     CHECK (g.phase() == ef::Phase::waiting);
     CHECK (! g.block (1.0f, 512, false, false, 0.02f).write); // loud but stopped
     auto d = g.block (0.0f, 512, true, false, 0.02f);
-    CHECK (d.write && ! d.jumpMarker && ! d.preRoll); // silent but playing
+    CHECK (d.write && d.jumpMarker && ! d.preRoll); // silent but playing; FL marks where the take starts (round 190ct)
     CHECK (g.phase() == ef::Phase::recording);
+    d = g.block (0.0f, 512, true, false, 0.02f);
+    CHECK (d.write && ! d.jumpMarker);
     d = g.block (0.0f, 512, true, true, 0.02f);
     CHECK (d.write && d.jumpMarker); // the song jumped (loop, click on the timeline)
     d = g.block (0.0f, 512, true, false, 0.02f);
     CHECK (d.write && ! d.jumpMarker); // one marker per jump
     CHECK (! g.block (0.0f, 512, false, false, 0.02f).write); // stop pauses
     CHECK (g.phase() == ef::Phase::waiting);
-    CHECK (g.block (0.0f, 512, true, false, 0.02f).write);
+    d = g.block (0.0f, 512, true, false, 0.02f);
+    CHECK (d.write && d.jumpMarker); // the song starts again: a marker where it resumes
 }
 
 TEST (edison190cd_idle_passes_the_audio_through_bit_exact)
@@ -369,9 +373,9 @@ TEST (edison190cd_on_play_records_only_while_the_song_plays_and_notes_jumps)
     p.drain (l, r, jumps, 0);
     CHECK (l.size() == 20 * 441);
     CHECK (l[0] == 0.25f && l[10 * 441 - 1] == 0.25f && l[10 * 441] == 0.75f);
-    CHECK (jumps.size() == 1);
-    if (! jumps.empty())
-        CHECK (jumps[0] == 10 * 441);
+    CHECK (jumps.size() == 2); // the take's start (FL's "Song jump" at 0, round 190ct) and the jump
+    if (jumps.size() == 2)
+        CHECK (jumps[0] == 0 && jumps[1] == 10 * 441);
     p.setRecording (false);
 }
 
@@ -685,8 +689,8 @@ TEST (edison190cd_fl_state_keeps_the_slot_as_the_plugin_with_settings_and_audio)
         CHECK (! session->dirty());
     }
 
-    // FL's defaults (an empty plugin as FL saves it): On input, Append on, 5 minutes
-    const auto fresh = lynx::effectFromFl ("Edison", edison190cd::flState ({}, 1, false, false, false, 3, false, false, 0.02f), 140.0);
+    // FL's defaults (an empty plugin as FL saves it): On input, Append on, 30 minutes (index 5)
+    const auto fresh = lynx::effectFromFl ("Edison", edison190cd::flState ({}, 1, false, false, false, 5, false, false, 0.02f), 140.0);
     CHECK (fresh.has_value());
     if (fresh)
     {
@@ -723,4 +727,103 @@ TEST (edison190cd_other_slots_and_old_projects_are_untouched)
         fx->process (l.data(), r.data(), 64, lynx::makeEffectSlot (lynx::EffectKind::edison).params, 120.0);
         CHECK (l[0] == 0.5f && r[63] == 0.25f);
     }
+}
+
+// Round 190ct (live FL check 190cq): the mixer's "Open audio editor and record" loads an Edison set to On play, 5 min,
+// Append off, Slave on (shot edison190cd-05b); a plain open and a fresh slot keep On input, 30 min, Append on, Slave off
+// (05c / 05d). Old slots keep what they saved.
+TEST (edison190ct_open_and_record_preset_and_fresh_defaults)
+{
+    namespace ef = lynx::edisonfx;
+    const auto fresh = lynx::makeEffectSlot (lynx::EffectKind::edison);
+    auto armed = fresh;
+    ef::setOpenAndRecord (armed.params);
+    CHECK (ef::modeOf (armed.params) == ef::Mode::onPlay);
+    CHECK (ef::maxTimeIndexOf (armed.params) == 3 && ef::maxMinutes[3] == 5);
+    CHECK (armed.params[ef::append] < 0.5f && armed.params[ef::slave] >= 0.5f);
+    // the rest stays the fresh plugin's
+    CHECK (armed.params[ef::muteInput] == fresh.params[ef::muteInput] && armed.params[ef::loopPlay] == fresh.params[ef::loopPlay]
+           && armed.params[ef::noiseThreshold] == fresh.params[ef::noiseThreshold]
+           && armed.params[ef::ignoreOwnSelection] == fresh.params[ef::ignoreOwnSelection]);
+    CHECK (ef::modeOf (fresh.params) == ef::Mode::onInput && ef::maxTimeIndexOf (fresh.params) == 5 && fresh.params[ef::append] >= 0.5f
+           && fresh.params[ef::slave] < 0.5f);
+    CHECK (ef::paramText (ef::maxTime, fresh.params[ef::maxTime]) == "30 min");
+
+    // a slot saved before (5 min, the earlier default) keeps its value: the value is in the saved parameters
+    auto old = fresh;
+    old.params[ef::maxTime] = 3.0f / 6.0f;
+    CHECK (ef::maxTimeIndexOf (old.params) == 3);
+    // an FL state too old to hold the time gets FL's default
+    CHECK (ef::FlState {}.maxTime == 5);
+}
+
+// Round 190ct (live FL check 190cq, shot edison190cd-01-02): in On play FL writes "Song jump" at the start of every take
+// — frame 0 of a replacing take, the join of an appended one — and where the song starts again while armed.
+TEST (edison190ct_on_play_marks_the_start_of_each_take)
+{
+    namespace ef = lynx::edisonfx;
+    namespace ae = lynx::audioedit;
+    ef::Processor p;
+    p.prepare (44100.0);
+    auto params = edison190cd::defaults();
+    params[ef::recordMode] = ef::modeValue (ef::Mode::onPlay);
+    p.setRecording (true);
+    double tick = 0.0;
+    const auto ticksPerBlock = 441.0 / 44100.0 * (120.0 / 60.0) * (double) lynx::ppq;
+    auto block = [&] (bool playing) {
+        p.setSongPosition (tick);
+        p.setPlaying (playing);
+        edison190cd::run (p, params, 0.3f, 1);
+        if (playing)
+            tick += ticksPerBlock;
+    };
+    for (int i = 0; i < 3; ++i)
+        block (false);
+    for (int i = 0; i < 4; ++i)
+        block (true);
+    for (int i = 0; i < 3; ++i)
+        block (false); // stop: the take pauses
+    tick = 0.0;            // play again from the start
+    for (int i = 0; i < 4; ++i)
+        block (true);
+    std::vector<float> l, r;
+    std::vector<std::int64_t> jumps;
+    p.drain (l, r, jumps, 0);
+    p.setRecording (false);
+    CHECK (l.size() == 8 * 441);
+    CHECK (jumps == (std::vector<std::int64_t> { 0, 4 * 441 }));
+
+    // replacing: the first marker sits at 0; appending: at the join
+    ae::Audio take;
+    take.sampleRate = 44100.0;
+    take.channels.assign (2, std::vector<float> (800, 0.1f));
+    const auto base = edison190cd::ramp (1000);
+    const auto replaced = ef::withTake (base, take, { 0 }, false);
+    CHECK (replaced.markers.size() == 1 && replaced.markers[0].start == 0 && replaced.markers[0].name == "Song jump");
+    const auto appended = ef::withTake (base, take, { 0 }, true);
+    CHECK (appended.audio.frames() == 1800 && appended.markers.size() == 1 && appended.markers[0].start == 1000
+           && appended.markers[0].name == "Song jump");
+
+    // Input mode still writes no marker (live check: none at the start or a resume)
+    ef::Gate g;
+    g.prepare (44100.0);
+    g.arm (ef::Mode::input);
+    CHECK (! g.block (0.5f, 512, true, false, 0.02f).jumpMarker);
+}
+
+// Round 190ct (live FL check 190cq, shot edison190cd-07b): "Remove all Edison instances" empties every Edison slot (the
+// question comes first, in the UI); the other effects keep their rows.
+TEST (edison190ct_remove_all_edison_instances)
+{
+    lynx::Song song;
+    song.mixer.resize (3);
+    song.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::edison));
+    song.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::newtone));
+    song.mixer[1].effects.back().row = 3;
+    song.mixer[2].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::edison));
+    song.mixer[2].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::edison));
+    CHECK (lynx::mixerops::removeEffectsOfKind (song, lynx::EffectKind::edison) == 3);
+    CHECK (song.mixer[1].effects.size() == 1 && song.mixer[1].effects[0].kind == lynx::EffectKind::newtone && song.mixer[1].effects[0].row == 3);
+    CHECK (song.mixer[2].effects.empty());
+    CHECK (lynx::mixerops::removeEffectsOfKind (song, lynx::EffectKind::edison) == 0); // none left: nothing happens
 }
