@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 
 #include "engine/AudioEngine.h"
 
@@ -11,6 +12,13 @@ namespace lynx
 void openChannelSettings (AudioEngine& engine, int channel);
 // Shows insert `insert` in the Mixer (the main window sets it): a double-click on the channel window's TRACK box, as in FL.
 std::function<void (int insert)>& openMixerInsertHandler();
+// Shows a file in the Browser (the main window sets it): the sampler's "Locate sample in browser" button (round 190df).
+std::function<void (const juce::File&)>& locateInBrowserHandler();
+// The sampler page's File row inside `root` (round 190df; the shot route and its checks): the "Sample history" menu of
+// its Load button (nullopt: no sampler page), and what its buttons do: 0 Load's wheel down, 1 Load's wheel up,
+// 2 Locate sample in browser, 3 Remove sample. False: no sampler page.
+std::optional<juce::PopupMenu> samplerHistoryMenu (juce::Component& root);
+bool samplerFileRowPress (juce::Component& root, int button);
 void closeChannelSettings();
 // FL's View › Align all channel editors (Shift+F12): every open channel editor moves to the focused one's place (else the
 // selected channel's), and channel editors opened later come up there too (round 169k).

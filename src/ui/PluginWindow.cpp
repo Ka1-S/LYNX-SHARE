@@ -12,6 +12,8 @@
 #endif
 
 #include "core/CrashReport.h"
+#include "core/FlControlMenus.h"
+#include "core/MidiControls.h"
 #include "core/EditorLimit.h"
 #include "core/PinOnTop.h"
 #include "core/Preferences.h"
@@ -27,6 +29,7 @@
 #include "ui/NativeChild.h"
 #include "ui/LiveRemoteUi.h"
 #include "ui/PluginHeader.h"
+#include "ui/RemoteControl.h"
 #include "ui/Workspace.h"
 #include "platform/Paths.h"
 #include "ui/Theme.h"
@@ -989,7 +992,7 @@ class WrappedEditor final : public juce::Component
 public:
     WrappedEditor (juce::AudioProcessorEditor* e, AudioEngine& engine, std::function<PluginRef* (Song&)> find, juce::AudioPluginInstance& plugin,
                    bool channel, int scTrack = -1, int scSlot = -1)
-        : engineRef (engine), sideTrack (scTrack), sideSlot (scSlot),
+        : engineRef (engine), hosted (plugin), sideTrack (scTrack), sideSlot (scSlot),
           editor (e), page (engine, std::move (find), plugin, channel, scTrack, scSlot), presets (plugin, [&engine] { engine.markModified(); })
     {
         // round 177b: a plugin with a sidechain input gets the picker in its header (the input is fed from the slot's
@@ -1075,7 +1078,22 @@ public:
         show (settings);
     }
     bool isDown() const noexcept { return down; }
-    void setMenuExtension (std::function<void (juce::PopupMenu&)> extend) { presets.extendMenu = std::move (extend); }
+    // the host's items (Detached, Pin on top) come last, after FL's spare state and parameter items (round 190df)
+    void setMenuExtension (std::function<void (juce::PopupMenu&)> extend)
+    {
+        presets.extendMenu = [this, extend = std::move (extend)] (juce::PopupMenu& menu) {
+            const auto channel = page.channelIndex();
+            const auto base = channel >= 0 ? AutomationTarget { AutomationTargetKind::channelParam, channel, 0, 0 }
+                              : sideTrack >= 0 && sideSlot >= 0 ? AutomationTarget { AutomationTargetKind::effectParam, sideTrack, sideSlot, 0 }
+                                                                : AutomationTarget {};
+            addPluginWrapperItems (menu, engineRef, hosted, base);
+            if (extend)
+            {
+                menu.addSeparator();
+                extend (menu);
+            }
+        };
+    }
 
     void refreshKeyboardPriority()
     {
@@ -1157,6 +1175,7 @@ public:
 private:
     static constexpr int headerHeight = 30, minWidth = 4 + 80 + 4 + 130 + 8 + 30 + 250 + 4;
     AudioEngine& engineRef;
+    juce::AudioPluginInstance& hosted; // (round 190df: the plugin menu's spare state and parameter items)
     int sideTrack = -1, sideSlot = -1;
     juce::TextButton sidechain;
     KeyboardPriorityButton keyboardPriority;
@@ -2462,5 +2481,61 @@ void addPluginItems (juce::PopupMenu& menu, AudioEngine& engine, bool instrument
 
     menu.addSeparator();
     menu.addItem (tr ("Scan for plugins ({0})...", { platform::pluginFormatNames() }), [&engine] { engine.getPluginHost().startBackgroundScan(); });
+}
+} // namespace lynx
+
+namespace lynx
+{
+std::vector<AutomationTarget> allPluginParameterTargets (juce::AudioPluginInstance& plugin, const AutomationTarget& base)
+{
+    std::vector<AutomationTarget> targets;
+    if (base.kind != AutomationTargetKind::channelParam && base.kind != AutomationTargetKind::effectParam)
+        return targets;
+    const auto count = juce::jmin (plugin.getParameters().size(), midictl::ccBase); // (the indexes plugin parameters use)
+    for (int i = 0; i < count; ++i)
+    {
+        auto t = base;
+        t.param = i;
+        targets.push_back (t);
+    }
+    return targets;
+}
+
+void addPluginWrapperItems (juce::PopupMenu& menu, AudioEngine& engine, juce::AudioPluginInstance& plugin, const AutomationTarget& base)
+{
+    // FL's "Spare state" section [PluginMenu Sparestate1]: LYNX names it A/B compare, as on the mixer slots
+    // (docs/WORKFLOW_FL.md keeps FL's feature name out of the UI). The kept state belongs to this plugin instance.
+    static std::map<const void*, juce::String> keptFor; // (a kept state is only flipped into the same plugin)
+    const auto id = plugin.getPluginDescription().createIdentifierString();
+    auto& spare = sparestate::shared();
+    if (const auto it = keptFor.find (&plugin); it != keptFor.end() && it->second != id)
+    {
+        spare.forget (&plugin);
+        keptFor.erase (it);
+    }
+    menu.addSectionHeader (tr ("A/B compare"));
+    menu.addItem (tr ("Store the current settings as B"), [&plugin, id] {
+        juce::MemoryBlock state;
+        plugin.getStateInformation (state);
+        sparestate::shared().store (&plugin, { (const std::uint8_t*) state.getData(), (const std::uint8_t*) state.getData() + state.getSize() });
+        keptFor[&plugin] = id;
+    });
+    menu.addItem (tr ("Swap with B"), spare.has (&plugin), false, [&engine, &plugin] {
+        juce::MemoryBlock state;
+        plugin.getStateInformation (state);
+        if (const auto load = sparestate::shared().flip (&plugin, { (const std::uint8_t*) state.getData(),
+                                                                    (const std::uint8_t*) state.getData() + state.getSize() }))
+        {
+            plugin.setStateInformation (load->data(), (int) load->size());
+            engine.markModified();
+        }
+    });
+    // FL's "Parameters" section [PluginMenu N51]: Link all parameters... (Browse parameters is left out: LYNX's
+    // Browser does not list a plugin's parameters)
+    const auto targets = allPluginParameterTargets (plugin, base);
+    if (base.kind == AutomationTargetKind::none)
+        return;
+    menu.addSectionHeader (tr ("Parameters"));
+    menu.addItem (tr ("Link all parameters..."), ! targets.empty(), false, [&engine, targets] { openRemoteControlSettings (engine, targets, false); });
 }
 } // namespace lynx

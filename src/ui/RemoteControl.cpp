@@ -1,10 +1,13 @@
 #include "ui/RemoteControl.h"
 
+#include "core/FlControlMenus.h"
 #include "core/LinkFormula.h"
 #include "core/MidiControls.h"
 #include "ui/AutomationUi.h"
+#include "ui/EventEditor.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
+#include "ui/ToolWindow.h"
 #include "ui/ValueControl.h"
 #include "ui/WindowOwner.h"
 
@@ -900,39 +903,108 @@ bool remoteControlPanelFinished (juce::Component& panel)
     return false;
 }
 
+// The parameters FL's multilink menu acts on: the queued controls while multilink is on, else the last two tweaked
+// parameters [0x1233e10 copies them into the queue when multilink is off]
+std::vector<AutomationTarget> multilinkMenuTargets (AudioEngine& engine)
+{
+    if (engine.isMultilinkOn())
+        return engine.multilinkTargets();
+    std::vector<AutomationTarget> targets;
+    for (int which = 0; which < 2; ++which)
+        if (const auto t = engine.getLastTweaked (which); t && t->kind != AutomationTargetKind::none)
+            targets.push_back (*t);
+    return targets;
+}
+
+void runMultilinkAction (AudioEngine& engine, mlmenu::Action action, const std::vector<AutomationTarget>& targets, std::uint32_t seed)
+{
+    const auto on = engine.isMultilinkOn();
+    using A = mlmenu::Action;
+    switch (action)
+    {
+        case A::editEvents:
+            // one event editor per parameter (FL calls its opener for each [0x1234110])
+            for (int i = 0; i < (int) targets.size(); ++i)
+                openToolWindow (makeEventEditor (engine, targets[(std::size_t) i]), tr ("Event editor"),
+                                i == 0 ? juce::String ("eventeditor") : "eventeditor-" + juce::String (i));
+            break;
+        case A::initSong:
+        case A::initPattern:
+        {
+            std::vector<std::pair<AutomationTarget, float>> values;
+            for (const auto& t : targets)
+                if (const auto v = engine.currentTargetValue (t); v >= 0.0f)
+                    values.push_back ({ t, v });
+            const auto pattern = action == A::initPattern;
+            engine.editSong ([values, pattern] (Song& s) {
+                for (const auto& [t, v] : values)
+                    if (pattern)
+                        mlmenu::initPattern (s, s.currentPattern, t, v);
+                    else
+                        s.setInitialValue (t, v);
+            });
+            break;
+        }
+        case A::createClips:
+            for (const auto& t : targets)
+                createAutomationClip (engine, t);
+            break;
+        case A::linkToControllers:
+        case A::overrideGlobal:
+            break; // (after the queue is cleared, below)
+        case A::randomize:
+        case A::humanize:
+        {
+            juce::Random random (seed != 0 ? (juce::int64) seed : juce::Time::currentTimeMillis());
+            std::vector<std::pair<AutomationTarget, float>> values;
+            for (const auto& t : targets)
+            {
+                const auto r = (std::uint32_t) random.nextInt();
+                if (action == A::randomize)
+                    values.push_back ({ t, mlmenu::randomize (r) });
+                else if (const auto v = engine.currentTargetValue (t); v >= 0.0f)
+                    values.push_back ({ t, mlmenu::humanize (v, r) });
+            }
+            engine.applyTargetValues (values);
+            break;
+        }
+        case A::cancel:
+        case A::none:
+            break;
+    }
+    if (on && mlmenu::endsMultilink (action, on))
+        engine.setMultilink (false);
+    if (action == A::linkToControllers || action == A::overrideGlobal)
+        openRemoteControlSettings (engine, targets, action == A::overrideGlobal);
+}
+
 void addMultilinkControlsItems (juce::PopupMenu& menu, AudioEngine& engine)
 {
-    const auto queued = engine.multilinkTargets();
-    const auto any = ! queued.empty();
-    menu.addSectionHeader (tr ("Controls") + " (" + juce::String ((int) queued.size()) + ")");
-    menu.addSectionHeader (tr ("Automation"));
-    menu.addItem (tr ("Init song with these positions"), any, false, [&engine, queued] {
-        std::vector<std::pair<AutomationTarget, float>> values;
-        for (const auto& t : queued)
-            if (const auto v = engine.currentTargetValue (t); v >= 0.0f)
-                values.push_back ({ t, v });
-        engine.editSong ([values] (Song& s) {
-            for (const auto& [t, v] : values)
-                s.setInitialValue (t, v);
-        });
-        engine.setMultilink (false);
-    });
-    menu.addItem (tr ("Create automation clips"), any, false, [&engine, queued] {
-        engine.setMultilink (false);
-        for (const auto& t : queued)
-            createAutomationClip (engine, t);
-    });
-    menu.addSectionHeader (tr ("Remote control"));
-    menu.addItem (tr ("Link to controllers..."), any, false, [&engine, queued] {
-        engine.setMultilink (false);
-        openRemoteControlSettings (engine, queued, false);
-    });
-    menu.addItem (tr ("Override global links..."), any, false, [&engine, queued] {
-        engine.setMultilink (false);
-        openRemoteControlSettings (engine, queued, true);
-    });
-    menu.addSectionHeader (tr ("Value"));
-    menu.addItem (tr ("Cancel"), engine.isMultilinkOn(), false, [&engine] { engine.setMultilink (false); });
+    // FL's MLWheelMenu (round 190df): its caption, sections, items and laws [MLWheelMenuPopup 0x1234ae0; live shot
+    // link190bt-09a], acting on the queued controls or, with multilink off, on the last two tweaked parameters
+    const auto targets = multilinkMenuTargets (engine);
+    const auto on = engine.isMultilinkOn();
+    const auto count = (int) targets.size();
+    auto first = true;
+    for (const auto& e : mlmenu::build (on, count))
+    {
+        using K = mlmenu::Entry::Kind;
+        if (e.kind == K::separator)
+            menu.addSeparator();
+        else if (e.kind == K::caption)
+        {
+            if (first && on && count > 0) // (FL's "%d parameter(s) selected")
+                menu.addSectionHeader (count < 2 ? tr ("{0} parameter selected", { juce::String (count) })
+                                                 : tr ("{0} parameters selected", { juce::String (count) }));
+            else
+                menu.addSectionHeader (tr (e.text.c_str()));
+            first = false;
+        }
+        else
+            menu.addItem (tr (e.text.c_str()), e.enabled, false, [&engine, action = e.action] {
+                runMultilinkAction (engine, action, multilinkMenuTargets (engine), 0);
+            });
+    }
 }
 
 // FL's FormulaMenu: its sections, dividing lines and presets, in its order.

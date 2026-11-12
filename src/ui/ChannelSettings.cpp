@@ -2,7 +2,9 @@
 #include "ui/WindowOwner.h"
 #include "core/NoteNames.h"
 #include "ui/ChannelSettings.h"
+#include "core/FlControlMenus.h"
 #include "ui/FileChoosers.h"
+#include "ui/Icons.h"
 #include "ui/LayerEditor.h"
 #include "ui/DanceView.h"
 #include "ui/Controllers164.h"
@@ -2898,6 +2900,22 @@ private:
     juce::ToggleButton clip;
 };
 
+// FL's Load button of the sampler's File row (round 190df): an icon button that also takes the mouse wheel (FL steps
+// through the sample history with it [OpenBtnMouseWheel 0xf68f50])
+class WheelIconButton final : public IconButton
+{
+public:
+    using IconButton::IconButton;
+    std::function<void (int)> onWheel; // +1 up, -1 down
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override
+    {
+        if (onWheel != nullptr && w.deltaY != 0.0f)
+            onWheel (w.deltaY > 0.0f ? 1 : -1);
+        else
+            IconButton::mouseWheelMove (e, w);
+    }
+};
+
 class SettingsPanel final : public juce::Component,
                             public juce::DragAndDropTarget,
                             public juce::FileDragAndDropTarget,
@@ -3006,6 +3024,35 @@ public:
             tweakTargets.push_back ({ slider, param });
         }
 
+        // FL's File row (round 190df; form TPluginForm SmpSheet.GrooveBox, shot dock188a fl-05): "File", the sample's
+        // name, then Load (click: the file dialog; right-click: "Sample history"; wheel: steps through it), Locate
+        // sample in browser and Remove sample
+        fileLabel.setText (tr ("File"), juce::dontSendNotification);
+        fileLabel.setJustificationType (juce::Justification::centredRight);
+        addAndMakeVisible (fileLabel);
+        fileName.setMinimumHorizontalScale (1.0f);
+        addAndMakeVisible (fileName);
+        loadButton.setTooltip (tr ("Load sample file... / Sample history"));
+        loadButton.onClick = [this] { chooseSample(); };
+        loadButton.onRightClick = [this] { showSampleHistory(); };
+        loadButton.onWheel = [this] (int delta) {
+            if (const auto* c = current())
+                if (const auto next = samplehistory::step (c->samplePath, delta))
+                    replaceSample (juce::File (juce::String::fromUTF8 (next->c_str())));
+        };
+        locateButton.setTooltip (tr ("Locate sample in browser"));
+        locateButton.onClick = [this] {
+            if (const auto* c = current(); c != nullptr && ! c->samplePath.empty() && locateInBrowserHandler())
+                locateInBrowserHandler() (juce::File (juce::String::fromUTF8 (c->samplePath.c_str())));
+        };
+        removeButton.setTooltip (tr ("Remove sample"));
+        removeButton.onClick = [this] { removeSample(); };
+        for (auto* b : { &loadButton, &locateButton, &removeButton })
+        {
+            b->setFlat (false);
+            addAndMakeVisible (b);
+        }
+
         wave.setEmptyText (tr ("No sample loaded"));
         wave.setTooltip (tr ("The sample: colours show where it is bass-heavy (warm) or bright (cool); outside Start/End is dimmed"));
         // round 190w: FL 2026 previews the sample when its display is clicked (from the start offset, to its end) and shows
@@ -3015,7 +3062,7 @@ public:
 
         refresh();
         engine.addChangeListener (this);
-        setSize (420, 676);
+        setSize (420, 676 + fileRowHeight);
         if (ref.index >= 0)
             startTimerHz (30); // the knobs follow their automation while the song plays (issue #12)
     }
@@ -3072,6 +3119,18 @@ public:
     void resized() override
     {
         auto area = getLocalBounds().reduced (12);
+        {
+            // (FL's order, right-aligned: Load, Locate, Remove)
+            auto row = area.removeFromTop (fileRowHeight - 6);
+            removeButton.setBounds (row.removeFromRight (26));
+            locateButton.setBounds (row.removeFromRight (26));
+            loadButton.setBounds (row.removeFromRight (34));
+            row.removeFromRight (6);
+            fileLabel.setBounds (row.removeFromLeft (34));
+            row.removeFromLeft (6);
+            fileName.setBounds (row);
+            area.removeFromTop (6);
+        }
         wave.setBounds (area.removeFromTop (92));
         area.removeFromTop (8);
         auto place = [] (juce::Rectangle<int> row, std::initializer_list<std::pair<juce::Slider*, juce::Label*>> items) {
@@ -3191,7 +3250,78 @@ private:
             d.sampler.slices.clear();
             d.name = name;
         });
+        samplehistory::add (file.getFullPathName().toStdString()); // (FL: every sample a sampler loads)
     }
+
+    // FL's Load button [OpenBtnClick 0xf68f20]: the sample file dialog
+    void chooseSample()
+    {
+        const auto* c = current();
+        const juce::File now (c != nullptr ? juce::String::fromUTF8 (c->samplePath.c_str()) : juce::String());
+        sampleChooser = lynx::ui::makeFileChooser (tr ("Load sample file..."), now.existsAsFile() ? now : juce::File(),
+                                                   "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
+        lynx::ui::launchChooser (sampleChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                                 [safe = juce::Component::SafePointer<SettingsPanel> (this)] (const juce::FileChooser& fc) {
+                                     if (safe != nullptr && fc.getResult() != juce::File())
+                                         safe->replaceSample (fc.getResult());
+                                 });
+    }
+
+    // FL's right-click on Load [WAVFileNameListMenuPopup 0x121afb0]: caption "Sample history", then the samples loaded
+    // (newest first, by name); a click loads one into this channel
+    juce::PopupMenu sampleHistoryMenu()
+    {
+        juce::PopupMenu menu;
+        const auto& paths = samplehistory::list();
+        if (paths.empty())
+            return menu;
+        menu.addSectionHeader (tr ("Sample history"));
+        for (const auto& p : paths)
+        {
+            const juce::File file (juce::String::fromUTF8 (p.c_str()));
+            menu.addItem (file.getFileName(), [safe = juce::Component::SafePointer<SettingsPanel> (this), file] {
+                if (safe != nullptr)
+                    if (const auto* c = safe->current(); c != nullptr && c->samplePath != file.getFullPathName().toStdString())
+                        safe->replaceSample (file);
+            });
+        }
+        return menu;
+    }
+    void showSampleHistory()
+    {
+        auto menu = sampleHistoryMenu();
+        if (menu.getNumItems() > 0)
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&loadButton));
+    }
+
+    // FL's Remove sample [RemoveBtnClick 0xf667a0]: one undo step "remove channel sample", only with a sample
+    void removeSample()
+    {
+        const auto* c = current();
+        if (c == nullptr || (c->samplePath.empty() && c->zones.empty()))
+            return;
+        stopPreview();
+        ref.edit (engine, [] (ChannelDef& d) {
+            d.samplePath.clear();
+            d.zones.clear();
+            d.sampler.slices.clear();
+        });
+    }
+
+public:
+    // (the shot route: the history menu without showing it, and the row's buttons)
+    juce::PopupMenu sampleHistoryMenuForShot() { return sampleHistoryMenu(); }
+    void pressFileRow (int button)
+    {
+        if (button == 0 || button == 1)
+            loadButton.onWheel (button == 0 ? -1 : 1);
+        else if (button == 2)
+            locateButton.onClick();
+        else if (button == 3)
+            removeSample();
+    }
+
+private:
 
     void setup (juce::Slider& s, juce::Label& label, const char* name, double lo, double hi, double step, const char* suffix)
     {
@@ -3241,6 +3371,10 @@ private:
             showAutomation (true);
 
             const auto path = juce::String::fromUTF8 ((c->samplePath.empty() && ! c->zones.empty() ? c->zones.front().path : c->samplePath).c_str());
+            fileName.setText (juce::File (path).getFileName(), juce::dontSendNotification); // (FL: the name, the path's end)
+            fileName.setTooltip (path);
+            locateButton.setEnabled (! c->samplePath.empty());
+            removeButton.setEnabled (! c->samplePath.empty() || ! c->zones.empty());
             wave.setFile (path, [&e = engine, path] { return e.getSampleLibrary().load (path); });
             wave.setRegion (c->sampler.regionStart, c->sampler.regionEnd);
             wave.setReversed (c->sampler.reverse);
@@ -3440,6 +3574,10 @@ private:
     juce::ToggleButton reverse, cut, keepPitch, porta;
     juce::ComboBox filterType, stretchMethod;
     juce::TextButton modulationButton, precomputeButton;
+    static constexpr int fileRowHeight = 34; // FL's File row (round 190df)
+    juce::Label fileLabel, fileName;
+    WheelIconButton loadButton { "load", Icon::open }, locateButton { "locate", Icon::browser }, removeButton { "remove", Icon::close };
+    std::unique_ptr<juce::FileChooser> sampleChooser;
     ui::WaveformDisplay wave;
     int previewKey = -1, previewFrames = 0; // round 190w: the display's preview note (-1 = none)
     bool previewSeen = false;
@@ -5207,6 +5345,21 @@ bool hasEnvelopeTab (InstrumentKind kind) noexcept
 // processor's block in the generator's state) for Fruity Slicer (issue #129)
 std::unique_ptr<juce::Component> makeEnvelopePage (AudioEngine& engine, const ChannelRef& ref, InstrumentKind kind)
 {
+    // round 190df: a sampler that runs FL's voice (an FL project's sampler: SamplerSettings::flChannel) gets FL's own
+    // page, with the three tensions, the predelay and the envelope presets; its edits keep FL's voice (LYNX's page
+    // would replace it)
+    if (const auto* def = ref.get (engine); kind == InstrumentKind::sampler && def != nullptr && flsamplervoice::has (def->sampler))
+        return makeFlVoicePanel (
+            engine,
+            [&engine, ref] () -> std::optional<flvoice::Settings> {
+                const auto* d = ref.get (engine);
+                if (d == nullptr || d->instrument != InstrumentKind::sampler || ! flsamplervoice::has (d->sampler))
+                    return std::nullopt;
+                return flsamplervoice::read (d->sampler);
+            },
+            [&engine, ref] (const flvoice::Settings& settings) {
+                ref.edit (engine, [settings] (ChannelDef& d) { flsamplervoice::write (d.sampler, settings); });
+            });
     if (hasEnvelopeTab (kind))
         return std::make_unique<ModulationPanel> (engine, ref);
     if (kind != InstrumentKind::fruityslicer)
@@ -5603,5 +5756,40 @@ std::function<void (int)>& openMixerInsertHandler()
 {
     static std::function<void (int)> handler;
     return handler;
+}
+
+std::function<void (const juce::File&)>& locateInBrowserHandler()
+{
+    static std::function<void (const juce::File&)> handler;
+    return handler;
+}
+
+namespace
+{
+SettingsPanel* findSamplerPage (juce::Component& c)
+{
+    if (auto* p = dynamic_cast<SettingsPanel*> (&c))
+        return p;
+    for (auto* child : c.getChildren())
+        if (auto* p = findSamplerPage (*child))
+            return p;
+    return nullptr;
+}
+} // namespace
+
+std::optional<juce::PopupMenu> samplerHistoryMenu (juce::Component& root)
+{
+    if (auto* p = findSamplerPage (root))
+        return p->sampleHistoryMenuForShot();
+    return std::nullopt;
+}
+
+bool samplerFileRowPress (juce::Component& root, int button)
+{
+    auto* p = findSamplerPage (root);
+    if (p == nullptr)
+        return false;
+    p->pressFileRow (button);
+    return true;
 }
 } // namespace lynx

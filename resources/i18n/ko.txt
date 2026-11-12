@@ -9355,6 +9355,23 @@ countries: kr
 "In: {0} out: {1}" = "입력: {0} 출력: {1}"
 "Note C0" = "노트 C0"
 
+# --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
+"{0} parameters selected" = "매개변수 {0}개 선택됨"
+"Last 2 tweaked parameters" = "마지막으로 조정한 매개변수 2개"
+"No parameter selected" = "선택된 매개변수 없음"
+"Last tweaked parameter" = "마지막으로 조정한 매개변수"
+"Edit events" = "이벤트 편집"
+"Init pattern with these positions" = "이 위치로 패턴 초기화"
+"Load sample file... / Sample history" = "샘플 파일 불러오기... / 샘플 기록"
+"Locate sample in browser" = "브라우저에서 샘플 위치 찾기"
+"Remove sample" = "샘플 제거"
+"Load sample file..." = "샘플 파일 불러오기..."
+"Sample history" = "샘플 기록"
+"Channel envelope presets" = "채널 엔벨로프 프리셋"
+"Envelope preset name" = "엔벨로프 프리셋 이름"
+"Link all parameters..." = "모든 매개변수 연결..."
+"{0} parameter selected" = "매개변수 {0}개 선택됨"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"

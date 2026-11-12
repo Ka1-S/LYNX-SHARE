@@ -23,4 +23,10 @@ std::unique_ptr<juce::Component> makeFlVoicePanel (AudioEngine& engine, std::fun
                                                    std::function<void (const flvoice::Settings&)> write);
 // Shows a target's tab (flvoice::Target) of the page inside `root`, if it holds one (for the --snapshot pictures)
 void showFlVoiceTarget (juce::Component& root, int target);
+// Round 190df: FL's channel envelope presets of that page (ChanEnvPresetBtn): its menu (nullopt: no page in `root`),
+// "Save as..." with a name (the shown target's record as <folder>/<name>.CHENV) and loading a file into the shown target
+std::optional<juce::PopupMenu> flVoicePresetsMenu (juce::Component& root);
+bool flVoiceSavePreset (juce::Component& root, const juce::String& name);
+bool flVoiceLoadPreset (juce::Component& root, const juce::File& file);
+juce::File flVoicePresetFolder();
 } // namespace lynx

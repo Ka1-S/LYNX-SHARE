@@ -23,6 +23,7 @@
 #include <vector>
 
 #if defined(__SSE__) || defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__) || defined(_M_ARM64) // x86 SSE, or ARM64 through core/Simd.h (sse2neon)
+#include "core/FlControlMenus.h"
 #include "core/LinkFormula.h"
 #include "core/Multilink.h"
 #include "core/Simd.h"
@@ -17521,3 +17522,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "ApexFix190coTests.inc"
 #include "Link190csTests.inc"
 #include "TrackLinkTests.inc"
+#include "FlCtl190dfTests.inc"

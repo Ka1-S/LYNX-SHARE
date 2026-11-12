@@ -9355,6 +9355,23 @@ countries: nl be
 "In: {0} out: {1}" = "In: {0} uit: {1}"
 "Note C0" = "Noot C0"
 
+# --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
+"{0} parameters selected" = "{0} parameters geselecteerd"
+"Last 2 tweaked parameters" = "Laatste 2 aangepaste parameters"
+"No parameter selected" = "Geen parameter geselecteerd"
+"Last tweaked parameter" = "Laatst aangepaste parameter"
+"Edit events" = "Events bewerken"
+"Init pattern with these positions" = "Pattern initialiseren met deze posities"
+"Load sample file... / Sample history" = "Samplebestand laden... / Samplegeschiedenis"
+"Locate sample in browser" = "Sample in de browser lokaliseren"
+"Remove sample" = "Sample verwijderen"
+"Load sample file..." = "Samplebestand laden..."
+"Sample history" = "Samplegeschiedenis"
+"Channel envelope presets" = "Kanaal-envelopepresets"
+"Envelope preset name" = "Naam van de envelopepreset"
+"Link all parameters..." = "Alle parameters koppelen..."
+"{0} parameter selected" = "{0} parameter geselecteerd"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Piekmeter (links/rechts) met peak hold  [LMB] wist het cliplampje"

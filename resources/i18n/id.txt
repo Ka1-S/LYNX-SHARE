@@ -9355,6 +9355,23 @@ countries: id
 "In: {0} out: {1}" = "Masuk: {0} keluar: {1}"
 "Note C0" = "Not C0"
 
+# --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
+"{0} parameters selected" = "{0} parameter dipilih"
+"Last 2 tweaked parameters" = "2 parameter terakhir yang diubah"
+"No parameter selected" = "Tidak ada parameter dipilih"
+"Last tweaked parameter" = "Parameter terakhir yang diubah"
+"Edit events" = "Edit event"
+"Init pattern with these positions" = "Inisialisasi pattern dengan posisi ini"
+"Load sample file... / Sample history" = "Muat file sample... / Riwayat sample"
+"Locate sample in browser" = "Cari sample di browser"
+"Remove sample" = "Hapus sample"
+"Load sample file..." = "Muat file sample..."
+"Sample history" = "Riwayat sample"
+"Channel envelope presets" = "Preset envelope channel"
+"Envelope preset name" = "Nama preset envelope"
+"Link all parameters..." = "Tautkan semua parameter..."
+"{0} parameter selected" = "{0} parameter dipilih"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"

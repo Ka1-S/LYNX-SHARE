@@ -56,6 +56,8 @@
 #include "core/EdisonFx.h"
 #include "engine/ProjectFile.h"
 #include "ui/RemoteControl.h"
+#include "core/FlControlMenus.h"
+#include "core/PlaylistOps.h"
 #include "core/Sha256.h"
 #include "engine/SessionPack.h"
 #include "engine/LiveTest.h"
@@ -1932,6 +1934,16 @@ public:
         if (args.contains ("--linkshot"))
         {
             setApplicationReturnValue (runLinkShot (args[args.indexOf ("--linkshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --flctlshot <prefix> (round 190df): FL's multilink menu (on / off), the plugin menu's A/B and "Link all
+        // parameters...", the sampler's File row with its Sample history, and the Envelope / instrument page of a sampler
+        // running FL's voice with its envelope presets, offscreen; prefix-checks.txt holds the checks
+        if (args.contains ("--flctlshot"))
+        {
+            setApplicationReturnValue (runFlCtlShot (args[args.indexOf ("--flctlshot") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -10241,6 +10253,236 @@ private:
             auto page = lynx::makeMidiPage (engine, {}, false);
             page->setSize (760, 900);
             shoot (*page, "settings-midi");
+        }
+
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
+        return allOk;
+    }
+
+    // A stand-in hosted plugin for the shot route: three parameters, its state = their values
+    struct FlCtlShotPlugin final : juce::AudioPluginInstance
+    {
+        FlCtlShotPlugin()
+        {
+            for (const char* n : { "Cutoff", "Resonance", "Drive" })
+                addHostedParameter (std::make_unique<juce::AudioParameterFloat> (juce::ParameterID (n, 1), n, 0.0f, 1.0f, 0.5f));
+        }
+        const juce::String getName() const override { return "Shot plugin"; }
+        void prepareToPlay (double, int) override {}
+        void releaseResources() override {}
+        void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override {}
+        double getTailLengthSeconds() const override { return 0.0; }
+        bool acceptsMidi() const override { return false; }
+        bool producesMidi() const override { return false; }
+        juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+        bool hasEditor() const override { return false; }
+        int getNumPrograms() override { return 1; }
+        int getCurrentProgram() override { return 0; }
+        void setCurrentProgram (int) override {}
+        const juce::String getProgramName (int) override { return {}; }
+        void changeProgramName (int, const juce::String&) override {}
+        void getStateInformation (juce::MemoryBlock& b) override
+        {
+            for (auto* p : getParameters())
+            {
+                const float v = static_cast<juce::AudioParameterFloat*> (p)->get();
+                b.append (&v, sizeof (float));
+            }
+        }
+        void setStateInformation (const void* data, int size) override
+        {
+            const auto& list = getParameters();
+            for (int i = 0; i < list.size() && (i + 1) * (int) sizeof (float) <= size; ++i)
+                *static_cast<juce::AudioParameterFloat*> (list[i]) = static_cast<const float*> (data)[i];
+        }
+        void fillInPluginDescription (juce::PluginDescription& d) const override
+        {
+            d.name = getName();
+            d.pluginFormatName = "Shot";
+            d.fileOrIdentifier = "shot";
+        }
+    };
+
+    static juce::File writeShotSample (const juce::File& file, double hz)
+    {
+        juce::AudioBuffer<float> buffer (1, 22050);
+        for (int i = 0; i < buffer.getNumSamples(); ++i)
+            buffer.setSample (0, i, (float) (std::sin (juce::MathConstants<double>::twoPi * hz * i / 44100.0) * std::exp (-i / 6000.0)));
+        file.deleteFile();
+        juce::WavAudioFormat wav;
+        if (auto out = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (file.createOutputStream().release(), 44100.0, 1, 16, {}, 0)))
+            out->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+        return file;
+    }
+
+    static bool clickMenuItem (const juce::PopupMenu& menu, const juce::String& text)
+    {
+        for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+            if (it.getItem().text == text && it.getItem().isEnabled && it.getItem().action != nullptr)
+            {
+                it.getItem().action();
+                return true;
+            }
+        return false;
+    }
+
+    bool runFlCtlShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        const auto shoot = [&prefix] (juce::Component& c, const char* name) {
+            savePng (c.createComponentSnapshot (c.getLocalBounds()), prefix + "-" + name + ".png");
+        };
+        using lynx::AutomationTarget;
+        using lynx::AutomationTargetKind;
+        lynx::AudioEngine engine (false);
+        engine.editSong ([] (lynx::Song& s) {
+            if (s.channels.size() < 3)
+                s.channels.resize (3);
+            if (s.patterns.empty())
+                s.patterns.resize (1);
+            s.currentPattern = 0;
+        });
+        const AutomationTarget volume { AutomationTargetKind::channelVolume, 0 }, pan { AutomationTargetKind::channelPan, 0 };
+
+        // ---- FL's multilink menu: on with two queued controls, off with the last tweaked parameters
+        {
+            engine.setMultilink (true);
+            engine.noteTweaked (volume);
+            engine.noteTweaked (pan);
+            juce::PopupMenu on;
+            lynx::addMultilinkControlsItems (on, engine);
+            juce::PopupMenu::MenuItemIterator first (on);
+            first.next();
+            check ("ml_caption_on", first.getItem().isSectionHeader && first.getItem().text == lynx::tr ("{0} parameters selected", { "2" }), first.getItem().text);
+            // Init pattern: the values at the pattern's start; ends multilink
+            const auto v0 = engine.currentTargetValue (volume);
+            lynx::runMultilinkAction (engine, lynx::mlmenu::Action::initPattern, engine.multilinkTargets(), 0);
+            const auto& lanes = engine.getSong().patterns[0].events;
+            check ("ml_init_pattern", lanes.size() == 2 && ! lanes[0].events.empty() && lanes[0].events[0].tick == 0
+                                          && std::abs (lanes[0].events[0].value - v0) < 1.0e-6f && ! engine.isMultilinkOn());
+            // Randomize keeps multilink on; Humanize moves at most an eighth
+            engine.setMultilink (true);
+            engine.noteTweaked (volume);
+            engine.noteTweaked (pan);
+            lynx::runMultilinkAction (engine, lynx::mlmenu::Action::randomize, engine.multilinkTargets(), 1234);
+            check ("ml_randomize_keeps_queue", engine.isMultilinkOn() && engine.multilinkTargets().size() == 2);
+            const auto before = engine.currentTargetValue (volume);
+            lynx::runMultilinkAction (engine, lynx::mlmenu::Action::humanize, engine.multilinkTargets(), 99);
+            check ("ml_humanize_small", std::abs (engine.currentTargetValue (volume) - before) <= 0.1251f && engine.isMultilinkOn(),
+                   juce::String (before) + " -> " + juce::String (engine.currentTargetValue (volume)));
+            lynx::runMultilinkAction (engine, lynx::mlmenu::Action::initSong, engine.multilinkTargets(), 0);
+            check ("ml_init_song", engine.getSong().findInitialValue (volume) >= 0 && ! engine.isMultilinkOn());
+            // off: the last two tweaked parameters, no Cancel
+            juce::PopupMenu off;
+            lynx::addMultilinkControlsItems (off, engine);
+            bool hasCancel = false;
+            for (juce::PopupMenu::MenuItemIterator it (off); it.next();)
+                hasCancel = hasCancel || it.getItem().text == lynx::tr ("Cancel");
+            juce::PopupMenu::MenuItemIterator offFirst (off);
+            offFirst.next();
+            check ("ml_off_caption", offFirst.getItem().text == lynx::tr ("Last 2 tweaked parameters") && ! hasCancel, offFirst.getItem().text);
+            saveMenus (juce::StringArray { "Multilink on (2 queued)", "Multilink off" }, std::vector<juce::PopupMenu> { on, off },
+                       prefix + "-multilink-menu.png");
+        }
+
+        // ---- the plugin menu's A/B (FL's spare state) and Parameters > Link all parameters...
+        {
+            FlCtlShotPlugin plugin;
+            juce::PopupMenu menu;
+            lynx::addPluginWrapperItems (menu, engine, plugin, { AutomationTargetKind::channelParam, 1, 0, 0 });
+            saveMenus (juce::StringArray { "Plugin menu: A/B and parameters" }, std::vector<juce::PopupMenu> { menu }, prefix + "-plugin-menu.png");
+            const auto targets = lynx::allPluginParameterTargets (plugin, { AutomationTargetKind::channelParam, 1, 0, 0 });
+            check ("link_all_parameters", targets.size() == 3 && targets[2].param == 2 && targets[2].index == 1);
+            auto* cutoff = static_cast<juce::AudioParameterFloat*> (plugin.getParameters()[0]);
+            *cutoff = 0.2f;
+            check ("spare_store", clickMenuItem (menu, lynx::tr ("Store the current settings as B")));
+            *cutoff = 0.9f;
+            juce::PopupMenu again;
+            lynx::addPluginWrapperItems (again, engine, plugin, { AutomationTargetKind::channelParam, 1, 0, 0 });
+            check ("spare_flip", clickMenuItem (again, lynx::tr ("Swap with B")) && std::abs (cutoff->get() - 0.2f) < 1.0e-6f, juce::String (cutoff->get()));
+            check ("spare_flip_back", clickMenuItem (again, lynx::tr ("Swap with B")) && std::abs (cutoff->get() - 0.9f) < 1.0e-6f, juce::String (cutoff->get()));
+            lynx::sparestate::shared().forget (&plugin);
+        }
+
+        // ---- the sampler's File row: Load (history menu, wheel), Locate, Remove
+        {
+            const auto folder = juce::File (prefix).getParentDirectory().getChildFile ("flctl-samples");
+            folder.createDirectory();
+            const auto a = writeShotSample (folder.getChildFile ("Kick 1.wav"), 60.0), b = writeShotSample (folder.getChildFile ("Snare 2.wav"), 200.0),
+                       c = writeShotSample (folder.getChildFile ("Hat 3.wav"), 900.0);
+            lynx::samplehistory::list().clear();
+            engine.editSong ([&] (lynx::Song& s) {
+                for (const auto& f : { c, b, a }) // (each load goes into the history, newest first)
+                    lynx::audioclips::loadSampleInto (s.channels[1], f.getFullPathName().toStdString(), f.getFileNameWithoutExtension().toStdString());
+            });
+            check ("history_order", lynx::samplehistory::list().size() == 3 && lynx::samplehistory::list().front() == a.getFullPathName().toStdString());
+            juce::File located;
+            lynx::locateInBrowserHandler() = [&located] (const juce::File& f) { located = f; };
+            auto frame = lynx::makeChannelFrame (engine, 1, 0);
+            frame->setSize (frame->getWidth() > 0 ? frame->getWidth() : 600, frame->getHeight() > 0 ? frame->getHeight() : 820);
+            frame->createComponentSnapshot (frame->getLocalBounds()); // (starts the waveform's analysis)
+            lynx::ui::WaveformCache::getInstance()->waitUntilIdle (8000);
+            shoot (*frame, "sampler-file-row");
+            const auto history = lynx::samplerHistoryMenu (*frame);
+            check ("history_menu", history.has_value() && history->getNumItems() == 4); // (caption + three samples)
+            if (history)
+                saveMenus (juce::StringArray { "Load: Sample history" }, std::vector<juce::PopupMenu> { *history }, prefix + "-sample-history.png");
+            lynx::samplerFileRowPress (*frame, 0); // wheel down: the next (older) sample
+            check ("wheel_down", engine.getSong().channels[1].samplePath == b.getFullPathName().toStdString(), juce::String (engine.getSong().channels[1].samplePath));
+            lynx::samplerFileRowPress (*frame, 1); // wheel up: back
+            check ("wheel_up", engine.getSong().channels[1].samplePath == a.getFullPathName().toStdString());
+            lynx::samplerFileRowPress (*frame, 2);
+            check ("locate", located == a, located.getFullPathName());
+            lynx::samplerFileRowPress (*frame, 3);
+            check ("remove", engine.getSong().channels[1].samplePath.empty());
+            engine.undo();
+            check ("remove_undo", engine.getSong().channels[1].samplePath == a.getFullPathName().toStdString());
+            lynx::locateInBrowserHandler() = nullptr;
+        }
+
+        // ---- a sampler running FL's voice: FL's Envelope / instrument page with the tensions, the predelay and presets
+        {
+            engine.editSong ([] (lynx::Song& s) {
+                auto& ch = s.channels[2];
+                ch.instrument = lynx::InstrumentKind::sampler;
+                ch.name = "FL sampler";
+                const auto snap = lynx::flvp::defaultSnapshot();
+                ch.sampler.flChannel.assign (90, 0);
+                std::memcpy (ch.sampler.flChannel.data(), snap.data(), 85 * 4);
+                std::memcpy (&ch.sampler.flChannel[85], snap.data() + 0x15c, 4);
+                std::memcpy (&ch.sampler.flChannel[86], snap.data() + 0x160, 4);
+                std::memcpy (&ch.sampler.flChannel[87], snap.data() + 0x168, 4);
+                ch.sampler.flChannel[88] = 96;
+                ch.sampler.flChannel[89] = 0;
+                auto& vol = ch.sampler.flChannel; // the volume envelope on, bent
+                vol[17 + 1] = -1;
+                vol[17 + 2] = 4000;   // predelay
+                vol[17 + 14] = -70;   // attack tension
+                vol[17 + 15] = 60;    // decay tension
+                vol[17 + 16] = -40;   // release tension
+            });
+            auto frame = lynx::makeChannelFrame (engine, 2, 1);
+            frame->setSize (frame->getWidth() > 0 ? frame->getWidth() : 600, frame->getHeight() > 0 ? frame->getHeight() : 560);
+            shoot (*frame, "sampler-fl-envelope");
+            check ("fl_page_shown", lynx::flVoicePresetsMenu (*frame).has_value());
+            lynx::flVoicePresetFolder().deleteRecursively();
+            check ("preset_save", lynx::flVoiceSavePreset (*frame, "Bent volume")
+                                      && lynx::flVoicePresetFolder().getChildFile ("Bent volume.CHENV").getSize() == 68);
+            if (const auto menu = lynx::flVoicePresetsMenu (*frame))
+                saveMenus (juce::StringArray { "Channel envelope presets" }, std::vector<juce::PopupMenu> { *menu }, prefix + "-envelope-presets.png");
+            // the preset into the pitch target: its record becomes the saved one
+            lynx::showFlVoiceTarget (*frame, lynx::flvoice::pitch);
+            const auto loaded = lynx::flVoiceLoadPreset (*frame, lynx::flVoicePresetFolder().getChildFile ("Bent volume.CHENV"));
+            const auto& fl = engine.getSong().channels[2].sampler.flChannel;
+            check ("preset_load", loaded && fl.size() == 90 && fl[68 + 2] == 4000 && fl[68 + 14] == -70 && fl[68 + 16] == -40 && fl[88] == 96);
+            engine.undo();
+            check ("preset_load_undo", engine.getSong().channels[2].sampler.flChannel[68 + 14] != -70);
         }
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");

@@ -9355,6 +9355,23 @@ countries: ru by kz
 "In: {0} out: {1}" = "Вход: {0} выход: {1}"
 "Note C0" = "Нота C0"
 
+# --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
+"{0} parameters selected" = "Выбрано параметров: {0}"
+"Last 2 tweaked parameters" = "Последние 2 измененных параметра"
+"No parameter selected" = "Параметр не выбран"
+"Last tweaked parameter" = "Последний измененный параметр"
+"Edit events" = "Редактировать события"
+"Init pattern with these positions" = "Инициализировать паттерн этими положениями"
+"Load sample file... / Sample history" = "Загрузить файл сэмпла... / История сэмплов"
+"Locate sample in browser" = "Найти сэмпл в браузере"
+"Remove sample" = "Убрать сэмпл"
+"Load sample file..." = "Загрузить файл сэмпла..."
+"Sample history" = "История сэмплов"
+"Channel envelope presets" = "Пресеты огибающей канала"
+"Envelope preset name" = "Имя пресета огибающей"
+"Link all parameters..." = "Привязать все параметры..."
+"{0} parameter selected" = "Выбран параметр: {0}"
+
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"
