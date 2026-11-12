@@ -341,7 +341,8 @@ Layout lynxFilter()
     v.push_back (display (8, 8, 384, 110, "fxresponse"));
     v.push_back (section (8, 126, 384, 90, TR_NOOP ("FILTER")));
     v.push_back (tabs (18, 150, 140, 22, "Type", TR_NOOP ("Low-pass|High-pass|Band-pass"), { 0.0f, 0.5f, 1.0f }));
-    v.push_back (label (18, 178, 140, 30, TR_NOOP ("12 dB/oct state-variable filter"), dim));
+    // round 190da: the appended Slope (12 dB/oct = the filter every older project has; 24 dB/oct adds a second stage)
+    v.push_back (tabs (18, 182, 140, 22, "Slope", TR_NOOP ("12 dB/oct|24 dB/oct"), { 0.0f, 1.0f }));
     v.push_back (knob (210, 166, 40, "Cutoff", TR_NOOP ("Cutoff"), 202, showValue | big));
     v.push_back (knob (284, 166, 34, "Reso.", TR_NOOP ("Resonance"), 202, showValue));
     v.push_back (knob (352, 166, 34, "Mix", TR_NOOP ("Mix"), 202, showValue));

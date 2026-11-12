@@ -6810,6 +6810,7 @@ countries: cn sg
 "FILTER" = "滤波器"
 "Low-pass|High-pass|Band-pass" = "低通|高通|带通"
 "12 dB/oct state-variable filter" = "12 dB/倍频程状态变量滤波器"
+"12 dB/oct|24 dB/oct" = "12 dB/oct|24 dB/oct"
 "CHORUS" = "合唱"
 "LEVEL" = "电平"
 "STEREO MATRIX" = "立体声矩阵"

@@ -145,6 +145,7 @@ int filterType (float v) { return std::clamp ((int) (v * 3.0f), 0, 2); } // low-
 constexpr std::array<const char*, 3> filterNames { "Low-pass", "High-pass", "Band-pass" };
 float filterHz (float v) { return logRange (v, 20.0f, 20000.0f); }
 float filterQ (float v) { return logRange (v, 0.5f, 12.0f); }
+bool filterSteep (float v) { return v >= 0.5f; } // round 190da: the appended Slope (0 = 12 dB/oct, the old filter; 1 = 24)
 float distortionDriveDb (float v) { return v * 36.0f; }
 float distortionToneHz (float v) { return logRange (v, 800.0f, 20000.0f); }
 float chorusRateHz (float v) { return logRange (v, 0.05f, 5.0f); }
@@ -829,17 +830,40 @@ public:
         reset();
     }
 
-    void reset() noexcept override { biquad.reset(); }
+    void reset() noexcept override
+    {
+        biquad.reset();
+        second.reset();
+    }
 
     void process (float* l, float* r, int n, const EffectParams& params, double) noexcept override
     {
-        if (params[0] != last[0] || params[1] != last[1] || params[2] != last[2])
+        if (params[0] != last[0] || params[1] != last[1] || params[2] != last[2] || params[4] != last[4])
         {
+            const auto wasSteep = filterSteep (last[4]);
             last = params;
-            biquad.filter (sampleRate, filterType (params[0]), filterHz (params[1]), filterQ (params[2]));
+            const auto q = filterQ (params[2]);
+            biquad.filter (sampleRate, filterType (params[0]), filterHz (params[1]), q);
+            steep = filterSteep (params[4]);
+            if (steep)
+            {
+                second.filter (sampleRate, filterType (params[0]), filterHz (params[1]), filterSecondStageQ (q));
+                if (! wasSteep)
+                    second.reset();
+            }
         }
 
         const auto mix = params[3];
+
+        if (steep)
+        {
+            for (int i = 0; i < n; ++i)
+            {
+                l[i] += (second.process (biquad.process (l[i], 0), 0) - l[i]) * mix;
+                r[i] += (second.process (biquad.process (r[i], 1), 1) - r[i]) * mix;
+            }
+            return;
+        }
 
         for (int i = 0; i < n; ++i)
         {
@@ -850,7 +874,8 @@ public:
 
 private:
     double sampleRate = 44100.0;
-    Biquad biquad;
+    Biquad biquad, second;
+    bool steep = false;
     EffectParams last {};
 };
 
@@ -2667,7 +2692,8 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                  { "Low cut", 0.0f }, { "High cut", 1.0f }, { "Predelay", 0.0f } } };
     static const EffectInfo plugin { "Plugin", {} };
     static const EffectInfo limiter { "Limiter", { { "Ceiling", 0.975f }, { "Gain", 0.0f }, { "Release", 0.5f } } };
-    static const EffectInfo filter { "Filter", { { "Type", 0.0f }, { "Cutoff", 0.75f }, { "Reso.", 0.2f }, { "Mix", 1.0f } } };
+    // round 190da: Slope appended (0 = 12 dB/oct, the filter every older project has)
+    static const EffectInfo filter { "Filter", { { "Type", 0.0f }, { "Cutoff", 0.75f }, { "Reso.", 0.2f }, { "Mix", 1.0f }, { "Slope", 0.0f } } };
     static const EffectInfo distortion { "Distortion", { { "Drive", 0.4f }, { "Tone", 0.7f }, { "Mix", 1.0f }, { "Output", 0.5f } } };
     static const EffectInfo chorus { "Chorus", { { "Rate", 0.45f }, { "Depth", 0.4f }, { "Mix", 0.5f }, { "Feedback", 0.0f } } };
     static const EffectInfo utility { "Utility", { { "Gain", 0.5f }, { "Balance", 0.5f }, { "L -> L", 0.75f }, { "R -> L", 0.5f },
@@ -3597,6 +3623,7 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
                 case 0: return filterNames[(std::size_t) filterType (v)];
                 case 1: std::snprintf (text, sizeof (text), "%.0f Hz", filterHz (v)); break;
                 case 2: std::snprintf (text, sizeof (text), "Q %.2f", filterQ (v)); break;
+                case 4: return filterSteep (v) ? "24 dB/oct" : "12 dB/oct";
                 default: std::snprintf (text, sizeof (text), "%.0f%%", v * 100.0f); break;
             }
             return text;
@@ -4124,6 +4151,12 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
     }
 
     return {};
+}
+
+double filterSecondStageQ (double q) noexcept
+{
+    const auto x = std::clamp ((q - 0.5) / (q + 1.5), 0.0, 0.999);
+    return 0.5 + x / (1.0 + x);
 }
 
 EffectSlot makeEffectSlot (EffectKind kind)

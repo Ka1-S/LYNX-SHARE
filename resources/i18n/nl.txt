@@ -6810,6 +6810,7 @@ countries: nl be
 "FILTER" = "FILTER"
 "Low-pass|High-pass|Band-pass" = "Laagdoorlaat|Hoogdoorlaat|Banddoorlaat"
 "12 dB/oct state-variable filter" = "State-variable-filter 12 dB/oct"
+"12 dB/oct|24 dB/oct" = "12 dB/oct|24 dB/oct"
 "CHORUS" = "CHORUS"
 "LEVEL" = "NIVEAU"
 "STEREO MATRIX" = "STEREOMATRIX"
