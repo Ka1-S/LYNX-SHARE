@@ -67,6 +67,10 @@ Result addAudio (Song& song, int track, const Request& request)
     {
         m.inputChannel = std::max (-1, request.input);
         m.inputStereo = request.inputStereo;
+        // a voice / guitar / bass track records its input alone (FL's answer "Yes" to "switch to External input
+        // only", issue #152): with FL's default Post EQ the take also held whatever else played through the insert
+        if (m.inputChannel >= 0)
+            m.recordSource = RecordSource::externalInput;
     }
     r.track = track;
     r.insert = insert;

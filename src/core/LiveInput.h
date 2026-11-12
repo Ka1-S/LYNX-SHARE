@@ -72,6 +72,17 @@ inline InputSource flInputSource (int flIndex, int deviceChannels)
     return { 0, false, {} };
 }
 
+// Issue #152 ("I pick a physical input on insert X and it records another insert's signal"): FL 2026's inserts record
+// "Post EQ" by default (RecordSource), i.e. everything that reaches the insert, not only the input. When an external
+// input is chosen on an insert that records anything else than "External input only", FL asks: "You've selected an
+// external input. Do you want to switch to External input only to avoid recording internal audio on this track?"
+// (FLEngine_x64.dll, FL Studio 2026: "External input|You've selected an external input. Do you want to switch to
+// |External input only| to avoid recording internal audio on this track?"). The Master has no record arm.
+inline bool asksExternalInputOnly (int track, int channel, RecordSource source) noexcept
+{
+    return track > 0 && channel >= 0 && source != RecordSource::externalInput;
+}
+
 // Whether an insert hears its external input now.
 inline bool inputMonitored (InputMonitor mode, bool armed, bool playing, bool recording) noexcept
 {

@@ -9533,3 +9533,5 @@ countries: br
 "Spare state" = "Estado reserva"
 "Store in spare state" = "Guardar no estado reserva"
 "Flip with spare state" = "Trocar com o estado reserva"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Você escolheu uma entrada externa. Quer mudar para \"Só a entrada externa\" para não gravar o áudio interno nesta faixa?"
+"The input of a mixer track can't be changed while recording." = "A entrada de uma faixa do mixer não pode ser trocada durante a gravação."

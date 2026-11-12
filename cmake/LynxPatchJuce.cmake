@@ -123,6 +123,13 @@
 #    now gets no position there (it stays where it is). (b) setBounds added the parent's screen position to such a
 #    child's place and then read the result back as the component's bounds; a child window is now placed like any
 #    other child, in its parent's client area. Top-level windows are untouched.
+# 24. Every platform, juce_audio_processors/format_types/juce_VST3PluginFormat.cpp (issue #152, "Arturia: the sound
+#    follows my controller, the plugin's knobs don't"): a VST3 plugin takes MIDI CCs through IMidiMapping, which JUCE's
+#    host turns into parameter changes for the PROCESSOR only. The VST3 SDK leaves the rest to the host: the edit
+#    controller (the plugin's own window) never heard of the change and the host's parameter value (LYNX's knobs,
+#    links, automation recording) stayed stale. The mapped change now also goes to the edit controller (JUCE's
+#    parameter dispatcher, on the message thread) and to the host's value and listeners, as JUCE already does for a
+#    plugin's own output parameter changes.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -285,6 +292,12 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("VST3 menu item by index" "LYNX patch (round 190an): getItem takes an index"
             "        tresult PLUGIN_API getItem (Steinberg::int32 tag, Item& result, IContextMenuTarget** target) override|NL|        {|NL|"
             "        tresult PLUGIN_API getItem (Steinberg::int32 tag, Item& result, IContextMenuTarget** target) override|NL|        {|NL|            // LYNX patch (round 190an): getItem takes an index (the SDK's IContextMenu::getItem (index, item, target)):|NL|            // a plugin that copies the host's items into its own menu walks 0 .. getItemCount() - 1. JUCE only|NL|            // compared tags, so such a plugin found nothing (or the wrong item).|NL|            if (isPositiveAndBelow ((int) tag, items.size()))|NL|            {|NL|                auto& indexed = items.getReference ((int) tag);|NL|                result = indexed.item;|NL||NL|                if (target != nullptr)|NL|                    *target = indexed.target.get();|NL||NL|                return kResultTrue;|NL|            }|NL||NL|")
+        lynx_juce_fix("VST3 MIDI-mapped parameter follows in the editor" "LYNX patch (issue #152): a MIDI CC the plugin maps"
+            "        void setValueWithoutUpdatingProcessor (float newValue)|NL|        {"
+            "        // LYNX patch (issue #152): a MIDI CC the plugin maps to this parameter (IMidiMapping) already reached the|NL|        // processor as a parameter change; the edit controller (the plugin's own window) and the host's value follow it|NL|        void lynxFollowMidiMapping (float newValue)|NL|        {|NL|            pluginInstance.parameterDispatcher.push (vstParamIndex, newValue);|NL|            setValueWithoutUpdatingProcessor (newValue);|NL|        }|NL||NL|        void setValueWithoutUpdatingProcessor (float newValue)|NL|        {")
+        lynx_juce_fix("VST3 MIDI-mapped parameter reaches the editor" "LYNX patch (issue #152): the editor and the host follow"
+            "                    queue->append ({ (Steinberg::int32) time, (float) paramValue });|NL|"
+            "                    queue->append ({ (Steinberg::int32) time, (float) paramValue });|NL||NL|                // LYNX patch (issue #152): the editor and the host follow the mapped change (the SDK leaves it to the|NL|                // host: the plugin's knob stayed still while its sound changed, e.g. Arturia's MIDI-learned controls)|NL|                if (auto* lynxParam = getParameterForID ((Vst::ParamID) controlID))|NL|                    lynxParam->lynxFollowMidiMapping ((float) paramValue);|NL|")
     elseif(file MATCHES "juce_Windowing_windows.cpp$")
         lynx_juce_fix("layered child window keeps its place when repainted" "LYNX patch (round 190cj): a child window's position"
             "        UpdateLayeredWindow (hwnd, nullptr, &pos, &size, sourceHdc, &p, 0, &bf, ULW_ALPHA);"

@@ -9416,3 +9416,5 @@ countries: kr
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "클릭하면 이 플러그인을 트랙에 불러와 들려줍니다 (Ctrl+Z로 되돌리기)"
 "Add \"{0}\" to favourites" = "\"{0}\"을(를) 즐겨찾기에 추가"
 "Remove \"{0}\" from favourites" = "\"{0}\"을(를) 즐겨찾기에서 제거"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "외부 입력을 선택했습니다. 이 트랙에서 내부 오디오가 녹음되지 않도록 \"외부 입력만\"으로 전환할까요?"
+"The input of a mixer track can't be changed while recording." = "녹음 중에는 믹서 트랙의 입력을 바꿀 수 없습니다."
