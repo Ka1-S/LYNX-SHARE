@@ -17,6 +17,7 @@
 namespace lynx
 {
 class AudioEngine;
+class FirstSongTour;
 class SimpleDock;
 
 class SimpleWorkflow
@@ -52,6 +53,10 @@ public:
         std::function<void (bool)> setFoldToKey;
         std::function<bool()> foldedToKey;
         std::function<void()> openPianoRollPanel;
+        // round 190dv: the Welcome screen and the first-song tour (ui/FirstSongTour.h)
+        std::function<juce::Component*()> window;          // the main window's content (the tour's ring and card)
+        std::function<void (std::function<void()> then)> newProjectForTour; // Help › tour on a project with work: a new one?
+        bool offerWelcome = false;                         // the Welcome screen opens by itself the first time (not in --snapshot routes)
     };
 
     SimpleWorkflow (AudioEngine& engine, Host host);
@@ -104,6 +109,16 @@ public:
     static inline int answerForSnapshot = -1;
     juce::String lastKeyQuestionForCheck() const { return lastKeyQuestion; }
 
+    // round 190dv: the Welcome screen (Help › Welcome screen; by itself the first time on an empty project) and the
+    // first-song tour (Help › First-song tour: continues a paused tour, else starts one)
+    void showWelcome();
+    void startOrContinueTour();
+    bool tourCanContinue() const;
+    bool tourRunning() const;
+    int tourStep() const;
+    FirstSongTour* tourForSnapshot() noexcept { return tour.get(); }
+    void doTourStep (int step); // the tour's "Do it for me", with the code the controls run
+
     // --simpleshot: the chooser's two pages, as drawn
     juce::Component* chooserForSnapshot();
     void showStarterPageForSnapshot();
@@ -137,6 +152,7 @@ private:
     std::unique_ptr<juce::Component> addButton, finishButton, titleTools;
     std::unique_ptr<juce::Component> finishDock;
     std::unique_ptr<SimpleDock> dock;
+    std::unique_ptr<FirstSongTour> tour; // round 190dv
     int dockTrack = -1;
     int lastAddedTrack = -1;
     juce::String lastKeyQuestion;

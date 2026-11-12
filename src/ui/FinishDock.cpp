@@ -210,6 +210,7 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
     : engine (e), onClose (std::move (close)), saving (std::move (s)), measuring (std::make_shared<std::atomic<int>> (0)),
       measuredLufs (std::make_shared<std::atomic<float>> (0.0f))
 {
+    setComponentID ("simple.finishDock"); // (round 190dv: the first-song tour keeps its card off it)
     setTitle (tr ("Master looks"));
     title.setText (tr ("Master looks"), juce::dontSendNotification);
     title.setFont (theme::font (theme::type::title, true));
@@ -242,6 +243,8 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
         tiles[i] = std::make_unique<LookTile> (i + 1);
         tiles[i]->onClick = [this, id = i + 1] { choose (id); };
         addAndMakeVisible (*tiles[i]);
+        if (i == 0)
+            tiles[i]->setComponentID ("simple.finish.looks"); // (round 190dv: the first-song tour's ring)
     }
 
     intensityLabel.setText (tr ("Intensity"), juce::dontSendNotification);

@@ -35,6 +35,8 @@
 #include "core/MasterLooks.h"
 #include "core/Harmor.h"
 #include "flp/Flp.h"
+#include "core/DemoSongs.h"
+#include "core/FirstSongTour.h"
 #include "core/ShowcaseSong.h"
 #include "core/SynthPresets.h"
 #include "core/FlWrapper.h"
@@ -150,6 +152,7 @@
 #include "ui/LyricsPanel.h"
 #include "ui/ReferenceMatchPanel.h"
 #include "ui/StartFromPanel.h"
+#include "ui/FirstSongTour.h"
 #include "ui/PluginsOffPanel.h"
 #include "ui/MissingFilesDialog.h"
 #include "ui/SettingsDialog.h"
@@ -598,6 +601,15 @@ public:
             // LYNX's own demo project (README screenshots): --showcase output.lynx [pattern]
             const auto i = args.indexOf ("--showcase");
             runShowcase (args[i + 1].unquoted(), args[i + 2].getIntValue());
+            return;
+        }
+
+        if (args.contains ("--demosongs"))
+        {
+            // round 190dv: LYNX's two short genre demos (core/DemoSongs.h) as .lynx files: --demosongs <folder>
+            // (resources/demos/ in the repository)
+            const auto i = args.indexOf ("--demosongs");
+            runDemoSongs (args[i + 1].unquoted());
             return;
         }
 
@@ -1896,6 +1908,18 @@ public:
             const auto i = args.indexOf ("--gridshot");
             const auto project = i + 2 < args.size() && ! args[i + 2].startsWith ("--") ? args[i + 2].unquoted() : juce::String();
             runGridShot (args[i + 1].unquoted(), project);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--tour190dvshot"))
+        {
+            // LYNX.exe --tour190dvshot prefix: round 190dv off-screen — the Simple workflow's Welcome screen, every step of
+            // the first-song tour done with its "Do it for me" (a loop dropped for the loop step), the end card, Back /
+            // Next / close, the Help menu, the chooser's tour button, Start from with the three demo songs, a demo
+            // opened in Simple — and a text report of the checks (incl. resources/demos/*.lynx = the generated songs)
+            const auto i = args.indexOf ("--tour190dvshot");
+            runTour190dvShot (args[i + 1].unquoted());
             quit();
             return;
         }
@@ -7420,6 +7444,20 @@ private:
 
         report << "result=" << (ok ? "OK" : "FAILED") << "\n";
         juce::File (reportPath).replaceWithText (report);
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
+    void runDemoSongs (const juce::String& folderPath)
+    {
+        const juce::File folder (folderPath);
+        folder.createDirectory();
+        bool ok = true;
+        for (int d = 1; d < lynx::demos::count; ++d)
+        {
+            juce::String error;
+            ok = lynx::ProjectFile::save (lynx::demos::make (d), folder.getChildFile (lynx::demos::fileName (d)), error) && ok;
+        }
         setApplicationReturnValue (ok ? 0 : 1);
         quit();
     }
@@ -15385,6 +15423,259 @@ private:
         simple->cycleDockTab();
         check ("Shift+Tab goes to the Instrument tab", dock->getTab() == lynx::SimpleDock::Tab::instrument);
         line ("Simple workflow objects: " + juce::String (madeBefore) + " before, " + juce::String (lynx::SimpleWorkflow::instances.load()) + " after");
+        line (report.contains ("ERROR ") ? "RESULT ERROR" : "RESULT OK");
+        juce::File (prefix + "-report.txt").replaceWithText (report);
+    }
+
+    void runTour190dvShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        ui.setVisible (true); // (no window: the docked editor and the ring's targets only need their parents visible)
+        const auto writeImage = [&prefix] (const juce::Image& image, const juce::String& name) {
+            const auto file = juce::File (prefix + "-" + name + ".png");
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        juce::String report;
+        // (written as it goes: a run that stops halfway still leaves its checks)
+        const auto line = [&report, &prefix] (const juce::String& text) {
+            report << text << "\n";
+            juce::File (prefix + "-report.txt").replaceWithText (report);
+        };
+        const auto check = [&line] (const juce::String& what, bool ok) { line ((ok ? "OK    " : "ERROR ") + what); };
+
+        ui.selectTabForSnapshot (2);
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        offline.dispatchPendingMessages();
+        auto* simple = ui.getSimpleWorkflowForSnapshot();
+        auto* tour = simple != nullptr ? simple->tourForSnapshot() : nullptr;
+        if (tour == nullptr)
+        {
+            juce::File (prefix + "-report.txt").replaceWithText ("ERROR no Simple workflow / tour\n");
+            return;
+        }
+        check ("no Welcome screen by itself in a --snapshot route (not a real first start)", ! tour->isWelcomeShowing());
+        const auto settle = [&] {
+            for (int k = 0; k < 3; ++k)
+                offline.dispatchPendingMessages();
+        };
+        const auto window = [&] (const juce::String& name, bool twoX = false) {
+            settle();
+            tour->ringForSnapshot(); // (the ring follows the layout: resolved now, as its timer would)
+            writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), name);
+            if (twoX)
+                if (auto* card = tour->cardForSnapshot(); card != nullptr && card->getParentComponent() != nullptr)
+                    writeImage (card->createComponentSnapshot (card->getLocalBounds(), true, 2.0f), name + "-card@2x");
+        };
+        const auto stepIs = [&] (int step, const juce::String& target) {
+            settle();
+            const auto ring = tour->ringForSnapshot();
+            const auto id = tour->targetIdForSnapshot();
+            line ("step " + juce::String (tour->step() + 1) + " (" + lynx::tour::stepId (tour->step()) + "): ring on " + (id.isEmpty() ? juce::String ("-") : id) + " "
+                  + ring.toString());
+            check (juce::String ("the card shows step ") + lynx::tour::stepId (step), tour->isRunning() && tour->step() == step);
+            if (target.isNotEmpty())
+                check ("the ring is on " + target, id == target && ! ring.isEmpty());
+        };
+
+        // --- the Welcome screen (on a new, empty project: the built-in "Empty" template, as File › New can give) -------------
+        const auto emptyProject = [] {
+            const auto index = lynx::builtInTemplateIndex ("Empty");
+            return index >= 0 ? lynx::makeNewProject (index) : lynx::makeNewProject();
+        };
+        offline.setSong (emptyProject());
+        settle();
+        check ("the new project is empty for the Simple workflow (it opens on the chooser)", lynx::simpletracks::isEmptySong (offline.getSong()));
+        simple->showWelcome();
+        settle();
+        check ("Help › Welcome screen shows it", tour->isWelcomeShowing());
+        window ("welcome");
+        if (auto* w = tour->welcomeForSnapshot())
+            writeImage (w->createComponentSnapshot (w->getLocalBounds(), true, 2.0f), "welcome@2x");
+        tour->clickForSnapshot ("welcome.tour");
+        settle();
+        check ("Make my first song: the Welcome screen closes, the tour starts, the chooser comes up for the beat",
+               ! tour->isWelcomeShowing() && tour->isRunning() && simple->isChooserShowing());
+
+        // --- step 1: the beat ---------------------------------------------------------------------------------------------
+        stepIs (lynx::tour::beat, "simple.tile.drums");
+        window ("step1-beat", true);
+        simple->showStarterPageForSnapshot();
+        stepIs (lynx::tour::beat, "simple.starters");
+        window ("step1-beat-starters");
+        tour->clickForSnapshot ("do");
+        settle();
+        check ("Do it for me added a starter beat", lynx::tour::hasBeat (offline.getSong()));
+
+        // --- step 2: the key ----------------------------------------------------------------------------------------------
+        stepIs (lynx::tour::key, "toolbar.key");
+        window ("step2-key", true);
+        tour->clickForSnapshot ("do");
+        settle();
+        check ("Do it for me set A minor", lynx::projectkey::get (offline.getSong()).has_value());
+
+        // --- step 3: an instrument (Add track opens the chooser: the ring moves to its tile) ------------------------------
+        stepIs (lynx::tour::instrument, "simple.addTrack");
+        window ("step3-instrument", true);
+        simple->showChooser();
+        stepIs (lynx::tour::instrument, "simple.tile.instrument");
+        window ("step3-instrument-chooser");
+        tour->clickForSnapshot ("do");
+        settle();
+        check ("Do it for me added an Instrument track (the chooser closed)", lynx::tour::firstInstrumentTrack (offline.getSong()) >= 0 && ! simple->isChooserShowing());
+
+        // --- step 4: chords -----------------------------------------------------------------------------------------------
+        stepIs (lynx::tour::chords, "keyboard.chordPad");
+        window ("step4-chords", true);
+        tour->clickForSnapshot ("do");
+        settle();
+        check ("Do it for me wrote four chords (12 notes) on the instrument's pattern", [&] {
+            const auto& song = offline.getSong();
+            const auto p = lynx::simpletracks::patternOf (song, lynx::tour::firstInstrumentTrack (song));
+            return p >= 0 && song.patterns[(std::size_t) p].notes.size() == 12;
+        }());
+
+        // --- step 5: a voice or a loop (no "Do it for me": a loop is dropped as a user would) ------------------------------
+        stepIs (lynx::tour::loop, "simple.addTrack");
+        window ("step5-loop", true);
+        {
+            const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-190dv-loops");
+            dir.deleteRecursively();
+            dir.createDirectory();
+            const auto wav = dir.getChildFile ("Warm Keys 120 Am.wav");
+            const int frames = 192000;
+            juce::AudioBuffer<float> audio (1, frames);
+            for (int i = 0; i < frames; ++i)
+            {
+                const auto t = (double) i / 48000.0;
+                double v = 0.0;
+                for (const auto key : { 57, 60, 64 })
+                    v += std::sin (2.0 * juce::MathConstants<double>::pi * 440.0 * std::pow (2.0, (key - 69) / 12.0) * t);
+                audio.setSample (0, i, (float) (0.1 * v * (1.0 - std::exp (-std::fmod (t, 0.5) * 60.0))));
+            }
+            {
+                juce::WavAudioFormat format;
+                std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+                if (auto* w = format.createWriterFor (out.get(), 48000.0, 1, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                    writer->writeFromAudioSampleBuffer (audio, 0, frames);
+                }
+            }
+            simple->dropFiles ({ wav.getFullPathName() }, 0);
+            settle();
+            check ("a dropped loop (A minor in its name) follows the key", [&] {
+                for (const auto& c : offline.getSong().playlist)
+                    if (c.kind == lynx::ClipKind::audio)
+                        return c.followKey;
+                return false;
+            }());
+        }
+
+        // --- step 6: a one-knob effect --------------------------------------------------------------------------------------
+        stepIs (lynx::tour::effect, "simple.dock.addEffect");
+        window ("step6-effect", true);
+        tour->clickForSnapshot ("do");
+        settle();
+        check ("Do it for me put Room on the instrument track", lynx::tour::hasOneKnob (offline.getSong()));
+
+        // --- step 7: Finish -----------------------------------------------------------------------------------------------
+        stepIs (lynx::tour::finish, "simple.finish");
+        window ("step7-finish", true);
+        tour->clickForSnapshot ("do");
+        settle();
+        check ("Do it for me opened Finish and chose Balanced", simple->isFinishShowing() && lynx::looks::present (offline.getSong()));
+
+        // --- the end card, Back / Next, close -------------------------------------------------------------------------------
+        settle();
+        check ("the end card", tour->isRunning() && tour->step() == lynx::tour::stepCount);
+        window ("end", true);
+        tour->clickForSnapshot ("back");
+        settle();
+        check ("Back: the Finish step again, shown done (the tour waits for Next)", tour->step() == lynx::tour::finish
+                                                                                   && tour->machineForCheck().shownDone (offline.getSong()));
+        window ("back-done", true);
+        tour->clickForSnapshot ("next");
+        settle();
+        check ("Next: the end card again", tour->step() == lynx::tour::stepCount);
+        check ("all seven steps done by the song", tour->machineForCheck().state().completed == 0x7fu);
+        tour->clickForSnapshot ("close");
+        settle();
+        check ("closing the end card ends the tour (not continued from Help)", ! tour->isRunning() && ! tour->canContinue()
+                                                                                && tour->machineForCheck().state().done);
+
+        line ("-- paused tour");
+        // --- a paused tour, the Help menu and the chooser's button ---------------------------------------------------------
+        offline.setSong (emptyProject());
+        settle();
+        tour->machineForCheck() = lynx::tour::Machine {};
+        simple->startOrContinueTour();
+        settle();
+        line ("-- do beat");
+        simple->doTourStep (lynx::tour::beat);
+        settle();
+        check ("a new tour on an empty project: the beat done moves it to the key", tour->step() == lynx::tour::key);
+        tour->clickForSnapshot ("close");
+        settle();
+        check ("closing the card pauses the tour (Help continues it)", ! tour->isRunning() && tour->canContinue());
+        line ("-- help menu");
+        {
+            const auto help = ui.getMenuForSnapshot (ui.getMenuNamesForSnapshot().indexOf (lynx::tr ("Help")));
+            bool continueItem = false, welcomeItem = false;
+            for (juce::PopupMenu::MenuItemIterator it (help); it.next();)
+            {
+                continueItem = continueItem || it.getItem().text.startsWith (lynx::tr ("Continue the first-song tour (step {0} of {1})", { "2", "7" }));
+                welcomeItem = welcomeItem || it.getItem().text == lynx::tr ("Welcome screen...");
+            }
+            check ("Help: Continue the first-song tour (step 2 of 7) and Welcome screen...", continueItem && welcomeItem);
+            saveMenus ({ lynx::tr ("Help") }, { help }, prefix + "-menu-help.png");
+        }
+        simple->startOrContinueTour();
+        settle();
+        check ("Help › Continue: back on the key step", tour->isRunning() && tour->step() == lynx::tour::key);
+        tour->clickForSnapshot ("skip");
+        settle();
+        check ("Skip tour ends it", ! tour->isRunning() && ! tour->canContinue());
+        offline.setSong (emptyProject());
+        settle();
+        simple->showChooser();
+        window ("chooser");
+
+        line ("-- start from");
+        // --- Start from: the three demo songs; a demo opened in Simple -------------------------------------------------------
+        if (auto* start = simple->startFromForSnapshot())
+        {
+            settle();
+            writeImage (start->createComponentSnapshot (start->getLocalBounds(), true, 1.0f), "startfrom");
+            const auto list = lynx::startfrom::entries();
+            int demos = 0;
+            for (const auto& e : list)
+                demos += e.kind == lynx::startfrom::Entry::Kind::demo && e.playable ? 1 : 0;
+            check ("Start from lists three playable demo songs first", demos == 3 && list.size() >= 3 && list[1].demo == 1 && list[2].demo == 2);
+            for (int d = 1; d < 3 && d < (int) list.size(); ++d)
+                line ("demo " + list[(std::size_t) d].name + ": " + juce::String (list[(std::size_t) d].bpm) + " BPM, " + juce::String (list[(std::size_t) d].bars) + " bars");
+            simple->hideStartFrom();
+        }
+        line ("-- demos");
+        for (int d = 1; d < lynx::demos::count; ++d)
+        {
+            offline.setSong (lynx::demos::make (d));
+            settle();
+            simple->hideChooser();
+            window (juce::String ("demo-") + (d == 1 ? "hiphop" : "pop"));
+            // the committed file is the generated song
+            const auto file = juce::File::getCurrentWorkingDirectory().getChildFile ("resources/demos").getChildFile (lynx::demos::fileName (d));
+            juce::String error;
+            const auto loaded = lynx::ProjectFile::load (file, error);
+            check ("resources/demos/" + juce::String (lynx::demos::fileName (d)) + " loads and is the generated song",
+                   loaded.has_value() && lynx::ProjectFile::toJson (*loaded, false) == lynx::ProjectFile::toJson (lynx::demos::make (d), false));
+        }
         line (report.contains ("ERROR ") ? "RESULT ERROR" : "RESULT OK");
         juce::File (prefix + "-report.txt").replaceWithText (report);
     }
