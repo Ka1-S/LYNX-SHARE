@@ -531,7 +531,10 @@ void applyFlStretchPanel (SamplerSettings& s, int mode, int pitchCents, int mul,
     }
 
     if (timeTicks <= 0.0f && mul != 0 && sampleSeconds > 0.0 && bpm > 0.0)
+    {
         s.stretchBeats = std::clamp ((float) (sampleSeconds * std::pow (2.0, mul / 10000.0) * bpm / 60.0), 0.0f, 4096.0f);
+        s.stretchMul = std::clamp (mul, -20000, 20000); // (round 190dh: the page shows TIME = the sample's beats, and MUL)
+    }
 }
 
 ChannelDef drumPadChannel (const ChannelDef& original, const DrumPad& pad, int channel)
@@ -2173,17 +2176,28 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             p.clip = (c.fxFlags & 4) != 0;
             def.sampler.useLoopPoints = c.useLoopPoints();
             def.sampler.declickMode = std::clamp (c.declickMode, 0, 5);
+            // round 190dh: the Content options (0x8F; kept for the way back) and the loop points of FL's loop knobs (0xFB)
+            if (c.sampleFlags >= 0)
+            {
+                def.sampler.keepOnDisk = (c.sampleFlags & 0x100) != 0;
+                def.sampler.resampleOnLoad = (c.sampleFlags & 1) != 0;
+                def.sampler.loadRegions = (c.sampleFlags & 2) != 0;
+                def.sampler.loadSliceMarkers = (c.sampleFlags & 4) != 0;
+            }
+            def.sampler.loopStart = c.loopStart;
+            def.sampler.loopEnd = c.loopEnd;
         }
 
         // time-stretch: the sample lasts TIME/192 beats × MUL
         if (c.stretchTime > 0.0f)
         {
             def.sampler.stretchBeats = (float) (c.stretchTime / 192.0 * std::pow (2.0, c.stretchMul / 10000.0));
+            def.sampler.stretchMul = std::clamp (c.stretchMul, -20000, 20000); // (the page's MUL; round 190dh)
             def.sampler.keepPitch = c.stretchMode != 0; // only FL's "Resample" changes the pitch
             def.sampler.stretchMethod = stretchMethodForFlMode (c.stretchMode);
             // Fruity Granulizer: FL hands the plugin TIME as its beat count, without MUL (REA_rodada165g-flgran165 §3)
             if (def.instrument == InstrumentKind::granulizer)
-                def.sampler.stretchBeats = (float) (c.stretchTime / 192.0);
+                def.sampler.stretchBeats = (float) (c.stretchTime / 192.0), def.sampler.stretchMul = 0;
         }
 
         // FL's time-stretching panel on a sample channel or an audio clip [FL: measured, REA_rodada164e-clippitch §2]:

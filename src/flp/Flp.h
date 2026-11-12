@@ -193,6 +193,11 @@ struct Channel
     int declickMode = 0, crossfade = 0, trim = 0;
     int sampleFlags = -1;
     bool loopPointsOld = false, pingPong = false;
+    // 0xFB (round 190dh): the sampler's loop record, saved by FL only when its loop START / END knobs moved the loop
+    // (FUN_01006f00 / FUN_01006d20): i32 version 2, i64 loop start, i64 loop end (frames, inclusive; −1 / INT64_MAX =
+    // none), 21 bytes FL keeps unset (double −1, i32 −1, u8 0, i32 / i32 INT32_MAX in FL's own files), u8 use loop points,
+    // u8 0. −1 here: no record.
+    std::int64_t loopStart = -1, loopEnd = -1;
     // the legacy precomputed effects (REA round 167l §1): 0x4A boost, 0x45 EQ ("FX"), 0x83 ring mod mix | freq << 16,
     // 0x55 stereo delay, 0x47 / 0x53 low-pass cutoff / resonance, 0x8B reverb | type << 16, 0x56 pogo ("FX3"); FL's
     // defaults when absent

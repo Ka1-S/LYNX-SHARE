@@ -2,6 +2,7 @@
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
 #include "core/Fpc.h"
+#include "core/SamplerPage.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1107,18 +1108,20 @@ struct Converter
         c.reverbType = p.reverbType;
         c.pogo = p.pogo;
         c.declickMode = s.declickMode;
-        c.sampleFlags = 2 | (s.useLoopPoints ? 8 : 0);
+        c.sampleFlags = samplerpage::contentFlags (s); // (round 190dh: FL's Content options and Use loop points)
+        if (s.hasLoopOverride())
+            c.loopStart = s.loopStart, c.loopEnd = s.loopEnd;
         // the region: FL's end is a fraction of what follows the start (REA_rodada167h §2)
         const auto start = std::clamp ((double) s.regionStart, 0.0, 1.0);
         const auto end = std::clamp ((double) s.regionEnd, start, 1.0);
         c.sampleStart = start;
         c.sampleEnd = start < 1.0 ? (end - start) / (1.0 - start) : 1.0;
         c.startOffset = std::clamp ((double) s.startOffset, 0.0, 1.0);
-        // the time-stretch: the whole sample lasts TIME/192 beats (MUL 0)
+        // the time-stretch: the whole sample lasts TIME/192 beats × MUL's factor (round 190dh: MUL kept, TIME without it)
         if (s.stretchBeats > 0.0f)
         {
-            c.stretchTime = s.stretchBeats * 192.0f;
-            c.stretchMul = 0;
+            c.stretchTime = samplerpage::stretchTime (s) * 192.0f;
+            c.stretchMul = std::clamp (s.stretchMul, -20000, 20000);
         }
         c.stretchMode = flStretchMode (s);
         if (s.cut && c.cutGroup == 0 && c.cutBy == 0)

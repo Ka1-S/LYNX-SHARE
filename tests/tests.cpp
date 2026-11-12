@@ -17523,3 +17523,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Link190csTests.inc"
 #include "TrackLinkTests.inc"
 #include "FlCtl190dfTests.inc"
+#include "Sampler190dhTests.inc"

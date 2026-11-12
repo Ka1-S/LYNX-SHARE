@@ -465,6 +465,18 @@ struct SamplerSettings
     // FL's "Declicking mode" (.flp 0xD7 byte 0x53, REA_rodada167h §3): 0 out only, 1 transient (no bleeding),
     // 2 transient, 3 generic, 4 smooth, 5 crossfade — how fast a cut voice fades out (10 / 10 / 20 / 20 / 100 / 200 ms)
     int declickMode = 0;
+    // Round 190dh, FL's Sampler page:
+    // Time stretching › MUL (FL's StretchMulWheel, -20000…20000, a factor 2^(v/10000)). stretchBeats stays the length the
+    // sample plays (TIME × the factor, as the .flp import computes it); the page shows TIME = stretchBeats / factor.
+    int stretchMul = 0;
+    // Playback › loop START / END (FL's LoopStartWheel / LoopEndWheel, REA round 190dh: frames of the sample, inclusive,
+    // kept in FL's .flp event 0xFB). -1: the file's own loop (WAV smpl). Played only with "Use loop points".
+    std::int64_t loopStart = -1, loopEnd = -1;
+    bool hasLoopOverride() const noexcept { return loopStart >= 0 && loopEnd >= loopStart; }
+    // Content (FL's .flp 0x8F bits 8 / 0 / 1 / 2): FL's load options of the sample, kept for FL projects. LYNX keeps
+    // every sample in memory (it streams files over 30 s from its disk cache by itself), resamples in real time, and its
+    // sampler does not play the file's regions or ACID markers itself, so they change nothing audible in LYNX.
+    bool keepOnDisk = false, resampleOnLoad = false, loadRegions = true, loadSliceMarkers = false;
 
     bool operator== (const SamplerSettings&) const = default;
 };

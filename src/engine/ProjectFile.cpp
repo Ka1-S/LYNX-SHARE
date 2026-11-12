@@ -1965,6 +1965,22 @@ juce::var channelToVar (const ChannelDef& c)
             sampler->setProperty ("flVelocityLaw", true);
         if (c.sampler.declickMode != 0)
             sampler->setProperty ("declickMode", c.sampler.declickMode);
+        // round 190dh (FL's Sampler page): MUL, the loop knobs' points and the Content options, each only when set
+        if (c.sampler.stretchMul != 0)
+            sampler->setProperty ("stretchMul", c.sampler.stretchMul);
+        if (c.sampler.hasLoopOverride())
+        {
+            sampler->setProperty ("loopStart", (juce::int64) c.sampler.loopStart);
+            sampler->setProperty ("loopEnd", (juce::int64) c.sampler.loopEnd);
+        }
+        if (c.sampler.keepOnDisk)
+            sampler->setProperty ("keepOnDisk", true);
+        if (c.sampler.resampleOnLoad)
+            sampler->setProperty ("resample", true);
+        if (! c.sampler.loadRegions)
+            sampler->setProperty ("loadRegions", false);
+        if (c.sampler.loadSliceMarkers)
+            sampler->setProperty ("loadSliceMarkers", true);
         if (! c.sampler.flVolumeEnvelope.empty())
         {
             juce::Array<juce::var> env;
@@ -2308,6 +2324,17 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.sampler.useLoopPoints = (bool) s.getProperty ("useLoopPoints", true);
         def.sampler.flVelocityLaw = (bool) s.getProperty ("flVelocityLaw", false);
         def.sampler.declickMode = juce::jlimit (0, 5, (int) s.getProperty ("declickMode", 0));
+        def.sampler.stretchMul = juce::jlimit (-20000, 20000, (int) s.getProperty ("stretchMul", 0));
+        if (s.hasProperty ("loopStart") && s.hasProperty ("loopEnd"))
+        {
+            const auto a = (juce::int64) s.getProperty ("loopStart", -1), b = (juce::int64) s.getProperty ("loopEnd", -1);
+            if (a >= 0 && b >= a)
+                def.sampler.loopStart = a, def.sampler.loopEnd = b;
+        }
+        def.sampler.keepOnDisk = (bool) s.getProperty ("keepOnDisk", false);
+        def.sampler.resampleOnLoad = (bool) s.getProperty ("resample", false);
+        def.sampler.loadRegions = (bool) s.getProperty ("loadRegions", true);
+        def.sampler.loadSliceMarkers = (bool) s.getProperty ("loadSliceMarkers", false);
 
         if (auto* env = s["flVolumeEnvelope"].getArray(); env != nullptr && env->size() == 18)
             for (const auto& v : *env)

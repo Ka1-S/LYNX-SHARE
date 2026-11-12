@@ -19,6 +19,12 @@ std::function<void (const juce::File&)>& locateInBrowserHandler();
 // 2 Locate sample in browser, 3 Remove sample. False: no sampler page.
 std::optional<juce::PopupMenu> samplerHistoryMenu (juce::Component& root);
 bool samplerFileRowPress (juce::Component& root, int button);
+// The sampler page inside `root` (round 190dh; the shot route): turns a control as a user would ("pitch", "mul", "time",
+// "loopStart", "loopEnd", "crossfade", "smpStart", "length", "useLoops", "pingPong", "keepOnDisk", "mode", "declick",
+// "legacy", "zoom"; `shift`: Shift held), and reads what the page shows ("legacy", "keepOnDisk", "loopStart", "mode",
+// "scroll"). False / empty: no sampler page.
+bool samplerPageTurn (juce::Component& root, const juce::String& what, double value, bool shift = false);
+juce::String samplerPageQuery (juce::Component& root, const juce::String& what);
 void closeChannelSettings();
 // FL's View › Align all channel editors (Shift+F12): every open channel editor moves to the focused one's place (else the
 // selected channel's), and channel editors opened later come up there too (round 169k).
