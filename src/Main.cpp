@@ -3877,6 +3877,10 @@ private:
         const auto versionsResult = lynx::versionsSelfTest();
         // round 190ap: a project opened with its plugins off creates none of them and saves their settings unchanged
         const auto pluginsOffResult = lynx::pluginsOffSelfTest();
+        // round 190cj: a dancer's own native window stays where the stage put it (it drifted off the screen: JUCE
+        // moved a transparent child window by the main window's client offset on every repaint)
+        juce::String danceWindowDetail;
+        const auto danceWindowResult = lynx::danceWindowSelfTest (&danceWindowDetail);
 
         // round 177b: automation lanes come back from a project (track, automation, height, folded)
         juce::String lanesResult = "OK";
@@ -3941,7 +3945,8 @@ private:
         const auto ok = mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK";
+                        && sidechainResult == "OK" && lanesResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
+                        && danceWindowResult == "OK";
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -3985,6 +3990,8 @@ private:
                << "plugin_sidechain=" << sidechainResult << "\n"
                << "versions_panel=" << versionsResult << "\n"
                << "plugins_off=" << pluginsOffResult << "\n"
+               << "dance_window=" << danceWindowResult << "\n"
+               << "dance_window_detail=" << danceWindowDetail << "\n"
                << "lanes_saved=" << lanesResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";

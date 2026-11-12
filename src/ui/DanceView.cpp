@@ -513,6 +513,7 @@ public:
         const auto it = stage.dancers.find (channel);
         if (it == stage.dancers.end() || ! it->second.now.visible)
             return;
+        ++stage.windowPaints;
         g.setOrigin (-origin());
         drawDancer (g, it->second);
     }
@@ -560,6 +561,7 @@ void DanceStage::syncWindow (Dancer& d, bool windows)
         if (! nativechild::attach (*w, *this))
             return; // (the stage draws it meanwhile)
         d.placedArea = area;
+        ++placements;
         if (d.now.keepInFront) // FL's "Keep in front": kept in front of the panels and docked plugins
             nativechild::addFloater (*w);
         d.floating = d.now.keepInFront;
@@ -587,6 +589,7 @@ void DanceStage::syncWindow (Dancer& d, bool windows)
     {
         nativechild::place (w, *this, area);
         d.placedArea = area;
+        ++placements;
         w.repaint();
     }
     if (! w.isVisible())
@@ -736,8 +739,20 @@ void DanceStage::timerCallback()
         if (windows)
         {
             for (auto& [channel, d] : dancers)
-                if (d.window != nullptr && nativechild::reattachIfNeeded (*d.window, *this)) // (the main window's native window made again)
+            {
+                if (d.window == nullptr)
+                    continue;
+                // the main window's native window made again; or the window is not where it was put (a UI zoom or
+                // display scale change, round 190cj): read from the system, so a window in its place is never moved
+                // (issue B1), and never while a menu or a dialog is open
+                if (nativechild::reattachIfNeeded (*d.window, *this)
+                    || (! modalOpen() && ! nativechild::isPlacedAt (*d.window, *this, d.placedArea)))
+                {
                     nativechild::place (*d.window, *this, d.placedArea);
+                    ++placements;
+                    d.window->repaint();
+                }
+            }
             nativechild::keepFloatersInFront();
         }
     }
@@ -1365,5 +1380,146 @@ private:
 std::unique_ptr<juce::Component> makeDanceEditor (AudioEngine& engine, int channel)
 {
     return std::make_unique<DanceEditor> (engine, channel);
+}
+
+juce::String danceWindowSelfTest (juce::String* detail)
+{
+   #if JUCE_WINDOWS
+    if (! nativechild::dockingEnabled() || ! nativechild::supportsFloaters())
+        return "OK";
+    juce::String log, error;
+    auto fail = [&error] (const juce::String& what) {
+        if (error.isEmpty())
+            error = what;
+    };
+    {
+        AudioEngine engine (false);
+        int channel = -1;
+        engine.editSongStructural ([&channel] (Song& song) {
+            ChannelDef c;
+            c.name = "LYNX Dance";
+            c.instrument = InstrumentKind::fruitydance;
+            c.pluginState = dance::toState (dance::Settings()); // (a new channel: FL's default place, a moving dancer)
+            channel = (int) song.channels.size();
+            song.channels.push_back (c);
+        });
+        engine.dispatchPendingMessages();
+
+        // the main window's stand-in: a native window with a title bar and a frame (so its client area is not at its
+        // corner), away from the screen's corner, never shown
+        juce::Component host;
+        host.setOpaque (true);
+        host.setBounds (108, 31, 900, 640);
+        host.addToDesktop (juce::ComponentPeer::windowHasTitleBar | juce::ComponentPeer::windowIsResizable);
+        DanceStage stage (engine);
+        host.addAndMakeVisible (stage);
+        stage.setBounds (host.getLocalBounds());
+        stage.update();
+        auto* w = stage.windowOf (channel);
+        auto* hostPeer = host.getPeer();
+        if (w == nullptr || w->getPeer() == nullptr || hostPeer == nullptr)
+            return "ERROR no dancer window (host peer " + juce::String ((int) (hostPeer != nullptr)) + ")";
+
+        const auto engines = w->getPeer()->getAvailableRenderingEngines();
+        const auto engineAtStart = w->getPeer()->getCurrentRenderingEngine();
+        // one frame: the stage's tick, then the window painted at once (a window being shown is painted by the
+        // Direct2D renderer, pending repaints are done by the software one)
+        auto frame = [&stage, w] {
+            stage.update();
+            w->repaint();
+            w->setVisible (false);
+            w->setVisible (true);
+            if (auto* peer = w->getPeer())
+                peer->performAnyPendingRepaintsNow();
+        };
+        // the dancer's window against its place, read from the system
+        auto check = [&] (const juce::String& name, int frames) {
+            stage.update();
+            frame(); // (settled: placed and painted once)
+            const auto scale = w->getPeer()->getPlatformScaleFactor() * (double) w->getDesktopScaleFactor();
+            const auto wanted = (stage.bodyOf (channel).toDouble() * scale).toNearestInt(); // (the body: inside the window)
+            const auto before = nativechild::nativeRectInParent (*w);
+            const auto client = nativechild::nativeParentClientSize (*w);
+            const auto placementsBefore = stage.placementsForTest();
+            const auto paintsBefore = stage.windowPaintsForTest();
+            auto moves = 0;
+            auto last = before;
+            for (int i = 0; i < frames; ++i)
+            {
+                frame();
+                const auto now = nativechild::nativeRectInParent (*w);
+                moves += now != last ? 1 : 0;
+                last = now;
+            }
+            const auto paints = stage.windowPaintsForTest() - paintsBefore;
+            const auto placed = stage.placementsForTest() - placementsBefore;
+            const auto screen = nativechild::nativeScreenRect (w->getWindowHandle());
+            const auto hostScreen = nativechild::nativeScreenRect (host.getWindowHandle());
+            log << name << ": window " << last.toString() << " in client " << client.toString() << " (screen " << screen.toString()
+                << ", main window " << hostScreen.toString() << "), body " << wanted.toString() << ", " << frames << " frames: " << paints
+                << " paints, " << moves << " native moves, " << placed << " placements; ";
+            if (before.isEmpty() || ! client.contains (before))
+                fail (name + ": the dancer's window " + before.toString() + " is not inside the main window's client area " + client.toString());
+            else if (! before.expanded (2).contains (wanted.getIntersection (client)))
+                fail (name + ": the dancer's window " + before.toString() + " is not over the dancer " + wanted.toString());
+            else if (paints < frames)
+                fail (name + ": the window painted " + juce::String (paints) + " times in " + juce::String (frames) + " frames (nothing proven)");
+            else if (moves != 0 || last != before)
+                fail (name + ": the window moved natively while it was repainted: " + before.toString() + " -> " + last.toString() + " (" + juce::String (moves) + " moves)");
+            else if (placed != 0)
+                fail (name + ": the stage placed the window again " + juce::String (placed) + " times in " + juce::String (frames) + " frames");
+        };
+
+        // the main window about 900 x 640 physical pixels at every zoom (it fits a small screen: nothing is clamped),
+        // the dancer at `at` (0..1 of the stage), 0.6 of its size
+        auto arrange = [&] (float zoom, juce::Point<int> corner, juce::Point<float> at) {
+            juce::Desktop::getInstance().setGlobalScaleFactor (zoom);
+            host.setBounds (juce::roundToInt ((float) corner.x / zoom), juce::roundToInt ((float) corner.y / zoom),
+                            juce::roundToInt (900.0f / zoom), juce::roundToInt (640.0f / zoom));
+            stage.setBounds (host.getLocalBounds());
+            auto s = dance::Settings();
+            s.scale = 0.6f;
+            s.x = juce::roundToInt ((float) stage.getWidth() * at.x);
+            s.y = juce::roundToInt ((float) stage.getHeight() * at.y);
+            saveSettings (engine, channel, s, false);
+            engine.dispatchPendingMessages();
+        };
+        const auto frames = 40;
+        for (int e = engines.size(); --e >= 0;) // (JUCE 8: the last one is Direct2D, 0 the software renderer)
+        {
+            w->getPeer()->setCurrentRenderingEngine (e);
+            const auto engineName = engines[e];
+            for (const auto zoom : { 1.0f, 1.25f, 1.5f, 2.0f })
+            {
+                arrange (zoom, { 108, 31 }, { 0.5f, 0.7f });
+                check (engineName + " " + juce::String (juce::roundToInt (zoom * 100.0f)) + "%", frames);
+            }
+            // the main window moved and resized (restored <-> maximised changes both), the dancer elsewhere
+            arrange (1.0f, { 233, 97 }, { 0.3f, 0.6f });
+            host.setSize (760, 600);
+            stage.setBounds (host.getLocalBounds());
+            check (engineName + " main window moved", frames);
+            // the dancer dragged out of sight, then "Put the dancer back" (the saved place back at FL's default)
+            auto away = dance::Settings();
+            away.x = 100000;
+            away.y = 100000;
+            saveSettings (engine, channel, away, false);
+            engine.dispatchPendingMessages();
+            stage.update();
+            saveSettings (engine, channel, dance::Settings(), false);
+            engine.dispatchPendingMessages();
+            check (engineName + " put back", frames);
+        }
+        juce::Desktop::getInstance().setGlobalScaleFactor (1.0f);
+        if (juce::isPositiveAndBelow (engineAtStart, engines.size()))
+            w->getPeer()->setCurrentRenderingEngine (engineAtStart);
+    }
+    if (detail != nullptr)
+        *detail = log;
+    return error.isEmpty() ? juce::String ("OK") : "ERROR " + error;
+   #else
+    juce::ignoreUnused (detail);
+    return "OK";
+   #endif
 }
 } // namespace lynx

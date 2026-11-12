@@ -28,6 +28,10 @@ bool isAttached (const juce::Component& c);
 // these are its plain bounds in its parent.
 void place (juce::Component& c, const juce::Component& area, juce::Rectangle<int> boundsInArea);
 juce::Rectangle<int> boundsIn (const juce::Component& c, const juce::Component& area);
+// Is the attached component's native window exactly at `boundsInArea`, read from the system (not from JUCE's idea of
+// its bounds)? True for a component that has no native window of its own. (Round 190cj: the dancers' windows are
+// checked twice a second and put back when a zoom or display change, or anything else, left them elsewhere.)
+bool isPlacedAt (const juce::Component& c, const juce::Component& area, juce::Rectangle<int> boundsInArea);
 // After the main window's native window was made again, or `area` moved inside it: attached again if needed, and put
 // back at the same place in `area`.
 void refresh (juce::Component& c, juce::Component& area);
@@ -82,6 +86,11 @@ bool isAbove (void* a, void* b);
 bool placedPhysically (const juce::Component& c);
 void notifyScaleListenersForTest (juce::Component& top);
 void* parentOf (void* window);
+// Tests (Windows; elsewhere empty): an attached component's native window in its parent's client area, that client
+// area (at 0,0), and any native window's rectangle on the screen; all in physical pixels, read from the system.
+juce::Rectangle<int> nativeRectInParent (const juce::Component& c);
+juce::Rectangle<int> nativeParentClientSize (const juce::Component& c);
+juce::Rectangle<int> nativeScreenRect (void* window);
 void* ownerOf (void* window);
 // Tests (Windows; elsewhere false / nullptr): the native window the mouse would reach at `c`'s local point (a layered
 // window's transparent pixels let it through), and whether a native window is layered (per-pixel transparency).

@@ -44,10 +44,31 @@ struct PeerScaleListeners : juce::ComponentPeer
     }
 };
 
+// `bounds` (the component's bounds: in the main window's client area, LYNX's zoomed units) in the parent's physical
+// pixels (times the UI zoom = the peer's logical pixels, times the display's scale = physical)
+#if JUCE_WINDOWS
+RECT physicalRect (const juce::Component& c, const juce::ComponentPeer& peer, juce::Rectangle<int> bounds)
+{
+    const auto scale = peer.getPlatformScaleFactor() * (double) c.getDesktopScaleFactor();
+    const auto b = bounds.toDouble() * scale;
+    return { juce::roundToInt (b.getX()), juce::roundToInt (b.getY()), juce::roundToInt (b.getRight()), juce::roundToInt (b.getBottom()) };
+}
+
+// the native window's place in its parent's client area, physical pixels
+RECT rectInParent (HWND hwnd, HWND parent)
+{
+    RECT now {};
+    GetWindowRect (hwnd, &now);
+    MapWindowPoints (nullptr, parent, reinterpret_cast<POINT*> (&now), 2);
+    return now;
+}
+#endif
+
 // JUCE places a child window from its logical bounds with the scale of the display at that point taken as a screen
-// point, which is not the parent's when the main window is on another display: put it at its bounds in the parent's own
-// scale (JUCE reads the child's bounds back that way: client pixels / the parent's scale).
-void placePhysically (juce::Component& c)
+// point, which is not the parent's when the main window is on another display: put it at `bounds` in the parent's own
+// scale. `bounds` is what the caller wants, not what JUCE reads back: for a transparent (layered) child JUCE 8.0.4 adds
+// the parent's screen position when it places it, and its read-back then replaces the component's bounds (round 190cj).
+void placePhysically (juce::Component& c, juce::Rectangle<int> bounds)
 {
    #if JUCE_WINDOWS
     auto* peer = c.getPeer();
@@ -55,22 +76,17 @@ void placePhysically (juce::Component& c)
     auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
     if (parent == nullptr)
         return;
-    // (component bounds are in LYNX's zoomed units: times the UI zoom = the peer's logical pixels, times the display's
-    // scale = physical)
-    const auto scale = peer->getPlatformScaleFactor() * (double) c.getDesktopScaleFactor();
-    const auto b = c.getBounds().toDouble() * scale;
-    const auto x = juce::roundToInt (b.getX()), y = juce::roundToInt (b.getY());
-    const auto w = juce::roundToInt (b.getRight()) - x, h = juce::roundToInt (b.getBottom()) - y;
-    RECT now {};
-    GetWindowRect (hwnd, &now);
-    MapWindowPoints (nullptr, parent, reinterpret_cast<POINT*> (&now), 2);
-    if (now.left == x && now.top == y && now.right - now.left == w && now.bottom - now.top == h)
+    const auto want = physicalRect (c, *peer, bounds);
+    const auto now = rectInParent (hwnd, parent);
+    if (now.left == want.left && now.top == want.top && now.right == want.right && now.bottom == want.bottom)
         return;
-    SetWindowPos (hwnd, nullptr, x, y, w, h, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+    SetWindowPos (hwnd, nullptr, want.left, want.top, want.right - want.left, want.bottom - want.top, SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER);
    #else
-    juce::ignoreUnused (c);
+    juce::ignoreUnused (c, bounds);
    #endif
 }
+
+void placePhysically (juce::Component& c) { placePhysically (c, c.getBounds()); }
 
 // the attached children of one native window, from the bottom of their stacking order up
 std::vector<juce::Component*> attachedChildrenOf (void* parent, const juce::Component* except = nullptr)
@@ -285,7 +301,24 @@ void place (juce::Component& c, const juce::Component& area, juce::Rectangle<int
     c.getProperties().set ("lynxNativeX", origin.x);
     c.getProperties().set ("lynxNativeY", origin.y);
     c.setBounds (boundsInArea + origin);
-    placePhysically (c);
+    placePhysically (c, boundsInArea + origin);
+}
+
+bool isPlacedAt (const juce::Component& c, const juce::Component& area, juce::Rectangle<int> boundsInArea)
+{
+   #if JUCE_WINDOWS
+    auto* peer = c.getPeer();
+    auto* hwnd = peer != nullptr ? static_cast<HWND> (peer->getNativeHandle()) : nullptr;
+    auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
+    if (parent == nullptr || ! isAttached (c))
+        return true; // (no native window to move)
+    const auto want = physicalRect (c, *peer, boundsInArea + originOf (area));
+    const auto now = rectInParent (hwnd, parent);
+    return now.left == want.left && now.top == want.top && now.right == want.right && now.bottom == want.bottom;
+   #else
+    juce::ignoreUnused (c, area, boundsInArea);
+    return true;
+   #endif
 }
 
 juce::Rectangle<int> boundsIn (const juce::Component& c, const juce::Component&)
@@ -470,6 +503,51 @@ bool isAbove (void* a, void* b)
     juce::ignoreUnused (a, b);
    #endif
     return false;
+}
+
+juce::Rectangle<int> nativeRectInParent (const juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    auto* hwnd = static_cast<HWND> (c.getWindowHandle());
+    auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
+    if (parent == nullptr)
+        return {};
+    const auto r = rectInParent (hwnd, parent);
+    return { (int) r.left, (int) r.top, (int) (r.right - r.left), (int) (r.bottom - r.top) };
+   #else
+    juce::ignoreUnused (c);
+    return {};
+   #endif
+}
+
+juce::Rectangle<int> nativeParentClientSize (const juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    auto* hwnd = static_cast<HWND> (c.getWindowHandle());
+    auto* parent = hwnd != nullptr ? GetParent (hwnd) : nullptr;
+    if (parent == nullptr)
+        return {};
+    RECT r {};
+    GetClientRect (parent, &r);
+    return { 0, 0, (int) (r.right - r.left), (int) (r.bottom - r.top) };
+   #else
+    juce::ignoreUnused (c);
+    return {};
+   #endif
+}
+
+juce::Rectangle<int> nativeScreenRect (void* window)
+{
+   #if JUCE_WINDOWS
+    if (window == nullptr)
+        return {};
+    RECT r {};
+    GetWindowRect (static_cast<HWND> (window), &r);
+    return { (int) r.left, (int) r.top, (int) (r.right - r.left), (int) (r.bottom - r.top) };
+   #else
+    juce::ignoreUnused (window);
+    return {};
+   #endif
 }
 
 void* parentOf (void* window)
