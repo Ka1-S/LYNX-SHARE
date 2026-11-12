@@ -1,10 +1,7 @@
 #include "core/FlCurve.h"
-<<<<<<< ours
 #include "core/DrawMode.h"
-=======
 #include "core/LayoutStyle.h"
 #include "ui/ClipGridComponent.h"
->>>>>>> theirs
 #include "ui/CleanVoiceMenu.h"
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
