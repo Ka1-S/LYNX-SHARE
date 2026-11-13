@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turn the renders of scripts/site-shots.sh into the pictures the website and the README use, at 1x and 2x (Pillow).
 
-    python3 scripts/site-shots.py RENDERS [--site website] [--docs docs/img] [--dry-run]
+    python3 scripts/site-shots.py RENDERS [--site website] [--docs docs/img] [--logo-was LOGO.png] [--dry-run]
 
 RENDERS is what site-shots.sh wrote: x1/ and x2/ (one folder per pixel scale, the same file names in each: snap/,
 snap1600/, grid/, grid1600/, plugui/, extra/, thumbs/, dance/) and art/ (--artshot draws 100 % and 200 % itself).
@@ -17,6 +17,12 @@ The @2x file is always exactly twice the 1x file's size and is drawn by the prog
 render missing for a picture: no @2x file is written (and an old one is removed), the table says so.
 Pictures larger than the page shows are fitted (plugins 960 px wide, wiki 1600 px) with the same factor at both scales.
 WebP: lossless when that costs little (flat interface pictures), else quality 92 (1x) / 88 (2x). Prints a table.
+
+--logo-was LOGO.png: the logo the build that made the renders draws (its src/ui/LogoData.h image), for renders made
+before a logo change. Wherever that build drew its logo button (plugin headers), the button is repainted with the
+brand's mark (website/assets/img/logo.png; up to 32 px resources/brand/lynx-share-logo-small.png, the form for
+small sizes made by tools/make_logo.py): a dark disc over the old button and the mark on it, its ears inside the
+picture, as the program draws it since the logo by w3teal (src/ui/PluginSkin.cpp brandMark). Leave it out for renders of a build that draws the current logo.
 """
 import argparse
 import io
@@ -25,7 +31,7 @@ import re
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 # Home / Features pictures: name -> (render, crop box at 1x or None)
 TOP = {
@@ -66,6 +72,96 @@ def render(root, ref, scale):
     return f if f.is_file() else None
 
 
+class LogoPainter:
+    """Finds the old logo button in a render and paints the brand's mark over it (see --logo-was)."""
+    DARK = (14, 15, 19)        # the disc under the mark (src/ui/PluginSkin.cpp brandMark)
+
+    def __init__(self, old, mark, small):
+        import numpy as np
+        self.np = np
+        self.old = Image.open(old).convert("RGBA")
+        self.mark = Image.open(mark).convert("RGBA")
+        self.small = Image.open(small).convert("RGBA").resize(self.mark.size, Image.LANCZOS)
+        x0, y0, x1, y1 = self.mark.getchannel("A").getbbox()
+        r = (x1 - x0) / 2.0
+        self.disc = ((x0 + x1) / 2.0 / self.mark.width, (y1 - r) / self.mark.height, r / self.mark.width)
+        self.pts = {}
+        self.count = 0
+
+    def points(self, d):
+        """A grid of points inside the old logo at diameter d: (y, x, rgb)."""
+        if d not in self.pts:
+            np = self.np
+            t = np.asarray(self.old.resize((d, d), Image.LANCZOS), dtype=np.float32)
+            n = max(6, min(10, d // 2))
+            self.pts[d] = [(y, x, t[y, x, :3]) for y in (int((i + .5) * d / n) for i in range(n))
+                           for x in (int((j + .5) * d / n) for j in range(n))
+                           if (y - d / 2 + .5) ** 2 + (x - d / 2 + .5) ** 2 < (d * .36) ** 2]
+        return self.pts[d]
+
+    def find(self, a, sizes, limit=14.0):
+        """Best (x, y, d) of the old logo in the array a, or None."""
+        np = self.np
+        best = None
+        for d in sizes:
+            h, w = a.shape[0] - d + 1, a.shape[1] - d + 1
+            if h < 1 or w < 1:
+                continue
+            pts = self.points(d)
+            e = np.zeros((h, w), dtype=np.float32)
+            for y, x, c in pts:
+                e += np.abs(a[y:y + h, x:x + w] - c).sum(axis=2)
+            i = np.unravel_index(e.argmin(), e.shape)
+            v = float(e[i]) / (3 * len(pts))
+            if best is None or v < best[3]:
+                best = (int(i[1]), int(i[0]), d, v)
+        return best[:3] if best and best[3] < limit else None
+
+    def paint(self, im, scale):
+        """im with every old logo button repainted (sizes: the 18 and 20 px header buttons, Strike's 40 px plate)."""
+        np = self.np
+        rgb = np.asarray(im.convert("RGB"), dtype=np.float32)
+        # the old logo is a red pepper with a green stem: search only around pixels of that green
+        g = (rgb[..., 1] > rgb[..., 0] + 40) & (rgb[..., 1] > rgb[..., 2] + 40) & (rgb[..., 1] > 90)
+        ys, xs = np.nonzero(g)
+        if len(xs) == 0:
+            return im, 0
+        sizes = sorted({v * scale + k for v in (18, 20, 40) for k in (-1, 0, 1)})
+        cell, span = 48 * scale, 48 * scale
+        cells = sorted({(int(y) // cell, int(x) // cell) for y, x in zip(ys, xs)})
+        hits = []
+        for cy, cx in cells:
+            y0, x0 = max(0, cy * cell - span), max(0, cx * cell - span)
+            y1, x1 = min(rgb.shape[0], (cy + 1) * cell + span), min(rgb.shape[1], (cx + 1) * cell + span)
+            hit = self.find(rgb[y0:y1, x0:x1], sizes)
+            if hit:
+                hit = (hit[0] + x0, hit[1] + y0, hit[2])
+                if all(abs(hit[0] - h[0]) > 4 or abs(hit[1] - h[1]) > 4 for h in hits):
+                    hits.append(hit)
+        if not hits:
+            return im, 0
+        out = im.convert("RGBA")
+        for x, y, d in hits:
+            cx, cy = x + d / 2.0, y + d / 2.0
+            r = d / 2.0 + 1.5 * scale                 # over the old button's dark edge and red ring
+            fx, fy, fr = self.disc
+            side = min(r / fr, cy / fy)               # (the ears stay inside the picture, as the program keeps them in the header)
+            r0, r = r, side * fr
+            k = 4                                     # the disc drawn 4x and scaled down (smooth edge)
+            rd = max(r0, r + scale)                   # the dark disc: over the old button, at least 1 px beyond the mark
+            box = (int(cx - rd) - 2, int(cy - rd) - 2, int(cx + rd) + 3, int(cy + rd) + 3)
+            w, h = box[2] - box[0], box[3] - box[1]
+            mask = Image.new("L", (w * k, h * k), 0)
+            ImageDraw.Draw(mask).ellipse(((cx - rd - box[0]) * k, (cy - rd - box[1]) * k, (cx + rd - box[0]) * k, (cy + rd - box[1]) * k), fill=255)
+            disc = Image.new("RGBA", (w, h), self.DARK + (255,))
+            disc.putalpha(mask.resize((w, h), Image.LANCZOS))
+            out.alpha_composite(disc, box[:2])
+            mark = (self.small if side <= 32 else self.mark).resize((max(1, round(side)), max(1, round(side))), Image.LANCZOS)
+            out.alpha_composite(mark, (round(cx - fx * side), round(cy - fy * side)))
+        self.count += len(hits)
+        return out.convert(im.mode if im.mode in ("RGB", "RGBA") else "RGB"), len(hits)
+
+
 def webp(im, quality):
     im = im.convert("RGB")
     lossy, exact = io.BytesIO(), io.BytesIO()
@@ -81,8 +177,8 @@ def png(im):
 
 
 class Writer:
-    def __init__(self, dry):
-        self.dry, self.rows = dry, []
+    def __init__(self, dry, painter=None):
+        self.dry, self.rows, self.painter, self.painted = dry, [], painter, []
 
     def put(self, dest, data, size, source):
         if not self.dry:
@@ -104,6 +200,10 @@ class Writer:
         one = Image.open(f1)
         if box:
             one = one.crop(box)
+        if self.painter:
+            one, n = self.painter.paint(one, 1)
+            if n:
+                self.painted.append(str(dest1))
         k = 1.0 if not maxw or one.width <= maxw else maxw / one.width
         if k != 1.0:
             one = one.resize((maxw, round(one.height * k)), Image.LANCZOS)
@@ -117,6 +217,10 @@ class Writer:
         two = Image.open(f2)
         if box:
             two = two.crop(tuple(2 * v for v in box))
+        if self.painter:
+            two, n = self.painter.paint(two, 2)
+            if n:
+                self.painted.append(str(dest2))
         want = (2 * one.width, 2 * one.height)
         if two.size != want:
             # (a fitted picture, or a render a pixel off from rounding: scaled to exactly twice the 1x file)
@@ -134,11 +238,12 @@ def main():
     ap.add_argument("renders")
     ap.add_argument("--site", default="website")
     ap.add_argument("--docs", default="docs/img")
+    ap.add_argument("--logo-was", help="the logo the renders' build draws (repaint its button with the brand's mark)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     root, site, docs = Path(a.renders), Path(a.site), Path(a.docs)
     img, src = site / "assets/img", site / "_src"
-    w = Writer(a.dry_run)
+    w = Writer(a.dry_run, LogoPainter(a.logo_was, img / "logo.png", Path(__file__).resolve().parent.parent / "resources/brand/lynx-share-logo-small.png") if a.logo_was else None)
 
     sizes = {}
     for name, (ref, box) in TOP.items():
@@ -185,6 +290,8 @@ def main():
     print("%-*s  %-11s %9s  %s" % (width, "file", "pixels", "bytes", "from"))
     for f, px, n, s in w.rows:
         print("%-*s  %-11s %9s  %s" % (width, f, px, n or "-", s))
+    if w.painter:
+        print("site-shots: logo button repainted %d times in %d files" % (w.painter.count, len(w.painted)))
     written = [r for r in w.rows if r[2]]
     problems = [r for r in w.rows if not r[2]]
     print("site-shots: %d files %s, %d with a note (missing render or no 2x)%s"

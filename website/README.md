@@ -86,11 +86,15 @@ article uses (from `snap/s-<name>.png`), and writes the sizes to `_src/catalog-i
 The build puts `width` and `height` on every picture from those two files, and the stylesheet never shows a picture
 above its own size. `--artshot` also draws each editor at twice the size: that becomes `<id>@2x.webp` (`srcset`). The
 other modes of the program draw at 100% only, so window and dialog pictures have no @2x file. A plugin without a
-render gets a name plate on its card, never a made-up picture. If `R/logo-<version>.png` (the logo that version
-draws, from its `src/ui/LogoData.h`) differs from the brand's mark, the logo button in the plugin headers is painted
-over with `assets/img/logo.png`; see the note at the top of the script. The 0.1.25 pictures are painted this way
-(103 editors, and `assets/img/eq.webp` is a copy of one): at the 0.1.26 release, whose program draws the vector
-pepper itself, render them again and leave `R/logo-<version>.png` out so nothing is painted.
+render gets a name plate on its card, never a made-up picture.
+
+**The logo in the pictures.** Since 2026-11-13 the brand's mark is the logo by w3teal
+(`resources/brand/lynx-share-logo.svg`; `python3 tools/make_logo.py site` writes `assets/img/logo.png`, the favicons,
+`assets/img/lynx-share-logo.svg`, the README logo, the social preview and the Store images from it). The pictures in
+`assets/img/` and `docs/img/` are still the 0.1.26 renders, whose program draws the earlier pepper in the logo button
+of a plugin's header: `scripts/site-shots.py R --logo-was <0.1.26 logo>` repainted that button with the new mark
+(a dark disc under it, as the program draws it from 0.1.27). At the next release, whose program draws the new logo
+itself, run `site-shots.py` again WITHOUT `--logo-was` so nothing is painted.
 
 ## 0.1.26 release: pictures and catalogue still to do (texts are ready)
 
@@ -101,9 +105,9 @@ The 0.1.26 texts are in the page sources; every picture is still from 0.1.25. No
   `assets/img/hero.webp`, `playlist.webp`, `rack.webp`, `pianoroll.webp`, `mixer.webp`, `synth.webp`, `eq.webp`,
   `automation.webp`, `cliplaunch.webp` (now with the Clip View and Device View), and `assets/media/poster.jpg`.
   `lynx-tour.mp4` and `demo.mp3` are from 0.1.23: re-render or keep the line that says so.
-- **Painted logos**: the 103 plugin editors in `assets/img/plugins/` whose header logo was painted over, and
-  `assets/img/eq.webp` (a copy of one). 0.1.26 draws the vector pepper itself: render them again with
-  `import-shots.py` and leave `R/logo-<version>.png` out so nothing is painted.
+- **Painted logos**: the plugin editors whose header logo button was repainted with the logo by w3teal (see "The logo
+  in the pictures" above). The release that draws that logo itself: render them again with `site-shots.py` and
+  without `--logo-was`.
 - **Why LYNX pictures and captions**: the three captions that say "0.1.25" (`why.online.cap`, `why.work.cap`,
   `why.crash.cap`) go with their pictures: change the text (and drop the key from the 14 language files) when the
   picture is replaced. A shot of the Share plugins dialog and of the Simple workflow would fit the new paragraphs.
