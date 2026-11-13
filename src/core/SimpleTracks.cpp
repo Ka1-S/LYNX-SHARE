@@ -1,4 +1,5 @@
 #include "core/SimpleTracks.h"
+#include "core/SimplePads.h"
 
 #include <algorithm>
 #include <cctype>
@@ -6,6 +7,8 @@
 #include <cstdlib>
 
 #include "core/AutoWarp.h"
+#include "core/EffectPresets.h"
+#include "core/Effects.h"
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
 #include "core/ProjectKey.h"
@@ -196,6 +199,8 @@ Result addDrums (Song& song, int track, const Request& request)
         channel.mixerTrack = insert;
         channel.group = r.group;
         channel.colour = colour;
+        if (request.kind == Kind::pads)
+            simplepads::apply (channel, 0); // (its choke group becomes this insert's own)
         song.channels.push_back (std::move (channel));
         r.channels.push_back ((int) song.channels.size() - 1);
     }
@@ -264,7 +269,8 @@ const char* defaultName (Kind kind) noexcept
         case Kind::voice: return "Voice";
         case Kind::instrument: return "Instrument";
         case Kind::drums: return "Drums";
-        case Kind::sampler: return "Sampler";
+        case Kind::sampler:
+        case Kind::pads: return "Sampler";
         case Kind::guitar: return "Guitar";
         case Kind::bass: return "Bass";
         case Kind::audio: break;
@@ -280,7 +286,8 @@ std::uint32_t defaultColour (Kind kind) noexcept
         case Kind::voice: return 0xFFD0645Au;
         case Kind::instrument: return 0xFF4FA3A5u;
         case Kind::drums: return 0xFFD39B3Eu;
-        case Kind::sampler: return 0xFF8E6CC9u;
+        case Kind::sampler:
+        case Kind::pads: return 0xFF8E6CC9u;
         case Kind::guitar: return 0xFF5C9E5Au;
         case Kind::bass: return 0xFF4C7FC2u;
         case Kind::audio: break;
@@ -379,7 +386,8 @@ Result addTrack (Song& song, const Request& request)
     {
         case Kind::instrument:
         case Kind::sampler: r = addInstrument (work, track, request); break;
-        case Kind::drums: r = addDrums (work, track, request); break;
+        case Kind::drums:
+        case Kind::pads: r = addDrums (work, track, request); break;
         case Kind::voice:
         case Kind::guitar:
         case Kind::bass:
@@ -407,7 +415,7 @@ std::string rename (Song& song, int track, const std::string& name)
         song.mixer[(std::size_t) insert].name = unique;
     if ((*kind == Kind::instrument || *kind == Kind::sampler) && validChannel (song, t.channel))
         song.channels[(std::size_t) t.channel].name = unique;
-    if (*kind == Kind::drums && ! old.empty())
+    if ((*kind == Kind::drums || *kind == Kind::pads) && ! old.empty())
     {
         // the kit's group and the track's pattern carry the track's name
         for (const auto& c : song.channels)
@@ -434,7 +442,7 @@ void recolour (Song& song, int track, std::uint32_t colour)
         song.mixer[(std::size_t) insert].colour = colour;
     if ((*kind == Kind::instrument || *kind == Kind::sampler) && validChannel (song, t.channel))
         song.channels[(std::size_t) t.channel].colour = colour;
-    if (*kind == Kind::drums)
+    if (*kind == Kind::drums || *kind == Kind::pads)
         for (auto& c : song.channels)
             if (c.mixerTrack == insert && c.instrument != InstrumentKind::audioClip)
                 c.colour = colour;
@@ -448,8 +456,181 @@ std::optional<Kind> kindOf (const Song& song, int track)
     if (t.mode == PlaylistTrackMode::instrument && validChannel (song, t.channel))
         return song.channels[(std::size_t) t.channel].instrument == InstrumentKind::sampler ? Kind::sampler : Kind::instrument;
     if (t.mode == PlaylistTrackMode::audio && validInsert (song, t.mixerTrack))
-        return insertHasInstruments (song, t.mixerTrack) ? Kind::drums : Kind::audio;
+    {
+        if (! insertHasInstruments (song, t.mixerTrack))
+            return Kind::audio;
+        // round 190fo: a Sampler track's pads are marked on their channels
+        const auto pads = std::any_of (song.channels.begin(), song.channels.end(), [insert = t.mixerTrack] (const ChannelDef& c) {
+            return c.mixerTrack == insert && c.simplePad.index >= 0;
+        });
+        return pads ? Kind::pads : Kind::drums;
+    }
     return std::nullopt;
+}
+
+int resetLevels (Song& song)
+{
+    int changed = 0;
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+    {
+        if (! kindOf (song, t))
+            continue;
+        const auto insert = insertOf (song, t);
+        if (! validInsert (song, insert))
+            continue;
+        auto& m = song.mixer[(std::size_t) insert];
+        if (m.volume != unityFader || m.pan != 0.0f)
+        {
+            m.volume = unityFader;
+            m.pan = 0.0f;
+            ++changed;
+        }
+    }
+    return changed;
+}
+
+int sharedReverb (const Song& song)
+{
+    for (int i = 1; i < (int) song.mixer.size(); ++i)
+        if (const auto& m = song.mixer[(std::size_t) i]; m.name == "Reverb" && ! m.effects.empty() && m.effects.front().kind == EffectKind::atrium)
+            return i;
+    return -1;
+}
+
+int ensureSharedReverb (Song& song)
+{
+    if (const auto have = sharedReverb (song); have >= 0)
+        return have;
+    const auto insert = trackmodes::freeMixerTrack (song);
+    if (insert <= 0 || insert >= (int) song.mixer.size())
+        return -1;
+    auto& m = song.mixer[(std::size_t) insert];
+    m.name = "Reverb";
+    m.colour = 0xFF5B7FA6u;
+    m.inputChannel = -1;
+    auto fx = makeEffectSlot (EffectKind::atrium);
+    // a return: only the reverb (Mix fully wet), a medium room, the lows kept out of it
+    for (const auto& [name, value] : { std::pair { "Mix", 1.0f }, { "Decay", 0.44f }, { "Low cut", 0.2f } })
+        if (const auto p = presets::paramByName (EffectKind::atrium, name); p >= 0 && p < maxEffectParams)
+            fx.params[(std::size_t) p] = value;
+    m.effects.push_back (std::move (fx));
+    return insert;
+}
+
+float reverbSend (const Song& song, int insert)
+{
+    const auto reverb = sharedReverb (song);
+    if (reverb < 0 || insert <= 0 || insert >= (int) song.mixer.size() || insert == reverb)
+        return 0.0f;
+    for (const auto& s : song.mixer[(std::size_t) insert].sends)
+        if (s.target == reverb)
+            return s.level;
+    return 0.0f;
+}
+
+bool setReverbSend (Song& song, int insert, float level)
+{
+    if (insert <= 0 || insert >= (int) song.mixer.size())
+        return false;
+    level = std::clamp (level, 0.0f, 1.0f);
+    const auto reverb = level > 0.0f ? ensureSharedReverb (song) : sharedReverb (song);
+    if (reverb < 0 || reverb == insert)
+        return level <= 0.0f;
+    auto& sends = song.mixer[(std::size_t) insert].sends;
+    const auto at = std::find_if (sends.begin(), sends.end(), [reverb] (const MixerSend& s) { return s.target == reverb; });
+    if (level <= 0.0f)
+    {
+        if (at != sends.end())
+            sends.erase (at);
+        return true;
+    }
+    if (at != sends.end())
+        at->level = level;
+    else
+        sends.push_back ({ reverb, level, false });
+    return true;
+}
+
+std::string stemTrackName (const std::string& stem)
+{
+    std::size_t i = 0;
+    while (i < stem.size() && i < 3 && std::isdigit ((unsigned char) stem[i]))
+        ++i;
+    if (i == 0 || i >= stem.size() || (stem[i] != '_' && stem[i] != ' ' && stem[i] != '-'))
+        return stem;
+    auto j = i;
+    while (j < stem.size() && (stem[j] == '_' || stem[j] == ' ' || stem[j] == '-'))
+        ++j;
+    return j < stem.size() ? stem.substr (j) : stem;
+}
+
+std::vector<FolderItem> folderPlan (std::vector<std::string> paths)
+{
+    const auto lower = [] (std::string s) {
+        for (auto& c : s)
+            c = (char) std::tolower ((unsigned char) c);
+        return s;
+    };
+    const auto fileName = [] (const std::string& p) { const auto at = p.find_last_of ('/'); return at == std::string::npos ? p : p.substr (at + 1); };
+    const auto stemOf = [] (const std::string& f) { const auto dot = f.find_last_of ('.'); return dot == std::string::npos ? f : f.substr (0, dot); };
+    const auto extOf = [&lower] (const std::string& f) { const auto dot = f.find_last_of ('.'); return dot == std::string::npos ? std::string() : lower (f.substr (dot + 1)); };
+    // natural order of the file names (01 < 2 < 10), then the path
+    const auto naturalLess = [&lower, &fileName] (const std::string& a, const std::string& b) {
+        const auto x = lower (fileName (a)), y = lower (fileName (b));
+        std::size_t i = 0, j = 0;
+        while (i < x.size() && j < y.size())
+        {
+            if (std::isdigit ((unsigned char) x[i]) && std::isdigit ((unsigned char) y[j]))
+            {
+                std::size_t ei = i, ej = j;
+                while (ei < x.size() && std::isdigit ((unsigned char) x[ei]))
+                    ++ei;
+                while (ej < y.size() && std::isdigit ((unsigned char) y[ej]))
+                    ++ej;
+                const auto nx = std::strtoull (x.substr (i, ei - i).c_str(), nullptr, 10), ny = std::strtoull (y.substr (j, ej - j).c_str(), nullptr, 10);
+                if (nx != ny)
+                    return nx < ny;
+                i = ei, j = ej;
+                continue;
+            }
+            if (x[i] != y[j])
+                return x[i] < y[j];
+            ++i, ++j;
+        }
+        return x.size() - i < y.size() - j || (x.size() - i == y.size() - j && a < b);
+    };
+    std::sort (paths.begin(), paths.end(), naturalLess);
+    static const std::vector<std::string> audioExt { "wav", "aif", "aiff", "flac", "mp3", "ogg", "m4a", "wv" };
+    std::vector<FolderItem> out;
+    std::vector<std::string> audioNames;
+    for (const auto& p : paths)
+    {
+        const auto file = fileName (p);
+        const auto ext = extOf (file);
+        if (file.empty() || file[0] == '.')
+            continue;
+        const auto midi = ext == "mid" || ext == "midi";
+        if (! midi && std::find (audioExt.begin(), audioExt.end(), ext) == audioExt.end())
+            continue;
+        const auto stem = stemOf (file);
+        if (midi && lower (stem).find ("(all tracks)") != std::string::npos)
+            continue;
+        if (! midi && lower (stem).size() >= 9 && lower (stem).rfind ("- mixdown") == lower (stem).size() - 9)
+            continue; // (LYNX's export puts the whole song beside the stems)
+        FolderItem item;
+        item.path = p;
+        item.name = stemTrackName (stem);
+        item.midi = midi;
+        if (! midi)
+            audioNames.push_back (lower (item.name));
+        out.push_back (std::move (item));
+    }
+    for (auto& item : out)
+        if (item.midi && std::find (audioNames.begin(), audioNames.end(), lower (item.name)) != audioNames.end())
+            item.muted = true;
+    // audio first, then MIDI, each in name order (the stems are the song; the notes come after them)
+    std::stable_partition (out.begin(), out.end(), [] (const FolderItem& i) { return ! i.midi; });
+    return out;
 }
 
 bool isEmptySong (const Song& song)

@@ -17,6 +17,10 @@ namespace lynx
 // The options window (the folder is asked for after it), then the export and its report.
 void showOtherAppsExportDialog (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& projectName);
 
+// Round 190fo: one Playlist track as a file — its stem as a WAV (as the bundle renders stems) or its notes as a MIDI
+// file — after a save dialog named as the original names them ("<song> - <track>.wav", "<track>.mid").
+void exportOneTrack (AudioEngine& engine, int track, bool asMidi, const juce::File& suggestedFolder, const juce::String& projectName);
+
 // The options window alone (snapshots); nothing is written.
 std::unique_ptr<juce::Component> makeOtherAppsExportPanel (AudioEngine& engine, const juce::String& projectName);
 // The report window alone (snapshots).

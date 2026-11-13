@@ -32,7 +32,7 @@ CORE="$CORE src/core/SlicexInstrument.cpp"
 # Loop Starter, local (round 168b)
 CORE="$CORE src/core/LoopStarter.cpp"
 # Simple workflow: adding a track (round 184a)
-CORE="$CORE src/core/SimpleTracks.cpp src/core/KeyFollow.cpp src/core/GamepadMap.cpp src/core/ExportBundle.cpp"
+CORE="$CORE src/core/SimpleTracks.cpp src/core/SimplePads.cpp src/core/KeyFollow.cpp src/core/GamepadMap.cpp src/core/ExportBundle.cpp"
 # Simple workflow: one-knob effects, chain presets, the sound picker (round 190bu)
 CORE="$CORE src/core/GoalKnobs.cpp src/core/ChainPresets.cpp src/core/SoundLibrary.cpp"
 # MIDI controller profiles and the controller layer (round 190aw)

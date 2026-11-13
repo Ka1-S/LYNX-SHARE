@@ -1,6 +1,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "engine/FileSort.h"
 #include "platform/Paths.h"
+#include "core/SimplePads.h"
 
 #include "core/KeyGuess.h"
 #include "core/Groove.h"
@@ -1997,6 +1998,16 @@ public:
             // a live session's remote song and an out-of-range current pattern; each must leave one pattern and not crash
             const auto i = args.indexOf ("--patterns190ea");
             setApplicationReturnValue (runPatterns190ea (args[i + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--reabl190foshot"))
+        {
+            // LYNX --reabl190foshot prefix: round 190fo off-screen — the Simple Sampler track's 16 pads in the dock, its
+            // menus and kits, the typing keys, the .lynx round trip, a folder of stems and MIDI files — and a report
+            const auto i = args.indexOf ("--reabl190foshot");
+            runReabl190foShot (args[i + 1].unquoted());
             quit();
             return;
         }
@@ -17953,6 +17964,320 @@ private:
         report << (ok ? "RESULT OK\n" : "RESULT FAILED\n");
         save();
         return ok;
+    }
+
+    // round 190fo: the Simple layout's Sampler track (16 pads) and a folder of stems and MIDI files, off-screen at 1x and
+    // 2x, with a text report of the checks (.lynx round trip, kits, typing keys, the folder import)
+    void runReabl190foShot (const juce::String& prefix)
+    {
+        namespace st = lynx::simpletracks;
+        namespace sp = lynx::simplepads;
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        ui.setVisible (true);
+        const auto writeImage = [&prefix] (const juce::Image& image, const juce::String& name) {
+            const auto file = juce::File (prefix + "-" + name + ".png");
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        juce::String report;
+        const auto line = [&report] (const juce::String& text) { report << text << "\n"; };
+        const auto check = [&report] (const juce::String& what, bool ok) { report << (ok ? "OK    " : "ERROR ") << what << "\n"; };
+
+        ui.selectTabForSnapshot (2);
+        ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+        offline.dispatchPendingMessages();
+        auto* simple = ui.getSimpleWorkflowForSnapshot();
+        if (simple == nullptr)
+        {
+            juce::File (prefix + "-report.txt").replaceWithText ("ERROR no Simple workflow\n");
+            return;
+        }
+        const auto whole = [&] (const juce::String& name) {
+            offline.dispatchPendingMessages();
+            for (float scale : { 1.0f, 2.0f })
+                writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, scale), name + (scale > 1.0f ? "@2x" : ""));
+        };
+        // the chooser: the Sampler tile (16 pads, "On keys..." for one sample over the keys) and Import's "Folder..."
+        simple->showChooser();
+        whole ("chooser");
+        simple->hideChooser();
+
+        // --- test sounds -------------------------------------------------------------------------------------------------
+        const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-190fo");
+        dir.deleteRecursively();
+        dir.createDirectory();
+        const auto writeWav = [] (const juce::File& wav, int frames, const std::function<float (int)>& f) {
+            juce::AudioBuffer<float> audio (1, frames);
+            for (int i = 0; i < frames; ++i)
+                audio.setSample (0, i, f (i));
+            wav.getParentDirectory().createDirectory();
+            juce::WavAudioFormat format;
+            std::unique_ptr<juce::OutputStream> out (wav.createOutputStream().release());
+            if (auto* w = format.createWriterFor (out.get(), 48000.0, 1, 16, {}, 0))
+            {
+                out.release();
+                std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                writer->writeFromAudioSampleBuffer (audio, 0, frames);
+            }
+            return wav;
+        };
+        juce::Random rnd (190);
+        const auto pi = juce::MathConstants<double>::pi;
+        const auto kick = writeWav (dir.getChildFile ("pads/Kick.wav"), 24000, [pi] (int i) {
+            const auto t = i / 48000.0;
+            return (float) (0.9 * std::sin (2.0 * pi * (50.0 * t + 60.0 * (1.0 - std::exp (-t * 30.0)) / 30.0)) * std::exp (-t * 7.0));
+        });
+        const auto snare = writeWav (dir.getChildFile ("pads/Snare.wav"), 14400, [&rnd] (int i) { return (float) ((rnd.nextFloat() * 2.0f - 1.0f) * 0.6f * std::exp (-i / 4000.0f)); });
+        const auto hat = writeWav (dir.getChildFile ("pads/Hat.wav"), 4800, [&rnd] (int i) { return (float) ((rnd.nextFloat() * 2.0f - 1.0f) * 0.4f * std::exp (-i / 900.0f)); });
+        const auto chord = writeWav (dir.getChildFile ("pads/Chord stab.wav"), 48000, [pi] (int i) {
+            const auto t = i / 48000.0;
+            double v = 0.0;
+            for (int k : { 57, 60, 64 })
+                v += std::sin (2.0 * pi * 440.0 * std::pow (2.0, (k - 69) / 12.0) * t);
+            return (float) (0.2 * v * std::exp (-t * 2.5));
+        });
+        const auto vox = writeWav (dir.getChildFile ("pads/Vox hey.wav"), 30000, [pi] (int i) {
+            const auto t = i / 48000.0;
+            return (float) (0.5 * std::sin (2.0 * pi * 220.0 * t + 2.0 * std::sin (2.0 * pi * 660.0 * t)) * std::sin (pi * t / 0.625));
+        });
+
+        // --- the Sampler track ---------------------------------------------------------------------------------------------
+        check ("the Sampler tile's track was added", simple->addPads());
+        offline.dispatchPendingMessages();
+        const auto& song0 = offline.getSong();
+        int track = -1;
+        for (int t = 0; t < (int) song0.playlistTracks.size() && track < 0; ++t)
+            if (st::kindOf (song0, t) == st::Kind::pads)
+                track = t;
+        check ("a Sampler track with 16 pads", track >= 0 && [&] {
+            const auto c = sp::padChannels (song0, track);
+            return std::all_of (c.begin(), c.end(), [] (int i) { return i >= 0; });
+        }());
+        auto* dock = simple->dockForSnapshot();
+        if (dock == nullptr || track < 0)
+        {
+            juce::File (prefix + "-report.txt").replaceWithText (report + "ERROR no dock / track\n");
+            return;
+        }
+        simple->trackSelected (track);
+        offline.dispatchPendingMessages();
+        check ("the dock opens on the Pads tab", dock->hasPadsTabForCheck() && dock->getTab() == lynx::SimpleDock::Tab::pads);
+        const auto shots = [&] (const juce::String& name) {
+            offline.dispatchPendingMessages();
+            for (float scale : { 1.0f, 2.0f })
+            {
+                const auto suffix = scale > 1.0f ? juce::String ("@2x") : juce::String();
+                writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, scale), name + suffix);
+                writeImage (dock->createComponentSnapshot (dock->getLocalBounds(), true, scale), "dock-" + name + suffix);
+            }
+        };
+        shots ("pads-empty");
+        const juce::File files[] { kick, snare, hat, hat, chord, vox };
+        for (int p = 0; p < 6; ++p)
+            dock->padsLoadForCheck (p, files[p]);
+        offline.dispatchPendingMessages();
+        check ("six pads hold a sound", [&] {
+            int n = 0;
+            for (int p = 0; p < sp::padCount; ++p)
+                n += sp::hasSample (offline.getSong(), track, p) ? 1 : 0;
+            return n == 6;
+        }());
+        // pad 3 = the open hat: one-shot, group 1 with pad 2 (closed hat), a colour; pad 4 = the chord, looped and darker
+        dock->padsSelectForCheck (2);
+        dock->padsModeForCheck (1);
+        dock->padsSelectForCheck (3);
+        dock->padsModeForCheck (1);
+        offline.editSong ([track] (lynx::Song& s) {
+            for (int p : { 2, 3 })
+                if (const auto c = sp::padChannel (s, track, p); c >= 0)
+                {
+                    s.channels[(std::size_t) c].simplePad.group = 1;
+                    s.channels[(std::size_t) c].simplePad.colour = 2;
+                    sp::apply (s.channels[(std::size_t) c], 4800);
+                }
+        });
+        dock->padsSelectForCheck (4);
+        dock->padsModeForCheck (2);
+        dock->padsKnobForCheck (2, 0.3f); // tone: a low-pass
+        dock->padsKnobForCheck (1, 0.35f); // release
+        dock->padsRegionForCheck (0.05f, 0.7f);
+        dock->padsNormalizeForCheck();
+        dock->padsUpdateForCheck();
+        {
+            const auto& s = offline.getSong();
+            const auto& c = s.channels[(std::size_t) sp::padChannel (s, track, 4)];
+            line ("pad 5: mode " + juce::String ((int) c.simplePad.mode) + " tone " + juce::String (c.simplePad.tone, 2) + " cutoff " + juce::String (c.sampler.cutoff, 0)
+                  + " release " + juce::String (c.sampler.release, 3) + " region " + juce::String (c.sampler.regionStart, 2) + "-" + juce::String (c.sampler.regionEnd, 2)
+                  + " gain " + juce::String (c.sampler.gainDb, 2) + " dB zones " + juce::String ((int) c.zones.size()));
+            check ("pad 5 loops its region, darker, normalized", c.simplePad.mode == 2 && c.zones.size() == 1 && c.zones[0].loopMode == 2 && c.simplePad.tone < -0.3f
+                                                                    && c.sampler.filterType == 0 && c.sampler.cutoff < 5000.0f && c.sampler.gainDb > 0.5f);
+            const auto& h = s.channels[(std::size_t) sp::padChannel (s, track, 3)];
+            check ("the hats share a choke group of this insert", h.cutGroup > 1000 && h.cutGroup == s.channels[(std::size_t) sp::padChannel (s, track, 2)].cutGroup);
+        }
+        shots ("pads");
+        dock->padsHitForCheck (0);
+        dock->lightPad (2);
+        shots ("pads-hit");
+        // the typing keys: V plays pad 1, M pad 4, 7 pad 16; Z is not a pad key
+        check ("typing keys reach the pads", simple->padChannelForKey ('V') == sp::padChannel (offline.getSong(), track, 0)
+                                                 && simple->padChannelForKey ('m') == sp::padChannel (offline.getSong(), track, 3)
+                                                 && simple->padChannelForKey ('7') == sp::padChannel (offline.getSong(), track, 15)
+                                                 && simple->padChannelForKey ('Z') == -1);
+        // drag pad 6 (vox) onto the empty pad 9: it moves; Alt-drag pad 1 onto pad 10: a copy
+        dock->padsDragForCheck (5, 8, false);
+        dock->padsDragForCheck (0, 9, true);
+        check ("a pad moved and a pad copied", ! sp::hasSample (offline.getSong(), track, 5) && sp::hasSample (offline.getSong(), track, 8)
+                                                  && sp::hasSample (offline.getSong(), track, 9) && sp::hasSample (offline.getSong(), track, 0));
+        dock->padsSelectForCheck (4);
+        shots ("pads-moved");
+        saveMenus ({ "Pad menu", "Colour", "Copy a value to every pad" }, [&] {
+            std::vector<juce::PopupMenu> menus { dock->padMenuForSnapshot (4) };
+            for (juce::PopupMenu::MenuItemIterator it (menus[0]); it.next();)
+                if (it.getItem().subMenu != nullptr)
+                    menus.push_back (*it.getItem().subMenu);
+            return menus;
+        }(), prefix + "-menu-pad.png");
+
+        // kits: saved, the pads cleared, opened again
+        const auto kitFile = lynx::platform::documentsFolder().getChildFile ("LYNX/Sampler kits/Test kit 190fo.lynxkit");
+        kitFile.deleteFile();
+        check ("the pads saved as a kit", dock->saveKitForCheck ("Test kit 190fo") && kitFile.existsAsFile());
+        saveMenus ({ "Kit", "My kits" }, [&] {
+            std::vector<juce::PopupMenu> menus { dock->kitMenuForSnapshot() };
+            for (juce::PopupMenu::MenuItemIterator it (menus[0]); it.next();)
+                if (it.getItem().subMenu != nullptr && it.getItem().text == lynx::tr ("My kits"))
+                    menus.push_back (*it.getItem().subMenu);
+            return menus;
+        }(), prefix + "-menu-kit.png");
+        const auto before = offline.getSong().channels;
+        offline.editSong ([track] (lynx::Song& s) {
+            for (int p = 0; p < sp::padCount; ++p)
+                sp::clearPad (s, track, p);
+        });
+        check ("the kit opens the same pads again", dock->openKitForCheck (kitFile) && [&] {
+            const auto& now = offline.getSong().channels;
+            for (int p = 0; p < sp::padCount; ++p)
+            {
+                const auto c = sp::padChannel (offline.getSong(), track, p);
+                if (c < 0 || now[(std::size_t) c].samplePath != before[(std::size_t) c].samplePath || now[(std::size_t) c].simplePad != before[(std::size_t) c].simplePad
+                    || now[(std::size_t) c].sampler.release != before[(std::size_t) c].sampler.release || now[(std::size_t) c].zones != before[(std::size_t) c].zones)
+                    return false;
+            }
+            return true;
+        }());
+        {
+            const auto renamed = kitFile.getSiblingFile ("Renamed kit 190fo.lynxkit");
+            renamed.deleteFile();
+            check ("a kit renamed (and a one-letter name refused)", ! lynx::SimpleDock::renameKitForCheck (kitFile, "x")
+                                                                     && lynx::SimpleDock::renameKitForCheck (kitFile, "Renamed kit 190fo") && renamed.existsAsFile()
+                                                                     && ! kitFile.exists());
+            renamed.deleteFile();
+        }
+        kitFile.deleteFile();
+
+        // a beat on the pads (the track's pattern) and the .lynx round trip
+        offline.editSong ([track] (lynx::Song& s) {
+            const auto pattern = [&] {
+                for (const auto& c : s.playlist)
+                    if (c.track == track && c.kind == lynx::ClipKind::pattern)
+                        return c.pattern;
+                return -1;
+            }();
+            if (pattern < 0)
+                return;
+            for (int step = 0; step < 16; ++step)
+            {
+                const int pad = step % 4 == 0 ? 0 : step % 8 == 4 ? 1 : 2;
+                lynx::Note n;
+                n.channel = sp::padChannel (s, track, pad);
+                n.key = sp::padKey;
+                n.start = (std::int64_t) step * lynx::ticksPerStep;
+                n.length = lynx::ticksPerStep;
+                s.patterns[(std::size_t) pattern].notes.push_back (n);
+            }
+        });
+        {
+            const auto json = lynx::ProjectFile::toJson (offline.getSong());
+            juce::String error;
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            bool same = back.has_value() && back->channels.size() == offline.getSong().channels.size() && st::kindOf (*back, track) == st::Kind::pads;
+            for (std::size_t c = 0; same && c < back->channels.size(); ++c)
+            {
+                const auto& a = back->channels[c];
+                const auto& b = offline.getSong().channels[c];
+                same = a.simplePad == b.simplePad && a.zones == b.zones && a.cutGroup == b.cutGroup && a.cutBy == b.cutBy && a.samplePath == b.samplePath
+                       && a.sampler.regionStart == b.sampler.regionStart && a.sampler.release == b.sampler.release && a.sampler.cutoff == b.sampler.cutoff;
+            }
+            check ("pads, their modes, groups and loops survive .lynx", same);
+            lynx::Song plain = lynx::Song::makeDefault();
+            check ("a project without pads writes no pad field", ! lynx::ProjectFile::toJson (plain).contains ("simplePad"));
+        }
+        ui.getPlaylistForSnapshot().selectTrack (track);
+
+        // --- a folder of stems and MIDI files (the other app's "download stems" naming) --------------------------------------
+        const auto stems = dir.getChildFile ("My song stems");
+        writeWav (stems.getChildFile ("01_Drums.wav"), 96000, [&rnd] (int i) { return (i % 24000) < 2000 ? (rnd.nextFloat() - 0.5f) * 0.8f : 0.0f; });
+        writeWav (stems.getChildFile ("02_Bass.wav"), 96000, [pi] (int i) { return (float) (0.3 * std::sin (2.0 * pi * 55.0 * i / 48000.0)); });
+        writeWav (stems.getChildFile ("10_Lead Vox.wav"), 96000, [pi] (int i) { return (float) (0.2 * std::sin (2.0 * pi * 330.0 * i / 48000.0)); });
+        {
+            juce::MidiMessageSequence seq;
+            for (int k = 0; k < 8; ++k)
+            {
+                seq.addEvent (juce::MidiMessage::noteOn (1, 36 + (k % 4) * 3, (juce::uint8) 100), k * 480.0);
+                seq.addEvent (juce::MidiMessage::noteOff (1, 36 + (k % 4) * 3), k * 480.0 + 400.0);
+            }
+            seq.updateMatchedPairs();
+            juce::MidiFile midi;
+            midi.setTicksPerQuarterNote (960);
+            midi.addTrack (seq);
+            for (const auto& name : { "02_Bass.mid", "03_Keys.mid" })
+            {
+                juce::FileOutputStream out (stems.getChildFile (name));
+                midi.writeTo (out);
+            }
+        }
+        const auto tracksBefore = [&] {
+            int n = 0;
+            for (int t = 0; t < (int) offline.getSong().playlistTracks.size(); ++t)
+                n += st::kindOf (offline.getSong(), t).has_value() ? 1 : 0;
+            return n;
+        }();
+        simple->addFilesForCheck ({ stems });
+        offline.dispatchPendingMessages();
+        {
+            const auto& s = offline.getSong();
+            juce::StringArray names;
+            int muted = 0, count = 0;
+            for (int t = 0; t < (int) s.playlistTracks.size(); ++t)
+                if (st::kindOf (s, t).has_value())
+                {
+                    ++count;
+                    if (count > tracksBefore)
+                    {
+                        names.add (juce::String::fromUTF8 (s.playlistTracks[(std::size_t) t].name.c_str()) + (s.playlistTracks[(std::size_t) t].muted ? " (muted)" : ""));
+                        muted += s.playlistTracks[(std::size_t) t].muted ? 1 : 0;
+                    }
+                }
+            line ("folder tracks: " + names.joinIntoString (", "));
+            check ("the folder gave 5 tracks in number order, named without numbers, the Bass notes muted (its stem plays)",
+                   names == juce::StringArray { "Drums", "Bass", "Lead Vox", "Bass 2 (muted)", "Keys" } && muted == 1);
+            bool atZero = true;
+            for (const auto& c : s.playlist)
+                if (c.track >= 0 && st::kindOf (s, c.track) == st::Kind::audio)
+                    atZero = atZero && c.start == 0;
+            check ("every stem starts at the song's start", atZero);
+        }
+        simple->hideChooser();
+        whole ("folder-import");
+
+        dir.deleteRecursively();
+        line (report.contains ("ERROR ") ? "RESULT ERROR" : "RESULT OK");
+        juce::File (prefix + "-report.txt").replaceWithText (report);
     }
 
     void runSimple190dsShot (const juce::String& prefix)

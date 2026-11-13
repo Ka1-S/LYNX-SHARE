@@ -21,6 +21,7 @@
 #include "core/KeyGuess.h"
 #include "core/ProjectKey.h"
 #include "core/ScaleKeys.h"
+#include "core/SimplePads.h"
 #include "core/SessionOps.h"
 #include "ui/FileChoosers.h"
 #include "ui/ProjectLoading.h"
@@ -965,6 +966,7 @@ MainComponent::~MainComponent()
         playlist.onTrackEffects = nullptr;
         playlist.onSimpleTrackSelected = nullptr;
         playlist.onSimpleFilesDropped = nullptr;
+        playlist.onExportTrack = nullptr;
         simpleWorkflow.reset();
     }
     simpleWorkflowAliveAfterTeardown = SimpleWorkflow::alive.load();
@@ -1755,6 +1757,14 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
     if (mapKeyPressed (key)) // round 190ef: the map modes' keys and the key mappings (Clip-launch layout only)
         return true;
+    // round 190fo: while the Simple dock shows a Sampler track's pads, V B N M / F G H J / R T Y U / 4 5 6 7 play them
+    if (simpleWorkflow != nullptr && ! key.getModifiers().isAnyModifierKeyDown())
+        if (const auto padChannel = simpleWorkflow->padChannelForKey (key.getKeyCode()); padChannel >= 0)
+        {
+            if (! heldKeys.hasTag (key.getKeyCode()))
+                heldKeys.press (padChannel, simplepads::padKey, 0.8f, key.getKeyCode());
+            return true;
+        }
     const auto chord = chordFromKeyPress (key);
 
     // 1. the typing piano: the keys its layout takes (notes, FL's LOCK) win over the shortcuts; FL's FREE keys don't
@@ -3389,6 +3399,13 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
         playlist.onSimpleFilesDropped = [this] (const juce::StringArray& files, std::int64_t tick) {
             if (simpleWorkflow != nullptr)
                 simpleWorkflow->dropFiles (files, tick);
+        };
+        // round 190fo: "Export this track" in the Simple track menu
+        playlist.onExportTrack = [this] (int track, bool asMidi) {
+            engine.capturePluginStates();
+            exportOneTrack (engine, track, asMidi,
+                            currentFile != juce::File() ? currentFile.getParentDirectory() : juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                            projectName.isNotEmpty() ? juce::File::createLegalFileName (projectName) : juce::String ("untitled"));
         };
     }
     if (from == Style::simple && style != Style::simple && simpleWorkflow != nullptr)

@@ -29,10 +29,11 @@ enum class Kind : std::uint8_t
     sampler,    // one sample played over the keyboard (instrument track with a sampler channel)
     guitar,     // an instrument cable (audio track, mono input)
     bass,       // an instrument cable (audio track, mono input)
-    audio       // imported audio or a dropped loop (audio track, no input)
+    audio,      // imported audio or a dropped loop (audio track, no input)
+    pads        // round 190fo: 16 pads, one sample each (the pads' Sampler channels in one group, one insert; core/SimplePads.h)
 };
 
-// "Voice", "Instrument", "Drums", "Sampler", "Guitar", "Bass", "Audio" (English, for tr())
+// "Voice", "Instrument", "Drums", "Sampler", "Guitar", "Bass", "Audio", "Sampler" (pads) (English, for tr())
 const char* defaultName (Kind kind) noexcept;
 // The colour a new track of this kind takes (0xFFRRGGBB), the same for its track, insert and channels.
 std::uint32_t defaultColour (Kind kind) noexcept;
@@ -51,6 +52,7 @@ struct Request
     std::optional<ChannelDef> channel;
     // Drums: the kit's channels (each with its sound), in row order, and the starter beat whose notes' `channel` is the
     // index into `kit` (nullopt: an empty one-bar pattern). Its name becomes the track's.
+    // Pads (round 190fo): the 16 pads' channels (simplepads::emptyKit) and the same pattern rules as Drums.
     // Instrument / Sampler (slice S3: an imported MIDI track): notes for the channel (their `channel` is ignored),
     // placed at the song's start as a pattern named after the track; nullopt: nothing placed.
     std::vector<ChannelDef> kit;
@@ -147,4 +149,33 @@ double tempoInName (const std::string& name, bool* explicitBpm = nullptr);
 // in any clip list, no note in any pattern, no Playlist track with a mode or a name. Channels without notes (a
 // template's empty drum rows) and inserts don't count.
 bool isEmptySong (const Song& song);
+
+// Round 190fo: a folder of stems and MIDI files brought in at once (owner decision O6: BandLab's "Download Stems",
+// one file per track named "NN_name", and LYNX's own export for other apps, "Stems/NN name.wav" + "MIDI/NN name.mid").
+// `paths` are the folder's files (any order, sub-folders allowed, '/' separated); the plan keeps the audio and MIDI files
+// in name order (the number first), names each track after its file without the number, skips the "(all tracks)" MIDI
+// file and the "<name> - mixdown" audio file of LYNX's export, and marks a MIDI file whose track name an audio file also has (`muted`: its notes come in on a
+// muted track, since the stem already plays them).
+struct FolderItem
+{
+    std::string path;
+    std::string name;
+    bool midi = false;
+    bool muted = false;
+};
+std::vector<FolderItem> folderPlan (std::vector<std::string> paths);
+// Round 190fo: the Simple layout's shared reverb (the original's per-track "Reverb" knob is a send into one shared aux
+// channel). It is the insert named "Reverb" whose first effect is Atrium; `ensureSharedReverb` makes it the first time (a
+// free insert, Atrium fully wet with a medium room, to the Master). −1: none (or no free insert). A track's send to it is
+// an ordinary FL send from the track's insert (linear gain 0…1 here: up to 0 dB); level 0 removes the send.
+// Round 190fo ("Reset all tracks", the original's mobile app): every Simple track's insert back to unity level and centre
+// pan (its effects, sends and channels stay). Returns how many inserts changed.
+int resetLevels (Song& song);
+int sharedReverb (const Song& song);
+int ensureSharedReverb (Song& song);
+float reverbSend (const Song& song, int insert);
+bool setReverbSend (Song& song, int insert, float level);
+
+// "03_Lead Vox" → "Lead Vox", "01 Drums" → "Drums", "12-Bass" → "Bass"; anything else stays (a bare number too).
+std::string stemTrackName (const std::string& fileStem);
 } // namespace lynx::simpletracks

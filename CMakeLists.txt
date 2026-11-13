@@ -98,6 +98,7 @@ add_library(lynx_core STATIC
     src/core/ThemePalette.cpp
     src/core/LoopStarter.cpp
     src/core/SimpleTracks.cpp
+    src/core/SimplePads.cpp
     src/core/KeyFollow.cpp
     src/core/GoalKnobs.cpp
     src/core/ChainPresets.cpp

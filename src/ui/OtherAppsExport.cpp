@@ -493,6 +493,66 @@ private:
     bool ok = false;
 };
 
+// Round 190fo: one track as a file (the Simple workflow's track menu, as the original's "export track" does): its stem
+// as a WAV (the same render as the bundle's stems: the track's clips from the song's start, 24-bit, no Master effects)
+class TrackStemThread final : public juce::ThreadWithProgressWindow
+{
+public:
+    TrackStemThread (AudioEngine& engine, int trackIndex, juce::File target)
+        : juce::ThreadWithProgressWindow (tr ("Exporting the track..."), true, true), song (exportbundle::prepared (engine.getSong())),
+          track (trackIndex), file (std::move (target))
+    {
+        const auto rate = engine.getTransport().sampleRate.load();
+        sampleRate = rate > 0.0 ? rate : 44100.0;
+    }
+
+    void run() override
+    {
+        const auto plan = exportbundle::plan (song, "track");
+        const auto stem = std::find_if (plan.stems.begin(), plan.stems.end(), [this] (const exportbundle::TrackFile& t) { return t.track == track; });
+        if (stem == plan.stems.end())
+        {
+            error = tr ("The track has nothing to play.");
+            return;
+        }
+        exportopts::Options render;
+        render.format = exportopts::Format::wav;
+        render.wavBits = 24;
+        render.sampleRate = sampleRate;
+        render.range = exportopts::Range::selection;
+        render.tail = exportopts::TailMode::leave;
+        render.masterEffects = false;
+        quickrender::Plan range;
+        range.clips = stem->clips;
+        range.start = 0;
+        range.end = std::max<std::int64_t> (1, plan.endTick);
+        RenderJob slot (*this);
+        auto* job = slot.create ([&] { return std::make_unique<ExportJob> (quickrender::makePlanRenderSong (song, range), render, file); });
+        if (job == nullptr)
+            return;
+        ok = job->run ([this] (double p) {
+            setProgress (p);
+            return ! threadShouldExit();
+        }, error);
+        slot.release();
+    }
+
+    void threadComplete (bool cancelled) override
+    {
+        if (! ok && ! cancelled)
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not export"), error);
+        juce::MessageManager::callAsync ([this] { delete this; });
+    }
+
+private:
+    Song song;
+    int track;
+    juce::File file;
+    double sampleRate = 44100.0;
+    juce::String error;
+    bool ok = false;
+};
+
 class OtherAppsPanel final : public juce::Component
 {
 public:
@@ -629,6 +689,44 @@ private:
     static inline bool lastMixdown = true, lastZip = false;
 };
 } // namespace
+
+void exportOneTrack (AudioEngine& engine, int track, bool asMidi, const juce::File& suggestedFolder, const juce::String& projectName)
+{
+    const auto& song = engine.getSong();
+    if (track < 0 || track >= (int) song.playlistTracks.size())
+        return;
+    const auto trackName = song.playlistTracks[(std::size_t) track].name.empty() ? tr ("Track {0}", { juce::String (track + 1) })
+                                                                                  : fromUtf8 (song.playlistTracks[(std::size_t) track].name);
+    // the original's names: "<song> - <track>.wav", "<track>.mid"
+    const auto name = juce::File::createLegalFileName (asMidi ? trackName + ".mid" : (projectName.isNotEmpty() ? projectName : juce::String ("LYNX SHARE")) + " - " + trackName + ".wav");
+    static std::unique_ptr<juce::FileChooser> chooser;
+    chooser = lynx::ui::makeFileChooser (asMidi ? tr ("Export the track as MIDI") : tr ("Export the track as audio"), suggestedFolder.getChildFile (name),
+                                         asMidi ? "*.mid" : "*.wav");
+    lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::warnAboutOverwriting,
+                             [&engine, track, asMidi] (const juce::FileChooser& fc) {
+                                 auto file = fc.getResult();
+                                 if (file == juce::File())
+                                     return;
+                                 file = file.withFileExtension (asMidi ? "mid" : "wav");
+                                 if (asMidi)
+                                 {
+                                     juce::String error;
+                                     const auto song = exportbundle::prepared (engine.getSong());
+                                     exportbundle::TrackFile t;
+                                     t.track = track;
+                                     for (int i = 0; i < (int) song.playlist.size(); ++i)
+                                         if (const auto& c = song.playlist[(std::size_t) i]; c.track == track && ! c.muted)
+                                             t.clips.push_back (i);
+                                     const auto notes = exportbundle::trackNotes (song, t);
+                                     if (notes.empty() || ! otherapps::writeMidi (song, notes, file, error))
+                                         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not export"),
+                                                                                 notes.empty() ? tr ("The track has no notes.") : error);
+                                     return;
+                                 }
+                                 engine.capturePluginStates();
+                                 (new TrackStemThread (engine, track, file))->launchThread();
+                             });
+}
 
 void showOtherAppsExportDialog (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& projectName)
 {
