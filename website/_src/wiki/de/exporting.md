@@ -1,5 +1,5 @@
 ---
-source: 10cb57faf4
+source: da5e41c322
 ---
 ![Das Export-Fenster mit gewähltem WAV: Bereich, Ausklang und Dateien links, Format rechts, Mix-Optionen darunter](/assets/img/wiki/export.webp)
 
@@ -82,7 +82,7 @@ Hake `Auch den Gesamtmix` an, um den Mix neben den Stems zu bekommen. Die Zeile 
 
 Die `.flp` ist ein FL-Studio-2026-Projekt. Sampler, Audioclips, die eigenen Generatoren und Effekte von FL Studio, Plugins von Drittanbietern, Patterns, die Playlist, der Mixer und die Automation gehen mit ihren Einstellungen hinüber. Für Dinge, die FL Studio nicht hat, wählst du zwischen `Zu Audio rendern (klingt gleich)` und `Das nächstliegende FL-Plugin verwenden (bleibt bearbeitbar, kann anders klingen)`. Bei der zweiten Wahl werden Instrumente nur für LYNX weggelassen. Modulatoren werden immer weggelassen. Ein Bericht listet, was gerendert, ersetzt oder weggelassen wurde. Details stehen unter [Umstieg von FL Studio](/wiki/coming-from-fl-studio/).
 
-Die `.als` enthält pro Kanal eine MIDI-Spur, Audiospuren, Gruppen, Returns, Sends, VST2- und VST3-Plugins mit ihrem Zustand, Marker sowie Automation von Lautstärke, Pan und Tempo. Die eigenen Instrumente und Effekte von LYNX SHARE werden nicht umgewandelt, ihre Spuren und Noten bleiben aber erhalten. Automation von Effektparametern und Routen von Insert zu Insert entfallen. Details stehen unter [Umstieg von Ableton Live](/wiki/coming-from-ableton/).
+Die `.als` enthält pro Kanal eine MIDI-Spur, Audiospuren, Gruppen, Returns, Sends, Racks und Drum Racks, VST2- und VST3-Plugins mit ihrem Zustand, Marker sowie Automation von Lautstärke, Pan und Tempo. Die eigenen Instrumente und Effekte von LYNX SHARE werden nicht umgewandelt, ihre Spuren und Noten bleiben aber erhalten. Automation von Effektparametern und Routen von Insert zu Insert entfallen. Details stehen unter [Umstieg von Ableton Live](/wiki/coming-from-ableton/).
 
 ## Gut zu wissen
 

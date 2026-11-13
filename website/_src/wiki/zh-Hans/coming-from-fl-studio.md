@@ -1,5 +1,5 @@
 ---
-source: 937b8d8778
+source: 3bf7e0c0ab
 ---
 LYNX SHARE 保留了你熟悉的工作方式：通道机架、样式、播放列表和混音台，快捷键也一样。它可以直接打开 `.flp` 工程，也可以写回一个。
 
@@ -72,7 +72,7 @@ FL Studio 自己的生成器和效果器不会被加载。LYNX SHARE 用它重�
 
 `文件 › 打开...` 也能打开 `.flm` 工程。导入是部分的。
 
-- 会导入：速度、拍号、每个 FLM 通道对应一个混音台插入轨、每条轨道对应一个播放列表轨道、样式（每次循环作为一个片段）、带偏移和音高的音频片段、鼓组、DW Sampler 采样（作为采样器）、`.dwp` 程序（在 DirectWave 中）、MiniSynth、Transistor Bass、3x Osc 和 GMSynth 乐器、FLM 的效果器（作为 Pocket 效果器），以及电平、声像、静音、独奏、弯音和发送的自动化。
+- 会导入：速度、拍号、每个 FLM 通道对应一个混音台插入轨、每条泳道对应一个播放列表轨道、样式（每次循环作为一个片段）、带偏移和音高的音频片段、鼓组、DW Sampler 采样和 `.dwp` 程序以及 Slicer（用 FLM 自己的引擎）、MiniSynth、Transistor Bass、3x Osc、GMSynth 和 SuperSaw 乐器、FLM 的效果器（作为 Pocket 效果器）、电平、声像、静音、独奏、弯音、发送和乐器参数的自动化，以及和弦集和调锁定。
 - 不会导入：FLM 的其他乐器，它们用内置合成器播放。
 - 采样会在 `.flm` 旁边以及 FL Studio 中 FLM 资源的副本里查找。找不到的 `.dwp` 会用替身来播放。
 

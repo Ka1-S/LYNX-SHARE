@@ -1,5 +1,5 @@
 ---
-source: c457d438ee
+source: a79e43f031
 ---
 LYNX SHARE 把工程保存为 `.lynx` 文件。它也能打开其他程序的工程，加载常见的音频文件，并导出供其他程序使用的音频、MIDI 和工程。下表列出了 0.1.26 alpha 的所有格式。
 
@@ -20,8 +20,8 @@ LYNX SHARE 把工程保存为 `.lynx` 文件。它也能打开其他程序的工
 | `.zip` | `文件 › 打开...` 把它解压到一个文件夹，然后打开其中的工程 | `文件 › 导出 › 工程及采样（.zip）...` | 也能打开 FL Studio 的压缩循环包 |
 | `.lynxpack` | 显示摘要后打开。其中的一部分会合并到宿主的工程 | `文件 › 在线会话 › 发送工程...` | 在[在线会话](/wiki/online-sessions/)中发送的工程或其中一部分。第三方插件的部分以音频渲染加插件设置的形式传送 |
 | `.flp` | `文件 › 打开...` | `文件 › 导出 › FL Studio 工程...`，即 FL Studio 2026 工程或压缩循环包 | 原生插件在重建的引擎上播放，精确程度各不相同。FLEX 包永远不会被打开。导出时，仅 LYNX 有的乐器和效果器会被渲染为音频，或换成最接近的 FL 插件，调制器则会被舍去。见[从 FL Studio 转来](/wiki/coming-from-fl-studio/) |
-| `.flm` | `文件 › 打开...` | 不支持 | FL Studio Mobile 工程。部分导入：除 MiniSynth、Transistor Bass、3x Osc、GMSynth 和 DirectWave 之外的乐器用内置合成器播放 |
-| `.als` | `文件 › 打开...`，Live 11 和 12 的套装 | `文件 › 导出 › Ableton Live 套装 (.als)...`，适用于 Live 12 或 Live 11 | 导入时，Live 自己的效果器会被丢弃。导出时，LYNX SHARE 自己的乐器和效果器不会被转换，效果器参数的自动化和插入轨之间的路由会被丢弃。见[从 Ableton Live 转来](/wiki/coming-from-ableton/) |
+| `.flm` | `文件 › 打开...` | 不支持 | FL Studio Mobile 工程。部分导入：除 MiniSynth、Transistor Bass、3x Osc、GMSynth、SuperSaw、DW Sampler、Slicer 和 DirectWave 之外的乐器用内置合成器播放 |
+| `.als` | `文件 › 打开...`，Live 11 和 12 的套装 | `文件 › 导出 › Ableton Live 套装 (.als)...`，适用于 Live 12 或 Live 11 | 导入时，Live 中没有 LYNX SHARE 对应项的设备会被丢弃。导出时，LYNX SHARE 自己的乐器和效果器不会被转换，效果器参数的自动化和插入轨之间的路由会被丢弃。见[从 Ableton Live 转来](/wiki/coming-from-ableton/) |
 | `.mid`、`.midi` | `文件 › 打开...` 会新建一个工程。`文件 › 导入 › MIDI文件...` 和钢琴卷帘则导入到当前工程 | `文件 › 导出 › MIDI文件...`（`Ctrl+Shift+M`） | |
 | `.wav` | 作为采样或音频片段 | `文件 › 导出 › Wave文件...`，16 位、24 位或 32 位浮点 | 可选抖动、速度信息、循环标记和播放列表标记 |
 | `.mp3` | 作为采样或音频片段 | `文件 › 导出 › MP3文件...` | 恒定码率 |

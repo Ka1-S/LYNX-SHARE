@@ -8,9 +8,11 @@ status: short
 ## What is in it
 
 - **New track**: a chooser adds a voice, guitar or bass track to record on, an instrument that plays in one click, a sampler, or a starter beat placed for four bars.
-- **Loops**: an audio loop dropped on the timeline keeps time with the project.
+- **Loops**: an audio loop dropped on the timeline keeps time with the project and moves to the project's key (`Follow the project key`, per clip).
 - **Key**: the project has a key, and `Guess from notes` finds it from the notes of the song.
 - **Finish**: the Finish dock gives the Master a ready-made sound and saves the song as WAV, MP3 or a package for other apps.
+- **Track dock**: under the timeline, the selected track's Instrument, Keyboard, Editor and Effects tabs. The Effects tab has eight one-knob effects, 22 chain presets and a Blend knob, and the Keyboard tab plays keys, scale keys or a chord pad.
+- **First song**: the Welcome screen offers a seven-step first-song tour, a demo song or an empty project (`Help › Welcome screen...`).
 
 ## Good to know
 

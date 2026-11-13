@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="5732fe19";
+window.LYNX_LANG=lang;window.LYNX_V="8fd86544";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=5732fe19">
+<link rel="stylesheet" href="/assets/site.css?v=8fd86544">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -110,7 +110,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <p data-i18n="home.what2">Projects from other programs open directly. An .flp comes in with its channels, samples, patterns, arrangement, automation and mixer, and FL Studio's native plugins are replaced by LYNX SHARE's own engines. Live 11 and 12 sets open too, and their Session clips land in an optional clip grid with scenes. The same menu (View › Layout style) has a Simple workflow: one window for a first song.</p>
       <p data-i18n="home.what3">Third-party plugins load as VST3 and CLAP on every system, plus Audio Units on macOS and LV2 on Linux. VST2 plugins load on Windows and Linux, and on Windows 32-bit plugins run through a bridge.</p>
       <h3 data-i18n="home.missT">What is missing</h3>
-      <p data-i18n="home.miss">It is an alpha, so expect bugs and keep backups. Not every FL Studio plugin is recreated exactly: the <a href="/features/#plugins">plugin list</a> gives the status of each one. Live's own devices are not converted, and in .flm projects only some of FL Studio Mobile's instruments are recreated. The Windows build is not code-signed and the macOS build is not notarized yet, so both systems warn the first time you open it.</p>
+      <p data-i18n="home.miss">It is an alpha, so expect bugs and keep backups. Not every FL Studio plugin is recreated exactly: the <a href="/features/#plugins">plugin list</a> gives the status of each one. Only some of Live's own devices are converted, and in .flm projects only some of FL Studio Mobile's instruments are recreated. The Windows build is not code-signed and the macOS build is not notarized yet, so both systems warn the first time you open it.</p>
       <p><a class="btn btn-ghost btn-sm" href="/features/" data-i18n="home.moreF">All features</a> <a class="btn btn-ghost btn-sm" href="/wiki/getting-started/" data-i18n="home.moreW">Getting started</a></p>
     </div>
     <dl class="facts">
@@ -212,7 +212,7 @@ LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=5732fe19" defer></script>
-<script src="/assets/motion.js?v=5732fe19" defer></script>
+<script src="/assets/site.js?v=8fd86544" defer></script>
+<script src="/assets/motion.js?v=8fd86544" defer></script>
 </body>
 </html>

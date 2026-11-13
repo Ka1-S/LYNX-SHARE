@@ -1,5 +1,5 @@
 ---
-source: bcd8a275bd
+source: 358890815a
 ---
 `Plik › Otwórz...` (`Ctrl+O`) otwiera własne projekty `.lynx` LYNX SHARE, a także pliki `.flp`, `.als`, `.flm` i `.mid`. Projekt z innego programu jest importem: staje się nowym, niezapisanym projektem LYNX SHARE, a oryginalny plik nigdy nie jest zapisywany.
 
@@ -16,8 +16,8 @@ source: bcd8a275bd
 | Format | Konwertowane | Niekonwertowane |
 |---|---|---|
 | `.flp` (FL Studio) | Kanały, sample, patterny, nuty slide i porta, wszystkie aranżacje, znaczniki, zmiany metrum, automatyka, powiązania z kontrolerami, Mixer z routingiem, sidechainy, EQ ścieżek i efekty natywne | Paczki FLEX są zaszyfrowane i nigdy nie są otwierane. Kanał FLEX dostaje patch syntezatora dobrany według nazwy presetu |
-| `.als` (Live 11 i 12) | Ścieżki MIDI, audio, grupowe i return, tempo, metrum, lokatory, pętla, głośność, panorama, wyciszenie, solo i wysyłki wraz z automatyką, klipy sesji i sceny, znaczniki warp | Własne efekty Live są pomijane. Racki zachowują tylko pierwszy łańcuch. Simpler, Sampler i racki perkusyjne stają się samplerami LYNX SHARE |
-| `.flm` (FL Studio Mobile) | Tempo, metrum, jeden insert miksera na kanał, jedna ścieżka Playlisty na tor, patterny, klipy audio z przesunięciem i wysokością, zestawy perkusyjne, sample DW Sampler i programy `.dwp` | Efekty i tory automatyki z FLM. Pozostałe generatory FLM grają wbudowanym syntezatorem |
+| `.als` (Live 11 i 12) | Ścieżki MIDI, audio, grupowe i return, tempo, metrum, lokatory, pętla, głośność, panorama, wyciszenie, solo i wysyłki wraz z automatyką, klipy sesji i sceny, znaczniki warp, racki i Racki perkusyjne oraz wiele własnych urządzeń Live (EQ Eight, Compressor, Glue Compressor, Reverb, Delay, Auto Filter, Saturator, Utility, Simpler, Drift i inne) jako własne urządzenia LYNX SHARE | Urządzenia Live bez odpowiednika w LYNX SHARE (Hybrid Reverb, Grain Delay, Amp, Roar, patche FM Operator i inne) są pomijane i wymienione na liście. Racki MIDI Effect nie są konwertowane |
+| `.flm` (FL Studio Mobile) | Tempo, metrum, jeden insert miksera na kanał, jedna ścieżka Playlisty na tor, patterny, klipy audio z przesunięciem i wysokością, zestawy perkusyjne, DW Sampler i programy `.dwp`, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth i SuperSaw, efekty, automatyka i zestawy akordów | Pozostałe generatory FLM grają wbudowanym syntezatorem |
 | `.mid` | Nuty, metrum i każda zmiana tempa | Plik MIDI nie niesie dźwięków: kanały dostają syntezator LYNX SHARE albo kanał MIDI Out |
 
 Pluginy innych firm VST2, VST3 i CLAP w pliku `.flp` oraz VST2 i VST3 w pliku `.als` wczytują się z zapisanym stanem, jeśli ten sam plugin jest zainstalowany na Twoim komputerze.

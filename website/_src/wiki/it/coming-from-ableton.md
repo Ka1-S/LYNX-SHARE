@@ -1,5 +1,5 @@
 ---
-source: 2285f3e677
+source: d5cc625221
 ---
 ![Il layout a lancio di clip: una griglia di clip con le scene accanto alla Playlist](/assets/img/cliplaunch.webp)
 
@@ -64,14 +64,14 @@ Le azioni successive vengono eseguite dopo un certo numero di battute o di passa
 | Gruppi, ritorni e mandate | I collegamenti da insert a insert |
 | Plugin VST2 e VST3 con il loro stato | |
 | Marker e automazione di volume, pan e tempo | |
-| La griglia di clip, come clip di sessione e scene | |
+| La griglia di clip come clip di sessione e scene, rack e Drum Rack | |
 
 Un report dopo l'esportazione elenca ciò che è stato lasciato fuori.
 
 ## Da sapere
 
-- I dispositivi propri di Live non vengono ricreati. Gli effetti propri di Live vengono scartati all'importazione.
-- I Rack di strumenti e di effetti audio arrivano con le loro catene, zone e macro. I MIDI Effect Rack di Live non vengono ancora convertiti e sono elencati nel report di importazione.
+- Molti dispositivi propri di Live arrivano come quelli di LYNX SHARE, con le loro impostazioni e la loro automazione: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift e Operator (senza FM). Gli altri vengono scartati ed elencati nel report di importazione.
+- I Rack di strumenti e di effetti audio arrivano con le loro catene, zone e macro, e un Drum Rack diventa il Drum Rack di LYNX SHARE. I MIDI Effect Rack di Live non vengono ancora convertiti e sono elencati nel report di importazione.
 - Il report di importazione elenca ciò che è stato lasciato fuori.
 - Live taglia le clip audio che si sovrappongono in un set esportato.
 - I marker di warp di un set di Live vengono conservati all'importazione e riscritti all'esportazione.

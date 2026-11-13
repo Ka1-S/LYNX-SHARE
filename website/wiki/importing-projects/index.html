@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="5732fe19";
+window.LYNX_LANG=lang;window.LYNX_V="8fd86544";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=5732fe19">
+<link rel="stylesheet" href="/assets/site.css?v=8fd86544">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -93,7 +93,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <h2 id="open-a-project-from-another-program">Open a project from another program</h2>
 <ol><li>Choose <code>File › Open...</code> and pick the <code>.flp</code>, <code>.als</code>, <code>.flm</code> or <code>.mid</code> file.</li><li>Wait while LYNX SHARE looks for the project's plugins and samples.</li><li>If something was not found, the <code>Missing files</code> window opens. Point it to your samples, or close it.</li><li>The title bar now shows where the project came from, for example &quot;(imported from FL Studio)&quot;.</li><li>Choose <code>File › Save</code>. LYNX SHARE asks where to write a <code>.lynx</code> file.</li></ol>
 <h2 id="what-comes-over">What comes over</h2>
-<div class="tablewrap"><table><thead><tr><th>Format</th><th>Converted</th><th>Not converted</th></tr></thead><tbody><tr><td><code>.flp</code> (FL Studio)</td><td>Channels, samples, patterns, slide and porta notes, every arrangement, markers, time-signature changes, automation, controller links, the Mixer with routing, sidechains, track EQ and native effects</td><td>FLEX packs are encrypted and never opened. A FLEX channel gets a synth patch chosen by its preset name</td></tr><tr><td><code>.als</code> (Live 11 and 12)</td><td>MIDI, audio, group and return tracks, tempo, time signature, locators, the loop, volume, pan, mute, solo and sends with their automation, Session clips and scenes, warp markers</td><td>Live's own effects are dropped. Racks keep only their first chain. Simpler, Sampler and drum racks become LYNX SHARE samplers</td></tr><tr><td><code>.flm</code> (FL Studio Mobile)</td><td>Tempo, time signature, one mixer insert per channel, one Playlist track per lane, patterns, audio clips with offset and pitch, drum kits, DW Sampler samples and <code>.dwp</code> programs</td><td>FLM's effects and automation lanes. Other FLM generators play the built-in synth</td></tr><tr><td><code>.mid</code></td><td>Notes, time signatures and every tempo change</td><td>A MIDI file carries no sounds: channels get the LYNX SHARE synth or a MIDI Out channel</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>Format</th><th>Converted</th><th>Not converted</th></tr></thead><tbody><tr><td><code>.flp</code> (FL Studio)</td><td>Channels, samples, patterns, slide and porta notes, every arrangement, markers, time-signature changes, automation, controller links, the Mixer with routing, sidechains, track EQ and native effects</td><td>FLEX packs are encrypted and never opened. A FLEX channel gets a synth patch chosen by its preset name</td></tr><tr><td><code>.als</code> (Live 11 and 12)</td><td>MIDI, audio, group and return tracks, tempo, time signature, locators, the loop, volume, pan, mute, solo and sends with their automation, Session clips and scenes, warp markers, racks and Drum Racks, and many of Live's own devices (EQ Eight, Compressor, Glue Compressor, Reverb, Delay, Auto Filter, Saturator, Utility, Simpler, Drift and more) as LYNX SHARE's own</td><td>Live's devices with no LYNX SHARE equivalent (Hybrid Reverb, Grain Delay, Amp, Roar, FM Operator patches and others) are dropped and listed. MIDI Effect Racks are not converted</td></tr><tr><td><code>.flm</code> (FL Studio Mobile)</td><td>Tempo, time signature, one mixer insert per channel, one Playlist track per lane, patterns, audio clips with offset and pitch, drum kits, DW Sampler and <code>.dwp</code> programs, the Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth and SuperSaw, the effects, the automation and the chord sets</td><td>Other FLM generators play the built-in synth</td></tr><tr><td><code>.mid</code></td><td>Notes, time signatures and every tempo change</td><td>A MIDI file carries no sounds: channels get the LYNX SHARE synth or a MIDI Out channel</td></tr></tbody></table></div>
 <p>Third-party VST2, VST3 and CLAP plugins in an <code>.flp</code>, and VST2 and VST3 plugins in an <code>.als</code>, load with their saved state if the same plugin is installed on your computer.</p>
 <h2 id="fl-studio-s-own-plugins">FL Studio's own plugins</h2>
 <p>FL Studio's generators and effects are not loaded. LYNX SHARE reads their saved settings and plays them on engines it recreated. Each engine has a quality level, from <code>Exact</code> (bit-identical to the original on every state tested) down to <code>Placeholder</code> (the settings are kept, but the plugin is silent or passes audio through). The levels are explained in <a href="/wiki/coming-from-fl-studio/">Coming from FL Studio</a>.</p>
@@ -128,8 +128,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=5732fe19" defer></script>
-<script src="/assets/wiki.js?v=5732fe19" defer></script>
-<script src="/assets/motion.js?v=5732fe19" defer></script>
+<script src="/assets/site.js?v=8fd86544" defer></script>
+<script src="/assets/wiki.js?v=8fd86544" defer></script>
+<script src="/assets/motion.js?v=8fd86544" defer></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 ---
-source: 2285f3e677
+source: d5cc625221
 ---
 ![Klip başlatma yerleşimi: Playlist'in yanında sahneli bir klip ızgarası](/assets/img/cliplaunch.webp)
 
@@ -27,7 +27,7 @@ LYNX SHARE Pattern iş akışıyla açılır: bir Channel Rack, pattern'ler ve b
 | Follow action'lar | Her biri için bir olasılıkla A eylemi ve B eylemi |
 | Klip durdurma düğmeleri | Boş bir yuvada durdurma düğmesi olabilir |
 | Aranjmana dön | `Playlist'e dön` |
-| Warp modları | `Kanal ayarları › Time stretch` içinde `Vuruş`, `Tonlar`, `Doku` ve `Karmaşık` |
+| Warp modları | `Kanal ayarları › Zaman esnetme` içinde `Vuruş`, `Tonlar`, `Doku` ve `Karmaşık` |
 | Simpler, Sampler ve drum rack'ler | LYNX SHARE sampler'ları |
 | `.als` set'i | `.lynx` proje dosyası |
 
@@ -64,14 +64,14 @@ Follow action'lar, klibin belirli sayıda ölçüsünden veya geçişinden sonra
 | Gruplar, return'ler ve send'ler | Insert'ten insert'e yönlendirmeler |
 | Durumlarıyla VST2 ve VST3 plugin'leri | |
 | İşaretçiler ile ses, pan ve tempo otomasyonu | |
-| Klip ızgarası, Session klipleri ve sahneler olarak | |
+| Klip ızgarası Session klipleri ve sahneler olarak, rack'ler ve Drum Rack'ler | |
 
 Dışa aktarmadan sonra bir rapor, dışarıda bırakılanları listeler.
 
 ## Bilmekte fayda var
 
-- Live'ın kendi cihazları yeniden oluşturulmaz. Live'ın kendi efektleri içe aktarmada bırakılır.
-- Instrument ve Audio Effect Rack'leri zincirleri, bölgeleri ve makrolarıyla gelir. Live'ın MIDI Effect Rack'leri henüz dönüştürülmez ve içe aktarma raporunda listelenir.
+- Live'ın kendi cihazlarının çoğu LYNX SHARE'in kendi cihazları olarak ayarları ve otomasyonlarıyla gelir: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift ve Operator (FM'siz). Diğerleri atılır ve içe aktarma raporunda listelenir.
+- Instrument ve Audio Effect Rack'leri zincirleri, bölgeleri ve makrolarıyla gelir ve bir Drum Rack, LYNX SHARE'in Drum Rack'i olur. Live'ın MIDI Effect Rack'leri henüz dönüştürülmez ve içe aktarma raporunda listelenir.
 - İçe aktarma raporu dışarıda bırakılanları listeler.
 - Live, dışa aktarılmış bir set'te üst üste binen ses kliplerini kırpar.
 - Bir Live set'indeki warp işaretçileri içe aktarmada korunur ve dışa aktarmada geri yazılır.

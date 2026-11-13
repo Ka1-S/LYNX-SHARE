@@ -1,5 +1,5 @@
 ---
-source: 2285f3e677
+source: d5cc625221
 ---
 ![片段启动布局：播放列表旁边是带有场景的片段网格](/assets/img/cliplaunch.webp)
 
@@ -27,7 +27,7 @@ LYNX SHARE 默认以样式工作流程启动：通道机架、样式和播放列
 | 跟随动作 | 动作 A 和动作 B，各有各的概率 |
 | 片段停止按钮 | 空槽位可以有停止按钮 |
 | 返回编排视图 | `返回播放列表` |
-| 扭曲模式 | `通道设置 › Time stretch` 中的 `拍`、`音调`、`纹理` 和 `复杂` |
+| 扭曲模式 | `通道设置 › 时间拉伸` 中的 `拍`、`音调`、`纹理` 和 `复杂` |
 | Simpler、Sampler 和鼓机架 | LYNX SHARE 采样器 |
 | `.als` 套装 | `.lynx` 工程文件 |
 
@@ -64,14 +64,14 @@ LYNX SHARE 默认以样式工作流程启动：通道机架、样式和播放列
 | 编组、返回轨道和发送 | 插入轨到插入轨的路由 |
 | 带状态的 VST2 和 VST3 插件 | |
 | 标记，以及音量、声像和速度自动化 | |
-| 片段网格，导出为会话片段和场景 | |
+| 片段网格，作为会话片段和场景，机架和 Drum Rack | |
 
 导出之后会有一份报告，列出被略去的内容。
 
 ## 须知
 
-- Live 自己的设备不会被重建。导入时，Live 自带的效果器会被丢弃。
-- 乐器机架和音频效果机架会连同链、区域和宏一起导入。Live 的 MIDI 效果机架还不能转换，会列在导入报告中。
+- Live 自己的许多设备会作为 LYNX SHARE 自己的设备导入，连同设置和自动化：EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Delay、Echo、Auto Filter、Saturator、Overdrive、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Simpler、Drift 和 Operator（不含 FM）。其余的会被丢弃并列在导入报告中。
+- Instrument Rack 和 Audio Effect Rack 会连同链、区域和宏一起导入，Drum Rack 会变成 LYNX SHARE 的 Drum Rack。Live 的 MIDI Effect Rack 还不能转换，会列在导入报告中。
 - 导入报告会列出被略去的内容。
 - 在导出的套装中，Live 会修剪相互重叠的音频片段。
 - Live 套装中的扭曲标记在导入时保留，导出时写回。

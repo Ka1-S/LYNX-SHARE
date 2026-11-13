@@ -1,5 +1,5 @@
 ---
-source: 10cb57faf4
+source: da5e41c322
 ---
 ![WAV seçili dışa aktarma penceresi: solda aralık, kuyruk ve dosyalar, sağda format, altta miks seçenekleri](/assets/img/wiki/export.webp)
 
@@ -82,7 +82,7 @@ Stem'lerin yanında miksi de almak için `Tam mix de` kutusunu işaretleyin. Alt
 
 `.flp` bir FL Studio 2026 projesidir. Sampler'lar, ses klipleri, FL Studio'nun kendi jeneratörleri ve efektleri, üçüncü taraf plugin'ler, pattern'ler, Playlist, Mixer ve otomasyon ayarlarıyla birlikte geçer. FL Studio'da karşılığı olmayan şeyler için `Sese render et (aynı ses)` ile `En yakın FL eklentisini kullan (düzenlenebilir kalır, farklı duyulabilir)` arasında seçim yaparsınız. İkinci seçenekte yalnızca LYNX'e özgü enstrümanlar dışarıda kalır. Modülatörler her zaman dışarıda bırakılır. Bir rapor, nelerin render edildiğini, değiştirildiğini ya da dışarıda bırakıldığını listeler. Ayrıntılar [FL Studio'dan geliyorsanız](/wiki/coming-from-fl-studio/) sayfasında.
 
-`.als`, her kanal için bir MIDI izi, ses izleri, gruplar, return'ler, send'ler, durumlarıyla VST2 ve VST3 plugin'leri, işaretçiler ile ses, pan ve tempo otomasyonunu içerir. LYNX SHARE'in kendi enstrümanları ve efektleri dönüştürülmez, ama izleri ve notaları korunur. Efekt parametrelerinin otomasyonu ve insert'ten insert'e yönlendirmeler atılır. Ayrıntılar [Ableton Live'dan geliyorsanız](/wiki/coming-from-ableton/) sayfasında.
+`.als`, her kanal için bir MIDI izi, ses izleri, gruplar, return'ler, send'ler, rack'ler ve Drum Rack'ler, durumlarıyla VST2 ve VST3 plugin'leri, işaretçiler ile ses, pan ve tempo otomasyonunu içerir. LYNX SHARE'in kendi enstrümanları ve efektleri dönüştürülmez, ama izleri ve notaları korunur. Efekt parametrelerinin otomasyonu ve insert'ten insert'e yönlendirmeler atılır. Ayrıntılar [Ableton Live'dan geliyorsanız](/wiki/coming-from-ableton/) sayfasında.
 
 ## Bilmekte fayda var
 

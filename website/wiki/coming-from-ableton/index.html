@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="5732fe19";
+window.LYNX_LANG=lang;window.LYNX_V="8fd86544";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=5732fe19">
+<link rel="stylesheet" href="/assets/site.css?v=8fd86544">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -104,10 +104,10 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <ul><li>MIDI, audio, group and return tracks, tempo, time signature, locators, the loop, mixer settings (volume, pan, mute, solo, sends) and their automation.</li><li>VST2 and VST3 plugins with their state, if the same plugin is installed. See <a href="/wiki/plugins/">Third-party plugins</a>.</li><li>Session clips and scenes, into the clip grid, with their launch mode, quantisation, legato, loop, follow actions and stop buttons. To place them on the Playlist instead, one section per scene, change <code>Session clips of Live sets</code> in <code>Options › General settings...</code>.</li><li>Warp markers.</li></ul>
 <h2 id="export-a-als">Export a .als</h2>
 <ol><li>Choose <code>File › Export › Ableton Live set (.als)...</code>.</li><li>Under <code>Save for</code>, pick <code>Live 12</code> or <code>Live 11 (also opens in Live 12)</code>.</li><li>Under <code>Samples</code>, copy them into the set's project folder or refer to them where they are.</li><li>Choose a folder. The set is saved as <code>&lt;name&gt; Project/&lt;name&gt;.als</code>.</li></ol>
-<div class="tablewrap"><table><thead><tr><th>Written</th><th>Not written</th></tr></thead><tbody><tr><td>A MIDI track per channel, with its notes as MIDI clips</td><td>LYNX SHARE's own instruments and effects. Their tracks and notes are kept</td></tr><tr><td>Audio tracks with stretch, transpose, gain, fades and warp mode</td><td>Automation of effect parameters</td></tr><tr><td>Groups, returns and sends</td><td>Insert-to-insert routes</td></tr><tr><td>VST2 and VST3 plugins with their state</td><td></td></tr><tr><td>Markers, and volume, pan and tempo automation</td><td></td></tr><tr><td>The clip grid, as Session clips and scenes</td><td></td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>Written</th><th>Not written</th></tr></thead><tbody><tr><td>A MIDI track per channel, with its notes as MIDI clips</td><td>LYNX SHARE's own instruments and effects. Their tracks and notes are kept</td></tr><tr><td>Audio tracks with stretch, transpose, gain, fades and warp mode</td><td>Automation of effect parameters</td></tr><tr><td>Groups, returns and sends</td><td>Insert-to-insert routes</td></tr><tr><td>VST2 and VST3 plugins with their state</td><td></td></tr><tr><td>Markers, and volume, pan and tempo automation</td><td></td></tr><tr><td>The clip grid as Session clips and scenes, racks and Drum Racks</td><td></td></tr></tbody></table></div>
 <p>A report after the export lists what was left out.</p>
 <h2 id="good-to-know">Good to know</h2>
-<ul><li>Live's own devices are not recreated. Live's own effects are dropped on import.</li><li>Instrument and Audio Effect Racks come in with their chains, zones and macros. Live's MIDI Effect Racks are not converted yet and are listed in the import report.</li><li>The import report lists what was left out.</li><li>Live trims audio clips that overlap in an exported set.</li><li>Warp markers from a Live set are kept on import and written back on export.</li></ul>
+<ul><li>Many of Live's own devices come in as LYNX SHARE's own, with their settings and automation: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift and Operator (without FM). The others are dropped and listed in the import report.</li><li>Instrument and Audio Effect Racks come in with their chains, zones and macros, and a Drum Rack becomes LYNX SHARE's Drum Rack. Live's MIDI Effect Racks are not converted yet and are listed in the import report.</li><li>The import report lists what was left out.</li><li>Live trims audio clips that overlap in an exported set.</li><li>Warp markers from a Live set are kept on import and written back on export.</li></ul>
 <h2 id="related">Related</h2>
 <ul><li><a href="/wiki/playlist/">Playlist</a></li><li><a href="/wiki/layouts/">Layouts</a></li><li><a href="/wiki/importing-projects/">Importing projects</a></li><li><a href="/wiki/file-formats/">File formats</a></li><li><a href="/why/#workflows">Two workflows in one program</a></li></ul></div></div><nav class="wpn"><a href="/wiki/coming-from-fl-studio/"><span data-i18n="wiki.prev">Previous</span><b data-i18n="wk.coming-from-fl-studio.t">Coming from FL Studio</b></a><a href="/wiki/built-in/" style="text-align:right"><span data-i18n="wiki.next">Next</span><b data-i18n="wk.built-in.t">Built-in instruments and effects</b></a></nav></article></div>
 </main>
@@ -119,8 +119,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=5732fe19" defer></script>
-<script src="/assets/wiki.js?v=5732fe19" defer></script>
-<script src="/assets/motion.js?v=5732fe19" defer></script>
+<script src="/assets/site.js?v=8fd86544" defer></script>
+<script src="/assets/wiki.js?v=8fd86544" defer></script>
+<script src="/assets/motion.js?v=8fd86544" defer></script>
 </body>
 </html>

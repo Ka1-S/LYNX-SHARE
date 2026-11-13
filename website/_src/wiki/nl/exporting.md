@@ -1,5 +1,5 @@
 ---
-source: 10cb57faf4
+source: da5e41c322
 ---
 ![Het exportvenster met WAV gekozen: bereik, staart en bestanden links, formaat rechts, mixopties eronder](/assets/img/wiki/export.webp)
 
@@ -82,7 +82,7 @@ Vink `Ook de volledige mix` aan om de mix naast de stems te krijgen. De regel on
 
 De `.flp` is een FL Studio 2026-project. Samplers, audioclips, de eigen generators en effecten van FL Studio, plugins van derden, patterns, de Playlist, de Mixer en automatisering gaan mee met hun instellingen. Voor dingen die FL Studio niet heeft, kies je tussen `Naar audio renderen (klinkt hetzelfde)` en `De dichtstbijzijnde FL-plugin gebruiken (blijft bewerkbaar, kan anders klinken)`. Bij de tweede keuze worden instrumenten die alleen in LYNX bestaan weggelaten. Modulators worden altijd weggelaten. Een rapport toont wat gerenderd, vervangen of weggelaten is. Details staan in [Overstappen van FL Studio](/wiki/coming-from-fl-studio/).
 
-De `.als` bevat een MIDI-track per kanaal, audiotracks, groepen, returns, sends, VST2- en VST3-plugins met hun staat, markers, en automatisering van volume, pan en tempo. De eigen instrumenten en effecten van LYNX SHARE worden niet omgezet, maar hun tracks en noten blijven behouden. Automatisering van effectparameters en routes van insert naar insert vervallen. Details staan in [Overstappen van Ableton Live](/wiki/coming-from-ableton/).
+De `.als` bevat een MIDI-track per kanaal, audiotracks, groepen, returns, sends, racks en Drum Racks, VST2- en VST3-plugins met hun staat, markers, en automatisering van volume, pan en tempo. De eigen instrumenten en effecten van LYNX SHARE worden niet omgezet, maar hun tracks en noten blijven behouden. Automatisering van effectparameters en routes van insert naar insert vervallen. Details staan in [Overstappen van Ableton Live](/wiki/coming-from-ableton/).
 
 ## Goed om te weten
 

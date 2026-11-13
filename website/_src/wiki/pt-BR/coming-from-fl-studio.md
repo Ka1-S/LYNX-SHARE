@@ -1,5 +1,5 @@
 ---
-source: 937b8d8778
+source: 3bf7e0c0ab
 ---
 O LYNX SHARE mantém o fluxo de trabalho que você conhece: um Channel Rack, patterns, uma Playlist e um Mixer, com as mesmas teclas. Ele abre projetos `.flp` diretamente e pode gravar um de volta.
 
@@ -72,7 +72,7 @@ O arquivo é um projeto do FL Studio 2026. Samplers, clipes de áudio, geradores
 
 `Arquivo › Abrir...` também aceita projetos `.flm`. A importação é parcial.
 
-- Importado: tempo, fórmula de compasso, um insert de mixer por canal FLM, uma faixa da Playlist por lane, patterns (cada passagem do loop como um clipe), clipes de áudio com deslocamento e afinação, kits de bateria, samples do DW Sampler (como samplers), programas `.dwp` (no DirectWave), os instrumentos MiniSynth, Transistor Bass, 3x Osc e GMSynth, os efeitos do FLM (como efeitos Pocket) e a automação de nível, pan, mute, solo, pitch bend e sends.
+- Importado: tempo, fórmula de compasso, um insert de mixer por canal FLM, uma faixa da Playlist por lane, patterns (cada passagem do loop como um clipe), clipes de áudio com deslocamento e afinação, kits de bateria, programas do DW Sampler e `.dwp` e o Slicer (nos motores do próprio FLM), os instrumentos MiniSynth, Transistor Bass, 3x Osc, GMSynth e SuperSaw, os efeitos do FLM (como efeitos Pocket), a automação de nível, pan, mute, solo, pitch bend, sends e parâmetros de instrumento, e os conjuntos de acordes e o key locker.
 - Não importado: os outros instrumentos do FLM, que tocam no synth embutido.
 - Os samples são procurados ao lado do `.flm` e na cópia que o FL Studio tem dos recursos do FLM. Um `.dwp` que não for encontrado toca um substituto.
 

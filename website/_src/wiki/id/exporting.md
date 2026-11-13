@@ -1,5 +1,5 @@
 ---
-source: 10cb57faf4
+source: da5e41c322
 ---
 ![Jendela ekspor dengan WAV terpilih: rentang, tail, dan file di kiri, format di kanan, opsi mix di bawah](/assets/img/wiki/export.webp)
 
@@ -82,7 +82,7 @@ Centang `Juga mix penuh` untuk mendapatkan mix di samping stem. Baris di bagian 
 
 `.flp` adalah proyek FL Studio 2026. Sampler, clip audio, generator dan efek bawaan FL Studio, plugin pihak ketiga, pattern, Playlist, Mixer, dan otomasi ikut terbawa beserta pengaturannya. Untuk hal-hal yang tidak dimiliki FL Studio, kamu memilih antara `Render ke audio (suaranya sama)` dan `Pakai plugin FL terdekat (tetap bisa diedit, suaranya bisa berbeda)`. Pada pilihan kedua, instrumen yang hanya ada di LYNX dilewati. Modulator selalu dilewati. Sebuah laporan mencantumkan apa yang di-render, diganti, atau dilewati. Rinciannya ada di [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/).
 
-`.als` berisi track MIDI per channel, track audio, grup, return, send, plugin VST2 dan VST3 beserta state-nya, marker, serta otomasi volume, pan, dan tempo. Instrumen dan efek bawaan LYNX SHARE tidak dikonversi, tetapi track dan not-nya tetap disimpan. Otomasi parameter efek dan rute antar insert dibuang. Rinciannya ada di [Pindahan dari Ableton Live](/wiki/coming-from-ableton/).
+`.als` berisi track MIDI per channel, track audio, grup, return, send, rack dan Drum Rack, plugin VST2 dan VST3 beserta state-nya, marker, serta otomasi volume, pan, dan tempo. Instrumen dan efek bawaan LYNX SHARE tidak dikonversi, tetapi track dan not-nya tetap disimpan. Otomasi parameter efek dan rute antar insert dibuang. Rinciannya ada di [Pindahan dari Ableton Live](/wiki/coming-from-ableton/).
 
 ## Baik diketahui
 
