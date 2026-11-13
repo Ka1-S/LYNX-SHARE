@@ -201,3 +201,26 @@ TEST (win190ev_soloing_the_recording_insert_keeps_its_input_and_take_audible)
     song.mixer[8].solo = true;
     CHECK (peak() < 1.0e-4f);
 }
+
+// --- (3) coordinator's decision (round 190ev): new inserts monitor their input "When armed", as FL ---------------
+#include "core/LiveInput.h"
+
+TEST (win190ev_new_inserts_monitor_when_armed_old_projects_keep_auto)
+{
+    using lynx::InputMonitor;
+    // a new insert (and every insert of a new project) defaults to FL's "When armed": the input is heard while the insert
+    // is armed, playing back too (the reporter's armed, soloed insert 7 during playback)
+    CHECK (lynx::MixerTrack {}.monitor == InputMonitor::whenArmed);
+    const auto fresh = lynx::Song::makeDefault();
+    CHECK (fresh.mixer.size() > 7 && fresh.mixer[7].monitor == InputMonitor::whenArmed);
+    for (const auto& t : lynx::Song::defaultMixer (12))
+        CHECK (t.monitor == InputMonitor::whenArmed);
+    CHECK (lynx::inputMonitored (InputMonitor::whenArmed, true, true, false));
+    // .lynx: "When armed" is written (it is not the key-less "Auto") and read back; a project saved before (no key)
+    // opens with "Auto" as it was saved; every stored value as stored
+    CHECK (lynx::monitorKeyWritten (InputMonitor::whenArmed) && ! lynx::monitorKeyWritten (InputMonitor::automatic));
+    CHECK (lynx::monitorFromKey (0, false) == InputMonitor::automatic);
+    for (const auto m : { InputMonitor::off, InputMonitor::whenArmed, InputMonitor::automatic, InputMonitor::on })
+        CHECK (lynx::monitorFromKey ((int) m, lynx::monitorKeyWritten (m)) == m);
+    CHECK (lynx::monitorFromKey (9, true) == InputMonitor::on && lynx::monitorFromKey (-2, true) == InputMonitor::off);
+}
