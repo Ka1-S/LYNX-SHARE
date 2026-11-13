@@ -68,6 +68,15 @@ struct Request
     // Audio (round 190p: a loop keeps time): > 0 makes the file last this many beats at any tempo (its channel's
     // stretch, pitch kept), and the clip is that long whatever `audioLength` says. 0: the file plays at its own speed.
     float audioBeats = 0.0f;
+    // Instrument / Sampler without notes (round 190ds): an empty pattern of `emptyBars` bars placed on the track from
+    // `start`, so the docked editor has a pattern to write into (0: none, as before)
+    int emptyBars = 0;
+    // Audio (round 190ds, core/KeyFollow.h): the file's key (root 0..11, −1 unknown), how it was found (1 name,
+    // 2 detected) and whether the clip follows the project key (moved to it in the same edit)
+    int audioKeyRoot = -1;
+    bool audioKeyMinor = false;
+    int audioKeySource = 0;
+    bool followKey = false;
     // Voice, Guitar, Bass: the insert's audio input (the device's input channel, 0-based; -1 none) and whether the
     // next channel is taken too. Audio (imports) has no input.
     int input = 0;
@@ -97,6 +106,13 @@ struct Result
 
 // Adds a track of `request.kind` to the first empty Playlist track. On an error the song is left as it was.
 Result addTrack (Song& song, const Request& request);
+
+// The pattern a Simple Instrument / Sampler track's notes are written into (round 190ds, the dock's Editor tab): the
+// pattern of the track's first pattern clip; with none, an empty `bars`-bar pattern named after the track is made and
+// placed at the song's start (`*made` = true). -1 for a track that is not an Instrument / Sampler track.
+int ensurePattern (Song& song, int track, int bars = 4, bool* made = nullptr);
+// The pattern ensurePattern would give without making one (-1: none yet)
+int patternOf (const Song& song, int track);
 
 // Renames a Simple track everywhere: the Playlist track, its insert and its channel (Drums: its group and its pattern
 // when they carry the old name). An empty name is ignored. Returns the name given (made unique among the tracks).

@@ -19,6 +19,17 @@ The record button in the transport, or the `R` key, turns recording on. The firs
 
 `Shift+R` does steps 4 to 6 in one key: it arms the selected insert, records audio only and starts playback. Press it again to stop.
 
+When you choose an input for an insert that records more than that input (other channels sending to it are recorded too), LYNX SHARE asks, as FL Studio does, whether to switch to `External input only`. Answer `Yes` to record the input alone on that insert.
+
+## One-click audio recording
+
+`Tools › One-click audio recording` starts a take in one step, as in FL Studio. It works on the selected mixer insert. With the Master or nothing selected, it takes the first insert with an input, or else a free insert.
+
+| Command | What it does |
+|---|---|
+| `Into Edison audio editor/recorder` | Puts Edison on the insert, set to record when playback starts, and starts playback. See [Mixer](/wiki/mixer/) |
+| `Into playlist as an audio clip` | Switches to Song mode, arms the insert, asks for its input if it has none, and starts recording and playback. Inserts that are already armed record as they are |
+
 ## What the Recording window offers
 
 | Choice | What it does |
@@ -61,7 +72,7 @@ The options are in `Options › Recording` and in the record button's right-clic
 
 | Command | Key | What it does |
 |---|---|---|
-| `Count-in` | `Ctrl+P` | Off, 1 bar, 2 bars or 4 bars of metronome before recording starts |
+| `Count-in` | `Ctrl+P` | Off, 1 bar, 2 bars or 4 bars of metronome before recording starts. `Ctrl+P` switches between off and the length you chose last. The choice is kept when you close the program; a new install starts with 1 bar, as FL Studio does |
 | `Metronome` | `Ctrl+M` | Click while playing |
 | `Wait for the first note to start` | `Ctrl+I` | Recording waits until you play |
 | `Loop record` | none | Recording loops instead of running on |
@@ -72,7 +83,17 @@ The options are in `Options › Recording` and in the record button's right-clic
 
 `Low latency while recording` is in the record button's right-click menu and in the Mixer's insert menu under `Disk recording`. It is off by default. While an insert with an input is armed, or its monitoring is `On`, the effects that add latency on its way to the Master are bypassed. This changes only what you hear: an insert keeps all its effects when the take is tapped after them, for example with `Post effects`. The effects come back when the insert is disarmed.
 
+`Latency compensation` is in the same `Disk recording` menu and is on by default, as in FL Studio. It moves each take back by the audio device's round trip, the `Fine adjust (samples)` value of the audio settings and the plugins' delay compensation. Turn it off to keep the takes where they were recorded.
+
 `Tools › Cancel recording` throws away what the current recording pass wrote (its notes, automation and audio takes) and turns recording off. Playback goes on and the armed inserts stay armed.
+
+## Recording into clip slots
+
+In the [Clip-launch workflow](/wiki/layouts/), takes can go into the clip grid instead of the Playlist, as in Ableton Live.
+
+- Arm a track with its arm button in the Session mixer. Its empty slots then show a round record button in place of the stop square. Click one to record into that slot.
+- `Session Record`, under the grid, records the armed tracks into the selected scene. While their clips play, new notes are added to them (overdub).
+- `Fixed recording length`, in the menu of an empty slot, ends a recording into a slot after 1 or more bars, and the clip plays on. `Off` records until you stop.
 
 ## Loop recording and takes
 

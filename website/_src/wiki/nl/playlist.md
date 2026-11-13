@@ -1,5 +1,5 @@
 ---
-source: f245a8e1b7
+source: 1b54c6493f
 ---
 ![De Playlist met clips op tracks](/assets/img/playlist.webp)
 
@@ -43,6 +43,8 @@ De letters werken zolang de pianofunctie van het typtoetsenbord (`Ctrl+T`) uit s
 - Rechtsklikken verwijdert een clip. `Ctrl`+slepen selecteert.
 - Dubbelklik op een clip om hem te openen.
 - De knop linksboven op een clip opent het clipmenu (uniek maken, hernoemen en kleuren, chop, en voor audio: pitch, aanpassen aan tempo, reverse).
+- Het menu van een audioclip volgt de indeling van FL Studio in twee kolommen. De linkerkolom heeft de sectie `Audioclip` (`Voorbeluisteren`, `Gemute`, `Hernoemen en kleuren...`, `Kleur wijzigen...`, `Willekeurige kleur`, `Pictogram wijzigen...`, `Bronkanaal selecteren`, `Kanaalinstellingen`, `Uniek maken`, `Alle vergelijkbare clips selecteren`, `Delete`, `Eigenschappen...`) en de sectie `Regio` (`Regio selecteren`, `Chop`). De rechterkolom heeft `Sample` (`Uniek maken als sample`, `Sample bewerken`, `Stems uit sample halen`, `Tempo detecteren`, `Aanpassen aan tempo`), `Automatisering` (`Automatiseren › Panning` of `Volume`, `Crossfade met`) en `Fades` (`Fades herstellen`). De eigen items van LYNX SHARE, zoals `Hier splitsen`, `Reverse`, `Normaliseren` en `Omzetten naar MIDI`, komen als laatste, onder een streep.
+- `Automatiseren › Panning` of `Volume` maakt een automatiseringsclip zo lang als de audioclip, op zijn track, voor de pan of het volume van de Levels adjustment van het kanaal.
 - Houd `Alt` ingedrukt tijdens het slepen om de snap te negeren.
 - Audioclips hebben fade-handvatten en een clipgain die je omhoog of omlaag sleept. Klik met rechts op een fade-handvat voor het menu, met `Crossfade maken`. Klik met rechts op het gain-handvat voor `Gain resetten` en `Normaliseren`.
 - `Shift+M` schakelt Stretch: de grootte van een audioclip wijzigen rekt dan de audio in plaats van hem af te knippen.
@@ -60,6 +62,10 @@ In de kop van een track selecteert klikken, voegt `Ctrl`+klikken toe of haalt we
 
 `Beeld` in het menu van de Playlist kiest wat de trackkoppen tonen: `Bediening op audiotracks tonen`, `Niveaus op audiotracks tonen` en `Niveaus op instrumenttracks tonen`.
 
+`Trackmodus` in het trackmenu maakt van een track een `Niet toegewezen`, een `Audiotrack` of een `Instrumenttrack`, zoals in FL Studio. `Audiotrack` toont eerst `Nieuwe mixertrack(s)` en daarna elke mixerinsert op nummer en naam. De keuze geldt voor alle geselecteerde tracks. `Instrumenttrack` heeft `Bestaand kanaal gebruiken`, `Meer plug-ins...` en de lijst instrumenten van het Channel rack.
+
+De `+` linksboven in de trackkoppen opent dezelfde keuzes voor een nieuwe track: `Audiospoor toevoegen`, `Meer plug-ins...` en de instrumenten. Een rechtsklik op `+` voegt meteen een audiotrack toe.
+
 ## Patternblokken
 
 Met `Patternblokken (huidig project)` aan in het menu van de Playlist heeft een onderdeel onder de tracks één rij per pattern. Daar plaatst het Potlood één blok en sleept het langs zijn rij, schildert de Kwast blokken en wist de Gum ze. Rechtsklikken wist met elk gereedschap.
@@ -75,6 +81,8 @@ Met `Patternblokken (huidig project)` aan in het menu van de Playlist heeft een 
 ## Automatisering
 
 Rechtsklik op een knop of fader en kies `Automation clip maken`. De clip verschijnt in de Playlist. Sleep met het Potlood de punten ervan en klik op de curve om er een toe te voegen. Automatiseringsbanen onder tracks zijn optioneel en staan standaard uit. Zie [Automation](/wiki/automation/).
+
+Klik met rechts op een punt voor zijn menu. De lijst `Modus` heeft de 13 curvemodi van FL Studio voor het segment dat bij dat punt eindigt: `Smooth`, `Hold`, drie enkele curves, drie dubbele curves, `Halve sinus`, `Trap`, `Vloeiende trap`, `Puls` en `Golf`. Een nieuw punt neemt de laatst gebruikte modus. Modi worden uit .flp-bestanden gelezen en ernaar geschreven.
 
 ## Arrangementen
 
@@ -109,6 +117,7 @@ Het arrangementvak in de werkbalk wisselt tussen arrangementen. Een project kan 
 - De Playlist hoor je alleen in de Song-modus. In de Pattern-modus speelt `Space` het huidige pattern, wat er ook op de tracks staat.
 - `Beeld › Lay-outstijl › Clipstart-werkwijze` voegt naast de Playlist een raster van clips en scènes toe. Het is optioneel. Zie [Lay-outs](/wiki/layouts/).
 - Bij meerdere overlappende automatiseringsclips op één regelaar kan de keuze welke speelt afwijken van die van FL Studio (releasenotities van 0.1.25).
+- Zoals in FL Studio speelt een pattern vanuit één clip tegelijk. Wanneer een latere clip van hetzelfde pattern begint, op welke track dan ook, start de eerdere clip vanaf daar geen noten meer. Clips van verschillende patterns spelen samen. Dit geldt in nieuwe projecten en FL Studio-projecten. Een .lynx-project dat vóór 0.1.27 is opgeslagen, blijft elke clip volledig afspelen.
 - Een tempo dat door een gekoppelde MIDI-controller wordt verschoven, wijzigt de grootte van audioclips niet.
 - Op Linux heeft video FFmpeg nodig.
 

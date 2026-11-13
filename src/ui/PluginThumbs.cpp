@@ -9,6 +9,7 @@
 #include "ui/FacetEqEditor.h"
 #include "ui/FlExtraEditors.h"
 #include "ui/NewtoneEditor.h"
+#include "ui/AudioEditor.h"
 #include "ui/PatcherEditor.h"
 #include "ui/PluginEditors.h"
 #include "ui/PluginSkin.h"
@@ -168,7 +169,7 @@ void addDemoContent (EffectSlot& slot, const juce::File& folder)
 {
     if (slot.kind == EffectKind::htmlNotebook && flextra::htmlnotebook::address (slot.state).empty())
         slot.state = flextra::htmlnotebook::stateFor (demoPage (folder).getFullPathName().toStdString());
-    if (slot.kind == EffectKind::newtone || slot.kind == EffectKind::newtime)
+    if (slot.kind == EffectKind::newtone || slot.kind == EffectKind::newtime || slot.kind == EffectKind::edison)
         if (const auto voice = demoVoice (folder); voice.existsAsFile())
             slot.samplePath = voice.getFullPathName().toStdString();
     if (slot.kind == EffectKind::controlSurface && slot.patcher.surface.empty())
@@ -249,6 +250,8 @@ std::unique_ptr<juce::Component> effectEditor (AudioEngine& engine, EffectSlot s
         return FormulaControllerWindows::makeEditor (engine, 1, 0);
     if (NewtoneWindows::handles (kind))
         return makeNewtoneEditor (engine, 1, 0);
+    if (kind == EffectKind::edison) // (round 190cd: the audio editor with a phrase in it)
+        return makeEdisonSlotEditor (engine, 1, 0);
     if (Controller164Windows::handles (kind))
     {
         auto locate = [] (Song& song) -> EffectSlot* { return song.mixer.size() > 1 && ! song.mixer[1].effects.empty() ? &song.mixer[1].effects[0] : nullptr; };

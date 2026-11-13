@@ -94,6 +94,9 @@ std::vector<Action> makeActions()
         { "view.detailClip", TR_NOOP ("Clip-launch workflow: clip view"), Context::global, { chord ('3', ctrl | alt) } },
         { "view.detailDevices", TR_NOOP ("Clip-launch workflow: device view"), Context::global, { chord ('4', ctrl | alt) } },
         { "view.detailSwitch", TR_NOOP ("Clip-launch workflow: switch between clip view and device view"), Context::global, { chord (tab, shift) } },
+        // Round 190ce: the reference DAW's hot-swap key (its lesson "Hot-Swapping Presets": Q links the Browser to the
+        // selected device and Q again ends it; docs/analise/REA_rodada190ce.md §2). The typing keyboard keeps Q while on.
+        { "view.hotSwap", TR_NOOP ("Hot-swap: link the Browser to the selected device, instrument or sample (again: end)"), Context::global, { chord ('Q') } },
         { "view.closePluginWindows", TR_NOOP ("Close all plugin windows"), Context::global, { chord (f12, alt) } },
         // FL's CloseAllUnfocusedWindowsAction (Ctrl+F12) and ShowTouchControllerAction (Alt+F7), round 167o
         { "view.closeUnfocusedWindows", TR_NOOP ("Close all windows except the focused one"), Context::global, { chord (f12, ctrl) } },
@@ -339,6 +342,16 @@ std::vector<Action> makeActions()
         { "playlist.nudgeRight", TR_NOOP ("Nudge the selected clips right (fine step, no snap)"), Context::playlist, { chord (right, alt), chord (right, alt | shift) } },
         { "playlist.sliceInsertSpace", TR_NOOP ("Slice & insert space"), Context::playlist, { chord (insert, ctrl | alt) } },
         { "playlist.trimSpace", TR_NOOP ("Trim selection (keep only the time selection)"), Context::playlist, {} },
+        // round 190cg: Live's arrangement commands on the time selection (no default keys: FL's stay as they are)
+        { "playlist.loopSwitch", TR_NOOP ("Loop the time selection on/off (the range stays)"), Context::playlist, {} },
+        { "playlist.loopHalve", TR_NOOP ("Halve the time selection"), Context::playlist, {} },
+        { "playlist.loopDouble", TR_NOOP ("Double the time selection"), Context::playlist, {} },
+        { "playlist.duplicateTime", TR_NOOP ("Duplicate time"), Context::playlist, {} },
+        { "playlist.cutTime", TR_NOOP ("Cut time"), Context::playlist, {} },
+        { "playlist.copyTime", TR_NOOP ("Copy time"), Context::playlist, {} },
+        { "playlist.pasteTime", TR_NOOP ("Paste time"), Context::playlist, {} },
+        { "playlist.cropClips", TR_NOOP ("Crop the selected clips to the time selection"), Context::playlist, {} },
+        { "playlist.automationFollowsClips", TR_NOOP ("Automation follows clips on/off"), Context::playlist, {} },
         { "playlist.deselect", TR_NOOP ("Deselect (clips and time)"), Context::playlist, { chord ('D', ctrl) } },
         { "playlist.selectBySource", TR_NOOP ("Select by selected source"), Context::playlist, { chord ('C', shift) } },
         { "playlist.invertSelection", TR_NOOP ("Invert selection"), Context::playlist, { chord ('I', shift) } },
@@ -361,6 +374,17 @@ std::vector<Action> makeActions()
         { "browser.closeFolder", TR_NOOP ("Close the folder (or go to the parent folder)"), Context::browser, { chord (left) } },
         { "browser.openFolder", TR_NOOP ("Open the folder"), Context::browser, { chord (right) } },
         { "browser.rename", TR_NOOP ("Rename the selected plugin (Plugin database)"), Context::browser, { chord (f2) } },
+        // Round 190ce: the Browser's collections with the reference DAW's keys (1-7 put the selected item into a colour
+        // collection or take it out, 0 takes it out of all; docs/analise/REA_rodada190ce.md §1). Plain keys: the typing
+        // keyboard keeps them while it is on.
+        { "browser.collection1", TR_NOOP ("Collection 1 (Starred): add or remove the selected item"), Context::browser, { chord ('1') } },
+        { "browser.collection2", TR_NOOP ("Collection 2: add or remove the selected item"), Context::browser, { chord ('2') } },
+        { "browser.collection3", TR_NOOP ("Collection 3: add or remove the selected item"), Context::browser, { chord ('3') } },
+        { "browser.collection4", TR_NOOP ("Collection 4: add or remove the selected item"), Context::browser, { chord ('4') } },
+        { "browser.collection5", TR_NOOP ("Collection 5: add or remove the selected item"), Context::browser, { chord ('5') } },
+        { "browser.collection6", TR_NOOP ("Collection 6: add or remove the selected item"), Context::browser, { chord ('6') } },
+        { "browser.collection7", TR_NOOP ("Collection 7: add or remove the selected item"), Context::browser, { chord ('7') } },
+        { "browser.clearCollections", TR_NOOP ("Remove the selected item from every collection"), Context::browser, { chord ('0') } },
 
         // Mixer (focused)
         { "mixer.moveLeft", TR_NOOP ("Move the selected inserts left"), Context::mixer, { chord (left, alt) } },

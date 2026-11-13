@@ -3916,6 +3916,7 @@ public:
         if (synth == nullptr)
             return;
         const auto k = std::clamp (key, 0, 127);
+        owners.start (k, startingNoteId());
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
         const auto v7 = velocityFromInitVol (initVol);
@@ -3962,6 +3963,10 @@ public:
 
     void noteOff (int key) noexcept override
     {
+        // (round 190ej: FL's Kepler keeps one note per key: a later note of the key takes it over and only the end of
+        // the note holding it ends it; the earlier note's end does nothing [EXEC: /R render, round 190ej])
+        if (! owners.ends (key, endingNoteId()))
+            return;
         take();
         const auto k = std::clamp (key, 0, 127);
         if (synth == nullptr || ! sounding[(std::size_t) k])
@@ -3969,6 +3974,7 @@ public:
         sounding[(std::size_t) k] = false;
         synth->noteOff (k, 0);
     }
+    KeyOwners owners; // the note that holds each key (round 190ej)
 
     void allNotesOff() noexcept override
     {

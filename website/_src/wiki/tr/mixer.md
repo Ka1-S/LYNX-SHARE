@@ -1,5 +1,5 @@
 ---
-source: 1e4bc038df
+source: b6e9ef0dd0
 ---
 ![Mixer](/assets/img/mixer.webp)
 
@@ -51,6 +51,18 @@ Efekt paneli, seçili insert'in on yuvasını gösterir.
 - Yuva menüsündeki `Ses efekti rafında grupla` efekti yeni bir rack'e koyar, `Tümünü ses efekti rafında grupla` bunu tüm zincir için yapar. `Grubu çöz`, tek zincirli bir rack'in efektlerini yuvalara geri koyar.
 - Panelin başlığındaki anahtar, insert'in tüm efektlerini açar veya kapatır.
 - Bir efekti [Browser](/wiki/browser/)'ın Plugin veritabanından bir insert'in veya efekt yuvasının üzerine sürükleyebilirsiniz.
+- Insert menüsündeki `Temiz ses`, insert'e hazır bir vokal temizleme zinciri koyar.
+
+## Bir yuvada Edison
+
+Ses editörü ve kaydedici olan Edison, her efekt yuvasında bulunabilir; bir insert'te birkaç tane olabilir. Penceresi, bir sıra kayıt kontrolü olan ses editörüdür.
+
+- Insert menüsündeki `Ses editörünü aç` (`Ctrl+E`), Edison'ı insert'in ilk boş yuvasına yükler ve açar. `Ses düzenleyiciyi aç ve kaydet` (`Shift+E`), şarkı çalınca kayda hazır halde yükler.
+- Kayıt modları `Şimdi`, `Girişte` (varsayılan: girişin bir eşiği geçmesini bekler), `Giriş` ve `Çalarken`'dir. `Sona ekle` yeni bir kaydı oradaki sesin ardına koyar. En uzun kayıt süresi `Sınırsız` veya 1, 3, 5, 10, 30 ya da 60 dakikadır: yeni bir yuva 30 ile başlar, `Ses düzenleyiciyi aç ve kaydet` 5 ayarlar.
+- `Sync`, şarkı çalarken Edison'ın sesini şarkının zamanında çalar.
+- Edison, penceresini kapattığınızda da kayda devam eder.
+- `Araçlar › Makrolar › Tüm Edison örneklerini kaldır`, bir soru sorduktan sonra projedeki her Edison yuvasını boşaltır.
+- FL Studio projelerindeki (.flp) Edison yuvaları sesleriyle açılır.
 
 ## Insert EQ
 
@@ -78,6 +90,8 @@ Mixer grupları, ok işaretleriyle katlanır (tümü için `Alt`+tıklama). Bir 
 
 Her insert'in bir kayda hazırlama düğmesi vardır. Bir insert kayda hazırken Rec ve Play, ses girişini bir Playlist klibine kaydeder. `Shift+R` seçili insert'i kayda hazırlar ve kaydı tek adımda başlatır. Bkz. [Kayıt](/wiki/recording/).
 
+Başka sesleri de kaydeden bir insert için harici bir giriş seçtiğinizde LYNX SHARE onu `Yalnızca harici giriş` olarak değiştirmek isteyip istemediğinizi sorar; böylece kayıtta yalnızca giriş bulunur. Insert menüsündeki `Mixer › Diske kayıt › Gecikme telafisi` varsayılan olarak açıktır. Kapatılırsa kaydedilen kayıtlar hiçbir gecikme telafisi uygulanmadan yerleştirilir.
+
 ## Tuşlar
 
 `Ctrl+L` ve `Ctrl+Shift+L` bu anlamı yalnızca Mixer odaktayken taşır.
@@ -92,6 +106,8 @@ Her insert'in bir kayda hazırlama düğmesi vardır. Bir insert kayda hazırken
 | Kaynaklarıyla solo | `Alt+S` | Seçili insert'leri ve onları besleyen insert'leri solo yapar |
 | Insert'leri sil | `Del` | Seçili insert'leri, bir soru sorduktan sonra siler |
 | Hazırla ve kaydet | `Shift+R` | Seçili insert'i kayda hazırlar ve kaydı başlatır |
+| Open audio editor | `Ctrl+E` | Edison'ı insert'in ilk boş yuvasına yükler ve açar |
+| Open audio editor and record | `Shift+E` | Aynısı, şarkı çalınca kayda hazır |
 
 ## Bilmekte fayda var
 
@@ -100,6 +116,8 @@ Her insert'in bir kayda hazırlama düğmesi vardır. Bir insert kayda hazırken
 - `Ctrl+L` Channel Rack'te ve Mixer'da farklı işler yapar. Rack'te boş insert'leri seçer. Mixer'da seçili insert'i kullanır.
 - Yönlendirme anahtarları seçili şeridde değil, diğer şeritlerde görünür.
 - Sınır, proje başına 127 insert ve insert başına on efekt yuvasıdır.
+- Edison'ın kaydı, proje dosyasının içinde değil, projenin klasöründe bir WAV dosyası olarak saklanır.
+- Klip gridinin altındaki Session mixer yalnızca Klip başlatma iş akışına aittir. Bu Mixer'daki insert'lerin aynısını gösterir. Bkz. [Düzenler](/wiki/layouts/).
 
 ## İlgili sayfalar
 

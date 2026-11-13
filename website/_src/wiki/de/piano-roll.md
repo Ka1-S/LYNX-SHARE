@@ -1,5 +1,5 @@
 ---
-source: 217f097c97
+source: a73763934f
 ---
 ![Das Piano Roll](/assets/img/pianoroll.webp)
 
@@ -69,6 +69,18 @@ Klicke auf das Lineal, um die Position zu setzen. `Ctrl`+Ziehen, Ziehen mit rech
 ## Chance und Velocity-Bereich
 
 Jede Note hat eine Chance und einen Velocity-Bereich. Die Chance gibt an, wie wahrscheinlich die Note bei jedem Durchlauf spielt. Der Velocity-Bereich lässt ihre Velocity zwischen der Velocity der Note und dieser Velocity plus dem Bereich schwanken. Wähle `Wahrscheinlichkeit` oder `Velocity-Bereich (LYNX)` im Spurfeld, um sie zu bearbeiten. `Tools › Wahrscheinlichkeit (LYNX)` im Menü des Piano Roll gruppiert die gewählten Noten so, dass entweder alle oder nur eine von ihnen spielt, und hat `Wahrscheinlichkeit und Velocity-Bereich zurücksetzen`.
+
+## Notenwerkzeuge
+
+Das Menü `Tools` der Piano Roll öffnet die Notenwerkzeuge von FL Studio als Dialoge. Sie wirken auf die gewählten Noten oder, wenn keine gewählt ist, auf alle Noten. Einige davon:
+
+| Werkzeug | Taste | Was es tut |
+|---|---|---|
+| Begrenzen | `Alt+K` | Verschiebt Noten oktavweise in einen Tastenbereich und begrenzt sie dann. Unter `Tonart- / Skalenbeschränkung` hält es Noten auf einer Grundtaste und einem der Akkorde oder Skalen von FL Studio, mit `Raster` auf `Darüber`, `Darunter` oder `Abwechselnd`. `Nach oben / unten umbrechen` und `Transponieren` legen fest, wohin Noten außerhalb des Bereichs gehen |
+| Spiegeln | `Alt+Y` | `Horizontal spiegeln` spiegelt die Noten in der Zeit. Mit `Startzeiten beibehalten`, anfangs an, werden die Startzeiten gespiegelt, und die Noten behalten ihre Längen. `Vertikal spiegeln` spiegelt die Tasten um die Mitte ihres Bereichs |
+| Zufällig | `Alt+R` | Zufällige Änderungen an Velocity, Pan, Feintonhöhe, Timing und Länge sowie an Mod X, Mod Y und Release |
+| Werte skalieren | `Alt+X` | Skaliert einen Notenwert vom Anfang bis zum Ende der Auswahl, mit `Versatz`, `Mitte` (der Wert, um den skaliert wird) und `Spannung` |
+| LFO | `Alt+O` | Schreibt eine LFO-Form in einen Notenwert. Klicke mit rechts auf einen `Periode`-Slider für eine Liste von 1 Step bis 512 Steps |
 
 ## MIDI-Tools und Skripte
 

@@ -156,6 +156,9 @@ int moveEffectBy (Song& song, int track, int index, int delta);
 int insertEffectAtRow (Song& song, int track, EffectSlot fx, int row);
 // Removes effect `index`; the others keep their rows (FL leaves the slot empty).
 void removeEffectKeepRows (Song& song, int track, int index);
+// Removes every effect of `kind` from every mixer track, each slot left empty (FL's Tools › Macros › "Remove all Edison
+// instances", round 190cd). Returns how many were removed.
+int removeEffectsOfKind (Song& song, EffectKind kind);
 
 // --- FL's mixer track menu (REA round 143) ---------------------------------------------------------------
 // "Reset selected track(s) to default": level, pan, stereo separation, phase, swap and EQ back to the defaults,

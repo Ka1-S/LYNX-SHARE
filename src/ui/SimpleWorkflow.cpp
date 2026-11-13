@@ -2,15 +2,20 @@
 
 #include <algorithm>
 
+#include "core/FirstSongTour.h"
+#include "core/KeyFollow.h"
 #include "core/LoopStarter.h"
 #include "core/MidiImport.h"
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/FileChoosers.h"
 #include "ui/FinishDock.h"
+#include "ui/FirstSongTour.h"
 #include "ui/I18n.h"
 #include "ui/LoopStarterWindow.h"
 #include "ui/QuickPick.h"
+#include "ui/SimpleDock.h"
+#include "ui/StartFromPanel.h"
 #include "ui/Theme.h"
 
 namespace lynx
@@ -218,6 +223,18 @@ public:
         close.setButtonText (juce::String::fromUTF8 ("\xc3\x97"));
         close.setTooltip (tr ("Close"));
         close.onClick = [this] { owner.closeByHand(); };
+        // round 190ch: a new project from LYNX's demo song or a template, with a preview
+        startFrom.setButtonText (tr ("Start from a demo song or a template..."));
+        startFrom.onClick = [this] { owner.showStartFrom(); };
+        // round 190dv: the first-song tour (continues a paused one)
+        tourButton.setButtonText (tr ("First-song tour"));
+        tourButton.setTooltip (tr ("A short guided tour that makes a first song with you"));
+        tourButton.onClick = [this] { owner.startOrContinueTour(); };
+        // round 190dv: what the tour's ring finds (ui/FirstSongTour.h)
+        voice.setComponentID ("simple.tile.voice");
+        instrument.setComponentID ("simple.tile.instrument");
+        drums.setComponentID ("simple.tile.drums");
+        loops.setComponentID ("simple.tile.loops");
 
         voice.onClick = [this] { owner.addAudio (Kind::voice); };
         // one click gives a sound to play at once (LYNX's own synth); "More..." lists every instrument, plugin and Soundfont
@@ -245,7 +262,7 @@ public:
         }
         guitarButton.setToggleState (true, juce::dontSendNotification);
 
-        for (auto* c : std::initializer_list<juce::Component*> { &title, &close, &voice, &instrument, &drums, &sampler, &guitar, &import, &loops, &footer })
+        for (auto* c : std::initializer_list<juce::Component*> { &title, &close, &voice, &instrument, &drums, &sampler, &guitar, &import, &loops, &footer, &startFrom, &tourButton })
             addAndMakeVisible (*c);
 
         // the starter-beat page
@@ -278,6 +295,8 @@ public:
             for (std::size_t i = 0; i < genreButtons.size(); ++i)
             {
                 genreButtons[i]->onClick = [this, i] { owner.addDrums (genreIds[i], i != 0, useTempo.getToggleState()); };
+                if (i == 1)
+                    genreButtons[i]->setComponentID ("simple.starters"); // (the tour's ring: the first starter beat)
                 addChildComponent (*genreButtons[i]);
             }
         }
@@ -318,10 +337,20 @@ public:
         c.removeFromTop (16);
         footer.setBounds (c.removeFromBottom (20));
         c.removeFromBottom (6);
+        {
+            // "Start from..." and the tour's button side by side
+            auto row = c.removeFromBottom (28);
+            const auto both = juce::jmin (340 + 8 + 170, row.getWidth());
+            row = row.withSizeKeepingCentre (both, 28);
+            tourButton.setBounds (row.removeFromRight (both * 170 / 518));
+            row.removeFromRight (8);
+            startFrom.setBounds (row);
+        }
+        c.removeFromBottom (8);
 
         // tiles: two columns, then Guitar / bass across, then Import and Loops
         const auto gap = 10;
-        const auto rowH = juce::jlimit (56, 78, (c.getHeight() - 4 * gap) / 5);
+        const auto rowH = juce::jlimit (50, 78, (c.getHeight() - 4 * gap) / 5);
         auto tiles = c;
         auto row = [&] { auto r = tiles.removeFromTop (rowH); tiles.removeFromTop (gap); return r; };
         auto pair = [&] (juce::Component& a, juce::Component& b) {
@@ -379,8 +408,10 @@ private:
 
     void updatePage()
     {
-        for (auto* c : std::initializer_list<juce::Component*> { &title, &voice, &instrument, &drums, &sampler, &guitar, &import, &loops, &footer })
+        for (auto* c : std::initializer_list<juce::Component*> { &title, &voice, &instrument, &drums, &sampler, &guitar, &import, &loops, &footer, &startFrom, &tourButton })
             c->setVisible (! starterPage);
+        tourButton.setButtonText (owner.tourCanContinue() ? tr ("Continue the tour") : tr ("First-song tour"));
+        tourButton.setVisible (! starterPage && ! owner.tourRunning()); // (not while its card is up)
         for (auto* c : std::initializer_list<juce::Component*> { &starterTitle, &back, &useTempo })
             c->setVisible (starterPage);
         for (auto& b : genreButtons)
@@ -391,7 +422,7 @@ private:
 
     SimpleWorkflow& owner;
     juce::Label title, footer, starterTitle;
-    juce::TextButton close, back, guitarButton, bassButton, moreInstruments;
+    juce::TextButton close, back, guitarButton, bassButton, moreInstruments, startFrom, tourButton;
     juce::ToggleButton useTempo;
     Tile voice, instrument, drums, sampler, guitar, import, loops;
     std::vector<std::unique_ptr<juce::TextButton>> genreButtons;
@@ -410,6 +441,7 @@ class AddTrackButton final : public juce::TextButton
 public:
     AddTrackButton() : juce::TextButton ("+ " + tr ("Add track"))
     {
+        setComponentID ("simple.addTrack");
         setTooltip (tr ("Add a track: voice, instrument, drums, sampler, guitar or bass, or import files"));
     }
 };
@@ -420,10 +452,12 @@ class SimpleTitleTools final : public juce::Component,
                                private juce::Timer
 {
 public:
-    SimpleTitleTools (juce::Component& a, juce::Component& b, std::function<juce::String()> statusText) : add (a), finish (b), text (std::move (statusText))
+    SimpleTitleTools (juce::Component& a, juce::Component& b, juce::Component& c, std::function<juce::String()> statusText)
+        : add (a), finish (b), lyrics (c), text (std::move (statusText))
     {
         addAndMakeVisible (add);
         addAndMakeVisible (finish);
+        addAndMakeVisible (lyrics);
         // round 190t: LYNX backs the work up by itself; a beginner should see it ("Backed up 2 min ago")
         status.setFont (theme::font (theme::type::small));
         status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
@@ -435,13 +469,15 @@ public:
         startTimer (2000);
     }
     static constexpr int statusWidth = 150;
-    static constexpr int width = 110 + 6 + 80 + 10 + statusWidth;
+    static constexpr int width = 110 + 6 + 80 + 6 + 80 + 10 + statusWidth; // (round 190ch: + Lyrics)
     void resized() override
     {
         auto r = getLocalBounds();
         add.setBounds (r.removeFromLeft (110));
         r.removeFromLeft (6);
         finish.setBounds (r.removeFromLeft (80));
+        r.removeFromLeft (6);
+        lyrics.setBounds (r.removeFromLeft (80));
         r.removeFromLeft (10);
         status.setBounds (r);
     }
@@ -463,6 +499,7 @@ private:
 
     juce::Component& add;
     juce::Component& finish;
+    juce::Component& lyrics;
     std::function<juce::String()> text;
     juce::Label status;
 };
@@ -474,6 +511,7 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
     button->onClick = [this] { showChooser(); };
     addButton = std::move (button);
     auto finish = std::make_unique<juce::TextButton> (tr ("Finish"));
+    finish->setComponentID ("simple.finish");
     finish->setTooltip (tr ("Master looks: give the whole song a finished sound"));
     finish->setClickingTogglesState (false);
     finish->onClick = [this] {
@@ -483,13 +521,85 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
             showFinish();
     };
     finishButton = std::move (finish);
-    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *finishButton, host.saveStatus);
+    // round 190ch: the project's Lyrics / Notes panel, docked beside the timeline
+    auto lyrics = std::make_unique<juce::TextButton> (tr ("Lyrics"));
+    lyrics->setTooltip (tr ("Lyrics and notes of this project"));
+    lyrics->onClick = [this] {
+        if (host.toggleLyrics)
+            host.toggleLyrics();
+    };
+    lyricsButton = std::move (lyrics);
+    titleTools = std::make_unique<SimpleTitleTools> (*addButton, *finishButton, *lyricsButton, host.saveStatus);
+
+    // round 190dv: the Welcome screen and the first-song tour
+    FirstSongTour::Host t;
+    t.window = host.window;
+    t.setOverlay = host.setOverlay;
+    t.doStep = [this] (int step) { doTourStep (step); };
+    t.showLoops = [this] {
+        if (host.showLoops)
+            host.showLoops();
+    };
+    t.openDemos = [this] { showStartFrom(); };
+    t.startEmpty = [this] { showChooser(); };
+    t.tourStarting = [this] {
+        if (simpletracks::isEmptySong (engine.getSong()) && ! isChooserShowing())
+            showChooser(); // (the first step's control: the Drums tile)
+    };
+    t.saveSong = [this] {
+        if (host.exportAudio)
+            host.exportAudio (0);
+    };
+    t.songIsEmpty = [this] { return simpletracks::isEmptySong (engine.getSong()); };
+    t.newProjectFirst = host.newProjectForTour;
+    tour = std::make_unique<FirstSongTour> (engine, std::move (t), host.offerWelcome);
+}
+
+// --- "Start from" (round 190ch) -----------------------------------------------------------------------------------------
+void SimpleWorkflow::showStartFrom()
+{
+    if (startFrom == nullptr)
+    {
+        StartFromPanel::Hooks hooks;
+        hooks.open = [this] (Song song) {
+            hideStartFrom();
+            if (host.startFrom)
+                host.startFrom (std::move (song));
+        };
+        hooks.close = [this] {
+            hideStartFrom();
+            if (simpletracks::isEmptySong (engine.getSong()) && engine.getSong().projectId != dismissedFor)
+                showChooser(); // (back to where it was opened from)
+        };
+        startFrom = std::make_unique<StartFromPanel> (engine, std::move (hooks));
+    }
+    if (host.setOverlay)
+        host.setOverlay (startFrom.get());
+    if (startFrom->isShowing())
+        startFrom->grabKeyboardFocus();
+}
+
+void SimpleWorkflow::hideStartFrom()
+{
+    if (! isStartFromShowing())
+        return;
+    static_cast<StartFromPanel&> (*startFrom).stopPreview();
+    if (host.setOverlay)
+        host.setOverlay (nullptr);
+}
+
+bool SimpleWorkflow::isStartFromShowing() const noexcept { return startFrom != nullptr && startFrom->getParentComponent() != nullptr; }
+
+juce::Component* SimpleWorkflow::startFromForSnapshot()
+{
+    showStartFrom();
+    return startFrom.get();
 }
 
 void SimpleWorkflow::showFinish()
 {
     if (finishDock == nullptr)
-        finishDock = std::make_unique<FinishDock> (engine, [this] { hideFinish(); }, FinishDock::Saving { host.exportAudio, host.exportOtherApps });
+        finishDock = std::make_unique<FinishDock> (engine, [this] { hideFinish(); }, FinishDock::Saving { host.exportAudio, host.exportOtherApps, host.showReferenceMatch });
     static_cast<FinishDock&> (*finishDock).refresh();
     if (host.setSideDock)
         host.setSideDock (finishDock.get(), FinishDock::width);
@@ -511,6 +621,91 @@ SimpleWorkflow::~SimpleWorkflow()
 {
     if (active)
         left();
+    tour.reset(); // (before the chooser and the docks it may point at)
+}
+
+// --- the Welcome screen and the first-song tour (round 190dv) ------------------------------------------------------------
+void SimpleWorkflow::showWelcome()
+{
+    if (! active)
+        return;
+    hideStartFrom();
+    tour->showWelcome();
+}
+
+void SimpleWorkflow::startOrContinueTour()
+{
+    if (! active)
+        return;
+    hideStartFrom();
+    if (isChooserShowing() && ! simpletracks::isEmptySong (engine.getSong()))
+        hideChooser();
+    tour->startOrContinue();
+}
+
+bool SimpleWorkflow::tourCanContinue() const { return tour != nullptr && tour->canContinue(); }
+bool SimpleWorkflow::tourRunning() const { return tour != nullptr && tour->isRunning(); }
+int SimpleWorkflow::tourStep() const { return tour != nullptr ? tour->step() : 0; }
+
+void SimpleWorkflow::doTourStep (int step)
+{
+    const auto& song = engine.getSong();
+    switch (step)
+    {
+        case tour::beat:
+            if (const auto* config = loopstarterui::sources().config)
+            {
+                if (isChooserShowing())
+                    hideChooser();
+                addDrums (config->defaultGenre, true, true);
+            }
+            break;
+        case tour::key:
+            engine.editSong ([] (Song& s) { projectkey::set (s, tour::defaultKey()); });
+            break;
+        case tour::instrument:
+            addDefaultInstrument();
+            break;
+        case tour::chords:
+        {
+            if (tour::firstInstrumentTrack (song) < 0)
+                addDefaultInstrument();
+            const auto track = tour::firstInstrumentTrack (engine.getSong());
+            if (track < 0)
+                break;
+            engine.editSong ([track] (Song& s) { tour::writeChords (s, track); });
+            dockTrack = track;
+            if (SimpleDock::shownSetting)
+            {
+                updateDock();
+                if (dock != nullptr)
+                    dock->setTab (SimpleDock::Tab::editor); // (the chords, as notes)
+            }
+            break;
+        }
+        case tour::effect:
+        {
+            auto track = tour::firstInstrumentTrack (song);
+            for (int t = 0; t < (int) song.playlistTracks.size() && track < 0; ++t)
+                if (simpletracks::kindOf (song, t))
+                    track = t;
+            if (track < 0)
+                break;
+            engine.editSong ([track] (Song& s) { tour::addOneKnob (s, track); });
+            showEffectsOfInsert (simpletracks::insertOf (engine.getSong(), track));
+            break;
+        }
+        case tour::finish:
+        {
+            showFinish();
+            MasterLookSettings look;
+            look.id = looks::balanced;
+            engine.editSong ([look] (Song& s) { looks::apply (s, look); });
+            break;
+        }
+        default:
+            break;
+    }
 }
 
 void SimpleWorkflow::entered()
@@ -524,10 +719,135 @@ void SimpleWorkflow::entered()
 void SimpleWorkflow::left()
 {
     active = false;
+    if (tour != nullptr) // (round 190dv: kept where it is; Help continues it)
+    {
+        if (tour->isRunning())
+            tour->pause();
+        tour->hideWelcome();
+    }
+    hideStartFrom();
     hideChooser();
     hideFinish();
+    releaseEditor(); // (the docked Piano roll goes back to its panel)
+    if (dock != nullptr && dock->getParentComponent() != nullptr && host.setBottomDock)
+        host.setBottomDock (nullptr, nullptr);
     if (host.setTitleAccessory)
         host.setTitleAccessory (nullptr, 0);
+}
+
+void SimpleWorkflow::editorTakenBack()
+{
+    if (dock != nullptr)
+        dock->editorTakenBack();
+}
+
+void SimpleWorkflow::releaseEditor()
+{
+    if (dock != nullptr)
+        dock->releaseEditor();
+}
+
+// --- the dock for the selected track (round 190bu) --------------------------------------------------------------------
+void SimpleWorkflow::updateDock()
+{
+    if (! active)
+        return;
+    if (! SimpleDock::shownSetting)
+    {
+        if (dock != nullptr && dock->getParentComponent() != nullptr && host.setBottomDock)
+            host.setBottomDock (nullptr, nullptr);
+        return;
+    }
+    if (dock == nullptr)
+    {
+        SimpleDock::Hooks hooks;
+        hooks.toggleChannelWindow = host.toggleChannelWindow;
+        hooks.showKeys = host.showKeys;
+        hooks.dockPianoRoll = host.dockPianoRoll;
+        hooks.undockPianoRoll = host.undockPianoRoll;
+        hooks.setFoldToKey = host.setFoldToKey;
+        hooks.foldedToKey = host.foldedToKey;
+        hooks.openPianoRollPanel = host.openPianoRollPanel;
+        hooks.layoutChanged = [this] {
+            updateDock(); // (the ▾ button hides it)
+            if (host.settingsChanged)
+                host.settingsChanged();
+        };
+        dock = std::make_unique<SimpleDock> (engine, std::move (hooks));
+    }
+    // the track it shows: the Playlist's current track while that is one of the song's tracks, else the first track
+    const auto& song = engine.getSong();
+    if (dockTrack < 0 && host.selectedTrack)
+        dockTrack = host.selectedTrack();
+    if (dockTrack >= (int) song.playlistTracks.size() || (dockTrack >= 0 && ! simpletracks::kindOf (song, dockTrack)))
+        dockTrack = -1;
+    if (dockTrack < 0)
+        for (int t = 0; t < (int) song.playlistTracks.size() && dockTrack < 0; ++t)
+            if (simpletracks::kindOf (song, t))
+                dockTrack = t;
+    if (dock->shownTrack() != dockTrack)
+        dock->showTrack (dockTrack);
+    else
+        dock->refresh();
+    if (dock->getParentComponent() == nullptr && host.setBottomDock)
+    {
+        dock->setVisible (true);
+        host.setBottomDock (dock.get(), [this] (int available) { return dock != nullptr ? dock->heightFor (available) : 0; });
+    }
+}
+
+void SimpleWorkflow::trackSelected (int track)
+{
+    if (! active || track == dockTrack)
+        return;
+    dockTrack = track;
+    if (isDockShowing())
+        updateDock();
+}
+
+void SimpleWorkflow::showEffectsOfInsert (int insert)
+{
+    if (! active)
+        return;
+    const auto& song = engine.getSong();
+    for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+        if (simpletracks::kindOf (song, t) && simpletracks::insertOf (song, t) == insert)
+        {
+            dockTrack = t;
+            break;
+        }
+    if (! SimpleDock::shownSetting)
+    {
+        SimpleDock::shownSetting = true;
+        if (host.settingsChanged)
+            host.settingsChanged();
+    }
+    updateDock();
+    if (dock != nullptr)
+        dock->setTab (SimpleDock::Tab::effects);
+}
+
+void SimpleWorkflow::toggleDock()
+{
+    SimpleDock::shownSetting = ! SimpleDock::shownSetting;
+    updateDock();
+    if (host.settingsChanged)
+        host.settingsChanged();
+}
+
+void SimpleWorkflow::cycleDockTab()
+{
+    if (isDockShowing())
+        dock->cycleTab();
+}
+
+bool SimpleWorkflow::isDockShowing() const noexcept { return dock != nullptr && dock->getParentComponent() != nullptr; }
+
+SimpleDock* SimpleWorkflow::dockForSnapshot()
+{
+    SimpleDock::shownSetting = true;
+    updateDock();
+    return dock.get();
 }
 
 void SimpleWorkflow::songChanged()
@@ -537,14 +857,25 @@ void SimpleWorkflow::songChanged()
     if (isFinishShowing())
         static_cast<FinishDock&> (*finishDock).refresh();
     static_cast<SimpleTitleTools&> (*titleTools).refresh();
+    updateDock();
+    if (tour != nullptr)
+        tour->songChanged(); // (round 190dv: a step the song shows done moves the tour on)
     const auto& song = engine.getSong();
     if (simpletracks::isEmptySong (song))
     {
-        if (song.projectId != dismissedFor && ! isChooserShowing())
+        // round 190dv: the first time, the Welcome screen instead of the chooser
+        if (tour != nullptr && host.offerWelcome && tour->shouldOfferWelcome() && ! isStartFromShowing())
+            tour->showWelcome();
+        else if (song.projectId != dismissedFor && ! isChooserShowing() && ! isStartFromShowing() && (tour == nullptr || ! tour->isWelcomeShowing()))
             showChooser();
     }
-    else if (isChooserShowing() && ! chooser->starterPage)
-        hideChooser(); // (something was added some other way: an undo, a drop, a loaded project)
+    else
+    {
+        if (isChooserShowing() && ! chooser->starterPage)
+            hideChooser(); // (something was added some other way: an undo, a drop, a loaded project)
+        if (tour != nullptr && tour->isWelcomeShowing())
+            tour->hideWelcome();
+    }
 }
 
 void SimpleWorkflow::showChooser()
@@ -617,6 +948,9 @@ bool SimpleWorkflow::add (simpletracks::Request request)
         engine.setInsertArmed (r.insert, true);
     if (! r.channels.empty() && ! simpletracks::isAudioKind (request.kind))
         engine.setSelectedChannel (r.channels.front());
+    lastAddedTrack = r.track;
+    if (r.pattern >= 0 && r.pattern < (int) engine.getSong().patterns.size() && ! simpletracks::isAudioKind (request.kind) && request.kind != Kind::drums)
+        engine.editSong ([p = r.pattern] (Song& s) { s.currentPattern = p; }, false); // (the typing keys record into it)
     hideChooser();
     if (host.trackAdded)
         host.trackAdded (r.track);
@@ -642,7 +976,22 @@ void SimpleWorkflow::addDefaultInstrument()
     q.kind = Kind::instrument;
     q.name = trackNameFor (q.kind);
     q.channel = std::move (synth);
-    if (add (std::move (q)) && host.showKeys)
+    q.emptyBars = 4; // a pattern to write into (round 190ds)
+    if (add (std::move (q)))
+        showKeysForNewTrack();
+}
+
+void SimpleWorkflow::showKeysForNewTrack()
+{
+    if (SimpleDock::shownSetting && active)
+    {
+        dockTrack = lastAddedTrack;
+        updateDock();
+        if (dock != nullptr)
+            dock->showKeyboard();
+        return;
+    }
+    if (host.showKeys)
         host.showKeys();
 }
 
@@ -657,8 +1006,9 @@ void SimpleWorkflow::chooseInstrument (juce::Component& tile)
             q.kind = c.instrument == InstrumentKind::sampler ? Kind::sampler : Kind::instrument;
             q.name = trackNameFor (q.kind);
             q.channel = std::move (c);
-            if (add (std::move (q)) && host.showKeys)
-                host.showKeys();
+            q.emptyBars = 4; // a pattern to write into (round 190ds)
+            if (add (std::move (q)))
+                showKeysForNewTrack();
         },
         [this] { chooseSample(); }, nullptr, chooser.get());
     quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (&tile), {});
@@ -689,6 +1039,7 @@ void SimpleWorkflow::chooseSample()
                            q.kind = Kind::sampler;
                            q.name = file.getFileNameWithoutExtension().toStdString();
                            q.channel = std::move (c);
+                           q.emptyBars = 4; // a pattern to write into (round 190ds)
                            add (std::move (q));
                        });
 }
@@ -712,6 +1063,7 @@ void SimpleWorkflow::dropFiles (const juce::StringArray& files, std::int64_t tic
 void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_t start)
 {
     juce::StringArray failed;
+    std::optional<keyfollow::LoopKey> firstKey; // the first keyed loop (a project without a key is offered its key)
     for (const auto& file : files)
     {
         if (file.hasFileExtension ("mid;midi"))
@@ -763,11 +1115,53 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
         // beats at the project's tempo, at its own pitch, and follows the tempo from then on (round 190p)
         q.audioBeats = simpletracks::loopBeats (file.getFileName().toStdString(), seconds, data->acidBeats, engine.getSong().beatsPerBar);
         q.start = start;
+        // round 190ds: a loop follows the project key — its key from its name, else detected from a loop's audio (a
+        // file made for a tempo); voice takes and songs (over 70 s) are left alone
+        if (seconds <= 70.0)
+        {
+            auto key = keyfollow::keyInName (file.getFileName().toStdString());
+            int source = key ? 1 : 0;
+            if (! key && q.audioBeats > 0.0f)
+                if (key = keyfollow::detectKey (*data).key; key)
+                    source = 2;
+            if (key)
+            {
+                q.audioKeyRoot = key->root;
+                q.audioKeyMinor = key->minor;
+                q.audioKeySource = source;
+                q.followKey = true;
+                if (! firstKey)
+                    firstKey = key;
+            }
+        }
         add (std::move (q));
     }
     if (! failed.isEmpty())
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not import"),
                                                 tr ("Could not read {0}", { failed.joinIntoString (", ") }));
+    if (firstKey && keyfollow::asksToSetKey (engine.getSong()))
+        offerProjectKey (firstKey->root, firstKey->minor);
+}
+
+void SimpleWorkflow::offerProjectKey (int root, bool minor)
+{
+    const keyfollow::LoopKey key { root, minor };
+    const auto name = juce::String (projectkey::rootName (root)) + " " + (minor ? tr ("minor") : tr ("major"));
+    lastKeyQuestion = tr ("Set the project key to {0}? Loops that follow the key are moved to it, keeping their length.", { name });
+    auto setKey = [this, key] {
+        engine.editSong ([key] (Song& s) { projectkey::set (s, keyfollow::projectKeyFor (key)); });
+    };
+    if (answerForSnapshot >= 0)
+    {
+        if (answerForSnapshot == 1)
+            setKey();
+        return;
+    }
+    juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Project key"), lastKeyQuestion, tr ("Set the key"), tr ("Not now"),
+                                        nullptr, juce::ModalCallbackFunction::create ([setKey] (int result) {
+                                            if (result == 1)
+                                                setKey();
+                                        }));
 }
 
 void SimpleWorkflow::addDrums (const std::string& genre, bool steps, bool useTempo)

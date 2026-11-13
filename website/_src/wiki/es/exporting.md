@@ -1,5 +1,5 @@
 ---
-source: 10cb57faf4
+source: da5e41c322
 ---
 ![La ventana de exportación con WAV seleccionado: rango, cola y archivos a la izquierda, formato a la derecha, opciones de mezcla debajo](/assets/img/wiki/export.webp)
 
@@ -82,7 +82,7 @@ Marca `Y la mezcla completa` para obtener la mezcla junto a los stems. La línea
 
 El `.flp` es un proyecto de FL Studio 2026. Los samplers, clips de audio, generadores y efectos propios de FL Studio, plugins de terceros, patrones, la Playlist, el Mixer y la automatización pasan con sus ajustes. Para lo que FL Studio no tiene, eliges entre `Renderizarlos a audio (suena igual)` y `Usar el plugin de FL más cercano (sigue editable, puede sonar distinto)`. Con la segunda opción, los instrumentos exclusivos de LYNX se dejan fuera. Los moduladores siempre se dejan fuera. Un informe lista qué se renderizó, sustituyó o dejó fuera. Los detalles están en [Si vienes de FL Studio](/wiki/coming-from-fl-studio/).
 
-El `.als` contiene una pista MIDI por canal, pistas de audio, grupos, retornos, envíos, plugins VST2 y VST3 con su estado, marcadores, y automatización de volumen, pan y tempo. Los instrumentos y efectos propios de LYNX SHARE no se convierten, aunque se conservan sus pistas y notas. La automatización de parámetros de efectos y las rutas de insert a insert se descartan. Los detalles están en [Si vienes de Ableton Live](/wiki/coming-from-ableton/).
+El `.als` contiene una pista MIDI por canal, pistas de audio, grupos, retornos, envíos, racks y Drum Racks, plugins VST2 y VST3 con su estado, marcadores, y automatización de volumen, pan y tempo. Los instrumentos y efectos propios de LYNX SHARE no se convierten, aunque se conservan sus pistas y notas. La automatización de parámetros de efectos y las rutas de insert a insert se descartan. Los detalles están en [Si vienes de Ableton Live](/wiki/coming-from-ableton/).
 
 ## Conviene saber
 

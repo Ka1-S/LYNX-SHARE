@@ -134,11 +134,13 @@ TEST (flm187d_mixer_and_rack_automation)
     // F2: Keys is muted and soloed, panned left (0.25 → −0.5); the master's Mute is the Master's
     CHECK (s.mixer[1].name == "Keys" && s.mixer[1].muted && s.mixer[1].solo && std::abs (s.mixer[1].pan + 0.5f) < 1e-6f);
     CHECK (s.mixer[0].muted && ! s.mixer[0].solo && ! s.mixer[2].muted && ! s.mixer[2].solo);
-    // the held pitch bend (0.6875 → 2^(4·0.6875 − 2) = +9 semitones) on the sampler's pitch; aftertouch reported
+    // the held pitch bend 0.6875 on the channel's pitch: the rack hands 4v − 2 = 0.75 to the DW Sampler, which bends by
+    // half of it × its PB Range (4 without a MIDI chunk) = +1.5 semitones (round 190de; until then +9, the drum slots'
+    // 2^(4v − 2)); aftertouch reported
     const auto* keys = flm182c::channelNamed (s, "Keys");
-    CHECK (keys != nullptr && keys->instrument == InstrumentKind::sampler && std::abs (keys->sampler.pitch - 9.0f) < 1e-4f);
-    CHECK (report.converted.count ("FL Studio Mobile: channel pitch bend (on the sampler's pitch)") == 1
-           && report.partialEffects.count ("FL Studio Mobile: channel aftertouch (not imported)") == 1);
+    CHECK (keys != nullptr && keys->instrument == InstrumentKind::sampler && std::abs (keys->sampler.pitch - 1.5f) < 1e-4f);
+    CHECK (report.converted.count ("FL Studio Mobile: channel pitch bend (on the channel's pitch)") == 1
+           && report.partialEffects.count ("FL Studio Mobile: channel aftertouch (not imported)") == 0); // (round 190dw: no FLM module reads it)
     // Vocal → Master and the bus at FLM's send levels
     CHECK (s.mixer[2].toMaster && s.mixer[2].sends.size() == 1 && s.mixer[2].sends[0].target == 3);
 
@@ -154,7 +156,8 @@ TEST (flm187d_mixer_and_rack_automation)
         if (t.kind == AutomationTargetKind::mixerSend && t.index == 2 && t.slot == 0)
             toMaster = (int) i;
     }
-    CHECK (s.automations.size() == 3 && pan >= 0 && toBus >= 0 && toMaster >= 0);
+    // (round 190de: the DW Sampler's Pitch lane is imported too, on its own value: a fourth)
+    CHECK (s.automations.size() == 4 && pan >= 0 && toBus >= 0 && toMaster >= 0);
     if (pan >= 0)
     {
         // every saved point kept, the jump at beat 2 as two points on one tick
@@ -175,9 +178,11 @@ TEST (flm187d_mixer_and_rack_automation)
     CHECK (report.converted.count ("FL Studio Mobile: Pan automation") == 1 && report.converted.count ("FL Studio Mobile: send level automation") == 1
            && report.converted.at ("FL Studio Mobile: send level automation") == 2);
     CHECK (report.unsupported.count ("FL Studio Mobile: Mute/Solo automation (LYNX automates neither)") == 1
-           && report.unsupported.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 1
+           && report.unsupported.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 0
+           && report.converted.count ("FL Studio Mobile: instrument parameter automation") == 1
            && report.unsupported.count ("FL Studio Mobile: send level automation without that route") == 1
-           && report.unsupported.count ("FL Studio Mobile: MIDI CC automation (not imported)") == 1);
+           // (round 190dw: CC #1 is the mod wheel, which no instrument of that empty rack reads: nothing to play)
+           && report.converted.count ("FL Studio Mobile: mod-wheel automation on instruments that ignore the wheel (nothing to play)") == 1);
     // the point shapes are FLM's saved samples, so no "straight lines" approximation is reported any more
     CHECK (report.partialEffects.count ("FL Studio Mobile: automation point shapes (straight lines)") == 0);
     // the rows: one per imported lane, in FLM's order, under the channel's name

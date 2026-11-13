@@ -891,6 +891,73 @@
 "Der Zufalls-Seed ist pro Instanz verschieden, daher sind zwei Renderings derselben Noten nicht samplegenau identisch mit FL Studio, das den Seed aus der Uhr nimmt."
 ]
 },
+"gen-pocket-supersaw": {
+"source": "59b10d9603",
+"intro": "Pocket SuperSaw ist ein virtuell-analoger Synthesizer mit bis zu 8 Stimmen. Jede Stimme ist ein Stapel aus 1 bis 12 verstimmten Sägezahnwellen mit einem Sub-Oktav-Sägezahn oder dem SuperSync-Oszillator, einer Pulsfolge, die wie Hard Sync sweept. Es ist die Engine, auf der FL-Studio-Mobile-Projekte (.flm) ihr Modul SuperSaw laden, und es steht auch in der Plugin-Auswahl unter Pocket SuperSaw. Ein neuer Kanal startet mit den Standardwerten von FL Studio Mobile. Die Seite ist eine schlichte Liste von Reglern, einer pro Parameter (59 insgesamt), nicht das eigene Panel von FL Studio Mobile.",
+"controls": [
+[
+"Osc unison, Osc unison detune, Osc unison detune curve, Osc unison pan",
+"Anzahl der Sägezähne pro Stimme (1 bis 12), wie weit sie verstimmt sind (bis zu 100 Cent), wie die Verstimmung auf die Sägezähne verteilt wird und wie breit sie panoramiert sind."
+],
+[
+"Osc pulse width, Osc pulse mode, Osc sub level",
+"Der Pulse-Modus macht aus jedem Sägezahn eine Pulswelle, mit ihrer Breite. Osc sub level ist der Pegel des Sägezahns eine Oktave tiefer."
+],
+[
+"Osc re-trig phases, Osc phases offset",
+"Bei eingeschaltetem Re-Trig startet jede Note die Sägezähne mit denselben Phasen, sodass das Schweben bei jeder Note gleich ist. Aus: Jede Note startet mit zufälligen Phasen."
+],
+[
+"SuperSync mode, Osc sync, Osc sync pulse width, Osc sync attack / decay / sustain / release, Osc sync EG amount, Osc sync kbd dir",
+"Der SuperSync-Oszillator und seine eigene Hüllkurve, die den Sync-Anteil durchfährt."
+],
+[
+"Filter cutoff, Filter resonance, Filter kbd, Filter vel",
+"Ein 4-Pol-Ladder-Tiefpassfilter bis 20 kHz, mit Tastatur- und Velocity-Tracking."
+],
+[
+"Filter EG attack / decay / sustain / release, Filter EG amount",
+"Die Filter-Hüllkurve. Der Betrag ist bipolar, -100 % bis +100 %."
+],
+[
+"Level EG attack / decay / sustain / release, Level, Pan",
+"Die Lautstärke-Hüllkurve sowie Ausgangspegel und Pan. Die Hüllkurvenzeiten reichen von 0 bis 31 Sekunden."
+],
+[
+"LFO shape, LFO rate, LFO mode, LFO beat, LFO amount, LFO dest, LFO fade in",
+"Ein LFO pro Stimme: Sine, Ramp, Square oder Random; Free, One shot oder Tempo sync. LFO dest wählt Cutoff, Resonance, Pitch, Sync, Pulse width, Detune, Level oder Pan."
+],
+[
+"Arp rate, Arp range, Arp mode",
+"Arpeggiator: Off, Up, Down, Up-down, Up-down (ends twice) oder Random, über bis zu 3 zusätzliche Oktaven."
+],
+[
+"Monophonic mode, Number of voices, Slide held mode, Slide time, Slide time static",
+"Eine Stimme oder bis zu 8 spielen und wie Noten ineinander gleiten."
+],
+[
+"Transpose, Pitch bend range",
+"Transponiert um -12 bis +12 Halbtöne. Das Pitch-Rad biegt um 1 bis 12 Halbtöne."
+],
+[
+"Distortion, Output trim",
+"Eine tanh-Verzerrung und ein Ausgangs-Trim von -18 bis 0 dB."
+],
+[
+"Delay time, Delay feedback, Delay mix, Delay filter",
+"Ein tempo-synchrones Stereo-Delay, 1/4 Schlag bis 1 Schlag, mit einem Tiefpass- oder Hochpassfilter in seiner Schleife."
+],
+[
+"Mod wheel amount, Mod wheel dest",
+"Was das Modulationsrad bewegt: Cutoff, Resonance, Sync, Pulse width, Detune, Level, Pan, LFO amount oder LFO rate."
+]
+],
+"tips": [
+"Jeder Regler lässt sich automatisieren. Die Sägezähne sind bandbegrenzt, sodass hohe Noten kein Aliasing erzeugen.",
+"Startphasen und der Random-LFO stammen aus einem Generator, der jeder Instanz gehört, sodass ein Render nie Sample für Sample einem Render von FL Studio Mobile entspricht. Energie und Spektrum tun es.",
+"Der Tonhöhenregler des Kanals, Feinstimmung, Mono und Porta und die Slide-Noten der Piano Roll wirken auf die Stimmen wie bei den Generatoren von FL Studio."
+]
+},
 "gen-poizone": {
 "source": "09b740f9c1",
 "intro": "PoiZone ist ein subtraktiver Generator auf Basis der Engine des gleichnamigen FL-Plugins: zwei Sägezahn- oder Pulse-Oszillatoren mit Rauschen, Hard Sync und Ringmodulation, ein 4-Pol-Filter, ein LFO, eine Modulationshüllkurve und eine Amp-Hüllkurve, dann ein 16-Step-Gate, Chorus, Stereo-Tape-Delay und Arpeggiator. Er lässt sich ohne FL Studio hinzufügen und startet dann von der eigenen Preset-Bank von LYNX SHARE.",
@@ -1424,6 +1491,54 @@
 "Die Stimme läuft intern mit 44,1 kHz und wird auf die Projekt-Samplerate resampelt."
 ]
 },
+"gen-drum-rack": {
+"source": "67ab8ab312",
+"intro": "Drum Rack ist ein Instrument Rack, dessen Ketten Pads sind. Jedes Pad empfängt eine Note und spielt das Instrument und die Effekte seiner Kette. Füge es über die Plugin-Auswahl als Drum Rack hinzu. Ein neues Drum Rack zeigt nur die Pads und den Geräte-Bereich, mit C1 gewählt. Ziehe Samples auf die Pads oder klicke mit rechts auf ein leeres Pad, um ein Sample oder ein Instrument zu laden. Ein Drum Rack in einem Ableton-Live-Set (.als) öffnet sich als ein Drum Rack mit seinen Pads, Sends und Return-Ketten, und Drum Racks werden beim Export eines Live-Sets geschrieben.",
+"controls": [
+[
+"Pads",
+"Eine 4-x-4-Ansicht der Pads, darüber ein Übersichtsstreifen aller 128: Klicke, ziehe oder scrolle ihn, um die Ansicht zu verschieben. Ein belegtes Pad zeigt seinen Namen mit M (Mute), einer Play-Taste und S (Solo). Ziehe ein Pad auf ein anderes, um sie zu tauschen. Werden mehrere Samples abgelegt, füllen sie aufeinanderfolgende Pads."
+],
+[
+"Pad menu",
+"Umbenennen (Ctrl+R), Löschen, Als Standard-Pad sichern, Nächstes ähnliches (Ctrl+Right), Vorheriges ähnliches (Ctrl+Left), Als Ähnlichkeitsreferenz sichern (Ctrl+Up), Zur Referenz zurück (Ctrl+Down) sowie die LYNX-SHARE-Einträge Duplizieren und Choke."
+],
+[
+"M, V, P, C, I-O, S, R, D",
+"Der Streifen links zeigt oder verbirgt die Makros, die Makro-Variationen, die Pads, die Kettenliste, die Spalten I-O, Send und Return sowie den Geräte-Bereich."
+],
+[
+"Receive, Play, Choke",
+"Pro Pad: die eingehende Note, auf die es reagiert (oder All), die Note, die es seinem Instrument übergibt, und seine Choke-Gruppe (None oder 1 bis 16). Ein Pad in einer Choke-Gruppe schneidet die anderen Pads dieser Gruppe ab."
+],
+[
+"Send-a, Send-b",
+"Der Pegel, den jedes Pad an jede Return-Kette sendet."
+],
+[
+"Return chains",
+"Ketten aus Audioeffekten, die von den Sends gespeist werden, angezeigt als a, b und so weiter, zum Beispiel „a Mix Bus“."
+],
+[
+"Audio an",
+"Wohin die Kette eines Pads geht: Rack-Ausgang oder direkt in eine Return-Kette."
+],
+[
+"Vel, Chain, Hide",
+"Eine Ergänzung von LYNX SHARE unter der Kettenliste: Velocity- und Kettenwahl-Zonen. Pads treten an die Stelle der Tastenzonen."
+],
+[
+"Makros",
+"Bis zu 16 Makro-Regler, mit Map, Rand und Makro-Variationen, wie in einem Instrument Rack."
+]
+],
+"tips": [
+"In Drum Rack zerschneiden im Menü eines Sampler-Kanals legt jeden Slice seines Samples auf ein Pad. In neue MIDI-Spur zerschneiden... auf einem Audioclip in der Playlist zerschneidet ihn pro Transiente, Takt, Notenwert oder Warp-Marker in einen neuen Drum-Rack-Kanal mit einem Pattern, das die Slices spielt.",
+"Im Layout Clip-Start zeigt die Piano Roll eines Drum-Rack-Kanals pro belegtem Pad eine benannte Zeile. Im Layout Pattern behält sie die Klaviertasten, mit den Pad-Namen darauf.",
+"Nächstes ähnliches und Vorheriges ähnliches tauschen das Sample des Pads mithilfe des Index Find similar samples des Browsers aus.",
+"Beim .als-Export werden die eingebauten Effekte von LYNX SHARE in einer Kette nicht geschrieben; Sampler auf Pads werden als Simpler von Live geschrieben. Noch kein Live hat ein exportiertes Drum Rack geöffnet."
+]
+},
 "gen-drumaxx": {
 "source": "271635956e",
 "intro": "Drumaxx ist ein Drum-Generator für das Channel Rack. Er modelliert Schlägel und Membran jedes seiner 16 Pads, verteilt auf zwei Seiten (1-8 und 9-16). Er öffnet beim .flp-Import die Einstellungen des passenden FL Studio-Plugins.",
@@ -1599,6 +1714,63 @@
 "Weil die Note mit halber Rate folgt, verschiebt eine Oktave auf der Tastatur die Starttonhöhe um eine halbe Oktave.",
 "Hüllkurven und LFOs des Kanals für Pan, Lautstärke, Cutoff und Resonanz werden einmal pro Sequencer-Tick weitergeschaltet.",
 "Eine Note, die ohne Lautstärke-Hüllkurve losgelassen wird, endet mit einer 10-ms-Ausblendung."
+]
+},
+"fx-edison": {
+"source": "d470ae5709",
+"intro": "Edison ist ein Audioeditor, der in einem Mixer-Slot sitzt. Er reicht den Eingang des Slots unverändert durch, nimmt diesen Eingang auf, solange Aufnahme an ist, und fügt seine eigene Wiedergabe zum Ausgang hinzu. Mehrere Edison-Slots können auf einer Spur liegen. Füge ihn über die Plugin-Liste des Slots hinzu oder nutze das Menü der Mixerspur: Audio-Editor öffnen (Ctrl+E) legt ihn in den ersten leeren Slot, und Audio-Editor öffnen und aufnehmen (Shift+E) macht ihn zusätzlich aufnahmebereit mit dem Aufnahmemodus Bei Wiedergabe, 5 min, Anhängen aus und Slave an. Sein Fenster ist der Audioeditor von LYNX SHARE, ergänzt um die Aufnahme-Regler des Slots. Die Aufnahme läuft weiter, während das Fenster geschlossen ist. Edison-Slots in .flp-Projekten öffnen sich als Edison, mit ihren Einstellungen und ihrem Audio.",
+"controls": [
+[
+"Aufnahme",
+"Nimmt den Eingang des Slots auf, je nach Modus. Taste R."
+],
+[
+"Now, On input, Input, On play",
+"Der Aufnahmemodus. Jetzt startet sofort. Bei Eingang startet, wenn der Eingang über die Rauschschwelle steigt, und behält 0.1 s von davor. Eingang nimmt nur auf, solange der Eingang zu hören ist, und pausiert nach 1 s Stille. Bei Wiedergabe nimmt auf, solange der Song spielt, und setzt jedes Mal einen Songsprung-Marker, wenn die Songposition springt, sodass ein geloopter Song eine Aufnahme mit einem Marker pro Durchlauf ergibt. Neue Slots starten auf Bei Eingang."
+],
+[
+"Maximale Aufnahmedauer",
+"Unbegrenzt, 1, 3, 5, 10, 30 oder 60 min. Neue Slots starten bei 30 min."
+],
+[
+"Anhängen",
+"An: Eine neue Aufnahme kommt hinter das vorhandene Audio. Aus: Sie ersetzt es. Standardmäßig an."
+],
+[
+"Sync",
+"Slave playback to host: Während der Song spielt, spielt das Audio zur Songzeit. Taste H. Das Menü Aufnahme enthält außerdem Eigene Auswahl ignorieren."
+],
+[
+"Eingang stumm",
+"Der Eingang des Slots wird nicht weitergereicht, nur die Wiedergabe von Edison. Taste I."
+],
+[
+"Loop",
+"Spielt die Wiedergabe in einer Schleife. Taste L."
+],
+[
+"Raster",
+"Rastet am Raster, an Regionen, an Samples oder an Nulldurchgängen ein, Tasten 1 bis 4."
+],
+[
+"Ziehen",
+"Ziehe das Sample oder die Auswahl als WAV auf die Playlist oder das Channel Rack. Rechtsklick kopiert es in die Zwischenablage des Editors."
+],
+[
+"Senden",
+"Senden an die Playlist als Audioclip, an den gewählten Kanal oder an einen neuen Sampler-Kanal."
+],
+[
+"Trigger-Note",
+"Im Menü einer Region: die mit der Region verknüpfte Note. Regionen › Allen Regionen Auslösenoten zuweisen... und Alle zuweisen an legen sie für jede Region fest."
+]
+],
+"tips": [
+"Das Audio wird als WAV-Datei im Aufnahmeordner des Projekts gespeichert, nicht in der Projektdatei.",
+"Tools › Rauschschwelle erfassen legt, auf einer Auswahl nur mit Hintergrundrauschen, den Pegel fest, auf den Bei Eingang und Eingang hören.",
+"Tools › Makros › Alle Edison-Instanzen entfernen entfernt jeden Edison-Slot des Projekts.",
+"Ein in LYNX SHARE angelegter Slot wird beim Export nicht in eine .flp geschrieben. Ein Edison-Slot, der aus einer .flp stammt und nicht bearbeitet wurde, behält die Daten von FL Studio.",
+"Auslösenoten werden mit den Regionen gespeichert und von Audio-Skripten gelesen. Eine Region über ihre Note abzuspielen ist noch nicht umgesetzt."
 ]
 },
 "gen-fruity-granulizer": {
@@ -2538,6 +2710,143 @@
 "Linearphasigkeit ist Teil der Engine. Ihre Latenz steht in der Doku."
 ]
 },
+"fx-pocket-comb-filter": {
+"source": "1845ad22a7",
+"intro": "Pocket Comb Filter fügt dem Dry-Signal ein kurzes Delay mit Feedback hinzu, sodass der Klang auf der eingestellten Tonhöhe nachklingt. Die Tonhöhe lässt sich von Hand einstellen, der tiefsten im Channel Rack gehaltenen Taste folgen oder der im Eingang erkannten Tonhöhe. Es ist die Engine, auf der FL-Studio-Mobile-Projekte (.flm) ihr Modul Comb Filter laden, mit allen Werten unverändert übernommen, und es lässt sich auch in jeden Mixer-Slot einfügen.",
+"controls": [
+[
+"Modus",
+"Manuell, Tiefste Note oder Tonhöhe erkennen. Manuell nutzt Pitch, oder Tonhöhe Oktave und Tonhöhe Note, wenn Snap an ist. Tiefste Note folgt der tiefsten im Channel Rack gehaltenen Taste und behält die letzte nach dem Loslassen. Tonhöhe erkennen folgt der Tonhöhe des Eingangs."
+],
+[
+"Tonhöhe",
+"Frequenz im Modus Manuell, wenn Snap aus ist, 1 Hz bis 2.50 kHz nach einem Gesetz vierter Potenz."
+],
+[
+"Feedback",
+"Wie viel vom verzögerten Signal zurückgeführt wird, 0 bis 100 %. Höhere Werte klingen länger nach."
+],
+[
+"Mix",
+"Pegel des Kammsignals, das zum Dry-Signal addiert wird, 0 bis 100 %. Das Dry-Signal bleibt auf vollem Pegel."
+],
+[
+"Versatz",
+"Verschiebt die Tonhöhe um -2 bis +2 Oktaven in den Modi Tiefste Note und Tonhöhe erkennen."
+],
+[
+"Glättung",
+"Wie langsam die Tonhöhe zu einem neuen Wert gleitet, 0 bis 100 %."
+],
+[
+"Raster",
+"An: Der Modus Manuell spielt die Note, die durch Tonhöhe Oktave und Tonhöhe Note festgelegt ist. Aus: Er nutzt die Frequenz von Pitch."
+],
+[
+"Polarität",
+"Vorzeichen des Feedbacks pro Seite: Both +, Left -, Right - oder Both -."
+],
+[
+"Asymmetrie",
+"-5.0 bis +5.0 %. Senkt die Frequenz der linken Seite und hebt die der rechten Seite um diesen Betrag (negative Werte tun das Gegenteil)."
+],
+[
+"Tonhöhe Oktave",
+"Oktave der Note, -1 bis 6."
+],
+[
+"Tonhöhe Note",
+"Notenname, C bis B. Solange noch keine Taste gehalten wurde, startet Tiefste Note ebenfalls auf dieser Note (standardmäßig E3)."
+]
+],
+"tips": [
+"Tiefste Note liest die gehaltenen Tasten aller Kanäle des Channel Racks. In FL Studio Mobile liest sie nur das Rack, in dem der Effekt sitzt.",
+"Tonhöhe erkennen funktioniert am besten bei tonhöhenbehafteten Klängen. Bei Drums oder Rauschen kann sie auf falsche Tonhöhen einrasten, und auch der eigene Detektor von FL Studio Mobile ist dort nicht konsistent.",
+"Die Stimmung folgt der Delay-Schleife von FL Studio Mobile, die bei derselben Note etwa 19 Cent neben einem idealen Kammfilter liegt.",
+"Der Effekt hat eine schlichte Reglerseite, nicht das Panel von FL Studio Mobile."
+]
+},
+"fx-pocket-eq": {
+"source": "3ee10840e7",
+"intro": "Pocket EQ hat vier Bänder. Jedes Band ist ein Low-Shelf, ein Peak oder ein High-Shelf mit eigenem Gain, eigener Frequenz und eigener Bandbreite und kann auf beiden Seiten, nur auf einer Seite oder auf den beiden Seiten in entgegengesetzter Richtung arbeiten. Es ist die Engine, auf der FL-Studio-Mobile-Projekte (.flm) ihr Modul Equalizer laden, mit allen Werten unverändert übernommen, und es lässt sich auch in jeden Mixer-Slot einfügen.",
+"controls": [
+[
+"Gain 1 to Gain 4",
+"Gain des Bands, angezeigt als -12 bis +12 dB. Wie in FL Studio Mobile hebt oder senkt das Band um das Doppelte des angezeigten Werts, der volle Bereich ist also -24 bis +24 dB."
+],
+[
+"Frequency 1 to Frequency 4",
+"Frequenz des Bands, 32 Hz bis etwa 19.5 kHz."
+],
+[
+"Bandwidth 1 to Bandwidth 4",
+"Breite des Bands, 0.25 bis 7.25 Oktaven."
+],
+[
+"Kind 1 to Kind 4",
+"Low-Shelf, Peak oder High-Shelf. Low-Shelf ist die untere Hälfte des Bereichs, Peak die obere Hälfte und High-Shelf nur ganz oben."
+],
+[
+"Channel 1 to Channel 4",
+"Auf welcher Seite das Band arbeitet: Both, Left, Right, Left + / right - (die rechte Seite bekommt den entgegengesetzten Gain) oder Left - / right + (die linke Seite bekommt den entgegengesetzten Gain)."
+]
+],
+"tips": [
+"Die Bänder laufen mit der doppelten Samplerate, wie in FL Studio Mobile.",
+"Die vier Bänder sind auf die Art von FL Studio Mobile hintereinandergeschaltet, was den Klang um 1.5 Samples verzögert. Wie FL Studio Mobile meldet der Effekt dies nicht an den Latenzausgleich.",
+"Der Effekt hat eine schlichte Reglerseite, nicht das EQ-Panel von FL Studio Mobile."
+]
+},
+"fx-pocket-filter": {
+"source": "9f7f27becb",
+"intro": "Pocket Filter ist ein resonanter Filter aus einem, zwei oder vier Paaren identischer Filterstufen. Es ist die Engine, auf der FL-Studio-Mobile-Projekte (.flm) ihr Modul Filter laden, mit allen Werten unverändert übernommen, und es lässt sich auch in jeden Mixer-Slot einfügen.",
+"controls": [
+[
+"Frequenz",
+"Cutoff- oder Mittenfrequenz, 16 Hz bis etwa 20 kHz."
+],
+[
+"Q",
+"Resonanz, angezeigt als 0.80 bis 2.80, nach einem quadratischen Gesetz."
+],
+[
+"Typ",
+"LP (Tiefpass), BP (Bandpass) oder HP (Hochpass). LP ist die untere Hälfte des Bereichs, BP die obere Hälfte und HP nur ganz oben."
+],
+[
+"Flanke",
+"24 dB/O, 48 dB/O oder 96 dB/O. 24 dB/O ist die untere Hälfte des Bereichs, 48 dB/O die obere Hälfte und 96 dB/O nur ganz oben."
+]
+],
+"tips": [
+"Wie in FL Studio Mobile senkt der Tiefpass den Pegel um etwa 2 dB pro Stufenpaar: etwa 2, 4 und 8 dB bei 24, 48 und 96 dB/O. Der Bandpass hebt die Mitte um den Wert von Q an, bis zu etwa 9 dB.",
+"Eine Änderung der Flanke wirkt sofort, und der Pegel des Tiefpasses folgt erst bei der nächsten Änderung von Frequenz, Q oder Typ. FL Studio Mobile macht es genauso.",
+"Jedes Stufenpaar verzögert den Klang um ein Sample, was wie in FL Studio Mobile nicht an den Latenzausgleich gemeldet wird."
+]
+},
+"fx-pocket-graphic-eq": {
+"source": "3fcecfce15",
+"intro": "Pocket Graphic EQ hat acht feste Bänder von je einer Oktave Breite: ein Low-Shelf bei 80 Hz, Peaks bei 160 Hz, 375 Hz, 750 Hz, 1.5 kHz, 3 kHz und 6 kHz und ein High-Shelf bei 12 kHz. Es ist die Engine, auf der FL-Studio-Mobile-Projekte (.flm) ihr Modul Graphic EQ laden, mit allen Werten unverändert übernommen, und es lässt sich auch in jeden Mixer-Slot einfügen.",
+"controls": [
+[
+"80 Hz",
+"Low-Shelf. Gain angezeigt als -12 bis +12 dB."
+],
+[
+"160 Hz, 375 Hz, 750 Hz, 1.5 kHz, 3 kHz, 6 kHz",
+"Peak-Bänder. Gain angezeigt als -12 bis +12 dB."
+],
+[
+"12 kHz",
+"High-Shelf. Gain angezeigt als -12 bis +12 dB."
+]
+],
+"tips": [
+"Wie in FL Studio Mobile hebt oder senkt jedes Band um das Doppelte des angezeigten Werts, der volle Bereich ist also -24 bis +24 dB.",
+"Die Bänder sind auf die Art von FL Studio Mobile hintereinandergeschaltet, was den Klang um 8 Samples verzögert. Wie FL Studio Mobile meldet der Effekt dies nicht an den Latenzausgleich.",
+"Der Effekt hat eine schlichte Reglerseite, nicht die Slider von FL Studio Mobile."
+]
+},
 "fx-ridge-strip": {
 "source": "4b27e2d1f5",
 "intro": "Ridge Strip ist ein nativer Channel Strip von LYNX SHARE für ein Mixer-Insert. Er vereint Filter, Equalizer und Dynamik in einem Fenster, mit einer Kurve und Gain-Metern in der Mitte.",
@@ -3049,7 +3358,7 @@
 ]
 },
 "fx-glow-leveler": {
-"source": "c674a036c1",
+"source": "c97ebe6b51",
 "intro": "Glow Leveler ist ein optischer Leveler: ein Modell einer elektrooptischen Zelle mit programmabhängiger Attack und zweistufigem Release. Er hat zwei Voicings, Modern und Opto classic, und eine neue Instanz startet mit Opto classic. Ein VU-Meter sitzt zwischen den Reglern Gain und Peak-Reduktion.",
 "controls": [
 [
@@ -3097,6 +3406,10 @@
 "Nur Opto classic. Zwei kleine Schalter behalten das Limit- und Make-up-Gesetz sowie das Attack- und Release-Timing von Projekten, die mit früheren Versionen gespeichert wurden, oder nutzen die gemessenen."
 ],
 [
+"Zellgedächtnis",
+"Nur Opto classic, Modus Compress. An: Das Release wird nach langer oder starker Gain-Reduktion langsamer, sodass sich der Leveler nach einer kurzen Spitze schnell und nach einer langen langsam erholt. Standardmäßig aus."
+],
+[
 "Make-up-Ref.",
 "Nur Opto classic. Der Wert von Peak-Reduktion, bei dem Auto-Make-up eingeschaltet wurde. Das Make-up folgt von dort dem Regler."
 ]
@@ -3107,7 +3420,7 @@
 ]
 },
 "fx-hush-de-esser": {
-"source": "a7ecd8dcb9",
+"source": "7fb1e34f17",
 "intro": "Hush De-esser ist ein nativer LYNX SHARE-Effekt, der harte Zischlaute im Gesang verringert. Er kann nur auf dem Zischlautband oder auf dem ganzen Signal arbeiten. Das große Display zeigt das Signal mit der Threshold-Linie, die du ziehen kannst.",
 "controls": [
 [
@@ -3149,6 +3462,14 @@
 [
 "Abhören",
 "Lässt dich das erkannte Band abhören."
+],
+[
+"Air",
+"Ein High-Shelf bei etwa 8 kHz auf dem bearbeiteten Signal, von aus bis +12 dB. Standardmäßig aus."
+],
+[
+"Mix",
+"Balance zwischen dem Dry-Signal und dem bearbeiteten Signal. Das Dry-Signal wird verzögert, um zum Look-ahead zu passen. Standardmäßig 100 %."
 ]
 ],
 "tips": [
@@ -3432,6 +3753,73 @@
 "Es gibt kein Look-ahead, und es fügt keine Latenz hinzu. Das Gain fällt innerhalb eines Samples, wenn eine Spitze den Threshold überschreitet."
 ]
 },
+"fx-pocket-multiband-compressor": {
+"source": "bb45f9448b",
+"intro": "Pocket Multiband Compressor teilt den Klang mit zwei 24-dB-Crossovern in Tiefen-, Mitten- und Höhenband und komprimiert jedes Band für sich. Seine Ratio wirkt auf die Amplitude des Signals, nicht auf Dezibel, daher ist er bei gleichen Zahlen sanfter als ein üblicher Kompressor. Es ist die Engine, auf der FL-Studio-Mobile-Projekte (.flm) ihr Modul Multiband Compressor laden, mit allen Werten unverändert übernommen, und es lässt sich auch in jeden Mixer-Slot einfügen. Sein Editor ist eine Seite mit schlichten Reglern, pro Band eine Reihe von Namen (Low, Mid, High).",
+"controls": [
+[
+"Master-Gain",
+"Ausgangspegel des ganzen Effekts, -24 dB bis +24 dB."
+],
+[
+"Untere Trennfrequenz",
+"Trennung zwischen Tiefen- und Mittenband, 20 Hz bis 10.2 kHz."
+],
+[
+"Obere Trennfrequenz",
+"Trennung zwischen Mitten- und Höhenband, 20 Hz bis 10.2 kHz."
+],
+[
+"Solo",
+"Off, Low, Mid oder High: spielt nur dieses Band. Dieser Regler ist eine Eigenheit von LYNX SHARE; FL Studio Mobile hat an seiner Stelle eine Editor-Einstellung, die ein .flm-Import auf Off zurücksetzt."
+],
+[
+"Dry-Anteil",
+"Addiert das unkomprimierte Band zum komprimierten, 0 bis 100%, für Parallelkompression."
+],
+[
+"Low / Mid / High input gain",
+"Gain in das Band, -24 dB bis +24 dB. Er speist sowohl den Detektor als auch das Audio."
+],
+[
+"Low / Mid / High threshold",
+"Pegel, ab dem das Band komprimiert wird, -48 dB bis 0 dB."
+],
+[
+"Low / Mid / High ratio",
+"1 bis 31."
+],
+[
+"Low / Mid / High attack",
+"Wie schnell der Kompressor des Bands reagiert, 0 bis 50 ms nach einem quadratischen Gesetz."
+],
+[
+"Low / Mid / High release",
+"Wie schnell er wieder loslässt, 10 ms bis 1 s."
+],
+[
+"Low / Mid / High gain",
+"Ausgangs-Gain des Bands, -24 dB bis +24 dB."
+],
+[
+"Low / Mid / High state",
+"On komprimiert das Band, Bypass reicht es wie getrennt durch, Mute schaltet es stumm."
+],
+[
+"Low / Mid / High width",
+"Stereobreite des Bands, 0 bis 200%. 100% lässt sie unverändert, 0% ist Mono."
+],
+[
+"Breitenmodus",
+"Modus 1: Über 100% bewegt sich die Breite zum reinen Seitensignal hin. Modus 2: Über 100% wird von jeder Seite ein Teil des anderen Kanals abgezogen."
+]
+],
+"tips": [
+"Ein überbrücktes Band überspringt auch seinen Eingangs-Gain, seinen Ausgangs-Gain und seine Breite.",
+"Attack und Release werden bei jeder Samplerate für 44.1 kHz berechnet, wie es FL Studio Mobile tut. Bei 48 kHz oder 96 kHz sind sie kürzer als ihre Anzeigewerte.",
+"Für neue Mixe sind der Fruity Multiband Compressor oder Prism Multiband die vollwertigeren Werkzeuge. Dieser hier ist dafür da, dass Songs aus FL Studio Mobile so klingen wie auf dem Handy."
+]
+},
 "fx-prism-multiband": {
 "source": "f559a7fa07",
 "intro": "Prism Multiband ist ein nativer LYNX SHARE-Effekt für einen Mixer-Insert. Er teilt das Signal in vier Bänder und wendet auf jedes Kompression oder Expansion an. Ein Band, das den Gain nicht ändert, lässt das Signal unberührt, deshalb ist der Effekt im Ruhezustand transparent.",
@@ -3483,7 +3871,7 @@
 ]
 },
 "fx-quell-denoiser": {
-"source": "cb9b3b14e9",
+"source": "1b2cc8c181",
 "intro": "Quell Denoiser ist ein nativer LYNX SHARE-Effekt für einen Mixer-Insert. Er verringert gleichmäßiges Breitbandrauschen wie Zischen mit einem einzigen Regler, Amount. Intern wird das Signal in sechs phasenkohärente Bänder geteilt, jedes mit einem Downward-Expander mit weichem Knee.",
 "controls": [
 [
@@ -3501,6 +3889,14 @@
 [
 "Meter",
 "Pegelanzeige links mit einer gehaltenen Reduktionsanzeige darunter."
+],
+[
+"Angepasst",
+"Wechselt vom Sechsband-Expander zur Matched-Engine: Sie schneidet auf sieben Oktavbändern, ohne Latenz. Standardmäßig aus."
+],
+[
+"Classic / Measured",
+"Nur Matched-Engine. Measured lässt jedes Band dem Rauschteppich folgen, den es über etwa eine Sekunde misst, sodass gleichmäßiges Rauschen weiter abgesenkt wird. Es kostet etwas CPU. Der Schalter wird nur bei einer Instanz aus einem vor 0.1.27 gespeicherten Projekt oder Preset angezeigt, die auf Classic lädt und wie zuvor klingt. Sobald du auf Measured umschaltest, wird er ausgeblendet. Neue Instanzen nutzen Measured."
 ]
 ],
 "tips": [
@@ -3509,7 +3905,7 @@
 ]
 },
 "fx-sentry-gate": {
-"source": "50e9527a46",
+"source": "0384d6aa45",
 "intro": "Sentry Gate ist ein natives Gate und ein Expander von LYNX SHARE für einen Mixer-Insert. Es dämpft das Signal unter einem Threshold, von sanfter Expansion bis zum vollen Gate, je nach Ratio und Range. Das Display zeigt die Übertragungskurve über dem Live-Pegel.",
 "controls": [
 [
@@ -3559,6 +3955,22 @@
 [
 "Oversampling, In and Out",
 "Oversampling-Menü sowie Ein- und Ausgangsgain."
+],
+[
+"Modell",
+"Classic oder Measured. Measured fügt die Rauschminderung des Stils Vocal hinzu; die anderen Stile ignorieren sie. Vor 0.1.26 gespeicherte Projekte laden auf Classic."
+],
+[
+"Trigger",
+"Level oder Transient. Level ist das Gate wie zuvor. Transient ist ein Drum-Gate: Ein Schlag über dem Threshold öffnet es vollständig, es bleibt für Hold offen und schließt über Release entlang der gewählten Form, was auch immer der Pegel in der Zwischenzeit tut. Ratio, Knee und die Kurve des Stils werden bei Transient nicht genutzt. Standardmäßig Level."
+],
+[
+"Form",
+"Nur Transient. Die Form des Release: Smooth, Mid oder Sharp."
+],
+[
+"Empfindlichkeit",
+"Nur Transient. 1 bis 10, Standard 5. Höhere Werte öffnen das Gate schon bei kleineren Schlägen."
 ]
 ],
 "tips": [
@@ -3788,7 +4200,7 @@
 ]
 },
 "fx-atrium": {
-"source": "5f968c5de3",
+"source": "595c3b57b8",
 "intro": "Atrium ist ein Raum- und Kammer-Hall mit getrennten Früh- und Spät-Abschnitten und dreibandigem Decay. Sechs Fader steuern den gesamten Hall, die Tabs Früh und Spät schalten die Regler rechts zwischen den beiden Abschnitten um, und das Menü Hall-Modus wählt einen von zwölf Raumtypen.",
 "controls": [
 [
@@ -3850,6 +4262,10 @@
 [
 "Hall-Modus",
 "Die Art des Raums: Large Room, Medium Room, Bright Room, Large Chamber, Dark Room, Dark Chamber, Dark Space, Deep Space, Mirror Space, Vast Space, Distant Space oder Dense Room."
+],
+[
+"Classic / Measured",
+"Measured ist die Hall-Engine von 0.1.27: Das Abklingen wird pro Oktavband eingestellt, ein Klangkorrektor folgt dem Hallnetzwerk und ein Diffusionsnetzwerk formt den Einsatz. Sie braucht weniger CPU als Classic. Neue Instanzen starten auf Measured. Vor 0.1.27 gespeicherte Projekte und Presets laden auf Classic und klingen wie zuvor."
 ]
 ],
 "tips": [
@@ -3858,7 +4274,7 @@
 ]
 },
 "fx-epoch-verb": {
-"source": "30c0764f87",
+"source": "e15dd52216",
 "intro": "Epoch Verb ist ein Hall-Plugin für einen Effekt-Slot. Es hat 22 Algorithmen und drei Farben (1970s, 1980s und Now). Nutze es für Halls, Plates und Räume auf Sends oder Inserts.",
 "controls": [
 [
@@ -3916,6 +4332,10 @@
 [
 "Low-Cut",
 "Hochpassfilter auf dem Hall."
+],
+[
+"Classic / Measured",
+"Measured ist die Hall-Engine von 0.1.27: Das Abklingen wird pro Oktavband eingestellt, ein Klangkorrektor folgt dem Hallnetzwerk und ein Diffusionsnetzwerk formt den Einsatz. Sie braucht weniger CPU als Classic. Neue Instanzen starten auf Measured. Vor 0.1.27 gespeicherte Projekte und Presets laden auf Classic und klingen wie zuvor."
 ]
 ],
 "tips": [
@@ -3924,7 +4344,7 @@
 ]
 },
 "fx-foil-plate": {
-"source": "1156cb5a2f",
+"source": "b0e5038719",
 "intro": "Foil Plate ist ein Plattenhall-Plugin für Effekt-Slots. Es hat zwölf Plattentypen und einen frequenzabhängigen Decay. Nutze es auf Snares, Gesang und Bussen.",
 "controls": [
 [
@@ -3982,6 +4402,10 @@
 [
 "Low-Cut",
 "Hochpassfilter auf dem Hall."
+],
+[
+"Classic / Measured",
+"Measured ist die Hall-Engine von 0.1.27: Das Abklingen wird pro Oktavband eingestellt, ein Klangkorrektor folgt dem Hallnetzwerk und ein Diffusionsnetzwerk formt den Einsatz. Sie braucht weniger CPU als Classic. Neue Instanzen starten auf Measured. Vor 0.1.27 gespeicherte Projekte und Presets laden auf Classic und klingen wie zuvor."
 ]
 ],
 "tips": [
@@ -4039,7 +4463,7 @@
 ]
 },
 "fx-halo": {
-"source": "f4b3fc155b",
+"source": "f8f93f7d26",
 "intro": "Halo ist ein nativer Shimmer-Hall von LYNX SHARE. Ein Pitch Shifter im Feedback-Pfad hebt oder senkt jede Wiederholung, sodass der Nachhall beim Ausklingen steigt oder fällt. Du fügst ihn für Pads, Vocals und Ambient-Texturen auf einem Insert oder einem Send hinzu.",
 "controls": [
 [
@@ -4089,6 +4513,10 @@
 [
 "Farbe",
 "Klang des Halls, zum Beispiel bright."
+],
+[
+"Classic / Measured",
+"Measured ist die Hall-Engine von 0.1.27: Das Abklingen wird pro Oktavband eingestellt, ein Klangkorrektor folgt dem Hallnetzwerk und ein Diffusionsnetzwerk formt den Einsatz. Sie braucht weniger CPU als Classic. Neue Instanzen starten auf Measured. Vor 0.1.27 gespeicherte Projekte und Presets laden auf Classic und klingen wie zuvor."
 ]
 ],
 "tips": [
@@ -4097,7 +4525,7 @@
 ]
 },
 "fx-horizon": {
-"source": "8b29b30bb7",
+"source": "6cc0736add",
 "intro": "Horizon ist ein nativer Effekt von LYNX SHARE, der ein Echo und einen Hall in einem Plugin vereint. Du wählst, ob das Echo den Hall speist oder ihm folgt. Er eignet sich für Vocals, Gitarren und Synths, bei denen die Wiederholungen in einen Raum übergehen sollen.",
 "controls": [
 [
@@ -4155,6 +4583,10 @@
 [
 "Echo mode, Reverb mode, Color",
 "Menüs für den Echo-Typ, den Hall-Typ und den Klang."
+],
+[
+"Classic / Measured",
+"Measured ist die Hall-Engine von 0.1.27: Das Abklingen wird pro Oktavband eingestellt, ein Klangkorrektor folgt dem Hallnetzwerk und ein Diffusionsnetzwerk formt den Einsatz. Sie braucht weniger CPU als Classic. Neue Instanzen starten auf Measured. Vor 0.1.27 gespeicherte Projekte und Presets laden auf Classic und klingen wie zuvor."
 ]
 ],
 "tips": [
@@ -4238,7 +4670,7 @@
 ]
 },
 "fx-nebula": {
-"source": "87313c4ef1",
+"source": "338ff67e03",
 "intro": "Nebula baut große Echo- und Hall-Räume aus einem Delay-Netzwerk. Mit dem Regler Mode wählst du eine von 22 Netzwerkformen und stellst Delay-Zeit, Feedback und Dichte ein. Füge es einem Mixer-Insert hinzu, oder einem Send für Ambient-Effekte.",
 "controls": [
 [
@@ -4284,11 +4716,260 @@
 [
 "Modus",
 "Die Netzwerkform."
+],
+[
+"Modell",
+"Classic oder Measured. Measured lässt sechs der Formen (Ripple, Fold, Drift, Abyss, Glint und Mirage) auf einem anderen Netzwerkmodell laufen, übernommen aus einem Modell unter MIT-Lizenz. Die anderen Formen klingen auf beiden gleich. Neue Instanzen starten auf Measured. Vor 0.1.27 gespeicherte Projekte und Presets laden auf Classic und klingen wie zuvor."
 ]
 ],
 "tips": [
 "Drücke Leeren, um einen Nachhall zum Schweigen zu bringen, der sich nach einer Feedback-Änderung aufgebaut hat.",
 "Die Zeile unten erklärt den gewählten Modus."
+]
+},
+"fx-pocket-reverb": {
+"source": "6722c47417",
+"intro": "Pocket Reverb ist das aktuelle Reverb-Modul von FL Studio Mobile auf der eigenen Platte von FL Studio Mobile. Es nutzt die Regler des älteren Moduls, mit den frühen Reflexionen und dem Ausklang der Platte auf festen Pegeln, und mischt sie selbst mit dem Dry-Signal. Es ist die Engine, auf der FL-Studio-Mobile-Projekte (.flm) ihr Modul Reverb laden, mit allen Werten unverändert übernommen, und es lässt sich auch in jeden Mixer-Slot einfügen. Sein Editor ist eine Seite mit schlichten Reglern.",
+"controls": [
+[
+"Decay",
+"Länge des Ausklangs, 0.1 s bis 20 s. Der Regler folgt einem kubischen Gesetz, sodass der größte Teil seines Wegs die kurzen Zeiten abdeckt."
+],
+[
+"Höhendämpfung",
+"Frequenz, oberhalb der der Ausklang seine Höhen schneller verliert, 0.5 kHz bis 22.1 kHz. Das obere Ende des Bereichs zeigt Aus."
+],
+[
+"Mix",
+"Mischung aus Dry und Hall. Unterhalb der Mitte bleibt das Dry auf vollem Pegel und der Hall steigt; oberhalb bleibt der Hall auf vollem Pegel und das Dry fällt. In der Mitte sind beide auf vollem Pegel."
+],
+[
+"Pan",
+"Panoramiert den Hall, nicht das Dry-Signal."
+],
+[
+"ER",
+"Pegel der frühen Reflexionen, 0 bis 100% nach einem quadratischen Gesetz."
+],
+[
+"Pre-Delay",
+"Zeit, bevor der Hall einsetzt, 0 bis 250 ms."
+],
+[
+"Raumgröße",
+"Größe der Platte, 1 bis 100."
+],
+[
+"Diffusion",
+"Wie schnell die Echos zu einem glatten Ausklang verschwimmen, 0 bis 100%."
+],
+[
+"Breite",
+"Stereobreite des Halls, 0 bis 200%."
+],
+[
+"Low-Cut",
+"Schneidet die Tiefen des Signals, das in den Hall geht, 19 Hz bis 3000 Hz. Das untere Ende des Bereichs zeigt Aus."
+],
+[
+"High-Cut",
+"Schneidet die Höhen des Signals, das in den Hall geht, 0.5 kHz bis 22.1 kHz. Das obere Ende des Bereichs zeigt Aus."
+],
+[
+"Mod-Rate",
+"Geschwindigkeit der Modulation im Ausklang, 0.1 Hz bis 10 Hz."
+],
+[
+"Mod-Tiefe",
+"Stärke der Modulation im Ausklang, 0 bis 100%."
+],
+[
+"Wet-Gain",
+"Gesamtpegel des Halls, 0 bis 100%."
+],
+[
+"Dry-Pegel",
+"Gesamtpegel des Dry-Signals, 0 bis 100%."
+]
+],
+"tips": [
+"Pegeländerungen gleiten über einige Millisekunden, sodass das Bewegen von Mix, Pan, ER oder den beiden Pegeln nicht knackt.",
+"Diese Platte ist nicht Fruity Reeverb 2: Bei gleichen Einstellungen klingen ihre Tiefen länger nach.",
+"Die Modulation wurde noch nicht per Gehör mit FL Studio Mobile verglichen: Keines der Projekte, an denen gemessen wurde, nutzt sie."
+]
+},
+"fx-pocket-reverb-2": {
+"source": "dcde5cb65f",
+"intro": "Pocket Reverb 2 lässt die Platte von FL Studio Mobile auf vollem Pegel laufen und mischt das Dry-Signal, die frühen Reflexionen und den Ausklang selbst, stellt dann die Stereo-Separation ein und panoramiert den Hall. Es ist die Engine, auf der FL-Studio-Mobile-Projekte (.flm) ihr Modul Reverb 2 laden, mit allen Werten unverändert übernommen, und es lässt sich auch in jeden Mixer-Slot einfügen. Sein Editor ist eine Seite mit schlichten Reglern.",
+"controls": [
+[
+"High-Cut",
+"Schneidet die Höhen des Signals, das in den Hall geht, 0.5 kHz bis 22.1 kHz. Das obere Ende des Bereichs zeigt Aus."
+],
+[
+"Low-Cut",
+"Schneidet die Tiefen des Signals, das in den Hall geht, 19 Hz bis 3000 Hz. Das untere Ende des Bereichs zeigt Aus."
+],
+[
+"Größe",
+"Größe der Platte, 1 bis 100."
+],
+[
+"Decay",
+"Länge des Ausklangs, 0.1 s bis 20 s, auf einer linearen Skala."
+],
+[
+"Diffusion",
+"Wie schnell die Echos zu einem glatten Ausklang verschwimmen, 0 bis 100%."
+],
+[
+"Dämpfung",
+"Frequenz, oberhalb der der Ausklang seine Höhen schneller verliert, 0.5 kHz bis 22.1 kHz. Das obere Ende des Bereichs zeigt Aus."
+],
+[
+"Dry",
+"Pegel des Originalsignals, 0 bis 125%."
+],
+[
+"ER",
+"Pegel der frühen Reflexionen, 0 bis 125%."
+],
+[
+"Wet",
+"Pegel des Halls, 0 bis 125%."
+],
+[
+"Seiteneingang",
+"An speist den Hall mit der Differenz von links und rechts statt mit ihrer Summe, sodass nur der Stereoanteil des Klangs verhallt wird."
+],
+[
+"Delay",
+"Zeit, bevor der Hall einsetzt, 0 bis 1000 ms."
+],
+[
+"Tempo",
+"An macht Delay zu einer Anzahl Sechzehntelschläge im Songtempo, bis zu einem Schlag. Ein Delay über 1000 ms wird jeweils um eine Sechzehntel gekürzt, bis es passt."
+],
+[
+"Mod",
+"Stärke der Modulation im Ausklang, 0 bis 100%."
+],
+[
+"Bass",
+"Abklingen der Tiefen im Vergleich zum Rest des Ausklangs, x0.2 bis x3.0."
+],
+[
+"Trennung",
+"Stereobreite des Halls, 0 bis 200%. 100% lässt sie so, wie die Platte sie erzeugt."
+],
+[
+"Rate",
+"Geschwindigkeit der Modulation, 0.1 Hz bis 10 Hz nach einem kubischen Gesetz."
+],
+[
+"Crossover",
+"Frequenz, unterhalb der Bass wirkt, 25 Hz bis 2000 Hz."
+],
+[
+"Pan",
+"Panoramiert den Hall, nicht das Dry-Signal."
+]
+],
+"tips": [
+"Anders als bei den anderen beiden Pocket-Reverbs hat das Dry-Signal hier einen eigenen Pegel, sodass Dry auf 0% nur den Hall ergibt.",
+"Delay wird immer in ms angezeigt, auch wenn Tempo an ist.",
+"Die Modulation wurde noch nicht per Gehör mit FL Studio Mobile verglichen: Keines der Projekte, an denen gemessen wurde, nutzt sie."
+]
+},
+"fx-pocket-reverb-classic": {
+"source": "5bf9dfb5b3",
+"intro": "Pocket Reverb Classic ist das ältere Reverb-Modul von FL Studio Mobile auf der eigenen Platte von FL Studio Mobile, einem Netzwerk, das Fruity Reeverb 2 nahekommt, aber nicht dasselbe ist. Das Originalsignal geht immer auf vollem Pegel durch, und der Hall wird dazu addiert. Es ist die Engine, auf der FL-Studio-Mobile-Projekte (.flm) ihr Modul Reverb (legacy) laden, mit allen Werten unverändert übernommen, und es lässt sich auch in jeden Mixer-Slot einfügen. Sein Editor ist eine Seite mit schlichten Reglern.",
+"controls": [
+[
+"Decay",
+"Länge des Ausklangs, 0.1 s bis 20 s. Der Regler folgt einem kubischen Gesetz, sodass der größte Teil seines Wegs die kurzen Zeiten abdeckt."
+],
+[
+"Höhendämpfung",
+"Frequenz, oberhalb der der Ausklang seine Höhen schneller verliert, 0.5 kHz bis 22.1 kHz. Das obere Ende des Bereichs zeigt Aus."
+],
+[
+"Mix",
+"Pegel des Halls, angezeigt in dB von -inf bis +6.0 dB."
+],
+[
+"Pre-Delay",
+"Zeit, bevor der Hall einsetzt, 0 bis 250 ms."
+],
+[
+"Raumgröße",
+"Größe der Platte, 1 bis 100."
+],
+[
+"Diffusion",
+"Wie schnell die Echos zu einem glatten Ausklang verschwimmen, 0 bis 100%."
+],
+[
+"Breite",
+"Stereobreite des Halls, 0 bis 200%."
+],
+[
+"Low-Cut",
+"Schneidet die Tiefen des Signals, das in den Hall geht, 19 Hz bis 3000 Hz. Das untere Ende des Bereichs zeigt Aus."
+],
+[
+"High-Cut",
+"Schneidet die Höhen des Signals, das in den Hall geht, 0.5 kHz bis 22.1 kHz. Das obere Ende des Bereichs zeigt Aus."
+],
+[
+"Eingang",
+"Pegel des Signals, das in den Hall geschickt wird, -inf bis +6.0 dB."
+],
+[
+"ER",
+"Pegel der frühen Reflexionen, -inf bis +6.0 dB."
+],
+[
+"Dry-Pegel",
+"Zusätzliches Dry-Signal, das der Hall addiert, -inf bis +6.0 dB. Bei einer neuen Instanz ist es -inf."
+],
+[
+"Eingang aus",
+"Schaltet das Signal stumm, das in den Hall geschickt wird. Zeigt On oder Muted."
+],
+[
+"Dry aus",
+"Schaltet das zusätzliche Dry-Signal von Dry-Pegel stumm. Zeigt On oder Muted."
+],
+[
+"ER aus",
+"Schaltet die frühen Reflexionen stumm. Zeigt On oder Muted."
+],
+[
+"Wet aus",
+"Schaltet den Hallausklang stumm. Zeigt On oder Muted."
+],
+[
+"Bass-Mult.",
+"Abklingen der Tiefen im Vergleich zum Rest des Ausklangs, x0.2 bis x3.0."
+],
+[
+"Crossover",
+"Frequenz, unterhalb der Bass-Mult. wirkt, 25 Hz bis 2000 Hz."
+],
+[
+"Mod-Rate",
+"Geschwindigkeit der Modulation im Ausklang, 0.1 Hz bis 10 Hz."
+],
+[
+"Mod-Tiefe",
+"Stärke der Modulation im Ausklang, 0 bis 100%."
+]
+],
+"tips": [
+"Das Originalsignal wird nie abgesenkt: Dry off und Dry-Pegel ändern nur die zusätzliche Dry-Kopie, nicht das Signal, das durchgeht.",
+"Von den drei Pocket-Reverbs ist dieser der einzige mit Stummschaltern und Pegeln in dB. Pocket Reverb 2 stellt seine Pegel in Prozent ein, und Pocket Reverb hat einen Mix-Regler.",
+"Die Modulation wurde noch nicht per Gehör mit FL Studio Mobile verglichen: Keines der Projekte, an denen gemessen wurde, nutzt sie."
 ]
 },
 "fx-reeverb": {
@@ -4465,7 +5146,7 @@
 ]
 },
 "fx-echoform": {
-"source": "0505e5d72c",
+"source": "5a830ced10",
 "intro": "Echoform ist ein Echo mit zwölf Stilen und fünf Echo-Anordnungen. Die Seite Haupt hat drei Abschnitte: Echo für Zeit, Feedback und Filter, Tap-Tempo für Groove und den Echo-Modus sowie Stil für Sättigung, Pegel und die Stil-Menüs. Die Seite Feintuning enthält die übrigen Regler.",
 "controls": [
 [
@@ -4531,6 +5212,14 @@
 [
 "Tape",
 "Wählt ein gemessenes Tape-Loop-Voicing: Off, Ping-pong tape, Studio tape oder Studio tape hot."
+],
+[
+"Classic / Measured",
+"Seite Feintuning. Measured lässt die gemessene Bandstufe im Stil Tape laufen, wenn das Menü Tape auf Aus steht: den Klang des Ausgangs und der Schleife, das Rauschen des Bands und die Trägheit des Wow. Es kostet etwas mehr CPU. Neue Instanzen starten auf Measured. Vor 0.1.27 gespeicherte Projekte und Presets laden auf Classic und klingen wie zuvor."
+],
+[
+"Clock",
+"Seite Feintuning. Die Modulation lässt die Echozeit um einen Bruchteil ihrer selbst schwanken, bei voller Tiefe bis zu 50 Prozent, auf beiden Seiten zusammen, wie bei einer getakteten Delay-Line. Standardmäßig aus."
 ]
 ],
 "tips": [
@@ -4733,7 +5422,7 @@
 ]
 },
 "fx-lattice-mod": {
-"source": "f7f92d15d2",
+"source": "21239e3a70",
 "intro": "Lattice Mod ist ein natives, moduliertes Delay von LYNX SHARE. Es verteilt ein bis sechzehn Taps über die Delay-Zeit und moduliert jeden mit langsamer Verstimmung und Vibrato. Du nutzt es für Chorus, Flanger, Ensemble und Delay-Texturen.",
 "controls": [
 [
@@ -4775,6 +5464,10 @@
 [
 "Übermod.",
 "Zusätzlicher Modulationsmultiplikator."
+],
+[
+"Classic / Measured",
+"Tab WARP. Measured lässt die langsame Verstimmung 3.5-mal so weit schwingen wie Classic, wie gemessen. Neue Instanzen starten auf Measured. Vor 0.1.27 gespeicherte Projekte und Presets laden auf Classic und klingen wie zuvor."
 ]
 ],
 "tips": [
@@ -4878,6 +5571,45 @@
 "Bewege Time, während Klang spielt, für einen Bandgeschwindigkeits-Effekt."
 ]
 },
+"fx-pocket-tape-stop": {
+"source": "68a5a737c8",
+"intro": "Pocket Tape Stop nimmt seinen Eingang die ganze Zeit auf. Schaltest du Play aus, wird die Aufnahme mit fallender Geschwindigkeit abgespielt, bis sie steht, und schaltest du Play wieder ein, beschleunigt sie und blendet in den letzten 0.1 s zurück zum Live-Eingang. Automatisiere Play, um die Stopps in einem Song zu platzieren. Es ist die Engine, auf der FL-Studio-Mobile-Projekte (.flm) ihr Modul Tape Stop laden, mit allen Werten unverändert übernommen, und es lässt sich auch in jeden Mixer-Slot einfügen. Sein Editor ist eine Seite mit schlichten Reglern.",
+"controls": [
+[
+"Stoppzeit",
+"Länge des Abbremsens, wenn Sync aus ist, bis zu 5 s. Unter einer Sekunde in ms angezeigt. Das untere Ende des Bereichs zeigt Aus: Das Band hält innerhalb von 5 ms an."
+],
+[
+"Startzeit",
+"Länge des Beschleunigens, wenn Sync aus ist, bis zu 5 s."
+],
+[
+"Stoppzeit (sync.)",
+"Länge des Abbremsens, wenn Sync an ist: Aus, 1/4 Schlag, 3/8 Schlag, 1/2 Schlag, 3/4 Schlag, 1 Schlag, 2, 4, 8 oder 16 Schläge."
+],
+[
+"Startzeit (sync.)",
+"Länge des Beschleunigens, wenn Sync an ist, mit denselben Stufen."
+],
+[
+"Wiedergabe",
+"An spielt den Eingang. Aus hält das Band an. Jede Änderung startet ein Abbremsen oder Beschleunigen."
+],
+[
+"Warp",
+"Form der Geschwindigkeitskurve, -100% bis +100%."
+],
+[
+"Sync",
+"An nutzt die synchronen Zeiten im Songtempo, Aus die Zeiten in Sekunden."
+]
+],
+"tips": [
+"Er funktioniert nur, während der Song spielt. Bei gestopptem Song geht das Audio durch, und nichts wird aufgenommen.",
+"Wenn das Band angehalten hat, blendet der Ausgang zu Stille aus, bis Play wieder eingeschaltet wird.",
+"Schaltest du Play während eines Abbremsens wieder ein, beschleunigt er ab der Geschwindigkeit, die er erreicht hatte."
+]
+},
 "fx-pocket-trance-delay": {
 "source": "390a4b427a",
 "intro": "Pocket Trance Delay ist ein Delay, das ans Songtempo gebunden ist. Die Echos werden zum trockenen Signal addiert, das immer auf vollem Pegel bleibt. Es ist die Engine, auf der FL-Studio-Mobile-Projekte (.flm) ihr Trance-Delay-Modul laden, und es lässt sich auch in jeden Mixer-Slot einfügen.",
@@ -4913,7 +5645,7 @@
 ]
 },
 "fx-spiral-echo": {
-"source": "60ff7072a7",
+"source": "10033a87c7",
 "intro": "Spiral Echo ist ein natives LYNX SHARE-Delay für einen Mixer-Insert. Jede Wiederholung wird ein Stück weiter in der Frequenz verschoben als die vorige, sodass die Echos steigen oder fallen, statt sich nur zu wiederholen. In Stereo hört die rechte Seite jede Wiederholung mit der entgegengesetzten Verschiebung.",
 "controls": [
 [
@@ -4947,6 +5679,10 @@
 [
 "Ausgang",
 "Ausgabemodus (im Bild Stereo)."
+],
+[
+"Classic / Measured",
+"Measured nutzt die gemessene Feedback-Schleife: ihre Filter, einen zusätzlichen Allpass, den Limiter und das Gleiten bei Änderung der Delay-Zeit. Es braucht etwas weniger CPU. Neue Instanzen starten auf Measured. Vor 0.1.27 gespeicherte Projekte und Presets laden auf Classic und klingen wie zuvor."
 ]
 ],
 "tips": [
@@ -5308,8 +6044,8 @@
 ]
 },
 "fx-gemini-doubler": {
-"source": "d9526268fd",
-"intro": "Gemini Doubler ist ein nativer LYNX SHARE-Effekt, der Gesang oder eine andere Mono-Quelle mit zwei verzögerten, leicht verstimmten Kopien dichter macht. Leg ihn in den Insert der Spur, die du doppeln willst. Jede Stimme ist ein tonhöhenverschiebendes Delay aus zwei überblendeten Grains.",
+"source": "c1f0d8a7eb",
+"intro": "Gemini Doubler ist ein nativer LYNX SHARE-Effekt, der Gesang oder eine andere Mono-Quelle mit zwei verzögerten, leicht verstimmten Kopien dichter macht. Leg ihn in den Insert der Spur, die du doppeln willst. Jede Stimme ist ein tonhöhenverschiebendes Delay.",
 "controls": [
 [
 "Direkt",
@@ -5358,6 +6094,10 @@
 [
 "L / L+R / L-R",
 "Quelle für Stimme 1: links, Summe oder Differenz."
+],
+[
+"Classic / Measured",
+"Der Lesekopf der Stimmen, wenn Ausrichten aus ist. Measured liest jede Stimme mit einem Kopf, der driftet und zurückspringt, wie gemessen, und braucht weniger als die halbe CPU. Classic nutzt zwei überblendete Taps. Neue Instanzen starten auf Measured. Vor 0.1.27 gespeicherte Projekte und Presets laden auf Classic und klingen wie zuvor."
 ]
 ],
 "tips": [
@@ -5462,7 +6202,7 @@
 ]
 },
 "fx-orbit": {
-"source": "5aec5c0bbd",
+"source": "e0ee24a093",
 "intro": "Orbit deckt Flanging, Chorus und Doubling in einem Effekt für Mixer-Inserts ab. Mit Mode wählst du den Charakter, etwa den aufsteigenden Barber-Pole-Flange, und formst ihn mit fünf Reglern. Die Hinweiszeile unter dem Regler Mode beschreibt den aktuellen Modus.",
 "controls": [
 [
@@ -5488,6 +6228,10 @@
 [
 "Modus",
 "Barber-Pole, Through-Zero-Flange, Tri- und Octo-Chorus, Doubler, Ensemble, Symphonic und mehr."
+],
+[
+"Classic / Measured",
+"Measured ändert den Sweep von Rise und Rise / fall, das Basis-Delay unter Manual und die Feedback-Kurve auf gemessene Werte. Bei Rise / fall steigt die linke Seite, während die rechte fällt. Neue Instanzen starten auf Measured. Vor 0.1.27 gespeicherte Projekte und Presets laden auf Classic und klingen wie zuvor."
 ]
 ],
 "tips": [
@@ -6943,7 +7687,7 @@
 ]
 },
 "fx-voice-shift": {
-"source": "040e0a998d",
+"source": "5906a3c3c3",
 "intro": "Voice Shift ist ein Pitch- und Formant-Shifter für eine Stimme oder eine monophone Linie. Er erkennt Tonhöhen zwischen 70 Hz und 1000 Hz. Er meldet seine Latenz für den Latenzausgleich und verzögert das Dry-Signal entsprechend.",
 "controls": [
 [
@@ -6973,6 +7717,10 @@
 [
 "MIDI-Kanal",
 "Aus, oder ein Kanal im Channel Rack, dessen gehaltene Noten die Tonhöhe bestimmen. Transpose und Quantize verschieben um den Abstand der höchsten gehaltenen Note von C4, und Robot singt diese Note."
+],
+[
+"Classic / Measured",
+"Measured lässt die Klänge, die der Detektor nicht als stimmhaft findet, etwa s- und t-Laute, der Formantverschiebung folgen (bei eingeschaltetem Link die Tonhöhe und die Formanten). Der Schalter wird nur bei einer Instanz aus einem vor 0.1.27 gespeicherten Projekt oder Preset angezeigt, die auf Classic lädt und wie zuvor klingt. Sobald du auf Measured umschaltest, wird er ausgeblendet. Neue Instanzen nutzen Measured."
 ]
 ],
 "tips": [

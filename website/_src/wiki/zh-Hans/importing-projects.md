@@ -1,5 +1,5 @@
 ---
-source: bcd8a275bd
+source: 358890815a
 ---
 `文件 › 打开...`（`Ctrl+O`）可以打开 LYNX SHARE 自己的 `.lynx` 工程，也可以打开 `.flp`、`.als`、`.flm` 和 `.mid` 文件。来自其他程序的工程属于导入：它会成为一个新的、未保存的 LYNX SHARE 工程，原文件绝不会被写入。
 
@@ -16,8 +16,8 @@ source: bcd8a275bd
 | 格式 | 会转换 | 不会转换 |
 |---|---|---|
 | `.flp`（FL Studio） | 通道、采样、样式、滑音和滑奏音符、所有编排、标记、拍号变化、自动化、控制器关联、带路由的混音台、侧链、轨道 EQ 和原生效果器 | FLEX 包是加密的，永远不会被打开。FLEX 通道会得到一个按其预设名称选定的合成器音色 |
-| `.als`（Live 11 和 12） | MIDI 轨道、音频轨道、编组轨道和返回轨道，速度、拍号、定位点、循环，音量、声像、静音、独奏和发送及其自动化，会话片段和场景，扭曲标记 | Live 自己的效果器会被丢弃。机架只保留它的第一条链。Simpler、Sampler 和鼓机架会变成 LYNX SHARE 采样器 |
-| `.flm`（FL Studio Mobile） | 速度、拍号、每个通道一个混音插入轨、每条泳道一条播放列表轨道、样式、带偏移和音高的音频片段、鼓组、DW Sampler 采样和 `.dwp` 程序 | FLM 的效果器和自动化泳道。FLM 的其他发生器改用内置合成器播放 |
+| `.als`（Live 11 和 12） | MIDI 轨道、音频轨道、编组轨道和返回轨道，速度、拍号、定位点、循环，音量、声像、静音、独奏和发送及其自动化，会话片段和场景，扭曲标记，机架和 Drum Rack，以及 Live 自己的许多设备（EQ Eight、Compressor、Glue Compressor、Reverb、Delay、Auto Filter、Saturator、Utility、Simpler、Drift 等），作为 LYNX SHARE 自己的设备 | Live 中没有 LYNX SHARE 对应项的设备（Hybrid Reverb、Grain Delay、Amp、Roar、FM Operator 音色等）会被丢弃并列出。MIDI Effect Rack 不会被转换 |
+| `.flm`（FL Studio Mobile） | 速度、拍号、每个通道一个混音插入轨、每条泳道一条播放列表轨道、样式、带偏移和音高的音频片段、鼓组、DW Sampler 和 `.dwp` 程序、Slicer、MiniSynth、Transistor Bass、3x Osc、GMSynth 和 SuperSaw、效果器、自动化和和弦集 | FLM 的其他发生器改用内置合成器播放 |
 | `.mid` | 音符、拍号和所有速度变化 | MIDI 文件不含声音：通道会得到 LYNX SHARE 合成器或一个 MIDI Out 通道 |
 
 `.flp` 中的第三方 VST2、VST3 和 CLAP 插件，以及 `.als` 中的 VST2 和 VST3 插件，如果你的电脑上安装了相同的插件，就会带着保存的状态加载。

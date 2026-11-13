@@ -1,5 +1,5 @@
 ---
-source: c457d438ee
+source: a79e43f031
 ---
 LYNX SHARE speichert Projekte als `.lynx`-Dateien. Es öffnet auch Projekte anderer Programme, lädt die gängigen Audiodateien und exportiert Audio, MIDI und Projekte für andere Programme. Die Tabelle listet jedes Format von 0.1.26 alpha.
 
@@ -20,8 +20,8 @@ Ein Projekt, das aus dem Format eines anderen Programms geöffnet wurde, ist ein
 | `.zip` | `Datei › Öffnen...` entpackt es in einen Ordner und öffnet das Projekt darin | `Datei › Exportieren › Projekt mit Samples (.zip)...` | Öffnet auch das gezippte Loop-Paket von FL Studio |
 | `.lynxpack` | Öffnet sich nach einer Zusammenfassung. Ein Part wird in das Projekt des Hosts eingefügt | `Datei › Online-Session › Projekt senden...` | Ein Projekt oder ein Part, der in einer [Online-Session](/wiki/online-sessions/) gesendet wurde. Parts mit Plugins von Drittanbietern reisen als Audio-Renders plus Plugin-Einstellungen |
 | `.flp` | `Datei › Öffnen...` | `Datei › Exportieren › FL Studio-Projekt...`, ein FL-Studio-2026-Projekt oder ein gezipptes Loop-Paket | Native Plugins laufen auf nachgebauten Engines unterschiedlicher Genauigkeit. FLEX-Packs werden nie geöffnet. Beim Export werden Instrumente und Effekte nur für LYNX in Audio gerendert oder durch das nächstliegende FL-Plugin ersetzt, und Modulatoren werden weggelassen. Siehe [Umstieg von FL Studio](/wiki/coming-from-fl-studio/) |
-| `.flm` | `Datei › Öffnen...` | Nein | FL-Studio-Mobile-Projekt. Unvollständig: Andere Instrumente als MiniSynth, Transistor Bass, 3x Osc, GMSynth und DirectWave spielen den eingebauten Synth |
-| `.als` | `Datei › Öffnen...`, Sets von Live 11 und 12 | `Datei › Exportieren › Ableton-Live-Set (.als)...`, für Live 12 oder Live 11 | Beim Import entfallen die eigenen Effekte von Live. Beim Export werden die eigenen Instrumente und Effekte von LYNX SHARE nicht umgewandelt, und Automation von Effektparametern sowie Routen von Insert zu Insert entfallen. Siehe [Umstieg von Ableton Live](/wiki/coming-from-ableton/) |
+| `.flm` | `Datei › Öffnen...` | Nein | FL-Studio-Mobile-Projekt. Unvollständig: Andere Instrumente als MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, der Slicer und DirectWave spielen den eingebauten Synth |
+| `.als` | `Datei › Öffnen...`, Sets von Live 11 und 12 | `Datei › Exportieren › Ableton-Live-Set (.als)...`, für Live 12 oder Live 11 | Beim Import entfallen Devices von Live ohne Entsprechung in LYNX SHARE. Beim Export werden die eigenen Instrumente und Effekte von LYNX SHARE nicht umgewandelt, und Automation von Effektparametern sowie Routen von Insert zu Insert entfallen. Siehe [Umstieg von Ableton Live](/wiki/coming-from-ableton/) |
 | `.mid`, `.midi` | `Datei › Öffnen...` erzeugt ein neues Projekt. `Datei › Importieren › MIDI-Datei...` und das Piano Roll importieren ins aktuelle | `Datei › Exportieren › MIDI-Datei...` (`Ctrl+Shift+M`) | |
 | `.wav` | Als Sample oder Audioclip | `Datei › Exportieren › Wave-Datei...`, 16-Bit, 24-Bit oder 32-Bit Float | Optional Dither, Tempoinformation, Loop-Marker und Playlist-Marker |
 | `.mp3` | Als Sample oder Audioclip | `Datei › Exportieren › MP3-Datei...` | Konstante Bitrate |

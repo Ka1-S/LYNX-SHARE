@@ -57,6 +57,12 @@ std::vector<SandboxDeath> pluginSandboxDeaths();
 // True if the plugin is a sandbox proxy and its process died (hung, exited or stopped responding).
 bool isSandboxedPluginDead (const juce::AudioPluginInstance& plugin);
 
+// A proxy ends its child process on a thread of its own (issue #159: JUCE's pipe waits up to 10 s for a dead child,
+// which froze the window whenever the rack freed such a plugin). At exit: waits up to `timeoutMs` for the ones still
+// ending; false if some are left (the process may end anyway: their children end when the pipe closes).
+bool finishSandboxTeardowns (int timeoutMs);
+int sandboxTeardownsRunning(); // (tests)
+
 // Child mode: if the command line belongs to a sandbox process, connects to the parent and returns true (the app
 // must not open a window or audio). The process exits on its own when the parent goes away.
 bool runPluginSandboxWorker (const juce::String& commandLine);

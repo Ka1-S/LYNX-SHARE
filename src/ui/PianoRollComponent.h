@@ -168,7 +168,10 @@ public:
 
     // For snapshots: the tool in use and the Note inspector of the selection.
     void setToolForSnapshot (EditTool tool) { tools.setTool (tool); }
-    void setScaleForSnapshot (int root, int scale) { scaleBox.setSelectedId (scale <= 0 ? 1 : scale * 100 + root + 1, juce::sendNotificationSync); }
+    void setScaleForSnapshot (int root, int scale) { setScale (root, scale); }
+    // The scale the rows show (LYNX's scale list index, 0 = none) on `root` (round 190ds: the Simple dock's "Only notes
+    // in key" sets the project key here before folding)
+    void setScale (int root, int scale) { scaleBox.setSelectedId (scale <= 0 ? 1 : scale * 100 + root + 1, juce::sendNotificationSync); }
     std::unique_ptr<juce::Component> makeNoteInspectorForSnapshot (bool singleNote = false);
     std::vector<int> noteIndicesForSnapshot() const { return selectionOrAll(); }
     std::int64_t gridForSnapshot() const { return gridTicks(); }
@@ -248,6 +251,12 @@ private:
     void updateKeyRows();                 // after the scale or the fold changed
     notetools::KeyRows rows = notetools::keyRows (0, 0, false);
     bool foldToScale = false;
+    // round 190el (decision 2 of the 190ei Live check): in the Clip-launch layout a Drum Rack channel's editor shows a
+    // row per filled pad, named, instead of the piano keys (Live's note editor for a Drum Rack, Fold on or off); the
+    // Pattern layout keeps FL's piano roll. The filled pads' keys (highest first), empty = the usual rows.
+    std::vector<int> padRows;
+    std::vector<int> wantedPadRows() const;
+    void syncPadRows(); // the rows follow the layout, the channel and its pads
     bool folded() const noexcept { return rows.count < 128; }
     bool ghostShown (int channel) const noexcept;
     void setGhostChannels (const std::function<bool (int channel, bool shown)>& show);

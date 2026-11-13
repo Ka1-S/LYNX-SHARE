@@ -84,7 +84,7 @@ Tick `Also the full mix` to get the mix next to the stems. The line at the botto
 
 The `.flp` is an FL Studio 2026 project. Samplers, audio clips, FL Studio's own generators and effects, third-party plugins, patterns, the Playlist, the Mixer and automation go over with their settings. For the things FL Studio does not have, you choose between `Render them to audio (sounds the same)` and `Use the nearest FL plugin (stays editable, may sound different)`. With the second choice, LYNX-only instruments are left out. Modulators are always left out. A report lists what was rendered, replaced or left out. Details are in [Coming from FL Studio](/wiki/coming-from-fl-studio/).
 
-The `.als` holds a MIDI track per channel, audio tracks, groups, returns, sends, VST2 and VST3 plugins with their state, markers, and volume, pan and tempo automation. LYNX SHARE's own instruments and effects are not converted, though their tracks and notes are kept. Automation of effect parameters and insert-to-insert routes are dropped. Details are in [Coming from Ableton Live](/wiki/coming-from-ableton/).
+The `.als` holds a MIDI track per channel, audio tracks, groups, returns, sends, racks and Drum Racks, VST2 and VST3 plugins with their state, markers, and volume, pan and tempo automation. LYNX SHARE's own instruments and effects are not converted, though their tracks and notes are kept. Automation of effect parameters and insert-to-insert routes are dropped. Details are in [Coming from Ableton Live](/wiki/coming-from-ableton/).
 
 ## Good to know
 

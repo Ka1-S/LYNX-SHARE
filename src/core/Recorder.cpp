@@ -439,7 +439,7 @@ void thinAutomation (std::vector<AutomationPoint>& points, std::int64_t from, st
     {
         const auto& p = points[i];
         if (p.tick >= from && p.tick <= to && sameValue (points[i - 1].value, p.value) && sameValue (points[i + 1].value, p.value)
-            && points[i - 1].tension == 0.0f && p.tension == 0.0f)
+            && points[i - 1].tension == 0.0f && p.tension == 0.0f && points[i - 1].mode == 0 && p.mode == 0)
             points.erase (points.begin() + (std::ptrdiff_t) i);
         else
             ++i;

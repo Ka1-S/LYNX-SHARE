@@ -210,6 +210,7 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
     : engine (e), onClose (std::move (close)), saving (std::move (s)), measuring (std::make_shared<std::atomic<int>> (0)),
       measuredLufs (std::make_shared<std::atomic<float>> (0.0f))
 {
+    setComponentID ("simple.finishDock"); // (round 190dv: the first-song tour keeps its card off it)
     setTitle (tr ("Master looks"));
     title.setText (tr ("Master looks"), juce::dontSendNotification);
     title.setFont (theme::font (theme::type::title, true));
@@ -242,6 +243,8 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
         tiles[i] = std::make_unique<LookTile> (i + 1);
         tiles[i]->onClick = [this, id = i + 1] { choose (id); };
         addAndMakeVisible (*tiles[i]);
+        if (i == 0)
+            tiles[i]->setComponentID ("simple.finish.looks"); // (round 190dv: the first-song tour's ring)
     }
 
     intensityLabel.setText (tr ("Intensity"), juce::dontSendNotification);
@@ -312,6 +315,15 @@ FinishDock::FinishDock (AudioEngine& e, std::function<void()> close, Saving s)
         refresh();
     };
     addAndMakeVisible (removeButton);
+
+    // round 190ch: measure a finished track and match its tone and loudness (its own window)
+    if (saving.referenceMatch)
+    {
+        matchButton.setButtonText (tr ("Match a reference track..."));
+        matchButton.setTooltip (tr ("Measures a finished track and your song, and suggests an EQ curve and a level"));
+        matchButton.onClick = [this] { saving.referenceMatch(); };
+        addAndMakeVisible (matchButton);
+    }
 
     // the last step in plain words: the song as one file, with the look on (round 190t)
     if (saving.exportAudio)
@@ -404,7 +416,7 @@ void FinishDock::choose (int id)
     engine.editSongStructural ([&ok, s] (Song& song) { ok = looks::apply (song, s); });
     if (! ok)
         juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Master looks"),
-                                                tr ("The Master has no room for the look: it needs four free effect slots."));
+                                                tr ("The Master has no room for the look: it needs five free effect slots."));
     refresh();
 }
 
@@ -497,7 +509,7 @@ void FinishDock::resized()
     status.setBounds (r.removeFromTop (34));
     r.removeFromTop (4);
     // (a short window: the look tiles give way so that the Save rows stay in view)
-    const auto saveH = saveRows[0] != nullptr ? 22 + 2 * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0;
+    const auto saveH = (saveRows[0] != nullptr ? 22 + 2 * 36 + (otherApps.isVisible() ? 34 : 0) + 10 : 0) + (matchButton.isVisible() ? 34 : 0);
     const auto gap = 6;
     const auto tileH = juce::jlimit (46, 64, (r.getHeight() - 306 - saveH) / 4 - gap);
     const auto colW = (r.getWidth() - gap) / 2;
@@ -535,6 +547,11 @@ void FinishDock::resized()
     buttons.removeFromLeft (6);
     removeButton.setBounds (buttons);
     r.removeFromTop (8);
+    if (matchButton.isVisible())
+    {
+        matchButton.setBounds (r.removeFromTop (28));
+        r.removeFromTop (6);
+    }
     peakHint.setBounds (r.removeFromTop (32));
     if (saveRows[0] != nullptr)
     {

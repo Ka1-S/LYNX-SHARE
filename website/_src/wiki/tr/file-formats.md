@@ -1,5 +1,5 @@
 ---
-source: c457d438ee
+source: a79e43f031
 ---
 LYNX SHARE projeleri `.lynx` dosyası olarak kaydeder. Ayrıca başka programların projelerini açar, yaygın ses dosyalarını yükler ve ses, MIDI ve diğer programlar için projeleri dışa aktarır. Tablo, 0.1.26 alpha sürümünün bütün formatlarını listeler.
 
@@ -20,8 +20,8 @@ Başka bir programın formatından açılan proje bir içe aktarmadır. `Dosya �
 | `.zip` | `Dosya › Aç...` onu bir klasöre çıkarır ve içindeki projeyi açar | `Dosya › Dışa aktar › Sample'larla proje (.zip)...` | FL Studio'nun sıkıştırılmış loop paketini de açar |
 | `.lynxpack` | Bir özetten sonra açılır. Bir parti, host'un projesine birleştirilir | `Dosya › Çevrimiçi oturum › Projeyi gönder...` | Bir [çevrimiçi oturumda](/wiki/online-sessions/) gönderilen proje veya parti. Üçüncü taraf plugin partileri, ses render'ları ve plugin ayarlarıyla birlikte taşınır |
 | `.flp` | `Dosya › Aç...` | `Dosya › Dışa aktar › FL Studio projesi...`, bir FL Studio 2026 projesi veya sıkıştırılmış loop paketi | Yerel plugin'ler, değişen doğrulukta yeniden oluşturulmuş motorlarda çalar. FLEX paketleri asla açılmaz. Dışa aktarırken yalnızca LYNX'e özgü enstrümanlar ve efektler sese render edilir ya da en yakın FL plugin'iyle değiştirilir, modülatörler dışarıda bırakılır. Bkz. [FL Studio'dan geliyorsanız](/wiki/coming-from-fl-studio/) |
-| `.flm` | `Dosya › Aç...` | Hayır | FL Studio Mobile projesi. Kısmi: MiniSynth, Transistor Bass, 3x Osc, GMSynth ve DirectWave dışındaki enstrümanlar dahili synth ile çalar |
-| `.als` | `Dosya › Aç...`, Live 11 ve 12 setleri | `Dosya › Dışa aktar › Ableton Live seti (.als)...`, Live 12 veya Live 11 için | İçe aktarırken Live'ın kendi efektleri atılır. Dışa aktarırken LYNX SHARE'in kendi enstrümanları ve efektleri dönüştürülmez, efekt parametresi otomasyonu ve insert'ten insert'e yönlendirmeler atılır. Bkz. [Ableton Live'dan geliyorsanız](/wiki/coming-from-ableton/) |
+| `.flm` | `Dosya › Aç...` | Hayır | FL Studio Mobile projesi. Kısmi: MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, Slicer ve DirectWave dışındaki enstrümanlar dahili synth ile çalar |
+| `.als` | `Dosya › Aç...`, Live 11 ve 12 setleri | `Dosya › Dışa aktar › Ableton Live seti (.als)...`, Live 12 veya Live 11 için | İçe aktarırken Live'ın LYNX SHARE karşılığı olmayan cihazları atılır. Dışa aktarırken LYNX SHARE'in kendi enstrümanları ve efektleri dönüştürülmez, efekt parametresi otomasyonu ve insert'ten insert'e yönlendirmeler atılır. Bkz. [Ableton Live'dan geliyorsanız](/wiki/coming-from-ableton/) |
 | `.mid`, `.midi` | `Dosya › Aç...` yeni bir proje oluşturur. `Dosya › İçe aktar › MIDI dosyası...` ve Piano Roll mevcut projeye içe aktarır | `Dosya › Dışa aktar › MIDI dosyası...` (`Ctrl+Shift+M`) | |
 | `.wav` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › Wave dosyası...`, 16 bit, 24 bit veya 32 bit float | İsteğe bağlı dither, tempo bilgisi, döngü işaretçileri ve Playlist işaretçileri |
 | `.mp3` | Sample veya ses klibi olarak | `Dosya › Dışa aktar › MP3 dosyası...` | Sabit bit hızı |

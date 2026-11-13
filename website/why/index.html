@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="4f58ecc3";
+window.LYNX_LANG=lang;window.LYNX_V="3f45f67a";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=4f58ecc3">
+<link rel="stylesheet" href="/assets/site.css?v=3f45f67a">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -125,14 +125,14 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <div class="prose">
     <h2 data-i18n="why.projects.t">Opens and writes other DAWs' projects</h2>
     <p class="lead2" data-i18n="why.projects.l">FL Studio projects and Ableton Live sets open with File › Open and can be written back.</p>
-    <p data-i18n="why.projects.p1">An .flp comes in with its channels, samples, patterns, arrangement, automation and mixer. A Live 11 or 12 set (.als) comes in with its tracks, clips and Session view, which lands in the clip grid. FL Studio Mobile projects (.flm) import the arrangement, samples, drum kits, DirectWave programs, four of its synths, its effects and its automation. The original file is never changed: saving writes a .lynx file.</p>
+    <p data-i18n="why.projects.p1">An .flp comes in with its channels, samples, patterns, arrangement, automation and mixer. A Live 11 or 12 set (.als) comes in with its tracks, clips and Session view, which lands in the clip grid. FL Studio Mobile projects (.flm) import the arrangement, samples, drum kits, DW Sampler and DirectWave programs, the Slicer, five of its synths, its effects, its automation and its chord sets. The original file is never changed: saving writes a .lynx file.</p>
     <p data-i18n="why.projects.p2">File › Export writes an FL Studio project or an Ableton Live set (for Live 12 or Live 11), so someone who works in the other program can open what you made.</p>
     <div class="tablewrap"><table>
       <thead><tr><th data-i18n="why.projects.c1">Format</th><th data-i18n="why.projects.c2">Open</th><th data-i18n="why.projects.c3">Export</th><th data-i18n="why.projects.c4">What does not convert</th></tr></thead>
       <tbody>
         <tr><td>.flp</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.projects.r1">FLEX packs are never opened. On export, LYNX-only instruments and effects are rendered to audio or swapped for the nearest FL plugin, and modulators are left out.</td></tr>
-        <tr><td>.als</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.projects.r2">Live's own devices are dropped. On export, LYNX SHARE's own instruments and effects, effect-parameter automation and insert-to-insert routes are not written.</td></tr>
-        <tr><td>.flm</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.no">No</td><td data-i18n="why.projects.r3">Instruments other than MiniSynth, Transistor Bass, 3x Osc, GMSynth, DirectWave and the samplers play the built-in synth.</td></tr>
+        <tr><td>.als</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.projects.r2">Many of Live's own effects and instruments become LYNX SHARE's own; the ones with no equivalent are dropped and listed. On export, LYNX SHARE's own instruments and effects, effect-parameter automation and insert-to-insert routes are not written.</td></tr>
+        <tr><td>.flm</td><td data-i18n="why.yes">Yes</td><td data-i18n="why.no">No</td><td data-i18n="why.projects.r3">Instruments other than MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, Slicer, DirectWave and the samplers play the built-in synth.</td></tr>
       </tbody>
     </table></div>
     <p><a class="tlink" href="/wiki/importing-projects/" data-i18n="why.guide">Read the guide</a> · <a class="tlink" href="/wiki/file-formats/" data-i18n="why.projects.all">Every file format</a></p>
@@ -163,8 +163,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <p class="lead2" data-i18n="why.work.l">Patterns and a Playlist by default, a clip grid with scenes or one simple window when you want one.</p>
     <p data-i18n="why.work.p1">The default layout is the pattern workflow FL Studio users know: Channel rack, Piano roll, Playlist and Mixer. View › Layout style › Clip-launch workflow adds a clip grid next to the Playlist, where Playlist tracks are columns and scenes are rows. Clips have launch modes, quantisation, legato, loop and follow actions, and a Grid / Both / Song switch chooses what plays.</p>
     <p data-i18n="why.work.p2">Live sets bring their Session clips and scenes into the grid, and exporting an .als writes the grid back as Session clips.</p>
-    <p data-i18n="why.work.p3">In the Clip-launch workflow a selected clip opens in a Clip View with Clip, Launch and Notes panels, the selected track's effects show as a chain of cards, and Instrument and Audio Effect Racks from Live sets open with their chains and macros.</p>
-    <p data-i18n="why.work.p4">View › Layout style › Simple workflow is for a first song: one window with the tracks and the timeline, a New track chooser that adds a voice, an instrument, a sampler or a starter beat in one click, and a Finish dock that saves the song as a file. The setup wizard offers the three workflows at the first start.</p>
+    <p data-i18n="why.work.p3">In the Clip-launch workflow a selected clip opens in a Clip View with Clip, Launch and Notes panels, a Session mixer sits under the grid, and the selected track's effects show as a chain of cards. Instrument and Audio Effect Racks and Drum Racks from Live sets open with their chains and macros, and MIDI and Key Map Modes link controllers and computer keys to clips, scenes and knobs.</p>
+    <p data-i18n="why.work.p4">View › Layout style › Simple workflow is for a first song: one window with the tracks and the timeline, a New track chooser that adds a voice, an instrument, a sampler or a starter beat in one click, a track dock with one-knob effects and a Chord pad, and a Finish dock that saves the song as a file. A first-song tour shows the way step by step. The setup wizard offers the three workflows at the first start.</p>
     <h3 data-i18n="why.limits">Limits</h3>
     <ul>
       <li data-i18n="why.work.x1">The clip grid and the Simple workflow are optional. The pattern workflow is unchanged when they are off.</li>
@@ -182,6 +182,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
     <p data-i18n="why.crash.p1">Every plugin file is scanned in a separate process, so a plugin that crashes or hangs during the scan is marked as failed and skipped. With "Run plugins in a separate process" turned on in the general settings, each plugin also runs outside LYNX SHARE while you work: if it crashes, it goes silent, a notice appears and the program keeps running.</p>
     <p data-i18n="why.crash.p2">On Windows, 32-bit VST2 and VST3 plugins run through a bridge that adds no latency. A plugin that crashes in the bridge stops on its own while LYNX SHARE keeps playing.</p>
     <p data-i18n="why.crash.p3">A plugin that crashed can be reloaded from its window, with its settings from the last save or backup, without reopening the project.</p>
+    <p data-i18n="why.crash.p4">Without a separate process, a plugin that crashes while it plays is switched off and LYNX SHARE keeps running, on Windows, macOS and Linux. A plugin that crashes while a project loads is left out, and the project opens with its settings kept.</p>
     <h3 data-i18n="why.limits">Limits</h3>
     <ul>
       <li data-i18n="why.crash.x1">Running plugins in a separate process is off by default. You can turn it on for everything or for one plugin.</li>
@@ -219,7 +220,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=4f58ecc3" defer></script>
-<script src="/assets/motion.js?v=4f58ecc3" defer></script>
+<script src="/assets/site.js?v=3f45f67a" defer></script>
+<script src="/assets/motion.js?v=3f45f67a" defer></script>
 </body>
 </html>

@@ -83,7 +83,8 @@ bool samePoints (const Automation& a, const Automation& b) noexcept
         return false;
 
     for (std::size_t i = 0; i < a.points.size(); ++i)
-        if (a.points[i].tick != b.points[i].tick || a.points[i].value != b.points[i].value || a.points[i].tension != b.points[i].tension)
+        if (a.points[i].tick != b.points[i].tick || a.points[i].value != b.points[i].value || a.points[i].tension != b.points[i].tension
+            || a.points[i].mode != b.points[i].mode)
             return false;
 
     return true;

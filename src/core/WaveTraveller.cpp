@@ -923,6 +923,7 @@ public:
             volFactor[(std::size_t) slot] = initVol;
             notePan[(std::size_t) slot] = nextPan;
             noteKey[(std::size_t) slot] = k;
+            slotNote[(std::size_t) slot] = startingNoteId(); // (round 190ej)
         }
         nextPan = 0.0f;
         nextCents = 0.0f;
@@ -931,7 +932,7 @@ public:
     void noteOff (int key) noexcept override
     {
         for (int slot = 0; slot < wavetrav::Engine::maxVoices; ++slot)
-            if (engine.voiceActive (slot) && noteKey[(std::size_t) slot] == key)
+            if (engine.voiceActive (slot) && endsVoice (noteKey[(std::size_t) slot], slotNote[(std::size_t) slot], key)) // (round 190ej)
                 engine.release (slot);
     }
 
@@ -1007,6 +1008,7 @@ private:
     float lastTempo = -1.0f;
     std::array<float, 2 * blockSize> buf {};
     std::array<float, wavetrav::Engine::maxVoices> volFactor {}, notePan {};
+    std::array<std::uint32_t, wavetrav::Engine::maxVoices> slotNote {}; // each voice slot's LYNX note id (round 190ej)
     std::array<int, wavetrav::Engine::maxVoices> noteKey {};
     double channelVol = 1.0, channelPan = 0.0;
     float nextPan = 0.0f, nextCents = 0.0f;

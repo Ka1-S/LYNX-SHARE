@@ -1017,6 +1017,19 @@ void removeEffectKeepRows (Song& song, int track, int index)
     tidyRows (fx);
 }
 
+int removeEffectsOfKind (Song& song, EffectKind kind)
+{
+    int removed = 0;
+    for (int t = 0; t < (int) song.mixer.size(); ++t)
+        for (int i = (int) song.mixer[(std::size_t) t].effects.size() - 1; i >= 0; --i)
+            if (song.mixer[(std::size_t) t].effects[(std::size_t) i].kind == kind)
+            {
+                removeEffectKeepRows (song, t, i);
+                ++removed;
+            }
+    return removed;
+}
+
 bool moveEffectSlot (Song& song, int track, int from, int to)
 {
     if (track < 0 || track >= (int) song.mixer.size())

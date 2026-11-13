@@ -365,6 +365,7 @@ public:
                                   (float) std::clamp ((double) nextPan + channelPan, -1.0, 1.0), 0.0f, 0.0f);
         const auto slot = (std::size_t) (&v - engine.voices.data());
         volFactor[slot] = (float) initVol;
+        slotNote[slot] = startingNoteId(); // (round 190ej)
         notePan[slot] = nextPan;
         nextPan = 0.0f;
         nextCents = 0.0f;
@@ -372,8 +373,9 @@ public:
 
     void noteOff (int key) noexcept override
     {
+        // (round 190ej: the note's own voice — FL hands Plucked! the ending note's voice, REA_rodada65 §1)
         for (auto& v : engine.voices)
-            if (v.active && v.key == key && ! v.released)
+            if (v.active && endsVoice (v.key, slotNote[(std::size_t) (&v - engine.voices.data())], key) && ! v.released)
                 engine.release (v);
     }
 
@@ -427,6 +429,7 @@ private:
     std::atomic<float> pitchCents { 0.0f };
     std::atomic<int> maxPoly { 0 };
     std::array<float, maxVoices> volFactor {}, notePan {};
+    std::array<std::uint32_t, maxVoices> slotNote {}; // each voice slot's LYNX note id (round 190ej)
     double channelVol = 1.0, channelPan = 0.0;
     float nextPan = 0.0f, nextCents = 0.0f;
 };

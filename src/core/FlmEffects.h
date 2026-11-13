@@ -5,18 +5,13 @@
 // read from the plugin's code and are restated here as formulas; no Image-Line code was copied.
 //
 // Mapped today:
-//  - Equalizer (3): 4 bands (low shelf / peak / high shelf, gain, frequency, bandwidth in octaves) → LYNX's 7-band
-//    parametric EQ with cookbook biquads (the same shapes; FLM computes them at twice the rate);
-//  - Graphic EQ (7): 8 fixed bands (80 Hz low shelf … 12 kHz high shelf, 1 octave) → the parametric EQ (two slots when
-//    more than seven bands are not flat);
-//  - Filter (9): low-pass / band-pass / high-pass, 24 / 48 / 96 dB per octave (2 / 4 / 8 equal biquads) → the
-//    parametric EQ's single-biquad cut and band-pass bands, FLM's level offsets on the EQ's output;
-//  - Autoduck legacy (10): the beat-synced duck curve → LYNX's rhythm gain (12 points), the ducking depth on the slot's
-//    mix;
-//  - Reverb legacy (12) and Reverb 2 (35): FLM's copy of the plate reverb that FL's Fruity Reeverb 2 uses → LYNX's
-//    exact Reeverb 2 engine, FLM's integer controls converted into FL's (levels corrected in round 188h).
-//  - MultiFX (4), Limiter legacy (5), Distortion (6), Trance Delay (16), Tape Delay (18), Leveller (20), Gate (27) and
-//    Limiter (28): LYNX's Pocket engines (core/PocketFx.h, round 188h), FLM's values copied as they are.
+//  - Equalizer (3), Graphic EQ (7), Filter (9), Reverb legacy (12), Reverb 2 (35) and Reverb (32): LYNX's exact Pocket
+//    engines since round 190dw (core/PocketFxE.cpp, core/PocketReverb.cpp; FLM's values copied as they are). Until then
+//    they were approximated on the Parametric EQ and Reeverb 2; projects saved with those slots keep them.
+//  - Autoduck legacy (10): Pocket Autoduck (module 29's engine) with the legacy curve, exact (round 190dw).
+//  - Tuned EQ (30): the parametric EQ's cookbook bands (round 190by).
+//  - MultiFX (4), Limiter legacy (5), Distortion (6), Trance Delay (16), Tape Delay (18), Leveller (20), Gate (27),
+//    Limiter (28) and the other Pocket engines (core/PocketFx.h, rounds 188h–190by), FLM's values copied as they are.
 // Every module: Mix → the slot's mix, Post Gain → a utility after it (round 188h, the module wrapper's laws).
 // Everything else returns no slots and the importer lists it.
 
@@ -43,6 +38,11 @@ struct Mapped
 // `live` = the module has automation lanes: the slot layout must not depend on which bands happen to be flat
 // `postGainLive` = the module's Post Gain is automated: the utility that carries it stays even at 0 dB
 Mapped map (const flm::Module& module, bool live = false, bool postGainLive = false);
+
+// round 190by: Tuned EQ's laws (module 30)
+int tunedEqNote (float v) noexcept;                 // ⌊11v + 0.001⌋: 0 = C … 9 = A … 11 = B
+double tunedEqHz (int note, int band) noexcept;     // 110·2^((note − 9)/12 + band), band 0…7
+double tunedEqOctaves (float v) noexcept;           // 10v³ + 0.1
 
 // An automation lane on parameter `param` of the module (FLM's index; −2 = the module's Mix, −3 its Post Gain): the LYNX
 // targets it moves and, per target, the value for each of `values` (0…1, FLM's). Empty = not automatable.

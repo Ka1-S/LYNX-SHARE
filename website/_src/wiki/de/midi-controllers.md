@@ -1,5 +1,5 @@
 ---
-source: a06504f3a0
+source: d2bebc77b1
 ---
 ![Die MIDI-Seite der Einstellungen: Eingabegeräte, Ausgabegeräte mit Master-Sync und externer Sync](/assets/img/wiki/settings-midi.webp)
 
@@ -36,7 +36,9 @@ Die Verknüpfung wird mit dem Projekt gespeichert. Um sie zu entfernen, klicke e
 
 | Befehl | Taste | Was er tut |
 |---|---|---|
-| `Override global link...` | keine | Erzeugt eine Verknüpfung, die in jedem Projekt gilt. Sie wird in den Einstellungen gespeichert, nicht im Projekt |
+| `Mit Controller verknüpfen...` | none | Öffnet das Fenster `Fernsteuerungs-Einstellungen` für den Regler, in dem du seine Verknüpfung von Hand siehst und einstellst (unten) |
+| `Globale Verknüpfung überschreiben...` | keine | Erzeugt eine Verknüpfung, die in jedem Projekt gilt. Sie wird in den Einstellungen gespeichert, nicht im Projekt |
+| `Globale Verknüpfung überschreiben... (für alle Projekte: Regler am Controller bewegen)` | none | Legt eine globale Verknüpfung in einem Schritt an: Bewege als Nächstes den Hardware-Regler. Der Eintrag ohne die Klammern öffnet stattdessen das Fenster `Einstellungen für globale Verknüpfung` |
 | `Globale Verknüpfung entfernen` | keine | Entfernt sie wieder |
 | `Multilink zu Controllern` | `Ctrl+J` | Solange es an ist, werden die Regler, die du bewegst, der Reihe nach mit den Hardware-Reglern verknüpft, die du als Nächstes bewegst. Es steht im Menü `Optionen` |
 | `Pickup (Übernahmemodus)` | keine | Auf der MIDI-Seite. Ein Controller bewegt einen Parameter erst, wenn er dessen aktuellen Wert erreicht hat, damit nichts springt |
@@ -44,6 +46,22 @@ Die Verknüpfung wird mit dem Projekt gespeichert. Um sie zu entfernen, klicke e
 Die MIDI-Seite listet die Verknüpfungen unter `Verknüpfungen (Projekt, global)` auf. Ein Gerät, dessen `Controller-Typ` auf `Generischer Controller` steht, macht nur das, was du von Hand verknüpfst.
 
 Die Parameter eines Plugins von Drittanbietern erreichst du über `Plugin-Parameter automatisieren` im Menü des Kanals oder des Effekt-Slots. Jeder Parameter dort hat dieselben Verknüpfungseinträge. Siehe [Automation](/wiki/automation/).
+
+## Fernsteuerungs-Einstellungen
+
+`Mit Controller verknüpfen...` öffnet dieses Fenster, wie in FL Studio. `Einstellungen für globale Verknüpfung` (über `Globale Verknüpfung überschreiben...`) hat dieselben Felder bis auf die Verknüpfungsliste, `Omni`, den internen Controller und `Konflikte entfernen`. Auch ein Doppelklick auf eine Verknüpfung in der Liste der MIDI-Seite öffnet es.
+
+| Einstellung | Was sie tut |
+|---|---|
+| `Port`, `Kanal`, `Ctrl` | Die Nummer des MIDI-Eingangsports, der MIDI-Kanal und die Controller-Nummer. Klicke mit rechts auf `Ctrl` für die Standard-Controller mit Namen. `Note C0` in dieser Liste macht eine Notenverknüpfung: Zähle die Nummer von dort hoch für eine andere Taste |
+| `Automatisch erkennen` | Standardmäßig an. Bewege einen Regler an deinem Gerät, und die Nummern werden ausgefüllt |
+| `Omni` | Die Verknüpfung folgt dem gewählten Kanal oder, bei einem Effekt in einem Mixer-Slot, der gewählten Mixerspur |
+| `Modus` | Wie eine Noten- oder Tasten-Verknüpfung wirkt. `Standard` und `Hold` folgen der Taste: ihre Velocity, solange sie gehalten wird, null beim Loslassen. `Latch` wechselt bei jedem Druck zwischen den beiden Enden. `Inc` erhöht den Wert bei jedem Druck schrittweise. `Bleiben` setzt die Velocity und behält sie nach dem Loslassen |
+| Interner Controller | Verknüpft den Regler stattdessen mit einem der internen Controller des Projekts. Wird nur angezeigt, wenn das Projekt einen hat. Mit `Automation aufnehmen` lassen sich die Bewegungen dieses Controllers als Automation aufnehmen |
+| `Mapping-Formel` | Wie die Eingabe auf den Regler abgebildet wird, mit der Variablen `Eingang`. `Presets` hat die Formelliste von FL. Drücke `Enter`, um eine eingetippte Formel anzuwenden. Die Kurve daneben zeigt das Ergebnis |
+| `Glättung` | Glättet die Bewegungen des Reglers. `Zeit` legt fest, wie lange: 1 Pol bei negativen Werten, 3 Pole bei positiven |
+| `Konflikte entfernen` | Standardmäßig an. Entfernt andere Verknüpfungen, die denselben Controller nutzen, wenn du auf `Übernehmen` klickst. Es wird rot, solange es eine solche Verknüpfung gibt |
+| `Reset`, `Überspringen`, `Übernehmen` | `Übernehmen` speichert die Verknüpfung (ein Undo-Schritt). Sind mehrere Regler per Multilink in der Warteschlange, geht `Überspringen` zum nächsten |
 
 ## Controller-Profile
 
@@ -79,6 +97,16 @@ MPE ist in einer ersten Stufe. Ein MPE-Controller spielt jede Note mit eigenem P
 - Von den eingebauten Instrumenten folgen der Sampler und der eingebaute Synth diesen Werten.
 - Ein Fremd-Plugin erhält MPE, wenn `MPE` unter `MIDI` in den `Wrapper-Einstellungen` des Plugin-Fensters an ist. Jede Note geht dann auf einem eigenen MIDI-Kanal hinaus, 2 bis 16.
 - Es wurde noch nicht mit einem echten MPE-Controller ausprobiert.
+
+## MIDI Map Mode und Key Map Mode
+
+Im [Clip-Start-Arbeitsablauf](/wiki/layouts/) lassen sich Clips, Szenen und Schaltflächen wie in Ableton Live zuordnen. Die Schaltflächen `MIDI` und `Tonart` neben dem Schalter `Beide`, `Raster`, `Song` schalten die Modi ein, ebenso `Ctrl+M` und `Ctrl+K`.
+
+1. Drücke `Ctrl+M` für den MIDI Map Mode oder `Ctrl+K` für den Key Map Mode. Jedes Element, das sich zuordnen lässt, ist eingefärbt, blau für MIDI und orange für Tasten.
+2. Klicke auf ein Element: einen Clip-Slot, eine Szene, die Stopp-Taste einer Spur, `Alle Clips stoppen`, Play, Stopp, Aufnahme, `Session-Aufnahme`, das Metronom oder einen Regler des Session-Mixers oder der Device View.
+3. Bewege einen Regler oder drücke eine Taste an deinem MIDI-Gerät, oder drücke im Key Map Mode eine Computertaste. Das Element zeigt seine Zuordnung, zum Beispiel `1/19` (Kanal und Controller).
+4. Die Zuordnungen werden anstelle des Browsers aufgelistet: Kanal, Note/Control oder Taste, Pfad, Name, Min und Max. Ziehe Min oder Max oder klicke doppelt, um einen Wert einzutippen. Klicke mit rechts auf eine Zeile für `Bereich umkehren` und `Delete`.
+5. Drücke dieselbe Taste noch einmal, um den Modus zu beenden.
 
 ## Die Computertastatur
 
@@ -116,6 +144,8 @@ MPE ist in einer ersten Stufe. Ein MPE-Controller spielt jede Note mit eigenem P
 - MIDI-CC, Channel-Aftertouch und Pitch Bend, die an ein Plugin gehen, lassen sich mit `MIDI-Controller automatisieren (CC, Aftertouch, Pitchbend)` automatisieren.
 - Eine von einem Pedal gehaltene Note wird bis zu dem Moment aufgenommen, in dem das Pedal losgelassen wird.
 - Ein Automationsclip nimmt einen Regler nicht zurück, solange du ihn von einem Controller aus bewegst. Der Regler folgt seiner Automation wieder, wenn die Wiedergabe das nächste Mal startet.
+- Notenverknüpfungen, die in `Fernsteuerungs-Einstellungen` angelegt wurden, werden nicht in einen .flp-Export geschrieben.
+- `Ctrl+M` und `Ctrl+K` starten die Map-Modi nur im Clip-Start-Arbeitsablauf. Der Map Mode hat noch kein Makro-Mapping und keine Notenbereiche.
 
 ## Siehe auch
 

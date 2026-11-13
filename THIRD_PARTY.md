@@ -15,6 +15,7 @@ LYNX is distributed under the [GNU AGPL-3.0](LICENSE). It uses the components be
 | [Signalsmith Stretch 1.4](https://github.com/Signalsmith-Audio/signalsmith-stretch) and [Signalsmith Linear 0.6.6](https://github.com/Signalsmith-Audio/linear) (`third_party/signalsmith`, unmodified) | pitch-preserving time-stretch (tempo-following samples, FL Studio stretch modes, Newtone, the audio editor) | MIT (`third_party/signalsmith/LICENSE-stretch.txt`, `LICENSE-linear.txt`) |
 | [pocketpy 2.2.0](https://github.com/pocketpy/pocketpy) (the single-file `pocketpy.c` / `pocketpy.h` amalgamation in `third_party/pocketpy`; LYNX's changes are marked "LYNX": an interrupt flag for scripts that run too long, eager generator expressions, line continuation after a backslash) | the embedded Python that runs FL Studio's VFX Script note scripts (built without its `os` / file modules) | MIT (`third_party/pocketpy/LICENSE`) |
 | [Monocypher 4.0.2](https://monocypher.org) (`third_party/monocypher/monocypher.c` / `.h`, unmodified) | the end-to-end encryption of live sessions: Argon2id (the invite code's keys), BLAKE2b, XChaCha20-Poly1305 | 2-clause BSD or CC0 1.0, at the user's choice (`third_party/monocypher/LICENCE.md`) |
+| [Faust Libraries](https://github.com/grame-cncm/faustlibraries) `reverbs.lib` 1.6.2: the function `re.valhallaSupermassive` by David Braun, ported to C++ in `src/core/NebulaCloud.h` / `.cpp` (no Faust code or runtime is shipped; LYNX's changes: block processing, glided controls, single-precision signal path) | the six "cloud" networks of the Nebula effect (its Measured model) | MIT (declared for that function in the file; notice below) |
 | [PipeWire 1.6.2](https://gitlab.freedesktop.org/pipewire/pipewire) headers (the `pipewire-0.3` / `spa-0.2` headers LYNX includes, in `third_party/pipewire/include`, unmodified) | LYNX's native PipeWire audio driver on Linux; `libpipewire-0.3.so.0` itself is loaded from the system at run time, never shipped | MIT (`third_party/pipewire/LICENSE`) |
 | [VST 3 SDK](https://github.com/steinbergmedia/vst3sdk) (the copy bundled with JUCE 8.0.4) | VST3 plugin hosting | GPLv3 option of Steinberg's dual licence (`VST3_SDK/LICENSE.txt` in JUCE) |
 | [ASIO SDK 2.3.4](https://www.steinberg.net/developers/) (interface headers in `third_party/asiosdk`) | ASIO audio drivers on Windows | GPLv3 option of Steinberg's dual licence (`third_party/asiosdk/LICENSE.txt`) |
@@ -55,6 +56,40 @@ Spotify AB (http://www.spotify.com/).
 
 (The rest of Basic Pitch's NOTICE names Python libraries its own package uses — librosa, mir_eval, numpy, pretty-midi,
 resampy, scipy, tensorflow — and test audio from the Vocadito dataset; none of them is part of LYNX.)
+
+## Faust Libraries `re.valhallaSupermassive` (MIT)
+
+`src/core/NebulaCloud.h` and `src/core/NebulaCloud.cpp` are a C++ port of the function `valhallaSupermassive` of
+`reverbs.lib` (version 1.6.2) in https://github.com/grame-cncm/faustlibraries — a model of six delay / reverb networks
+(feedback delay networks and cascades of matrix all-passes). The library file declares, for this function,
+`author "David Braun"` and `license "MIT"`; the other functions of that file, under other licences, are not used.
+
+```
+MIT License
+
+Copyright (c) 2026 David Braun
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+(The library names the author and the licence but carries no copyright line for this function; the line above is
+written from that declaration and the year of the contribution.)
 
 ## sse2neon (MIT)
 

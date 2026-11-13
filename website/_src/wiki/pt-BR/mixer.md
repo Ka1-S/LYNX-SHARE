@@ -1,5 +1,5 @@
 ---
-source: 1e4bc038df
+source: b6e9ef0dd0
 ---
 ![O Mixer](/assets/img/mixer.webp)
 
@@ -51,6 +51,18 @@ O painel de efeitos mostra os dez slots do insert selecionado.
 - `Agrupar em rack de efeitos de áudio` no menu do slot coloca o efeito em um novo rack, e `Agrupar tudo em rack de efeitos de áudio` faz isso com a cadeia inteira. `Desagrupar` devolve aos slots os efeitos de um rack de uma só cadeia.
 - O interruptor no cabeçalho do painel liga ou desliga todos os efeitos do insert.
 - Você pode arrastar um efeito do banco de plugins do [Browser](/wiki/browser/) para um insert ou slot de efeito.
+- `Voz limpa` no menu do insert põe no insert uma cadeia pronta de limpeza de vocal.
+
+## Edison em um slot
+
+O Edison, o editor e gravador de áudio, pode ficar em qualquer slot de efeito, vários por insert. A janela dele é o editor de áudio com uma linha de controles de gravação.
+
+- `Abrir editor de áudio` (`Ctrl+E`) no menu do insert carrega o Edison no primeiro slot vazio do insert e o abre. `Abrir editor de áudio e gravar` (`Shift+E`) o carrega pronto para gravar quando a música toca.
+- Os modos de gravação são `Agora`, `Na entrada` (o padrão: espera a entrada passar de um limiar), `Entrada` e `Ao tocar`. `Anexar` põe uma gravação nova depois do áudio que já está lá. O tempo máximo de gravação é `Sem limite` ou 1, 3, 5, 10, 30 ou 60 minutos: um slot novo começa em 30, `Abrir editor de áudio e gravar` define 5.
+- `Sync` toca o áudio do Edison no tempo da música enquanto a música toca.
+- O Edison continua gravando depois de você fechar a janela dele.
+- `Ferramentas › Macros › Remover todas as instâncias do Edison` esvazia todos os slots do Edison do projeto, depois de uma pergunta.
+- Slots do Edison em projetos do FL Studio (.flp) abrem com o áudio deles.
 
 ## EQ do insert
 
@@ -78,6 +90,8 @@ Os grupos do Mixer se recolhem com o chevron (ou `Alt`+clique para todos os grup
 
 Cada insert tem um botão de armar gravação. Com um insert armado, Rec e Play gravam a entrada de áudio dele em um clipe da Playlist. `Shift+R` arma o insert selecionado e começa a gravar em um só passo. Veja [Gravação](/wiki/recording/).
 
+Quando você escolhe uma entrada externa para um insert que também grava outro áudio, o LYNX SHARE pergunta se deve trocá-lo para `Só a entrada externa`, para que o take contenha só a entrada. `Mixer › Gravação em disco › Compensação de latência` no menu do insert vem ligado por padrão. Desligado, os takes gravados são colocados sem nenhuma compensação de latência.
+
 ## Teclas
 
 `Ctrl+L` e `Ctrl+Shift+L` têm este significado só quando o Mixer está com o foco.
@@ -92,6 +106,8 @@ Cada insert tem um botão de armar gravação. Com um insert armado, Rec e Play 
 | Solo com as fontes | `Alt+S` | Dá solo nos inserts selecionados e nos inserts que os alimentam |
 | Excluir inserts | `Del` | Exclui os inserts selecionados, depois de uma pergunta |
 | Armar e gravar | `Shift+R` | Arma o insert selecionado e começa a gravar |
+| Open audio editor | `Ctrl+E` | Carrega o Edison no primeiro slot vazio do insert e o abre |
+| Open audio editor and record | `Shift+E` | O mesmo, pronto para gravar quando a música toca |
 
 ## Bom saber
 
@@ -100,6 +116,8 @@ Cada insert tem um botão de armar gravação. Com um insert armado, Rec e Play 
 - `Ctrl+L` faz coisas diferentes no Channel Rack e no Mixer. No rack, ele escolhe inserts livres. No Mixer, usa o insert selecionado.
 - Os interruptores de rota aparecem nas outras faixas, não na selecionada.
 - O limite é de 127 inserts por projeto e dez slots de efeito por insert.
+- A gravação do Edison é guardada como arquivo WAV na pasta do projeto, não dentro do arquivo do projeto.
+- O mixer Session sob a grade de clipes pertence só ao fluxo por disparo de clipes. Ele mostra os mesmos inserts deste Mixer. Veja [Layouts](/wiki/layouts/).
 
 ## Veja também
 

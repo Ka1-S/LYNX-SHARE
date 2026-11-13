@@ -9,7 +9,9 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/BrowserCollections.h"
 #include "core/BrowserView.h"
+#include "core/HotSwap.h"
 #include "engine/AudioEngine.h"
 #include "ui/Icons.h"
 
@@ -52,6 +54,10 @@ class BrowserComponent final : public juce::Component,
                                private juce::Timer
 {
 public:
+    // Live's pad menu › Next Similar (round 190el, ui/RackEditor.cpp): the samples most like `file` in the main
+    // Browser's folders, nearest first, from its "Find similar samples" index (the first use starts the analysis, as the
+    // Browser's own does). `done` runs on the message thread, with an empty list when there is no Browser or no match yet.
+    static void findSimilarSamples (const juce::File& file, std::function<void (juce::Array<juce::File>)> done);
     // The main Browser (a panel) or the separate Sample browser window (round 163): each keeps its own view (which
     // top-level folders it shows, which kinds of files it lists).
     enum class Role
@@ -144,6 +150,9 @@ public:
     void showProjectForSnapshot();
     void showPluginDatabaseForSnapshot();
     std::vector<juce::PopupMenu> pluginDatabaseMenusForSnapshot(); // round 190bf: a folder's and an entry's right-click menus
+    // FL's "Locate sample in browser" (the sampler's File row, round 190df): the ALL tab with the folders opened down to
+    // the file, its row selected; false (and a note) when no folder the Browser shows holds it
+    bool locateFile (const juce::File& file);
     void showScores (const juce::String& subfolder = {});         // the Piano roll's File › Browse scores: FL's "Scores" (the user's Presets/Scores and Data/Patches/Scores)
     // FL's Shift+F8: the All tab with the Plugin database opened and scrolled into view; with a folder (the Plugin
     // picker's tab, round 171c; `generators` 1 / 0, -1 = none) that folder of the Generators / Effects opened
@@ -199,9 +208,48 @@ public:
     void showFoldersDialog();
     std::unique_ptr<juce::Component> makeFoldersPanelForSnapshot();
 
-    // starred files and folders (one path per line in the settings folder)
-    bool isStarred (const juce::File& file) const { return starred.contains (file.getFullPathName()); }
+    // starred files and folders: collection 1 of the Browser's collections (below)
+    bool isStarred (const juce::File& file) const { return collectionStore().has (file.getFullPathName().toStdString(), 0); }
     void setStarred (const juce::File& file, bool on);
+
+    // --- Collections (round 190ce, core/BrowserCollections.h; docs/analise/REA_rodada190ce.md §1) -----------------------
+    // Seven colour collections an item (a file, a folder, a Plugin database entry) can be in, several at once; Starred is
+    // the first. One store for every Browser of the process, saved in the settings folder at each change. The STARRED
+    // tab lists the collections that are switched on (only Starred at first: the tab then looks as it always did).
+    static collections::Store& collectionStore();
+    static juce::String collectionName (int collection);    // the user's name, else the translated default
+    static juce::Colour collectionColour (int collection);
+    void setInCollection (const std::string& item, int collection, bool on);
+    // the number keys on the selected row: 1-7 put it into that collection or take it out, 0 takes it out of all
+    void toggleCollectionOnSelection (int collection);
+    void clearCollectionsOnSelection();
+    void renameCollection (int collection);                  // asks for the name (empty: the default again)
+    void setCollectionShown (int collection, bool shown);
+    void addCollectionItems (juce::PopupMenu& menu, const std::string& item); // the collections part of a row's menu
+    // Round 190cy: the Clip-launch workflow's row menus list the collections flat, as Live's item menu does (the
+    // Pattern workflow keeps the "Collections" sub-menu). Set by the main window with the workflow.
+    void setLiveItemMenus (bool on) noexcept { liveItemMenus = on; }
+    void selectRowForSnapshot (const juce::String& label);   // --shots: the first row with this name
+    juce::PopupMenu collectionsMenuForSnapshot (const std::string& item);
+
+    // The automatic preview (the reference's headphone switch, its menu "browser pre-hear"): off = selecting a file
+    // shows its waveform and details without playing it; the strip's Play button still plays it. A user setting.
+    static inline bool autoPreview = true;
+
+    // --- Hot-swap (round 190ce, core/HotSwap.h; docs/analise/REA_rodada190ce.md §2) --------------------------------------
+    // The Browser linked to a device: a bar over the tabs names it, and Enter / a double-click on a Plugin database
+    // entry, a preset or a sample replaces it in place. Ended by the bar's X, Esc, the hot-swap key or the device's own
+    // button, and when the device is deleted.
+    void beginHotSwap (const hotswap::Target& target);
+    void endHotSwap();
+    bool isHotSwapping() const noexcept { return swapSession.active(); }
+    const hotswap::Target& hotSwapTarget() const noexcept { return swapSession.target; }
+    juce::String hotSwapTargetName() const;
+    bool hotSwapLoadSelected(); // Enter while linked: true when the mode took the key
+    std::function<void()> onHotSwapChanged;                                // the link began, moved to a new device or ended
+    std::function<void (int channel)> onHotSwapWillReplaceInstrument;      // (the channel's editor closes first)
+    std::function<void (int channel, const juce::File&)> onHotSwapSample;  // a sample into the linked channel
+    class HotSwapBar;
 
 private:
     void textEditorTextChanged (juce::TextEditor&) override;
@@ -250,7 +298,25 @@ private:
     std::uint64_t prunedGeneration = 0;
     void addHideItem (juce::PopupMenu& menu, const juce::String& id, const juce::String& label);
     juce::String rootId (const juce::File& folder) const; // the root's id, empty if `folder` isn't a root
-    juce::StringArray starred;
+    static juce::File collectionsFile();
+    static void loadCollections();
+    static void saveCollections();
+    static std::vector<BrowserComponent*>& liveBrowsers();
+    void collectionsChanged(); // every Browser draws its rows (and its STARRED tab) again
+    std::set<int> closedCollections; // the STARRED tab's collection headings the user folded
+    bool previewWanted (bool asked) const noexcept { return asked && autoPreview; }
+    hotswap::Session swapSession;
+    bool liveItemMenus = false;
+    // round 190cy: hot-swap starts on the linked effect's current preset (Live 12.4.16 reveals it, live check 190cw
+    // shot 02a): in its folder when the Browser shows that folder, else the effect's presets as a list, the current
+    // one selected. False: the effect has no preset file.
+    bool revealCurrentPreset (const hotswap::Target& target);
+    bool presetsListed = false; // (that list is up: it goes when the mode ends)
+    std::unique_ptr<HotSwapBar> swapBar;
+    bool hotSwapLoadFile (const juce::File& file);
+    bool hotSwapLoadPlugin (const std::function<std::optional<ChannelDef>()>& generator, const std::function<std::optional<EffectSlot>()>& effect);
+    void hotSwapRefused();
+    juce::Array<juce::File> collectionMatches (const juce::String& query) const; // files found through a collection's name
     void openFile (const juce::File& file); // what a double-click does
     void newSampleChannel (const juce::File& file); // a new Sampler channel playing `file`
     void fileSelected (const juce::File& file, bool preview);

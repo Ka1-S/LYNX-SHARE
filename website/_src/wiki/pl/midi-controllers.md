@@ -1,5 +1,5 @@
 ---
-source: a06504f3a0
+source: d2bebc77b1
 ---
 ![Strona MIDI w ustawieniach: urządzenia wejściowe, urządzenia wyjściowe z synchronizacją master i synchronizacja zewnętrzna](/assets/img/wiki/settings-midi.webp)
 
@@ -36,7 +36,9 @@ Powiązanie zapisuje się z projektem. Żeby je usunąć, kliknij element prawym
 
 | Polecenie | Klawisz | Co robi |
 |---|---|---|
-| `Override global link...` | brak | Tworzy powiązanie działające w każdym projekcie. Jest trzymane w ustawieniach, nie w projekcie |
+| `Powiąż z kontrolerem...` | brak | Otwiera okno `Ustawienia zdalnego sterowania` dla elementu, w którym widzisz i ustawiasz jego powiązanie ręcznie (poniżej) |
+| `Zastąp powiązanie globalne...` | brak | Tworzy powiązanie działające w każdym projekcie. Jest trzymane w ustawieniach, nie w projekcie |
+| `Nadpisz powiązanie globalne... (dla wszystkich projektów: porusz gałką na kontrolerze)` | brak | Tworzy powiązanie globalne w jednym kroku: następnie poruszasz element sprzętu. Pozycja bez nawiasów otwiera zamiast tego okno `Ustawienia powiązania globalnego` |
 | `Usuń powiązanie globalne` | brak | Usuwa je z powrotem |
 | `Multilink do kontrolerów` | `Ctrl+J` | Gdy jest włączone, poruszane elementy są powiązywane po kolei z elementami sprzętu, którymi ruszysz w następnej kolejności. Jest w menu `Opcje` |
 | `Pickup (tryb przejęcia)` | brak | Na stronie MIDI. Kontroler porusza parametr dopiero po dojściu do jego bieżącej wartości, więc nic nie skacze |
@@ -44,6 +46,22 @@ Powiązanie zapisuje się z projektem. Żeby je usunąć, kliknij element prawym
 Strona MIDI wylicza powiązania w `Powiązania (projekt, globalne)`. Urządzenie, którego `Typ kontrolera` to `Kontroler ogólny`, robi tylko to, co powiążesz ręcznie.
 
 Do parametrów pluginu zewnętrznego dochodzi się przez `Automatyzuj parametr pluginu` w menu kanału albo menu slotu efektu. Każdy parametr ma tam te same pozycje powiązań. Zobacz [Automatyka](/wiki/automation/).
+
+## Ustawienia zdalnego sterowania
+
+`Powiąż z kontrolerem...` otwiera to okno, jak w FL Studio. `Ustawienia powiązania globalnego` (z `Zastąp powiązanie globalne...`) ma te same pola, z wyjątkiem listy powiązań, `Omni`, kontrolera wewnętrznego i `Usuń konflikty`. Podwójne kliknięcie powiązania na liście na stronie MIDI też je otwiera.
+
+| Ustawienie | Co robi |
+|---|---|
+| `Port`, `Kanał`, `Ctrl` | Numer portu wejściowego MIDI, kanał MIDI i numer kontrolera. Kliknij `Ctrl` prawym przyciskiem, aby zobaczyć standardowe kontrolery z nazwami. `Nuta C0` na tej liście tworzy powiązanie z nutą: zwiększ stamtąd numer, aby wybrać inny klawisz |
+| `Wykryj automatycznie` | Domyślnie włączone. Poruszasz elementem na urządzeniu, a numery wypełniają się same |
+| `Omni` | Powiązanie podąża za wybranym kanałem, a dla efektu w slocie miksera za wybraną ścieżką miksera |
+| `Tryb` | Jak działa powiązanie z nutą lub przyciskiem. `Domyślny` i `Hold` podążają za klawiszem: jego velocity, gdy jest trzymany, zero po puszczeniu. `Latch` przełącza między dwoma końcami przy każdym naciśnięciu. `Inc` zwiększa wartość o krok przy każdym naciśnięciu. `Pozostań` ustawia velocity i zachowuje je po puszczeniu |
+| Kontroler wewnętrzny | Zamiast tego łączy element z jednym z kontrolerów wewnętrznych projektu. Widoczne tylko, gdy projekt ma taki kontroler. `Nagrywaj automatykę` pozwala nagrywać ruchy tego kontrolera jako automatyzację |
+| `Formuła mapowania` | Jak wejście jest mapowane na element, ze zmienną `Wejście`. `Presety` ma listę formuł z FL. Naciśnij `Enter`, aby zastosować wpisaną formułę. Krzywa obok pokazuje wynik |
+| `Wygładzanie` | Wygładza ruchy elementu. `Czas` ustawia, jak długo: 1 biegun dla wartości ujemnych, 3 bieguny dla dodatnich |
+| `Usuń konflikty` | Domyślnie włączone. Usuwa inne powiązania używające tego samego kontrolera po kliknięciu `Akceptuj`. Robi się czerwone, gdy takie powiązanie istnieje |
+| `Resetuj`, `Pomiń`, `Akceptuj` | `Akceptuj` zapisuje powiązanie (jeden krok cofania). Gdy multilink ustawił w kolejce kilka elementów, `Pomiń` przechodzi do następnego |
 
 ## Profile kontrolerów
 
@@ -79,6 +97,16 @@ MPE jest na pierwszym etapie. Kontroler MPE gra każdą nutę z własnym pitch b
 - Spośród wbudowanych instrumentów te wartości śledzą Sampler i wbudowany syntezator.
 - Plugin innego producenta dostaje MPE, gdy włączone jest `MPE` w sekcji `MIDI` w `Ustawienia wrappera` okna pluginu. Każda nuta wychodzi wtedy na własnym kanale MIDI, od 2 do 16.
 - Nie sprawdzono tego jeszcze z prawdziwym kontrolerem MPE.
+
+## MIDI Map Mode i Key Map Mode
+
+W [sposobie pracy Clip-launch](/wiki/layouts/) klipy, sceny i przyciski można mapować jak w Ableton Live. Przyciski `MIDI` i `Tonacja` obok przełącznika `Oba`, `Siatka`, `Song` włączają te tryby, tak samo jak `Ctrl+M` i `Ctrl+K`.
+
+1. Naciśnij `Ctrl+M` dla MIDI Map Mode lub `Ctrl+K` dla Key Map Mode. Każdy element, który można zmapować, jest podświetlony, na niebiesko dla MIDI i na pomarańczowo dla klawiszy.
+2. Kliknij element: slot klipu, scenę, przycisk stop ścieżki, `Zatrzymaj wszystkie klipy`, play, stop, record, `Nagrywanie sesji`, metronom albo pokrętło Mikser sesji lub Device View.
+3. Poruszaj elementem lub naciśnij klawisz na swoim urządzeniu MIDI, albo naciśnij klawisz komputera w Key Map Mode. Element pokaże swoje przypisanie, na przykład `1/19` (kanał i kontroler).
+4. Mapowania są wyświetlane w miejscu Browsera: Channel, Note/Control lub Key, Path, Name, Min i Max. Przeciągnij Min lub Max albo kliknij dwukrotnie, aby wpisać wartość. Kliknij wiersz prawym przyciskiem, aby zobaczyć `Odwróć zakres` i `Delete`.
+5. Naciśnij ten sam klawisz ponownie, aby zakończyć tryb.
 
 ## Klawiatura komputera
 
@@ -116,6 +144,8 @@ MPE jest na pierwszym etapie. Kontroler MPE gra każdą nutę z własnym pitch b
 - MIDI CC, aftertouch kanału i pitch bend wysyłane do pluginu można automatyzować przez `Automatyzuj kontroler MIDI (CC, aftertouch, pitch bend)`.
 - Nuta przytrzymana pedałem jest nagrywana do chwili, gdy pedał się podnosi.
 - Klip automatyki nie odbiera kontrolki, gdy poruszasz nią z kontrolera. Kontrolka znów podąża za swoją automatyką, gdy odtwarzanie następnym razem się zaczyna.
+- Powiązania z nutami utworzone w `Ustawienia zdalnego sterowania` nie są zapisywane do eksportu .flp.
+- `Ctrl+M` i `Ctrl+K` uruchamiają tryby mapowania tylko w sposobie pracy Clip-launch. Map Mode nie ma jeszcze mapowania makr ani zakresów nut.
 
 ## Powiązane
 

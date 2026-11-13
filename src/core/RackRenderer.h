@@ -96,6 +96,9 @@ struct RackState
     std::vector<std::vector<int>> automationGroups;
     std::vector<char> automationFollowers;
     std::vector<int> channelVolumeAuto, channelPanAuto;
+    // FL's Levels adjustment (round 190dz): the automation slot of each channel's pan / volume offset ([channel][param],
+    // leveladjust::pan / volume; −1 = none). Mod X / Y offsets apply when the instrument is configured.
+    std::vector<std::array<int, 2>> channelAdjustAuto;
     std::vector<int> mixerVolumeAuto, mixerPanAuto;
     std::vector<std::vector<std::array<int, maxEffectParams>>> effectParamAuto; // [track][slot][param] (built-in)
     std::vector<std::vector<int>> effectMixAuto;                                 // [track][slot]: dry/wet
@@ -140,6 +143,25 @@ struct RackState
     std::vector<std::shared_ptr<DelayLine>> channelDelays;
     std::vector<std::vector<std::shared_ptr<DelayLine>>> sendDelays; // [track][k] like PdcPlan::sendDelay
     std::vector<int> latencies; // channels, then slots of all tracks
+
+    // The Simple workflow's Blend (round 190bu, MixerTrack::chainBlend): the dry/wet of an insert's whole effect chain.
+    // One stage per insert whose Blend is under 100 % (nullptr = 100 %: nothing is copied or mixed): the insert's
+    // input before its first slot, kept in `dry` and delayed by the chain's latency (`delay`, nullptr = none) so the
+    // two paths line up. Built with the PDC plan; a stage of the same latency is kept across rebuilds.
+    struct ChainBlendStage
+    {
+        static constexpr int capacity = 512; // (the renderer's chunk)
+        std::shared_ptr<DelayLine> delay;
+        int latency = 0;
+        std::array<float, 2 * capacity> dry {};
+        // round 190dg: the Blend the audio last ran (a new value ramps from it over one chunk instead of stepping; a
+        // stage kept for its insert's next state carries it). Written by the audio thread, read by the next build.
+        std::atomic<float> lastWet { 1.0f };
+        // samples still to come before a new stage's delayed dry path holds the input (until then the mix stays where it
+        // was: a delay line starts empty)
+        int warmup = 0;
+    };
+    std::vector<std::shared_ptr<ChainBlendStage>> chainBlends; // [track]
 
     // Inserts with a hardware output target (REA round 156), each delayed by what it lacks to line up with the
     // Master output (pdc.total − outLat[track]; nullptr = no delay). Built with the PDC plan.
@@ -341,6 +363,13 @@ struct ClipAudio
     std::vector<float> left, right;
 };
 ClipAudio renderClipAudio (const Song& song, std::size_t clipIndex, double sampleRate, const RackState::Factories& factories);
+
+// A channel's instrument heard alone before it is in the song (round 190bu: the Simple workflow's sound picker): the
+// notes `keys` (MIDI keys, 60 = C5) one after the other, `noteSeconds` each, then `tailSeconds` of release, at unity
+// through no mixer; then the whole is brought to `peak` (0 = left as rendered) so every sound previews at one level.
+// Empty when the instrument can't be built or stays silent. UI thread (allocates).
+ClipAudio renderAudition (const ChannelDef& channel, const std::vector<int>& keys, double noteSeconds, double tailSeconds, double bpm,
+                          double sampleRate, const RackState::Factories& factories, float peak = 0.5f);
 
 class WorkerPool;
 
@@ -551,6 +580,9 @@ private:
     float* channelBuffer (int channel, int side) noexcept;
     float* trackScratch (int track, int side) noexcept;
     void runEffects (const RackState& state, int track, int n) noexcept;
+    // one slot's process, with a moved one-knob slot's glide (round 190dg)
+    void runGoalSlot (const EffectSlot& slot, Effect& effect, std::size_t key, float* l, float* r, int n, const EffectParams& params,
+                      double bpm) noexcept;
     void setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept;
     void connect (const RackState& state, const SlotConnections& c, Effect& effect, int track, const float* l, const float* r) noexcept;
     void updateAutomation (const RackState& state, double startTick) noexcept;
@@ -603,6 +635,15 @@ private:
     // round 190aq: slots skipped for low latency last block; back in the chain they start from a reset state
     // (their look-ahead buffers hold what played before the bypass)
     std::vector<char> lowLatencySkipped; // maxMixerTracks * maxEffectSlots
+    // round 190dg: each one-knob slot's knob (core/GoalKnobs.h) as this renderer last ran it, and the effect it ran it
+    // on. A knob turned since glides there over the block in steps of `goalGlideStep` samples, so a dragged knob doesn't
+    // step its effect's parameters once per edit (a click on a held tone). NaN / nullptr: not run yet.
+    std::vector<float> goalGlideAmount;           // maxMixerTracks * maxEffectSlots
+    std::vector<const Effect*> goalGlideEffect;   // maxMixerTracks * maxEffectSlots
+    static constexpr int goalGlideStep = 8;
+    // the fastest a knob or a Blend moves on the audio side: the whole range in this many seconds (a jump, e.g. a double
+    // click back to the default, becomes a short glide)
+    static constexpr double fullTurnSeconds = 0.25;
     float* tapBuffer (int tap, int side) noexcept;
     std::array<char, maxChannels> channelSilent {};          // channel skipped in this chunk (idle, no notes)
     std::array<NoteMask, maxChannels> heldNotes {};          // keys held on each channel (effects that follow notes: LYNX Tune)

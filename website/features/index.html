@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="4f58ecc3";
+window.LYNX_LANG=lang;window.LYNX_V="3f45f67a";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=4f58ecc3">
+<link rel="stylesheet" href="/assets/site.css?v=3f45f67a">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -103,7 +103,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <figure><a class="shot" href="/assets/img/playlist.webp?v=0.1.26"><img src="/assets/img/playlist.webp?v=0.1.26" srcset="/assets/img/playlist.webp?v=0.1.26 1x, /assets/img/playlist@2x.webp?v=0.1.26 2x" alt="Playlist" width="1600" height="900"></a></figure>
       <div><h3>Playlist</h3>
         <p data-i18n="fe.plP">Pattern, audio and automation clips on tracks. Right-click a clip for split, chop, merge, reverse, normalize and fit to tempo.</p>
-        <ul><li data-i18n="fe.plA">Several arrangements in one project, markers and time selection</li><li data-i18n="fe.plB">Automation clips with curves for any knob or fader, and optional automation lanes under tracks</li><li data-i18n="fe.plC">Audio recording with loop takes and comping</li><li data-i18n="fe.plD">Video tracks with a timecode ruler (export with video needs FFmpeg)</li><li data-i18n="fe.plE">Warp markers and Auto-warp, to lock audio clips to the beat</li></ul>
+        <ul><li data-i18n="fe.plA">Several arrangements in one project, markers and time selection</li><li data-i18n="fe.plB">Automation clips with curves for any knob or fader, and optional automation lanes under tracks</li><li data-i18n="fe.plC">Audio recording with loop takes and comping</li><li data-i18n="fe.plD">Video tracks with a timecode ruler (export with video needs FFmpeg)</li><li data-i18n="fe.plE">Warp markers and Auto-warp, to lock audio clips to the beat</li><li data-i18n="fe.plF">FL Studio's 13 automation curve modes on every point</li></ul>
       </div>
     </div>
 
@@ -119,7 +119,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <figure><a class="shot" href="/assets/img/pianoroll.webp?v=0.1.26"><img src="/assets/img/pianoroll.webp?v=0.1.26" srcset="/assets/img/pianoroll.webp?v=0.1.26 1x, /assets/img/pianoroll@2x.webp?v=0.1.26 2x" alt="Piano roll" loading="lazy" width="1920" height="1080"></a></figure>
       <div><h3>Piano roll</h3>
         <p data-i18n="fe.prP">Configurable snap, chords and scales, 16 note colours, note groups, and slide and porta notes.</p>
-        <ul><li data-i18n="fe.prA">Lanes for velocity, pan and pitch under the notes</li><li data-i18n="fe.prB">Ghost notes from other channels</li><li data-i18n="fe.prC">Quantize, strum, arpeggiate and randomize tools</li><li data-i18n="fe.prD">.mid import and export</li><li data-i18n="fe.prE">Note chance, velocity range and Piano roll scripts</li></ul>
+        <ul><li data-i18n="fe.prA">Lanes for velocity, pan and pitch under the notes</li><li data-i18n="fe.prB">Ghost notes from other channels</li><li data-i18n="fe.prC">Quantize, strum, arpeggiate and randomize tools</li><li data-i18n="fe.prD">.mid import and export</li><li data-i18n="fe.prE">Note chance, velocity range and Piano roll scripts</li><li data-i18n="fe.prF">Limit to a scale or chord, Scale levels, Flip and Randomize, as in FL Studio</li></ul>
       </div>
     </div>
 
@@ -127,7 +127,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <figure><a class="shot" href="/assets/img/mixer.webp?v=0.1.26"><img src="/assets/img/mixer.webp?v=0.1.26" srcset="/assets/img/mixer.webp?v=0.1.26 1x, /assets/img/mixer@2x.webp?v=0.1.26 2x" alt="Mixer" loading="lazy" width="1920" height="1080"></a></figure>
       <div><h3>Mixer</h3>
         <p data-i18n="fe.mxP">Up to 127 insert tracks. Each has 10 effect slots with dry/wet, sends with levels, a built-in EQ and delay compensation.</p>
-        <ul><li data-i18n="fe.mxA">Sidechain from one menu on any effect with a side input</li><li data-i18n="fe.mxB">VCA faders and groups that fold</li><li data-i18n="fe.mxC">Moving a track keeps its sends, sidechains and automation</li><li data-i18n="fe.mxD">An optional loudness meter (LUFS and true peak) beside the Master</li></ul>
+        <ul><li data-i18n="fe.mxA">Sidechain from one menu on any effect with a side input</li><li data-i18n="fe.mxB">VCA faders and groups that fold</li><li data-i18n="fe.mxC">Moving a track keeps its sends, sidechains and automation</li><li data-i18n="fe.mxD">An optional loudness meter (LUFS and true peak) beside the Master</li><li data-i18n="fe.mxE">Edison on any mixer slot, recording even with its window closed</li></ul>
       </div>
     </div>
 
@@ -135,7 +135,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <figure><a class="shot" href="/assets/img/automation.webp?v=0.1.26"><img src="/assets/img/automation.webp?v=0.1.26" srcset="/assets/img/automation.webp?v=0.1.26 1x, /assets/img/automation@2x.webp?v=0.1.26 2x" alt="Automation" data-i18n-alt="alt.auto" loading="lazy" width="760" height="300"></a></figure>
       <div><h3 data-i18n="fe.auT">Automation and controllers</h3>
         <p data-i18n="fe.auP">Any knob or fader of a channel, the mixer, an effect or a plugin can become a clip with points and curves. MIDI controllers can be linked to any parameter, and modulators (an LFO or a random source) move a knob around its own value.</p>
-        <p data-i18n="fe.auP2">Common MIDI controllers work from profiles (Mackie Control, Launchkey MK3, APC Key 25 mk2, KeyLab Essential mk3 and nanoKONTROL2). An MPE controller plays each note with its own bend, timbre and pressure; this is a first stage.</p>
+        <p data-i18n="fe.auP2">Common MIDI controllers work from profiles (Mackie Control, Launchkey MK3, APC Key 25 mk2, KeyLab Essential mk3 and nanoKONTROL2). An MPE controller plays each note with its own bend, timbre and pressure; this is a first stage. Right-click a control › Link to controller... opens Remote control settings, as in FL Studio, for knobs, notes and buttons.</p>
       </div>
     </div>
   </div>
@@ -149,8 +149,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <div>
         <p data-i18n="fe.clP">An optional layout (View › Layout style) puts a grid of clips and scenes next to the Playlist, in the manner of Ableton Live's Session view. Clips have launch modes, quantisation, legato, loop and follow actions.</p>
         <p data-i18n="fe.clP2">Live sets bring their Session clips into this grid, and exporting an .als writes the grid back. The pattern layout stays the default and nothing changes in it.</p>
-        <p data-i18n="fe.clP3">A selected clip opens in a Clip View with Clip, Launch and Notes panels and Live 12's MIDI tools. The selected track's effects show as a chain of cards, and racks with chains, zones and macros open from Live sets and are written back.</p>
-        <p data-i18n="fe.simP">The same menu has a third layout, the Simple workflow, for a first song: one window with the tracks and the timeline, a New track chooser, starter beats and a Finish dock that saves the song as a file.</p>
+        <p data-i18n="fe.clP3">A selected clip opens in a Clip View with Clip, Launch and Notes panels and Live 12's MIDI tools. The selected track's effects show as a chain of cards, and racks with chains, zones and macros open from Live sets and are written back. A Session mixer sits under the grid, a Drum Rack plays pads with choke groups and return chains, and MIDI and Key Map Modes link controllers and computer keys to clips, scenes and knobs.</p>
+        <p data-i18n="fe.simP">The same menu has a third layout, the Simple workflow, for a first song: one window with the tracks and the timeline, a New track chooser, starter beats, a track dock with one-knob effects and a Chord pad, a first-song tour and a Finish dock that saves the song as a file.</p>
         <p><a class="tlink" href="/wiki/coming-from-ableton/" data-i18n="fe.clL">Coming from Ableton Live</a></p>
       </div>
     </div>
@@ -165,8 +165,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
       <thead><tr><th data-i18n="fe.fmH1">Format</th><th data-i18n="fe.fmH2">Open</th><th data-i18n="fe.fmH3">Export</th><th data-i18n="fe.fmH4">Limits</th></tr></thead>
       <tbody>
         <tr><td>.flp<br><span class="muted">FL Studio</span></td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmFlp">Channels, samples, patterns, arrangement, automation and mixer come in. FL Studio's native plugins play on LYNX SHARE's engines (see the list below). On export, what FL Studio does not have is rendered to audio or left out.</td></tr>
-        <tr><td>.als<br><span class="muted">Ableton Live 11, 12</span></td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmAls">Tracks, clips, mixer settings, automation, racks and VST2 / VST3 plugins. Simpler, Sampler and drum racks become samplers. Live's other devices are dropped. On export, LYNX SHARE's own instruments and effects are not converted.</td></tr>
-        <tr><td>.flm<br><span class="muted">FL Studio Mobile</span></td><td data-i18n="fe.part">Partial</td><td data-i18n="fe.no">No</td><td data-i18n="fe.fmFlm">Arrangement, samples, drum kits, DirectWave programs, MiniSynth, Transistor Bass, 3x Osc and GMSynth, the effects and the automation. Other instruments play the built-in synth.</td></tr>
+        <tr><td>.als<br><span class="muted">Ableton Live 11, 12</span></td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmAls">Tracks, clips, mixer settings, automation, racks, Drum Racks and VST2 / VST3 plugins. Many of Live's own effects and instruments (EQ Eight, Compressor, Reverb, Auto Filter, Simpler, Drift and more) become LYNX SHARE's own; the others are dropped. On export, LYNX SHARE's own instruments and effects are not converted.</td></tr>
+        <tr><td>.flm<br><span class="muted">FL Studio Mobile</span></td><td data-i18n="fe.part">Partial</td><td data-i18n="fe.no">No</td><td data-i18n="fe.fmFlm">Arrangement, samples, drum kits, DW Sampler and DirectWave programs, the Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth and SuperSaw, the effects, the automation and the chord sets. Other instruments play the built-in synth.</td></tr>
         <tr><td>.mid</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.yes">Yes</td><td data-i18n="fe.fmMid">As a new project, or into the current one from the Piano roll.</td></tr>
         <tr><td data-i18n="fe.fmAudio">Audio</td><td>WAV, AIFF, FLAC, OGG, MP3</td><td>WAV, MP3, FLAC, OGG</td><td data-i18n="fe.fmAud">WAV at 16-bit, 24-bit or 32-bit float. Stems: one file per mixer insert, per channel or per Playlist track.</td></tr>
       </tbody>
@@ -208,7 +208,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <div class="wrap">
     <h2 data-i18n="fe.pluT">FL Studio's plugins, recreated</h2>
     <div class="prose" style="max-width:780px">
-      <p data-i18n="cat.sub" data-args='[&quot;193&quot;, &quot;0.1.26&quot;]' data-count="193">193 instruments, effects and tools are built into LYNX SHARE 0.1.26. Each picture is the plugin's own editor, drawn by the released program. Third-party plugins (VST3, CLAP and others) load next to them.</p>
+      <p data-i18n="cat.sub" data-args='[&quot;205&quot;, &quot;0.1.27&quot;]' data-count="205">205 instruments, effects and tools are built into LYNX SHARE 0.1.27. Each picture is the plugin's own editor, drawn by the released program. Third-party plugins (VST3, CLAP and others) load next to them.</p>
       <p data-i18n="why.fl.p1">FL Studio's own plugins cannot be loaded by another program. LYNX SHARE has its own engine for most of them, written from scratch, and reads each plugin's saved settings from the .flp or from an .fst preset. A Sytrus channel opens as LYNX SHARE's Sytrus engine with the same patch, a Fruity Limiter slot as its limiter with the same values.</p>
       <p data-i18n="why.fl.x2">Some engines need wave data or samples that belong to FL Studio. LYNX SHARE reads those from your own FL Studio installation and ships none of them.</p>
     </div>
@@ -222,7 +222,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <div class="wrap">
     <h2 data-i18n="fe.insT2">Stand-ins for third-party plugins</h2>
     <p class="lead" data-i18n="fe.insL">LYNX SHARE has its own effects that play the role of widely used third-party plugins. If a project uses one of those plugins and it is not installed, the LYNX SHARE effect loads in its slot and the original's settings are kept for when it is back.</p>
-    <p><a class="btn btn-ghost btn-sm" href="/wiki/plugins/#when-a-plugin-is-not-installed" data-i18n="why.guide">Read the guide</a> <a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE/blob/v0.1.26-alpha/docs/PLUGINS.md#inspired-by-the-classics">docs/PLUGINS.md (0.1.26)</a></p>
+    <p><a class="btn btn-ghost btn-sm" href="/wiki/plugins/#when-a-plugin-is-not-installed" data-i18n="why.guide">Read the guide</a> <a class="btn btn-ghost btn-sm" href="https://github.com/Ka1-S/LYNX-SHARE/blob/v0.1.27-alpha/docs/PLUGINS.md#inspired-by-the-classics">docs/PLUGINS.md (0.1.27)</a></p>
   </div>
 </section>
 
@@ -278,8 +278,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=4f58ecc3" defer></script>
-<script src="/assets/features.js?v=4f58ecc3" defer></script>
-<script src="/assets/motion.js?v=4f58ecc3" defer></script>
+<script src="/assets/site.js?v=3f45f67a" defer></script>
+<script src="/assets/features.js?v=3f45f67a" defer></script>
+<script src="/assets/motion.js?v=3f45f67a" defer></script>
 </body>
 </html>

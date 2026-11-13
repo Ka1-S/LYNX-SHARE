@@ -1,5 +1,5 @@
 ---
-source: 2285f3e677
+source: d5cc625221
 ---
 ![클립 실행 레이아웃: 플레이리스트 옆에 장면이 있는 클립 그리드](/assets/img/cliplaunch.webp)
 
@@ -27,7 +27,7 @@ LYNX SHARE는 패턴 워크플로로 시작합니다. 채널 랙, 패턴, 플레
 | 팔로 액션 | 액션 A와 액션 B. 각각 확률을 지정 |
 | 클립 정지 버튼 | 빈 슬롯에 정지 버튼을 둘 수 있습니다 |
 | 어레인지먼트로 돌아가기 | `플레이리스트로 돌아가기` |
-| 워프 모드 | `채널 설정 › Time stretch`의 `박`, `톤`, `텍스처`, `컴플렉스` |
+| 워프 모드 | `채널 설정 › 타임 스트레치`의 `박`, `톤`, `텍스처`, `컴플렉스` |
 | Simpler, Sampler, 드럼 랙 | LYNX SHARE 샘플러 |
 | `.als` 세트 | `.lynx` 프로젝트 파일 |
 
@@ -64,14 +64,14 @@ LYNX SHARE는 패턴 워크플로로 시작합니다. 채널 랙, 패턴, 플레
 | 그룹, 리턴, 센드 | 인서트에서 인서트로 가는 라우팅 |
 | 상태를 포함한 VST2와 VST3 플러그인 | |
 | 마커, 볼륨, 팬, 템포 오토메이션 | |
-| 세션 클립과 장면으로 변환한 클립 그리드 | |
+| 세션 클립과 장면으로 변환한 클립 그리드, 랙과 Drum Rack | |
 
 내보낸 뒤에는 제외된 항목이 담긴 보고서가 나옵니다.
 
 ## 알아 두면 좋은 점
 
-- Live 자체 디바이스는 다시 만들어지지 않습니다. 가져올 때 Live 자체 이펙트는 제외됩니다.
-- Instrument Rack과 Audio Effect Rack은 체인, 존, 매크로와 함께 들어옵니다. Live의 MIDI Effect Rack은 아직 변환되지 않으며 가져오기 보고서에 나열됩니다.
+- Live 자체 디바이스 중 많은 수는 설정과 오토메이션과 함께 LYNX SHARE 자체의 것으로 들어옵니다. EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift, Operator(FM 제외)입니다. 나머지는 빠지고 가져오기 보고서에 나열됩니다.
+- Instrument Rack과 Audio Effect Rack은 체인, 존, 매크로와 함께 들어오고, Drum Rack은 LYNX SHARE의 Drum Rack이 됩니다. Live의 MIDI Effect Rack은 아직 변환되지 않으며 가져오기 보고서에 나열됩니다.
 - 제외된 항목은 가져오기 보고서에 나열됩니다.
 - Live는 내보낸 세트에서 겹치는 오디오 클립을 잘라 냅니다.
 - Live 세트의 워프 마커는 가져올 때 유지되고, 내보낼 때 다시 기록됩니다.

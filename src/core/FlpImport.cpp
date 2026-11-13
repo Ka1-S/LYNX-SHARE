@@ -1,3 +1,4 @@
+#include "core/FlCurve.h"
 #include "core/FlpImport.h"
 #include "core/FruityDance.h"
 #include "core/FlpExport.h"
@@ -296,6 +297,14 @@ std::optional<std::pair<int, int>> flRawRange (flp::ControlId id, const std::str
     {
         if (p == 0 || p == 1) // volume 0..12800 (10000 = default), pan 0..12800 (6400 = centre)
             return std::pair { 0, 12800 };
+        // Levels adjustment (round 190dz, TPluginForm OfsLevelsPanel): pan offset ±6400, volume multiplier 0..25600,
+        // Mod X / Y offsets ±256
+        if (p == 0x10)
+            return std::pair { -6400, 6400 };
+        if (p == 0x11)
+            return std::pair { 0, 25600 };
+        if (p == 0x13 || p == 0x14)
+            return std::pair { -256, 256 };
     }
     else if (id.isMixer())
     {
@@ -355,6 +364,11 @@ AutomationTarget automationTargetFor (flp::ControlId id, const std::map<int, int
             t.kind = AutomationTargetKind::channelVolume;
         else if (p == 1)
             t.kind = AutomationTargetKind::channelPan;
+        else if (p >= 0x10 && p <= 0x14 && leveladjust::valid (p - 0x10)) // Levels adjustment (round 190dz)
+        {
+            t.kind = AutomationTargetKind::channelAdjust;
+            t.param = p - 0x10;
+        }
         else if (p >= flp::ControlId::pluginParamBase)
         {
             t.kind = AutomationTargetKind::channelParam;
@@ -530,7 +544,10 @@ void applyFlStretchPanel (SamplerSettings& s, int mode, int pitchCents, int mul,
     }
 
     if (timeTicks <= 0.0f && mul != 0 && sampleSeconds > 0.0 && bpm > 0.0)
+    {
         s.stretchBeats = std::clamp ((float) (sampleSeconds * std::pow (2.0, mul / 10000.0) * bpm / 60.0), 0.0f, 4096.0f);
+        s.stretchMul = std::clamp (mul, -20000, 20000); // (round 190dh: the page shows TIME = the sample's beats, and MUL)
+    }
 }
 
 ChannelDef drumPadChannel (const ChannelDef& original, const DrumPad& pad, int channel)
@@ -643,7 +660,7 @@ void splitDrumChannel (Song& song, int channel, const std::vector<DrumPad>& pads
 
     song.forEachTarget ([&] (AutomationTarget& t) {
         if ((t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-             || t.kind == AutomationTargetKind::channelParam) && t.index >= 0)
+             || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust) && t.index >= 0)
             t.index = shift (t.index);
     });
 }
@@ -939,6 +956,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
     song.muteRunsEffects = true;                          // FL's muted insert (round 190y)
+    song.patternClipTakeover = true;                      // FL's pattern clip takeover (issue #158)
     song.fastDeclick = project.fastDeclick;               // 0x28 (REA round 167h)
     song.panTriangular = (project.panLaw >> 1) == 1;       // 0x17: FL saves 2 × its pan-law mode (REA round 167j §1)
     song.flPluginLevels = true; // hosted plugins at Fruity Wrapper's level and velocity law (REA_rodada190ad.md)
@@ -1080,15 +1098,15 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         // level adjustments (0xE5): FL multiplies the channel volume by the adjustment through the same curve
         // (gain = f(volume)·f(volAdj), REA_rodada3 §2 [DECOMP]; an FL render of one channel with volAdj 7286 vs 12800
         // differs by −10.4 dB, f() gives −10.7 dB, a linear factor −4.9 dB) and adds the pan adjustment to the pan.
+        // Since round 190dz they are the channel's own Levels adjustment (Misc tab), no longer folded into its knobs: the
+        // knobs read as in FL and Automate's clips (channel parameters 0x10 / 0x11) move them.
         if (c.hasLevelAdjust)
         {
-            if (c.volAdj != 12800)
-            {
-                const auto g = channelGain (def.volume) * channelGain (std::clamp (c.volAdj / 12800.0f, 0.0f, 1.0f));
-                def.volume = std::clamp ((float) (std::log (10.0 * g + 1.0) / std::log (11.0)), 0.0f, 1.0f);
-            }
-            if (c.panAdj != 0)
-                def.pan = std::clamp (def.pan + c.panAdj / 6400.0f, -1.0f, 1.0f);
+            auto& l = def.misc.levels;
+            l.pan = std::clamp (c.panAdj / 6400.0f, -1.0f, 1.0f);
+            l.volume = std::clamp (c.volAdj / 12800.0f, 0.0f, 2.0f);
+            l.modX = std::clamp (c.modXAdj / 256.0f, -1.0f, 1.0f);
+            l.modY = std::clamp (c.modYAdj / 256.0f, -1.0f, 1.0f);
         }
 
         // sample root note: our sampler plays at the original pitch at C5 (60)
@@ -2172,17 +2190,28 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             p.clip = (c.fxFlags & 4) != 0;
             def.sampler.useLoopPoints = c.useLoopPoints();
             def.sampler.declickMode = std::clamp (c.declickMode, 0, 5);
+            // round 190dh: the Content options (0x8F; kept for the way back) and the loop points of FL's loop knobs (0xFB)
+            if (c.sampleFlags >= 0)
+            {
+                def.sampler.keepOnDisk = (c.sampleFlags & 0x100) != 0;
+                def.sampler.resampleOnLoad = (c.sampleFlags & 1) != 0;
+                def.sampler.loadRegions = (c.sampleFlags & 2) != 0;
+                def.sampler.loadSliceMarkers = (c.sampleFlags & 4) != 0;
+            }
+            def.sampler.loopStart = c.loopStart;
+            def.sampler.loopEnd = c.loopEnd;
         }
 
         // time-stretch: the sample lasts TIME/192 beats × MUL
         if (c.stretchTime > 0.0f)
         {
             def.sampler.stretchBeats = (float) (c.stretchTime / 192.0 * std::pow (2.0, c.stretchMul / 10000.0));
+            def.sampler.stretchMul = std::clamp (c.stretchMul, -20000, 20000); // (the page's MUL; round 190dh)
             def.sampler.keepPitch = c.stretchMode != 0; // only FL's "Resample" changes the pitch
             def.sampler.stretchMethod = stretchMethodForFlMode (c.stretchMode);
             // Fruity Granulizer: FL hands the plugin TIME as its beat count, without MUL (REA_rodada165g-flgran165 §3)
             if (def.instrument == InstrumentKind::granulizer)
-                def.sampler.stretchBeats = (float) (c.stretchTime / 192.0);
+                def.sampler.stretchBeats = (float) (c.stretchTime / 192.0), def.sampler.stretchMul = 0;
         }
 
         // FL's time-stretching panel on a sample channel or an audio clip [FL: measured, REA_rodada164e-clippitch §2]:
@@ -2340,6 +2369,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         // 0x9A "Audio input source" (REA round 157c): resolved against the open device when the project opens
         // (AudioEngine::setSong). FL plays an insert's input through it whether the insert is armed or not, stopped or
         // playing ([FL] FL Studio 2026, meters of unarmed inserts with an input): monitoring On
+        // (no input and no 0xA6: "Auto", as these files always opened; round 190ev changed only new inserts' default)
+        track.monitor = InputMonitor::automatic;
         if (insert.input >= 0)
         {
             track.flInput = insert.input;
@@ -3575,6 +3606,12 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         }
     }
 
+    // an FL point's curve (the segment that ends at it) onto LYNX's point where that segment starts
+    const auto flCurveOnto = [] (AutomationPoint& previous, const flp::AutomationPoint& p) {
+        previous.mode = p.curve < flcurve::modeCount ? p.curve : (std::uint8_t) flcurve::singleCurve;
+        previous.tension = std::isfinite (p.tension) ? std::clamp (0.0f - p.tension, -1.0f, 1.0f) : 0.0f;
+    };
+
     // Automation clips: one Automation per FL automation channel, with the target from the 0xE3 link.
     std::map<int, int> automationMap; // FL channel -> index into song.automations
 
@@ -3615,16 +3652,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             else if (valueMap)
                 value = std::clamp (valueMap (value), 0.0f, 1.0f);
 
-            // FL's curve belongs to the segment ending at the point; ours sits on the left point
+            // FL's curve mode and tension belong to the segment ending at the point; ours sit on the left point, the
+            // tension with the opposite sign (round 190bw: every mode, played by FL's own law)
             if (i > 0)
-            {
-                auto& previous = a.points.back();
-
-                if (p.curve == 0 || p.curve == 1) // single/double curve: exponential by tension
-                    previous.tension = std::clamp (-p.tension, -1.0f, 1.0f);
-                else if (p.curve == 2 && tick - previous.tick > 1) // hold: step right before the point
-                    a.points.push_back ({ tick - 1, previous.value, 0.0f });
-            }
+                flCurveOnto (a.points.back(), p);
 
             a.points.push_back ({ tick, value, 0.0f });
         }
@@ -3649,13 +3680,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 const auto& p = f.points[i];
                 const auto tick = (std::int64_t) std::llround (p.position * ppq);
                 if (i > 0)
-                {
-                    auto& previous = lfo.amp.back();
-                    if (p.curve == 0 || p.curve == 1)
-                        previous.tension = std::clamp (-p.tension, -1.0f, 1.0f);
-                    else if (p.curve == 2 && tick - previous.tick > 1)
-                        lfo.amp.push_back ({ tick - 1, previous.value, 0.0f });
-                }
+                    flCurveOnto (lfo.amp.back(), p);
                 lfo.amp.push_back ({ tick, (float) std::clamp (p.value, 0.0, 1.0), 0.0f });
             }
             if (lfo.amp.empty())
@@ -3897,7 +3922,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             clips.push_back (clip);
         }
 
-        std::sort (clips.begin(), clips.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
+        // stable: on the same start the file's order stays, and the clip later in it wins a pattern clip takeover (issue #158)
+        std::stable_sort (clips.begin(), clips.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
 
         Arrangement a;
         a.name = arrangement.name.empty() ? "Arrangement " + std::to_string (song.arrangements.size() + 1) : arrangement.name;

@@ -1,4 +1,5 @@
 #include "core/FruityDance.h"
+#include "core/FruitySlicer.h"
 #include "core/Instruments.h"
 #include "core/FpcInstrument.h"
 #include "core/ControlSurface.h"
@@ -13,6 +14,7 @@
 #include "core/DirectWave.h"
 #include "core/FlSynths.h"
 #include "core/FlResampler.h"
+#include "core/FlSettings.h"
 #include "core/TimeStretch.h"
 #include "core/FlVoiceProcessor.h"
 #include "core/DrumSynthLive.h"
@@ -22,12 +24,14 @@
 #include "core/SytrusEngine.h"
 #include "core/Harmor.h"
 #include "core/MiniSynth.h"
+#include "core/PocketSuperSaw.h"
 #include "core/SimSynth.h"
 #include "core/Wasp.h"
 #include "core/Plucked.h"
 #include "core/SoundFont.h"
 #include "core/BeepMap.h"
 #include "core/Sawer.h"
+#include "core/FlmPad.h"
 #include "core/Drumaxx.h"
 #include "core/Granulizer.h"
 #include "core/WaveTraveller.h"
@@ -320,6 +324,7 @@ private:
             case InstrumentKind::fruityslicer:
             case InstrumentKind::slicex:
             case InstrumentKind::fpc:
+            case InstrumentKind::pocketSuperSaw:
             case InstrumentKind::drumaxx:
             case InstrumentKind::slayer:
             case InstrumentKind::fruitydance:
@@ -754,6 +759,7 @@ struct SynthVoice
     float tone[2][2] {};    // states of the two low-passes of the 3-band tone control (per side)
     int controlCountdown = 0;
     int age = 0;
+    std::uint32_t noteId = 0; // the note it plays (round 190ej): only that note's end releases it
 };
 
 // Settings exchange without blocking the audio thread: the UI writes under a short flag and audio
@@ -810,7 +816,15 @@ public:
         bpm.store (std::max (1.0, songBpm)); // first: the synced LFO uses it when reading the settings
         channelPitch.store (channel.sampler.pitch * 100.0f); // the channel's PITCH knob (issue #14)
         updateFrames (channel.synth);
-        mailbox.write (channel.synth);
+        if (const auto& l = channel.misc.levels; l.modX != 0.0f || l.modY != 0.0f) // Levels adjustment Mod X / Y (round 190dz)
+        {
+            auto adjusted = channel.synth;
+            adjusted.cutoff = adjustedCutoff (adjusted.cutoff, l.modX);
+            adjusted.resonance = adjustedResonance (adjusted.resonance, l.modY);
+            mailbox.write (adjusted);
+        }
+        else
+            mailbox.write (channel.synth);
     }
 
     ~SynthInstrument() override
@@ -878,6 +892,7 @@ public:
 
                 auto& v = *sounding;
                 v.key = key;
+                v.noteId = startingNoteId();
                 v.velocity = velocity;
                 v.releasing = false;
                 v.stage = 0;
@@ -915,6 +930,7 @@ public:
         *target = {};
         target->active = true;
         target->key = key;
+        target->noteId = startingNoteId();
         target->velocity = velocity;
         const auto cents = nextCents + channelPitch.load (std::memory_order_relaxed);
         const auto delta = midiToHz (key) / sampleRate * std::pow (2.0, cents / 1200.0);
@@ -978,8 +994,9 @@ public:
 
     void noteOff (int key) noexcept override
     {
+        // (round 190ej: the note's own voice, as FL's generators end it)
         for (auto& v : voices)
-            if (v.active && ! v.releasing && v.key == key)
+            if (v.active && ! v.releasing && endsVoice (v.key, v.noteId, key))
             {
                 v.releasing = true;
                 v.stage = 3;
@@ -1524,8 +1541,14 @@ struct SamplerVoice
     bool clipEndHard = false; // the clip's end is a sharp cut (FL: Disabled, a manual side, a seamless join, a fade out)
     int age = 0;
     int key = 60;
+    std::uint32_t noteId = 0; // the note that started it (round 190ej): only that note's end releases it
     float env = 1.0f;      // envelope
     float envStep = 0.0f;  // attack step (> 0) or release step (< 0)
+    // FL Studio Mobile's pad envelope (core/FlmPad.h, round 190bs): `env` moves towards padTarget by padRate each sample
+    bool padEnv = false;
+    float padTarget = 0.0f, padRate = 1.0f;
+    int padCount = 0, padLength = 0; // samples played, and the count at which the release starts (0 = never)
+    int padDelay = 0;                // samples of silence before the sample starts (a negative Sample Start)
     int stage = 1;         // 0 attack, 1 decay, 2 sustain, 3 release
     double first = 0.0, last = 0.0; // played region: first and last frame (inclusive)
     double regionFirst = 0.0, regionLast = 0.0; // the whole region, before the start offset and slicing (round 190w: the locator)
@@ -1639,13 +1662,34 @@ public:
     void prepare (double sr) noexcept override
     {
         sampleRate = sr;
-        quality = offlineRendering() ? flrs::renderQuality : flrs::liveQuality;
+        preparedOffline = offlineRendering();
+        quality = preparedOffline ? flrs::renderQuality : flsettings::options().interpolation.load (std::memory_order_relaxed);
         fadeStep = (float) (1.0 / (0.003 * sr)); // 3 ms
         updateModulation();
         allNotesOff();
     }
 
+    // Fruity Slicer (round 180c): the sampler's voices on the slices of the sample the rack prepared
+    bool slicer = false;
+
     void configure (const ChannelDef& channel, double songBpm) noexcept override
+    {
+        // a Slicer's slices, key table, PLAY TO END and voice block come from its state, not from the channel (issue
+        // #160): every configure takes them from it again. Before, the rack's next edit (a kept instrument is configured
+        // with the bare channel) emptied the slice table and every key played the sample from its start. A channel
+        // whose state isn't a Slicer's (tests hand a configured one) is taken as it is.
+        if (slicer && sample != nullptr)
+            if (const auto state = fslicer::parse (channel.pluginState))
+            {
+                auto def = channel;
+                fslicer::configureSampler (def, *state, (std::int64_t) sample->frames());
+                configureChannel (def, songBpm);
+                return;
+            }
+        configureChannel (channel, songBpm);
+    }
+
+    void configureChannel (const ChannelDef& channel, double songBpm) noexcept
     {
         const auto& s = channel.sampler;
         pitch.store (std::clamp (s.pitch, -24.0f, 24.0f));
@@ -1664,6 +1708,18 @@ public:
         knob (samplerparam::decay, s.decay);
         knob (samplerparam::sustain, s.sustain);
         knob (samplerparam::release, s.release);
+        {
+            const auto on = s.flmPad.size() == (std::size_t) flmpad::count;
+            const auto pad = [&s, on] (int k, float fallback) { return on ? std::clamp (s.flmPad[(std::size_t) k], 0.0f, 1.0f) : fallback; };
+            padAttack.store (pad (flmpad::attack, 0.0f));
+            padDecay.store (pad (flmpad::decay, 1.0f));
+            padSustain.store (pad (flmpad::sustain, 1.0f));
+            padRelease.store (pad (flmpad::release, 1.0f));
+            padLength.store (pad (flmpad::length, 0.0f));
+            padStart.store (pad (flmpad::start, 0.5f));
+            padHold.store (pad (flmpad::hold, 0.0f) >= 0.5f);
+            padOn.store (on);
+        }
         reverse.store (s.reverse);
         cutSelf.store (s.cut);
         useLoops.store (s.useLoopPoints);
@@ -1682,8 +1738,9 @@ public:
         startOffset.store (std::clamp (s.startOffset, 0.0f, 1.0f));
         porta.store (s.porta);
         portaBeats.store (std::max (0.0f, s.portaBeats));
-        knob (samplerparam::cutoff, s.cutoff);
-        knob (samplerparam::resonance, s.resonance);
+        // (with the Misc tab's Levels adjustment Mod X / Mod Y offsets, round 190dz)
+        knob (samplerparam::cutoff, adjustedCutoff (s.cutoff, channel.misc.levels.modX));
+        knob (samplerparam::resonance, adjustedResonance (s.resonance, channel.misc.levels.modY));
         filterType.store (std::clamp (s.filterType, 0, 3));
         outGain.store (samplerGain (s.gainDb));
         bpm.store (std::max (1.0, songBpm)); // before the mailbox: the synced LFO reads it when updating
@@ -1716,6 +1773,9 @@ public:
         for (int i = 0; i < table.count; ++i)
             table.starts[(std::size_t) i] = std::clamp (s.slices[(std::size_t) i], 0.0f, 1.0f);
         table.firstKey = s.sliceFirstKey;
+        table.keyed = s.sliceKeys.size() == table.keys.size();
+        for (std::size_t k = 0; k < table.keys.size(); ++k)
+            table.keys[k] = (std::int16_t) (table.keyed ? std::clamp (s.sliceKeys[k], -1, 32767) : -1);
         table.toEnd = s.slicesToEnd;
         table.cutAtEnd = s.slicesCutAtEnd;
         sliceMailbox.write (table);
@@ -1779,10 +1839,13 @@ public:
             first += offset * (last - first + 1.0); // FL: a fraction of the region's frames (not floored, FL render §4)
         auto sliced = false;
 
-        // sliced sample: each key from C5 up plays one slice, at the original pitch
+        // sliced sample: each key from C5 up plays one slice, at the original pitch; Fruity Slicer: the slice FL's key
+        // table gives the key (issue #160)
         if (! clipMode && slices.count > 0)
         {
-            const auto index = key - slices.firstKey;
+            const auto index = ! slices.keyed                                 ? key - slices.firstKey
+                               : key >= 0 && key < (int) slices.keys.size() ? (int) slices.keys[(std::size_t) key]
+                                                                              : -1;
 
             if (index < 0 || index >= slices.count)
                 return;
@@ -1847,6 +1910,7 @@ public:
         *target = {};
         target->active = true;
         target->key = key;
+        target->noteId = startingNoteId();
         // FL plays a Playlist audio clip at unity gain at the channel's default volume (78%): the channel volume
         // curve is relative to that point for clips (REA_rodada89 §4.2 [EXEC]: +5.2 dB at every volume and pan)
         target->velocity = clipMode                                         ? velocity * audioClipUnity()
@@ -1890,6 +1954,11 @@ public:
         }
         // the render quality is read at each note (round 160): the export engine prepares its instruments before it
         // switches to offline rendering, so a value taken in prepare() kept the playback quality in most exports
+        // ...and the playback quality too (round 190bx): FL's Settings › Audio › Mixer › "Resampling quality" applies to the
+        // notes played from then on (core/FlSettings.h; 24-point sinc unless changed)
+        // (an instrument prepared for an export keeps the export's quality, as before)
+        if (! preparedOffline)
+            quality = flsettings::options().interpolation.load (std::memory_order_relaxed);
         target->kernel.setQuality (offlineRendering() ? flrs::renderQuality : quality);
 
         // portamento (channel porta, inverted by the note): starts from the previous note's pitch
@@ -1912,6 +1981,29 @@ public:
         target->env = attackSeconds > 0.0f ? 0.0f : 1.0f;
         target->envStep = attackSeconds > 0.0f ? (float) (1.0 / (attackSeconds * sampleRate)) : 0.0f;
         target->stage = attackSeconds > 0.0f ? 0 : 1;
+
+        // FL Studio Mobile's pad (core/FlmPad.h): the level starts at 0 and takes its first step before the first
+        // sample, as FLM's voice does; Sample Start moves the read position (seconds of the file) or delays the voice.
+        // An imported FLM audio clip plays the same slot voice (round 190de): its clip channel may carry the envelope too
+        target->padEnv = padOn.load (std::memory_order_relaxed);
+        target->padDelay = 0;
+        if (target->padEnv)
+        {
+            target->env = 0.0f;
+            target->envStep = 0.0f;
+            target->stage = 1;
+            target->padTarget = 5.0f;
+            target->padRate = flmpad::rateAt (flmpad::attackRate (padAttack.load (std::memory_order_relaxed)), sampleRate);
+            target->padCount = 0;
+            const auto fileRate = base * sampleRate; // the file's frames per second
+            target->padLength = (int) ((double) data->frames() * (double) padLength.load (std::memory_order_relaxed) * sampleRate / std::max (1.0, fileRate));
+            if (const auto seconds = flmpad::startSeconds (padStart.load (std::memory_order_relaxed)); seconds > 0.0)
+                target->position = backwards ? std::max (target->first, target->position - seconds * fileRate)
+                                             : std::min (target->last, target->position + seconds * fileRate);
+            else if (seconds < 0.0)
+                target->padDelay = (int) (-seconds * fileRate / std::max (1.0e-6, target->rate));
+            padStep (*target);
+        }
 
         // FL's volume articulator: starts at its initial level and is stepped on the voice's first block (FLEngine
         // FUN_00d24ae0 steps a new voice at once, then once per sequencer tick)
@@ -2282,14 +2374,16 @@ public:
             return;
         }
 
+        // (round 190ej: of two overlapping notes of one key, FL's sampler ends only the note's own voice [EXEC: issue #158's
+        // 25 renders and round 190ej's]; endsVoice() takes every voice of the key for an off without a note id)
         if (shaper != nullptr)
             for (auto& v : voices)
-                if (v.active && v.key == key)
+                if (v.active && endsVoice (v.key, v.noteId, key))
                     shaper->voiceReleased ((int) (&v - voices.data()));
 
         // the cutoff/pitch envelopes always release
         for (auto& v : voices)
-            if (v.active && v.key == key && v.stage < 3)
+            if (v.active && endsVoice (v.key, v.noteId, key) && v.stage < 3)
                 for (std::size_t e = 0; e < 2; ++e)
                     modEnv[e].release (v.mod[e]);
 
@@ -2297,7 +2391,7 @@ public:
         // volume envelope the note-off changes nothing — the sample plays on and the other envelopes hold (EXEC: FL's
         // renders, REA_rodada76 §6)
         for (auto& v : voices)
-            if (v.active && v.key == key && v.flVoice && v.stage < 3)
+            if (v.active && endsVoice (v.key, v.noteId, key) && v.flVoice && v.stage < 3)
             {
                 if (modulation.fl.recs[1].enabled != 0)
                     for (int k = 1; k < 5; ++k)
@@ -2313,11 +2407,21 @@ public:
 
         // FL's volume articulator enters its release stage from the current level
         for (auto& v : voices)
-            if (v.active && v.key == key && v.flEnvelope && v.stage < 3)
+            if (v.active && endsVoice (v.key, v.noteId, key) && v.flEnvelope && v.stage < 3)
             {
                 v.volumeArt.release (modulation.volume);
                 v.stage = 3; // released (stops "while held" loops); the ADSR level stays at 1
             }
+
+        // FL Studio Mobile's pad: the note's end starts the release only on a lane that holds its notes (core/FlmPad.h)
+        if (padHold.load (std::memory_order_relaxed))
+            for (auto& v : voices)
+                if (v.active && endsVoice (v.key, v.noteId, key) && v.padEnv && v.stage < 3)
+                {
+                    v.stage = 3;
+                    v.padTarget = 0.0f;
+                    v.padRate = flmpad::rateAt (flmpad::decayRate (padRelease.load (std::memory_order_relaxed)), sampleRate);
+                }
 
         // with release, the released note decays; without release the sample plays in full (one-shot)
         const auto seconds = release.load();
@@ -2327,7 +2431,7 @@ public:
 
         // linear release from the current level (like FL)
         for (auto& v : voices)
-            if (v.active && v.key == key && v.stage < 3 && ! v.flEnvelope && ! v.flVoice)
+            if (v.active && endsVoice (v.key, v.noteId, key) && v.stage < 3 && ! v.flEnvelope && ! v.flVoice && ! v.padEnv)
             {
                 v.stage = 3;
                 v.envStep = -(float) (std::max (v.env, 0.001f) / (seconds * sampleRate));
@@ -2582,6 +2686,13 @@ public:
                     break;
                 }
 
+                if (v.padDelay > 0) // FLM's pad before its sample starts: silence, the envelope already running
+                {
+                    --v.padDelay;
+                    padAdvance (v);
+                    continue;
+                }
+
                 float shapeL = 1.0f, shapeR = 1.0f;
                 if (shaper != nullptr && ! shaper->voiceGains ((int) (&v - voices.data()), shapeL, shapeR))
                 {
@@ -2701,7 +2812,9 @@ public:
                 }
 
                 // envelope: 0 attack, 1 decay, 2 sustain, 3 release
-                if (v.stage == 0)
+                if (v.padEnv)
+                    padAdvance (v);
+                else if (v.stage == 0)
                 {
                     v.env += v.envStep;
 
@@ -2742,6 +2855,33 @@ public:
                     stepFade (v);
             }
         }
+    }
+
+    // FL Studio Mobile's pad envelope (core/FlmPad.h): one step of the level; reaching the top starts the decay
+    void padStep (SamplerVoice& v) const noexcept
+    {
+        v.env += (v.padTarget - v.env) * v.padRate;
+        if (v.env > 1.0f)
+        {
+            v.env = 1.0f;
+            v.padTarget = padSustain.load (std::memory_order_relaxed);
+            v.padRate = flmpad::rateAt (flmpad::decayRate (padDecay.load (std::memory_order_relaxed)), sampleRate);
+        }
+    }
+    // after a sample: Length's release point, the voice's end (below −80 dB on its way to 0), the next step
+    void padAdvance (SamplerVoice& v) const noexcept
+    {
+        if (++v.padCount == v.padLength)
+        {
+            v.padTarget = 0.0f;
+            v.padRate = flmpad::rateAt (flmpad::decayRate (padRelease.load (std::memory_order_relaxed)), sampleRate);
+        }
+        if (v.env < 0.0001f && v.padTarget == 0.0f)
+        {
+            v.env = 0.0f; // (ends the voice at the next sample)
+            return;
+        }
+        padStep (v);
     }
 
     // One sequencer tick of FL's sampler voice (FLEngine FUN_00d24ae0 / FUN_00d24500 / FUN_00d24650, REA_rodada76
@@ -3058,6 +3198,7 @@ private:
     double lastFactor = 1.0; // the last shifted note's transposition (where its portamento starts)
     double bendMul = 1.0;    // the pitch wheel (pitchBend), audio thread
     int quality = flrs::liveQuality;        // FL's interpolation index (prepare)
+    bool preparedOffline = false;           // prepare() ran for an export: `quality` stays the export's
     std::array<float, 1024> tapL {}, tapR {}; // kernel taps gathered near the region edges and loops
     static constexpr int flBlock = 512;       // FL voices: longest segment rendered at once
     std::array<float, 2 * flBlock> flX {}, flY {};
@@ -3167,6 +3308,8 @@ private:
         std::array<float, 128> starts {};
         int count = 0;
         int firstKey = 60;   // Fruity Slicer: the key of slice 1
+        std::array<std::int16_t, 125> keys {}; // Fruity Slicer: FL's key table, key → slice (−1 none), when `keyed`
+        bool keyed = false;
         bool toEnd = false;  // Fruity Slicer's "play to end"
         bool cutAtEnd = false; // Fruity Slicer: the voice stops dead at the slice's end
     };
@@ -3178,6 +3321,9 @@ private:
     bool nextPorta = false;
     std::atomic<bool> reverse { false }, cutSelf { false };
     std::atomic<bool> useLoops { true }, fastDeclick { false }, panTriangular { false };
+    // FL Studio Mobile's pad (SamplerSettings::flmPad, core/FlmPad.h)
+    std::atomic<bool> padOn { false }, padHold { false };
+    std::atomic<float> padAttack { 0.0f }, padDecay { 1.0f }, padSustain { 1.0f }, padRelease { 1.0f }, padLength { 0.0f }, padStart { 0.5f };
     std::atomic<bool> flVelocityLaw { false }; // SamplerSettings::flVelocityLaw
     std::atomic<int> declickMode { 0 };
 };
@@ -3596,11 +3742,17 @@ std::unique_ptr<Instrument> makeInstrument (InstrumentKind kind, std::shared_ptr
     if (kind == InstrumentKind::wavetraveller)
         return makeWaveTravellerInstrument (std::move (sample));
     if (kind == InstrumentKind::fruityslicer) // the sampler's voices on the slices (the rack prepares the sample)
-        return makeInstrument (InstrumentKind::sampler, std::move (sample));
+    {
+        auto slicer = std::make_unique<SamplerInstrument> (std::move (sample), false);
+        slicer->slicer = true;
+        return slicer;
+    }
     if (kind == InstrumentKind::slicex)
         return makeSlicexInstrument (std::move (sample), nullptr); // (deck B's sample comes from RackRenderer)
     if (kind == InstrumentKind::fpc) // (without its channel: no pads; the rack builds it from the channel's kit)
         return makeFpcInstrument ({}, {});
+    if (kind == InstrumentKind::pocketSuperSaw)
+        return makePocketSuperSawInstrument();
     if (kind == InstrumentKind::drumaxx)
         return makeDrumaxxInstrument();
     if (kind == InstrumentKind::slayer)

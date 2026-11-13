@@ -1,5 +1,5 @@
 ---
-source: 1e4bc038df
+source: b6e9ef0dd0
 ---
 ![Mixer](/assets/img/mixer.webp)
 
@@ -51,6 +51,18 @@ Panel efektów pokazuje dziesięć slotów zaznaczonego insertu.
 - `Grupuj w rack efektów audio` w menu slotu wkłada efekt do nowego racka, a `Grupuj wszystko w rack efektów audio` robi to dla całego łańcucha. `Rozgrupuj` wkłada efekty racka z jednym łańcuchem z powrotem do slotów.
 - Przełącznik w nagłówku panelu włącza lub wyłącza wszystkie efekty insertu.
 - Efekt z bazy pluginów w [Browserze](/wiki/browser/) możesz przeciągnąć na insert albo slot efektu.
+- `Czysty wokal` w menu insertu umieszcza na insercie gotowy łańcuch oczyszczania wokalu.
+
+## Edison w slocie
+
+Edison, edytor audio i rejestrator, może siedzieć w dowolnym slocie efektu, po kilka na insert. Jego okno to edytor audio z rzędem elementów sterowania nagrywaniem.
+
+- `Otwórz edytor audio` (`Ctrl+E`) w menu insertu wczytuje Edisona do pierwszego wolnego slotu insertu i otwiera go. `Otwórz edytor audio i nagrywaj` (`Shift+E`) wczytuje go gotowego do nagrywania, gdy utwór gra.
+- Tryby nagrywania to `Teraz`, `Na wejściu` (domyślny: czeka, aż wejście przekroczy próg), `Wejście` i `Przy odtwarzaniu`. `Dołącz` umieszcza nowe nagranie za audio, które już tam jest. Maksymalny czas nagrywania to `Bez limitu` lub 1, 3, 5, 10, 30 albo 60 minut: nowy slot startuje na 30, `Otwórz edytor audio i nagrywaj` ustawia 5.
+- `Sync` odtwarza audio Edisona w czasie utworu, gdy utwór gra.
+- Edison nagrywa dalej po zamknięciu jego okna.
+- `Narzędzia › Makra › Usuń wszystkie instancje Edison` opróżnia każdy slot Edison w projekcie, po pytaniu.
+- Sloty Edison w projektach FL Studio (.flp) otwierają się z ich audio.
 
 ## Korektor insertu
 
@@ -78,6 +90,8 @@ Grupy Mixera zwija się strzałką (albo `Alt`+klik dla wszystkich grup). Suwak 
 
 Każdy insert ma przycisk uzbrojenia nagrywania. Gdy insert jest uzbrojony, Nagrywaj i Odtwórz nagrywają jego wejście audio do klipu Playlisty. `Shift+R` uzbraja zaznaczony insert i od razu zaczyna nagrywanie. Zobacz [Nagrywanie](/wiki/recording/).
 
+Gdy wybierzesz wejście zewnętrzne dla insertu, który nagrywa też inne audio, LYNX SHARE pyta, czy przełączyć go na `Tylko wejście zewnętrzne`, aby nagranie zawierało samo wejście. `Mixer › Nagrywanie na dysk › Kompensacja opóźnienia` w menu insertu jest domyślnie włączone. Po wyłączeniu nagrane ujęcia są umieszczane bez żadnej kompensacji opóźnienia.
+
 ## Klawisze
 
 `Ctrl+L` i `Ctrl+Shift+L` mają to znaczenie tylko wtedy, gdy aktywny jest Mixer.
@@ -92,6 +106,8 @@ Każdy insert ma przycisk uzbrojenia nagrywania. Gdy insert jest uzbrojony, Nagr
 | Solo ze źródłami | `Alt+S` | Włącza solo na zaznaczonych insertach i insertach, które je zasilają |
 | Usuń inserty | `Del` | Usuwa zaznaczone inserty, po pytaniu |
 | Uzbrój i nagrywaj | `Shift+R` | Uzbraja zaznaczony insert i zaczyna nagrywanie |
+| Open audio editor | `Ctrl+E` | Wczytuje Edisona do pierwszego wolnego slotu insertu i otwiera go |
+| Open audio editor and record | `Shift+E` | To samo, gotowy do nagrywania, gdy utwór gra |
 
 ## Warto wiedzieć
 
@@ -100,6 +116,8 @@ Każdy insert ma przycisk uzbrojenia nagrywania. Gdy insert jest uzbrojony, Nagr
 - `Ctrl+L` robi co innego w Channel Racku i w Mixerze. W racku wybiera wolne inserty. W Mixerze używa zaznaczonego insertu.
 - Przełączniki tras pojawiają się na innych paskach, nie na zaznaczonym.
 - Limit to 127 insertów na projekt i dziesięć slotów efektów na insert.
+- Nagranie Edisona jest przechowywane jako plik WAV w folderze projektu, a nie w pliku projektu.
+- Mikser sesji pod siatką klipów należy tylko do sposobu pracy Clip-launch. Pokazuje te same inserty co ten Mixer. Zobacz [Układy](/wiki/layouts/).
 
 ## Powiązane
 

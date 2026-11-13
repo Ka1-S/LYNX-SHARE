@@ -207,7 +207,7 @@ Layout pitcherLayout()
     Layout l;
     l.fl = "Pitcher";
     l.width = 523;
-    l.height = 330;
+    l.height = 352;
     auto& v = l.items;
     static const char* const notes[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     static const char* const offs[12] = { "C off", "C# off", "D off", "D# off", "E off", "F off", "F# off", "G off", "G# off", "A off", "A# off", "B off" };
@@ -253,6 +253,10 @@ Layout pitcherLayout()
     v.push_back (toggle (196, 298, 50, 22, "MIDI", TR_NOOP ("MIDI"), boxed));
     v.push_back (toggle (250, 298, 70, 22, "Octaves", TR_NOOP ("Octaves"), boxed));
     v.push_back (toggle (324, 298, 96, 22, "Harmonize", TR_NOOP ("Harmonize"), boxed));
+    // round 190ez: FL's bottom line "MIDI Input Port Number: ..." (live FL check 190ew PIT-1: "..." = none, a vertical
+    // drag on it sets the number); Port routing is saved state
+    v.push_back (display (8, 332, 300, 18, "pitchport"));
+    l.editedElsewhere = { "MIDI port", "Port routing" };
     return l;
 }
 
@@ -341,7 +345,8 @@ Layout lynxFilter()
     v.push_back (display (8, 8, 384, 110, "fxresponse"));
     v.push_back (section (8, 126, 384, 90, TR_NOOP ("FILTER")));
     v.push_back (tabs (18, 150, 140, 22, "Type", TR_NOOP ("Low-pass|High-pass|Band-pass"), { 0.0f, 0.5f, 1.0f }));
-    v.push_back (label (18, 178, 140, 30, TR_NOOP ("12 dB/oct state-variable filter"), dim));
+    // round 190da: the appended Slope (12 dB/oct = the filter every older project has; 24 dB/oct adds a second stage)
+    v.push_back (tabs (18, 182, 140, 22, "Slope", TR_NOOP ("12 dB/oct|24 dB/oct"), { 0.0f, 1.0f }));
     v.push_back (knob (210, 166, 40, "Cutoff", TR_NOOP ("Cutoff"), 202, showValue | big));
     v.push_back (knob (284, 166, 34, "Reso.", TR_NOOP ("Resonance"), 202, showValue));
     v.push_back (knob (352, 166, 34, "Mix", TR_NOOP ("Mix"), 202, showValue));

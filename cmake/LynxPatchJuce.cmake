@@ -123,6 +123,24 @@
 #    now gets no position there (it stays where it is). (b) setBounds added the parent's screen position to such a
 #    child's place and then read the result back as the component's bounds; a child window is now placed like any
 #    other child, in its parent's client area. Top-level windows are untouched.
+# 24. Every platform, juce_audio_processors/format_types/juce_VST3Common.h + juce_VST3PluginFormat.cpp (issue #155,
+#    0.1.25/0.1.26: Spectral Compressor crashed LYNX on an insert, Linux): JUCE's VST3 host passes an INACTIVE bus with
+#    its channel count and null sample pointers (HostBufferMapper::associateBufferTo). The SDK allows that ("if an audio
+#    bus is currently inactive, the actual sample buffer addresses are safe to be null", ivstaudioprocessor.h), but
+#    plugins that ignore activateBus read them anyway: every nih-plug VST3 copies each aux input into its own buffers
+#    (wrapper/util/buffer_management.rs create_buffers: memcpy from null, SIGSEGV on the audio thread). Since issue #109
+#    (142979eb7) LYNX keeps a plugin's sidechain bus off until something feeds it, so every nih-plug plugin with a
+#    sidechain input crashed as soon as it processed. An inactive bus's channels now point at silence: one zeroed
+#    stretch of the block's length per channel (outputs too: a plugin may write there), cleared for every block,
+#    sized by prepareToPlay's block size (a longer block grows it). The bus stays inactive for the plugin
+#    (activateBus 0, silence flags set), so plugins that follow activation (Waves, issue #109) are unchanged.
+# 25. Every platform, juce_audio_processors/format_types/juce_VST3PluginFormat.cpp (issue #152, "Arturia: the sound
+#    follows my controller, the plugin's knobs don't"): a VST3 plugin takes MIDI CCs through IMidiMapping, which JUCE's
+#    host turns into parameter changes for the PROCESSOR only. The VST3 SDK leaves the rest to the host: the edit
+#    controller (the plugin's own window) never heard of the change and the host's parameter value (LYNX's knobs,
+#    links, automation recording) stayed stale. The mapped change now also goes to the edit controller (JUCE's
+#    parameter dispatcher, on the message thread) and to the host's value and listeners, as JUCE already does for a
+#    plugin's own output parameter changes.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -270,6 +288,9 @@ function(lynx_patch_juce_file file)
             "        if (fallbackNumChannels >= maxNumChannelsToQuery)|NL|            return fallbackNumChannels;|NL|"
             "        if (fallbackNumChannels >= maxNumChannelsToQuery)|NL|            return fallbackNumChannels;|NL||NL|        // LYNX patch (issue #134): shared mode never answers with more channels than its mix format, so the|NL|        // 434+ IsFormatSupported round trips below only cost time (85 s on a Realtek), on the message thread|NL|        if (! isExclusiveMode (deviceMode))|NL|            return fallbackNumChannels;|NL|")
     elseif(file MATCHES "juce_VST3PluginFormat.cpp$")
+        lynx_juce_fix("VST3 inactive bus silence: block size" "LYNX patch (issue #155): the block size"
+            "        inputBusMap .prepare (createChannelMappings (true));|NL|        outputBusMap.prepare (createChannelMappings (false));|NL||NL|        setStateForAllMidiBuses (true);|NL|"
+            "        // LYNX patch (issue #155): the block size, for the silence behind inactive buses|NL|        inputBusMap .prepare (createChannelMappings (true), estimatedSamplesPerBlock);|NL|        outputBusMap.prepare (createChannelMappings (false), estimatedSamplesPerBlock);|NL||NL|        setStateForAllMidiBuses (true);|NL|")
         lynx_juce_fix("VST3 host menu hook" "LYNX patch (round 177b): the host's items in a parameter's menu"
             "class VST3PluginInstance;|NL||NL|struct VST3HostContext final : public Vst::IComponentHandler,"
             "class VST3PluginInstance;|NL||NL|// LYNX patch (round 177b): the host's items in a parameter's menu (set by LYNX; null = none)|NL|void (*lynxVst3ParamMenuHook) (AudioPluginInstance&, int, PopupMenu&) = nullptr;|NL||NL|struct VST3HostContext final : public Vst::IComponentHandler,")
@@ -285,6 +306,12 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("VST3 menu item by index" "LYNX patch (round 190an): getItem takes an index"
             "        tresult PLUGIN_API getItem (Steinberg::int32 tag, Item& result, IContextMenuTarget** target) override|NL|        {|NL|"
             "        tresult PLUGIN_API getItem (Steinberg::int32 tag, Item& result, IContextMenuTarget** target) override|NL|        {|NL|            // LYNX patch (round 190an): getItem takes an index (the SDK's IContextMenu::getItem (index, item, target)):|NL|            // a plugin that copies the host's items into its own menu walks 0 .. getItemCount() - 1. JUCE only|NL|            // compared tags, so such a plugin found nothing (or the wrong item).|NL|            if (isPositiveAndBelow ((int) tag, items.size()))|NL|            {|NL|                auto& indexed = items.getReference ((int) tag);|NL|                result = indexed.item;|NL||NL|                if (target != nullptr)|NL|                    *target = indexed.target.get();|NL||NL|                return kResultTrue;|NL|            }|NL||NL|")
+        lynx_juce_fix("VST3 MIDI-mapped parameter follows in the editor" "LYNX patch (issue #152): a MIDI CC the plugin maps"
+            "        void setValueWithoutUpdatingProcessor (float newValue)|NL|        {"
+            "        // LYNX patch (issue #152): a MIDI CC the plugin maps to this parameter (IMidiMapping) already reached the|NL|        // processor as a parameter change; the edit controller (the plugin's own window) and the host's value follow it|NL|        void lynxFollowMidiMapping (float newValue)|NL|        {|NL|            pluginInstance.parameterDispatcher.push (vstParamIndex, newValue);|NL|            setValueWithoutUpdatingProcessor (newValue);|NL|        }|NL||NL|        void setValueWithoutUpdatingProcessor (float newValue)|NL|        {")
+        lynx_juce_fix("VST3 MIDI-mapped parameter reaches the editor" "LYNX patch (issue #152): the editor and the host follow"
+            "                    queue->append ({ (Steinberg::int32) time, (float) paramValue });|NL|"
+            "                    queue->append ({ (Steinberg::int32) time, (float) paramValue });|NL||NL|                // LYNX patch (issue #152): the editor and the host follow the mapped change (the SDK leaves it to the|NL|                // host: the plugin's knob stayed still while its sound changed, e.g. Arturia's MIDI-learned controls)|NL|                if (auto* lynxParam = getParameterForID ((Vst::ParamID) controlID))|NL|                    lynxParam->lynxFollowMidiMapping ((float) paramValue);|NL|")
     elseif(file MATCHES "juce_Windowing_windows.cpp$")
         lynx_juce_fix("layered child window keeps its place when repainted" "LYNX patch (round 190cj): a child window's position"
             "        UpdateLayeredWindow (hwnd, nullptr, &pos, &size, sourceHdc, &p, 0, &bf, ULW_ALPHA);"
@@ -303,6 +330,15 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("VST3 note tuning hook" "LYNX patch (issue #63): the note tuning hook"
             "//==============================================================================|NL|class MidiEventList  : public Steinberg::Vst::IEventList"
             "// LYNX patch (issue #63): the note tuning hook. LYNX (engine/Vst3NoteTuning.h, the same two declarations) sets|NL|// the hook and, while a plugin's block runs on this thread, the context: each note on then gets its tuning from it.|NL|inline float (*lynxNoteTuningHook) (void* context, int channel, int key) = nullptr;|NL|inline thread_local void* lynxNoteTuningContext = nullptr;|NL||NL|//==============================================================================|NL|class MidiEventList  : public Steinberg::Vst::IEventList")
+        lynx_juce_fix("VST3 inactive bus silence: room" "LYNX patch (issue #155): room for the silence"
+            "    void prepare (std::vector<ChannelMapping> arrangements)|NL|    {|NL|        mappings = std::move (arrangements);|NL|"
+            "    void prepare (std::vector<ChannelMapping> arrangements, int lynxMaxSamples = 0)|NL|    {|NL|        mappings = std::move (arrangements);|NL|        // LYNX patch (issue #155): room for the silence behind inactive buses (lynxSilence), for blocks up to lynxMaxSamples|NL|        lynxSilentFloat.assign (lynxInactiveChannels() * (size_t) jmax (1, lynxMaxSamples), 0.0f);|NL|")
+        lynx_juce_fix("VST3 inactive bus silence: pointers" "LYNX patch (issue #155): an inactive bus's channels"
+            "        int channelIndexOffset = 0;|NL||NL|        for (size_t i = 0; i < mappings.size(); ++i)|NL|        {|NL|            const auto& mapping = mappings[i];|NL|            associateBufferTo (busBuffers[i], get (detail::Tag<FloatType>{})[i], source, mapping, channelIndexOffset);|NL|"
+            "        int channelIndexOffset = 0;|NL|        const auto lynxStride = (size_t) jmax (1, source.getNumSamples());|NL|        auto* lynxNextSilent = lynxSilence (detail::Tag<FloatType>{}, lynxStride);|NL||NL|        for (size_t i = 0; i < mappings.size(); ++i)|NL|        {|NL|            const auto& mapping = mappings[i];|NL|            associateBufferTo (busBuffers[i], get (detail::Tag<FloatType>{})[i], source, mapping, channelIndexOffset);|NL||NL|            // LYNX patch (issue #155): an inactive bus's channels point at silence, not at null. The SDK allows null|NL|            // there, but plugins that ignore activateBus (every nih-plug VST3: Spectral Compressor's sidechain) copy|NL|            // from those pointers: SIGSEGV in memcpy on the audio thread.|NL|            if (! mapping.isActive())|NL|            {|NL|                for (auto& channel : get (detail::Tag<FloatType>{})[i])|NL|                {|NL|                    channel = lynxNextSilent;|NL|                    lynxNextSilent += lynxStride;|NL|                }|NL|            }|NL|")
+        lynx_juce_fix("VST3 inactive bus silence: storage" "LYNX patch (issue #155): the silence behind inactive buses"
+            "    auto& get (detail::Tag<float>)    { return floatBusMap; }|NL|"
+            "    auto& get (detail::Tag<float>)    { return floatBusMap; }|NL||NL|    // LYNX patch (issue #155): the silence behind inactive buses: `stride` zeroed samples per inactive channel,|NL|    // cleared again for every block (a plugin may write into it). prepare() sizes it; a longer block grows it here.|NL|    size_t lynxInactiveChannels() const|NL|    {|NL|        size_t n = 0;|NL|        for (const auto& m : mappings)|NL|            n += m.isActive() ? 0 : m.size();|NL|        return n;|NL|    }|NL||NL|    template <typename FloatType>|NL|    FloatType* lynxSilence (detail::Tag<FloatType> tag, size_t stride)|NL|    {|NL|        auto& silence = lynxSilenceStore (tag);|NL|        const auto needed = lynxInactiveChannels() * stride;|NL|        if (silence.size() < needed)|NL|            silence.resize (needed);|NL|        std::fill (silence.begin(), silence.begin() + (std::ptrdiff_t) needed, FloatType {});|NL|        return silence.data();|NL|    }|NL||NL|    auto& lynxSilenceStore (detail::Tag<float>)  { return lynxSilentFloat; }|NL|    auto& lynxSilenceStore (detail::Tag<double>) { return lynxSilentDouble; }|NL||NL|    std::vector<float>  lynxSilentFloat;|NL|    std::vector<double> lynxSilentDouble;|NL||NL|")
         lynx_juce_fix("VST3 note tuning" "LYNX patch (issue #63): the note's tuning"
             "                e.noteOn.noteId = id;|NL|"
             "                e.noteOn.noteId = id;|NL|                // LYNX patch (issue #63): the note's tuning (FL's wrapper sends a note's fine pitch there)|NL|                if (lynxNoteTuningHook != nullptr && lynxNoteTuningContext != nullptr)|NL|                    e.noteOn.tuning = lynxNoteTuningHook (lynxNoteTuningContext, (int) e.noteOn.channel, (int) e.noteOn.pitch);|NL|")

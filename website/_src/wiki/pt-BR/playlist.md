@@ -1,5 +1,5 @@
 ---
-source: f245a8e1b7
+source: 1b54c6493f
 ---
 ![A Playlist com clipes nas faixas](/assets/img/playlist.webp)
 
@@ -43,6 +43,8 @@ As letras funcionam enquanto o piano do teclado de digitação (`Ctrl+T`) está 
 - O clique com o botão direito exclui um clipe. `Ctrl`+arrastar seleciona.
 - Dê um clique duplo em um clipe para abri-lo.
 - O botão no canto superior esquerdo de um clipe abre o menu do clipe (tornar único, renomear e colorir, picotar e, para áudio: pitch, ajustar ao tempo, inverter).
+- O menu de um clipe de áudio segue o layout do FL Studio em duas colunas. A coluna da esquerda tem a seção `Clipe de áudio` (`Pré-ouvir`, `Mudo`, `Renomear e colorir...`, `Mudar cor...`, `Cor aleatória`, `Mudar ícone...`, `Selecionar canal de origem`, `Configurações do canal`, `Tornar único`, `Selecionar todos os clipes semelhantes`, `Delete`, `Propriedades...`) e a seção `Região` (`Selecionar região`, `Picotar`). A coluna da direita tem `Sample` (`Tornar único como amostra`, `Editar sample`, `Extrair stems do sample`, `Detectar andamento`, `Ajustar ao andamento`), `Automação` (`Automatizar › Pan` ou `Volume`, `Crossfade com`) e `Fades` (`Redefinir fades`). Os itens próprios do LYNX SHARE, como `Dividir aqui`, `Reverso`, `Normalizar` e `Converter para MIDI`, vêm por último, abaixo de uma linha.
+- `Automatizar › Pan` ou `Volume` cria um clipe de automação do mesmo comprimento do clipe de áudio, na faixa dele, para o pan ou o volume do ajuste Levels do canal.
 - Mantenha `Alt` pressionado ao arrastar para ignorar a grade.
 - Clipes de áudio têm alças de fade e um ganho de clipe que você arrasta para cima ou para baixo. Clique com o botão direito em uma alça de fade para abrir o menu dela, com `Criar crossfade`. Clique com o botão direito na alça de ganho para `Zerar ganho` e `Normalizar`.
 - `Shift+M` liga o Stretch: redimensionar um clipe de áudio passa a esticar o áudio em vez de cortá-lo.
@@ -60,6 +62,10 @@ No cabeçalho de uma faixa, o clique seleciona, `Ctrl`+clique adiciona ou remove
 
 `Exibir` no menu da Playlist escolhe o que os cabeçalhos das faixas mostram: `Mostrar controles nas trilhas de áudio`, `Mostrar níveis nas trilhas de áudio` e `Mostrar níveis nas trilhas de instrumento`.
 
+`Modo da trilha` no menu da faixa faz de uma faixa `Não atribuída`, uma `Trilha de áudio` ou uma `Trilha de instrumento`, como no FL Studio. `Trilha de áudio` lista `Nova(s) trilha(s) do mixer` primeiro e depois cada insert do mixer por número e nome. A escolha vale para todas as faixas selecionadas. `Trilha de instrumento` tem `Usar canal existente`, `Mais plugins...` e a lista de instrumentos do Channel rack.
+
+O `+` no canto superior esquerdo dos cabeçalhos de faixa abre as mesmas opções para uma faixa nova: `Adicionar faixa de áudio`, `Mais plugins...` e os instrumentos. Um clique com o botão direito em `+` adiciona uma faixa de áudio na hora.
+
 ## Pattern Blocks
 
 Com `Blocos de pattern (projeto atual)` ligado no menu da Playlist, uma seção embaixo das faixas tem uma linha por pattern. Ali, o Lápis coloca um bloco e o arrasta ao longo da linha, o Pincel pinta blocos e a Borracha os exclui. O botão direito apaga com qualquer ferramenta.
@@ -75,6 +81,8 @@ Com `Blocos de pattern (projeto atual)` ligado no menu da Playlist, uma seção 
 ## Automação
 
 Clique com o botão direito em um knob ou fader e escolha `Criar clipe de automação`. O clipe aparece na Playlist. Com o Lápis, arraste os pontos dele e clique na curva para adicionar um. As lanes de automação sob as faixas são opcionais e vêm desligadas por padrão. Veja [Automação](/wiki/automation/).
+
+Clique com o botão direito em um ponto para ver o menu dele. A lista `Modo` tem os 13 modos de curva do FL Studio para o segmento que termina nesse ponto: `Suavizar`, `Hold`, três curvas simples, três curvas duplas, `Meio seno`, `Escada`, `Escada suave`, `Pulso` e `Onda`. Um ponto novo usa o último modo usado. Os modos são lidos de arquivos .flp e gravados neles.
 
 ## Arranjos
 
@@ -109,6 +117,7 @@ A caixa de arranjo na barra de ferramentas alterna entre arranjos. Um projeto po
 - A Playlist só é ouvida no modo Song. No modo Pattern, `Space` toca o pattern atual, seja o que for que estiver nas faixas.
 - `Exibir › Estilo de layout › Fluxo por disparo de clipes` acrescenta uma grade de clipes e cenas ao lado da Playlist. É opcional. Veja [Layouts](/wiki/layouts/).
 - Com vários clipes de automação sobrepostos em um mesmo controle, a escolha de qual deles toca pode diferir da do FL Studio (notas da versão 0.1.25).
+- Como no FL Studio, um pattern toca a partir de um clipe de cada vez. Quando um clipe posterior do mesmo pattern começa, em qualquer faixa, o clipe anterior não inicia mais notas a partir dali. Clipes de patterns diferentes tocam juntos. Isso vale em projetos novos e em projetos do FL Studio. Um projeto .lynx salvo antes da 0.1.27 continua tocando todos os clipes por inteiro.
 - Um tempo alterado por um controlador MIDI vinculado não redimensiona os clipes de áudio.
 - No Linux, vídeo precisa do FFmpeg.
 

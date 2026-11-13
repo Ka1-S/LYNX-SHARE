@@ -341,6 +341,27 @@ inline std::vector<Hint> hintsFor (InstrumentKind kind, const std::vector<Contro
             out.push_back (std::move (h));
             break;
         }
+        case InstrumentKind::pocketSuperSaw:
+            // (round 190cm) FLM's defaults leave most sections off: one oscillator (no stack to detune or spread), no
+            // pulse, no SuperSync, the filter wide open with its envelope at 0, sustains at full, no slide time, the
+            // LFO, arpeggiator, delay and mod wheel at 0 (PocketSuperSaw.cpp, docs/analise/REA_rodada190by.md §2…3)
+            named ("pulse mode on", { { "Osc pulse mode", 1.0f } });
+            named ("a stack of 12 oscillators", { { "Osc unison", 1.0f } });
+            named ("a stack of 12 oscillators restarting their phases", { { "Osc unison", 1.0f }, { "Osc re-trig phases", 1.0f } });
+            named ("SuperSync on, its envelope at full amount decaying into a release",
+                   { { "SuperSync mode", 1.0f }, { "Osc sync", 0.2f }, { "Osc sync EG amount", 1.0f }, { "Osc sync decay", 0.4f }, { "Osc sync sustain", 0.3f }, { "Level EG release", 0.6f } });
+            named ("the filter closed to 30 %, its envelope at full amount decaying into a release",
+                   { { "Filter cutoff", 0.3f }, { "Filter EG amount", 1.0f }, { "Filter EG decay", 0.4f }, { "Filter EG sustain", 0.2f }, { "Level EG release", 0.6f } });
+            named ("the level envelope's sustain at 30 %", { { "Level EG sustain", 0.3f } });
+            // (Slide held mode: heard on a note played after the last one was let go, pat:gap; Static: on any glide)
+            named ("a slide time of 160 ms", { { "Slide time", 0.8f } });
+            named ("the LFO at full amount and 4 Hz, the filter half closed", { { "LFO amount", 1.0f }, { "LFO rate", 0.8f }, { "Filter cutoff", 0.5f } });
+            named ("the LFO at full amount and tempo-synced, the filter half closed", { { "LFO amount", 1.0f }, { "LFO mode", 1.0f }, { "Filter cutoff", 0.5f } });
+            // (Arp range: heard on one key alone, pat:one, whose second step is the octave above)
+            named ("the arpeggiator going up", { { "Arp mode", 0.3f } });
+            named ("the delay mixed in", { { "Delay mix", 0.7f } });
+            named ("the mod wheel at full on a negative amount", { { "Mod wheel amount", 0.25f } }, "pat:mod");
+            break;
         default:
             break;
     }

@@ -298,6 +298,7 @@ void applyNewProjectDefaults (Song& song, const NewProjectDefaults& defaults)
     song.autoCrossfades = defaults.autoCrossfades;
     song.playTruncatedNotes = true; // (on in FL's Empty template and new projects)
     song.muteRunsEffects = true;    // (FL's muted insert, round 190y)
+    song.patternClipTakeover = true; // (FL's pattern clip takeover, issue #158)
 }
 
 NewProjectDefaults& newProjectDefaults()

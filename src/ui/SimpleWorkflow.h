@@ -17,6 +17,8 @@
 namespace lynx
 {
 class AudioEngine;
+class FirstSongTour;
+class SimpleDock;
 
 class SimpleWorkflow
 {
@@ -28,6 +30,11 @@ public:
         std::function<void()> showKeys;                    // an instrument was added from the chooser: the on-screen keyboard
         std::function<void (juce::Component*, int)> setTitleAccessory; // the Playlist title bar's accessory (nullptr: none)
         std::function<void()> showLoops;                   // the sample browser, to drag loops onto the timeline
+        // round 190ch: the Lyrics / Notes panel (the main window's, the same in every layout), Reference match, and a
+        // new project from the "Start from" list
+        std::function<void()> toggleLyrics;
+        std::function<void()> showReferenceMatch;
+        std::function<void (Song song)> startFrom;
         std::function<void (int track)> trackAdded;        // a track was added (select it, scroll to it)
         // round 190t
         std::function<juce::File()> sampleFolder;          // where the Sampler tile's file dialog starts (the Browser's samples)
@@ -35,6 +42,21 @@ public:
         std::function<void()> exportOtherApps;             // File › Export › For other apps
         std::function<juce::String()> saveStatus;          // "Backed up 2 min ago", "Not saved yet"...: beside the title tools
         std::function<void (juce::Component*, int)> setSideDock; // the dock on the right of the Playlist (nullptr: none)
+        // round 190bu: the dock for the selected track, under the timeline
+        std::function<void (juce::Component*, std::function<int (int)>)> setBottomDock; // (nullptr: none; its height out of the panel's)
+        std::function<void (int channel)> toggleChannelWindow; // the instrument's own window
+        std::function<int()> selectedTrack;                // the Playlist's current track (-1: none)
+        std::function<void()> settingsChanged;             // the dock's height or shown state changed: save the UI settings
+        // round 190ds: the dock's Editor tab docks the main window's Piano roll (ui/SimpleDock.h Hooks)
+        std::function<juce::Component* (int pattern)> dockPianoRoll;
+        std::function<void()> undockPianoRoll;
+        std::function<void (bool)> setFoldToKey;
+        std::function<bool()> foldedToKey;
+        std::function<void()> openPianoRollPanel;
+        // round 190dv: the Welcome screen and the first-song tour (ui/FirstSongTour.h)
+        std::function<juce::Component*()> window;          // the main window's content (the tour's ring and card)
+        std::function<void (std::function<void()> then)> newProjectForTour; // Help › tour on a project with work: a new one?
+        bool offerWelcome = false;                         // the Welcome screen opens by itself the first time (not in --snapshot routes)
     };
 
     SimpleWorkflow (AudioEngine& engine, Host host);
@@ -53,6 +75,12 @@ public:
     void showChooser();
     void hideChooser();
     bool isChooserShowing() const noexcept;
+    // "Start from" (round 190ch, ui/StartFromPanel.h): LYNX's demo song and the templates, with a preview, over the
+    // Playlist like the chooser
+    void showStartFrom();
+    void hideStartFrom();
+    bool isStartFromShowing() const noexcept;
+    juce::Component* startFromForSnapshot(); // (made and shown if needed)
 
     // Adds a track built from `request` (one undo step): arms an audio track's insert, selects an instrument's channel,
     // hides the chooser. False (and a message) when it can't be added.
@@ -64,6 +92,32 @@ public:
     void showFinish();
     void hideFinish();
     bool isFinishShowing() const noexcept;
+
+    // The dock for the selected track (slices S5, S6, S13, S14; ui/SimpleDock.h): its sound and its effects, under the
+    // timeline. Made the first time it shows.
+    void trackSelected (int track);      // a click on a track header
+    void showEffectsOfInsert (int insert); // "+FX" on a header: the dock, on its Effects tab, for the track of `insert`
+    void toggleDock();                   // Ctrl+Alt+L
+    void cycleDockTab();                 // Shift+Tab
+    bool isDockShowing() const noexcept;
+    SimpleDock* dockForSnapshot();       // (made and shown if needed)
+    // round 190ds: the Piano roll docked in the Editor tab was taken back by its own panel / must be given back
+    void editorTakenBack();
+    void releaseEditor();
+    // round 190ds: what a dropped keyed loop asks when the project has no key ("Set the project key to D minor?");
+    // `answer` (tests, --snapshot) answers it at once instead of a dialog: 1 yes, 0 no, -1 ask
+    static inline int answerForSnapshot = -1;
+    juce::String lastKeyQuestionForCheck() const { return lastKeyQuestion; }
+
+    // round 190dv: the Welcome screen (Help › Welcome screen; by itself the first time on an empty project) and the
+    // first-song tour (Help › First-song tour: continues a paused tour, else starts one)
+    void showWelcome();
+    void startOrContinueTour();
+    bool tourCanContinue() const;
+    bool tourRunning() const;
+    int tourStep() const;
+    FirstSongTour* tourForSnapshot() noexcept { return tour.get(); }
+    void doTourStep (int step); // the tour's "Do it for me", with the code the controls run
 
     // --simpleshot: the chooser's two pages, as drawn
     juce::Component* chooserForSnapshot();
@@ -85,14 +139,23 @@ private:
     void addFiles (const juce::Array<juce::File>& files, std::int64_t start);
     void addDrums (const std::string& genre, bool steps, bool useTempo);
     void addAudio (simpletracks::Kind kind);
+    void updateDock(); // shows or hides the dock as the setting says, on the Playlist's current track
+    void showKeysForNewTrack(); // a new instrument: the dock's Keyboard tab (or the Touch keyboard window, dock hidden)
+    void offerProjectKey (int root, bool minor); // a keyed loop came into a project without a key
 
     AudioEngine& engine;
     Host host;
     bool active = false;
     std::string dismissedFor; // the project (Song::projectId) whose chooser was closed by hand
+    std::unique_ptr<juce::Component> startFrom, lyricsButton; // round 190ch
     std::unique_ptr<Chooser> chooser;
     std::unique_ptr<juce::Component> addButton, finishButton, titleTools;
     std::unique_ptr<juce::Component> finishDock;
+    std::unique_ptr<SimpleDock> dock;
+    std::unique_ptr<FirstSongTour> tour; // round 190dv
+    int dockTrack = -1;
+    int lastAddedTrack = -1;
+    juce::String lastKeyQuestion;
     std::unique_ptr<juce::FileChooser> fileChooser;
     juce::File sampleFolder; // where the last sample for a Sampler track came from (this session)
 };

@@ -1,5 +1,5 @@
 ---
-source: bcd8a275bd
+source: 358890815a
 ---
 `파일 › 열기...` (`Ctrl+O`) 메뉴는 LYNX SHARE 자체 `.lynx` 프로젝트와 `.flp`, `.als`, `.flm`, `.mid` 파일을 엽니다. 다른 프로그램의 프로젝트는 가져오기로 처리됩니다. 저장되지 않은 새 LYNX SHARE 프로젝트가 만들어지고, 원본 파일에는 절대 쓰지 않습니다.
 
@@ -16,8 +16,8 @@ source: bcd8a275bd
 | 형식 | 변환되는 것 | 변환되지 않는 것 |
 |---|---|---|
 | `.flp` (FL Studio) | 채널, 샘플, 패턴, 슬라이드와 포르타 노트, 모든 어레인지먼트, 마커, 박자 변경, 오토메이션, 컨트롤러 연결, 라우팅이 있는 믹서, 사이드체인, 트랙 EQ, 기본 이펙트 | FLEX 팩은 암호화되어 있어 열지 않습니다. FLEX 채널에는 프리셋 이름에 따라 고른 신스 패치가 적용됩니다 |
-| `.als` (Live 11, 12) | MIDI, 오디오, 그룹, 리턴 트랙, 템포, 박자, 로케이터, 루프, 볼륨, 팬, 뮤트, 솔로, 센드와 그 오토메이션, 세션 클립과 장면, 워프 마커 | Live 자체 이펙트는 제외됩니다. 랙은 첫 번째 체인만 유지됩니다. Simpler, Sampler, 드럼 랙은 LYNX SHARE 샘플러가 됩니다 |
-| `.flm` (FL Studio Mobile) | 템포, 박자, 채널마다 믹서 인서트 하나, 레인마다 플레이리스트 트랙 하나, 패턴, 오프셋과 피치가 있는 오디오 클립, 드럼 키트, DW Sampler 샘플, `.dwp` 프로그램 | FLM의 이펙트와 오토메이션 레인. 다른 FLM 제너레이터는 내장 신스로 재생됩니다 |
+| `.als` (Live 11, 12) | MIDI, 오디오, 그룹, 리턴 트랙, 템포, 박자, 로케이터, 루프, 볼륨, 팬, 뮤트, 솔로, 센드와 그 오토메이션, 세션 클립과 장면, 워프 마커, 랙과 Drum Rack, Live 자체 디바이스 중 많은 수(EQ Eight, Compressor, Glue Compressor, Reverb, Delay, Auto Filter, Saturator, Utility, Simpler, Drift 등)를 LYNX SHARE 자체의 것으로 | LYNX SHARE에 대응하는 것이 없는 Live 디바이스(Hybrid Reverb, Grain Delay, Amp, Roar, FM Operator 패치 등)는 빠지고 목록으로 보여 줍니다. MIDI Effect Rack은 변환되지 않습니다 |
+| `.flm` (FL Studio Mobile) | 템포, 박자, 채널마다 믹서 인서트 하나, 레인마다 플레이리스트 트랙 하나, 패턴, 오프셋과 피치가 있는 오디오 클립, 드럼 키트, DW Sampler와 `.dwp` 프로그램, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, 이펙트, 오토메이션, 코드 세트 | 다른 FLM 제너레이터는 내장 신스로 재생됩니다 |
 | `.mid` | 노트, 박자, 모든 템포 변경 | MIDI 파일에는 사운드가 없습니다. 채널에는 LYNX SHARE 신스 또는 MIDI Out 채널이 지정됩니다 |
 
 `.flp` 안의 서드파티 VST2, VST3, CLAP 플러그인과 `.als` 안의 VST2, VST3 플러그인은 같은 플러그인이 컴퓨터에 설치되어 있으면 저장된 상태와 함께 로드됩니다.

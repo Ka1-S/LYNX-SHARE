@@ -7,6 +7,7 @@
 #include <complex>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 #include "core/Biquad.h"
@@ -127,6 +128,83 @@ struct Butter8
 
 // Saturation with unity small-signal gain: (tanh (k (x + b)) − tanh (k b)) / (k sech² (k b)). The bias b gives even
 // harmonics (fitted to the measured 2nd / 3rd harmonic levels of each character, REA_rodada101 §3.3).
+// round 190dl: log2 / exp2 to about 1e-5 (the measured tape stage's level law runs every sample): the exponent from the
+// bits, a polynomial for the rest
+// (x > 0, normal; no library call: the exponent and the mantissa straight from the bits)
+inline double fastLog2 (double x) noexcept
+{
+    std::uint64_t b;
+    std::memcpy (&b, &x, 8);
+    const auto e = (int) ((b >> 52) & 0x7ff) - 1023;
+    b = (b & 0x000fffffffffffffull) | 0x3ff0000000000000ull;
+    double m;
+    std::memcpy (&m, &b, 8); // x = m · 2^e, m in [1, 2)
+    const auto t = (m - 1.4142135623730951) / (m + 1.4142135623730951); // atanh series around √2
+    const auto t2 = t * t;
+    return (double) e + 0.5 + 2.8853900817779268 * t * (1.0 + t2 * (1.0 / 3.0 + t2 * (1.0 / 5.0 + t2 * (1.0 / 7.0))));
+}
+inline double fastExp2 (double x) noexcept
+{
+    x = std::clamp (x, -1000.0, 1000.0);
+    auto n = (int) x;
+    n -= x < (double) n ? 1 : 0; // floor
+    const auto f = (x - (double) n) * 0.69314718055994531; // e^f, f in [0, ln 2)
+    const auto p = 1.0 + f * (1.0 + f * (0.5 + f * (1.0 / 6.0 + f * (1.0 / 24.0 + f * (1.0 / 120.0 + f * (1.0 / 720.0))))));
+    const auto b = (std::uint64_t) (n + 1023) << 52;
+    double s;
+    std::memcpy (&s, &b, 8);
+    return p * s;
+}
+
+// round 190dl: cookbook sections (core/Biquad.h's maths) run on both sides at once — a 2-double register per section
+template <int N>
+struct StereoSections
+{
+    double c[N][5] {}; // b0 b1 b2 a1 a2
+    double z1[N][2] {}, z2[N][2] {};
+    void set (int k, const Biquad& q) noexcept
+    {
+        c[k][0] = q.b0; c[k][1] = q.b1; c[k][2] = q.b2; c[k][3] = q.a1; c[k][4] = q.a2;
+    }
+    void reset() noexcept
+    {
+        for (int k = 0; k < N; ++k)
+            z1[k][0] = z1[k][1] = z2[k][0] = z2[k][1] = 0.0;
+    }
+    void process (float& l, float& r) noexcept
+    {
+       #if LYNX_BIQUAD_SSE2
+        auto x = _mm_set_pd ((double) r, (double) l);
+        for (int k = 0; k < N; ++k)
+        {
+            const auto s1 = _mm_loadu_pd (z1[k]), s2 = _mm_loadu_pd (z2[k]);
+            const auto y = _mm_add_pd (_mm_mul_pd (_mm_set1_pd (c[k][0]), x), s1);
+            _mm_storeu_pd (z1[k], _mm_add_pd (_mm_sub_pd (_mm_mul_pd (_mm_set1_pd (c[k][1]), x), _mm_mul_pd (_mm_set1_pd (c[k][3]), y)), s2));
+            _mm_storeu_pd (z2[k], _mm_sub_pd (_mm_mul_pd (_mm_set1_pd (c[k][2]), x), _mm_mul_pd (_mm_set1_pd (c[k][4]), y)));
+            x = y;
+        }
+        double out[2];
+        _mm_storeu_pd (out, x);
+        l = (float) out[0];
+        r = (float) out[1];
+       #else
+        double xl = l, xr = r;
+        for (int k = 0; k < N; ++k)
+        {
+            const auto yl = c[k][0] * xl + z1[k][0], yr = c[k][0] * xr + z1[k][1];
+            z1[k][0] = c[k][1] * xl - c[k][3] * yl + z2[k][0];
+            z1[k][1] = c[k][1] * xr - c[k][3] * yr + z2[k][1];
+            z2[k][0] = c[k][2] * xl - c[k][4] * yl;
+            z2[k][1] = c[k][2] * xr - c[k][4] * yr;
+            xl = yl;
+            xr = yr;
+        }
+        l = (float) xl;
+        r = (float) xr;
+       #endif
+    }
+};
+
 struct Shaper
 {
     float k = 0.5f, b = 0.0f, t0 = 0.0f, g = 1.0f;
@@ -899,6 +977,29 @@ const char* modeName (Mode m) noexcept
     return names[std::clamp ((int) m, 0, modeCount - 1)];
 }
 
+// round 190dl: the measured tape stage's constants (Law = Measured, Tape character), see designMeasuredTape (). The lab's
+// fitting harness builds this file with LYNX_ECHO_FIT and writes them; the product reads them as constants. Two of the
+// fitted sections are not run (recLp2Hz, a low pass at 20.9 kHz, and fbHigh*, +0.65 dB above 4.4 kHz): without them the
+// stage costs about what the classic tape does and the bank scores the same or higher
+struct TapeLaw
+{
+    double recShelfHz, recShelfDb, recPeakHz, recPeakQ, recPeakDb, recLpHz, recLpQ, recLp2Hz, recGainDb;
+    double fbHpHz, fbHpQ, fbHighHz, fbHighDb, fbLowHz, fbLowDb, fbGainDb;
+    double extraMs, hissDb;
+    double compThresholdDb, compRatio, compAttackMs, compReleaseMs, compKneeDb;
+    double satK, satBias; // the head's curve (the classic Tape's: 0.95, 0.11)
+};
+#ifdef LYNX_ECHO_FIT
+TapeLaw tapeLaw
+#else
+constexpr TapeLaw tapeLaw
+#endif
+    { 433.19, -4.202, 391.2, 0.2, 2.279, 13908.6, 0.3, 20942.0, -0.700,
+      29.65, 0.3, 4383.7, 0.654, 819.5, -2.042, 0.673,
+      0.102, -75.5,
+      -47.54, 1.06364, 0.051, 43.89, 5.871,
+      1.8565, -0.08793 };
+
 namespace
 {
 const char* const styleNames[styleCount] = { "Single", "Ratio", "Quad", "Dual", "Ping-pong" };
@@ -919,6 +1020,9 @@ public:
             for (auto& a : c.diffOut) // round 144: the diffusion after the loop
                 a.line.allocate (sr * 0.05);
         }
+        for (auto& t : hissTab) // round 190dl: the measured tape stage's hiss
+            t.assign ((std::size_t) hissLength, 0.0f);
+        makeHiss();
         for (auto& b : bpath) // round 150: the second loop of the L/R offset
         {
             b.line.allocate (lineSamples);
@@ -960,6 +1064,15 @@ public:
         }
         steep.reset();
         lofiLp.reset();
+        recChain.reset(); // round 190dl
+        fbChain.reset();
+        tapeEnv = tapeEnvAt = 0.0;
+        tapeGainNow = 1.0f;
+        tapeCount = 0;
+
+        hissOn = 0.0f;
+        hissHold = 0;
+        hissPos = 0u;
         eqBass.reset();
         eqMid.reset();
         eqTreble.reset();
@@ -1109,12 +1222,15 @@ private:
             eqTreble.shelf (sr, std::min (5000.0, 0.4 * sr), trebleDb, true);
         }
         const auto depth = (double) clamp01 (p[modDepth]);
+        const bool clockMod = p[modClock] >= 0.5f; // round 190dl
         const auto wowV = (double) clamp01 (p[wow]), flutterV = (double) clamp01 (p[flutter]);
         const auto fShift = shiftHz (p[shift]), fDetune = shiftDetuneHz (p[shiftDetune]);
         const auto semis = pitchSemis (p[pitch]);
         const auto cents = 100.0 * bipolar (p[pitchDetune]);
 
         // character: the write-path filter / shaper and the modulation source
+        // round 190dl: the measured tape stage (Law = Measured, the Tape character without a voicing)
+        measuredTape = md == Mode::tape && p[engineLaw] >= 0.5f;
         configure (md, tL, ageV, eraOf (p[era]));
         for (auto& c : ch)
         {
@@ -1242,7 +1358,7 @@ private:
                         break;
                     case ModSource::sine:
                     {
-                        auto ph = lfoPhase + (c == 1 ? 0.25 : 0.0);
+                        auto ph = lfoPhase + (c == 1 && ! clockMod ? 0.25 : 0.0); // round 190dl: Clock = both sides in step
                         ph -= std::floor (ph);
                         double w = 0.0;
                         switch (lfoShape) // round 144: the LFO's wave (0 = the sine as before)
@@ -1253,7 +1369,8 @@ private:
                             case 4: w = 0.5 * s.drift.next (rate * 2.0, sr); break;                        // random
                             default: w = std::sin (twoPi * ph); break;
                         }
-                        modMs[c] = modAmountMs * depth * depth * w;
+                        // round 190dl: Clock — the swing is a fraction of the echo time (½ · depth), as a clocked line's
+                        modMs[c] = clockMod ? 0.5 * depth * (c == 0 ? tL : tR) * w : modAmountMs * depth * depth * w;
                         break;
                     }
                     case ModSource::random:
@@ -1270,6 +1387,9 @@ private:
 
             // targets in samples (tape glide when the time changes)
             double target[2] = { tL * 0.001 * sr, tR * 0.001 * sr };
+            if (measuredTape) // round 190dl: 0.102 ms more per pass (measured, minimum-phase tones + this delay)
+                for (auto& t : target)
+                    t += tapeLaw.extraMs * 0.001 * sr;
             if (primesOn)
                 for (auto& t : target)
                     t = (double) nearestPrime ((int) std::lround (t));
@@ -1278,6 +1398,8 @@ private:
             {
                 auto& s = ch[(std::size_t) c];
                 d[c] = std::max (2.0, s.time.next (target[c], 0.12, sr) + modMs[c] * 0.001 * sr);
+                if (clockMod) // round 190dl: a swing of up to 1.5 x the time stays inside the line
+                    d[c] = std::min (d[c], maxRead);
             }
 
             // read the echoes (read path: shifter / pitch / reverse / phaser / detune)
@@ -1387,6 +1509,14 @@ private:
                 echo[c] = y;
             }
 
+            // round 190dl: the measured tape stage's feedback tone (the repeats only; the first echo is not touched)
+            if (measuredTape)
+            {
+                fbChain.process (fbSig[0], fbSig[1]);
+                fbSig[0] *= fbGain;
+                fbSig[1] *= fbGain;
+            }
+
             // loop inputs per style
             const auto mono = 0.5f * (in[0] + in[1]);
             const auto feed = freezeOn ? 0.0f : inG; // frozen: the input stays out of the loop; round 144: Input level
@@ -1420,6 +1550,18 @@ private:
                 loopIn[1] = feed * in[1] + fbR * (float) loopG * (mine * fbSig[1] + crossV * fbSig[0]);
             }
 
+            // round 190dl: the measured tape stage records both sides at once (diffusion first, as below)
+            float rec[2] = { loopIn[0], loopIn[1] };
+            const bool stereoRecord = measuredTape && ! freezeOn;
+            if (stereoRecord)
+            {
+                for (int c = 0; c < 2; ++c)
+                    if (diffAmount > 0.0f && ! postDiff)
+                        for (std::size_t k = 0; k < 4; ++k)
+                            rec[c] = ch[(std::size_t) c].diff[k].process (rec[c], diffMs[k] * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0), 0.65f * diffAmount);
+                recordTape (rec, driveGain);
+            }
+
             // write path: diffusion, character, cuts, a soft limit (feedback above 100 % stays bounded)
             for (int c = 0; c < 2; ++c)
             {
@@ -1430,10 +1572,14 @@ private:
                     s.line.push (u);
                     continue;
                 }
-                if (diffAmount > 0.0f && ! postDiff)
+                if (stereoRecord)
+                    u = rec[c];
+                else if (diffAmount > 0.0f && ! postDiff)
                     for (std::size_t k = 0; k < 4; ++k)
                         u = s.diff[k].process (u, diffMs[k] * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0), 0.65f * diffAmount);
-                if (vd != nullptr) // round 147: the voicing's saturation and loop tone (every pass)
+                if (stereoRecord)
+                    ; // recorded above
+                else if (vd != nullptr) // round 147: the voicing's saturation and loop tone (every pass)
                 {
                     u = saturate (u, c);
                     for (int k = 0; k < loopN; ++k)
@@ -1499,6 +1645,20 @@ private:
                     for (std::size_t k = 0; k < 4; ++k)
                         echo[c] = ch[(std::size_t) c].diffOut[k].process (echo[c], diffMs[k] * diffScale * 0.001 * sr * (c == 1 ? 1.07 : 1.0), 0.65f * diffAmount);
 
+            if (measuredTape) // round 190dl: the tape's hiss on the echoes while the tape holds anything (an idle insert
+            {                 // stays silent: the hiss fades once the input and the echoes have been under −110 dBFS for one
+                              // echo time + 50 ms)
+                const auto level = std::max (std::max (std::abs (in[0]), std::abs (in[1])), std::max (std::abs (echo[0]), std::abs (echo[1])));
+                if (level > 3.2e-6f)
+                    hissHold = (long) ((std::max (tL, tR) * 0.001 + 0.05) * sr);
+                hissOn = hissHold > 0 ? 1.0f : hissOn * hissFade;
+                hissHold = std::max (0L, hissHold - 1);
+                if (hissOn > 1e-4f)
+                    for (int c = 0; c < 2; ++c)
+                        echo[c] += hissOn * hiss (c);
+                ++hissPos;
+            }
+
             // balance of the echoes, width (M / S of the echoes) and the equal-power mix
             echo[0] *= 1.0f - std::max (0.0f, balanceV);
             echo[1] *= 1.0f + std::min (0.0f, balanceV);
@@ -1555,14 +1715,18 @@ private:
                 // tape: the head bump / low-end loss (low shelf −5 dB), and a two-pole roll-off that falls with the
                 // delay time (tape speed): ≈ 9 kHz at 100 ms, 5 kHz at 300 ms, 2.7 kHz at 1 s
                 const auto fc = std::min (0.45 * sr, bw * (m == Mode::tape ? std::clamp (9000.0 * std::pow (std::max (1.0, timeMsL) / 100.0, -0.5), 1500.0, 10000.0) : 9000.0));
-                for (auto& c : ch)
+                for (auto& c : ch) // (round 190dl: the measured tape stage does not use these)
                 {
+                    if (m == Mode::tape && measuredTape)
+                        break;
                     c.shelf.set (350.0, sr);
                     c.tapeLp1.set (fc, sr);
                     c.tapeLp2.set (fc, sr);
                 }
                 shaper.set (m == Mode::lofi ? 0.9f : 0.95f, m == Mode::lofi ? 0.0f : 0.11f);
                 modulation = m == Mode::tape ? ModSource::tape : (m == Mode::lofi ? ModSource::sine : ModSource::none);
+                if (m == Mode::tape && measuredTape)
+                    designMeasuredTape (fc / (9000.0 / std::sqrt (3.0))); // the corners follow the classic law's tape speed and Era
                 break;
             }
             case Mode::hifi:
@@ -1606,6 +1770,96 @@ private:
             }
         }
     }
+
+    // round 190dl [EXEC] (tp172d bank, ValhallaDelay's Tape mode at 300 ms, Wow / Flutter 0, Feedback 35 %, Era Past). Echo
+    // train of an impulse: the first echo is the record tone R, every further pass feedback × Fb × R, where Fb (the feedback
+    // path only) loses the lows each pass (−9 dB at 63 Hz, −4 dB at 200 Hz against 1.3 kHz); both minimum phase within
+    // 0.02 rad plus 0.102 ms more delay per pass. Programme (drums, music, vocal at the same setting) comes out 2 … 4 dB
+    // under that impulse gain, more so in the lows: a record level law with memory (a gentle mean-square compressor) and
+    // a harder head curve. Cookbook sections first fitted on the impulse's third-octave magnitudes (R 0.51 dB rms, Fb
+    // 0.43 dB rms), then all of it by Nelder-Mead on the four renders of that setting (mean waveform error + level +
+    // third-octave spectrum): mean ESR −3.1 → −11.2 dB (the lab's fit_tape.cpp). The low passes of R move with the classic
+    // law's tape-speed corner (`speed` = 1 at 300 ms, Past)
+    void designMeasuredTape (double speed) noexcept
+    {
+        const auto& t = tapeLaw;
+        shaper.set ((float) t.satK, (float) t.satBias);
+        if (speed == tapeSpeed && sr == tapeSr) // (the coefficients only change with the time / Era / rate)
+            return;
+        tapeSpeed = speed;
+        tapeSr = sr;
+        Biquad q;
+        q.shelf (sr, t.recShelfHz, t.recShelfDb, false, 0.7);
+        recChain.set (0, q);
+        q.peaking (sr, t.recPeakHz, t.recPeakQ, t.recPeakDb);
+        recChain.set (1, q);
+        q.filter (sr, 0, std::min (t.recLpHz * speed, 0.45 * sr), t.recLpQ);
+        recChain.set (2, q);
+
+        recGain = (float) std::pow (10.0, t.recGainDb / 20.0);
+        q.filter (sr, 1, t.fbHpHz, t.fbHpQ);
+        fbChain.set (0, q);
+        q.shelf (sr, t.fbLowHz, t.fbLowDb, false, 0.7);
+        fbChain.set (1, q);
+        fbGain = (float) std::pow (10.0, t.fbGainDb / 20.0);
+        hissGain = (float) std::pow (10.0, t.hissDb / 20.0);
+        hissFade = (float) std::exp (-1.0 / (0.1 * sr)); // −43 dB in 0.5 s
+        tapeAtt = 1.0 - std::exp (-1.0 / (std::max (0.01, t.compAttackMs) * 0.001 * sr));
+        tapeRel = 1.0 - std::exp (-1.0 / (std::max (0.01, t.compReleaseMs) * 0.001 * sr));
+    }
+
+    // round 190dl: the record stage on both sides — the level law with memory (one mean-square follower for the pair), the
+    // head's curve (or the chosen saturation type), the record tone
+    void recordTape (float* u, float driveGain) noexcept
+    {
+        if (tapeLaw.compRatio > 1.0)
+        {
+            const auto e = std::max ((double) u[0] * u[0], (double) u[1] * u[1]);
+            tapeEnv += (e > tapeEnv ? tapeAtt : tapeRel) * (e - tapeEnv);
+            // the gain is worked out again when the level has risen by 0.5 dB (an attack: at once) or every 16 samples
+            // (at ratio 1.06 that holds it within 0.03 dB); log2 / exp2 from the bits and a polynomial
+            if (tapeEnv > tapeEnvAt * 1.1220184543 || --tapeCount <= 0)
+            {
+                tapeCount = 16;
+                tapeEnvAt = tapeEnv;
+                const auto over = 3.0102999566 * fastLog2 (tapeEnv + 1e-20) - tapeLaw.compThresholdDb, k = tapeLaw.compKneeDb;
+                const auto x = over <= -0.5 * k ? 0.0 : over >= 0.5 * k ? over : (over + 0.5 * k) * (over + 0.5 * k) / (2.0 * k);
+                tapeGainNow = x > 0.0 ? (float) fastExp2 (-x * (1.0 - 1.0 / tapeLaw.compRatio) / 6.0205999133) : 1.0f;
+            }
+            u[0] *= tapeGainNow;
+            u[1] *= tapeGainNow;
+        }
+        for (int c = 0; c < 2; ++c)
+            u[c] = satCurve != nullptr ? saturate (u[c], c) : shaper (u[c] * driveGain) / driveGain;
+        recChain.process (u[0], u[1]);
+        u[0] *= recGain;
+        u[1] *= recGain;
+    }
+
+    // round 190dl [EXEC]: the Tape mode's hiss, −91.5 dBFS rms at Mix 100 % in the same bank (no input, before the first
+    // echo; uncorrelated sides): pink noise (P. Kellet's economy filter) through a low pass at 4.5 kHz, 2.6 dB rms from the
+    // reference's third-octave levels 40 Hz … 16 kHz. Made once in prepare () (2.7 s a side, read in a loop)
+    void makeHiss() noexcept
+    {
+        Biquad lp;
+        lp.filter (sr, 0, 4534.0, 0.3);
+        for (int c = 0; c < 2; ++c)
+        {
+            Noise n { 0x2545f491u + 0x9e3779b9u * (std::uint32_t) c };
+            float b0 = 0.0f, b1 = 0.0f, b2 = 0.0f;
+            for (int i = 0; i < hissLength + 4096; ++i) // (the first 4096 settle the filters)
+            {
+                const auto w = n.next();
+                b0 = 0.99765f * b0 + w * 0.0990460f;
+                b1 = 0.96300f * b1 + w * 0.2965164f;
+                b2 = 0.57000f * b2 + w * 1.0526913f;
+                const auto v = lp.process ((b0 + b1 + b2 + w * 0.1848f) * 0.11f, c);
+                if (i >= 4096)
+                    hissTab[(std::size_t) c][(std::size_t) (i - 4096)] = v;
+            }
+        }
+    }
+    float hiss (int c) noexcept { return hissTab[(std::size_t) c][(std::size_t) (hissPos & (hissLength - 1))] * hissGain; }
 
     float character (Channel& s, int c, float u, Mode m, float ageV, float driveGain) noexcept
     {
@@ -2035,6 +2289,21 @@ private:
     std::array<Channel, 2> ch;
     Butter8 steep;
     Butter8 lofiLp; // round 137: the LoFi switch
+    // round 190dl: the measured tape stage (Law = Measured): the record tone, the feedback path's own tone, the hiss
+    bool measuredTape = false;
+    StereoSections<3> recChain; // (the fit's fourth section, a low pass at 20.9 kHz, is left out: −0.4 dB at 10 kHz)
+    StereoSections<2> fbChain; // (the fit's +0.65 dB high shelf at 4.4 kHz is left out)
+    static constexpr int hissLength = 1 << 17;
+    std::array<std::vector<float>, 2> hissTab;
+    std::uint32_t hissPos = 0;
+    float recGain = 1.0f, fbGain = 1.0f, hissGain = 0.0f, hissOn = 0.0f, hissFade = 0.0f;
+    long hissHold = 0;
+    double tapeSpeed = -1.0, tapeSr = 0.0;
+    double tapeAtt = 1.0, tapeRel = 1.0, tapeEnv = 0.0, tapeEnvAt = 0.0; // the record stage's level memory (mean square, both sides)
+    float tapeGainNow = 1.0f;
+    int tapeCount = 0;
+
+
     Biquad eqBass, eqMid, eqTreble; // round 144: the loop EQ (both channels)
     Shaper shaper;
     ModSource modulation = ModSource::tape;
@@ -2074,6 +2343,29 @@ double highCutHz (float v) noexcept { return 50.0 + 14950.0 * clamp01 (v); }
 
 namespace
 {
+// bilinear sections (round 190do): first order (b2 = a2 = 0) and second order, corners pre-warped
+inline void bilinearFirst (Biquad& b, double hz, double sr, bool high) noexcept
+{
+    const auto k = std::tan (pi * std::clamp (hz, 1.0, 0.49 * sr) / sr);
+    const auto n = 1.0 / (1.0 + k);
+    b.b0 = high ? n : k * n;
+    b.b1 = high ? -n : k * n;
+    b.b2 = 0.0;
+    b.a1 = (k - 1.0) * n;
+    b.a2 = 0.0;
+}
+inline void bilinearSecond (Biquad& b, double hz, double q, double sr, int type) noexcept // 0 low-pass, 1 high-pass, 2 all-pass
+{
+    const auto w = twoPi * std::clamp (hz, 1.0, 0.49 * sr) / sr, cw = std::cos (w), alpha = std::sin (w) / (2.0 * q);
+    const auto a0 = 1.0 + alpha;
+    if (type == 0)
+        b.set ((1.0 - cw) * 0.5, 1.0 - cw, (1.0 - cw) * 0.5, a0, -2.0 * cw, 1.0 - alpha);
+    else if (type == 1)
+        b.set ((1.0 + cw) * 0.5, -(1.0 + cw), (1.0 + cw) * 0.5, a0, -2.0 * cw, 1.0 - alpha);
+    else
+        b.set (1.0 - alpha, -2.0 * cw, 1.0 + alpha, a0, -2.0 * cw, 1.0 - alpha);
+}
+
 class SpiralEcho final : public Effect
 {
 public:
@@ -2093,8 +2385,11 @@ public:
             c.shifter.reset();
             c.lo.reset();
             c.hi.reset();
+            c.band.reset();
+            c.ap.reset();
         }
         time = {};
+        rotC = 1.0, rotS = 0.0;
     }
 
     void process (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept override
@@ -2108,6 +2403,11 @@ public:
         const auto g = (float) loopGain (p[feedback]);
         const auto hz = shiftHz (p[shift]);
         const auto stereoMode = on (p[stereo]);
+        if (p[law] >= 0.5f)
+        {
+            processMeasured (l, r, n, p, ms, g, hz, stereoMode, wet, dry);
+            return;
+        }
         for (auto& c : ch)
         {
             c.lo.set (lowCutHz (p[lowCut]), sr);
@@ -2133,15 +2433,75 @@ public:
     }
 
 private:
+    // round 190do: the measured loop [EXEC] (tp172d renders of the reference, black-box; /mnt/e/lynx-work/mod190do):
+    // the low / high cuts as first-order bilinear sections (the reference's per-pass magnitude, echo by echo; its low
+    // cut sits at 0.8 of the knob's frequency), a second-order all-pass at 2875 Hz (Q 0.34) for the extra low-mid
+    // group delay of its loop (S1: +31 samples at 100 Hz, +9.5 at 400 Hz over the high band), a loop limiter of
+    // 0.256 · tanh (x / 0.256) (on loud material the reference is 3 … 4 dB under the classic tanh (x)), and delay changes
+    // gliding with a 0.175 s time constant (the reference's, refcap0124 delay sweeps; the classic loop: 0.05 s)
+    void processMeasured (float* l, float* r, int n, const EffectParams& p, double ms, float g, double hz, bool stereoMode,
+                          float wet, float dry) noexcept
+    {
+        static constexpr double lowCutScale = 0.8, allpassHz = 2875.0, allpassQ = 0.3375;
+        static constexpr float limitAt = 0.25625f;
+        const auto target = std::clamp (ms * 0.001 * sr - 0.125 * sr / 48000.0, 2.0, ch[0].line.maxDelay() - 4.0);
+        const auto hpHz = lowCutHz (p[lowCut]) * lowCutScale, lpHz = highCutHz (p[highCut]);
+        if (hpHz != designedHp || lpHz != designedLp || sr != designedSr)
+        {
+            designedHp = hpHz, designedLp = lpHz, designedSr = sr;
+            // the two first-order cuts as one second-order section: c (1 − z⁻²) / ((1 + a z⁻¹)(1 + b z⁻¹))
+            Biquad hpS, lpS;
+            bilinearFirst (hpS, hpHz, sr, true);
+            bilinearFirst (lpS, lpHz, sr, false);
+            for (auto& c : ch)
+            {
+                c.band.b0 = hpS.b0 * lpS.b0;
+                c.band.b1 = 0.0;
+                c.band.b2 = -hpS.b0 * lpS.b0;
+                c.band.a1 = hpS.a1 + lpS.a1;
+                c.band.a2 = hpS.a1 * lpS.a1;
+                bilinearSecond (c.ap, allpassHz, allpassQ, sr, 2);
+            }
+        }
+        // the shifter's oscillator as a rotating phasor (one for both channels; the classic loop calls cos / sin per
+        // sample and channel), renormalised every block
+        const auto step = twoPi * hz / sr;
+        const auto wc = std::cos (step), ws = std::sin (step);
+        for (int i = 0; i < n; ++i)
+        {
+            const auto d = time.next (target, 0.175, sr);
+            const auto oc = (float) rotC, os = (float) rotS;
+            float* io[2] = { l + i, r + i };
+            for (int c = 0; c < 2; ++c)
+            {
+                auto& s = ch[(std::size_t) c];
+                const auto x = *io[c];
+                float re = 0.0f, im = 0.0f;
+                s.shifter.h.analytic (s.ap.process (s.band.process (s.line.at (d), 0), 0), re, im);
+                const auto up = re * oc + im * os, down = re * oc - im * os;
+                s.line.push (x + g * (limitAt * std::tanh (up / limitAt)));
+                *io[c] = dry * x + wet * (c == 1 && stereoMode ? down : up);
+            }
+            const auto nc = rotC * wc - rotS * ws;
+            rotS = rotS * wc + rotC * ws;
+            rotC = nc;
+        }
+        const auto mag = std::sqrt (rotC * rotC + rotS * rotS);
+        rotC /= mag, rotS /= mag;
+    }
+
     struct Channel
     {
         Line line;
         Shifter shifter;
         OnePole lo, hi;
+        Biquad band, ap; // round 190do: the measured loop's filters
     };
     double sr = 48000.0;
     std::array<Channel, 2> ch;
     Glide time;
+    double designedHp = -1.0, designedLp = -1.0, designedSr = -1.0;
+    double rotC = 1.0, rotS = 0.0; // the measured loop's shifter phasor
 };
 } // namespace
 } // namespace spiral
@@ -2201,8 +2561,13 @@ public:
         const auto m = modeOf (p[mode]);
         const auto hz = rateHz (p[rate]);
         const auto dm = depthMs (p[depth]) * 0.001 * sr;
-        const auto base = (0.25 + std::abs (manualMs (p[manual]))) * 0.001 * sr;
-        const auto g = (float) feedbackGain (p[feedback]);
+        // round 190do [EXEC] (tp172d renders, black-box): the measured sweep reads from the manual delay alone (the
+        // classic law added 0.25 ms; fitted: −0.034 ms, i.e. the shortest read sits at the line's 2-sample floor) and its
+        // feedback grows as 0.7 · |x|^0.891 (0.377 at +50 %, the reference's S1 setting; the classic 0.7 · |x|^1.5 gave
+        // 0.247; the same 0.7 at the top, so the loop stays below unity)
+        measured = p[law] >= 0.5f;
+        const auto base = ((measured ? -0.034375 : 0.25) + std::abs (manualMs (p[manual]))) * 0.001 * sr;
+        const auto g = (float) (measured ? 0.7 * signedPow (bipolar (p[feedback]), 0.891) : feedbackGain (p[feedback]));
         rateNow = hz;
 
         for (int i = 0; i < n; ++i)
@@ -2249,7 +2614,11 @@ private:
             case Mode::driftRise:
             {
                 // barber pole: two taps ramping across the range, each faded in / out at the ends (sin window)
-                const auto lo = m == Mode::rise ? 0.25 : 0.02, span = m == Mode::rise ? 0.5 : 0.96;
+                // round 190do [EXEC] (tp172d D / S3, the taps tracked over 8 s of music): the reference's two taps sweep
+                // the whole depth (0 … depth), at rate × depth samples per second; the classic law swept 0.25 … 0.75
+                auto lo = m == Mode::rise ? 0.25 : 0.02, span = m == Mode::rise ? 0.5 : 0.96;
+                if (measured && m == Mode::rise)
+                    lo = 0.0, span = 1.0;
                 float y = 0.0f;
                 for (int k = 0; k < 2; ++k)
                 {
@@ -2260,6 +2629,20 @@ private:
                 return y;
             }
             case Mode::riseFall:
+                if (measured)
+                {
+                    // round 190do [EXEC] (tp172d S2, taps tracked over 8 s of music): the left channel is the Rise
+                    // barber pole, the right channel the same two taps sweeping the other way (falling pitch), in phase
+                    float y = 0.0f;
+                    for (int k = 0; k < 2; ++k)
+                    {
+                        const auto q = frac (phase + 0.5 * k);
+                        const auto w = (float) std::sin (pi * q);
+                        y += w * w * at (base + dm * (c == 0 ? 1.0 - q : q));
+                    }
+                    return y;
+                }
+                [[fallthrough]];
             case Mode::driftRiseFall:
             {
                 const auto q = frac (phase + off);
@@ -2321,6 +2704,7 @@ private:
     std::array<Channel, 2> ch;
     RandomLfo speedRandom;
     double phase = 0.0, fast = 0.0, rateNow = 0.5;
+    bool measured = false; // round 190do: the measured sweep (law 1)
 };
 } // namespace
 } // namespace orbit
@@ -2482,6 +2866,11 @@ public:
         const auto smoothS = (1.0 + 999.0 * (double) clamp01 (p[smoothing])) * 0.001;
         const auto isDark = on (p[colour]);
         const auto panMode = inputPanOf (p[inputPan]);
+        // round 190do [EXEC] (refcap0124 one-parameter captures of the reference, impulse at 0.1 s): at the default
+        // depth (50 % of a 50 % detune) its taps sit anywhere from 340 to 739 samples for a 10 ms delay, about ±200
+        // samples around their mean (≈ ±22 cents at 0.5 Hz); the classic law multiplies both 50 % settings into a quarter
+        // of the ±25-cent swing (±56 samples). The measured law keeps the shape and scales the excursion by 3.5
+        const auto detK = p[law] >= 0.5f ? 3.5 : 1.0;
         static constexpr double diffRatios[4] = { 0.131, 0.217, 0.293, 0.359 };
         for (auto& c : ch)
         {
@@ -2530,7 +2919,7 @@ public:
                 double y = 0.0;
                 for (int k = 0; k < nTaps; ++k)
                 {
-                    const auto det = detuneAmp > 0.0 ? detuneAmp * (double) s.detune[(std::size_t) k].next (detuneHz, sr) / 2.1 : 0.0;
+                    const auto det = detuneAmp > 0.0 ? detK * detuneAmp * (double) s.detune[(std::size_t) k].next (detuneHz, sr) / 2.1 : 0.0;
                     const auto vib = vibAmp > 0.0 ? vibAmp * std::sin (twoPi * (vibPhase + (double) k / (double) nTaps)) : 0.0;
                     const auto d = tapNow[(std::size_t) c][(std::size_t) k] + std::abs (det) + vibAmp + sign * (det + vib) * 0.5;
                     y += gains[(std::size_t) k] * (double) s.line.at (std::max (2.0, d));
@@ -2633,7 +3022,10 @@ const EffectInfo& echoformInfo()
                                      { "Echo voicing", 0.0f }, { "Saturation type", 0.0f }, { "Multiply", 0.0f },
                                      // round 150: the voicings' measured stereo behaviour, EchoBoy's L/R offset (appended;
                                      // projects saved before load with it off)
-                                     { "Voicing stereo", 1.0f }, { "L/R offset", 8.0f / 25.0f } } };
+                                     { "Voicing stereo", 1.0f }, { "L/R offset", 8.0f / 25.0f },
+                                     // round 190dl: the measured tape stage (Law, Measured for new instances; projects saved
+                                     // before load Classic) and the clocked LFO law (off = the ms law)
+                                     { "Law", 1.0f }, { "Mod clock", 0.0f } } };
     return info;
 }
 
@@ -2641,14 +3033,16 @@ const EffectInfo& spiralInfo()
 {
     static const EffectInfo info { "Spiral Echo",
                                    { { "Mix", 0.5f }, { "Shift", 0.5f }, { "Delay", 0.5f }, { "Sync", 0.0f }, { "Feedback", 0.5f },
-                                     { "Low cut", 0.0604027f }, { "High cut", 0.3311037f }, { "Stereo", 1.0f } } };
+                                     { "Low cut", 0.0604027f }, { "High cut", 0.3311037f }, { "Stereo", 1.0f },
+                                     { "Law", 1.0f } /* round 190do: the measured loop; projects saved before keep the classic one */ } };
     return info;
 }
 
 const EffectInfo& orbitInfo()
 {
     static const EffectInfo info { "Orbit", { { "Mix", 0.5f }, { "Rate", 0.626f }, { "Depth", 0.5f }, { "Feedback", 0.5f },
-                                              { "Manual", 0.5f }, { "Mode", 1.0f / 11.0f } } };
+                                              { "Manual", 0.5f }, { "Mode", 1.0f / 11.0f },
+                                              { "Law", 1.0f } /* round 190do: the measured sweep; projects saved before keep the classic one */ } };
     return info;
 }
 
@@ -2665,7 +3059,8 @@ const EffectInfo& latticeInfo()
                                      { "Sync", 0.0f }, { "Taps", 1.5f / 24.0f } /* round 129: two taps (one a side), the reference default */, { "Diffusion on", 0.0f }, { "Drive on", 0.0f },
                                      { "Drive post", 1.0f }, { "Half speed", 0.0f },
                                      { "Input pan", 0.125f } /* round 137: index 1 = stereo, the reference default */,
-                                     { "Delay sync", 0.0f } /* round 144: the reference's DelaySync law, free */ } };
+                                     { "Delay sync", 0.0f } /* round 144: the reference's DelaySync law, free */,
+                                     { "Law", 1.0f } /* round 190do: the measured detune depth; projects saved before keep the classic one */ } };
     return info;
 }
 
@@ -2763,6 +3158,8 @@ std::string paramText (EffectKind kind, int param, float v)
             case multiply: return std::to_string (multiplyOf (v)) + "x";
             case voicingStereo: return v >= 0.5f ? "measured" : "classic";
             case lrOffset: return fmt ("%.1f ms", lrOffsetMs (v));
+            case engineLaw: return v >= 0.5f ? "Measured" : "Classic";
+            case modClock: return v >= 0.5f ? "on" : "off";
             case rhythmEdit: return rhythmEditOf (v) == RhythmEdit::even ? "even" : rhythmEditOf (v) == RhythmEdit::free ? "free" : "grid";
             case rhythmGrid:
             {
@@ -2802,6 +3199,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case lowCut: return hzText (lowCutHz (v));
             case highCut: return hzText (highCutHz (v));
             case stereo: return on (v) ? "stereo" : "mono";
+            case law: return v >= 0.5f ? "Measured" : "Classic";
             default: return fmt ("%.2f", v);
         }
     }
@@ -2816,6 +3214,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case feedback: return fmt ("%+.0f%%", 100.0 * bipolar (v));
             case manual: return fmt ("%+.2f ms", manualMs (v));
             case mode: return modeName (modeOf (v));
+            case law: return v >= 0.5f ? "Measured" : "Classic";
             default: return fmt ("%.2f", v);
         }
     }
@@ -2850,6 +3249,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case taps: return fmt ("%.0f", (double) tapCount (v));
             case diffOn: case driveOn: return on (v) ? "on" : "off";
             case drivePost: return on (v) ? "post" : "pre";
+            case law: return v >= 0.5f ? "Measured" : "Classic";
             case halfSpeed: return on (v) ? "1/2x" : "1x";
             case delaySync:
             {

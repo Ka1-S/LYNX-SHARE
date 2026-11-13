@@ -25,6 +25,9 @@ The Pattern workflow is the Channel rack, patterns and the Playlist. The Clip-la
 - The first time, the Channel rack is hidden. `F6` or its toolbar button shows it.
 - The Playlist's automation lanes are switched on.
 - The window layout is stored per style, so each style comes back the way you left it.
+- Under the grid, the `Mixer` button shows or hides the Session mixer, as in Ableton Live: `In/Out` (`Audio From`, `Monitor`, `Audio To`), `Sends`, `Track Delay`, and each track's volume with its activator, solo, arm button and meter, plus the `Main` strip.
+- `Grooves`, under the grid, shows the Groove Pool. `Commit groove` writes a groove into the notes of a MIDI clip.
+- The `MIDI` and `Key` buttons start MIDI Map Mode and Key Map Mode. See [MIDI controllers](/wiki/midi-controllers/).
 
 ## The grid
 
@@ -43,6 +46,8 @@ Right-click a clip for its settings.
 
 Right-click an empty slot for `Stop button (a scene stops this track here)`. Clicking the square at the left of an empty slot stops that track. Right-click a scene for `Insert scene`, `Add scene below`, `Delete scene`, `Rename scene...` and the scene's tempo.
 
+Clips can be cut, copied, pasted and duplicated (`Ctrl+D`) from their menu, and dragged between slots and to or from the Playlist. A pattern or a sample dragged from the Browser, or audio files dropped from outside, fill the slot they land on. A scene's menu also has `Duplicate` and `Capture and insert scene`, which puts the clips playing now into a new scene. `View › Scene tempo and time signature` shows a tempo and time signature for each scene.
+
 The slot menu also has two options for the whole grid: `Give tracks back to the Playlist when the transport stops` and `Follow actions on the whole grid`.
 
 | Command | Key | What it does |
@@ -51,10 +56,17 @@ The slot menu also has two options for the whole grid: `Give tracks back to the 
 | Launch clip | `Enter` | Launches the selected clip |
 | Launch scene | `Ctrl+Enter` | Launches the selected scene |
 | Delete clip | `Del` | Empties the selected slot |
+| Draw Mode | `B` | A drag in an automation lane draws steps as wide as the grid, or freehand with snap off or `Alt` held, as in Ableton Live. Also in `Options` |
 
 ## Ableton Live sets
 
 When you open a Live set, its Session clips and scenes go into the clip grid, with their launch settings. `File › Export › Ableton Live set (.als)` writes the grid back as Session clips. `Options › General settings` has `Session clips of Live sets`, where `Playlist, after the arrangement` places them on the Playlist instead.
+
+## The Simple workflow
+
+`View › Layout style › Simple workflow` is one window with the tracks and the timeline, for a first song. `View › Track dock` shows a dock under the timeline for the selected track, with the `Effects`, `Instrument`, `Keyboard` and `Editor` tabs. In this workflow, the `Help` menu has `First-song tour` and `Welcome screen...`, which offers a seven-step first song, a demo song or an empty project. See [Simple layout](/wiki/simple-layout/).
+
+`Lyrics and notes` and `Reference match...` in the `View` menu, and `Clean voice` in a Mixer insert's menu, are there in every layout. In the Simple workflow, `Clean voice` is in a track's menu too.
 
 ## Switch back
 
@@ -63,7 +75,8 @@ Choose `View › Layout style › Pattern workflow (default)`. The window layout
 ## Good to know
 
 - A track that launched a clip stays silent in the Playlist until you press `Back to Playlist`. The option `Give tracks back to the Playlist when the transport stops` does it for you at every stop.
-- In 0.1.25 a slot is filled from its menu or by double-click. You cannot drag a clip or a file into a slot.
+- The new keys of the grid (`B`, `Q`, `Ctrl+M`, `Ctrl+K` and others) act this way in the Clip-launch workflow only. In the Pattern workflow they keep FL Studio's meaning.
+- A scene in 6/8 plays a bar of three beats, because the meter counts quarter notes.
 - Follow actions exist for clips, not for scenes.
 - Automation lanes switched by hand while in the Clip-launch workflow are not kept when you go back.
 - With the Pattern workflow selected, nothing of the grid is loaded.

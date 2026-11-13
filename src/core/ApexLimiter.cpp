@@ -111,6 +111,7 @@ struct Core
         const auto ring = (std::size_t) (maxLook + extraDelay + 2);
         inL.assign (ring, 0.0f); inR.assign (ring, 0.0f);
         outL.assign (ring, 0.0f); outR.assign (ring, 0.0f);
+        limL.assign (ring, 0.0f); limR.assign (ring, 0.0f);
         boxL.assign ((std::size_t) maxLook + 1, 1.0); boxR.assign ((std::size_t) maxLook + 1, 1.0);
         minAll.setCapacity (maxLook + 1); minL.setCapacity (maxLook + 1); minR.setCapacity (maxLook + 1);
         reset();
@@ -121,6 +122,7 @@ struct Core
     {
         std::fill (inL.begin(), inL.end(), 0.0f); std::fill (inR.begin(), inR.end(), 0.0f);
         std::fill (outL.begin(), outL.end(), 0.0f); std::fill (outR.begin(), outR.end(), 0.0f);
+        std::fill (limL.begin(), limL.end(), 0.0f); std::fill (limR.begin(), limR.end(), 0.0f);
         histL.fill (0.0); histR.fill (0.0); scHistL.fill (0.0); scHistR.fill (0.0);
         pos = 0;
         fastL = fastR = slowL = slowR = 0.0; // dB
@@ -135,7 +137,11 @@ struct Core
     // `scl` / `scr`: the external side chain (round 135) — when given, the required gain is computed from it (after
     // the same gain) instead of the programme; the safety clip still holds the programme at the ceiling.
     // Returns the lowest gain of the block.
-    double run (float* left, float* right, int n, const EffectParams& p, const float* scl, const float* scr, bool ditherHere) noexcept
+    // `post` (round 190co, true-peak limiting): a true-peak guard follows this core, so Unity gain is left to the
+    // caller (the guard works against the ceiling), and with Audition on `keepL` / `keepR` receive the limited signal
+    // beside the removed one in `left` / `right` (the guard needs both).
+    double run (float* left, float* right, int n, const EffectParams& p, const float* scl, const float* scr, bool ditherHere,
+                bool post = false, float* keepL = nullptr, float* keepR = nullptr) noexcept
     {
         const double gain = std::pow (10.0, gainDb (p[0]) / 20.0);
         const double ceiling = std::pow (10.0, ceilingDb (p[1]) / 20.0);
@@ -157,7 +163,8 @@ struct Core
         const double attackSamples = attackMs (p[pAttack]) * 0.001 * sampleRate;
         const double kAttack = attackSamples * law.attackFactor >= 1.0 ? 1.0 - std::exp (-1.0 / (attackSamples * law.attackFactor)) : 1.0;
         const double linkRelease = std::clamp ((double) p[pLinkRelease], 0.0, 1.0);
-        const bool unity = p[pUnity] >= 0.5f, audition = p[pAudition] >= 0.5f, dcFilter = p[pDcFilter] >= 0.5f;
+        const bool unity = p[pUnity] >= 0.5f && ! post, audition = p[pAudition] >= 0.5f, dcFilter = p[pDcFilter] >= 0.5f;
+        const bool keep = post && audition && keepL != nullptr && keepR != nullptr;
         if (! dcFilter) dcXL = dcXR = dcYL = dcYR = 0.0;
         dcR = std::exp (-2.0 * pi * 5.0 / sampleRate);
         bits = ditherHere ? ditherBits (p[pDither]) : 0;
@@ -266,6 +273,7 @@ struct Core
             const int back = (pos - look + len) % len;
             double yl = std::clamp (inL[(std::size_t) back] * gL, -ceiling, ceiling); // safety clip
             double yr = std::clamp (inR[(std::size_t) back] * gR, -ceiling, ceiling);
+            if (keep) { limL[(std::size_t) pos] = (float) yl; limR[(std::size_t) pos] = (float) yr; }
             if (audition) { yl = inL[(std::size_t) back] - yl; yr = inR[(std::size_t) back] - yr; } // what is removed
             if (unity) { yl /= gain; yr /= gain; }
             if (bits > 0) { yl = dither (yl, 0); yr = dither (yr, 1); }
@@ -273,6 +281,7 @@ struct Core
             outL[(std::size_t) pos] = (float) yl; outR[(std::size_t) pos] = (float) yr;
             const int rd = (pos - pad + len) % len;
             left[i] = outL[(std::size_t) rd]; right[i] = outR[(std::size_t) rd];
+            if (keep) { keepL[i] = limL[(std::size_t) rd]; keepR[i] = limR[(std::size_t) rd]; }
             pos = (pos + 1) % len;
         }
         return minGain;
@@ -302,7 +311,7 @@ struct Core
     std::array<std::array<double, 3>, 2> err {};
     unsigned long long rng = 0x9e3779b97f4a7c15ull;
     double dcXL = 0.0, dcXR = 0.0, dcYL = 0.0, dcYR = 0.0, dcR = 0.9993;
-    std::vector<float> inL, inR, outL, outR;
+    std::vector<float> inL, inR, outL, outR, limL, limR;
     std::array<double, interpTaps> histL {}, histR {}, scHistL {}, scHistR {};
     std::vector<double> boxL, boxR;
     double boxSumL = 1.0, boxSumR = 1.0;
@@ -311,6 +320,154 @@ struct Core
     double fastL = 0.0, fastR = 0.0, slowL = 0.0, slowR = 0.0; // release stages, dB
     double peakL = 0.0, peakR = 0.0; // round tp172b3: the detected peaks over ~10 ms (the headroom under the ceiling)
     double levelDb = 0.0; // round 190ar: the levelling stage's reduction, dB
+};
+
+
+// ---- the true-peak guard (round 190co) ----
+// With True peak on, the core above asks for the gain from a 4× estimate of its INPUT and applies a gain that moves:
+// the product has inter-sample peaks the estimate never saw, the 8-tap estimator reads a limited signal's peaks low,
+// an oversampled core's output grows again in the down filter, and the old last stage, a clip of the samples at the
+// ceiling, leaves flat tops that overshoot between the samples. Measured (round 190cn, ceiling −1 dB, 16× reference
+// meter): up to +1.07 dBTP with oversampling off and −0.76 dBTP at 2× … 8×.
+// This stage ends the chain at the base rate and holds the ceiling on what really leaves the plugin:
+//  - the true peak of every sample period of its input, by the meter's own estimator (core/Loudness.h TruePeak: the
+//    reference reconstruction) and, as true-peak meters differ wherever a signal has energy next to half the rate,
+//    also by a short 4× interpolator of the kind most meters use (24 taps per phase, Kaiser β = 8; libswresample's
+//    32-tap one, which ffmpeg's ebur128 reads, differs from it by hundredths): the higher of the two counts;
+//  - required gain = ceiling / peak, held over the gain's ramp plus `reach` samples each side of the peak (so the
+//    samples the interpolation leans on all carry the same gain) and smoothed by two running means of 0.125 ms: the
+//    gain is a small smooth dip around each overshoot, exactly 1 everywhere else (the signal passes bit for bit).
+//    (Round 190co2: 0.125 ms and `reach` 8 rather than 0.25 ms and 6: the parity banks of the reference limiter lost a
+//    step on 0.25 ms (trial187b 6.800 -> 6.763) and keep their score now, the ceiling holds with more margin (drums
+//    +0.01 dB over at most instead of +0.08 with 0.125 ms and 6), and the latency is shorter);
+//  - the dip is taken 6 % deeper than ceiling / peak asks (`deepen`): a peak between the samples is the sum of
+//    many samples each side, and the ones beyond the dip keep their size. Measured on drums and on treble-only noise
+//    bursts, a 2.8 dB dip came out 0.11 dB short without it and within 0.03 dB with it;
+//  - the clip of the samples stays behind it as the last word (it no longer has anything to do).
+// Latency: the estimator's 67 samples + the ramp + `reach` (85 samples at 44.1 and 48 kHz, 97 at 96 kHz), reported to
+// the host.
+struct Guard
+{
+    static constexpr int softTaps = 24, reach = 8;
+    static constexpr double deepen = 0.06;
+    static int boxLength (double sr) noexcept { return std::max (2, (int) std::lround (0.000125 * sr)); }
+    static int latencyAt (double sr) noexcept { return loudness::TruePeak::delay - 1 + 2 * boxLength (sr) - 2 + reach; }
+
+    void prepare (double sr)
+    {
+        (void) soft();
+        box = boxLength (sr);
+        lat = latencyAt (sr);
+        for (auto* v : { &yL, &yR, &dL, &dR }) v->assign ((std::size_t) lat + 1, 0.0f);
+        b1.assign ((std::size_t) box, 1.0); b2.assign ((std::size_t) box, 1.0);
+        hold.setCapacity (2 * box - 2 + 2 * reach + 1);
+        reset();
+    }
+    int latency() const noexcept { return lat; }
+    void reset() noexcept
+    {
+        for (auto* v : { &yL, &yR, &dL, &dR }) std::fill (v->begin(), v->end(), 0.0f);
+        std::fill (b1.begin(), b1.end(), 1.0); std::fill (b2.begin(), b2.end(), 1.0);
+        sum1 = sum2 = (double) box;
+        hold.setLength (2 * box - 2 + 2 * reach + 1);
+        for (auto& t : tp) t.clear();
+        for (auto& f : fit) f.clear();
+        pos = boxPos = 0; ones = 0;
+    }
+
+    // `left` / `right`: the limited signal in, the guarded signal out (delayed by latency()). `remL` / `remR`
+    // (Audition, or nullptr): what the stages before removed in, what the whole limiter removes out.
+    // Returns the lowest gain of the block.
+    double run (float* left, float* right, int n, double ceiling, float* remL, float* remR) noexcept
+    {
+        const int ring = lat + 1;
+        const auto& sf = soft();
+        // under this level nothing the estimators could return reaches the ceiling
+        const double gate = ceiling / loudness::TruePeak::gateBound() * 0.999;
+        tp[0].setGate (gate); tp[1].setGate (gate);
+        const auto skip = (float) (ceiling / loudness::TruePeak::fitReach); // (a peak under it cannot reach the ceiling)
+        double minGain = 1.0;
+        for (int i = 0; i < n; ++i)
+        {
+            const float xl = left[i], xr = right[i];
+            double peak = std::max (tp[0].push (xl, ceiling), tp[1].push (xr, ceiling));
+            if (! (tp[0].quiet() && tp[1].quiet()))
+                for (int c = 0; c < 2; ++c)
+                {
+                    // the short interpolator over the same sample period (the sample itself, then the three points)
+                    const float* x = tp[c].newestFirst() + (loudness::TruePeak::delay - softTaps / 2);
+                    float m = 0.0f;
+                    fit[c].feed (x[softTaps / 2], m, skip);
+                    for (int ph = 0; ph < 3; ++ph) fit[c].feed (loudness::dot4 (sf.h[(std::size_t) ph].data(), x, softTaps), m, skip);
+                    peak = std::max (peak, (double) m);
+                }
+            double need = 1.0;
+            if (peak > ceiling)
+            {
+                need = ceiling / peak;
+                need *= 1.0 - deepen * (1.0 - need);
+            }
+            const double h = hold.push (need);
+            ones = h >= 1.0 ? std::min (ones + 1, 2 * box) : 0;
+            // two running means; pinned to exactly 1 once everything they hold is 1 (no drift, and the signal passes
+            // untouched)
+            sum1 += h - b1[(std::size_t) boxPos]; b1[(std::size_t) boxPos] = h;
+            if (ones >= box) sum1 = (double) box;
+            const double m1 = std::min (1.0, sum1 / box);
+            sum2 += m1 - b2[(std::size_t) boxPos]; b2[(std::size_t) boxPos] = m1;
+            boxPos = (boxPos + 1) % box;
+            double g = std::min (1.0, sum2 / box);
+            if (ones >= 2 * box) { sum2 = (double) box; g = 1.0; }
+            minGain = std::min (minGain, g);
+
+            yL[(std::size_t) pos] = xl; yR[(std::size_t) pos] = xr;
+            const int back = (pos + 1) % ring; // `lat` samples ago
+            const double il = yL[(std::size_t) back], ir = yR[(std::size_t) back];
+            const double ol = g < 1.0 ? std::clamp (il * g, -ceiling, ceiling) : std::clamp (il, -ceiling, ceiling);
+            const double orr = g < 1.0 ? std::clamp (ir * g, -ceiling, ceiling) : std::clamp (ir, -ceiling, ceiling);
+            left[i] = (float) ol; right[i] = (float) orr;
+            if (remL != nullptr && remR != nullptr)
+            {
+                dL[(std::size_t) pos] = remL[i]; dR[(std::size_t) pos] = remR[i];
+                remL[i] = (float) (dL[(std::size_t) back] + (il - ol));
+                remR[i] = (float) (dR[(std::size_t) back] + (ir - orr));
+            }
+            pos = (pos + 1) % ring;
+        }
+        return minGain;
+    }
+
+private:
+    // the three in-between phases of a 4× windowed-sinc interpolator, 24 taps, Kaiser β = 8, over x newest first:
+    // tap j is the sample 12 − j after the period's first one
+    struct Soft
+    {
+        std::array<std::array<float, softTaps>, 3> h {};
+        Soft()
+        {
+            for (int ph = 1; ph <= 3; ++ph)
+            {
+                std::array<double, softTaps> c {};
+                double sum = 0.0;
+                for (int j = 0; j < softTaps; ++j)
+                {
+                    const double u = (softTaps / 2 - j) - ph / 4.0; // sample position − the point's
+                    c[(std::size_t) j] = std::sin (pi * u) / (pi * u) * loudness::kaiser (u / (softTaps / 2), 8.0);
+                    sum += c[(std::size_t) j];
+                }
+                for (int j = 0; j < softTaps; ++j) h[(std::size_t) ph - 1][(std::size_t) j] = (float) (c[(std::size_t) j] / sum);
+            }
+        }
+    };
+    static const Soft& soft() { static const Soft s; return s; }
+
+    int box = 6, lat = 85, pos = 0, boxPos = 0, ones = 0;
+    std::array<loudness::TruePeak, 2> tp;
+    std::array<loudness::PeakFit, 2> fit;
+    SlidingMin hold;
+    std::vector<double> b1, b2;
+    double sum1 = 6.0, sum2 = 6.0;
+    std::vector<float> yL, yR, dL, dR;
 };
 
 class ApexLimiterEffect final : public Effect
@@ -328,7 +485,8 @@ public:
             over[(std::size_t) k].prepare (sr * f, f * base.latency() - overLatency);
         }
         loud.prepare (sr);
-        latency.store (latencyFor (sr, knownFactor), std::memory_order_relaxed);
+        guard.prepare (sr);
+        latency.store (latencyFor (sr, knownFactor, knownTruePeak), std::memory_order_relaxed);
         reset();
     }
 
@@ -339,6 +497,8 @@ public:
         for (auto& o : os) o.reset();
         for (auto& o : osSide) o.reset();
         for (auto& o : osSc) o.reset();
+        for (auto& o : osKeep) o.reset();
+        guard.reset();
         loud.reset();
     }
 
@@ -348,7 +508,8 @@ public:
     void presetLatency (const EffectParams& p) noexcept
     {
         knownFactor = oversamplingFactor (p[pOversampling]);
-        latency.store (latencyFor (sampleRate, knownFactor), std::memory_order_relaxed);
+        knownTruePeak = p[pTruePeak] >= 0.5f;
+        latency.store (latencyFor (sampleRate, knownFactor, knownTruePeak), std::memory_order_relaxed);
     }
 
     // live meters for the editor (round 114): 0 = gain reduction over 0 … 30 dB (0..1), 2 = input peak, 3 = output
@@ -370,9 +531,21 @@ public:
             for (auto& o : os) { o.setFactor (std::max (2, factor)); o.reset(); }
             for (auto& o : osSide) { o.setFactor (std::max (2, factor)); o.reset(); }
             for (auto& o : osSc) { o.setFactor (std::max (2, factor)); o.reset(); }
+            for (auto& o : osKeep) { o.setFactor (std::max (2, factor)); o.reset(); }
+            guard.reset();
         }
         knownFactor = factor;
-        latency.store (latencyFor (sampleRate, factor), std::memory_order_relaxed);
+        // round 190co: with True peak on, the true-peak guard ends the chain (its latency is part of the report);
+        // with it off nothing below changed: the output is the one of 0.1.26, bit for bit
+        const bool truePeak = p[pTruePeak] >= 0.5f;
+        if (truePeak != guarded)
+        {
+            guarded = truePeak;
+            guard.reset();
+            for (auto& o : osKeep) o.reset();
+        }
+        knownTruePeak = truePeak;
+        latency.store (latencyFor (sampleRate, factor, truePeak), std::memory_order_relaxed);
         // the loudness meter's reset button flips its value (a "momentary" switch)
         if (p[pLoudnessReset] != lastReset) { lastReset = p[pLoudnessReset]; loud.reset(); }
         const bool external = p[pSidechain] >= 0.5f && scL != nullptr && scR != nullptr;
@@ -380,7 +553,9 @@ public:
         float inPeak = 0.0f;
         for (int i = 0; i < n; ++i) inPeak = std::max (inPeak, std::max (std::abs (left[i]), std::abs (right[i])));
         double minGain = 1.0;
-        if (factor == 1)
+        if (truePeak)
+            minGain = runGuarded (left, right, n, p, factor, external);
+        else if (factor == 1)
             minGain = base.run (left, right, n, p, external ? scL : nullptr, external ? scR : nullptr, true);
         else
         {
@@ -445,14 +620,90 @@ public:
 private:
     void store (int k, float v) noexcept { meters[(std::size_t) k].store (v, std::memory_order_relaxed); }
 
+    // True peak on (round 190co): the core (at the base or the oversampled rate, without Unity gain and dither), the
+    // true-peak guard at the base rate, then Unity gain and the dither. Audition plays what the core and the guard
+    // remove together.
+    double runGuarded (float* left, float* right, int n, const EffectParams& p, int factor, bool external) noexcept
+    {
+        const double gain = std::pow (10.0, gainDb (p[0]) / 20.0);
+        const double ceiling = std::pow (10.0, ceilingDb (p[1]) / 20.0);
+        const bool audition = p[pAudition] >= 0.5f, unity = p[pUnity] >= 0.5f;
+        const int bits = ditherBits (p[pDither]);
+        double coreGain = 1.0, guardGain = 1.0;
+        for (int start = 0; start < n; start += chunk)
+        {
+            const int m = std::min (chunk, n - start);
+            float* l = left + start;
+            float* r = right + start;
+            if (factor == 1)
+                coreGain = std::min (coreGain, base.run (l, r, m, p, external ? scL + start : nullptr, external ? scR + start : nullptr, false,
+                                                         true, keepL.data(), keepR.data()));
+            else
+            {
+                auto& core = over[(std::size_t) (factor == 2 ? 0 : factor == 4 ? 1 : 2)];
+                const int up = m * factor;
+                for (int c = 0; c < 2; ++c)
+                {
+                    std::copy (c == 0 ? l : r, (c == 0 ? l : r) + m, copy.begin());
+                    auto* dst = c == 0 ? upL.data() : upR.data();
+                    int k = 0;
+                    osSide[(std::size_t) c].process (copy.data(), m, [&] (float v) noexcept { dst[std::min (k++, up - 1)] = v; return 0.0f; });
+                    if (external)
+                    {
+                        std::copy (c == 0 ? scL + start : scR + start, (c == 0 ? scL : scR) + start + m, copy.begin());
+                        auto* sdst = c == 0 ? upScL.data() : upScR.data();
+                        int j = 0;
+                        osSc[(std::size_t) c].process (copy.data(), m, [&] (float v) noexcept { sdst[std::min (j++, up - 1)] = v; return 0.0f; });
+                    }
+                }
+                coreGain = std::min (coreGain, core.run (upL.data(), upR.data(), up, p, external ? upScL.data() : nullptr, external ? upScR.data() : nullptr, false,
+                                                         true, upKeepL.data(), upKeepR.data()));
+                for (int c = 0; c < 2; ++c)
+                {
+                    const auto* src = c == 0 ? upL.data() : upR.data();
+                    int k = 0;
+                    os[(std::size_t) c].process (c == 0 ? l : r, m, [&] (float) noexcept { return src[std::min (k++, up - 1)]; });
+                    if (audition)
+                    {
+                        const auto* ksrc = c == 0 ? upKeepL.data() : upKeepR.data();
+                        int j = 0;
+                        osKeep[(std::size_t) c].process (c == 0 ? keepL.data() : keepR.data(), m, [&] (float) noexcept { return ksrc[std::min (j++, up - 1)]; });
+                    }
+                }
+            }
+            // (with Audition on, l / r hold what the core removed and keepL / keepR the limited signal)
+            if (audition)
+            {
+                guardGain = std::min (guardGain, guard.run (keepL.data(), keepR.data(), m, ceiling, l, r));
+            }
+            else
+                guardGain = std::min (guardGain, guard.run (l, r, m, ceiling, nullptr, nullptr));
+            if (unity || bits > 0)
+            {
+                base.bits = bits;
+                base.shaping = noiseShaping (p[pShaping]);
+                for (int i = 0; i < m; ++i)
+                {
+                    double yl = l[i], yr = r[i];
+                    if (unity) { yl /= gain; yr /= gain; }
+                    if (bits > 0) { yl = base.dither (yl, 0); yr = base.dither (yr, 1); }
+                    l[i] = (float) yl; r[i] = (float) yr;
+                }
+            }
+        }
+        return coreGain * guardGain;
+    }
+
     static constexpr int chunk = 1024, maxFactor = 8;
     double sampleRate = 48000.0;
     Core base;
     std::array<Core, 3> over; // 2x, 4x, 8x
-    std::array<mixsuite::Oversampler, 2> os, osSide, osSc;
+    std::array<mixsuite::Oversampler, 2> os, osSide, osSc, osKeep;
     int osFactor = 1, knownFactor = 1;
-    std::array<float, chunk> copy {};
-    std::array<float, chunk * maxFactor> upL {}, upR {}, upScL {}, upScR {};
+    bool guarded = true, knownTruePeak = true; // (True peak is on by default)
+    Guard guard;
+    std::array<float, chunk> copy {}, keepL {}, keepR {};
+    std::array<float, chunk * maxFactor> upL {}, upR {}, upScL {}, upScR {}, upKeepL {}, upKeepR {};
     const float* scL = nullptr;
     const float* scR = nullptr;
     loudness::Meter loud;
@@ -463,7 +714,11 @@ private:
 } // namespace
 
 int oversamplingFactor (float v) noexcept { return 1 << std::clamp ((int) std::lround (v * 3.0f), 0, 3); }
-int latencyFor (double sr, int factor) noexcept { return latencyAt (sr) + (factor > 1 ? mixsuite::Oversampler::latency() : 0); }
+int guardLatency (double sr) noexcept { return Guard::latencyAt (sr); }
+int latencyFor (double sr, int factor, bool truePeak) noexcept
+{
+    return (int) std::ceil (maxLookaheadMs * 0.001 * sr) + interpDelay + (factor > 1 ? mixsuite::Oversampler::latency() : 0) + (truePeak ? Guard::latencyAt (sr) : 0);
+}
 int displayMode (float v) noexcept { return std::clamp ((int) std::lround (v * 4.0f), 0, 4); }
 double loudnessTarget (float v) noexcept
 {
@@ -551,7 +806,7 @@ std::string paramText (int p, float v)
     return t;
 }
 
-int latencyAt (double sr) noexcept { return (int) std::ceil (maxLookaheadMs * 0.001 * sr) + interpDelay; }
+int latencyAt (double sr, bool truePeak) noexcept { return latencyFor (sr, 1, truePeak); }
 
 std::unique_ptr<Effect> make (const EffectParams* initial)
 {

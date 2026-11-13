@@ -1,5 +1,5 @@
 ---
-source: a06504f3a0
+source: d2bebc77b1
 ---
 ![La pagina MIDI delle impostazioni: dispositivi di ingresso, dispositivi di uscita con sincronia master e sincronia esterna](/assets/img/wiki/settings-midi.webp)
 
@@ -36,7 +36,9 @@ Il collegamento viene salvato con il progetto. Per rimuoverlo, clicca di nuovo c
 
 | Comando | Tasto | Cosa fa |
 |---|---|---|
-| `Override global link...` | nessuno | Crea un collegamento che vale in ogni progetto. Viene mantenuto nelle impostazioni, non nel progetto |
+| `Collega a controller...` | nessuno | Apre la finestra `Impostazioni di controllo remoto` per il controllo, dove vedi e imposti a mano il suo collegamento (sotto) |
+| `Sostituisci collegamento globale...` | nessuno | Crea un collegamento che vale in ogni progetto. Viene mantenuto nelle impostazioni, non nel progetto |
+| `Sostituisci collegamento globale... (per tutti i progetti: muovi una manopola sul controller)` | nessuno | Crea un collegamento globale in un solo passo: muovi subito dopo il controllo hardware. La voce senza le parentesi apre invece la finestra `Impostazioni del collegamento globale` |
 | `Rimuovi collegamento globale` | nessuno | Lo rimuove di nuovo |
 | `Multilink ai controller` | `Ctrl+J` | Finché è attivo, i controlli che muovi vengono collegati, in ordine, ai controlli hardware che muovi subito dopo. Si trova nel menu `Opzioni` |
 | `Pickup (modalità takeover)` | nessuno | Nella pagina MIDI. Un controller muove un parametro solo dopo aver raggiunto il suo valore attuale, così niente salta |
@@ -44,6 +46,22 @@ Il collegamento viene salvato con il progetto. Per rimuoverlo, clicca di nuovo c
 La pagina MIDI elenca i collegamenti sotto `Collegamenti (progetto, globali)`. Un dispositivo il cui `Tipo di controller` è `Controller generico` fa solo ciò che colleghi a mano.
 
 I parametri di un plugin di terze parti si raggiungono con `Automatizza parametro del plugin` nel menu del canale o nel menu dello slot effetto. Ogni parametro lì ha le stesse voci di collegamento. Vedi [Automazione](/wiki/automation/).
+
+## Impostazioni di controllo remoto
+
+`Collega a controller...` apre questa finestra, come in FL Studio. `Impostazioni del collegamento globale` (da `Sostituisci collegamento globale...`) ha gli stessi campi tranne l'elenco dei collegamenti, `Omni`, il controller interno e `Rimuovi conflitti`. Anche un doppio clic su un collegamento nell'elenco della pagina MIDI la apre.
+
+| Impostazione | Cosa fa |
+|---|---|
+| `Porta`, `Canale`, `Ctrl` | Il numero della porta di ingresso MIDI, il canale MIDI e il numero del controller. Clic destro su `Ctrl` per i controller standard per nome. `Nota C0` in quell'elenco crea un collegamento a una nota: alza il numero da lì per un altro tasto |
+| `Rilevamento automatico` | Attivo per impostazione predefinita. Muovi un controllo sul tuo dispositivo e i numeri vengono compilati |
+| `Omni` | Il collegamento segue il canale selezionato o, per un effetto in uno slot del Mixer, la traccia del Mixer selezionata |
+| `Modalità` | Come agisce il collegamento di una nota o di un pulsante. `Predefinito` e `Hold` seguono il tasto: la sua velocity finché è premuto, zero al rilascio. `Latch` passa tra i due estremi a ogni pressione. `Inc` aumenta il valore a ogni pressione. `Resta` imposta la velocity e la mantiene dopo il rilascio |
+| Controller interno | Collega il controllo a uno dei controller interni del progetto. Mostrato solo quando il progetto ne ha uno. `Registra automazione` permette di registrare i movimenti di quel controller come automazione |
+| `Formula di mappatura` | Come l'ingresso viene mappato sul controllo, con la variabile `Ingresso`. `Preset` ha l'elenco di formule di FL. Premi `Enter` per applicare una formula che hai digitato. La curva accanto mostra il risultato |
+| `Smussamento` | Ammorbidisce i movimenti del controllo. `Tempo` imposta per quanto tempo: 1 polo per i valori negativi, 3 poli per quelli positivi |
+| `Rimuovi conflitti` | Attivo per impostazione predefinita. Rimuove gli altri collegamenti che usano lo stesso controller quando fai clic su `Accetta`. Diventa rosso finché esiste un collegamento del genere |
+| `Ripristina`, `Salta`, `Accetta` | `Accetta` salva il collegamento (un solo passo di annullamento). Con più controlli in coda per il multilink, `Salta` passa al successivo |
 
 ## Profili di controller
 
@@ -79,6 +97,16 @@ L'MPE è a un primo stadio. Un controller MPE suona ogni nota con il proprio pit
 - Tra gli strumenti integrati, il Sampler e il synth integrato seguono questi valori.
 - Un plugin di terze parti riceve l'MPE quando `MPE` è attivo sotto `MIDI` in `Impostazioni del wrapper` della finestra del plugin. Ogni nota esce allora sul proprio canale MIDI, da 2 a 16.
 - Non è ancora stato provato con un vero controller MPE.
+
+## MIDI Map Mode e Key Map Mode
+
+Nel [flusso Clip-launch](/wiki/layouts/), clip, scene e pulsanti si possono mappare come in Ableton Live. I pulsanti `MIDI` e `Tonalità` accanto all'interruttore `Entrambi`, `Griglia`, `Brano` attivano le modalità, così come `Ctrl+M` e `Ctrl+K`.
+
+1. Premi `Ctrl+M` per MIDI Map Mode, o `Ctrl+K` per Key Map Mode. Ogni elemento mappabile si tinge, di blu per il MIDI e di arancione per i tasti.
+2. Fai clic su un elemento: uno slot di clip, una scena, il pulsante stop di una traccia, `Ferma tutte le clip`, play, stop, record, `Registrazione di sessione`, il metronomo, o una manopola del Session mixer o della Device View.
+3. Muovi un controllo o premi un tasto sul tuo dispositivo MIDI, oppure premi un tasto del computer in Key Map Mode. L'elemento mostra la sua assegnazione, per esempio `1/19` (canale e controller).
+4. Le mappature sono elencate al posto del Browser: Channel, Note/Control o Key, Path, Name, Min e Max. Trascina Min o Max, oppure fai doppio clic per digitare un valore. Clic destro su una riga per `Inverti intervallo` e `Delete`.
+5. Premi di nuovo lo stesso tasto per terminare la modalità.
 
 ## La tastiera del PC
 
@@ -116,6 +144,8 @@ L'MPE è a un primo stadio. Un controller MPE suona ogni nota con il proprio pit
 - MIDI CC, aftertouch di canale e pitch bend inviati a un plugin si possono automatizzare con `Automatizza controller MIDI (CC, aftertouch, pitch bend)`.
 - Una nota trattenuta da un pedale viene registrata fino al momento in cui il pedale si alza.
 - Una clip di automazione non riprende un controllo mentre lo muovi da un controller. Il controllo segue di nuovo la sua automazione alla successiva partenza della riproduzione.
+- I collegamenti a note creati in `Impostazioni di controllo remoto` non vengono scritti in un'esportazione .flp.
+- `Ctrl+M` e `Ctrl+K` avviano le modalità di mappatura solo nel flusso Clip-launch. Map Mode non ha ancora la mappatura delle macro né gli intervalli di note.
 
 ## Correlati
 

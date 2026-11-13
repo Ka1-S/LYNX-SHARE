@@ -118,7 +118,7 @@ namespace lynx::refs
 bool targetsChannel (const AutomationTarget& t) noexcept
 {
     return t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-           || t.kind == AutomationTargetKind::channelParam;
+           || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust;
 }
 
 bool targetsInsert (const AutomationTarget& t) noexcept

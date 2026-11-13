@@ -7,8 +7,10 @@
 #include "core/PatternBlocks.h"
 #include "core/MidiControls.h"
 #include "core/SessionIds.h"
+#include "core/FlCurve.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <iterator>
 #include <cmath>
 #include <functional>
@@ -238,10 +240,37 @@ void Song::removePattern (int index)
         else if (c.loopStarterPattern > index)
             --c.loopStarterPattern;
 
-    if (patterns.empty())
-        patterns.emplace_back().name = "Pattern 1";
+    if (currentPattern > index)
+        --currentPattern;
+    keepOnePattern(); // (the last one: an empty "Pattern 1" stays, as in FL)
+}
 
-    currentPattern = std::clamp (currentPattern > index ? currentPattern - 1 : currentPattern, 0, (int) patterns.size() - 1);
+bool Song::keepOnePattern()
+{
+    bool changed = false;
+    if (patterns.empty())
+    {
+        patterns.emplace_back().name = "Pattern 1";
+        changed = true;
+    }
+    const auto clamped = std::clamp (currentPattern, 0, (int) patterns.size() - 1);
+    changed = changed || clamped != currentPattern;
+    currentPattern = clamped;
+    return changed;
+}
+
+const Pattern& Song::activePattern() const noexcept
+{
+    static const Pattern none;
+    if (patterns.empty())
+        return none;
+    return patterns[(std::size_t) std::clamp (currentPattern, 0, (int) patterns.size() - 1)];
+}
+
+Pattern& Song::activePattern()
+{
+    keepOnePattern();
+    return patterns[(std::size_t) currentPattern];
 }
 
 std::vector<MixerTrack> Song::defaultMixer (int inserts)
@@ -372,7 +401,7 @@ void Song::removeChannel (int index)
 
     forEachTarget ([index] (AutomationTarget& t) {
         const auto onChannel = t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-                               || t.kind == AutomationTargetKind::channelParam;
+                               || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust;
 
         if (onChannel && t.index == index)
             t.kind = AutomationTargetKind::none;
@@ -416,6 +445,11 @@ void Song::removeDeadMidiLinks()
     initialValues.erase (std::remove_if (initialValues.begin(), initialValues.end(),
                                          [] (const InitialValue& v) { return v.target.kind == AutomationTargetKind::none; }),
                          initialValues.end());
+    remoteMappings.erase (std::remove_if (remoteMappings.begin(), remoteMappings.end(), // (round 190ef)
+                                          [] (const RemoteMapping& m) {
+                                              return m.action == RemoteAction::parameter && m.target.kind == AutomationTargetKind::none;
+                                          }),
+                          remoteMappings.end());
 }
 
 std::vector<MidiLink> linksWithGlobal (const std::vector<MidiLink>& project, const std::vector<MidiLink>& global)
@@ -424,12 +458,73 @@ std::vector<MidiLink> linksWithGlobal (const std::vector<MidiLink>& project, con
     for (const auto& g : global)
     {
         const auto overridden = std::any_of (project.begin(), project.end(), [&] (const MidiLink& p) {
-            return p.target == g.target || (p.cc == g.cc && (p.channel < 0 || g.channel < 0 || p.channel == g.channel));
+            return p.target == g.target || (p.cc == g.cc && p.port == g.port && (p.channel < 0 || g.channel < 0 || p.channel == g.channel));
         });
         if (! overridden && g.target.kind != AutomationTargetKind::none)
             out.push_back (g);
     }
     return out;
+}
+
+bool linkOmniAvailable (AutomationTargetKind kind) noexcept
+{
+    return kind == AutomationTargetKind::channelVolume || kind == AutomationTargetKind::channelPan || kind == AutomationTargetKind::channelParam
+        || kind == AutomationTargetKind::channelAdjust || kind == AutomationTargetKind::mixerVolume || kind == AutomationTargetKind::mixerPan || kind == AutomationTargetKind::effectParam
+        || kind == AutomationTargetKind::effectMix;
+}
+
+AutomationTarget linkOmniTarget (const MidiLink& link, int selectedChannel, int selectedMixerTrack) noexcept
+{
+    auto t = link.target;
+    if (! link.omni || ! linkOmniAvailable (t.kind))
+        return t;
+    const auto channelControl = t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
+                                || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust;
+    const auto index = channelControl ? selectedChannel : selectedMixerTrack;
+    if (index >= 0)
+        t.index = index;
+    return t;
+}
+
+int countLinkConflicts (const std::vector<MidiLink>& links, const MidiLink& link)
+{
+    if (link.cc < 0)
+        return 0;
+    return (int) std::count_if (links.begin(), links.end(), [&] (const MidiLink& l) { return ! (l.target == link.target) && sameController (l, link); });
+}
+
+int setTargetLinks (std::vector<MidiLink>& links, const AutomationTarget& target, std::vector<MidiLink> edited, bool removeConflicts)
+{
+    edited.erase (std::remove_if (edited.begin(), edited.end(), [] (const MidiLink& l) { return l.cc < 0; }), edited.end());
+    for (auto& l : edited)
+        l.target = target;
+    int removed = 0;
+    if (removeConflicts)
+    {
+        const auto before = links.size();
+        links.erase (std::remove_if (links.begin(), links.end(),
+                                     [&] (const MidiLink& l) {
+                                         return ! (l.target == target)
+                                             && std::any_of (edited.begin(), edited.end(), [&] (const MidiLink& e) { return sameController (l, e); });
+                                     }),
+                     links.end());
+        removed = (int) (before - links.size());
+    }
+    // the control's links keep the place of its first one
+    const auto first = std::find_if (links.begin(), links.end(), [&] (const MidiLink& l) { return l.target == target; });
+    const auto at = (std::size_t) (first - links.begin());
+    std::vector<MidiLink> out;
+    for (std::size_t i = 0; i < links.size(); ++i)
+    {
+        if (i == at)
+            out.insert (out.end(), edited.begin(), edited.end());
+        if (! (links[i].target == target))
+            out.push_back (links[i]);
+    }
+    if (at >= links.size())
+        out.insert (out.end(), edited.begin(), edited.end());
+    links = std::move (out);
+    return removed;
 }
 
 int Song::findInitialValue (const AutomationTarget& target) const noexcept
@@ -1166,7 +1261,10 @@ void set (SamplerSettings& s, int param, float value) noexcept
     }
     // like editing the knob by hand: the envelope / filter replace FL's imported voice (REA_rodada69 §3, REA_rodada76)
     if (param <= release)
+    {
         s.flVolumeEnvelope.clear();
+        s.flmPad.clear();
+    }
     if (param <= resonance)
         s.flChannel.clear();
 }
@@ -1181,6 +1279,14 @@ float Song::targetValue (const AutomationTarget& t) const noexcept
     {
         case AutomationTargetKind::channelVolume: return validChannel ? channels[(std::size_t) t.index].volume : -1.0f;
         case AutomationTargetKind::channelPan: return validChannel ? (channels[(std::size_t) t.index].pan + 1.0f) * 0.5f : -1.0f;
+        case AutomationTargetKind::channelAdjust:
+        {
+            if (! validChannel || ! leveladjust::valid (t.param))
+                return -1.0f;
+            const auto& l = channels[(std::size_t) t.index].misc.levels;
+            return t.param == leveladjust::volume ? l.volume * 0.5f
+                                                  : ((t.param == leveladjust::pan ? l.pan : t.param == leveladjust::modX ? l.modX : l.modY) + 1.0f) * 0.5f;
+        }
         case AutomationTargetKind::mixerVolume: return validTrack ? mixer[(std::size_t) t.index].volume : -1.0f;
         case AutomationTargetKind::mixerPan: return validTrack ? (mixer[(std::size_t) t.index].pan + 1.0f) * 0.5f : -1.0f;
         case AutomationTargetKind::effectParam:
@@ -1239,6 +1345,14 @@ bool Song::setTargetValue (const AutomationTarget& t, float v) noexcept
     {
         case AutomationTargetKind::channelVolume: if (! validChannel) return false; channels[(std::size_t) t.index].volume = v; return true;
         case AutomationTargetKind::channelPan: if (! validChannel) return false; channels[(std::size_t) t.index].pan = v * 2.0f - 1.0f; return true;
+        case AutomationTargetKind::channelAdjust:
+        {
+            if (! validChannel || ! leveladjust::valid (t.param))
+                return false;
+            auto& l = channels[(std::size_t) t.index].misc.levels;
+            (t.param == leveladjust::volume ? l.volume : t.param == leveladjust::pan ? l.pan : t.param == leveladjust::modX ? l.modX : l.modY) = v * 2.0f - (t.param == leveladjust::volume ? 0.0f : 1.0f);
+            return true;
+        }
         case AutomationTargetKind::mixerVolume: if (! validTrack) return false; mixer[(std::size_t) t.index].volume = v; return true;
         case AutomationTargetKind::mixerPan: if (! validTrack) return false; mixer[(std::size_t) t.index].pan = v * 2.0f - 1.0f; return true;
         case AutomationTargetKind::tempo: bpm = tempoFromValue (v); return true;
@@ -1395,6 +1509,34 @@ float Automation::valueAt (double tick) const noexcept
     return automationCurveAt (points, tick);
 }
 
+double automationSegmentShape (const std::vector<AutomationPoint>& points, std::size_t k, double x) noexcept
+{
+    if (k + 1 >= points.size())
+        return x;
+    const auto& a = points[k];
+    const auto& b = points[k + 1];
+    if (a.mode == AutomationPoint::legacyCurve) // LYNX's law before round 190bw: a power curve
+        return a.tension != 0.0f ? std::pow (x, std::pow (2.0, (double) a.tension * 3.0)) : x;
+    if (a.mode != flcurve::smooth)
+        return flcurve::shape (a.mode, -a.tension, x);
+
+    // Smooth: the slopes come from the neighbouring segments that are Smooth too
+    flcurve::SmoothSide before, after;
+    if (k > 0 && points[k - 1].mode == flcurve::smooth)
+    {
+        before.smooth = true;
+        before.dx = (double) (a.tick - points[k - 1].tick);
+        before.y = (double) points[k - 1].value;
+    }
+    if (k + 2 < points.size() && b.mode == flcurve::smooth)
+    {
+        after.smooth = true;
+        after.dx = (double) (points[k + 2].tick - b.tick);
+        after.y = (double) points[k + 2].value;
+    }
+    return flcurve::evaluate (flcurve::prepareSmooth (-a.tension, (double) (b.tick - a.tick), (double) a.value, (double) b.value, before, after), x);
+}
+
 float automationCurveAt (const std::vector<AutomationPoint>& points, double tick) noexcept
 {
     if (points.empty())
@@ -1411,17 +1553,81 @@ float automationCurveAt (const std::vector<AutomationPoint>& points, double tick
         if (tick < (double) b.tick)
         {
             const auto span = (double) std::max<std::int64_t> (1, b.tick - a.tick);
-            auto t = (float) ((tick - (double) a.tick) / span);
-
-            // tension: curve exponent (positive = rises slowly then accelerates)
-            if (a.tension != 0.0f)
-                t = std::pow (t, std::pow (2.0f, a.tension * 3.0f));
-
-            return a.value + (b.value - a.value) * t;
+            const auto x = (tick - (double) a.tick) / span;
+            if (a.mode == AutomationPoint::legacyCurve || (a.mode == 0 && a.tension == 0.0f))
+            {
+                // a straight segment, or an older project's bend: the same float arithmetic as before round 190bw
+                auto t = (float) x;
+                if (a.tension != 0.0f)
+                    t = std::pow (t, std::pow (2.0f, a.tension * 3.0f));
+                return a.value + (b.value - a.value) * t;
+            }
+            return (float) ((double) a.value + ((double) b.value - (double) a.value) * automationSegmentShape (points, i - 1, x));
         }
     }
 
     return points.back().value;
+}
+
+int automationPointMode (const std::vector<AutomationPoint>& points, int point) noexcept
+{
+    if (point < 1 || point >= (int) points.size())
+        return -1;
+    const auto m = points[(std::size_t) point - 1].mode;
+    return m < flcurve::modeCount ? (int) m : -1;
+}
+
+void setAutomationPointMode (std::vector<AutomationPoint>& points, int point, int mode) noexcept
+{
+    if (point < 1 || point >= (int) points.size() || mode < 0 || mode >= flcurve::modeCount)
+        return;
+    points[(std::size_t) point - 1].mode = (std::uint8_t) mode;
+}
+
+int insertAutomationPoint (std::vector<AutomationPoint>& points, AutomationPoint p, int mode, float tension)
+{
+    const auto at = std::upper_bound (points.begin(), points.end(), p.tick, [] (std::int64_t t, const AutomationPoint& q) { return t < q.tick; });
+    const auto index = (int) (at - points.begin());
+    const auto m = (std::uint8_t) std::clamp (mode, 0, (int) flcurve::modeCount - 1);
+    p.mode = 0;
+    p.tension = 0.0f;
+    if (index > 0)
+    {
+        auto& before = points[(std::size_t) index - 1];
+        if (index < (int) points.size()) // splitting a segment: its curve stays on the part after the new point
+        {
+            p.mode = before.mode;
+            p.tension = before.tension;
+        }
+        before.mode = m;
+        before.tension = std::clamp (tension, -1.0f, 1.0f);
+    }
+    points.insert (points.begin() + index, p);
+    return index;
+}
+
+void eraseAutomationPoint (std::vector<AutomationPoint>& points, int point)
+{
+    if (point < 0 || point >= (int) points.size())
+        return;
+    if (point > 0)
+    {
+        auto& before = points[(std::size_t) point - 1];
+        const auto last = point + 1 == (int) points.size();
+        before.mode = last ? (std::uint8_t) 0 : points[(std::size_t) point].mode;
+        before.tension = last ? 0.0f : points[(std::size_t) point].tension;
+    }
+    points.erase (points.begin() + point);
+}
+
+void setAutomationSegmentTension (std::vector<AutomationPoint>& points, int segment, float tension) noexcept
+{
+    if (segment < 0 || segment >= (int) points.size())
+        return;
+    auto& p = points[(std::size_t) segment];
+    p.tension = std::clamp (tension, -1.0f, 1.0f);
+    if (p.mode == AutomationPoint::legacyCurve)
+        p.mode = 0;
 }
 
 // --- FL's automation clip LFO (REA round 177b; FUN_00ba1700, FUN_00ba0710, FUN_00ba03d0, FUN_00677660/820) ---------
@@ -1633,7 +1839,8 @@ bool EffectSlot::operator== (const EffectSlot& o) const
     if (kind != o.kind || enabled != o.enabled || params != o.params || mix != o.mix || ! (plugin == o.plugin) || sidechain != o.sidechain
         || sidechain2 != o.sidechain2 || sendTracks != o.sendTracks || state != o.state || samplePath != o.samplePath || ! (substituteFor == o.substituteFor)
         || presetName != o.presetName || abOther != o.abOther || abShowingB != o.abShowingB || branches.size() != o.branches.size()
-        || links.size() != o.links.size() || ! (patcher == o.patcher) || row != o.row || look != o.look || ! (flOrigin == o.flOrigin))
+        || links.size() != o.links.size() || ! (patcher == o.patcher) || row != o.row || look != o.look || goal != o.goal
+        || goalAmount != o.goalAmount || ! (flOrigin == o.flOrigin))
         return false;
     for (std::size_t i = 0; i < branches.size(); ++i)
         if (branches[i].gain != o.branches[i].gain || branches[i].chain != o.branches[i].chain)
@@ -1652,6 +1859,24 @@ float channelGain (float volume) noexcept
 {
     const auto v = std::clamp (volume, 0.0f, 1.0f);
     return (std::pow (11.0f, v) - 1.0f) / 10.0f;
+}
+
+float levelAdjustGain (float multiplier) noexcept
+{
+    const auto x = std::clamp (multiplier, 0.0f, 2.0f);
+    return x == 1.0f ? 1.0f : (std::pow (11.0f, x) - 1.0f) / 10.0f;
+}
+
+std::string levelVolumeText (float multiplier)
+{
+    const auto x = std::clamp (multiplier, 0.0f, 2.0f);
+    const auto gain = levelAdjustGain (x);
+    char text[64];
+    if (gain <= 1.0e-6f)
+        std::snprintf (text, sizeof (text), "%d%%  -INF dB  0.00", (int) std::lround (x * 100.0f));
+    else
+        std::snprintf (text, sizeof (text), "%d%%  %.1fdB  %.2f", (int) std::lround (x * 100.0f), 20.0 * std::log10 ((double) gain), (double) gain);
+    return text;
 }
 
 float faderGain (float position) noexcept

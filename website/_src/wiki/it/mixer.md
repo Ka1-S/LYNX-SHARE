@@ -1,5 +1,5 @@
 ---
-source: 1e4bc038df
+source: b6e9ef0dd0
 ---
 ![Il Mixer](/assets/img/mixer.webp)
 
@@ -51,6 +51,18 @@ Il pannello degli effetti mostra i dieci slot dell'insert selezionato.
 - `Raggruppa in un rack di effetti audio` nel menu dello slot mette l'effetto in un nuovo rack, e `Raggruppa tutto in un rack di effetti audio` lo fa per l'intera catena. `Separa` rimette negli slot gli effetti di un rack a una sola catena.
 - L'interruttore nell'intestazione del pannello attiva o disattiva tutti gli effetti dell'insert.
 - Puoi trascinare un effetto dal Database dei plugin del [Browser](/wiki/browser/) su un insert o su uno slot effetto.
+- `Voce pulita` nel menu dell'insert mette sull'insert una catena pronta per ripulire la voce.
+
+## Edison in uno slot
+
+Edison, l'editor e registratore audio, può stare in qualsiasi slot effetto, anche più d'uno per insert. La sua finestra è l'editor audio con una riga di controlli di registrazione.
+
+- `Apri editor audio` (`Ctrl+E`) nel menu dell'insert carica Edison nel primo slot vuoto dell'insert e lo apre. `Apri l'editor audio e registra` (`Shift+E`) lo carica pronto a registrare quando il brano è in riproduzione.
+- Le modalità di registrazione sono `Ora`, `All'ingresso` (quella predefinita: aspetta che l'ingresso superi una soglia), `Ingresso` e `In riproduzione`. `Accoda` mette una nuova registrazione dopo l'audio già presente. La durata massima della registrazione è `Senza limite` oppure 1, 3, 5, 10, 30 o 60 minuti: un nuovo slot parte da 30, `Apri l'editor audio e registra` imposta 5.
+- `Sync` suona l'audio di Edison al tempo del brano mentre il brano è in riproduzione.
+- Edison continua a registrare dopo che hai chiuso la sua finestra.
+- `Strumenti › Macro › Rimuovi tutte le istanze di Edison` svuota ogni slot Edison del progetto, dopo una domanda.
+- Gli slot Edison nei progetti di FL Studio (.flp) si aprono con il loro audio.
 
 ## EQ dell'insert
 
@@ -78,6 +90,8 @@ I gruppi del Mixer si richiudono con il loro chevron (o `Alt`+clic per tutti i g
 
 Ogni insert ha un pulsante di armo per la registrazione. Con un insert armato, Rec e Play registrano il suo ingresso audio in una clip della Playlist. `Shift+R` arma l'insert selezionato e avvia la registrazione in un solo passaggio. Vedi [Registrazione](/wiki/recording/).
 
+Quando scegli un ingresso esterno per un insert che registra anche altro audio, LYNX SHARE chiede se passarlo a `Solo ingresso esterno`, così la take contiene solo l'ingresso. `Mixer › Registrazione su disco › Compensazione della latenza` nel menu dell'insert è attivo per impostazione predefinita. Se lo disattivi, le take registrate vengono collocate senza alcuna compensazione della latenza.
+
 ## Tasti
 
 `Ctrl+L` e `Ctrl+Shift+L` hanno questo significato solo mentre il Mixer ha il focus.
@@ -92,6 +106,8 @@ Ogni insert ha un pulsante di armo per la registrazione. Con un insert armato, R
 | Solo con le sorgenti | `Alt+S` | Mette in solo gli insert selezionati e gli insert che li alimentano |
 | Eliminare gli insert | `Del` | Elimina gli insert selezionati, dopo una domanda |
 | Armare e registrare | `Shift+R` | Arma l'insert selezionato e avvia la registrazione |
+| Open audio editor | `Ctrl+E` | Carica Edison nel primo slot vuoto dell'insert e lo apre |
+| Open audio editor and record | `Shift+E` | Lo stesso, pronto a registrare quando il brano è in riproduzione |
 
 ## Da sapere
 
@@ -100,6 +116,8 @@ Ogni insert ha un pulsante di armo per la registrazione. Con un insert armato, R
 - `Ctrl+L` fa cose diverse nel Channel Rack e nel Mixer. Nel rack sceglie insert liberi. Nel Mixer usa l'insert selezionato.
 - Gli interruttori di instradamento compaiono sulle altre strisce, non su quella selezionata.
 - Il limite è 127 insert per progetto e dieci slot effetto per insert.
+- La registrazione di Edison è conservata come file WAV nella cartella del progetto, non dentro il file del progetto.
+- Il Session mixer sotto la griglia di clip appartiene solo al flusso Clip-launch. Mostra gli stessi insert di questo Mixer. Vedi [Layout](/wiki/layouts/).
 
 ## Correlati
 

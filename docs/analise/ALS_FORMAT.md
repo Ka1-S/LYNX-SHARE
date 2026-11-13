@@ -180,9 +180,9 @@ PluginDevice{ IsExpanded, BreakoutIsExpanded, On{Manual, AutomationTarget, MidiC
 | Tempo / TimeSignature + automation | `Song::bpm`, `beatsPerBar` + tempo automation clip; signature changes → markers |
 | Locators | Playlist markers |
 | Session clips / Scenes | the clip grid (round 181c, section 13; the default by the user's choice of 2026-11-08); Settings › General › Workflow can put them on the Playlist after the arrangement instead, one section per scene (a marker per scene) |
-| Volume/Pan/Send/plugin-param automation | automation clips on the matching target |
+| Volume/Pan/Send/plugin-param automation | automation clips on the matching target (round 190ed, §18: rack macros, devices inside racks through a free macro, VST2 plugin parameters, a Simpler's filter; VST3 parameters listed) |
 | PluginDevice | `PluginRef.foreign` (vst2 id / vst3 class id + state), resolved like an .flp's plugins |
-| Native devices | closest LYNX engine (slice N3 table), otherwise dropped and listed in the import report |
+| Native devices | the LYNX engine in the same role with its settings translated (slice N3, section 14: Simpler, Sampler zones, Drum Rack pads, racks, EQ Eight, Compressor, Glue Compressor, Utility, Reverb; lot 2 §15; lot 3 §18: EQ Three, Drum Buss, Auto Filter's modulation, Operator without FM, Drift); every other device is dropped and listed in the import report |
 
 ## 9. What Live's loader requires (found by experiment, 2026-11-06) [LIVE]
 Live crashes on a set that is merely well-formed. It either exits or shows "A serious program error". A set written by another program must follow these rules:
@@ -295,3 +295,176 @@ Export:
 - Session clips have `Time` 0, the clip span as the loop region (`LoopOn` = the slot's Loop) and the slot's launch settings and follow actions. An empty slot without its LYNX stop button gets `HasStop` false (MIDI tracks use their channel's Playlist track).
 - Scenes: name, colour, tempo and n/4 time signature with their enable flags; `GlobalQuantisation` = grid quantisation − 1.
 - A song whose grid has clips but no Playlist clips exports no arrangement clip (the current-pattern fallback is for songs with neither).
+
+## 14. Live's own devices → LYNX's own (slice N3, round 190bq, 2026-11-11)
+Code: `src/core/AlsDevices.{h,cpp}` (the laws, one function per device) and `AlsImport.cpp` (`nativeEffectFrom`, the Simpler branch of `instrumentFrom`). Tests: `tests/AlsDevices190bqTests.inc`. Sources: the device elements of the 19 sets Live 12.4 ships (181 EQ Eight, 149 Compressor, 24 Glue Compressor, 38 Utility, 98 Reverb, 330 Simpler) [DATA], each parameter's own range in `MidiControllerRange` [DATA], Ableton's manual from memory [DOC]. Live was not run and its binary was not read in this round, so every statement about how Live *sounds* is [ASSUMED] until an A/B in Live; the list is in round 190bq's handoff and as [ASSUMED] tags in `AlsDevices.h` / `.cpp`.
+
+A device parameter is `<Name><Manual Value="…"/>…</Name>`; switches are `true` / `false`; enumerations are indices.
+
+| Live device (tag) | LYNX | Translated | Listed in the report |
+|---|---|---|---|
+| EQ Eight (`Eq8`) | Facet EQ | per band (curve A): on, type, frequency, gain, Q; Scale; output gain; L/R and M/S modes (curve B → right / side bands) | Adaptive Q on a shelf, a 48 dB/oct cut or a shelf outside the measured Q span, a ninth band in L/R or M/S, Q beyond Facet's range |
+| Compressor (`Compressor2`) | Crest Compressor, Clean style | threshold, ratio (inf : 1 = Crest's limit), attack, release, auto release, knee, look-ahead, output gain, makeup switch, dry/wet, side-chain input track + gain + EQ + listen | RMS detection, values outside Crest's ranges, linear release, side-chain tap point, side-chain dry/wet; Expand mode is not translated (device dropped and listed) |
+| Glue Compressor (`GlueCompressor`) | Crest Compressor, Bus style | threshold, ratio 2 / 4 / 10, attack and release steps, Auto release, range, makeup, dry/wet, oversampling, side chain | Soft clip |
+| Utility (`StereoGain`) | Utility | gain, mute, phase L / R, channel mode, Mono, width, mid/side balance, balance | exact: gain within ±24 dB, mute, phase, channel mode, Mono, width and balance (in the matrix while its coefficients stay within ±2); approximated: wider matrices, gain beyond ±24 dB, mid/side balance; not applied: Bass Mono, DC filter |
+| Reverb (`Reverb`) | Atrium | dry/wet, predelay, decay, size, input filter → low / high cut, Reflect / Diffuse → early/late, Chorus → late modulation, Spin → early modulation, shelves → bass / high decay multipliers, density → diffusion | Freeze, Stereo, Shape, Scale |
+| Simpler (`OriginalSimpler`) | Sampler channel | (besides zones and volume envelope) transpose, volume, pan, filter type / frequency / resonance, filter and pitch envelopes, LFO → volume / pan / cutoff, voices, glide, One-Shot fades and Gate, Classic loop and region, Slice mode (stored points, by region), Warp (one tempo) | filter slope / circuit / drive / key tracking, velocity sensitivity, LFO → pitch, synced LFO rate, Spread, random pan, loop crossfade |
+
+Laws that carry a unit conversion:
+- **EQ Eight Q → Facet Q** (Facet's prototypes, `MEASURE_fabfilter.md` §1; Live's side measured in Live 12.4, round 190cw renders, fits in round 190cx): bell and notch `√2·Q` (Live = the textbook bell, 0.03…0.08 dB); 12 dB cuts `√2·Q` (textbook, 0.08 dB); shelves: Live's Q acts as the cookbook Q `0.71·(Q/0.71)^0.394` (Q 0.71 → 0.71, Q 2 → 1.068; best fits 0.709 / 1.068, measured on a +12 dB low shelf only), Facet `(Qs/0.7071)^(1/0.4697)`; 48 dB cuts: an 8th-order Butterworth at Q 0.71 with all four section Qs scaled by `1 + 0.2611·ln(Q/0.714)` (Q 0.5 / 0.71 / 1 → × 0.907 / 0.999 / 1.088, fit 0.14 dB; four equal sections are 2.2 dB off at best) — Facet holds it with its cut law "all sections" (`facet::cutLawParam`, set by the importer only; the default law and every older project are unchanged). Adaptive Q (bells): `Q × AdaptiveQFactor^(|gain|/2)` (1.12 in every saved device, ≈ Q·10^(|gain|/40); Q 2 at ±12 dB → 3.95, measured 3.97 / 3.95). Mode order 0…7 = low cut 48, low cut 12, low shelf, bell, notch, high shelf, high cut 12, high cut 48. Scale −200…200 % → Facet's 0…200 % with the gains turned over when negative.
+- **Compressor**: Threshold is a linear gain (0.000316…1.995) → dB; Ratio's largest float = inf : 1; times in ms; look-ahead index 0 / 1 / 2 = 0 / 1 / 10 ms; side chain `AudioIn/Track.<id>/<tap>` → `EffectSlot::sidechain` = that track's insert.
+- **Glue**: attack index → 0.01 / 0.1 / 0.3 / 1 / 3 / 10 / 30 ms; release index → 0.1 / 0.2 / 0.4 / 0.6 / 0.8 / 1.2 s, 6 = Auto; ratio index → 2 / 4 / 10; Range 70 dB = no limit.
+- **Utility**: `out = gain · B · W · A · in`, A = phase switches then channel mode (0 Left, 1 Stereo, 2 Right, 3 Swap), W = Mono or `M ± width·S` with M = (L+R)/2, S = (L−R)/2, B = the balance, constant power with a boost: L × √2·cos((b+1)π/4), R × √2·sin((b+1)π/4) (+0.5 → 0.541 / 1.307). All three measured in Live 12.4 (round 190cw r13–r17, exact to 1e-4); the balance's place after the width stage is assumed (measured alone).
+- **Simpler**: voices index 0…14 → 1…8, 10, 12, 14, 16, 20, 24, 32; envelope times ms → s; filter-envelope amount semitones → octaves; a Slice-mode Simpler plays its first slice on C1 in Live and on key 60 in LYNX, so its notes move up 24 keys on import.
+
+Drum Rack pads keep the pad Simpler's sample, tuning, volume and pan only (one report line). A device element without its parameters (another Live version, a stub) is not translated and is dropped and listed as before. Since lot 2 (§15) automation and rack macro mappings follow a converted device's parameters where the parameter has a LYNX control.
+
+**Export:** no Live-native device is written yet. `alsdev::liveUtilityOf` gives a LYNX Utility's exact Live settings (gain / mute / phase / channel mode / Mono, balance centred) and is tested, but a new device kind needs a skeleton and a load test in Live (§9), which this round could not run.
+
+## 15. Live's own devices → LYNX's own, lot 2 (round 190cf, 2026-11-11)
+Code: `src/core/AlsDevicesLot2.cpp` (laws and translators, declared in `AlsDevices.h`), `AlsDevices.cpp` (`effectFromLiveDevice` dispatch and the parameter links of lot 1's devices), `AlsImport.cpp` (`nativeEffectFrom`, `effectsFrom`, `rackDeviceFrom`, `midiEffectFrom`). Tests: `tests/AlsDevices190cfTests.inc`. Sources as in §14: the device elements and `MidiControllerRange` of the 19 shipped sets [DATA], Ableton's manual from memory [DOC]; Live was not run and its binary was not analysed (names from an older static string dump only), so enumeration orders and curve shapes marked [ASSUMED] in the code wait for an A/B in Live (list in the round's handoff).
+
+| Live device (tag) | LYNX | Translated | Listed in the report |
+|---|---|---|---|
+| Delay (`Delay`) | Echoform, Clean mode | per side: synced sixteenths (1…6, 8, 16) as a note value, or the free time in ms; Link; ping-pong; feedback; freeze; band-pass → low cut + high cut; time modulation rate / depth; dry/wet | 5 sixteenths or an offset (held in ms at the set's tempo), filter modulation, transition mode, linear dry/wet law |
+| Echo (`Echo`) | Echoform, Clean mode | per side: division / sixteenths with straight, triplet, dotted modes, or ms; link; feedback (inverted listed); channel mode stereo / ping-pong; input and output gain; high-pass / low-pass → low cut / high cut; modulation rate / depth; dry/wet | Mid/Side mode, filter resonance, Reverb, Noise, Wobble, Gate, Ducking, stereo width, envelope modulation |
+| Multiband Dynamics (`MultibandDynamics`) | Prism Multiband, 2 or 3 bands | crossovers, per band: on, one action (above or below the threshold, as compression / limit / expansion / upward lift), thresholds with the band's input gain folded in, output gain, attack, release; Amount; Time; output | a band's second action, RMS detection, times beyond Prism's ranges, soft knee as a fixed 6 dB knee |
+| Auto Filter (`AutoFilter`, `AutoFilter2`) | Filter | low-pass / high-pass / band-pass, cutoff (pitch → Hz in the older device), resonance → Q (§16), 12 / 24 dB slope, dry/wet | LFO, envelope follower, circuit / drive, band pass peak level, Q over 12; notch and morph types are not translated (device dropped and listed) |
+| Saturator (`Saturator`) | Ember Saturator | drive (negative drive → input gain), curve → the fitted Ember curve with drive / output offsets (§16), output, dry/wet, auto gain off | Color filters, output clip, DC filter, the curve itself (named) |
+| Overdrive (`Overdrive`) | Distortion | drive, tone, dry/wet | band-pass before the drive, Dynamics |
+| Limiter (`Limiter`) | Apex Limiter, Clean style | gain, ceiling, release, look-ahead, stereo link, true-peak mode | negative gain, release above 1 s, auto release, 6 ms look-ahead, Soft Clip mode, Mid/Side routing, Maximize |
+| Gate (`Gate`) | Sentry Gate, Classic style | threshold (linear → dB), attack, hold, release, floor → range, Flip → ducking, look-ahead, side-chain input + high pass / low pass | Return (hysteresis), other side-chain EQ shapes, side-chain dry/wet |
+| Compressor in Expand mode (`Compressor2`, Model 2) | Sentry Gate, Upward style | threshold, expansion ratio 1 : n → lift of (n − 1) dB per dB over the threshold, attack, release, output gain | dry/wet, makeup, the release of the lifted gain |
+| Channel EQ (`ChannelEq`) | EQ | low / mid / high gains (linear → dB), mid frequency, output | 80 Hz high pass, mid frequency outside 200 Hz … 5 kHz |
+| Chorus-Ensemble (`Chorus2`), Chorus (`Chorus`) | Chorus | rate, amount → depth, feedback, dry/wet | Ensemble and Vibrato modes (named), width, warmth, high pass, output gain; the older device's two delay times |
+| Auto Pan (`AutoPan`) | Auto-pan | only as a panner (phase 180°): synced rate → period in beats, free rate in Hz, amount → depth | LFO shape, offset, Spin, Invert; as a tremolo (phase 0° / 360°) it is not translated (device dropped and listed) |
+| Redux (`Redux2`) | Lo-fi | sample rate → hold length, bit depth, dry/wet | Jitter, quantiser shape, pre / post filter |
+| Arpeggiator (`MidiArpeggiator`) | the channel's arpeggiator | style → up / down / up-down / up & down (the ends twice) / random, synced rate (1/128 … 1/1) or free rate in beats, gate, steps of 12 semitones → octave range | other styles (nearest named), Repeats, Retrigger, velocity decay, Hold, Offset, Groove |
+| Pitch, Velocity, Chord, Note Length (`MidiPitcher`, `MidiVelocity`, `MidiChord`, `MidiNoteLength`) | written into the notes of the track's clips | transpose with its key range; velocity range / out range in Clip, Gate and Fixed modes; chord shifts with their velocities; free note length | notes played live are not changed (one line each); Velocity's Drive / Compand / Random, Chord's Chance / Strum, Note Length on note-off or synced |
+
+Where MIDI effects are read: before the instrument on a MIDI track, and at the head of the chain of a one-chain Instrument Rack. A Chord or Note Length behind an Arpeggiator cannot be written into the notes and stays unsupported; Scale, Random and MIDI effects inside multi-chain racks stay unsupported.
+
+Laws that carry a unit conversion:
+- **Echoform**: sixteenth counts index 0…7 → 1, 2, 3, 4, 5, 6, 8, 16 sixteenths; a time that is a note value × straight / dotted / triplet goes to the note sync, any other to ms at the set's tempo. Feedback gain g → Echoform value g / 2. Delay's band-pass (centre f, width w octaves) → low cut f·2^(−w/2), high cut f·2^(w/2). A linear dry/wet d → the equal-power mix value with the same wet : dry ratio, `(2/π)·atan(d / (1 − d))`.
+- **Multiband Dynamics**: the saved "ratio" r is a slope. Above the threshold the output rises (1 + r) dB per dB: r = −0.75 → 4 : 1, r = −1 → limit, r > 0 → upward expansion. Below it the output falls (1 − r) dB per dB: r > 0 lifts quiet signal (upward compression), r = 1 holds it at the threshold, r < 0 expands downwards. Amount scales r; Time scales attack and release. A band's input gain g moves its thresholds by −g at Prism's input and adds to its level.
+- **Auto Filter** (resonance law superseded by §16): the older device's cutoff is a pitch, Hz = 440·2^((n − 69)/12). Resonance r (older device 0…1.25, new 0…1) → the cookbook Q = 0.7071·12.5^r, clamped to the Filter's 0.5 … 12. Measured in Live 12.4 (round 190cw r18 / r19, fitted in 190cx): a low pass at 1 kHz with r = 0.5 is the cookbook biquad at Q 2.49 (new) / 2.50 (older) within 0.02 dB, the two tags the same curve within 0.035 dB once the new device's Output (a linear gain: 0.5 = −6.02 dB, listed when not 1) is taken out; 0.7071 at r = 0 is assumed, so the law rests on one point.
+- **Saturator** (curve mapping superseded by §16) curve type 0…7 (Live 12.4's menu, round 190cw): Analog Clip, Soft Sine, Bass Shaper, Medium Curve, Hard Curve, Sinoid Fold, Digital Clip, Waveshaper → Ember's tube, tape, tube, tape, transistor, fuzz, transistor, fuzz.
+- **Gate / Compressor**: thresholds are linear gains → dB; Gate's floor ("Gain") −75 dB is "−inf dB" in Live 12.4 → Sentry's deepest floor (100 dB, a full gate), above it the floor in dB; Gate look-ahead index 0 / 1 / 2 = 0 / 1.5 / 10 ms; Limiter look-ahead index = 1.5 / 3 / 6 ms.
+- **Redux → Lo-fi**: the Lo-fi holds n = 44100 / rate whole samples and quantises to 2^bits levels.
+- **Arpeggiator**: synced-rate index 0…13 = 1/128, 1/96, 1/64, 1/48, 1/32, 1/24, 1/16, 1/12, 1/8, 1/6, 1/4, 1/3, 1/2, 1/1 [DATA: default 8; DOC]; gate % → 0…1.
+
+**Automation and macros.** Each translator also returns, per Live parameter it maps continuously, a link `{Live parameter path, LYNX parameter, law}`. An arrangement envelope whose `PointeeId` is such a parameter's `AutomationTarget` becomes an automation of that effect parameter with every point passed through the law; a rack macro mapped onto it (`KeyMidi`, channel 16) becomes a `RackMapping` whose ends are the law of the mapping's `Min` / `Max`. Mappings and envelopes onto a setting with no LYNX control are listed. Envelopes onto devices inside a rack and clip envelopes are still listed as unsupported.
+
+## 16. Time signature changes, the loop switch and the tempo lane range (round 190cg, 2026-11-11)
+- Signature changes: an `AutomationEnvelope` of the main track whose `PointeeId` is the `Id` of `DeviceChain/Mixer/TimeSignature/AutomationTarget`, holding `EnumEvent`s. The value is the signature code of §4 (99 × denominator exponent + numerator − 1, 201 = 4/4); the first event sits at −63072000 like every envelope [DATA]. Later events are taken to be in beats [inferred, needs a live check]. Import: each event after the start → a time-signature marker. Export: the start signature (with its denominator) in `TimeSignature/Manual`; the envelope is written only when the song has later signature markers.
+- `Transport/LoopOn` is the loop switch; `LoopStart` / `LoopLength` hold the brace whether the loop is on or off [DATA: a new set has LoopOn false, LoopStart 8, LoopLength 16]. Import keeps the range and sets `Song::loopOff` from the switch; export writes the range whenever the song has a time selection.
+- `Mixer/TempoAutomationViewBottom` / `Top` (60 / 200 in a new set) are the BPM range the tempo lane shows [DATA]. Kept both ways in `Song::tempoViewLow/High`; LYNX's lane does not draw with it yet.
+
+## 17. Device laws refit to Live 12.4.16's renders (round 190da, 2026-11-12)
+
+Round 190cz rendered 190 tracks in Live 12.4.16 (an impulse, a sweep, sines, noise and a 1 kHz staircase through one
+device each, 48 kHz float); round 190da fitted the laws and ran every case through the importer and LYNX's engines
+(before / after tables: `/mnt/e/lynx-work/als190cf/HANDOFF.md` § Round 190da). The laws now in `AlsDevices*.cpp`:
+
+- **Auto Filter**: both tags are cookbook biquads at the cutoff, Q = 0.5 + 2x / (1 − x) (Q does not depend on the cutoff;
+  low, high and band pass share it). Older device x = min(r, 0.9) (Q 0.5 … 18.5); new device x from its measured table
+  (0.5 → 2.49, 0.9 → 17.86, 1 → 35.78; r above 1 acts as 1). The 24 dB/oct slope adds a second stage of the same type
+  with Q2 = 0.5 + x / (1 + x): LYNX's Filter got an appended Slope parameter (0 = 12 dB/oct, every older project) that
+  runs that pair. Live's band pass peaks at its Q (the cookbook "constant skirt" form); the Filter's at 0 dB (listed). Q
+  over the Filter's 12 is listed.
+- **EQ Eight**: 48 dB cut section scale 1 + 0.2632·ln(Q / 0.7071) (exact at Q 0.1 … 10, low and high cut); shelves: Live's
+  Q is a fixed cookbook Q, the same for both shelves and every gain (13-point table Q 0.1 … 18, a quintic in ln Q);
+  Adaptive Q: Q × AdaptiveQFactor^(|gain × Scale| − 6) on bells and, when AdaptiveQAffectsShelves, on the shelf's cookbook Q.
+- **Utility**: mid/side balance m: mid × min(1, 2 − m), side × min(1, m); the balance comes after width / mono / mid-side.
+- **Glue Compressor**: Range ≤ 40 stops the gain reduction at 1.1727·Range − 2.197 dB; from 50 up no limit (Crest's 60 dB).
+  The detector weighting seen in the rendered preset is its own side-chain EQ (high pass 200 Hz), which the importer
+  already carries.
+- **Saturator**: Drive is a gain before a memoryless curve (Waveshaper excepted). Per type, the Ember curve and drive /
+  output offsets fitted on the curves at drive 0 and +12 dB (`AlsDevicesLot2.cpp`, `saturatorFit`).
+- **Reverb**: Live's 1 kHz T30 ≈ 0.91 × Decay → Atrium's decay 0.94 × Decay; the loop's high shelf (gain g) → Atrium's
+  High mult 1 / (1 + 0.08·(−20 log10 g)·Decay). Atrium's fully wet tail is louder than Live's (listed with the measured sizes).
+
+## 18. Live's own devices → LYNX's own, lot 3, and the envelopes of racks and plugins (round 190ed, 2026-11-12)
+Code: `src/core/AlsDevicesLot3.cpp` (laws and translators, declared in `AlsDevices.h`), `AlsDevices.cpp` (dispatch),
+`AlsImport.cpp` (rack / plugin envelopes, the Peak Controller links, the synths). No Live render of these devices
+exists yet: every law that is not plain unit maths is [ASSUMED] and listed in the round's handoff
+(`/mnt/e/lynx-work/als190ed/HANDOFF.md`, "needs live render").
+
+| Live device (tag) | LYNX | Translated | Listed in the report |
+|---|---|---|---|
+| EQ Three (`FilterEQ3`) | Prism Multiband, 3 bands, minimum-phase (the crossover sum), no dynamics | FreqLo / FreqHi → crossovers, Slope → 24 / 48 dB/oct, GainLo / Mid / Hi (linear) → band levels (dB), kill switches and −inf gains → the bands that still sound are soloed | the pair (fitted), gains under −30 dB, all bands off (Prism's lowest output) |
+| Drum Buss (`DrumBuss`) | an Audio Effect Rack "Drum Buss": Ember Saturator → Facet EQ → Crest Compressor (with Comp on) → Shell Channel, plus a "Dry" chain when Dry/Wet is under 100 % or can move (refit to Live's renders in round 190ek, §19) | Drive and its type → Ember's Pentode voicing at the measured small-signal gain per type and amount (+ the type's own EQ: Medium a bell, Hard a low shelf, in proportion to the drive); the device's own colour → three Facet bells and the output; Damping → Ember's 6 dB/oct high cut; Input Trim → Ember's input; Crunch → its mid band (two Facet shelves under the output's lift); Boom → a Facet bell at the Boom frequency and a resonant 12 dB/oct high pass (decay sets their gain / Q / place); Comp → Crest at 4 : 1, −19 dB, 1 / 200 ms, +11 dB; Transients → Shell's transient shaper (Amount, Invert below 0); Output → Shell's output; Dry/Wet → the chains' volumes. The rack's macros (Drive, Crunch, Damping, Transients, Boom, Boom Freq, Trim, Output, Dry/Wet) run through the imported values: Live's envelopes and macros reach them | every fitted part, the type's EQ at other drives, Boom's tail, Crunch's distortion, the transient shaper's tail lift, Soft's wave folding, negative transients under automation |
+| Auto Filter's LFO / envelope follower / side chain | a Peak Controller (FL's internal-controller link) in front of the Filter — or at the end of the side-chain source track's insert — whose output 0 (peak + LFO) drives the Filter's cutoff through a 33-point curve | LFO rate (Hz at the set's tempo, or synced), shape, phase offset, amount; the follower's amount and release (a straight fall); the cutoff's base | amounts (law assumed), the follower's attack, stereo LFO offset, falling saw, inside a rack (no link possible) |
+| Operator (`Operator`) | the built-in synth, only when no FM is in use: operator A alone (B … D off or at −inf), or algorithm 11's carriers (≤ 3) | waveforms Sine (0), White noise (21), User (22 → the synth's harmonic table), coarse / fine ratio → pitch, volume, A's envelope (ms → s), filter, glide, global volume / pan | the pair (fitted), envelope levels / slopes / loop, LFO, pitch envelope, spread, tone; with FM the device stays unsupported ("FM synthesis: no LYNX engine for it yet") |
+| Drift (`Drift`) | the built-in synth | oscillator 1 / 2 types → nearest waves, transposes, detune, levels, noise; filter I / II (12 dB / 24 dB ladder), frequency, resonance, key tracking; envelope 1 (amp ADSR); voice mode mono; glide; volume | the pair (fitted), shape, high pass, envelope 2 / LFO / cycling envelope / matrix, drift, stereo / unison voices |
+
+**Envelopes (arrangement automation).** Before lot 3 only envelopes on mixer, tempo, sends and the parameters of converted
+devices on a track's own chain came in. Now also:
+- a rack's own macro (Audio Effect Rack on an insert → `effectParam` slot parameter k; Instrument Rack on a channel →
+  `channelParam` k; 0 … 127 → 0 … 1);
+- a converted device inside a rack, a plugin inside a rack, a nested rack's macro: a free macro of the outer rack (no
+  mapping, no name, not under an envelope itself) is mapped over the target's whole range, set to the target's value
+  (nothing moves), excluded from Rand and variations and named after the parameter; the envelope drives that macro through
+  the device's law;
+- a VST2 plugin's parameter (`ParameterId` = its index [model]) on an insert or as the track's instrument;
+- a Simpler's filter frequency / resonance → the Sampler's Cutoff / Resonance knobs.
+(round 190ek) A VST3 plugin's parameter on an insert or as the track's instrument is carried by the plugin's own
+ParamID: slot k = its place among the device's parameters with an id (`ParameterId` ≥ 0), the ParamIDs written into
+the plugin's state as FL's record 4 so the plugin host puts slot k on the plugin's own parameter when it opens it; Live's
+plain values are mapped linearly over the saved `MidiControllerRange` (exact for 0 … 1; another range is listed as
+approximate). Inside a rack it stays listed. Envelopes of devices LYNX does not translate stay listed as "Automation of a
+device parameter (track)".
+
+## 19. Lot 3 refit to Live 12.4's renders (round 190ek, 2026-11-12)
+Evidence: round 190ei's renders and saves (`/mnt/e/lynx-work/live190ei/`: RESULTS.md, CASES.md, renders, the VST3 save),
+re-analysed with LYNX's own renders of the same devices (`/mnt/e/lynx-work/als190ek/`: measure3.cpp runs the importer's
+translations on the same stimuli, compare3.py scores both against Live; dbfit / dbeval try every Ember curve on the
+Drum Buss staircases). Live's devices were not decompiled; renders, the menus' shots, Live's own saves and the rate
+labels read as plain strings from Live's engine binary were used.
+- **Auto Filter (new device).** `Lfo_Amount` 94 semitones per 1.0 (0.5 → ±47 st), `Envelope_Amount` 96 semitones per
+  1.0 at a full-scale peak; `Lfo_TimeMode` 0 Hz, 1 time (`Lfo_Time` s), 2 synced, 3 triplet (× 2/3), 4 dotted (× 1.5),
+  5 sixteenths (`Lfo_Sixteenth`); `Lfo_SyncedRate` 0 … 21 = the older `BeatRate` table turned round (8 bars … 1/64:
+  index 9 = 3/8 = 1.5 beats measured; the engine holds the same 22 labels for both).
+- **Auto Filter (older device).** `ModHub` 0.94 semitone per unit at a full-scale peak (linear in the peak); LFO shapes:
+  0 sine (0 rising at song time 0), 1 square (+ first), 2 triangle (from the bottom: the controller's is shifted half a
+  cycle), 3 saw up, 4 saw down (alone: the rising saw with the curve turned over), 5 and 6 random steps four per cycle.
+  The Peak Controller follows a sine's peak exactly; on noise it reads about 1.9 × Live's follower (block peak vs a
+  smoothed one) and it has no attack (Live's side-chained kick peaks 80 ms after the hit).
+- **Drift.** `Global_VoiceMode` 3 = Unison (menu: Poly, Mono, Stereo, Unison); 2 and 3 listed.
+- **Drum Buss.** As in the §18 table; the laws and their fits are in `AlsDevices.h` (`namespace drumbuss`).
+- **Unchanged and pinned by tests:** EQ Three (flat within 0.31 dB, Slope 0 / 1 = 24 / 48 dB/oct, kills, gains,
+  FlatResponse has no effect), Operator's waves 0 / 21 / 22 and algorithm 10, Drift's oscillator maps, filter slopes and
+  envelope 1.
+
+## 20. Drum Racks in and out (round 190ec, 2026-11-12) [DATA]
+
+Read from the Drum Racks of the 19 shipped Live 12 / 11 sets and the Core Library's Slicing and pad defaults (format
+only; nothing of their content is used). `DrumGroupDevice` has every member of the other racks (`Branches`, macros,
+variations, the chain selector) plus:
+
+- `ReturnBranches/ReturnBranch` (the return chains: `DeviceChain/AudioToAudioDeviceChain/Devices`, a `MixerDevice` whose
+  `SendInfos` hold one `AudioBranchSendInfo` per return, all at the floor with `EnabledByUser` false);
+- views: `ArePadsVisible`, `IsMidiSectionVisible` (the chain list's I/O), `AreSendsVisible`, `IsReturnBranchesListVisible`,
+  `PadScrollPosition` (the pad view's top row counted from the top of 32 rows of 4: 19 shows C1…D#2 at the bottom),
+  `ShowsZonesInsteadOfNoteNames`, `RangeTypeIndex`.
+
+A `DrumBranch` adds `BranchInfo {ReceivingNote = 128 − key (0 = all notes), SendingNote = the key its devices get (60 in
+every kit but Drums Lesson's tuned pads), ChokeGroup 0 none / 1…16}`, and in its `MixerDevice`:
+
+- `SendInfos/AudioBranchSendInfo {Send (linear gain, Min 0.0003162277571 = −70 dB = off, Max 1 = 0 dB), EnabledByUser,
+  Index (the return chain)}`;
+- `RoutingHelper/Routable/Target`: `AudioOut/None` = the rack's output; `AudioOut/Track.<track Id>/DeviceIn.<device Id>.R<k>,ChainIn`
+  = into return chain k of that Drum Rack (Drums Lesson sends all 16 pads into "a Mix Bus" this way, their send to that
+  return switched off: `EnabledByUser` false). The display strings beside it are not reliable ("No Output" for both).
+
+LYNX (core/Rack.h `drum`): a pad chain's zone takes its Receive key (or all keys) and hands its devices the Play note; a
+note into a pad of a choke group cuts the instrument of every other pad of the group; a chain's mixer feeds the rack's
+output or a return chain, and one cable per return carries its send (post the chain's volume and pan: a live check). The
+import builds that rack (option `drumPadsAsChannels` keeps the import before 190ec: one sampler channel per pad); the
+pads' Simplers become full Samplers (§14) and a Slice-mode Simpler on a pad no longer moves the track's notes. The
+export writes the Drum Rack from its own skeletons (tools/als_skeleton.py `--drum12`): pads, sends, Audio To, return
+chains, views, and a pad's LYNX Sampler as a Simpler (One-Shot when it plays the whole sample, else Classic with its
+envelope; volume, pan, transpose, reverse; one sample part per zone or the sample with its region in frames, from
+`AlsExportOptions::sampleFormat`). Live's Slicing defaults (Defaults/Slicing) hold one `DrumBranchPreset` each: "Default"
+is a Classic Simpler with a 50 ms release, one voice, `ChokeGroup` 1; the drum ones are One-Shot, polyphonic, no choke;
+LYNX's Slice to Drum Rack templates follow those facts with its own names.

@@ -4,6 +4,7 @@
 #include "ui/ControllerEditors.h"
 #include "ui/Controllers164.h"
 #include "ui/NewtoneEditor.h"
+#include "ui/AudioEditor.h"
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
 #include "ui/PluginEditors.h"
@@ -22,6 +23,7 @@
 #include "core/Transmitter.h"
 #include "core/TransporterFl.h"
 #include "core/FruityShapers.h"
+#include "core/FlCurve.h"
 #include "core/GrossBeat.h"
 #include "core/LynxTune.h"
 #include "core/MaximusFx.h"
@@ -2548,7 +2550,7 @@ public:
         using namespace theme;
         const auto s = scale();
         const juce::String id (item.display != nullptr ? item.display : "");
-        if (id != "faderscale" && id != "decayeq") // round 137: the fader scale is bare text beside its fader (tp172b4: the decay EQ lies on the field)
+        if (id != "faderscale" && id != "decayeq" && id != "pitchport") // round 137: the fader scale is bare text beside its fader (tp172b4: the decay EQ lies on the field)
             skin::well (g, r, radius::md * s, fx.enabled ? accent : juce::Colours::transparentBlack);
         const auto curveColour = fx.enabled ? accent : colour::textDisabled;
         const auto inner = r.reduced (6.0f * s);
@@ -2559,6 +2561,20 @@ public:
         if (id == "tssenvelope")
         {
             paintTransmitterEnvelope (g, inner, fx);
+            return;
+        }
+        if (id == "pitchport") // round 190ez: Pitcher's bottom line, FL's "MIDI Input Port Number: ..." ("..." = none)
+        {
+            const auto port = effectMidiInPort (fx);
+            const juce::Font f (theme::font (juce::jmax (8.0f, 11.0f * scale())));
+            const auto caption = tr ("MIDI Input Port Number:");
+            const auto w = juce::GlyphArrangement::getStringWidth (f, caption) + 6.0f * scale();
+            g.setFont (f);
+            g.setColour (theme::colour::textSecondary);
+            g.drawText (caption, r.withWidth (w).toNearestInt(), juce::Justification::centredLeft, false);
+            g.setFont (theme::font (juce::jmax (8.0f, 11.0f * scale()), true));
+            g.setColour (fx.enabled ? theme::colour::textPrimary : theme::colour::textDisabled);
+            g.drawText (port >= 0 ? juce::String (port) : juce::String ("..."), r.withTrimmedLeft (w).toNearestInt(), juce::Justification::centredLeft, false);
             return;
         }
         if (id == "equosend") // FL's send track box: "---" (none) or the insert's number, with its up / down marks
@@ -4415,6 +4431,16 @@ public:
             vxMapMenu (rectOf (item));
             return;
         }
+        if (item.type == Item::display && juce::String (item.display) == "pitchport") // round 190ez: drag up / down = port
+        {
+            if (! e.mods.isPopupMenu() && current() != nullptr)
+            {
+                portDragStart = effectMidiInPort (*current());
+                portDragY = e.position.y;
+                dragItem = index;
+            }
+            return;
+        }
         if (item.type == Item::display && juce::String (item.display) == "equosend") // round 173d3: EQUO's send box
         {
             showTransmitterSendMenu (0, rectOf (item));
@@ -4751,6 +4777,13 @@ public:
             gbEnvelopeDrag (e, activeLayout().items[(std::size_t) dragItem]);
             return;
         }
+        if (portDragStart >= -1 && dragItem >= 0) // round 190ez: Pitcher's MIDI port, one number per 11 px (FL: 33 px up
+        {                                         // took "..." to 2, live FL check 190ew)
+            const auto port = juce::jlimit (-1, 255, portDragStart + (int) std::floor ((portDragY - e.position.y) / 11.0f));
+            if (current() != nullptr && port != effectMidiInPort (*current()))
+                editSlot ([port] (EffectSlot& target) { setEffectMidiInPort (target, port); });
+            return;
+        }
         if (crossoverDrag >= 0 && dragItem >= 0)
         {
             const auto r = rectOf (activeLayout().items[(std::size_t) dragItem]);
@@ -4826,6 +4859,11 @@ public:
     void mouseUp (const juce::MouseEvent& e) override
     {
         eqDragging = false;
+        if (portDragStart >= -1) // round 190ez
+        {
+            portDragStart = -2;
+            dragItem = -1;
+        }
         if (wsDragState) // round 165
         {
             wsMouseUp();
@@ -5141,6 +5179,8 @@ private:
     int stepperMenusShown = 0;     // (the self-test counts the menus a click opens)
     float stepperWheel = 0.0f;     // a trackpad's accumulated scroll over a listed stepper
     int stepperDragIndex = -1;     // the value a drag started from (-1 = no stepper drag)
+    int portDragStart = -2;        // round 190ez: Pitcher's MIDI port when its drag started (-2 = no drag)
+    float portDragY = 0.0f;
     bool stepperMoved = false;     // that drag moved (then its mouse-up opens no menu)
 
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
@@ -5272,6 +5312,8 @@ private:
             return { mxHint (item, p), {}, false, true };
         if (isPhilterCurve (item)) // round 173d3
             return { lpHint (item, p), {}, false, true };
+        if (item.type == Item::display && juce::String (item.display) == "pitchport") // round 190ez
+            return { tr ("MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize"), {}, false, false };
         if (item.type == Item::display && juce::String (item.display) == "equosend") // round 173d3: FL's hint
             return { tr ("Send track number"), current() != nullptr && current()->sendTracks[0] > 0 ? insertName (current()->sendTracks[0]) : juce::String ("---"), false, false };
         if (isGbAny (item)) // round 168m
@@ -5437,10 +5479,27 @@ private:
             menu.addSeparator();
         }
         const auto* fx = current();
+        // (round 190ez: the MIDI input port of the effects that take notes left this menu, as FL 2026's wrapper menu
+        // has none: Pitcher sets it in its own panel's bottom line, Gross Beat in its Options menu, live FL check 190ew)
         menu.addItem (tr ("Bypass"), true, fx != nullptr && ! fx->enabled, [this] {
             editSlot ([] (EffectSlot& target) { target.enabled = ! target.enabled; });
         });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (menuButton().toNearestInt())));
+    }
+
+    // None, Port 0 … 31 (the plugin wrapper menu's list; a port set higher, e.g. by an FL project, is listed too)
+    juce::PopupMenu midiPortMenu()
+    {
+        const auto* fx = current();
+        const auto now = fx != nullptr ? effectMidiInPort (*fx) : -1;
+        juce::PopupMenu ports;
+        auto set = [this] (int port) { editSlot ([port] (EffectSlot& target) { setEffectMidiInPort (target, port); }); };
+        ports.addItem (tr ("None"), true, now < 0, [set] { set (-1); });
+        for (int port = 0; port < 32; ++port)
+            ports.addItem (tr ("Port {0}", { juce::String (port) }), true, now == port, [set, port] { set (port); });
+        if (now >= 32)
+            ports.addItem (tr ("Port {0}", { juce::String (now) }), true, true, [] {});
+        return ports;
     }
 
 private:
@@ -5687,7 +5746,7 @@ public:
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
         markLinkedWindow (*this, -1, track); // FL's Auto select linked modules (round 187a)
-        keepAboveMainWindow (*this);
+        dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
         skin::playOpenAnimation (*editor, editor->editorStyle()); // round 126: fade / scale in
     }
 
@@ -5812,6 +5871,11 @@ void open (AudioEngine& engine, int track, int slot)
     if (Controller164Windows::handles (kind)) // the X-Y / X-Y-Z pad, the Control Surface's panel (round 164)
     {
         Controller164Windows::open (engine, track, slot);
+        return;
+    }
+    if (kind == EffectKind::edison) // the audio editor as the slot's plugin window (round 190cd)
+    {
+        openEdisonSlot (engine, track, slot);
         return;
     }
     if (NewtoneWindows::handles (kind)) // load a sample, edit its notes / warp markers, hear it (round 142)

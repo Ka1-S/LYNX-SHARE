@@ -106,6 +106,53 @@ Segment prepare (int mode, float tension) noexcept
     return s;
 }
 
+Segment prepareSmooth (float tension, double dx, double y0, double y1, const SmoothSide& before, const SmoothSide& after) noexcept
+{
+    constexpr double eps = 5.960464477539063e-08; // 2^-24
+    Segment s;
+    s.mode = smooth;
+    const auto t = std::isfinite (tension) ? std::clamp (tension, -1.0f, 1.0f) : 0.0f;
+    s.sign = t == 0.0f ? 0 : t < 0.0f ? -1 : 1;
+    const auto h = dx > eps ? dx : eps;
+    auto rp = 1.0, ypp = y0;
+    if (before.smooth)
+    {
+        rp = before.dx / h;
+        if (before.hasY)
+            ypp = before.y;
+    }
+    auto rn = 1.0, yn = y1;
+    if (after.smooth)
+    {
+        rn = after.dx / h;
+        yn = after.y;
+    }
+    const auto d = y1 - y0;
+    if (! (std::abs (d) >= eps)) // a flat segment is straight
+    {
+        s.sign = 2;
+        return s;
+    }
+    const auto a = (ypp - y0) / d, b = (yn - y0) / d;
+    rp = rp > eps ? rp : eps;
+    rn = rn > eps ? rn : eps;
+    // the neighbours' slopes in this segment's units; each end takes a weighted harmonic mean with this segment's own
+    // slope (1), and 0 when the two disagree in direction (no overshoot)
+    const auto sr = (float) ((b - 1.0) / rn), sl = (float) (-a / rp);
+    if (sr > 0.0f)
+    {
+        const auto w1 = (float) rn * 2.0f + 1.0f, w2 = (float) rn + 2.0f;
+        s.c0 = (sr * (w1 + w2)) / (w1 * sr + w2);
+    }
+    if (sl > 0.0f)
+    {
+        const auto w1 = 2.0f + (float) rp, w2 = 1.0f + (float) rp * 2.0f;
+        s.c1 = (sl * (w1 + w2)) / (w1 + w2 * sl);
+    }
+    s.c2 = (float) (1.0 - (double) std::abs (t));
+    return s;
+}
+
 double evaluate (const Segment& s, double x) noexcept
 {
     x = std::clamp (x, 0.0, 1.0);
@@ -181,6 +228,11 @@ double evaluate (const Segment& s, double x) noexcept
                 return s.sign < 1 ? 1.0 - (double) s.c1 / (1.0 - (double) s.c0 * y) + (double) s.c2
                                   : 1.0 - (double) s.c1 / (1.0 - (double) s.c0 * (1.0 - y)) + (double) s.c2;
             }
+        case smooth:
+        {
+            const auto x2 = x * x, x1 = x - 1.0;
+            return x + ((((x2 * 3.0 - x2 * 2.0 * x) + x2 * x1 * (double) s.c0) + x * x1 * x1 * (double) s.c1) - x) * (double) s.c2;
+        }
         default: return x;
     }
 }

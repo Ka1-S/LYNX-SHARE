@@ -20,6 +20,7 @@
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/BrowserComponent.h"
+#include "ui/MapMode.h"
 #include "ui/Icons.h"
 #include "ui/ChannelRackComponent.h"
 #include "ui/PianoRollComponent.h"
@@ -50,6 +51,8 @@ namespace gamepad
 struct Changes;
 struct State;
 } // namespace gamepad
+
+class LyricsPanel;
 
 class MainComponent final : public juce::Component,
                             public juce::DragAndDropContainer,
@@ -105,6 +108,13 @@ public:
     void setClipLaunchWorkflow (bool on, bool swapLayout = true) { setLayoutStyle (on ? layoutstyle::Style::clipLaunch : layoutstyle::Style::pattern, swapLayout); }
     void setClipGridView (PlaylistArea::GridView view);
     bool isClipLaunchWorkflow() const noexcept { return layoutStyle == layoutstyle::Style::clipLaunch; }
+    // Round 190ef: the reference's MIDI Map Mode / Key Map Mode (ui/MapMode.h; Ctrl+M / Ctrl+K and the MIDI / Key
+    // switches), in the Clip-launch layout only (elsewhere it stays off).
+    void setMapMode (remotemap::Mode mode);
+    remotemap::Mode getMapMode() const noexcept { return mapOverlay != nullptr ? mapOverlay->getMode() : remotemap::Mode::off; }
+    mapmode::Overlay* mapOverlayForSnapshot() noexcept { return mapOverlay.get(); }
+    mapmode::MappingBrowser* mappingBrowserForSnapshot() noexcept { return mappingBrowser.get(); }
+    void fireRemote (const remotemap::Fire& fire); // a mapping acts (MIDI from the engine, keys from keyPressed)
     // View › Layout style (round 184a: Pattern, Clip-launch or Simple workflow; core/LayoutStyle.h). Moves panels only;
     // each style keeps its own workspace layout. The Simple workflow's parts are made when it is first chosen.
     void setLayoutStyle (layoutstyle::Style style, bool swapLayout = true);
@@ -112,6 +122,16 @@ public:
     SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
+    juce::Component* getClipGridForSnapshot() const noexcept { return clipGridView.get(); } // --gridshot (round 190bv)
+    // round 190ch (LYNX's own): the project's Lyrics / Notes panel — docked on the right of the Playlist in every layout,
+    // or in its own window — and the Reference match window
+    void toggleLyrics();
+    void showLyrics (bool floating);
+    void hideLyrics();
+    bool isLyricsShowing() const;
+    void showReferenceMatch();
+    LyricsPanel* getLyricsPanelForSnapshot(); // (docked, made if needed)
+    void commitSongNotes(); // what is being typed in the Lyrics / Notes panel reaches the project now (before a save)
     juce::PopupMenu getKeyMenuForSnapshot() { return makeKeyMenu(); } // --simpleshot (round 184a S11)
     // --uiperf (round 173f): the default layout with these panels shown too (the reporter's Channel Rack + Mixer)
     void showPanelsForSnapshot (std::initializer_list<workspace::Panel> panels);
@@ -160,6 +180,8 @@ public:
     void scrollRackForSnapshot (int x) { rackViewport.setViewPosition (x, rackViewport.getViewPositionY()); }
     BrowserComponent& getBrowserForSnapshot() { return browser; }
     MixerComponent& getMixerForSnapshot() { return mixer; }
+    // the Multilink button's right-click menu (round 190ey: shown by it, and the shot route's)
+    juce::PopupMenu getMultilinkMenuForSnapshot();
     PlaylistComponent& getPlaylistForSnapshot() { return playlist; }
     juce::Component& getRackViewportForSnapshot() { return rackViewport; }
     std::unique_ptr<juce::Component> makeQuickAddForSnapshot();
@@ -284,6 +306,9 @@ private:
     juce::PopupMenu playlistTrackExportMenu (bool groups); // File › Export / Playlist Tools: the three starts (round 168e)
     // Tools › Last tweaked / Next to last tweaked (REA round 143): the parameter menu of a recently moved control
     juce::PopupMenu makeLastTweakedMenu (int which);
+    // the last tweaked control's own items (automation, remote control, value): its menu, and FL's left column of the
+    // Multilink button's menu while multilink is off (round 190ey)
+    void addLastTweakedItems (juce::PopupMenu& menu, const AutomationTarget& target);
     // File › Import › MIDI file... (REA round 143)
     void importMidiFile();
     void importMidiFile (const juce::File& file, const MidiFileIo::ImportOptions& options);
@@ -347,6 +372,8 @@ private:
     void exportForOtherApps();          // File › Export › For other apps... (round 184a S9; also the Finish dock's row)
     void exportMidiFile();
     void switchSmartDisableForAll();
+    void autoCloseDevice(); // Settings › Audio › "Auto close" (round 190bx), from the timer
+    bool deviceClosedByAutoClose = false;
     void confirmPrepareForMidiExport();
     void saveClipboardToBrowser (bool midi);
     juce::PopupMenu makeSwitchAudioClipsMenu (bool selectedOnly);
@@ -448,6 +475,9 @@ private:
     void openSampleBrowser();
     void toggleRecording();       // the record button: asks what to record first (unless told not to)
     void armSelectedInsertForAudio(); // "Audio, into the Playlist": arms the selected insert (asks for its input)
+    // FL's Tools › One-click audio recording › Into Edison audio editor/recorder | Into playlist as an audio clip (round
+    // 190dx, core/OneClickRec.h): `into` = 3 (Edison) or 2 (Playlist), FL's modes
+    void oneClickRecord (int into);
     void setControlHints(); // the hint bar text of every toolbar control (markup, see ui/HintBar.h)
     juce::String keyMarkup (const char* actionId) const; // "[Ctrl][S]" for the action's first key ("" when unbound)
 
@@ -649,15 +679,29 @@ private:
     PlaylistArea playlistArea { picker, playlist };
     layoutstyle::Style layoutStyle = layoutstyle::Style::pattern;
     layoutstyle::SettingsReader startStyle; // the style saved in the UI settings (applied when the window is ready)
+    // round 190ch: the docked Lyrics / Notes panel (made when first shown) and the ones living in tool windows
+    std::unique_ptr<juce::Component> lyricsDock;
+    juce::Component::SafePointer<juce::Component> lyricsWindowPanel, referenceMatchPanel;
+    void refreshSongNotes(); // the song changed: the panels above follow
     bool lanesBeforeClipLaunch = false; // the Automation lanes setting to go back to
     void addLayoutStyleItems (juce::PopupMenu& menu);
     std::unique_ptr<juce::Component> clipGridView, clipGridSwitch; // made when Clip-launch workflow is first chosen (round 181a)
+    // round 190ef: the map modes' overlay and Mapping Browser (made when a map mode is first switched on), and the
+    // computer keys held that fired a key mapping (their release fires it again)
+    std::unique_ptr<mapmode::Overlay> mapOverlay;
+    std::unique_ptr<mapmode::MappingBrowser> mappingBrowser;
+    std::vector<int> heldMappedKeys;
+    bool mapKeyPressed (const juce::KeyPress& key);
+    void layoutMapMode();
+    void syncClipLaunchSwitches();
     std::unique_ptr<SimpleWorkflow> simpleWorkflow; // made when Simple workflow is first chosen (round 184a)
     std::unique_ptr<DetailView> detailView; // made with the grid (round 183a); never in Pattern workflow
     void makeDetailView();
+    void toggleHotSwap (const hotswap::Target& target); // round 190ce (core/HotSwap.h)
     // Slice 2: the Piano roll docked in the detail view's Clip page (its panel lets go of it meanwhile)
     bool pianoRollDocked = false;
     juce::Component* dockPianoRoll (int pattern);
+    void pianoRollPanelWillShow (Panel panel);
     void undockPianoRoll();
     bool pianoRollKeysHere() const; // the docked Piano roll was clicked last: the keys are its own
     struct DockClickWatcher final : juce::MouseListener

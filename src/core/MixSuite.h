@@ -233,7 +233,8 @@ namespace glow
 // switched on: the trial's make-up follows the dial from there; 0.46 = round 152's fixed reference, so older projects
 // are unchanged); the opto release now also selects the measured attack; and the VU display (gain reduction / input /
 // output: the reference saves its VU DISPLAY knob with the state, so LYNX keeps the editor's selector with the project)
-enum Param { peakReduction, gain, mode, emphasis, mix, trim, autoMakeup, voicing, optoLaw, analog, releaseLaw, makeupRef, vuDisplay, count };
+// round 190dm (appended): the Opto classic voicing's cell memory (VoiceMatch.h opto::Settings::memory; off = as before)
+enum Param { peakReduction, gain, mode, emphasis, mix, trim, autoMakeup, voicing, optoLaw, analog, releaseLaw, makeupRef, vuDisplay, optoMemory, count };
 // round 165x: an editor edit with the reference's AUTO MAKEUP behaviour (switching it on takes the dial as the
 // reference; switching it off leaves the make-up in the Gain dial, as the trial turns its own Gain knob)
 std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value);
@@ -270,7 +271,13 @@ enum Param { frequency, threshold, range, mode, detector, listen, lookahead, rel
              // two channels' signals, 100 % = the mid signal) and its 100 … 200 % half: `linkOnly` (0 … 100 % of the
              // processing on the mid — or with `linkSide`, the side — signal only). A project saved before keeps the old
              // law (±12 dB, 2 … 16 kHz, Hush's own link) through upgradeLoadedEffectParams; the classic voicing ignores it.
-             rangeLaw, linkOnly, linkSide, count };
+             rangeLaw, linkOnly, linkSide,
+             // round 190dm (appended, every default = the sound before): Air — a high shelf on the processed signal
+             // (0 … +12 dB, measured on a de-esser reference's wet path: 8.15 kHz, S 0.5) — and Mix (dry / processed;
+             // the dry signal delayed by the latency), for every voicing
+             air, mix, count };
+double airDb (float v) noexcept;        // round 190dm: 0 … +12 dB
+constexpr double airHz = 8151.0, airSlope = 0.5;
 bool extended (const EffectParams& p) noexcept;         // round 165x: the extended law (and not the classic voicing)
 double levelDb (float v, bool extended) noexcept;       // input / output: ±12 dB, or −∞ (−200) … +36 dB
 float levelValue (double db, bool extended) noexcept;

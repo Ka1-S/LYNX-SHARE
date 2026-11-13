@@ -1,5 +1,5 @@
 ---
-source: 2285f3e677
+source: d5cc625221
 ---
 ![De Clip-launch-indeling: een clipraster met scènes naast de Playlist](/assets/img/cliplaunch.webp)
 
@@ -27,7 +27,7 @@ LYNX SHARE start in de Pattern-werkwijze: een Channel Rack, patterns en een Play
 | Follow actions | Actie A en Actie B, elk met een kans |
 | Clip-stopknoppen | Een leeg slot kan een stopknop hebben |
 | Terug naar Arrangement | `Terug naar Playlist` |
-| Warp-modi | `Tellen`, `Tonen`, `Textuur` en `Complex` in `Kanaalinstellingen › Time stretch` |
+| Warp-modi | `Tellen`, `Tonen`, `Textuur` en `Complex` in `Kanaalinstellingen › Time-stretch` |
 | Simpler, Sampler en drum racks | Samplers van LYNX SHARE |
 | `.als`-set | `.lynx`-projectbestand |
 
@@ -64,14 +64,14 @@ Follow actions lopen af na een aantal maten of doorgangen van de clip. De acties
 | Groepen, returns en sends | Routes van insert naar insert |
 | VST2- en VST3-plugins met hun staat | |
 | Markers, en automatisering van volume, pan en tempo | |
-| Het clipraster, als Session-clips en scènes | |
+| Het clipraster als Session-clips en scènes, racks en Drum Racks | |
 
 Een rapport na de export toont wat is weggelaten.
 
 ## Goed om te weten
 
-- De eigen devices van Live worden niet nagemaakt. De eigen effecten van Live worden bij het importeren weggelaten.
-- Instrument- en Audio Effect Racks komen binnen met hun ketens, zones en macro's. De MIDI Effect Racks van Live worden nog niet omgezet en staan in het importrapport.
+- Veel eigen devices van Live komen binnen als die van LYNX SHARE, met hun instellingen en automatisering: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift en Operator (zonder FM). De andere worden weggelaten en vermeld in het importrapport.
+- Instrument- en Audio Effect Racks komen binnen met hun ketens, zones en macro's, en een Drum Rack wordt het Drum Rack van LYNX SHARE. De MIDI Effect Racks van Live worden nog niet omgezet en staan in het importrapport.
 - Het importrapport toont wat is weggelaten.
 - Live knipt overlappende audioclips in een geëxporteerde set bij.
 - Warp-markeringen uit een Live-set blijven bij het importeren behouden en worden bij het exporteren teruggeschreven.

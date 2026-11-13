@@ -1,8 +1,11 @@
+#include "ui/RemoteControl.h"
+#include "ui/NumBox.h"
 #include "ui/SettingsPages.h"
 #include "platform/Paths.h"
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
 
+#include "core/FlSettings.h"
 #include "core/LayoutStyle.h"
 #include "core/LynxExtras.h"
 #include "core/PlaylistOps.h"
@@ -132,7 +135,8 @@ public:
                                                                  &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
-                                                                 &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
+                                                                 &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote,
+                                                                 &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst })
             add (*c);
 
         setupFontRow();
@@ -336,6 +340,28 @@ public:
         undoBox.onChange = [this] { change ([&] { options.undoLevels = undoBox.getSelectedId(); }); };
         toggle (alternateUndo, tr ("Alternate undo mode (classic undo, instead of undo/redo on the same shortcut)"), options.alternateUndo,
                 [this] (bool on) { options.alternateUndo = on; });
+        // FL's General options of round 190bx (core/FlSettings.h; labels, hints and defaults are FL's): kept with the
+        // other options, read where they act
+        {
+            auto flag = [] (juce::ToggleButton& t, const juce::String& text, const juce::String& hint, std::atomic<bool>& value) {
+                styleToggle (t, text);
+                t.setTooltip (hint);
+                t.setToggleState (value.load(), juce::dontSendNotification);
+                t.onClick = [&t, &value] {
+                    value.store (t.getToggleState());
+                    if (mixeroptions::changed)
+                        mixeroptions::changed(); // (ui-options.txt)
+                };
+            };
+            auto& fl = flsettings::options();
+            flag (autoNameChannels, tr ("Auto name channels"),
+                  tr ("Channel name will be set to the sample filename. Off: a channel that has a name keeps it when another sample is loaded"), fl.autoNameChannels);
+            flag (restoreAfterSolo, tr ("Restore previous state after solo"),
+                  tr ("Restore the previous active state of channels and playlist tracks after solo. Off: everything is switched on"), fl.restoreStateAfterSolo);
+            flag (readSampleTempo, tr ("Read sample tempo information"),
+                  tr ("Read tempo information stored in samples. Off: it is ignored for the samples loaded from then on"), fl.readSampleTempo);
+            flag (historyNewestFirst, tr ("Show recent changes at the top"), tr ("Sort the undo history from new to old"), fl.historyNewestFirst);
+        }
 
         styleLabel (autosaveLabel, tr ("Save a backup copy"));
         for (auto minutes : prefs::autosaveIntervals())
@@ -485,11 +511,13 @@ private:
             menuEntry.setBounds (r.full (24));
 
         r.section (editingTitle);
-        for (auto* t : { &typingPiano, &keepEditors, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority, &hoverValues })
+        for (auto* t : { &typingPiano, &keepEditors, &autoNameChannels, &detachNew, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority,
+                         &restoreAfterSolo, &readSampleTempo, &hoverValues })
             t->setBounds (r.full (24));
         editInBox.setBounds (r.row (editInLabel, 0));
         undoBox.setBounds (r.row (undoLabel, 120));
         alternateUndo.setBounds (r.full (24));
+        historyNewestFirst.setBounds (r.full (24)); // (FL's Undo history panel: its last box)
 
         r.section (hintsTitle); // FL's General › Hints and warnings (round 186c)
         {
@@ -652,6 +680,7 @@ private:
     juce::HyperlinkButton translationLink;
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
     juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, sandbox, substitutes, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
+    juce::ToggleButton autoNameChannels, restoreAfterSolo, readSampleTempo, historyNewestFirst; // FL's options of round 190bx (core/FlSettings.h)
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") };
     juce::Label messagesNote;
@@ -672,10 +701,12 @@ public:
                                                                  &bufferNote, &panelButton, &testButton, &status, &load, &outputChannels, &realtime, &recordInput, &recordNote, &inputChannels,
                                                                  &formatLabel, &formatBox, &takeNames, &latencyTitle, &latencyText, &pingOutLabel, &pingOutBox,
                                                                  &pingInLabel, &pingInBox, &measureButton, &pingNote, &useMeasured, &offsetLabel, &offsetSlider, &offsetNote,
-                                                                 &mixerTitle, &metronomeTrackLabel, &metronomeTrackBox, &metronomeTrackNote, &playTruncated, &resetPlugins })
+                                                                 &mixerTitle, &metronomeTrackLabel, &metronomeTrackBox, &metronomeTrackNote, &playTruncated, &resetPlugins,
+                                                                 &autoClose, &cpuTitle, &threadGenerators, &threadMixer, &smartDisableAll, &resamplingLabel, &resamplingBox, &resamplingNote })
             add (*c);
         setupRecordingControls();
         setupMixerControls();
+        setupFlOptions();
 
         styleLabel (driverLabel, tr ("Driver"));
         styleLabel (outputLabel, tr ("Output device"));
@@ -770,6 +801,7 @@ private:
             row.removeFromLeft (8);
             testButton.setBounds (row.removeFromLeft (150));
         }
+        autoClose.setBounds (r.indented (24)); // (FL: "Auto close", under the device in the Input / output panel)
         r.section (statusTitle);
         status.setBounds (r.full (22));
         load.setBounds (r.full (22));
@@ -792,7 +824,13 @@ private:
         useMeasured.setBounds (r.full (24));
         offsetSlider.setBounds (r.row (offsetLabel, 200));
         offsetNote.setBounds (r.full (32).translated (0, -3));
+        r.section (cpuTitle); // (FL's order: Input / output, CPU, Mixer)
+        for (auto* t : { &threadGenerators, &threadMixer, &smartDisableAll })
+            t->setBounds (r.full (24));
         r.section (mixerTitle);
+        resamplingBox.setBounds (r.row (resamplingLabel, 260)); // (FL: the Mixer panel's first row)
+        if (resamplingNote.isVisible())
+            resamplingNote.setBounds (r.indented (32).translated (0, -3));
         metronomeTrackBox.setBounds (r.row (metronomeTrackLabel, 260));
         metronomeTrackNote.setBounds (r.full (32).translated (0, -3));
         playTruncated.setBounds (r.full (24));
@@ -838,6 +876,55 @@ private:
             engine.getTransport().resetPluginsOnTransport.store (resetPlugins.getToggleState());
             if (mixeroptions::changed)
                 mixeroptions::changed();
+        };
+    }
+
+    // FL's Settings › Audio options of round 190bx (core/FlSettings.h; docs/analise/REA_rodada190bx.md): the labels and
+    // hints are FL's, the defaults too. App-wide, saved with the other options (ui-options.txt).
+    void setupFlOptions()
+    {
+        auto& o = flsettings::options();
+        auto flag = [] (juce::ToggleButton& t, const juce::String& text, const juce::String& hint, std::atomic<bool>& value) {
+            styleToggle (t, text);
+            t.setTooltip (hint);
+            t.setToggleState (value.load(), juce::dontSendNotification);
+            t.onClick = [&t, &value] {
+                value.store (t.getToggleState());
+                if (mixeroptions::changed)
+                    mixeroptions::changed();
+            };
+        };
+        flag (autoClose, tr ("Auto close"),
+              tr ("Free the audio device for other applications while LYNX SHARE is in the background and nothing plays or records"), o.autoCloseDevice);
+        flag (threadGenerators, tr ("Multithreaded generator processing"), tr ("May increase CPU performance"), o.multithreadGenerators);
+        flag (threadMixer, tr ("Multithreaded mixer processing"), tr ("May increase CPU performance"), o.multithreadMixer);
+        flag (smartDisableAll, tr ("Smart disable"),
+              tr ("May increase CPU performance. Off: every effect is processed all the time, whatever its own Smart disable switch says"), o.smartDisable);
+
+        styleLabel (resamplingLabel, tr ("Resampling quality"));
+        styleCombo (resamplingBox);
+        resamplingBox.setTooltip (tr ("Interpolation method for sampler channels"));
+        resamplingBox.addSectionHeading (tr ("Low quality / fastest"));
+        resamplingBox.addItem (tr ("2-point linear"), 1);
+        resamplingBox.addItem (tr ("6-point Hermite"), 2);
+        resamplingBox.addSectionHeading (tr ("Average quality"));
+        for (int index = 3; index <= flsettings::interpolationMax; ++index)
+        {
+            if (index == flsettings::interpolationHeavyFrom)
+                resamplingBox.addSectionHeading (tr ("High quality / slowest"));
+            resamplingBox.addItem (tr ("{0}-point sinc", { juce::String (flsettings::interpolationPoints (index)) }), index);
+        }
+        resamplingBox.setSelectedId (flsettings::clampInterpolation (o.interpolation.load()), juce::dontSendNotification);
+        styleNote (resamplingNote, tr ("64-point sinc and higher use much more CPU while playing. An export always uses 32-point sinc."));
+        resamplingNote.setVisible (o.interpolation.load() >= flsettings::interpolationHeavyFrom);
+        resamplingBox.onChange = [this] {
+            const auto index = flsettings::clampInterpolation (resamplingBox.getSelectedId());
+            flsettings::options().interpolation.store (index);
+            // (FL warns here too, from 64 points on)
+            resamplingNote.setVisible (index >= flsettings::interpolationHeavyFrom);
+            if (mixeroptions::changed)
+                mixeroptions::changed();
+            resized();
         };
     }
 
@@ -1236,6 +1323,12 @@ private:
     bool measuring = false;
     juce::String pingResult;
     SectionTitle mixerTitle { tr ("Mixer") };
+    // FL's Settings › Audio options of round 190bx (core/FlSettings.h)
+    juce::ToggleButton autoClose;
+    SectionTitle cpuTitle { tr ("CPU") };
+    juce::ToggleButton threadGenerators, threadMixer, smartDisableAll;
+    juce::Label resamplingLabel, resamplingNote;
+    juce::ComboBox resamplingBox;
     juce::Label metronomeTrackLabel, metronomeTrackNote;
     juce::ComboBox metronomeTrackBox;
     juce::ToggleButton playTruncated, resetPlugins;
@@ -1352,6 +1445,30 @@ public:
             styleCombo (*b);
             addAndMakeVisible (b);
         }
+        // FL's input "Port" (InPortSel, a number wheel -1...255, none by default; round 190bt): the port number the
+        // Remote control settings window's "Port" refers to
+        portLabel.setText (tr ("Port"), juce::dontSendNotification);
+        portLabel.setFont (theme::font (theme::type::small));
+        portLabel.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        portLabel.setJustificationType (juce::Justification::centredRight);
+        addAndMakeVisible (portLabel);
+        {
+            ui::ValueSpec spec;
+            spec.name = tr ("Port number: a controller link made with a port number follows only the devices with that port");
+            spec.minimum = -1.0;
+            spec.maximum = 255.0;
+            spec.defaultValue = -1.0;
+            spec.interval = 1.0;
+            spec.toText = [] (double v) { return v < 0.0 ? juce::String::fromUTF8 ("\xe2\x8b\xaf") : juce::String (juce::roundToInt (v)); };
+            port = std::make_unique<ui::NumBox> (ui::digitWheel (spec), [this] { return (double) prefsNow.port; }, [this] (double v) {
+                const auto now = juce::jlimit (-1, 255, juce::roundToInt (v));
+                if (now == prefsNow.port)
+                    return;
+                prefsNow.port = now;
+                update();
+            });
+            addAndMakeVisible (*port);
+        }
         update (false);
     }
 
@@ -1385,6 +1502,8 @@ public:
         typeLabel.setBounds (bottom.removeFromLeft (110));
         type.setBounds (bottom.removeFromLeft (juce::jmin (260, bottom.getWidth())));
         bottom.removeFromLeft (10);
+        port->setBounds (bottom.removeFromRight (48).reduced (0, 2));
+        portLabel.setBounds (bottom.removeFromRight (44));
         status.setBounds (bottom);
     }
 
@@ -1401,6 +1520,7 @@ private:
         zone.setEnabled (prefsNow.enabled);
         plays.setEnabled (prefsNow.enabled);
         type.setEnabled (prefsNow.enabled);
+        port->setEnabled (prefsNow.enabled);
         if (notify && onChange)
             onChange (prefsNow);
     }
@@ -1409,7 +1529,8 @@ private:
     std::function<void (const prefs::MidiInputPrefs&)> onChange;
     juce::ToggleButton enabled;
     juce::ComboBox channel, plays, type, zone;
-    juce::Label typeLabel, status;
+    juce::Label typeLabel, status, portLabel;
+    std::unique_ptr<ui::NumBox> port;
     std::vector<std::string> typeIds; // [item id − 3] the profile's id
     static constexpr int mpeItem = 100;
 
@@ -1934,6 +2055,16 @@ private:
     // links list
     int getNumRows() override { return juce::jmax (1, linkRows()); }
 
+    // round 190bt: a double-click opens the link in its Remote control settings / Global link settings window
+    void listBoxItemDoubleClicked (int row, const juce::MouseEvent&) override
+    {
+        const auto& project = engine.getSong().midiLinks;
+        if (juce::isPositiveAndBelow (row, (int) project.size()))
+            openRemoteControlSettings (engine, { project[(std::size_t) row].target }, false);
+        else if (const auto global = engine.getGlobalLinks(); juce::isPositiveAndBelow (row - (int) project.size(), (int) global.size()))
+            openRemoteControlSettings (engine, { global[(std::size_t) (row - (int) project.size())].target }, true);
+    }
+
     void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool selected) override
     {
         auto list = engine.getSong().midiLinks;
@@ -1955,11 +2086,30 @@ private:
         const auto& link = list[(std::size_t) row];
         g.setFont (theme::font (theme::type::body));
         g.setColour (theme::colour::info);
-        const auto source = "CC " + juce::String (link.cc) + (link.channel >= 0 ? juce::String::fromUTF8 (" \xc2\xb7 ") + tr ("ch. {0}", { juce::String (link.channel + 1) }) : juce::String());
+        // (round 190cs: a key link reads as its note, FL's octaves: C5 = MIDI note 60)
+        const auto source = (isNoteLink (link.cc) ? tr ("Note") + " " + juce::MidiMessage::getMidiNoteName (link.cc - linkNoteBase, true, true, 5)
+                                                  : "CC " + juce::String (link.cc))
+                            + (link.channel >= 0 ? juce::String::fromUTF8 (" \xc2\xb7 ") + tr ("ch. {0}", { juce::String (link.channel + 1) }) : juce::String());
         g.drawText (source, 10, 0, 110, height, juce::Justification::centredLeft);
         g.setColour (theme::colour::textPrimary);
-        g.drawText (describeAutomationTarget (engine, link.target) + (row >= projectLinks ? "  (" + tr ("global") + ")" : juce::String()), 124, 0,
-                    width - 134, height, juce::Justification::centredLeft, true);
+        // (round 190bt: what the Remote control settings window set on the link)
+        juce::StringArray extras;
+        if (link.port >= 0)
+            extras.add (tr ("Port") + " " + juce::String (link.port));
+        if (! link.formula.empty())
+            extras.add (juce::String::fromUTF8 (link.formula.c_str()));
+        if (link.smooth)
+            extras.add (tr ("Smoothing"));
+        if (link.omni)
+            extras.add (tr ("Omni"));
+        if (link.mode > 0 && link.mode < 5) // FL's link Mode (round 190cs)
+        {
+            static const char* const modes[] { "Default", "Hold", "Latch", "Inc", "Stay" };
+            extras.add (tr ("Mode") + " " + tr (modes[link.mode]));
+        }
+        g.drawText (describeAutomationTarget (engine, link.target) + (row >= projectLinks ? "  (" + tr ("global") + ")" : juce::String())
+                        + (extras.isEmpty() ? juce::String() : juce::String::fromUTF8 ("  \xc2\xb7  ") + extras.joinIntoString (", ")),
+                    124, 0, width - 134, height, juce::Justification::centredLeft, true);
     }
 
     void selectedRowsChanged (int) override { removeLink.setEnabled (links.getSelectedRow() >= 0 && linkRows() > 0); }

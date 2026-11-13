@@ -1,5 +1,6 @@
 #include "ui/HistoryPanel.h"
 
+#include "core/FlSettings.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 
@@ -9,7 +10,8 @@ namespace
 {
 class HistoryPanel final : public juce::Component,
                            private juce::ListBoxModel,
-                           private juce::ChangeListener
+                           private juce::ChangeListener,
+                           private juce::Timer
 {
 public:
     explicit HistoryPanel (AudioEngine& e) : engine (e)
@@ -17,7 +19,6 @@ public:
         title.setText (tr ("Undo history"), juce::dontSendNotification);
         title.setFont (theme::font (theme::type::title, true));
         addAndMakeVisible (title);
-        note.setText (tr ("Click a step to go back (or forward) to it. Newest at the bottom."), juce::dontSendNotification);
         note.setFont (theme::font (theme::type::small));
         note.setColour (juce::Label::textColourId, theme::colour::textSecondary);
         addAndMakeVisible (note);
@@ -30,6 +31,7 @@ public:
         engine.addChangeListener (this);
         refresh();
         setSize (340, 420);
+        startTimer (300); // (Settings › General › "Show recent changes at the top" switched while this is open)
     }
 
     ~HistoryPanel() override { engine.removeChangeListener (this); }
@@ -56,9 +58,23 @@ private:
         }
 
         position = engine.getHistoryPosition();
+        // FL's General › Undo history › "Show recent changes at the top" (round 190bx, core/FlSettings.h)
+        newestFirst = flsettings::options().historyNewestFirst.load();
+        note.setText (newestFirst ? tr ("Click a step to go back (or forward) to it. Newest at the top.")
+                                  : tr ("Click a step to go back (or forward) to it. Newest at the bottom."),
+                      juce::dontSendNotification);
         list.updateContent();
-        list.scrollToEnsureRowIsOnscreen (position);
+        list.scrollToEnsureRowIsOnscreen (rowOf (position));
         list.repaint();
+    }
+
+    int stepOf (int row) const noexcept { return flsettings::historyStepForRow (row, labels.size(), newestFirst); }
+    int rowOf (int step) const noexcept { return flsettings::historyRowForStep (step, labels.size(), newestFirst); }
+
+    void timerCallback() override
+    {
+        if (newestFirst != flsettings::options().historyNewestFirst.load())
+            refresh();
     }
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
@@ -69,7 +85,7 @@ private:
         {
             const auto l = engine.getHistoryLabel (labels.size() - 1);
             labels.set (labels.size() - 1, tr (l.text, { juce::String::fromUTF8 (l.arg.c_str()) }));
-            list.repaintRow (labels.size() - 1);
+            list.repaintRow (rowOf (labels.size() - 1));
         }
     }
 
@@ -77,8 +93,9 @@ private:
 
     void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool) override
     {
-        const auto current = row == position;
-        const auto future = row > position;
+        const auto step = stepOf (row);
+        const auto current = step == position;
+        const auto future = step > position;
 
         if (current)
         {
@@ -90,19 +107,20 @@ private:
 
         g.setFont (theme::font (theme::type::caption));
         g.setColour (theme::colour::textDisabled);
-        g.drawText (juce::String (row), 8, 0, 28, height, juce::Justification::centredRight);
+        g.drawText (juce::String (step), 8, 0, 28, height, juce::Justification::centredRight);
         g.setFont (theme::font (theme::type::body, current));
         g.setColour (future ? theme::colour::textDisabled : theme::colour::textPrimary);
-        g.drawText (labels[row], 44, 0, width - 50, height, juce::Justification::centredLeft, true);
+        g.drawText (labels[step], 44, 0, width - 50, height, juce::Justification::centredLeft, true);
     }
 
-    void listBoxItemClicked (int row, const juce::MouseEvent&) override { engine.jumpToHistory (row); }
+    void listBoxItemClicked (int row, const juce::MouseEvent&) override { engine.jumpToHistory (stepOf (row)); }
 
     AudioEngine& engine;
     juce::Label title, note;
     juce::ListBox list;
     juce::StringArray labels;
     int position = 0;
+    bool newestFirst = false;
 };
 } // namespace
 

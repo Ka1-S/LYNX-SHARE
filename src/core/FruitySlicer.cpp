@@ -486,11 +486,19 @@ void configureSampler (ChannelDef& def, const State& state, std::int64_t frames)
     const auto factor = scaled ? stretchFactor (state.stretch) : 1.0f;
     const auto originalFrames = scaled ? (std::int64_t) std::nearbyint ((double) frames / (double) factor) : frames;
     const auto starts = playedStarts (state, originalFrames);
+    std::vector<int> played (starts.size(), -1); // a slice's index among the played ones (a start past the end is left out)
     if (frames > 0)
-        for (const auto p : starts)
-            if (p >= 0 && p < frames)
+        for (std::size_t i = 0; i < starts.size(); ++i)
+            if (const auto p = starts[i]; p >= 0 && p < frames)
+            {
+                played[i] = (int) def.sampler.slices.size();
                 def.sampler.slices.push_back ((float) ((double) p / (double) frames));
+            }
     def.sampler.sliceFirstKey = firstNote (state);
+    // which slice each key plays (issue #160): FL's key table, with the slices' own keys
+    def.sampler.sliceKeys = keyTable (state);
+    for (auto& k : def.sampler.sliceKeys)
+        k = k >= 0 && k < (int) played.size() ? played[(std::size_t) k] : -1;
     def.sampler.slicesToEnd = state.playToEnd != 0;
     def.sampler.slicesCutAtEnd = true; // its voice ends with the slice (FL render: exact silence right after it)
     // The voice: Fruity Slicer's voices run the plugin voice processor (FUN_00756d30) with the state's 364-byte block —
@@ -562,6 +570,15 @@ int sliceKey (const State& state, int index)
     if (key < 0)
         key = firstNote (state) + index;
     return std::clamp (key, 0, 124);
+}
+
+std::vector<int> keyTable (const State& state)
+{
+    // FUN_0076c200
+    std::vector<int> table (125, -1);
+    for (int i = 0; i < (int) state.slices.size(); ++i)
+        table[(std::size_t) sliceKey (state, i)] = i;
+    return table;
 }
 
 std::vector<DumpNote> dumpNotes (const State& state, int tag, std::int64_t frames, double sampleRate, double bpm, int ppq,

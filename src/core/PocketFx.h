@@ -65,6 +65,26 @@
 //     [2] Mono Bass (0), [3] Separation (0.5). FL's Spreader engine (core/SpreaderEngine.h) behind FLM's mapping;
 //     reports FLM's latency (the engine's longest delay, 6.35 ms), which FL compensates.
 
+//   Pocket Comb Filter (EffectKind::pocketComb, FLM module 40, core/PocketFxD.cpp, round 190by): [0] Mode (0: Manual,
+//     Lowest Note, Detect Pitch), [1] Pitch (0.33; 2499v⁴ + 1 Hz, Manual with Snap off), [2] Feedback (0.8), [3] Mix
+//     (0.75; the comb added to the dry), [4] Offset (0.5; −2…+2 octaves, not in Manual), [5] Smoothing (0.25; the
+//     pitch glide), [6] Snap (1; Manual plays Pitch oct / Pitch note), [7] Polarity (0: Both +, Left −, Right −, Both −),
+//     [8] Asymmetry (0.5; ±5 % between the sides), [9] Pitch oct (0.5), [10] Pitch note (0.4). A feedback comb on
+//     FLM's tape (core/PocketTape.h): one loop lasts (⌊fs⌋ − 2) / f + 3 samples, a pitch change bends what the loop
+//     holds. Lowest Note follows the lowest key held on the Channel Rack.
+//   Pocket Multiband Compressor (EffectKind::pocketMultiband, FLM module 36, core/PocketFxD.cpp, round 190by): [0] Master
+//     gain (0.5 = 0 dB; ±24 dB), [1] Low crossover (0.3; 20·2^(9v) Hz), [2] High crossover (0.7), [3] Solo (0: Off / Low /
+//     Mid / High — LYNX's own: FLM keeps a flag of its editor here), [4] Dry mix (0; v², added to each band's gain),
+//     then per band (low from [5], mid from [12], high from [19]): Input gain (0.5 = 0 dB; ±24 dB), Threshold (1 = 0 dB;
+//     −48…0 dB), Ratio (0; 30v + 1), Attack (0.3; 50v² ms), Release (0.3; 10 ms…1 s), Gain (0.5 = 0 dB; ±24 dB), State
+//     (0: On / Bypass / Mute); [26]…[28] the bands' Width (0.5 = as it is), [29] Width mode (0). Three bands from 24 dB
+//     crossovers; each band a peak compressor whose ratio works on the amplitude, not on dB.
+//   Pocket Tape Stop (EffectKind::pocketTapeStop, FLM module 42, core/PocketFxD.cpp, round 190by): [0] Stop time (0.2;
+//     5v s), [1] Start time (0.2), [2] Stop time synced (1/3: Off, 1/4 … 16 beats in 10 steps), [3] Start time synced
+//     (1/3), [4] Play (1; turning it off stops the tape, on starts it again), [5] Warp (0.5; the speed curve), [6] Sync
+//     (0; the synced times). The input is always recorded; a stop plays the recording at a falling speed, a start at a
+//     rising one and cross-fades back to the input over the last 0.1 s. Runs with the song only, as FLM's.
+
 #include <memory>
 #include <string>
 
@@ -139,4 +159,77 @@ struct CompressorTransfer
     float thresholdDb = 0.0f, threshold = 1.0f, ratio = 1.0f, slope = 1.0f, makeup = 1.0f;
 };
 CompressorTransfer compressorTransfer (float thresh, float ratio) noexcept;
+
+// core/PocketFxD.cpp (round 190by)
+constexpr int combParams = 11;
+std::unique_ptr<Effect> makeComb();
+std::string combParamText (int param, float v);
+int combMode (float v) noexcept;                    // ⌊2v⌋: 0 Manual, 1 Lowest Note, 2 Detect Pitch
+const char* combModeName (int mode) noexcept;
+float combFreeHz (float v) noexcept;                // 2499v⁴ + 1
+int combNote (float octave, float note) noexcept;   // 12·round(7·oct) + round(11·note), MIDI numbering
+float combNoteHz (int note) noexcept;               // 440·2^((n − 69)/12), 0 below note 1
+int combOffsetOctaves (float v) noexcept;           // round(4(v − ½)), −2…+2
+float combGlide (float v) noexcept;                 // the pitch glide per sample: 0.1999(1 − v²) + 0.0001
+int combPolarity (float v) noexcept;                // ⌊3v⌋: bit 0 = left feedback negative, bit 1 = right
+double combDelaySamples (double hz, double sampleRate) noexcept; // the loop at a settled frequency
+// the detector's period (samples; 0 = none) for one block of 2048 already low-passed samples (tests)
+float combDetectPeriod (const float* block2048, double sampleRate);
+
+constexpr int multibandParams = 30;
+std::unique_ptr<Effect> makeMultiband();
+std::string multibandParamText (int param, float v);
+float multibandGain (float v) noexcept;         // 10^((48v − 24)/20): master and band input gain; band output gain alike
+float multibandCrossoverHz (float v) noexcept;  // 20·2^(9v)
+// a band's curve, in amplitude (not dB): above the threshold the level is threshold + (level − threshold) / ratio
+struct MultibandTransfer
+{
+    float thresholdDb = 0.0f, threshold = 1.0f, ratio = 1.0f, slope = 1.0f;
+};
+MultibandTransfer multibandTransfer (float threshold, float ratio) noexcept; // −48(1 − v) dB; 30v + 1
+float multibandOutput (const MultibandTransfer& t, float level) noexcept;
+float multibandAttackSeconds (float v) noexcept;  // 0.05v²
+float multibandReleaseSeconds (float v) noexcept; // 0.99v + 0.01
+float multibandAttackCoefficient (float v) noexcept;  // per sample, for 44.1 kHz at every rate (as FLM)
+float multibandReleaseCoefficient (float v) noexcept;
+int multibandSolo (float v) noexcept;             // LYNX's Solo: ⌊3v + ½⌋ = 0 off, 1 low, 2 mid, 3 high
+
+constexpr int tapeStopParams = 7;
+std::unique_ptr<Effect> makeTapeStop();
+std::string tapeStopParamText (int param, float v);
+float tapeStopSeconds (float v) noexcept;                    // max(5v, 0.005)
+int tapeStopSyncedStep (float v) noexcept;                   // round(9v): Off, 1/4, 3/8, 1/2, 3/4, 1, 2, 4, 8, 16 beats
+float tapeStopSyncedSeconds (float v, double bpm) noexcept;  // at the tempo's whole number, at least 5 ms
+float tapeStopBase (float warp) noexcept;                    // B = 200^(1 − 2·warp) (1 / 0.995 at the centre)
+float tapeStopSpeed (float base, float u) noexcept;          // (B^u − 1) / (B − 1): 0 at u = 0, 1 at u = 1
+// --- round 190dw: core/PocketFxE.cpp — Equalizer (module 3), Graphic EQ (7), Filter (9)
+constexpr int eqParams = 20, graphicEqParams = 8, filterParams = 4;
+std::unique_ptr<Effect> makeEq();
+std::unique_ptr<Effect> makeGraphicEq();
+std::unique_ptr<Effect> makeFilter();
+std::string eqParamText (int param, float v);
+std::string graphicEqParamText (int param, float v);
+std::string filterParamText (int param, float v);
+// laws (tests, editors): kind ⌊2v⌋, channel mode ⌊4v⌋, 2^(9.25v + 5) Hz, 7v + ¼ octaves; Filter 2^(10.3v + 4) Hz,
+// Q = 2v² + 0.8, type ⌊2v⌋ (LP, BP, HP), pairs 1 / 2 / 4
+int eqKind (float v) noexcept;
+int eqChannelMode (float v) noexcept;
+double eqHz (float v) noexcept;
+double eqOctaves (float v) noexcept;
+double filterHzOf (float v) noexcept;
+double filterQOf (float v) noexcept;
+int filterType (float v) noexcept;
+int filterPairs (float v) noexcept;
+// one Equalizer / Graphic EQ band as FLM designs it (b0, b1, b2, a1, a2; a0 = 1) at the given design rate
+std::array<double, 5> eqBandCoefficients (int kind, double hz, double shownDb, double octaves, double rate) noexcept;
+
+// --- round 190dw: core/PocketReverb.cpp — Reverb (legacy, module 12), Reverb 2 (35), Reverb (32) on FLM's plate
+constexpr int reverbClassicParams = 20, reverb2Params = 18, reverbParams = 15;
+std::unique_ptr<Effect> makeReverbClassic();
+std::unique_ptr<Effect> makeReverb2();
+std::unique_ptr<Effect> makeReverb();
+std::string reverbClassicParamText (int param, float v);
+std::string reverb2ParamText (int param, float v);
+std::string reverbParamText (int param, float v);
+// --- end of round 190dw
 } // namespace lynx::pocket

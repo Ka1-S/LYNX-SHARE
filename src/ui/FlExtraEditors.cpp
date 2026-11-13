@@ -1290,7 +1290,7 @@ public:
             setResizeLimits (360, 240, 3000, 2400);
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
-        keepAboveMainWindow (*this);
+        dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
         if (target.track >= 0 && target.engine != nullptr)
             gone = std::make_unique<ui::SlotGoneWatcher> (*target.engine, target.track, target.slot, [this] { closeButtonPressed(); });
     }

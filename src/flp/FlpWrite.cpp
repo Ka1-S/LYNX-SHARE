@@ -1,5 +1,6 @@
 #include "flp/FlpWrite.h"
 
+#include <limits>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -19,6 +20,7 @@ enum : std::uint32_t
     evTimeSigNumerator = 0x11,
     evTimeSigDenominator = 0x12,
     evSamplePingPong = 0x14,
+    evSampleLoopRecord = 0xFB, // the sampler's loop points (round 190dh)
     evChannelType = 0x15,
     evPanLaw = 0x17,
     evRegistered = 0x1C,
@@ -410,8 +412,9 @@ void writeChannel (Out& out, const Channel& c)
         Blob a;
         a.put<std::int32_t> (c.panAdj);
         a.put<std::int32_t> (c.volAdj);
-        for (int k = 0; k < 3; ++k)
-            a.put<std::int32_t> (0);
+        a.put<std::int32_t> (c.adjUnknown); // (round 190dz: FL's Levels adjustment, whole)
+        a.put<std::int32_t> (c.modXAdj);
+        a.put<std::int32_t> (c.modYAdj);
         out.data (evChannelLevelAdjust, a.b);
     }
     {
@@ -489,6 +492,22 @@ void writeChannel (Out& out, const Channel& c)
         out.data (evAutomationPoints, a.b);
     }
     out.u8 (evChannelSoloLock, c.soloLock ? 1 : 0);
+    // the loop record where FL's saver puts it, after 0x20 (FUN_00f3e190); only for moved loop points, as FL
+    if (c.loopStart >= 0 && c.loopEnd >= c.loopStart)
+    {
+        Blob b;
+        b.put<std::int32_t> (2);
+        b.put<std::int64_t> (c.loopStart);
+        b.put<std::int64_t> (c.loopEnd);
+        b.put<double> (-1.0); // (FL's own files: these five unset)
+        b.put<std::int32_t> (-1);
+        b.put<std::uint8_t> (0);
+        b.put<std::int32_t> (std::numeric_limits<std::int32_t>::max());
+        b.put<std::int32_t> (std::numeric_limits<std::int32_t>::max());
+        b.put<std::uint8_t> (c.useLoopPoints() ? 1 : 0);
+        b.put<std::uint8_t> (0);
+        out.data (evSampleLoopRecord, b.b);
+    }
     for (int k = 0; k < 2; ++k)
     {
         const auto& t = c.tracking[(std::size_t) k];

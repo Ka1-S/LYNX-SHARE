@@ -241,6 +241,8 @@ inline const char* skipReason (EffectKind k)
         case EffectKind::waveCandy: case EffectKind::visualizer: case EffectKind::bigClock: case EffectKind::htmlNotebook:
         case EffectKind::tuner:
             return "visual only: no sound, no control output";
+        case EffectKind::edison: // (round 190cd)
+            return "a recorder / editor: its controls act on its own recording and playback, the input passes through";
         default: return nullptr;
     }
 }
@@ -465,6 +467,11 @@ inline Output run (const EffectSlot& built, const EffectSlot& played, const Prog
         fx->setSongPosition (tick);
         fx->setPlaying (true);
         fx->setHeldNotes (held.data(), (int) held.size());
+        // round 190ee: Pitcher takes its notes from a MIDI port (a MIDI Out on that port): the same chord arrives there
+        // (a held note's repeated note on changes nothing)
+        if (slot.kind == EffectKind::pitchCorrect)
+            for (const auto key : { 60, 64, 67, 71 })
+                fx->midiNote (key, 100, 0);
         if (o.sidechain)
         {
             fx->setSidechain (prog.scL.data() + at, prog.scR.data() + at);
@@ -1025,6 +1032,29 @@ inline std::vector<Hint> hintsFor (EffectKind kind)
             Hint h { "the gate map drawn (a rising line)", {} };
             h.edit = [] (EffectSlot& e) { e.state = vocodex::withMap (e.state, 3, { { 0.0, 0.0 }, { 1.0, 0.8 } }); };
             out.push_back (h);
+            break;
+        }
+        case EffectKind::pocketMultiband:
+            // (round 190cm) FLM's defaults compress nothing (thresholds at 0 dB, ratios 1:1): a band's attack and
+            // release are heard once it works
+            for (const char* band : { "Low", "Mid", "High" })
+            {
+                const auto t = std::string (band) + " threshold", r = std::string (band) + " ratio";
+                out.push_back (named (std::string ("the ") + band + " band compressing (threshold −34 dB, ratio 31:1)", { { t.c_str(), 0.3f }, { r.c_str(), 1.0f } }));
+            }
+            break;
+        case EffectKind::pocketTapeStop:
+        {
+            // (round 190cm) FLM's Tape Stop acts on an edge of Play while the song runs (spec-tapestop.md §3.2): the
+            // times, Warp and Sync shape the ramp that edge starts; held on it passes the input, held off it is silent
+            const auto play = plugui::paramIndex (kind, "Play");
+            auto stop = named ("Sync on, Play switched off while the pad plays (the stop ramp)", { { "Sync", 1.0f } });
+            stop.move = play, stop.moveTo = 0.0f;
+            auto start = named ("Play off, switched on while the pad plays (the start ramp)", { { "Play", 0.0f } });
+            start.move = play, start.moveTo = 1.0f;
+            auto startSynced = named ("Sync on and Play off, switched on while the pad plays (the start ramp)", { { "Sync", 1.0f }, { "Play", 0.0f } });
+            startSynced.move = play, startSynced.moveTo = 1.0f;
+            out.push_back (stop), out.push_back (start), out.push_back (startSynced);
             break;
         }
         default:

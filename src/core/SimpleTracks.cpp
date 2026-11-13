@@ -8,6 +8,7 @@
 #include "core/AutoWarp.h"
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
+#include "core/ProjectKey.h"
 
 namespace lynx::simpletracks
 {
@@ -67,6 +68,10 @@ Result addAudio (Song& song, int track, const Request& request)
     {
         m.inputChannel = std::max (-1, request.input);
         m.inputStereo = request.inputStereo;
+        // a voice / guitar / bass track records its input alone (FL's answer "Yes" to "switch to External input
+        // only", issue #152): with FL's default Post EQ the take also held whatever else played through the insert
+        if (m.inputChannel >= 0)
+            m.recordSource = RecordSource::externalInput;
     }
     r.track = track;
     r.insert = insert;
@@ -88,15 +93,23 @@ Result addAudio (Song& song, int track, const Request& request)
             c.sampler.stretchBeats = request.audioBeats;
             c.sampler.keepPitch = true;
         }
+        if (request.audioKeyRoot >= 0) // the file's key (round 190ds)
+        {
+            c.sampler.loopKeyRoot = request.audioKeyRoot % 12;
+            c.sampler.loopKeyMinor = request.audioKeyMinor;
+            c.sampler.loopKeySource = (std::uint8_t) std::clamp (request.audioKeySource, 0, 3);
+        }
         song.channels.push_back (std::move (c));
         r.channels = { (int) song.channels.size() - 1 };
         Clip clip;
+        clip.followKey = request.followKey;
         clip.kind = ClipKind::audio;
         clip.channel = r.channels[0];
         clip.track = track;
         clip.start = std::max<std::int64_t> (0, request.start);
         clip.length = request.audioBeats > 0.0f ? std::max<std::int64_t> (1, std::llround ((double) request.audioBeats * ppq)) : request.audioLength;
         song.playlist.push_back (clip);
+        projectkey::retuneClip (song.playlist.back(), song, projectkey::get (song)); // (moved to the project key)
         song.mode = PlayMode::song;
     }
     return r;
@@ -105,9 +118,13 @@ Result addAudio (Song& song, int track, const Request& request)
 // The notes of `request.pattern` on `channel`, placed at the song's start on `track` (an Instrument made from a MIDI track)
 void placeInstrumentNotes (Song& song, int track, int channel, const std::string& name, std::uint32_t colour, Result& r, const Request& request)
 {
-    if (! request.pattern)
+    if (! request.pattern && request.emptyBars <= 0)
         return;
-    auto pattern = *request.pattern;
+    Pattern pattern;
+    if (request.pattern)
+        pattern = *request.pattern;
+    else
+        pattern.lengthTicks = (std::int64_t) request.emptyBars * std::max (1, song.beatsPerBar) * ppq;
     pattern.name = name;
     pattern.colour = colour;
     for (auto& n : pattern.notes)
@@ -448,6 +465,47 @@ bool isEmptySong (const Song& song)
         if (t.mode != PlaylistTrackMode::unassigned || ! t.name.empty())
             return false;
     return true;
+}
+
+int patternOf (const Song& song, int track)
+{
+    const auto kind = kindOf (song, track);
+    if (kind != Kind::instrument && kind != Kind::sampler)
+        return -1;
+    const Clip* first = nullptr;
+    for (const auto& c : song.playlist)
+        if (c.kind == ClipKind::pattern && c.track == track && c.pattern >= 0 && c.pattern < (int) song.patterns.size()
+            && (first == nullptr || c.start < first->start))
+            first = &c;
+    return first != nullptr ? first->pattern : -1;
+}
+
+int ensurePattern (Song& song, int track, int bars, bool* made)
+{
+    if (made != nullptr)
+        *made = false;
+    if (const auto p = patternOf (song, track); p >= 0)
+        return p;
+    const auto kind = kindOf (song, track);
+    if (kind != Kind::instrument && kind != Kind::sampler)
+        return -1;
+    const auto& t = song.playlistTracks[(std::size_t) track];
+    Pattern pattern;
+    pattern.name = ! t.name.empty() ? t.name : song.channels[(std::size_t) t.channel].name;
+    pattern.colour = song.channels[(std::size_t) t.channel].colour;
+    pattern.lengthTicks = (std::int64_t) std::max (1, bars) * std::max (1, song.beatsPerBar) * ppq;
+    song.patterns.push_back (std::move (pattern));
+    Clip clip;
+    clip.kind = ClipKind::pattern;
+    clip.pattern = (int) song.patterns.size() - 1;
+    clip.track = track;
+    clip.start = 0;
+    clip.length = song.patterns.back().effectiveLength (song.beatsPerBar);
+    song.playlist.push_back (clip);
+    song.mode = PlayMode::song;
+    if (made != nullptr)
+        *made = true;
+    return clip.pattern;
 }
 
 int insertOf (const Song& song, int track)

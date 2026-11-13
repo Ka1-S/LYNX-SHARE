@@ -1,5 +1,5 @@
 ---
-source: bcd8a275bd
+source: 358890815a
 ---
 `Archivo › Abrir...` (`Ctrl+O`) abre los proyectos `.lynx` propios de LYNX SHARE y también archivos `.flp`, `.als`, `.flm` y `.mid`. Un proyecto de otro programa es una importación: se convierte en un proyecto nuevo de LYNX SHARE sin guardar, y el archivo original nunca se modifica.
 
@@ -16,8 +16,8 @@ source: bcd8a275bd
 | Formato | Se convierte | No se convierte |
 |---|---|---|
 | `.flp` (FL Studio) | Canales, samples, patrones, notas slide y porta, todos los arreglos, marcadores, cambios de compás, automatización, vínculos a controladores, el Mixer con su enrutado, sidechains, EQ de pista y efectos nativos | Los paquetes FLEX están cifrados y nunca se abren. Un canal FLEX recibe un patch de sintetizador elegido según el nombre de su preset |
-| `.als` (Live 11 y 12) | Pistas MIDI, de audio, de grupo y de retorno, tempo, compás, locators, el bucle, volumen, pan, silencio, solo y envíos con su automatización, clips de sesión y escenas, marcadores de warp | Los efectos propios de Live se descartan. Los racks conservan solo su primera cadena. Simpler, Sampler y los racks de batería se convierten en samplers de LYNX SHARE |
-| `.flm` (FL Studio Mobile) | Tempo, compás, un insert del mezclador por canal, una pista de la Playlist por carril, patrones, clips de audio con desfase y tono, kits de batería, samples de DW Sampler y programas `.dwp` | Los efectos y los carriles de automatización de FLM. Los demás generadores de FLM suenan con el sintetizador integrado |
+| `.als` (Live 11 y 12) | Pistas MIDI, de audio, de grupo y de retorno, tempo, compás, locators, el bucle, volumen, pan, silencio, solo y envíos con su automatización, clips de sesión y escenas, marcadores de warp, racks y Drum Racks, y muchos de los dispositivos propios de Live (EQ Eight, Compressor, Glue Compressor, Reverb, Delay, Auto Filter, Saturator, Utility, Simpler, Drift y más) como propios de LYNX SHARE | Los dispositivos de Live sin equivalente en LYNX SHARE (Hybrid Reverb, Grain Delay, Amp, Roar, parches de FM Operator y otros) se descartan y se listan. Los MIDI Effect Racks no se convierten |
+| `.flm` (FL Studio Mobile) | Tempo, compás, un insert del Mixer por canal, una pista de la Playlist por carril, patrones, clips de audio con desfase y tono, kits de batería, DW Sampler y programas `.dwp`, el Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth y SuperSaw, los efectos, la automatización y los sets de acordes | Los demás generadores de FLM suenan con el sintetizador integrado |
 | `.mid` | Notas, compases y todos los cambios de tempo | Un archivo MIDI no lleva sonidos: los canales reciben el sintetizador de LYNX SHARE o un canal MIDI Out |
 
 Los plugins VST2, VST3 y CLAP de terceros de un `.flp`, y los VST2 y VST3 de un `.als`, se cargan con su estado guardado si el mismo plugin está instalado en tu ordenador.

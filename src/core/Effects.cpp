@@ -34,6 +34,7 @@
 #include "core/FruityBasicFx.h"
 #include "core/FruityFilters.h"
 #include "core/NewtoneFx.h"
+#include "core/EdisonFx.h"
 #include "core/FruityDelay.h"
 #include "core/FrequencySplitter.h"
 #include "core/HardcoreFx.h"
@@ -144,6 +145,7 @@ int filterType (float v) { return std::clamp ((int) (v * 3.0f), 0, 2); } // low-
 constexpr std::array<const char*, 3> filterNames { "Low-pass", "High-pass", "Band-pass" };
 float filterHz (float v) { return logRange (v, 20.0f, 20000.0f); }
 float filterQ (float v) { return logRange (v, 0.5f, 12.0f); }
+bool filterSteep (float v) { return v >= 0.5f; } // round 190da: the appended Slope (0 = 12 dB/oct, the old filter; 1 = 24)
 float distortionDriveDb (float v) { return v * 36.0f; }
 float distortionToneHz (float v) { return logRange (v, 800.0f, 20000.0f); }
 float chorusRateHz (float v) { return logRange (v, 0.05f, 5.0f); }
@@ -828,17 +830,40 @@ public:
         reset();
     }
 
-    void reset() noexcept override { biquad.reset(); }
+    void reset() noexcept override
+    {
+        biquad.reset();
+        second.reset();
+    }
 
     void process (float* l, float* r, int n, const EffectParams& params, double) noexcept override
     {
-        if (params[0] != last[0] || params[1] != last[1] || params[2] != last[2])
+        if (params[0] != last[0] || params[1] != last[1] || params[2] != last[2] || params[4] != last[4])
         {
+            const auto wasSteep = filterSteep (last[4]);
             last = params;
-            biquad.filter (sampleRate, filterType (params[0]), filterHz (params[1]), filterQ (params[2]));
+            const auto q = filterQ (params[2]);
+            biquad.filter (sampleRate, filterType (params[0]), filterHz (params[1]), q);
+            steep = filterSteep (params[4]);
+            if (steep)
+            {
+                second.filter (sampleRate, filterType (params[0]), filterHz (params[1]), filterSecondStageQ (q));
+                if (! wasSteep)
+                    second.reset();
+            }
         }
 
         const auto mix = params[3];
+
+        if (steep)
+        {
+            for (int i = 0; i < n; ++i)
+            {
+                l[i] += (second.process (biquad.process (l[i], 0), 0) - l[i]) * mix;
+                r[i] += (second.process (biquad.process (r[i], 1), 1) - r[i]) * mix;
+            }
+            return;
+        }
 
         for (int i = 0; i < n; ++i)
         {
@@ -849,7 +874,8 @@ public:
 
 private:
     double sampleRate = 44100.0;
-    Biquad biquad;
+    Biquad biquad, second;
+    bool steep = false;
     EffectParams last {};
 };
 
@@ -1995,11 +2021,15 @@ private:
 // Speed, 1 Fine Tune, 2 Bypass All, 3 Note A Freq, 4 range (index/5: min f 220/170/110/80/55/25 Hz), 5…16 note
 // mask C…B (1 = allowed), 17…28 Key Bypass C…B, 29 Formant, 30 Gender, 31 Pitch Reference (0 left, 0.5
 // independent, 1 right), 32 Stereo, 33 Harmonize, 34 MIDI, 35 Octaves, 36 Replace/Mix, 37 Vel, 38…41 Voice 1…4 pan.
-// The DSP is FL's (core/PitcherDsp.h). MIDI mode and Harmonize take held notes, but LYNX effects receive no MIDI:
-// no note is ever held, so MIDI mode corrects nothing (only Fine applies) and Harmonize passes the voice-0 dry
-// signal (Replace) or the dry input alone (Mix) — what FL does with nothing arriving on the Pitcher's MIDI port.
+// The DSP is FL's (core/PitcherDsp.h). Round 190ee: 42 MIDI port (FL's raw parameter 33: port = int(256 v) − 1, −1 =
+// none; REA_rodada16 §1, REA_rodada30 §2.8), 43 Port routing — on (every new and FL-imported Pitcher) the notes come
+// from the MIDI Out channels on that port, as in FL; off (projects saved before round 190ee, through
+// upgradeLoadedEffectParams) the notes held on any Channel Rack channel, as round 173d made it.
 namespace pcorr
 {
+constexpr int midiPortParam = 42, portRoutingParam = 43;
+int midiPort (float v) noexcept { return v > 0.0f ? std::min (255, (int) (v * 256.0f) - 1) : -1; }
+float midiPortValue (int port) noexcept { return port < 0 ? 0.0f : std::min (1.0f, ((float) port + 1.5f) / 256.0f); }
 constexpr double minHz[6] { 220.0, 170.0, 110.0, 80.0, 55.0, 25.0 };
 int range (float v) { return std::clamp ((int) std::lround (v * 5.0f), 0, 5); }
 double noteA (float v) { return 55.0 * std::pow (2.0, (2.0 * v - 1.0) / 12.0); } // ×8 = A 440 at v = 0.5
@@ -2031,12 +2061,26 @@ public:
         heldCount = count;
     }
 
+    // round 190ee: a note from the MIDI Out channels on the Pitcher's port (FL: note in 0x180007a40, velocity / 127)
+    void midiNote (int key, int velocity, int) noexcept override
+    {
+        if (portRouting)
+            dsp.noteOn (key, velocity);
+    }
+
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
+        const auto routed = p[(std::size_t) pcorr::portRoutingParam] > 0.5f;
+        if (routed != portRouting)
+        {
+            dsp.allNotesOff();
+            sounding = {};
+            portRouting = routed;
+        }
         NoteMask now {};
-        for (int c = 0; held != nullptr && c < heldCount; ++c)
+        for (int c = 0; ! portRouting && held != nullptr && c < heldCount; ++c)
             now[0] |= held[c][0], now[1] |= held[c][1];
-        if (now != sounding)
+        if (! portRouting && now != sounding)
         {
             for (int k = 0; k < 128; ++k)
             {
@@ -2086,6 +2130,7 @@ private:
     const NoteMask* held = nullptr;
     int heldCount = 0;
     NoteMask sounding {};
+    bool portRouting = true;
 };
 
 class LoFi final : public Effect
@@ -2666,7 +2711,8 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                  { "Low cut", 0.0f }, { "High cut", 1.0f }, { "Predelay", 0.0f } } };
     static const EffectInfo plugin { "Plugin", {} };
     static const EffectInfo limiter { "Limiter", { { "Ceiling", 0.975f }, { "Gain", 0.0f }, { "Release", 0.5f } } };
-    static const EffectInfo filter { "Filter", { { "Type", 0.0f }, { "Cutoff", 0.75f }, { "Reso.", 0.2f }, { "Mix", 1.0f } } };
+    // round 190da: Slope appended (0 = 12 dB/oct, the filter every older project has)
+    static const EffectInfo filter { "Filter", { { "Type", 0.0f }, { "Cutoff", 0.75f }, { "Reso.", 0.2f }, { "Mix", 1.0f }, { "Slope", 0.0f } } };
     static const EffectInfo distortion { "Distortion", { { "Drive", 0.4f }, { "Tone", 0.7f }, { "Mix", 1.0f }, { "Output", 0.5f } } };
     static const EffectInfo chorus { "Chorus", { { "Rate", 0.45f }, { "Depth", 0.4f }, { "Mix", 0.5f }, { "Feedback", 0.0f } } };
     static const EffectInfo utility { "Utility", { { "Gain", 0.5f }, { "Balance", 0.5f }, { "L -> L", 0.75f }, { "R -> L", 0.5f },
@@ -2907,6 +2953,8 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                  { "Harmonize", 0.0f }, { "MIDI", 0.0f }, { "Octaves", 0.0f }, { "Mix", 0.0f },
                                                  { "Vel", 0.0f }, { "Voice 1 pan", 0.5f }, { "Voice 2 pan", 0.5f },
                                                  { "Voice 3 pan", 0.5f }, { "Voice 4 pan", 0.5f } });
+        // round 190ee: FL's MIDI port (none by default) and how notes arrive (older projects: Port routing off)
+        info.params.insert (info.params.end(), { { "MIDI port", 0.0f }, { "Port routing", 1.0f } });
         return info;
     }();
     static const EffectInfo lofiInfo { "Lo-fi", { { "Rate", 0.0f }, { "Bits", 0.0f }, { "Mix", 1.0f } } };
@@ -3168,11 +3216,91 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                                 { "Separation", 0.5f } } };
             return info;
         }
+        case EffectKind::pocketComb: // round 190by
+        {
+            static const EffectInfo info { "Pocket Comb Filter", { { "Mode", 0.0f }, { "Pitch", 0.33f }, { "Feedback", 0.8f }, { "Mix", 0.75f },
+                                                                   { "Offset", 0.5f }, { "Smoothing", 0.25f }, { "Snap", 1.0f },
+                                                                   { "Polarity", 0.0f }, { "Asymmetry", 0.5f }, { "Pitch oct", 0.5f },
+                                                                   { "Pitch note", 0.4f } } };
+            return info;
+        }
+        case EffectKind::pocketMultiband: // round 190by
+        {
+            static const EffectInfo info { "Pocket Multiband Compressor",
+                                           { { "Master gain", 0.5f }, { "Low crossover", 0.3f }, { "High crossover", 0.7f }, { "Solo", 0.0f },
+                                             { "Dry mix", 0.0f },
+                                             { "Low input gain", 0.5f }, { "Low threshold", 1.0f }, { "Low ratio", 0.0f }, { "Low attack", 0.3f },
+                                             { "Low release", 0.3f }, { "Low gain", 0.5f }, { "Low state", 0.0f },
+                                             { "Mid input gain", 0.5f }, { "Mid threshold", 1.0f }, { "Mid ratio", 0.0f }, { "Mid attack", 0.3f },
+                                             { "Mid release", 0.3f }, { "Mid gain", 0.5f }, { "Mid state", 0.0f },
+                                             { "High input gain", 0.5f }, { "High threshold", 1.0f }, { "High ratio", 0.0f }, { "High attack", 0.3f },
+                                             { "High release", 0.3f }, { "High gain", 0.5f }, { "High state", 0.0f },
+                                             { "Low width", 0.5f }, { "Mid width", 0.5f }, { "High width", 0.5f }, { "Width mode", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketTapeStop: // round 190by
+        {
+            static const EffectInfo info { "Pocket Tape Stop", { { "Stop time", 0.2f }, { "Start time", 0.2f }, { "Stop time synced", 1.0f / 3.0f },
+                                                                 { "Start time synced", 1.0f / 3.0f }, { "Play", 1.0f }, { "Warp", 0.5f },
+                                                                 { "Sync", 0.0f } } };
+            return info;
+        }
+        // --- round 190dw: FLM's own defaults (each module's default-value function, REA_rodada182c / FLM_FORMAT §7.1)
+        case EffectKind::pocketEq:
+        {
+            static const EffectInfo info { "Pocket EQ", { { "Gain 1", 0.5f }, { "Frequency 1", 0.2f }, { "Bandwidth 1", 0.5f }, { "Kind 1", 0.51f },
+                                                          { "Gain 2", 0.5f }, { "Frequency 2", 0.4f }, { "Bandwidth 2", 0.5f }, { "Kind 2", 0.51f },
+                                                          { "Gain 3", 0.5f }, { "Frequency 3", 0.6f }, { "Bandwidth 3", 0.5f }, { "Kind 3", 0.51f },
+                                                          { "Gain 4", 0.5f }, { "Frequency 4", 0.8f }, { "Bandwidth 4", 0.5f }, { "Kind 4", 0.51f },
+                                                          { "Channel 1", 0.0f }, { "Channel 2", 0.0f }, { "Channel 3", 0.0f }, { "Channel 4", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketGraphicEq:
+        {
+            static const EffectInfo info { "Pocket Graphic EQ", { { "80 Hz", 0.5f }, { "160 Hz", 0.5f }, { "375 Hz", 0.5f }, { "750 Hz", 0.5f },
+                                                                  { "1.5 kHz", 0.5f }, { "3 kHz", 0.5f }, { "6 kHz", 0.5f }, { "12 kHz", 0.5f } } };
+            return info;
+        }
+        case EffectKind::pocketFilter:
+        {
+            static const EffectInfo info { "Pocket Filter", { { "Frequency", 0.7f }, { "Q", 0.0f }, { "Type", 0.0f }, { "Slope", 0.5f } } };
+            return info;
+        }
+        case EffectKind::pocketReverbClassic:
+        {
+            static const EffectInfo info { "Pocket Reverb Classic",
+                                           { { "Decay", 0.4f }, { "High damping", 0.8f }, { "Mix", 0.4f }, { "Predelay", 0.0f }, { "Room size", 1.0f },
+                                             { "Diffusion", 1.0f }, { "Width", 1.0f }, { "Low cut", 0.0f }, { "High cut", 1.0f }, { "Input", 1.0f },
+                                             { "ER", 0.25f }, { "Dry level", 0.0f }, { "Input off", 0.0f }, { "Dry off", 0.0f },
+                                             { "ER off", 0.0f }, { "Wet off", 0.0f }, { "Bass mult", 0.0f }, { "Crossover", 0.0f },
+                                             { "Mod rate", 0.499f }, { "Mod depth", 0.0f } } };
+            return info;
+        }
+        case EffectKind::pocketReverb2:
+        {
+            static const EffectInfo info { "Pocket Reverb 2",
+                                           { { "High cut", 0.16f }, { "Low cut", 0.0187f }, { "Size", 0.5f }, { "Decay", 0.068f }, { "Diffusion", 1.0f },
+                                             { "Damping", 0.16f }, { "Dry", 0.8f }, { "ER", 0.8f }, { "Wet", 0.56f }, { "Side input", 0.0f },
+                                             { "Delay", 0.0f }, { "Tempo", 0.0f }, { "Mod", 0.0f }, { "Bass", 0.28f }, { "Separation", 0.5f },
+                                             { "Speed", 0.33f }, { "Crossover", 0.2405f }, { "Pan", 0.5f } } };
+            return info;
+        }
+        case EffectKind::pocketReverb:
+        {
+            static const EffectInfo info { "Pocket Reverb",
+                                           { { "Decay", 0.4f }, { "High damping", 0.8f }, { "Mix", 0.4f }, { "Pan", 0.5f }, { "ER", 0.25f },
+                                             { "Predelay", 0.0f }, { "Room size", 1.0f }, { "Diffusion", 1.0f }, { "Width", 1.0f }, { "Low cut", 0.0f },
+                                             { "High cut", 1.0f }, { "Mod rate", 0.499f }, { "Mod depth", 0.0f }, { "Wet gain", 1.0f },
+                                             { "Dry level", 1.0f } } };
+            return info;
+        }
+        // --- end of round 190dw
         case EffectKind::rackMixer:
         {
             static const EffectInfo rackMixerInfo { "Chain mixer", { { "Volume", rack::unityVolume }, { "Pan", 0.5f }, { "Chain select", 1.0f } } };
             return rackMixerInfo;
         }
+        case EffectKind::edison: return edisonfx::info();
         case EffectKind::lynxTune: return lynxtune::info();
         case EffectKind::fruityPhaser: return fruityPhaserInfo;
         case EffectKind::epochVerb:
@@ -3566,6 +3694,7 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
                 case 0: return filterNames[(std::size_t) filterType (v)];
                 case 1: std::snprintf (text, sizeof (text), "%.0f Hz", filterHz (v)); break;
                 case 2: std::snprintf (text, sizeof (text), "Q %.2f", filterQ (v)); break;
+                case 4: return filterSteep (v) ? "24 dB/oct" : "12 dB/oct";
                 default: std::snprintf (text, sizeof (text), "%.0f%%", v * 100.0f); break;
             }
             return text;
@@ -3613,6 +3742,9 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
                 }
             return text;
         }
+
+        case EffectKind::edison:
+            return edisonfx::paramText (param, v);
 
         case EffectKind::rackMixer: // (round 183c: Live's chain units)
             if (param == rack::mixerVolume)
@@ -4019,6 +4151,18 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
             return pocket::compressorParamText (param, v);
         case EffectKind::pocketSpreader:
             return pocket::spreaderParamText (param, v);
+        case EffectKind::pocketComb:
+            return pocket::combParamText (param, v);
+        case EffectKind::pocketMultiband:
+            return pocket::multibandParamText (param, v);
+        case EffectKind::pocketTapeStop:
+            return pocket::tapeStopParamText (param, v);
+        case EffectKind::pocketEq: return pocket::eqParamText (param, v);                 // round 190dw
+        case EffectKind::pocketGraphicEq: return pocket::graphicEqParamText (param, v);
+        case EffectKind::pocketFilter: return pocket::filterParamText (param, v);
+        case EffectKind::pocketReverbClassic: return pocket::reverbClassicParamText (param, v);
+        case EffectKind::pocketReverb2: return pocket::reverb2ParamText (param, v);
+        case EffectKind::pocketReverb: return pocket::reverbParamText (param, v);
         case EffectKind::hardwareInsert:
             return hwinsert::paramText (param, v);
         case EffectKind::fruityMute2:
@@ -4086,6 +4230,12 @@ std::string formatEffectParam (EffectKind kind, int param, float v, double bpm)
     return {};
 }
 
+double filterSecondStageQ (double q) noexcept
+{
+    const auto x = std::clamp ((q - 0.5) / (q + 1.5), 0.0, 0.999);
+    return 0.5 + x / (1.0 + x);
+}
+
 EffectSlot makeEffectSlot (EffectKind kind)
 {
     EffectSlot slot;
@@ -4131,8 +4281,34 @@ double savedEffectParamValue (float v) noexcept
     return (double) v;
 }
 
+bool effectHasMidiPort (EffectKind kind) noexcept { return kind == EffectKind::grossBeat || kind == EffectKind::pitchCorrect; }
+
+int effectMidiInPort (const EffectSlot& slot) noexcept
+{
+    if (slot.kind == EffectKind::grossBeat)
+        return std::clamp (slot.plugin.midiInPort, -1, 255);
+    if (slot.kind == EffectKind::pitchCorrect && slot.params[(std::size_t) pcorr::portRoutingParam] > 0.5f)
+        return pcorr::midiPort (slot.params[(std::size_t) pcorr::midiPortParam]);
+    return -1;
+}
+
+void setEffectMidiInPort (EffectSlot& slot, int port) noexcept
+{
+    port = std::clamp (port, -1, 255);
+    if (slot.kind == EffectKind::grossBeat)
+        slot.plugin.midiInPort = port;
+    else if (slot.kind == EffectKind::pitchCorrect)
+    {
+        slot.params[(std::size_t) pcorr::midiPortParam] = pcorr::midiPortValue (port);
+        slot.params[(std::size_t) pcorr::portRoutingParam] = 1.0f; // (an older project's Pitcher moves to FL's routing)
+    }
+}
+
 void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexcept
 {
+    // round 190ee: a Pitcher saved before its MIDI port keeps taking the notes held on the Channel Rack (round 173d)
+    if (slot.kind == EffectKind::pitchCorrect && savedCount <= (std::size_t) pcorr::portRoutingParam)
+        slot.params[(std::size_t) pcorr::portRoutingParam] = 0.0f;
     // round 173d3: a Love Philter saved before its units' L / B / H / shaper / IN / NEXT became parameters takes them from its state
     if (slot.kind == EffectKind::lovePhilter)
         philter::upgradeParams (slot, savedCount);
@@ -4167,9 +4343,19 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::voicingStereo
         && slot.params.size() > (std::size_t) echosuite::echoform::voicingStereo)
         slot.params[(std::size_t) echosuite::echoform::voicingStereo] = 0.0f;
+    // round 190dl: … and before the measured tape stage keeps the classic tape characters, bit for bit
+    if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::engineLaw
+        && slot.params.size() > (std::size_t) echosuite::echoform::engineLaw)
+        slot.params[(std::size_t) echosuite::echoform::engineLaw] = 0.0f;
     // round 152: a Glow Leveler saved before the measured opto law keeps the round-123 Limit and no classic auto make-up
     if (slot.kind == EffectKind::glowLeveler && savedCount <= (std::size_t) mixsuite::glow::optoLaw)
         slot.params[(std::size_t) mixsuite::glow::optoLaw] = 0.0f;
+    // round 190dp: a Quell saved before the matched engine's noise-floor tracker keeps round 124's fixed thresholds
+    if (slot.kind == EffectKind::quellDenoiser && savedCount <= (std::size_t) voicetools::quell::law)
+        slot.params[(std::size_t) voicetools::quell::law] = 0.0f;
+    // round 190dp: a Voice Shift saved before the measured unvoiced path keeps the classic one (unvoiced passes through)
+    if (slot.kind == EffectKind::voiceShift && savedCount <= (std::size_t) voiceshift::law)
+        slot.params[(std::size_t) voiceshift::law] = 0.0f;
     // round 165w: a Gemini Doubler saved before the measured shelves keeps round 124's (−30 … +12 dB, first order)
     if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::eqLaw)
         slot.params[(std::size_t) voicetools::gemini::eqLaw] = 0.0f;
@@ -4183,9 +4369,40 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // (round 124) keeps the shelf + exciter it was set up with
     if (slot.kind == EffectKind::aether && savedCount <= (std::size_t) mixsuite::aether::dynamic)
         slot.params[(std::size_t) mixsuite::aether::dynamic] = 0.0f;
+    // round 190bz: a LYNX reverb saved before the 0.1.27 engine law (per-band decay, tone corrector, onset network)
+    // keeps the classic engine, bit for bit
+    {
+        int law = -1;
+        switch (slot.kind)
+        {
+            case EffectKind::epochVerb: law = verbs::epoch::engineLaw; break;
+            case EffectKind::atrium: law = verbs::atrium::engineLaw; break;
+            case EffectKind::foilPlate: law = verbs::foil::engineLaw; break;
+            case EffectKind::halo: law = verbs::halo::engineLaw; break;
+            case EffectKind::horizon: law = verbs::horizon::engineLaw; break;
+            default: break;
+        }
+        if (law >= 0 && savedCount <= (std::size_t) law)
+            slot.params[(std::size_t) law] = 0.0f;
+    }
     // round 152: a Compressor saved before the measured vintage curve keeps the round-150 curve
     if (slot.kind == EffectKind::compressor && savedCount <= 18 && slot.params.size() > 18)
         slot.params[18] = 0.0f;
+    // round 190do: a Gemini Doubler saved before the measured read head keeps the two crossfaded taps
+    if (slot.kind == EffectKind::geminiDoubler && savedCount <= (std::size_t) voicetools::gemini::headLaw)
+        slot.params[(std::size_t) voicetools::gemini::headLaw] = 0.0f;
+    // round 190do: an Orbit saved before the measured sweep keeps the classic voices
+    if (slot.kind == EffectKind::orbit && savedCount <= (std::size_t) echosuite::orbit::law)
+        slot.params[(std::size_t) echosuite::orbit::law] = 0.0f;
+    // round 190do: a Lattice Mod saved before the measured detune depth keeps the classic one
+    if (slot.kind == EffectKind::latticeMod && savedCount <= (std::size_t) echosuite::lattice::law)
+        slot.params[(std::size_t) echosuite::lattice::law] = 0.0f;
+    // round 190do: a Spiral Echo saved before the measured loop keeps the classic one
+    if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::law)
+        slot.params[(std::size_t) echosuite::spiral::law] = 0.0f;
+    // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
+    if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
+        slot.params[(std::size_t) verbs::nebula::law] = 0.0f;
 }
 
 std::unique_ptr<Effect> makeParallelEffect (const EffectSlot& slot)
@@ -4356,6 +4573,7 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::shellChannel:
         case EffectKind::strikeShaper: return mixsuite::make (kind); // LYNX's own mixing suite (REA_rodada96)
         case EffectKind::rackMixer: return rack::makeChainMixer(); // a rack chain's mixer (round 183c)
+        case EffectKind::edison: return std::make_unique<edisonfx::Processor>(); // without its slot: nothing to play (round 190cd)
         case EffectKind::lynxTune: return lynxtune::make(); // LYNX's own pitch corrector (REA_rodada95)
         case EffectKind::fruityPhaser: return phaserfx::make(); // FL's Fruity Phaser, exact (REA_rodada105_phaser)
         case EffectKind::epochVerb:
@@ -4403,6 +4621,15 @@ std::unique_ptr<Effect> makeEffect (EffectKind kind)
         case EffectKind::pocketWaveshaper: return pocket::makeWaveshaper(); // round 189h
         case EffectKind::pocketCompressor: return pocket::makeCompressor();
         case EffectKind::pocketSpreader: return pocket::makeSpreader();
+        case EffectKind::pocketComb: return pocket::makeComb(); // round 190by
+        case EffectKind::pocketMultiband: return pocket::makeMultiband();
+        case EffectKind::pocketTapeStop: return pocket::makeTapeStop();
+        case EffectKind::pocketEq: return pocket::makeEq(); // round 190dw
+        case EffectKind::pocketGraphicEq: return pocket::makeGraphicEq();
+        case EffectKind::pocketFilter: return pocket::makeFilter();
+        case EffectKind::pocketReverbClassic: return pocket::makeReverbClassic();
+        case EffectKind::pocketReverb2: return pocket::makeReverb2();
+        case EffectKind::pocketReverb: return pocket::makeReverb();
         case EffectKind::hardwareInsert: return std::make_unique<hwinsert::HardwareInsertFx>(); // round 164d
         case EffectKind::fruityMute2: return flextra::mute2::make(); // round 165g
         case EffectKind::bigClock:

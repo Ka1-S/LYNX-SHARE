@@ -37,9 +37,19 @@ std::string formatEffectParam (EffectKind kind, int param, float value01, double
 std::string formatEffectParam (EffectKind kind, int param, float value01, double bpm, const EffectParams& context);
 
 EffectSlot makeEffectSlot (EffectKind kind);
+// The basic Filter's second stage at 24 dB/oct (round 190da, its appended Slope): the same type and cutoff, Q2 =
+// 0.5 + x / (1 + x) for the first stage's Q = 0.5 + 2x / (1 − x) — the pair Ableton Live 12.4's Auto Filter runs
+// (measured in round 190cz: both stages cookbook biquads, 0.003 dB); at Q 0.5 both are 0.5
+double filterSecondStageQ (double q) noexcept;
 // A slot loaded from a project that stored `savedCount` parameters: parameters added later that switch an engine
 // to a newer construction get the value that keeps the old sound (round 147: Prism's measured Dynamic phase).
 void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexcept;
+// Round 190ee: the effects that listen to a MIDI input port (FL: the notes of the MIDI Out channels on that port):
+// Gross Beat (its wrapper's port, kept in EffectSlot::plugin.midiInPort) and Pitcher (its own MIDI port parameter,
+// FL's raw parameter 33). −1 = none; a Pitcher of an older project (Port routing off) listens to no port.
+bool effectHasMidiPort (EffectKind kind) noexcept;
+int effectMidiInPort (const EffectSlot& slot) noexcept;
+void setEffectMidiInPort (EffectSlot& slot, int port) noexcept; // −1…255
 // How many of a slot's parameters a project / preset saves (issue #67): the named ones plus any hidden ones after them
 // that hold a value (the Parametric EQ's FL law, processing, band mask and FL's own values: ParametricEqFl.h [36…47]).
 std::size_t savedEffectParamCount (const EffectSlot& slot) noexcept;
@@ -127,6 +137,10 @@ public:
     // The notes held on every Channel Rack channel (`count` masks, by channel index) during the next process(); the
     // pointer stays valid until the next call. Effects that follow notes (LYNX Tune's MIDI targets) keep it.
     virtual void setHeldNotes (const NoteMask* /*channels*/, int /*count*/) noexcept {}
+    // Round 190ee: a note reaching the effect through its MIDI input port (FL: a MIDI Out channel on the port the
+    // effect listens to), before the process() that follows. `velocity` 1…127, 0 = note off; `midiChannel` 0…15.
+    // Audio thread. Effects that take notes: Gross Beat (slot selection), Pitcher (MIDI mode / Harmonize).
+    virtual void midiNote (int /*key*/, int /*velocity*/, int /*midiChannel*/) noexcept {}
     // Only the slot's state changed (an editor edited a control stored there, core/StateParams.h). Called off the audio
     // thread on the running effect: true = it takes the new state itself, applied at the start of a later process(),
     // so its delay lines and filters keep running; false (the default) = the slot's effect is built again.

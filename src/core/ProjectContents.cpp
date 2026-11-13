@@ -168,7 +168,7 @@ std::vector<Item> automations (const Song& song)
         // the colour of what it moves: a channel's or an insert's
         const auto& t = automation.target;
         if ((t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-             || t.kind == AutomationTargetKind::channelParam)
+             || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust)
             && t.index >= 0 && t.index < (int) song.channels.size())
             item.colour = song.channels[(std::size_t) t.index].colour;
         else if ((t.kind == AutomationTargetKind::mixerVolume || t.kind == AutomationTargetKind::mixerPan

@@ -73,6 +73,8 @@ public:
     void hoverExit() { hovered = Part::none; }
 
     bool hasLynxPresets() const;
+    // Round 190ce (the Device View card's save button): the "Save preset" dialog, over `owner`.
+    void savePreset (juce::Component& owner) { saveAs (owner); }
     juce::String presetLabel (const FlPresets* flPresets = nullptr) const;
 
 private:

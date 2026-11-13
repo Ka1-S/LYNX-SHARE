@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "core/Effects.h"
+#include "core/NoteEdit.h"
 
 namespace lynx::rack
 {
@@ -134,7 +135,8 @@ int midiPortOfMidiRack() noexcept { return 0; }
 // shifts every rack index above `node` down by one (the node was erased from the Patcher)
 void forgetNode (RackDoc& r, int node)
 {
-    for (auto& c : r.chains)
+    for (auto* list : { &r.chains, &r.returns })
+        for (auto& c : *list)
     {
         std::erase (c.nodes, node);
         for (auto& n : c.nodes)
@@ -243,14 +245,16 @@ EffectSlot makeRackSlot (RackDoc::Kind kind)
 const std::vector<int>& devices (const RackDoc& rack, int chain)
 {
     static const std::vector<int> none;
-    return chain >= 0 && chain < (int) rack.chains.size() ? rack.chains[(std::size_t) chain].nodes : none;
+    const auto* c = chainAt (rack, chain);
+    return c != nullptr ? c->nodes : none;
 }
 
 bool isChainNode (const RackDoc& rack, int node) noexcept
 {
-    for (const auto& c : rack.chains)
-        if (c.mixer == node || c.gate == node)
-            return true;
+    for (const auto* list : { &rack.chains, &rack.returns })
+        for (const auto& c : *list)
+            if (c.mixer == node || c.gate == node)
+                return true;
     return false;
 }
 
@@ -307,6 +311,15 @@ void compile (PatcherDoc& doc)
     bool anySolo = false;
     for (const auto& c : r->chains)
         anySolo = anySolo || c.solo;
+    // a Drum Rack's return chains (round 190ec): where a chain's audio and sends go in (the first effect, else the mixer)
+    for (auto& ret : r->returns)
+        std::erase_if (ret.nodes, [&] (int n) { return ! valid (n) || doc.nodes[(std::size_t) n].generator; });
+    const auto returnHead = [&] (int k) {
+        if (! r->drum || k < 0 || k >= (int) r->returns.size())
+            return -1;
+        const auto& ret = r->returns[(std::size_t) k];
+        return ! ret.nodes.empty() ? ret.nodes.front() : valid (ret.mixer) ? ret.mixer : -1;
+    };
 
     for (int ci = 0; ci < (int) r->chains.size(); ++ci)
     {
@@ -383,6 +396,14 @@ void compile (PatcherDoc& doc)
             z.selectorMax = selHi;
             z.selectorScalesVelocity = r->kind == RackDoc::Kind::midiEffect;
             z.selectorFiltersCtrl = r->selectorFiltersCtrl;
+            if (r->drum) // a pad (round 190ec): the Receive note in, the Play note to the devices, its choke group
+            {
+                const auto receive = std::clamp (c.receive, -1, 127);
+                z.key = receive < 0 ? RackZone {} : RackZone { receive, receive, receive, receive };
+                c.key = z.key; // (what a LYNX without Drum Racks plays: a key split on the pad's note)
+                z.playKey = receive < 0 ? -1 : std::clamp (c.play, 0, 127);
+                z.choke = std::clamp (c.choke, 0, drumChokeGroups);
+            }
             const auto zone = (int) doc.zones.size();
             doc.zones.push_back (z);
 
@@ -415,6 +436,8 @@ void compile (PatcherDoc& doc)
                     break;
                 }
             }
+            if (r->drum)
+                doc.zones[(std::size_t) zone].chokeNode = instrument;
             if (r->kind == RackDoc::Kind::midiEffect)
             {
                 if (noteFrom != patchFromHost) // the last MIDI effect plays on "To LYNX" port 0 (the rack's children)
@@ -459,9 +482,27 @@ void compile (PatcherDoc& doc)
                 PatchWire out;
                 out.kind = PatchWire::Kind::audio;
                 out.from = c.mixer;
-                out.to = patchToHost;
+                out.to = r->drum && returnHead (c.audioTo) >= 0 ? returnHead (c.audioTo) : patchToHost;
                 out.enabled = audible;
                 doc.wires.push_back (out);
+                // a Drum Rack chain's sends: one cable per return chain after the chain's mixer (post its volume and pan),
+                // its gain the send level; a send at −inf or switched off is a disabled cable (no rebuild when it moves)
+                if (r->drum)
+                {
+                    c.sends.resize (r->returns.size());
+                    for (int k = 0; k < (int) r->returns.size(); ++k)
+                        if (const auto head = returnHead (k); head >= 0)
+                        {
+                            const auto& send = c.sends[(std::size_t) k];
+                            PatchWire w;
+                            w.kind = PatchWire::Kind::audio;
+                            w.from = c.mixer;
+                            w.to = head;
+                            w.gain = std::max (0.0f, send.level);
+                            w.enabled = audible && send.on && send.level > 0.0f;
+                            doc.wires.push_back (w);
+                        }
+                }
             }
         }
 
@@ -480,6 +521,60 @@ void compile (PatcherDoc& doc)
             sel.toPort = mixerSelect;
             sel.curve = sampledCurve (129, [&] (float v) { return selectOutputGain (c.select, selectorAt (v)); });
             doc.wires.push_back (std::move (sel));
+        }
+    }
+
+    // a Drum Rack's return chains: their effects in series, then their mixer, into the rack's output
+    if (r->drum)
+    {
+        bool anyReturnSolo = false;
+        for (const auto& ret : r->returns)
+            anyReturnSolo = anyReturnSolo || ret.solo;
+        for (int k = 0; k < (int) r->returns.size(); ++k)
+        {
+            auto& ret = r->returns[(std::size_t) k];
+            if (! valid (ret.mixer))
+                ret.mixer = -1;
+            const auto y = 60.0f + 90.0f * (float) (r->chains.size() + (std::size_t) k);
+            float x = 150.0f;
+            int previous = -1;
+            for (const auto n : ret.nodes)
+            {
+                doc.nodes[(std::size_t) n].x = x;
+                doc.nodes[(std::size_t) n].y = y;
+                x += 130.0f;
+                if (previous >= 0)
+                {
+                    PatchWire w;
+                    w.kind = PatchWire::Kind::audio;
+                    w.from = previous;
+                    w.to = n;
+                    doc.wires.push_back (w);
+                }
+                previous = n;
+            }
+            if (ret.mixer < 0)
+                continue;
+            doc.nodes[(std::size_t) ret.mixer].x = x;
+            doc.nodes[(std::size_t) ret.mixer].y = y;
+            if (previous >= 0)
+            {
+                PatchWire w;
+                w.kind = PatchWire::Kind::audio;
+                w.from = previous;
+                w.to = ret.mixer;
+                doc.wires.push_back (w);
+            }
+            auto& mixer = doc.nodes[(std::size_t) ret.mixer].effect;
+            mixer.params[(std::size_t) mixerVolume] = volumeValue (ret.volume);
+            mixer.params[(std::size_t) mixerPan] = std::clamp ((ret.pan + 1.0f) * 0.5f, 0.0f, 1.0f);
+            mixer.params[(std::size_t) mixerSelect] = 1.0f;
+            PatchWire out;
+            out.kind = PatchWire::Kind::audio;
+            out.from = ret.mixer;
+            out.to = patchToHost;
+            out.enabled = ret.active && (! anyReturnSolo || ret.solo);
+            doc.wires.push_back (out);
         }
     }
 
@@ -634,14 +729,15 @@ bool moveChain (PatcherDoc& doc, int from, int to)
 int addDevice (PatcherDoc& doc, int chain, PatchNode node, int position)
 {
     auto* r = rackOf (doc);
-    if (r == nullptr || chain < 0 || chain >= (int) r->chains.size())
+    if (r == nullptr || chainAt (*r, chain) == nullptr)
         return -1;
     // what each rack kind holds (Live, REA §1): audio effects only; MIDI effects only; MIDI effects, one instrument,
-    // audio effects
+    // audio effects (a Drum Rack's return chain: audio effects only)
     const auto midi = isMidiEffectNode (node), instrument = isInstrumentNode (node);
-    if ((r->kind == RackDoc::Kind::audioEffect && node.generator) || (r->kind == RackDoc::Kind::midiEffect && ! midi))
+    if ((r->kind == RackDoc::Kind::audioEffect && node.generator) || (r->kind == RackDoc::Kind::midiEffect && ! midi)
+        || (isReturnSlot (*r, chain) && node.generator))
         return -1;
-    auto& list = r->chains[(std::size_t) chain].nodes;
+    auto& list = chainAt (*r, chain)->nodes;
     auto rankOf = [&] (const PatchNode& n) { return isMidiEffectNode (n) ? 0 : isInstrumentNode (n) ? 1 : 2; };
     if (instrument && std::any_of (list.begin(), list.end(), [&] (int n) { return isInstrumentNode (doc.nodes[(std::size_t) n]); }))
         return -1; // (one instrument per chain)
@@ -661,7 +757,7 @@ int addDevice (PatcherDoc& doc, int chain, PatchNode node, int position)
     position = std::clamp (position, lo, std::max (lo, hi));
     const auto index = newNode (doc, std::move (node));
     r = rackOf (doc);
-    auto& nodes = r->chains[(std::size_t) chain].nodes;
+    auto& nodes = chainAt (*r, chain)->nodes;
     nodes.insert (nodes.begin() + position, index);
     compile (doc);
     return index;
@@ -670,9 +766,10 @@ int addDevice (PatcherDoc& doc, int chain, PatchNode node, int position)
 bool removeDevice (PatcherDoc& doc, int chain, int position)
 {
     auto* r = rackOf (doc);
-    if (r == nullptr || chain < 0 || chain >= (int) r->chains.size() || position < 0 || position >= (int) r->chains[(std::size_t) chain].nodes.size())
+    const auto* c = r != nullptr ? chainAt (*r, chain) : nullptr;
+    if (c == nullptr || position < 0 || position >= (int) c->nodes.size())
         return false;
-    eraseNode (doc, r->chains[(std::size_t) chain].nodes[(std::size_t) position]);
+    eraseNode (doc, c->nodes[(std::size_t) position]);
     compile (doc);
     return true;
 }
@@ -680,9 +777,9 @@ bool removeDevice (PatcherDoc& doc, int chain, int position)
 bool moveDevice (PatcherDoc& doc, int chain, int from, int to)
 {
     auto* r = rackOf (doc);
-    if (r == nullptr || chain < 0 || chain >= (int) r->chains.size())
+    if (r == nullptr || chainAt (*r, chain) == nullptr)
         return false;
-    auto& list = r->chains[(std::size_t) chain].nodes;
+    auto& list = chainAt (*r, chain)->nodes;
     if (from < 0 || from >= (int) list.size() || to < 0 || to >= (int) list.size() || from == to)
         return false;
     const auto n = list[(std::size_t) from];
@@ -707,36 +804,36 @@ bool moveDevice (PatcherDoc& doc, int chain, int from, int to)
 
 void setSolo (PatcherDoc& doc, int chain, bool solo)
 {
-    if (auto* r = rackOf (doc); r != nullptr && chain >= 0 && chain < (int) r->chains.size())
+    if (auto* r = rackOf (doc); r != nullptr && chainAt (*r, chain) != nullptr)
     {
-        r->chains[(std::size_t) chain].solo = solo;
+        chainAt (*r, chain)->solo = solo;
         compile (doc);
     }
 }
 
 void setActive (PatcherDoc& doc, int chain, bool active)
 {
-    if (auto* r = rackOf (doc); r != nullptr && chain >= 0 && chain < (int) r->chains.size())
+    if (auto* r = rackOf (doc); r != nullptr && chainAt (*r, chain) != nullptr)
     {
-        r->chains[(std::size_t) chain].active = active;
+        chainAt (*r, chain)->active = active;
         compile (doc);
     }
 }
 
 void setChainVolume (PatcherDoc& doc, int chain, float gain)
 {
-    if (auto* r = rackOf (doc); r != nullptr && chain >= 0 && chain < (int) r->chains.size())
+    if (auto* r = rackOf (doc); r != nullptr && chainAt (*r, chain) != nullptr)
     {
-        r->chains[(std::size_t) chain].volume = std::clamp (gain, 0.0f, volumeGain (1.0f));
+        chainAt (*r, chain)->volume = std::clamp (gain, 0.0f, volumeGain (1.0f));
         compile (doc);
     }
 }
 
 void setChainPan (PatcherDoc& doc, int chain, float pan)
 {
-    if (auto* r = rackOf (doc); r != nullptr && chain >= 0 && chain < (int) r->chains.size())
+    if (auto* r = rackOf (doc); r != nullptr && chainAt (*r, chain) != nullptr)
     {
-        r->chains[(std::size_t) chain].pan = std::clamp (pan, -1.0f, 1.0f);
+        chainAt (*r, chain)->pan = std::clamp (pan, -1.0f, 1.0f);
         compile (doc);
     }
 }
@@ -1298,4 +1395,428 @@ private:
 } // namespace
 
 std::unique_ptr<Effect> makeChainMixer() { return std::make_unique<ChainMixer>(); }
+// ---------------------------------------------------------------------------------------------------------------
+// Drum Rack (round 190ec)
+
+PatcherDoc makeDrumRack()
+{
+    PatcherDoc doc;
+    RackDoc r;
+    r.kind = RackDoc::Kind::instrument;
+    r.drum = true;
+    r.showMacros = false; // (Live's empty Drum Rack: the pads and the devices pane only, 190ei B1a)
+    r.showChains = false;
+    r.showVariations = false;
+    r.showDevices = true;
+    r.showPads = true;
+    r.padScroll = drumDefaultScroll;
+    r.selectedChain = 0;
+    doc.rack.push_back (std::move (r));
+    compile (doc);
+    return doc;
+}
+
+bool isDrumRack (const PatcherDoc& doc) noexcept
+{
+    const auto* r = rackOf (doc);
+    return r != nullptr && r->drum;
+}
+
+bool isDrumRack (const ChannelDef& channel) noexcept { return isRack (channel) && isDrumRack (channel.patcher); }
+
+int padRow (int key) noexcept { return drumPadRows - 1 - std::clamp (key, 0, drumPadCount - 1) / drumPadColumns; }
+int rowFirstKey (int row) noexcept { return (drumPadRows - 1 - std::clamp (row, 0, drumPadRows - 1)) * drumPadColumns; }
+
+int chainSlots (const RackDoc& rack) noexcept { return (int) (rack.chains.size() + rack.returns.size()); }
+bool isReturnSlot (const RackDoc& rack, int slot) noexcept { return slot >= (int) rack.chains.size() && slot < chainSlots (rack); }
+
+RackChain* chainAt (RackDoc& rack, int slot) noexcept
+{
+    if (slot < 0)
+        return nullptr;
+    if (slot < (int) rack.chains.size())
+        return &rack.chains[(std::size_t) slot];
+    slot -= (int) rack.chains.size();
+    return slot < (int) rack.returns.size() ? &rack.returns[(std::size_t) slot] : nullptr;
+}
+
+const RackChain* chainAt (const RackDoc& rack, int slot) noexcept { return chainAt (const_cast<RackDoc&> (rack), slot); }
+
+int padChain (const RackDoc& rack, int key) noexcept
+{
+    for (int c = 0; c < (int) rack.chains.size(); ++c)
+        if (rack.chains[(std::size_t) c].receive == key)
+            return c;
+    return -1;
+}
+
+std::string padName (const RackDoc& rack, int key)
+{
+    const auto c = padChain (rack, key);
+    return c >= 0 ? rack.chains[(std::size_t) c].name : std::string();
+}
+
+std::map<int, std::string> padNames (const RackDoc& rack)
+{
+    std::map<int, std::string> names;
+    if (! rack.drum)
+        return names;
+    for (const auto& c : rack.chains)
+        if (c.receive >= 0 && c.receive < drumPadCount && ! c.name.empty())
+            names.emplace (c.receive, c.name); // (the first chain on a key names its pad)
+    return names;
+}
+
+std::vector<int> filledPadKeys (const RackDoc& rack)
+{
+    std::vector<int> keys;
+    if (! rack.drum)
+        return keys;
+    for (int key = drumPadCount - 1; key >= 0; --key)
+        if (padChain (rack, key) >= 0)
+            keys.push_back (key);
+    return keys;
+}
+
+int copyPad (const PatcherDoc& from, int chain, PatcherDoc& to, int key, const std::string& samplePath)
+{
+    const auto* src = rackOf (from);
+    if (src == nullptr || chain < 0 || chain >= (int) src->chains.size() || ! isDrumRack (to))
+        return -1;
+    const auto& c = src->chains[(std::size_t) chain];
+    auto name = c.name;
+    std::optional<PatchNode> instrument;
+    std::vector<PatchNode> others;
+    for (const auto n : c.nodes)
+        if (n >= 0 && n < (int) from.nodes.size())
+        {
+            const auto& node = from.nodes[(std::size_t) n];
+            if (! instrument && isInstrumentNode (node))
+                instrument = node;
+            else
+                others.push_back (node);
+        }
+    if (! samplePath.empty())
+    {
+        const auto slash = samplePath.find_last_of ("/\\");
+        auto stem = samplePath.substr (slash == std::string::npos ? 0 : slash + 1);
+        if (const auto dot = stem.find_last_of ('.'); dot != std::string::npos && dot > 0)
+            stem.resize (dot);
+        if (! instrument || instrument->channel.instrument != InstrumentKind::sampler)
+        {
+            PatchNode n;
+            n.generator = true;
+            n.channel.instrument = InstrumentKind::sampler;
+            n.channel.sampler.release = 0.0f; // (Live's pad Simpler: one-shot)
+            instrument = n;
+        }
+        instrument->channel.samplePath = samplePath;
+        instrument->channel.name = stem;
+        name = stem;
+    }
+    const auto k = addPad (to, key, name, instrument);
+    if (k < 0)
+        return -1;
+    for (const auto& node : others)
+        addDevice (to, k, node);
+    auto* r = rackOf (to);
+    auto& dst = r->chains[(std::size_t) k];
+    dst.volume = c.volume;
+    dst.pan = c.pan;
+    dst.active = c.active;
+    dst.play = c.play;
+    dst.choke = c.choke;
+    compile (to);
+    return k;
+}
+
+std::string returnLetter (int k) { return std::string (1, (char) ('a' + std::clamp (k, 0, 25))); }
+
+std::string returnLabel (const RackDoc& rack, int k)
+{
+    if (k < 0 || k >= (int) rack.returns.size())
+        return {};
+    const auto& name = rack.returns[(std::size_t) k].name;
+    return name.empty() ? returnLetter (k) : returnLetter (k) + " " + name;
+}
+
+int addPad (PatcherDoc& doc, int key, const std::string& name, std::optional<PatchNode> instrument)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || ! r->drum)
+        return -1;
+    RackChain c;
+    c.name = name;
+    c.receive = std::clamp (key, -1, drumPadCount - 1);
+    c.play = drumPlayNote;
+    c.sends.assign (r->returns.size(), RackSend {});
+    addChainNodes (doc, c, RackDoc::Kind::instrument);
+    r = rackOf (doc);
+    r->chains.push_back (std::move (c));
+    const auto index = (int) r->chains.size() - 1;
+    r->selectedChain = index;
+    if (instrument)
+        addDevice (doc, index, std::move (*instrument)); // (compiles)
+    else
+        compile (doc);
+    return index;
+}
+
+bool swapPads (PatcherDoc& doc, int fromKey, int toKey)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || ! r->drum || fromKey == toKey || fromKey < 0 || toKey < 0 || fromKey >= drumPadCount || toKey >= drumPadCount)
+        return false;
+    bool any = false;
+    for (auto& c : r->chains)
+        if (c.receive == fromKey)
+            c.receive = toKey, any = true;
+        else if (c.receive == toKey)
+            c.receive = fromKey, any = true;
+    if (any)
+        compile (doc);
+    return any;
+}
+
+namespace
+{
+template <typename F>
+void editChain (PatcherDoc& doc, int chain, F&& f)
+{
+    if (auto* r = rackOf (doc); r != nullptr && chain >= 0 && chain < (int) r->chains.size())
+    {
+        f (*r, r->chains[(std::size_t) chain]);
+        compile (doc);
+    }
+}
+} // namespace
+
+void setReceive (PatcherDoc& doc, int chain, int key)
+{
+    editChain (doc, chain, [key] (RackDoc&, RackChain& c) { c.receive = std::clamp (key, -1, drumPadCount - 1); });
+}
+
+void setPlay (PatcherDoc& doc, int chain, int key)
+{
+    editChain (doc, chain, [key] (RackDoc&, RackChain& c) { c.play = std::clamp (key, 0, drumPadCount - 1); });
+}
+
+void setChoke (PatcherDoc& doc, int chain, int group)
+{
+    editChain (doc, chain, [group] (RackDoc&, RackChain& c) { c.choke = std::clamp (group, 0, drumChokeGroups); });
+}
+
+void setAudioTo (PatcherDoc& doc, int chain, int target)
+{
+    editChain (doc, chain, [target] (RackDoc& r, RackChain& c) { c.audioTo = target >= 0 && target < (int) r.returns.size() ? target : -1; });
+}
+
+void setSend (PatcherDoc& doc, int chain, int returnChain, float level, bool on)
+{
+    editChain (doc, chain, [=] (RackDoc& r, RackChain& c) {
+        if (returnChain < 0 || returnChain >= (int) r.returns.size())
+            return;
+        c.sends.resize (r.returns.size());
+        c.sends[(std::size_t) returnChain] = { std::clamp (level, 0.0f, 1.0f), on };
+    });
+}
+
+int addReturn (PatcherDoc& doc, const std::string& name)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || ! r->drum)
+        return -1;
+    RackChain ret;
+    // Live shows a return chain with its letter before its name ("a Reverb", returnLabel); the name is kept without it
+    // (Live's UserName [DATA]), so a new unnamed one shows its letter alone
+    ret.name = name;
+    ret.receive = -1;
+    addChainNodes (doc, ret, RackDoc::Kind::instrument);
+    r = rackOf (doc);
+    r->returns.push_back (std::move (ret));
+    for (auto& c : r->chains)
+        c.sends.resize (r->returns.size());
+    compile (doc);
+    return (int) r->returns.size() - 1;
+}
+
+bool removeReturn (PatcherDoc& doc, int k)
+{
+    auto* r = rackOf (doc);
+    if (r == nullptr || k < 0 || k >= (int) r->returns.size())
+        return false;
+    for (auto& c : r->chains)
+    {
+        if ((int) c.sends.size() > k)
+            c.sends.erase (c.sends.begin() + k);
+        c.audioTo = c.audioTo == k ? -1 : (c.audioTo > k ? c.audioTo - 1 : c.audioTo);
+    }
+    auto nodes = r->returns[(std::size_t) k].nodes;
+    if (r->returns[(std::size_t) k].mixer >= 0)
+        nodes.push_back (r->returns[(std::size_t) k].mixer);
+    r->returns.erase (r->returns.begin() + k);
+    std::sort (nodes.rbegin(), nodes.rend());
+    for (const auto n : nodes)
+        eraseNode (doc, n);
+    r = rackOf (doc);
+    r->selectedChain = std::clamp (r->selectedChain, 0, std::max (0, chainSlots (*r) - 1));
+    compile (doc);
+    return true;
+}
+
+ChannelDef sliceToDrumRack (const std::string& samplePath, const std::vector<float>& slices, const std::string& baseName, SliceTemplate preset, float end,
+                            const std::string& rackName)
+{
+    ChannelDef channel;
+    channel.instrument = InstrumentKind::patcher;
+    channel.name = rackName.empty() ? baseName : rackName;
+    channel.patcher = makeDrumRack();
+    rackOf (channel.patcher)->name = rackName;
+    std::vector<float> starts;
+    for (const auto x : slices)
+        if (x >= 0.0f && x < end && (starts.empty() || x > starts.back()))
+            starts.push_back (x);
+    if (starts.empty())
+        starts.push_back (0.0f);
+    const auto count = std::min ((int) starts.size(), maxSlicePads);
+    for (int i = 0; i < count; ++i)
+    {
+        PatchNode n;
+        n.generator = true;
+        auto& s = n.channel;
+        s.instrument = InstrumentKind::sampler;
+        s.name = baseName + " " + std::to_string (i + 1);
+        s.samplePath = samplePath;
+        s.sampler.regionStart = std::clamp (starts[(std::size_t) i], 0.0f, 1.0f);
+        s.sampler.regionEnd = std::clamp (i + 1 < (int) starts.size() ? starts[(std::size_t) i + 1] : end, s.sampler.regionStart, 1.0f);
+        // Live's Default slicing: Classic mode with a 50 ms release, one voice, every pad in choke group 1; the one-shot
+        // template plays each slice to its end (LYNX's Sampler: release 0 = one-shot)
+        s.sampler.release = preset == SliceTemplate::gated ? 0.05f : 0.0f;
+        s.sampler.cut = preset == SliceTemplate::gated; // (one voice: a new note on the pad cuts the last)
+        const auto name = s.name; // (copied first: the pad's node is moved into addPad)
+        const auto chain = addPad (channel.patcher, drumFirstPad + i, name, std::move (n));
+        if (preset == SliceTemplate::gated)
+            rackOf (channel.patcher)->chains[(std::size_t) chain].choke = 1;
+    }
+    auto* r = rackOf (channel.patcher);
+    r->selectedChain = 0;
+    r->padScroll = drumDefaultScroll;
+    compile (channel.patcher);
+    return channel;
+}
+// ---------------------------------------------------------------------------------------------------------------
+// Slicing helpers (round 190ec)
+
+std::vector<float> slicesInRegion (const std::vector<float>& starts, float from, float to)
+{
+    from = std::clamp (from, 0.0f, 1.0f);
+    to = std::clamp (to, from, 1.0f);
+    std::vector<float> sorted;
+    for (const auto x : starts)
+        if (x > from && x < to)
+            sorted.push_back (x);
+    std::sort (sorted.begin(), sorted.end());
+    std::vector<float> out { from };
+    for (const auto x : sorted)
+        if (x - out.back() > 1.0e-6f)
+            out.push_back (x);
+    return out;
+}
+
+std::vector<float> gridSlices (double fileSeconds, float from, float to, double secondsPerSlice)
+{
+    from = std::clamp (from, 0.0f, 1.0f);
+    to = std::clamp (to, from, 1.0f);
+    std::vector<float> out { from };
+    if (! (fileSeconds > 0.0) || ! (secondsPerSlice > 0.0))
+        return out;
+    const auto step = secondsPerSlice / fileSeconds;
+    const auto count = (int) std::ceil (((double) to - (double) from) / step - 1.0e-6);
+    for (int i = 1; i < count && (int) out.size() < drumPadCount; ++i)
+        out.push_back ((float) ((double) from + step * i));
+    return out;
+}
+
+std::vector<Note> sliceNotes (const std::vector<float>& starts, float end, const std::function<double (float)>& tickOf, int channel)
+{
+    std::vector<Note> notes;
+    const auto count = std::min ((int) starts.size(), maxSlicePads);
+    for (int i = 0; i < count; ++i)
+    {
+        const auto a = tickOf (starts[(std::size_t) i]);
+        const auto b = tickOf (i + 1 < (int) starts.size() ? starts[(std::size_t) i + 1] : end);
+        if (b <= 0.0 || b <= a)
+            continue;
+        Note n;
+        n.start = (std::int64_t) std::llround (std::max (0.0, a));
+        n.length = std::max<std::int64_t> (1, (std::int64_t) std::llround (b) - n.start);
+        n.key = drumFirstPad + i;
+        n.channel = channel;
+        notes.push_back (n);
+    }
+    return notes;
+}
+
+int addSliceTrack (Song& song, int clipIndex, ChannelDef drumRack, std::vector<Note> notes, const std::string& patternName)
+{
+    if (clipIndex < 0 || clipIndex >= (int) song.playlist.size() || notes.empty())
+        return -1;
+    const auto source = song.playlist[(std::size_t) clipIndex];
+    if (source.kind != ClipKind::audio)
+        return -1;
+    const auto channel = (int) song.channels.size();
+    drumRack.mixerTrack = song.claimFreeInsert();
+    song.channels.push_back (std::move (drumRack));
+    Pattern pattern;
+    pattern.name = patternName;
+    for (auto& n : notes)
+        n.channel = channel;
+    pattern.notes = std::move (notes);
+    pattern.sortNotes();
+    song.patterns.push_back (std::move (pattern));
+    const auto track = source.track + 1;
+    noteedit::insertTrack (song, track);
+    if (track < (int) song.playlistTracks.size())
+        song.playlistTracks[(std::size_t) track].name = patternName; // (Live: the new MIDI track is named after the clip)
+    Clip clip;
+    clip.kind = ClipKind::pattern;
+    clip.pattern = (int) song.patterns.size() - 1;
+    clip.track = track;
+    clip.start = source.start;
+    clip.length = source.length;
+    song.playlist.push_back (clip);
+    return channel;
+}
+
+const char* slicePerName (SlicePer per) noexcept
+{
+    switch (per)
+    {
+        case SlicePer::warpMarker: return "Warp Marker";
+        case SlicePer::transient: return "Transient";
+        case SlicePer::bar: return "Bar";
+        case SlicePer::half: return "1/2 Note";
+        case SlicePer::quarter: return "1/4 Note";
+        case SlicePer::eighth: return "1/8 Note";
+        case SlicePer::sixteenth: return "1/16 Note";
+        case SlicePer::thirtySecond: return "1/32 Note";
+    }
+    return "";
+}
+
+double slicePerBeats (SlicePer per, int beatsPerBar) noexcept
+{
+    switch (per)
+    {
+        case SlicePer::bar: return (double) std::max (1, beatsPerBar);
+        case SlicePer::half: return 2.0;
+        case SlicePer::quarter: return 1.0;
+        case SlicePer::eighth: return 0.5;
+        case SlicePer::sixteenth: return 0.25;
+        case SlicePer::thirtySecond: return 0.125;
+        case SlicePer::warpMarker:
+        case SlicePer::transient: break;
+    }
+    return 0.0;
+}
 } // namespace lynx::rack

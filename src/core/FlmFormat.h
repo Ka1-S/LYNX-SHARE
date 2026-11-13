@@ -31,8 +31,25 @@ struct SampleRef
     int stretchMode = 0;   // STR1
     double stretch = 1.0;  // STR1: time-stretch ratio
     double pitch = 0.0;    // STR1: semitones
-    std::vector<float> params; // PRMS
+    std::vector<float> params; // PRMS: the slot's eleven parameters, see samplepad (core/FlmPad.h has their laws)
+    // MAIN's tail (PROVEN-REA, round 190bs: the sample writer 0x18074a1c0 and the drum sampler's trigger 0x1807503a0)
+    bool reverse = false;     // the slot plays its sample backwards
+    double timeShift = 0.0;   // beats added to every drum note of the slot (never before the clip's start)
+    int cutGroup = 0;         // 0 = none, 1…3 = "Cut group A / B / C": a hit silences the group's other slots
+    bool polyphonic = true;   // false: a new hit silences the slot's own voices
+    // LINk: the slot's id in its drum set and the channel it plays into (−1 = its own rack)
+    int slotId = -1, outputChannel = -1;
+    bool legacyStretch = false; // the stretch and pitch came from STRC (no STR1)
+
+    float param (int index, float fallback) const noexcept { return index >= 0 && index < (int) params.size() ? params[(std::size_t) index] : fallback; }
 };
+
+// A sample slot's parameters (sample PRMS; the names PROVEN-REA 0x180748680, the defaults 0x180748120)
+namespace samplepad
+{
+constexpr int level = 0, pan = 1, speed = 2, mute = 3, solo = 4, length = 5, egAttack = 6, egDecay = 7, egSustain = 8, egRelease = 9, start = 10, count = 11;
+constexpr float defaults[count] = { 0.853125f, 0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.5f };
+} // namespace samplepad
 
 // One EVN2 record (20 bytes): FLM_FORMAT §4
 struct Event
@@ -42,6 +59,8 @@ struct Event
     int key = 0;             // MIDI key, kit sample index on drum lanes; < 0 on automation lanes
     std::uint8_t velocity = 200; // byte 14: the module's note-on velocity = byte / 255 (PROVEN-REA, round 190u)
     std::uint8_t pan = 127;      // byte 15: pan = byte / 255 (PROVEN-REA; 127 is the editors' centre)
+    // (automation lanes and audio clips: |key| − 1 is the parameter the point moves, a negative key marks a point FLM
+    // computed between two control points; PROVEN-REA, round 190bs: the song scheduler 0x180770330)
     // bytes 16–17: automation value 0…65535; notes: pitch p = u16 / 65534, 0x7FFF = centre — a drum pad plays at
     // 2^(2p − 1) of its speed, note lanes do not hand it to the module (PROVEN-REA, round 190u)
     std::uint16_t value = 0x7FFF;
@@ -75,6 +94,10 @@ struct Lane
     std::string name;
     double swing = 0.0;    // DESc f64 at 12: the step track's swing 0…1 (odd 1/16 steps start swing / 8 of a beat late)
     std::vector<Clip> clips;
+
+    // a drum lane whose notes are held (PROVEN-REA, round 190bs: the scheduler passes a drum note's end to the pad
+    // only with this flag, the lane's second kind byte; without it every hit is a one-shot)
+    bool holdsNotes() const noexcept { return ((rawKind >> 8) & 1u) != 0; }
 
     LaneKind kind() const noexcept
     {
@@ -125,6 +148,14 @@ struct Rack
     std::vector<std::uint8_t> pads; // RSMP's PADS
     std::vector<SampleRef> kit;     // RSMP's samples (drum lanes play kit[key])
     std::vector<Module> modules;    // in slot order
+    // --- round 190dw item 4: CCLK, the rack's controller links (FLM_FORMAT §3: writer 0x18059af42, lookup 0x18059fa60,
+    // the base CC handler 0x180799210): a MIDI CC n sets parameter `param` of module instance `module` to its value
+    struct CcLink
+    {
+        int cc = 0, module = 0, param = 0;
+    };
+    std::vector<CcLink> ccLinks;
+    // --- end of round 190dw item 4
 };
 
 struct Project
@@ -132,7 +163,7 @@ struct Project
     std::string title;
     double tempo = 120.0;
     int numerator = 4, denominator = 4; // TDIV: beats per bar, the grid's steps per beat (also the modules' tick rate, 384 / it)
-    std::uint32_t scale = 0, root = 0; // the "key locker" (FLM_FORMAT §2)
+    std::uint32_t root = 0, scale = 0; // the "key locker" (FLM_FORMAT §2): HEAD +344 root 0..11, +348 FLM's scale index
     std::string appVersion; // "5.0.4"
     std::string created, saved, author, originalName;
     std::string chordSetJson; // KEYB

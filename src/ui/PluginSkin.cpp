@@ -42,8 +42,9 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::reverb: case EffectKind::reeverb2: case EffectKind::reeverb1: case EffectKind::luxeVerb: case EffectKind::convolver:
         case EffectKind::epochVerb: case EffectKind::atrium: case EffectKind::foilPlate: case EffectKind::nebula: case EffectKind::halo:
         case EffectKind::horizon:
+        case EffectKind::pocketReverbClassic: case EffectKind::pocketReverb2: case EffectKind::pocketReverb: // round 190dw
             return colour::violet;
-        case EffectKind::delay: case EffectKind::fruityDelay2: case EffectKind::fruityDelay3: case EffectKind::fruityDelayBank: case EffectKind::pocketTranceDelay: case EffectKind::pocketTapeDelay:
+        case EffectKind::delay: case EffectKind::fruityDelay2: case EffectKind::fruityDelay3: case EffectKind::fruityDelayBank: case EffectKind::pocketTranceDelay: case EffectKind::pocketTapeDelay: case EffectKind::pocketTapeStop:
         case EffectKind::multibandDelay: case EffectKind::echoform: case EffectKind::spiralEcho: case EffectKind::geminiDoubler:
         case EffectKind::newtime:
             return colour::azure;
@@ -57,14 +58,14 @@ juce::Colour accentFor (EffectKind kind)
         case EffectKind::apexLimiter: case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::transientProcessor: case EffectKind::shellChannel: case EffectKind::strikeShaper:
         case EffectKind::maximus: case EffectKind::peakController: case EffectKind::pocketLimiterClassic: case EffectKind::pocketLimiter: case EffectKind::pocketLeveller: case EffectKind::pocketGate:
         case EffectKind::pocketAutoduck:
-        case EffectKind::pocketCompressor:
+        case EffectKind::pocketCompressor: case EffectKind::pocketMultiband:
             return colour::amber;
         case EffectKind::distortion: case EffectKind::fruityBloodOverdrive: case EffectKind::fruityFastDist: case EffectKind::ember: case EffectKind::kilnChannel: case EffectKind::fretChannel:
         case EffectKind::hardcore: case EffectKind::distructor: case EffectKind::fruityWaveShaper: case EffectKind::fruitySoftClipper:
         case EffectKind::lofi: case EffectKind::squeeze: case EffectKind::pocketDistortion: case EffectKind::pocketWaveshaper:
             return colour::ember;
         case EffectKind::lynxTune: case EffectKind::pitchCorrect: case EffectKind::pitchShift: case EffectKind::flPitchShifter:
-        case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::quellDenoiser: case EffectKind::aether: case EffectKind::newtone:
+        case EffectKind::vocoder: case EffectKind::vocodex: case EffectKind::quellDenoiser: case EffectKind::aether: case EffectKind::newtone: case EffectKind::edison:
         case EffectKind::voiceShift:
             return colour::rose;
         case EffectKind::utility: case EffectKind::stereoShaper: case EffectKind::stereoEnhancer: case EffectKind::spreader:
@@ -503,30 +504,42 @@ void brandMark (juce::Graphics& g, juce::Rectangle<float> a)
 {
     const auto d = juce::jmin (a.getWidth(), a.getHeight());
     if (d < 6.0f) return;
-    // the logo resampled once per size (×2 for high-DPI)
+    const auto c = a.getCentre();
+    const auto scale = pixelScale (g);
+    // a picture resampled once per size (x2 for high-DPI), halving step by step: one big jump from 512 px aliases at
+    // the 16-24 px header size
     static std::map<int, juce::Image> cache;
     static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
-    const auto px = juce::jlimit (8, 128, (int) std::ceil (d * 2.0f));
-    auto& img = cache[px];
-    if (img.isNull())
+    auto scaled = [] (juce::Image img, int px)
     {
-        const auto logo = logoImage();
-        if (logo.isNull()) return;
-        // halve step by step: one big jump from 512 px aliases at the 16-24 px header size
-        img = logo;
         while (px > 0 && img.getWidth() / 2 >= px)
             img = img.rescaled (img.getWidth() / 2, img.getHeight() / 2, juce::Graphics::highResamplingQuality);
         if (img.getWidth() != px)
             img = img.rescaled (px, px, juce::Graphics::highResamplingQuality);
-    }
-    const auto r = a.withSizeKeepingCentre (d, d);
-    bloom (g, r.getCentre(), d * 1.05f, colour::crimson, 0.55f);
+        return img;
+    };
+    // The mark by w3teal (the lynx in the red ring with the pepper stem) without the app icon's tile, which would
+    // shrink the lynx to half the button (round 190eq): its ring fills the button's circle
+    // (d + 3, over the place of the old dark edge and ring) and its ears rise above it, as far as the area's top; a
+    // dark disc under it (1 px wider) so the cut-outs read the same on every skin. Up to 32 physical pixels across
+    // (the 1x header buttons) the mark's small-size form (thicker lines and ring).
+    const auto disc = logoDisc();
+    // (smaller where the ears would rise above the area: a header's top edge)
+    const auto side = juce::jmin ((d + 3.0f) / (2.0f * disc.r), (c.y - a.getY()) / disc.y);
+    const auto circle = side * 2.0f * disc.r;
+    const bool small = side * scale <= 32.0f;
+    const auto px = juce::jlimit (8, 160, (int) std::ceil (side * juce::jmax (2.0f, scale)));
+    auto& img = cache[small ? -px : px];
+    if (img.isNull())
+        img = scaled (small ? logoMarkSmallImage() : logoMarkImage(), px);
+    if (img.isNull()) return;
+    bloom (g, c, d * 1.05f, colour::crimson, 0.55f);
     g.setColour (juce::Colours::black.withAlpha (0.5f));
-    g.fillEllipse (r.expanded (1.5f).translated (0.0f, 0.8f));
-    g.setColour (colour::crimson.withAlpha (0.55f));
-    g.drawEllipse (r.expanded (1.2f), 1.0f);
+    g.fillEllipse (juce::Rectangle<float> (circle + 2.0f, circle + 2.0f).withCentre (c).translated (0.0f, 0.8f));
+    g.setColour (juce::Colour (0xff0e0f13));
+    g.fillEllipse (juce::Rectangle<float> (circle + 2.0f, circle + 2.0f).withCentre (c));
     g.setOpacity (1.0f);
-    g.drawImage (img, r, juce::RectanglePlacement::centred);
+    g.drawImage (img, juce::Rectangle<float> (c.x - disc.x * side, c.y - disc.y * side, side, side), juce::RectanglePlacement::stretchToFit);
 }
 
 namespace

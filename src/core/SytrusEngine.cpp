@@ -4878,10 +4878,10 @@ void Engine::release (std::int64_t id) noexcept
             impl->releaseVoice (*v);
 }
 
-void Engine::releaseKey (int key) noexcept
+void Engine::releaseKey (int key, std::int64_t id) noexcept
 {
     for (auto* v : impl->act)
-        if (v->key == key && v->state < 5)
+        if (v->key == key && v->state < 5 && (id == 0 || v->id == id))
             impl->releaseVoice (*v);
 }
 
@@ -5049,6 +5049,9 @@ public:
         // LYNX's per-note porta flag inverts the patch's PORTA button, as FL's note colour 14 does (§6.4; inference)
         p.colour = nextPorta ? 14 : 0;
         p.id = ++serial;
+        // (round 190ej: a scheduled note's voices carry its note id, so its end releases only them, as FL's Voice_Release)
+        if (const auto note = startingNoteId(); note != 0)
+            p.id = noteHandle (note);
         nextPan = 0.0f, nextCents = 0.0f, nextPorta = false;
         engine->setMaxPolyphony (mono.load() ? 1 : 1 << 20);
         engine->noteOn (p);
@@ -5074,8 +5077,10 @@ public:
     {
         take();
         if (engine != nullptr)
-            engine->releaseKey (key);
+            engine->releaseKey (key, endingNoteId() != 0 ? noteHandle (endingNoteId()) : 0);
     }
+    // a note id's voice handle: above every serial number (those count from 1 and never reach 2^40)
+    static std::int64_t noteHandle (std::uint32_t note) noexcept { return ((std::int64_t) 1 << 40) + (std::int64_t) note; }
 
     void allNotesOff() noexcept override
     {

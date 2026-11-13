@@ -15,6 +15,7 @@
 #include "core/MarkerPlan.h"
 #include "core/NoteEdit.h"
 #include "core/NoteTools.h"
+#include "core/Rack.h"
 
 #include <array>
 #include "engine/MidiFileIo.h"
@@ -50,14 +51,15 @@ juce::String keyName (int key)
     return juce::String (notenames::keyName (key)); // Settings › General › Note names (round 165f)
 }
 
+// (round 190ea: never out of range: an empty pattern when a hand-built song has none; an edit keeps one first)
 const Pattern& currentPattern (const Song& s)
 {
-    return s.patterns[(std::size_t) s.currentPattern];
+    return s.activePattern();
 }
 
 Pattern& currentPattern (Song& s)
 {
-    return s.patterns[(std::size_t) s.currentPattern];
+    return s.activePattern();
 }
 
 // "\t" + the key map's shortcut of `id` for a menu item (empty when unbound or no key map is connected)
@@ -389,10 +391,29 @@ void PianoRollComponent::updateKeyRows()
 {
     // keep the key at the top of the view where it is when the rows change (fold on/off, another scale)
     const auto topKey = yToKey (headerHeight);
-    rows = notetools::keyRows (scaleRoot(), scaleIndex(), foldToScale);
+    rows = ! padRows.empty() ? notetools::keyRowsOf (padRows) : notetools::keyRows (scaleRoot(), scaleIndex(), foldToScale);
     scrollY = juce::jlimit (0, juce::jmax (0, rows.count * rowHeight - gridArea().getHeight()), rowFor (topKey) * rowHeight);
     updateScrollBars();
     repaint();
+}
+
+std::vector<int> PianoRollComponent::wantedPadRows() const
+{
+    const auto& song = engine.getSong();
+    const auto channel = engine.getSelectedChannel();
+    if (! EditorGlobals::get().clipLaunchWorkflow || allChannels || channel < 0 || channel >= (int) song.channels.size()
+        || ! rack::isDrumRack (song.channels[(std::size_t) channel]))
+        return {};
+    return rack::filledPadKeys (*rack::rackOf (song.channels[(std::size_t) channel].patcher));
+}
+
+void PianoRollComponent::syncPadRows()
+{
+    if (auto wanted = wantedPadRows(); wanted != padRows)
+    {
+        padRows = std::move (wanted);
+        updateKeyRows();
+    }
 }
 
 void PianoRollComponent::setFoldToScale (bool on)
@@ -894,7 +915,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             g.setColour (row);
             g.fillRect (grid.getX(), y, grid.getWidth(), rowHeight);
 
-            if (key % 12 == (folded() ? scaleRoot() : 0)) // folded: the octave line under each root
+            if (! padRows.empty() || key % 12 == (folded() ? scaleRoot() : 0)) // folded: the octave line under each root (pads: each row)
             {
                 g.setColour (gridBeat);
                 g.drawHorizontalLine (y + rowHeight - 1, (float) grid.getX(), (float) grid.getRight());
@@ -1282,8 +1303,17 @@ void PianoRollComponent::paint (juce::Graphics& g)
         const auto blackWidth = keyboardWidth * 3 / 5;
         static const std::map<int, std::string> noLabels;
         const auto selectedChannel = engine.getSelectedChannel();
-        const auto& labels = selectedChannel >= 0 && selectedChannel < (int) song.channels.size()
-                                 ? song.channels[(std::size_t) selectedChannel].keyLabels : noLabels;
+        const auto& ownLabels = selectedChannel >= 0 && selectedChannel < (int) song.channels.size()
+                                    ? song.channels[(std::size_t) selectedChannel].keyLabels : noLabels;
+        // a Drum Rack's pad names on its keys (round 190ec, Live's note editor); a key label of the user's wins
+        std::map<int, std::string> padLabels;
+        if (selectedChannel >= 0 && selectedChannel < (int) song.channels.size() && rack::isDrumRack (song.channels[(std::size_t) selectedChannel]))
+        {
+            padLabels = rack::padNames (*rack::rackOf (song.channels[(std::size_t) selectedChannel].patcher));
+            for (const auto& [key, label] : ownLabels)
+                padLabels[key] = label;
+        }
+        const auto& labels = padLabels.empty() ? ownLabels : padLabels;
 
         // folded to the scale (round 166d) the keys no longer alternate like a piano: one full-width named row each
         const auto list = folded();
@@ -1378,6 +1408,11 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 g.setFont (theme::font (fontHeight, false));
                 g.setColour (pressed ? onAccent : bg0);
                 g.drawFittedText (juce::String::fromUTF8 (label->second.c_str()), area.reduced (1, 0), juce::Justification::centredLeft, 1, 0.8f);
+            }
+            if (! padRows.empty()) // (a Drum Rack's pad rows: a strip at the right in the key's piano colour, as Live's list)
+            {
+                g.setColour (isBlackKey (key) ? keyBlack : keyWhite.darker (0.25f));
+                g.fillRect (keyboardWidth - 12, y, 11, rowHeight - 1);
             }
         }
 
@@ -3342,7 +3377,7 @@ juce::PopupMenu PianoRollComponent::toolsMenu()
         juce::PopupMenu velocity;
         auto choose = [this] (std::function<std::vector<int> (const Pattern&, const std::vector<int>&)> pick) {
             const auto& song = engine.getSong();
-            setSelection (pick (song.patterns[(std::size_t) song.currentPattern], channelNotes()));
+            setSelection (pick (song.activePattern(), channelNotes()));
         };
         velocity.addItem (tr ("Loudest quarter"), [choose] { choose ([] (const Pattern& p, const std::vector<int>& t) { return notetools::selectLoudest (p, t, 0.25f, true); }); });
         velocity.addItem (tr ("Quietest quarter"), [choose] { choose ([] (const Pattern& p, const std::vector<int>& t) { return notetools::selectLoudest (p, t, 0.25f, false); }); });
@@ -3353,7 +3388,7 @@ juce::PopupMenu PianoRollComponent::toolsMenu()
             });
         if (! selection.empty())
         {
-            const auto& notes = engine.getSong().patterns[(std::size_t) engine.getSong().currentPattern].notes;
+            const auto& notes = engine.getSong().activePattern().notes;
             const auto v = selection.front() < (int) notes.size() ? notes[(std::size_t) selection.front()].velocity : 0.0f;
             velocity.addSeparator();
             velocity.addItem (tr ("Same velocity as the selected note ({0}%)", { juce::String (juce::roundToInt (v * 100.0f)) }), [choose, v] {
@@ -3800,7 +3835,7 @@ bool PianoRollComponent::runAction (const std::string& id)
     else if (is ("pianoRoll.exportMidi"))
     {
         const auto& song = engine.getSong();
-        const auto name = juce::String::fromUTF8 (song.patterns[(std::size_t) song.currentPattern].name.c_str());
+        const auto name = juce::String::fromUTF8 (song.activePattern().name.c_str());
         chooser = lynx::ui::makeFileChooser (tr ("Export MIDI"), juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile (name + ".mid"),
                                                        "*.mid");
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
@@ -4460,6 +4495,7 @@ void PianoRollComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     }
 
     followButton.setToggleState (EditorGlobals::get().isFollowing (true), juce::dontSendNotification);
+    syncPadRows();
     refreshChannelBox();
     rebuildLaneBox();
     updateScrollBars();
@@ -4616,7 +4652,7 @@ bool PianoRollComponent::playheadFrame (double)
         const auto& followSong = engine.getSong();
         const auto loops = followSong.mode == PlayMode::pattern && engine.patternLinearOrigin() < 0.0 && followSong.currentPattern >= 0
                            && followSong.currentPattern < (int) followSong.patterns.size();
-        const auto loopTicks = loops ? (double) followSong.patterns[(std::size_t) followSong.currentPattern].effectiveLength (followSong.beatsPerBar) : 0.0;
+        const auto loopTicks = loops ? (double) followSong.activePattern().effectiveLength (followSong.beatsPerBar) : 0.0;
         const auto newStart = transportedit::followViewStartInLoop (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
                                                                     20.0 / pixelsPerTick, loopTicks);
 

@@ -137,11 +137,10 @@ TEST (flm190ab_gmsynth_imports_its_parameters_and_waves)
             same = same && p->P[(std::size_t) k] == v[(std::size_t) k];
         CHECK (same && p->waveA == 16 && p->waveB == 2);
         CHECK (gm::waveFileName (2) == "Devils Horn" && gm::waveFileName (18) == "Sine" && gm::waveFileName (29).empty());
-        // slot 1: kind ⌊9·0.46⌋ = 4 (F HP), on (0.47): not rendered yet, so listed; slot 2: ⌊9·0.53⌋ = 4 too; slot 3: 5
-        // (DLY), rendered
-        CHECK (report.partialEffects.count ("FL Studio Mobile: GMSynth effect F HP (not rendered)") == 1
-               && report.partialEffects.at ("FL Studio Mobile: GMSynth effect F HP (not rendered)") == 2);
-        CHECK (report.partialEffects.size() == 1);
+        // slot 1: kind ⌊9·0.46⌋ = 4 (F HP), on (0.47); slot 2: ⌊9·0.53⌋ = 4 too; slot 3: 5 (DLY): all rendered since
+        // round 190dw (F HP was listed as not rendered before)
+        CHECK (report.partialEffects.count ("FL Studio Mobile: GMSynth effect F HP (not rendered)") == 0);
+        CHECK (report.partialEffects.empty());
     }
     // without FLM's data files the channel stays where it was: the built-in synth, listed as not converted
     {
@@ -197,7 +196,7 @@ TEST (flm190ab_gmsynth_laws)
     CHECK (gm::fxKindOf (0.0f) == 0 && gm::fxKindOf (0.11111111f) == 1 && gm::fxKindOf (0.33333334f) == 3 && gm::fxKindOf (0.5555556f) == 5
            && gm::fxKindOf (0.7222f) == 6 && gm::fxKindOf (1.0f) == 9);
     CHECK (gm::fx::implemented (gm::fx::dist) && gm::fx::implemented (gm::fx::phaser) && gm::fx::implemented (gm::fx::lowPass) && gm::fx::implemented (gm::fx::pan));
-    CHECK (gm::fx::implemented (gm::fx::delay) && gm::fx::implemented (gm::fx::reverb) && ! gm::fx::implemented (gm::fx::flanger) && std::string (gm::fx::name (gm::fx::reverb)) == "RVRB");
+    CHECK (gm::fx::implemented (gm::fx::delay) && gm::fx::implemented (gm::fx::reverb) && gm::fx::implemented (gm::fx::flanger) /* (round 190dw: all ten) */ && std::string (gm::fx::name (gm::fx::reverb)) == "RVRB");
     // nothing plays without the data files
     CHECK (gm::renderReference (gm::defaultPatch(), { { 0, 60, 1.0f, 0.5f, -1 } }, fs, 1000, "/nowhere").empty());
 }

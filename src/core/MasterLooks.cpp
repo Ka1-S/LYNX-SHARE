@@ -3,10 +3,12 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/ApexLimiter.h"
 #include "core/Effects.h"
 #include "core/FruityDynamics.h"
 #include "core/FruityMultiband.h"
 #include "core/FruityShapers.h"
+#include "core/MixerOps.h"
 #include "core/ParametricEqFl.h"
 #include "core/StereoFx.h"
 
@@ -197,6 +199,20 @@ EffectSlot limiterSlot (const Point& p, double ceilingDb)
     return slot;
 }
 
+// the true-peak stage (round 190ea): LYNX's Apex Limiter at 0 dB gain, True peak on (its guard holds the output's true
+// peak at its ceiling within a few hundredths of a dB on a 16× reference meter, round 190co), its ceiling 0.05 dB under
+// trueCeilingDb so the stated ceiling holds on that meter too (measured worst −0.98 dBTP at −1.00, −1.00 at −1.05); the other controls at a new instance's values (1 ms
+// look-ahead, Clean, 150 ms release, no oversampling, no dither). Below the ceiling it passes the signal unchanged
+// (delayed by its constant latency).
+EffectSlot truePeakSlotOf()
+{
+    auto slot = makeEffectSlot (EffectKind::apexLimiter);
+    slot.params[(std::size_t) apex::pGain] = 0.0f;
+    slot.params[(std::size_t) apex::pCeiling] = (30.0f + trueCeilingDb - truePeakMarginDb) / 30.0f; // (−30 … 0 dB)
+    slot.params[(std::size_t) apex::pTruePeak] = 1.0f;
+    return slot;
+}
+
 std::vector<int> lookSlots (const Song& song)
 {
     std::vector<int> out;
@@ -221,6 +237,8 @@ bool sameSettings (const EffectSlot& a, const EffectSlot& b) noexcept
 }
 } // namespace
 
+EffectSlot truePeakStage() { return truePeakSlotOf(); }
+
 const char* name (int id) noexcept { return id >= 1 && id <= count ? table[id - 1].name : ""; }
 const char* description (int id) noexcept { return id >= 1 && id <= count ? table[id - 1].description : ""; }
 
@@ -230,7 +248,8 @@ std::vector<EffectSlot> chain (const MasterLookSettings& s)
         return {};
     const auto& l = table[s.id - 1];
     const auto p = at (l, s.intensity);
-    std::vector<EffectSlot> out { eqSlot (p, s), multibandSlot (p, l.finisher), finisherSlot (p, l.finisher), limiterSlot (p, l.ceilingDb) };
+    std::vector<EffectSlot> out { eqSlot (p, s), multibandSlot (p, l.finisher), finisherSlot (p, l.finisher), limiterSlot (p, l.ceilingDb),
+                                  truePeakStage() };
     for (auto& slot : out)
         slot.look = (std::uint8_t) s.id;
     return out;
@@ -261,7 +280,41 @@ bool apply (Song& song, const MasterLookSettings& s)
         song.masterLook = s;
         return true;
     }
-    // a fresh chain after the Master's last effect (an incomplete old one is taken off first)
+    if (existing.size() + 1 == slots.size() && (int) existing.size() == legacySlots)
+    {
+        // a look applied before round 190ea (four slots, no true-peak stage): replaced in place like above, and the
+        // true-peak slot goes in the row right after its limiter; effects after the look move down a row only where
+        // they must (their order stays). Else (no room) the fresh chain below.
+        const auto last = existing.back();
+        const auto rows = mixerops::effectRows (fx);
+        const auto row = rows[(std::size_t) last] + 1;
+        std::vector<int> after; // the new rows of the effects after the look
+        for (auto prev = row, i = last + 1; i < (int) fx.size(); ++i)
+            after.push_back (prev = std::max (rows[(std::size_t) i], prev + 1));
+        const auto lastRow = after.empty() ? row : after.back();
+        if (existing.back() - existing.front() == legacySlots - 1 && (int) fx.size() < maxEffectSlots && lastRow < maxEffectSlots)
+        {
+            for (std::size_t k = 0; k < after.size(); ++k)
+                if (auto& e = fx[(std::size_t) last + 1 + k]; rows[(std::size_t) last + 1 + k] != after[k])
+                    e.row = after[k];
+            const bool on = fx[(std::size_t) last].enabled;
+            for (std::size_t k = 0; k < existing.size(); ++k)
+            {
+                auto& old = fx[(std::size_t) existing[k]];
+                slots[k].row = old.row;
+                slots[k].enabled = old.enabled;
+                old = std::move (slots[k]);
+            }
+            auto& tp = slots.back();
+            tp.row = row;
+            tp.enabled = on;
+            fx.insert (fx.begin() + last + 1, std::move (tp));
+            song.masterLook = s;
+            return true;
+        }
+    }
+    // a fresh chain after the Master's last effect (an incomplete old one is taken off first; "Hear without" stays)
+    const bool wasBypassed = bypassed (song);
     std::vector<EffectSlot> kept;
     for (auto& e : fx)
         if (e.look == 0)
@@ -274,6 +327,7 @@ bool apply (Song& song, const MasterLookSettings& s)
     for (auto& slot : slots)
     {
         slot.row = nextRow++;
+        slot.enabled = ! wasBypassed;
         kept.push_back (std::move (slot));
     }
     fx = std::move (kept);
@@ -298,7 +352,9 @@ bool custom (const Song& song)
     const auto idx = lookSlots (song);
     if (idx.empty())
         return false;
-    const auto want = chain (song.masterLook);
+    auto want = chain (song.masterLook);
+    if ((int) idx.size() == legacySlots && want.size() == (std::size_t) chainSlots)
+        want.resize ((std::size_t) legacySlots); // (a look saved before round 190ea: its four slots are the chain's first four)
     if (want.size() != idx.size())
         return true;
     for (std::size_t k = 0; k < idx.size(); ++k)

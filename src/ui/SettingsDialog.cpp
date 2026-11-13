@@ -21,18 +21,19 @@ juce::String u8 (const std::string& s) { return juce::String::fromUTF8 (s.c_str(
 using namespace settingsui;
 
 // --- Project page ----------------------------------------------------------------------------------
-class ProjectPage final : public juce::Component,
+// (round 190bx: a ScrollingPage, as General / Audio / MIDI: in a short window the rows scroll instead of being cut off)
+class ProjectPage final : public ScrollingPage,
                           private juce::ChangeListener
 {
 public:
     ProjectPage (AudioEngine& e, const SettingsHooks& h) : engine (e), hooks (h)
     {
-        addAndMakeVisible (timeTitle);
-        addAndMakeVisible (grooveTitle);
-        addAndMakeVisible (gridTitle);
+        add (timeTitle);
+        add (grooveTitle);
+        add (gridTitle);
 
         for (auto* l : { &tempoLabel, &beatsLabel, &swingLabel, &pitchLabel })
-            addAndMakeVisible (l);
+            add (*l);
         styleLabel (tempoLabel, tr ("Tempo"));
         styleLabel (beatsLabel, tr ("Beats per bar"));
         styleLabel (swingLabel, tr ("Swing"));
@@ -46,7 +47,7 @@ public:
             s.setDoubleClickReturnValue (true, def);
             s.setColour (juce::Slider::trackColourId, theme::colour::bg4); // a quiet bar: the number is what matters here
             s.setColour (juce::Slider::textBoxOutlineColourId, theme::colour::borderStrong);
-            addAndMakeVisible (s);
+            add (s);
         };
         setup (tempo, 10.0, 999.0, 0.001, " BPM", 130.0);
         setup (beats, 1.0, 32.0, 1.0, {}, 4.0);
@@ -55,7 +56,7 @@ public:
         tempo.setNumDecimalPlacesToDisplay (3);
         // FL's Options › Project › Time settings combo (REA round 168j, .flp 0x23): how the time settings are shown
         styleLabel (timeModeLabel, tr ("Time settings"));
-        addAndMakeVisible (timeModeLabel);
+        add (timeModeLabel);
         timeMode.addItem (tr ("Set as time division"), 1);
         timeMode.addItem (tr ("Set as time signature"), 2);
         timeMode.setTooltip (tr ("Time division: FL Studio's original system (beats per bar, steps per beat). Time signature: traditional time signatures (numerator / denominator)."));
@@ -63,7 +64,7 @@ public:
             edit ([on = timeMode.getSelectedId() == 2] (Song& s) { s.timeSignatureMode = on; });
             showTimeMode (timeMode.getSelectedId() == 2);
         };
-        addAndMakeVisible (timeMode);
+        add (timeMode);
 
         tempo.onValueChange = [this] { edit ([v = tempo.getValue()] (Song& s) { clipops::followTempo (s, v); }); };
         beats.onValueChange = [this] { edit ([v = (int) beats.getValue()] (Song& s) { s.beatsPerBar = v; }); };
@@ -74,7 +75,7 @@ public:
         {
             styleLabel (*l, {});
             l->setFont (theme::font (theme::type::small));
-            addAndMakeVisible (l);
+            add (*l);
         }
         ppqText.setText (tr ("Timebase: {0} ticks per quarter note (PPQ). Imported projects (.flp, .als, .flm) are converted to it.", { juce::String (ppq) }),
                          juce::dontSendNotification);
@@ -82,10 +83,10 @@ public:
                                juce::dontSendNotification);
 
         // FL's Options › Project general settings › Playlist (round 166e)
-        addAndMakeVisible (playlistTitle);
+        add (playlistTitle);
         crossfades.setButtonText (tr ("Automatic crossfades (overlapping audio clips on a track crossfade over the overlap)"));
         crossfades.onClick = [this] { edit ([on = crossfades.getToggleState()] (Song& s) { s.autoCrossfades = on; }); };
-        addAndMakeVisible (crossfades);
+        add (crossfades);
         crossfadesNew.setButtonText (tr ("Enable automatic crossfades in new projects"));
         crossfadesNew.onClick = [this] {
             if (hooks.getGeneral == nullptr || hooks.setGeneral == nullptr)
@@ -96,10 +97,10 @@ public:
         };
         crossfadesNew.setEnabled (hooks.getGeneral != nullptr);
         crossfadesNew.setToggleState (hooks.getGeneral != nullptr ? hooks.getGeneral().crossfadesInNewProjects : true, juce::dontSendNotification);
-        addAndMakeVisible (crossfadesNew);
+        add (crossfadesNew);
         // Comping (round 177c): the crossfade at a comp's switches, re-applied to every comp when it changes
         styleLabel (compFadeLabel, tr ("Comp crossfade"));
-        addAndMakeVisible (compFadeLabel);
+        add (compFadeLabel);
         setup (compFade, 0.0, 100.0, 0.5, " ms", (double) Song::defaultCompCrossfadeMs);
         compFade.onValueChange = [this] {
             edit ([v = (float) compFade.getValue()] (Song& s) {
@@ -112,19 +113,19 @@ public:
         // FL's Project › "Play truncated notes in clips" (round 167g)
         truncated.setButtonText (tr ("Play truncated notes in clips (a note that starts before a pattern clip plays from the clip's start)"));
         truncated.onClick = [this] { edit ([on = truncated.getToggleState()] (Song& s) { s.playTruncatedNotes = on; }); };
-        addAndMakeVisible (truncated);
+        add (truncated);
         // FL's Options › Project › General › advanced: "Fast declick for cut groups" (round 167h)
         fastDeclick.setButtonText (tr ("Fast declick for cut groups (use faster ramping when cutting notes)"));
         fastDeclick.onClick = [this] { edit ([on = fastDeclick.getToggleState()] (Song& s) { s.fastDeclick = on; }); };
-        addAndMakeVisible (fastDeclick);
+        add (fastDeclick);
         // FL's Options › Project › General › advanced: "Panning law" (round 167j)
         styleLabel (panLawLabel, tr ("Panning law"));
-        addAndMakeVisible (panLawLabel);
+        add (panLawLabel);
         panLaw.addItem (tr ("Circular"), 1);
         panLaw.addItem (tr ("Triangular"), 2);
         panLaw.setTooltip (tr ("Circular: centre at 0 dB, +3 dB on the side panned to. Triangular: the louder side keeps its level. Mixer inserts and Sampler channels."));
         panLaw.onChange = [this] { edit ([on = panLaw.getSelectedId() == 2] (Song& s) { s.panTriangular = on; }); };
-        addAndMakeVisible (panLaw);
+        add (panLaw);
 
         engine.addChangeListener (this);
         load();
@@ -132,9 +133,10 @@ public:
 
     ~ProjectPage() override { engine.removeChangeListener (this); }
 
-    void resized() override
+private:
+    int layout (int width) override
     {
-        auto area = getLocalBounds().reduced (20, 14);
+        auto area = juce::Rectangle<int> (0, 0, width, 100000).reduced (20, 14);
         auto row = [&area] (juce::Label& l, juce::Slider& s) {
             auto r = area.removeFromTop (28);
             l.setBounds (r.removeFromLeft (150));
@@ -173,9 +175,9 @@ public:
         auto lawRow = area.removeFromTop (26);
         panLawLabel.setBounds (lawRow.removeFromLeft (150));
         panLaw.setBounds (lawRow.removeFromLeft (180));
+        return area.getY() + 14;
     }
 
-private:
     void edit (std::function<void (Song&)> fn)
     {
         if (loading)
@@ -230,16 +232,17 @@ private:
 };
 
 // --- Info page -------------------------------------------------------------------------------------
-class InfoPage final : public juce::Component,
+// (round 190bx: a ScrollingPage too; the comments box takes the room left and never gets shorter than a few lines)
+class InfoPage final : public ScrollingPage,
                        private juce::ChangeListener,
                        private juce::Timer
 {
 public:
     explicit InfoPage (AudioEngine& e) : engine (e)
     {
-        addAndMakeVisible (infoTitle);
+        add (infoTitle);
         for (auto* l : { &titleLabel, &authorLabel, &genreLabel, &urlLabel, &commentsLabel })
-            addAndMakeVisible (l);
+            add (*l);
         styleLabel (titleLabel, tr ("Title"));
         styleLabel (authorLabel, tr ("Author"));
         styleLabel (genreLabel, tr ("Genre"));
@@ -251,35 +254,43 @@ public:
             styleEditor (*t);
             t->onReturnKey = [this] { commit(); };
             t->onFocusLost = [this] { commit(); };
-            addAndMakeVisible (t);
+            add (*t);
         }
         genre.setTextToShowWhenEmpty (tr ("e.g. House, Trap, Lo-fi"), theme::colour::textDisabled);
         url.setTextToShowWhenEmpty ("https://", theme::colour::textDisabled);
 
         genreMenu.setButtonText (juce::String::fromUTF8 ("\xe2\x96\xbe"));
         genreMenu.onClick = [this] { showGenres(); };
-        addAndMakeVisible (genreMenu);
+        add (genreMenu);
         openLink.onClick = [this] {
             const juce::URL link (url.getText().trim());
             if (url.getText().trim().isNotEmpty())
                 link.launchInDefaultBrowser();
         };
-        addAndMakeVisible (openLink);
+        add (openLink);
 
         styleEditor (comments);
         comments.setMultiLine (true, true);
         comments.setReturnKeyStartsNewLine (true);
         comments.setScrollbarsShown (true);
         comments.onFocusLost = [this] { commit(); };
-        addAndMakeVisible (comments);
+        add (comments);
 
         showOnOpen.setButtonText (tr ("Show this page when the project is opened"));
         showOnOpen.onClick = [this] { commit(); };
-        addAndMakeVisible (showOnOpen);
+        add (showOnOpen);
 
         // FL's Project info: when the project was created and how long it has been worked on (REA round 167g)
         styleLabel (timesLabel, {}); // (secondary text colour)
-        addAndMakeVisible (timesLabel);
+        add (timesLabel);
+
+        // FL's Project info › "Reset working time" (round 190bx: FL's handler restarts the count at once, no question)
+        resetTime.setTooltip (tr ("The project's start date becomes now and its working time starts again from zero"));
+        resetTime.onClick = [this] {
+            engine.resetWorkTime();
+            timerCallback();
+        };
+        add (resetTime);
 
         engine.addChangeListener (this);
         load();
@@ -292,9 +303,13 @@ public:
         engine.removeChangeListener (this);
     }
 
-    void resized() override
+private:
+    static constexpr int minimumHeight = 14 + 36 + 4 * 36 + 22 + 84 + 8 + 26 + 2 + 26 + 14; // (comments: at least 84 px)
+
+    int layout (int width) override
     {
-        auto area = getLocalBounds().reduced (20, 14);
+        const auto height = juce::jmax (minimumHeight, getHeight());
+        auto area = juce::Rectangle<int> (0, 0, width, height).reduced (20, 14);
         infoTitle.setBounds (area.removeFromTop (28));
         area.removeFromTop (8);
         auto row = [&area] (juce::Label& l) {
@@ -317,14 +332,23 @@ public:
             r.removeFromRight (4);
             url.setBounds (r);
         }
-        timesLabel.setBounds (area.removeFromBottom (22));
+        {
+            // (FL: the button at the right of the "This project started on" line)
+            auto times = area.removeFromBottom (26);
+            const auto buttonWidth = juce::jlimit (120, juce::jmax (120, times.getWidth() / 2),
+                                                   juce::roundToInt (juce::GlyphArrangement::getStringWidth (getLookAndFeel().getTextButtonFont (resetTime, 26), resetTime.getButtonText())) + 28);
+            resetTime.setBounds (times.removeFromRight (buttonWidth));
+            times.removeFromRight (8);
+            timesLabel.setBounds (times);
+        }
+        area.removeFromBottom (2);
         showOnOpen.setBounds (area.removeFromBottom (26));
         area.removeFromBottom (8);
         commentsLabel.setBounds (area.removeFromTop (22));
         comments.setBounds (area);
+        return height;
     }
 
-private:
     ProjectInfo typed() const
     {
         ProjectInfo i = engine.getSong().info; // (created / working time are not typed)
@@ -403,6 +427,7 @@ private:
     juce::Label titleLabel, authorLabel, genreLabel, urlLabel, commentsLabel;
     juce::TextEditor title, author, genre, url, comments;
     juce::TextButton genreMenu, openLink { tr ("Open") };
+    juce::TextButton resetTime { tr ("Reset working time") };
     juce::ToggleButton showOnOpen;
     juce::Label timesLabel;
 };

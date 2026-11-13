@@ -8,6 +8,7 @@
 
 #include "core/Effector.h"
 #include "core/Effects.h"
+#include "core/MasterLooks.h"
 #include "core/Song.h"
 #include "core/SynthPresets.h"
 
@@ -201,6 +202,9 @@ inline Song makeShowcaseSong (int currentPattern = 0)
     fx (0, EffectKind::parametricEq);
     auto& limiter = fx (0, EffectKind::limiter);
     limiter.params = { 11.7f / 12.0f, 0.1f, 0.5f };
+    // round 190ea: the Limiter holds sample peaks (−0.3 dBFS), and the song left +0.8 dBTP between them (16× meter and
+    // ffmpeg agree; the website's demo.mp3 measures +0.2 dBTP). The Master looks' true-peak stage ends the chain: −1 dBTP.
+    song.mixer[0].effects.push_back (looks::truePeakStage());
     song.mixer[1].volume = 0.78f;
     song.mixer[5].volume = 0.72f;
     song.mixer[6].volume = 0.6f;

@@ -270,8 +270,20 @@ enum Param
     // round 190v (appended; on for new instances): the Vocal style's noise reduction. Off = none: what a project saved
     // before that round loads with (upgradeLoadedEffectParams). The other styles ignore it.
     law,
+    // round 190dm (appended; default Level = every gate before this round, sample for sample): the trigger. Transient: a
+    // drum gate — an onset over the threshold opens it fully, it holds for Hold and closes along the release shape
+    // over Release, whatever the level does meanwhile (the style's level curve, ratio and knee are not used). Measured
+    // black-box on a drum-gate reference's probes (docs/PARITY.md "Round 190dm").
+    trigger, sensitivity, releaseShape,
     count
 };
+enum class Shape { smooth, mid, sharp };
+bool transientTrigger (const EffectParams& p) noexcept;
+double sensitivityOf (float v) noexcept;   // 1 … 10 (5 = the default)
+float sensitivityValue (double s) noexcept;
+Shape shapeOf (float v) noexcept;
+// the transient gate's closing curve (dB, ≤ 0) `tau` seconds after its hold, for a release of `releaseSec` seconds
+double transientCurveDb (Shape s, double tau, double releaseSec) noexcept;
 double scGainDb (float v) noexcept;      // −36 … +36 dB
 double mixOf (float v) noexcept;         // −1 (left / mid) … +1 (right / side); 0 = the channel's own input
 double panOf (float v) noexcept;         // −1 … +1 balance

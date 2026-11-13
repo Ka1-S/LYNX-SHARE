@@ -776,31 +776,72 @@ void swapTracks (Song& song, int a, int b)
     std::swap (h[(std::size_t) a], h[(std::size_t) b]);
 }
 
-void soloTrack (Song& song, int track, int trackCount)
+namespace
+{
+// FL's channel solo with its memory (round 190bx; FLEngine 2026 FUN_00ffaaa0, docs/analise/REA_rodada190bx.md §3): a
+// solo remembers which rows were on (a solo moved to another row keeps the memory of before the first one), and the
+// un-solo switches on either every row (General › "Restore previous state after solo" off, FL's default) or only the
+// rows that were on before (`restore`). FL reads the option at the un-solo. `muted (row)` reads and
+// `setMuted (row, on)` writes a row's mute switch, `touched (row)` says whether the solo may change it. Without a
+// memory for this row (none passed, or the solo came with the project) the un-solo unmutes.
+template <typename Muted, typename SetMuted, typename Touched>
+void soloRows (int rows, int row, flsettings::SoloMemory* memory, bool restore, Muted muted, SetMuted setMuted, Touched touched)
+{
+    auto alone = ! muted (row);
+    for (int i = 0; i < rows && alone; ++i)
+        if (i != row && touched (i) && ! muted (i))
+            alone = false;
+
+    if (! alone)
+    {
+        if (memory != nullptr)
+        {
+            // a solo already on (exactly the remembered row heard) moves: the memory of before the first solo stays
+            auto moved = memory->valid (memory->row, (std::size_t) rows) && memory->row != row && ! muted (memory->row);
+            for (int i = 0; i < rows && moved; ++i)
+                if (i != memory->row && touched (i) && ! muted (i))
+                    moved = false;
+            if (! moved)
+            {
+                memory->muted.resize ((std::size_t) rows);
+                for (int i = 0; i < rows; ++i)
+                    memory->muted[(std::size_t) i] = muted (i);
+            }
+            memory->row = row;
+        }
+        for (int i = 0; i < rows; ++i)
+            if (i == row || touched (i))
+                setMuted (i, i != row);
+        return;
+    }
+
+    const auto back = restore && memory != nullptr && memory->valid (row, (std::size_t) rows);
+    for (int i = 0; i < rows; ++i)
+        if (i == row || touched (i))
+            setMuted (i, back ? (bool) memory->muted[(std::size_t) i] : false);
+    if (memory != nullptr)
+        memory->clear();
+}
+} // namespace
+
+void soloTrack (Song& song, int track, int trackCount, flsettings::SoloMemory* memory, bool restore)
 {
     trackCount = std::max (trackCount, track + 1);
     auto& h = headers (song, trackCount);
-    bool alone = ! h[(std::size_t) track].muted;
-
-    for (int t = 0; t < trackCount && alone; ++t)
-        if (t != track && ! h[(std::size_t) t].muted)
-            alone = false;
-
-    for (int t = 0; t < (int) h.size(); ++t)
-        h[(std::size_t) t].muted = alone ? false : t != track;
+    soloRows ((int) h.size(), track, memory, restore,
+              [&h] (int t) { return h[(std::size_t) t].muted; },
+              [&h] (int t, bool on) { h[(std::size_t) t].muted = on; },
+              [] (int) { return true; });
 }
-void soloChannel (Song& song, int channel)
+void soloChannel (Song& song, int channel, flsettings::SoloMemory* memory, bool restore)
 {
     auto& c = song.channels;
     if (channel < 0 || channel >= (int) c.size())
         return;
-    auto alone = ! c[(std::size_t) channel].muted;
-    for (int i = 0; i < (int) c.size() && alone; ++i)
-        if (i != channel && ! c[(std::size_t) i].soloLock && ! c[(std::size_t) i].muted)
-            alone = false;
-    for (int i = 0; i < (int) c.size(); ++i)
-        if (i == channel || ! c[(std::size_t) i].soloLock)
-            c[(std::size_t) i].muted = alone ? false : i != channel;
+    soloRows ((int) c.size(), channel, memory, restore,
+              [&c] (int i) { return c[(std::size_t) i].muted; },
+              [&c] (int i, bool on) { c[(std::size_t) i].muted = on; },
+              [&c] (int i) { return ! c[(std::size_t) i].soloLock; });
 }
 
 // --- track groups ------------------------------------------------------------------------------------

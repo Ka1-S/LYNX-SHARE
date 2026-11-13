@@ -3,6 +3,10 @@
 <h2 id="record-a-microphone-or-an-instrument">录制话筒或乐器</h2>
 <ol><li>打开 <code>选项 › 音频设置...</code>，选择一个输入设备。</li><li>打开<a href="/wiki/mixer/">混音台</a>（<code>F9</code>），选择一个空的插入轨。</li><li>点击插入轨效果器插槽上方的输入框，选择一个输入。立体声对排在前面，单个通道标有 <code>（单声道）</code>。</li><li>点击输入框旁边的录音预备按钮。</li><li>按 <code>R</code>，选择 <code>音频，作为音频片段录入播放列表</code>。</li><li>如果播放没有自动开始，就按播放，然后演奏。</li><li>按停止。这一遍录音就成了播放列表上的一个音频片段。</li></ol>
 <p><code>Shift+R</code> 用一个键完成第 4 到 6 步：它预备所选插入轨，只录制音频，并开始播放。再按一次则停止。</p>
+<p>当你为一个录制内容不止该输入的插入轨选择输入时（发送到它的其他通道也会被录制），LYNX SHARE 会像 FL Studio 一样询问是否切换到 <code>仅外部输入</code>。回答 <code>是</code> 即可在该插入轨上只录制该输入。</p>
+<h2 id="one-click-audio-recording">一键音频录制</h2>
+<p><code>工具 › 一键音频录制</code> 一步开始一次录音，与 FL Studio 中一样。它作用于所选的混音台插入轨。选中主控或未选中任何轨道时，它会取第一个有输入的插入轨，否则取一个空闲的插入轨。</p>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>作用</th></tr></thead><tbody><tr><td><code>到 Edison 音频编辑器/录音器</code></td><td>把 Edison 放在插入轨上，设为播放开始时录制，并开始播放。参见<a href="/wiki/mixer/">混音台</a></td></tr><tr><td><code>作为音频片段到播放列表</code></td><td>切换到歌曲模式，使插入轨进入录音准备，若它没有输入则询问输入，然后开始录制和播放。已处于录音准备的插入轨按原样录制</td></tr></tbody></table></div>
 <h2 id="what-the-recording-window-offers">录制窗口提供什么</h2>
 <div class="tablewrap"><table><thead><tr><th>选项</th><th>作用</th></tr></thead><tbody><tr><td><code>音频，作为音频片段录入播放列表</code></td><td>预备所选的混音台插入轨，如果它没有输入，会询问输入</td></tr><tr><td><code>音符和自动化</code></td><td>录制来自 MIDI 键盘或电脑键盘的音符，以及你移动的控件</td></tr><tr><td><code>全部</code></td><td>音符、自动化，以及来自已预备插入轨的音频</td></tr><tr><td><code>音频，录入音频编辑器</code></td><td>在歌曲播放时，把输入录入一个新的音频编辑器</td></tr></tbody></table></div>
 <p>勾选 <code>不再询问</code> 可保留你的选择。之后，右键单击录制按钮可打开录制过滤器：<code>自动化</code>、<code>音符</code>、<code>音频</code>、<code>片段</code>，以及用来重新显示该窗口的 <code>开始录制时询问录制内容</code>。</p>
@@ -15,9 +19,13 @@
 <p>录制时你移动的控件，在歌曲模式下写成自动化片段，在样式模式下写成样式事件。见<a href="/wiki/automation/">自动化</a>。</p>
 <h2 id="recording-options">录制选项</h2>
 <p>这些选项在 <code>选项 › 录制</code> 和录制按钮的右键菜单中。</p>
-<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td><code>预备拍</code></td><td><code>Ctrl+P</code></td><td>录制开始前播放 0、1、2 或 4 小节节拍器</td></tr><tr><td><code>节拍器</code></td><td><code>Ctrl+M</code></td><td>播放时发出咔嗒声</td></tr><tr><td><code>等待第一个音符再开始</code></td><td><code>Ctrl+I</code></td><td>录制等到你开始演奏才开始</td></tr><tr><td><code>循环录音</code></td><td>无</td><td>录制循环进行，而不是一直往后走</td></tr><tr><td><code>音频：在循环区域上插入录音</code></td><td>无</td><td>播放整个循环区域，只保留其中的音频</td></tr><tr><td><code>音频：预滚</code> 和 <code>post-roll</code></td><td>无</td><td>在切入之前和切出之后播放 0、1、2 或 4 小节</td></tr><tr><td><code>录制时开始播放</code></td><td>无</td><td>开启录制的同时也按下播放</td></tr><tr><td><code>停止录制时取消插入轨的预备</code></td><td>无</td><td>每遍录音之后释放已预备的插入轨</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td><code>预备拍</code></td><td><code>Ctrl+P</code></td><td>录制开始前播放关闭、1 小节、2 小节或 4 小节的节拍器。<code>Ctrl+P</code> 在关闭和你上次选择的长度之间切换。该选择在关闭程序后会保留；新安装从 1 小节开始，与 FL Studio 相同</td></tr><tr><td><code>节拍器</code></td><td><code>Ctrl+M</code></td><td>播放时发出咔嗒声</td></tr><tr><td><code>等待第一个音符再开始</code></td><td><code>Ctrl+I</code></td><td>录制等到你开始演奏才开始</td></tr><tr><td><code>循环录音</code></td><td>无</td><td>录制循环进行，而不是一直往后走</td></tr><tr><td><code>音频：在循环区域上插入录音</code></td><td>无</td><td>播放整个循环区域，只保留其中的音频</td></tr><tr><td><code>音频：预滚</code> 和 <code>post-roll</code></td><td>无</td><td>在切入之前和切出之后播放 0、1、2 或 4 小节</td></tr><tr><td><code>录制时开始播放</code></td><td>无</td><td>开启录制的同时也按下播放</td></tr><tr><td><code>停止录制时取消插入轨的预备</code></td><td>无</td><td>每遍录音之后释放已预备的插入轨</td></tr></tbody></table></div>
 <p><code>录音时低延迟</code> 位于录制按钮的右键菜单中，也位于混音台插入轨菜单的 <code>磁盘录音</code> 下。默认关闭。当带输入的插入轨处于录音待命，或它的监听为 <code>开</code> 时，它通往 Master 的路径上会增加延迟的效果器会被旁通。这只改变你听到的声音：如果录音取自这些效果器之后，例如使用 <code>效果后</code>，插入轨会保留它的所有效果器。取消录音待命后，这些效果器会恢复。</p>
+<p><code>延迟补偿</code> 在同一个 <code>磁盘录音</code> 菜单中，默认开启，与 FL Studio 中一样。它会把每段录音往回移动，移动量为音频设备的往返延迟、音频设置中的 <code>微调（采样）</code> 值，以及插件的延迟补偿。关闭它可让录音保持在录制时的位置。</p>
 <p><code>工具 › 取消录音</code> 会丢弃当前这一遍录制所写入的内容（它的音符、自动化和音频录音），并关闭录制。播放继续，处于录音待命的插入轨仍保持待命。</p>
+<h2 id="recording-into-clip-slots">录制到片段插槽</h2>
+<p>在<a href="/wiki/layouts/">片段启动工作流程</a>中，录音可以进入片段网格而不是播放列表，与 Ableton Live 中一样。</p>
+<ul><li>用 Session 混音台中的录音准备按钮使一条轨道进入录音准备。它的空插槽会显示一个圆形录音按钮，取代停止方块。点击其中一个即可录制到该插槽。</li><li>网格下方的 <code>会话录音</code> 把进入录音准备的轨道录制到所选场景中。在它们的片段播放时，新音符会被加到片段中（叠录）。</li><li>空插槽菜单中的 <code>固定录音长度</code> 会在 1 个或更多小节之后结束对插槽的录制，片段随即播放。<code>关</code> 则录到你停止为止。</li></ul>
 <h2 id="loop-recording-and-takes">循环录制和录音</h2>
 <p>开启 <code>循环录音</code> 后，在歌曲模式下录制会在循环区域内循环，在样式模式下则在样式内循环。关闭时，录制会一直往后播放。</p>
 <p>音频循环录制的每一遍都会落在下一条空闲的播放列表轨道上，这些轨道构成一个组。<code>混合录制的音符</code> 决定停止后播放什么：关闭时每一遍都静音，开启时全部播放。右键单击该组中的一条轨道并选择 <code>用这些录音合成</code>，可以用这些录音合成出一个完整录音。录制选项中的 <code>循环录音后仅播放最后一遍</code> 则退回到单条轨道。</p>

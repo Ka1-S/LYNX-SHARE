@@ -1,5 +1,5 @@
 ---
-source: 217f097c97
+source: a73763934f
 ---
 ![El Piano Roll](/assets/img/pianoroll.webp)
 
@@ -69,6 +69,18 @@ Haz clic en la regla para fijar la posición. `Ctrl`+arrastrar, arrastrar con el
 ## Probabilidad y rango de velocidad
 
 Cada nota tiene una Probabilidad y un Rango de velocidad. La Probabilidad es cuán probable es que la nota suene cada vez que le toca. El Rango de velocidad deja que su velocidad varíe entre la velocidad de la nota y esa velocidad más el rango. Elige `Probabilidad` o `Rango de velocity (LYNX)` en la caja de carril para editarlos. `Herram. › Probabilidad (LYNX)` en el menú del Piano Roll agrupa las notas seleccionadas para que suenen todas o solo una de ellas, y tiene `Restablecer probabilidad y rango de velocity`.
+
+## Herramientas de notas
+
+El menú `Herram.` del Piano roll abre las herramientas de notas de FL Studio como diálogos. Actúan sobre las notas seleccionadas, o sobre todas las notas cuando no hay ninguna seleccionada. Algunas de ellas:
+
+| Herramienta | Tecla | Qué hace |
+|---|---|---|
+| Limit | `Alt+K` | Mueve las notas por octavas hasta un rango de teclas y luego las limita. Bajo `Restricción de tonalidad / escala` mantiene las notas en una tecla base y uno de los acordes o escalas de FL Studio, con `Ajuste` en `Arriba`, `Abajo` o `Alternar`. `Envolver hacia arriba / abajo` y `Transponer` fijan a dónde van las notas fuera del rango |
+| Flip | `Alt+Y` | `Invertir horizontalmente` refleja las notas en el tiempo. Con `Conservar los tiempos de inicio`, activado al principio, los tiempos de inicio se reflejan y las notas conservan su duración. `Invertir verticalmente` refleja las teclas alrededor del centro de su rango |
+| Randomise | `Alt+R` | Cambios aleatorios de velocidad, pan, afinación fina, tiempo y duración, y de Mod X, Mod Y y liberación |
+| Scale levels | `Alt+X` | Escala el nivel de una nota desde el inicio hasta el final de la selección, con `Desplazamiento`, `Centro` (el valor alrededor del que escala) y `Tensión` |
+| LFO | `Alt+O` | Escribe una forma de LFO en el nivel de una nota. Haz clic derecho en un deslizador `Periodo` para ver una lista de 1 paso a 512 pasos |
 
 ## Herramientas MIDI y scripts
 

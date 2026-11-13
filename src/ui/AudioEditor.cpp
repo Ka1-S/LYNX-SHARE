@@ -16,12 +16,19 @@
 #include "core/AudioCapture.h"
 #include "core/AudioEditTools.h"
 #include "core/AutoWarp.h"
+#include "core/EdisonFx.h"
 #include "core/EdisonScript.h"
+#include "core/SessionKeys.h"
 #include "core/Instruments.h"
+#include "core/MixerOps.h"
+#include "core/NoteTools.h"
 #include "core/NewtoneFx.h"
 #include "core/WaveAnalysis.h"
 #include "core/ValueMath.h"
 #include "core/WarpEdit.h"
+#include "core/WarpTools.h"
+#include "core/WarpView.h"
+#include "core/ClipLauncher.h"
 #include "engine/SampleLibrary.h"
 #include "engine/Text.h"
 #include "platform/Paths.h"
@@ -224,12 +231,15 @@ struct Source
         none,
         file,
         channel,
-        insert
+        insert,
+        slot // an Edison effect slot (round 190cd): the editor is that plugin's window, its audio is the slot's
     };
     Kind kind = Kind::none;
     int index = -1; // channel or insert
     juce::String path;
     int clip = -1; // a channel opened from a Playlist audio clip: that clip
+    std::uint64_t instance = 0; // slot: the slot's runtime identity (EffectSlot::instance), wherever it moves
+    int gridTrack = -1, gridScene = -1; // round 190cy: opened from a clip of the grid (the Detail View's Clip page)
 };
 
 class AudioEditor final : public juce::Component,
@@ -254,9 +264,17 @@ public:
         setupIcon (recordMenuButton, tr ("What and when to record"));
         setupIcon (playButton, tr ("Play / stop the selection") + " (Space)");
         setupIcon (stopButton, tr ("Stop"));
-        setupIcon (snapButton, tr ("Snap the selection to zero crossings"));
+        setupIcon (snapButton, snapCaption (snapMode)); // FL: the hint names the snap mode (round 190ee)
         setupIcon (fitButton, tr ("Zoom out full"));
         setupIcon (saveButton, tr ("Save as WAV..."));
+        setupIcon (dragButton, tr ("Drag / copy sample / selection: drag it to the Playlist or the Channel Rack; right-click copies it"));
+        dragButton.onDragOut = [this] { dragOut(); };
+        dragButton.onRightClick = [this] {
+            if (doc.audio.empty())
+                return;
+            clipboard() = ae::copy (doc.audio, ae::orAll (doc, selection));
+            setStatus (tr ("Sent to clipboard"), false);
+        };
         // Follow (issue #12): the view pages along with the playback position; off, it stays where you look
         setupIcon (followButton, tr ("Follow: the view pages along with the playback position; off, it stays where you scrolled"));
         followButton.setClickingTogglesState (false);
@@ -274,7 +292,7 @@ public:
 
         menuButton.onClick = [this] { mainMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&menuButton)); };
         warpButton.setButtonText (tr ("Warp markers")); // ("Warp" alone is a synth control's name in the tables)
-        warpButton.setTooltip (tr ("Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers)"));
+        warpButton.setTooltip (tr ("Warp markers: tie points of the audio to beats; the audio between them stretches (the channel's markers). Drag a marker: its audio goes to another beat; Shift + drag: the audio slides under it"));
         warpButton.setClickingTogglesState (true);
         warpButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
         warpButton.onClick = [this] { setWarpMode (warpButton.getToggleState()); };
@@ -283,6 +301,29 @@ public:
         autoWarpButton.onClick = [this] { autoWarp(); };
         addChildComponent (warpButton);
         addChildComponent (autoWarpButton);
+        // round 190cg: the tempo of the selected segment with Live's ÷2 and ×2 beside it [SHOT live-m3-01-clipview-warp:
+        // "BPM 120.00 /2 x2" in the Audio panel]
+        warpBpmBox.setEditable (true);
+        warpBpmBox.setJustificationType (juce::Justification::centred);
+        warpBpmBox.setFont (theme::font (theme::type::small));
+        warpBpmBox.setColour (juce::Label::backgroundColourId, theme::colour::bg1);
+        warpBpmBox.setColour (juce::Label::outlineColourId, theme::colour::border);
+        warpBpmBox.setTooltip (tr ("Tempo of the selected segment (BPM): type a value, or use the buttons beside it"));
+        warpBpmBox.onTextChange = [this] {
+            const auto bpm = warpBpmBox.getText().replaceCharacter (',', '.').getDoubleValue();
+            const auto segment = warpSegment();
+            if (bpm >= 5.0 && bpm <= 2000.0 && segment >= 0)
+                editWarp ([segment, bpm] (SamplerSettings& sampler, double) { warptools::setSegmentBpm (sampler, segment, bpm); });
+            refreshWarpBpm();
+        };
+        warpHalveButton.setButtonText (juce::String::fromUTF8 ("\xc3\xb7" "2"));
+        warpHalveButton.setTooltip (tr ("Half the tempo: the audio plays twice as fast"));
+        warpHalveButton.onClick = [this] { scaleWarpTempo (0.5); };
+        warpDoubleButton.setButtonText (juce::String::fromUTF8 ("\xc3\x97" "2"));
+        warpDoubleButton.setTooltip (tr ("Twice the tempo: the audio plays half as fast"));
+        warpDoubleButton.onClick = [this] { scaleWarpTempo (2.0); };
+        for (auto* c : std::initializer_list<juce::Component*> { &warpBpmBox, &warpHalveButton, &warpDoubleButton })
+            addChildComponent (*c);
         warpButton.setVisible (source.kind == Source::Kind::channel);
         undoButton.onClick = [this] { undo(); };
         redoButton.onClick = [this] { redo(); };
@@ -295,7 +336,7 @@ public:
             if (recState != RecState::idle)
                 stopRecording();
         };
-        snapButton.onClick = [this] { snapZero = snapButton.getToggleState(); };
+        snapButton.onClick = [this] { snapOn = snapButton.getToggleState(); };
         fitButton.onClick = [this] { zoomToFit(); };
         saveButton.onClick = [this] { saveAs (bits); };
 
@@ -309,6 +350,8 @@ public:
         loopButton.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
         loopButton.onClick = [this] {
             loopPlay = loopButton.getToggleState();
+            if (slotMode())
+                setSlotParam (edisonfx::loopPlay, loopPlay ? 1.0f : 0.0f);
             if (playing)
                 startPlayback();
         };
@@ -377,19 +420,245 @@ public:
         }
 
         setWantsKeyboardFocus (true);
-        setSize (1120, 600);
+        setSize (1120, slotMode() ? 630 : 600);
         history.reset (doc, tr ("Empty").toStdString());
+        if (slotMode())
+            setupSlotMode();
         updateButtons();
         startTimerHz (30);
     }
 
     ~AudioEditor() override
     {
+        if (slotMode())
+        {
+            // the plugin goes on without its window: a recording continues (AudioEngine::pumpEdisonRecordings), the audio stays in the slot
+            if (playing)
+                if (const auto p = processor())
+                    p->play (nullptr, false);
+            if (session != nullptr && ! session->recording())
+                engine.flushEdisonAudio();
+            return;
+        }
         if (playing)
             engine.previewSample (nullptr);
         if (recState != RecState::idle)
             engine.getMeters().capture.setSource (AudioCapture::off);
         releaseInput();
+    }
+
+    // --- an Edison slot (round 190cd) -------------------------------------------------------------------------
+    bool slotMode() const noexcept { return source.kind == Source::Kind::slot; }
+
+    // where the slot is now (it may have moved): { track, slot }, { -1, -1 } when it is gone
+    std::pair<int, int> slotPlace() const
+    {
+        const auto& mixer = engine.getSong().mixer;
+        for (std::size_t t = 0; t < mixer.size(); ++t)
+            for (std::size_t i = 0; i < mixer[t].effects.size(); ++i)
+                if (mixer[t].effects[i].kind == EffectKind::edison && mixer[t].effects[i].instance.id == source.instance)
+                    return { (int) t, (int) i };
+        return { -1, -1 };
+    }
+
+    const EffectSlot* slotDef() const
+    {
+        const auto [t, i] = slotPlace();
+        return t < 0 ? nullptr : &engine.getSong().mixer[(std::size_t) t].effects[(std::size_t) i];
+    }
+
+    std::shared_ptr<edisonfx::Processor> processor() const
+    {
+        const auto [t, i] = slotPlace();
+        return t < 0 ? nullptr : std::dynamic_pointer_cast<edisonfx::Processor> (engine.getEffect (t, i));
+    }
+
+    float slotParam (int param) const
+    {
+        const auto* fx = slotDef();
+        return fx != nullptr ? fx->params[(std::size_t) param] : edisonfx::info().params[(std::size_t) param].defaultValue;
+    }
+
+    void setSlotParam (int param, float value)
+    {
+        const auto [t, i] = slotPlace();
+        if (t < 0 || slotParam (param) == value)
+            return;
+        engine.editSong ([t = t, i = i, param, value] (Song& song) {
+            if (t < (int) song.mixer.size() && i < (int) song.mixer[(std::size_t) t].effects.size())
+                song.mixer[(std::size_t) t].effects[(std::size_t) i].params[(std::size_t) param] = value;
+        });
+        syncSlotControls();
+    }
+
+    static juce::String maxTimeName (int index)
+    {
+        const auto minutes = edisonfx::maxMinutes[juce::jlimit (0, edisonfx::maxTimeCount - 1, index)];
+        return minutes == 0 ? tr ("Forever") : tr ("{0} min", { juce::String (minutes) });
+    }
+
+    static juce::String modeHelp (edisonfx::Mode m)
+    {
+        switch (m)
+        {
+            case edisonfx::Mode::now: return tr ("Recording starts at once");
+            case edisonfx::Mode::onInput: return tr ("Recording starts when the input is heard");
+            case edisonfx::Mode::input: return tr ("Records only while the input is heard (it pauses in silence)");
+            case edisonfx::Mode::onPlay: return tr ("Records while the song plays");
+        }
+        return {};
+    }
+
+    void setupSlotMode()
+    {
+        session = edisonfx::findSession (source.instance);
+        if (session == nullptr)
+            if (const auto* fx = slotDef())
+                session = edisonfx::sessionFor (*fx);
+        recordMenuButton.setVisible (false);
+        recordButton.setTooltip (tr ("Record this slot's input") + " (R)");
+
+        // FL's four record modes, by FL's names (the plugin's mode list)
+        static const char* const modeNames[] = { TR_NOOP ("Now"), TR_NOOP ("On input"), TR_NOOP ("Input"), TR_NOOP ("On play") };
+        for (int m = 0; m < edisonfx::modeCount; ++m)
+            recModeBox.addItem (tr (modeNames[m]), m + 1);
+        recModeBox.setTooltip (tr ("When / what to record"));
+        recModeBox.onChange = [this] {
+            const auto m = (edisonfx::Mode) juce::jlimit (0, edisonfx::modeCount - 1, recModeBox.getSelectedItemIndex());
+            setSlotParam (edisonfx::recordMode, edisonfx::modeValue (m));
+            setStatus (modeHelp (m), false);
+        };
+        for (int i = 0; i < edisonfx::maxTimeCount; ++i)
+            maxTimeBox.addItem (maxTimeName (i), i + 1);
+        maxTimeBox.setTooltip (tr ("Maximum recording time"));
+        maxTimeBox.onChange = [this] {
+            setSlotParam (edisonfx::maxTime, (float) maxTimeBox.getSelectedItemIndex() / (float) (edisonfx::maxTimeCount - 1));
+        };
+        for (auto* box : { &recModeBox, &maxTimeBox })
+        {
+            box->setWantsKeyboardFocus (false);
+            addAndMakeVisible (*box);
+        }
+        auto setupSwitch = [this] (juce::TextButton& b, const juce::String& text, const juce::String& tip, int param) {
+            b.setButtonText (text);
+            b.setTooltip (tip);
+            b.setClickingTogglesState (true);
+            b.setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
+            b.setWantsKeyboardFocus (false);
+            b.onClick = [this, &b, param] { setSlotParam (param, b.getToggleState() ? 1.0f : 0.0f); };
+            addAndMakeVisible (b);
+        };
+        setupSwitch (appendButton, tr ("Append"), tr ("A new recording goes after the audio already here (off: it replaces it)"), edisonfx::append);
+        setupSwitch (slaveButton, tr ("Slave"), tr ("Slave playback to host: while the song plays, this audio plays at the song time") + " (H)", edisonfx::slave);
+        setupSwitch (muteInputButton, tr ("Mute input"), tr ("Mute input: the slot's input is not passed on") + " (I)", edisonfx::muteInput);
+        syncSlotControls();
+
+        if (session != nullptr)
+        {
+            adoptSession ({}, true);
+            if (session->recording()) // (a recording started before this window was opened)
+            {
+                beforeRecording = doc;
+                recState = session->phase() == edisonfx::Phase::recording ? RecState::recording : RecState::waiting;
+                recordButton.setToggleState (true, juce::dontSendNotification);
+                showSlotPhase();
+            }
+        }
+    }
+
+    // the switches show the slot's parameters (they also change by undo, or from another window)
+    void syncSlotControls()
+    {
+        const auto* fx = slotDef();
+        if (fx == nullptr)
+            return;
+        recModeBox.setSelectedItemIndex ((int) edisonfx::modeOf (fx->params), juce::dontSendNotification);
+        maxTimeBox.setSelectedItemIndex (edisonfx::maxTimeIndexOf (fx->params), juce::dontSendNotification);
+        appendButton.setToggleState (fx->params[edisonfx::append] >= 0.5f, juce::dontSendNotification);
+        slaveButton.setToggleState (fx->params[edisonfx::slave] >= 0.5f, juce::dontSendNotification);
+        muteInputButton.setToggleState (fx->params[edisonfx::muteInput] >= 0.5f, juce::dontSendNotification);
+        loopPlay = fx->params[edisonfx::loopPlay] >= 0.5f;
+        loopButton.setToggleState (loopPlay, juce::dontSendNotification);
+        shownParams.assign (fx->params.begin(), fx->params.begin() + edisonfx::paramCount);
+    }
+
+    // the editor shows the session's document (`label` empty: as a newly opened one, else one more history step)
+    void adoptSession (const juce::String& label, bool opening = false)
+    {
+        const juce::ScopedValueSetter<bool> guard (adopting, true);
+        doc = session->document();
+        seenRevision = session->revision();
+        if (opening)
+        {
+            history.reset (doc, tr ("Open").toStdString());
+            selection = {};
+            cursor = 0;
+            modified = false;
+            documentChanged();
+            zoomToFit();
+        }
+        else
+        {
+            history.commit (doc, label.toStdString());
+            modified = true;
+            documentChanged();
+        }
+    }
+
+    void showSlotPhase()
+    {
+        if (recState == RecState::recording)
+            setStatus (tr ("Recording..."), false);
+        else if (recState == RecState::waiting)
+            setStatus (edisonfx::modeOf (slotDef() != nullptr ? slotDef()->params : EffectParams {}) == edisonfx::Mode::onPlay
+                           ? tr ("Waiting for project playback...")
+                           : tr ("Waiting for audio input..."),
+                       false);
+    }
+
+    void startSlotRecording()
+    {
+        stopPlayback();
+        const auto p = processor();
+        if (session == nullptr || p == nullptr)
+        {
+            setStatus (tr ("This slot is not processing audio (the effect was removed)"), true);
+            return;
+        }
+        const auto appendTake = slotParam (edisonfx::append) >= 0.5f;
+        if (! session->start (p, appendTake))
+            return;
+        beforeRecording = doc;
+        if (! appendTake)
+        {
+            beforeRecording = {};
+            beforeRecording.title = doc.title;
+        }
+        recState = edisonfx::modeOf (slotDef()->params) == edisonfx::Mode::now ? RecState::recording : RecState::waiting;
+        recordButton.setToggleState (true, juce::dontSendNotification);
+        showSlotPhase();
+        repaint();
+    }
+
+    // the recording ended (Record, Stop, or the maximum recording time): the take is in the session's document
+    void finishSlotRecording()
+    {
+        recState = RecState::idle;
+        recordButton.setToggleState (false, juce::dontSendNotification);
+        if (session->revision() != seenRevision)
+        {
+            adoptSession (tr ("Record"));
+            const auto lost = session->droppedFrames();
+            setStatus (tr ("Recorded {0}", { formatTime (selection.length()) }) + (lost > 0 ? "  (" + tr ("{0} frames lost", { juce::String (lost) }) + ")" : ""), lost > 0);
+            engine.flushEdisonAudio(); // a take is in the project's recording folder as soon as it exists
+        }
+        else
+        {
+            const juce::ScopedValueSetter<bool> guard (adopting, true);
+            doc = session->document();
+            documentChanged();
+            setStatus (tr ("Nothing was recorded"), false);
+        }
     }
 
     // --- opening ---------------------------------------------------------------------------------------------
@@ -480,22 +749,59 @@ public:
         return c != nullptr && c->sampler.keepPitch && c->sampler.warp.size() >= 2 ? c->sampler.warp : std::vector<WarpPoint> {};
     }
     void setWarpModeForPanel (bool on) { setWarpMode (on); }
+    // --warpshot (round 190cy): ÷2 / ×2 as the buttons do it; a marker held in the middle of a drag
+    void scaleWarpTempoForSnapshot (double factor) { scaleWarpTempo (factor); }
+    void holdWarpDragForSnapshot (int index, double beatOrSeconds, bool slides)
+    {
+        const auto markers = warpMarkers();
+        if (index <= 0 || index >= (int) markers.size())
+            return;
+        if (drag != Drag::warp)
+        {
+            syncAxis();
+            dragAxis = axis;
+        }
+        warpSelected = warpDrag = index;
+        warpDragSlides = slides;
+        warpDragBefore = markers;
+        warpDragBeat = slides ? markers[(std::size_t) index].beats : beatOrSeconds;
+        warpDragSeconds = slides ? beatOrSeconds : markers[(std::size_t) index].seconds;
+        drag = Drag::warp;
+        syncAxis();
+        repaint();
+    }
+    // --warpshot (round 190db): -1 as the workflow, 0 file time, 1 beats
+    void setBeatTimeForSnapshot (int choice) { setBeatTimeChoice (choice); }
+    void setGridClip (int track, int scene)
+    {
+        source.gridTrack = track;
+        source.gridScene = scene;
+    }
     void setWarpMode (bool on)
     {
         warpMode = on && source.kind == Source::Kind::channel;
         warpButton.setToggleState (warpMode, juce::dontSendNotification);
         autoWarpButton.setVisible (warpMode);
-        warpSelected = warpDrag = -1;
+        for (auto* c : std::initializer_list<juce::Component*> { &warpBpmBox, &warpHalveButton, &warpDoubleButton })
+            c->setVisible (warpMode);
+        warpSelected = warpDrag = warpHover = -1;
         resized();
+        syncAxis();
         repaint();
     }
-    void editWarp (const std::function<void (SamplerSettings&, double)>& fn)
+    // ÷2 / ×2 (round 190cy, as Live 12.4.16): the markers' beats and the clip the editor was opened from (a Playlist
+    // clip or a clip of the grid) scale together, so the clip keeps the same audio in half / twice the beats
+    void scaleWarpTempo (double factor)
+    {
+        editWarp ([factor] (SamplerSettings& sampler, double) { warptools::scaleTempo (sampler, factor); }, factor);
+    }
+    void editWarp (const std::function<void (SamplerSettings&, double)>& fn, double clipFactor = 0.0)
     {
         const auto seconds = warpFileSeconds();
         if (source.kind != Source::Kind::channel || ! (seconds > 0.0))
             return;
         auto channel = source.index;
-        engine.editSong ([&, clip = source.clip] (Song& s) {
+        engine.editSong ([&, clip = source.clip, gridTrack = source.gridTrack, gridScene = source.gridScene] (Song& s) {
             if (clip >= 0)
                 if (const auto own = warpedit::channelForClipEdit (s, clip); own >= 0)
                     channel = own;
@@ -505,8 +811,17 @@ public:
             warpedit::ensureMarkers (sampler, seconds, s.bpm);
             fn (sampler, seconds);
             warpedit::syncLength (sampler, seconds);
+            if (clipFactor > 0.0)
+            {
+                if (juce::isPositiveAndBelow (clip, (int) s.playlist.size()) && s.playlist[(std::size_t) clip].kind == ClipKind::audio)
+                    warptools::scaleClip (s.playlist[(std::size_t) clip], clipFactor);
+                if (s.clipGrid)
+                    if (auto* c = const_cast<Clip*> (launcher::clipAt (*s.clipGrid, gridTrack, gridScene)); c != nullptr && c->kind == ClipKind::audio && c->channel == channel)
+                        warptools::scaleClip (*c, clipFactor);
+            }
         });
         source.index = channel;
+        syncAxis();
         repaint();
     }
     void findWarpAttacks()
@@ -525,6 +840,71 @@ public:
             warpAttacks.push_back ((double) a / doc.audio.sampleRate);
     }
     double secondsToX (double seconds) const { return frameToX (seconds * doc.audio.sampleRate); }
+
+    // --- the beat-time view (round 190db; Live 12.4.16's Clip View draws a warped clip in beats, live check 190cw shot
+    // warp190cg-09). A warped channel's audio with the warp lane shown is drawn through its markers: the ruler counts
+    // bars.beats, each marker segment of the file is resampled to its beat span, and a marker drag redraws the two
+    // segments around the marker as it moves. The view's units are beats scaled so the file spans [0, frames], so the
+    // view position, the zoom and everything kept in file frames (selection, markers, loop, envelopes, cursor) work as in
+    // file time; the selection stays in file time, so the edits act on the audio they show. Unwarped audio and the
+    // Pattern workflow (unless chosen in the Warp markers menu) keep the file-time view.
+    bool beatTimeChosen() const noexcept { return beatTimeChoice < 0 ? EditorGlobals::get().clipLaunchWorkflow : beatTimeChoice > 0; }
+    double unitOfFrame (double frame) const noexcept { return axis.valid() ? axis.unitOfFrame (frame) : frame; }
+    double frameOfUnit (double unit) const noexcept { return axis.valid() ? axis.frameOfUnit (unit) : unit; }
+    bool warpDragHeld() const noexcept { return drag == Drag::warp && warpDrag > 0 && warpDrag < (int) warpDragBefore.size(); }
+    // brings `axis` up to the channel's markers (or the held drag's preview); the view keeps its place. True on a change.
+    bool syncAxis()
+    {
+        warpview::BeatAxis next;
+        if (warpMode && beatTimeChosen() && ! doc.audio.empty() && doc.audio.sampleRate > 0.0)
+        {
+            if (warpDragHeld() && dragAxis.valid())
+                next = warpview::withScaleOf (dragAxis, warpDragSlides ? warpview::slidePreview (warpDragBefore, warpDrag, warpDragSeconds)
+                                                                       : warpview::stretchPreview (warpDragBefore, warpDrag, warpDragBeat));
+            else if (const auto markers = warpMarkers(); markers.size() >= 2)
+                next = warpview::makeAxis (markers, (double) doc.audio.frames(), doc.audio.sampleRate);
+        }
+        if (next.valid() == axis.valid() && (! next.valid() || (next.markers == axis.markers && next.beat0 == axis.beat0 && next.unitsPerBeat == axis.unitsPerBeat && next.frames == axis.frames)))
+            return false;
+        if (axis.valid() && next.valid())
+            warpview::keepView (axis, next, viewStart, fpp);
+        else if (const auto width = waveArea.getWidth(); width > 0)
+        {
+            // to or from file time: the same stretch of the file stays in view
+            const auto left = frameOfUnit (viewStart), right = frameOfUnit (viewStart + (double) width * fpp);
+            const auto l = next.valid() ? next.unitOfFrame (left) : left, r = next.valid() ? next.unitOfFrame (right) : right;
+            viewStart = l;
+            fpp = r > l ? (r - l) / (double) width : fpp;
+        }
+        axis = std::move (next);
+        ++axisVersion;
+        clampView();
+        return true;
+    }
+    void setBeatTimeChoice (int choice)
+    {
+        beatTimeChoice = choice;
+        syncAxis();
+        repaint();
+    }
+    // what a held drag changes on screen: the ruler, the lane and the waveform between the marker's neighbours (they keep
+    // their beats, so their place, during a drag in beats), and the overview
+    void repaintWarpDrag()
+    {
+        if (! axis.valid() || ! warpDragHeld() || envMode != EnvMode::wave)
+        {
+            repaint();
+            return;
+        }
+        const auto& w = warpDragBefore;
+        const auto xOfBeat = [this] (double b) { return (float) waveArea.getX() + (float) ((axis.unitOfBeat (b) - viewStart) / fpp); };
+        const auto left = juce::jmax ((float) waveArea.getX(), xOfBeat (w[(std::size_t) warpDrag - 1].beats) - 3.0f);
+        const auto right = warpDrag + 1 < (int) w.size() ? juce::jmin ((float) waveArea.getRight(), xOfBeat (w[(std::size_t) warpDrag + 1].beats) + 60.0f)
+                                                         : (float) waveArea.getRight();
+        if (right > left)
+            repaint (juce::Rectangle<float>::leftTopRightBottom (left, (float) rulerArea.getY(), right, (float) waveArea.getBottom()).getSmallestIntegerContainer());
+        repaint (overviewArea);
+    }
     int warpMarkerAtX (int x) const
     {
         const auto markers = warpMarkers();
@@ -552,6 +932,19 @@ public:
             if (const auto x = secondsToX (a); x >= warpLane.getX() && x <= warpLane.getRight())
                 g.drawVerticalLine ((int) std::round (x), (float) warpLane.getBottom() - 4.0f, (float) warpLane.getBottom());
         const auto markers = warpMarkers();
+        refreshWarpBpm();
+        // the pseudo warp marker (round 190cg): the attack under the mouse offers a marker to grab
+        // [live-exe-strings.txt:1675853 sInfoTextPseudoWarpMarker]
+        if (warpHover >= 0 && warpHover < (int) warpAttacks.size() && warpDrag < 0)
+        {
+            const auto x = (float) secondsToX (warpAttacks[(std::size_t) warpHover]);
+            juce::Path ghost;
+            ghost.addTriangle (x - 5.0f, (float) warpLane.getY() + 2.0f, x + 5.0f, (float) warpLane.getY() + 2.0f, x, (float) warpLane.getY() + 10.0f);
+            g.setColour (colour::textSecondary.withAlpha (0.75f));
+            g.fillPath (ghost);
+            g.setColour (colour::textSecondary.withAlpha (0.35f));
+            g.drawVerticalLine ((int) std::round (x), (float) warpLane.getY() + 10.0f, (float) waveArea.getBottom());
+        }
         if (markers.empty())
         {
             g.setColour (colour::textDisabled);
@@ -561,9 +954,15 @@ public:
         }
         const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
         g.setFont (font (type::small));
+        // in beats the axis holds the markers as drawn (a held drag's preview included): each sits on its beat
+        const auto inBeats = axis.valid() && axis.markers.size() == markers.size();
         for (std::size_t k = 0; k < markers.size(); ++k)
         {
-            const auto seconds = (int) k == warpDrag ? warpDragSeconds : markers[k].seconds;
+            const auto stretching = (int) k == warpDrag && ! warpDragSlides && ! warpDragBefore.empty();
+            const auto seconds = inBeats ? axis.markers[k].seconds
+                                 : stretching ? warpedit::secondsAt (warpDragBefore, warpDragBeat) // (where its new beat is now)
+                                 : (int) k == warpDrag ? warpDragSeconds
+                                                       : markers[k].seconds;
             const auto x = (float) secondsToX (seconds);
             if (x < warpLane.getX() - 40.0f || x > warpLane.getRight() + 2.0f)
                 continue;
@@ -575,7 +974,7 @@ public:
             g.fillPath (flag);
             g.setColour (fill.withAlpha (selected ? 0.8f : 0.4f));
             g.drawVerticalLine ((int) std::round (x), (float) warpLane.getY() + 10.0f, (float) waveArea.getBottom());
-            const auto b = markers[k].beats;
+            const auto b = inBeats ? axis.markers[k].beats : stretching ? warpDragBeat : markers[k].beats;
             const auto bar = (int) std::floor (b / perBar) + 1;
             const auto beat = b - (bar - 1) * perBar + 1.0;
             const auto label = juce::String (bar) + "." + (std::abs (beat - std::round (beat)) < 0.005 ? juce::String ((int) std::round (beat)) : juce::String (beat, 2));
@@ -585,12 +984,29 @@ public:
     }
     void warpMouseDown (const juce::MouseEvent& e)
     {
-        const auto m = warpMarkerAtX (e.x);
+        auto m = warpMarkerAtX (e.x);
+        // a pseudo marker grabbed (round 190cg): it becomes a marker on that attack, selected and already held
+        if (m < 0 && ! e.mods.isPopupMenu() && warpHover >= 0 && warpHover < (int) warpAttacks.size())
+        {
+            const auto seconds = warpAttacks[(std::size_t) warpHover];
+            editWarp ([seconds] (SamplerSettings& sampler, double) { warpedit::addMarker (sampler, seconds); });
+            m = warpMarkerAtX ((int) std::round (secondsToX (seconds)));
+            warpHover = -1;
+        }
         warpSelected = m;
         if (m > 0 && ! e.mods.isPopupMenu())
         {
             warpDrag = m;
             warpDragSeconds = warpMarkers()[(std::size_t) m].seconds;
+            // round 190cy (Live 12.4.16): a plain drag moves the marker with its audio to another beat (the audio
+            // stretches around it); Shift + drag slides the audio under the marker, which keeps its beat
+            warpDragSlides = e.mods.isShiftDown();
+            warpDragBefore = warpMarkers();
+            warpDragBeat = warpDragBefore[(std::size_t) m].beats;
+            // round 190db: in beats the drag keeps the axis' scale; the pointer's beat is read on it
+            syncAxis();
+            dragAxis = axis;
+            slideDownBeat = axis.valid() ? axis.beatOfUnit (viewStart + (double) (e.x - waveArea.getX()) * fpp) : 0.0;
             drag = Drag::warp;
         }
         else if (e.mods.isPopupMenu())
@@ -601,6 +1017,9 @@ public:
             menu.addItem (tr ("Remove all warp markers"), warpMarkers().size() > 2, false, [this] {
                 editWarp ([] (SamplerSettings& s, double) { warpedit::clearMarkers (s); });
             });
+            menu.addItem (tr ("Show the audio in beats"), true, beatTimeChosen(), [this] { setBeatTimeChoice (beatTimeChosen() ? 0 : 1); });
+            const auto markers = warpMarkers();
+            addWarpCommands (menu, m >= 0 && m < (int) markers.size() ? markers[(std::size_t) m].seconds : (double) xToFrame (e.x) / doc.audio.sampleRate);
             menu.showMenuAsync (juce::PopupMenu::Options().withMousePosition());
         }
         repaint();
@@ -610,7 +1029,26 @@ public:
         const auto markers = warpMarkers();
         if (warpDrag <= 0 || warpDrag >= (int) markers.size())
             return;
+        if (axis.valid() && dragAxis.valid() && warpDrag < (int) warpDragBefore.size())
+        {
+            warpMouseDragInBeats (e);
+            return;
+        }
         auto seconds = (double) xToFrame (e.x) / doc.audio.sampleRate;
+        if (! warpDragSlides)
+        {
+            // to the beat the pointer's place played on (onto a sixteenth within 6 px; Alt: free), between the neighbours
+            auto beat = warptools::stretchDragBeat (warpDragBefore, seconds);
+            if (const auto sixteenth = std::round (beat * 4.0) / 4.0;
+                ! e.mods.isAltDown() && std::abs (secondsToX (warpedit::secondsAt (warpDragBefore, sixteenth)) - e.x) <= 6.0)
+                beat = sixteenth;
+            const auto& w = warpDragBefore;
+            const auto lo = w[(std::size_t) warpDrag - 1].beats + warpedit::minBeatGap;
+            const auto hi = warpDrag + 1 < (int) w.size() ? w[(std::size_t) warpDrag + 1].beats - warpedit::minBeatGap : 1.0e6;
+            warpDragBeat = juce::jlimit (lo, juce::jmax (lo, hi), beat);
+            repaint();
+            return;
+        }
         if (! e.mods.isAltDown()) // onto an attack within 6 px
             for (const auto a : warpAttacks)
                 if (std::abs (secondsToX (a) - e.x) <= 6.0)
@@ -623,6 +1061,42 @@ public:
         warpDragSeconds = juce::jlimit (lo, juce::jmax (lo, hi), seconds);
         repaint();
     }
+    // round 190db: a drag in the beat-time view (Live 12.4.16, live check 190cw shot warp190cg-09). Plain: the marker
+    // and its audio follow the pointer onto its beat (a sixteenth within 6 px; Alt: free), so the audio on both sides
+    // stretches as it moves. Shift: the marker keeps its beat and the audio slides under it with the pointer (an attack
+    // within 6 px of the marker lands on it; Alt: free). Only the two segments around the marker are drawn again.
+    void warpMouseDragInBeats (const juce::MouseEvent& e)
+    {
+        const auto& w = warpDragBefore;
+        const auto pointerBeat = dragAxis.beatOfUnit (viewStart + (double) (e.x - waveArea.getX()) * fpp);
+        const auto pixels = [this] (double units) { return std::abs (units) / fpp; };
+        if (! warpDragSlides)
+        {
+            auto beat = pointerBeat;
+            if (const auto sixteenth = std::round (beat * 4.0) / 4.0; ! e.mods.isAltDown() && pixels (dragAxis.unitOfBeat (sixteenth) - dragAxis.unitOfBeat (beat)) <= 6.0)
+                beat = sixteenth;
+            warpDragBeat = warpview::stretchPreview (w, warpDrag, beat)[(std::size_t) warpDrag].beats;
+        }
+        else
+        {
+            auto seconds = warpview::slideDragSeconds (w, warpDrag, slideDownBeat, pointerBeat);
+            if (! e.mods.isAltDown())
+            {
+                const auto rate = doc.audio.sampleRate;
+                auto best = 6.0;
+                for (const auto a : warpAttacks)
+                    if (const auto d = pixels (dragAxis.unitOfFrame (a * rate) - dragAxis.unitOfFrame (seconds * rate)); d <= best)
+                    {
+                        best = d;
+                        seconds = a;
+                    }
+                // (attacks are found over the editor's copy; the file's end is the limit)
+            }
+            warpDragSeconds = warpview::slidePreview (w, warpDrag, seconds)[(std::size_t) warpDrag].seconds;
+        }
+        syncAxis();
+        repaintWarpDrag();
+    }
     void warpMouseUp()
     {
         const auto index = warpDrag, at = warpDrag;
@@ -630,12 +1104,20 @@ public:
         warpDrag = -1;
         drag = Drag::none;
         const auto markers = warpMarkers();
-        if (index > 0 && index < (int) markers.size() && std::abs (markers[(std::size_t) index].seconds - seconds) > 1.0e-6)
+        if (! warpDragSlides)
+        {
+            // the marker goes to its new beat with its audio: the audio on both sides stretches
+            if (const auto beat = warpDragBeat; index > 0 && index < (int) markers.size() && std::abs (markers[(std::size_t) index].beats - beat) > 1.0e-6)
+                editWarp ([at, beat] (SamplerSettings& s, double file) { warpedit::moveMarker (s, at, beat, file); });
+        }
+        else if (index > 0 && index < (int) markers.size() && std::abs (markers[(std::size_t) index].seconds - seconds) > 1.0e-6)
             editWarp ([at, seconds] (SamplerSettings& s, double) {
                 // the marker keeps its beat and ties it to another point of the audio
-                if (juce::isPositiveAndBelow (at, (int) s.warp.size()))
-                    s.warp[(std::size_t) at].seconds = seconds;
+                warptools::slideMarker (s, at, seconds);
             });
+        warpDragBefore.clear();
+        dragAxis = {};
+        syncAxis();
         repaint();
     }
     void warpDoubleClick (const juce::MouseEvent& e)
@@ -662,6 +1144,161 @@ public:
             return;
         editWarp ([index] (SamplerSettings& s, double) { warpedit::removeMarker (s, index); });
         warpSelected = -1;
+    }
+    // --- warp commands (round 190cg, core/WarpTools.h): Live's sample editor commands [live-exe-strings.txt:1645479…1645494
+    // sMenuWarpFromHere / …StartAtSongTempo / …Straight / …StraightWithSongTempo, sMenuSet111Here,
+    // sMenuWarpSampleAsLoopInBars; 1676273 sMenuTextInsertWarpMarker; 1586628 sMenuQuantize, 1586633 sMenuQuantizeSettings]
+    // the segment the tempo box shows: the selected marker's, else the first
+    int warpSegment() const
+    {
+        const auto count = (int) warpMarkers().size();
+        return count < 2 ? -1 : juce::jlimit (0, count - 2, warpSelected < 0 ? 0 : warpSelected);
+    }
+    void refreshWarpBpm()
+    {
+        if (! warpBpmBox.isVisible() || warpBpmBox.isBeingEdited())
+            return;
+        const auto segment = warpSegment();
+        const auto text = segment < 0 ? juce::String ("-") : juce::String (warptools::segmentBpm (warpMarkers(), segment), 2);
+        if (warpBpmBox.getText() != text)
+            warpBpmBox.setText (text, juce::dontSendNotification);
+        warpBpmBox.setEnabled (segment >= 0);
+        warpHalveButton.setEnabled (segment >= 0);
+        warpDoubleButton.setEnabled (segment >= 0);
+    }
+    // the attack a pseudo marker is offered on at `x`: within 5 px, and not where a marker already sits
+    int warpAttackAtX (int x) const
+    {
+        if (warpMarkerAtX (x) >= 0)
+            return -1;
+        int best = -1;
+        double bestDx = 5.0;
+        for (std::size_t k = 0; k < warpAttacks.size(); ++k)
+            if (const auto dx = std::abs (secondsToX (warpAttacks[k]) - x); dx <= bestDx)
+            {
+                bestDx = dx;
+                best = (int) k;
+            }
+        return best;
+    }
+    // variant 0: auto-warp from `seconds`; 1: starting at the song's tempo; 2: straight (one tempo); 3: the song's tempo
+    void warpFromHere (double seconds, int variant)
+    {
+        if (doc.audio.empty() || source.kind != Source::Kind::channel || ! (doc.audio.sampleRate > 0.0))
+            return;
+        const auto bpm = engine.getSong().bpm;
+        if (variant == 3)
+        {
+            editWarp ([seconds, bpm] (SamplerSettings& sampler, double file) { warptools::warpTempoFromHere (sampler, seconds, file, bpm); });
+            return;
+        }
+        const auto from = (std::size_t) juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (seconds * doc.audio.sampleRate));
+        SampleData sample;
+        sample.sampleRate = doc.audio.sampleRate;
+        sample.left.assign (doc.audio.channels[0].begin() + (std::ptrdiff_t) from, doc.audio.channels[0].end());
+        if (doc.audio.numChannels() > 1)
+            sample.right.assign (doc.audio.channels[1].begin() + (std::ptrdiff_t) from, doc.audio.channels[1].end());
+        autowarp::Options o;
+        o.songBpm = bpm;
+        o.beatsPerBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        if (variant == 1)
+            o.knownBpm = bpm;
+        if (variant == 2)
+            o.trackBars = 1.0e12; // never bar by bar: one tempo
+        const auto result = autowarp::analyse (sample, o);
+        if (result.markers.size() < 2)
+        {
+            setStatus (tr ("Auto-warp found no beat to lock to"), true);
+            return;
+        }
+        editWarp ([seconds, tail = result.markers] (SamplerSettings& sampler, double file) { warptools::warpTailFromHere (sampler, seconds, file, tail); });
+        setStatus (tr ("Auto-warp: {0} markers at {1} BPM", { juce::String ((int) result.markers.size()), juce::String (result.bpm, 2) }), false);
+    }
+    // the audio at `seconds` becomes 1.1.1; the clip the editor was opened from starts there
+    void setWarpOneOneOne (double seconds)
+    {
+        const auto file = warpFileSeconds();
+        if (source.kind != Source::Kind::channel || ! (file > 0.0))
+            return;
+        auto channel = source.index;
+        engine.editSong ([&, clip = source.clip] (Song& song) {
+            if (clip >= 0)
+                if (const auto own = warpedit::channelForClipEdit (song, clip); own >= 0)
+                    channel = own;
+            if (! juce::isPositiveAndBelow (channel, (int) song.channels.size()))
+                return;
+            auto& sampler = song.channels[(std::size_t) channel].sampler;
+            warpedit::ensureMarkers (sampler, file, song.bpm);
+            warptools::setOneOneOne (sampler, seconds);
+            warpedit::syncLength (sampler, file);
+            if (juce::isPositiveAndBelow (clip, (int) song.playlist.size()))
+            {
+                auto& c = song.playlist[(std::size_t) clip];
+                c.offset = juce::jmax<std::int64_t> (0, (std::int64_t) std::llround (warptools::playedBeatOfZero (sampler, file) * ppq * juce::jlimit (0.01, 100.0, c.stretch)));
+                c.offsetFraction = 0.0f;
+            }
+        });
+        source.index = channel;
+        repaint();
+    }
+    void insertWarpMarkers()
+    {
+        if (doc.audio.empty() || selection.empty() || ! (doc.audio.sampleRate > 0.0))
+            return;
+        findWarpAttacks();
+        const auto from = (double) selection.start / doc.audio.sampleRate, to = (double) selection.end / doc.audio.sampleRate;
+        std::vector<double> at;
+        for (const auto a : warpAttacks)
+            if (a >= from && a <= to)
+                at.push_back (a);
+        if (at.empty())
+            at = { from, to }; // no attack inside: the selection's edges
+        editWarp ([at] (SamplerSettings& sampler, double) { warptools::insertMarkers (sampler, at); });
+        if (! warpMode)
+            setWarpMode (true);
+    }
+    void quantizeWarp()
+    {
+        if (doc.audio.empty() || source.kind != Source::Kind::channel || ! (doc.audio.sampleRate > 0.0))
+            return;
+        findWarpAttacks();
+        const auto from = selection.empty() ? 0.0 : (double) selection.start / doc.audio.sampleRate;
+        const auto to = selection.empty() ? (double) doc.audio.frames() / doc.audio.sampleRate : (double) selection.end / doc.audio.sampleRate;
+        int placed = 0;
+        editWarp ([&placed, from, to, points = warpAttacks, grid = warpGridBeats, amount = warpAmount] (SamplerSettings& sampler, double) {
+            placed = warptools::quantize (sampler, points, from, to, grid, amount);
+        });
+        if (! warpMode)
+            setWarpMode (true);
+        setStatus (placed > 0 ? tr ("{0} warp markers placed", { juce::String (placed) }) : tr ("No attack to quantize here"), placed == 0);
+    }
+    void addWarpCommands (juce::PopupMenu& menu, double seconds)
+    {
+        const auto has = ! doc.audio.empty();
+        const auto bpm = juce::String (engine.getSong().bpm, 2);
+        const auto perBar = (double) juce::jmax (1, engine.getSong().beatsPerBar);
+        const auto bars = warptools::loopBars (warpFileSeconds(), engine.getSong().bpm, perBar);
+        menu.addSeparator();
+        menu.addItem (tr ("Warp from here"), has, false, [this, seconds] { warpFromHere (seconds, 0); });
+        menu.addItem (tr ("Warp from here (start at {0} BPM)", { bpm }), has, false, [this, seconds] { warpFromHere (seconds, 1); });
+        menu.addItem (tr ("Warp from here (straight)"), has, false, [this, seconds] { warpFromHere (seconds, 2); });
+        menu.addItem (tr ("Warp {0} BPM from here", { bpm }), has, false, [this, seconds] { warpFromHere (seconds, 3); });
+        menu.addItem (tr ("Warp as {0}-bar loop", { juce::String ((int) bars) }), has, false, [this, bars, perBar] {
+            editWarp ([beats = bars * perBar] (SamplerSettings& sampler, double file) { warptools::warpAsLoop (sampler, file, beats); });
+        });
+        menu.addItem (tr ("Set 1.1.1 here"), has, false, [this, seconds] { setWarpOneOneOne (seconds); });
+        menu.addSeparator();
+        menu.addItem (tr ("Insert warp markers") + sessionkeys::menuKey (sessionkeys::Command::audioInsertWarpMarkers), has && ! selection.empty(), false,
+                      [this] { insertWarpMarkers(); });
+        menu.addItem (tr ("Quantize audio") + sessionkeys::menuKey (sessionkeys::Command::audioQuantize), has, false, [this] { quantizeWarp(); });
+        juce::PopupMenu settings;
+        const std::pair<const char*, double> grids[] = { { "1/4", 1.0 }, { "1/8", 0.5 }, { "1/8T", 1.0 / 3.0 }, { "1/16", 0.25 }, { "1/16T", 1.0 / 6.0 }, { "1/32", 0.125 } };
+        for (const auto& [name, beats] : grids)
+            settings.addItem (name, true, std::abs (warpGridBeats - beats) < 1.0e-9, [this, beats = beats] { warpGridBeats = beats; });
+        settings.addSeparator();
+        for (const auto percent : { 100, 75, 50, 25 })
+            settings.addItem (juce::String (percent) + " %", true, std::abs (warpAmount * 100.0 - percent) < 0.5, [this, percent] { warpAmount = percent / 100.0; });
+        menu.addSubMenu (tr ("Quantize settings"), settings, has);
     }
     void autoWarp()
     {
@@ -691,6 +1328,11 @@ public:
         setStatus (tr ("Auto-warp: {0} markers at {1} BPM", { juce::String ((int) result.markers.size()), juce::String (result.bpm, 2) }), false);
     }
     void setEnvModeForSnapshot (int mode) { setEnvMode ((EnvMode) juce::jlimit (0, 3, mode)); }
+    // round 190ee: a marker's menu (with its Trigger note submenu) and FL's snap mode, for the off-screen checks
+    juce::PopupMenu markerMenuForSnapshot (int index) { return juce::isPositiveAndBelow (index, (int) doc.markers.size()) ? markerMenu (index) : juce::PopupMenu(); }
+    void setSnapForSnapshot (int mode) { setSnapMode (mode); }
+    juce::String snapTooltipForSnapshot() { return snapButton.getTooltip() + (snapButton.getToggleState() ? " [on]" : " [off]"); }
+    std::int64_t snapFrameForSnapshot (std::int64_t f) const { return snapFrame (f); }
 
     // --- layout and painting ---------------------------------------------------------------------------------
     void resized() override
@@ -720,9 +1362,32 @@ public:
             place (warpButton, 100);
         if (autoWarpButton.isVisible())
             place (autoWarpButton, 78);
+        if (warpBpmBox.isVisible())
+        {
+            place (warpBpmBox, 58);
+            place (warpHalveButton, 26);
+            place (warpDoubleButton, 26);
+        }
         sendButton.setBounds (bar.removeFromRight (70));
         bar.removeFromRight (6);
+        dragButton.setBounds (bar.removeFromRight (28));
+        bar.removeFromRight (2);
         saveButton.setBounds (bar.removeFromRight (28));
+
+        if (slotMode()) // the plugin's own switches, under the transport (FL: next to its Record button)
+        {
+            auto row = area.removeFromTop (30).reduced (6, 3);
+            row.removeFromLeft (112); // (they start under the Record button)
+            auto put = [&row] (juce::Component& c, int w, int gap = 4) {
+                c.setBounds (row.removeFromLeft (w));
+                row.removeFromLeft (gap);
+            };
+            put (recModeBox, 104);
+            put (maxTimeBox, 96);
+            put (appendButton, 72, 14);
+            put (slaveButton, 64);
+            put (muteInputButton, 96);
+        }
 
         // each button gets the width its text needs, plus an equal share of what is left (round 165o: translated
         // labels such as "Normalisieren" or "Ausschneiden" are never cut). When one row cannot hold them all (German,
@@ -800,6 +1465,8 @@ public:
     void paint (juce::Graphics& g) override
     {
         using namespace theme;
+        if (syncAxis()) // (the markers changed elsewhere: the Playlist, undo; the whole view follows)
+            repaint();
         g.fillAll (colour::bg2);
         g.setColour (colour::bg3);
         g.fillRect (getLocalBounds().removeFromTop (36));
@@ -824,6 +1491,7 @@ public:
     {
         grabKeyboardFocus();
         drag = Drag::none;
+        syncAxis();
         if (doc.audio.empty())
         {
             if (e.mods.isPopupMenu())
@@ -929,7 +1597,7 @@ public:
             viewStart += (e.x - waveArea.getRight()) * fpp * 0.25;
         clampView();
 
-        const auto f = snapFrame (xToFrame (e.x));
+        const auto f = snapFrame (xToFrame (e.x), drag == Drag::marker ? dragMarkerIndex : -1);
         if (drag == Drag::select)
         {
             selection = { std::min (anchor, f), std::max (anchor, f) };
@@ -980,8 +1648,21 @@ public:
         drag = Drag::none;
     }
 
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        const auto hover = warpMode && ! doc.audio.empty() && warpLane.contains (e.getPosition()) ? warpAttackAtX (e.x) : -1;
+        if (std::exchange (warpHover, hover) != hover)
+            repaint (warpLane.getUnion (waveArea));
+    }
+    void mouseExit (const juce::MouseEvent&) override
+    {
+        if (std::exchange (warpHover, -1) != -1)
+            repaint (warpLane.getUnion (waveArea));
+    }
+
     void mouseDoubleClick (const juce::MouseEvent& e) override
     {
+        syncAxis();
         if (warpMode && ! doc.audio.empty() && warpLane.contains (e.getPosition()))
         {
             warpDoubleClick (e);
@@ -1038,6 +1719,21 @@ public:
             removeWarpMarker (warpSelected);
             return true;
         }
+        // round 190cg: Live's Insert Warp Markers and Quantize on a channel's audio
+        // (round 190cm: default keys only in the Clip-launch layout, core/SessionKeys.h; elsewhere the chords are not
+        // taken, so Ctrl+I stays "Recording waits for input" and the commands are in the warp menu)
+        if (ctrl && ! shift && source.kind == Source::Kind::channel && (code == 'I' || c == 'i') && ! selection.empty()
+            && sessionkeys::defaultKeyActs (sessionkeys::Command::audioInsertWarpMarkers))
+        {
+            insertWarpMarkers();
+            return true;
+        }
+        if (ctrl && ! shift && source.kind == Source::Kind::channel && warpMode && (code == 'U' || c == 'u')
+            && sessionkeys::defaultKeyActs (sessionkeys::Command::audioQuantize))
+        {
+            quantizeWarp();
+            return true;
+        }
         if (ctrl && (code == 'Z' || c == 'z'))
             shift ? redo() : undo();
         else if (ctrl && (code == 'Y' || c == 'y'))
@@ -1082,6 +1778,14 @@ public:
             setEnvMode ((EnvMode) (((int) envMode + 1) % 4));
         else if (! ctrl && c == 'f')
             zoomToFit();
+        else if (slotMode() && ! ctrl && c == 'h')
+            slaveButton.triggerClick();
+        else if (slotMode() && ! ctrl && c == 'i')
+            muteInputButton.triggerClick();
+        else if (slotMode() && ! ctrl && c == 'a')
+            followButton.triggerClick();
+        else if (! ctrl && c >= '1' && c <= '4') // FL's Snap menu keys (round 190ee)
+            setSnapMode ((int) (c - '1'));
         else if (c == '+' || c == '=')
             zoomAround ((float) waveArea.getCentreX(), 0.5);
         else if (c == '-')
@@ -1097,10 +1801,69 @@ public:
         return files.size() == 1 && SampleLibrary::isSampleFile (juce::File (files[0]));
     }
 
-    // a sample dragged from LYNX's Browser too (issue #12)
+    // a sample dragged from LYNX's Browser too (issue #12); not the editor's own Drag button
     bool isInterestedInDragSource (const SourceDetails& details) override
     {
-        return BrowserComponent::isBrowserDrag (details) && SampleLibrary::isSampleFile (BrowserComponent::draggedFile (details));
+        return details.sourceComponent.get() != &dragButton && BrowserComponent::isBrowserDrag (details)
+               && SampleLibrary::isSampleFile (BrowserComponent::draggedFile (details));
+    }
+
+    // round 190ee: the selection (or the whole sample) written to LYNX/Edits with its markers and loop, then dragged
+    // as the Browser drags a file, so the Playlist and the Channel Rack take it as they take a dropped sample
+    juce::File writePartFile (ae::Range range)
+    {
+        range = ae::orAll (doc, range);
+        ae::Document part;
+        part.audio = ae::copy (doc.audio, range);
+        part.title = doc.title;
+        for (auto m : doc.markers)
+            if (m.start >= range.start && m.end <= range.end)
+            {
+                m.start -= range.start;
+                m.end -= range.start;
+                part.markers.push_back (m);
+            }
+        if (doc.hasLoop() && doc.loopStart >= range.start && doc.loopEnd <= range.end)
+            ae::setLoop (part, { doc.loopStart - range.start, doc.loopEnd - range.start });
+        const auto folder = juce::File::getSpecialLocation (juce::File::userMusicDirectory).getChildFile ("LYNX/Edits");
+        folder.createDirectory();
+        const auto whole = range.start == 0 && range.end == doc.audio.frames();
+        const auto file = folder.getNonexistentChildFile (safeTitle() + (whole ? " (edit)" : " (part)"), ".wav");
+        const auto bytes = ae::encodeWav (part, bits);
+        if (! file.replaceWithData (bytes.data(), bytes.size()))
+        {
+            setStatus (tr ("Could not write {0}", { file.getFullPathName() }), true);
+            return {};
+        }
+        engine.getSampleLibrary().forget (file.getFullPathName());
+        return file;
+    }
+
+    static juce::DragAndDropContainer* containerIn (juce::Component& c, int depth)
+    {
+        if (auto* d = dynamic_cast<juce::DragAndDropContainer*> (&c))
+            return d;
+        if (depth > 0)
+            for (auto* child : c.getChildren())
+                if (auto* d = containerIn (*child, depth - 1))
+                    return d;
+        return nullptr;
+    }
+
+    void dragOut()
+    {
+        if (doc.audio.empty())
+            return;
+        auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this);
+        for (int i = 0; container == nullptr && i < juce::Desktop::getInstance().getNumComponents(); ++i) // (a window of its own)
+            if (auto* top = juce::Desktop::getInstance().getComponent (i))
+                container = containerIn (*top, 3);
+        if (container == nullptr)
+            return;
+        const auto file = writePartFile (selection);
+        if (file == juce::File {})
+            return;
+        container->startDragging (juce::String (BrowserComponent::dragDescription) + "|" + file.getFullPathName(), &dragButton, juce::ScaledImage(), true);
     }
 
     void itemDropped (const SourceDetails& details) override
@@ -1120,7 +1883,8 @@ public:
         {
             stopPlayback();
             const auto previous = source;
-            source = { Source::Kind::file, -1, files[0] };
+            if (! slotMode()) // (an Edison slot stays that slot: the file becomes its audio)
+                source = { Source::Kind::file, -1, files[0] };
             if (! loadFile (juce::File (files[0])))
                 source = previous;
             return;
@@ -1164,10 +1928,11 @@ private:
     };
 
     // --- coordinates ----------------------------------------------------------------------------------------
-    float frameToX (double frame) const noexcept { return (float) waveArea.getX() + (float) ((frame - viewStart) / fpp); }
+    // (round 190db: through the warp markers in the beat-time view; the same as before in file time)
+    float frameToX (double frame) const noexcept { return (float) waveArea.getX() + (float) ((unitOfFrame (frame) - viewStart) / fpp); }
     std::int64_t xToFrame (int x) const noexcept
     {
-        return juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (viewStart + (double) (x - waveArea.getX()) * fpp));
+        return juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (frameOfUnit (viewStart + (double) (x - waveArea.getX()) * fpp)));
     }
     double maxFpp() const noexcept { return juce::jmax (1.0, (double) doc.audio.frames() / juce::jmax (1, waveArea.getWidth())); }
 
@@ -1200,9 +1965,10 @@ private:
     {
         if (r.empty())
             return;
-        fpp = (double) r.length() / juce::jmax (1, waveArea.getWidth());
+        const auto from = unitOfFrame ((double) r.start), to = unitOfFrame ((double) r.end);
+        fpp = (to - from) / juce::jmax (1, waveArea.getWidth());
         clampView();
-        viewStart = (double) r.start;
+        viewStart = from;
         clampView();
         repaint();
     }
@@ -1216,16 +1982,73 @@ private:
         repaint();
     }
 
-    std::int64_t snapFrame (std::int64_t f) const
+    // FL's Edison snap (round 190ee; Edison_x64.dll snap function 0x855d20, Snap menu Tags 0…4): the toolbar's Snap
+    // button switches snapping on and off, the Snap menu picks what it snaps to. LYNX's grid is the one its ruler
+    // draws at the current zoom (FL's own grid-step law is not decoded); "Snap to pitch period" is not built.
+    static juce::String snapCaption (int mode)
     {
-        if (! snapZero)
+        static const char* const names[] { TR_NOOP ("Snap to grid"), TR_NOOP ("Snap to regions"), TR_NOOP ("Snap to samples"), TR_NOOP ("Snap to zero-crossing") };
+        return tr (names[juce::jlimit (0, 3, mode)]);
+    }
+
+    void setSnapMode (int mode)
+    {
+        snapMode = juce::jlimit (0, 3, mode);
+        snapButton.setTooltip (snapCaption (snapMode));
+        snapButton.setToggleState (true, juce::sendNotification); // (FL: picking a mode turns snapping on)
+    }
+
+    // the grid the ruler shows: beats in the beat-time view, the time ruler's labelled step otherwise
+    std::int64_t snapToGrid (std::int64_t f) const
+    {
+        if (doc.audio.empty())
             return f;
-        return ae::nearestZeroCrossing (doc.audio, f, (std::int64_t) juce::jmax (8.0, fpp * 6.0));
+        if (axis.valid())
+        {
+            const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
+            const auto pixelsPerBeat = axis.unitsPerBeat / fpp;
+            const auto step = warpview::rulerStep (pixelsPerBeat, perBar);
+            const auto tick = step <= 1.0 ? 0.25 : (step <= perBar ? 1.0 : (double) perBar);
+            const auto grid = tick * pixelsPerBeat >= 6.0 ? tick : step;
+            const auto beat = std::round (axis.beatOfUnit (unitOfFrame ((double) f)) / grid) * grid;
+            return juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (frameOfUnit (axis.unitOfBeat (beat))));
+        }
+        const auto rate = doc.audio.sampleRate;
+        const auto step = timeRulerStep() * rate;
+        if (! (step > 0.0))
+            return f;
+        return juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (std::round ((double) f / step) * step));
+    }
+
+    // FL: the nearest region edge within 12 pixels, other than the region being moved
+    std::int64_t snapToRegions (std::int64_t f, int skip) const
+    {
+        auto best = f;
+        auto bestPx = 12.0f;
+        for (int i = 0; i < (int) doc.markers.size(); ++i)
+            if (i != skip)
+                for (const auto edge : { doc.markers[(std::size_t) i].start, doc.markers[(std::size_t) i].end })
+                    if (const auto px = std::abs (frameToX ((double) edge) - frameToX ((double) f)); px <= bestPx)
+                        best = edge, bestPx = px;
+        return best;
+    }
+
+    std::int64_t snapFrame (std::int64_t f, int skipMarker = -1) const
+    {
+        if (! snapOn)
+            return f;
+        switch (snapMode)
+        {
+            case 0: return snapToGrid (f);
+            case 1: return snapToRegions (f, skipMarker);
+            case 2: return f; // (positions are whole samples already)
+            default: return ae::nearestZeroCrossing (doc.audio, f, (std::int64_t) juce::jmax (8.0, fpp * 6.0));
+        }
     }
 
     int markerAt (int x) const
     {
-        for (int i = (int) doc.markers.size() - 1; i >= 0; --i)
+        for (int i = viewRegions ? (int) doc.markers.size() - 1 : -1; i >= 0; --i)
             if (std::abs (frameToX ((double) doc.markers[(std::size_t) i].start) - (float) x) < 5.0f)
                 return i;
         return -1;
@@ -1240,7 +2063,7 @@ private:
         selection = {};
         if (frameToX ((double) cursor) < (float) waveArea.getX() || frameToX ((double) cursor) > (float) waveArea.getRight())
         {
-            viewStart = (double) cursor - (double) waveArea.getWidth() * fpp * 0.5;
+            viewStart = unitOfFrame ((double) cursor) - (double) waveArea.getWidth() * fpp * 0.5;
             clampView();
         }
         repaint();
@@ -1249,12 +2072,14 @@ private:
     // --- painting -------------------------------------------------------------------------------------------
     // per pixel column x of a lane: the min/max of the samples it covers (exact when zoomed in, from the
     // summary when zoomed out)
-    bool columnRange (int channel, double from, double to, float& lo, float& hi) const
+    bool columnRange (int channel, double from, double to, float& lo, float& hi) const { return framesRange (channel, from, to, lo, hi, fpp > 256.0); }
+    // the min / max of frames [from, to): from the summary when asked to (wide stretches), else exact
+    bool framesRange (int channel, double from, double to, float& lo, float& hi, bool fromSummary) const
     {
         const auto frames = doc.audio.frames();
         if (to <= 0.0 || from >= (double) frames)
             return false;
-        if (fpp > 256.0 && summary != nullptr)
+        if (fromSummary && summary != nullptr)
         {
             const auto p = summary->query (from, to, doc.audio.numChannels() > 1 ? channel : -1);
             if (! p.valid)
@@ -1302,6 +2127,8 @@ private:
         juce::Graphics::ScopedSaveState save (g);
         g.reduceClipRegion (waveArea);
         paintSelectionAndRegions (g);
+        if (axis.valid())
+            paintBeatGrid (g);
 
         const auto lanes = doc.audio.numChannels();
         for (int lane = 0; lane < lanes; ++lane)
@@ -1316,12 +2143,24 @@ private:
             g.drawHorizontalLine ((int) (centre + half * 0.5f), r.getX(), r.getRight());
             g.setColour (colour::gridBar);
             g.drawHorizontalLine ((int) centre, r.getX(), r.getRight());
+            if (const auto mark = shownNoiseThreshold(); viewNoiseMark && mark > 0.0f && mark < 1.0f)
+            {
+                // the noise threshold (what "Acquire noise threshold" measured; in a slot, what the input must exceed)
+                g.setColour (colour::warning.withAlpha (0.55f));
+                g.drawHorizontalLine ((int) (centre - half * mark), r.getX(), r.getRight());
+                g.drawHorizontalLine ((int) (centre + half * mark), r.getX(), r.getRight());
+            }
             if (lane > 0)
             {
                 g.setColour (colour::border);
                 g.drawHorizontalLine ((int) r.getY(), r.getX(), r.getRight());
             }
 
+            if (axis.valid())
+            {
+                paintLaneInBeats (g, lane, centre, half);
+                continue;
+            }
             const auto width = waveArea.getWidth();
             if (fpp < 1.0)
             {
@@ -1360,28 +2199,94 @@ private:
                     bottoms[(std::size_t) x] = mid + 0.5f;
                 }
             }
-            juce::Path wave;
-            for (int x = 0; x < width;)
+            fillWave (g, valid, tops, bottoms);
+        }
+    }
+
+    // one filled shape per lane: the top edge (maxima) left to right, the bottom edge (minima) back
+    void fillWave (juce::Graphics& g, const std::vector<char>& valid, const std::vector<float>& tops, const std::vector<float>& bottoms)
+    {
+        const auto width = (int) valid.size();
+        juce::Path wave;
+        for (int x = 0; x < width;)
+        {
+            while (x < width && ! valid[(std::size_t) x])
+                ++x;
+            if (x >= width)
+                break;
+            const auto start = x;
+            while (x < width && valid[(std::size_t) x])
+                ++x;
+            const auto px = [this] (int i) { return (float) (waveArea.getX() + i); };
+            wave.startNewSubPath (px (start), tops[(std::size_t) start]);
+            for (int i = start + 1; i < x; ++i)
+                wave.lineTo (px (i), tops[(std::size_t) i]);
+            wave.lineTo (px (x), tops[(std::size_t) (x - 1)]);
+            wave.lineTo (px (x), bottoms[(std::size_t) (x - 1)]);
+            for (int i = x - 1; i >= start; --i)
+                wave.lineTo (px (i), bottoms[(std::size_t) i]);
+            wave.closeSubPath();
+        }
+        g.setColour (waveColour());
+        g.fillPath (wave);
+    }
+
+    // round 190db: a lane of the beat-time view. Each pixel column shows the stretch of the file its beats play
+    // (warpview::columnPeaks keeps the columns a drag does not touch); zoomed in past a sample per pixel, the samples
+    // joined by a line at their beats.
+    void paintLaneInBeats (juce::Graphics& g, int lane, float centre, float half)
+    {
+        const auto width = waveArea.getWidth();
+        const auto& data = doc.audio.channels[(std::size_t) lane];
+        const auto firstFrame = axis.frameOfUnit (viewStart), lastFrame = axis.frameOfUnit (viewStart + (double) width * fpp);
+        if (lastFrame - firstFrame < (double) width)
+        {
+            const auto first = juce::jmax<std::int64_t> (0, (std::int64_t) std::floor (firstFrame) - 1);
+            const auto last = juce::jmin<std::int64_t> (doc.audio.frames() - 1, (std::int64_t) std::ceil (lastFrame) + 1);
+            juce::Path line;
+            for (auto i = first; i <= last; ++i)
             {
-                while (x < width && ! valid[(std::size_t) x])
-                    ++x;
-                if (x >= width)
-                    break;
-                const auto start = x;
-                while (x < width && valid[(std::size_t) x])
-                    ++x;
-                const auto px = [this] (int i) { return (float) (waveArea.getX() + i); };
-                wave.startNewSubPath (px (start), tops[(std::size_t) start]);
-                for (int i = start + 1; i < x; ++i)
-                    wave.lineTo (px (i), tops[(std::size_t) i]);
-                wave.lineTo (px (x), tops[(std::size_t) (x - 1)]);
-                wave.lineTo (px (x), bottoms[(std::size_t) (x - 1)]);
-                for (int i = x - 1; i >= start; --i)
-                    wave.lineTo (px (i), bottoms[(std::size_t) i]);
-                wave.closeSubPath();
+                const auto p = juce::Point<float> (frameToX ((double) i), centre - juce::jlimit (-1.0f, 1.0f, data[(std::size_t) i]) * half);
+                i == first ? line.startNewSubPath (p) : line.lineTo (p);
             }
             g.setColour (waveColour());
-            g.fillPath (wave);
+            g.strokePath (line, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+            return;
+        }
+        if ((int) waveColumns.size() != doc.audio.numChannels())
+            waveColumns.assign ((std::size_t) doc.audio.numChannels(), {});
+        auto& columns = waveColumns[(std::size_t) lane];
+        warpview::columnPeaks (axis, viewStart, fpp, width, (std::uint64_t) docVersion, columns, [this, lane] (double from, double to, float& lo, float& hi) {
+            return framesRange (lane, from, to, lo, hi, to - from > 256.0);
+        });
+        std::vector<float> tops ((std::size_t) width), bottoms ((std::size_t) width);
+        for (std::size_t x = 0; x < (std::size_t) width; ++x)
+        {
+            tops[x] = centre - juce::jlimit (-1.0f, 1.0f, columns.hi[x]) * half;
+            bottoms[x] = centre - juce::jlimit (-1.0f, 1.0f, columns.lo[x]) * half;
+            if (bottoms[x] - tops[x] < 1.0f)
+            {
+                const auto mid = (bottoms[x] + tops[x]) * 0.5f;
+                tops[x] = mid - 0.5f;
+                bottoms[x] = mid + 0.5f;
+            }
+        }
+        fillWave (g, columns.valid, tops, bottoms);
+    }
+
+    // round 190db: the beat lines behind the waveform in the beat-time view (bars stronger), at the ruler's step
+    void paintBeatGrid (juce::Graphics& g)
+    {
+        using namespace theme;
+        const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        const auto step = warpview::rulerStep (axis.unitsPerBeat / fpp, perBar);
+        const auto firstBeat = axis.beatOfUnit (viewStart), lastBeat = axis.beatOfUnit (viewStart + (double) waveArea.getWidth() * fpp);
+        for (auto b = std::floor (firstBeat / step) * step; b <= lastBeat; b += step)
+        {
+            const auto x = (float) waveArea.getX() + (float) ((axis.unitOfBeat (b) - viewStart) / fpp);
+            const auto onBar = std::abs (b / perBar - std::round (b / perBar)) < 1.0e-6;
+            g.setColour (onBar ? colour::gridBar : colour::gridBeat);
+            g.drawVerticalLine ((int) x, (float) waveArea.getY(), (float) waveArea.getBottom());
         }
     }
 
@@ -1389,7 +2294,7 @@ private:
     {
         using namespace theme;
         for (const auto& m : doc.markers)
-            if (m.isRegion())
+            if (viewRegions && m.isRegion())
             {
                 g.setColour (colour::warning.withAlpha (0.07f));
                 g.fillRect (juce::Rectangle<float>::leftTopRightBottom (frameToX ((double) m.start), (float) waveArea.getY(), frameToX ((double) m.end),
@@ -1416,12 +2321,14 @@ private:
 
         const auto columns = juce::jmax (1, waveArea.getWidth() / 2);
         const auto height = juce::jmax (1, waveArea.getHeight());
-        const auto key = juce::String (docVersion) + "|" + juce::String (viewStart) + "|" + juce::String (fpp) + "|" + juce::String (columns) + "x"
+        // the file range in view (round 190db: in beats, the range the view's beats play; the columns are then
+        // redistributed along the beats, so a marker drag only redistributes them)
+        const auto from = (std::int64_t) frameOfUnit (viewStart);
+        const auto to = juce::jmin (doc.audio.frames(), (std::int64_t) std::ceil (frameOfUnit (viewStart + waveArea.getWidth() * fpp)));
+        const auto key = juce::String (docVersion) + "|" + juce::String (from) + "|" + juce::String (to) + "|" + juce::String (columns) + "x"
                          + juce::String (height) + "|" + juce::String (fftSize) + (logFrequency ? "l" : "n");
         if (key != spectrumKey)
         {
-            const auto from = (std::int64_t) viewStart;
-            const auto to = juce::jmin (doc.audio.frames(), (std::int64_t) std::ceil (viewStart + waveArea.getWidth() * fpp));
             const auto spec = ae::spectrogram (doc.audio, { from, to }, columns, fftSize);
             spectrumImage = juce::Image (juce::Image::RGB, columns, height, false);
             const auto nyquist = doc.audio.sampleRate * 0.5;
@@ -1445,7 +2352,28 @@ private:
             }
             spectrumKey = key;
         }
-        g.drawImage (spectrumImage, waveArea.toFloat());
+        if (axis.valid() && to > from)
+        {
+            const auto warpedKey = key + "|" + juce::String ((juce::int64) axisVersion) + "|" + juce::String (viewStart) + "|" + juce::String (fpp);
+            if (warpedKey != spectrumWarpedKey)
+            {
+                spectrumWarped = juce::Image (juce::Image::RGB, columns, height, false);
+                const juce::Image::BitmapData source (spectrumImage, juce::Image::BitmapData::readOnly);
+                juce::Image::BitmapData out (spectrumWarped, juce::Image::BitmapData::writeOnly);
+                const auto unitsPerColumn = (double) waveArea.getWidth() * fpp / columns;
+                for (int c = 0; c < columns; ++c)
+                {
+                    const auto f = axis.frameOfUnit (viewStart + ((double) c + 0.5) * unitsPerColumn);
+                    const auto sc = juce::jlimit (0, columns - 1, (int) ((f - (double) from) / (double) (to - from) * columns));
+                    for (int y = 0; y < height; ++y)
+                        out.setPixelColour (c, y, source.getPixelColour (sc, y));
+                }
+                spectrumWarpedKey = warpedKey;
+            }
+            g.drawImage (spectrumWarped, waveArea.toFloat());
+        }
+        else
+            g.drawImage (spectrumImage, waveArea.toFloat());
 
         juce::Graphics::ScopedSaveState save (g);
         g.reduceClipRegion (waveArea);
@@ -1505,7 +2433,50 @@ private:
         if (doc.audio.empty())
             return;
 
-        // a time step that leaves ~90 px between labels
+        if (axis.valid())
+            paintBeatRuler (g);
+        else
+            paintTimeRuler (g);
+
+        // regions and markers: flags with their names; the loop: a bar along the bottom
+        paintRulerMarks (g);
+    }
+
+    // round 190db: the beat-time view's ruler, labelled as Live's Clip View labels it ("1", "1.2", "1.2.3"), with
+    // sixteenth ticks when there is room
+    void paintBeatRuler (juce::Graphics& g)
+    {
+        using namespace theme;
+        const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        const auto pixelsPerBeat = axis.unitsPerBeat / fpp;
+        const auto step = warpview::rulerStep (pixelsPerBeat, perBar);
+        const auto tick = step <= 1.0 ? 0.25 : (step <= perBar ? 1.0 : (double) perBar);
+        const auto firstBeat = axis.beatOfUnit (viewStart), lastBeat = axis.beatOfUnit (viewStart + (double) waveArea.getWidth() * fpp);
+        const auto xOf = [this] (double b) { return (float) waveArea.getX() + (float) ((axis.unitOfBeat (b) - viewStart) / fpp); };
+        g.setFont (font (type::caption));
+        if (tick * pixelsPerBeat >= 6.0)
+        {
+            g.setColour (colour::gridBeat);
+            for (auto b = std::floor (firstBeat / tick) * tick; b <= lastBeat; b += tick)
+                if (const auto x = xOf (b); x >= (float) rulerArea.getX())
+                    g.drawVerticalLine ((int) x, (float) rulerArea.getBottom() - 4.0f, (float) rulerArea.getBottom());
+        }
+        for (auto b = std::floor (firstBeat / step) * step; b <= lastBeat; b += step)
+        {
+            const auto x = xOf (b);
+            if (x < (float) rulerArea.getX())
+                continue;
+            g.setColour (colour::gridBar);
+            g.drawVerticalLine ((int) x, (float) rulerArea.getBottom() - 7.0f, (float) rulerArea.getBottom());
+            g.setColour (colour::textSecondary);
+            g.drawText (juce::String (warpview::beatLabel (b, perBar)), juce::Rectangle<float> (x + 3.0f, (float) rulerArea.getY(), 60.0f, 13.0f),
+                        juce::Justification::centredLeft);
+        }
+    }
+
+    // the time ruler's step in seconds: one that leaves ~90 px between labels (beats doubled in the bar format)
+    double timeRulerStep() const
+    {
         const auto rate = doc.audio.sampleRate;
         const auto secondsPerPixel = fpp / rate;
         double step = 0.001;
@@ -1515,14 +2486,20 @@ private:
                 step = s;
                 break;
             }
-        const auto bars = timeFormat == TimeFormat::bars;
-        const auto beatSeconds = 60.0 / juce::jmax (1.0, engine.getSong().bpm);
-        if (bars)
+        if (timeFormat == TimeFormat::bars)
         {
-            step = beatSeconds;
+            step = 60.0 / juce::jmax (1.0, engine.getSong().bpm);
             while (step / secondsPerPixel < 90.0)
                 step *= 2.0;
         }
+        return step;
+    }
+
+    void paintTimeRuler (juce::Graphics& g)
+    {
+        using namespace theme;
+        const auto rate = doc.audio.sampleRate;
+        const auto step = timeRulerStep();
 
         g.setFont (font (type::caption));
         const auto firstSecond = viewStart / rate;
@@ -1538,10 +2515,15 @@ private:
             g.drawText (formatTime ((std::int64_t) std::llround (t * rate)), juce::Rectangle<float> (x + 3.0f, (float) rulerArea.getY(), 90.0f, 13.0f),
                         juce::Justification::centredLeft);
         }
+    }
 
-        // regions and markers: flags with their names; the loop: a bar along the bottom
+    void paintRulerMarks (juce::Graphics& g)
+    {
+        using namespace theme;
         for (const auto& m : doc.markers)
         {
+            if (! viewRegions)
+                break;
             const auto x = frameToX ((double) m.start);
             if (m.isRegion())
             {
@@ -1557,7 +2539,7 @@ private:
                 g.drawText (juce::String::fromUTF8 (m.name.c_str()), juce::Rectangle<float> (x + 8.0f, (float) rulerArea.getY() + 12.0f, 120.0f, 8.0f),
                             juce::Justification::centredLeft);
         }
-        if (doc.hasLoop())
+        if (doc.hasLoop() && viewLoop)
         {
             const auto a = frameToX ((double) doc.loopStart), b = frameToX ((double) doc.loopEnd);
             g.setColour (colour::accent);
@@ -1577,6 +2559,8 @@ private:
 
         for (const auto& m : doc.markers)
         {
+            if (! viewRegions)
+                break;
             g.setColour (colour::warning.withAlpha (0.55f));
             g.drawVerticalLine ((int) frameToX ((double) m.start), (float) waveArea.getY(), (float) waveArea.getBottom());
             if (m.isRegion())
@@ -1585,7 +2569,7 @@ private:
                 g.drawVerticalLine ((int) frameToX ((double) m.end), (float) waveArea.getY(), (float) waveArea.getBottom());
             }
         }
-        if (doc.hasLoop())
+        if (doc.hasLoop() && viewLoop)
         {
             g.setColour (colour::accent.withAlpha (0.6f));
             const float dash[] = { 4.0f, 3.0f };
@@ -1638,7 +2622,8 @@ private:
         g.setColour (waveColour().withAlpha (0.55f));
         for (int x = 0; x < overviewArea.getWidth(); ++x)
         {
-            const auto p = summary->query (x * perPixel, (x + 1) * perPixel, -1);
+            // (round 190db: in beats, each pixel shows the file its beats play)
+            const auto p = summary->query (frameOfUnit (x * perPixel), frameOfUnit ((x + 1) * perPixel), -1);
             if (! p.valid)
                 break;
             const auto a = juce::jmin (1.0f, std::max (std::abs (p.lo), std::abs (p.hi)));
@@ -1741,6 +2726,11 @@ private:
 
     void documentChanged()
     {
+        if (slotMode() && session != nullptr && ! adopting && recState == RecState::idle)
+        {
+            session->setDocument (doc); // the slot plays and keeps what the editor shows
+            seenRevision = session->revision();
+        }
         ++docVersion;
         selection = ae::clamp (doc, selection);
         cursor = juce::jlimit<std::int64_t> (0, doc.audio.frames(), cursor);
@@ -2414,12 +3404,23 @@ private:
     {
         if (audio.empty())
             return;
-        auto data = std::make_shared<SampleData>();
-        data->sampleRate = audio.sampleRate;
-        data->left = audio.channels[0];
-        if (audio.numChannels() > 1)
-            data->right = audio.channels[1];
-        engine.previewSample (data, loop, 1.0f, true); // (at the volume knob's level)
+        if (slotMode())
+        {
+            // an Edison slot plays into its own insert, after the slot (round 190cd)
+            const auto p = processor();
+            if (p == nullptr)
+                return;
+            p->play (std::make_shared<const ae::Audio> (audio), loop, (float) engine.getEditorVolume());
+        }
+        else
+        {
+            auto data = std::make_shared<SampleData>();
+            data->sampleRate = audio.sampleRate;
+            data->left = audio.channels[0];
+            if (audio.numChannels() > 1)
+                data->right = audio.channels[1];
+            engine.previewSample (data, loop, 1.0f, true); // (at the volume knob's level)
+        }
         playing = true;
         playFrom = from;
         playStartedMs = juce::Time::getMillisecondCounterHiRes();
@@ -2457,7 +3458,13 @@ private:
     {
         if (! playing)
             return;
-        engine.previewSample (nullptr);
+        if (slotMode())
+        {
+            if (const auto p = processor())
+                p->play (nullptr, false);
+        }
+        else
+            engine.previewSample (nullptr);
         playing = false;
         playhead = -1;
         playButton.setIcon (Icon::play);
@@ -2475,6 +3482,11 @@ private:
 
     void startRecording()
     {
+        if (slotMode())
+        {
+            startSlotRecording();
+            return;
+        }
         stopPlayback();
         auto* device = engine.getDeviceManager().getCurrentAudioDevice();
         if (device == nullptr)
@@ -2522,6 +3534,21 @@ private:
 
     void drainRecording()
     {
+        if (slotMode())
+        {
+            if (! session->pump())
+            {
+                finishSlotRecording();
+                return;
+            }
+            const auto now = session->phase() == edisonfx::Phase::recording ? RecState::recording : RecState::waiting;
+            if (now != recState)
+            {
+                recState = now;
+                showSlotPhase();
+            }
+            return;
+        }
         std::vector<float> l, r;
         engine.getMeters().capture.pull (l, r);
         if (l.empty())
@@ -2563,15 +3590,23 @@ private:
     // the document = what it was, with the recording inserted at the cursor
     void showRecording()
     {
-        doc = beforeRecording;
-        const auto rec = recordedAudio();
-        if (doc.audio.empty())
+        if (slotMode())
         {
-            doc.audio = rec;
-            doc.title = tr ("Recording").toStdString();
+            doc = session->preview(); // (what the document will be when the recording stops now)
+            recordAt = session->takeStart();
         }
         else
-            ae::insert (doc, recordAt, rec);
+        {
+            doc = beforeRecording;
+            const auto rec = recordedAudio();
+            if (doc.audio.empty())
+            {
+                doc.audio = rec;
+                doc.title = tr ("Recording").toStdString();
+            }
+            else
+                ae::insert (doc, recordAt, rec);
+        }
         const auto length = doc.audio.frames() - beforeRecording.audio.frames();
         selection = { recordAt, recordAt + length };
         cursor = recordAt + length;
@@ -2603,6 +3638,12 @@ private:
     {
         if (recState == RecState::idle)
             return;
+        if (slotMode())
+        {
+            session->stop();
+            finishSlotRecording();
+            return;
+        }
         drainRecording();
         engine.getMeters().capture.setSource (AudioCapture::off);
         releaseInput();
@@ -2639,6 +3680,13 @@ private:
     }
 
 public:
+    // Record on, if it is not (the mixer's "Open audio editor and record")
+    void armRecording()
+    {
+        if (recState == RecState::idle)
+            startRecording();
+    }
+
     void recordInputWithSong()
     {
         recordSource = AudioCapture::input;
@@ -2716,7 +3764,8 @@ private:
             if (self == nullptr || ! fc.getResult().existsAsFile())
                 return;
             self->stopPlayback();
-            self->source = { Source::Kind::file, -1, fc.getResult().getFullPathName() };
+            if (! self->slotMode())
+                self->source = { Source::Kind::file, -1, fc.getResult().getFullPathName() };
             self->loadFile (fc.getResult());
         });
     }
@@ -2902,6 +3951,33 @@ private:
         updateTitle();
     }
 
+    // FL's "Send to selected channel": the Channel Rack's selected channel plays the audio, when it plays a sample
+    int selectedSamplerChannel() const
+    {
+        const auto ch = engine.getSelectedChannel();
+        const auto& channels = engine.getSong().channels;
+        if (! juce::isPositiveAndBelow (ch, (int) channels.size()))
+            return -1;
+        const auto kind = channels[(std::size_t) ch].instrument;
+        return kind == InstrumentKind::sampler || kind == InstrumentKind::audioClip ? ch : -1;
+    }
+
+    void sendToSelectedChannel()
+    {
+        const auto ch = selectedSamplerChannel();
+        if (doc.audio.empty() || ch < 0)
+            return;
+        const auto file = writeEditFile();
+        if (file == juce::File {})
+            return;
+        const auto path = file.getFullPathName().toStdString();
+        engine.editSong ([=] (Song& s) {
+            if (ch < (int) s.channels.size())
+                s.channels[(std::size_t) ch].samplePath = path;
+        });
+        setStatus (tr ("The channel now plays the edited audio"), false);
+    }
+
     // --- menus ----------------------------------------------------------------------------------------------
     juce::PopupMenu historyMenu()
     {
@@ -2935,6 +4011,32 @@ private:
     juce::PopupMenu recordMenu()
     {
         juce::PopupMenu menu;
+        if (slotMode()) // the plugin records its slot's input: when, how long, and what its playback does
+        {
+            const auto* fx = slotDef();
+            const auto mode = fx != nullptr ? edisonfx::modeOf (fx->params) : edisonfx::Mode::onInput;
+            const auto limit = fx != nullptr ? edisonfx::maxTimeIndexOf (fx->params) : 0;
+            menu.addSectionHeader (tr ("When / what to record"));
+            for (int m = 0; m < edisonfx::modeCount; ++m)
+                menu.addItem (tr (edisonfx::modeName ((edisonfx::Mode) m)), true, (int) mode == m,
+                              [this, m] { setSlotParam (edisonfx::recordMode, edisonfx::modeValue ((edisonfx::Mode) m)); });
+            menu.addItem (tr ("Append"), true, slotParam (edisonfx::append) >= 0.5f,
+                          [this] { setSlotParam (edisonfx::append, slotParam (edisonfx::append) >= 0.5f ? 0.0f : 1.0f); });
+            juce::PopupMenu time;
+            for (int i = 0; i < edisonfx::maxTimeCount; ++i)
+                time.addItem (maxTimeName (i), true, limit == i,
+                              [this, i] { setSlotParam (edisonfx::maxTime, (float) i / (float) (edisonfx::maxTimeCount - 1)); });
+            menu.addSubMenu (tr ("Maximum recording time"), time);
+            menu.addSectionHeader (tr ("Playback"));
+            menu.addItem (tr ("Mute input") + "\tI", true, slotParam (edisonfx::muteInput) >= 0.5f,
+                          [this] { setSlotParam (edisonfx::muteInput, slotParam (edisonfx::muteInput) >= 0.5f ? 0.0f : 1.0f); });
+            menu.addItem (tr ("Slave playback to host") + "\tH", true, slotParam (edisonfx::slave) >= 0.5f,
+                          [this] { setSlotParam (edisonfx::slave, slotParam (edisonfx::slave) >= 0.5f ? 0.0f : 1.0f); });
+            menu.addItem (tr ("Ignore own selection"), true, slotParam (edisonfx::ignoreOwnSelection) >= 0.5f, [this] {
+                setSlotParam (edisonfx::ignoreOwnSelection, slotParam (edisonfx::ignoreOwnSelection) >= 0.5f ? 0.0f : 1.0f);
+            });
+            return menu;
+        }
         menu.addSectionHeader (tr ("Record from"));
         menu.addItem (tr ("Audio input"), true, recordSource == AudioCapture::input, [this] { recordSource = AudioCapture::input; });
         menu.addItem (tr ("Master output"), true, recordSource == 0, [this] { recordSource = 0; });
@@ -2955,6 +4057,7 @@ private:
         juce::PopupMenu menu;
         const auto has = ! doc.audio.empty();
         menu.addItem (tr ("Send to the Playlist as an audio clip"), has, false, [this] { sendToPlaylist(); });
+        menu.addItem (tr ("Send to the selected channel"), has && selectedSamplerChannel() >= 0, false, [this] { sendToSelectedChannel(); });
         menu.addItem (tr ("Send to a new Sampler channel"), has, false, [this] { sendToNewSampler(); });
         menu.addItem (tr ("Send the selection to a new Sampler channel"), has && ! selection.empty(), false,
                       [this] { sendRangeToNewSampler (selection); });
@@ -2969,12 +4072,114 @@ private:
         return menu;
     }
 
+    // --- FL's region trigger notes (round 190ee; Edison_x64.dll RegionMenuPopup 0x86d850, DefaultNoteMenuClick
+    // 0x8712e0, AssignRegionsMenuClick 0x868c30): the key a region answers when the sample is played by keys
+    // (Marker::keyNum, saved in the WAV's "tlst" chunk as FL does; round 190ez) -----------------------------------
+    int assignWalk = -1;        // the region "Assign trigger notes to all..." is asking about; -1 = no walk
+    bool assignChanged = false;
+
+    // FL's note captions: the note and its octave with C5 = 60, and the General MIDI drum name where there is one
+    static juce::String triggerKeyName (int key)
+    {
+        return juce::MidiMessage::getMidiNoteName (key, true, false, 0) + juce::String (key / 12);
+    }
+
+    void setTriggerNote (int index, int key)
+    {
+        if (! juce::isPositiveAndBelow (index, (int) doc.markers.size()))
+            return;
+        auto& m = doc.markers[(std::size_t) index];
+        if (m.keyNum == key)
+            return;
+        m.keyNum = key;
+        if (assignWalk >= 0)
+            assignChanged = true; // (the walk is one undo step)
+        else
+            commit (tr ("Set trigger note for {0}", { m.name.empty() ? tr ("Region") : juce::String::fromUTF8 (m.name.c_str()) }));
+        repaint();
+    }
+
+    juce::PopupMenu triggerNoteMenu (int index)
+    {
+        juce::PopupMenu menu;
+        const auto now = doc.markers[(std::size_t) index].keyNum;
+        menu.addItem (tr ("Default / none"), true, now < 0, [this, index] { setTriggerNote (index, -1); });
+        const auto last = juce::jlimit (0, 127, engine.lastPlayedKey());
+        menu.addItem (tr ("Last hit ({0})", { triggerKeyName (last) }), [this, index, last] { setTriggerNote (index, last); });
+        if (assignWalk >= 0) // FL shows these two only during the walk
+        {
+            menu.addSeparator();
+            menu.addItem (tr ("Cancel all"), [this] { assignWalk = -2; });
+        }
+        for (int key = 0; key < 128; ++key)
+        {
+            if (key % 12 == 0)
+                menu.addColumnBreak(); // (FL: a column per octave)
+            auto text = triggerKeyName (key);
+            if (const auto* drum = notetools::generalMidiDrumName (key))
+                text << " (" << drum << ")";
+            menu.addItem (text, true, now == key, [this, index, key] { setTriggerNote (index, key); });
+        }
+        return menu;
+    }
+
+    // FL: every region in turn is selected and played, and its menu opens at its start until the last one or
+    // "Cancel all"; the whole walk is one undo step ("Assign all regions")
+    void assignTriggerNotes()
+    {
+        assignWalk = -1;
+        assignChanged = false;
+        assignStep (0);
+    }
+
+    void assignStep (int from)
+    {
+        auto next = -1;
+        if (assignWalk != -2)
+            for (int i = juce::jmax (0, from); i < (int) doc.markers.size(); ++i)
+                if (doc.markers[(std::size_t) i].isRegion())
+                {
+                    next = i;
+                    break;
+                }
+        if (next < 0)
+        {
+            assignWalk = -1;
+            selection = {};
+            if (playing)
+                stopPlayback();
+            if (assignChanged)
+                commit (tr ("Assign all regions"));
+            assignChanged = false;
+            repaint();
+            return;
+        }
+        assignWalk = next;
+        const auto& m = doc.markers[(std::size_t) next];
+        selection = { m.start, m.end };
+        startPlayback();
+        repaint();
+        const auto x = juce::jlimit (waveArea.getX(), waveArea.getRight(), (int) frameToX ((double) m.start));
+        juce::Component::SafePointer<AudioEditor> self (this);
+        markerMenu (next).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (
+                                             localAreaToGlobal (juce::Rectangle<int> (x, waveArea.getY(), 1, 1))),
+                                         [self, next] (int) {
+                                             juce::MessageManager::callAsync ([self, next] {
+                                                 if (self != nullptr)
+                                                     self->assignStep (self->assignWalk == -2 ? (int) self->doc.markers.size() : next + 1);
+                                             });
+                                         });
+    }
+
     juce::PopupMenu markerMenu (int index)
     {
         juce::PopupMenu menu;
         const auto m = doc.markers[(std::size_t) index];
         menu.addSectionHeader (m.name.empty() ? (m.isRegion() ? tr ("Region") : tr ("Marker")) : juce::String::fromUTF8 (m.name.c_str()));
         menu.addItem (tr ("Rename..."), [this, index] { renameMarker (index); });
+        menu.addItem (tr ("Set info..."), [this, index] { setMarkerInfo (index); });
+        menu.addSubMenu (tr ("Trigger note"), triggerNoteMenu (index));
+        menu.addItem (tr ("Clone as region"), [this, index] { cloneRegion (index); });
         if (m.isRegion())
         {
             menu.addItem (tr ("Select"), [this, m] {
@@ -3032,18 +4237,69 @@ private:
             b->setEnabled (has);
         playButton.setEnabled (has);
         saveButton.setEnabled (has);
+        dragButton.setEnabled (has);
     }
 
     void updateTitle()
     {
         if (auto* window = findParentComponentOfClass<juce::DocumentWindow>())
-            window->setName (tr ("Audio editor") + (doc.title.empty() ? juce::String() : " - " + juce::String::fromUTF8 (doc.title.c_str())) + (modified ? " *" : ""));
+        {
+            auto name = tr ("Audio editor");
+            if (slotMode()) // the plugin's window: its name, then where it sits (like every effect window)
+            {
+                const auto [t, i] = slotPlace();
+                name = utf8 (edisonfx::info().name);
+                if (t >= 0)
+                {
+                    const auto track = t == 0 ? tr ("Master") : juce::String::fromUTF8 (engine.getSong().mixer[(std::size_t) t].name.c_str());
+                    name += " - " + (track.isNotEmpty() ? track : tr ("Insert {0}", { juce::String (t) })) + " (" + tr ("slot {0}", { juce::String (i + 1) }) + ")";
+                }
+            }
+            window->setName (name + (doc.title.empty() ? juce::String() : " - " + juce::String::fromUTF8 (doc.title.c_str())) + (modified && ! slotMode() ? " *" : ""));
+        }
     }
 
     void parentHierarchyChanged() override { updateTitle(); }
 
     void timerCallback() override
     {
+        if (slotMode() && session != nullptr)
+        {
+            const auto* fx = slotDef();
+            if (fx == nullptr) // the slot was deleted: its window goes with it
+            {
+                stopTimer();
+                juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<AudioEditor> (this)] {
+                    if (safe != nullptr)
+                        closeToolWindowOf (*safe);
+                });
+                return;
+            }
+            if (! std::equal (shownParams.begin(), shownParams.end(), fx->params.begin()))
+                syncSlotControls();
+            if (recState == RecState::idle && session->recording()) // (armed from outside: the mixer's "…and record")
+            {
+                beforeRecording = doc;
+                recState = RecState::waiting;
+                recordButton.setToggleState (true, juce::dontSendNotification);
+                showSlotPhase();
+            }
+            else if (recState == RecState::idle && session->revision() != seenRevision) // (changed behind the window)
+                adoptSession (tr ("Record"));
+            session->setSlaveOffset (selection.empty() ? 0 : selection.start);
+            // slaved to the song: the playback marker shows where the content is being played
+            if (! playing && recState == RecState::idle)
+            {
+                const auto p = processor();
+                const auto pos = p != nullptr && fx->params[edisonfx::slave] >= 0.5f && engine.getTransport().playing.load() ? p->playPosition() : -1.0;
+                const auto shown = pos >= 0.0 ? (std::int64_t) pos : (std::int64_t) -1;
+                if (shown != playhead)
+                {
+                    playhead = shown;
+                    repaint();
+                }
+            }
+        }
         if (recState != RecState::idle)
         {
             drainRecording();
@@ -3055,7 +4311,8 @@ private:
         }
         if (playing)
         {
-            const auto pos = engine.getPreviewPosition();
+            const auto slotPlayer = slotMode() ? processor() : nullptr;
+            const auto pos = slotMode() ? (slotPlayer != nullptr ? slotPlayer->playPosition() : -1.0) : engine.getPreviewPosition();
             if (pos < 0.0)
             {
                 if (juce::Time::getMillisecondCounterHiRes() - playStartedMs > 250.0)
@@ -3066,9 +4323,9 @@ private:
             playhead = playFrom < 0 ? -1 : playFrom + (std::int64_t) pos; // (a tool preview is not on the timeline)
             // page along with the playhead (Follow on, issue #12)
             if (playhead >= 0 && EditorGlobals::get().isFollowingView (EditorGlobals::FollowView::audioEditor)
-                && ((double) playhead > viewStart + (double) waveArea.getWidth() * fpp || (double) playhead < viewStart) && fpp < maxFpp())
+                && (unitOfFrame ((double) playhead) > viewStart + (double) waveArea.getWidth() * fpp || unitOfFrame ((double) playhead) < viewStart) && fpp < maxFpp())
             {
-                viewStart = (double) playhead;
+                viewStart = unitOfFrame ((double) playhead);
                 clampView();
                 repaint();
             }
@@ -3365,11 +4622,159 @@ private:
         }
         noiseThreshold = ae::acquireNoiseThreshold (doc.audio, selection);
         setStatus (tr ("Noise threshold: {0} dB", { juce::String (juce::Decibels::gainToDecibels (noiseThreshold, -120.0f), 1) }), false);
+        if (slotMode()) // FL: the plugin has one noise threshold, which "On input" / "Input" recording waits for too
+            setSlotParam (edisonfx::noiseThreshold, juce::jlimit (0.0f, 1.0f, noiseThreshold));
         repaint();
+    }
+
+    // the threshold to show: the one acquired here, else the slot's own
+    float shownNoiseThreshold() const
+    {
+        return noiseThreshold >= 0.0f ? noiseThreshold : slotMode() ? slotParam (edisonfx::noiseThreshold) : -1.0f;
+    }
+
+    // --- FL's Select / Zoom / region commands of the editor (round 190cd; the same commands as Slicex's wave editor) ---
+    void selectBeside (bool before)
+    {
+        if (selection.empty())
+            return;
+        selection = before ? ae::Range { 0, selection.start } : ae::Range { selection.end, doc.audio.frames() };
+        cursor = selection.start;
+        repaint();
+    }
+
+    void selectZoomedPart()
+    {
+        if (doc.audio.empty())
+            return;
+        const auto from = juce::jlimit<std::int64_t> (0, doc.audio.frames(), (std::int64_t) std::llround (viewStart));
+        const auto to = juce::jlimit<std::int64_t> (from, doc.audio.frames(), (std::int64_t) std::llround (viewStart + (double) waveArea.getWidth() * fpp));
+        selection = { from, to };
+        cursor = from;
+        repaint();
+    }
+
+    // the region before / after the selected one (round the ends), shown and selected
+    void selectRegionStep (int step)
+    {
+        std::vector<int> regions;
+        for (int i = 0; i < (int) doc.markers.size(); ++i)
+            if (doc.markers[(std::size_t) i].isRegion())
+                regions.push_back (i);
+        if (regions.empty())
+            return;
+        const auto n = (int) regions.size();
+        int at = -1;
+        for (int i = 0; i < n && at < 0; ++i)
+            if (const auto& m = doc.markers[(std::size_t) regions[(std::size_t) i]]; m.start == selection.start && m.end == selection.end)
+                at = i;
+        const auto to = step > 0 ? (at + 1) % n : (at <= 0 ? n - 1 : at - 1);
+        const auto& m = doc.markers[(std::size_t) regions[(std::size_t) to]];
+        selection = { m.start, m.end };
+        cursor = m.start;
+        if ((double) m.start < viewStart || (double) m.end > viewStart + (double) waveArea.getWidth() * fpp)
+        {
+            if ((double) (m.end - m.start) > (double) waveArea.getWidth() * fpp)
+                zoomTo ({ m.start, m.end });
+            else
+            {
+                viewStart = (double) m.start - ((double) waveArea.getWidth() * fpp - (double) (m.end - m.start)) * 0.5;
+                clampView();
+            }
+        }
+        repaint();
+    }
+
+    // the view at its closest zoom around one end of the selection
+    void zoomOnSelectionEdge (bool left)
+    {
+        if (selection.empty())
+            return;
+        const auto frame = (double) (left ? selection.start : selection.end);
+        fpp = 1.0 / 32.0;
+        clampView();
+        viewStart = frame - (double) waveArea.getWidth() * fpp * 0.5;
+        clampView();
+        repaint();
+    }
+
+    // FL names the copy "<name> #2" and keeps its start and length; the trigger note stays with the first
+    void cloneRegion (int index)
+    {
+        if (! juce::isPositiveAndBelow (index, (int) doc.markers.size()))
+            return;
+        auto copy = doc.markers[(std::size_t) index];
+        if (copy.name.empty())
+            copy.name = (copy.isRegion() ? tr ("Region") : tr ("Marker")).toStdString();
+        copy.name += " #2";
+        copy.keyNum = -1;
+        if (! copy.isRegion()) // (a marker cloned "as region": to the next marker, else to the end)
+        {
+            copy.end = doc.audio.frames();
+            for (const auto& m : doc.markers)
+                if (m.start > copy.start)
+                    copy.end = std::min (copy.end, m.start);
+        }
+        doc.markers.insert (doc.markers.begin() + index + 1, copy);
+        commit (tr ("Clone as region"));
+    }
+
+    void setMarkerInfo (int index)
+    {
+        auto* box = new juce::AlertWindow (tr ("Set info"), {}, juce::MessageBoxIconType::NoIcon, this);
+        box->addTextEditor ("info", juce::String::fromUTF8 (doc.markers[(std::size_t) index].info.c_str()));
+        box->addButton (tr ("Accept"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<AudioEditor> self (this);
+        box->enterModalState (true, juce::ModalCallbackFunction::create ([self, box, index] (int result) {
+                                  if (self != nullptr && result == 1 && juce::isPositiveAndBelow (index, (int) self->doc.markers.size()))
+                                  {
+                                      self->doc.markers[(std::size_t) index].info = box->getTextEditorContents ("info").toStdString();
+                                      self->commit (tr ("Set info"));
+                                  }
+                              }),
+                              true);
+    }
+
+    // "Rename all...": one name box after the other, from marker `index` on (Cancel stops the round)
+    void renameAllMarkers (int index, bool changed = false)
+    {
+        if (! juce::isPositiveAndBelow (index, (int) doc.markers.size()))
+        {
+            if (changed)
+                commit (tr ("Rename all"));
+            return;
+        }
+        const auto& m = doc.markers[(std::size_t) index];
+        selection = m.isRegion() ? ae::Range { m.start, m.end } : selection;
+        repaint();
+        auto* box = new juce::AlertWindow (tr ("Rename") + " (" + juce::String (index + 1) + "/" + juce::String ((int) doc.markers.size()) + ")", {},
+                                           juce::MessageBoxIconType::NoIcon, this);
+        box->addTextEditor ("name", juce::String::fromUTF8 (m.name.c_str()));
+        box->addButton (tr ("Accept"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+        box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+        juce::Component::SafePointer<AudioEditor> self (this);
+        box->enterModalState (true, juce::ModalCallbackFunction::create ([self, box, index, changed] (int result) {
+                                  if (self == nullptr)
+                                      return;
+                                  if (result != 1 || ! juce::isPositiveAndBelow (index, (int) self->doc.markers.size()))
+                                  {
+                                      if (changed)
+                                          self->commit (tr ("Rename all"));
+                                      return;
+                                  }
+                                  const auto name = box->getTextEditorContents ("name").toStdString();
+                                  const auto differs = name != self->doc.markers[(std::size_t) index].name;
+                                  self->doc.markers[(std::size_t) index].name = name;
+                                  self->renameAllMarkers (index + 1, changed || differs);
+                              }),
+                              true);
     }
 
     float gateThreshold()
     {
+        if (noiseThreshold < 0.0f && slotMode()) // the plugin's own threshold (FL: 0.02 until one is acquired)
+            return slotParam (edisonfx::noiseThreshold);
         if (noiseThreshold >= 0.0f)
             return noiseThreshold * 1.12f; // a little over what was measured
         // not acquired: -48 dB under the peak
@@ -3410,7 +4815,10 @@ private:
     juce::Image spectrumImage;
     juce::String spectrumKey;
     TimeFormat timeFormat = TimeFormat::automatic;
-    bool snapZero = false;
+    bool snapOn = false; // FL's Snap button (off in its form); snapMode: 0 grid, 1 regions, 2 samples, 3 zero-crossing
+    int snapMode = 0;
+    // FL's view switches (round 190cd): regions and markers, the loop, the noise threshold mark
+    bool viewRegions = true, viewLoop = true, viewNoiseMark = false;
     ae::Curve fadeCurve = ae::Curve::smooth;
 
     bool playing = false, loopPlay = false;
@@ -3432,6 +4840,14 @@ private:
     bool recordStereo = true;
     int recordTicks = 0;
 
+    // an Edison slot (round 190cd): the slot's document and take, and the plugin's switches
+    std::shared_ptr<edisonfx::Session> session;
+    std::uint64_t seenRevision = 0;
+    bool adopting = false; // the editor is taking the session's document (not the other way round)
+    std::vector<float> shownParams;
+    juce::ComboBox recModeBox, maxTimeBox;
+    juce::TextButton appendButton, slaveButton, muteInputButton;
+
     juce::String status;
     bool statusIsError = false;
     std::unique_ptr<juce::FileChooser> chooser;
@@ -3441,6 +4857,35 @@ private:
         historyButton { "history", Icon::chevronDown }, recordButton { "record", Icon::record }, recordMenuButton { "recordMenu", Icon::chevronDown },
         playButton { "play", Icon::play }, stopButton { "stop", Icon::stop }, snapButton { "snap", Icon::magnet }, fitButton { "fit", Icon::zoom },
         saveButton { "save", Icon::save }, followButton { "follow", Icon::follow };
+    // FL's DragBtn (round 190ee, hint "Drag / copy sample / selection", MouseDown 0x88ea00): drag = the sample or the
+    // selection as a WAV onto the Playlist / Channel Rack (the Browser's file drag); right-click = copy to the clipboard
+    struct DragSourceButton final : public IconButton
+    {
+        using IconButton::IconButton;
+        std::function<void()> onDragOut, onRightClick;
+        bool started = false;
+        void mouseDown (const juce::MouseEvent& e) override
+        {
+            started = false;
+            if (e.mods.isPopupMenu())
+            {
+                if (onRightClick)
+                    onRightClick();
+                return;
+            }
+            IconButton::mouseDown (e);
+        }
+        void mouseDrag (const juce::MouseEvent& e) override
+        {
+            if (! started && ! e.mods.isPopupMenu() && e.getDistanceFromDragStart() > 4)
+            {
+                started = true;
+                if (onDragOut)
+                    onDragOut();
+            }
+        }
+    };
+    DragSourceButton dragButton { "drag", Icon::audioFile };
     juce::TextButton loopButton, viewButton, sendButton, envButton;
     // warp markers (round 175a, M3): a lane above the waveform with the channel's markers, for a channel source
     juce::TextButton warpButton, autoWarpButton;
@@ -3448,8 +4893,29 @@ private:
     juce::Rectangle<int> warpLane;
     int warpDrag = -1, warpSelected = -1;   // marker index (in the channel's markers)
     double warpDragSeconds = 0.0;           // where the dragged marker goes (applied on release)
+    // round 190cy: Shift + drag slides the audio under the marker; a plain drag takes it to `warpDragBeat` (the beat of
+    // the pointer's place in `warpDragBefore`, the markers when the drag began)
+    bool warpDragSlides = false;
+    double warpDragBeat = 0.0;
+    std::vector<WarpPoint> warpDragBefore;
     std::vector<double> warpAttacks;        // the file's attacks (seconds): the transient ticks, and where drags snap
     const void* warpAttacksOf = nullptr;    // the audio they were found in
+    // round 190cg: the pseudo marker under the mouse (index into warpAttacks), the segment tempo box with ÷2 / ×2,
+    // and the Quantize settings (grid in beats, amount 0…1; kept while the editor is open)
+    int warpHover = -1;
+    juce::Label warpBpmBox;
+    juce::TextButton warpHalveButton, warpDoubleButton;
+    double warpGridBeats = 0.25, warpAmount = 1.0;
+    // round 190db: the beat-time view of a warped clip (core/WarpView.h). `axis` is valid while the view is in beats;
+    // `dragAxis` is the axis when a marker drag began (its scale holds during the drag, so the pointer's beat and the
+    // markers the drag does not touch stay put); `waveColumns` keep each pixel column's peaks with its stretch of the file.
+    int beatTimeChoice = -1; // -1: as the workflow (beats in the Clip-launch workflow), 0 / 1: chosen in the menu
+    warpview::BeatAxis axis, dragAxis;
+    double slideDownBeat = 0.0; // Shift + drag in beats: the pointer's beat at the press
+    std::uint64_t axisVersion = 0;
+    std::vector<warpview::Columns> waveColumns;
+    juce::Image spectrumWarped;
+    juce::String spectrumWarpedKey;
     juce::Slider volumeKnob { juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::NoTextBox };
     juce::OwnedArray<juce::TextButton> quickButtons;
 
@@ -3525,7 +4991,8 @@ juce::PopupMenu AudioEditor::mainMenu()
     juce::PopupMenu file;
     file.addItem (tr ("New (empty)"), [this] {
         stopPlayback();
-        source = {};
+        if (! slotMode())
+            source = {};
         setDocument ({}, tr ("Empty"));
     });
     file.addItem (tr ("Open audio file..."), [this] { openFileDialog(); });
@@ -3691,6 +5158,24 @@ juce::PopupMenu AudioEditor::mainMenu()
         ae::setLoop (doc, {});
         commit (tr ("Remove loop"));
     });
+    regions.addItem (tr ("Rename all..."), has && ! doc.markers.empty(), false, [this] { renameAllMarkers (0); });
+    regions.addItem (tr ("Assign trigger notes to all..."), has && std::any_of (doc.markers.begin(), doc.markers.end(), [] (const ae::Marker& m) { return m.isRegion(); }),
+                     false, [this] { assignTriggerNotes(); });
+    {
+        // FL's Assign all to (0x86e370): every marker in order; FL's three pad layouts are not built
+        juce::PopupMenu to;
+        const std::pair<const char*, ae::NoteLayout> layouts[] = { { TR_NOOP ("Whole keyboard"), ae::NoteLayout::wholeKeyboard },
+                                                                   { TR_NOOP ("White notes"), ae::NoteLayout::whiteNotes },
+                                                                   { TR_NOOP ("Black notes"), ae::NoteLayout::blackNotes },
+                                                                   { TR_NOOP ("Default / none"), ae::NoteLayout::none },
+                                                                   { "C5", ae::NoteLayout::c5 } };
+        for (const auto& [label, layout] : layouts)
+            to.addItem (tr (label), [this, l = layout] {
+                ae::assignTriggerNotes (doc, l);
+                commit (tr ("Assign all regions to notes"));
+            });
+        regions.addSubMenu (tr ("Assign all to"), to, has && ! doc.markers.empty());
+    }
     regions.addItem (tr ("Delete markers in the selection"), has && ! doc.markers.empty(), false, [this] {
         if (ae::removeMarkers (doc, ae::orAll (doc, selection)) > 0)
             commit (tr ("Delete markers"));
@@ -3736,24 +5221,63 @@ juce::PopupMenu AudioEditor::mainMenu()
     view.addItem (tr ("Zoom out") + "\t-", has, false, [this] { zoomAround ((float) waveArea.getCentreX(), 2.0); });
     view.addItem (tr ("Zoom out full") + "\tF", has, false, [this] { zoomToFit(); });
     view.addItem (tr ("Zoom on the selection"), has && ! selection.empty(), false, [this] { zoomTo (selection); });
-    view.addItem (tr ("Snap to zero crossings"), true, snapZero, [this] { snapButton.setToggleState (! snapZero, juce::sendNotification); });
+    view.addItem (tr ("Zoom on left of selection"), has && ! selection.empty(), false, [this] { zoomOnSelectionEdge (true); });
+    view.addItem (tr ("Zoom on right of selection"), has && ! selection.empty(), false, [this] { zoomOnSelectionEdge (false); });
+    view.addSeparator();
+    view.addItem (tr ("Regions"), true, viewRegions, [this] {
+        viewRegions = ! viewRegions;
+        repaint();
+    });
+    view.addItem (tr ("Loop"), true, viewLoop, [this] {
+        viewLoop = ! viewLoop;
+        repaint();
+    });
+    view.addItem (tr ("Noise threshold mark"), true, viewNoiseMark, [this] {
+        viewNoiseMark = ! viewNoiseMark;
+        if (viewNoiseMark && shownNoiseThreshold() <= 0.0f)
+            setStatus (tr ("No noise threshold yet: select a part with only the background noise, then Tools > Acquire noise threshold"), false);
+        repaint();
+    });
+
+    // FL's Snap menu (round 190ee): the mode, keys 1…4 (picking one turns snapping on)
+    juce::PopupMenu snap;
+    for (int mode = 0; mode < 4; ++mode)
+        snap.addItem (snapCaption (mode) + "\t" + juce::String (mode + 1), true, snapMode == mode, [this, mode] { setSnapMode (mode); });
+
+    // FL's Select menu (the commands Slicex's wave editor has too)
+    juce::PopupMenu select;
+    const auto anyRegion = std::any_of (doc.markers.begin(), doc.markers.end(), [] (const ae::Marker& m) { return m.isRegion(); });
+    select.addItem (tr ("Select before current selection"), has && ! selection.empty(), false, [this] { selectBeside (true); });
+    select.addItem (tr ("Select after current selection"), has && ! selection.empty(), false, [this] { selectBeside (false); });
+    select.addItem (tr ("Select zoomed part"), has, false, [this] { selectZoomedPart(); });
+    select.addSeparator();
+    select.addItem (tr ("Select previous region"), has && anyRegion, false, [this] { selectRegionStep (-1); });
+    select.addItem (tr ("Select next region"), has && anyRegion, false, [this] { selectRegionStep (1); });
 
     juce::PopupMenu menu;
     menu.addSubMenu (tr ("File"), file);
     menu.addSubMenu (tr ("Edit"), editMenu (false));
+    menu.addSubMenu (tr ("Select"), select, has);
     menu.addSubMenu (tr ("Tools"), tools, has);
     menu.addSubMenu (tr ("Regions"), regions, has);
     menu.addSubMenu (tr ("View"), view);
+    menu.addSubMenu (tr ("Snap"), snap);
     menu.addSubMenu (tr ("Record"), recordMenu());
     if (source.kind == Source::Kind::channel)
     {
         juce::PopupMenu warp;
         warp.addItem (tr ("Show warp markers"), has, warpMode, [this] { setWarpMode (! warpMode); });
+        // round 190db: a warped clip drawn in beats while the markers are shown (default: the Clip-launch workflow)
+        warp.addItem (tr ("Show the audio in beats"), has, beatTimeChosen(), [this] { setBeatTimeChoice (beatTimeChosen() ? 0 : 1); });
         warp.addItem (tr ("Auto-warp"), has, false, [this] { autoWarp(); });
         warp.addItem (tr ("Remove the selected warp marker"), warpMode && warpSelected > 0, false, [this] { removeWarpMarker (warpSelected); });
         warp.addItem (tr ("Remove all warp markers"), has && warpMarkers().size() > 2, false, [this] {
             editWarp ([] (SamplerSettings& s, double) { warpedit::clearMarkers (s); });
         });
+        // (round 190cg) from the selected marker, else from the cursor
+        const auto markers = warpMarkers();
+        addWarpCommands (warp, warpSelected >= 0 && warpSelected < (int) markers.size() ? markers[(std::size_t) warpSelected].seconds
+                                   : doc.audio.sampleRate > 0.0 ? (double) cursor / doc.audio.sampleRate : 0.0);
         menu.addSubMenu (tr ("Warp markers"), warp);
     }
     return menu;
@@ -3766,6 +5290,7 @@ juce::String windowKey (const Source& s)
         case Source::Kind::file: return "audioeditor:" + s.path;
         case Source::Kind::channel: return "audioeditor:channel:" + juce::String (s.index);
         case Source::Kind::insert: return "audioeditor:insert:" + juce::String (s.index);
+        case Source::Kind::slot: return "audioeditor:slot:" + juce::String ((juce::int64) s.instance);
         case Source::Kind::none: break;
     }
     return "audioeditor";
@@ -3821,6 +5346,30 @@ std::unique_ptr<juce::Component> makeAudioEditorPanel (AudioEngine& engine, int 
     return editor;
 }
 
+void scaleAudioEditorTempoForSnapshot (juce::Component& panel, double factor)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->scaleWarpTempoForSnapshot (factor);
+}
+
+void holdAudioEditorWarpDragForSnapshot (juce::Component& panel, int marker, double beatOrSeconds, bool slides)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->holdWarpDragForSnapshot (marker, beatOrSeconds, slides);
+}
+
+void setAudioEditorBeatTimeForSnapshot (juce::Component& panel, int choice)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->setBeatTimeForSnapshot (choice);
+}
+
+void setAudioEditorGridClip (juce::Component& panel, int track, int scene)
+{
+    if (auto* editor = dynamic_cast<AudioEditor*> (&panel))
+        editor->setGridClip (track, scene);
+}
+
 void openAudioEditorRecording (AudioEngine& engine)
 {
     openWindow (engine, {})->recordInputWithSong();
@@ -3830,6 +5379,89 @@ void openAudioEditorForInsert (AudioEngine& engine, int insert)
 {
     auto* editor = openWindow (engine, { Source::Kind::insert, insert, {} });
     editor->setRecordSource (insert);
+}
+
+namespace
+{
+std::optional<Source> slotSource (AudioEngine& engine, int track, int slot)
+{
+    const auto& mixer = engine.getSong().mixer;
+    if (! juce::isPositiveAndBelow (track, (int) mixer.size()) || ! juce::isPositiveAndBelow (slot, (int) mixer[(std::size_t) track].effects.size())
+        || mixer[(std::size_t) track].effects[(std::size_t) slot].kind != EffectKind::edison)
+        return std::nullopt;
+    Source s;
+    s.kind = Source::Kind::slot;
+    s.index = track;
+    s.instance = mixer[(std::size_t) track].effects[(std::size_t) slot].instance.id;
+    return s;
+}
+} // namespace
+
+void openEdisonSlot (AudioEngine& engine, int track, int slot, bool record)
+{
+    const auto source = slotSource (engine, track, slot);
+    if (! source)
+        return;
+    AudioEditor* editor = nullptr;
+    if (auto* open = findToolWindow (windowKey (*source)))
+    {
+        open->toFront (true);
+        editor = dynamic_cast<AudioEditor*> (open->getContentComponent());
+    }
+    else
+        editor = openWindow (engine, *source);
+    if (editor != nullptr && record)
+        editor->armRecording();
+}
+
+std::unique_ptr<juce::Component> makeEdisonSlotEditor (AudioEngine& engine, int track, int slot)
+{
+    const auto source = slotSource (engine, track, slot);
+    if (! source)
+        return {};
+    return std::make_unique<AudioEditor> (engine, *source);
+}
+
+int addEdisonSlot (AudioEngine& engine, int track, bool openAndRecord)
+{
+    int at = -1;
+    engine.editSong ([track, openAndRecord, &at] (Song& song) {
+        if (track < 0 || track >= (int) song.mixer.size() || (int) song.mixer[(std::size_t) track].effects.size() >= maxEffectSlots)
+            return;
+        auto slot = makeEffectSlot (EffectKind::edison);
+        if (openAndRecord)
+            edisonfx::setOpenAndRecord (slot.params);
+        auto& effects = song.mixer[(std::size_t) track].effects;
+        for (int row = 0; row < maxEffectSlots && at < 0; ++row) // FL: the first empty slot of the track
+            if (mixerops::effectAtRow (effects, row) < 0)
+                at = mixerops::insertEffectAtRow (song, track, slot, row);
+    });
+    return at;
+}
+
+juce::MessageBoxOptions removeAllEdisonInstancesQuestion()
+{
+    // FL's box word for word (its "?" after a space included), less FL's second line "(No undo)": LYNX's removal is
+    // one undo step (removeAllEdisonInstances), so that line would be false here
+    return juce::MessageBoxOptions()
+        .withIconType (juce::MessageBoxIconType::QuestionIcon)
+        .withTitle (tr ("Remove Edison instances"))
+        .withMessage (tr ("Are you sure you want to remove all Edison instances from the project ?"))
+        .withButton (tr ("Yes"))
+        .withButton (tr ("No"));
+}
+
+void removeAllEdisonInstances (AudioEngine& engine)
+{
+    engine.editSongStructural ([] (Song& song) { mixerops::removeEffectsOfKind (song, EffectKind::edison); });
+}
+
+void askRemoveAllEdisonInstances (AudioEngine& engine)
+{
+    juce::AlertWindow::showAsync (removeAllEdisonInstancesQuestion(), [&engine] (int result) {
+        if (result == 1)
+            removeAllEdisonInstances (engine);
+    });
 }
 
 std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine, audioedit::Document doc, bool spectrum)
@@ -3861,6 +5493,42 @@ void setAudioEditorEnvelopeModeForSnapshot (juce::Component& editor, int mode)
 {
     if (auto* e = dynamic_cast<AudioEditor*> (&editor))
         e->setEnvModeForSnapshot (mode);
+}
+
+static juce::StringArray menuLinesForSnapshot (const juce::PopupMenu& root)
+{
+    juce::StringArray lines;
+    std::function<void (const juce::PopupMenu&, const juce::String&)> walk = [&] (const juce::PopupMenu& menu, const juce::String& prefix) {
+        for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+        {
+            const auto& item = it.getItem();
+            if (item.isSeparator || item.text.isEmpty())
+                continue;
+            const auto text = prefix + item.text.upToFirstOccurrenceOf ("\t", false, false);
+            if (item.subMenu != nullptr)
+                walk (*item.subMenu, text + " > ");
+            else if (! item.isSectionHeader)
+                lines.add (text + (item.isEnabled ? "" : "  (disabled)") + (item.isTicked ? "  [x]" : ""));
+        }
+    };
+    walk (root, {});
+    return lines;
+}
+
+// round 190ee
+juce::StringArray audioEditorMarkerMenuForSnapshot (juce::Component& component, int marker)
+{
+    auto* editor = dynamic_cast<AudioEditor*> (&component);
+    return editor != nullptr ? menuLinesForSnapshot (editor->markerMenuForSnapshot (marker)) : juce::StringArray();
+}
+
+juce::String setAudioEditorSnapForSnapshot (juce::Component& component, int mode, std::int64_t probeFrame)
+{
+    auto* editor = dynamic_cast<AudioEditor*> (&component);
+    if (editor == nullptr)
+        return {};
+    editor->setSnapForSnapshot (mode);
+    return editor->snapTooltipForSnapshot() + "; frame " + juce::String (probeFrame) + " snaps to " + juce::String (editor->snapFrameForSnapshot (probeFrame));
 }
 
 juce::StringArray audioEditorMenuForSnapshot (juce::Component& component)

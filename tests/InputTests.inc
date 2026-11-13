@@ -32,7 +32,7 @@ TEST (input_monitor_modes)
     CHECK (lynx::inputMonitored (InputMonitor::automatic, true, true, true));
     CHECK (! lynx::inputMonitored (InputMonitor::automatic, true, true, false));
     CHECK (! lynx::inputMonitored (InputMonitor::automatic, false, false, false));
-    CHECK (lynx::MixerTrack {}.monitor == InputMonitor::automatic && lynx::MixerTrack {}.inputChannel == -1);
+    CHECK (lynx::MixerTrack {}.monitor == InputMonitor::whenArmed && lynx::MixerTrack {}.inputChannel == -1); // FL's default (round 190ev)
 
     lynx::MixerTrack t;
     t.inputChannel = 1;

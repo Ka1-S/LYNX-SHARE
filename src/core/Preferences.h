@@ -167,6 +167,9 @@ struct MidiInputPrefs
     bool mpe = false;
     int mpeMembers = 15;
     int mpeBendRange = 48;
+    // FL's input "Port" (Options > MIDI, InPortSel "Unique / feedback port number", -1...255, none by default; round
+    // 190bt): a controller link made with a port number follows only the devices with that port
+    int port = -1;
 
     bool operator== (const MidiInputPrefs&) const = default;
 };
@@ -178,6 +181,13 @@ struct GlobalLink
 {
     int cc = 0, channel = -1;                // channel -1 = any
     int kind = 0, index = 0, slot = 0, param = 0; // the AutomationTarget (kind = its enum value)
+    // FL's "Global link settings" (form TMIDIInputForm_Generic; round 190bt), as MidiLink has them
+    int port = -1;
+    std::string formula;
+    bool smooth = false;
+    int smoothing = 469;
+    int mode = 0; // FL's "Mode" (round 190cs; linkformula::LinkMode)
+    bool hasSettings() const noexcept { return port >= 0 || ! formula.empty() || smooth || smoothing != 469 || mode != 0; }
     bool operator== (const GlobalLink&) const = default;
 };
 

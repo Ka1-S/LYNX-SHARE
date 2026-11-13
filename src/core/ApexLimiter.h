@@ -6,8 +6,11 @@
 // peak optionally including inter-sample peaks estimated by 4× interpolation) is held for the look-ahead window and
 // smoothed by a moving average of the same length, so the gain has fully reached its target when the peak leaves the
 // delay line; a program-dependent two-stage release (fast + slow, mixed by style) brings it back. A final safety
-// clip at the ceiling catches what is left. The latency is constant (maximum look-ahead + interpolator) so the
-// mixer's delay compensation never changes while look-ahead moves. Design targets come from our black-box
+// clip at the ceiling catches what is left. With True peak on, a true-peak guard ends the chain (round 190co): it
+// measures the true peak of what the stages before it deliver, at the base rate, and takes the rest off with a short
+// smooth gain dip, so the output's true peak stays at the ceiling at every oversampling setting (Guard in the .cpp).
+// The latency is constant (maximum look-ahead + interpolator, + the guard with True peak on) so the mixer's delay
+// compensation never changes while look-ahead moves. Design targets come from our black-box
 // measurements of a reference mastering limiter (docs/analise/MEASURE_fabfilter.md §3).
 //
 // Parameters (0..1, EffectKind::apexLimiter): [0] gain 0..30 dB, [1] ceiling −30..0 dB, [2] look-ahead 0..5 ms,
@@ -68,8 +71,11 @@ const EffectInfo& info();
 std::string paramText (int param, float v);
 
 // Constant latency at a sample rate (samples), without oversampling; latencyFor: with an oversampling factor.
-int latencyAt (double sampleRate) noexcept;
-int latencyFor (double sampleRate, int factor) noexcept;
+// Round 190co: with True peak on (the default) the true-peak guard's latency is part of it (guardLatency: 85 samples at
+// 48 kHz); with it off the latency is the one of 0.1.26.
+int latencyAt (double sampleRate, bool truePeak = true) noexcept;
+int latencyFor (double sampleRate, int factor, bool truePeak = true) noexcept;
+int guardLatency (double sampleRate) noexcept;
 
 std::unique_ptr<Effect> make (const EffectParams* initial = nullptr);
 } // namespace lynx::apex

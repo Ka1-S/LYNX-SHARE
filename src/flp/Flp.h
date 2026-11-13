@@ -123,8 +123,10 @@ struct Channel
     int modX = 256, modY = 0, filterType = 0; // channel filter (0xDB with 24 B; docs/analise/REA_rodada4.md §3)
     // event 0xE5 (channel "level adjustments", REA_rodada3 §2): pan adjustment ±6400 (0 = neutral) added to the pan,
     // volume adjustment 0..12800 (12800 = neutral) that scales the volume with the same curve: f(volume)·f(volAdj)
+    // (round 190dz: the whole event — FL's Misc › Levels adjustment: pan offset ±6400, volume multiplier 0…25600, an
+    // unnamed value kept as it is, Mod X / Mod Y offsets ±256; TPluginForm OfsLevelsPanel)
     bool hasLevelAdjust = false;
-    int panAdj = 0, volAdj = 12800;
+    int panAdj = 0, volAdj = 12800, adjUnknown = 0, modXAdj = 0, modYAdj = 0;
 
     std::vector<std::uint8_t> pluginState; // the generator's 0xD5 (e.g. 3x Osc state)
     int wrapperFlags = -1;                 // the generator's 0xD4 u16 at +16 (0x10 generator, 0x20 smart disable; −1 = none)
@@ -193,6 +195,11 @@ struct Channel
     int declickMode = 0, crossfade = 0, trim = 0;
     int sampleFlags = -1;
     bool loopPointsOld = false, pingPong = false;
+    // 0xFB (round 190dh): the sampler's loop record, saved by FL only when its loop START / END knobs moved the loop
+    // (FUN_01006f00 / FUN_01006d20): i32 version 2, i64 loop start, i64 loop end (frames, inclusive; −1 / INT64_MAX =
+    // none), 21 bytes FL keeps unset (double −1, i32 −1, u8 0, i32 / i32 INT32_MAX in FL's own files), u8 use loop points,
+    // u8 0. −1 here: no record.
+    std::int64_t loopStart = -1, loopEnd = -1;
     // the legacy precomputed effects (REA round 167l §1): 0x4A boost, 0x45 EQ ("FX"), 0x83 ring mod mix | freq << 16,
     // 0x55 stereo delay, 0x47 / 0x53 low-pass cutoff / resonance, 0x8B reverb | type << 16, 0x56 pogo ("FX3"); FL's
     // defaults when absent

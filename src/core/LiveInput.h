@@ -72,6 +72,25 @@ inline InputSource flInputSource (int flIndex, int deviceChannels)
     return { 0, false, {} };
 }
 
+// Issue #152 ("I pick a physical input on insert X and it records another insert's signal"): FL 2026's inserts record
+// "Post EQ" by default (RecordSource), i.e. everything that reaches the insert, not only the input. When an external
+// input is chosen on an insert that records anything else than "External input only", FL asks: "You've selected an
+// external input. Do you want to switch to External input only to avoid recording internal audio on this track?"
+// (FLEngine_x64.dll, FL Studio 2026: "External input|You've selected an external input. Do you want to switch to
+// |External input only| to avoid recording internal audio on this track?"). The Master has no record arm.
+inline bool asksExternalInputOnly (int track, int channel, RecordSource source) noexcept
+{
+    return track > 0 && channel >= 0 && source != RecordSource::externalInput;
+}
+
+// Live check 190ew ISS152-1 (FL 2026, shot ISS152-1-external-input-question.png): FL asks only when the insert goes from
+// no input to an input; changing one input for another does not ask. The box has FL's "Remember my choice" check
+// (message "RecAutoSwitchExternalInput", "Auto switch to external input only" in Manage messages).
+inline bool asksExternalInputOnly (int track, int channelBefore, int channelNow, RecordSource source) noexcept
+{
+    return channelBefore < 0 && asksExternalInputOnly (track, channelNow, source);
+}
+
 // Whether an insert hears its external input now.
 inline bool inputMonitored (InputMonitor mode, bool armed, bool playing, bool recording) noexcept
 {
@@ -84,6 +103,14 @@ inline bool inputMonitored (InputMonitor mode, bool armed, bool playing, bool re
     }
 
     return false;
+}
+
+// The .lynx key "monitor" of an insert (round 190ev): written only when the mode is not "Auto", so a project without the
+// key — every insert saved before round 190ev made FL's "When armed" the default of new inserts — opens as it was saved.
+constexpr bool monitorKeyWritten (InputMonitor mode) noexcept { return mode != InputMonitor::automatic; }
+constexpr InputMonitor monitorFromKey (int stored, bool present) noexcept
+{
+    return ! present ? InputMonitor::automatic : (InputMonitor) (stored < 0 ? 0 : stored > 3 ? 3 : stored);
 }
 
 // What a left-click on an insert's arm switch (the Mixer's, or an audio track's record button in the Playlist) does.

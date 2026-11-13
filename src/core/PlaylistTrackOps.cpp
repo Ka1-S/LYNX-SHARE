@@ -665,6 +665,7 @@ int mergeAutomationClips (Song& song, const std::vector<int>& clips, AutomationL
         if (i > 0 && ! merged.points.empty())
         {
             merged.points.back().tension = 0.0f; // the curve after a clip's last point isn't shown
+            merged.points.back().mode = 0;
             if (list[i - 1].end() < c.start)
                 merged.points.push_back ({ at, merged.points.back().value, 0.0f });
         }

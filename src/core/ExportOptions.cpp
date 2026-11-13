@@ -1,4 +1,5 @@
 #include "core/ExportOptions.h"
+#include "core/Scheduler.h"
 
 #include <algorithm>
 #include <cctype>
@@ -215,8 +216,9 @@ std::vector<Note> midiExportNotes (const Song& original)
         return track >= 0 && track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].muted;
     };
     if (song.mode == PlayMode::song)
-        for (const auto& c : song.playlist)
+        for (std::size_t clipIndex = 0; clipIndex < song.playlist.size(); ++clipIndex)
         {
+            const auto& c = song.playlist[clipIndex];
             if (c.kind != ClipKind::pattern || c.muted || c.length <= 0 || trackMuted (c.track) || c.pattern < 0
                 || c.pattern >= (int) song.patterns.size())
                 continue;
@@ -225,6 +227,8 @@ std::vector<Note> midiExportNotes (const Song& original)
             const auto& pattern = song.patterns[(std::size_t) c.pattern];
             const auto period = std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
             const auto repeats = stretchedClipsLoop() && c.offset + c.length > period;
+            // FL's pattern clip takeover (issue #158): what plays is what is written
+            const auto stopsAt = patternClipStopsAt (song, clipIndex);
             for (auto pass = repeats ? c.offset / period : 0; pass <= (repeats ? (c.offset + c.length - 1) / period : 0); ++pass)
                 for (auto n : pattern.notes)
                 {
@@ -234,6 +238,8 @@ std::vector<Note> midiExportNotes (const Song& original)
                     if (n.muted || at < c.offset || at >= c.offset + c.length)
                         continue;
                     n.start = c.start + (at - c.offset);
+                    if (n.start >= stopsAt)
+                        continue;
                     n.length = std::max<std::int64_t> (1, std::min (n.length, c.end() - n.start));
                     out.push_back (n);
                 }
@@ -343,8 +349,12 @@ Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTi
     {
         const auto from = song.loopStart, to = song.loopEnd;
         std::vector<Clip> cropped;
+        // by start (the same start: the list's order): clips of a pattern cut at `from` all start there, and the one that
+        // started last must stay the later one (FL's pattern clip takeover, issue #158)
+        auto ordered = song.playlist;
+        std::stable_sort (ordered.begin(), ordered.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
 
-        for (auto clip : song.playlist)
+        for (auto clip : ordered)
         {
             if (clip.end() <= from || clip.start >= to || clip.length <= 0)
                 continue;

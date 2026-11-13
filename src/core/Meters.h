@@ -25,6 +25,8 @@ public:
         raise (peaks[(std::size_t) track * 2 + 1], right);
         raise (viewPeaks[(std::size_t) track * 2], left);
         raise (viewPeaks[(std::size_t) track * 2 + 1], right);
+        raise (sessionPeaks[(std::size_t) track * 2], left);
+        raise (sessionPeaks[(std::size_t) track * 2 + 1], right);
     }
 
     // UI: peak since the last read. channel 0 = left, 1 = right.
@@ -44,6 +46,16 @@ public:
             return 0.0f;
 
         return viewPeaks[(std::size_t) track * 2 + (std::size_t) channel].exchange (0.0f, std::memory_order_relaxed);
+    }
+
+    // A third reader (round 190dr: the Session mixer's meters under the clip grid), so it takes no peaks from the Mixer
+    // or the Playlist headers.
+    float takeSessionPeak (int track, int channel) noexcept
+    {
+        if (track < 0 || track >= maxMixerTracks)
+            return 0.0f;
+
+        return sessionPeaks[(std::size_t) track * 2 + (std::size_t) channel].exchange (0.0f, std::memory_order_relaxed);
     }
 
     // the audio editor's recording tap (round 86): input, Master (0) or a mixer insert
@@ -70,5 +82,6 @@ private:
 
     std::array<std::atomic<float>, maxMixerTracks * 2> peaks {};
     std::array<std::atomic<float>, maxMixerTracks * 2> viewPeaks {};
+    std::array<std::atomic<float>, maxMixerTracks * 2> sessionPeaks {};
 };
 } // namespace lynx

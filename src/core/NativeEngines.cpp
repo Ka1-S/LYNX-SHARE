@@ -131,6 +131,7 @@ const std::vector<InstrumentEngine>& instrumentEngines()
         { InstrumentKind::boobass, "BooBass", "", fl, false }, // (its multisample: the user's BooBass_Eng_x64.dll)
         { InstrumentKind::simsynth, "SimSynth", "SimSynth", own, false },
         { InstrumentKind::minisynth, "MiniSynth", "MiniSynth", fl, false },
+        { InstrumentKind::pocketSuperSaw, "Pocket SuperSaw", "", own, false }, // (FL Studio Mobile's SuperSaw: plays from its defaults)
         { InstrumentKind::dx10, "Fruity DX10", "Fruity DX10", own, false },
         { InstrumentKind::plucked, "Plucked!", "Plucked!", own, false },
         { InstrumentKind::sawer, "Sawer", "Sawer", fl, false },

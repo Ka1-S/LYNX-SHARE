@@ -891,6 +891,73 @@
 "De random seed verschilt per instantie, dus twee renders van dezelfde noten zijn niet sample-identiek aan FL Studio, dat de seed uit de klok haalt."
 ]
 },
+"gen-pocket-supersaw": {
+"source": "59b10d9603",
+"intro": "Pocket SuperSaw is een virtueel analoge synthesizer met tot 8 stemmen. Elke stem is een stapel van 1 tot 12 ontstemde zaagtandgolven met een zaagtand een octaaf lager, of de SuperSync-oscillator, een reeks pulsen die zwiept als hard sync. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun SuperSaw-module laden, en hij staat ook in de pluginkiezer onder Pocket SuperSaw. Een nieuw kanaal start met de standaardwaarden van FL Studio Mobile. De pagina is een eenvoudige lijst met knoppen, één per parameter (59 in totaal), niet het eigen paneel van FL Studio Mobile.",
+"controls": [
+[
+"Osc unison, Osc unison detune, Osc unison detune curve, Osc unison pan",
+"Aantal zaagtanden per stem (1 tot 12), hoe ver ze zijn ontstemd (tot 100 cent), hoe de ontstemming over de zaagtanden is verdeeld en hoe breed ze zijn gepand."
+],
+[
+"Osc pulse width, Osc pulse mode, Osc sub level",
+"Pulse mode verandert elke zaagtand in een pulsgolf, met zijn breedte. Osc sub level is het niveau van de zaagtand een octaaf lager."
+],
+[
+"Osc re-trig phases, Osc phases offset",
+"Met re-trig aan start elke noot de zaagtanden met dezelfde fases, dus de zweving is bij elke noot gelijk. Uit: elke noot start met willekeurige fases."
+],
+[
+"SuperSync mode, Osc sync, Osc sync pulse width, Osc sync attack / decay / sustain / release, Osc sync EG amount, Osc sync kbd dir",
+"De SuperSync-oscillator en zijn eigen envelope, die de syncwaarde laat zwiepen."
+],
+[
+"Filter cutoff, Filter resonance, Filter kbd, Filter vel",
+"Een 4-polig ladder-laagdoorlaatfilter, tot 20 kHz, met toetsenbord- en velocitytracking."
+],
+[
+"Filter EG attack / decay / sustain / release, Filter EG amount",
+"De filterenvelope. De hoeveelheid is bipolair, -100 % tot +100 %."
+],
+[
+"Level EG attack / decay / sustain / release, Level, Pan",
+"De volume-envelope en het uitgangsniveau en de pan. Envelopetijden lopen van 0 tot 31 seconden."
+],
+[
+"LFO shape, LFO rate, LFO mode, LFO beat, LFO amount, LFO dest, LFO fade in",
+"Eén LFO per stem: Sine, Ramp, Square of Random; Free, One shot of Tempo sync. LFO dest kiest Cutoff, Resonance, Pitch, Sync, Pulse width, Detune, Level of Pan."
+],
+[
+"Arp rate, Arp range, Arp mode",
+"Arpeggiator: Off, Up, Down, Up-down, Up-down (ends twice) of Random, over maximaal 3 extra octaven."
+],
+[
+"Monophonic mode, Number of voices, Slide held mode, Slide time, Slide time static",
+"Speel één stem of maximaal 8, en hoe noten glijden."
+],
+[
+"Transpose, Pitch bend range",
+"Transponeer met -12 tot +12 halve tonen. Het pitchwiel buigt met 1 tot 12 halve tonen."
+],
+[
+"Distortion, Output trim",
+"Een tanh-vervorming en een uitgangstrim van -18 tot 0 dB."
+],
+[
+"Delay time, Delay feedback, Delay mix, Delay filter",
+"Een stereodelay die met het tempo is gesynchroniseerd, 1/4 beat tot 1 beat, met een laagdoorlaat- of hoogdoorlaatfilter in de loop."
+],
+[
+"Mod wheel amount, Mod wheel dest",
+"Wat het modwiel beweegt: Cutoff, Resonance, Sync, Pulse width, Detune, Level, Pan, LFO amount of LFO rate."
+]
+],
+"tips": [
+"Elke knop kan worden geautomatiseerd. De zaagtanden zijn bandbegrensd, dus hoge noten geven geen aliasing.",
+"Startfases en de Random LFO komen uit een generator die van elke instantie is, dus een render komt nooit sample voor sample overeen met een bepaalde render van FL Studio Mobile. De energie en het spectrum wel.",
+"De toonhoogteknop van het kanaal, fine tune, Mono en Porta en de slide-noten van de Piano roll werken op de stemmen zoals ze op de generators van FL Studio werken."
+]
+},
 "gen-poizone": {
 "source": "09b740f9c1",
 "intro": "PoiZone is een subtractieve generator, gebouwd op de engine van de FL-plugin met dezelfde naam: twee zaagtand- of pulse-oscillatoren met ruis, hard sync en ringmodulatie, een 4-polig filter, een LFO, een modulatie-envelope en een amp-envelope, daarna een gate met 16 steps, chorus, stereo tape delay en arpeggiator. Hij kan zonder FL Studio worden toegevoegd en begint dan bij de eigen presetbank van LYNX SHARE.",
@@ -1424,6 +1491,54 @@
 "De stem draait op een interne 44,1 kHz en wordt naar de projectfrequentie geresampled."
 ]
 },
+"gen-drum-rack": {
+"source": "67ab8ab312",
+"intro": "Drum Rack is een Instrument Rack waarvan de ketens pads zijn. Elke pad ontvangt één noot en speelt het instrument en de effecten van zijn keten. Voeg hem toe via de pluginkiezer als Drum Rack. Een nieuwe Drum Rack toont alleen de pads en het devicespaneel, met C1 geselecteerd. Sleep samples op de pads, of klik met rechts op een lege pad om een sample of een instrument te laden. Een Drum Rack in een Ableton Live-set (.als) opent als één Drum Rack met zijn pads, sends en returnketens, en Drum Racks worden geschreven wanneer je een Live-set exporteert.",
+"controls": [
+[
+"Pads",
+"Een 4 x 4-weergave van de pads, met erboven een overzichtsbalk van alle 128: klik, sleep of scroll erop om de weergave te verplaatsen. Een gevulde pad toont zijn naam met M (mute), een afspeelknop en S (solo). Sleep een pad op een andere om ze te verwisselen. Meerdere samples neerzetten vult opeenvolgende pads."
+],
+[
+"Pad menu",
+"Rename (Ctrl+R), Delete, Save as Default Pad, Next Similar (Ctrl+Right), Previous Similar (Ctrl+Left), Save as Similarity Reference (Ctrl+Up), Return to Reference (Ctrl+Down), en de LYNX SHARE-items Duplicate en Choke."
+],
+[
+"M, V, P, C, I-O, S, R, D",
+"De balk links toont of verbergt de macro's, de macrovariaties, de pads, de ketenlijst, de kolommen I-O, send en return, en het devicespaneel."
+],
+[
+"Receive, Play, Choke",
+"Per pad: de binnenkomende noot waarop hij reageert (of All), de noot die hij aan zijn instrument doorgeeft, en zijn choke-groep (None of 1 tot 16). Een pad in een choke-groep kapt de andere pads van die groep af."
+],
+[
+"Send-a, Send-b",
+"Het niveau dat elke pad naar elke returnketen stuurt."
+],
+[
+"Return chains",
+"Ketens van audio-effecten die door de sends worden gevoed, weergegeven als a, b enzovoort, bijvoorbeeld \"a Mix Bus\"."
+],
+[
+"Audio naar",
+"Waar de keten van een pad heen gaat: Rack Output, of rechtstreeks naar een returnketen."
+],
+[
+"Vel, Chain, Hide",
+"Een toevoeging van LYNX SHARE onder de ketenlijst: velocity- en ketenkeuzezones. Pads nemen de plaats in van toetszones."
+],
+[
+"Macro's",
+"Tot 16 macroknoppen, met Map, Rand en Macro Variations, zoals in een Instrument Rack."
+]
+],
+"tips": [
+"Slice to Drum Rack in het menu van een Sampler-kanaal zet elke slice van zijn sample op een pad. Slice to New MIDI Track... op een audioclip in de Playlist snijdt hem per transiënt, maat, notenwaarde of warpmarker in een nieuw Drum Rack-kanaal met een pattern dat de slices afspeelt.",
+"In de Clip-launch-lay-out toont de Piano roll van een Drum Rack-kanaal één benoemde rij per gevulde pad. In de Pattern-lay-out behoudt hij de pianotoetsen, met de padnamen erop.",
+"Next Similar en Previous Similar verwisselen de sample van de pad met behulp van de index Find similar samples van de Browser.",
+"Bij .als-export worden de ingebouwde effecten van LYNX SHARE in een keten niet geschreven; Samplers op pads worden geschreven als Simpler van Live. Er is nog geen Live geweest die een geëxporteerde Drum Rack heeft geopend."
+]
+},
 "gen-drumaxx": {
 "source": "271635956e",
 "intro": "Drumaxx is een drumgenerator voor het Channel Rack. Hij modelleert de mallet en het membraan van elk van zijn 16 pads, getoond op twee pagina's (1-8 en 9-16). Hij opent bij .flp-import de instellingen van de bijbehorende FL Studio-plugin.",
@@ -1599,6 +1714,63 @@
 "Omdat de noot met de halve snelheid volgt, verplaatst één octaaf op het toetsenbord de starttoonhoogte met een half octaaf.",
 "Channel-envelopes en LFO's voor pan, volume, cutoff en resonantie worden één keer per sequencertick doorgestapt.",
 "Een noot die zonder volume-envelope wordt losgelaten, eindigt met een fade van 10 ms."
+]
+},
+"fx-edison": {
+"source": "d470ae5709",
+"intro": "Edison is een audio-editor die in een mixerslot zit. Hij geeft de ingang van het slot ongewijzigd door, neemt die ingang op zolang Record aan staat en voegt zijn eigen weergave toe aan de uitgang. Er kunnen meerdere Edison-slots op één track staan. Voeg hem toe via de pluginlijst van het slot, of gebruik het menu van de mixertrack: Open audio editor (Ctrl+E) zet hem in het eerste lege slot en Open audio editor and record (Shift+E) zet hem ook klaar met Record mode On play, 5 min, Append uit en Slave aan. Zijn venster is de audio-editor van LYNX SHARE, met de opnamebediening van het slot erbij. De opname gaat door terwijl het venster gesloten is. Edison-slots in .flp-projecten openen als Edison, met hun instellingen en audio.",
+"controls": [
+[
+"Opnemen",
+"Neemt de ingang van het slot op, afhankelijk van de modus. Toets R."
+],
+[
+"Now, On input, Input, On play",
+"De opnamemodus. Now start meteen. On input start wanneer de ingang boven de ruisdrempel komt en bewaart 0,1 s van daarvoor. Input neemt alleen op zolang de ingang te horen is en pauzeert na 1 s stilte. On play neemt op terwijl de song speelt en voegt een Song jump-marker toe elke keer dat de songpositie springt, zodat een geloopte song één take geeft met een marker per ronde. Nieuwe slots starten op On input."
+],
+[
+"Maximale opnameduur",
+"Forever, 1, 3, 5, 10, 30 of 60 min. Nieuwe slots starten op 30 min."
+],
+[
+"Toevoegen",
+"Aan: een nieuwe take komt na de audio die er al staat. Uit: hij vervangt die. Standaard aan."
+],
+[
+"Sync",
+"Slave playback to host: terwijl de song speelt, speelt de audio op de tijd van de song. Toets H. Het Record-menu heeft ook Ignore own selection."
+],
+[
+"Ingang dempen",
+"De ingang van het slot wordt niet doorgegeven, alleen de weergave van Edison. Toets I."
+],
+[
+"Loop",
+"Laat de weergave loopen. Toets L."
+],
+[
+"Snap",
+"Snap aan het raster, aan regio's, aan samples of aan nuldoorgangen, toetsen 1 tot 4."
+],
+[
+"Slepen",
+"Sleep de sample of de selectie als WAV naar de Playlist of het Channel Rack. Rechtsklikken kopieert hem naar het klembord van de editor."
+],
+[
+"Sturen",
+"Naar de Playlist sturen als audioclip, naar het geselecteerde kanaal of naar een nieuw Sampler-kanaal."
+],
+[
+"Triggernoot",
+"In het menu van een regio: de noot die aan de regio is gekoppeld. Regions › Assign trigger notes to all... en Assign all stellen ze in voor elke regio."
+]
+],
+"tips": [
+"De audio wordt bewaard als WAV-bestand in de map met opnamen van het project, niet in het projectbestand zelf.",
+"Tools › Acquire noise threshold, op een selectie met alleen achtergrondruis, stelt het niveau in waarop On input en Input luisteren.",
+"Tools › Macros › Remove all Edison instances verwijdert elk Edison-slot van het project.",
+"Een slot dat in LYNX SHARE is gemaakt, wordt bij export niet in een .flp geschreven. Een Edison-slot dat uit een .flp kwam en niet is bewerkt, behoudt de gegevens van FL Studio.",
+"Triggernoten worden bij de regio's opgeslagen en door audioscripts gelezen. Een regio afspelen vanaf zijn noot is nog niet gedaan."
 ]
 },
 "gen-fruity-granulizer": {
@@ -2538,6 +2710,143 @@
 "Lineaire fase is onderdeel van de engine; zie de documentatie voor de latentie ervan."
 ]
 },
+"fx-pocket-comb-filter": {
+"source": "1845ad22a7",
+"intro": "Pocket Comb Filter voegt een korte delay met feedback toe aan het dry signaal, zodat het geluid rinkelt op de gestemde toonhoogte. De toonhoogte kan met de hand worden ingesteld, de laagste ingedrukte toets op het Channel rack volgen, of de toonhoogte volgen die in de ingang wordt gedetecteerd. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Comb Filter-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Modus",
+"Manual, Lowest Note of Detect Pitch. Manual gebruikt Pitch, of Pitch oct en Pitch note wanneer Snap aan staat. Lowest Note volgt de laagste ingedrukte toets op het Channel rack en houdt de laatste vast na het loslaten. Detect Pitch volgt de toonhoogte van de ingang."
+],
+[
+"Pitch",
+"Frequentie in de modus Manual wanneer Snap uit staat, 1 Hz tot 2,50 kHz volgens een vierdemachtswet."
+],
+[
+"Feedback",
+"Hoeveel van het vertraagde signaal wordt teruggevoerd, 0 tot 100 %. Hogere waarden rinkelen langer."
+],
+[
+"Mix",
+"Niveau van het kamsignaal dat bij het dry signaal wordt opgeteld, 0 tot 100 %. Het dry signaal blijft op vol niveau."
+],
+[
+"Offset",
+"Verschuift de toonhoogte met -2 tot +2 octaven in de modi Lowest Note en Detect Pitch."
+],
+[
+"Afvlakking",
+"Hoe langzaam de toonhoogte naar een nieuwe waarde glijdt, 0 tot 100 %."
+],
+[
+"Snap",
+"Aan: de modus Manual speelt de noot die met Pitch oct en Pitch note is ingesteld. Uit: hij gebruikt de frequentie van Pitch."
+],
+[
+"Polariteit",
+"Teken van de feedback per kant: Both +, Left -, Right - of Both -."
+],
+[
+"Asymmetrie",
+"-5,0 tot +5,0 %. Verlaagt de frequentie van de linkerkant en verhoogt die van de rechterkant met dit bedrag (negatieve waarden doen het tegenovergestelde)."
+],
+[
+"Toonhoogte octaaf",
+"Octaaf van de noot, -1 tot 6."
+],
+[
+"Toonhoogte noot",
+"Notennaam, C tot B. Zolang er nog geen toets is ingedrukt, begint Lowest Note ook op deze noot (standaard E3)."
+]
+],
+"tips": [
+"Lowest Note leest de toetsen die op alle kanalen van het Channel rack zijn ingedrukt. In FL Studio Mobile leest hij alleen het rack waarop het effect staat.",
+"Detect Pitch werkt het best op geluiden met een toonhoogte. Op drums of ruis kan hij op verkeerde toonhoogtes vastlopen, en ook de eigen detector van FL Studio Mobile is daar niet consistent.",
+"De stemming volgt de delayloop van FL Studio Mobile, die bij dezelfde noot ongeveer 19 cent afwijkt van een ideaal kamfilter.",
+"Het effect heeft een eenvoudige knoppenpagina, niet het paneel van FL Studio Mobile."
+]
+},
+"fx-pocket-eq": {
+"source": "3ee10840e7",
+"intro": "Pocket EQ heeft vier banden. Elke band is een low shelf, een peak of een high shelf met een eigen gain, frequentie en bandbreedte, en kan op beide kanten werken, op één kant, of op de twee kanten in tegengestelde richting. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Equalizer-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Gain 1 to Gain 4",
+"Gain van de band, weergegeven als -12 tot +12 dB. Zoals in FL Studio Mobile versterkt of verzwakt de band tweemaal het getoonde bedrag, dus het volledige bereik is -24 tot +24 dB."
+],
+[
+"Frequency 1 to Frequency 4",
+"Frequentie van de band, 32 Hz tot ongeveer 19,5 kHz."
+],
+[
+"Bandwidth 1 to Bandwidth 4",
+"Breedte van de band, 0,25 tot 7,25 octaven."
+],
+[
+"Kind 1 to Kind 4",
+"Low shelf, Peak of High shelf. Low shelf is de onderste helft van het bereik, Peak de bovenste helft en High shelf alleen de allerhoogste waarden."
+],
+[
+"Channel 1 to Channel 4",
+"Op welke kant de band werkt: Both, Left, Right, Left + / right - (de rechterkant krijgt de tegengestelde gain) of Left - / right + (de linkerkant krijgt de tegengestelde gain)."
+]
+],
+"tips": [
+"De banden draaien op de dubbele samplerate, zoals in FL Studio Mobile.",
+"De vier banden zijn geschakeld op de manier van FL Studio Mobile, wat het geluid met 1,5 sample vertraagt. Net als FL Studio Mobile meldt het effect dit niet aan de vertragingscompensatie.",
+"Het effect heeft een eenvoudige knoppenpagina, niet het EQ-paneel van FL Studio Mobile."
+]
+},
+"fx-pocket-filter": {
+"source": "9f7f27becb",
+"intro": "Pocket Filter is een resonant filter dat uit één, twee of vier paren identieke filtertrappen bestaat. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Filter-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"Frequentie",
+"Cutoff of middenfrequentie, 16 Hz tot ongeveer 20 kHz."
+],
+[
+"Q",
+"Resonantie, weergegeven als 0,80 tot 2,80, volgens een kwadratische wet."
+],
+[
+"Type",
+"LP (laagdoorlaat), BP (banddoorlaat) of HP (hoogdoorlaat). LP is de onderste helft van het bereik, BP de bovenste helft en HP alleen de allerhoogste waarden."
+],
+[
+"Helling",
+"24 dB/O, 48 dB/O of 96 dB/O. 24 dB/O is de onderste helft van het bereik, 48 dB/O de bovenste helft en 96 dB/O alleen de allerhoogste waarden."
+]
+],
+"tips": [
+"Zoals in FL Studio Mobile verlaagt het laagdoorlaatfilter het niveau met ongeveer 2 dB per paar trappen: ongeveer 2, 4 en 8 dB bij 24, 48 en 96 dB/O. Het banddoorlaatfilter verhoogt het midden met de Q-waarde, tot ongeveer 9 dB.",
+"Een wijziging van Slope schakelt meteen om, en het niveau van het laagdoorlaatfilter volgt pas bij de volgende wijziging van Frequency, Q of Type. FL Studio Mobile doet hetzelfde.",
+"Elk paar trappen vertraagt het geluid met één sample, wat niet aan de vertragingscompensatie wordt gemeld, zoals in FL Studio Mobile."
+]
+},
+"fx-pocket-graphic-eq": {
+"source": "3fcecfce15",
+"intro": "Pocket Graphic EQ heeft acht vaste banden van elk een octaaf breed: een low shelf bij 80 Hz, peaks bij 160 Hz, 375 Hz, 750 Hz, 1,5 kHz, 3 kHz en 6 kHz, en een high shelf bij 12 kHz. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Graphic EQ-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd.",
+"controls": [
+[
+"80 Hz",
+"Low shelf. Gain weergegeven als -12 tot +12 dB."
+],
+[
+"160 Hz, 375 Hz, 750 Hz, 1.5 kHz, 3 kHz, 6 kHz",
+"Peak-banden. Gain weergegeven als -12 tot +12 dB."
+],
+[
+"12 kHz",
+"High shelf. Gain weergegeven als -12 tot +12 dB."
+]
+],
+"tips": [
+"Zoals in FL Studio Mobile versterkt of verzwakt elke band tweemaal het getoonde bedrag, dus het volledige bereik is -24 tot +24 dB.",
+"De banden zijn geschakeld op de manier van FL Studio Mobile, wat het geluid met 8 samples vertraagt. Net als FL Studio Mobile meldt het effect dit niet aan de vertragingscompensatie.",
+"Het effect heeft een eenvoudige knoppenpagina, niet de schuifregelaars van FL Studio Mobile."
+]
+},
 "fx-ridge-strip": {
 "source": "4b27e2d1f5",
 "intro": "Ridge Strip is een eigen channel strip van LYNX SHARE voor een mixer-insert. Hij combineert filters, equalizer en dynamics in één venster, met een curve en gainmeters in het midden.",
@@ -3049,7 +3358,7 @@
 ]
 },
 "fx-glow-leveler": {
-"source": "c674a036c1",
+"source": "c97ebe6b51",
 "intro": "Glow Leveler is een optische leveler: een model van een elektro-optische cel met een programma-afhankelijke attack en een release in twee trappen. Hij heeft twee voicings, Modern en Opto classic, en een nieuwe instantie begint op Opto classic. Een VU-meter zit tussen de knoppen Gain en Peak reduction.",
 "controls": [
 [
@@ -3097,6 +3406,10 @@
 "Alleen Opto classic. Twee kleine schakelaars behouden de limit- en make-upwet en de attack- en release-timing van projecten die met eerdere versies zijn opgeslagen, of gebruiken de gemeten waarden."
 ],
 [
+"Celgeheugen",
+"Alleen Opto classic, modus Compress. Aan vertraagt de release na lange of harde gain reduction, zodat de leveler snel herstelt na een korte piek en langzaam na een lange. Standaard uit."
+],
+[
 "Makeup-ref.",
 "Alleen Opto classic. De waarde van peak reduction waarbij Auto makeup is ingeschakeld. De make-up volgt vanaf daar de draaiknop."
 ]
@@ -3107,7 +3420,7 @@
 ]
 },
 "fx-hush-de-esser": {
-"source": "a7ecd8dcb9",
+"source": "7fb1e34f17",
 "intro": "Hush De-esser is een eigen effect van LYNX SHARE dat scherpe sisklanken in zang vermindert. Hij kan alleen op de sisband werken of op het hele signaal. Het grote display toont het signaal met de threshold-lijn, die je kunt slepen.",
 "controls": [
 [
@@ -3149,6 +3462,14 @@
 [
 "Beluisteren",
 "Laat je de gedetecteerde band beluisteren."
+],
+[
+"Air",
+"Een high shelf bij ongeveer 8 kHz op het bewerkte signaal, van uit tot +12 dB. Standaard uit."
+],
+[
+"Mix",
+"Balans tussen het dry signaal en het bewerkte signaal. Het dry signaal wordt vertraagd zodat het bij de lookahead past. Standaard 100 %."
 ]
 ],
 "tips": [
@@ -3432,6 +3753,73 @@
 "Er is geen look-ahead en hij voegt geen latentie toe. De gain daalt binnen één sample als een piek de threshold overschrijdt."
 ]
 },
+"fx-pocket-multiband-compressor": {
+"source": "bb45f9448b",
+"intro": "Pocket Multiband Compressor splitst het geluid met twee crossovers van 24 dB in lage, middelste en hoge banden en comprimeert elke band afzonderlijk. Zijn ratio werkt op de amplitude van het signaal, niet op decibels, dus hij is bij dezelfde getallen milder dan een gewone compressor. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Multiband Compressor-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd. Zijn editor is een pagina met eenvoudige knoppen, één rij namen per band (Low, Mid, High).",
+"controls": [
+[
+"Mastergain",
+"Uitgangsniveau van het hele effect, -24 dB tot +24 dB."
+],
+[
+"Lage crossover",
+"Scheiding tussen de lage en middelste band, 20 Hz tot 10,2 kHz."
+],
+[
+"Hoge crossover",
+"Scheiding tussen de middelste en hoge band, 20 Hz tot 10,2 kHz."
+],
+[
+"Solo",
+"Off, Low, Mid of High: speelt alleen die band af. Deze regelaar is een eigen toevoeging van LYNX SHARE; FL Studio Mobile heeft in plaats daarvan een editorinstelling, die een .flm-import terugzet naar Off."
+],
+[
+"Dry-mix",
+"Voegt de ongecomprimeerde band toe aan de gecomprimeerde, 0 tot 100%, voor parallelle compressie."
+],
+[
+"Low / Mid / High input gain",
+"Gain naar de band, -24 dB tot +24 dB. Hij voedt zowel de detector als de audio."
+],
+[
+"Low / Mid / High threshold",
+"Niveau waarboven de band wordt gecomprimeerd, -48 dB tot 0 dB."
+],
+[
+"Low / Mid / High ratio",
+"1 tot 31."
+],
+[
+"Low / Mid / High attack",
+"Hoe snel de compressor van de band reageert, 0 tot 50 ms volgens een kwadratische wet."
+],
+[
+"Low / Mid / High release",
+"Hoe snel hij loslaat, 10 ms tot 1 s."
+],
+[
+"Low / Mid / High gain",
+"Uitgangsgain van de band, -24 dB tot +24 dB."
+],
+[
+"Low / Mid / High state",
+"On comprimeert de band, Bypass geeft hem door zoals gesplitst, Mute dempt hem."
+],
+[
+"Low / Mid / High width",
+"Stereobreedte van de band, 0 tot 200%. 100% laat hem zoals hij is, 0% is mono."
+],
+[
+"Breedtemodus",
+"Mode 1: boven 100% beweegt de breedte naar alleen het zijsignaal. Mode 2: boven 100% wordt een deel van het andere kanaal van elke kant afgetrokken."
+]
+],
+"tips": [
+"Een band met Bypass slaat ook zijn ingangsgain, uitgangsgain en breedte over.",
+"Attack en release worden bij elke samplerate uitgerekend voor 44,1 kHz, zoals FL Studio Mobile doet. Bij 48 kHz of 96 kHz zijn ze korter dan hun uitlezing.",
+"Voor nieuwe mixen zijn de Fruity Multiband Compressor of Prism Multiband de completere tools. Deze is er zodat songs van FL Studio Mobile klinken zoals ze op de telefoon deden."
+]
+},
 "fx-prism-multiband": {
 "source": "f559a7fa07",
 "intro": "Prism Multiband is een eigen effect van LYNX SHARE voor een mixer-insert. Het splitst het signaal in vier banden en past op elke band compressie of expansie toe. Een band die de gain niet verandert, laat het signaal ongemoeid, dus het effect is in rust transparant.",
@@ -3483,7 +3871,7 @@
 ]
 },
 "fx-quell-denoiser": {
-"source": "cb9b3b14e9",
+"source": "1b2cc8c181",
 "intro": "Quell Denoiser is een eigen effect van LYNX SHARE voor een mixer-insert. Hij vermindert constante breedbandruis zoals hiss met één enkele regelaar Amount. Intern wordt het signaal gesplitst in zes fasecoherente banden, elk met een downward expander met zachte knee.",
 "controls": [
 [
@@ -3501,6 +3889,14 @@
 [
 "Meter",
 "Niveaumeter links met daaronder een vastgehouden reductie-uitlezing."
+],
+[
+"Matched",
+"Schakelt van de expander met zes banden over op de matched engine: snijdt op zeven octaafbanden, zonder latentie. Standaard uit."
+],
+[
+"Classic / Measured",
+"Alleen de matched engine. Measured laat elke band de ruisvloer volgen die hij over ongeveer een seconde meet, zodat stabiele ruis verder wordt verlaagd. Het kost wat CPU. De schakelaar is alleen zichtbaar bij een instantie uit een project of preset die vóór 0.1.27 is opgeslagen, die op Classic laadt en klinkt zoals voorheen. Zodra je naar Measured omschakelt, wordt hij verborgen. Nieuwe instanties gebruiken Measured."
 ]
 ],
 "tips": [
@@ -3509,7 +3905,7 @@
 ]
 },
 "fx-sentry-gate": {
-"source": "50e9527a46",
+"source": "0384d6aa45",
 "intro": "Sentry Gate is een eigen gate en expander van LYNX SHARE voor een mixer-insert. Hij knipt het signaal onder een threshold af, van lichte expansie tot een volledige gate, afhankelijk van ratio en range. Het display toont de overdrachtscurve boven het live niveau.",
 "controls": [
 [
@@ -3559,6 +3955,22 @@
 [
 "Oversampling, In and Out",
 "Oversampling-menu en ingangs- en uitgangsgain."
+],
+[
+"Model",
+"Classic of Measured. Measured voegt de ruisonderdrukking van de stijl Vocal toe; de andere stijlen negeren die. Projecten die vóór 0.1.26 zijn opgeslagen, laden op Classic."
+],
+[
+"Trigger",
+"Level of Transient. Level is de gate zoals voorheen. Transient is een drumgate: een slag boven de threshold opent hem volledig, hij blijft open voor Hold en sluit over Release langs de gekozen vorm, wat het niveau ondertussen ook doet. Ratio, Knee en de curve van de stijl worden bij Transient niet gebruikt. Standaard Level."
+],
+[
+"Vorm",
+"Alleen Transient. De vorm van de release: Smooth, Mid of Sharp."
+],
+[
+"Gevoeligheid",
+"Alleen Transient. 1 tot 10, standaard 5. Hogere waarden openen de gate bij kleinere slagen."
 ]
 ],
 "tips": [
@@ -3788,7 +4200,7 @@
 ]
 },
 "fx-atrium": {
-"source": "5f968c5de3",
+"source": "595c3b57b8",
 "intro": "Atrium is een ruimte- en kamerreverb met aparte early- en late-secties en een decay in drie banden. Zes faders bepalen de reverb als geheel, de tabs Early en Late schakelen de draaiknoppen rechts tussen de twee secties, en het menu Reverb mode kiest uit twaalf ruimtetypen.",
 "controls": [
 [
@@ -3850,6 +4262,10 @@
 [
 "Reverbmodus",
 "Het soort ruimte: Large Room, Medium Room, Bright Room, Large Chamber, Dark Room, Dark Chamber, Dark Space, Deep Space, Mirror Space, Vast Space, Distant Space of Dense Room."
+],
+[
+"Classic / Measured",
+"Measured is de reverb-engine van 0.1.27: de decay wordt per octaafband ingesteld, een toonregeling volgt op het reverbnetwerk en een diffusienetwerk vormt het begin van de galm. Hij gebruikt minder CPU dan Classic. Nieuwe instanties starten op Measured. Projecten en presets die vóór 0.1.27 zijn opgeslagen, laden op Classic en klinken zoals voorheen."
 ]
 ],
 "tips": [
@@ -3858,7 +4274,7 @@
 ]
 },
 "fx-epoch-verb": {
-"source": "30c0764f87",
+"source": "e15dd52216",
 "intro": "Epoch Verb is een reverbplugin voor effectslots. Hij heeft 22 algoritmen en drie kleuren (1970s, 1980s en Now). Gebruik hem voor halls, plates en rooms op sends of inserts.",
 "controls": [
 [
@@ -3916,6 +4332,10 @@
 [
 "Low cut",
 "High-pass-filter op de reverb."
+],
+[
+"Classic / Measured",
+"Measured is de reverb-engine van 0.1.27: de decay wordt per octaafband ingesteld, een toonregeling volgt op het reverbnetwerk en een diffusienetwerk vormt het begin van de galm. Hij gebruikt minder CPU dan Classic. Nieuwe instanties starten op Measured. Projecten en presets die vóór 0.1.27 zijn opgeslagen, laden op Classic en klinken zoals voorheen."
 ]
 ],
 "tips": [
@@ -3924,7 +4344,7 @@
 ]
 },
 "fx-foil-plate": {
-"source": "1156cb5a2f",
+"source": "b0e5038719",
 "intro": "Foil Plate is een plate-reverb als plugin voor het effectslot. Hij heeft twaalf platetypen en een decay die van de frequentie afhangt. Gebruik hem op snares, zang en bussen.",
 "controls": [
 [
@@ -3982,6 +4402,10 @@
 [
 "Low cut",
 "High-pass-filter op de reverb."
+],
+[
+"Classic / Measured",
+"Measured is de reverb-engine van 0.1.27: de decay wordt per octaafband ingesteld, een toonregeling volgt op het reverbnetwerk en een diffusienetwerk vormt het begin van de galm. Hij gebruikt minder CPU dan Classic. Nieuwe instanties starten op Measured. Projecten en presets die vóór 0.1.27 zijn opgeslagen, laden op Classic en klinken zoals voorheen."
 ]
 ],
 "tips": [
@@ -4039,7 +4463,7 @@
 ]
 },
 "fx-halo": {
-"source": "f4b3fc155b",
+"source": "f8f93f7d26",
 "intro": "Halo is een eigen shimmer-reverb van LYNX SHARE. Een pitch shifter in het feedbackpad verhoogt of verlaagt elke herhaling, zodat de staart tijdens het wegsterven stijgt of daalt. Je voegt hem toe aan een insert of een send voor pads, zang en ambient-texturen.",
 "controls": [
 [
@@ -4089,6 +4513,10 @@
 [
 "Kleur",
 "Toon van de reverb, bijvoorbeeld bright."
+],
+[
+"Classic / Measured",
+"Measured is de reverb-engine van 0.1.27: de decay wordt per octaafband ingesteld, een toonregeling volgt op het reverbnetwerk en een diffusienetwerk vormt het begin van de galm. Hij gebruikt minder CPU dan Classic. Nieuwe instanties starten op Measured. Projecten en presets die vóór 0.1.27 zijn opgeslagen, laden op Classic en klinken zoals voorheen."
 ]
 ],
 "tips": [
@@ -4097,7 +4525,7 @@
 ]
 },
 "fx-horizon": {
-"source": "8b29b30bb7",
+"source": "6cc0736add",
 "intro": "Horizon is een eigen effect van LYNX SHARE dat een echo en een reverb in één plugin combineert. Je kiest of de echo de reverb voedt of erop volgt. Het past bij zang, gitaren en synths waar je herhalingen wilt die in een ruimte opgaan.",
 "controls": [
 [
@@ -4155,6 +4583,10 @@
 [
 "Echo mode, Reverb mode, Color",
 "Menu's voor het echotype, het reverbtype en de toon."
+],
+[
+"Classic / Measured",
+"Measured is de reverb-engine van 0.1.27: de decay wordt per octaafband ingesteld, een toonregeling volgt op het reverbnetwerk en een diffusienetwerk vormt het begin van de galm. Hij gebruikt minder CPU dan Classic. Nieuwe instanties starten op Measured. Projecten en presets die vóór 0.1.27 zijn opgeslagen, laden op Classic en klinken zoals voorheen."
 ]
 ],
 "tips": [
@@ -4238,7 +4670,7 @@
 ]
 },
 "fx-nebula": {
-"source": "87313c4ef1",
+"source": "338ff67e03",
 "intro": "Nebula bouwt grote echo- en reverbruimtes op uit een delaynetwerk. Je kiest met de regelaar Mode een van de 22 netwerkvormen en stelt de delaytijd, feedback en dichtheid in. Voeg hem toe aan een mixer-insert, of aan een send voor ambient-effecten.",
 "controls": [
 [
@@ -4284,11 +4716,260 @@
 [
 "Modus",
 "De netwerkvorm."
+],
+[
+"Model",
+"Classic of Measured. Measured laat zes van de vormen (Ripple, Fold, Drift, Abyss, Glint en Mirage) draaien op een ander netwerkmodel, overgenomen uit een model met MIT-licentie. De andere vormen klinken op beide hetzelfde. Nieuwe instanties starten op Measured. Projecten en presets die vóór 0.1.27 zijn opgeslagen, laden op Classic en klinken zoals voorheen."
 ]
 ],
 "tips": [
 "Druk op Wissen om een staart te dempen die is opgebouwd na een feedbackwijziging.",
 "De regel onderaan legt de gekozen modus uit."
+]
+},
+"fx-pocket-reverb": {
+"source": "6722c47417",
+"intro": "Pocket Reverb is de huidige reverbmodule van FL Studio Mobile op de eigen plate van FL Studio Mobile. Hij gebruikt de regelaars van de oudere module, met de early reflections en de staart van de plate op vaste niveaus, en mengt ze zelf met het dry signaal. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Reverb-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd. Zijn editor is een pagina met eenvoudige knoppen.",
+"controls": [
+[
+"Decay",
+"Lengte van de staart, 0,1 s tot 20 s. De knop volgt een derdemachtswet, dus het grootste deel van zijn draaiweg beslaat de korte tijden."
+],
+[
+"Hoge demping",
+"Frequentie waarboven de staart sneller zijn hoge tonen verliest, 0,5 kHz tot 22,1 kHz. De top van het bereik toont Off."
+],
+[
+"Mix",
+"Mengverhouding van dry en reverb. Onder het midden blijft het dry signaal op vol niveau en stijgt de reverb; erboven blijft de reverb op vol niveau en daalt het dry signaal. In het midden staan beide op vol niveau."
+],
+[
+"Pan",
+"Panoramaregeling van de reverb, niet van het dry signaal."
+],
+[
+"ER",
+"Niveau van de early reflections, 0 tot 100% volgens een kwadratische wet."
+],
+[
+"Predelay",
+"Tijd voordat de reverb begint, 0 tot 250 ms."
+],
+[
+"Ruimtegrootte",
+"Grootte van de plate, 1 tot 100."
+],
+[
+"Diffusie",
+"Hoe snel de echo's vervagen tot een gladde staart, 0 tot 100%."
+],
+[
+"Breedte",
+"Stereobreedte van de reverb, 0 tot 200%."
+],
+[
+"Low cut",
+"Snijdt de lage tonen af van het signaal dat de reverb ingaat, 19 Hz tot 3000 Hz. De onderkant van het bereik toont Off."
+],
+[
+"High cut",
+"Snijdt de hoge tonen af van het signaal dat de reverb ingaat, 0,5 kHz tot 22,1 kHz. De top van het bereik toont Off."
+],
+[
+"Mod-rate",
+"Snelheid van de modulatie in de staart, 0,1 Hz tot 10 Hz."
+],
+[
+"Mod-diepte",
+"Hoeveelheid modulatie in de staart, 0 tot 100%."
+],
+[
+"Wet-gain",
+"Totaalniveau van de reverb, 0 tot 100%."
+],
+[
+"Dry-niveau",
+"Totaalniveau van het dry signaal, 0 tot 100%."
+]
+],
+"tips": [
+"Niveauwijzigingen glijden over een paar milliseconden, dus Mix, Pan, ER of de twee niveaus verplaatsen klikt niet.",
+"Deze plate is niet Fruity Reeverb 2: bij dezelfde instellingen rinkelt zijn laagste bereik langer.",
+"Modulatie is nog niet op het gehoor met FL Studio Mobile vergeleken: geen van de projecten waarop is gemeten gebruikt hem."
+]
+},
+"fx-pocket-reverb-2": {
+"source": "dcde5cb65f",
+"intro": "Pocket Reverb 2 laat de plate van FL Studio Mobile op vol niveau draaien en mengt het dry signaal, de early reflections en de staart zelf, en stelt dan de stereoseparatie in en panoramaregelt de reverb. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Reverb 2-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd. Zijn editor is een pagina met eenvoudige knoppen.",
+"controls": [
+[
+"High cut",
+"Snijdt de hoge tonen af van het signaal dat de reverb ingaat, 0,5 kHz tot 22,1 kHz. De top van het bereik toont Off."
+],
+[
+"Low cut",
+"Snijdt de lage tonen af van het signaal dat de reverb ingaat, 19 Hz tot 3000 Hz. De onderkant van het bereik toont Off."
+],
+[
+"Grootte",
+"Grootte van de plate, 1 tot 100."
+],
+[
+"Decay",
+"Lengte van de staart, 0,1 s tot 20 s, op een rechte schaal."
+],
+[
+"Diffusie",
+"Hoe snel de echo's vervagen tot een gladde staart, 0 tot 100%."
+],
+[
+"Demping",
+"Frequentie waarboven de staart sneller zijn hoge tonen verliest, 0,5 kHz tot 22,1 kHz. De top van het bereik toont Off."
+],
+[
+"Dry",
+"Niveau van het originele signaal, 0 tot 125%."
+],
+[
+"ER",
+"Niveau van de early reflections, 0 tot 125%."
+],
+[
+"Wet",
+"Niveau van de reverb, 0 tot 125%."
+],
+[
+"Zij-ingang",
+"Aan voedt de reverb met het verschil van links en rechts in plaats van hun som, zodat alleen het stereodeel van het geluid wordt galmend gemaakt."
+],
+[
+"Delay",
+"Tijd voordat de reverb begint, 0 tot 1000 ms."
+],
+[
+"Tempo",
+"Aan maakt van Delay een aantal zestiende beats op het tempo van de song, tot één beat. Een delay langer dan 1000 ms wordt telkens een zestiende korter gemaakt totdat hij past."
+],
+[
+"Mod",
+"Hoeveelheid modulatie in de staart, 0 tot 100%."
+],
+[
+"Bass",
+"Decay van de lage tonen ten opzichte van de rest van de staart, x0,2 tot x3,0."
+],
+[
+"Scheiding",
+"Stereobreedte van de reverb, 0 tot 200%. 100% laat hem zoals de plate hem maakt."
+],
+[
+"Snelheid",
+"Snelheid van de modulatie, 0,1 Hz tot 10 Hz volgens een derdemachtswet."
+],
+[
+"Crossover",
+"Frequentie waaronder Bass werkt, 25 Hz tot 2000 Hz."
+],
+[
+"Pan",
+"Panoramaregeling van de reverb, niet van het dry signaal."
+]
+],
+"tips": [
+"Anders dan bij de andere twee Pocket-reverbs heeft het dry signaal hier een eigen niveau, dus Dry op 0% geeft alleen de reverb.",
+"Delay toont altijd ms, ook wanneer Tempo aan staat.",
+"Modulatie is nog niet op het gehoor met FL Studio Mobile vergeleken: geen van de projecten waarop is gemeten gebruikt hem."
+]
+},
+"fx-pocket-reverb-classic": {
+"source": "5bf9dfb5b3",
+"intro": "Pocket Reverb Classic is de oudere reverbmodule van FL Studio Mobile op de eigen plate van FL Studio Mobile, een netwerk dat dicht bij Fruity Reeverb 2 ligt maar niet hetzelfde is. Het originele signaal gaat altijd op vol niveau door en de reverb wordt eraan toegevoegd. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Reverb (legacy)-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd. Zijn editor is een pagina met eenvoudige knoppen.",
+"controls": [
+[
+"Decay",
+"Lengte van de staart, 0,1 s tot 20 s. De knop volgt een derdemachtswet, dus het grootste deel van zijn draaiweg beslaat de korte tijden."
+],
+[
+"Hoge demping",
+"Frequentie waarboven de staart sneller zijn hoge tonen verliest, 0,5 kHz tot 22,1 kHz. De top van het bereik toont Off."
+],
+[
+"Mix",
+"Niveau van de reverb, weergegeven in dB van -inf tot +6,0 dB."
+],
+[
+"Predelay",
+"Tijd voordat de reverb begint, 0 tot 250 ms."
+],
+[
+"Ruimtegrootte",
+"Grootte van de plate, 1 tot 100."
+],
+[
+"Diffusie",
+"Hoe snel de echo's vervagen tot een gladde staart, 0 tot 100%."
+],
+[
+"Breedte",
+"Stereobreedte van de reverb, 0 tot 200%."
+],
+[
+"Low cut",
+"Snijdt de lage tonen af van het signaal dat de reverb ingaat, 19 Hz tot 3000 Hz. De onderkant van het bereik toont Off."
+],
+[
+"High cut",
+"Snijdt de hoge tonen af van het signaal dat de reverb ingaat, 0,5 kHz tot 22,1 kHz. De top van het bereik toont Off."
+],
+[
+"Ingang",
+"Niveau van het signaal dat naar de reverb wordt gestuurd, -inf tot +6,0 dB."
+],
+[
+"ER",
+"Niveau van de early reflections, -inf tot +6,0 dB."
+],
+[
+"Dry-niveau",
+"Extra dry signaal dat de reverb toevoegt, -inf tot +6,0 dB. Op een nieuwe instantie is het -inf."
+],
+[
+"Ingang uit",
+"Dempt het signaal dat naar de reverb wordt gestuurd. Toont On of Muted."
+],
+[
+"Dry uit",
+"Dempt het extra dry signaal van Dry level. Toont On of Muted."
+],
+[
+"ER uit",
+"Dempt de early reflections. Toont On of Muted."
+],
+[
+"Wet uit",
+"Dempt de reverbstaart. Toont On of Muted."
+],
+[
+"Bass mult",
+"Decay van de lage tonen ten opzichte van de rest van de staart, x0,2 tot x3,0."
+],
+[
+"Crossover",
+"Frequentie waaronder Bass mult werkt, 25 Hz tot 2000 Hz."
+],
+[
+"Mod-rate",
+"Snelheid van de modulatie in de staart, 0,1 Hz tot 10 Hz."
+],
+[
+"Mod-diepte",
+"Hoeveelheid modulatie in de staart, 0 tot 100%."
+]
+],
+"tips": [
+"Het originele signaal wordt nooit verlaagd: Dry off en Dry level veranderen alleen de extra dry kopie, niet het signaal dat doorgaat.",
+"Van de drie Pocket-reverbs is dit de enige met mute-schakelaars en niveaus in dB. Pocket Reverb 2 stelt zijn niveaus in procenten in en Pocket Reverb heeft één Mix-knop.",
+"Modulatie is nog niet op het gehoor met FL Studio Mobile vergeleken: geen van de projecten waarop is gemeten gebruikt hem."
 ]
 },
 "fx-reeverb": {
@@ -4465,7 +5146,7 @@
 ]
 },
 "fx-echoform": {
-"source": "0505e5d72c",
+"source": "5a830ced10",
 "intro": "Echoform is een echo met twaalf stijlen en vijf echo-indelingen. De pagina Main heeft drie secties: Echo voor tijd, feedback en filters, Tap tempo voor groove en de echomodus, en Style voor saturatie, niveaus en de stijlmenu's. De pagina Tweak bevat de overige regelaars.",
 "controls": [
 [
@@ -4531,6 +5212,14 @@
 [
 "Tape",
 "Kiest een gemeten tape-loop-klank: Off, Ping-pong tape, Studio tape of Studio tape hot."
+],
+[
+"Classic / Measured",
+"Tweak-pagina. Measured laat de gemeten bandtrap draaien in de stijl Tape wanneer het Tape-menu op Off staat: de toon van de uitgang en van de loop, de ruis van de band en de vertraging van de wow. Het kost iets meer CPU. Nieuwe instanties starten op Measured. Projecten en presets die vóór 0.1.27 zijn opgeslagen, laden op Classic en klinken zoals voorheen."
+],
+[
+"Klok",
+"Tweak-pagina. De modulatie laat de echotijd zwaaien met een fractie van zichzelf, tot 50 procent bij volle diepte, aan beide kanten tegelijk, als een geklokte delayline. Standaard uit."
 ]
 ],
 "tips": [
@@ -4733,7 +5422,7 @@
 ]
 },
 "fx-lattice-mod": {
-"source": "f7f92d15d2",
+"source": "21239e3a70",
 "intro": "Lattice Mod is een eigen gemoduleerde delay van LYNX SHARE. Hij verdeelt één tot zestien taps over de delaytijd en moduleert elk met langzame detune en vibrato. Je gebruikt hem voor chorus, flanging, ensemble en delaytexturen.",
 "controls": [
 [
@@ -4775,6 +5464,10 @@
 [
 "Over-mod",
 "Extra modulatievermenigvuldiger."
+],
+[
+"Classic / Measured",
+"WARP-tab. Measured laat de langzame detune-zwaai 3,5 keer zo ver gaan als Classic, zoals gemeten. Nieuwe instanties starten op Measured. Projecten en presets die vóór 0.1.27 zijn opgeslagen, laden op Classic en klinken zoals voorheen."
 ]
 ],
 "tips": [
@@ -4878,6 +5571,45 @@
 "Beweeg Time terwijl er geluid speelt voor een tapesnelheid-effect."
 ]
 },
+"fx-pocket-tape-stop": {
+"source": "68a5a737c8",
+"intro": "Pocket Tape Stop neemt zijn ingang de hele tijd op. Play uitzetten speelt de opname af met dalende snelheid tot hij stilstaat, en Play weer aanzetten versnelt hem en fadet over de laatste 0,1 s terug naar de live ingang. Automatiseer Play om de stops in een song te plaatsen. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Tape Stop-module laden, met elke waarde overgenomen zoals hij is, en hij kan ook aan elk mixerslot worden toegevoegd. Zijn editor is een pagina met eenvoudige knoppen.",
+"controls": [
+[
+"Stoptijd",
+"Duur van de vertraging wanneer Sync uit staat, tot 5 s. Onder één seconde weergegeven in ms. De onderkant van het bereik toont Off: de band stopt binnen 5 ms."
+],
+[
+"Begintijd",
+"Duur van de versnelling wanneer Sync uit staat, tot 5 s."
+],
+[
+"Stoptijd (sync)",
+"Duur van de vertraging wanneer Sync aan staat: Off, 1/4 beat, 3/8 beat, 1/2 beat, 3/4 beat, 1 beat, 2, 4, 8 of 16 beats."
+],
+[
+"Starttijd (sync)",
+"Duur van de versnelling wanneer Sync aan staat, met dezelfde stappen."
+],
+[
+"Afspelen",
+"On speelt de ingang af. Off stopt de band. Elke wijziging start een vertraging of een versnelling."
+],
+[
+"Warp",
+"Vorm van de snelheidscurve, -100% tot +100%."
+],
+[
+"Sync",
+"On gebruikt de gesynchroniseerde tijden op het tempo van de song, Off de tijden in seconden."
+]
+],
+"tips": [
+"Het werkt alleen terwijl de song speelt. Met een gestopte song gaat de audio er gewoon doorheen en wordt er niets opgenomen.",
+"Wanneer de band is gestopt, fadet de uitgang naar stilte totdat Play weer wordt aangezet.",
+"Play tijdens een vertraging weer aanzetten versnelt vanaf de snelheid die was bereikt."
+]
+},
 "fx-pocket-trance-delay": {
 "source": "390a4b427a",
 "intro": "Pocket Trance Delay is een delay die aan het tempo van het nummer vastzit. De echo's worden bij het droge signaal opgeteld, dat altijd op vol niveau blijft. Het is de engine waarop projecten van FL Studio Mobile (.flm) hun Trance Delay-module laden, en hij kan ook aan elk mixerslot worden toegevoegd.",
@@ -4913,7 +5645,7 @@
 ]
 },
 "fx-spiral-echo": {
-"source": "60ff7072a7",
+"source": "10033a87c7",
 "intro": "Spiral Echo is een eigen delay van LYNX SHARE voor een mixer-insert. Elke herhaling wordt iets verder in frequentie verschoven dan de vorige, waardoor de echo's stijgen of dalen in plaats van simpelweg te herhalen. In stereo hoort de rechterkant elke herhaling met de tegenovergestelde verschuiving.",
 "controls": [
 [
@@ -4947,6 +5679,10 @@
 [
 "Uitgang",
 "Uitgangsmodus (Stereo op de afbeelding)."
+],
+[
+"Classic / Measured",
+"Measured gebruikt de gemeten feedbackloop: zijn filters, een toegevoegde all-pass, de limiter en het glijden wanneer de delaytijd verandert. Hij gebruikt iets minder CPU. Nieuwe instanties starten op Measured. Projecten en presets die vóór 0.1.27 zijn opgeslagen, laden op Classic en klinken zoals voorheen."
 ]
 ],
 "tips": [
@@ -5308,8 +6044,8 @@
 ]
 },
 "fx-gemini-doubler": {
-"source": "d9526268fd",
-"intro": "Gemini Doubler is een eigen effect van LYNX SHARE dat een zangstem of andere monobron dikker maakt met twee vertraagde, licht gedetuunde kopieën. Voeg hem toe aan de insert van de track die je wilt dubbelen. Elke stem is een pitch-shifting delay van twee gecrossfade grains.",
+"source": "c1f0d8a7eb",
+"intro": "Gemini Doubler is een eigen effect van LYNX SHARE dat een zangstem of andere monobron dikker maakt met twee vertraagde, licht gedetuunde kopieën. Voeg hem toe aan de insert van de track die je wilt dubbelen. Elke stem is een pitch-shifting delay.",
 "controls": [
 [
 "Direct",
@@ -5358,6 +6094,10 @@
 [
 "L / L+R / L-R",
 "Bron voor stem 1: links, som of verschil."
+],
+[
+"Classic / Measured",
+"De leeskop van de stemmen wanneer Align uit staat. Measured leest elke stem met één kop die wegdrijft en terugspringt, zoals gemeten, en gebruikt minder dan de helft van de CPU. Classic gebruikt twee gecrossfade taps. Nieuwe instanties starten op Measured. Projecten en presets die vóór 0.1.27 zijn opgeslagen, laden op Classic en klinken zoals voorheen."
 ]
 ],
 "tips": [
@@ -5462,7 +6202,7 @@
 ]
 },
 "fx-orbit": {
-"source": "5aec5c0bbd",
+"source": "e0ee24a093",
 "intro": "Orbit dekt flanging, chorus en doubling in één effect voor mixer-inserts. Je kiest het karakter met Mode, zoals de stijgende barber-pole-flange, en vormt het met vijf knoppen. De hintregel onder de regelaar Mode beschrijft de huidige modus.",
 "controls": [
 [
@@ -5488,6 +6228,10 @@
 [
 "Modus",
 "Barber-pole, through-zero-flange, tri- en octo-chorus, doubler, ensemble, symphonic en meer."
+],
+[
+"Classic / Measured",
+"Measured verandert de sweep van Rise en Rise / fall, de basisdelay onder Manual en de feedbackcurve in gemeten exemplaren. Bij Rise / fall stijgt de linkerkant terwijl de rechterkant daalt. Nieuwe instanties starten op Measured. Projecten en presets die vóór 0.1.27 zijn opgeslagen, laden op Classic en klinken zoals voorheen."
 ]
 ],
 "tips": [
@@ -6943,7 +7687,7 @@
 ]
 },
 "fx-voice-shift": {
-"source": "040e0a998d",
+"source": "5906a3c3c3",
 "intro": "Voice Shift is een pitch- en formantshifter voor één stem of één monofone lijn. Hij detecteert toonhoogtes tussen 70 Hz en 1000 Hz. Hij meldt zijn latentie voor delaycompensatie en vertraagt het dry-signaal om erbij te passen.",
 "controls": [
 [
@@ -6973,6 +7717,10 @@
 [
 "MIDI-kanaal",
 "Uit, of een kanaal van het Channel Rack waarvan de ingedrukt gehouden noten de toonhoogte bepalen. Transpose en Quantize verschuiven met de afstand van de hoogste ingedrukte noot tot C4, en Robot zingt die noot."
+],
+[
+"Classic / Measured",
+"Measured laat de geluiden die de detector niet als stemhebbend vindt, zoals s- en t-klanken, de formantverschuiving volgen (met Link aan, de toonhoogte en de formant). De schakelaar is alleen zichtbaar bij een instantie uit een project of preset die vóór 0.1.27 is opgeslagen, die op Classic laadt en klinkt zoals voorheen. Zodra je naar Measured omschakelt, wordt hij verborgen. Nieuwe instanties gebruiken Measured."
 ]
 ],
 "tips": [

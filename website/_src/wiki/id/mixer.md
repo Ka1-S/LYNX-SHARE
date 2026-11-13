@@ -1,5 +1,5 @@
 ---
-source: 1e4bc038df
+source: b6e9ef0dd0
 ---
 ![Mixer](/assets/img/mixer.webp)
 
@@ -51,6 +51,18 @@ Panel efek menampilkan sepuluh slot dari insert terpilih.
 - `Kelompokkan ke rak efek audio` di menu slot memasukkan efek ke rack baru, dan `Kelompokkan semua ke rak efek audio` melakukannya untuk seluruh chain. `Pisahkan grup` mengembalikan efek rack satu-chain ke slot-slot.
 - Sakelar di header panel menyalakan atau mematikan semua efek insert itu.
 - Kamu bisa menyeret efek dari database Plugin di [Browser](/wiki/browser/) ke sebuah insert atau slot efek.
+- `Suara bersih` di menu insert menaruh rantai pembersih vokal siap pakai pada insert.
+
+## Edison di sebuah slot
+
+Edison, editor dan perekam audio, bisa berada di slot efek mana pun, beberapa per insert. Jendelanya adalah editor audio dengan satu baris kontrol rekaman.
+
+- `Buka editor audio` (`Ctrl+E`) di menu insert memuat Edison ke slot kosong pertama insert dan membukanya. `Buka editor audio dan rekam` (`Shift+E`) memuatnya siap merekam saat lagu diputar.
+- Mode rekam adalah `Sekarang`, `Saat input` (bawaan: ia menunggu input melewati threshold), `Input`, dan `Saat putar`. `Tambahkan` menaruh rekaman baru setelah audio yang sudah ada. Waktu rekam maksimum adalah `Selamanya` atau 1, 3, 5, 10, 30, atau 60 menit: slot baru dimulai pada 30, `Buka editor audio dan rekam` mengaturnya ke 5.
+- `Sync` memutar audio Edison pada waktu lagu selama lagu diputar.
+- Edison terus merekam setelah kamu menutup jendelanya.
+- `Alat › Makro › Hapus semua instance Edison` mengosongkan setiap slot Edison di proyek, setelah ada pertanyaan.
+- Slot Edison di proyek FL Studio (.flp) terbuka bersama audionya.
 
 ## EQ insert
 
@@ -78,6 +90,8 @@ Grup Mixer dilipat dengan chevron-nya (atau `Alt`+klik untuk semua grup). Fader 
 
 Setiap insert punya tombol siaga rekam. Dengan insert yang disiagakan, Rec dan Play merekam input audionya ke clip Playlist. `Shift+R` menyiagakan insert terpilih dan memulai rekaman dalam satu langkah. Lihat [Merekam](/wiki/recording/).
 
+Saat kamu memilih input eksternal untuk insert yang juga merekam audio lain, LYNX SHARE bertanya apakah akan mengalihkannya ke `Hanya input eksternal`, sehingga take hanya berisi input itu. `Mixer › Perekaman ke disk › Kompensasi latensi` di menu insert menyala secara bawaan. Jika dimatikan, take yang direkam ditempatkan tanpa kompensasi latensi sama sekali.
+
 ## Tombol
 
 `Ctrl+L` dan `Ctrl+Shift+L` berarti seperti ini hanya saat Mixer sedang fokus.
@@ -92,6 +106,8 @@ Setiap insert punya tombol siaga rekam. Dengan insert yang disiagakan, Rec dan P
 | Solo dengan sumber | `Alt+S` | Men-solo insert terpilih dan insert yang mengumpannya |
 | Menghapus insert | `Del` | Menghapus insert terpilih, setelah bertanya |
 | Siaga dan rekam | `Shift+R` | Menyiagakan insert terpilih dan memulai rekaman |
+| Open audio editor | `Ctrl+E` | Memuat Edison ke slot kosong pertama insert dan membukanya |
+| Open audio editor and record | `Shift+E` | Sama, siap merekam saat lagu diputar |
 
 ## Baik diketahui
 
@@ -100,6 +116,8 @@ Setiap insert punya tombol siaga rekam. Dengan insert yang disiagakan, Rec dan P
 - `Ctrl+L` melakukan hal berbeda di Channel Rack dan di Mixer. Di rack ia memilih insert kosong. Di Mixer ia memakai insert terpilih.
 - Sakelar rute muncul di strip lain, bukan di strip yang terpilih.
 - Batasnya 127 insert per proyek dan sepuluh slot efek per insert.
+- Rekaman Edison disimpan sebagai file WAV di folder proyek, bukan di dalam file proyek.
+- Mixer Session di bawah grid clip hanya milik alur kerja Clip-launch. Ia menampilkan insert yang sama dengan Mixer ini. Lihat [Layout](/wiki/layouts/).
 
 ## Terkait
 

@@ -105,6 +105,14 @@ void scanPluginsWithProgress (AudioEngine& engine, std::function<void (int)> onD
 juce::PopupMenu pluginProcessingMenu (AudioEngine& engine, const PluginRef& current, juce::AudioPluginInstance* instance,
                                       std::function<PluginRef* (Song&)> find);
 
+// FL's plugin menu items for a hosted plugin (round 190df; FL's PluginMenu): its spare state ("Store in spare state",
+// "Flip with spare state", FL's hint "A/B compare") and Parameters > "Link all parameters..." (the Remote control settings window
+// stepping through every parameter). `base`: the plugin's first parameter as an automation target (channelParam or
+// effectParam; none = no parameter items).
+void addPluginWrapperItems (juce::PopupMenu& menu, AudioEngine& engine, juce::AudioPluginInstance& plugin, const AutomationTarget& base);
+// The parameters "Link all parameters..." queues (FL: every parameter of the plugin [0x124dea0])
+std::vector<AutomationTarget> allPluginParameterTargets (juce::AudioPluginInstance& plugin, const AutomationTarget& base);
+
 // Menus of known plugins (instruments or effects): the favourites, then "More plugins..." (the plugin picker) and
 // the scan. `onChosen` receives the reference; from the picker (a window of its own, chosen later) it is only
 // called while `owner` (the component whose menu this is) still exists.

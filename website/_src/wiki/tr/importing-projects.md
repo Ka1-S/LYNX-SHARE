@@ -1,5 +1,5 @@
 ---
-source: bcd8a275bd
+source: 358890815a
 ---
 `Dosya › Aç...` (`Ctrl+O`), LYNX SHARE'in kendi `.lynx` projelerini ve ayrıca `.flp`, `.als`, `.flm` ve `.mid` dosyalarını açar. Başka bir programdan gelen proje bir içe aktarmadır: yeni, kaydedilmemiş bir LYNX SHARE projesi olur ve özgün dosyaya asla yazılmaz.
 
@@ -16,8 +16,8 @@ source: bcd8a275bd
 | Format | Dönüştürülenler | Dönüştürülmeyenler |
 |---|---|---|
 | `.flp` (FL Studio) | Kanallar, sample'lar, pattern'ler, slide ve porta notaları, tüm aranjmanlar, işaretçiler, ölçü işareti değişiklikleri, otomasyon, kontrolcü bağlantıları, yönlendirmeli Mixer, sidechain'ler, kanal EQ'su ve yerel efektler | FLEX paketleri şifrelidir ve asla açılmaz. Bir FLEX kanalı, preset adına göre seçilen bir synth patch'i alır |
-| `.als` (Live 11 ve 12) | MIDI, ses, grup ve return izleri, tempo, ölçü işareti, locator'lar, döngü, otomasyonlarıyla ses, pan, mute, solo ve send'ler, Session klipleri ve sahneler, warp işaretçileri | Live'ın kendi efektleri bırakılır. Rack'ler yalnızca ilk zincirini korur. Simpler, Sampler ve drum rack'ler LYNX SHARE sampler'ları olur |
-| `.flm` (FL Studio Mobile) | Tempo, ölçü işareti, kanal başına bir mixer insert'i, şerit başına bir Playlist izi, pattern'ler, ofset ve pitch'li ses klipleri, davul kit'leri, DW Sampler sample'ları ve `.dwp` programları | FLM'in efektleri ve otomasyon şeritleri. Diğer FLM generator'ları dahili synth ile çalar |
+| `.als` (Live 11 ve 12) | MIDI, ses, grup ve return track'leri, tempo, ölçü işareti, locator'lar, döngü, ses, pan, mute, solo ve otomasyonlarıyla send'ler, Session klipleri ve sahneler, warp işaretçileri, rack'ler ve Drum Rack'ler ve Live'ın kendi cihazlarının çoğu (EQ Eight, Compressor, Glue Compressor, Reverb, Delay, Auto Filter, Saturator, Utility, Simpler, Drift ve daha fazlası) LYNX SHARE'in kendi cihazları olarak | Live'ın LYNX SHARE karşılığı olmayan cihazları (Hybrid Reverb, Grain Delay, Amp, Roar, FM Operator patch'leri ve diğerleri) atılır ve listelenir. MIDI Effect Rack'ler dönüştürülmez |
+| `.flm` (FL Studio Mobile) | Tempo, ölçü işareti, kanal başına bir mixer insert'i, şerit başına bir Playlist izi, pattern'ler, ofset ve pitch'li ses klipleri, davul kit'leri, DW Sampler ve `.dwp` programları, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth ve SuperSaw, efektler, otomasyon ve akor setleri | Diğer FLM generator'ları dahili synth ile çalar |
 | `.mid` | Notalar, ölçü işaretleri ve her tempo değişikliği | Bir MIDI dosyası ses taşımaz: kanallar LYNX SHARE synth'ini ya da bir MIDI Out kanalı alır |
 
 Bir `.flp` içindeki üçüncü taraf VST2, VST3 ve CLAP plugin'leri ile bir `.als` içindeki VST2 ve VST3 plugin'leri, aynı plugin bilgisayarınızda kuruluysa kaydedilmiş durumlarıyla yüklenir.

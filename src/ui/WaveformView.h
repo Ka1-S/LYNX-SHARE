@@ -118,13 +118,34 @@ public:
     void setLocator (float fractionOfRegion);
     float getLocator() const noexcept { return locator; }
     std::function<void()> onClick; // a click on the display (the Sampler previews the sample from its start offset)
+    // Round 190ey (live check 190ew SMP-7): a right-click opens the owner's menu (FL's Sampler waveform menu) instead of
+    // the click above; and a small text in the bottom-right corner (FL's bit-depth box, "16" / "32"; empty = none)
+    std::function<void()> onRightClick;
+    void setCornerText (const juce::String& text);
+    const juce::String& getCornerText() const noexcept { return cornerText; }
+
+    // Round 190dh (FL's Sampler page): a faded name drawn at the top right ("Sampler"), the caption hidden, the loop
+    // (file fractions, -1 = none) drawn as two lines, and a zoom: the part of the file shown (display-order fractions,
+    // 0…1 = all). With setZoomable the mouse wheel zooms around the mouse (FL's manual: the wheel zooms the waveform);
+    // onViewChanged follows the view (a scroll bar under it).
+    void setWatermark (const juce::String& text);
+    void setCaptionVisible (bool shown);
+    void setLoop (float start, float end);
+    void setZoomable (bool zoomable) { zoomEnabled = zoomable; }
+    void setView (double start, double end);
+    double getViewStart() const noexcept { return viewStart; }
+    double getViewEnd() const noexcept { return viewEnd; }
+    std::function<void()> onViewChanged;
 
     void paint (juce::Graphics& g) override;
-    void mouseDown (const juce::MouseEvent&) override
+    void mouseDown (const juce::MouseEvent& e) override
     {
-        if (onClick != nullptr)
+        if (e.mods.isPopupMenu() && onRightClick != nullptr)
+            onRightClick();
+        else if (onClick != nullptr)
             onClick();
     }
+    void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override;
 
 private:
     void changeListenerCallback (juce::ChangeBroadcaster*) override { repaint(); }
@@ -134,6 +155,11 @@ private:
     float regionStart = 0.0f, regionEnd = 1.0f;
     bool reversed = false;
     float startOffset = 0.0f, locator = -1.0f;
+    juce::String watermark, cornerText;
+    bool captionShown = true, zoomEnabled = false;
+    float loopStart = -1.0f, loopEnd = -1.0f;
+    double viewStart = 0.0, viewEnd = 1.0;
+    float displayX (double displayFraction) const; // the x of a display-order fraction of the file, through the view
     static constexpr int locatorTrail = 20; // px of the fading trail behind the locator (FL's)
     float regionX (float fraction) const; // the x of a play-order fraction of the region
     juce::Rectangle<int> locatorArea (float fraction) const;

@@ -233,6 +233,12 @@ bool decodeWav (const std::uint8_t* data, std::size_t size, Document& out);
 // Only the markers/regions/loop of a WAV (the audio is read elsewhere). False if none.
 bool decodeWavMarkers (const std::uint8_t* data, std::size_t size, Document& out);
 
+// FL Edison's Regions › Assign all to (round 190ee; Edison_x64.dll 0x86e370): every marker in order gets a trigger note
+// (Marker::keyNum). Layouts: 0 whole keyboard, 1 white notes, 2 black notes (from C5, or lower when there are more
+// than 65 markers, one key up each, at most 124), 3 default / none, 4 C5 for all. (FL's pad layouts are not here.)
+enum class NoteLayout { wholeKeyboard, whiteNotes, blackNotes, none, c5 };
+void assignTriggerNotes (Document& doc, NoteLayout layout);
+
 // What FL hands a plugin about a WAV besides its audio: the starts of its cue points and regions (ascending, clamped to
 // `frames` − 1) and the ACID chunk's beat count (0 = none). `data` may hold only the RIFF header and the non-audio
 // chunks (the "data" chunk skipped).
@@ -240,6 +246,7 @@ struct WavExtras
 {
     std::vector<std::int64_t> markerStarts;
     float acidBeats = 0.0f;
+    int sliceMarkers = 0; // round 190ey: the entries of FL's "strc" slice list after its first (0 = no list)
 };
 WavExtras decodeWavExtras (const std::uint8_t* data, std::size_t size, std::int64_t frames);
 } // namespace lynx::audioedit

@@ -31,7 +31,7 @@ LYNX SHARE 目前為 Alpha 版：難免有不夠完善之處，遇到問題請�
 
 ## What's new
 
-LYNX SHARE 0.1.26：給初學者的簡易工作流程；片段格線的片段檢視、機架和音符機率；Slicex 和 FPC 樂器；帶有樂器、效果器和自動化的 FL Studio Mobile 專案；通道的凍結；停靠的外掛視窗；MIDI 控制器設定檔和第一階段的 MPE；在線上工作階段中共用外掛；以及許多修正。
+LYNX SHARE 0.1.27：效果器重新調整得更接近所模擬的外掛，已儲存的專案保留原本的聲音；修正 Apex Limiter 的真峰值上限；更多 FL Studio 工具（遠端控制設定、自動化曲線、混音器插槽上的 Edison、含循環點和交叉淡化的取樣器頁面、音訊片段選單）；片段格線新增工作階段混音器、鼓機架、場景和 Map Mode，並可從 .als 套裝開啟 Ableton Live 自己的許多裝置；可從 FL Studio Mobile 專案匯入 DW Sampler、Slicer 和更多效果器；簡易工作流程新增效果器分頁、和弦墊和第一首歌導覽；Linux 和 macOS 上的外掛崩潰防護；新標誌；以及許多修正。
 
 ## Features
 

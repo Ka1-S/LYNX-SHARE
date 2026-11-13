@@ -1,5 +1,5 @@
 ---
-source: 217f097c97
+source: a73763934f
 ---
 ![Piano Roll](/assets/img/pianoroll.webp)
 
@@ -69,6 +69,18 @@ Konumu belirlemek için cetvele tıklayın. Cetvelde `Ctrl`+sürükleme, sağ tu
 ## Chance ve velocity range
 
 Her notanın bir Chance'ı ve bir Velocity range'i vardır. Chance, notanın her turda çalma olasılığıdır. Velocity range, velocity'sinin notanın velocity'si ile o velocity artı range arasında değişmesini sağlar. Bunları düzenlemek için şerit kutusunda `Olasılık` veya `Velocity aralığı (LYNX)` seçin. Piano roll menüsündeki `Araçlar › Olasılık (LYNX)`, seçili notaları hepsi ya da yalnızca biri çalacak şekilde gruplar ve `Olasılığı ve velocity aralığını sıfırla` içerir.
+
+## Nota araçları
+
+Piano Roll'un `Araçlar` menüsü FL Studio'nun nota araçlarını diyalog olarak açar. Seçili notalar üzerinde, hiçbiri seçili değilse tüm notalar üzerinde çalışırlar. Bazıları:
+
+| Araç | Tuş | Ne yapar |
+|---|---|---|
+| Limit | `Alt+K` | Notaları oktav oktav bir tuş aralığına taşır, sonra kırpar. `Ton / gam kısıtlaması` altında notaları bir ana tuşta ve FL Studio'nun akorlarından veya gamlarından birinde tutar; `Snap` `Üstte`, `Altta` veya `Dönüşümlü` olarak ayarlanır. `Üste / alta sar` ve `Transpoze`, aralığın dışındaki notaların nereye gideceğini belirler |
+| Flip | `Alt+Y` | `Yatay çevir` notaları zamanda aynalar. İlk başta açık olan `Başlangıç zamanlarını koru` ile başlangıç zamanları aynalanır, notalar uzunluklarını korur. `Dikey çevir` tuşları aralıklarının ortası etrafında aynalar |
+| Randomise | `Alt+R` | Velocity, pan, ince pitch, zamanlama ve uzunlukta, ayrıca Mod X, Mod Y ve release'de rastgele değişiklikler |
+| Scale levels | `Alt+X` | Bir nota seviyesini seçimin başından sonuna ölçekler; `Ofset`, `Orta` (etrafında ölçeklediği değer) ve `Gerilim` ile |
+| LFO | `Alt+O` | Bir nota seviyesine LFO şekli yazar. Bir `Periyot` kaydırıcısına sağ tıklayınca 1 adımdan 512 adıma kadar bir liste çıkar |
 
 ## MIDI araçları ve script'ler
 

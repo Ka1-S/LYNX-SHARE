@@ -115,6 +115,7 @@ inline lynx::EffectParams echoform (es::echoform::Mode mode, double ms)
     p[ef::flutter] = 0.0f;
     p[ef::age] = 0.0f;
     p[ef::timeL] = p[ef::timeR] = ef::timeValue (ms);
+    p[ef::engineLaw] = 0.0f; // round 190dl: these laws are the classic characters' (the measured tape stage: Echo190dlTests)
     return p;
 }
 } // namespace es101
@@ -316,10 +317,12 @@ TEST (echosuite101_spiral_echo)
     base[sp::delay] = sp::delayValue (100.0);
     // echo time
     CHECK (std::abs ((double) argmaxAbs (run (EffectKind::spiralEcho, base, impulse (9600)).l) - 4800.0) < 8.0);
-    // loop gain 1.5 × feedback
+    // loop gain 1.5 × feedback (the classic loop; round 190do's measured loop limits at 0.256, so a 0.1 tone loses
+    // 0.4 dB a pass there: tests/Mod190doTests.inc checks its gain at a lower level)
     for (const auto fb : { 0.25f, 0.5f })
     {
         auto p = base;
+        p[sp::law] = 0.0f;
         p[sp::feedback] = fb;
         const auto y = run (EffectKind::spiralEcho, p, sine (1000.0, 0.1, 1920, 20000));
         const auto a1 = amplitude (y.l, 1000.0, 4800 + 300, 1400), a2 = amplitude (y.l, 1000.0, 9600 + 300, 1400);
@@ -368,9 +371,11 @@ TEST (echosuite101_orbit_modes)
     base[ob::mix] = 1.0f;
     base[ob::feedback] = 0.5f;
     base[ob::manual] = 0.5f;
-    // manual delay (depth 0): +20 ms of manual → echo at ≈ 20.5 ms; equal-power mix
+    // manual delay (depth 0): +20 ms of manual → echo at ≈ 20.5 ms; equal-power mix (the classic voices: round 190do's
+    // measured sweep reads from the manual delay alone, tests/Mod190doTests.inc)
     {
         auto p = base;
+        p[ob::law] = 0.0f;
         p[ob::depth] = 0.0f;
         p[ob::manual] = 0.5f + 0.5f * (float) std::pow (20.0 / 50.0, 0.25);
         p[ob::mode] = ob::modeValue (ob::Mode::riseFall);

@@ -2,6 +2,7 @@
 // tests, field by field as the format page describes them; no file of Image-Line's or of a user is committed. Real
 // projects (FL's FLM demos, a user's share-zip) are imported only by the opt-in test at the end (LYNX_FLM_DIR).
 
+#include "core/FlmDwSampler.h"
 #include "core/FlmFormat.h"
 #include "core/FlmImport.h"
 #include "core/MiniSynth.h"
@@ -58,8 +59,8 @@ inline Bytes head (const std::string& title, double tempo)
     for (int k = 0; k < 4; ++k)
         f64 (b, 0.5);
     b.resize (b.size() + 16, 0x11); // GUID
-    u32 (b, 5);                     // scale
-    u32 (b, 2);                     // root
+    u32 (b, 5);                     // root (F; round 190ds: +344 is the root, every file on disk agrees)
+    u32 (b, 2);                     // scale (FLM's list: 2 = Major Bebop)
     u8 (b, 1);
     u8 (b, 1);
     u32 (b, 9); // channel-id counter
@@ -336,7 +337,7 @@ TEST (flm182c_reads_the_structure)
         return;
     }
     CHECK (p->title == "Test Song" && p->tempo == 130.0 && p->numerator == 3 && p->denominator == 4);
-    CHECK (p->scale == 5 && p->root == 2 && p->appVersion == "5.0.4");
+    CHECK (p->root == 5 && p->scale == 2 && p->appVersion == "5.0.4");
     CHECK (p->created == "2025-07-06 11-39-10" && p->saved == "2026-11-08 02:09:36" && p->originalName == "New Song (1)");
     CHECK (p->racks.size() == 6 && p->channels.size() == 6);
     CHECK (p->racks[1].params.size() == 6 && std::abs (p->racks[1].params[0] - 0.9f) < 1e-6f);
@@ -483,7 +484,7 @@ TEST (flm182c_imports_a_project)
         const auto clip = std::find_if (s.playlist.begin(), s.playlist.end(), [] (const Clip& c) { return c.kind == ClipKind::automation; });
         CHECK (clip != s.playlist.end() && clip->start == 8 * ppq && clip->length == 16 * ppq && clip->automation == 0);
     }
-    CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (one sample)") == 1);
+    CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (FLM's engine)") == 1); // (round 190de: FLM's own voice)
 
     // patterns: 808 content 1 and 2, the drum pattern, the lead's
     CHECK (s.patterns.size() == 4);
@@ -600,7 +601,7 @@ TEST (flm182c_real_projects)
         for (const auto& c : song->channels)
         {
             samplers += c.instrument == InstrumentKind::sampler && ! c.samplePath.empty();
-            directWaves += c.instrument == InstrumentKind::directwave;
+            directWaves += c.instrument == InstrumentKind::directwave || flmdw::isChannel (c);
         }
         std::printf ("  %s: %.1f ms, bpm %.3f %d/4, %zu inserts, %zu channels (%d samplers with a sample, %d DirectWave), %zu patterns (%d notes), "
                      "%zu clips (%d audio), end %.3f beats, %d samples missing, %zu dropped effects, %zu unsupported\n",
@@ -611,7 +612,8 @@ TEST (flm182c_real_projects)
 }
 
 // Opt-in (LYNX_FLM_RESOURCES = FL's "…/FL Studio Mobile/Installed"): a DW Sampler playing one of the DirectWave programs
-// FL ships there becomes LYNX's DirectWave with the program's zones (slice F3)
+// FL ships there plays the program's zones (slice F3; since round 190de on FLM's own DW Sampler voice, which reads the
+// program itself, core/FlmDwSampler.h)
 TEST (flm182c_directwave_program)
 {
     using namespace lynx;
@@ -637,8 +639,8 @@ TEST (flm182c_directwave_program)
     o.resourceRoot = resources;
     const auto song = importFlm (bytes, o);
     const auto* keys = song ? t::channelNamed (*song, "Keys") : nullptr;
-    CHECK (keys != nullptr && keys->instrument == InstrumentKind::directwave && keys->zones.size() > 1);
-    CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (DirectWave program)") == 1 && report.missingSamples == 0);
+    CHECK (keys != nullptr && keys->instrument == InstrumentKind::sampler && flmdw::isChannel (*keys) && keys->zones.size() > 1);
+    CHECK (report.converted.count ("FL Studio Mobile: DW Sampler (multisample, FLM's engine)") == 1 && report.missingSamples == 0);
     if (keys != nullptr)
         std::printf ("  Electric.dwp: %zu zones, first %s\n", keys->zones.size(), keys->zones.empty() ? "-" : keys->zones[0].path.c_str());
 }

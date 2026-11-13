@@ -9,6 +9,10 @@ device, so you can write a profile for your own controller.
   - *Generic controller* uses no profile: link each control by hand with a control's right-click menu ›
     *Link to MIDI controller*.
   - Any profile can be forced by picking it from the list.
+  - For the detailed way use *Link to controller...* in the same menu: the "Remote control settings" window sets
+    the port, channel and controller number (or detects them), a mapping formula (presets: inverted, log scale,
+    switch, dead zone...), smoothing, Omni and whether other controls on the same controller are unlinked. Give a
+    device a *Port* number in Settings › MIDI › Input devices when links should follow only that device.
 - **Links made by hand come first.** A controller (CC) you linked by hand is never taken by a profile.
 - **Add your own profile:** click *Controller profiles folder* in Settings › MIDI, put a `<name>.lynxctl` file
   there, then click *Refresh device list*. Your profiles are listed with "(user)". A file of yours with the same

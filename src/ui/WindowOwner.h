@@ -6,6 +6,8 @@
 
 namespace lynx
 {
+class Workspace;
+
 // Secondary windows (plugin, channel settings, EQ, automation) always stay above the LYNX main window,
 // without staying above other programs: on Windows, the main window becomes their "owner".
 void setMainWindowForOwnership (juce::Component* mainWindow);
@@ -14,6 +16,22 @@ void keepAboveMainWindow (juce::Component& window); // call after the window is 
 // The main window's native handle (HWND / X11 Window id; nullptr without one): a plugin's window in a separate
 // process is kept above it (round 162d).
 void* mainWindowHandle();
+
+// Round 190ev (issue #152, 0.1.26: "the Channel rack almost never comes to the front"): LYNX's own plugin-like editor
+// windows (channel settings, the native effects' and controllers' editors, automation clip settings) are FL's docked
+// plugin windows: child windows of the main window floating in the workspace among the docked panels and plugin
+// windows (issue #116), so a click on a panel brings it in front of them and a click on one of them brings it back. As
+// owned top-level windows they stayed above every panel whatever was clicked. They get LYNX's own title bar (a child
+// window has no native one) with its close button. `setEditorDock` names the workspace (nullptr: none, at shutdown);
+// FL's "Detach all new plugins" (`setEditorsDetached`) or LYNX_DOCKED_PLUGINS=0 keep them owned top-level windows.
+void setEditorDock (Workspace* workspace);
+void setEditorsDetached (bool detached);
+// Call where keepAboveMainWindow was called (after the window is visible): docks the window, or keeps it above the main
+// window when it can't be docked. True when it is docked.
+bool dockOrKeepAbove (juce::DocumentWindow& window);
+// A window's top-left on the screen, and moving it there, docked or not (a docked window's own position is in the main
+// window's client area).
+void setWindowScreenPosition (juce::Component& window, juce::Point<int> screenTopLeft);
 
 // Keys a secondary window does not use (no component in it took them) go to the main window's global shortcuts, as in
 // FL (round 165q / issue #12: Space, F12 or a user's key did nothing while the Undo history, Settings, a plugin window...
@@ -100,8 +118,22 @@ void removeDialogTextFocus();
 // The dialog's first editable, visible text field (top to bottom, then left to right), or nullptr.
 juce::TextEditor* firstTextField (juce::Component& dialog);
 
-// The LYNX logo (256 px, with transparency).
+// The LYNX SHARE logo by w3teal as the app icon (the mark on its dark tile; 512 px, with transparency), and the icon's
+// small-size form (thicker lines, the mark larger in the tile: tools/make_logo.py) with the pepper stem for 21-32
+// physical pixels and without it for 20 px and less. All three are square with the tile filling them.
 juce::Image logoImage();
+juce::Image logoSmallImage();
+juce::Image logoTinyImage();
+// The mark alone (w3teal's lynx in the red ring with the stem, no tile; 512 px) and its small-size form (128 px).
+juce::Image logoMarkImage();
+juce::Image logoMarkSmallImage();
+// Where the mark's ring sits in the mark pictures (the ears and the stem rise above it): centre and radius as
+// fractions of the picture's side.
+struct LogoDisc { float x, y, r; };
+LogoDisc logoDisc();
+// The app icon at px x px, scaled down in halving steps (one big jump from 512 px aliases) and cached; the small-size
+// forms up to 32 px. For window title bars and other small places.
+juce::Image logoAt (int px);
 
 // The CPU time this process has used so far, in seconds (user + kernel; --editorcpu).
 double processCpuSeconds();

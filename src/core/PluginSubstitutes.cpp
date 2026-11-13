@@ -8,6 +8,7 @@
 #include <initializer_list>
 #include <limits>
 #include <map>
+#include <mutex>
 
 #include "core/Effects.h"
 #include "core/FabFilterStates.h"
@@ -306,6 +307,10 @@ map = xml:Era -> Era | steps 0:0 0.6662:0.5 0.9995:1
 # RevPitch (reverse), BBDuck (bucket), Clarity (clean), DuckTape (tape), PitchDuck (pitch), LoFi, Quartz (clean),
 # PhaserDDL (phaser), RichPitch (detune), ChromeTape (tape), Analog; the "duck" variants' built-in ducking is not kept
 map = xml:Mode -> Mode | steps 0:0.041667 0.0828:0.208333 0.1245:0.291667 0.1662:0.458333 0.2078:0.708333 0.2495:0.791667 0.2912:0.875 0.3328:0.291667 0.3745:0.541667 0.4162:0.041667 0.4578:0.791667 0.4995:0.125 0.5412:0.541667 0.5828:0.625 0.6245:0.958333 0.6662:0.041667 0.7078:0.375 0.7495:0.041667
+# round 190ca measured the Tape mode's echoes of drums, music and a vocal 2.1 / 1.2 / 1.8 dB louder than the reference's
+# while a single impulse came out 0.9 dB quieter (the level laws differ with the signal) and set Output -1.67 dB. Round
+# 190dl: Echoform's measured tape stage (Law = Measured, every new instance) has that level law itself (a record gain
+# with memory, fitted on the same renders), so the translation leaves Output at 0 dB again
 
 [valhalla-freqecho]
 product = ValhallaFreqEcho
@@ -557,7 +562,7 @@ vendor = Complete Access (role)
 lynx = Crest Compressor
 # round 190ar: the references with a fitted setting map load at the mapped settings (core/FittedMaps.inc)
 translate = fitted-map
-names = SSL Native Bus Compressor 2; SSL G3 MultiBusComp; SSL 360 Link Bus Compressor; SSL Native X-Comp v6; SSL Fusion HF Compressor; VBC FG-Grey; VBC FG-MU; VBC FG-Red; smartcomp3; smartcomp2; purecomp; learncomp; Harrison_LookaheadCompressor; Harrison_MPCCompressor; VM FG-Stress; VM FG-Bomber
+names = SSL Native Bus Compressor 2; SSL 360 Link Bus Compressor; SSL Native X-Comp v6; SSL Fusion HF Compressor; VBC FG-Grey; VBC FG-MU; VBC FG-Red; smartcomp3; smartcomp2; purecomp; learncomp; Harrison_LookaheadCompressor; Harrison_MPCCompressor; VM FG-Stress; VM FG-Bomber
 
 [complete-access-vintage-comps]
 product = vintage compressor models (Slate FG-116 / FG-76 / FG-401 / FG-A / FG-Dynamics, SSL X-ValveComp)
@@ -596,21 +601,55 @@ product = gates (SSL X-Gate, Slate Gate Classic / Drums, Harrison Spectral Gate)
 vendor = Complete Access (role)
 lynx = Sentry Gate
 translate = fitted-map
-names = SSL X-Gate; VM Gate Classic; VM Gate Drums; Harrison_SpectralGate
+names = SSL X-Gate; VM Gate Classic; Harrison_SpectralGate
+
+# round 190dm: the three-band bus compressor stands in on Prism Multiband (three bands on its crossovers, set alike), at its
+# setting map's default (fitted black-box on its probes, /mnt/e/lynx-work/dyn190dm/fit): every bank setting played
+# through this preset scores 4.25 / 2.76 (tp172c / programme) against Crest's defaults 2.50 / 2.36. (MO-TT stays on the
+# Compressor: on Prism its map wins at matched settings, but its default as a stand-in scores 2.92 / 2.48 against 3.08 / 2.56.)
+[three-band-bus-compressor]
+product = three-band bus compressor (SSL G3 MultiBusComp)
+vendor = Complete Access (role)
+lynx = Prism Multiband
+names = SSL G3 MultiBusComp
+preset = Bands=0.4; Band layout=0; Crossover 1=0.216712; Crossover 2=0.828259; Slope=0.5; Mix=1; Processing=1; B1 threshold=0.97449; B1 ratio=0.47828; B1 range=0.0; B1 knee=0.5; B1 attack=0.33953; B1 release=0.53006; B1 level=0.48994; B2 threshold=0.97449; B2 ratio=0.47828; B2 range=0.0; B2 knee=0.5; B2 attack=0.33953; B2 release=0.53006; B2 level=0.48994; B3 threshold=0.97449; B3 ratio=0.47828; B3 range=0.0; B3 knee=0.5; B3 attack=0.33953; B3 release=0.53006; B3 level=0.48994
+
+# round 190dm: the drum gate stands in on Sentry Gate's transient trigger, at the reference's default settings (its laws
+# measured on its probes: threshold -60 dB, range 100 dB, release 500 ms, hold 46.75 ms, Mid shape, sensitivity 5): every
+# bank setting played through this preset scores 4.12 / 3.41 (tp172c / programme) against the level gate's 2.25 / 1.73
+[drum-gate]
+product = drum gate (Slate Gate Drums)
+vendor = Complete Access (role)
+lynx = Sentry Gate
+names = VM Gate Drums
+preset = Trigger=1; Threshold=0; Range=1; Attack=0.1316; Release=0.46416; Hold=0.43243; Knee=0; Release shape=0.5; Sensitivity=0.44444
 
 [complete-access-reverbs]
 product = reverbs (LiquidSonics Lustrous Plates / Seventh Heaven / Cinematic Rooms, Slate VerbSuite Classics, SSL FlexVerb / PlateVerb / SpringVerb, sonible smart:reverb)
 vendor = Complete Access (role)
 lynx = Foil Plate
 names = Lustrous Plates; Seventh Heaven; Seventh Heaven Professional; Cinematic Rooms; Cinematic Rooms Professional; Illusion; VerbSuite Classics; SSL Native FlexVerb; SSL PlateVerb; SSL SpringVerb; SSL GateVerb; smartreverb2; smartreverb; pureverb; learnreverb; Vocal Reverb
-preset = Decay=0.3; Mix=1
+preset = Decay=0.3; Mix=1; Law=0
 mix = 0.25
+# round 190ca: four of these devices at their own default setting, from Foil setting maps fitted on physical measurements of
+# each device's probe renders (decay per band, onset, dry gain, wet energy and band balance, echo density, L/R correlation,
+# band limit; the lab folder nebula190ca/maps, fitverb.py). FlexVerb and VerbSuite default to 100 % wet, the two SSL plates
+# to an even mix. Both shelves sit at 700 Hz: equal gains there are a flat wet gain (Foil has no wet level control).
+# round 190cm: FlexVerb and VerbSuite keep the role's 25 % wet (mix=0.25 = the slot's dry/wet, the effect itself all wet as
+# in `preset`): no state of theirs is translated, so the mix a project used is unknown, and before round 190ca their
+# stand-in opened at 25 % — an import must not suddenly get wetter. The fitted character (decay, size, EQ, type) stays.
+default = SSL PlateVerb | Mix=0.2687; Predelay=0.4168; Decay=0.3028; Size=1.0000; Width=0.5000; Mod rate=0.0000; Mod depth=1.0000; Low EQ freq=0.7420; Low EQ gain=0.7917; High EQ freq=0.0606; High EQ gain=1.0000; Type=0.2900; Low cut=0.3268; Voicing=1.0000
+default = SSL SpringVerb | Mix=0.1933; Predelay=0.0000; Decay=0.4877; Size=1.0000; Width=0.5000; Mod rate=0.0000; Mod depth=0.2309; Low EQ freq=0.7420; Low EQ gain=1.0000; High EQ freq=0.0606; High EQ gain=0.9915; Type=0.3750; Low cut=0.3764; Voicing=0.0000
+default = SSL Native FlexVerb | Mix=1.0000; Predelay=0.0000; Decay=0.0541; Size=0.2500; Width=0.4694; Mod rate=0.0000; Mod depth=0.0768; Low EQ freq=0.7420; Low EQ gain=0.8524; High EQ freq=0.0606; High EQ gain=0.9149; Type=0.8750; Low cut=0.5996; Voicing=0.0000; mix=0.25
+default = VerbSuite Classics | Mix=1.0000; Predelay=0.1351; Decay=0.2780; Size=1.0000; Width=0.5000; Mod rate=0.0000; Mod depth=0.0000; Low EQ freq=0.7420; Low EQ gain=0.2242; High EQ freq=0.0606; High EQ gain=0.5054; Type=0.2900; Low cut=0.0000; Voicing=1.0000; mix=0.25
 
 [complete-access-delays]
 product = delays (SSL X-Echo / X-Delay, Slate Stellar Echo SD-201, Harrison 3D Delay)
 vendor = Complete Access (role)
 lynx = Echoform
-preset = Mode=0.0415; Sync L=0.6248; Note L=0.4498; Feedback=0.125; Mix=0.25
+# round 190dl: these devices keep the Classic law (the measured tape stage is ValhallaDelay's; on the bank it lowered
+# the multi-head tape row's tail score 2.72 -> 2.28)
+preset = Mode=0.0415; Sync L=0.6248; Note L=0.4498; Feedback=0.125; Mix=0.25; Law=0
 names = SSL Native X-Echo; SSL X-Delay; Stellar Echo SD-201; Harrison_3DDelay
 
 [complete-access-saturators]
@@ -2407,7 +2446,18 @@ int translateWavesHDelay (const std::vector<std::uint8_t>& state, EffectSlot& sl
     const auto depth = wavesValue (rw, 19).value_or (0.0);
     p[e::modDepth] = (float) std::clamp (std::sqrt (std::max (0.0, depth) / 100.0), 0.0, 1.0);
     if (depth > 0.0)
-        p[e::modRate] = (float) std::clamp (std::pow ((std::clamp (wavesValue (rw, 20).value_or (0.1), 0.01, 10.0) - 0.01) / 9.99, 1.0 / 2.3277), 0.0, 1.0);
+    {
+        // round 190dl [EXEC] (tp172d bank, Depth 50 %, its stored rate 0.1, Sync own BPM 1/8 dotted = 375 ms, LoFi on): the
+        // echo time swings as a triangle of ± 87.5 ms (23.3 % of the time) about the set time, period 5.0 s, both sides in
+        // step (echo train of an impulse and of a noise burst, fitted to 3 ms). Echoform's Clock law: swing = ½ · depth of
+        // the time, the triangle, rate × 2. One depth and one rate were measured: the depth is taken as proportional to
+        // the time and linear in the percentage, as on a clocked line (the PCM42 lineage the vendor names)
+        const auto rate = 2.0 * std::clamp (wavesValue (rw, 20).value_or (0.1), 0.01, 5.0);
+        p[e::modClock] = 1.0f;
+        p[e::modShape] = 1.5f / 5.0f; // triangle
+        p[e::modDepth] = (float) std::clamp (0.932 * depth / 100.0, 0.0, 1.0);
+        p[e::modRate] = (float) std::clamp (std::pow ((rate - 0.01) / 9.99, 1.0 / 2.3277), 0.0, 1.0);
+    }
     return 8;
 }
 
@@ -3160,13 +3210,37 @@ PluginIdentity pluginIdentity (const ForeignPlugin& plugin)
     return id;
 }
 
+// round 190ca: a role entry stands in for several devices whose own default settings differ. `default = <plugin name> |
+// <preset items>` gives one of them its own starting preset (the values a setting map fitted on the device's probe
+// renders gives at the device's default setting); it is applied over `preset` when that plugin is replaced, with the slot
+// mix at 100 % (the effect's own Mix carries the device's dry/wet). Kept beside the table (entry key -> defaults).
+// Round 190cm: an item "mix=<0…1>" (lower case, like the `mix` key and a map's target) is the slot's dry/wet instead of
+// 100 %: for a device whose own default is all wet (a send reverb) while nothing in its saved state tells the mix it
+// was used at — the stand-in then opens at the role's wet amount, as it did before the device had a preset.
+struct DeviceDefault
+{
+    std::string nameKey;
+    std::vector<std::pair<int, float>> preset;
+    float slotMix = 1.0f;
+};
+std::mutex& deviceDefaultsLock()
+{
+    static std::mutex m;
+    return m;
+}
+std::map<std::string, std::vector<DeviceDefault>>& deviceDefaults()
+{
+    static std::map<std::string, std::vector<DeviceDefault>> d;
+    return d;
+}
+
 std::vector<SubstituteEntry> parseSubstituteTable (std::string_view text, int* errors)
 {
     std::vector<SubstituteEntry> entries;
     int bad = 0;
     std::optional<SubstituteEntry> current;
     std::string lynxName;
-    std::vector<std::string> presetItems, mapItems;
+    std::vector<std::string> presetItems, mapItems, defaultItems;
     bool entryBad = false;
 
     auto finish = [&] {
@@ -3200,6 +3274,44 @@ std::vector<SubstituteEntry> parseSubstituteTable (std::string_view text, int* e
             else
                 ++bad;
         }
+        std::vector<DeviceDefault> defaults;
+        for (const auto& line : defaultItems)
+        {
+            const auto bar = line.find ('|');
+            DeviceDefault d;
+            if (bar != std::string::npos)
+                d.nameKey = matchKey (trim (line.substr (0, bar)));
+            if (d.nameKey.empty())
+            {
+                ++bad;
+                continue;
+            }
+            for (const auto& item : splitList (line.substr (bar + 1), ';'))
+            {
+                const auto eq = item.rfind ('=');
+                float v = 0;
+                if (eq != std::string::npos && trim (item.substr (0, eq)) == "mix" && parseFloat (trim (item.substr (eq + 1)), v))
+                {
+                    d.slotMix = std::clamp (v, 0.0f, 1.0f);
+                    continue;
+                }
+                const auto index = eq == std::string::npos ? -1 : paramNamed (*kind, item.substr (0, eq));
+                if (index < 0 || ! parseFloat (trim (item.substr (eq + 1)), v))
+                {
+                    ++bad;
+                    continue;
+                }
+                d.preset.push_back ({ index, std::clamp (v, 0.0f, 1.0f) });
+            }
+            defaults.push_back (std::move (d));
+        }
+        {
+            const std::lock_guard<std::mutex> guard (deviceDefaultsLock());
+            if (defaults.empty())
+                deviceDefaults().erase (current->key);
+            else
+                deviceDefaults()[current->key] = std::move (defaults);
+        }
         if (current->product.empty())
             current->product = current->key;
         entries.push_back (std::move (*current));
@@ -3224,6 +3336,7 @@ std::vector<SubstituteEntry> parseSubstituteTable (std::string_view text, int* e
             lynxName.clear();
             presetItems.clear();
             mapItems.clear();
+            defaultItems.clear();
             entryBad = false;
             continue;
         }
@@ -3289,6 +3402,8 @@ std::vector<SubstituteEntry> parseSubstituteTable (std::string_view text, int* e
         else if (key == "preset")
             for (auto& item : splitList (value, ';'))
                 presetItems.push_back (std::move (item));
+        else if (key == "default")
+            defaultItems.push_back (value);
         else if (key == "mix")
         {
             float v = 1;
@@ -3398,6 +3513,30 @@ EffectSlot makeSubstituteSlot (const SubstituteEntry& entry, const PluginIdentit
         if (index >= 0 && index < maxEffectParams)
             slot.params[(std::size_t) index] = value;
     slot.mix = entry.mix;
+    if (original != nullptr) // round 190ca: the replaced device's own default preset, when the entry carries one
+    {
+        std::vector<std::string> keys { matchKey (original->name) };
+        auto file = original->path;
+        std::replace (file.begin(), file.end(), '\\', '/');
+        if (const auto slash = file.rfind ('/'); slash != std::string::npos)
+            file = file.substr (slash + 1);
+        if (const auto dot = file.rfind ('.'); dot != std::string::npos)
+            file = file.substr (0, dot);
+        keys.push_back (matchKey (file));
+        const std::lock_guard<std::mutex> guard (deviceDefaultsLock());
+        if (const auto it = deviceDefaults().find (entry.key); it != deviceDefaults().end())
+            for (const auto& key : keys)
+            {
+                const auto d = std::find_if (it->second.begin(), it->second.end(), [&key] (const DeviceDefault& x) { return ! key.empty() && x.nameKey == key; });
+                if (d == it->second.end())
+                    continue;
+                for (const auto& [index, value] : d->preset)
+                    if (index >= 0 && index < maxEffectParams)
+                        slot.params[(std::size_t) index] = value;
+                slot.mix = d->slotMix;
+                break;
+            }
+    }
 
     int count = 0;
     if (original != nullptr && ! original->state.empty() && ! entry.params.empty())

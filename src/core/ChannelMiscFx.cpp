@@ -135,6 +135,7 @@ void NoteEcho::process (int channel, const NoteEvent* in, int inCount, double st
             Held h;
             h.key = e.key;
             h.onTick = tick;
+            h.noteId = e.noteId;
             // FL's fat mode (REA round 149 [DECOMP FLEngine FUN_00d28c90, the channel echo generator]): a second
             // series mirrors the first (the pan and pitch steps negated) and every echo plays at feedback × the note's
             // level instead of decaying (feedback^k)
@@ -168,6 +169,9 @@ void NoteEcho::process (int channel, const NoteEvent* in, int inCount, double st
                     // units, half the note's 0..1 range; not mirrored by fat mode, which negates pan and pitch only)
                     echo.modX = (float) std::clamp ((double) e.modX + 0.5 * s.modX * k, 0.0, 1.0);
                     echo.modY = (float) std::clamp ((double) e.modY + 0.5 * s.modY * k, 0.0, 1.0);
+                    // each repeat is a voice of its own in FL: its own identity, so the note's end (or another
+                    // repeat's) does not end it (round 190ej); the k-th entry's "off" below derives the same id
+                    echo.noteId = noteEchoId (e.noteId, count + 1);
                     if (count < (int) h.echoKeys.size())
                         h.echoKeys[(std::size_t) count++] = echo.key;
                     schedule ({ tick + k * delay, echo, gain });
@@ -179,9 +183,13 @@ void NoteEcho::process (int channel, const NoteEvent* in, int inCount, double st
         }
         else if (e.type == NoteEvent::Type::off)
         {
-            // the oldest held note of this key
+            // the note this "off" ends (round 190ej: by its identity), else the oldest held note of this key
             auto found = -1;
-            for (int j = 0; j < heldCount; ++j)
+            for (int j = 0; j < heldCount && e.noteId != 0; ++j)
+                if (held[(std::size_t) j].noteId == e.noteId && held[(std::size_t) j].key == e.key)
+                    found = j;
+            const auto byId = found >= 0;
+            for (int j = 0; j < heldCount && ! byId; ++j)
                 if (held[(std::size_t) j].key == e.key && (found < 0 || held[(std::size_t) j].onTick < held[(std::size_t) found].onTick))
                     found = j;
             if (found < 0)
@@ -193,6 +201,7 @@ void NoteEcho::process (int channel, const NoteEvent* in, int inCount, double st
                 auto off = e;
                 off.echo = true;
                 off.key = h.echoKeys[(std::size_t) i];
+                off.noteId = noteEchoId (h.noteId, i + 1);
                 const auto k = echoes > 0 ? i % echoes + 1 : 1;
                 schedule ({ tick + k * delay, off, 1.0f }); // the echo keeps the note's length
             }

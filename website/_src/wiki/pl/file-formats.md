@@ -1,5 +1,5 @@
 ---
-source: c457d438ee
+source: a79e43f031
 ---
 LYNX SHARE zapisuje projekty jako pliki `.lynx`. Otwiera też projekty innych programów, wczytuje typowe pliki audio oraz eksportuje audio, MIDI i projekty dla innych programów. Tabela wylicza każdy format wersji 0.1.26 alpha.
 
@@ -20,8 +20,8 @@ Projekt otwarty z formatu innego programu to import. `Plik › Zapisz` pyta wted
 | `.zip` | `Plik › Otwórz...` rozpakowuje go do folderu i otwiera projekt w środku | `Plik › Eksportuj › Projekt z samplami (.zip)...` | Otwiera też spakowaną paczkę pętli FL Studio |
 | `.lynxpack` | Otwiera się po podsumowaniu. Partia jest scalana z projektem gospodarza | `Plik › Sesja online › Wyślij projekt...` | Projekt lub partia wysłana w [sesji online](/wiki/online-sessions/). Partie pluginów zewnętrznych podróżują jako rendery audio plus ustawienia pluginu |
 | `.flp` | `Plik › Otwórz...` | `Plik › Eksportuj › Projekt FL Studio...`, projekt FL Studio 2026 albo spakowana paczka pętli | Natywne pluginy grają na odtworzonych silnikach o różnej dokładności. Paczki FLEX nigdy nie są otwierane. Przy eksporcie instrumenty i efekty tylko z LYNX są renderowane do audio albo zamieniane na najbliższy plugin FL, a modulatory są pomijane. Zobacz [Przejście z FL Studio](/wiki/coming-from-fl-studio/) |
-| `.flm` | `Plik › Otwórz...` | Nie | Projekt FL Studio Mobile. Częściowo: instrumenty inne niż MiniSynth, Transistor Bass, 3x Osc, GMSynth i DirectWave grają wbudowanym syntezatorem |
-| `.als` | `Plik › Otwórz...`, sety Live 11 i 12 | `Plik › Eksportuj › Set Ableton Live (.als)...`, dla Live 12 lub Live 11 | Przy imporcie własne efekty Live są pomijane. Przy eksporcie własne instrumenty i efekty LYNX SHARE nie są konwertowane, a automatyka parametrów efektów i trasy insert do insertu są pomijane. Zobacz [Przejście z Ableton Live](/wiki/coming-from-ableton/) |
+| `.flm` | `Plik › Otwórz...` | Nie | Projekt FL Studio Mobile. Częściowo: instrumenty inne niż MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, Slicer i DirectWave grają wbudowanym syntezatorem |
+| `.als` | `Plik › Otwórz...`, sety Live 11 i 12 | `Plik › Eksportuj › Set Ableton Live (.als)...`, dla Live 12 lub Live 11 | Przy imporcie urządzenia Live bez odpowiednika w LYNX SHARE są pomijane. Przy eksporcie własne instrumenty i efekty LYNX SHARE nie są konwertowane, a automatyka parametrów efektów i trasy insert do insertu są pomijane. Zobacz [Przejście z Ableton Live](/wiki/coming-from-ableton/) |
 | `.mid`, `.midi` | `Plik › Otwórz...` tworzy nowy projekt. `Plik › Importuj › Plik MIDI...` i Piano Roll importują do bieżącego | `Plik › Eksportuj › Plik MIDI...` (`Ctrl+Shift+M`) | |
 | `.wav` | Jako sampel albo klip audio | `Plik › Eksportuj › Plik WAV...`, 16-bit, 24-bit lub 32-bit float | Opcjonalnie dither, informacje o tempie, znaczniki pętli i znaczniki Playlisty |
 | `.mp3` | Jako sampel albo klip audio | `Plik › Eksportuj › Plik MP3...` | Stały bitrate |

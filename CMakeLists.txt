@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 # macOS: Big Sur or newer (universal builds pass -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"); set before project()
 set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
 
-project(LYNX VERSION 0.1.26 LANGUAGES C CXX)
+project(LYNX VERSION 0.1.27 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,6 +39,10 @@ add_library(lynx_core STATIC
     src/core/MarkerPlan.cpp
     src/core/Performance.cpp
     src/core/ClipLauncher.cpp
+    src/core/SessionOps.cpp
+    src/core/RemoteMap.cpp
+    src/core/DrawMode.cpp
+    src/core/Groove.cpp
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
     src/core/RackRenderer.cpp
@@ -51,9 +55,15 @@ add_library(lynx_core STATIC
     src/core/XmlLite.cpp
     src/core/Gzip.cpp
     src/core/AlsImport.cpp
+    src/core/AlsDevices.cpp
+    src/core/AlsDevicesLot2.cpp
+    src/core/AlsDevicesLot3.cpp
     src/core/FlmFormat.cpp
     src/core/FlmImport.cpp
     src/core/FlmEffects.cpp
+    src/core/FlmNoteFx.cpp
+    src/core/FlmDwSampler.cpp
+    src/core/FlmSlicer.cpp
     src/core/AlsExport.cpp
     src/flp/FlpWrite.cpp
     src/core/Effects.cpp
@@ -88,6 +98,10 @@ add_library(lynx_core STATIC
     src/core/ThemePalette.cpp
     src/core/LoopStarter.cpp
     src/core/SimpleTracks.cpp
+    src/core/KeyFollow.cpp
+    src/core/GoalKnobs.cpp
+    src/core/ChainPresets.cpp
+    src/core/SoundLibrary.cpp
     src/core/GamepadMap.cpp
     src/core/ControllerProfile.cpp
     src/core/ControllerSession.cpp
@@ -109,6 +123,7 @@ add_library(lynx_core STATIC
     src/core/Harmor.cpp
     src/core/Gms.cpp
     src/core/GmsMobile.cpp
+    src/core/PocketSuperSaw.cpp
     src/core/Morphine.cpp
     src/core/FruitKick.cpp
     src/core/BassDrum.cpp
@@ -142,7 +157,7 @@ add_library(lynx_core STATIC
     src/core/FlLegacyFx.cpp
     src/core/PocketFx.cpp
     src/core/PocketMultiFx.cpp
-    src/core/PocketFxA.cpp src/core/PocketFxB.cpp src/core/PocketFxC.cpp
+    src/core/PocketFxA.cpp src/core/PocketFxB.cpp src/core/PocketFxC.cpp src/core/PocketFxD.cpp src/core/PocketFxE.cpp src/core/PocketReverb.cpp
     src/core/VisualFx.cpp
     src/core/FlExtraFx.cpp
     src/core/Scratcher.cpp
@@ -183,6 +198,7 @@ add_library(lynx_core STATIC
     src/core/FruityPhaser.cpp
     src/core/FruityFilters.cpp
     src/core/NewtoneFx.cpp
+    src/core/EdisonFx.cpp
     src/core/MixSuite.cpp
     src/core/EmberClassic.cpp
     src/core/VoxStrip.cpp
@@ -192,6 +208,7 @@ add_library(lynx_core STATIC
     src/core/VocalPitch.cpp
     src/core/LynxTune.cpp
     src/core/LynxVerbs.cpp
+    src/core/NebulaCloud.cpp
     src/core/FlPatcher.cpp
     src/core/Patcher.cpp
     src/core/Rack.cpp
@@ -210,6 +227,7 @@ add_library(lynx_core STATIC
     src/core/DynamicsSuite.cpp
     src/core/VoiceTools.cpp
     src/core/MidiControls.cpp
+    src/core/LinkFormula.cpp
     src/core/MidiOut.cpp
     src/core/FormulaController.cpp
     src/core/VoiceShift.cpp
@@ -395,10 +413,11 @@ if(LYNX_BUILD_APP)
         COMPANY_NAME "Ka1-S"
         COMPANY_COPYRIGHT "Copyright (C) 2026 Ka1-S. Licensed under the GNU AGPL-3.0."
         DESCRIPTION "LYNX SHARE digital audio workstation"
-        # macOS bundle (Info.plist, .icns made from the 1024 px badge); ignored elsewhere
+        # macOS bundle (Info.plist, .icns made from the 1024 and 256 px icons on Apple's icon grid, written by
+        # tools/make_logo.py); ignored elsewhere
         BUNDLE_ID "com.ka1-s.lynx"
-        ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/resources/lynx_badge.png"
-        ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/lynx_icon_256.png"
+        ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/lynx-icon-1024.png"
+        ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/lynx-icon-256.png"
         MICROPHONE_PERMISSION_ENABLED TRUE
         MICROPHONE_PERMISSION_TEXT "LYNX SHARE records audio from your microphone or audio interface when you arm a track and press Record."
         DOCUMENT_EXTENSIONS lynx flp mid
@@ -413,6 +432,7 @@ if(LYNX_BUILD_APP)
         src/platform/Package.cpp
         src/platform/NativeEmbed.cpp
         src/engine/AudioEngine.cpp
+        src/engine/AudioEngineSession.cpp
         src/engine/ChannelRackProcessor.cpp
         src/engine/Metronome.cpp
         src/engine/SampleLibrary.cpp
@@ -471,6 +491,7 @@ if(LYNX_BUILD_APP)
         src/ui/PluginEditors.cpp
         src/ui/PatcherEditor.cpp
         src/ui/RackEditor.cpp
+        src/ui/DrumRackShot.cpp
         src/ui/DynamicsDisplays.cpp
         src/ui/ExportDialog.cpp
         src/ui/FlStudioExportDialog.cpp
@@ -480,6 +501,7 @@ if(LYNX_BUILD_APP)
         src/ui/OtherAppsExport.cpp
         src/ui/AutoSamplerDialog.cpp
         src/ui/AutomationUi.cpp
+        src/ui/RemoteControl.cpp
         src/ui/ControllerEditors.cpp
         src/ui/MidiOutEditor.cpp
         src/ui/VisualEditors.cpp
@@ -542,11 +564,17 @@ if(LYNX_BUILD_APP)
         src/ui/ToolWindow.cpp
         src/ui/SpeechDialog.cpp
         src/ui/TempoTapper.cpp
+        src/ui/TempoDetectionDialog.cpp
         src/ui/LoopStarterWindow.cpp
         src/ui/SimpleWorkflow.cpp
         src/ui/FinishDock.cpp
+        src/ui/SimpleDock.cpp
         src/ui/HistoryPanel.cpp
         src/ui/VersionsPanel.cpp
+        src/ui/LyricsPanel.cpp
+        src/ui/ReferenceMatchPanel.cpp
+        src/ui/StartFromPanel.cpp
+        src/ui/FirstSongTour.cpp
         src/ui/PluginsOffPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp
@@ -557,7 +585,11 @@ if(LYNX_BUILD_APP)
         src/ui/ClipProperties.cpp
         src/ui/PluginMonitorWindow.cpp
         src/ui/ClipGridComponent.cpp
+        src/ui/GroovePoolComponent.cpp
         src/ui/DetailView.cpp
+        src/ui/ClipAudioPanel.cpp
+        src/ui/SessionMixer.cpp
+        src/ui/MapMode.cpp
         src/ui/MidiToolsPanel.cpp
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp

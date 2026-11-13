@@ -435,6 +435,9 @@ void Psola::prepare (double sampleRate, double maxPeriod, int latency) noexcept
     delay = std::clamp (latency, 8, ringSize / 2);
     lag = 0;
     unvoicedHop = std::clamp ((int) std::lround (128.0 * sr / 44100.0), 4, std::max (4, (delay - 4) / 2));
+    // round 190dp: the shifted unvoiced grains' hop (longer: their joins modulate the sound at the grain rate, and a
+    // slower rate keeps that modulation's sidebands next to what made them instead of under a voice's lowest band)
+    shiftHop = std::clamp ((int) std::lround (unvoicedShiftHopMs * 0.001 * sr), 4, std::max (4, (delay - 4) / 3));
     reset();
 }
 
@@ -638,10 +641,15 @@ void Psola::process (const float* x, float* y, int channels) noexcept
 
         const Mark* mk = best >= 0 ? &marks[(std::size_t) ((markHead + best) % maxMarks)] : nullptr;
         const auto isVoiced = mk != nullptr && mk->voiced;
-        const auto f = isVoiced ? (double) mk->formant : 1.0;
+        // round 190dp (setUnvoicedShift, off by default): an unvoiced grain is read at the formant factor too — the
+        // same window and spacing on the output, a source span `fu` times as long — so noise, breath and what lies
+        // above the detector's range move with the formants instead of passing unshifted. fu = 1 = the old grains
+        const auto fu = ! isVoiced && unvoicedShift && mk != nullptr ? (double) mk->formant : 1.0;
+        const auto f = isVoiced ? (double) mk->formant : fu;
         const auto r = isVoiced ? (double) mk->ratio : 1.0;
-        const auto ha = isVoiced ? (double) mk->period : (double) unvoicedHop; // analysis half-length
-        const auto hs = ha / f;                                                // synthesis half-length
+        // analysis half-length (a shifted unvoiced grain: its own longer hop, `fu` times as much source), synthesis half-length
+        const auto ha = isVoiced ? (double) mk->period : (fu != 1.0 ? (double) shiftHop * fu : (double) unvoicedHop);
+        const auto hs = ha / f;
         // a voiced onset starts on its mark: the voice is not displaced in time from the input
         if (isVoiced && ! lastVoiced && mk->pos - hs > (double) e - 1.0)
             nextSynth = mk->pos;
@@ -652,29 +660,50 @@ void Psola::process (const float* x, float* y, int channels) noexcept
 
         // unvoiced: read around the synthesis time itself (plain overlap-add, transparent); voiced: around the mark
         const auto ta = isVoiced ? mk->pos : ts;
-        if (! isVoiced && ts + hs + 2.0 > last)
+        if (! isVoiced && ts + std::max (hs, ha) + 2.0 > last)
             break; // not in yet (only with a very short latency)
 
-        const auto gain = (float) std::clamp (f / r, 0.25, 4.0);
+        const auto gain = (float) std::clamp (isVoiced ? f / r : 1.0, 0.25, 4.0);
         const auto o0 = std::max<std::int64_t> ((std::int64_t) std::ceil (ts - hs), e);
         const auto o1 = std::min<std::int64_t> ((std::int64_t) std::floor (ts + hs), e + ringSize - 1);
         const auto invHs = 1.0 / hs;
-        for (auto o = o0; o <= o1; ++o)
+        if (fu != 1.0)
         {
-            const auto u = ((double) o - ts) * invHs;
-            if (u <= -1.0 || u >= 1.0)
-                continue;
-            const auto w = gain * (float) (0.5 + 0.5 * std::cos (pi * u));
-            const auto src = ta + ((double) o - ts) * f;
-            for (int c = 0; c < channels; ++c)
-                acc[c][(std::size_t) (o & m)] += w * readIn (c, src);
-            wsum[(std::size_t) (o & m)] += w;
+            // round 190dp: a resampled unvoiced grain overlaps its neighbour with the source `hs · (fu − 1)` apart, which
+            // combs noise where the two windows meet (3 ms Hann grains at +2 st: a notch near 1.4 kHz): a flat-topped window whose
+            // raised-cosine ramps take only `unvoicedTaper` of the hop keeps the sum at 1 with that overlap only there
+            const auto flat = 0.5 * hs * (1.0 - unvoicedTaper), ramp = unvoicedTaper * hs;
+            const auto q0 = std::max<std::int64_t> ((std::int64_t) std::ceil (ts - flat - ramp), e);
+            const auto q1 = std::min<std::int64_t> ((std::int64_t) std::floor (ts + flat + ramp), e + ringSize - 1);
+            for (auto o = q0; o <= q1; ++o)
+            {
+                const auto d = std::abs ((double) o - ts) - flat;
+                if (d >= ramp)
+                    continue;
+                const auto w = d <= 0.0 ? 1.0f : (float) (0.5 + 0.5 * std::cos (pi * d / ramp));
+                const auto src = ta + ((double) o - ts) * f;
+                for (int c = 0; c < channels; ++c)
+                    acc[c][(std::size_t) (o & m)] += w * readIn (c, src);
+                wsum[(std::size_t) (o & m)] += w;
+            }
         }
+        else
+            for (auto o = o0; o <= o1; ++o)
+            {
+                const auto u = ((double) o - ts) * invHs;
+                if (u <= -1.0 || u >= 1.0)
+                    continue;
+                const auto w = gain * (float) (0.5 + 0.5 * std::cos (pi * u));
+                const auto src = ta + ((double) o - ts) * f;
+                for (int c = 0; c < channels; ++c)
+                    acc[c][(std::size_t) (o & m)] += w * readIn (c, src);
+                wsum[(std::size_t) (o & m)] += w;
+            }
         // unshifted voiced grains drift toward their marks, so a voice already on its note comes out as the input
         // itself (delayed), not displaced by up to half a period. Round 148: faded in over the last 3.4 cents of
         // shift and at most 0.05 % of a period per grain (~0.9 c) — the on / off switch at 1.7 cents (0.15 %) turned
         // into a 0.5 c wobble on held notes whose correction hovers around zero
-        auto hop = isVoiced ? ha / r : ha;
+        auto hop = isVoiced ? ha / r : hs;
         if (isVoiced && std::abs (f - 1.0) < 1e-3)
         {
             const auto w = std::max (0.0, 1.0 - std::abs (r - 1.0) / 2e-3);

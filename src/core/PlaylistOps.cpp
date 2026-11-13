@@ -1,3 +1,4 @@
+#include "core/FlControlMenus.h"
 #include "core/PlaylistOps.h"
 #include "core/QuickRender.h"
 
@@ -412,7 +413,7 @@ int freeMixerTrack (Song& song)
 {
     const auto isFree = [&song] (int t) {
         const auto& m = song.mixer[(std::size_t) t];
-        if (! m.effects.empty() || linkedElsewhere (song, t, -1))
+        if (! m.effects.empty() || linkedElsewhere (song, t, -1) || song.session.reservedForOther (true, t))
             return false;
         for (const auto& c : song.channels)
             if (c.mixerTrack == t)
@@ -427,10 +428,7 @@ int freeMixerTrack (Song& song)
     for (int t = 1; t < (int) song.mixer.size(); ++t)
         if (isFree (t))
             return t;
-    if (song.mixer.empty() || (int) song.mixer.size() >= maxMixerTracks)
-        return -1;
-    song.mixer.emplace_back().name = "Insert " + std::to_string (song.mixer.size());
-    return (int) song.mixer.size() - 1;
+    return addMixerTrack (song);
 }
 
 bool makeAudioTrack (Song& song, int track)
@@ -487,6 +485,136 @@ bool makeInstrumentTrack (Song& song, int track, int channel)
     return true;
 }
 
+bool canLinkToMixerTrack (const Song& song, int track, int mixer)
+{
+    return track >= 0 && track < 500 && mixer > 0 && mixer < (int) song.mixer.size() && ! linkedElsewhere (song, mixer, track)
+           && ! song.session.reservedForOther (true, mixer);
+}
+
+bool hasOwnName (const Song& song, int mixer)
+{
+    if (mixer <= 0 || mixer >= (int) song.mixer.size())
+        return false;
+    const auto& name = song.mixer[(std::size_t) mixer].name;
+    return ! name.empty() && name != "Insert " + std::to_string (mixer);
+}
+
+bool canAddMixerTrack (const Song& song)
+{
+    if (song.mixer.empty())
+        return false;
+    for (int t = (int) song.mixer.size(); t < maxMixerTracks; ++t)
+        if (! song.session.reservedForOther (true, t))
+            return true;
+    return false;
+}
+
+int addMixerTrack (Song& song)
+{
+    if (! canAddMixerTrack (song))
+        return -1;
+    // inserts reserved for another participant are added as plain inserts and skipped (Song::claimFreeInsert's rule)
+    while (true)
+    {
+        song.mixer.emplace_back().name = "Insert " + std::to_string (song.mixer.size());
+        if (const auto t = (int) song.mixer.size() - 1; ! song.session.reservedForOther (true, t))
+            return t;
+    }
+}
+
+bool linkToMixerTrack (Song& song, int track, int mixer)
+{
+    if (! canLinkToMixerTrack (song, track, mixer))
+        return false;
+    auto* t = trackAt (song, track);
+    if (t->mode == PlaylistTrackMode::audio && t->mixerTrack == mixer)
+        return true;
+    auto& m = song.mixer[(std::size_t) mixer];
+    const auto insertName = hasOwnName (song, mixer) ? m.name : "Insert " + std::to_string (mixer);
+    if (t->mode == PlaylistTrackMode::unassigned)
+    {
+        // FL (FUN_012f38f0): the insert's colour when the track has the default one; the insert's own name, else the
+        // track's, else "Insert N"
+        if (t->colour == 0)
+            t->colour = m.colour;
+        if (hasOwnName (song, mixer) || t->name.empty())
+            t->name = insertName;
+    }
+    else if (t->mode == PlaylistTrackMode::audio && t->mixerTrack > 0 && t->mixerTrack < (int) song.mixer.size())
+    {
+        // FL: the previous insert is reset (name, colour; its effects and routing stay)
+        auto& old = song.mixer[(std::size_t) t->mixerTrack];
+        old.name = "Insert " + std::to_string (t->mixerTrack);
+        old.colour = 0;
+    }
+    t->mode = PlaylistTrackMode::audio;
+    t->mixerTrack = mixer;
+    t->channel = -1;
+    // FL: the track and the insert end with one name and colour
+    if (t->name.empty())
+    {
+        t->name = insertName;
+        t->colour = m.colour;
+    }
+    else
+    {
+        m.name = t->name;
+        m.colour = t->colour;
+    }
+    std::vector<int> onTrack;
+    for (int i = 0; i < (int) song.playlist.size(); ++i)
+        if (song.playlist[(std::size_t) i].track == track)
+            onTrack.push_back (i);
+    followAudioTracks (song, onTrack);
+    return true;
+}
+
+int assignAudioTracks (Song& song, const std::vector<int>& tracks, int mixer)
+{
+    if (mixer != newMixerTrack && (mixer <= 0 || mixer >= (int) song.mixer.size()))
+        return 0;
+    int linked = 0;
+    auto next = mixer;
+    for (std::size_t i = 0; i < tracks.size(); ++i)
+    {
+        if (next == newMixerTrack || next >= (int) song.mixer.size())
+        {
+            next = addMixerTrack (song);
+            if (next < 0)
+                break;
+        }
+        // a refused track (LYNX: the pick is linked to another selected track, e.g. the menu's own) leaves the insert
+        // to the next one
+        if (! linkToMixerTrack (song, tracks[i], next))
+            continue;
+        ++linked;
+        // FL: the next insert no Playlist track is linked to (LYNX: nor reserved for another participant)
+        do
+            ++next;
+        while (next < (int) song.mixer.size() && (linkedElsewhere (song, next, -1) || song.session.reservedForOther (true, next)));
+        if (next >= maxMixerTracks)
+            break;
+    }
+    return linked;
+}
+
+AudioTrackMenu audioTrackMenu (const Song& song, int track)
+{
+    AudioTrackMenu menu;
+    menu.canAddMixerTrack = canAddMixerTrack (song);
+    const auto* t = track >= 0 && track < (int) song.playlistTracks.size() ? &song.playlistTracks[(std::size_t) track] : nullptr;
+    for (int m = 1; m < (int) song.mixer.size(); ++m)
+    {
+        auto& item = menu.inserts.emplace_back();
+        item.mixer = m;
+        item.name = song.mixer[(std::size_t) m].name;
+        // FL ticks the insert the track is stored as linked to, whatever its mode
+        item.ticked = t != nullptr && t->mode != PlaylistTrackMode::unassigned && t->mixerTrack == m;
+        item.enabled = item.ticked || canLinkToMixerTrack (song, track, m);
+    }
+    return menu;
+}
+
 int instrumentTrackPattern (Song& song, int track)
 {
     if (track < 0 || track >= (int) song.playlistTracks.size())
@@ -517,6 +645,95 @@ void unassign (Song& song, int track)
     t.mode = PlaylistTrackMode::unassigned;
     t.mixerTrack = -1;
     t.channel = -1;
+}
+
+int firstFreeTrack (const Song& song)
+{
+    std::vector<bool> used (500, false);
+    for (const auto& c : song.playlist)
+        if (c.track >= 0 && c.track < 500)
+            used[(std::size_t) c.track] = true;
+    for (int t = 0; t < 500; ++t)
+        if (! used[(std::size_t) t] && (t >= (int) song.playlistTracks.size() || song.playlistTracks[(std::size_t) t].mode == PlaylistTrackMode::unassigned))
+            return t;
+    return -1;
+}
+
+int addAudioTrack (Song& song)
+{
+    const auto track = firstFreeTrack (song);
+    if (track < 0)
+        return -1;
+    const auto mixerBefore = song.mixer.size();
+    const auto mixer = freeMixerTrack (song);
+    if (mixer <= 0 || assignAudioTracks (song, { track }, mixer) != 1)
+    {
+        if (song.mixer.size() > mixerBefore) // (an insert freeMixerTrack added for nothing goes again)
+            song.mixer.resize (mixerBefore);
+        return -1;
+    }
+    return track;
+}
+
+bool canBeInstrumentTrack (const Song& song, int channel)
+{
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return false;
+    const auto kind = song.channels[(std::size_t) channel].instrument;
+    return kind != InstrumentKind::audioClip && kind != InstrumentKind::controller;
+}
+
+std::vector<int> instrumentTracksOf (const Song& song, int channel)
+{
+    std::vector<int> tracks;
+    for (int i = 0; i < (int) song.playlistTracks.size(); ++i)
+        if (song.playlistTracks[(std::size_t) i].mode == PlaylistTrackMode::instrument && song.playlistTracks[(std::size_t) i].channel == channel)
+            tracks.push_back (i);
+    return tracks;
+}
+
+int assignToNewInstrumentTrack (Song& song, int channel)
+{
+    if (! canBeInstrumentTrack (song, channel))
+        return -1;
+    const auto track = firstFreeTrack (song);
+    if (track < 0)
+        return -1;
+    const auto before = song;
+    if (! makeInstrumentTrack (song, track, channel))
+    {
+        song = before;
+        return -1;
+    }
+    return track;
+}
+
+int unassignFromInstrumentTracks (Song& song, int channel)
+{
+    const auto tracks = instrumentTracksOf (song, channel);
+    for (const auto t : tracks)
+        unassign (song, t);
+    return (int) tracks.size();
+}
+
+int addInstrumentTrack (Song& song, ChannelDef generator, int track)
+{
+    if (generator.instrument == InstrumentKind::audioClip || generator.instrument == InstrumentKind::controller)
+        return -1;
+    if (track < 0)
+        track = firstFreeTrack (song);
+    if (track < 0 || track >= 500 || (track < (int) song.playlistTracks.size() && song.playlistTracks[(std::size_t) track].mode == PlaylistTrackMode::instrument))
+        return -1;
+    const auto before = song;
+    generator.mixerTrack = 0; // (makeInstrumentTrack gives it a free mixer track)
+    song.channels.push_back (std::move (generator));
+    const auto channel = (int) song.channels.size() - 1;
+    if (! makeInstrumentTrack (song, track, channel))
+    {
+        song = before;
+        return -1;
+    }
+    return channel;
 }
 
 std::string describe (const Song& song, int track)
@@ -783,14 +1000,17 @@ int repairChannels (Song& song)
     return changed;
 }
 
-void loadSampleInto (ChannelDef& channel, const std::string& path, const std::string& name)
+void loadSampleInto (ChannelDef& channel, const std::string& path, const std::string& name, bool autoName)
 {
     channel.samplePath = path;
+    samplehistory::add (path); // FL's Sample history (round 190df): every sample a channel loads
     if (channel.instrument == InstrumentKind::granulizer || channel.instrument == InstrumentKind::wavetraveller)
         return; // FL's Granulizer keeps its engine and plays the file (round 142); so does Wave Traveller
     if (channel.instrument != InstrumentKind::audioClip)
         channel.instrument = InstrumentKind::sampler;
-    channel.name = name;
+    // FL's General › "Auto name channels" (round 190bx): off = a channel that has a name keeps it
+    if (autoName || channel.name.empty())
+        channel.name = name;
 }
 } // namespace lynx::audioclips
 
@@ -871,6 +1091,7 @@ int trackFor (const Song& song, const AutomationTarget& target)
         case AutomationTargetKind::channelVolume:
         case AutomationTargetKind::channelPan:
         case AutomationTargetKind::channelParam:
+        case AutomationTargetKind::channelAdjust:
             channel = target.index;
             if (channel >= 0 && channel < (int) song.channels.size())
                 insert = song.channels[(std::size_t) channel].mixerTrack;
@@ -951,7 +1172,7 @@ int clipToLane (Song& song, int clipIndex, int track)
     inside.push_back ({ clip.start, source.valueAt ((double) clip.offset), 0.0f });
     for (const auto& p : source.points)
         if (p.tick > clip.offset && p.tick < clip.offset + clip.length)
-            inside.push_back ({ clip.start + p.tick - clip.offset, p.value, p.tension });
+            inside.push_back ({ clip.start + p.tick - clip.offset, p.value, p.tension, p.mode });
     inside.push_back ({ clip.end(), source.valueAt ((double) (clip.offset + clip.length)), 0.0f });
 
     auto& points = song.automations[(std::size_t) lane].points;

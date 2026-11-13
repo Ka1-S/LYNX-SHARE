@@ -14,6 +14,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/HotSwap.h"
 #include "core/Song.h"
 
 namespace lynx
@@ -63,6 +64,11 @@ public:
         // Slice 3: the Envelopes tab edits the current pattern's events (the existing Event editor); this makes the
         // clip's pattern the current one.
         std::function<void (int pattern)> selectPattern;
+        // Round 190ce (hot-swap, core/HotSwap.h): a card's hot-swap button links the Browser to its device, or ends the
+        // link when the Browser is linked to it already; `hotSwapTarget` = what the Browser is linked to now.
+        std::function<void (const hotswap::Target&)> toggleHotSwap;
+        std::function<hotswap::Target()> hotSwapTarget;
+        std::function<bool()> typingKeyboardOn; // (the plain 0 key is a note while the typing keyboard is on)
     };
 
     DetailView (AudioEngine& engine, Hooks hooks);
@@ -92,7 +98,15 @@ public:
     static inline bool envelopesTab = false;       // the Clip page shows Envelopes instead of Notes (not saved)
     static constexpr int minHeight = 140, edgeHeight = 5, stripHeight = 22;
 
+    // Round 190ce: the selected card's device (none: the Device View is not showing or nothing is selected) for the
+    // hot-swap key; the 0 key switches the selected device on / off while the chain has the keyboard (false: not here).
+    hotswap::Target selectedDeviceTarget() const;
+    void hotSwapChanged(); // the Browser's link began, moved or ended: the cards' buttons are drawn again
+
     // tests and --snapshot
+    void selectCardForCheck (int card);
+    bool duplicateCardForCheck (int card);
+    juce::PopupMenu cardMenuForSnapshot (int card); // an effect card's right-click menu
     int cardCountForCheck() const;
     int chainInsertForCheck() const;
     int chainChannelForCheck() const;
@@ -125,4 +139,9 @@ private:
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DetailView)
 };
+
+// Round 190dr: a device card dragged out of the Device View (the reference: drag a device to another track to move it
+// there, Ctrl to copy it). The description a drop target reads; true and the device's insert and slot when it is one.
+juce::String deviceDragDescription (int insert, int slot);
+bool detailDeviceDrag (const juce::var& description, int& insert, int& slot);
 } // namespace lynx

@@ -59,6 +59,8 @@ const std::vector<Allowed>& allowed()
         { "Vintage Phaser", "Keep pitch", "inert", "not-in-programme: acts only while the delay time is being changed (automation)" },
         { "Transporter", "Send to", "inert", "routing: picks the insert its loops' send goes to; the send buffer is pulled by that insert, not this one" },
         { "LYNX Tune", "Receive", "inert", "routing: takes the scale another LYNX Tune instance sends; one instance alone has nothing to receive" },
+        { "Pitch correction", "MIDI port", "inert", "routing (round 190ee): the MIDI Out port whose notes reach MIDI mode / Harmonize (RackRenderer); the audit hands the notes to the effect itself" },
+        { "Pitch correction", "Port routing", "inert", "routing (round 190ee): notes from the port or (older projects) from the Channel Rack; the audit feeds the same chord both ways" },
         { "Newtone", "Slave to host playback", "inert", "no-source: syncs the playback of the loaded source sample; a new instance has none" },
         { "Newtime", "Slave to host playback", "inert", "no-source: syncs the playback of the loaded source sample; a new instance has none" },
         { "Facet EQ", "Target Level", "inert", "no-source: levels the Listen = Source / Target audition of the EQ match; a new instance has no captured target spectrum" },
@@ -95,6 +97,11 @@ const std::vector<Allowed>& allowed()
         { "Pocket Compressor", "RMS", "inert", "fl-inert: FLM's setter always clears the RMS flag (its RMS mode is unreachable), so the control does nothing there either" },
         { "Pocket Compressor", "Auto gain", "clip", "behaviour: with Auto gain off FLM's Level runs 0…+40 dB instead of −20…+20 dB, so the default Level is +20 dB" },
         { "Pocket Tremolo", "Stereo offset", "inert", "not-in-programme: the audit only tries the knob's end, 360°, a whole cycle = the same phase; 90° and 180° move the right channel (FlmImport189hBTests.inc)" },
+        // round 190cm: FLM's Tape Stop held off is silence — the stop ramp ends on a ~11 ms decay to nothing and the input is
+        // not heard until Play goes on (spec-tapestop.md §0, §3.3; FL render "Play off": silence, flmeng190by/fx/scores_all.txt)
+        { "Pocket Tape Stop", "Play", "silent", "behaviour: FLM's Tape Stop is silent while Play is off (the tape has stopped); the ramps are checked by the Play-edge contexts of tools/FxAudit.h" },
+        // round 190dw: FLM's Filter changes the number of biquad pairs at once on a Slope change (FL renders: flm190dw/fx)
+        { "Pocket Filter", "Slope", "click", "behaviour: FLM switches the number of biquad pairs at once (the newly used pairs start from their old state, the level follows with the next coefficient change)" },
         { "Pocket Wow & Flutter", "Random rate", "inert", "not-in-programme: FLM writes the sync length after the free rate, so a loaded state takes its random interval from the sync length; the free rate acts when it is moved while playing" },
     };
     return a;

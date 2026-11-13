@@ -188,7 +188,10 @@ int analogSections (const EffectParams& p, int b, Analog* out, double extraDb = 
             const int n = std::max (1, slope / 6);
             double qs[16];
             const int m = butterworthQs (n, qs);
-            if (m > 0) qs[m - 1] *= Q / 1.0; // the highest-Q section carries the band's resonance (Q 1 = Butterworth)
+            if (p[(std::size_t) cutLawParam] >= 0.5f)
+                for (int k = 0; k < m; ++k) qs[k] *= Q; // round 190cx: every section scaled (Q 1 = Butterworth)
+            else if (m > 0)
+                qs[m - 1] *= Q / 1.0; // the highest-Q section carries the band's resonance (Q 1 = Butterworth)
             int c = 0;
             for (int k = 0; k < m; ++k)
                 out[c++] = hp ? Analog { 1.0, 0.0, 0.0, 1.0, 1.0 / qs[k], 1.0 } : Analog { 0.0, 0.0, 1.0, 1.0, 1.0 / qs[k], 1.0 };
@@ -1368,6 +1371,7 @@ const EffectInfo& info()
         }
         e.params.push_back ({ "Listen", 0.0f });       // round 166f: the EQ's output (the old behaviour)
         e.params.push_back ({ "Target Level", 1.0f }); // level match on
+        e.params.push_back ({ "Cut Q Law", 0.0f });    // round 190cx: the top section carries Q (the old behaviour)
         return e;
     }();
     return i;
@@ -1409,6 +1413,7 @@ std::string paramText (int p, float v)
     if (p >= spectralTiltParam0 && p < spectralTiltParam0 + bands) return v >= 0.5f ? "On" : "Off";
     if (p == listenParam) return listenName (listen (v));
     if (p == targetLevelParam) return v >= 0.5f ? "Matched" : "As is";
+    if (p == cutLawParam) return v >= 0.5f ? "All sections" : "Top section";
     switch (p % fieldsPerBand)
     {
         case 0: return shapeName (shape (v));

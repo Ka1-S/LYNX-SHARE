@@ -449,6 +449,9 @@ public:
     }
     void showAddMenuFor (int row) { showAddMenu (row); }
     std::function<void (juce::PopupMenu&, int slot)> extendSlotMenu; // items put first in a slot's menu (nullptr: none)
+    static inline juce::PopupMenu* slotMenuForSnapshot = nullptr;    // the shot routes: the next slot menu goes here instead of opening
+    // Round 190ce: the slot menu's "Hot-swap in the Browser" (set once by the main window; nullptr: no such item)
+    static inline std::function<void (int track, int slot)> onHotSwapSlot;
     // the knob of parameter `param` of effect `slot` (param -1: the slot's Mix), as the Mixer shows and sets it
     ui::ValueSpec slotParamSpec (int param, int slot) const { return specFor (param < 0 ? mixParam : param, slot); }
     double slotParamValue (int param, int slot) const { return valueOf (param < 0 ? mixParam : param, slot); }

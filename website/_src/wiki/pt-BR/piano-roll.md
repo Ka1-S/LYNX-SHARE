@@ -1,5 +1,5 @@
 ---
-source: 217f097c97
+source: a73763934f
 ---
 ![O Piano Roll](/assets/img/pianoroll.webp)
 
@@ -69,6 +69,18 @@ Clique na régua para definir a posição. `Ctrl`+arrastar, arrastar com o botã
 ## Chance e faixa de velocity
 
 Toda nota tem uma Chance e uma Faixa de velocity. A Chance é a probabilidade de a nota tocar cada vez que ela volta. A Faixa de velocity deixa a velocity variar entre a velocity da nota e essa velocity mais a faixa. Escolha `Chance` ou `Faixa de velocity (LYNX)` na caixa de faixa para editá-las. `Ferramentas › Chance (LYNX)` no menu do Piano Roll agrupa as notas selecionadas para que todas ou só uma delas toque, e tem `Redefinir chance e faixa de velocity`.
+
+## Ferramentas de notas
+
+O menu `Ferramentas` do Piano roll abre as ferramentas de notas do FL Studio como diálogos. Elas atuam nas notas selecionadas, ou em todas as notas quando nenhuma está selecionada. Algumas delas:
+
+| Ferramenta | Tecla | O que faz |
+|---|---|---|
+| Limit | `Alt+K` | Move notas por oitavas para dentro de uma faixa de teclas e depois as limita. Em `Restrição de tom / escala` ele mantém as notas em uma tecla-base e um dos acordes ou escalas do FL Studio, com `Grade` em `Acima`, `Abaixo` ou `Alternar`. `Dobrar para o topo / a base` e `Transpor` definem para onde vão as notas fora da faixa |
+| Flip | `Alt+Y` | `Inverter horizontalmente` espelha as notas no tempo. Com `Preservar os tempos de início`, ligado no início, os inícios são espelhados e as notas mantêm a duração. `Inverter verticalmente` espelha as teclas em torno do meio da faixa delas |
+| Randomise | `Alt+R` | Mudanças aleatórias de velocity, pan, afinação fina, timing e duração, e de Mod X, Mod Y e release |
+| Scale levels | `Alt+X` | Escala um nível de nota do início ao fim da seleção, com `Deslocamento`, `Centro` (o valor em torno do qual escala) e `Tensão` |
+| LFO | `Alt+O` | Escreve uma forma de LFO em um nível de nota. Clique com o botão direito em um slider `Período` para ver uma lista de 1 passo a 512 passos |
 
 ## Ferramentas MIDI e scripts
 

@@ -26,8 +26,46 @@ void createUnlinkedAutomationClip (AudioEngine& engine);
 // Round 165: shared by the point editor and the Playlist's in-clip editing — a point's value as text (percent, or BPM
 // for the tempo), the copied value of FL's "Copy value" (< 0 = none) and FL's "Type in value..." dialog.
 juce::String automationPointValueText (const AutomationTarget& target, float value);
+// Round 190em: a target's value `value` (0..1) in the unit its control shows (dB, pan, BPM, a LYNX effect's own unit, a
+// hosted plugin's own text); "" when there is none.
+juce::String targetValueTextAt (AudioEngine& engine, const AutomationTarget& target, float value);
 float& copiedAutomationValue();
 void typeAutomationPointValue (AudioEngine& engine, int automation, int point);
+
+// Round 190bw, FL's per-point curve modes. FL's envelope editor remembers the mode and the tension last used and gives
+// them to the next new point [DECOMP FLEngine 0xcce3b0: new point; 0xcd79f0: "change point curve"; 0xcc9790: tension
+// drag; 0xccfd0c: "default tension"]. One memory for the point editor and the Playlist's in-clip editing (LYNX's
+// tension sign).
+struct AutomationPointMemory
+{
+    int mode = 0;
+    float tension = 0.0f;
+};
+AutomationPointMemory& automationPointMemory();
+// The header of FL's automation point menu: the point's number and the clip's point count, "Point 2/14" (`point` is
+// 0-based) [live FL check 190cq, shot curves190bw-01].
+juce::String automationPointMenuHeader (int point, int count);
+// The "Mode" block of FL's automation point menu (EEACPointMenu): the header and the 13 modes as radio items in FL's
+// order (Smooth, Hold, Single curve, Single curve 2, Single curve 3, Double curve…, Wave). `current`: the mode of the
+// segment that ends at the point (−1: none ticked); `enabled` false on the first point, which ends no segment.
+void addAutomationModeItems (juce::PopupMenu& menu, int current, bool enabled, std::function<void (int)> pick);
+
+// The next sample (x1, y1) of an automation curve drawn from (x0, y0), keeping the jumps of Hold, Stairs and Pulse
+// segments square: when the curve's level halfway between the two samples (`midY`, asked only for a big change)
+// equals one of them, the line turns a corner instead of slanting.
+template <typename MidY>
+void automationLineTo (juce::Path& path, float x0, float y0, float x1, float y1, MidY&& midY)
+{
+    if (std::abs (y1 - y0) > 1.5f)
+    {
+        const auto m = (float) midY();
+        if (std::abs (m - y0) < 0.01f)
+            path.lineTo (x1, y0);
+        else if (std::abs (m - y1) < 0.01f)
+            path.lineTo (x0, y1);
+    }
+    path.lineTo (x1, y1);
+}
 
 // Opens (or brings to front) the point editor window of an automation.
 void openAutomationEditor (AudioEngine& engine, int automation);

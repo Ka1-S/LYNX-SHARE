@@ -289,12 +289,13 @@
         juce::PopupMenu menu;
         menu.addSectionHeader (tr ("Point {0}/{1}", { juce::String (point + 1), juce::String ((int) points.size()) }) + ": " + gbLevelText (p.y));
         menu.addItem (tr ("Delete"), point > 0 && point + 1 < (int) points.size(), false, [this, point] { gbDeletePoint (point); });
-        if (point > 0) // the shape of the segment that ends here (FL's point menu; "Smooth" is not played by Gross Beat's engine)
+        if (point > 0) // the shape of the segment that ends here (FL's point menu, Gross Beat's DFM order; Smooth: round 190ee)
         {
             menu.addSectionHeader (tr ("Mode"));
-            for (const auto& m : flshape::waveShaperModes())
-                if (m.mode != 10)
-                    menu.addItem (tr (m.name), true, p.type == m.mode, [this, point, mode = m.mode] {
+            // Gross Beat's own PointMenu (DFM of TSynthEditorForm's MEnvEditor): Hold first, then Smooth
+            static const int order[] { 2, 10, 0, 7, 11, 1, 8, 12, 9, 3, 4, 5, 6 };
+            for (const auto mode : order)
+                menu.addItem (tr (flcurve::modeName (mode)), true, p.type == mode, [this, point, mode] {
                         auto pts = grossbeat::editPoints (gbState().slots[(std::size_t) gbSlotIndex()]);
                         if (point < (int) pts.size())
                         {
@@ -601,6 +602,11 @@
             gbToolDown (item, e.position);
             return true;
         }
+        if (isGbItem (item, "gbopts"))
+        {
+            gbPluginOptionsMenu (rectOf (item));
+            return true;
+        }
         if (isGbItem (item, "gbslot"))
         {
             gbBarDown (item, e.position);
@@ -663,8 +669,57 @@
         return true;
     }
 
+    // FL's Options button over the slot grids (DFM OptionsBtn, SynthResModule.OptionsMenu), in FL's order: Trigger slots
+    // from MIDI notes | Click reduction › Off / Low (drums) / High (melodic), Smoothing attack compensation, Remove DC
+    // offset, HQ resampling | View scratching clock. Each item sets one of the plugin's option bytes (round 190ez, REA of
+    // Gross Beat_x64.dll: CenterMenuClick 0x845640 writes +0x16c DC (byte 4), +0x16d compensation (5), +0x16e HQ (6) and
+    // the Click reduction radio index at +0x170 (8); ViewScratchMenuClick 0x8459b0 writes +0x16f (7)). FL's last item,
+    // About (its splash), is left out. Below a separator, LYNX's own extra: the MIDI input port the trigger notes come
+    // from (FL 2026 has no port setting for Gross Beat; owner decision D1, live FL check 190ew).
+    void gbPluginOptionsMenu (juce::Rectangle<float> at)
+    {
+        const auto* fx = current();
+        if (fx == nullptr)
+            return;
+        const auto st = gbState();
+        auto option = [this] (int byte, std::uint8_t value) {
+            auto next = gbState();
+            next.options[(std::size_t) byte] = value;
+            gbWriteState (next);
+        };
+        auto toggle = [&st, option] (juce::PopupMenu& m, const juce::String& text, int byte) {
+            const auto on = st.options[(std::size_t) byte] != 0;
+            m.addItem (text, true, on, [option, byte, on] { option (byte, on ? 0 : 1); });
+        };
+        juce::PopupMenu menu;
+        menu.addItem (tr ("Trigger slots from MIDI notes"), true, st.midiTrigger, [this, on = st.midiTrigger] {
+            auto next = gbState();
+            next.midiTrigger = ! on;
+            gbWriteState (next);
+        });
+        menu.addSeparator();
+        juce::PopupMenu click;
+        const auto level = std::min<int> (st.options[8], 2);
+        static const char* const levels[3] { TR_NOOP ("Off"), TR_NOOP ("Low (drums)"), TR_NOOP ("High (melodic)") };
+        for (int i = 0; i < 3; ++i)
+        {
+            click.addItem (tr (levels[i]), true, level == i, [option, i] { option (8, (std::uint8_t) i); });
+        }
+        menu.addSubMenu (tr ("Click reduction"), click);
+        toggle (menu, tr ("Smoothing attack compensation"), 5);
+        toggle (menu, tr ("Remove DC offset"), 4);
+        toggle (menu, tr ("HQ resampling"), 6);
+        menu.addSeparator();
+        toggle (menu, tr ("View scratching clock"), 7);
+        menu.addSeparator();
+        menu.addSubMenu (tr ("MIDI input port"), midiPortMenu());
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (at.toNearestInt())));
+    }
+
     juce::String gbHint (const LayoutItem& item, juce::Point<float> p) const
     {
+        if (isGbItem (item, "gbopts"))
+            return tr ("Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port");
         if (isGbItem (item, "gbtools"))
         {
             const auto part = gbToolAt (item, p);
@@ -720,8 +775,20 @@
         const auto volumeColour = colour::info.withAlpha (fx.enabled ? 1.0f : 0.4f);
         const auto kindColour = gbEditKind == 0 ? timeColour : volumeColour;
 
+        if (id == "gbopts") // FL's small Options button (a menu glyph)
+        {
+            const auto b = r.reduced (1.0f * s);
+            g.setColour (colour::bg3);
+            g.fillRoundedRectangle (b, 3.0f * s);
+            g.setColour (fx.enabled ? colour::textPrimary : colour::textDisabled);
+            for (int i = 0; i < 3; ++i)
+                g.fillRect (juce::Rectangle<float> (b.getWidth() * 0.5f, 1.6f * s).withCentre ({ b.getCentreX(), b.getCentreY() + (float) (i - 1) * 4.0f * s }));
+            return;
+        }
         if (id == "gbjog") // a dial with the beat positions (FL's scratch indicator)
         {
+            if (gbState().options[7] == 0) // Options › View scratching clock off (round 190ez)
+                return;
             const auto c = r.getCentre();
             const auto radius = juce::jmin (r.getWidth(), r.getHeight()) * 0.4f;
             g.setColour (colour::bg3);

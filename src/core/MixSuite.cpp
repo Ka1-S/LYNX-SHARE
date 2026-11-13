@@ -1324,6 +1324,7 @@ public:
             c.autoMakeup = on (p[autoMakeup]);
             c.measuredRelease = on (p[releaseLaw]);
             c.makeupRef = 100.0 * std::clamp ((double) p[makeupRef], 0.0, 1.0);
+            c.memory = on (p[optoMemory]);
             const auto mx = std::clamp (p[mix], 0.0f, 1.0f);
             const int hz = analogHz (p[analog]);
             const auto trimGain = (float) dbToGain (trimDb (p[trim]));
@@ -1554,6 +1555,7 @@ static void balance (float* l, float* r, int n, double pan) noexcept
 }
 bool classic (const EffectParams& p) noexcept { return on (p[voicing]); }
 bool vocal (const EffectParams& p) noexcept { return on (p[vocalVoicing]) && ! on (p[voicing]); }
+double airDb (float v) noexcept { return lin (std::clamp (v, 0.0f, 1.0f), 0.0, 12.0); }
 
 namespace
 {
@@ -1604,6 +1606,9 @@ public:
         gr = 0.0;
         envCh[0] = envCh[1] = grCh[0] = grCh[1] = 0.0;
         fullEnv = 0.0;
+        airShelf.reset();
+        for (auto& d : dryLine) d.fill (0.0f);
+        dryPos = 0;
         for (auto& o : os) o.reset();
         for (auto& o : osBand) o.reset();
         for (auto& o : osGain) o.reset();
@@ -1640,8 +1645,51 @@ public:
 private:
     void processBlock (float* l, float* r, int n, const EffectParams& p, double bpm) noexcept
     {
+        // round 190dm: Air and Mix (off and 100 %: nothing below runs, the sound before)
+        const auto aDb = airDb (p[air]);
+        const auto mx = std::clamp (p[mix], 0.0f, 1.0f);
+        const bool post = aDb > 0.0 || mx < 1.0f;
+        if (post)
+        {
+            std::copy (l, l + n, dryBuf[0].begin());
+            std::copy (r, r + n, dryBuf[1].begin());
+        }
         processCore (l, r, n, p, bpm);
+        if (post)
+            airAndMix (l, r, n, aDb, mx);
         balance (l, r, n, panValue (p[outputPan])); // round 165w: after the output level, every voicing
+    }
+
+    // round 190dm: the air shelf on the processed signal, then the dry signal (delayed by the latency) mixed back
+    void airAndMix (float* l, float* r, int n, double aDb, float mx) noexcept
+    {
+        if (aDb != airDesignDb || sr != airDesignRate)
+        {
+            airDesignDb = aDb;
+            airDesignRate = sr;
+            airShelf.shelf (sr, std::min (airHz, 0.45 * sr), aDb, true, airSlope);
+        }
+        if (aDb > 0.0)
+            for (int i = 0; i < n; ++i)
+            {
+                l[i] = airShelf.process (l[i], 0);
+                r[i] = airShelf.process (r[i], 1);
+            }
+        else
+            airShelf.reset();
+        const int lat = std::clamp (latencySamples(), 0, dryLen - 1);
+        for (int i = 0; i < n; ++i)
+        {
+            dryLine[0][(std::size_t) dryPos] = dryBuf[0][(std::size_t) i];
+            dryLine[1][(std::size_t) dryPos] = dryBuf[1][(std::size_t) i];
+            const auto rd = (std::size_t) ((dryPos - lat + dryLen) % dryLen);
+            dryPos = (dryPos + 1) % dryLen;
+            if (mx < 1.0f)
+            {
+                l[i] = l[i] * mx + dryLine[0][rd] * (1.0f - mx);
+                r[i] = r[i] * mx + dryLine[1][rd] * (1.0f - mx);
+            }
+        }
     }
 
     void processCore (float* l, float* r, int n, const EffectParams& p, double) noexcept
@@ -1993,6 +2041,13 @@ private:
     bool vocalOn = false;
     bool classicOn = false; // round 165: the classic voicing has no latency
     Biquad detect, detectLp, listenF, listenLp, split, bandLp, bandLp2, topHp, topHp2;
+    // round 190dm: Air and Mix — the shelf, the block's dry input and the dry line (latency ≤ 8191 samples)
+    static constexpr int dryLen = 8192;
+    Biquad airShelf;
+    double airDesignDb = -1.0, airDesignRate = 0.0;
+    std::array<std::array<float, maxBlock>, 2> dryBuf {};
+    std::array<std::array<float, dryLen>, 2> dryLine {};
+    int dryPos = 0;
     double env = 0.0, gr = 0.0, fullEnv = 0.0;
     double envCh[2] {}, grCh[2] {};
     const float* scL = nullptr;
@@ -3654,7 +3709,9 @@ const EffectInfo& glowInfo()
                                      // round 165x: the dial where Auto makeup was switched on (0.46 = round 152's)
                                      { "Makeup ref", 0.46f },
                                      // round 165x: what the VU shows (0 gain reduction, 0.5 input, 1 output), saved
-                                     { "VU display", 0.0f } } };
+                                     { "VU display", 0.0f },
+                                     // round 190dm: the cell's memory (off = the releases before, for every project)
+                                     { "Opto memory", 0.0f } } };
     return info;
 }
 
@@ -3673,7 +3730,9 @@ const EffectInfo& hushInfo()
                                      { "Vocal voicing", 0.0f }, // round 148
                                      { "Input pan", 0.5f }, { "Output pan", 0.5f }, // round 165w
                                      // round 165x: the reference's ranges and link (a project saved before: the old law)
-                                     { "Range law", 1.0f }, { "Link only", 0.0f }, { "Link only side", 0.0f } } };
+                                     { "Range law", 1.0f }, { "Link only", 0.0f }, { "Link only side", 0.0f },
+                                     // round 190dm: the air shelf (off) and the mix (100 %): what every project had
+                                     { "Air", 0.0f }, { "Mix", 1.0f } } };
     return info;
 }
 
@@ -4021,6 +4080,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case releaseLaw: return on (v) ? "measured" : "round 123";
             case makeupRef: return fmt ("%.0f", v * 100.0);
             case vuDisplay: return vuModeOf (v) == 1 ? "input" : vuModeOf (v) == 2 ? "output" : "gain reduction";
+            case optoMemory: return on (v) ? "on" : "off";
             case analog: return analogHz (v) == 0 ? "off" : analogHz (v) == 50 ? "50 Hz" : "60 Hz";
             default: return fmt ("%.2f", v);
         }
@@ -4048,6 +4108,8 @@ std::string paramText (EffectKind kind, int param, float v)
             case rangeLaw: return on (v) ? "extended" : "round 165w";
             case linkOnly: return fmt ("%.0f%%", v * 100.0);
             case linkSide: return on (v) ? "side" : "mid";
+            case air: return v <= 0.0f ? "off" : fmt ("+%.1f dB", airDb (v));
+            case mix: return fmt ("%.0f%%", v * 100.0);
             case inputPan: case outputPan:
             {
                 const auto pan = panValue (v);

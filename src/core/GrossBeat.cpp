@@ -4,6 +4,7 @@
 // IPP-style vector steps), which is what makes the output sample-identical.
 
 #include "core/GrossBeat.h"
+#include "core/FlCurve.h"
 
 #include <algorithm>
 #include <atomic>
@@ -198,9 +199,34 @@ void precompute (std::vector<Point>& pts) noexcept
                 }
                 break;
             }
-            default: // 2 hold; 10 (spline, not decoded: evaluated as a straight line)
-                if (p.type == 10)
+            case 10:
+            {
+                // round 190ee: "Smooth" — a cubic Hermite segment whose end slopes come from the neighbouring Smooth
+                // segments (the plugin's own preparation, Gross Beat_x64.dll 0x784d60 at 0x785157, is FLEngine's law:
+                // core/FlCurve prepareSmooth). Before this round it played as a straight line.
+                flcurve::SmoothSide before, after;
+                if (pts[i - 1].type == 10)
+                {
+                    before.smooth = true;
+                    before.dx = pts[i - 1].dx;
+                    before.hasY = i >= 2;
+                    before.y = i >= 2 ? (double) pts[i - 2].y : 0.0;
+                }
+                if (i + 1 < pts.size() && pts[i + 1].type == 10)
+                {
+                    after.smooth = true;
+                    after.dx = pts[i + 1].dx;
+                    after.y = (double) pts[i + 1].y;
+                }
+                const auto s = flcurve::prepareSmooth (p.tension, p.dx, (double) pts[i - 1].y, (double) p.y, before, after);
+                p.k14 = s.c0;
+                p.k18 = s.c1;
+                p.k1c = s.c2;
+                if (s.sign == 2)
                     p.dir = 2;
+                break;
+            }
+            default: // 2 hold
                 break;
         }
         // types 0, 1, 7, 8, 9, 11, 12 with no tension: straight line
@@ -321,6 +347,11 @@ double shape (const Point& p, double ph) noexcept
             const auto q = ph * (double) 1.57079637f;
             const auto c = p.dir < 1 ? 1.0 - std::cos (q) : std::sin (q);
             return ph - (ph - c) * k14;
+        }
+        case 10: // round 190ee: Smooth (players 0x789a70 / 0x788d60), the same law as flcurve::evaluate
+        {
+            const auto x2 = ph * ph, x1 = ph - 1.0;
+            return ph + ((((x2 * 3.0 - x2 * 2.0 * ph) + x2 * x1 * k14) + ph * x1 * x1 * k18) - ph) * k1c;
         }
         case 11:
             if (p.dir < 1)
@@ -590,7 +621,22 @@ std::optional<State> parseState (const std::uint8_t* d, std::size_t size)
         if ((double) slot.points[0].y != 1.0)
             slot.flat = false;
     }
+    // round 190ee: "Trigger slots from MIDI notes" — on for states before version 9, else the byte after the slots
+    s.midiTrigger = true;
+    if (v > 8 && pos < size)
+        s.midiTrigger = d[pos] != 0;
     return s;
+}
+
+std::pair<int, int> slotForKey (int key) noexcept
+{
+    // kind 0 first, then kind 1 (the later match wins, as FL's lookup 0x844ae0; the ranges never overlap)
+    std::pair<int, int> r { -1, -1 };
+    if (key >= timeBaseKey && key < timeBaseKey + slotsPerKind)
+        r = { 0, key - timeBaseKey };
+    if (key >= volumeBaseKey && key < volumeBaseKey + slotsPerKind)
+        r = { 1, key - volumeBaseKey };
+    return r;
 }
 
 std::vector<std::uint8_t> pack (const std::vector<std::uint8_t>& flState, int ppq)
@@ -649,7 +695,10 @@ std::vector<std::uint8_t> writeState (const State& st)
 {
     std::vector<std::uint8_t> b;
     b.reserve (72 * 96);
-    put<std::int32_t> (b, 0x00080003); // version 8 in the high half, as FL's demo projects
+    // version 8 in the high half, as FL's demo projects; version 9 (FL 2026's own) when the state came as version 9 or
+    // has "Trigger slots from MIDI notes" off, which only version 9 can say (one byte after the slots, round 190ee)
+    const auto v9 = st.version >= 9 || ! st.midiTrigger;
+    put<std::int32_t> (b, v9 ? 0x00090003 : 0x00080003);
     for (const auto v : st.params)
         put<std::int32_t> (b, v);
     b.insert (b.end(), st.options.begin(), st.options.end());
@@ -688,13 +737,16 @@ std::vector<std::uint8_t> writeState (const State& st)
         for (int i = 0; i < 4; ++i)
             put<std::int32_t> (b, -1);
     }
+    if (v9)
+        b.push_back (st.midiTrigger ? 1 : 0);
     return b;
 }
 
 State emptyState()
 {
     State s;
-    s.version = 8;
+    s.version = 9; // round 190ee: FL 2026's instance, whose state is version 9 with the MIDI byte (off: 0x83fcf0)
+    s.midiTrigger = false;
     s.params = { 0, 0, 256, 256, 1765, 5000, 0, 0, 0x10000 };
     s.options = { 0, 0, 0, 0, 0, 0, 1, 1, 1 }; // FUN_0083fcf0: high quality (byte 6), byte 7 and declick (byte 8) on
     for (auto& slot : s.slots)
@@ -965,6 +1017,10 @@ State factoryState()
     }
     fill (volume (29), "Mute last beat", Shape (1.0f).step (3.0, 0.0f).step (4.0, 1.0f));
     fill (volume (30), "Stutter gate 1/16", gate (0.0625, 0.03125));
+    // round 190ee: LYNX's bank stands in for FL's Default preset, which a new FL instance loads (a version-4 state:
+    // "Trigger slots from MIDI notes" on); kept as the version-8 bytes it always had
+    s.version = 8;
+    s.midiTrigger = true;
     return s;
 }
 
@@ -1269,6 +1325,17 @@ struct Engine::Impl
             f.set (attackSamples * inv, rel * inv);
     }
 
+    // Options › Click reduction (option byte 8: 0 off, 1 low, 2 high): the jump fade and the speed smoothing
+    void setClickReduction() noexcept
+    {
+        const auto opt = std::min<int> (st.options[8], 2);
+        static constexpr float clickMs[3] { 25.0f, 25.0f, 35.0f };
+        static constexpr float speedMs[3] { 1.0f, 1.0f, 5.0f };
+        clickDecay = (float) std::exp (std::log (0.01) / ((double) clickMs[opt] * 0.001 * (double) fs));
+        const auto sm = (double) speedMs[opt] * 0.001 * (double) fs;
+        reader.speed.set (sm, sm);
+    }
+
     void setTension()
     {
         const auto mag = (double) (float) std::fabs ((double) ((float) P[6] * 0.00390625f));
@@ -1308,12 +1375,7 @@ struct Engine::Impl
         fadeReader.setCutoff (1.0);
         fadeLen = (int) std::max<std::int64_t> (roundEven ((double) fs * 0.001), 1);
         jumpLevel = (float) ((double) fs * 0.002);
-        const auto opt = std::min<int> (st.options[8], 2);
-        static constexpr float clickMs[3] { 25.0f, 25.0f, 35.0f };
-        static constexpr float speedMs[3] { 1.0f, 1.0f, 5.0f };
-        clickDecay = (float) std::exp (std::log (0.01) / ((double) clickMs[opt] * 0.001 * (double) fs));
-        const auto sm = (double) speedMs[opt] * 0.001 * (double) fs;
-        reader.speed.set (sm, sm);
+        setClickReduction();
         dcC2 = (float) (44100.0 / (double) fs * 2.2834999999999997e-05);
         span = 0.0;
         timing();
@@ -1360,6 +1422,8 @@ struct Engine::Impl
         st.options = s.options;
         if (oldOptions[5] != st.options[5])
             setFollowers();
+        if (oldOptions[8] != st.options[8]) // round 190ez: the Options menu changes it while playing
+            setClickReduction();
         quality = st.options[6] != 0 ? 16 : 8;
         for (int k = 0; k < 2; ++k)
         {
@@ -2036,6 +2100,16 @@ public:
         ok = true;
         engine.load (state, flPpq);
         raw = state.params;
+        current = { raw[0], raw[1] };
+        takeMidiSettings (state);
+    }
+
+    // round 190ee: a note on the effect's MIDI input port (FL: Options › "Trigger slots from MIDI notes"); applied at
+    // the start of the next block (FL handles it on its editor's thread, not at the note's sample)
+    void midiNote (int key, int velocity, int midiChannel) noexcept override
+    {
+        if (queued < (int) queue.size())
+            queue[(std::size_t) queued++] = { key, velocity, midiChannel };
     }
 
     // the editor changed a slot (points, settings, a preset's bank): the new bank is parsed here, off the audio thread,
@@ -2096,6 +2170,7 @@ public:
         if (incomingFull.load (std::memory_order_acquire))
         {
             engine.update (incoming);
+            takeMidiSettings (incoming);
             incomingFull.store (false, std::memory_order_release);
         }
         for (int i = 0; i < paramCount; ++i)
@@ -2105,8 +2180,26 @@ public:
             {
                 raw[(std::size_t) i] = v;
                 engine.setParam (i, v);
+                if (i < 2)
+                    current[(std::size_t) i] = v;
             }
         }
+        // MIDI notes select slots as a click in the grids would (the editor's handler 0x848330); the slot's own
+        // parameter keeps its value, so a later change of it still applies
+        for (int e = 0; e < queued; ++e)
+        {
+            const auto& ev = queue[(std::size_t) e];
+            if (! midiTrigger)
+                continue;
+            const auto [kind, slot] = midi.note (ev.velocity > 0, ev.channel, ev.key, current,
+                                                 [this] (int k, int s) { return keyHeld[(std::size_t) (k * slotsPerKind + s)]; });
+            if (kind >= 0)
+            {
+                current[(std::size_t) kind] = slot;
+                engine.setParam (kind, slot);
+            }
+        }
+        queued = 0;
         engine.setTempo ((float) bpm);
         const auto flTicks = songTicks / (double) ppq * (double) flPpq;
         // LYNX's transport: a moving song position is FL's "playing"; a position that does not follow the previous
@@ -2124,6 +2217,24 @@ public:
     }
 
 private:
+    void takeMidiSettings (const State& s) noexcept
+    {
+        midiTrigger = s.midiTrigger;
+        for (std::size_t k = 0; k < keyHeld.size(); ++k)
+            keyHeld[k] = s.slots[k].keyHeld;
+    }
+
+    struct Note
+    {
+        int key = 0, velocity = 0, channel = 0;
+    };
+    std::array<Note, 256> queue {};
+    int queued = 0;
+    MidiSlots midi;
+    bool midiTrigger = true;
+    std::array<bool, 2 * slotsPerKind> keyHeld {};
+    std::array<int, 2> current {};
+
     State state, incoming;
     std::atomic<bool> incomingFull { false };
     Engine engine;

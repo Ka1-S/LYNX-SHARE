@@ -83,7 +83,7 @@ int gotoNextEmptyPattern (Song& song)
 
     if (index < 0)
     {
-        if (! song.patterns.empty() && isPatternEmpty (song.patterns[(std::size_t) song.currentPattern]))
+        if (! song.patterns.empty() && isPatternEmpty (song.activePattern()))
             return song.currentPattern;
 
         Pattern p;
@@ -729,7 +729,7 @@ void permuteChannels (Song& song, const std::vector<int>& newOrder)
 
     song.forEachTarget ([&] (AutomationTarget& t) {
         if (t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan
-            || t.kind == AutomationTargetKind::channelParam)
+            || t.kind == AutomationTargetKind::channelParam || t.kind == AutomationTargetKind::channelAdjust)
             t.index = map (t.index);
     });
 

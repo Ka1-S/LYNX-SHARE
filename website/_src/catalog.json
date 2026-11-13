@@ -183,6 +183,10 @@
     [
      "Reverb mode",
      "The kind of space: Large Room, Medium Room, Bright Room, Large Chamber, Dark Room, Dark Chamber, Dark Space, Deep Space, Mirror Space, Vast Space, Distant Space or Dense Room."
+    ],
+    [
+     "Classic / Measured",
+     "Measured is the reverb engine of 0.1.27: the decay is set per octave band, a tone corrector follows the reverb network and a diffusion network shapes the onset. It uses less CPU than Classic. New instances start on Measured. Projects and presets saved before 0.1.27 load on Classic and sound as before."
     ]
    ],
    "tips": [
@@ -773,12 +777,84 @@
     [
      "Tape",
      "Selects a measured tape loop voicing: Off, Ping-pong tape, Studio tape or Studio tape hot."
+    ],
+    [
+     "Classic / Measured",
+     "Tweak page. Measured runs the measured tape stage in the Tape style when the Tape menu is Off: the tone of the output and of the loop, the tape's hiss and the lag of the wow. It costs a little more CPU. New instances start on Measured. Projects and presets saved before 0.1.27 load on Classic and sound as before."
+    ],
+    [
+     "Clock",
+     "Tweak page. The modulation swings the echo time by a fraction of itself, up to 50 percent at full depth, on both sides together, like a clocked delay line. Off by default."
     ]
    ],
    "tips": [
     "The status line under the editor describes the chosen style.",
     "The Tweak page adds Width, Diffusion, the style's modulation (Wow and Flutter for tape), Ducking, Accent, X-feed and Balance, plus Freeze, a Rhythm mode with its own tap editor and a choice between the project tempo and the echo's own BPM.",
     "Feedback above 100 percent keeps building, so raise it slowly."
+   ]
+  }
+ },
+ {
+  "id": "fx-edison",
+  "name": "Edison",
+  "cat": "sampler",
+  "flp": "Edison",
+  "desc": "Audio editor in a mixer slot, as in FL Studio: it records the slot's input, passes it on and can play its audio back in time with the song. Its window is the LYNX SHARE audio editor.",
+  "img": "thumbs/fx-edison-95160c7e.png",
+  "wiki": {
+   "intro": "Edison is an audio editor that sits in a mixer slot. It passes the slot's input through unchanged, records that input while Record is on, and adds its own playback to the output. Several Edison slots can be on one track. Add it from the slot's plugin list, or use the mixer track menu: Open audio editor (Ctrl+E) puts it in the first empty slot, and Open audio editor and record (Shift+E) also arms it with Record mode On play, 5 min, Append off and Slave on. Its window is the LYNX SHARE audio editor, with the slot's recording controls added. Recording goes on while the window is closed. Edison slots in .flp projects open as Edison, with their settings and audio.",
+   "controls": [
+    [
+     "Record",
+     "Records the slot's input, depending on the mode. Key R."
+    ],
+    [
+     "Now, On input, Input, On play",
+     "The record mode. Now starts at once. On input starts when the input goes above the noise threshold and keeps 0.1 s from before. Input records only while the input is heard and pauses after 1 s of silence. On play records while the song plays and adds a Song jump marker each time the song position jumps, so a looped song gives one take with a marker per pass. New slots start on On input."
+    ],
+    [
+     "Maximum recording time",
+     "Forever, 1, 3, 5, 10, 30 or 60 min. New slots start at 30 min."
+    ],
+    [
+     "Append",
+     "On: a new take goes after the audio already there. Off: it replaces it. On by default."
+    ],
+    [
+     "Slave",
+     "Slave playback to host: while the song plays, the audio plays at the song time. Key H. The Record menu also has Ignore own selection."
+    ],
+    [
+     "Mute input",
+     "The slot's input is not passed on, only Edison's playback. Key I."
+    ],
+    [
+     "Loop",
+     "Loops the playback. Key L."
+    ],
+    [
+     "Snap",
+     "Snap to the grid, to regions, to samples or to zero crossings, keys 1 to 4."
+    ],
+    [
+     "Drag",
+     "Drag the sample or the selection as a WAV onto the Playlist or the Channel Rack. Right-click copies it to the editor's clipboard."
+    ],
+    [
+     "Send",
+     "Send to the Playlist as an audio clip, to the selected channel or to a new Sampler channel."
+    ],
+    [
+     "Trigger note",
+     "In a region's menu: the note linked to the region. Regions › Assign trigger notes to all... and Assign all to set them for every region."
+    ]
+   ],
+   "tips": [
+    "The audio is kept as a WAV file in the project's recordings folder, not inside the project file.",
+    "Tools › Acquire noise threshold, on a selection of background noise only, sets the level that On input and Input listen for.",
+    "Tools › Macros › Remove all Edison instances removes every Edison slot of the project.",
+    "A slot made in LYNX SHARE is not written into a .flp on export. An Edison slot that came from a .flp and was not edited keeps FL Studio's data.",
+    "Trigger notes are stored with the regions and read by audio scripts. Playing a region from its note is not done yet."
    ]
   }
  },
@@ -1097,6 +1173,10 @@
     [
      "Low cut",
      "High-pass filter on the reverb."
+    ],
+    [
+     "Classic / Measured",
+     "Measured is the reverb engine of 0.1.27: the decay is set per octave band, a tone corrector follows the reverb network and a diffusion network shapes the onset. It uses less CPU than Classic. New instances start on Measured. Projects and presets saved before 0.1.27 load on Classic and sound as before."
     ]
    ],
    "tips": [
@@ -1367,6 +1447,10 @@
     [
      "Low cut",
      "High-pass filter on the reverb."
+    ],
+    [
+     "Classic / Measured",
+     "Measured is the reverb engine of 0.1.27: the decay is set per octave band, a tone corrector follows the reverb network and a diffusion network shapes the onset. It uses less CPU than Classic. New instances start on Measured. Projects and presets saved before 0.1.27 load on Classic and sound as before."
     ]
    ],
    "tips": [
@@ -2962,7 +3046,7 @@
   "desc": "Two-voice vocal doubler. Each voice has its own delay, detune, pitch drift, pan, gain and feedback, plus an octave-down switch and voice shelves.",
   "img": "art/gemini-doubler-after-100.png",
   "wiki": {
-   "intro": "Gemini Doubler is a native LYNX SHARE effect that thickens a vocal or other mono source with two delayed, slightly detuned copies. Add it to the insert of the track you want to double. Each voice is a pitch-shifting delay made of two crossfaded grains.",
+   "intro": "Gemini Doubler is a native LYNX SHARE effect that thickens a vocal or other mono source with two delayed, slightly detuned copies. Add it to the insert of the track you want to double. Each voice is a pitch-shifting delay.",
    "controls": [
     [
      "Direct",
@@ -3011,6 +3095,10 @@
     [
      "L / L+R / L-R",
      "Source for voice 1: left, sum or difference."
+    ],
+    [
+     "Classic / Measured",
+     "The voices' read head when Align is off. Measured reads each voice with one head that drifts and jumps back, as measured, and uses less than half the CPU. Classic uses two crossfaded taps. New instances start on Measured. Projects and presets saved before 0.1.27 load on Classic and sound as before."
     ]
    ],
    "tips": [
@@ -3072,6 +3160,10 @@
     [
      "Old / Measured",
      "Opto classic only. Two small switches keep the limit and make-up law and the attack and release timing of projects saved with earlier versions, or use the measured ones."
+    ],
+    [
+     "Cell memory",
+     "Opto classic only, Compress mode. On, the release slows down after long or hard gain reduction, so the leveler recovers fast after a short peak and slowly after a long one. Off by default."
     ],
     [
      "Makeup ref",
@@ -3190,6 +3282,10 @@
     [
      "Color",
      "Tone of the reverb, for example bright."
+    ],
+    [
+     "Classic / Measured",
+     "Measured is the reverb engine of 0.1.27: the decay is set per octave band, a tone corrector follows the reverb network and a diffusion network shapes the onset. It uses less CPU than Classic. New instances start on Measured. Projects and presets saved before 0.1.27 load on Classic and sound as before."
     ]
    ],
    "tips": [
@@ -3386,6 +3482,10 @@
     [
      "Echo mode, Reverb mode, Color",
      "Menus for the echo type, the reverb type and the tone."
+    ],
+    [
+     "Classic / Measured",
+     "Measured is the reverb engine of 0.1.27: the decay is set per octave band, a tone corrector follows the reverb network and a diffusion network shapes the onset. It uses less CPU than Classic. New instances start on Measured. Projects and presets saved before 0.1.27 load on Classic and sound as before."
     ]
    ],
    "tips": [
@@ -3443,6 +3543,14 @@
     [
      "Audition",
      "Lets you listen to the detected band."
+    ],
+    [
+     "Air",
+     "A high shelf at about 8 kHz on the processed signal, from off to +12 dB. Off by default."
+    ],
+    [
+     "Mix",
+     "Balance between the dry signal and the processed one. The dry signal is delayed to match the lookahead. 100 % by default."
     ]
    ],
    "tips": [
@@ -3614,6 +3722,10 @@
     [
      "Over-mod",
      "Extra modulation multiplier."
+    ],
+    [
+     "Classic / Measured",
+     "WARP tab. Measured makes the slow detune swing 3.5 times as far as Classic, as measured. New instances start on Measured. Projects and presets saved before 0.1.27 load on Classic and sound as before."
     ]
    ],
    "tips": [
@@ -4083,6 +4195,10 @@
     [
      "Mode",
      "The network shape."
+    ],
+    [
+     "Model",
+     "Classic or Measured. Measured runs six of the shapes (Ripple, Fold, Drift, Abyss, Glint and Mirage) on a different network model, ported from an MIT-licensed model. The other shapes sound the same on both. New instances start on Measured. Projects and presets saved before 0.1.27 load on Classic and sound as before."
     ]
    ],
    "tips": [
@@ -4234,6 +4350,10 @@
     [
      "Mode",
      "Barber-pole, through-zero flange, tri and octo chorus, doubler, ensemble, symphonic and more."
+    ],
+    [
+     "Classic / Measured",
+     "Measured changes the sweep of Rise and Rise / fall, the base delay under Manual and the feedback curve to measured ones. In Rise / fall the left side rises while the right side falls. New instances start on Measured. Projects and presets saved before 0.1.27 load on Classic and sound as before."
     ]
    ],
    "tips": [
@@ -4629,6 +4749,69 @@
   }
  },
  {
+  "id": "fx-pocket-comb-filter",
+  "name": "Pocket Comb Filter",
+  "cat": "eq",
+  "flp": "",
+  "desc": "Comb filter with feedback that is tuned by hand, to the lowest held key, or to the pitch it detects in the input. Rebuilt from FL Studio Mobile's Comb Filter.",
+  "img": "thumbs/fx-pocket-comb-filter-74ccea05.png",
+  "wiki": {
+   "intro": "Pocket Comb Filter adds a short delay with feedback to the dry signal, so the sound rings at the tuned pitch. The pitch can be set by hand, follow the lowest key held on the Channel rack, or follow the pitch detected in the input. It is the engine that FL Studio Mobile projects (.flm) load their Comb Filter module on, with every value copied as it is, and it can also be added to any mixer slot.",
+   "controls": [
+    [
+     "Mode",
+     "Manual, Lowest Note or Detect Pitch. Manual uses Pitch, or Pitch oct and Pitch note when Snap is on. Lowest Note follows the lowest key held on the Channel rack and keeps the last one after release. Detect Pitch follows the pitch of the input."
+    ],
+    [
+     "Pitch",
+     "Frequency in Manual mode when Snap is off, 1 Hz to 2.50 kHz on a fourth-power law."
+    ],
+    [
+     "Feedback",
+     "How much of the delayed signal is fed back, 0 to 100 %. Higher values ring longer."
+    ],
+    [
+     "Mix",
+     "Level of the comb signal added to the dry signal, 0 to 100 %. The dry signal stays at full level."
+    ],
+    [
+     "Offset",
+     "Moves the pitch by -2 to +2 octaves in Lowest Note and Detect Pitch modes."
+    ],
+    [
+     "Smoothing",
+     "How slowly the pitch glides to a new value, 0 to 100 %."
+    ],
+    [
+     "Snap",
+     "On: Manual mode plays the note set by Pitch oct and Pitch note. Off: it uses the Pitch frequency."
+    ],
+    [
+     "Polarity",
+     "Sign of the feedback per side: Both +, Left -, Right - or Both -."
+    ],
+    [
+     "Asymmetry",
+     "-5.0 to +5.0 %. Lowers the left side's frequency and raises the right side's by this amount (negative values do the opposite)."
+    ],
+    [
+     "Pitch oct",
+     "Octave of the note, -1 to 6."
+    ],
+    [
+     "Pitch note",
+     "Note name, C to B. With no key held yet, Lowest Note also starts on this note (E3 by default)."
+    ]
+   ],
+   "tips": [
+    "Lowest Note reads the keys held on all channels of the Channel rack. In FL Studio Mobile it reads only the rack the effect sits on.",
+    "Detect Pitch works best on pitched sounds. On drums or noise it can lock to wrong pitches, and FL Studio Mobile's own detector is not consistent there either.",
+    "The tuning follows FL Studio Mobile's delay loop, which is about 19 cents off an ideal comb at the same note.",
+    "The effect has a plain knob page, not FL Studio Mobile's panel."
+   ]
+  }
+ },
+ {
   "id": "fx-pocket-compressor",
   "name": "Pocket Compressor",
   "cat": "dynamics",
@@ -4719,6 +4902,78 @@
    "tips": [
     "BitCrush lowers the sample rate by holding samples. It does not reduce the bit depth.",
     "Gain only lowers the level. Use it to compensate for the level that Drive adds."
+   ]
+  }
+ },
+ {
+  "id": "fx-pocket-eq",
+  "name": "Pocket EQ",
+  "cat": "eq",
+  "flp": "",
+  "desc": "Four-band equalizer with a low shelf, peak or high shelf per band, a bandwidth in octaves and a choice of channel per band. Rebuilt from FL Studio Mobile's Equalizer.",
+  "img": "thumbs/fx-pocket-eq-e381890e.png",
+  "wiki": {
+   "intro": "Pocket EQ has four bands. Each band is a low shelf, a peak or a high shelf with its own gain, frequency and bandwidth, and it can work on both sides, on one side only, or on the two sides in opposite directions. It is the engine that FL Studio Mobile projects (.flm) load their Equalizer module on, with every value copied as it is, and it can also be added to any mixer slot.",
+   "controls": [
+    [
+     "Gain 1 to Gain 4",
+     "Gain of the band, shown as -12 to +12 dB. As in FL Studio Mobile, the band boosts or cuts twice the amount shown, so the full range is -24 to +24 dB."
+    ],
+    [
+     "Frequency 1 to Frequency 4",
+     "Frequency of the band, 32 Hz to about 19.5 kHz."
+    ],
+    [
+     "Bandwidth 1 to Bandwidth 4",
+     "Width of the band, 0.25 to 7.25 octaves."
+    ],
+    [
+     "Kind 1 to Kind 4",
+     "Low shelf, Peak or High shelf. Low shelf is the lower half of the range, Peak the upper half, and High shelf only the very top."
+    ],
+    [
+     "Channel 1 to Channel 4",
+     "Which side the band works on: Both, Left, Right, Left + / right - (the right side gets the opposite gain) or Left - / right + (the left side gets the opposite gain)."
+    ]
+   ],
+   "tips": [
+    "The bands run at twice the sample rate, as in FL Studio Mobile.",
+    "The four bands are chained in FL Studio Mobile's way, which delays the sound by 1.5 samples. Like FL Studio Mobile, the effect does not report this to the delay compensation.",
+    "The effect has a plain knob page, not FL Studio Mobile's EQ panel."
+   ]
+  }
+ },
+ {
+  "id": "fx-pocket-filter",
+  "name": "Pocket Filter",
+  "cat": "eq",
+  "flp": "",
+  "desc": "Low-pass, band-pass or high-pass filter with a frequency, a Q and a slope of 24, 48 or 96 dB per octave. Rebuilt from FL Studio Mobile's Filter.",
+  "img": "thumbs/fx-pocket-filter-5341844e.png",
+  "wiki": {
+   "intro": "Pocket Filter is a resonant filter made of one, two or four pairs of identical filter stages. It is the engine that FL Studio Mobile projects (.flm) load their Filter module on, with every value copied as it is, and it can also be added to any mixer slot.",
+   "controls": [
+    [
+     "Frequency",
+     "Cutoff or centre frequency, 16 Hz to about 20 kHz."
+    ],
+    [
+     "Q",
+     "Resonance, shown as 0.80 to 2.80, on a square law."
+    ],
+    [
+     "Type",
+     "LP (low-pass), BP (band-pass) or HP (high-pass). LP is the lower half of the range, BP the upper half, and HP only the very top."
+    ],
+    [
+     "Slope",
+     "24 dB/O, 48 dB/O or 96 dB/O. 24 dB/O is the lower half of the range, 48 dB/O the upper half, and 96 dB/O only the very top."
+    ]
+   ],
+   "tips": [
+    "As in FL Studio Mobile, the low-pass lowers the level by about 2 dB per pair of stages: about 2, 4 and 8 dB at 24, 48 and 96 dB/O. The band-pass raises the centre by the Q value, up to about 9 dB.",
+    "A change of Slope switches at once, and the low-pass level follows only at the next change of Frequency, Q or Type. FL Studio Mobile does the same.",
+    "Each pair of stages delays the sound by one sample, which is not reported to the delay compensation, as in FL Studio Mobile."
    ]
   }
  },
@@ -4834,6 +5089,36 @@
   }
  },
  {
+  "id": "fx-pocket-graphic-eq",
+  "name": "Pocket Graphic EQ",
+  "cat": "eq",
+  "flp": "",
+  "desc": "Eight-band graphic equalizer from 80 Hz to 12 kHz, one octave per band. Rebuilt from FL Studio Mobile's Graphic EQ.",
+  "img": "thumbs/fx-pocket-graphic-eq-94da1872.png",
+  "wiki": {
+   "intro": "Pocket Graphic EQ has eight fixed bands, one octave wide: a low shelf at 80 Hz, peaks at 160 Hz, 375 Hz, 750 Hz, 1.5 kHz, 3 kHz and 6 kHz, and a high shelf at 12 kHz. It is the engine that FL Studio Mobile projects (.flm) load their Graphic EQ module on, with every value copied as it is, and it can also be added to any mixer slot.",
+   "controls": [
+    [
+     "80 Hz",
+     "Low shelf. Gain shown as -12 to +12 dB."
+    ],
+    [
+     "160 Hz, 375 Hz, 750 Hz, 1.5 kHz, 3 kHz, 6 kHz",
+     "Peak bands. Gain shown as -12 to +12 dB."
+    ],
+    [
+     "12 kHz",
+     "High shelf. Gain shown as -12 to +12 dB."
+    ]
+   ],
+   "tips": [
+    "As in FL Studio Mobile, each band boosts or cuts twice the amount shown, so the full range is -24 to +24 dB.",
+    "The bands are chained in FL Studio Mobile's way, which delays the sound by 8 samples. Like FL Studio Mobile, the effect does not report this to the delay compensation.",
+    "The effect has a plain knob page, not FL Studio Mobile's sliders."
+   ]
+  }
+ },
+ {
   "id": "fx-pocket-leveller",
   "name": "Pocket Leveller",
   "cat": "dynamics",
@@ -4929,6 +5214,80 @@
   }
  },
  {
+  "id": "fx-pocket-multiband-compressor",
+  "name": "Pocket Multiband Compressor",
+  "cat": "dynamics",
+  "flp": "",
+  "desc": "Three-band compressor with two crossovers, and per band an input gain, threshold, ratio, attack, release, output gain, On, Bypass or Mute, and a stereo width. Rebuilt from FL Studio Mobile's Multiband Compressor.",
+  "img": "thumbs/fx-pocket-multiband-compressor-0166a4bb.png",
+  "wiki": {
+   "intro": "Pocket Multiband Compressor splits the sound into low, mid and high bands with two 24 dB crossovers and compresses each band on its own. Its ratio works on the signal's amplitude, not on decibels, so it is gentler than a usual compressor at the same numbers. It is the engine that FL Studio Mobile projects (.flm) load their Multiband Compressor module on, with every value copied as it is, and it can also be added to any mixer slot. Its editor is a page of plain knobs, one row of names per band (Low, Mid, High).",
+   "controls": [
+    [
+     "Master gain",
+     "Output level of the whole effect, -24 dB to +24 dB."
+    ],
+    [
+     "Low crossover",
+     "Split between the low and mid bands, 20 Hz to 10.2 kHz."
+    ],
+    [
+     "High crossover",
+     "Split between the mid and high bands, 20 Hz to 10.2 kHz."
+    ],
+    [
+     "Solo",
+     "Off, Low, Mid or High: plays only that band. This control is LYNX SHARE's own; FL Studio Mobile keeps an editor setting in its place, which a .flm import resets to Off."
+    ],
+    [
+     "Dry mix",
+     "Adds the uncompressed band to the compressed one, 0 to 100%, for parallel compression."
+    ],
+    [
+     "Low / Mid / High input gain",
+     "Gain into the band, -24 dB to +24 dB. It feeds both the detector and the audio."
+    ],
+    [
+     "Low / Mid / High threshold",
+     "Level above which the band is compressed, -48 dB to 0 dB."
+    ],
+    [
+     "Low / Mid / High ratio",
+     "1 to 31."
+    ],
+    [
+     "Low / Mid / High attack",
+     "How fast the band's compressor reacts, 0 to 50 ms on a square law."
+    ],
+    [
+     "Low / Mid / High release",
+     "How fast it lets go, 10 ms to 1 s."
+    ],
+    [
+     "Low / Mid / High gain",
+     "Output gain of the band, -24 dB to +24 dB."
+    ],
+    [
+     "Low / Mid / High state",
+     "On compresses the band, Bypass passes it as split, Mute silences it."
+    ],
+    [
+     "Low / Mid / High width",
+     "Stereo width of the band, 0 to 200%. 100% leaves it as it is, 0% is mono."
+    ],
+    [
+     "Width mode",
+     "Mode 1: above 100% the width moves towards the side signal alone. Mode 2: above 100% part of the other channel is subtracted from each side."
+    ]
+   ],
+   "tips": [
+    "A bypassed band skips its input gain, output gain and width as well.",
+    "Attack and release are worked out for 44.1 kHz at every sample rate, as FL Studio Mobile does. At 48 kHz or 96 kHz they are shorter than their read-outs.",
+    "For new mixes the Fruity Multiband Compressor or Prism Multiband are the fuller tools. This one is here so that FL Studio Mobile songs sound as they did on the phone."
+   ]
+  }
+ },
+ {
   "id": "fx-pocket-multifx",
   "name": "Pocket MultiFX",
   "cat": "modulation",
@@ -5016,6 +5375,272 @@
    "tips": [
     "The rate labels are FL Studio Mobile's own: 1/1 is one beat and 1 bar is sixteen beats, so 16 bars is 256 beats.",
     "The sweep is limited to the range 50 Hz to 16 kHz."
+   ]
+  }
+ },
+ {
+  "id": "fx-pocket-reverb",
+  "name": "Pocket Reverb",
+  "cat": "reverb",
+  "flp": "",
+  "desc": "Plate reverb with one Mix knob that blends dry and wet, decay, damping, room size, predelay, width, low and high cuts, early reflections, modulation and a pan for the reverb. Rebuilt from FL Studio Mobile's Reverb.",
+  "img": "thumbs/fx-pocket-reverb-de000728.png",
+  "wiki": {
+   "intro": "Pocket Reverb is FL Studio Mobile's current reverb module on FL Studio Mobile's own plate. It uses the controls of the older module, with the plate's early reflections and tail at fixed levels, and mixes them with the dry signal itself. It is the engine that FL Studio Mobile projects (.flm) load their Reverb module on, with every value copied as it is, and it can also be added to any mixer slot. Its editor is a page of plain knobs.",
+   "controls": [
+    [
+     "Decay",
+     "Length of the tail, 0.1 s to 20 s. The knob follows a cube law, so most of its travel covers the short times."
+    ],
+    [
+     "High damping",
+     "Frequency above which the tail loses its highs faster, 0.5 kHz to 22.1 kHz. The top of the range reads Off."
+    ],
+    [
+     "Mix",
+     "Blend of dry and reverb. Below the middle the dry stays at full level and the reverb rises; above it the reverb stays at full level and the dry falls. In the middle both are at full level."
+    ],
+    [
+     "Pan",
+     "Pans the reverb, not the dry signal."
+    ],
+    [
+     "ER",
+     "Level of the early reflections, 0 to 100% on a square law."
+    ],
+    [
+     "Predelay",
+     "Time before the reverb starts, 0 to 250 ms."
+    ],
+    [
+     "Room size",
+     "Size of the plate, 1 to 100."
+    ],
+    [
+     "Diffusion",
+     "How quickly the echoes blur into a smooth tail, 0 to 100%."
+    ],
+    [
+     "Width",
+     "Stereo width of the reverb, 0 to 200%."
+    ],
+    [
+     "Low cut",
+     "Cuts the lows of the signal that enters the reverb, 19 Hz to 3000 Hz. The bottom of the range reads Off."
+    ],
+    [
+     "High cut",
+     "Cuts the highs of the signal that enters the reverb, 0.5 kHz to 22.1 kHz. The top of the range reads Off."
+    ],
+    [
+     "Mod rate",
+     "Speed of the modulation in the tail, 0.1 Hz to 10 Hz."
+    ],
+    [
+     "Mod depth",
+     "Amount of modulation in the tail, 0 to 100%."
+    ],
+    [
+     "Wet gain",
+     "Overall level of the reverb, 0 to 100%."
+    ],
+    [
+     "Dry level",
+     "Overall level of the dry signal, 0 to 100%."
+    ]
+   ],
+   "tips": [
+    "Level changes glide over a few milliseconds, so moving Mix, Pan, ER or the two levels does not click.",
+    "This plate is not Fruity Reeverb 2: at the same settings its low end rings longer.",
+    "Modulation has not been compared with FL Studio Mobile by ear yet: none of the projects it was measured on uses it."
+   ]
+  }
+ },
+ {
+  "id": "fx-pocket-reverb-2",
+  "name": "Pocket Reverb 2",
+  "cat": "reverb",
+  "flp": "",
+  "desc": "Plate reverb with size, decay, damping, low and high cuts, dry, early reflection and wet levels, a predelay of up to 1000 ms that can follow the tempo, a side input, separation and a wet pan. Rebuilt from FL Studio Mobile's Reverb 2.",
+  "img": "thumbs/fx-pocket-reverb-2-616cce9e.png",
+  "wiki": {
+   "intro": "Pocket Reverb 2 runs FL Studio Mobile's plate at full level and mixes the dry signal, the early reflections and the tail itself, then sets the stereo separation and pans the reverb. It is the engine that FL Studio Mobile projects (.flm) load their Reverb 2 module on, with every value copied as it is, and it can also be added to any mixer slot. Its editor is a page of plain knobs.",
+   "controls": [
+    [
+     "High cut",
+     "Cuts the highs of the signal that enters the reverb, 0.5 kHz to 22.1 kHz. The top of the range reads Off."
+    ],
+    [
+     "Low cut",
+     "Cuts the lows of the signal that enters the reverb, 19 Hz to 3000 Hz. The bottom of the range reads Off."
+    ],
+    [
+     "Size",
+     "Size of the plate, 1 to 100."
+    ],
+    [
+     "Decay",
+     "Length of the tail, 0.1 s to 20 s, on a straight scale."
+    ],
+    [
+     "Diffusion",
+     "How quickly the echoes blur into a smooth tail, 0 to 100%."
+    ],
+    [
+     "Damping",
+     "Frequency above which the tail loses its highs faster, 0.5 kHz to 22.1 kHz. The top of the range reads Off."
+    ],
+    [
+     "Dry",
+     "Level of the original signal, 0 to 125%."
+    ],
+    [
+     "ER",
+     "Level of the early reflections, 0 to 125%."
+    ],
+    [
+     "Wet",
+     "Level of the reverb, 0 to 125%."
+    ],
+    [
+     "Side input",
+     "On feeds the reverb with the difference of left and right instead of their sum, so only the stereo part of the sound is reverberated."
+    ],
+    [
+     "Delay",
+     "Time before the reverb starts, 0 to 1000 ms."
+    ],
+    [
+     "Tempo",
+     "On makes Delay a number of sixteenths of a beat at the song tempo, up to one beat. A delay longer than 1000 ms is shortened by a sixteenth at a time until it fits."
+    ],
+    [
+     "Mod",
+     "Amount of modulation in the tail, 0 to 100%."
+    ],
+    [
+     "Bass",
+     "Decay of the lows against the rest of the tail, x0.2 to x3.0."
+    ],
+    [
+     "Separation",
+     "Stereo width of the reverb, 0 to 200%. 100% leaves it as the plate makes it."
+    ],
+    [
+     "Speed",
+     "Speed of the modulation, 0.1 Hz to 10 Hz on a cube law."
+    ],
+    [
+     "Crossover",
+     "Frequency below which Bass acts, 25 Hz to 2000 Hz."
+    ],
+    [
+     "Pan",
+     "Pans the reverb, not the dry signal."
+    ]
+   ],
+   "tips": [
+    "Unlike the other two Pocket reverbs, the dry signal has its own level here, so Dry at 0% gives the reverb alone.",
+    "Delay always reads in ms, also when Tempo is on.",
+    "Modulation has not been compared with FL Studio Mobile by ear yet: none of the projects it was measured on uses it."
+   ]
+  }
+ },
+ {
+  "id": "fx-pocket-reverb-classic",
+  "name": "Pocket Reverb Classic",
+  "cat": "reverb",
+  "flp": "",
+  "desc": "Plate reverb with decay, room size, predelay, damping, low and high cuts, a bass multiplier, modulation, and input, early reflection, dry and wet levels in dB with a mute switch each. Rebuilt from FL Studio Mobile's Reverb (legacy).",
+  "img": "thumbs/fx-pocket-reverb-classic-e47dfa68.png",
+  "wiki": {
+   "intro": "Pocket Reverb Classic is FL Studio Mobile's older reverb module on FL Studio Mobile's own plate, a network close to Fruity Reeverb 2 but not the same. The original signal always passes at full level and the reverb is added to it. It is the engine that FL Studio Mobile projects (.flm) load their Reverb (legacy) module on, with every value copied as it is, and it can also be added to any mixer slot. Its editor is a page of plain knobs.",
+   "controls": [
+    [
+     "Decay",
+     "Length of the tail, 0.1 s to 20 s. The knob follows a cube law, so most of its travel covers the short times."
+    ],
+    [
+     "High damping",
+     "Frequency above which the tail loses its highs faster, 0.5 kHz to 22.1 kHz. The top of the range reads Off."
+    ],
+    [
+     "Mix",
+     "Level of the reverb, shown in dB from -inf up to +6.0 dB."
+    ],
+    [
+     "Predelay",
+     "Time before the reverb starts, 0 to 250 ms."
+    ],
+    [
+     "Room size",
+     "Size of the plate, 1 to 100."
+    ],
+    [
+     "Diffusion",
+     "How quickly the echoes blur into a smooth tail, 0 to 100%."
+    ],
+    [
+     "Width",
+     "Stereo width of the reverb, 0 to 200%."
+    ],
+    [
+     "Low cut",
+     "Cuts the lows of the signal that enters the reverb, 19 Hz to 3000 Hz. The bottom of the range reads Off."
+    ],
+    [
+     "High cut",
+     "Cuts the highs of the signal that enters the reverb, 0.5 kHz to 22.1 kHz. The top of the range reads Off."
+    ],
+    [
+     "Input",
+     "Level of the signal sent into the reverb, -inf to +6.0 dB."
+    ],
+    [
+     "ER",
+     "Level of the early reflections, -inf to +6.0 dB."
+    ],
+    [
+     "Dry level",
+     "Extra dry signal added by the reverb, -inf to +6.0 dB. It is -inf on a new instance."
+    ],
+    [
+     "Input off",
+     "Mutes the signal sent into the reverb. Reads On or Muted."
+    ],
+    [
+     "Dry off",
+     "Mutes the extra dry signal of Dry level. Reads On or Muted."
+    ],
+    [
+     "ER off",
+     "Mutes the early reflections. Reads On or Muted."
+    ],
+    [
+     "Wet off",
+     "Mutes the reverb tail. Reads On or Muted."
+    ],
+    [
+     "Bass mult",
+     "Decay of the lows against the rest of the tail, x0.2 to x3.0."
+    ],
+    [
+     "Crossover",
+     "Frequency below which Bass mult acts, 25 Hz to 2000 Hz."
+    ],
+    [
+     "Mod rate",
+     "Speed of the modulation in the tail, 0.1 Hz to 10 Hz."
+    ],
+    [
+     "Mod depth",
+     "Amount of modulation in the tail, 0 to 100%."
+    ]
+   ],
+   "tips": [
+    "The original signal is never lowered: Dry off and Dry level only change the extra dry copy, not the signal that passes through.",
+    "Of the three Pocket reverbs this is the only one with mute switches and levels in dB. Pocket Reverb 2 sets its levels in percent and Pocket Reverb has one Mix knob.",
+    "Modulation has not been compared with FL Studio Mobile by ear yet: none of the projects it was measured on uses it."
    ]
   }
  },
@@ -5163,6 +5788,52 @@
    "tips": [
     "The echo level is Mix times Fdbk, so with Fdbk at 0 no echo is heard at any Mix setting.",
     "Move Time while sound is playing for a tape speed effect."
+   ]
+  }
+ },
+ {
+  "id": "fx-pocket-tape-stop",
+  "name": "Pocket Tape Stop",
+  "cat": "delay",
+  "flp": "",
+  "desc": "Slows the sound down to a stop like a tape machine and speeds it up again, with free or tempo-synced stop and start times, a Play switch and a curve for the speed. Rebuilt from FL Studio Mobile's Tape Stop.",
+  "img": "thumbs/fx-pocket-tape-stop-052705cc.png",
+  "wiki": {
+   "intro": "Pocket Tape Stop records its input all the time. Turning Play off plays the recording back at a falling speed until it stops, and turning Play on again speeds it up and fades back to the live input over the last 0.1 s. Automate Play to place the stops in a song. It is the engine that FL Studio Mobile projects (.flm) load their Tape Stop module on, with every value copied as it is, and it can also be added to any mixer slot. Its editor is a page of plain knobs.",
+   "controls": [
+    [
+     "Stop time",
+     "Length of the slowdown when Sync is off, up to 5 s. Shown in ms below one second. The bottom of the range reads Off: the tape stops within 5 ms."
+    ],
+    [
+     "Start time",
+     "Length of the speed-up when Sync is off, up to 5 s."
+    ],
+    [
+     "Stop time synced",
+     "Length of the slowdown when Sync is on: Off, 1/4 beat, 3/8 beat, 1/2 beat, 3/4 beat, 1 beat, 2, 4, 8 or 16 beats."
+    ],
+    [
+     "Start time synced",
+     "Length of the speed-up when Sync is on, with the same steps."
+    ],
+    [
+     "Play",
+     "On plays the input. Off stops the tape. Each change starts a slowdown or a speed-up."
+    ],
+    [
+     "Warp",
+     "Shape of the speed curve, -100% to +100%."
+    ],
+    [
+     "Sync",
+     "On uses the synced times at the song tempo, Off the times in seconds."
+    ]
+   ],
+   "tips": [
+    "It only works while the song plays. With the song stopped the audio passes through and nothing is recorded.",
+    "When the tape has stopped, the output fades to silence until Play is turned on again.",
+    "Turning Play back on during a slowdown speeds up from the speed it had reached."
    ]
   }
  },
@@ -5489,6 +6160,14 @@
     [
      "Meter",
      "Level meter on the left with a held reduction read-out below it."
+    ],
+    [
+     "Matched",
+     "Switches from the six-band expander to the matched engine: cuts on seven octave bands, with no latency. Off by default."
+    ],
+    [
+     "Classic / Measured",
+     "Matched engine only. Measured lets each band follow the noise floor it measures over about a second, so steady noise is taken down further. It costs some CPU. The switch is shown only for an instance from a project or preset saved before 0.1.27, which loads on Classic and sounds as before. Once you switch to Measured it is hidden. New instances use Measured."
     ]
    ],
    "tips": [
@@ -5823,6 +6502,22 @@
     [
      "Oversampling, In and Out",
      "Oversampling menu and input and output gain."
+    ],
+    [
+     "Model",
+     "Classic or Measured. Measured adds the Vocal style's noise reduction; the other styles ignore it. Projects saved before 0.1.26 load on Classic."
+    ],
+    [
+     "Trigger",
+     "Level or Transient. Level is the gate as before. Transient is a drum gate: a hit above the threshold opens it fully, it stays open for Hold and closes over Release along the chosen shape, whatever the level does meanwhile. Ratio, Knee and the style's curve are not used in Transient. Level by default."
+    ],
+    [
+     "Shape",
+     "Transient only. The shape of the release: Smooth, Mid or Sharp."
+    ],
+    [
+     "Sensitivity",
+     "Transient only. 1 to 10, default 5. Higher values open the gate on smaller hits."
     ]
    ],
    "tips": [
@@ -5915,6 +6610,10 @@
     [
      "Output",
      "Output mode (Stereo in the picture)."
+    ],
+    [
+     "Classic / Measured",
+     "Measured uses the measured feedback loop: its filters, an added all-pass, the limiter and the glide when the delay time changes. It uses a little less CPU. New instances start on Measured. Projects and presets saved before 0.1.27 load on Classic and sound as before."
     ]
    ],
    "tips": [
@@ -6747,6 +7446,10 @@
     [
      "MIDI channel",
      "Off, or a Channel Rack channel whose held notes set the pitch. Transpose and Quantize shift by the distance of the highest held note from C4, and Robot sings that note."
+    ],
+    [
+     "Classic / Measured",
+     "Measured makes the sounds the detector does not find voiced, such as s and t sounds, follow the formant shift (with Link on, the pitch and the formant). The switch is shown only for an instance from a project or preset saved before 0.1.27, which loads on Classic and sounds as before. Once you switch to Measured it is hidden. New instances use Measured."
     ]
    ],
    "tips": [
@@ -7212,6 +7915,61 @@
    "tips": [
     "A new Dashboard starts with two knobs, Knob 1 and Knob 2.",
     "Each control is an output: right-click a knob, Link to internal controller."
+   ]
+  }
+ },
+ {
+  "id": "gen-drum-rack",
+  "name": "Drum Rack",
+  "cat": "drums",
+  "flp": "",
+  "desc": "Ableton Live-style drum rack for the Channel Rack: 16 pads in view out of 128, each pad a chain with its own instrument and effects, with choke groups, return chains and sends. Drum Racks in Live sets (.als) open as one Drum Rack.",
+  "img": "thumbs/gen-drum-rack-a4ce4351.png",
+  "wiki": {
+   "intro": "Drum Rack is an Instrument Rack whose chains are pads. Each pad receives one note and plays the instrument and effects of its chain. Add it from the plugin picker as Drum Rack. A new Drum Rack shows only the pads and the devices pane, with C1 selected. Drop samples on the pads, or right-click an empty pad to load a sample or an instrument. A Drum Rack in an Ableton Live set (.als) opens as one Drum Rack with its pads, sends and return chains, and Drum Racks are written when you export a Live set.",
+   "controls": [
+    [
+     "Pads",
+     "A 4 x 4 view of the pads, with an overview strip of all 128 above it: click, drag or scroll it to move the view. A filled pad shows its name with M (mute), a play button and S (solo). Drag a pad onto another to swap them. Dropping several samples fills consecutive pads."
+    ],
+    [
+     "Pad menu",
+     "Rename (Ctrl+R), Delete, Save as Default Pad, Next Similar (Ctrl+Right), Previous Similar (Ctrl+Left), Save as Similarity Reference (Ctrl+Up), Return to Reference (Ctrl+Down), and the LYNX SHARE items Duplicate and Choke."
+    ],
+    [
+     "M, V, P, C, I-O, S, R, D",
+     "The strip on the left shows or hides the macros, the macro variations, the pads, the chain list, the I-O, send and return columns, and the devices pane."
+    ],
+    [
+     "Receive, Play, Choke",
+     "Per pad: the incoming note it answers to (or All), the note it hands its instrument, and its choke group (None or 1 to 16). A pad in a choke group cuts the other pads of that group."
+    ],
+    [
+     "Send-a, Send-b",
+     "The level each pad sends to each return chain."
+    ],
+    [
+     "Return chains",
+     "Chains of audio effects fed by the sends, shown as a, b and so on, for example \"a Mix Bus\"."
+    ],
+    [
+     "Audio To",
+     "Where a pad's chain goes: Rack Output, or straight into a return chain."
+    ],
+    [
+     "Vel, Chain, Hide",
+     "A LYNX SHARE addition under the chain list: velocity and chain-select zones. Pads take the place of key zones."
+    ],
+    [
+     "Macros",
+     "Up to 16 macro knobs, with Map, Rand and Macro Variations, as in an Instrument Rack."
+    ]
+   ],
+   "tips": [
+    "Slice to Drum Rack in a Sampler channel's menu puts each slice of its sample on a pad. Slice to New MIDI Track... on an audio clip in the Playlist slices it per transient, bar, note value or warp marker into a new Drum Rack channel with a pattern that plays the slices.",
+    "In the Clip-launch layout the Piano roll of a Drum Rack channel shows one named row per filled pad. In the Pattern layout it keeps the piano keys, with the pad names on them.",
+    "Next Similar and Previous Similar swap the pad's sample using the Browser's Find similar samples index.",
+    "On .als export, LYNX SHARE's built-in effects in a chain are not written; Samplers on pads are written as Live's Simpler. No Live has opened an exported Drum Rack yet."
    ]
   }
  },
@@ -9039,6 +9797,80 @@
    ],
    "tips": [
     "The random seed differs per instance, so two renders of the same notes are not sample identical to FL Studio, which seeds from the clock."
+   ]
+  }
+ },
+ {
+  "id": "gen-pocket-supersaw",
+  "name": "Pocket SuperSaw",
+  "cat": "synth",
+  "flp": "",
+  "desc": "Virtual analog synth with up to 12 detuned saws per voice, a sub oscillator, a 4-pole low-pass filter, three envelopes, an LFO, an arpeggiator, distortion and delay. Rebuilt from FL Studio Mobile's SuperSaw.",
+  "img": "thumbs/gen-pocket-supersaw-f93c6894.png",
+  "wiki": {
+   "intro": "Pocket SuperSaw is a virtual analog synthesizer with up to 8 voices. Each voice is a stack of 1 to 12 detuned saw waves with a sub-octave saw, or the SuperSync oscillator, a train of pulses that sweeps like hard sync. It is the engine that FL Studio Mobile projects (.flm) load their SuperSaw module on, and it is also in the plugin picker under Pocket SuperSaw. A new channel starts from FL Studio Mobile's defaults. The page is a plain list of knobs, one per parameter (59 in all), not FL Studio Mobile's own panel.",
+   "controls": [
+    [
+     "Osc unison, Osc unison detune, Osc unison detune curve, Osc unison pan",
+     "Number of saws per voice (1 to 12), how far they are detuned (up to 100 cents), how the detune is spread across the saws, and how wide they are panned."
+    ],
+    [
+     "Osc pulse width, Osc pulse mode, Osc sub level",
+     "Pulse mode turns each saw into a pulse wave, with its width. Osc sub level is the level of the saw one octave down."
+    ],
+    [
+     "Osc re-trig phases, Osc phases offset",
+     "With re-trig on, every note starts the saws at the same phases, so the beating is the same on every note. Off: each note starts at random phases."
+    ],
+    [
+     "SuperSync mode, Osc sync, Osc sync pulse width, Osc sync attack / decay / sustain / release, Osc sync EG amount, Osc sync kbd dir",
+     "The SuperSync oscillator and its own envelope, which sweeps the sync amount."
+    ],
+    [
+     "Filter cutoff, Filter resonance, Filter kbd, Filter vel",
+     "A 4-pole ladder low-pass filter, up to 20 kHz, with keyboard and velocity tracking."
+    ],
+    [
+     "Filter EG attack / decay / sustain / release, Filter EG amount",
+     "The filter envelope. The amount is bipolar, -100 % to +100 %."
+    ],
+    [
+     "Level EG attack / decay / sustain / release, Level, Pan",
+     "The volume envelope and the output level and pan. Envelope times run from 0 to 31 seconds."
+    ],
+    [
+     "LFO shape, LFO rate, LFO mode, LFO beat, LFO amount, LFO dest, LFO fade in",
+     "One LFO per voice: Sine, Ramp, Square or Random; Free, One shot or Tempo sync. LFO dest picks Cutoff, Resonance, Pitch, Sync, Pulse width, Detune, Level or Pan."
+    ],
+    [
+     "Arp rate, Arp range, Arp mode",
+     "Arpeggiator: Off, Up, Down, Up-down, Up-down (ends twice) or Random, over up to 3 extra octaves."
+    ],
+    [
+     "Monophonic mode, Number of voices, Slide held mode, Slide time, Slide time static",
+     "Play one voice or up to 8, and how notes glide."
+    ],
+    [
+     "Transpose, Pitch bend range",
+     "Transpose by -12 to +12 semitones. The pitch wheel bends by 1 to 12 semitones."
+    ],
+    [
+     "Distortion, Output trim",
+     "A tanh distortion and an output trim of -18 to 0 dB."
+    ],
+    [
+     "Delay time, Delay feedback, Delay mix, Delay filter",
+     "A tempo-synced stereo delay, 1/4 beat to 1 beat, with a low-pass or high-pass filter in its loop."
+    ],
+    [
+     "Mod wheel amount, Mod wheel dest",
+     "What the mod wheel moves: Cutoff, Resonance, Sync, Pulse width, Detune, Level, Pan, LFO amount or LFO rate."
+    ]
+   ],
+   "tips": [
+    "Every knob can be automated. The saws are band-limited, so high notes do not alias.",
+    "Start phases and the Random LFO come from a generator owned by each instance, so a render never matches a given FL Studio Mobile render sample for sample. The energy and the spectrum do.",
+    "The channel's pitch knob, fine tune, Mono and Porta and the Piano roll's slide notes act on the voices as they do on FL Studio's generators."
    ]
   }
  },

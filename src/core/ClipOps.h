@@ -905,4 +905,72 @@ inline float groupNormalizeGain (const std::vector<float>& peaks) noexcept
     return top == 0.0f ? 0.0f : 1.0f / top;
 }
 
+// FL's audio clip menu › Automate › Panning / Volume (EEAUAutoPanMenuClick 0x1244900, Tag 0 / 1; round 190dx,
+// /mnt/e/lynx-work/flpl190dx/FL-FACTS.md). FL makes an automation clip of a parameter of the clip's channel and puts it
+// where the audio clip is: same track, same start, same length, a flat line at the parameter's current value from the
+// clip's start to its end. FL's parameters are the channel's Misc › "Levels adjustment" pan offset / volume multiplier
+// (channel parameters 0x10 / 0x11; round 190dz: LYNX's AutomationTargetKind::channelAdjust, the same parameters), so the
+// main Pan / Volume knobs stay free. FL's Volume clip sets its range top to unity (half of the multiplier's 0…200 %
+// travel) and the line at that top; LYNX's clips have no range of their own: the line sits at min(value, 0.5) (round
+// 190ey, see automateAudioClip).
+enum class AutomateWhat : std::uint8_t { panning, volume };
+
+inline AutomationTarget automateTarget (const Song& song, int clip, AutomateWhat what)
+{
+    if (clip < 0 || clip >= (int) song.playlist.size())
+        return {};
+    const auto& c = song.playlist[(std::size_t) clip];
+    if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size())
+        return {};
+    AutomationTarget t;
+    t.kind = AutomationTargetKind::channelAdjust;
+    t.index = c.channel;
+    t.param = what == AutomateWhat::panning ? leveladjust::pan : leveladjust::volume;
+    return t;
+}
+
+// The new clip's name (live check 190ew PL-1 / PL-2): "<channel> - Volume multiplier", and " #2", " #3"... when clips of
+// that target already exist (FL: "Amount Too - Bass - Volume multiplier #2")
+inline std::string automateName (const Song& song, const AutomationTarget& target, const std::string& base)
+{
+    int same = 0;
+    for (const auto& a : song.automations)
+        if (a.target == target && ! a.isLive())
+            ++same;
+    return same == 0 ? base : base + " #" + std::to_string (same + 1);
+}
+
+// Adds that automation clip (named `name`); returns the new automation's index, −1 when `clip` is no audio clip.
+// (Live check 190ew PL-1: FL makes the new clip the Playlist's current clip, the UI's part.) Live check 190ew PL-2 (shot
+// PL-2-automate-volume-147pct-clip-editor.png): FL's Volume clip plays unity whatever the Levels VOL is above it (its
+// range top set to unity, the line at that top: a 147 % multiplier is not kept); below unity the line is at the value.
+// LYNX's clips have no range of their own, so the line sits at min(value, unity) = min(value, 0.5) of the 0…200 % travel.
+
+inline int automateAudioClip (Song& song, int clip, AutomateWhat what, const std::string& name)
+{
+    const auto target = automateTarget (song, clip, what);
+    if (target.kind == AutomationTargetKind::none)
+        return -1;
+    const auto audio = song.playlist[(std::size_t) clip];
+    auto value = std::clamp (song.targetValue (target), 0.0f, 1.0f);
+    if (what == AutomateWhat::volume)
+        value = std::min (value, 0.5f); // (FL: unity at most, live check 190ew PL-2)
+    const auto length = std::max<std::int64_t> (1, audio.length);
+
+    Automation a;
+    a.name = name;
+    a.target = target;
+    a.points = { { 0, value, 0.0f }, { length, value, 0.0f } };
+    song.automations.push_back (std::move (a));
+
+    Clip made;
+    made.kind = ClipKind::automation;
+    made.automation = (int) song.automations.size() - 1;
+    made.track = audio.track;
+    made.start = audio.start;
+    made.length = length;
+    song.playlist.push_back (made);
+    return made.automation;
+}
+
 } // namespace lynx::clipops

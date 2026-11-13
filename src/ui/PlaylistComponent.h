@@ -9,6 +9,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/ArrangeOps.h"
 #include "core/MagicLasso.h"
 #include "core/MeterBallistics.h"
 #include "core/PickerSelection.h"
@@ -21,6 +22,11 @@
 
 namespace lynx
 {
+struct SampleData; // (core/Instruments.h)
+// (shots, round 190el) the audio clip's Slice to New MIDI Track dialog for clip `clipIndex`, built but not shown, with
+// "Create one slice per" at item `per` (rack::SlicePer)
+std::unique_ptr<juce::Component> makeSliceDialogForSnapshot (AudioEngine& engine, int clipIndex, int per);
+
 class PatternBlocksView;
 class VideoLanesView;
 
@@ -75,6 +81,14 @@ public:
     std::function<void()> onOpenPianoRoll;
     std::function<void (int pattern)> onRenamePattern;  // clip menu: Rename and color (pattern clips)
     std::function<void (int channel)> onOpenInSampler;  // clip menu: the audio clip's file in a new Sampler channel
+    // round 190dx: a new instrument track's channel was made (or its generator replaced): the main window opens it as the
+    // Channel Rack opens a new generator
+    std::function<void (int channel, InstrumentKind kind)> onGeneratorAdded;
+    // FL's "+" at the top left of the track headers (AddInstrBtn, round 190dx): left click = this menu ("Audio track":
+    // Add audio track; "Instrument track": More plugins..., the generators), right click = addAudioTrackNow
+    juce::PopupMenu getAddTrackMenuForSnapshot() { return buildAddTrackMenu(); }
+    juce::Component* getAddTrackButtonForSnapshot() const noexcept { return addTrackButton.get(); }
+    int addAudioTrackNow(); // FL's Add audio track: the new track (selected, in view), −1 when none could be made
 
     // Double-click on a pattern clip opens it in: 0 = the Piano Roll when it has piano-roll notes, else the
     // Channel Rack; 1 = always the Channel Rack; 2 = always the Piano Roll. Alt+double-click opens the other one.
@@ -123,7 +137,8 @@ public:
     // in FL's order, FL 2026 shots f04 / f06), for the Playlist's options menu and its right-click menu.
     juce::PopupMenu editMenu();
     // FL's fade handle menu for an audio clip's fade in (side 0) / out (1) (round 189i; shown by a right-click on the handle)
-    juce::PopupMenu fadeHandleMenu (int index, int side);
+    // `clipMenu` (round 190ey): the clip menu's "Fade in / out curve" submenu (core flclipmenu::fadeCurve)
+    juce::PopupMenu fadeHandleMenu (int index, int side, bool clipMenu = false);
     // FL's gain handle menu of clip `index` (round 166e; Normalize items round 189n): what showGainMenu opens; public for
     // --snapshot, which also sets the selection it reads (selectForSnapshot)
     juce::PopupMenu gainMenu (int index);
@@ -164,7 +179,11 @@ public:
     void setViewForSnapshot (double pixelsPerBar, int firstBar, int firstTrack);
     void selectClipsForSnapshot (const std::vector<int>& clips) { setSelection (clips); repaint(); }
     void setScrollTickForSnapshot (double tick) { scrollTicks = tick; repaint(); }
+    // round 190ef (--drawshot190ef): where a lane's curve is drawn, and the x of a tick
+    juce::Rectangle<float> laneBodyForSnapshot (int track, int lane) const { return laneBody (track, lane); }
+    double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
+    juce::PopupMenu getAutomationPointMenuForSnapshot (int clip, int point); // FL's point menu of an automation clip's point (round 190bw)
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
     // hovers the right edge of the first clip in view (grip, outline, menu button); returns its hint
     ui::Hint hoverForSnapshot();
@@ -189,8 +208,21 @@ public:
     // on the track's mixer insert (mute, solo, record arm, volume, pan, "+FX"), taller rows by default, a lane under
     // the tracks to drop files on, and a click that also selects the track's channel. Off: FL's headers, unchanged.
     void setSimpleHeaders (bool on);
+    // The Clip-launch workflow (round 190cg): track fold, "Group with above track" makes the group a bus, and automation
+    // follows clips unless set otherwise. The data is the Song's either way; the other layouts show it all the same.
+    void setLiveStyle (bool on);
+    bool hasLiveStyle() const noexcept { return liveStyle; }
+    static constexpr int liveFoldedHeight = 17; // a folded track: its title bar's height
+    bool automationFollows() const noexcept;
+    // 0 duplicate, 1 cut, 2 copy, 3 paste (at the time selection's start, else the song position), 4 crop the selected clips
+    void timeCommand (int which);
+    void setLoopSwitch (bool plays);
+    float laneShown (int automation, float value) const;   // a lane value as a fraction of the lane's height
+    float laneValueOf (int automation, float shown) const; // and back
+    void askTempoRange();
     bool hasSimpleHeaders() const noexcept { return simpleHeaders; }
     std::function<void (int insert)> onTrackEffects; // "+FX" on a Simple header: the insert's effects
+    std::function<void (int track)> onSimpleTrackSelected; // the Simple workflow: a track was selected (its dock follows)
     // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
     std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
 
@@ -222,7 +254,7 @@ public:
 
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
-                      lanePoint, laneTension, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };
+                      lanePoint, laneTension, laneDraw, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
@@ -325,6 +357,8 @@ private:
     bool resizeAll = false;
     // Alt+right-click on a clip: hear it while the button is held (pattern clips play their pattern)
     void startPreview (int clip, int x);
+    // FL's audio clip menu › Preview (EEAUPreviewMenuClick, round 190dx): the clip's own audio, alone, once
+    void previewClipAudio (int clip);
     void stopPreview();
     bool previewRestoreSong = false;
     int previewPatternBefore = -1;
@@ -387,9 +421,28 @@ private:
     void moveTimeSelection (int direction);
     void deleteSelection();
     void copySelection();
+public:
+    // round 190bv: the clipboard is shared with the clip grid (a clip copied in a slot pastes here and the other way);
+    // the stamp tells the grid whether its own copy is still the newest
+    static void setCopiedClips (std::vector<Clip> clips)
+    {
+        clipboard = std::move (clips);
+        ++clipboardStamp;
+    }
+    static const std::vector<Clip>& copiedClips() noexcept { return clipboard; }
+    static std::uint64_t copiedStamp() noexcept { return clipboardStamp; }
+
+private:
     void pasteClips (std::int64_t at = -1);
     void normalizeClips (const std::vector<int>& targets, bool asGroup = false);
     juce::PopupMenu buildClipMenu (int index, int mouseX);
+    void addKeyFollowItems (juce::PopupMenu& menu, int index, const std::vector<int>& targets); // round 190ds
+
+    // FL's audio clip menu (round 190dz, core/FlClipMenu.h): FL's two columns and sections, LYNX's own items after them
+    juce::PopupMenu buildAudioClipMenu (int index, int mouseX);
+    std::function<void (float, bool)> clipFitter (int index, std::shared_ptr<const SampleData> sample);
+    juce::PopupMenu fitToTempoMenu (int index, std::shared_ptr<const SampleData> sample);
+    void showDetectTempo (int index, std::shared_ptr<const SampleData> sample);
     void duplicateSelection();
     void seekTo (int x, bool snapOn = true); // Alt held while scrubbing: snapOn false (free position, FL)
     void paintAudioClip (juce::Graphics& g, const Clip& clip, juce::Rectangle<float> bounds);
@@ -408,6 +461,9 @@ private:
     juce::Rectangle<int> trackLed (int track) const;   // the mute LED on the right of a header (Simple headers: the M button)
     // the Simple headers' controls (round 184a): empty with FL's headers, a row too short or a track without an insert
     bool simpleHeaders = false;
+    bool liveStyle = false;
+    bool dragCopies = false; // the clips being moved are copies made at the press
+    arrange::TimeClip timeClipboard;
     static constexpr int simpleTrackHeight = 56, simpleTwoRows = 44; // the default row; the height that shows the second row
     juce::Rectangle<int> trackSolo (int track) const;
     juce::Rectangle<int> trackVolume (int track) const;
@@ -431,6 +487,12 @@ private:
     std::vector<int> selectedTracks; // Ctrl / Shift+click on headers: more selected tracks (round 165m)
     bool isTrackSelected (int track) const;
     std::vector<int> tracksForMenu (int track) const;
+    // round 190dx: FL's new instrument tracks (core trackmodes::addInstrumentTrack; on an instrument track the
+    // generator is replaced, FL's EEPLTrackMorePlugMenuClick)
+    juce::PopupMenu buildAddTrackMenu();
+    void instrumentForTrack (int track, ChannelDef generator);
+    void morePluginsForTrack (int track);
+    std::unique_ptr<juce::Component> addTrackButton;
 
     AudioEngine& engine;
     juce::ScrollBar hBar { false }, vBar { true }; // hBar is hidden: the overview strip scrolls sideways
@@ -468,6 +530,7 @@ private:
     juce::Point<int> knifeFrom, knifeTo;
     std::size_t knownClipCount = 0;
     static inline std::vector<Clip> clipboard;
+    static inline std::uint64_t clipboardStamp = 0;
     std::int64_t grabOffset = 0;
     double playheadTick = -1.0;
 
@@ -521,12 +584,21 @@ private:
     void paintLanes (juce::Graphics& g, juce::Rectangle<int> grid);
     void paintLaneHeaders (juce::Graphics& g, juce::Rectangle<int> headers);
     bool laneMouseDown (const juce::MouseEvent& e);        // true: the press was on a lane (handled)
+    // Round 190ef: in the Clip-launch layout, the clip being moved dragged off the Playlist over the clip grid: the clips go
+    // back where they were and the grabbed one becomes a drag the grid takes (a copy into a slot). True: done.
+    bool dragOutToClipGrid (const juce::MouseEvent& e);
     void showLaneMenu (int track, int lane);
     void showAddLaneMenu (int track);
     void toggleAutomationLanes();
     bool laneButtonHover = false;
     int laneTrack = -1, laneIndex = -1;                    // the lane a lanePoint / laneTension drag edits
     float tensionStart = 0.0f, tensionSign = 1.0f;
+    // round 190ef, Draw Mode (core/DrawMode.h): a laneDraw drag's last mouse position (tick, value) and whether it draws
+    // freehand (no grid, or Alt) or steps at the grid width
+    std::int64_t drawTick = 0;
+    float drawValue = 0.0f;
+    bool drawFreehand = false;
+    void laneDrawTo (const juce::MouseEvent& e);
     // hover: what a click would hit (drives the cursor, the highlight and the hint)
     struct Hover
     {

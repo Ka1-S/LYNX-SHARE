@@ -891,6 +891,73 @@
 "随机种子在每个实例中不同，所以同样音符的两次渲染与 FL Studio 并非逐采样一致，因为 FL Studio 以时钟为种子。"
 ]
 },
+"gen-pocket-supersaw": {
+"source": "59b10d9603",
+"intro": "Pocket SuperSaw 是最多 8 个声部的虚拟模拟合成器。每个声部是 1 到 12 个失谐锯齿波的叠加，带有低一个八度的副锯齿波，或者是 SuperSync 振荡器，这是一串像硬同步一样扫动的脉冲。FL Studio Mobile 工程 (.flm) 的 SuperSaw 模块就是用它作为引擎加载的，它也出现在插件选择器的 Pocket SuperSaw 下。新通道以 FL Studio Mobile 的默认值起步。页面是一份普通的旋钮列表，每个参数一个（共 59 个），而不是 FL Studio Mobile 自己的面板。",
+"controls": [
+[
+"Osc unison, Osc unison detune, Osc unison detune curve, Osc unison pan",
+"每个声部的锯齿波数量（1 到 12）、它们的失谐幅度（最多 100 音分）、失谐如何分布在各锯齿波上，以及它们的声像宽度。"
+],
+[
+"Osc pulse width, Osc pulse mode, Osc sub level",
+"Pulse mode 把每个锯齿波变成脉冲波，并带有脉宽。Osc sub level 是低一个八度的锯齿波的电平。"
+],
+[
+"Osc re-trig phases, Osc phases offset",
+"开启 re-trig 时，每个音符都让锯齿波从相同的相位开始，所以每个音符的拍频相同。关闭：每个音符从随机相位开始。"
+],
+[
+"SuperSync mode, Osc sync, Osc sync pulse width, Osc sync attack / decay / sustain / release, Osc sync EG amount, Osc sync kbd dir",
+"SuperSync 振荡器及其自己的包络，包络用来扫动同步量。"
+],
+[
+"Filter cutoff, Filter resonance, Filter kbd, Filter vel",
+"4 极梯形低通滤波器，最高 20 kHz，带有键盘跟踪和力度跟踪。"
+],
+[
+"Filter EG attack / decay / sustain / release, Filter EG amount",
+"滤波器包络。量是双极性的，-100 % 到 +100 %。"
+],
+[
+"Level EG attack / decay / sustain / release, Level, Pan",
+"音量包络，以及输出电平和声像。包络时间从 0 到 31 秒。"
+],
+[
+"LFO shape, LFO rate, LFO mode, LFO beat, LFO amount, LFO dest, LFO fade in",
+"每个声部一个 LFO：Sine、Ramp、Square 或 Random；Free、One shot 或 Tempo sync。LFO dest 可选 Cutoff、Resonance、Pitch、Sync、Pulse width、Detune、Level 或 Pan。"
+],
+[
+"Arp rate, Arp range, Arp mode",
+"琶音器：Off、Up、Down、Up-down、Up-down (ends twice) 或 Random，最多可扩展 3 个额外八度。"
+],
+[
+"Monophonic mode, Number of voices, Slide held mode, Slide time, Slide time static",
+"演奏一个声部或最多 8 个声部，以及音符如何滑音。"
+],
+[
+"Transpose, Pitch bend range",
+"移调 -12 到 +12 个半音。弯音轮弯曲 1 到 12 个半音。"
+],
+[
+"Distortion, Output trim",
+"tanh 失真和 -18 到 0 dB 的输出微调。"
+],
+[
+"Delay time, Delay feedback, Delay mix, Delay filter",
+"与速度同步的立体声延时，1/4 拍到 1 拍，回路中带有低通或高通滤波器。"
+],
+[
+"Mod wheel amount, Mod wheel dest",
+"调制轮控制的对象：Cutoff、Resonance、Sync、Pulse width、Detune、Level、Pan、LFO amount 或 LFO rate。"
+]
+],
+"tips": [
+"每个旋钮都可以自动化。锯齿波是带限的，所以高音不会产生混叠。",
+"起始相位和 Random LFO 来自每个实例各自拥有的生成器，所以渲染结果不会与某次 FL Studio Mobile 的渲染逐采样一致。能量和频谱则是一致的。",
+"通道的音高旋钮、微调、Mono 和 Porta，以及钢琴卷帘的滑音音符，对声部的作用与它们对 FL Studio 发生器的作用相同。"
+]
+},
 "gen-poizone": {
 "source": "09b740f9c1",
 "intro": "PoiZone 是一个减法发生器，基于同名 FL 插件的引擎构建：两个锯齿波或脉冲波振荡器，带噪声、硬同步和环形调制，一个 4 极滤波器、一个 LFO、一个调制包络和一个音量包络，之后是 16 步门控、合唱、立体声磁带延时和琶音器。它可以在没有 FL Studio 的情况下添加，此时从 LYNX SHARE 自己的预设库开始。",
@@ -1424,6 +1491,54 @@
 "声部在内部以 44.1 kHz 运行，并重采样到工程采样率。"
 ]
 },
+"gen-drum-rack": {
+"source": "67ab8ab312",
+"intro": "Drum Rack 是一种 Instrument Rack，它的链就是打击垫。每个打击垫接收一个音符，并播放它那条链的乐器和效果器。可从插件选择器中以 Drum Rack 添加。新的 Drum Rack 只显示打击垫和设备窗格，并选中 C1。把采样拖到打击垫上，或右键单击空打击垫来载入采样或乐器。Ableton Live 套装 (.als) 中的 Drum Rack 会作为一个带有打击垫、发送和返回链的 Drum Rack 打开，导出 Live 套装时也会写出 Drum Rack。",
+"controls": [
+[
+"Pads",
+"打击垫的 4 x 4 视图，上方有一条显示全部 128 个的概览条：点击、拖动或滚动它即可移动视图。已有内容的打击垫显示它的名称，以及 M（静音）、播放按钮和 S（独奏）。把一个打击垫拖到另一个上可交换它们。一次放入多个采样会依次填充相邻的打击垫。"
+],
+[
+"Pad menu",
+"Rename (Ctrl+R)、Delete、Save as Default Pad、Next Similar (Ctrl+Right)、Previous Similar (Ctrl+Left)、Save as Similarity Reference (Ctrl+Up)、Return to Reference (Ctrl+Down)，以及 LYNX SHARE 的 Duplicate 和 Choke 项。"
+],
+[
+"M, V, P, C, I-O, S, R, D",
+"左侧的条用于显示或隐藏宏、宏变体、打击垫、链列表、I-O、发送和返回列，以及设备窗格。"
+],
+[
+"Receive, Play, Choke",
+"每个打击垫：它响应的传入音符（或 All）、它交给自己乐器的音符，以及它的互斥组（None 或 1 到 16）。互斥组中的一个打击垫会切断该组的其他打击垫。"
+],
+[
+"Send-a, Send-b",
+"每个打击垫发送到每条返回链的电平。"
+],
+[
+"Return chains",
+"由发送馈入的音频效果器链，显示为 a、b 等，例如“a Mix Bus”。"
+],
+[
+"音频输出到",
+"打击垫的链去向哪里：Rack Output，或直接进入某条返回链。"
+],
+[
+"Vel, Chain, Hide",
+"LYNX SHARE 在链列表下方新增的功能：力度区和链选择区。打击垫取代了琴键区。"
+],
+[
+"宏",
+"最多 16 个宏旋钮，带有 Map、Rand 和 Macro Variations，与 Instrument Rack 中一样。"
+]
+],
+"tips": [
+"Sampler 通道菜单中的 Slice to Drum Rack 会把它采样的每个切片放到一个打击垫上。在播放列表中的音频片段上使用 Slice to New MIDI Track...，会按瞬态、小节、音符时值或扭曲标记切片，放入一个新的 Drum Rack 通道，并带有一个播放这些切片的样式。",
+"在片段启动布局中，Drum Rack 通道的钢琴卷帘为每个已有内容的打击垫显示一个带名称的行。在样式布局中，它保留钢琴键，并在琴键上标出打击垫的名称。",
+"Next Similar 和 Previous Similar 使用浏览器的 Find similar samples 索引来替换打击垫的采样。",
+"导出 .als 时，链中 LYNX SHARE 的内置效果器不会写出；打击垫上的 Sampler 会写成 Live 的 Simpler。尚未有任何 Live 打开过导出的 Drum Rack。"
+]
+},
 "gen-drumaxx": {
 "source": "271635956e",
 "intro": "Drumaxx 是用于 Channel Rack 的鼓发生器。它为 16 个鼓垫中的每一个都模拟了槌和膜，分两页显示（1-8 和 9-16）。导入 .flp 时，它会打开对应 FL Studio 插件的设置。",
@@ -1599,6 +1714,63 @@
 "因为音符按一半的速率跟踪，键盘上的一个八度会使起始音高移动半个八度。",
 "声像、音量、截止和共振的通道包络与 LFO 每个音序器节拍步进一次。",
 "没有音量包络时释放的音符，以 10 ms 的淡出结束。"
+]
+},
+"fx-edison": {
+"source": "d470ae5709",
+"intro": "Edison 是放在混音台插槽中的音频编辑器。它把插槽的输入原样传出，在 Record 开启时录制该输入，并把自己的回放加到输出中。一条轨道上可以有多个 Edison 插槽。可从插槽的插件列表添加，也可使用混音台轨道菜单：Open audio editor (Ctrl+E) 会把它放进第一个空插槽，Open audio editor and record (Shift+E) 还会为它设好录制准备，Record mode 为 On play，5 min，Append 关闭，Slave 开启。它的窗口就是 LYNX SHARE 音频编辑器，并加入了插槽的录制控件。关闭窗口后录制仍会继续。.flp 工程中的 Edison 插槽会作为 Edison 打开，并带有其设置和音频。",
+"controls": [
+[
+"录制",
+"根据模式录制插槽的输入。快捷键 R。"
+],
+[
+"Now, On input, Input, On play",
+"录制模式。Now 立即开始。On input 在输入超过噪声阈值时开始，并保留此前 0.1 s。Input 只在听到输入时录制，静音 1 s 后暂停。On play 在歌曲播放时录制，歌曲位置每次跳转时添加一个 Song jump 标记，所以循环播放的歌曲会得到一段录音，每遍一个标记。新插槽以 On input 起步。"
+],
+[
+"最长录制时间",
+"Forever、1、3、5、10、30 或 60 min。新插槽以 30 min 起步。"
+],
+[
+"追加",
+"开启：新录音接在已有音频之后。关闭：替换已有音频。默认开启。"
+],
+[
+"同步",
+"Slave playback to host：歌曲播放时，音频按歌曲时间播放。快捷键 H。Record 菜单中还有 Ignore own selection。"
+],
+[
+"输入静音",
+"不传出插槽的输入，只输出 Edison 的回放。快捷键 I。"
+],
+[
+"循环",
+"循环回放。快捷键 L。"
+],
+[
+"吸附",
+"吸附到网格、区域、采样或过零点，快捷键 1 到 4。"
+],
+[
+"拖动",
+"把采样或选区以 WAV 形式拖到播放列表或通道机架上。右键单击会把它复制到编辑器的剪贴板。"
+],
+[
+"发送",
+"作为音频片段发送到播放列表，发送到所选通道，或发送到一个新的 Sampler 通道。"
+],
+[
+"触发音符",
+"在区域的菜单中：与该区域关联的音符。Regions › Assign trigger notes to all... 和 Assign all 可为每个区域设置音符。"
+]
+],
+"tips": [
+"音频以 WAV 文件保存在工程的 recordings 文件夹中，而不是工程文件内部。",
+"在只有背景噪声的选区上使用 Tools › Acquire noise threshold，可设置 On input 和 Input 所监听的电平。",
+"Tools › Macros › Remove all Edison instances 会移除工程中的每个 Edison 插槽。",
+"在 LYNX SHARE 中创建的插槽不会在导出时写入 .flp。来自 .flp 且未被编辑过的 Edison 插槽会保留 FL Studio 的数据。",
+"触发音符与区域一起保存，并由音频脚本读取。尚不支持通过音符播放区域。"
 ]
 },
 "gen-fruity-granulizer": {
@@ -2538,6 +2710,143 @@
 "线性相位是引擎的一部分；它的延迟请见文档。"
 ]
 },
+"fx-pocket-comb-filter": {
+"source": "1845ad22a7",
+"intro": "Pocket Comb Filter 给干信号加上带反馈的短延时，使声音在调谐的音高上持续共鸣。音高可以手动设置，可以跟随通道机架上按住的最低音，也可以跟随从输入中检测到的音高。FL Studio Mobile 工程 (.flm) 的 Comb Filter 模块就是用它作为引擎加载的，每个数值都原样复制，它也可以添加到任何混音台插槽。",
+"controls": [
+[
+"模式",
+"Manual、Lowest Note 或 Detect Pitch。Manual 使用 Pitch，吸附开启时使用 Pitch oct 和 Pitch note。Lowest Note 跟随通道机架上按住的最低音，松开后保留最后一个音。Detect Pitch 跟随输入的音高。"
+],
+[
+"音高",
+"吸附关闭时 Manual 模式下的频率，1 Hz 到 2.50 kHz，遵循四次方律。"
+],
+[
+"反馈",
+"有多少延时信号被反馈回去，0 到 100 %。数值越高，共鸣越长。"
+],
+[
+"混合",
+"加到干信号上的梳状信号电平，0 到 100 %。干信号保持满电平。"
+],
+[
+"偏移",
+"在 Lowest Note 和 Detect Pitch 模式下，把音高移动 -2 到 +2 个八度。"
+],
+[
+"平滑",
+"音高滑向新值的缓慢程度，0 到 100 %。"
+],
+[
+"吸附",
+"开启：Manual 模式播放由 Pitch oct 和 Pitch note 设置的音符。关闭：使用 Pitch 频率。"
+],
+[
+"极性",
+"每一侧的反馈符号：Both +、Left -、Right - 或 Both -。"
+],
+[
+"不对称",
+"-5.0 到 +5.0 %。按此幅度降低左侧的频率并升高右侧的频率（负值则相反）。"
+],
+[
+"音高八度",
+"音符的八度，-1 到 6。"
+],
+[
+"音高音符",
+"音名，C 到 B。尚未按住任何键时，Lowest Note 也从这个音符开始（默认 E3）。"
+]
+],
+"tips": [
+"Lowest Note 读取通道机架所有通道上按住的键。在 FL Studio Mobile 中，它只读取该效果器所在的机架。",
+"Detect Pitch 对有音高的声音效果最好。对鼓或噪声，它可能锁定到错误的音高，FL Studio Mobile 自己的检测器在这里也并不稳定。",
+"调谐遵循 FL Studio Mobile 的延时回路，在同一个音符上，它比理想的梳状滤波器偏差约 19 音分。",
+"这个效果器是一页普通的旋钮，而不是 FL Studio Mobile 的面板。"
+]
+},
+"fx-pocket-eq": {
+"source": "3ee10840e7",
+"intro": "Pocket EQ 有四个频段。每个频段是低搁架、峰值或高搁架，有各自的增益、频率和带宽，并且可以同时作用于两侧、只作用于一侧，或让两侧朝相反方向作用。FL Studio Mobile 工程 (.flm) 的 Equalizer 模块就是用它作为引擎加载的，每个数值都原样复制，它也可以添加到任何混音台插槽。",
+"controls": [
+[
+"Gain 1 to Gain 4",
+"频段的增益，显示为 -12 到 +12 dB。与 FL Studio Mobile 一样，频段提升或衰减的量是显示值的两倍，所以完整范围是 -24 到 +24 dB。"
+],
+[
+"Frequency 1 to Frequency 4",
+"频段的频率，32 Hz 到约 19.5 kHz。"
+],
+[
+"Bandwidth 1 to Bandwidth 4",
+"频段的宽度，0.25 到 7.25 个八度。"
+],
+[
+"Kind 1 to Kind 4",
+"Low shelf、Peak 或 High shelf。Low shelf 占范围的下半部分，Peak 占上半部分，High shelf 只占最顶端。"
+],
+[
+"Channel 1 to Channel 4",
+"频段作用于哪一侧：Both、Left、Right、Left + / right -（右侧得到相反的增益）或 Left - / right +（左侧得到相反的增益）。"
+]
+],
+"tips": [
+"各频段以两倍采样率运行，与 FL Studio Mobile 相同。",
+"四个频段按 FL Studio Mobile 的方式串联，这会使声音延迟 1.5 个采样。与 FL Studio Mobile 一样，该效果器不会把这一延迟报告给延迟补偿。",
+"这个效果器是一页普通的旋钮，而不是 FL Studio Mobile 的 EQ 面板。"
+]
+},
+"fx-pocket-filter": {
+"source": "9f7f27becb",
+"intro": "Pocket Filter 是由一对、两对或四对相同的滤波级组成的共振滤波器。FL Studio Mobile 工程 (.flm) 的 Filter 模块就是用它作为引擎加载的，每个数值都原样复制，它也可以添加到任何混音台插槽。",
+"controls": [
+[
+"频率",
+"截止频率或中心频率，16 Hz 到约 20 kHz。"
+],
+[
+"Q",
+"共振，显示为 0.80 到 2.80，遵循平方律。"
+],
+[
+"类型",
+"LP（低通）、BP（带通）或 HP（高通）。LP 占范围的下半部分，BP 占上半部分，HP 只占最顶端。"
+],
+[
+"斜率",
+"24 dB/O、48 dB/O 或 96 dB/O。24 dB/O 占范围的下半部分，48 dB/O 占上半部分，96 dB/O 只占最顶端。"
+]
+],
+"tips": [
+"与 FL Studio Mobile 一样，低通每一对滤波级把电平降低约 2 dB：在 24、48 和 96 dB/O 时分别约为 2、4 和 8 dB。带通会按 Q 值抬高中心，最多约 9 dB。",
+"Slope 的改变立即切换，低通电平只在下一次改变 Frequency、Q 或 Type 时才跟上。FL Studio Mobile 的做法相同。",
+"每一对滤波级使声音延迟一个采样，这不会报告给延迟补偿，与 FL Studio Mobile 相同。"
+]
+},
+"fx-pocket-graphic-eq": {
+"source": "3fcecfce15",
+"intro": "Pocket Graphic EQ 有八个固定频段，每段宽一个八度：80 Hz 的低搁架，160 Hz、375 Hz、750 Hz、1.5 kHz、3 kHz 和 6 kHz 的峰值，以及 12 kHz 的高搁架。FL Studio Mobile 工程 (.flm) 的 Graphic EQ 模块就是用它作为引擎加载的，每个数值都原样复制，它也可以添加到任何混音台插槽。",
+"controls": [
+[
+"80 Hz",
+"低搁架。增益显示为 -12 到 +12 dB。"
+],
+[
+"160 Hz, 375 Hz, 750 Hz, 1.5 kHz, 3 kHz, 6 kHz",
+"峰值频段。增益显示为 -12 到 +12 dB。"
+],
+[
+"12 kHz",
+"高搁架。增益显示为 -12 到 +12 dB。"
+]
+],
+"tips": [
+"与 FL Studio Mobile 一样，每个频段提升或衰减的量是显示值的两倍，所以完整范围是 -24 到 +24 dB。",
+"各频段按 FL Studio Mobile 的方式串联，这会使声音延迟 8 个采样。与 FL Studio Mobile 一样，该效果器不会把这一延迟报告给延迟补偿。",
+"这个效果器是一页普通的旋钮，而不是 FL Studio Mobile 的滑块。"
+]
+},
 "fx-ridge-strip": {
 "source": "4b27e2d1f5",
 "intro": "Ridge Strip 是 LYNX SHARE 原生的通道条，用于混音台插入轨。它把滤波器、均衡器和动态处理合在一个窗口里，中间有曲线和增益表。",
@@ -3049,7 +3358,7 @@
 ]
 },
 "fx-glow-leveler": {
-"source": "c674a036c1",
+"source": "c97ebe6b51",
 "intro": "Glow Leveler 是光学电平器：对电光电池的建模，起音随节目内容变化，释音分两级。它有 Modern 和 Opto classic 两种音色取向，新实例从 Opto classic 开始。增益旋钮和峰值衰减旋钮之间有一个 VU 表。",
 "controls": [
 [
@@ -3097,6 +3406,10 @@
 "仅 Opto classic 可用。两个小开关保留用早期版本保存的工程的限制和补偿法则以及起音和释音时序，或改用实测的数值。"
 ],
 [
+"光电池记忆",
+"仅 Opto classic 可用，Compress 模式。开启时，长时间或大幅度的增益衰减之后，释音会变慢，所以电平器在短促峰值之后恢复得快，在长峰值之后恢复得慢。默认关闭。"
+],
+[
 "补偿参考",
 "仅 Opto classic 可用。开启自动补偿时的峰值衰减值。补偿从那里起跟随旋钮。"
 ]
@@ -3107,7 +3420,7 @@
 ]
 },
 "fx-hush-de-esser": {
-"source": "a7ecd8dcb9",
+"source": "7fb1e34f17",
 "intro": "Hush De-esser 是 LYNX SHARE 原生的效果器，用来减轻人声中刺耳的齿音。它可以只作用于齿音频段，也可以作用于整个信号。大显示区显示带有阈值线的信号，阈值线可以拖动。",
 "controls": [
 [
@@ -3149,6 +3462,14 @@
 [
 "试听",
 "让你试听检测到的频段。"
+],
+[
+"空气感",
+"处理后信号上约 8 kHz 的高搁架，从关闭到 +12 dB。默认关闭。"
+],
+[
+"混合",
+"干信号与处理后信号之间的平衡。干信号会被延时以匹配前瞻。默认 100 %。"
 ]
 ],
 "tips": [
@@ -3432,6 +3753,73 @@
 "没有前瞻，也不增加延迟。峰值越过阈值时，增益在一个采样内下降。"
 ]
 },
+"fx-pocket-multiband-compressor": {
+"source": "bb45f9448b",
+"intro": "Pocket Multiband Compressor 用两个 24 dB 分频点把声音分成低、中、高三段，并分别压缩每一段。它的压缩比作用于信号的振幅，而不是分贝，所以在相同数值下比普通压缩器更温和。FL Studio Mobile 工程 (.flm) 的 Multiband Compressor 模块就是用它作为引擎加载的，每个数值都原样复制，它也可以添加到任何混音台插槽。它的编辑器是一页普通的旋钮，每个频段（Low、Mid、High）一行名称。",
+"controls": [
+[
+"主增益",
+"整个效果器的输出电平，-24 dB 到 +24 dB。"
+],
+[
+"低分频点",
+"低段与中段之间的分频点，20 Hz 到 10.2 kHz。"
+],
+[
+"高分频点",
+"中段与高段之间的分频点，20 Hz 到 10.2 kHz。"
+],
+[
+"独奏",
+"Off、Low、Mid 或 High：只播放该频段。这个控件是 LYNX SHARE 自己的；FL Studio Mobile 在这里保存的是一个编辑器设置，.flm 导入会把它重置为 Off。"
+],
+[
+"干声混合",
+"把未压缩的频段加到压缩后的频段上，0 到 100%，用于平行压缩。"
+],
+[
+"Low / Mid / High input gain",
+"进入该频段的增益，-24 dB 到 +24 dB。它同时馈入检测器和音频。"
+],
+[
+"Low / Mid / High threshold",
+"高于此电平时频段被压缩，-48 dB 到 0 dB。"
+],
+[
+"Low / Mid / High ratio",
+"1 到 31。"
+],
+[
+"Low / Mid / High attack",
+"该频段压缩器的反应速度，0 到 50 ms，遵循平方律。"
+],
+[
+"Low / Mid / High release",
+"它松开的速度，10 ms 到 1 s。"
+],
+[
+"Low / Mid / High gain",
+"该频段的输出增益，-24 dB 到 +24 dB。"
+],
+[
+"Low / Mid / High state",
+"On 压缩该频段，Bypass 按分频后的原样通过，Mute 使其静音。"
+],
+[
+"Low / Mid / High width",
+"该频段的立体声宽度，0 到 200%。100% 保持原样，0% 为单声道。"
+],
+[
+"宽度模式",
+"Mode 1：超过 100% 时，宽度向仅有侧信号的方向移动。Mode 2：超过 100% 时，从每一侧减去另一个声道的一部分。"
+]
+],
+"tips": [
+"被旁通的频段也会跳过它的输入增益、输出增益和宽度。",
+"无论采样率是多少，起音和释音都按 44.1 kHz 计算，FL Studio Mobile 也是这样做的。在 48 kHz 或 96 kHz 下，它们比读数更短。",
+"做新的混音时，Fruity Multiband Compressor 或 Prism Multiband 是功能更全面的工具。这个效果器的存在，是为了让 FL Studio Mobile 的歌曲听起来和在手机上一样。"
+]
+},
 "fx-prism-multiband": {
 "source": "f559a7fa07",
 "intro": "Prism Multiband 是 LYNX SHARE 原生的混音台插入轨效果器。它把信号分成四个频段，并对每个频段做压缩或扩展。没有改变增益的频段不会动信号，所以效果器在静止时是透明的。",
@@ -3483,7 +3871,7 @@
 ]
 },
 "fx-quell-denoiser": {
-"source": "cb9b3b14e9",
+"source": "1b2cc8c181",
 "intro": "Quell Denoiser 是 LYNX SHARE 原生的混音台插入轨效果器。它用一个 Amount 控件降低稳定的宽带噪声，比如嘶声。内部把信号分成六个相位一致的频段，每个频段带一个软拐点的向下扩展器。",
 "controls": [
 [
@@ -3501,6 +3889,14 @@
 [
 "Meter",
 "左侧的电平表，下方有保持的衰减读数。"
+],
+[
+"匹配",
+"从六段扩展器切换到匹配引擎：在七个八度频段上削减，没有延迟。默认关闭。"
+],
+[
+"Classic / Measured",
+"仅匹配引擎。Measured 让每个频段跟随它在大约一秒内测得的噪声底，所以稳定的噪声会被降得更低。它会占用一些 CPU。该开关只对来自 0.1.27 之前保存的工程或预设的实例显示，这类实例以 Classic 载入，听起来与之前相同。一旦切换到 Measured，它就会隐藏。新实例使用 Measured。"
 ]
 ],
 "tips": [
@@ -3509,7 +3905,7 @@
 ]
 },
 "fx-sentry-gate": {
-"source": "50e9527a46",
+"source": "0384d6aa45",
 "intro": "Sentry Gate 是 LYNX SHARE 原生的噪声门和扩展器，用于混音台插入轨。它会切掉阈值以下的信号，根据压缩比和范围，从轻微的扩展到完全的噪声门都可以。显示区在实时电平上画出传输曲线。",
 "controls": [
 [
@@ -3559,6 +3955,22 @@
 [
 "Oversampling, In and Out",
 "过采样菜单，以及输入和输出增益。"
+],
+[
+"模型",
+"Classic 或 Measured。Measured 会加入 Vocal 风格的降噪；其他风格忽略它。0.1.26 之前保存的工程以 Classic 载入。"
+],
+[
+"触发",
+"Level 或 Transient。Level 是和之前一样的门限。Transient 是鼓的门限：超过阈值的一击会让它完全打开，它在 Hold 时间内保持打开，并在 Release 时间内沿所选形状关闭，期间电平如何变化都不影响。Transient 下不使用 Ratio、Knee 和风格的曲线。默认 Level。"
+],
+[
+"形状",
+"仅 Transient。释音的形状：Smooth、Mid 或 Sharp。"
+],
+[
+"灵敏度",
+"仅 Transient。1 到 10，默认 5。数值越高，门限在越小的敲击上就会打开。"
 ]
 ],
 "tips": [
@@ -3788,7 +4200,7 @@
 ]
 },
 "fx-atrium": {
-"source": "5f968c5de3",
+"source": "595c3b57b8",
 "intro": "Atrium 是一款房间与厅室混响，早期反射和后期混响分开，衰减分三个频段。六个推子设定整体混响，Early 和 Late 标签页在这两个部分之间切换右侧的旋钮，混响模式菜单从十二种房间类型中选择一种。",
 "controls": [
 [
@@ -3850,6 +4262,10 @@
 [
 "混响模式",
 "空间的类型：Large Room、Medium Room、Bright Room、Large Chamber、Dark Room、Dark Chamber、Dark Space、Deep Space、Mirror Space、Vast Space、Distant Space 或 Dense Room。"
+],
+[
+"Classic / Measured",
+"Measured 是 0.1.27 的混响引擎：衰减按每个八度频段分别设置，混响网络之后接一个音色校正器，由一个扩散网络塑造起始部分。它比 Classic 占用更少 CPU。新实例以 Measured 起步。0.1.27 之前保存的工程和预设会以 Classic 载入，听起来与之前相同。"
 ]
 ],
 "tips": [
@@ -3858,7 +4274,7 @@
 ]
 },
 "fx-epoch-verb": {
-"source": "30c0764f87",
+"source": "e15dd52216",
 "intro": "Epoch Verb 是一个混响效果器插槽插件。它有 22 种算法和三种色彩（1970s、1980s 和 Now）。可在发送或插入轨上用它做大厅、板式和房间混响。",
 "controls": [
 [
@@ -3916,6 +4332,10 @@
 [
 "低切",
 "作用于混响的高通滤波器。"
+],
+[
+"Classic / Measured",
+"Measured 是 0.1.27 的混响引擎：衰减按每个八度频段分别设置，混响网络之后接一个音色校正器，由一个扩散网络塑造起始部分。它比 Classic 占用更少 CPU。新实例以 Measured 起步。0.1.27 之前保存的工程和预设会以 Classic 载入，听起来与之前相同。"
 ]
 ],
 "tips": [
@@ -3924,7 +4344,7 @@
 ]
 },
 "fx-foil-plate": {
-"source": "1156cb5a2f",
+"source": "b0e5038719",
 "intro": "Foil Plate 是板式混响的效果器槽插件。它有十二种板型，衰减随频率而变。可用于军鼓、人声和总线。",
 "controls": [
 [
@@ -3982,6 +4402,10 @@
 [
 "低切",
 "混响上的高通滤波器。"
+],
+[
+"Classic / Measured",
+"Measured 是 0.1.27 的混响引擎：衰减按每个八度频段分别设置，混响网络之后接一个音色校正器，由一个扩散网络塑造起始部分。它比 Classic 占用更少 CPU。新实例以 Measured 起步。0.1.27 之前保存的工程和预设会以 Classic 载入，听起来与之前相同。"
 ]
 ],
 "tips": [
@@ -4039,7 +4463,7 @@
 ]
 },
 "fx-halo": {
-"source": "f4b3fc155b",
+"source": "f8f93f7d26",
 "intro": "Halo 是 LYNX SHARE 原生的闪烁混响。反馈路径里的移调器会把每次重复升高或降低，所以尾音在衰减时向上爬升或向下滑落。你可以把它加到插入轨或发送上，用于铺底音色、人声和氛围质感。",
 "controls": [
 [
@@ -4089,6 +4513,10 @@
 [
 "颜色",
 "混响的音色，例如 bright。"
+],
+[
+"Classic / Measured",
+"Measured 是 0.1.27 的混响引擎：衰减按每个八度频段分别设置，混响网络之后接一个音色校正器，由一个扩散网络塑造起始部分。它比 Classic 占用更少 CPU。新实例以 Measured 起步。0.1.27 之前保存的工程和预设会以 Classic 载入，听起来与之前相同。"
 ]
 ],
 "tips": [
@@ -4097,7 +4525,7 @@
 ]
 },
 "fx-horizon": {
-"source": "8b29b30bb7",
+"source": "6cc0736add",
 "intro": "Horizon 是 LYNX SHARE 原生的效果器，把回声和混响合在一个插件里。你可以选择回声送入混响，还是跟在混响之后。适合人声、吉他和合成器，当你想要融入空间的重复声时。",
 "controls": [
 [
@@ -4155,6 +4583,10 @@
 [
 "Echo mode, Reverb mode, Color",
 "回声类型、混响类型和音色的菜单。"
+],
+[
+"Classic / Measured",
+"Measured 是 0.1.27 的混响引擎：衰减按每个八度频段分别设置，混响网络之后接一个音色校正器，由一个扩散网络塑造起始部分。它比 Classic 占用更少 CPU。新实例以 Measured 起步。0.1.27 之前保存的工程和预设会以 Classic 载入，听起来与之前相同。"
 ]
 ],
 "tips": [
@@ -4238,7 +4670,7 @@
 ]
 },
 "fx-nebula": {
-"source": "87313c4ef1",
+"source": "338ff67e03",
 "intro": "Nebula 用延时网络构建大型回声和混响空间。你用模式控件从 22 种网络形状中选一种，再设定延时时间、反馈和密度。把它加到混音台插入轨，或加到发送上做氛围效果。",
 "controls": [
 [
@@ -4284,11 +4716,260 @@
 [
 "模式",
 "网络的形状。"
+],
+[
+"模型",
+"Classic 或 Measured。Measured 让其中六种形状（Ripple、Fold、Drift、Abyss、Glint 和 Mirage）运行在另一种网络模型上，该模型移植自一个 MIT 许可的模型。其他形状在两者上听起来相同。新实例以 Measured 起步。0.1.27 之前保存的工程和预设会以 Classic 载入，听起来与之前相同。"
 ]
 ],
 "tips": [
 "改变反馈后若有尾音堆积，按清除可使其静下来。",
 "底部的一行文字会说明所选的模式。"
+]
+},
+"fx-pocket-reverb": {
+"source": "6722c47417",
+"intro": "Pocket Reverb 是 FL Studio Mobile 当前的混响模块，运行在 FL Studio Mobile 自己的板式混响上。它使用旧模块的控件，板的早期反射和尾音保持固定电平，并自行与干信号混合。FL Studio Mobile 工程 (.flm) 的 Reverb 模块就是用它作为引擎加载的，每个数值都原样复制，它也可以添加到任何混音台插槽。它的编辑器是一页普通的旋钮。",
+"controls": [
+[
+"衰减",
+"尾音的长度，0.1 s 到 20 s。旋钮遵循立方律，所以大部分行程对应较短的时间。"
+],
+[
+"高频阻尼",
+"高于此频率时，混响尾音的高频衰减得更快，0.5 kHz 到 22.1 kHz。范围顶端显示为 Off。"
+],
+[
+"混合",
+"干声与混响的混合。低于中间位置时，干声保持满电平而混响上升；高于中间位置时，混响保持满电平而干声下降。在中间位置，两者都是满电平。"
+],
+[
+"声像",
+"对混响做声像，而不是干信号。"
+],
+[
+"ER",
+"早期反射的电平，0 到 100%，遵循平方律。"
+],
+[
+"预延时",
+"混响开始之前的时间，0 到 250 ms。"
+],
+[
+"房间大小",
+"板的大小，1 到 100。"
+],
+[
+"扩散",
+"回声融合成平滑尾音的快慢，0 到 100%。"
+],
+[
+"宽度",
+"混响的立体声宽度，0 到 200%。"
+],
+[
+"低切",
+"切除进入混响的信号的低频，19 Hz 到 3000 Hz。范围底端显示为 Off。"
+],
+[
+"高切",
+"切除进入混响的信号的高频，0.5 kHz 到 22.1 kHz。范围顶端显示为 Off。"
+],
+[
+"调制速率",
+"尾音中调制的速度，0.1 Hz 到 10 Hz。"
+],
+[
+"调制深度",
+"尾音中调制的量，0 到 100%。"
+],
+[
+"湿声增益",
+"混响的总体电平，0 到 100%。"
+],
+[
+"干声电平",
+"干信号的总体电平，0 到 100%。"
+]
+],
+"tips": [
+"电平变化会在几毫秒内平滑过渡，所以移动 Mix、Pan、ER 或两个电平时不会产生爆音。",
+"这块板不是 Fruity Reeverb 2：在相同设置下，它的低频共鸣更长。",
+"调制尚未与 FL Studio Mobile 做过听感对比：用于实测的工程都没有使用它。"
+]
+},
+"fx-pocket-reverb-2": {
+"source": "dcde5cb65f",
+"intro": "Pocket Reverb 2 以满电平运行 FL Studio Mobile 的板式混响，并自行混合干信号、早期反射和尾音，然后设置立体声分离度并为混响做声像。FL Studio Mobile 工程 (.flm) 的 Reverb 2 模块就是用它作为引擎加载的，每个数值都原样复制，它也可以添加到任何混音台插槽。它的编辑器是一页普通的旋钮。",
+"controls": [
+[
+"高切",
+"切除进入混响的信号的高频，0.5 kHz 到 22.1 kHz。范围顶端显示为 Off。"
+],
+[
+"低切",
+"切除进入混响的信号的低频，19 Hz 到 3000 Hz。范围底端显示为 Off。"
+],
+[
+"大小",
+"板的大小，1 到 100。"
+],
+[
+"衰减",
+"尾音的长度，0.1 s 到 20 s，线性刻度。"
+],
+[
+"扩散",
+"回声融合成平滑尾音的快慢，0 到 100%。"
+],
+[
+"阻尼",
+"高于此频率时，混响尾音的高频衰减得更快，0.5 kHz 到 22.1 kHz。范围顶端显示为 Off。"
+],
+[
+"干",
+"原始信号的电平，0 到 125%。"
+],
+[
+"ER",
+"早期反射的电平，0 到 125%。"
+],
+[
+"湿",
+"混响的电平，0 到 125%。"
+],
+[
+"侧输入",
+"开启时，用左右声道之差而不是它们的和来驱动混响，所以只有声音的立体声部分会产生混响。"
+],
+[
+"延时",
+"混响开始之前的时间，0 到 1000 ms。"
+],
+[
+"速度",
+"开启时，Delay 按歌曲速度取若干个十六分之一拍，最多一拍。超过 1000 ms 的延时会每次缩短十六分之一拍，直到合适为止。"
+],
+[
+"调制",
+"尾音中调制的量，0 到 100%。"
+],
+[
+"低音",
+"低频相对于尾音其余部分的衰减，x0.2 到 x3.0。"
+],
+[
+"分离",
+"混响的立体声宽度，0 到 200%。100% 保持板所产生的原样。"
+],
+[
+"速率",
+"调制的速度，0.1 Hz 到 10 Hz，遵循立方律。"
+],
+[
+"分频器",
+"低于此频率时 Bass 起作用，25 Hz 到 2000 Hz。"
+],
+[
+"声像",
+"对混响做声像，而不是干信号。"
+]
+],
+"tips": [
+"与另外两个 Pocket 混响不同，这里的干信号有自己的电平，所以 Dry 为 0% 时只输出混响。",
+"Delay 始终以 ms 显示，开启 Tempo 时也一样。",
+"调制尚未与 FL Studio Mobile 做过听感对比：用于实测的工程都没有使用它。"
+]
+},
+"fx-pocket-reverb-classic": {
+"source": "5bf9dfb5b3",
+"intro": "Pocket Reverb Classic 是 FL Studio Mobile 较旧的混响模块，运行在 FL Studio Mobile 自己的板式混响上，其网络接近 Fruity Reeverb 2，但并不相同。原始信号始终以满电平通过，混响叠加在它之上。FL Studio Mobile 工程 (.flm) 的 Reverb（旧版）模块就是用它作为引擎加载的，每个数值都原样复制，它也可以添加到任何混音台插槽。它的编辑器是一页普通的旋钮。",
+"controls": [
+[
+"衰减",
+"尾音的长度，0.1 s 到 20 s。旋钮遵循立方律，所以大部分行程对应较短的时间。"
+],
+[
+"高频阻尼",
+"高于此频率时，混响尾音的高频衰减得更快，0.5 kHz 到 22.1 kHz。范围顶端显示为 Off。"
+],
+[
+"混合",
+"混响的电平，以 dB 显示，从 -inf 到 +6.0 dB。"
+],
+[
+"预延时",
+"混响开始之前的时间，0 到 250 ms。"
+],
+[
+"房间大小",
+"板的大小，1 到 100。"
+],
+[
+"扩散",
+"回声融合成平滑尾音的快慢，0 到 100%。"
+],
+[
+"宽度",
+"混响的立体声宽度，0 到 200%。"
+],
+[
+"低切",
+"切除进入混响的信号的低频，19 Hz 到 3000 Hz。范围底端显示为 Off。"
+],
+[
+"高切",
+"切除进入混响的信号的高频，0.5 kHz 到 22.1 kHz。范围顶端显示为 Off。"
+],
+[
+"输入",
+"送入混响的信号电平，-inf 到 +6.0 dB。"
+],
+[
+"ER",
+"早期反射的电平，-inf 到 +6.0 dB。"
+],
+[
+"干声电平",
+"混响额外加入的干信号，-inf 到 +6.0 dB。新实例上为 -inf。"
+],
+[
+"输入关",
+"使送入混响的信号静音。显示为 On 或 Muted。"
+],
+[
+"干声关",
+"使 Dry level 的额外干信号静音。显示为 On 或 Muted。"
+],
+[
+"ER关",
+"使早期反射静音。显示为 On 或 Muted。"
+],
+[
+"湿声关",
+"使混响尾音静音。显示为 On 或 Muted。"
+],
+[
+"低音倍数",
+"低频相对于尾音其余部分的衰减，x0.2 到 x3.0。"
+],
+[
+"分频器",
+"低于此频率时 Bass mult 起作用，25 Hz 到 2000 Hz。"
+],
+[
+"调制速率",
+"尾音中调制的速度，0.1 Hz 到 10 Hz。"
+],
+[
+"调制深度",
+"尾音中调制的量，0 到 100%。"
+]
+],
+"tips": [
+"原始信号从不被降低：Dry off 和 Dry level 只改变额外的干信号副本，不改变直通的信号。",
+"在三个 Pocket 混响中，只有这一个带有静音开关和以 dB 表示的电平。Pocket Reverb 2 以百分比设置电平，Pocket Reverb 只有一个 Mix 旋钮。",
+"调制尚未与 FL Studio Mobile 做过听感对比：用于实测的工程都没有使用它。"
 ]
 },
 "fx-reeverb": {
@@ -4465,7 +5146,7 @@
 ]
 },
 "fx-echoform": {
-"source": "0505e5d72c",
+"source": "5a830ced10",
 "intro": "Echoform 是一款回声，有十二种风格和五种回声布局。Main 页面有三个部分：Echo 用于时间、反馈和滤波器，Tap tempo 用于律动和回声模式，Style 用于饱和、电平和风格菜单。其余控件在 Tweak 页面。",
 "controls": [
 [
@@ -4531,6 +5212,14 @@
 [
 "磁带",
 "选择一种实测的磁带环路音色：Off、Ping-pong tape、Studio tape 或 Studio tape hot。"
+],
+[
+"Classic / Measured",
+"Tweak 页面。当 Tape 菜单为 Off 时，Measured 在 Tape 风格下运行实测磁带级：包括输出和回路的音色、磁带嘶声，以及 wow 的滞后。它会多占用一点 CPU。新实例以 Measured 起步。0.1.27 之前保存的工程和预设会以 Classic 载入，听起来与之前相同。"
+],
+[
+"时钟",
+"Tweak 页面。调制会让回声时间按自身的一个比例摆动，满深度时最多 50%，两侧同时摆动，就像时钟驱动的延时线。默认关闭。"
 ]
 ],
 "tips": [
@@ -4733,7 +5422,7 @@
 ]
 },
 "fx-lattice-mod": {
-"source": "f7f92d15d2",
+"source": "21239e3a70",
 "intro": "Lattice Mod 是 LYNX SHARE 原生的调制延时。它把一到十六个抽头分布在延时时间上，并用缓慢的失谐和颤音调制每个抽头。可用于合唱、镶边、合奏和延时质感。",
 "controls": [
 [
@@ -4775,6 +5464,10 @@
 [
 "过调制",
 "额外的调制倍数。"
+],
+[
+"Classic / Measured",
+"WARP 标签页。Measured 让缓慢的失谐摆动幅度达到 Classic 的 3.5 倍，与实测一致。新实例以 Measured 起步。0.1.27 之前保存的工程和预设会以 Classic 载入，听起来与之前相同。"
 ]
 ],
 "tips": [
@@ -4878,6 +5571,45 @@
 "在声音播放时移动 Time，可以得到磁带变速的效果。"
 ]
 },
+"fx-pocket-tape-stop": {
+"source": "68a5a737c8",
+"intro": "Pocket Tape Stop 一直在录制它的输入。关闭 Play 会以逐渐下降的速度回放录音直到停止，再次开启 Play 则加速，并在最后 0.1 s 内淡回实时输入。自动化 Play 即可在歌曲中安排停止的位置。FL Studio Mobile 工程 (.flm) 的 Tape Stop 模块就是用它作为引擎加载的，每个数值都原样复制，它也可以添加到任何混音台插槽。它的编辑器是一页普通的旋钮。",
+"controls": [
+[
+"停止时间",
+"Sync 关闭时减速的时长，最长 5 s。一秒以下以 ms 显示。范围底端显示为 Off：磁带在 5 ms 内停止。"
+],
+[
+"开始时间",
+"Sync 关闭时加速的时长，最长 5 s。"
+],
+[
+"停止时间（同步）",
+"Sync 开启时减速的时长：Off、1/4 拍、3/8 拍、1/2 拍、3/4 拍、1 拍、2、4、8 或 16 拍。"
+],
+[
+"开始时间（同步）",
+"Sync 开启时加速的时长，档位相同。"
+],
+[
+"播放",
+"开启时播放输入。关闭时停止磁带。每次改变都会开始一次减速或加速。"
+],
+[
+"扭曲",
+"速度曲线的形状，-100% 到 +100%。"
+],
+[
+"同步",
+"开启时按歌曲速度使用同步的时间，关闭时使用以秒为单位的时间。"
+]
+],
+"tips": [
+"它只在歌曲播放时工作。歌曲停止时，音频直接通过，什么也不录制。",
+"磁带停止后，输出会淡出到静音，直到再次开启 Play。",
+"在减速过程中重新开启 Play，会从已经达到的速度开始加速。"
+]
+},
 "fx-pocket-trance-delay": {
 "source": "390a4b427a",
 "intro": "Pocket Trance Delay 是与歌曲速度锁定的延时。回声加到干信号上，干信号始终保持满电平。FL Studio Mobile 工程 (.flm) 的 Trance Delay 模块就是用它作为引擎加载的，它也可以添加到任何混音台插槽。",
@@ -4913,7 +5645,7 @@
 ]
 },
 "fx-spiral-echo": {
-"source": "60ff7072a7",
+"source": "10033a87c7",
 "intro": "Spiral Echo 是 LYNX SHARE 原生的混音台插入轨延时。每次重复的频率都比上一次多移一点，使回声上升或下降，而不是简单地重复。在立体声中，右侧听到的每次重复带有相反的移位。",
 "controls": [
 [
@@ -4947,6 +5679,10 @@
 [
 "输出",
 "输出模式（图中为 Stereo）。"
+],
+[
+"Classic / Measured",
+"Measured 使用实测的反馈回路：它的滤波器、额外加入的全通、限制器，以及延时时间改变时的滑动。它占用的 CPU 稍少一些。新实例以 Measured 起步。0.1.27 之前保存的工程和预设会以 Classic 载入，听起来与之前相同。"
 ]
 ],
 "tips": [
@@ -5308,8 +6044,8 @@
 ]
 },
 "fx-gemini-doubler": {
-"source": "d9526268fd",
-"intro": "Gemini Doubler 是 LYNX SHARE 原生的效果器，用两份延时、略微失谐的副本使人声或其他单声道音源变厚。把它加到你想加倍的轨道的插入轨上。每个声部是由两个交叉淡化的颗粒组成的变调延时。",
+"source": "c1f0d8a7eb",
+"intro": "Gemini Doubler 是 LYNX SHARE 原生的效果器，用两份延时、略微失谐的副本使人声或其他单声道音源变厚。把它加到你想加倍的轨道的插入轨上。每个声部是一个变调延时。",
 "controls": [
 [
 "直达",
@@ -5358,6 +6094,10 @@
 [
 "L / L+R / L-R",
 "声部 1 的来源：左、和或差。"
+],
+[
+"Classic / Measured",
+"Align 关闭时声部的读取头。Measured 用一个会漂移并跳回的读取头读取每个声部，与实测一致，占用的 CPU 不到一半。Classic 使用两个交叉淡化的抽头。新实例以 Measured 起步。0.1.27 之前保存的工程和预设会以 Classic 载入，听起来与之前相同。"
 ]
 ],
 "tips": [
@@ -5462,7 +6202,7 @@
 ]
 },
 "fx-orbit": {
-"source": "5aec5c0bbd",
+"source": "e0ee24a093",
 "intro": "Orbit 在一个效果器里涵盖镶边、合唱和加倍，用于混音台插入轨。你用模式选择特性，例如不断上升的理发店旋柱镶边，再用五个旋钮塑形。模式控件下方的提示行描述当前的模式。",
 "controls": [
 [
@@ -5488,6 +6228,10 @@
 [
 "模式",
 "Barber-pole、through-zero 镶边、tri 和 octo 合唱、doubler、ensemble、symphonic 等。"
+],
+[
+"Classic / Measured",
+"Measured 把 Rise 和 Rise / fall 的扫频、Manual 下的基础延时以及反馈曲线改为实测值。在 Rise / fall 中，左侧上升而右侧下降。新实例以 Measured 起步。0.1.27 之前保存的工程和预设会以 Classic 载入，听起来与之前相同。"
 ]
 ],
 "tips": [
@@ -6943,7 +7687,7 @@
 ]
 },
 "fx-voice-shift": {
-"source": "040e0a998d",
+"source": "5906a3c3c3",
 "intro": "Voice Shift 是用于单个人声或单声部线条的音高和共振峰移调器。它检测 70 Hz 到 1000 Hz 之间的音高。它报告自己的延迟用于延迟补偿，并把干声延时以匹配。",
 "controls": [
 [
@@ -6973,6 +7717,10 @@
 [
 "MIDI通道",
 "关闭，或选择一个 Channel Rack 通道，由它按住的音符设置音高。Transpose 和 Quantize 按最高按住音符与 C4 的距离移调，Robot 唱的就是那个音。"
+],
+[
+"Classic / Measured",
+"Measured 让检测器认为不是浊音的声音（例如 s 和 t 的声音）跟随共振峰移动（开启 Link 时，同时跟随音高和共振峰）。该开关只对来自 0.1.27 之前保存的工程或预设的实例显示，这类实例以 Classic 载入，听起来与之前相同。一旦切换到 Measured，它就会隐藏。新实例使用 Measured。"
 ]
 ],
 "tips": [

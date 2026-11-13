@@ -178,4 +178,67 @@ inline int moveEffectBefore (Song& song, int track, int from, int position)
     const auto to = std::clamp (position > from ? position - 1 : position, 0, n - 1);
     return to != from && mixerops::moveEffectSlot (song, track, from, to) ? to : -1;
 }
+
+// Round 190ce: the Device View's Copy / Paste / Duplicate and Ctrl-drag of a card (the reference DAW's Edit commands on
+// a selected device; docs/analise/REA_rodada190ce.md §3). A copy is a new device: a new running instance, its sidechain
+// sources kept, no automation of its own (automation clips stay with the original).
+// Pastes `fx` before the card at effect position `position`; returns its index, or -1 (no such insert, 10 effects).
+inline int pasteEffect (Song& song, int track, EffectSlot fx, int position)
+{
+    fx.instance.renew();
+    fx.row = -1;
+    return insertEffectAt (song, track, std::move (fx), position);
+}
+
+// Duplicate: a copy of effect `index` right after it (Ctrl-drag: `position` = where it is dropped; -1 = right after).
+inline int duplicateEffect (Song& song, int track, int index, int position = -1)
+{
+    if (track < 0 || track >= (int) song.mixer.size() || index < 0 || index >= (int) song.mixer[(std::size_t) track].effects.size())
+        return -1;
+    auto copy = song.mixer[(std::size_t) track].effects[(std::size_t) index];
+    return pasteEffect (song, track, std::move (copy), position < 0 ? index + 1 : position);
+}
+
+// Round 190dr: a device dragged out of the Device View onto another track (the reference's "drag a device to another
+// track: it moves there; with Ctrl it is copied", docs/analise/REA_rodada190dr.md §3). It lands at the end of `to`'s
+// chain. A move keeps the device itself (its running instance, its settings) and what automates or links to it follows
+// it to its new place; a copy is a new device, as pasteEffect makes. A side input that would now be the device's own
+// insert is dropped. Returns its index in `to`, or -1 (the same insert, no such device, or `to` has 10 effects).
+inline int moveEffectToInsert (Song& song, int from, int index, int to, bool copy)
+{
+    if (from < 0 || from >= (int) song.mixer.size() || to < 0 || to >= (int) song.mixer.size() || from == to)
+        return -1;
+    if (index < 0 || index >= (int) song.mixer[(std::size_t) from].effects.size())
+        return -1;
+    const auto n = (int) song.mixer[(std::size_t) to].effects.size();
+    if (n >= maxEffectSlots)
+        return -1;
+    auto fx = song.mixer[(std::size_t) from].effects[(std::size_t) index];
+    if (fx.sidechain == to)
+        fx.sidechain = -1;
+    if (fx.sidechain2 == to)
+        fx.sidechain2 = -1;
+    if (copy)
+        return pasteEffect (song, to, std::move (fx), n);
+    fx.row = -1;
+    const auto added = insertEffectAt (song, to, std::move (fx), n);
+    if (added < 0)
+        return -1;
+    // the device's automation, MIDI links, modulator routes and controller sources go with it
+    song.forEachTarget ([&] (AutomationTarget& t) {
+        if ((t.kind == AutomationTargetKind::effectParam || t.kind == AutomationTargetKind::effectMix) && t.index == from && t.slot == index)
+        {
+            t.index = to;
+            t.slot = added;
+        }
+    });
+    for (auto& a : song.automations)
+        if (a.source.track == from && a.source.slot == index)
+        {
+            a.source.track = to;
+            a.source.slot = added;
+        }
+    mixerops::removeEffectKeepRows (song, from, index);
+    return added;
+}
 } // namespace lynx::detailchain

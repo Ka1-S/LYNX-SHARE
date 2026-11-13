@@ -1,6 +1,7 @@
 #include "flp/Flp.h"
 
 #include <algorithm>
+#include <limits>
 #include <cmath>
 #include <cstring>
 #include <map>
@@ -38,6 +39,7 @@ enum : std::uint32_t
     evSampleFlags = 0x8F,       // u32: bit 0 resample, 1 load regions, 2 load ACID markers, 3 use loop points, 8 keep on disk
     evSampleLoopPointsOld = 0x13, // (older files) "use loop points" on
     evSamplePingPong = 0x14,    // u8: Sampler › Ping pong loop
+    evSampleLoopRecord = 0xFB,  // the sampler's loop points (round 190dh, see Channel::loopStart)
     evTimeSignatureNumerator = 0x11,
     evChannelSwingMix = 0x61,
     evLayerChild = 0x5E,  // u16: a Layer channel's child (one event per child; REA_rodada164a §1)
@@ -710,6 +712,15 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                     channel().pingPong = e.value != 0;
                 break;
 
+            case evSampleLoopRecord:
+                if (section == Section::channel && e.data.size() >= 20 && readLE<std::int32_t> (e.data, 0) == 2)
+                {
+                    const auto a = readLE<std::int64_t> (e.data, 4), b = readLE<std::int64_t> (e.data, 12);
+                    if (a >= 0 && b >= a && b != std::numeric_limits<std::int64_t>::max())
+                        channel().loopStart = a, channel().loopEnd = b;
+                }
+                break;
+
             case evPanLaw:
                 project.panLaw = (int) e.value;
                 break;
@@ -1248,6 +1259,12 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                     c.hasLevelAdjust = true;
                     c.panAdj = readLE<std::int32_t> (e.data, 0) * scale;
                     c.volAdj = readLE<std::int32_t> (e.data, 4) * scale;
+                    if (e.data.size() >= 20) // (round 190dz) the rest of FL's Levels adjustment
+                    {
+                        c.adjUnknown = readLE<std::int32_t> (e.data, 8);
+                        c.modXAdj = readLE<std::int32_t> (e.data, 12);
+                        c.modYAdj = readLE<std::int32_t> (e.data, 16);
+                    }
                 }
                 break;
 

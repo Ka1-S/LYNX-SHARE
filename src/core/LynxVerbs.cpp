@@ -4,9 +4,12 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <string>
 
 #include "core/Biquad.h"
 #include "core/Effects.h"
+#include "core/NebulaCloud.h"
 
 namespace lynx::verbs
 {
@@ -146,7 +149,142 @@ struct Shifter
 };
 
 double clampPos (double v, double lo, double hi) noexcept { return std::isfinite (v) ? std::clamp (v, lo, hi) : lo; }
+
+// ---- engine law 1 (0.1.27, round 190bz) ------------------------------------------------------------------------
+// Per-band decay (Jot & Chaigne 1991: one absorption filter per line whose attenuation in dB is proportional to the
+// line's length gives the same RT60 on every line; the filter here is a cascade of first-order shelves whose gains are
+// solved by least squares on the octave bands, the way proportional graphic equalisers are designed: Välimäki &
+// Liski 2017, Prawda, Välimäki & Schlecht 2019), a tone corrector of the same kind after the loop, a diffusion-step
+// onset (delay bank → polarity → Hadamard, three steps), rotation scattering inside the halves and a swinging
+// rotation between them (Schlecht & Habets 2015: a time-varying unitary matrix moves all bands alike).
+constexpr double bandHz[engineBands] = { 63.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0 };
+constexpr int loopShelves = 6;
+constexpr double loopShelfHz[loopShelves] = { 90.0, 250.0, 700.0, 1600.0, 3200.0, 6000.0 };
+constexpr int maxShelves = 7;
+constexpr int onsetSteps = 3, onsetChans = 4;
+constexpr double onsetFrac[onsetSteps][onsetChans] = { { 0.23, 0.52, 0.77, 1.0 }, { 0.19, 0.47, 0.71, 1.0 }, { 0.27, 0.44, 0.83, 1.0 } };
+constexpr double onsetSpan[onsetSteps] = { 1.0 / 7.0, 2.0 / 7.0, 4.0 / 7.0 };
+constexpr float onsetSign[onsetSteps][onsetChans] = { { 1.0f, -1.0f, 1.0f, 1.0f }, { 1.0f, 1.0f, -1.0f, 1.0f }, { -1.0f, 1.0f, 1.0f, 1.0f } };
+constexpr double maxOnsetSec = 0.25;
+constexpr double maxLoopGain = 0.99995;
+
+// dB of the symmetric first-order low shelf (gain gDb at 0 Hz, 0 dB at the top, half of it at the corner) at the
+// warped frequency t = tan (π f / sr), corner tc: |H|² = (t² + tc² G) / (t² + tc² / G)
+double shelfDbAt (double gDb, double tc, double t) noexcept
+{
+    const auto g = std::pow (10.0, gDb / 20.0);
+    return 10.0 * std::log10 ((t * t + tc * tc * g) / (t * t + tc * tc / g));
+}
+
+// least squares: a broadband gain and n low shelves (dB) whose sum meets the dB targets at the eight band centres.
+// The shelves' shapes depend a little on their gains, so the solve is repeated on the shapes of the last answer
+void fitShelves (const double* tc, int n, const double* tb, const double* target, double ridge, double& gainDb, double* shelfDb) noexcept
+{
+    const int m = n + 1;
+    for (int k = 0; k < n; ++k)
+        shelfDb[k] = 0.0;
+    gainDb = 0.0;
+    for (int pass = 0; pass < 3; ++pass)
+    {
+        double a[engineBands][maxShelves + 1];
+        for (int b = 0; b < engineBands; ++b)
+        {
+            a[b][0] = 1.0;
+            for (int k = 0; k < n; ++k)
+                a[b][k + 1] = std::abs (shelfDb[k]) < 0.05 ? tc[k] * tc[k] / (tb[b] * tb[b] + tc[k] * tc[k])
+                                                           : shelfDbAt (shelfDb[k], tc[k], tb[b]) / shelfDb[k];
+        }
+        double nm[maxShelves + 1][maxShelves + 2] {};
+        for (int i = 0; i < m; ++i)
+        {
+            for (int j = 0; j < m; ++j)
+                for (int b = 0; b < engineBands; ++b)
+                    nm[i][j] += a[b][i] * a[b][j];
+            for (int b = 0; b < engineBands; ++b)
+                nm[i][m] += a[b][i] * target[b];
+            if (i > 0)
+                nm[i][i] *= 1.0 + ridge;
+        }
+        for (int c = 0; c < m; ++c) // Gauss–Jordan with partial pivoting
+        {
+            int piv = c;
+            for (int r = c + 1; r < m; ++r)
+                if (std::abs (nm[r][c]) > std::abs (nm[piv][c]))
+                    piv = r;
+            if (std::abs (nm[piv][c]) < 1e-14)
+                continue;
+            if (piv != c)
+                for (int j = 0; j <= m; ++j)
+                    std::swap (nm[piv][j], nm[c][j]);
+            for (int r = 0; r < m; ++r)
+                if (r != c)
+                {
+                    const auto f = nm[r][c] / nm[c][c];
+                    for (int j = c; j <= m; ++j)
+                        nm[r][j] -= f * nm[c][j];
+                }
+        }
+        gainDb = std::abs (nm[0][0]) > 1e-14 ? nm[0][m] / nm[0][0] : 0.0;
+        for (int k = 0; k < n; ++k)
+            shelfDb[k] = std::abs (nm[k + 1][k + 1]) > 1e-14 ? std::clamp (nm[k + 1][m] / nm[k + 1][k + 1], -48.0, 48.0) : 0.0;
+    }
+}
+
+// dB per pass, at the eight band centres, of the classic three-band absorption of a line of `len` samples (its two
+// one-pole crossovers included), divided by the per-band multipliers: what law 1's loop filter is designed to
+void bandLossDb (const Settings& s, double sr, double len, double out[engineBands]) noexcept
+{
+    const auto rt = std::max (0.01, s.gateSec > 0.0 ? std::min (s.rt60, 0.12) : s.rt60);
+    const auto gain = [&] (double mult) { return std::min (maxLoopGain, std::pow (10.0, -3.0 * len / (rt * std::max (0.02, mult) * sr))); };
+    const auto gM = gain (1.0), gL = gain (s.lowMult), gH = gain (s.highMult);
+    const auto aLo = std::exp (-2.0 * pi * std::clamp (std::max (20.0, s.lowXover), 1.0, sr * 0.49) / sr);
+    const auto aHi = std::exp (-2.0 * pi * std::clamp (std::max (20.0, s.highXover), 1.0, sr * 0.49) / sr);
+    for (int b = 0; b < engineBands; ++b)
+    {
+        const auto w = 2.0 * pi * std::min (bandHz[b], 0.45 * sr) / sr;
+        const auto cw = std::cos (w), sw = std::sin (w);
+        // one-pole low-pass (1 − a) / (1 − a z⁻¹) at e^{jw}
+        const auto lp = [&] (double a, double& re, double& im)
+        {
+            const auto dr = 1.0 - a * cw, di = a * sw, d = dr * dr + di * di;
+            re = (1.0 - a) * dr / d;
+            im = -(1.0 - a) * di / d;
+        };
+        double lr, li, hr, hi;
+        lp (aLo, lr, li);
+        lp (aHi, hr, hi);
+        const auto re = gM + (gL - gM) * lr + (gH - gM) * (1.0 - hr), im = (gL - gM) * li - (gH - gM) * hi;
+        const auto db = 10.0 * std::log10 (std::max (1e-12, re * re + im * im));
+        out[b] = std::clamp (db / std::clamp (s.bandRtMult[b], 0.02, 50.0), -60.0, -1e-7);
+    }
+}
 } // namespace
+
+void bandTargets (const Settings& s, double sampleRate, double lineMs, double out[engineBands]) noexcept
+{
+    const auto len = lineMs * sampleRate / 1000.0;
+    double db[engineBands];
+    bandLossDb (s, sampleRate, len, db);
+    // the loop's own one-pole band limits (both laws have them) take their share on top of the designed filter
+    const auto onePoleDb = [&] (double hz, double at)
+    {
+        const auto a = std::exp (-2.0 * pi * hz / sampleRate), w = 2.0 * pi * std::min (at, 0.45 * sampleRate) / sampleRate;
+        return 10.0 * std::log10 ((1.0 - a) * (1.0 - a) / (1.0 - 2.0 * a * std::cos (w) + a * a));
+    };
+    for (int b = 0; b < engineBands; ++b)
+    {
+        auto loss = db[b];
+        if (s.loopBandwidth > 0.0 && s.loopBandwidth < 0.49 * sampleRate)
+            loss += onePoleDb (s.loopBandwidth, bandHz[b]);
+        if (s.loopLowCut > 0.0)
+        {
+            // the high-pass is the input minus its low-pass: a (1 − z⁻¹) / (1 − a z⁻¹)
+            const auto a = std::exp (-2.0 * pi * s.loopLowCut / sampleRate), w = 2.0 * pi * std::min (bandHz[b], 0.45 * sampleRate) / sampleRate;
+            loss += 10.0 * std::log10 (std::max (1e-12, a * a * (2.0 - 2.0 * std::cos (w)) / (1.0 - 2.0 * a * std::cos (w) + a * a)));
+        }
+        out[b] = -60.0 * len / (std::min (loss, -1e-7) * sampleRate);
+    }
+}
 
 // =================================================================================================================
 // laws
@@ -241,6 +379,22 @@ struct Engine::Impl
     double eModDepth = 0, eModInc = 0, eModPhase = 0; // round 170c: the early taps' modulation (samples, rad / sample)
     double feedbackGain = -1;
 
+    // ---- law 1 (round 190bz) ----
+    float shB0[loopShelves][lineCount] {}, shB1[loopShelves][lineCount] {}, shA1[loopShelves][lineCount] {}, shZ[loopShelves][lineCount] {};
+    double loopKey[14 + lineCount] {};  // the settings and lengths the loop filters were designed for
+    bool loopDesigned = false;
+    Biquad geq[engineBands];
+    bool geqOn[engineBands] {};
+    double toneKey[engineBands] {};
+    bool toneDesigned = false, toneOn = false;
+    double lfoC[lineCount] {}, lfoS[lineCount] {}, lfoRc[lineCount] {}, lfoRs[lineCount] {}, lfoInc[lineCount] {};
+    double mmC = 1.0, mmS = 0.0, mmRc = 1.0, mmRs = 0.0, mmInc = -1.0;
+    unsigned renorm = 0;
+    Line onsetLine[onsetSteps][onsetChans];
+    Biquad bell[3];
+    bool bellOn[3] {};
+    int onsetD[onsetSteps][onsetChans] {};
+
     Impl (double maxLine, double maxPre) : maxLineSec (maxLine), maxPreSec (maxPre)
     {
         Lcg r { 0x2545F491u };
@@ -287,6 +441,9 @@ struct Engine::Impl
         }
         for (auto& sh : shifters)
             sh.prepare (sr, 0.06);
+        for (int k = 0; k < onsetSteps; ++k)
+            for (auto& l : onsetLine[k])
+                l.allocate ((int) (maxOnsetSec * onsetSpan[k] * sr) + 8);
         reset();
     }
 
@@ -324,6 +481,27 @@ struct Engine::Impl
         toneMid.reset();
         shiftState = 0.0f;
         first = true;
+        for (int i = 0; i < lineCount; ++i)
+        {
+            lfoC[i] = std::cos (2.0 * pi * i / lineCount);
+            lfoS[i] = std::sin (2.0 * pi * i / lineCount);
+            lfoInc[i] = -1.0;
+        }
+        for (auto& row : shZ)
+            for (auto& z : row)
+                z = 0.0f;
+        for (auto& b : geq)
+            b.reset();
+        for (auto& step : onsetLine)
+            for (auto& l : step)
+                l.clear();
+        for (auto& b : bell)
+            b.reset();
+        mmC = 1.0;
+        mmS = 0.0;
+        mmInc = -1.0;
+        renorm = 0;
+        loopDesigned = toneDesigned = false;
     }
 
     double targetLen (const Settings& s, int i) const noexcept
@@ -476,8 +654,453 @@ struct Engine::Impl
         }
     }
 
+    // ---- law 1 ---------------------------------------------------------------------------------------------------
+    // the loop filter of every line: its dB per pass at the octave bands (the classic law's, times the per-band
+    // multipliers) met by a gain and six shelves; redone only when a setting or a length it depends on moves
+    void designLoop (const Settings& s) noexcept
+    {
+        double key[14 + lineCount] = { s.rt60, s.lowMult, s.lowXover, s.highMult, s.highXover, s.gateSec };
+        for (int b = 0; b < engineBands; ++b)
+            key[6 + b] = s.bandRtMult[b];
+        for (int i = 0; i < lineCount; ++i)
+            key[14 + i] = curLen[i] + (apG[i] != 0.0f ? (double) loopAp[i].len : 0.0);
+        if (loopDesigned && std::equal (std::begin (key), std::end (key), std::begin (loopKey)))
+            return;
+        std::copy (std::begin (key), std::end (key), std::begin (loopKey));
+        loopDesigned = true;
+        double tc[loopShelves], tb[engineBands];
+        for (int k = 0; k < loopShelves; ++k)
+            tc[k] = std::tan (pi * std::min (loopShelfHz[k], 0.45 * sr) / sr);
+        for (int b = 0; b < engineBands; ++b)
+            tb[b] = std::tan (pi * std::min (bandHz[b], 0.45 * sr) / sr);
+        for (int i = 0; i < lineCount; ++i)
+        {
+            double target[engineBands], shelf[loopShelves], gainDb = 0.0;
+            bandLossDb (s, sr, key[14 + i], target);
+            fitShelves (tc, loopShelves, tb, target, 1e-3, gainDb, shelf);
+            // never above unity at any frequency: the highest point of the response on a grid of 40 frequencies from
+            // 0 Hz to the top (the cascade of first-order shelves is smooth: between two grid points it cannot rise by
+            // more than a small share of the shelves' gains, which is added)
+            double top = -1000.0, sum = 0.0;
+            for (int k = 0; k < loopShelves; ++k)
+                sum += std::abs (shelf[k]);
+            for (int j = 0; j < 40; ++j)
+            {
+                const auto t = j == 0 ? 0.0 : j == 39 ? 1.0e6 : std::tan (pi * std::min (10.0 * std::pow (2.0, 0.3 * j), 0.499 * sr) / sr);
+                auto db = gainDb;
+                for (int k = 0; k < loopShelves; ++k)
+                    db += shelfDbAt (shelf[k], tc[k], t);
+                top = std::max (top, db);
+            }
+            top += 0.03 * sum;
+            const auto limit = 20.0 * std::log10 (maxLoopGain);
+            if (top > limit)
+                gainDb -= top - limit;
+            const auto g = std::pow (10.0, gainDb / 20.0);
+            for (int k = 0; k < loopShelves; ++k)
+            {
+                const auto r = std::pow (10.0, shelf[k] / 40.0), den = 1.0 + tc[k] / r, fold = k == 0 ? g : 1.0;
+                shB0[k][i] = (float) (fold * (1.0 + tc[k] * r) / den);
+                shB1[k][i] = (float) (fold * (tc[k] * r - 1.0) / den);
+                shA1[k][i] = (float) ((tc[k] / r - 1.0) / den);
+            }
+        }
+    }
+
+    // the tone corrector: dB per octave band after the loop. A proportional graphic equaliser (a low shelf, six bells,
+    // a high shelf); the bands overlap, so the gains are solved through their interaction at the band centres (two
+    // rounds: the shapes change a little with the gains) — Välimäki & Liski 2017
+    void setToneBand (int k, double db) noexcept
+    {
+        if (k == 0)
+            geq[k].shelf (sr, 88.0, db, false, 1.0);
+        else if (k == engineBands - 1)
+            geq[k].shelf (sr, std::min (5657.0, 0.4 * sr), db, true, 1.0);
+        else
+            geq[k].peaking (sr, std::min (bandHz[k], 0.4 * sr), 1.25, db);
+    }
+    void designTone (const Settings& s) noexcept
+    {
+        if (toneDesigned && std::equal (std::begin (s.bandDb), std::end (s.bandDb), std::begin (toneKey)))
+            return;
+        std::copy (std::begin (s.bandDb), std::end (s.bandDb), std::begin (toneKey));
+        toneDesigned = true;
+        toneOn = false;
+        double target[engineBands], g[engineBands];
+        for (int b = 0; b < engineBands; ++b)
+        {
+            g[b] = target[b] = std::clamp (s.bandDb[b], -18.0, 18.0);
+            toneOn = toneOn || std::abs (target[b]) > 0.01;
+        }
+        if (! toneOn)
+            return;
+        const auto magDb = [this] (const Biquad& q, double hz)
+        {
+            const auto w = 2.0 * pi * std::min (hz, 0.45 * sr) / sr;
+            const auto c1 = std::cos (w), s1 = std::sin (w), c2 = std::cos (2.0 * w), s2 = std::sin (2.0 * w);
+            const auto nr = q.b0 + q.b1 * c1 + q.b2 * c2, ni = -(q.b1 * s1 + q.b2 * s2);
+            const auto dr = 1.0 + q.a1 * c1 + q.a2 * c2, di = -(q.a1 * s1 + q.a2 * s2);
+            return 10.0 * std::log10 (std::max (1e-20, (nr * nr + ni * ni) / (dr * dr + di * di)));
+        };
+        for (int round = 0; round < 2; ++round)
+        {
+            double m[engineBands][engineBands + 1];
+            for (int k = 0; k < engineBands; ++k)
+            {
+                const auto proto = std::abs (g[k]) < 0.5 ? (g[k] < 0.0 ? -0.5 : 0.5) : g[k];
+                setToneBand (k, proto);
+                for (int j = 0; j < engineBands; ++j)
+                    m[j][k] = magDb (geq[k], bandHz[j]) / proto;
+            }
+            for (int j = 0; j < engineBands; ++j)
+                m[j][engineBands] = target[j];
+            for (int c = 0; c < engineBands; ++c)
+            {
+                int piv = c;
+                for (int r = c + 1; r < engineBands; ++r)
+                    if (std::abs (m[r][c]) > std::abs (m[piv][c]))
+                        piv = r;
+                if (std::abs (m[piv][c]) < 1e-12)
+                    continue;
+                if (piv != c)
+                    for (int j = 0; j <= engineBands; ++j)
+                        std::swap (m[piv][j], m[c][j]);
+                for (int r = 0; r < engineBands; ++r)
+                    if (r != c)
+                    {
+                        const auto f = m[r][c] / m[c][c];
+                        for (int j = c; j <= engineBands; ++j)
+                            m[r][j] -= f * m[c][j];
+                    }
+            }
+            for (int k = 0; k < engineBands; ++k)
+                g[k] = std::abs (m[k][k]) > 1e-12 ? std::clamp (m[k][engineBands] / m[k][k], -24.0, 24.0) : 0.0;
+        }
+        for (int k = 0; k < engineBands; ++k)
+        {
+            geqOn[k] = std::abs (g[k]) > 0.01;
+            setToneBand (k, g[k]);
+        }
+    }
+
+    void processLaw1 (float* L, float* R, int n, const Settings& s) noexcept
+    {
+        update (s);
+        const auto pd = std::clamp ((int) std::lround (s.predelaySec * sr), 0, pre[0].mask - 2);
+        double target[lineCount];
+        for (int i = 0; i < lineCount; ++i)
+        {
+            // whole samples: a still line is then read without interpolation loss (the glide moves in quarter samples
+            // and lands on them), so the top band decays as designed
+            target[i] = std::floor (targetLen (s, i));
+            if (first)
+                curLen[i] = target[i];
+            loopAp[i].len = std::clamp ((int) (target[i] * loopApFraction), 1, loopAp[i].line.mask - 2);
+        }
+        first = false;
+        designLoop (s);
+        designTone (s);
+        // modulators as rotating pairs (one rotation per sample instead of a sine), the lines' rates as in law 0
+        for (int i = 0; i < lineCount; ++i)
+            if (modInc[i] != lfoInc[i])
+            {
+                lfoInc[i] = modInc[i];
+                lfoRc[i] = std::cos (modInc[i]);
+                lfoRs[i] = std::sin (modInc[i]);
+            }
+        const auto mmDepth = std::clamp (s.matrixModDepth, 0.0, 0.7);
+        {
+            const auto inc = 2.0 * pi * std::clamp (s.matrixModRateHz, 0.0, 20.0) / sr;
+            if (inc != mmInc)
+            {
+                mmInc = inc;
+                mmRc = std::cos (inc);
+                mmRs = std::sin (inc);
+            }
+        }
+        const auto glide = 0.25;
+        const auto norm = (float) (1.0 / std::sqrt ((double) lineCount));
+        const auto early = (float) s.earlyLevel, late = (float) s.lateLevel, send = (float) s.earlySend;
+        const auto gated = s.gateSec > 0.0, build = gated || s.buildSec > 0.0005;
+        const auto crossAngle = 0.25 * pi * std::clamp (s.crossFeed, 0.0, 1.0);
+        const auto crossCos0 = std::cos (crossAngle), crossSin0 = std::sin (crossAngle);
+        const auto mixA = 0.25 * pi * std::clamp (s.mixAngle, 0.0, 1.0);
+        const auto mc = (float) std::cos (mixA), msn = (float) std::sin (mixA);
+        const auto ratio = std::pow (2.0, s.shiftSemis / 12.0), ratio2 = std::pow (2.0, s.shiftSemis2 / 12.0);
+        const auto voice2 = (float) std::clamp (s.shift2Mix, 0.0, 1.0);
+        const auto shimmer = (float) (std::clamp (s.shiftFeedback, 0.0, 1.0) * std::clamp (s.shiftMix, 0.0, 1.0));
+        const auto width = (float) std::clamp (s.width, -2.0, 2.0), gain = (float) s.gain;
+        float shimmerKeep[2] = { 1.0f, 1.0f }, shimmerB[2] = { 0.0f, 0.0f };
+        const auto hpC = (float) (1.0 - std::exp (-2.0 * pi * 120.0 / sr));
+        if (s.shimmerEnergy > 0.0)
+            for (int v = 0; v < 2; ++v)
+            {
+                const auto a = (double) (v == 1 ? shimmer * voice2 : shimmer);
+                const auto f = std::min (1.0, std::abs (v == 1 ? s.shiftSemis2 : s.shiftSemis) / 2.0);
+                shimmerB[v] = (float) (s.shimmerEnergy * a * f);
+                shimmerKeep[v] = 1.0f - shimmerB[v] * (float) (1.0 - f);
+            }
+        // onset network
+        const auto onsetLevel = (float) s.onsetLevel, onsetFeed = (float) std::clamp (s.onsetFeed, 0.0, 1.0);
+        const auto onsetFront = (float) std::clamp (s.onsetFront, 0.0, 1.0);
+        const auto onsetOn = onsetLevel != 0.0f || onsetFeed != 0.0f;
+        if (onsetOn)
+            for (int k = 0; k < onsetSteps; ++k)
+                for (int j = 0; j < onsetChans; ++j)
+                    onsetD[k][j] = std::clamp ((int) (std::clamp (s.onsetSec, 0.001, maxOnsetSec) * onsetSpan[k] * onsetFrac[k][j] * sr), 1,
+                                               onsetLine[k][j].mask - 2);
+        const auto bwOn = absorb[0].bw.a != 0.0f, lcOn = absorb[0].lc.a != 1.0f;
+        constexpr float r2 = 0.70710678f; // (two inputs spread over four channels)
+        constexpr float tiny = 1.0e-18f; // keeps the recirculating states out of the denormal range
+
+        for (int t = 0; t < n; ++t)
+        {
+            float x[2] = { L[t], R[t] };
+            float e[2], d[2], pin[2];
+            for (int c = 0; c < 2; ++c)
+            {
+                pre[c].write (x[c]);
+                const auto p = pd == 0 ? x[c] : pre[c].read (pd);
+                pin[c] = p;
+                raw[c].write (p);
+                float er = 0.0f;
+                if ((early != 0.0f || send != 0.0f) && eModDepth > 0.0)
+                {
+                    double eLfo[4];
+                    for (int j = 0; j < 4; ++j)
+                        eLfo[j] = 0.5 * eModDepth * (1.0 + std::sin (eModPhase + 1.5707963267948966 * j + 0.9 * c));
+                    const auto longest = (double) (raw[c].mask - 3);
+                    for (int k = 0; k < earlyTaps; ++k)
+                        er += eW[c][k] * raw[c].readFrac (std::min (longest, (double) eD[c][k] + eLfo[k & 3]));
+                }
+                else if (early != 0.0f || send != 0.0f)
+                    for (int k = 0; k < earlyTaps; ++k)
+                        er += eW[c][k] * raw[c].read (eD[c][k]);
+                if (eApG != 0.0f)
+                    for (auto& a : earlyAp[c])
+                        er = a.process (er, eApG);
+                e[c] = er;
+                auto v = p;
+                for (int k = 0; k < 4; ++k)
+                    if (inG[k] != 0.0f)
+                        v = inAp[c][k].process (v, inG[k]);
+                if (build)
+                {
+                    dif[c].write (v);
+                    float b = 0.0f;
+                    for (int k = 0; k < buildTaps; ++k)
+                        b += bW[c][k] * (bD[c][k] == 0 ? v : dif[c].read (bD[c][k]));
+                    v = b;
+                }
+                d[c] = v;
+            }
+            eModPhase += eModInc;
+            if (eModPhase > 2.0 * pi)
+                eModPhase -= 2.0 * pi;
+
+            // onset: three diffusion steps on four channels
+            float on[2] = { 0.0f, 0.0f }, onOut[2] = { 0.0f, 0.0f };
+            if (onsetOn)
+            {
+                float oc[onsetChans] = { pin[0] * r2, pin[1] * r2, pin[0] * r2, pin[1] * r2 };
+                float front[2] = { 0.0f, 0.0f };
+                for (int k = 0; k < onsetSteps; ++k)
+                {
+                    float dl[onsetChans];
+                    for (int j = 0; j < onsetChans; ++j)
+                    {
+                        onsetLine[k][j].write (oc[j]);
+                        dl[j] = onsetSign[k][j] * onsetLine[k][j].read (onsetD[k][j]);
+                    }
+                    const auto a0 = dl[0] + dl[1], a1 = dl[0] - dl[1], a2 = dl[2] + dl[3], a3 = dl[2] - dl[3];
+                    oc[0] = 0.5f * (a0 + a2);
+                    oc[1] = 0.5f * (a1 + a3);
+                    oc[2] = 0.5f * (a0 - a2);
+                    oc[3] = 0.5f * (a1 - a3);
+                    if (k + 1 < onsetSteps)
+                    {
+                        front[0] += oc[0];
+                        front[1] += oc[1];
+                    }
+                }
+                // two of the four channels (each holds every path), at the input's energy
+                on[0] = 1.41421356f * oc[0];
+                on[1] = 1.41421356f * oc[1];
+                onOut[0] = onsetLevel * (on[0] + onsetFront * 1.41421356f * front[0]);
+                onOut[1] = onsetLevel * (on[1] + onsetFront * 1.41421356f * front[1]);
+            }
+
+            // late tank
+            float sOut[lineCount];
+            for (int i = 0; i < lineCount; ++i)
+            {
+                curLen[i] += std::clamp (target[i] - curLen[i], -glide, glide);
+                const auto c = lfoC[i] * lfoRc[i] - lfoS[i] * lfoRs[i];
+                lfoS[i] = lfoS[i] * lfoRc[i] + lfoC[i] * lfoRs[i];
+                lfoC[i] = c;
+                const auto dl = std::max (2.0, curLen[i] - modDepth * 0.5 * (1.0 + lfoS[i]));
+                auto y = lines[i].readFrac (dl);
+                if (apG[i] != 0.0f)
+                    y = loopAp[i].process (y, apG[i]);
+                sOut[i] = y;
+            }
+            for (int k = 0; k < loopShelves; ++k)
+                for (int i = 0; i < lineCount; ++i)
+                {
+                    const auto y = shB0[k][i] * sOut[i] + shZ[k][i];
+                    shZ[k][i] = shB1[k][i] * sOut[i] - shA1[k][i] * y;
+                    sOut[i] = y;
+                }
+            if (bwOn)
+                for (int i = 0; i < lineCount; ++i)
+                    sOut[i] = absorb[i].bw.lp (sOut[i]);
+            if (lcOn)
+                for (int i = 0; i < lineCount; ++i)
+                    sOut[i] -= absorb[i].lc.lp (sOut[i]);
+
+            float lateL = (sOut[0] + sOut[1] + sOut[2] - sOut[3] + sOut[4] + sOut[5] - sOut[6] + sOut[7]) * norm;
+            float lateR = (sOut[0] - sOut[1] + sOut[2] + sOut[3] + sOut[4] - sOut[5] + sOut[6] + sOut[7]) * norm;
+            if (s.splitSides)
+            {
+                lateL = (sOut[0] + sOut[1] + sOut[2] - sOut[3]) * norm * 1.41421356f;
+                lateR = (sOut[4] - sOut[5] + sOut[6] + sOut[7]) * norm * 1.41421356f;
+            }
+            const float in[2] = { (1.0f - onsetFeed) * (d[0] + send * e[0]) + onsetFeed * on[0] + tiny,
+                                  (1.0f - onsetFeed) * (d[1] + send * e[1]) + onsetFeed * on[1] + tiny };
+            if (gated)
+            {
+                lateL = 0.3f * lateL + d[0];
+                lateR = 0.3f * lateR + d[1];
+            }
+
+            // mixing: each half through two layers of rotations by mixAngle × 45° (at 45° a normalised 4-point
+            // Hadamard up to signs), then the halves rotated into each other by crossFeed × 45°, swinging by the
+            // matrix modulator (orthogonal for any amount)
+            auto crossCos = (float) crossCos0, crossSin = (float) crossSin0;
+            float hc[2] = { mc, mc }, hs[2] = { msn, msn };
+            if (mmDepth > 0.0)
+            {
+                const auto c = mmC * mmRc - mmS * mmRs;
+                mmS = mmS * mmRc + mmC * mmRs;
+                mmC = c;
+                const auto dlt = mmDepth * mmS, d2 = dlt * dlt;
+                const auto cd = 1.0 - d2 * (0.5 - d2 * (1.0 / 24.0 - d2 * (1.0 / 720.0)));
+                const auto sd = dlt * (1.0 - d2 * (1.0 / 6.0 - d2 * (1.0 / 120.0 - d2 * (1.0 / 5040.0))));
+                crossCos = (float) (crossCos0 * cd - crossSin0 * sd);
+                crossSin = (float) (crossSin0 * cd + crossCos0 * sd);
+                // the rotations inside the halves swing too, the two halves in opposite ways
+                hc[0] = (float) (mc * cd - msn * sd);
+                hs[0] = (float) (msn * cd + mc * sd);
+                hc[1] = (float) (mc * cd + msn * sd);
+                hs[1] = (float) (msn * cd - mc * sd);
+            }
+            float h[lineCount];
+            for (int half = 0; half < lineCount; half += 4)
+            {
+                const auto qc = hc[half / 4], qs = hs[half / 4];
+                const auto a0 = qc * sOut[half] + qs * sOut[half + 1], a1 = qc * sOut[half + 1] - qs * sOut[half];
+                const auto a2 = qc * sOut[half + 2] + qs * sOut[half + 3], a3 = qc * sOut[half + 3] - qs * sOut[half + 2];
+                h[half] = qc * a0 + qs * a2;
+                h[half + 2] = qc * a2 - qs * a0;
+                h[half + 1] = qc * a1 + qs * a3;
+                h[half + 3] = qc * a3 - qs * a1;
+            }
+            for (int i = 0; i < 4; ++i)
+            {
+                const auto a = h[i], b = h[i + 4];
+                auto u = crossCos * a + crossSin * b, w = -crossSin * a + crossCos * b;
+                if (shimmer > 0.0f && (i & 1) == 0)
+                {
+                    const auto second = i == 2 && voice2 > 0.0f;
+                    const auto r = second ? ratio2 : ratio;
+                    const auto amount = second ? shimmer * voice2 : shimmer;
+                    if (s.shimmerEnergy > 0.0)
+                    {
+                        const auto bb = shimmerB[second ? 1 : 0], keep = shimmerKeep[second ? 1 : 0];
+                        auto hp = [&] (int k, float v)
+                        {
+                            shiftHp[k][0] += hpC * (v - shiftHp[k][0]);
+                            v -= shiftHp[k][0];
+                            shiftHp[k][1] += hpC * (v - shiftHp[k][1]);
+                            return v - shiftHp[k][1];
+                        };
+                        u = keep * u + bb * hp (i / 2, shifters[i / 2].process (u, r));
+                        w = keep * w + bb * hp (2 + i / 2, shifters[2 + i / 2].process (w, r));
+                    }
+                    else
+                    {
+                        u = (1.0f - amount) * u + amount * shifters[i / 2].process (u, r);
+                        w = (1.0f - amount) * w + amount * shifters[2 + i / 2].process (w, r);
+                    }
+                }
+                const auto alt = (i & 1) == 0 ? 0.5f : -0.5f;
+                lines[i].write (u + alt * in[0]);
+                lines[i + 4].write (w + alt * in[1]);
+            }
+            if ((++renorm & 8191u) == 0) // the rotating pairs drift by rounding: back onto the unit circle
+            {
+                for (int i = 0; i < lineCount; ++i)
+                {
+                    const auto m = 1.0 / std::sqrt (lfoC[i] * lfoC[i] + lfoS[i] * lfoS[i]);
+                    lfoC[i] *= m;
+                    lfoS[i] *= m;
+                }
+                const auto m = 1.0 / std::sqrt (mmC * mmC + mmS * mmS);
+                mmC *= m;
+                mmS *= m;
+            }
+
+            auto ol = late * lateL + early * e[0] + onOut[0];
+            auto orr = late * lateR + early * e[1] + onOut[1];
+            const auto mid = 0.5f * (ol + orr), side = 0.5f * (ol - orr) * width;
+            L[t] = (mid + side) * gain;
+            R[t] = (mid - side) * gain;
+        }
+        if (toneOn)
+            for (int k = 0; k < engineBands; ++k)
+                if (geqOn[k])
+                    geq[k].processBlock (L, R, n);
+        for (int k = 0; k < 3; ++k)
+        {
+            bellOn[k] = std::abs (s.bellDb[k]) > 0.01;
+            if (bellOn[k])
+            {
+                bell[k].peaking (sr, std::clamp (s.bellHz[k], 20.0, 0.45 * sr), std::clamp (s.bellQ[k], 0.1, 12.0), std::clamp (s.bellDb[k], -18.0, 18.0));
+                bell[k].processBlock (L, R, n);
+            }
+        }
+        outputFilters (L, R, n);
+        last = s;
+    }
+
+    void outputFilters (float* L, float* R, int n) noexcept
+    {
+        if (outLowOn)
+            outLow.processBlock (L, R, n);
+        if (outHighOn)
+            outHigh.processBlock (L, R, n);
+        if (bandOn)
+            for (int k = 0; k < bandSections; ++k)
+                band[k].processBlock (L, R, n);
+        if (toneHighOn)
+            toneHigh.processBlock (L, R, n);
+        if (toneLowOn)
+            toneLow.processBlock (L, R, n);
+        if (toneMidOn)
+            toneMid.processBlock (L, R, n);
+        if (shelfLowOn)
+            shelfLow.processBlock (L, R, n);
+        if (shelfHighOn)
+            shelfHigh.processBlock (L, R, n);
+    }
+
     void process (float* L, float* R, int n, const Settings& s) noexcept
     {
+        if (s.law == 1 && s.feedback < 0.0 && ! s.parallelLines)
+        {
+            processLaw1 (L, R, n, s);
+            return;
+        }
         update (s);
         const auto pd = std::clamp ((int) std::lround (s.predelaySec * sr), 0, pre[0].mask - 2);
         // loop all-pass lengths follow the line lengths (fixed per block)
@@ -724,6 +1347,128 @@ double syncedMs (int sync, int note, double msValue, double bpm)
     return q;
 }
 
+// ---- law 1 (round 190bz): what a mode / type adds on the 0.1.27 engine law, neutral by default. Fitted with the tail
+// lab (scripts/taillab.py) to black-box renders of the reference each effect stands in for.
+struct LawVoicing
+{
+    double rtMult[engineBands] = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 }; // decay per octave band × the classic law's
+    double db[engineBands] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };     // tone corrector, dB per octave band
+    double gainDb = 0.0;                                                     // wet level
+    double onset = 0.0, onsetMs = 30.0, front = 0.0, feed = 0.0;             // onset network: level, span, front weight, tank feed
+    double early = 1.0;                                                      // × the classic early taps' level
+    double angle = 1.0;                                                      // mixing inside the halves (× 45°)
+    double mmDepth = 0.0, mmRate = 0.3;                                      // matrix modulation (rad, Hz)
+    double mod = 1.0;                                                        // × the delay modulation's depth
+    double bandLimit = 1.0;                                                  // × the steep band limit's frequency
+    double bellHz[3] = { 100.0, 1000.0, 5000.0 }, bellDb[3] = { 0.0, 0.0, 0.0 }, bellQ[3] = { 1.4, 1.4, 1.4 }; // narrow colour
+};
+void applyLaw (Settings& s, const LawVoicing& v) noexcept
+{
+    s.law = 1;
+    for (int b = 0; b < engineBands; ++b)
+    {
+        s.bandRtMult[b] = v.rtMult[b];
+        s.bandDb[b] = v.db[b];
+    }
+    s.gain *= std::pow (10.0, v.gainDb / 20.0);
+    s.onsetLevel = v.onset;
+    s.onsetSec = v.onsetMs / 1000.0;
+    s.onsetFront = v.front;
+    s.onsetFeed = v.feed;
+    s.earlyLevel *= v.early;
+    s.mixAngle = v.angle;
+    s.matrixModDepth = v.mmDepth;
+    s.matrixModRateHz = v.mmRate;
+    s.modDepthMs *= v.mod;
+    s.bandLimit *= v.bandLimit;
+    for (int k = 0; k < 3; ++k)
+    {
+        s.bellHz[k] = v.bellHz[k];
+        s.bellDb[k] = v.bellDb[k];
+        s.bellQ[k] = v.bellQ[k];
+    }
+}
+
+// between two voicings (t = 0 … 1): decay multipliers and bell frequencies on a ratio scale, the rest linear
+LawVoicing blendLaw (const LawVoicing& a, const LawVoicing& b, double t) noexcept
+{
+    t = std::clamp (t, 0.0, 1.0);
+    const auto lin = [t] (double x, double y) { return x + (y - x) * t; };
+    const auto geo = [t] (double x, double y) { return x > 0.0 && y > 0.0 ? x * std::pow (y / x, t) : x + (y - x) * t; };
+    LawVoicing v;
+    for (int i = 0; i < engineBands; ++i)
+    {
+        v.rtMult[i] = geo (a.rtMult[i], b.rtMult[i]);
+        v.db[i] = lin (a.db[i], b.db[i]);
+    }
+    v.gainDb = lin (a.gainDb, b.gainDb);
+    v.onset = lin (a.onset, b.onset);
+    v.onsetMs = lin (a.onsetMs, b.onsetMs);
+    v.front = lin (a.front, b.front);
+    v.feed = lin (a.feed, b.feed);
+    v.early = lin (a.early, b.early);
+    v.angle = lin (a.angle, b.angle);
+    v.mmDepth = lin (a.mmDepth, b.mmDepth);
+    v.mmRate = geo (a.mmRate, b.mmRate);
+    v.mod = geo (a.mod, b.mod);
+    v.bandLimit = geo (a.bandLimit, b.bandLimit);
+    for (int k = 0; k < 3; ++k)
+    {
+        v.bellHz[k] = geo (a.bellHz[k], b.bellHz[k]);
+        v.bellDb[k] = lin (a.bellDb[k], b.bellDb[k]);
+        v.bellQ[k] = geo (a.bellQ[k], b.bellQ[k]);
+    }
+    return v;
+}
+
+#ifdef LYNX_VERB_FIT
+// the fitting harness: LYNX_VFIT="key=value;key=value" changes law 1's settings after the front-end has set them
+void fitOverride (Settings& s)
+{
+    static const std::string spec = [] { const char* e = std::getenv ("LYNX_VFIT"); return std::string (e != nullptr ? e : ""); }();
+    if (spec.empty() || s.law != 1)
+        return;
+    std::size_t at = 0;
+    while (at < spec.size())
+    {
+        const auto end = std::min (spec.find (';', at), spec.size());
+        const auto item = spec.substr (at, end - at);
+        at = end + 1;
+        const auto eq = item.find ('=');
+        if (eq == std::string::npos)
+            continue;
+        const auto k = item.substr (0, eq);
+        const auto v = std::atof (item.substr (eq + 1).c_str());
+        if (k.size() == 3 && k[0] == 'r' && k[1] == 't' && k[2] >= '0' && k[2] <= '7') s.bandRtMult[k[2] - '0'] *= v;
+        else if (k.size() == 3 && k[0] == 'd' && k[1] == 'b' && k[2] >= '0' && k[2] <= '7') s.bandDb[k[2] - '0'] += v;
+        else if (k == "gain") s.gain *= std::pow (10.0, v / 20.0);
+        else if (k == "onset") s.onsetLevel = v;
+        else if (k == "onsetms") s.onsetSec = v / 1000.0;
+        else if (k == "front") s.onsetFront = v;
+        else if (k == "feed") s.onsetFeed = v;
+        else if (k == "early") s.earlyLevel *= v;
+        else if (k == "late") s.lateLevel *= v;
+        else if (k == "angle") s.mixAngle = v;
+        else if (k == "mmd") s.matrixModDepth = v;
+        else if (k == "mmr") s.matrixModRateHz = v;
+        else if (k == "mod") s.modDepthMs *= v;
+        else if (k == "indiff") s.inDiffusion *= v;
+        else if (k == "loopdiff") s.loopDiffusion *= v;
+        else if (k == "pre") s.predelaySec += v / 1000.0;
+        else if (k == "build") s.buildSec *= v;
+        else if (k == "buildms") s.buildSec = v / 1000.0;
+        else if (k == "scale") s.lineScale *= v;
+        else if (k == "rt") s.rt60 *= v;
+        else if (k == "cross") s.crossFeed = v;
+        else if (k == "width") s.width *= v;
+        else if (k == "earlyms") s.earlySec = v / 1000.0;
+        else if (k == "bl") s.bandLimit *= v;
+        else if (k.size() == 3 && k[0] == 'b' && (k[1] == 'f' || k[1] == 'g' || k[1] == 'q') && k[2] >= '0' && k[2] <= '2')
+            (k[1] == 'f' ? s.bellHz : k[1] == 'g' ? s.bellDb : s.bellQ)[k[2] - '0'] = v;
+    }
+}
+#endif
+
 class VerbEffect : public Effect
 {
 public:
@@ -782,6 +1527,9 @@ protected:
         Settings s;
         float mix = 1.0f;
         configure (p, bpm, s, mix);
+       #ifdef LYNX_VERB_FIT
+        fitOverride (s);
+       #endif
         float dry, wet;
         mixGains (mix, dry, wet);
         for (int start = 0; start < n; start += chunk)
@@ -914,6 +1662,14 @@ LYNX_FIT_TABLE EpochVoicing epochVoicing[epoch::modeCount] = {
     {},
 };
 
+// round 190bz: law 1 per mode
+// fitted with the tail lab (round 190bz; the reference and the scores per row: docs/PARITY.md); a neutral entry is the classic voicing on the new loop
+LYNX_FIT_TABLE LawVoicing epochLaw[epoch::modeCount] = {
+    { { 0.998, 1.001, 0.969, 0.971, 0.957, 0.928, 0.881, 0.770 }, { -2.03, -0.49, -0.60, -1.21, -1.43, -0.37, 1.07, 1.53 }, 2.22, 0.000, 30, 0.00, 0.00, 1.00, 1.00, 0.00, 0.30, 1.00, 1.00, { 100, 1000, 5000 }, { 0.00, 0.00, 0.00 }, { 1.4, 1.4, 1.4 } }, // Concert Hall
+    {},
+    { { 0.894, 1.486, 0.845, 1.106, 1.151, 1.092, 2.405, 4.000 }, { -1.29, -2.74, -2.79, -0.81, -1.29, -0.33, 1.15, 6.09 }, 1.67, 0.300, 45, 0.00, 0.00, 1.00, 1.00, 0.00, 0.30, 4.00, 1.00, { 100, 1000, 5000 }, { 0.00, 0.00, 0.00 }, { 1.4, 1.4, 1.4 } }, // Room
+};
+
 double epochDecay (float v) { return skewLaw (v, 0.2, 70.0, 3.3596); }
 double epochPredelay (float v) { return skewLaw (v, 0.0, 500.0, 2.3219); }
 double epochBassMult (float v) { return skewLaw (v, 0.25, 4.0, 2.3219); }
@@ -926,7 +1682,7 @@ public:
     EpochFx() : VerbEffect (EffectKind::epochVerb, 0.25, 0.62) {}
 
 protected:
-    int structure (const EffectParams& p) const noexcept override { return choice (p[16], epoch::modeCount); }
+    int structure (const EffectParams& p) const noexcept override { return choice (p[16], epoch::modeCount) + (p[epoch::engineLaw] >= 0.5f ? 1000 : 0); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto modeIndex = choice (p[16], epoch::modeCount);
@@ -991,6 +1747,8 @@ protected:
         s.lineScale *= 0.85;
         s.earlyLevel *= std::min (1.6, 1.13 * std::sqrt (std::max (1.0, decay / 2.0)));
         s.gain *= 0.92;
+        if (p[epoch::engineLaw] >= 0.5f)
+            applyLaw (s, epochLaw[modeIndex]);
     }
 };
 
@@ -1019,6 +1777,14 @@ const AtriumType atriumTypes[atrium::typeCount] = {
     { "Dense Room", 1, 1.00, 1.00, 1.0, 1.05, 1.00, 10500.0, 1.0 },
 };
 
+// round 190bz: law 1 per type
+// fitted with the tail lab (round 190bz; the reference and the scores per row: docs/PARITY.md); a neutral entry is the classic voicing on the new loop
+LYNX_FIT_TABLE LawVoicing atriumLaw[atrium::typeCount] = {
+    { { 1.161, 0.971, 1.153, 0.990, 1.001, 1.113, 1.069, 1.374 }, { 1.17, 0.78, 1.30, 1.29, -0.71, 0.20, -0.93, -1.68 }, -1.09, 0.650, 30, 0.00, 0.00, 1.00, 1.00, 0.00, 0.30, 1.00, 1.00, { 100, 159, 5000 }, { 1.26, -1.21, 0.00 }, { 2.0, 2.0, 1.4 } }, // Large Room
+    {},
+    { { 0.695, 0.920, 0.713, 0.900, 0.910, 1.075, 1.257, 1.773 }, { 2.40, 1.43, 0.65, 1.22, -1.46, -0.47, -1.43, -1.80 }, 0.40, 0.650, 30, 0.00, 0.00, 1.00, 0.60, 0.00, 0.30, 2.50, 1.00, { 100, 1000, 5000 }, { 0.00, 0.00, 0.00 }, { 1.4, 1.4, 1.4 } }, // Bright Room
+};
+
 double atriumDecaySec (float v) { return skewLaw (v, 0.1, 100.0, 5.717); }
 
 class AtriumFx final : public VerbEffect
@@ -1027,7 +1793,7 @@ public:
     AtriumFx() : VerbEffect (EffectKind::atrium, 0.25, 1.05) {}
 
 protected:
-    int structure (const EffectParams& p) const noexcept override { return choice (p[19], atrium::typeCount); }
+    int structure (const EffectParams& p) const noexcept override { return choice (p[19], atrium::typeCount) + (p[atrium::engineLaw] >= 0.5f ? 1000 : 0); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto& t = atriumTypes[choice (p[19], atrium::typeCount)];
@@ -1081,6 +1847,8 @@ protected:
         s.outLowOrder = 1;
         if (s.outLowCut < 5.0)
             s.outLowCut = 0.0;
+        if (p[atrium::engineLaw] >= 0.5f)
+            applyLaw (s, atriumLaw[choice (p[19], atrium::typeCount)]);
     }
 };
 
@@ -1112,6 +1880,20 @@ const FoilType foilTypes[foil::typeCount] = {
     { "Lead", 1.00, 1.5, 1.0, 0.45, 11000.0, 0.40, 1.00 },
 };
 double foilDecaySec (float v) { return knotLaw (v, foilDecayKnots, foilDecayCount); }
+// round 190bz: law 1 per plate type, and for the measured plate voicing
+// fitted with the tail lab (round 190bz; the reference and the scores per row: docs/PARITY.md); a neutral entry is the classic voicing on the new loop
+LYNX_FIT_TABLE LawVoicing foilLaw[foil::typeCount] = {
+    { { 1.062, 0.891, 0.982, 0.948, 0.906, 0.886, 0.789, 0.832 }, { -1.25, -1.92, -1.60, -1.46, -0.93, -0.35, 1.42, -1.23 }, 2.01, 0.150, 30, 0.00, 0.00, 1.00, 1.00, 0.00, 0.30, 1.00, 1.00, { 10159, 8064, 5000 }, { 1.95, -1.15, 0.00 }, { 2.0, 2.0, 1.4 } }, // Silver
+    { { 1.111, 0.990, 1.033, 0.957, 0.940, 0.947, 0.889, 1.042 }, { -1.42, -0.59, -0.09, -0.79, 0.47, -0.56, 0.42, -4.09 }, -0.29, 0.650, 30, 0.00, 0.00, 1.00, 1.00, 0.00, 0.30, 1.00, 1.00, { 10159, 400, 5000 }, { 1.90, -1.79, 0.00 }, { 2.0, 2.0, 1.4 } }, // Pewter
+};
+// the measured plate voicing: fitted at three decay times, blended between them on the decay's logarithm (the third
+// bell fills a 2 … 3 dB dip around 190 Hz that every setting showed against the reference)
+constexpr double foilMeasuredLawSec[3] = { 1.0, 3.0, 10.0 };
+LYNX_FIT_TABLE LawVoicing foilMeasuredLaw[3] = {
+    { { 1.416, 0.965, 1.094, 0.917, 1.058, 1.076, 1.001, 0.856 }, { 1.92, 1.10, -0.87, -3.09, -3.11, -2.49, -0.60, -0.84 }, -2.73, 0.150, 30, 0.00, 0.00, 1.00, 1.00, 0.00, 0.30, 1.00, 1.00, { 318, 63, 188 }, { -1.49, -1.43, 3.00 }, { 2.0, 2.0, 4.0 } }, // decay 1 s
+    { { 1.106, 0.936, 1.018, 1.009, 0.992, 0.971, 1.011, 0.839 }, { -0.36, -0.71, -1.22, -2.71, -2.48, -1.30, 0.30, -0.04 }, -0.02, 0.300, 30, 0.00, 0.00, 1.00, 1.00, 0.00, 0.30, 1.00, 1.00, { 318, 63, 188 }, { -1.41, -1.15, 3.00 }, { 2.0, 2.0, 4.0 } }, // decay 3 s
+    { { 1.231, 0.924, 0.967, 1.069, 0.969, 0.945, 0.968, 0.830 }, { -3.00, -1.28, 0.11, -0.43, -0.67, -0.06, -0.15, -2.05 }, 0.10, 0.450, 30, 0.00, 0.00, 1.00, 1.00, 0.00, 0.30, 1.00, 1.00, { 318, 100, 188 }, { -1.34, 1.20, 3.00 }, { 2.0, 2.0, 4.0 } }, // decay 10 s
+};
 
 // round 150 (parity150a) [EXEC]: the measured plate voicing (the Little Plate role, official trial, impulses at Decay 0.5 …
 // 20 s and ∞, REA_rodada150a §7): the plate speaks after 0.7 ms (no plate delay), and its decay per band against the
@@ -1148,7 +1930,12 @@ public:
     FoilFx() : VerbEffect (EffectKind::foilPlate, 0.2, 0.62) {}
 
 protected:
-    int structure (const EffectParams& p) const noexcept override { return choice (p[11], foil::typeCount); }
+    // (round 190cm: the measured plate voicing is another tank too — its own level (+6 … +16 dB), band edges, onset
+    // network and, under the Measured law, loop voicing — so switching it while playing takes the same fade as a type)
+    int structure (const EffectParams& p) const noexcept override
+    {
+        return choice (p[11], foil::typeCount) + (p[foil::engineLaw] >= 0.5f ? 1000 : 0) + (p[14] >= 0.5f ? 2000 : 0);
+    }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto& t = foilTypes[choice (p[11], foil::typeCount)];
@@ -1242,6 +2029,18 @@ protected:
             s.outHighOrder = 2;
             s.earlyLevel *= 0.35;
         }
+        if (p[foil::engineLaw] >= 0.5f)
+        {
+            if (p[14] >= 0.5f)
+            {
+                const auto at = std::log (std::clamp (infinite ? 30.0 : rt, foilMeasuredLawSec[0], foilMeasuredLawSec[2]));
+                const auto k = at < std::log (foilMeasuredLawSec[1]) ? 0 : 1;
+                applyLaw (s, blendLaw (foilMeasuredLaw[k], foilMeasuredLaw[k + 1],
+                                       (at - std::log (foilMeasuredLawSec[k])) / std::log (foilMeasuredLawSec[k + 1] / foilMeasuredLawSec[k])));
+            }
+            else
+                applyLaw (s, foilLaw[choice (p[11], foil::typeCount)]);
+        }
     }
 };
 
@@ -1274,10 +2073,41 @@ LYNX_FIT_TABLE NebulaMode nebulaModes[nebula::modeCount] = {
 double nebulaDelayMs (float v) { return knotLaw (v, nebulaDelayKnots, nebulaDelayCount); }
 const char* const syncNames[4] = { "ms", "Note", "Dotted", "Triplet" };
 
+// Round 190ca: the cloud law (parameter 14, on for new instances). Six of the 22 networks — the ones whose structure
+// is published — run on core/NebulaCloud (a port of an MIT-licensed model, see that header); the other sixteen and
+// every project saved before the round (Law off: upgradeLoadedEffectParams) keep the classic engine below, unchanged.
+constexpr int nebulaLaw = 14;
+cloud::Topology nebulaTopology (int mode) noexcept
+{
+    switch (mode)
+    {
+        case 0: return cloud::Topology::fdn16;
+        case 2: return cloud::Topology::serialQuad;
+        case 3: return cloud::Topology::serialStereo;
+        case 4: return cloud::Topology::loopedQuad;
+        case 6: return cloud::Topology::fdn4;
+        case 19: return cloud::Topology::fdn4Filtered;
+        default: return cloud::Topology::none;
+    }
+}
+
 class NebulaFx final : public VerbEffect
 {
 public:
     NebulaFx() : VerbEffect (EffectKind::nebula, 4.2, 0.05) {}
+
+    void prepare (double sampleRate) noexcept override
+    {
+        VerbEffect::prepare (sampleRate);
+        network.prepare (sampleRate);
+    }
+    void reset() noexcept override
+    {
+        VerbEffect::reset();
+        network.reset();
+        change = Fade::none;
+        placed = false;
+    }
 
     // CLEAR (round 129): the panel's push button flips parameter 13; a flip empties the delay network at once
     void process (float* left, float* right, int n, const EffectParams& p, double bpm) noexcept override
@@ -1288,13 +2118,104 @@ public:
                 reset();
             lastClear = p[13];
         }
-        VerbEffect::process (left, right, n, p, bpm);
+        const auto want = p[nebulaLaw] >= 0.5f ? nebulaTopology (choice (p[12], nebula::modeCount)) : cloud::Topology::none;
+        if (! placed)
+            placed = true, active = want, before = p;
+        if (want != active && change == Fade::none)
+        {
+            change = Fade::out;
+            changeLeft = fadeLength;
+            kept = before;
+        }
+        if (active == cloud::Topology::none && change == Fade::none)
+        {
+            VerbEffect::process (left, right, n, p, bpm); // the classic engine, as before the round
+            before = p;
+            return;
+        }
+        // a cloud network, or the 11 ms either side of a change between the two engines / two cloud networks (the wet
+        // part fades out on the old one with its settings held, the new one starts empty and fades in)
+        for (int done = 0; done < n;)
+        {
+            auto m = std::min (n - done, chunk);
+            if (change != Fade::none)
+                m = std::min (m, changeLeft);
+            const auto& q = change == Fade::out ? kept : p;
+            auto* l = left + done;
+            auto* r = right + done;
+            float dry, wet;
+            mixGains (q[0], dry, wet);
+            std::copy (l, l + m, inL.begin());
+            std::copy (r, r + m, inR.begin());
+            if (active == cloud::Topology::none)
+            {
+                VerbEffect::process (l, r, m, q, bpm);
+                for (int i = 0; i < m; ++i)
+                {
+                    l[i] -= dry * inL[(std::size_t) i];
+                    r[i] -= dry * inR[(std::size_t) i];
+                }
+                wet = 1.0f;
+            }
+            else
+                network.process (inL.data(), inR.data(), l, r, m, controls (q, bpm, active));
+            for (int i = 0; i < m; ++i)
+            {
+                auto w = wet;
+                if (change != Fade::none)
+                {
+                    const auto g = (float) (changeLeft - i) / (float) fadeLength; // 1 … 0 over the fade
+                    w *= change == Fade::out ? g : 1.0f - g;
+                }
+                l[i] = dry * inL[(std::size_t) i] + w * l[i];
+                r[i] = dry * inR[(std::size_t) i] + w * r[i];
+            }
+            done += m;
+            if (change != Fade::none && (changeLeft -= m) <= 0)
+            {
+                if (change == Fade::out)
+                {
+                    change = Fade::in;
+                    changeLeft = fadeLength;
+                    active = want;
+                    if (active == cloud::Topology::none)
+                        VerbEffect::reset();
+                    else
+                        network.reset();
+                }
+                else
+                    change = Fade::none;
+            }
+        }
+        before = p;
     }
 
 private:
-    float lastClear = -1.0f;
+    // the cloud law's controls: the same parameters in the reference's units (the model takes them directly)
+    cloud::Controls controls (const EffectParams& p, double bpm, cloud::Topology topology) const noexcept
+    {
+        cloud::Controls c;
+        c.topology = topology;
+        c.delayMs = syncedMs (choice (p[1], 4), choice (p[2], 7), nebulaDelayMs (p[3]), bpm);
+        c.warp = p[4];
+        c.feedback = p[5];
+        c.density = p[6];
+        c.width = -1.0 + 2.0 * p[7];
+        c.lowCutHz = 10.0 + 1990.0 * p[8];
+        c.highCutHz = 200.0 + 19800.0 * p[9];
+        c.modRateHz = skewLaw (p[10], 0.01, 10.0, 2.328);
+        c.modDepth = p[11];
+        return c;
+    }
 
-protected:
+    float lastClear = -1.0f;
+    cloud::Network network;
+    cloud::Topology active = cloud::Topology::none;
+    Fade change = Fade::none;
+    int changeLeft = 0;
+    bool placed = false;
+    EffectParams before {}, kept {};
+    std::array<float, chunk> inL {}, inR {};
 
 protected:
     int structure (const EffectParams& p) const noexcept override { return choice (p[12], nebula::modeCount); }
@@ -1383,6 +2304,9 @@ const char* const haloShiftModes[5] = { "Single", "Dual", "Single, bright", "Dua
 const char* const haloColours[2] = { "Bright", "Dark" };
 
 double haloShiftSemis (float v) { return -12.0 + 24.0 * v; }
+// round 190bz: law 1
+// fitted with the tail lab (round 190bz; the reference and the scores per row: docs/PARITY.md); a neutral entry is the classic voicing on the new loop
+LYNX_FIT_TABLE LawVoicing haloLaw = { { 1.108, 1.268, 1.316, 1.083, 1.164, 1.001, 1.182, 1.427 }, { 1.63, -1.12, -1.41, -0.40, -0.68, -1.46, -1.95, -0.59 }, 2.13, 0.000, 30, 0.00, 0.00, 1.00, 1.00, 0.00, 0.30, 6.00, 1.00, { 63, 159, 5000 }, { -2.29, -1.54, 0.00 }, { 2.0, 2.0, 1.4 } };
 
 class HaloFx final : public VerbEffect
 {
@@ -1390,6 +2314,7 @@ public:
     HaloFx() : VerbEffect (EffectKind::halo, 0.3, 0.05) {}
 
 protected:
+    int structure (const EffectParams& p) const noexcept override { return p[halo::engineLaw] >= 0.5f ? 1000 : 0; }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         mix = p[0];
@@ -1462,6 +2387,8 @@ protected:
             s.gain *= std::sqrt (2.0 / (1.0 + s.width * s.width)); // (the same energy as the full width)
             s.earlyLevel *= 0.4; // its first 80 ms hold 3.4 dB less of the energy than ours did (impulse at −20 dB)
         }
+        if (p[halo::engineLaw] >= 0.5f)
+            applyLaw (s, haloLaw);
     }
 
     // the reference's Mono mode sums the input (mono in, a stereo tail)
@@ -1512,6 +2439,12 @@ LYNX_FIT_TABLE HorizonReverb horizonReverbs[horizon::reverbModeCount] = {
 const char* const horizonColours[4] = { "Bright", "Neutral", "Dark", "Studio" };
 
 double horizonDecaySec (float v) { return knotLaw (v, horizonDecayKnots, horizonDecayCount); }
+// round 190bz: law 1 per reverb mode
+// fitted with the tail lab (round 190bz; the reference and the scores per row: docs/PARITY.md); a neutral entry is the classic voicing on the new loop
+LYNX_FIT_TABLE LawVoicing horizonLaw[horizon::reverbModeCount] = {
+    {},
+    { { 1.177, 0.994, 1.035, 0.965, 0.987, 0.962, 0.896, 0.980 }, { -2.48, 0.06, 1.67, -1.40, 1.21, -0.06, -1.35, -1.94 }, 0.75, 0.450, 30, 0.00, 0.00, 1.00, 0.40, 0.40, 1.00, 1.00, 1.00, { 63, 200, 5000 }, { -1.86, -1.37, 0.00 }, { 2.0, 2.0, 1.4 } }, // Chamber
+};
 double horizonEchoMs (float v) { return knotLaw (v, horizonEchoKnots, horizonEchoCount); }
 
 class HorizonFx final : public VerbEffect
@@ -1546,7 +2479,7 @@ public:
     }
 
 protected:
-    int structure (const EffectParams& p) const noexcept override { return choice (p[22], horizon::reverbModeCount); }
+    int structure (const EffectParams& p) const noexcept override { return choice (p[22], horizon::reverbModeCount) + (p[horizon::engineLaw] >= 0.5f ? 1000 : 0); }
     void configure (const EffectParams& p, double, Settings& s, float& mix) const noexcept override
     {
         const auto mode = choice (p[22], horizon::reverbModeCount);
@@ -1623,6 +2556,8 @@ protected:
         // round 183b: this tank's short lines (small Size) and lower Density run louder than the reference's
         // (measured: Size 0 at −0.9 dB against Size 50 %; Density 0 / 50 % at +2.3 / +1.9 dB against 100 %)
         s.gain *= std::min (1.0, 0.56 + 0.88 * size) * std::pow (10.0, 2.2 * std::min (1.0, 2.0 * (1.0 - (double) p[15])) / 20.0);
+        if (p[horizon::engineLaw] >= 0.5f)
+            applyLaw (s, horizonLaw[mode]);
     }
 
     // round 183b: the echo section as the reference's manual has it. Echo → Reverb: the echo's output (not the dry
@@ -1784,6 +2719,7 @@ const char* foil::typeName (int i) noexcept { return foilTypes[std::clamp (i, 0,
 double foil::decaySec (float v) noexcept { return foilDecaySec (v); }
 const char* nebula::modeName (int i) noexcept { return nebulaModes[std::clamp (i, 0, nebula::modeCount - 1)].name; }
 double nebula::delayMs (float v) noexcept { return nebulaDelayMs (v); }
+bool nebula::cloudMode (int mode) noexcept { return nebulaTopology (mode) != cloud::Topology::none; }
 const char* horizon::echoModeName (int i) noexcept { return horizonEchoModes[std::clamp (i, 0, horizon::echoModeCount - 1)]; }
 const char* horizon::reverbModeName (int i) noexcept { return horizonReverbs[std::clamp (i, 0, horizon::reverbModeCount - 1)].name; }
 double horizon::decaySec (float v) noexcept { return horizonDecaySec (v); }
@@ -1802,36 +2738,44 @@ const EffectInfo& info (EffectKind kind)
         params ({ { "Mix", 1.0f }, { "Predelay", 0.25f }, { "Decay", 0.42048f }, { "Size", 1.0f }, { "Attack", 0.5f },
                   { "Bass mult", 0.623039f }, { "Bass xover", 0.381065f }, { "High shelf", 0.0f }, { "High freq", 0.5f },
                   { "Early diffusion", 1.0f }, { "Late diffusion", 1.0f }, { "Mod rate", 0.245455f }, { "Mod depth", 0.38f },
-                  { "High cut", 0.590539f }, { "Low cut", 0.0f }, { "Color", 0.0f }, { "Mode", 0.0f } }) };
+                  { "High cut", 0.590539f }, { "Low cut", 0.0f }, { "Color", 0.0f }, { "Mode", 0.0f },
+                  { "Law", 1.0f } }) }; // round 190bz: the 0.1.27 engine law (a project saved before keeps the classic engine: upgradeLoadedEffectParams)
     static const EffectInfo atriumInfo { "Atrium",
         params ({ { "Mix", 1.0f }, { "Predelay", 0.02f }, { "Decay", 0.5f }, { "High cut", 0.530201f }, { "Early/late", 0.5f },
                   { "Late size", 0.5f }, { "Late cross", 1.0f }, { "Late mod rate", 0.090909f }, { "Late mod depth", 0.5f },
                   { "Bass mult", 0.333333f }, { "Bass xover", 0.090909f }, { "High mult", 0.444444f }, { "High xover", 0.530201f },
                   { "Early size", 0.029029f }, { "Early cross", 0.1f }, { "Early mod rate", 0.090909f }, { "Early mod depth", 0.0f },
-                  { "Early send", 0.0f }, { "Diffusion", 1.0f }, { "Type", 0.0f }, { "Space", 0.0f }, { "Low cut", 0.0f } }) };
+                  { "Early send", 0.0f }, { "Diffusion", 1.0f }, { "Type", 0.0f }, { "Space", 0.0f }, { "Low cut", 0.0f },
+                  { "Law", 1.0f } }) }; // round 190bz
     static const EffectInfo foilInfo { "Foil Plate",
         params ({ { "Mix", 1.0f }, { "Predelay", 0.0f }, { "Decay", 0.5f }, { "Size", 0.5f }, { "Width", 0.5f },
                   { "Mod rate", 0.365345f }, { "Mod depth", 0.0f }, { "Low EQ freq", 0.343434f }, { "Low EQ gain", 0.5f },
                   { "High EQ freq", 0.494949f }, { "High EQ gain", 0.5f }, { "Type", 0.0f }, // EQ at 700 Hz / 10 kHz (round 129)
                   { "Infinite", 0.0f }, { "Low cut", 0.0f }, // round 135 (the Little Plate role)
                   { "Voicing", 0.0f }, // round 150: the measured plate voicing (off = the plate types as before)
-                  { "View", 0.0f } }) }; // round 152: the editor's view (Full | Plate: the one-knob panel of the Little Plate role)
+                  { "View", 0.0f }, // round 152: the editor's view (Full | Plate: the one-knob panel of the Little Plate role)
+                  { "Law", 1.0f } }) }; // round 190bz
     static const EffectInfo nebulaInfo { "Nebula",
         params ({ { "Mix", 0.5f }, { "Sync", 0.0f }, { "Note", 0.333333f }, { "Delay", 0.5f }, { "Warp", 0.0f },
                   { "Feedback", 0.5f }, { "Density", 0.0f }, { "Width", 1.0f }, { "Low cut", 0.0f }, { "High cut", 1.0f },
                   { "Mod rate", 0.273834f }, { "Mod depth", 0.5f }, { "Mode", 0.0f },
-                  { "Clear", 0.0f } }) }; // round 129: the reference's CLEAR button (any change of the value empties the network)
+                  { "Clear", 0.0f }, // round 129: the reference's CLEAR button (any change of the value empties the network)
+                  // round 190ca: the cloud law (core/NebulaCloud.h) for new instances; projects saved before keep the
+                  // classic engine: upgradeLoadedEffectParams
+                  { "Law", 1.0f } }) };
     static const EffectInfo haloInfo { "Halo",
         params ({ { "Mix", 0.5f }, { "Shift", 1.0f }, { "Feedback", 0.0f }, { "Diffusion", 0.919192f }, { "Size", 0.5f },
                   { "Low cut", 0.0f }, { "High cut", 0.530201f }, { "Mod rate", 0.1f }, { "Mod depth", 0.3f },
-                  { "Reverb mode", 0.0f }, { "Shift mode", 0.0f }, { "Color", 0.0f } }) };
+                  { "Reverb mode", 0.0f }, { "Shift mode", 0.0f }, { "Color", 0.0f },
+                  { "Law", 1.0f } }) }; // round 190bz
     static const EffectInfo horizonInfo { "Horizon",
         params ({ { "Mix", 0.5f }, { "Width", 1.0f }, { "Echo sync", 0.0f }, { "Echo note", 0.4f }, { "Echo time", 0.15f },
                   { "Echo feedback", 0.0f }, { "Echo spread", 0.0f }, { "Echo drive", 0.125f }, { "Echo detune", 0.566667f },
                   { "Echo level", 0.0f }, { "Routing", 0.0f }, { "Decay", 0.291667f }, { "Size", 0.5f }, { "Attack", 0.5f },
                   { "Early/late", 0.5f }, { "Density", 1.0f }, { "Reverb level", 1.0f }, { "Mod rate", 0.132226f },
                   { "Mod depth", 0.4f }, { "Low EQ freq", 0.25f }, { "High EQ freq", 0.208197f }, { "Echo mode", 0.090909f },
-                  { "Reverb mode", 0.142857f }, { "Color", 0.333333f } }) };
+                  { "Reverb mode", 0.142857f }, { "Color", 0.333333f },
+                  { "Law", 1.0f } }) }; // round 190bz
     switch (kind)
     {
         case EffectKind::atrium: return atriumInfo;
@@ -1862,6 +2806,7 @@ std::string paramText (EffectKind kind, int param, float v, double bpm)
                 case 14: return hz (10.0 + 1490.0 * v);
                 case 15: return epoch::colourName (choice (v, epoch::colourCount));
                 case 16: return epoch::modeName (choice (v, epoch::modeCount));
+                case epoch::engineLaw: return v >= 0.5f ? "Measured" : "Classic";
                 default: return pct (v);
             }
         case EffectKind::atrium:
@@ -1879,6 +2824,7 @@ std::string paramText (EffectKind kind, int param, float v, double bpm)
                 case 13: return ms (1.0 + 999.0 * v);
                 case 19: return atrium::typeName (choice (v, atrium::typeCount));
                 case 21: return hz (1000.0 * v);
+                case atrium::engineLaw: return v >= 0.5f ? "Measured" : "Classic";
                 default: return pct (v);
             }
         case EffectKind::foilPlate:
@@ -1896,12 +2842,14 @@ std::string paramText (EffectKind kind, int param, float v, double bpm)
                 case 13: return v <= 0.0f ? "off" : hz (foil::lowCutHz (v));
                 case 14: return v >= 0.5f ? "measured" : "off";
                 case 15: return v >= 0.5f ? "Plate" : "Full"; // round 152: the editor's view
+                case foil::engineLaw: return v >= 0.5f ? "Measured" : "Classic";
                 default: return pct (v);
             }
         case EffectKind::nebula:
             switch (param)
             {
                 case 13: return "Clear";
+                case 14: return v >= 0.5f ? "measured" : "classic";
                 case 1: return syncNames[choice (v, 4)];
                 case 2: return noteNames[choice (v, 7)];
                 case 3: return ms (nebulaDelayMs (v));
@@ -1924,6 +2872,7 @@ std::string paramText (EffectKind kind, int param, float v, double bpm)
                 case 9: return haloModes[haloModeIndex (v)].name;
                 case 10: return haloShiftModes[choice (v, 5)];
                 case 11: return haloColours[choice (v, 2)];
+                case halo::engineLaw: return v >= 0.5f ? "Measured" : "Classic";
                 default: return pct (v);
             }
         case EffectKind::horizon:
@@ -1943,6 +2892,7 @@ std::string paramText (EffectKind kind, int param, float v, double bpm)
                 case 21: return horizon::echoModeName (choice (v, horizon::echoModeCount));
                 case 22: return horizon::reverbModeName (choice (v, horizon::reverbModeCount));
                 case 23: return horizonColours[choice (v, 4)];
+                case horizon::engineLaw: return v >= 0.5f ? "Measured" : "Classic";
                 default: return pct (v);
             }
         default: return pct (v);

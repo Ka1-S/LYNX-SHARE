@@ -18,6 +18,8 @@
 // Chaigne 1991), Dattorro's input-diffuser lengths (J. Dattorro, "Effect Design Part 1", JAES 1997), a two-head
 // crossfaded delay-line pitch shifter. The parameter laws (normalised value → unit) follow the measured laws of the
 // reference plugins so their saved values translate one to one.
+// One exception (round 190ca): with its Law parameter on, six of Nebula's modes run on core/NebulaCloud — a port of
+// an MIT-licensed model of those networks (attribution and notice in that header and in THIRD_PARTY.md).
 //
 // Every parameter is 0..1 (EffectParams). Nothing allocates after prepare(); no latency.
 
@@ -103,7 +105,29 @@ struct Settings
     double toneLowHz = 100.0, toneLowDb = 0.0;             // round 183b: a second low shelf (an algorithm's own tone)
     double toneMidHz = 1000.0, toneMidDb = 0.0, toneMidQ = 0.7; // a bell (an algorithm's own tone)
     double gain = 1.0;
+
+    // ---- engine law 1 (0.1.27, round 190bz). Everything below is read only when law == 1; law 0 is the engine as it
+    // was (bit-identical: projects saved before keep it). A delay-network front-end (feedback ≥ 0) stays on law 0.
+    int law = 0;
+    // per-band decay: RT60 of the octave bands 63 Hz … 8 kHz as a multiple of the decay the three-band law above gives
+    // there (the loop filter of every line is designed to it), and the tone corrector after the loop (dB per band)
+    double bandRtMult[8] = { 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 };
+    double bandDb[8] = { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    // onset: a diffusion-step network (delays → polarity → mixing, three steps) on the pre-delayed input: a dense
+    // burst over onsetSec heard at onsetLevel; onsetFront 0..1 adds its first two steps (energy to the very front);
+    // onsetFeed 0..1 feeds the tank from it instead of the input all-passes (dense from the first pass)
+    double onsetLevel = 0.0, onsetSec = 0.03, onsetFront = 0.0, onsetFeed = 0.0;
+    // density as a law: the mixing inside each half of the tank is a rotation scattering by mixAngle × 45° (1 = full
+    // mixing, 0 = none: the echo density then builds only through crossFeed and the all-passes)
+    double mixAngle = 1.0;
+    // modulation that moves every band alike: the rotation between the two halves swings by ± matrixModDepth (rad)
+    double matrixModDepth = 0.0, matrixModRateHz = 0.3;
+    // three bells after the tone corrector (a mode's own narrow colour, where an octave band is too wide)
+    double bellHz[3] = { 100.0, 1000.0, 5000.0 }, bellDb[3] = { 0.0, 0.0, 0.0 }, bellQ[3] = { 1.4, 1.4, 1.4 };
 };
+constexpr int engineBands = 8;
+// the octave-band RT60 (s, 63 Hz … 8 kHz) the engine aims at for a line of lineMs under law 1 (tests, fitting)
+void bandTargets (const Settings& s, double sampleRate, double lineMs, double out[engineBands]) noexcept;
 
 class Engine
 {
@@ -124,7 +148,8 @@ private:
 // ---- the six effects ---------------------------------------------------------------------------------------------
 namespace epoch
 {
-constexpr int paramCount = 17;
+constexpr int paramCount = 18;
+constexpr int engineLaw = 17; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
 constexpr int modeCount = 22;
 constexpr int colourCount = 3;
 const char* modeName (int index) noexcept;
@@ -134,7 +159,8 @@ double decaySec (float v) noexcept;
 }
 namespace atrium
 {
-constexpr int paramCount = 22;
+constexpr int paramCount = 23;
+constexpr int engineLaw = 22; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
 constexpr int typeCount = 12;
 const char* typeName (int index) noexcept;
 double decaySec (float v) noexcept;
@@ -142,7 +168,8 @@ float decayValue (double sec) noexcept;
 }
 namespace foil
 {
-constexpr int paramCount = 15; // round 135: + Infinite, Low cut; round 150: + Voicing
+constexpr int paramCount = 17; // round 135: + Infinite, Low cut; round 150: + Voicing; 152: + View; 190bz: + Law
+constexpr int engineLaw = 16; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
 constexpr int typeCount = 12;
 const char* typeName (int index) noexcept;
 double decaySec (float v) noexcept;
@@ -152,16 +179,20 @@ namespace nebula
 {
 constexpr int paramCount = 13;
 constexpr int modeCount = 22;
+constexpr int law = 14; // round 190ca: 1 = the cloud law (core/NebulaCloud.h; new instances), 0 = the classic engine
 const char* modeName (int index) noexcept;
 double delayMs (float v) noexcept;
+bool cloudMode (int mode) noexcept; // whether the cloud law has a network for this mode (the others stay classic)
 }
 namespace halo
 {
-constexpr int paramCount = 12;
+constexpr int paramCount = 13;
+constexpr int engineLaw = 12; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
 }
 namespace horizon
 {
-constexpr int paramCount = 24;
+constexpr int paramCount = 25;
+constexpr int engineLaw = 24; // round 190bz: 0 = the classic engine (projects saved before), 1 = the 0.1.27 law
 constexpr int echoModeCount = 12;
 constexpr int reverbModeCount = 8;
 const char* echoModeName (int index) noexcept;

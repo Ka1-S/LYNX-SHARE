@@ -131,7 +131,7 @@
 		</archive>
 	</archives>
 </package>)x190",
-      { { 0, 0.20053f }, { 1, 1.00000f }, { 2, 0.01216f }, { 3, 0.95424f }, { 4, 0.95000f }, { 7, 0.33566f } } },
+      { { 0, 0.20053f }, { 1, 1.00000f }, { 2, 0.01216f }, { 3, 0.95424f }, { 4, 0.95000f }, { 5, 0.00000f }, { 7, 0.33566f } } },
     { "FG_X_2 S2", "FG-X 2", "Apex Limiter",
       R"x190(<package version="1.0">
 	<manifest>
@@ -246,7 +246,7 @@
 		</archive>
 	</archives>
 </package>)x190",
-      { { 0, 0.26738f }, { 1, 1.00000f }, { 2, 0.01216f }, { 3, 0.95424f }, { 4, 0.00000f }, { 7, 0.33566f } } },
+      { { 0, 0.26738f }, { 1, 1.00000f }, { 2, 0.01216f }, { 3, 0.95424f }, { 4, 0.00000f }, { 5, 0.00000f }, { 7, 0.33566f } } },
     { "FG_X_2 D", "FG-X 2", "Apex Limiter",
       R"x190(<package version="1.0">
 	<manifest>
@@ -361,7 +361,7 @@
 		</archive>
 	</archives>
 </package>)x190",
-      { { 0, 0.00000f }, { 1, 1.00000f }, { 2, 0.01216f }, { 3, 0.95424f }, { 4, 0.95000f }, { 7, 0.33566f } } },
+      { { 0, 0.00000f }, { 1, 1.00000f }, { 2, 0.01216f }, { 3, 0.95424f }, { 4, 0.95000f }, { 5, 0.00000f }, { 7, 0.33566f } } },
     { "SSL_Native_X_Saturator_v6 S1", "SSL Native X-Saturator v6", "Ember Saturator",
       R"x190(<SSL_PLUGIN_STATE PluginName="SSL Native X-Saturator v6" Version="6.9.3" StateASelected="1"><A LastLoadedPreset="C:\ProgramData\Solid State Logic\PlugIns\Presets\XSaturator\Default Preset.xml"><PROCESSOR_STATE><PARAM id="bypass" value="0.0"/><PARAM id="depth" value="50.0"/><PARAM id="drive" value="12.0"/><PARAM id="harmonics" value="50.0"/><PARAM id="headroom" value="0.0"/><PARAM id="input" value="0.0"/><PARAM id="mix" value="100.0"/><PARAM id="output" value="0.0"/><PARAM id="shape" value="0.0"/></PROCESSOR_STATE></A><B LastLoadedPreset="C:\ProgramData\Solid State Logic\PlugIns\Presets\XSaturator\Default Preset.xml"><PROCESSOR_STATE><PARAM id="input" value="0.0"/><PARAM id="output" value="0.0"/><PARAM id="drive" value="0.0"/><PARAM id="depth" value="50.0"/><PARAM id="harmonics" value="50.0"/><PARAM id="shape" value="0.0"/><PARAM id="mix" value="100.0"/><PARAM id="headroom" value="0.0"/><PARAM id="bypass" value="0.0"/></PROCESSOR_STATE></B></SSL_PLUGIN_STATE>)x190",
       { { 0, 0.41667f }, { 1, 0.50000f }, { 2, 0.48607f }, { 5, 0.90628f }, { 6, 0.49798f }, { 7, 0.00000f }, { 37, 0.55437f } } },

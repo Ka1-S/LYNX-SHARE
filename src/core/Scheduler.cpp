@@ -1,6 +1,7 @@
 #include "core/Scheduler.h"
 
 #include "core/ClipOps.h"
+#include "core/Groove.h"
 #include "core/NoteChance.h"
 
 #include <algorithm>
@@ -232,12 +233,18 @@ void ScheduledNotes::process (EventBuffer& events, int numSamples, double tps) n
         const auto e = events[i];
         const auto note = e.channel >= 0 && e.key >= 0 && e.key < audioClipKeyBase;
 
+        auto id = 0u;
         if (note && e.type == NoteEvent::Type::on)
         {
             if (count < capacity)
+            {
+                id = nextId;
+                nextId = nextId >= 0xffffffu ? 1u : nextId + 1u;
                 entries[(std::size_t) count++] = { e.channel, e.key,
                                                    e.lengthTicks > 0.0f ? clock + e.sampleOffset * tps + (double) e.lengthTicks
-                                                                        : std::numeric_limits<double>::infinity() };
+                                                                        : std::numeric_limits<double>::infinity(),
+                                                   id };
+            }
             else
                 overflow = true;
         }
@@ -257,11 +264,15 @@ void ScheduledNotes::process (EventBuffer& events, int numSamples, double tps) n
                 }
             }
             if (match >= 0)
+            {
+                id = entries[(std::size_t) match].id;
                 entries[(std::size_t) match] = entries[(std::size_t) --count];
+            }
             else if (! overflow)
                 continue; // not the end of a sounding note: a note edited in behind the play head, or changed
         }
-        events.at (kept++) = e;
+        events.at (kept) = e;
+        events.at (kept++).noteId = id;
     }
     events.resize (kept);
 
@@ -280,6 +291,7 @@ void ScheduledNotes::process (EventBuffer& events, int numSamples, double tps) n
         off.key = entries[(std::size_t) k].key;
         off.velocity = 0.0f;
         off.sampleOffset = std::clamp ((int) std::ceil (due - 1.0e-6), 0, numSamples - 1);
+        off.noteId = entries[(std::size_t) k].id;
         events.add (off);
         added = true;
         entries[(std::size_t) k] = entries[(std::size_t) --count];
@@ -321,7 +333,75 @@ ScheduleIndex makeScheduleIndex (const Song& song)
         index.patternLength.push_back (std::max<std::int64_t> (1, p.effectiveLength (song.beatsPerBar)));
     }
 
+    // FL's pattern clip takeover (issue #158): each pattern's clips chained by start, the list order kept on the same start
+    index.nextOfPattern.assign (song.playlist.size(), -1);
+    std::vector<int> order;
+    order.reserve (song.playlist.size());
+    for (int i = 0; i < (int) song.playlist.size(); ++i)
+        if (const auto& c = song.playlist[(std::size_t) i]; c.kind == ClipKind::pattern && c.length > 0)
+            order.push_back (i);
+    std::stable_sort (order.begin(), order.end(), [&] (int a, int b) {
+        const auto& x = song.playlist[(std::size_t) a];
+        const auto& y = song.playlist[(std::size_t) b];
+        return x.pattern != y.pattern ? x.pattern < y.pattern : x.start < y.start;
+    });
+    for (std::size_t k = 0; k + 1 < order.size(); ++k)
+        if (song.playlist[(std::size_t) order[k]].pattern == song.playlist[(std::size_t) order[k + 1]].pattern)
+            index.nextOfPattern[(std::size_t) order[k]] = order[k + 1];
+
     return index;
+}
+
+namespace
+{
+// Does Playlist clip `clip` play in Song mode (scheduleSong's own test)? zoneEnd = Song::performanceZoneEnd().
+bool clipPlaysInSong (const Song& song, const Clip& clip, std::int64_t zoneEnd) noexcept
+{
+    if (song.auditionLane >= 0) // comping (round 177c): an auditioned take lane plays instead of its comp track
+    {
+        if (clip.track == song.auditionComp)
+            return false;
+        if (clip.track != song.auditionLane && (clip.muted || song.isTrackMuted (clip.track)))
+            return false;
+    }
+    else if (clip.muted || song.isTrackMuted (clip.track))
+        return false;
+    return clip.start >= zoneEnd; // Performance mode: the zone's clips play only when launched
+}
+
+std::int64_t stopsAtFor (const Song& song, std::size_t clipIndex, const ScheduleIndex* index, std::int64_t zoneEnd) noexcept
+{
+    constexpr auto never = std::numeric_limits<std::int64_t>::max();
+    if (! song.patternClipTakeover || clipIndex >= song.playlist.size())
+        return never;
+    const auto& clip = song.playlist[clipIndex];
+    if (clip.kind != ClipKind::pattern)
+        return never;
+    if (index != nullptr && index->nextOfPattern.size() == song.playlist.size())
+    {
+        for (auto i = index->nextOfPattern[clipIndex]; i >= 0; i = index->nextOfPattern[(std::size_t) i])
+            if (clipPlaysInSong (song, song.playlist[(std::size_t) i], zoneEnd))
+                return song.playlist[(std::size_t) i].start;
+        return never;
+    }
+    auto stops = never;
+    for (std::size_t i = 0; i < song.playlist.size(); ++i)
+    {
+        const auto& d = song.playlist[i];
+        if (i == clipIndex || d.kind != ClipKind::pattern || d.pattern != clip.pattern || d.length <= 0)
+            continue;
+        if (d.start < clip.start || (d.start == clip.start && i < clipIndex) || d.start >= stops)
+            continue;
+        if (clipPlaysInSong (song, d, zoneEnd))
+            stops = d.start;
+    }
+    return stops;
+}
+} // namespace
+
+std::int64_t patternClipStopsAt (const Song& song, std::size_t clipIndex, const ScheduleIndex* index) noexcept
+{
+    return stopsAtFor (song, clipIndex, index, song.performanceZoneEnd());
 }
 
 PlaybackLoop playbackLoop (bool songMode, double loopStart, double loopEnd, double songLength, double songStart) noexcept
@@ -346,13 +426,57 @@ double hostPositionTick (const Song& song, double tick, std::int64_t songLength)
     return std::fmod (tick, (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar)));
 }
 
+// An audio clip's note (round 190ey: out of scheduleClip, so a Playlist preview plays the clip through its channel the
+// same way, AudioEngine::previewClipThroughChannel): the "on" at the clip's start.
+NoteEvent audioClipNote (const Song& song, const Clip& clip, std::size_t clipIndex, double tps) noexcept
+{
+    const auto secondsPerTick = 60.0 / (std::max (song.bpm, 1.0) * ppq);
+    NoteEvent e;
+    e.channel = clip.channel;
+    e.key = audioClipKey (clipIndex);
+    e.velocity = clip.gain;
+    e.pan = clip.pan;
+    e.fadeIn = (float) ((double) clip.effectiveFadeIn() / tps);
+    e.fadeOut = (float) ((double) clip.effectiveFadeOut() / tps);
+    e.fadeShape = (std::uint16_t) ((clip.crossfadeIn > 0 || (clip.fadeIn > 0 && (clip.linearFades & 1) == 0) ? 1 : 0)
+                                   | (clip.crossfadeOut > 0 || (clip.fadeOut > 0 && (clip.linearFades & 2) == 0) ? 2 : 0)
+                                   | (clip.reversed ? 4 : 0)
+                                   // a comp crossfade (round 177c): the equal-power curve, which wins over bits 0 / 1
+                                   | ((clip.fadeCurve & 1) != 0 ? 8 : 0) | ((clip.fadeCurve & 2) != 0 ? 16 : 0));
+    // an automatic crossfade, or a comp crossfade, has no tension of its own here
+    e.fadeInTension = clip.crossfadeIn > 0 || (clip.fadeCurve & 1) != 0 ? 0.0f : clip.fadeInTension;
+    e.fadeOutTension = clip.crossfadeOut > 0 || (clip.fadeCurve & 2) != 0 ? 0.0f : clip.fadeOutTension;
+    e.clipPitch = clip.pitch; // FL 2026's clip pitch (round 167k): shifted, the clip's length stays
+    e.clipStretch = (float) clip.stretch; // FL 2026's clip stretch (round 167l)
+
+    // FL's per-clip edge declicker (round 189i, clipops::declickChoice): a Disabled side plays without the channel's
+    // declicker, a manual side neither. FL /R renders (round 189l): a side FL marks as joined seamlessly (choice 1)
+    // still takes it, so two clips that continue each other crossfade through the release and the attack
+    const auto declickBits = [&]
+    {
+        std::uint16_t bits = 0;
+        for (int side = 0; side < 2; ++side)
+        {
+            const auto off = clipops::declickChoice (clip, side) == clipops::declickDisabled;
+            bits |= (std::uint16_t) ((off ? (side == 0 ? 32 : 64) : 0) | (clipops::manualFade (clip, side) ? (side == 0 ? 128 : 256) : 0));
+        }
+        return bits;
+    };
+    e.fadeShape |= declickBits();
+    e.type = NoteEvent::Type::on;
+    e.startSeconds = std::max (0.0, ((double) clip.offset + (double) clip.offsetFraction) * secondsPerTick);
+    e.clipElapsed = 0.0f;
+    e.clipRemaining = (float) ((double) clip.length / std::max (1.0e-12, tps));
+    return e;
+}
+
 namespace
 {
 // One clip of the Playlist (or a performance-mode launch, played as a clip of its own), its events in the block.
 // [loopStart, loopEnd) = the block within the song loop of length `loop`.
 void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, double endTick, int numSamples,
                    double tps, std::int64_t loop, double loopStart, double loopEnd, bool resume, const ScheduleIndex* index,
-                   EventBuffer& out, bool chase = false) noexcept
+                   EventBuffer& out, bool chase = false, std::int64_t stopsAt = std::numeric_limits<std::int64_t>::max()) noexcept
 {
     auto overlaps = [&] (double from, double to) {
         return (from < loopEnd && to > loopStart) || (loopEnd > (double) loop && from < loopEnd - (double) loop);
@@ -364,41 +488,10 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         if (clip.channel < 0 || clip.channel >= (int) song.channels.size() || clip.length <= 0)
             return;
 
-        NoteEvent e;
-        e.channel = clip.channel;
-        e.key = audioClipKey (clipIndex);
-        e.velocity = clip.gain;
-        e.pan = clip.pan;
-        e.fadeIn = (float) ((double) clip.effectiveFadeIn() / tps);
-        e.fadeOut = (float) ((double) clip.effectiveFadeOut() / tps);
-        e.fadeShape = (std::uint16_t) ((clip.crossfadeIn > 0 || (clip.fadeIn > 0 && (clip.linearFades & 1) == 0) ? 1 : 0)
-                                       | (clip.crossfadeOut > 0 || (clip.fadeOut > 0 && (clip.linearFades & 2) == 0) ? 2 : 0)
-                                       | (clip.reversed ? 4 : 0)
-                                       // a comp crossfade (round 177c): the equal-power curve, which wins over bits 0 / 1
-                                       | ((clip.fadeCurve & 1) != 0 ? 8 : 0) | ((clip.fadeCurve & 2) != 0 ? 16 : 0));
-        // an automatic crossfade, or a comp crossfade, has no tension of its own here
-        e.fadeInTension = clip.crossfadeIn > 0 || (clip.fadeCurve & 1) != 0 ? 0.0f : clip.fadeInTension;
-        e.fadeOutTension = clip.crossfadeOut > 0 || (clip.fadeCurve & 2) != 0 ? 0.0f : clip.fadeOutTension;
-        e.clipPitch = clip.pitch; // FL 2026's clip pitch (round 167k): shifted, the clip's length stays
-        e.clipStretch = (float) clip.stretch; // FL 2026's clip stretch (round 167l)
-
-        // FL's per-clip edge declicker (round 189i, clipops::declickChoice): a Disabled side plays without the channel's
-        // declicker, a manual side neither. FL /R renders (round 189l): a side FL marks as joined seamlessly (choice 1)
-        // still takes it, so two clips that continue each other crossfade through the release and the attack
-        const auto declickBits = [&]
-        {
-            std::uint16_t bits = 0;
-            for (int side = 0; side < 2; ++side)
-            {
-                const auto off = clipops::declickChoice (clip, side) == clipops::declickDisabled;
-                bits |= (std::uint16_t) ((off ? (side == 0 ? 32 : 64) : 0) | (clipops::manualFade (clip, side) ? (side == 0 ? 128 : 256) : 0));
-            }
-            return bits;
-        };
+        auto e = audioClipNote (song, clip, clipIndex, tps);
 
         if (resume && loopStart > (double) clip.start && loopStart < (double) clip.end())
         {
-            e.fadeShape |= declickBits();
             e.type = NoteEvent::Type::on;
             e.sampleOffset = 0;
             e.startSeconds = ((double) clip.offset + (double) clip.offsetFraction + loopStart - (double) clip.start) * secondsPerTick;
@@ -410,7 +503,6 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         if (! overlaps ((double) clip.start, (double) clip.end() + 1.0))
             return;
 
-        e.fadeShape |= declickBits();
         e.type = NoteEvent::Type::on;
         e.startSeconds = std::max (0.0, ((double) clip.offset + (double) clip.offsetFraction) * secondsPerTick);
         e.clipElapsed = 0.0f;
@@ -440,6 +532,10 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
                             : std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
     const auto repeats = stretchedClipsLoop() && clip.offset + clip.length > period;
     const auto firstPass = repeats ? clip.offset / period : 0, lastPass = repeats ? (clip.offset + clip.length - 1) / period : 0;
+    // a clip of the grid may play through a groove of the pool (round 190bv, core/Groove.h): its notes sound moved and
+    // accented, the pattern stays as written. No groove (every Playlist clip, every project without a pool): nothing here.
+    const auto* clipGroove = clip.gridSlot >= 0 ? groove::ofClip (song, clip) : nullptr;
+    const auto grooveReach = clipGroove != nullptr ? (double) groove::maxShift (*clipGroove, song.grooves.amount) : 0.0;
 
     // one pass: the notes `shift` ticks later (pass ticks = pattern ticks + shift)
     auto playPass = [&] (std::int64_t shift) {
@@ -450,8 +546,8 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         if (index != nullptr && loopEnd <= (double) loop && (std::size_t) clip.pattern < index->maxNoteLength.size())
         {
             const auto local = (double) (clip.offset - clip.start - shift);
-            const auto from = loopStart + local - (double) (ticksPerStep + index->maxNoteLength[(std::size_t) clip.pattern] + index->maxShift) - 1.0;
-            const auto to = loopEnd + local + 1.0;
+            const auto from = loopStart + local - (double) (ticksPerStep + index->maxNoteLength[(std::size_t) clip.pattern] + index->maxShift) - 1.0 - grooveReach;
+            const auto to = loopEnd + local + 1.0 + grooveReach;
             if (to < 0.0 || (repeats && from >= (double) period))
                 return;
             first = std::lower_bound (notes.begin(), notes.end(), from, [] (const Note& n, double t) { return (double) n.start < t; });
@@ -473,7 +569,17 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
                 continue;
 
             const auto timing = noteTiming (note, song.swing, channelOf (&song.channels, note.channel));
-            auto on = std::min (clip.start + (start - clip.offset) + (timing.start - note.start), clip.end() - 1);
+            auto grooveShift = (std::int64_t) 0;
+            auto grooveVelocity = note.velocity;
+            if (clipGroove != nullptr)
+            {
+                const auto played = groove::apply (*clipGroove, song.grooves.amount, note.start, note.velocity,
+                                                   groove::randomBits (song.chanceSeed, (std::size_t) (it - notes.begin()),
+                                                                       clip.start - clip.offset + shift));
+                grooveShift = played.start - note.start;
+                grooveVelocity = played.velocity;
+            }
+            auto on = std::clamp (clip.start + (start - clip.offset) + (timing.start - note.start) + grooveShift, clip.start, clip.end() - 1);
             auto off = std::min (on + timing.length, clip.end());
 
             // FL's "Play truncated notes in clips" (FUN_010608a0): a note starting before the clip's offset keeps what is
@@ -487,11 +593,16 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
                 off = std::min (clip.start + left, clip.end());
             }
 
+            // FL's pattern clip takeover (issue #158): from where a later clip of this pattern starts, this clip starts
+            // no more notes (the ones already playing go on to their ends)
+            if (on >= stopsAt)
+                continue;
+
             NoteEvent e;
             e.type = NoteEvent::Type::on;
             e.channel = note.channel;
             e.key = note.key;
-            e.velocity = note.velocity;
+            e.velocity = grooveVelocity;
             e.pan = note.pan;
             e.cents = note.finePitch;
             e.porta = note.porta;
@@ -577,19 +688,13 @@ void scheduleSong (const Song& song, double startTick, int numSamples, double tp
     {
         const auto& clip = song.playlist[clipIndex];
 
-        if (song.auditionLane >= 0) // comping (round 177c): an auditioned take lane plays instead of its comp track
-        {
-            if (clip.track == song.auditionComp)
-                continue;
-            if (clip.track != song.auditionLane && (clip.muted || song.isTrackMuted (clip.track)))
-                continue;
-        }
-        else if (clip.muted || song.isTrackMuted (clip.track))
-            continue;
-        if (clip.start < zoneEnd) // Performance mode: the zone's clips play only when launched (schedulePerformance)
+        // muted clips and tracks, comping auditions; Performance mode: the zone's clips play only when launched
+        // (schedulePerformance)
+        if (! clipPlaysInSong (song, clip, zoneEnd))
             continue;
 
-        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume, index, out, chase);
+        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume, index, out, chase,
+                      stopsAtFor (song, clipIndex, index, zoneEnd));
     }
 
     out.sortByOffset();
@@ -620,7 +725,8 @@ void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMa
         {
             // only the ends: what the track was sounding still stops
             const auto first = out.size();
-            scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, false, index, out);
+            scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, false, index, out, false,
+                          stopsAtFor (song, clipIndex, index, zoneEnd));
             auto kept = first;
             for (int i = first; i < out.size(); ++i)
                 if (out[i].type == NoteEvent::Type::off)
@@ -629,7 +735,8 @@ void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMa
             continue;
         }
         const auto back = inMask && givenBack[(std::size_t) clip.track];
-        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume || back, index, out, chase || back);
+        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume || back, index, out, chase || back,
+                      stopsAtFor (song, clipIndex, index, zoneEnd));
     }
     out.sortByOffset();
 }

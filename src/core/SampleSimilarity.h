@@ -16,10 +16,14 @@
 //  - Service: one background worker (lowest priority, at most half of one core, paused while LYNX plays or renders)
 //    analyses the Browser's folders; a query is served before the pass goes on and analyses the clicked file first
 //    when the pass did not reach it yet. Nothing is ever killed: the worker stops between two files.
+//    Queries are answered by a second thread at normal priority (round 190dc): an answer never waits for the
+//    lowest-priority worker, which a busy machine may not run for many seconds (macOS' background class, Windows'
+//    background mode). The pass waits between two files while a query is waiting or being answered.
 //
 // No JUCE: the disk, the decoder and the index file go through callbacks (tests/Similar190asTests.inc).
 
 #include <array>
+#include <atomic>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
@@ -120,12 +124,13 @@ public:
     {
         search::FileSystem fs;                                                                         // folder listings (the Browser's)
         std::function<bool (const std::string& path, std::int64_t& size, std::int64_t& time)> stat;    // false: no such file
-        // The file's first `seconds` as mono; false when it can't be read. Called on the worker thread.
+        // The file's first `seconds` as mono; false when it can't be read. Called on the worker and the answering
+        // thread, at the same time when a query comes in while the pass analyses a file.
         std::function<bool (const std::string& path, double seconds, std::vector<float>& mono, double& sampleRate)> decode;
         std::function<bool (const std::string& fileName)> accepts; // an audio file LYNX can analyse (by name)
         std::function<std::string()> load;                         // the index file's bytes ("" when there is none)
         std::function<void (const std::string&)> save;
-        std::function<void()> statusChanged;                       // (worker thread)
+        std::function<void()> statusChanged;                       // (worker threads)
         std::function<bool()> shouldPause;                         // LYNX is playing, recording or rendering
         bool throttle = true;                                      // rest as long as each file took (tests: off)
     };
@@ -140,7 +145,7 @@ public:
     void refresh (std::vector<std::string> roots);
 
     // The files most like `path` under `roots` (all when empty). Replaces a query still waiting. `done` is called on
-    // the worker thread, never after a newer findSimilar() or cancel(). Returns the query's id (Result::id).
+    // the answering thread, never after a newer findSimilar() or cancel(). Returns the query's id (Result::id).
     std::uint64_t findSimilar (std::string path, std::vector<std::string> roots, std::size_t max, std::function<void (const Result&)> done);
     void cancel();
 
@@ -157,13 +162,15 @@ private:
         std::function<void (const Result&)> done;
     };
 
-    void run();
+    void run();    // the pass (lowest priority)
+    void answer(); // the queries (normal priority)
     void loadIndex();
     void saveIndex();
     void runQuery (Query& query);
-    bool runPass (std::vector<std::string>& folders); // false: interrupted (a query came in, or closing)
+    bool runPass (std::vector<std::string>& folders); // false: closing
     bool analyseFile (const std::string& path, Entry& entry);
     bool interrupted() const;
+    bool idleLocked() const; // (holding `lock`)
     void setStatus (const std::function<void (Status&)>& change, bool notify = true);
     void rest (double workedSeconds);
 
@@ -171,16 +178,19 @@ private:
 
     mutable std::mutex indexLock; // guards `index`
     Index index;
-    bool dirty = false; // (worker thread)
+    std::atomic<bool> dirty { false };
 
     mutable std::mutex lock; // guards everything below
     std::condition_variable wake, idleWake;
-    bool stopping = false, working = true;
+    bool stopping = false;
+    bool loading = true;      // the index file is being read (before any query or pass)
+    bool answering = false;   // a query is being answered
+    bool passRunning = false; // the worker is in a pass (until its status is updated)
     std::optional<Query> pending;
     std::uint64_t latest = 0;
     std::deque<std::vector<std::string>> passes; // each: the folders still to walk (a stack)
     Status state;
 
-    std::thread worker; // (last: started when everything else exists)
+    std::thread asker, worker; // (last: started when everything else exists)
 };
 } // namespace lynx::similarity

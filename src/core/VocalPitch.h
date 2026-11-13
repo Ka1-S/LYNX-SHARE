@@ -160,6 +160,9 @@ public:
     // lengths or spacings meet), by `amount` (0 = plain overlap-add, 1 = fully normalised). Off by default (LYNX Tune
     // fades it in while it corrects a voiced sound).
     void setNormalise (float amount) noexcept { normalise = std::clamp (amount, 0.0f, 1.0f); }
+    // Round 190dp: unvoiced grains follow the formant factor (the noise / breath / out-of-range path of a voice
+    // shifter: they move with the formants instead of passing through). Off by default (LYNX Tune keeps its path).
+    void setUnvoicedShift (bool on) noexcept { unvoicedShift = on; }
     // Marks are placed this many samples behind the newest input (the centre of the pitch detector's window, so the
     // period and shift given with setPitch / setShift describe the signal where the mark lies). Clamped so that the
     // grains stay within the latency.
@@ -178,13 +181,15 @@ private:
     float readIn (int ch, double pos) const noexcept;
 
     double sr = 44100.0, maxP = 600.0;
-    int delay = 1200, unvoicedHop = 256, lag = 0;
+    int delay = 1200, unvoicedHop = 256, lag = 0, shiftHop = 512;
     std::int64_t now = 0;        // samples written so far
     double nextMark = 0.0;       // next analysis mark (absolute)
     double nextSynth = 0.0;      // next synthesis mark (absolute, output timeline = input timeline)
     double lastMark = 0.0;       // the last voiced mark placed (absolute; 0 = none): the next one correlates with it
     double period = 0.0, ratio = 1.0, formant = 1.0;
-    bool voiced = false, peakAlign = true, lastVoiced = false;
+    bool voiced = false, peakAlign = true, lastVoiced = false, unvoicedShift = false;
+    static constexpr double unvoicedTaper = 0.6;       // round 190dp: the share of the hop a shifted unvoiced grain crossfades over
+    static constexpr double unvoicedShiftHopMs = 9.5;  // round 190dp: the shifted unvoiced grains' hop (ms)
     float normalise = 0.0f;
     std::array<Mark, maxMarks> marks {};
     int markHead = 0, markCount = 0;

@@ -1,5 +1,5 @@
 ---
-source: 217f097c97
+source: a73763934f
 ---
 ![De Piano Roll](/assets/img/pianoroll.webp)
 
@@ -69,6 +69,18 @@ Klik op de liniaal om de positie in te stellen. `Ctrl`+slepen, met rechts slepen
 ## Kans en velocity-bereik
 
 Elke noot heeft een Kans en een Velocity-bereik. Kans is hoe waarschijnlijk het is dat de noot speelt elke keer dat hij aan de beurt komt. Met het Velocity-bereik varieert de velocity tussen de velocity van de noot en die velocity plus het bereik. Kies `Kans` of `Velocitybereik (LYNX)` in het banenvak om ze te bewerken. `Extra › Kans (LYNX)` in het menu van de Piano Roll groepeert de geselecteerde noten zodat ze allemaal of slechts één ervan speelt, en heeft `Kans en velocitybereik herstellen`.
+
+## Notentools
+
+Het menu `Extra` van de Piano roll opent de notentools van FL Studio als dialogen. Ze werken op de geselecteerde noten, of op alle noten wanneer er geen is geselecteerd. Enkele ervan:
+
+| Tool | Toets | Wat het doet |
+|---|---|---|
+| Limit | `Alt+K` | Verplaatst noten met octaven naar een toetsenbereik en klemt ze dan vast. Onder `Toonsoort- / toonladderbeperking` houdt hij noten op een grondtoon en een van de akkoorden of toonladders van FL Studio, met `Snap` ingesteld op `Erboven`, `Eronder` of `Afwisselend`. `Omslaan naar boven / onder` en `Transponeren` bepalen waar noten buiten het bereik heen gaan |
+| Flip | `Alt+Y` | `Horizontaal spiegelen` spiegelt de noten in de tijd. Met `Starttijden behouden`, eerst aan, worden de starttijden gespiegeld en behouden de noten hun lengte. `Verticaal spiegelen` spiegelt de toetsen rond het midden van hun bereik |
+| Randomise | `Alt+R` | Willekeurige wijzigingen in velocity, pan, fijne toonhoogte, timing en lengte, en in Mod X, Mod Y en release |
+| Scale levels | `Alt+X` | Schaalt een nootniveau van het begin tot het einde van de selectie, met `Offset`, `Midden` (de waarde waaromheen wordt geschaald) en `Spanning` |
+| LFO | `Alt+O` | Schrijft een LFO-vorm in een nootniveau. Klik met rechts op een schuifregelaar `Periode` voor een lijst van 1 stap tot 512 stappen |
 
 ## MIDI-tools en scripts
 

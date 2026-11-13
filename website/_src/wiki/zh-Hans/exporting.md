@@ -1,5 +1,5 @@
 ---
-source: 10cb57faf4
+source: da5e41c322
 ---
 ![选择了 WAV 的导出窗口：左侧是范围、尾音和文件，右侧是格式，下方是混音选项](/assets/img/wiki/export.webp)
 
@@ -82,7 +82,7 @@ source: 10cb57faf4
 
 `.flp` 是 FL Studio 2026 工程。采样器、音频片段、FL Studio 自己的生成器和效果器、第三方插件、样式、播放列表、混音台和自动化都会连同设置一起转过去。对于 FL Studio 没有的内容，你可以在 `渲染为音频（声音相同）` 和 `使用最接近的 FL 插件（仍可编辑，声音可能不同）` 之间选择。选第二项时，仅 LYNX 有的乐器会被舍去。调制器一律会被舍去。报告会列出哪些内容被渲染、替换或舍去。详情见[从 FL Studio 转来](/wiki/coming-from-fl-studio/)。
 
-`.als` 包含每个通道一条 MIDI 轨道、音频轨道、编组、返回轨、发送、带状态的 VST2 和 VST3 插件、标记，以及音量、声像和速度的自动化。LYNX SHARE 自己的乐器和效果器不会被转换，但它们的轨道和音符会保留。效果器参数的自动化和插入轨之间的路由会被丢弃。详情见[从 Ableton Live 转来](/wiki/coming-from-ableton/)。
+`.als` 包含每个通道一条 MIDI 轨道、音频轨道、编组、返回轨、发送、机架和 Drum Rack、带状态的 VST2 和 VST3 插件、标记，以及音量、声像和速度的自动化。LYNX SHARE 自己的乐器和效果器不会被转换，但它们的轨道和音符会保留。效果器参数的自动化和插入轨之间的路由会被丢弃。详情见[从 Ableton Live 转来](/wiki/coming-from-ableton/)。
 
 ## 须知
 

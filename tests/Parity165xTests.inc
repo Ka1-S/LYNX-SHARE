@@ -82,7 +82,7 @@ TEST (glow_auto_makeup_reference_round165x)
     namespace g = mixsuite::glow;
     namespace o = vmatch::opto;
     const auto& info = effectInfo (EffectKind::glowLeveler);
-    CHECK ((int) info.params.size() == g::count && g::makeupRef == 11 && g::vuDisplay == g::count - 1);
+    CHECK ((int) info.params.size() == g::count && g::makeupRef == 11 && g::vuDisplay == 12); // (round 190dm appended Opto memory after it)
     auto p = makeEffectSlot (EffectKind::glowLeveler).params;
     CHECK (p[g::makeupRef] == 0.46f); // round 152's reference: older projects unchanged
     // the level of a −40 dBFS tone (below the threshold)
@@ -157,7 +157,7 @@ TEST (hush_extended_ranges_round165x)
     using namespace lynx;
     namespace h = mixsuite::hush;
     const auto& info = effectInfo (EffectKind::hushDeEsser);
-    CHECK ((int) info.params.size() == h::count && h::linkSide == h::count - 1);
+    CHECK ((int) info.params.size() == h::count && h::linkSide == 24); // (round 190dm appended Air and Mix after it)
     auto p = makeEffectSlot (EffectKind::hushDeEsser).params;
     CHECK (p[h::rangeLaw] == 1.0f && h::extended (p));
     // [EXEC] the trial's Input / Output Level texts

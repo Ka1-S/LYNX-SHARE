@@ -502,7 +502,7 @@ const std::vector<CategoryList>& flGeneratorFolders()
                     "ReWired", "SoundFont Player" } },
         { "Patcher", { "Patcher", "VFX Color Mapper", "VFX Envelope", "VFX Key Mapper", "VFX Keyboard Splitter", "VFX Level Scaler", "VFX Script", "VFX Sequencer" } },
         { "Sampler", { "DirectWave", "Fruity Granulizer", "Sampler", "Wave Traveller" } },
-        { "Synth classic", { "3x Osc", "FLEX", "Fruity DX10", "GMS", "Harmless", "Kepler", "Kepler Exo", "MiniSynth", "PoiZone", "Sawer", "SimSynth", "Sytrus",
+        { "Synth classic", { "3x Osc", "FLEX", "Fruity DX10", "GMS", "Harmless", "Kepler", "Kepler Exo", "MiniSynth", "Pocket SuperSaw", "PoiZone", "Sawer", "SimSynth", "Sytrus",
                              "Toxic Biohazard", "Transistor Bass" } },
         // (FL lists Ogun under Drum and Synth special; one folder per plugin here: Synth special)
         { "Synth special", { "Autogun", "BeepMap", "Harmor", "Morphine", "Ogun", "Plucked!", "Sakura" } },

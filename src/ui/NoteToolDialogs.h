@@ -30,6 +30,11 @@ bool noteToolGenerates (NoteTool tool) noexcept;
 // The panel (for --snapshot and tests); `indices` are notes of the current pattern, `grid` the editor's grid.
 std::unique_ptr<juce::Component> makeNoteToolPanel (AudioEngine& engine, NoteTool tool, std::vector<int> indices, std::int64_t grid);
 
+// The right-click menu of the panel's first slider that has one (the LFO tool's Period steps), for --curveshot.
+juce::PopupMenu noteToolPresetMenuForSnapshot (juce::Component& panel);
+// The panel's choice box with the most items (the Limit tool's chord / scale list), for --curveshot; nullptr if none.
+juce::ComboBox* noteToolLongestChoiceForSnapshot (juce::Component& panel);
+
 // Opens the tool in its own window. `onFinished` runs after Accept or Revert (the note indices changed).
 void showNoteTool (AudioEngine& engine, NoteTool tool, std::vector<int> indices, std::int64_t grid, std::function<void()> onFinished = {});
 } // namespace lynx

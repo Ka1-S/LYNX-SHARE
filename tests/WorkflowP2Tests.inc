@@ -166,13 +166,13 @@ TEST (p2_randomise_is_deterministic_and_bounded)
     randomise (b, p2test::all (b), o);
     CHECK (b.notes[3].velocity != a.notes[3].velocity || b.notes[5].velocity != a.notes[5].velocity);
 
-    // one-sided: velocities only go down
+    // one-sided (FL's Bipolar off, live check 190cq): velocities only go up
     lynx::Pattern c;
     c.notes = { p2test::note (0, 60, 240, 0, 0.5f), p2test::note (240, 60, 240, 0, 0.5f), p2test::note (480, 60, 240, 0, 0.5f) };
     o.bipolar = false;
     o.timing = 0;
     randomise (c, p2test::all (c), o);
-    CHECK (c.notes[0].velocity <= 0.5f && c.notes[1].velocity <= 0.5f && c.notes[2].velocity <= 0.5f);
+    CHECK (c.notes[0].velocity >= 0.5f && c.notes[1].velocity >= 0.5f && c.notes[2].velocity >= 0.5f);
 }
 
 TEST (p2_scale_levels_and_limit)
@@ -197,9 +197,10 @@ TEST (p2_scale_levels_and_limit)
     CHECK (q.notes[0].key == 54 && q.notes[1].key == 64 && q.notes[2].key == 60); // moved by octaves (pitch class kept)
     CHECK (q.notes[0].velocity == 0.2f && q.notes[1].velocity == 0.9f && q.notes[2].velocity == 0.5f);
     o.lowKey = 60;
-    o.highKey = 64; // narrower than an octave: clamped
+    o.highKey = 64; // narrower than an octave: moved by octaves as far as needed, then clamped (FL's law, round 190bw:
+                    // 54 goes one octave up to 66 and is clamped to the top)
     limit (q, p2test::all (q), o);
-    CHECK (q.notes[0].key == 60 && q.notes[1].key == 64);
+    CHECK (q.notes[0].key == 64 && q.notes[1].key == 64);
 }
 
 TEST (p2_euclidean_and_fill)

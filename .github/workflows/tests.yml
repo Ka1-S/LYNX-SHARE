@@ -196,3 +196,51 @@ jobs:
           LYNX_PROFILE_DIR="$PWD/crash-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --scantest "$PWD/crash-plugin" "$PWD/crash.txt" || true
           cat crash.txt
           grep -q 'blacklisted: .*crash.clap' crash.txt
+
+      # Issue #155: a VST3 that ignores bus activation (as every nih-plug plugin does) reads its sidechain bus while LYNX
+      # keeps that bus off; JUCE passed null sample pointers there (nih-plug: memcpy from null, LYNX crashed). The test
+      # plugin goes silent on a null pointer, so this fails (peak=0) unless the off bus holds silence (cmake fix 24).
+      - name: Inactive sidechain bus (VST3)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          V="$RUNNER_TEMP/juce/modules/juce_audio_processors/format_types/VST3_SDK"
+          B="sc-plugin/LYNX Test Sidechain.vst3/Contents/x86_64-linux"
+          mkdir -p "$B"
+          c++ -shared -fPIC -O2 -std=c++17 -I"$V" tools/testplugin/lynx_test_sidechain_vst3.cpp "$V/pluginterfaces/base/funknown.cpp" -o "$B/LYNX Test Sidechain.so"
+          LYNX_PROFILE_DIR="$PWD/sc-profile" xvfb-run -a build/LYNX_artefacts/Release/LYNX --plugintest "$PWD/sc-plugin/LYNX Test Sidechain.vst3" "$PWD/sc.txt" || true
+          cat sc.txt
+          grep -q '^result=OK' sc.txt && grep -q '^plugin_crashes=0' sc.txt
+
+      # Round 190dt: a hosted plugin that crashes in its audio processing (a null write, and a memcpy from null as in
+      # issue #155) is switched off and LYNX keeps playing, saves and reloads it; a plugin that crashes on its saved state
+      # is left out as the project opens; LYNX's own faults inside a plugin call still end in the crash handler.
+      # Linux: CLAP + VST3; macOS: CLAP.
+      - name: Crashing plugin guard
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            bin=build/LYNX_artefacts/Release/LYNX; run=(xvfb-run -a)
+          else
+            bin=build/LYNX_artefacts/Release/LYNX.app/Contents/MacOS/LYNX; run=()
+          fi
+          mkdir -p cg-plugins
+          cc -shared -fPIC -O2 -Ithird_party/clap/include tools/testplugin/lynx_test_crash.c -o "cg-plugins/LYNX Test Crash.clap"
+          plugins=("LYNX Test Crash.clap" "LYNX Test Crash.clap")
+          modes=(process memcpy)
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            V="$RUNNER_TEMP/juce/modules/juce_audio_processors/format_types/VST3_SDK"
+            B="cg-plugins/LYNX Test Crash.vst3/Contents/x86_64-linux"
+            mkdir -p "$B"
+            c++ -shared -fPIC -O2 -std=c++17 -I"$V" tools/testplugin/lynx_test_crash_vst3.cpp "$V/pluginterfaces/base/funknown.cpp" -o "$B/LYNX Test Crash.so"
+            plugins+=("LYNX Test Crash.vst3" "LYNX Test Crash.vst3")
+            modes+=(process memcpy)
+          fi
+          status=0
+          for i in "${!plugins[@]}"; do
+            report="$PWD/crashguard-$i.txt"
+            LYNX_PROFILE_DIR="$PWD/cg-profile-$i" perl -e 'alarm shift; exec @ARGV' 600 "${run[@]}" "$bin" --crashguardtest "$PWD/cg-plugins/${plugins[$i]}" "$report" "${modes[$i]}" || true
+            echo "--- ${plugins[$i]} (${modes[$i]})"; cat "$report" || true
+            grep -q '^result=OK' "$report" || status=1
+          done
+          exit $status

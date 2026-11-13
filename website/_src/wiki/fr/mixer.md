@@ -1,5 +1,5 @@
 ---
-source: 1e4bc038df
+source: b6e9ef0dd0
 ---
 ![Le Mixer](/assets/img/mixer.webp)
 
@@ -51,6 +51,18 @@ Le panneau d'effets montre les dix emplacements de l'insert sélectionné.
 - `Grouper dans un rack d'effets audio` dans le menu de l'emplacement place l'effet dans un nouveau rack, et `Tout grouper dans un rack d'effets audio` le fait pour toute la chaîne. `Dégrouper` remet dans les emplacements les effets d'un rack à une seule chaîne.
 - L'interrupteur dans l'en-tête du panneau active ou désactive tous les effets de l'insert.
 - Vous pouvez faire glisser un effet depuis la Base de plugins du [Browser](/wiki/browser/) sur un insert ou un emplacement d'effet.
+- `Voix claire`, dans le menu de l'insert, place sur l'insert une chaîne de nettoyage vocal toute prête.
+
+## Edison dans un emplacement
+
+Edison, l'éditeur et enregistreur audio, peut se placer dans n'importe quel emplacement d'effet, plusieurs par insert. Sa fenêtre est l'éditeur audio avec une rangée de commandes d'enregistrement.
+
+- `Ouvrir l'éditeur audio` (`Ctrl+E`), dans le menu de l'insert, charge Edison dans le premier emplacement libre de l'insert et l'ouvre. `Ouvrir l'éditeur audio et enregistrer` (`Shift+E`) le charge prêt à enregistrer quand le morceau est lu.
+- Les modes d'enregistrement sont `Actuel`, `Sur entrée` (par défaut : il attend que l'entrée dépasse un seuil), `Entrée` et `À la lecture`. `Ajouter à la fin` place un nouvel enregistrement après l'audio déjà présent. La durée maximale d'enregistrement est `Sans limite` ou 1, 3, 5, 10, 30 ou 60 minutes : un nouvel emplacement démarre à 30, `Ouvrir l'éditeur audio et enregistrer` règle 5.
+- `Sync` lit l'audio d'Edison au temps du morceau pendant la lecture du morceau.
+- Edison continue d'enregistrer après la fermeture de sa fenêtre.
+- `Outils › Macros › Retirer toutes les instances d'Edison` vide tous les emplacements Edison du projet, après une question.
+- Les emplacements Edison des projets FL Studio (.flp) s'ouvrent avec leur audio.
 
 ## EQ de l'insert
 
@@ -78,6 +90,8 @@ Les groupes du Mixer se replient avec leur chevron (ou `Alt`+clic pour tous les 
 
 Chaque insert a un bouton d'armement d'enregistrement. Avec un insert armé, Rec et Play enregistrent son entrée audio dans un clip de Playlist. `Shift+R` arme l'insert sélectionné et lance l'enregistrement en une seule étape. Voir [Enregistrement](/wiki/recording/).
 
+Quand vous choisissez une entrée externe pour un insert qui enregistre aussi d'autres audios, LYNX SHARE demande s'il faut le passer sur `Entrée externe seule`, pour que la prise ne contienne que l'entrée. `Mixer › Enregistrement sur disque › Compensation de latence`, dans le menu de l'insert, est activé par défaut. Désactivé, les prises enregistrées sont placées sans aucune compensation de latence.
+
 ## Touches
 
 `Ctrl+L` et `Ctrl+Shift+L` n'ont ce sens que lorsque le Mixer a le focus.
@@ -92,6 +106,8 @@ Chaque insert a un bouton d'armement d'enregistrement. Avec un insert armé, Rec
 | Solo avec les sources | `Alt+S` | Met en solo les inserts sélectionnés et les inserts qui les alimentent |
 | Supprimer des inserts | `Del` | Supprime les inserts sélectionnés, après confirmation |
 | Armer et enregistrer | `Shift+R` | Arme l'insert sélectionné et lance l'enregistrement |
+| Open audio editor | `Ctrl+E` | Charge Edison dans le premier emplacement libre de l'insert et l'ouvre |
+| Open audio editor and record | `Shift+E` | Pareil, prêt à enregistrer quand le morceau est lu |
 
 ## Bon à savoir
 
@@ -100,6 +116,8 @@ Chaque insert a un bouton d'armement d'enregistrement. Avec un insert armé, Rec
 - `Ctrl+L` ne fait pas la même chose dans le Channel Rack et dans le Mixer. Dans le Channel Rack, il choisit des inserts libres. Dans le Mixer, il utilise l'insert sélectionné.
 - Les interrupteurs de routage apparaissent sur les autres bandes, pas sur celle qui est sélectionnée.
 - La limite est de 127 inserts par projet et de dix emplacements d'effets par insert.
+- L'enregistrement d'Edison est conservé sous forme de fichier WAV dans le dossier du projet, et non dans le fichier du projet.
+- La table de mixage de session sous la grille de clips n'appartient qu'au flux par lancement de clips. Elle affiche les mêmes inserts que ce Mixer. Voir [Dispositions](/wiki/layouts/).
 
 ## Voir aussi
 

@@ -72,6 +72,18 @@ Click the ruler to set the position. `Ctrl`+drag, right-drag or double-click-dra
 
 Every note has a Chance and a Velocity range. Chance is how likely the note is to play each time it comes round. Velocity range lets its velocity vary between the note's velocity and that velocity plus the range. Pick `Chance` or `Velocity range (LYNX)` in the lane box to edit them. `Tools › Chance (LYNX)` in the Piano roll's menu groups the selected notes so that all of them or only one of them plays, and has `Reset chance and velocity range`.
 
+## Note tools
+
+The `Tools` menu of the Piano roll opens FL Studio's note tools as dialogs. They work on the selected notes, or on all notes when none is selected. Some of them:
+
+| Tool | Key | What it does |
+|---|---|---|
+| Limit | `Alt+K` | Moves notes by octaves into a key range, then clamps them. Under `Key / scale restriction` it keeps notes on a base key and one of FL Studio's chords or scales, with `Snap` set to `Above`, `Under` or `Alternate`. `Wrap to top / bottom` and `Transpose` set where notes outside the range go |
+| Flip | `Alt+Y` | `Flip horizontally` mirrors the notes in time. With `Preserve start times`, on at first, the start times are mirrored and the notes keep their lengths. `Flip vertically` mirrors the keys around the middle of their range |
+| Randomise | `Alt+R` | Random changes to velocity, pan, fine pitch, timing and length, and to Mod X, Mod Y and release |
+| Scale levels | `Alt+X` | Scales a note level from the start to the end of the selection, with `Offset`, `Center` (the value it scales around) and `Tension` |
+| LFO | `Alt+O` | Writes an LFO shape into a note level. Right-click a `Period` slider for a list from 1 step to 512 steps |
+
 ## MIDI tools and scripts
 
 `Tools › MIDI Tools...` in the Piano roll's menu opens a panel with Arpeggiate, Chop, Connect, Ornament, Quantize, Recombine, Span, Strum, Time Warp and Velocity Shaper.

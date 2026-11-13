@@ -25,6 +25,7 @@
 #include "ui/Icons.h"
 #include "ui/ImageCaches.h"
 #include "ui/PluginSkin.h"
+#include "ui/WindowOwner.h"
 
 namespace lynx::theme
 {
@@ -1546,7 +1547,10 @@ void LookAndFeel::drawDocumentWindowTitleBar (juce::DocumentWindow& window, juce
     if (icon != nullptr)
     {
         g.setOpacity (window.isActiveWindow() ? 1.0f : 0.6f);
-        g.drawImageWithin (*icon, textX, 5, h - 10, h - 10, juce::RectanglePlacement::centred, false);
+        // LYNX's own logo (by w3teal): pre-scaled at the physical size, the small-size form up to 32 px
+        const auto px = juce::roundToInt ((float) (h - 10) * juce::jmax (1.0f, g.getInternalContext().getPhysicalPixelScaleFactor()));
+        const auto shown = (*icon == logoImage()) ? logoAt (px) : *icon;
+        g.drawImageWithin (shown, textX, 5, h - 10, h - 10, juce::RectanglePlacement::centred, false);
         textX += iconW;
         textW -= iconW;
     }

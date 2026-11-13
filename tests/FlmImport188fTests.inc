@@ -8,6 +8,7 @@
 
 #include "core/FlmEffects.h"
 #include "core/ParametricEqFl.h"
+#include "core/PocketFx.h"
 #include "core/Reeverb2.h"
 
 namespace flm188f
@@ -107,136 +108,122 @@ TEST (flm188f_effect_laws)
 TEST (flm188f_eq_responses)
 {
     using namespace lynx;
-    using flm188f::flmBand;
-    const auto rate = flmfx::designRate;
-    // Graphic EQ (designed at the running rate): the LYNX slot is FLM's filter
+    // round 190dw: the Graphic EQ and the Equalizer are FLM's own engines (Pocket Graphic EQ / Pocket EQ, measured against
+    // FLM inside FL in tests/PocketEq190dwTests.inc); the import copies the module's values (parameter k + 1 → k)
     {
         std::vector<float> p { 1.0f, 0.62f, 0.5f, 0.3f, 0.5f, 0.71f, 0.5f, 0.5f, 0.66f };
         const auto mapped = flmfx::map (flm188f::moduleOf (7, p));
-        CHECK (mapped.slots.size() == 1 && mapped.partial.empty());
-        static constexpr double centres[8] { 80, 160, 375, 750, 1500, 3000, 6000, 12000 };
-        std::vector<flm188f::Bq> chain;
-        for (int b = 0; b < 8; ++b)
-            chain.push_back (flmBand (b == 0 ? 0 : b == 7 ? 2 : 1, centres[b], p[(std::size_t) b + 1] * 24.0 - 12.0, 1.0, rate));
-        double worst = 0.0;
+        CHECK (mapped.slots.size() == 1 && mapped.partial.empty() && mapped.label == "FL Studio Mobile: Graphic EQ");
         if (mapped.slots.size() == 1)
-            for (double f = 20.0; f < 20000.0; f *= 1.07)
-                worst = std::max (worst, std::abs (peq::responseDb (mapped.slots[0].params, rate, f) - flm188f::magnitudeDb (chain, f, rate)));
-        CHECK (worst < 1e-3);
-        if (worst >= 1e-3)
-            std::printf ("  graphic EQ: worst %.6f dB\n", worst);
+        {
+            CHECK (mapped.slots[0].kind == EffectKind::pocketGraphicEq && mapped.slots[0].enabled);
+            for (int k = 0; k < 8; ++k)
+                CHECK (mapped.slots[0].params[(std::size_t) k] == p[(std::size_t) k + 1]);
+        }
+        // the eight bands all moved: still one slot (two Parametric EQ slots before round 190dw)
+        CHECK (flmfx::map (flm188f::moduleOf (7, { 1.0f, 0.6f, 0.6f, 0.6f, 0.6f, 0.6f, 0.6f, 0.6f, 0.6f })).slots.size() == 1);
     }
-    // the eight bands all moved → two slots
-    {
-        const auto mapped = flmfx::map (flm188f::moduleOf (7, { 1.0f, 0.6f, 0.6f, 0.6f, 0.6f, 0.6f, 0.6f, 0.6f, 0.6f }));
-        CHECK (mapped.slots.size() == 2);
-    }
-    // Equalizer ("Low Cut 200Hz": a −24 dB shelf, capped at LYNX's −18; "Low and High Boost"): FLM designs at twice the
-    // rate, so the slot matches it below a few kHz
     {
         std::vector<float> p { 1.0f, 0.6263f, 0.2f, 0.5f, 0.0f, 0.5f, 0.4f, 0.5f, 0.51f, 0.5f, 0.6f, 0.5f, 0.51f, 0.625f, 0.8f, 0.5f, 1.0f };
         const auto mapped = flmfx::map (flm188f::moduleOf (3, p));
-        CHECK (mapped.slots.size() == 1 && mapped.label == "FL Studio Mobile: Equalizer");
-        std::vector<flm188f::Bq> chain;
-        for (int b = 0; b < 4; ++b)
-            chain.push_back (flmBand ((int) (p[(std::size_t) (4 + 4 * b)] * 2.0f), flmfx::equalizerHz (p[(std::size_t) (2 + 4 * b)]),
-                                      (p[(std::size_t) (1 + 4 * b)] - 0.5) * 24.0, p[(std::size_t) (3 + 4 * b)] * 7.0 + 0.25, 2.0 * rate));
-        double worst = 0.0;
-        if (! mapped.slots.empty())
-            for (double f = 20.0; f < 3000.0; f *= 1.05)
-                worst = std::max (worst, std::abs (peq::responseDb (mapped.slots[0].params, rate, f) - flm188f::magnitudeDb (chain, f, 2.0 * rate)));
-        CHECK (worst < 0.15); // the 5.4 kHz high shelf: FLM's 2× design keeps more top (0.1 dB at 1 kHz, 0.7 dB at 19 kHz)
-        if (worst >= 0.15)
-            std::printf ("  equalizer: worst %.4f dB\n", worst);
+        CHECK (mapped.slots.size() == 1 && mapped.label == "FL Studio Mobile: Equalizer" && mapped.partial.empty());
+        if (mapped.slots.size() == 1)
+        {
+            CHECK (mapped.slots[0].kind == EffectKind::pocketEq);
+            for (int k = 0; k < 16; ++k)
+                CHECK (mapped.slots[0].params[(std::size_t) k] == p[(std::size_t) k + 1]);
+            // a module saved without its four Channel values keeps FLM's default (both channels)
+            for (int k = 16; k < 20; ++k)
+                CHECK (mapped.slots[0].params[(std::size_t) k] == 0.0f);
+        }
+        // "Low Cut 200Hz": a −24 dB shelf plays at −24 dB now (it was capped at the Parametric EQ's −18 dB and listed)
         const auto cut = flmfx::map (flm188f::moduleOf (3, { 1.0f, 0.0f, 0.2863f, 0.1062f, 0.0f }));
-        CHECK (cut.partial.size() == 1 && cut.partial[0] == "FL Studio Mobile: EQ band beyond ±18 dB (capped)");
+        CHECK (cut.partial.empty() && cut.slots.size() == 1);
+        // a band on one channel is played on that channel (listed before round 190dw)
+        auto one = p;
+        one.resize (21, 0.0f);
+        one[17] = 0.3f;
+        CHECK (flmfx::map (flm188f::moduleOf (3, one)).partial.empty());
     }
 }
 
 TEST (flm188f_filter_responses)
 {
     using namespace lynx;
-    const auto rate = flmfx::designRate;
-    // low-pass 24 dB (FLM's default slope), band-pass 48, high-pass 24; Q from 0.8 up
-    const std::vector<std::vector<float>> cases { { 1.0f, 0.8075f, 0.2562f, 0.0f, 0.0f }, { 1.0f, 0.68f, 0.5037f, 0.5f, 0.5f },
-                                                  { 1.0f, 0.5788f, 0.5037f, 1.0f, 0.0f }, { 1.0f, 0.9f, 0.0f, 0.0f, 0.5f } };
-    for (const auto& p : cases)
+    // round 190dw: Pocket Filter (FLM's engine, tests/PocketEq190dwTests.inc) with the module's four values, every slope
+    // in one slot
+    for (const auto& p : std::vector<std::vector<float>> { { 1.0f, 0.8075f, 0.2562f, 0.0f, 0.0f }, { 1.0f, 0.68f, 0.5037f, 0.5f, 0.5f },
+                                                           { 1.0f, 0.5788f, 0.5037f, 1.0f, 0.0f }, { 1.0f, 0.5f, 0.0f, 0.0f, 1.0f } })
     {
         const auto mapped = flmfx::map (flm188f::moduleOf (9, p));
-        const auto type = (int) (p[3] * 2.0f), pairs = std::array<int, 3> { 1, 2, 4 }[(std::size_t) (int) (p[4] * 2.0f)];
-        std::vector<flm188f::Bq> chain ((std::size_t) (2 * pairs), flm188f::flmFilter (type, flmfx::filterHz (p[1]), flmfx::filterQ (p[2]), rate));
-        const auto level = type == 0 ? 20.0 * std::log10 (std::pow (0.8, pairs)) : 0.0;
-        CHECK (mapped.slots.size() == 1);
-        double worst = 0.0;
+        CHECK (mapped.slots.size() == 1 && mapped.partial.empty());
         if (mapped.slots.size() == 1)
-            for (double f = 30.0; f < 18000.0; f *= 1.07)
-            {
-                const auto want = flm188f::magnitudeDb (chain, f, rate) + level;
-                if (want > -80.0) // below that both are numerically nothing
-                    worst = std::max (worst, std::abs (peq::responseDb (mapped.slots[0].params, rate, f) - want));
-            }
-        CHECK (worst < 1e-3);
-        if (worst >= 1e-3)
-            std::printf ("  filter type %d pairs %d: worst %.6f dB\n", type, pairs, worst);
+        {
+            CHECK (mapped.slots[0].kind == EffectKind::pocketFilter);
+            for (int k = 0; k < 4; ++k)
+                CHECK (mapped.slots[0].params[(std::size_t) k] == p[(std::size_t) k + 1]);
+        }
     }
-    // 96 dB/oct: eight biquads, two slots
-    CHECK (flmfx::map (flm188f::moduleOf (9, { 1.0f, 0.5f, 0.0f, 0.0f, 1.0f })).slots.size() == 2);
-    // the frequency knob moves every band and the level: one target per LYNX parameter, none for the slope (layout)
+    // the frequency knob is one LYNX parameter; the slope is automatable too now (the slot layout no longer changes)
     const auto targets = flmfx::automate (flm188f::moduleOf (9, { 1.0f, 1.0f, 0.0f, 0.0f, 0.0f }), 1, { 0.2f, 0.5f, 1.0f });
-    CHECK (targets.size() == 3); // two band frequencies + the output level
-    CHECK (flmfx::automate (flm188f::moduleOf (9, { 1.0f, 1.0f, 0.0f, 0.0f, 0.0f }), 4, { 0.0f, 1.0f }).empty());
+    CHECK (targets.size() == 1 && targets[0].param == 0 && targets[0].values == std::vector<float> ({ 0.2f, 0.5f, 1.0f }));
+    const auto slope = flmfx::automate (flm188f::moduleOf (9, { 1.0f, 1.0f, 0.0f, 0.0f, 0.0f }), 4, { 0.0f, 1.0f });
+    CHECK (slope.size() == 1 && slope[0].param == 3);
 }
 
 TEST (flm188f_autoduck_and_reverbs)
 {
     using namespace lynx;
-    // Autoduck (legacy) "Pump": duck to 1 − 0.8977² at a = 0.051 beat, back up by the next beat
+    // Autoduck (legacy) "Pump": since round 190dw Pocket Autoduck (module 29's engine) with the legacy curve: depth
+    // Ducking² = √(Ducking⁴), rise over 0.5·Attack + 0.001, fall to the next beat, power (Curve + 1)/2
     {
         const auto mapped = flmfx::map (flm188f::moduleOf (10, { 1.0f, 0.8977f, 0.1f, 0.49f }));
-        CHECK (mapped.slots.size() == 1);
+        CHECK (mapped.slots.size() == 1 && mapped.partial.empty());
         if (mapped.slots.size() == 1)
         {
             const auto& s = mapped.slots[0];
-            CHECK (s.kind == EffectKind::rhythmGain && std::abs (s.mix - 0.8977f * 0.8977f) < 1e-6f && std::abs (s.params[0] * 64.0f - 1.0f) < 1e-6f);
-            CHECK (std::abs (s.params[2 + 3 * 4] - 0.051f) < 1e-6f && std::abs (s.params[3 + 3 * 4]) < 1e-6f // the bottom of the duck
-                   && std::abs (s.params[2 + 3 * 11] - 1.0f) < 1e-6f && std::abs (s.params[3 + 3 * 11] - 1.0f) < 1e-6f);
+            CHECK (s.kind == EffectKind::pocketAutoduck && s.mix == 1.0f);
+            CHECK (std::abs (std::sqrt (s.params[0]) - 0.8977f * 0.8977f) < 1e-6f && s.params[1] == 0.1f && s.params[2] == 0.49f
+                   && s.params[3] == 1.0f && s.params[4] == 0.5f && s.params[5] == 0.0f && s.params[6] == 0.0f);
+            // the curve: full duck at a = 0.051 beat, half-way back at the middle of the fall
+            CHECK (pocket::autoduckEnvelope (s.params, 0.051f) == 1.0f && pocket::autoduckEnvelope (s.params, 0.0f) == 0.0f);
+            CHECK (std::abs (pocket::autoduckEnvelope (s.params, 0.051f + 0.949f * 0.5f) - std::pow (0.5f, (0.49f + 1.0f) * 0.5f)) < 1e-4f);
         }
-        // the Ducking lane moves the mix only
+        // the Ducking lane moves Pocket Autoduck's Ducking (as Ducking⁴)
         const auto t = flmfx::automate (flm188f::moduleOf (10, { 1.0f, 0.8977f, 0.1f, 0.49f }), 1, { 0.0f, 0.5f, 1.0f });
-        CHECK (t.size() == 1 && t[0].kind == AutomationTargetKind::effectMix && std::abs (t[0].values[1] - 0.25f) < 1e-6f);
+        CHECK (t.size() == 1 && t[0].kind == AutomationTargetKind::effectParam && t[0].param == 0 && std::abs (t[0].values[1] - 0.0625f) < 1e-6f);
     }
-    // Reverb 2 as the user's song has it → FL Reeverb 2 controls (round 188h's corrected law: dry 1.25·DRY, wet
-    // 0.375·WET, early reflections 0.625·(ER + WET)); FL's early-reflection control can't reach that level, so the three
-    // levels are lowered by k = 1.674 and a utility after the reverb gives back +4.47 dB
+    // Reverb 2 as the user's song has it, and the legacy Reverb's default preset: FLM's own reverbs (Pocket Reverb 2 /
+    // Pocket Reverb Classic, round 190dw: tests/PocketReverb190dwTests.inc) with the module's values
     {
-        const auto mapped = flmfx::map (flm188f::moduleOf (35, { 1.0f, 0.16f, 0.0187f, 0.5f, 0.068f, 1.0f, 0.16f, 0.8f, 0.8f, 0.131f, 0.0f, 0.0f,
-                                                                  0.0f, 0.0f, 0.28f, 0.5f, 0.33f, 0.2405f, 0.5f }));
-        CHECK (mapped.slots.size() == 2 && mapped.partial.empty());
-        if (mapped.slots.size() == 2)
+        const std::vector<float> p { 1.0f, 0.16f, 0.0187f, 0.5f, 0.068f, 1.0f, 0.16f, 0.8f, 0.8f, 0.131f, 0.0f, 0.0f,
+                                     0.0f, 0.0f, 0.28f, 0.5f, 0.33f, 0.2405f, 0.5f };
+        const auto mapped = flmfx::map (flm188f::moduleOf (35, p));
+        CHECK (mapped.slots.size() == 1 && mapped.partial.empty());
+        if (mapped.slots.size() == 1)
         {
-            const auto s = reeverb2::fromParams (mapped.slots[0].params);
-            CHECK (mapped.slots[0].kind == EffectKind::reeverb2 && mapped.slots[1].kind == EffectKind::utility);
-            CHECK (s.p[0] == 75 && s.p[1] == 40 && s.p[2] == 0 && s.p[3] == 51 && s.p[4] == 100 && s.p[5] == 15 && s.p[6] == 40 && s.p[7] == 100
-                   && s.p[8] == 500 && s.p[9] == 0 && s.p[14] == 0 && ! s.midSide);
-            CHECK (s.p[10] == 104 && s.p[11] == 160 && s.p[12] == 27);
-            CHECK (std::abs ((mapped.slots[1].params[0] - 0.5f) * 48.0f - 4.474f) < 0.01f);
+            CHECK (mapped.slots[0].kind == EffectKind::pocketReverb2);
+            for (int k = 0; k < 18; ++k)
+                CHECK (mapped.slots[0].params[(std::size_t) k] == p[(std::size_t) k + 1]);
         }
     }
-    // the legacy Reverb's default preset: the input passes at unity (DRY at its minimum adds nothing: FL 128), INPUT
-    // +6 dB, MIX −19.3 dB (FL 53), DECAY cubed (0.4 → 14 = 1.4 s), WIDTH 102 (FL separation −1)
     {
-        const auto mapped = flmfx::map (flm188f::moduleOf (12, { 1.0f, 0.4f, 0.8f, 0.4f, 0.0f, 1.0f, 1.0f, 0.5104f, 0.0729f, 1.0f, 1.0f, 0.25f,
-                                                                  0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f }));
-        CHECK (mapped.slots.size() == 1);
+        const std::vector<float> p { 1.0f, 0.4f, 0.8f, 0.4f, 0.0f, 1.0f, 1.0f, 0.5104f, 0.0729f, 1.0f, 1.0f, 0.25f,
+                                     0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+        const auto mapped = flmfx::map (flm188f::moduleOf (12, p));
+        CHECK (mapped.slots.size() == 1 && mapped.partial.empty());
         if (! mapped.slots.empty())
         {
-            const auto s = reeverb2::fromParams (mapped.slots[0].params);
-            CHECK (s.p[5] == 14 && s.p[10] == 128 && s.p[11] == 45 && s.p[12] == 53 && s.p[3] == 100 && s.p[0] == 236 && s.p[9] == -1);
+            CHECK (mapped.slots[0].kind == EffectKind::pocketReverbClassic);
+            for (int k = 0; k < 18; ++k)
+                CHECK (mapped.slots[0].params[(std::size_t) k] == p[(std::size_t) k + 1]);
+            // values the file doesn't hold keep FLM's defaults
+            const auto def = makeEffectSlot (EffectKind::pocketReverbClassic).params;
+            CHECK (mapped.slots[0].params[18] == def[18] && mapped.slots[0].params[19] == def[19]);
         }
-        // its MIX lane: the wet control and, for the stable layout, the utility (here at 0 dB throughout)
-        const auto t = flmfx::automate (flm188f::moduleOf (12, { 1.0f, 0.4f, 0.8f, 0.4f, 0.0f, 1.0f, 1.0f, 0.5104f, 0.0729f, 1.0f, 1.0f, 0.25f }),
-                                        3, { 0.0f, 0.4f, 0.6f });
-        CHECK (t.size() == 1 && t[0].slot == 0 && t[0].param == 12);
+        // its MIX lane: one LYNX parameter
+        const auto t = flmfx::automate (flm188f::moduleOf (12, p), 3, { 0.0f, 0.4f, 0.6f });
+        CHECK (t.size() == 1 && t[0].slot == 0 && t[0].param == 2);
     }
     // MultiFX: Pocket MultiFX since round 188h
     CHECK (flmfx::map (flm188f::moduleOf (4, { 1.0f, 0.1429f, 0.5f, 0.5f, 0.61f, 0.0f, 0.0f })).slots.size() == 1);
@@ -296,26 +283,26 @@ TEST (flm188f_imports_effects_and_their_lanes)
     const auto& fx = s.mixer[1].effects;
     CHECK (fx.size() == 2 && s.mixer[0].effects.size() == 1 && s.mixer[0].effects[0].kind == EffectKind::pocketMultiFx);
     if (fx.size() == 2)
-        CHECK (fx[0].kind == EffectKind::parametricEq && fx[1].kind == EffectKind::parametricEq && fx[0].enabled);
+        CHECK (fx[0].kind == EffectKind::pocketEq && fx[1].kind == EffectKind::pocketFilter && fx[0].enabled); // round 190dw
     CHECK (report.converted.count ("FL Studio Mobile: Equalizer") == 1 && report.converted.count ("FL Studio Mobile: Filter") == 1
            && report.converted.count ("FL Studio Mobile: MultiFX") == 1 && report.droppedEffects.empty());
-    // the Filter's frequency lane: both bands and the output level of slot 1, on three rows; the MultiFX lane is listed
+    // the Filter's frequency lane: Pocket Filter's Frequency of slot 1 (round 190dw: one row; the Parametric EQ mapping
+    // took three); the MultiFX lane is listed
     std::set<int> params;
     for (const auto& a : s.automations)
         if (a.target.kind == AutomationTargetKind::effectParam && a.target.index == 1 && a.target.slot == 1)
         {
             params.insert (a.target.param);
             CHECK (a.points.size() == 3);
-            if (a.target.param == peq::param (0, 1) && a.points.size() == 3)
-                CHECK (std::abs (a.points[0].value - peq::hzValue (flmfx::filterHz (1.0f))) < 1e-5f
-                       && std::abs (a.points[1].value - peq::hzValue (flmfx::filterHz (32768.0f / 65535.0f))) < 1e-5f && a.points[1].tick == 2 * ppq);
+            if (a.target.param == 0 && a.points.size() == 3)
+                CHECK (std::abs (a.points[0].value - 1.0f) < 1e-5f && std::abs (a.points[1].value - 32768.0f / 65535.0f) < 1e-5f
+                       && a.points[1].tick == 2 * ppq);
         }
-    CHECK (s.automations.size() == 3 && params.count (peq::param (0, 1)) == 1 && params.count (peq::param (1, 1)) == 1
-           && params.count (peq::outputParam) == 1);
+    CHECK (s.automations.size() == 1 && params.count (0) == 1);
     CHECK (report.converted.count ("FL Studio Mobile: effect automation") == 1
            && report.unsupported.count ("FL Studio Mobile: automation of module parameters (not imported yet)") == 1);
     int rows = 0;
     for (const auto& t : s.playlistTracks)
         rows += t.name.rfind ("Pad Frequency : FX Filter", 0) == 0;
-    CHECK (rows == 3);
+    CHECK (rows == 1);
 }

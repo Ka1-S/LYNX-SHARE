@@ -197,6 +197,13 @@ public:
     bool wheelNudging = true;
     bool manualFades = false;
     bool snapFadeHandles = false;
+    // round 190cg: "Automation follows clips" (Live's lock-envelopes switch turned round): a clip moved or copied along
+    // its track takes the track's lane automation with it. -1 = as the layout: on in the Clip-launch workflow, off in
+    // the others (which is what LYNX did before); 0 / 1 = set by hand.
+    int automationFollowsClips = -1;
+    // round 190db: the window's workflow is the Clip-launch workflow (set with the layout style). The audio editor draws
+    // a warped clip in beats there, as Live's Clip View does; the Pattern workflow keeps its file-time view.
+    bool clipLaunchWorkflow = false;
     // FL's Playlist menu › Select › "Magic lasso" (EESelMagicAction, the PLForm's +0xb49; off in FL): circling clips with
     // the mouse selects them (FUN_00e6ff80).
     bool magicLasso = false;

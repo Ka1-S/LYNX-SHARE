@@ -1,5 +1,6 @@
 #include "core/Gms.h"
 #include "core/GmsMobile.h"
+#include "core/MidiControls.h" // round 190dw item 4
 #include "core/HostSlide.h"
 
 #include <algorithm>
@@ -2252,6 +2253,15 @@ public:
     void setParameter (int index, float value) noexcept override
     {
         take();
+        // --- round 190dw item 4: FL Studio Mobile's GMSynth takes a CC #1 lane (an imported .flm mod-wheel lane) as
+        // its mod wheel; the desktop GMS keeps ignoring MIDI indices here
+        if (index == midictl::ccBase + 1 && std::isfinite (value))
+            if (auto* m = setup->mobile.get())
+            {
+                m->setModWheel (std::clamp (value, 0.0f, 1.0f));
+                return;
+            }
+        // --- end of round 190dw item 4
         if (index < 0 || index >= paramCount || ! std::isfinite (value))
             return;
         const auto v = std::clamp (value, 0.0f, 1.0f);
@@ -2298,12 +2308,22 @@ public:
         }
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
         const auto k = std::clamp (key, 0, 127);
+        owners.start (k, startingNoteId());
         notePan[k] = nextPan;
         const auto knob = pitchCents.load();
         plugin.noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0), (double) knob + (double) nextCents);
         plugin.held[k].slide.anchor (live.ref (knob));
         nextPan = 0.0f;
         nextCents = 0.0f;
+    }
+
+    // round 190dw item 4: a played mod wheel (CC #1) reaches FL Studio Mobile's GMSynth as FLM's rack hands it on
+    void controlChange (int cc, float value) noexcept override
+    {
+        take();
+        if (cc == 1)
+            if (auto* m = setup->mobile.get())
+                m->setModWheel (std::clamp (value, 0.0f, 1.0f));
     }
 
     void noteOff (int key) noexcept override
@@ -2314,8 +2334,13 @@ public:
             m->note (key, 0.0f);
             return;
         }
+        // (round 190ej: FL's GMS keeps one note per key: a later note of the key takes it over and only the end of
+        // the note holding it ends it; the earlier note's end does nothing [EXEC: /R render, round 190ej])
+        if (! owners.ends (key, endingNoteId()))
+            return;
         plugin.noteOff (key);
     }
+    KeyOwners owners; // the note that holds each key (round 190ej)
 
     void allNotesOff() noexcept override
     {

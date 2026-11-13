@@ -64,6 +64,7 @@ TEST (simple189k_looks_apply_remove_bypass)
             const auto c = looks::chain (s);
             CHECK (c.size() == (std::size_t) looks::chainSlots);
             CHECK (c[0].kind == EffectKind::parametricEq && c[1].kind == EffectKind::fruityMultiband && c[3].kind == EffectKind::fruityLimiter);
+            CHECK (c[4].kind == EffectKind::apexLimiter); // (round 190ea: the true-peak stage)
             CHECK (c[2].kind == EffectKind::stereoEnhancer || c[2].kind == EffectKind::fruitySoftClipper);
             for (const auto& slot : c)
             {
@@ -75,15 +76,15 @@ TEST (simple189k_looks_apply_remove_bypass)
     }
     MasterLookSettings s { looks::loud, 0.5f, { 2, 0, -1 }, 3 };
     CHECK (looks::apply (song, s));
-    CHECK (song.mixer[0].effects.size() == 5 && song.mixer[0].effects[0].look == 0);
-    CHECK (song.mixer[0].effects[1].row == 1 && song.mixer[0].effects[4].row == 4);
+    CHECK (song.mixer[0].effects.size() == 6 && song.mixer[0].effects[0].look == 0);
+    CHECK (song.mixer[0].effects[1].row == 1 && song.mixer[0].effects[5].row == 5);
     CHECK (looks::present (song) && ! looks::custom (song) && song.masterLook == s);
     looks::setBypassed (song, true);
     CHECK (looks::bypassed (song));
     // another look replaces the chain in place and keeps the A/B state
     MasterLookSettings w { looks::wide, 0.85f, { 0, 0, 0 }, 0 };
     CHECK (looks::apply (song, w));
-    CHECK (song.mixer[0].effects.size() == 5 && looks::bypassed (song) && song.mixer[0].effects[3].kind == EffectKind::stereoEnhancer);
+    CHECK (song.mixer[0].effects.size() == 6 && looks::bypassed (song) && song.mixer[0].effects[3].kind == EffectKind::stereoEnhancer);
     looks::setBypassed (song, false);
     CHECK (! looks::bypassed (song));
     // a hand edit makes it "Custom"
@@ -111,7 +112,7 @@ TEST (simple189k_look_exports_fl_plugins)
         MasterLookSettings s { id, 0.6f, { 1, -1, 2 }, -2 };
         CHECK (looks::apply (song, s));
         const auto& fx = song.mixer[0].effects;
-        CHECK (fx.size() == 4);
+        CHECK (fx.size() == 5); // (round 190ea: + the true-peak stage)
         // each slot is written as FL's own plugin, and the import reader gives its settings back
         auto eq = flpexport::nativeLookState (fx[0]);
         CHECK (eq && eq->first == "Fruity Parametric EQ 2");
@@ -136,6 +137,7 @@ TEST (simple189k_look_exports_fl_plugins)
         CHECK (fin && (fin->first == "Fruity Soft Clipper" || fin->first == "Fruity Stereo Enhancer"));
         auto lim = flpexport::nativeLookState (fx[3]);
         CHECK (lim && lim->first == "Fruity Limiter" && lim->second.size() == 169);
+        CHECK (fx[4].kind == EffectKind::apexLimiter && ! flpexport::nativeLookState (fx[4])); // (FL has no true-peak limiter)
     }
     // an ordinary slot is not a look's
     CHECK (! flpexport::nativeLookState (makeEffectSlot (EffectKind::fruityLimiter)));

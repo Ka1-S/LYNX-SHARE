@@ -22,7 +22,13 @@
 #include <tuple>
 #include <vector>
 
+#include "core/FlTrackMenus.h" // round 190dx
+#include "core/OneClickRec.h"
+#include "core/TakeRecording.h"
+
 #if defined(__SSE__) || defined(_M_X64) || defined(__x86_64__) || defined(__aarch64__) || defined(_M_ARM64) // x86 SSE, or ARM64 through core/Simd.h (sse2neon)
+#include "core/FlControlMenus.h"
+#include "core/LinkFormula.h"
 #include "core/Multilink.h"
 #include "core/Simd.h"
 #endif
@@ -40,6 +46,7 @@
 #include "core/FruityMultiband.h"
 #include "core/Denormals.h"
 #include "core/TestProfile.h"
+#include "core/FlCurve.h"
 #include "core/FlpImport.h"
 #include "core/MidiControls.h"
 #include "core/MidiImport.h"
@@ -123,6 +130,7 @@
 #include "core/PitchShifterFl.h"
 #include "core/FruityFilters.h"
 #include "core/NewtoneFx.h"
+#include "core/EdisonFx.h"
 #include "core/FruityDelay.h"
 #include "core/StereoFx.h"
 #include "core/FrequencySplitter.h"
@@ -534,10 +542,12 @@ TEST (flp_channel_level_adjustments_and_stretched_clip_start)
     CHECK (song.channels.size() == 1 && song.playlist.size() == 1);
     if (song.channels.size() != 1 || song.playlist.size() != 1)
         return;
-    // gain = f(volume)·f(volAdj), pan = pan + panAdj
+    // gain = f(volume)·f(volAdj), pan = pan + panAdj (round 190dz: the adjustments are the channel's own Levels
+    // adjustment, the knobs read as in FL)
     const auto expected = lynx::channelGain (10000.0f / 12800.0f) * lynx::channelGain (7286.0f / 12800.0f);
-    CHECK (std::abs (lynx::channelGain (song.channels[0].volume) - expected) < 1e-5f);
-    CHECK (std::abs (song.channels[0].pan - 0.5f) < 1e-6f);
+    CHECK (std::abs (lynx::channelGain (song.channels[0].volume) * lynx::levelAdjustGain (song.channels[0].misc.levels.volume) - expected) < 1e-5f);
+    CHECK (std::abs (song.channels[0].volume - 10000.0f / 12800.0f) < 1e-6f);
+    CHECK (std::abs (lynx::adjustedPan (song.channels[0].pan, song.channels[0].misc.levels.pan) - 0.5f) < 1e-6f);
     // 788.46 sample ms / 1.056892 = 746.0 ms = 1.6164 beats into the clip
     CHECK (song.channels[0].sampler.stretchBeats > 0.0f);
     CHECK (std::llabs (song.playlist[0].offset - (std::int64_t) std::llround (1.61638 * lynx::ppq)) <= 1);
@@ -17377,6 +17387,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlmEngines190uTests.inc"
 #include "FlmNotes190abTests.inc"
 #include "FlmGmsynth190abTests.inc"
+#include "PocketSuperSaw190byTests.inc" // round 190by
 #include "FlmImport187dTests.inc"
 #include "FlmImport188fTests.inc"
 #include "FlmImport188hTests.inc"
@@ -17384,15 +17395,29 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlmImport189hATests.inc"
 #include "FlmImport189hBTests.inc"
 #include "FlmImport189hCTests.inc"
+#include "FlmImport190bsTests.inc"
+#include "PocketFx190byTests.inc" // round 190by
+#include "FlmImport190deTests.inc" // round 190de
+#include "PocketEq190dwTests.inc" // round 190dw
+#include "PocketReverb190dwTests.inc" // round 190dw
+#include "FlmEffects190dwTests.inc" // round 190dw: the .flm effect laws against FLM's renders
+#include "FlmImport190dwInstTests.inc" // round 190dw item 4
 #include "Bridge176aTests.inc"
 #include "Issues178aTests.inc"
 #include "Mixer177aTests.inc"
 #include "ClipLauncher181aTests.inc"
+#include "Session190bvTests.inc"
 #include "DetailView183aTests.inc"
 #include "Als181cTests.inc"
+#include "AlsDevices190bqTests.inc"
+#include "AlsDevices190cfTests.inc"
+#include "AlsDevices190edTests.inc"
+#include "AlsDevices190ekTests.inc"
 #include "Merge180cTests.inc"
 #include "Slicer180cTests.inc"
 #include "Slicer190fTests.inc"
+#include "Issue160Tests.inc"
+#include "Issue159Tests.inc"
 #include "Fpc190mTests.inc"
 #include "Fpc190qTests.inc"
 #include "Fpc190zTests.inc"
@@ -17414,6 +17439,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Auto177bTests.inc"
 #include "Lanes177bTests.inc"
 #include "Lfo177bTests.inc"
+#include "Curves190bwTests.inc"
 #include "Mod177bTests.inc"
 #include "UiFont179aTests.inc"
 #include "Multilink177bTests.inc"
@@ -17436,6 +17462,9 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Playlist189nTests.inc"
 #include "PlaylistKeys190agTests.inc"
 #include "Rack183cTests.inc"
+#include "DrumRack190ecTests.inc"
+#include "DrumRackSlice190ecTests.inc"
+#include "DrumRack190elTests.inc"
 #include "Gamepad184aTests.inc"
 #include "ExportBundle184aTests.inc"
 #include "MultiOut188dTests.inc"
@@ -17487,6 +17516,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Snap190axTests.inc"
 #include "PluginState190azTests.inc"
 #include "Parity190arTests.inc"
+#include "Maps190caTests.inc"
 #include "Mpe190bbTests.inc"
 #include "Mpe190bbLiveTests.inc"
 #include "PluginDb190baTests.inc"
@@ -17496,4 +17526,42 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "ShotScale190biTests.inc"
 #include "QaFix190bjATests.inc"
 #include "Demo190bmTests.inc"
+#include "Nebula190caTests.inc"
+#include "Settings190bxTests.inc"
+#include "Link190btTests.inc"
+#include "LiveBrowser190ceTests.inc"
+#include "SimpleFx190buTests.inc"
+#include "SimpleGate190dgTests.inc"
+#include "SimpleNext190dsTests.inc"
+#include "FirstSongTour190dvTests.inc"
+#include "Rollup027Tests.inc"
+#include "Edison190cdTests.inc"
+#include "Fled190eeTests.inc"
+#include "Warp190cgTests.inc"
+#include "LiveScr190drTests.inc"
+#include "LiveWf190efMapTests.inc"
+#include "LiveWf190efDrawTests.inc"
+#include "LiveWf190efScenesTests.inc"
+#include "LiveWf190emTests.inc"
+#include "BandlabExtras190chTests.inc"
 #include "DanceFix190cjTests.inc"
+#include "Reverb190bzTests.inc"
+#include "Dyn190dmTests.inc"
+#include "Echo190dlTests.inc"
+#include "Vqe190dpTests.inc"
+#include "ApexFix190coTests.inc"
+#include "Link190csTests.inc"
+#include "TrackLinkTests.inc"
+#include "Warp190dbTests.inc"
+#include "FlCtl190dfTests.inc"
+#include "FlFix190eyTests.inc"
+#include "FlPl190dxTests.inc"
+#include "FlClip190dzTests.inc"
+#include "Iss152Tests.inc"
+#include "Win190evTests.inc"
+#include "Mod190doTests.inc"
+#include "Sampler190dhTests.inc"
+#include "Fix190eaTests.inc"
+#include "Iss158Tests.inc"
+#include "Voices190ejTests.inc"
+#include "Flfix190ezTests.inc"

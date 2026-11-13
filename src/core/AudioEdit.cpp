@@ -915,6 +915,7 @@ bool parseMarkers (const std::uint8_t* data, std::size_t size, Document& out, st
     {
         std::uint32_t id = 0, position = 0, length = 0;
         std::string name;
+        int key = -1;
     };
     std::vector<Cue> cues;
     gotAny = false;
@@ -989,6 +990,29 @@ bool parseMarkers (const std::uint8_t* data, std::size_t size, Document& out, st
                     q = sb + subLen + (subLen & 1);
                 }
             }
+            else if (pass == 1 && std::memcmp (tag, "tlst", 4) == 0 && len >= 4) // round 190ez: FL Edison's trigger notes
+            {
+                // u32 count, then 24-byte entries: fourcc "cue ", u32 0, u32 cue id, u8 0xFF, u8 note, u8 0x90, u8 0,
+                // u32 0, u32 0 (live FL check 190ew, EDI-2: a WAV Edison saved with a region on D3 = note 38)
+                const auto count = (std::size_t) get32 (data + body);
+                for (std::size_t i = 0; i < count && 4 + (i + 1) * 24 <= len; ++i)
+                {
+                    const auto* t = data + body + 4 + i * 24;
+                    if (std::memcmp (t, "cue ", 4) != 0)
+                        continue;
+                    if (auto* c = findCue (get32 (t + 8)))
+                        c->key = t[13] < 128 ? (int) t[13] : -1;
+                }
+            }
+            else if (pass == 1 && std::memcmp (tag, "lxkn", 4) == 0) // round 190ee: LYNX 0.1.27's own chunk (read only)
+            {
+                for (std::size_t q = body; q + 8 <= body + len; q += 8)
+                    if (auto* c = findCue (get32 (data + q)))
+                    {
+                        const auto key = (int) get32 (data + q + 4);
+                        c->key = key >= 0 && key < 128 ? key : -1;
+                    }
+            }
             p = body + len + (len & 1);
         }
     }
@@ -999,6 +1023,7 @@ bool parseMarkers (const std::uint8_t* data, std::size_t size, Document& out, st
         m.start = std::min<std::int64_t> (c.position, (std::int64_t) frames);
         m.end = std::min<std::int64_t> (m.start + c.length, (std::int64_t) frames);
         m.name = c.name;
+        m.keyNum = c.key;
         out.markers.push_back (std::move (m));
         gotAny = true;
     }
@@ -1006,6 +1031,30 @@ bool parseMarkers (const std::uint8_t* data, std::size_t size, Document& out, st
     return gotAny;
 }
 } // namespace
+
+void assignTriggerNotes (Document& doc, NoteLayout layout)
+{
+    const auto count = (int) doc.markers.size();
+    auto key = count - 0x41 < 1 ? 60 : std::max (0, 60 - ((count - 54) / 12) * 12); // (FL's start, 0x62b0b0)
+    if (layout == NoteLayout::none)
+        key = -1;
+    else if (layout == NoteLayout::c5)
+        key = 60;
+    // black keys of an octave (C = bit 0): C#, D#, F#, G#, A#
+    auto black = [] (int k) { return ((0x54a >> (k % 12)) & 1) != 0; };
+    for (auto& m : doc.markers)
+    {
+        if (layout == NoteLayout::whiteNotes)
+            while (black (key))
+                ++key;
+        if (layout == NoteLayout::blackNotes)
+            while (! black (key))
+                ++key;
+        m.keyNum = std::min (key, 124);
+        if (layout == NoteLayout::wholeKeyboard || layout == NoteLayout::whiteNotes || layout == NoteLayout::blackNotes)
+            ++key;
+    }
+}
 
 std::vector<std::uint8_t> encodeWav (const Document& doc, WavFormat format)
 {
@@ -1116,6 +1165,29 @@ std::vector<std::uint8_t> encodeWav (const Document& doc, WavFormat format)
             }
         }
         endChunk (o, at);
+
+        // the regions' trigger notes (Edison's Region › Trigger note) in FL Edison's own "tlst" chunk (round 190ez,
+        // layout from a WAV FL wrote: live FL check 190ew EDI-2), written only when a region has one, so files without
+        // them stay as they were. LYNX 0.1.27 wrote them in a chunk of its own ("lxkn"), still read above.
+        if (std::any_of (doc.markers.begin(), doc.markers.end(), [] (const Marker& m) { return m.keyNum >= 0; }))
+        {
+            at = beginChunk (o, "tlst");
+            put32 (o, (std::uint32_t) std::count_if (doc.markers.begin(), doc.markers.end(), [] (const Marker& m) { return m.keyNum >= 0; }));
+            for (std::size_t i = 0; i < doc.markers.size(); ++i)
+                if (doc.markers[i].keyNum >= 0)
+                {
+                    putTag (o, "cue ");
+                    put32 (o, 0);
+                    put32 (o, (std::uint32_t) i + 1); // the cue id
+                    o.push_back (0xff);
+                    o.push_back ((std::uint8_t) std::min (doc.markers[i].keyNum, 127));
+                    o.push_back (0x90);
+                    o.push_back (0);
+                    put32 (o, 0);
+                    put32 (o, 0);
+                }
+            endChunk (o, at);
+        }
     }
 
     set32 (o, 4, (std::uint32_t) (o.size() - 8));
@@ -1225,6 +1297,13 @@ WavExtras decodeWavExtras (const std::uint8_t* data, std::size_t size, std::int6
         {
             const auto beats = get32 (data + body + 12);
             x.acidBeats = beats > 0 && beats < 65536 ? (float) beats : 0.0f;
+        }
+        // FL's slice list (round 190aj layout: u32, u32 count = regions + 1, 20 header bytes, 24-byte entries; the first
+        // entry is no slice): what FL's Sampler page calls the sample's slice markers (round 190ey, live check 190ew SMP-1)
+        if (std::memcmp (data + p, "strc", 4) == 0 && len >= 28)
+        {
+            const auto count = get32 (data + body + 4);
+            x.sliceMarkers = count > 1 && count < 65536 ? (int) count - 1 : 0;
         }
         p = body + len + (len & 1);
     }

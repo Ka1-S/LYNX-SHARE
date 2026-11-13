@@ -115,6 +115,7 @@ struct Voice
     float inc = 0.0f, amp = 1.5f;
     int key = 60;
     double initVol = 1.0, notePan = 0.0;
+    std::uint32_t lynxNote = 0; // the LYNX note that started it (round 190ej)
     float fvol = 1.0f, fpan = 0.0f;
     bool released = false; // the framework's "released" flag (+0x174)
     int id = 0;
@@ -200,10 +201,11 @@ public:
             startFade (v);
     }
 
-    void releaseKey (int key)
+    // `note` ≠ 0 (round 190ej): only that LYNX note's voice (FL's Voice_Release of one voice, REA_rodada43 §1)
+    void releaseKey (int key, std::uint32_t note = 0)
     {
         for (auto& v : voices)
-            if (v.key == key && ! v.released)
+            if (v.key == key && ! v.released && (note == 0 || v.lynxNote == note))
                 release (v);
     }
 
@@ -426,6 +428,7 @@ public:
         auto* v = engine->trigger (std::clamp (key, 0, 127), initVol, (float) (initVol * channelVol),
                                    (float) ((double) nextPan + channelPan), (double) channelCents.load() + (double) nextCents);
         v->notePan = nextPan;
+        v->lynxNote = startingNoteId();
         nextPan = 0.0f, nextCents = 0.0f;
     }
 
@@ -433,7 +436,7 @@ public:
     {
         take();
         if (engine != nullptr)
-            engine->releaseKey (key);
+            engine->releaseKey (key, endingNoteId());
     }
 
     void allNotesOff() noexcept override

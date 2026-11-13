@@ -119,5 +119,9 @@ int sliceKey (const State& state, int index);
 // The first note FL plays from: FUN_00769900 sets it to 60 whenever it measures the slices (every load), an octave
 // lower while the last slice would pass key 124 — the saved one is not used (FL render, round 180c)
 int firstNote (const State& state);
+// FL's key table (FUN_0076c200, issue #160): 125 keys, each the index of the slice it plays or −1. Every entry starts at
+// −1, then each slice in order writes its index at its key (sliceKey), so a later slice on the same key wins. A note
+// below the first slice's key or past the last one plays nothing (TriggerVoice FUN_00768230 starts no voice).
+std::vector<int> keyTable (const State& state);
 } // namespace fslicer
 } // namespace lynx

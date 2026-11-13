@@ -5,6 +5,7 @@
 // /mnt/e/lynx-work/simple184a/DESIGN.md: one window with the tracks, the timeline and a dock for the selected track).
 // A style is a preference of the user, not part of a project: switching moves panels only. No JUCE here.
 
+#include <atomic>
 #include <string>
 #include <string_view>
 
@@ -16,6 +17,15 @@ enum class Style : int
     clipLaunch, // a clip grid with scenes beside the Playlist
     simple      // one window: the tracks, the timeline and a dock for the selected track
 };
+
+// The style the main window shows now (round 190cm), for the panels and tool windows whose keys depend on it
+// (core/SessionKeys.h). The main window sets it when the style changes; Pattern until then.
+namespace detail
+{
+inline std::atomic<int> shown { (int) Style::pattern };
+}
+inline Style current() noexcept { return (Style) detail::shown.load (std::memory_order_relaxed); }
+inline void setCurrent (Style s) noexcept { detail::shown.store ((int) s, std::memory_order_relaxed); }
 
 constexpr int count = 3;
 

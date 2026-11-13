@@ -1,4 +1,6 @@
 #include "core/ClipLauncher.h"
+#include "core/RemoteMap.h"
+#include "core/Groove.h"
 
 #include <algorithm>
 #include <cmath>
@@ -218,6 +220,7 @@ int insertScene (Song& song, int at)
         if (c.gridSlot >= 0 && c.gridSlot < (int) grid.slots.size())
             if (auto& s = grid.slots[(std::size_t) c.gridSlot]; s.scene >= at)
                 ++s.scene;
+    remotemap::scenesInserted (song, at); // (round 190ef: a mapping belongs to its slot / scene and moves with it)
     return at;
 }
 
@@ -237,6 +240,7 @@ bool removeScene (Song& song, int scene)
         if (c.gridSlot >= 0 && c.gridSlot < (int) grid.slots.size())
             if (auto& s = grid.slots[(std::size_t) c.gridSlot]; s.scene > scene)
                 --s.scene;
+    remotemap::sceneRemoved (song, scene); // (round 190ef)
     return true;
 }
 
@@ -318,6 +322,61 @@ int Player::playingOn (int track) const noexcept
     return -1;
 }
 
+int Player::recordingOn (int track) const noexcept
+{
+    for (int i = 0; i < numActive; ++i)
+        if (active[(std::size_t) i].track == track)
+            return active[(std::size_t) i].recScene;
+    return -1;
+}
+
+// The end of a track's recording becomes known: the UI is told once (it makes the clip), again if the end moves earlier.
+void Player::tellTake (TrackState& t, Runtime* runtime) noexcept
+{
+    if (runtime != nullptr && t.recScene >= 0)
+        runtime->takes.push ({ t.track, t.recScene, t.recFrom, std::max (t.recFrom, t.recUntil), t.recThenPlay });
+    t.recTold = true;
+}
+
+void Player::tellCancelled (Runtime* runtime, int track, int scene) noexcept
+{
+    if (runtime != nullptr && scene >= 0)
+        runtime->takes.push ({ track, scene, 0.0, 0.0, false });
+}
+
+// The slot queued to record after the current recording is given up (a stop, a launch, another project).
+void Player::dropNextRecording (TrackState& t, Runtime* runtime) noexcept
+{
+    tellCancelled (runtime, t.track, t.recNextScene);
+    t.recNextScene = -1;
+    t.recNextLength = 0.0;
+}
+
+void Player::endRecording (const Song& song, const ClipGrid& grid, TrackState& t, double now, bool thenPlay, Runtime* runtime) noexcept
+{
+    if (t.recScene < 0)
+        return;
+    const auto quant = quantTicks (grid.globalQuant, song.beatsPerBar);
+    if (! t.recStarted) // not begun yet (or asked for while the transport stood still): nothing was recorded
+    {
+        t.recUntil = t.recFrom;
+        t.recThenPlay = false;
+        tellTake (t, runtime);
+        t.recScene = -1;
+        t.recFrom = t.recUntil = never;
+        t.recTold = false;
+        return;
+    }
+    auto until = nextGrid (std::max (now, t.recFrom), quant);
+    if (until < t.recFrom + (quant > 0.0 ? quant : 1.0) - 1.0e-9)
+        until = t.recFrom + (quant > 0.0 ? quant : 1.0);
+    if (until >= t.recUntil && t.recTold)
+        return; // (a fixed length, or an end already asked for, that comes first)
+    t.recUntil = std::min (t.recUntil, until);
+    t.recThenPlay = thenPlay;
+    tellTake (t, runtime);
+}
+
 void Player::launch (const Song& song, const ClipGrid& grid, const GridIndex& index, TrackState& t, int slot, double now) noexcept
 {
     const auto* clip = clipOfSlot (grid, index, slot);
@@ -325,6 +384,19 @@ void Player::launch (const Song& song, const ClipGrid& grid, const GridIndex& in
         return;
     const auto& settings = grid.slots[(std::size_t) slot];
     const auto from = nextGrid (now, slotQuant (song, grid, slot));
+    // a clip launched on a track that records ends the recording where it starts (round 190bv)
+    dropNextRecording (t, commandRuntime);
+    if (t.recScene >= 0 && (t.recUntil == never || t.recUntil > from))
+    {
+        if (! t.recStarted && from <= t.recFrom)
+            endRecording (song, grid, t, t.recFrom - 1.0, false, commandRuntime);
+        else
+        {
+            t.recUntil = std::max (from, t.recFrom);
+            t.recThenPlay = false;
+            tellTake (t, commandRuntime);
+        }
+    }
     const auto length = (double) std::max<std::int64_t> (1, clip->length);
 
     // legato: the position the clip it replaces will have reached
@@ -418,6 +490,14 @@ void Player::recordPartial (const ClipGrid& grid, const GridIndex& index, const 
 void Player::stopTrack (const Song& song, const ClipGrid& grid, TrackState& t, double now) noexcept
 {
     t.next = Play {};
+    t.wantScene = -1;
+    dropNextRecording (t, commandRuntime);
+    endRecording (song, grid, t, now, false, commandRuntime); // (a stop ends a recording on its grid point too)
+    if (t.recScene >= 0 && t.recThenPlay) // (its end was asked for already, to play on: a stop now ends it there without that)
+    {
+        t.recThenPlay = false;
+        tellTake (t, commandRuntime);
+    }
     if (t.current.slot < 0)
         return;
     const auto at = nextGrid (now, quantTicks (grid.globalQuant, song.beatsPerBar));
@@ -429,9 +509,67 @@ void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& ind
 {
     switch (c.type)
     {
+        case Command::Type::record:
+        {
+            if (c.track < 0 || c.track >= maxTracks || c.scene < 0)
+                return;
+            auto* t = clipAt (grid, c.track, c.scene) == nullptr ? stateOf (c.track, true) : nullptr;
+            if (t != nullptr && t->recScene >= 0 && t->recScene != c.scene && t->recNextScene < 0)
+            {
+                // another record button on a track that records (round 190cy; Live 12.4.16, live check 190cw: the
+                // first take ends and goes on playing, the clicked slot records the next take)
+                if (! t->recStarted)
+                    endRecording (song, grid, *t, now, false, commandRuntime); // (not begun: the wait moves to the new slot)
+                else
+                {
+                    endRecording (song, grid, *t, now, true, commandRuntime);
+                    t->recNextScene = c.scene;
+                    t->recNextLength = std::max (0.0, c.at);
+                    return;
+                }
+            }
+            if (t == nullptr || t->recScene >= 0)
+            {
+                if (t == nullptr || (t->recScene != c.scene && t->recNextScene != c.scene))
+                    tellCancelled (commandRuntime, c.track, c.scene); // (the engine forgets it)
+                return;
+            }
+            {
+                const auto from = nextGrid (now, quantTicks (grid.globalQuant, song.beatsPerBar));
+                t->next = Play {};
+                t->wantScene = -1;
+                t->heldSlot = -1;
+                t->repeatEvery = 0.0;
+                if (t->current.slot >= 0)
+                    t->current.until = std::min (t->current.until, std::max (from, t->current.from));
+                t->recScene = c.scene;
+                t->recFrom = from;
+                t->recUntil = c.at > 0.0 ? from + c.at : never;
+                t->recStarted = false;
+                t->recThenPlay = c.at > 0.0; // a fixed length plays on
+                t->recTold = false;
+                if (c.at > 0.0)
+                    tellTake (*t, commandRuntime);
+            }
+            return;
+        }
+        case Command::Type::recordEnd:
+            if (auto* t = stateOf (c.track, false))
+                endRecording (song, grid, *t, now, c.scene != 0, commandRuntime);
+            return;
         case Command::Type::launch:
             if (c.track < 0 || c.track >= maxTracks)
                 return;
+            if (c.at >= 0.0) // the clip just recorded: in phase with its recording, as soon as it exists
+            {
+                if (auto* t = stateOf (c.track, true))
+                {
+                    t->wantScene = c.scene;
+                    t->wantAnchor = c.at;
+                    t->wantBlocks = 0;
+                }
+                return;
+            }
             if (const auto* clip = clipAt (grid, c.track, c.scene))
                 if (auto* t = stateOf (c.track, true))
                 {
@@ -494,6 +632,14 @@ void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& ind
             takenTracks.reset();
             return;
         case Command::Type::reset: // another project
+            for (int i = 0; i < numActive; ++i)
+                if (auto& t = active[(std::size_t) i]; t.recScene >= 0)
+                {
+                    dropNextRecording (t, commandRuntime);
+                    t.recUntil = t.recFrom; // (nothing of it is kept)
+                    t.recThenPlay = false;
+                    tellTake (t, commandRuntime);
+                }
             numActive = 0;
             takenTracks.reset();
             backTracks.reset();
@@ -518,6 +664,15 @@ void Player::recordStop (const ClipGrid& grid, const GridIndex& index, Runtime* 
 
 void Player::stopAll (Runtime* runtime, bool giveBack) noexcept
 {
+    // a recording into a slot ends where the transport stopped (round 190bv): what was played up to there is the clip
+    for (int i = 0; i < numActive; ++i)
+        if (auto& t = active[(std::size_t) i]; t.recScene >= 0)
+        {
+            dropNextRecording (t, runtime);
+            t.recUntil = t.recStarted ? std::min (t.recUntil, std::max (lastEnd, t.recFrom + 1.0)) : t.recFrom;
+            t.recThenPlay = false;
+            tellTake (t, runtime);
+        }
     numActive = numVirtual = numCuts = numTakeovers = 0;
     backTracks.reset();
     if (giveBack)
@@ -529,10 +684,13 @@ void Player::stopAll (Runtime* runtime, bool giveBack) noexcept
         v.playing.store (-1, std::memory_order_relaxed);
         v.pending.store (-1, std::memory_order_relaxed);
         v.stopping.store (false, std::memory_order_relaxed);
+        v.recording.store (-1, std::memory_order_relaxed);
+        v.recordPending.store (-1, std::memory_order_relaxed);
         if (giveBack)
             v.taken.store (false, std::memory_order_relaxed);
     }
     runtime->anyPlaying.store (false, std::memory_order_relaxed);
+    runtime->running.store (false, std::memory_order_relaxed);
 }
 
 void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& index, Runtime* runtime, double clock,
@@ -547,9 +705,82 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
 
     if (runtime != nullptr)
     {
+        runtime->clockNow.store (clock, std::memory_order_relaxed);
+        runtime->clockMinusSong.store (clock - songTick, std::memory_order_relaxed);
+        commandRuntime = runtime;
         Command c;
         while (runtime->commands.pop (c))
             apply (song, grid, index, c, clock);
+        commandRuntime = nullptr;
+    }
+
+    // recordings into slots (round 190bv) and the launches that wait for their recorded clip
+    for (int i = 0; i < numActive; ++i)
+    {
+        auto& t = active[(std::size_t) i];
+        if (t.wantScene >= 0)
+        {
+            if (const auto* clip = clipAt (grid, t.track, t.wantScene))
+            {
+                // position 0 at the anchor; it plays from the anchor, or from now when the clip arrived after it
+                const auto slot = (int) clip->gridSlot;
+                const auto from = std::max (t.wantAnchor, std::ceil (clock - 1.0e-6));
+                const auto length = (double) std::max<std::int64_t> (1, clip->length);
+                t.next = Play {};
+                t.next.slot = slot;
+                t.next.anchor = t.wantAnchor;
+                t.next.from = from;
+                if (! grid.slots[(std::size_t) slot].loop)
+                    t.next.until = t.wantAnchor + (std::floor ((from - t.wantAnchor) / length + 1.0e-9) + 1.0) * length;
+                scheduleFollow (grid, index, t.next);
+                t.wantScene = -1;
+            }
+            else if (++t.wantBlocks > 4000) // (it never came: an undo, another project)
+                t.wantScene = -1;
+        }
+        if (t.recScene < 0)
+            continue;
+        if (! t.recStarted && t.recFrom < end)
+        {
+            t.recStarted = true;
+            // the track is the grid's from here on, as when a clip starts
+            if (t.track >= 0 && t.track < maxTracks && ! takenTracks[(std::size_t) t.track])
+            {
+                takenTracks.set ((std::size_t) t.track);
+                if (numTakeovers < (int) takeovers.size())
+                    takeovers[(std::size_t) numTakeovers++] = Takeover { t.track, std::max (t.recFrom, clock) };
+            }
+        }
+        if (t.recStarted && t.recUntil < end)
+        {
+            if (! t.recTold)
+                tellTake (t, runtime);
+            const auto ended = t.recUntil;
+            t.recScene = -1;
+            t.recFrom = t.recUntil = never;
+            t.recStarted = t.recTold = false;
+            // the slot queued by another record button records from here, while the take that ended plays on (round 190cy)
+            if (t.recNextScene >= 0)
+            {
+                const auto scene = t.recNextScene;
+                const auto length = t.recNextLength;
+                t.recNextScene = -1;
+                t.recNextLength = 0.0;
+                if (clipAt (grid, t.track, scene) != nullptr)
+                    tellCancelled (runtime, t.track, scene); // (a clip was put there meanwhile)
+                else
+                {
+                    t.recScene = scene;
+                    t.recFrom = ended;
+                    t.recUntil = length > 0.0 ? ended + length : never;
+                    t.recStarted = true;
+                    t.recThenPlay = length > 0.0;
+                    t.recTold = false;
+                    if (length > 0.0)
+                        tellTake (t, runtime);
+                }
+            }
+        }
     }
 
     for (int i = 0; i < numActive; ++i)
@@ -655,19 +886,27 @@ void Player::process (const Song& song, const ClipGrid& grid, const GridIndex& i
             view.playing.store (sceneOf (playingNow), std::memory_order_relaxed);
             view.pending.store (sceneOf (t.next.slot), std::memory_order_relaxed);
             view.stopping.store (playingNow >= 0 && t.current.stopping && t.next.slot < 0, std::memory_order_relaxed);
+            view.recording.store (t.recStarted ? t.recScene : -1, std::memory_order_relaxed);
+            view.recordPending.store (t.recStarted ? t.recNextScene : t.recScene, std::memory_order_relaxed);
+            if (t.recScene >= 0)
+                view.recordFrom.store (t.recFrom, std::memory_order_relaxed);
+            if (playingNow >= 0)
+                view.anchor.store (t.current.anchor, std::memory_order_relaxed);
             if (const auto* clip = clipOfSlot (grid, index, playingNow))
             {
                 const auto length = (double) std::max<std::int64_t> (1, clip->length);
                 view.progress.store ((float) (std::fmod (std::max (0.0, clock - t.current.anchor), length) / length), std::memory_order_relaxed);
             }
         }
-        if (t.current.slot < 0 && t.next.slot < 0 && (t.previous.slot < 0 || t.previous.until < clock - 1.0))
+        if (t.current.slot < 0 && t.next.slot < 0 && t.recScene < 0 && t.wantScene < 0 && (t.previous.slot < 0 || t.previous.until < clock - 1.0))
         {
             if (runtime != nullptr && t.track >= 0 && t.track < maxTracks)
             {
                 runtime->tracks[(std::size_t) t.track].playing.store (-1, std::memory_order_relaxed);
                 runtime->tracks[(std::size_t) t.track].pending.store (-1, std::memory_order_relaxed);
                 runtime->tracks[(std::size_t) t.track].stopping.store (false, std::memory_order_relaxed);
+                runtime->tracks[(std::size_t) t.track].recording.store (-1, std::memory_order_relaxed);
+                runtime->tracks[(std::size_t) t.track].recordPending.store (-1, std::memory_order_relaxed);
             }
             active[(std::size_t) i] = active[(std::size_t) --numActive];
             continue;
@@ -718,7 +957,9 @@ void cutPatternNotes (const Song& song, const Clip& clip, double position, doubl
                                                        : p.effectiveLength (song.beatsPerBar));
     const auto loops = stretchedClipsLoop() && clip.offset + clip.length > period;
     const auto at = std::max (0.0, position);
-    const auto slack = (double) ticksPerStep + (index != nullptr ? (double) index->maxShift : 0.0);
+    auto slack = (double) ticksPerStep + (index != nullptr ? (double) index->maxShift : 0.0);
+    if (const auto* g = groove::ofClip (song, clip)) // (a groove may have moved the note later: round 190bv)
+        slack += (double) groove::maxShift (*g, song.grooves.amount);
     for (const auto& n : p.notes)
     {
         const auto start = (double) n.start;
@@ -802,5 +1043,6 @@ void playBlock (Runtime& runtime, const Song& song, const ClipGrid& grid, const 
     schedulePasses (song, player, clock, numSamples, tps, out, index);
     out.sortByOffset();
     runtime.clock = clock + numSamples * tps;
+    runtime.running.store (true, std::memory_order_relaxed);
 }
 } // namespace lynx::launcher

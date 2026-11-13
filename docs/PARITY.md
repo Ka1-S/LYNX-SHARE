@@ -2371,7 +2371,7 @@ Proof: `docs/analise/REA_rodada181b.md`.
 | Tools › Macros › Prepare for MIDI export | same numbering (FPC on 10, others 1–16 without 10), names kept | ✅ | FL skips only automation clip channels (seen at runtime); LYNX's automation clips aren't channels |
 | Tools › Riff machine | opens LYNX's Riff machine on the selected channel | ⚠️ | FL inserts a new Sytrus channel from `Data\System\Riff machine\*.fst` first |
 | Tools › Chord progression tool | opens LYNX's chord progression generator | ⚠️ | FL's is its own Python window (`cpt.pyscript`), much larger |
-| Tools › Macros › Remove all Edison instances | — | ❌ | not added: LYNX has no Edison instances |
+| Tools › Macros › Remove all Edison instances | same item, in FL's place (after "Reset empty playlist tracks") | ✅ | round 190cd/190ct; asks first with FL's question, enabled with none (FL); LYNX can undo it (one step), so no "(No undo)" line (rollup 190cv) |
 | Tools › Macros › Switch all / selected audio clip channels to | same items, place and texts, with LYNX's modes (Resample, stretch engine, Ableton-style warp) | ⚠️ | user's decision: no élastique / slice modes; no tempo detection for channels without a stretch length |
 | Tools › Clipboard › Save audio / MIDI clipboard to browser, greyed when empty | same, into the Browser's "Clipboard files" | ⚠️ | audio: CF_WAVE on Windows, else LYNX's audio editor clipboard; " (2)" naming INFERRED |
 | Tools › Score logger (Dump score log to selected pattern, Clear log) | same, moved from Options to Tools | ✅ | |
@@ -2431,9 +2431,41 @@ for now (FL Studio Mobile reference shots and the matching layouts are the next 
 | Pocket Gate | Gate (256-sample RMS blocks, curves, hold) | FLM-exact | floor, opening, delay |
 | Pocket Tape Delay | Tape Delay (variable-speed tape) | FLM-exact | echo position and spread |
 
-Not yet (listed in the import report): Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor, Spreader,
-Stereoizer, Flanger, Autoduck (29), Tremolo. No per-effect render from FL Studio Mobile exists yet: an A/B in FL's
-FL Studio Mobile plugin is the open sound check.
+(The effects this section once listed as "not yet" — Chorus, Spacer, Wow & Flutter, Phaser, Waveshaper, Compressor,
+Spreader, Stereoizer, Flanger, Autoduck (29), Tremolo — are Pocket engines since rounds 188i / 189h, measured against
+FL's FL Studio Mobile plugin there.)
+
+## Round 190by: Pocket SuperSaw, Comb Filter, Multiband Compressor, Tape Stop; Reverb (32) and Tuned EQ mapped
+
+Laws and measurements: `docs/analise/REA_rodada190by.md`. Measured = FL's command-line render of FL Studio Mobile
+inside FL against LYNX's import of the same module (16-bit files: about −75 dB is a null).
+
+| LYNX | Role (FL Mobile) | Sound | Measured against FL Studio Mobile in FL |
+|---|---|---|---|
+| Pocket SuperSaw (instrument, `core/PocketSuperSaw.*`) | SuperSaw (module 23, 59 knobs: unison saw / pulse, sub, SuperSync, filter with envelope, LFO, arpeggiator, chorus / phaser / delay) | ✅ FLM's laws; band-limited tables | 37 sets: 29 within 0.03 dB energy and 0.3 dB per third octave; the rest differ by FL's 16-bit clipping or by random phases / unison draws. Open: pitch-bend and mod-wheel scale |
+| Pocket Comb Filter (`core/PocketFxD.cpp`) | Comb Filter (40): tape-loop comb, Manual / Lowest Note / Detect Pitch | ✅ FLM's laws, the loop's own delay law | 5 sets score 10 (−74…−78 dB); Detect Pitch 8 on tones, sweep and music; on drums FLM itself does not repeat between two renders |
+| Pocket Multiband Compressor (`core/PocketFxD.cpp`) | Multiband Compressor (36): three bands, linear-domain peak compressors, width per band | ✅ FLM's laws (ballistics fixed to 44.1 kHz as in FLM); Solo knob is LYNX's own | 8 sets score 9–10 (−64…−78 dB) |
+| Pocket Tape Stop (`core/PocketFxD.cpp`) | Tape Stop (42): stop / start ramps on the Play switch, Warp curve, synced times | ✅ FLM's laws | steady states exact; ⚠️ the ramps are checked by unit tests only (need a live check) |
+| Reeverb 2 (+ utility) by import | Reverb (32) | ⚠️ mapped: levels within 0.4 dB, decay and width equal; PAN, WIDTH on the raw early reflections and modulation not reproduced (reported) | 5 sets |
+| Parametric EQ (1–2 slots) by import | Tuned EQ (30) | ⚠️ mapped: exact when flat, −39 dB at the default bandwidth; bandwidths outside the EQ's range are reported; FLM's 8-sample delay not reproduced | 4 sets |
+
+## Round 190dw: FL Studio Mobile's Equalizer, Graphic EQ, Filter, Autoduck (legacy) and reverbs on FLM's own engines
+
+Laws: `docs/analise/REA_rodada190dw.md`, `docs/analise/FLM_FORMAT.md` §7.9–7.10. Measured = FL's command-line render of
+FL Studio Mobile inside FL against LYNX's import of the same module (16-bit files: about −75 dB is a null); settings
+mostly from FL's FLM sample songs. Before = the earlier mapping (Parametric EQ / rhythm gain / Reeverb 2), still what
+projects saved with it play.
+
+| LYNX | Role (FL Mobile) | Sound | Before → after (score, ESR) |
+|---|---|---|---|
+| Pocket EQ (`core/PocketFxE.cpp`) | Equalizer (3): 4 bands, ±24 dB, 2× design, channel modes | ✅ FLM's engine | 6 sets: 3–8 (−4…−41 dB) → 9–10 (−66…−83 dB) |
+| Pocket Graphic EQ (`core/PocketFxE.cpp`) | Graphic EQ (7): 8 bands, 8-sample pipeline | ✅ FLM's engine | 4 sets: 2–8 (−8…−44 dB, 8 samples late) → 9–10 (−62…−75 dB) |
+| Pocket Filter (`core/PocketFxE.cpp`) | Filter (9): LP / BP / HP, 24 / 48 / 96 dB | ✅ FLM's engine (Slope switches at once, as FLM) | 7 sets: 3–10 (−9…−71 dB) → 9–10 (−68…−85 dB) |
+| Pocket Autoduck (legacy curve) by import | Autoduck legacy (10) | ✅ exact (module 29's engine) | 4 sets: 5–8 (−19…−41 dB) → 10 (−71…−74 dB) |
+| Pocket Reverb Classic (`core/PocketReverb.cpp`) | Reverb legacy (12) | ✅ FLM's plate | 4 sets: 6–8 (−17…−20 dB) → 10 (−75…−77 dB) |
+| Pocket Reverb 2 (`core/PocketReverb.cpp`) | Reverb 2 (35): separation, pan, side input, tempo delay | ✅ FLM's plate | 4 sets: 3–7 (−5…−16 dB) → 10 (−74…−76 dB) |
+| Pocket Reverb (`core/PocketReverb.cpp`) | Reverb (32) | ✅ FLM's plate | 5 sets: 2–6 (−2…−6 dB) → 9–10 (−70…−76 dB) |
+| Pocket GMSynth effects (`core/GmsMobile.cpp`) | GMSynth's FLNG / F HP / RING / VOX (item 4) | ⚠️ level and spectrum within 0.03 dB / 0.8 dB; RING and VOX-with-LFO phase not matched (ESR −2 dB) | 6 sets, pass-through before |
 
 ## Round 190o: Live's MIDI Transformations (core) and Scale Mode in .als (LYNX extras, Ableton-style)
 
@@ -2696,6 +2728,20 @@ is still slower than the reference's (−2.4 dB after 30 ms against −4.8).
 |---|---|---|---|
 | Sounds tab (FL Cloud, online) › a sound's menu › Find similar samples: FL Cloud ranks its own catalogue ("tone and rhythm"); Loop Starter's channel menu › Find similar samples... opens the same query. No local analysis, no index, no settings (`REA_rodada190as.md` §1) | Browser › right-click an audio file › Find similar samples: the samples of the Browser's own folders, most similar first, with a percentage, in the results list; search box "Similar to <name>" | ⚠️ | LYNX's own measure on local files (`core/SampleSimilarity.*`); FL's ranking can't be compared offline. On FL's packs the 10 nearest files sit in the query's own class folder 56 % of the time (chance 2.9 %) |
 | FL Cloud's online library | — | ❌ | no FL Cloud in LYNX |
+## Round 190bt: "Remote control settings" (the detailed controller link)
+
+REA: docs/analise/REA_rodada190bt.md. One-step learning stays the default way of linking.
+
+| FL | LYNX | State |
+|---|---|---|
+| Control menu › "Link to controller...": window "Remote control settings" (parameter, assignment "Link 1"... "New link", Port / Channel / Ctrl, Auto detect, Omni, internal controller, mapping formula with presets and curve, smoothing, Remove conflicts, Reset / Skip / Accept) | Right-click a control › *Link to controller...*: the same window, FL's fields, hints, ranges and defaults | Done (tests, shots). Round 190cs: FL's live layout (assignment list, Skip, internal controller group with "Record automation" shown only when FL shows them), Mode list with key / button links (Default, Hold, Latch, Inc, Stay), "Note C0" in the Ctrl menu, Omni on mixer tracks, FL's curve colours and hover read-out. Left out: channel / key aftertouch and pitch bend sources |
+| Mapping formula over `Input` with FL's functions (Tension, Min, Max, Int, Round, Frac, If*, Case...) and 25 presets | `core/LinkFormula`: same variable, functions and presets; own parser | Done (tests). Round 190cs: FL's operator priorities and error texts, compile on Enter, a formula with a mistake is not kept on Accept, `inter`, `internoswap`, `fold`, `warp`, `map`, `fmod`, `!`, `%`. Incremental presets apply to absolute controllers and Inc-mode links |
+| Smoothing per link: slider -1024...1024 (default 469, about 200 ms), 1 pole below 0, 3 poles above | Same slider, time law and pole count | Done; the filter's exact response needs a live check |
+| Port number per link and per input device | `MidiLink::port`, Settings › MIDI › input devices › *Port* | Done (tests) |
+| "Override global link...": window "Global link settings" | Same | Done |
+| Multilink menu: Link to controllers..., Override global links..., Init song with these positions, Create automation clips, Cancel | In the Multilink button's menu, on the queued controls | Done; Edit events, Init pattern, Randomize, Humanize left out |
+| Tempo menu: 80 BPM ... 160 BPM | Same nine items | Done |
+
 ## Round 190aw: MIDI controller profiles (phases A and B of the controller plan)
 
 REA: docs/analise/REA_rodada190aw.md; format: docs/CONTROLLERS.md.
@@ -2737,3 +2783,533 @@ put one take a score step down (E alone: drive 8 3.6 → 4.0 and drive 10 3.0 �
 CPU and latency unchanged (one multiply-add per oversampled sample). Open: style E's ceilings give way above about
 −14 dBFS at drive 10 (their sum 1.45 → 0.62); a level-dependent ceiling scale did not lower the fit's error.
 Tools and tables: `/mnt/e/lynx-work/parity190ar/ember` (`emfit3.cpp`, `apply_tables.py`, `gatecmp.py`, `gate/`).
+
+## Round 190bp: the tail lab and the TAIL SCORE (measurement only, no DSP change)
+
+A reverb or a modulated effect cannot null against a second correct render of itself, so the waveform score
+(`scripts/fxparity.py`, unchanged) saturates near 3 ... 6 on those rows whatever the model. `scripts/taillab.py`
+adds a second number beside it, the **tail score**: per octave band the decay (T20 / T30 / late slope), early decay,
+clarity and pre-delay, the energy decay relief, echo-density build-up, band balance and L/R correlation in time
+slices, a time-variance index (how much the tail is modulated, blind to the modulators' phase), level and dry gain
+on the impulse render; long-term spectrum, wide-band envelopes, level and band correlation on programme renders;
+for modulation effects the modulation spectrum of the band transfer and of the L/R level difference. Each part
+loses a dead zone equal to the estimator's own noise between two phase-realisations of one reverb.
+Both scores are always reported; the tail score replaces nothing.
+
+Anchors on real renders: LYNX against itself at another modulator phase 9.6 ... 10.0 on dense reverbs (wave 4 ... 7
+for the same pairs), a reference against another setting of itself 0.7 ... 9.8 (median 5.8), unrelated references
+2.6 ... 6.6. Sparse cloud modes repeat only to 7.7 ... 9.1, on the reference too: that row's practical ceiling is
+about 8.4. Smallest step worth claiming: 0.15 on a dense reverb row, 0.5 on the cloud row.
+
+Baseline at d141370db (wave | tail): Epoch Verb 3.07 | 6.82, Atrium 3.50 | 7.92, Foil Plate 3.73 | 8.12 and
+3.42 | 7.55, Halo 3.25 | 6.02, Horizon 3.25 | 7.71, Nebula 3.33 | 5.84, LuxeVerb 3.83 | 7.72; Orbit 3.75 | 6.32,
+Lattice Mod 3.92 | 6.33, Gemini Doubler 4.44 | 7.89, Auto-pan 4.78 | 8.31, Spiral Echo 3.38 | 5.93; Echoform
+1.67 ... 5.92 | 1.90 ... 6.34 over seven references.
+
+Use: `python3 scripts/taillab.py dir <ref-dir> <lynx-dir> --stim <stim-dir> [--kind verb|delay|mod]`;
+`python3 scripts/taillab.py engine <fxrender> <effect> <probe-dir> <out-dir>` for one LYNX effect on the lab's own
+probes; `python3 scripts/taillab_test.py` (80 checks on synthetic decays, densities, correlations and modulations
+of known value). Tables, anchors and the per-plugin loss lists: `/mnt/e/lynx-work/parity190bp/BASELINE-TAIL.md`.
+
+## Round 190ca: Nebula's cloud law (a port of an MIT-licensed model of six networks)
+
+The tail lab's candidate (round 190bp: the Faust Libraries function `re.valhallaSupermassive` by David Braun, MIT,
+transcribed outside the product) scored 7.91 tail / 6.20 wave against Nebula's 5.84 / 3.33, above the owner's bar
+for outside code (at least + 1.0). It is now Nebula's **Measured** model, written as native C++
+(`src/core/NebulaCloud.h` / `.cpp`; no Faust code or runtime; MIT notice in the header and in `THIRD_PARTY.md`).
+Provenance: github.com/grame-cncm/faustlibraries, `reverbs.lib` 1.6.2 (pull requests 256 and 328); the structures
+follow the diagrams their designer presented at DAFx26, the laws were matched to the reference by black-box
+measurement — the method LYNX allows itself.
+
+| Mode (LYNX name) | Network |
+|---|---|
+| 1 Ripple | sixteen modulated lines scattered by a butterfly of rotations |
+| 3 Fold | four four-channel matrix all-passes in series |
+| 4 Drift | eight stereo matrix all-passes in series |
+| 5 Abyss | a plain four-channel stage and three matrix all-passes inside one feedback loop |
+| 7 Glint | four modulated lines with a four-channel scattering matrix |
+| 20 Mirage | the same with both cuts inside the loop |
+
+Laws (the model's, in the reference's own units, which Nebula's parameters already use): line length
+D · r^k + 33 samples with r = 1 − warp³ / √8; scattering angle π · density / 4 (no mixing at 0); loop gain √feedback
+(feedback networks) or all-pass coefficient 0.91 · feedback (all-pass networks); one quadrature modulator low-passed
+at 0.25 Hz, excursion 500 / 48000 s · depth², one phase per line; lines read through a moving first-order all-pass
+interpolator; first-order cuts. LYNX's own part: controls are glided (line lengths at 0.25 samples per sample, as
+the classic network; coefficients over 5 ms), the signal path is single precision, and the looped network's global
+gain is capped at 0.9995 like the others (the model lets it reach 1).
+
+**What changes for whom.** Parameter 14, "Law" (panel: Model, Classic | Measured). New instances and the factory
+presets run the Measured model in the six modes above; the other sixteen modes have no published structure and keep
+the classic network under either setting (same samples, tested). A project or user preset saved before the round
+loads with Classic in every mode (`upgradeLoadedEffectParams`): its renders are byte-identical to the build before
+the round (78 of 78 fxrender pairs: 22 modes × 3 settings, six modes at 44.1 and 96 kHz). A change of model or mode
+while playing fades the wet signal out on the old network and in on the new one (11 ms each way).
+
+**Score, from the product's fxrender through LYNX's own state translator** (reference bank tp172d, five settings ×
+impulse / drums / music; the practical ceiling of this row is about 8.4 — the reference against its own second
+recording reads 7.7 and 9.1):
+
+| | wave | tail | D | S1 | S2 | S3 | S4 |
+|---|---|---|---|---|---|---|---|
+| Classic (before) | 3.33 | 5.84 | 6.19 | 6.08 | 4.13 | 5.38 | 7.41 |
+| Measured (the bank's render) | **6.27** | **8.43** | 8.09 | 8.06 | 9.07 | 8.19 | 8.71 |
+| Measured, three other modulator phases | 6.13 … 6.33 | 8.01 … 8.25 | 8.26 … 8.63 | 8.66 … 9.14 | 6.87 … 7.06 | 7.34 … 7.86 | 8.71 |
+| Classic, the same phases | 3.33 | 5.87 … 5.92 | 6.09 … 6.30 | 6.06 … 6.29 | 4.27 … 4.34 | 5.33 … 5.47 | 7.41 |
+
+All fifteen files rise on both scores; the worst Measured phase is above the best Classic phase on every setting.
+One part of the impulse half falls at two settings (L/R correlation of the single-impulse answer at Density 0:
+4.9 → 1.0 and 5.0 → 1.3 at the bank's phase, 5.4 … 6.8 over the row at the other phases): a handful of modulated
+echoes has no stable correlation, on the reference either.
+
+CPU and memory: see `/mnt/e/lynx-work/nebula190ca/HANDOFF.md` (the Measured model costs less than the classic
+network in every one of the six modes); + 8.4 MB per instance at 48 kHz for the sixteen 2.1 s lines.
+Open: the other sixteen modes (classify each from black-box impulses into one of the five structures and fit its
+laws; one or two rounds), and the factory presets, which were written on the classic network.
+
+## Round 190ce: Browser collections, hot-swap, device commands (LYNX extras, Ableton-style)
+
+| Item | FL Studio | Ableton Live 12 | LYNX |
+|---|---|---|---|
+| Collections: seven colour labels per item, several at once; rename, show / hide; keys 1-7 and 0 | one Starred flag (STARRED tab) | Browser sidebar › Collections | ✅ Starred is collection 1, six more (`core/BrowserCollections.h`); the STARRED tab lists the collections shown; the key of each colour needs a live check (`docs/analise/REA_rodada190ce.md` §1) |
+| Search by a collection's name | — | search matches tags | ⚠️ collection names only; no other tags |
+| Automatic preview switch | a click previews | headphone button | ✅ Browser options › Preview files when they are selected |
+| Show a search result in its folder | — | Show in Places | ✅ right-click › Show in its folder |
+| Hot-swap (Q): the Browser replaces the linked device, preset or sample in place | Replace in the slot / channel menus (unchanged) | Hot-Swap mode | ✅ `core/HotSwap.h`: effects, instruments, effect / synth presets, samples; bar in the Browser, button on the device card. ❌ rack chains, drum pads, similar-sample swap |
+| Device Cut / Copy / Paste / Duplicate, Ctrl-drag copy, 0 = on / off, Ctrl+G / Ctrl+Shift+G | slot menu, Alt-drag in the Mixer | Device View edit commands | ✅ effect cards of the Device View (Ableton-style layout). ❌ several cards at once, drag to another track |
+| MIDI / Key Map Mode overlay | Link to controller, Multilink | Ctrl+M / Ctrl+K | ✅ Clip-launch layout (`ui/MapMode.h`, `core/RemoteMap.h`; REA_rodada190ef.md §3 and §5, checked against Live 12.4.16 in round 190em: Min-first key toggle, Min / Max in units, Path "track \| device"). ❌ Macro Map Mode, relative navigation |
+
+## Round 190cd: the audio editor as a mixer-slot plugin (FL's Edison)
+Static study of FL's own Edison plugin (docs/analise/REA_rodada190cd.md). The plugin is LYNX's existing audio editor
+in a slot mode: one editor, no fork.
+
+| FL | LYNX | Status | Notes |
+|---|---|---|---|
+| Edison loads in a mixer insert slot, several instances | effect "Edison" in the effect list, any slot, several per track | ✅ | its window is the audio editor |
+| Record modes Now / On input / Input / On play, default On input | same names, order, default; hold 1 s, pre-roll 0.1 s, threshold 0.02 | ✅ | the 0.2 s trimming step of FL's buffer is not reproduced |
+| Maximum recording time: Forever, 1, 3, 5, 10, 30, 60 min, default 5; megabyte limits | the seven time choices, default 5 min | ⚠️ | megabyte limits left out |
+| APPEND (on by default) | Append: on = after the audio, off = replaces it | ⚠️ | what FL does at the moment Record is pressed with Append off: needs a live check |
+| Input passes through; Mute input; own playback added to the slot | same; pass-through bit-exact | ✅ | |
+| Slave playback to host, Ignore host / own selection | Slave: plays at the song time from the selection start; "Ignore own selection" | ⚠️ | host selection not used; time unit needs a live check |
+| On play: "Song jump" marker when the song position jumps | same marker, one per jump (loop passes included) | ✅ | |
+| Sample saved inside the project (embedded) | saved as a WAV in the project's recordings folder, path in .lynx | ⚠️ | deliberate: the rule of takes; small project files and undo steps |
+| Edison slot in an .flp | kept as Edison with its settings; audio, markers, regions and loop decoded from the state | ✅ | envelopes of the state not read |
+| Mixer track: open audio editor (Ctrl+E) / and record (Shift+E) load Edison in the first empty slot | same | ✅ | a full track opens the plain editor window |
+| Send to playlist / to channel | Send menu from the slot window, plus "Send to the selected channel" | ✅ | no mouse drag out of the editor |
+| Select menu: before / after selection, zoomed part, previous / next region; Zoom on left / right of selection | same commands in every audio editor window | ✅ | |
+| Regions: Rename all..., Set info..., Clone as region | same | ✅ | Quick rename all, Auto rename all, trigger-note assignment: left out (flows not established) |
+| View: regions / markers / loop switch, noise threshold mark | View menu switches "Regions", "Loop", "Noise threshold mark" | ⚠️ | menu items, not FL's toolbar buttons |
+
+## Round 190bz: the measured engine law of the reverbs (R1, R4, R5; new instances only)
+
+The 8-line network of `core/LynxVerbs.cpp` (Epoch Verb, Atrium, Foil Plate, Halo, Horizon) has a second engine law.
+Each of the five effects got an appended parameter **Law** (Classic | Measured, default Measured): a project saved
+before this round ends one parameter short, so `upgradeLoadedEffectParams` loads it as Classic and it renders bit for
+bit as before (135 of 135 bank renders byte-identical to the base commit with Law = Classic, 44.1 / 48 / 96 kHz
+included; ten render hashes in `tests/Reverb190bzTests.inc`). Nebula keeps its one engine (its port is a round of its
+own); LuxeVerb runs on its own 16-line engine (`core/SpaceVerb.h`) and is not touched.
+
+What the Measured law adds (law 1 in `verbs::Settings`, all neutral unless a mode's table says otherwise):
+
+| Part | What | Plan item |
+|---|---|---|
+| Per-band decay | the three-band absorption is replaced by six first-order shelves + a gain per line, fitted (least squares) so the loss per pass at eight octave bands is the classic law's divided by a per-band multiplier (`bandRtMult`); the T60 per band follows `verbs::bandTargets` within 10 % on the test rows (125 Hz … 8 kHz at 44.1 / 48 / 96 kHz); line lengths are whole samples, so a still line is read without interpolation loss | R1 |
+| Tone corrector | an eight-band proportional equaliser after the loop (`bandDb`, gains solved through the bands' interaction) + three optional narrow bells | R1 |
+| Onset | a three-step diffusion network (delay, polarity, 4-point mix per step: 64 arrivals inside `onsetSec`) beside the tank, at the input's energy per unit level | R4 |
+| Density | the mixing angle inside the halves (`mixAngle` × 45°; 1 = the classic Hadamard) | R2 / R7 |
+| Modulation | `mod` scales the delay modulation per mode; `matrixModDepth` swings the rotations of the mixing matrix (orthogonal at any depth), which moves low and mid bands as well | R5 |
+| Wet level | `gainDb` per mode | level laws |
+
+Fitted with `scripts/taillab.py` against the black-box reference renders of bank tp172d (closed loop on the lab's
+signed differences: T30 per band, band spectra of impulse and programme, level, onset level by grid). Tables
+`epochLaw` (Concert Hall, Room), `atriumLaw` (Large Room, Bright Room), `foilLaw` (Silver, Pewter), `foilMeasuredLaw`
+(the measured plate voicing at 1 / 3 / 10 s decay, blended on the decay's logarithm), `haloLaw`, `horizonLaw`
+(Chamber). Every other mode runs the new loop with neutral numbers (decay per band and level within the classic
+law's; test `reverb190bz_unfitted_modes_stay_close_to_the_classic_law`).
+
+Rows (wave | tail, base d141370db + 190bp → this round; the lab's anchors: a reference against its own second
+recording 9.57 median, other settings of the same reference 5.80, unrelated references 3.83):
+
+| Row | Wave | Tail | Per setting (tail) |
+|---|---|---|---|
+| Epoch Verb | 3.07 → 3.73 | 6.82 → **7.99** | D 7.65 → 8.20, S1 6.16 → 7.12, S2 4.82 → 7.95, S3 7.44 → 8.49, S4 8.00 → 8.17 |
+| Atrium | 3.50 → 3.58 | 7.92 → **8.72** | D 8.01 → 8.81, S1 8.11 → 8.84, S2 7.66 → 8.75, S3 7.90 → 8.47 |
+| Foil Plate (hall plate reference) | 3.73 → 3.73 | 8.12 → **8.84** | D 8.34 → 8.95, S1 8.09 → 8.88, S2 7.69 → 8.55, S3 8.16 → 8.87, S4 8.33 → 8.95 |
+| Foil Plate (small plate reference) | 3.42 → 3.50 | 7.55 → **8.46** | D 8.00 → 8.76, S1 6.29 → 8.28, S2 8.31 → 8.56, S3 7.61 → 8.23 |
+| Halo | 3.25 → 3.50 | 6.02 → **7.02** | D 6.70 → 7.80, S1 5.04 → 6.51, S2 6.56 → 7.44, S3 5.78 → 6.31 |
+| Horizon | 3.25 → 3.58 | 7.71 → **8.25** | D 7.78 → 8.29, S1 7.70 → 8.31, S2 7.61 → 8.10, S3 7.77 → 8.30 |
+| Nebula, LuxeVerb, the 18 other rows | unchanged | unchanged | renders identical |
+
+What moved: decay 7.1 → 8.1 / 7.6 → 9.5 / 8.2 → 9.7 / 9.1 → 9.7 / 5.1 → 6.4 / 9.0 → 9.6 (Epoch, Atrium, the two plate
+rows, Halo, Horizon), early energy (C80) 8.0 → 8.8 / 8.2 → 8.7 / 7.9 → 9.1 / 7.3 → 8.9 / – / 5.8 → 7.6, impulse level
+7.2 → 8.8 / 8.8 → 9.7 / 8.9 → 9.7 / 7.5 → 10.0 / 5.3 → 8.4 / 9.2 → 9.8, Halo's modulation part 1.8 → 7.2 (delay
+modulation × 6: its reference moves in every band). What did not: echo density (4.9 on Epoch, 5.5 on Halo: the
+build-up law of the references is not the mixing angle's; the angle gave under 0.15 per row and was taken only on
+Atrium's Bright Room and Horizon's Chamber), Halo's shimmer spectrum per setting (S1, S3).
+
+CPU (thread time, 20 s of noise bursts at 48 kHz, blocks of 512, Measured against Classic): Epoch −31 % (Room mode
+−20 %), Atrium −16 % (Bright Room −16 %), Foil −16 % (measured plate −15 %), Halo −30 % (with shimmer −15 %),
+Horizon −14 % (Chamber −10 %): the shelves run eight lines wide and the modulators are rotations instead of `sin` calls.
+
+The devices that only borrow Foil Plate (rule `complete-access-reverbs`) stay on the Classic law (`Law=0` in the
+rule's preset): their maps were fitted on it, and their rows are unchanged.
+
+## Round 190cm — the 0.1.27 integration made green
+
+No sound law changed; what the full suite found in the new 0.1.27 code is closed in the product:
+
+- **Pocket SuperSaw** follows LYNX's channel workflow like FL's generators: channel Mono / Porta (the rack's glide is
+  taken at note on, `HostSlide`), piano roll slide notes (each sounding voice glides to the slide note and keeps its
+  key), the channel's PITCH knob, fine tune and main pitch live on sounding notes and on the arpeggiator's notes, and
+  the MIDI wheel through the module's own **Pitch bend range** (1…12 semitones; it was a stored value with no source).
+  The module's own Monophonic mode and Slide time are unchanged and stack with them. Parity against FL Studio Mobile:
+  the 37 A/B renders of round 190by are byte-identical before / after.
+- **Foil Plate**: switching **Voicing** (plate types ↔ the measured plate) while playing fades the wet signal out on
+  the old tank and in on the new one (11 ms each way, the fade a type or Law change already had), under both laws.
+  A steady setting renders the same samples as before (Classic: the 190bz goldens and the 135-render identity).
+- **Reverb stand-ins**: SSL Native FlexVerb and VerbSuite Classics keep their fitted starting presets of round 190ca
+  but open at the role's 25 % slot mix again (the effect all wet), since nothing in their saved state is translated;
+  `default = … ; mix=0.25` in the substitutes table. SSL PlateVerb / SpringVerb are unchanged (their own even mix).
+- **Keys**: Ctrl+Shift+M (new empty MIDI clip in the clip grid), Ctrl+I and Ctrl+U (insert warp markers, quantize
+  audio in the audio editor) act as default keys only in the Clip-launch layout (`core/SessionKeys.h`); in the Pattern
+  and Simple layouts the commands stay in their menus without a key, so Export › MIDI file keeps Ctrl+Shift+M and
+  "Recording waits for input" keeps Ctrl+I.
+- **Mixer insert menu**: "Clean voice" (LYNX's own) sits in the menu's Sound section with LYNX's other sound items.
+- Audits: the generator and effect control audits now know the contexts of the Pocket engines' conditional controls
+  (`tools/CtlWake.h`, `tools/FxAudit.h`); Pocket Tape Stop silent with Play off is FL Studio Mobile's behaviour.
+
+## Round 190co: Apex Limiter holds the true-peak ceiling; the true-peak meter reads what a 16× meter reads
+Round 190cn measured the 0.1.26 limiter with True peak on and the ceiling at −1 dB: up to +1.07 dBTP with
+oversampling off, and LYNX's own meter 0.2 … 2.4 dB under a reference meter on limited material. Two causes: the
+limiter's last word was a clip of the samples at the base rate (flat tops overshoot between the samples), and the
+meter's 4-point interpolator was 12 taps long and never looked at the samples themselves.
+
+Reference meter of this round (and of `tests/ApexFix190coTests.inc`): 16× polyphase, 128 taps per phase, Kaiser
+β = 10, the sample peak folded in. ffmpeg's `ebur128=peak=true` (4×, libswresample's 32-tap filter, printed to
+0.1 dB) is the second opinion.
+
+**Meter** (`core/Loudness.h` `TruePeak`, used by the Loudness meter, the mastering assistant, the Master loudness
+read-out and Apex's own display): a half-band cascade, 1× → 2× with 128 taps (Kaiser β = 10), 2× → 4× with 12 taps,
+a parabola through every local maximum of the 4× sequence, and the samples themselves. Against the reference over 60
+files (five signals, three rates, limited and not): 0.1.26 −2.41 … +0.25 dB, now −0.024 … +0.012 dB. The reading is
+68 samples late; `Meter::flushTruePeak` runs the tail out at the end of a file. Cost of the true-peak part, stereo at
+48 kHz: about 0.25 → 0.35 % of one core (g++ −O2, best of five on a loaded machine; quiet stretches cost nothing, the
+filters sleep under −60 dB).
+
+**Limiter**: with True peak on, a guard stage ends the chain at the base rate, after the oversampler: the true peak of
+every sample period by the meter's estimator and by a short 4× interpolator of the kind most meters use (the higher
+counts), required gain = ceiling / peak taken 6 % deeper, held over the ramp and 8 samples each side and smoothed by
+two running means of 0.125 ms. Under the ceiling the guard is a delay, bit for bit. Dither, Unity gain and Audition
+moved behind it. (Round 190co2 tuned the dip: 0.25 ms cost the trial187b bank a step, 6.800 → 6.763; 0.125 ms with 8
+samples each side keeps every bank's score and holds the ceiling as well.)
+
+Highest output over the ceiling, True peak on (16× reference; ffmpeg in brackets), 0.1.26 → now:
+
+| Signal (round 190cn's) | 44.1 kHz, Off | 48 kHz, Off | 96 kHz, Off | 2× … 8×, all rates |
+|---|---|---|---|---|
+| Dense mix, + 12 dB | +1.64 (+1.0) → +0.03 (0.0) | +1.59 (+1.1) → +0.02 (0.0) | +1.34 (+1.1) → +0.02 (0.0) | +0.24 (+0.4) → +0.02 (0.0) |
+| Clipped sweep, + 6 dB | +2.07 (+1.9) → +0.01 (0.0) | +2.07 (+1.9) → +0.01 (0.0) | +2.06 (+1.8) → +0.01 (0.0) | +0.10 (+0.2) → +0.02 (0.0) |
+| Quarter-rate sine, + 6 dB | −0.08 → −0.08 | −0.08 → −0.08 | −0.08 → −0.08 | −0.01 → −0.01 |
+| White noise, + 12 dB | +1.65 (+1.0) → +0.02 (+0.1) | +1.80 (+1.4) → +0.02 (0.0) | +2.03 (+1.3) → +0.02 (0.0) | +0.32 (+0.2) → +0.02 (0.0) (4×) |
+| Square, + 9 dB | +2.85 (+1.4) → −0.10 (−1.5) | +2.85 (+1.4) → −0.10 (−1.5) | +2.85 (+1.4) → −0.14 (−1.5) | +0.21 → 0.00 (4×) |
+| Mix, look-ahead 0 | +1.94 → +0.01 | +2.19 → +0.02 | +1.98 → +0.02 | +0.40 → +0.02 (4×) |
+| Mix, Loud, ceiling 0 dB, + 18 dB | +1.64 → +0.03 | +1.59 → +0.02 | +1.34 → +0.02 | +0.24 → +0.02 (4×) |
+| Mix, Unity gain | +1.64 → +0.03 | +1.59 → +0.02 | +1.34 → +0.02 | +0.62 → +0.02 (4×) |
+
+72 renders with True peak on: highest +0.026 dB (0.1.26: +2.85); ffmpeg reads at most +0.1 (its 0.1 dB step). True
+peak off: the 9 renders are the same files, byte for byte, and so are 36 more (oversampling Off/2×/4×/8× × three
+styles × three signals), and the latency is unchanged. Per-render table: `/mnt/e/lynx-work/apexfix190co/table_final.md`.
+
+Not versioned: a project saved with True peak on now holds its ceiling (the switch never did what it says; no "law"
+parameter). True peak off is the 0.1.26 limiter exactly. What changes for a saved project with True peak on: the
+overshoots are gone (on the dense mix at 48 kHz, + 12 dB into −1 dB, 2.3 % of the samples differ from 0.1.26's with
+oversampling off and 1.2 % at 4×, latency-compensated; the level changes by −0.003 / −0.000 dB RMS) and the reported
+latency grows by the guard's. FG-X 2 substitutes now run with True peak off, as the reference's own switch says.
+
+Latency (samples; reported to the host, `apex::latencyFor (rate, factor, truePeak)`), 0.1.26 → now with True peak on:
+44.1 kHz 225 → 310, 48 kHz 244 → 329, 96 kHz 484 → 581; + 55 with oversampling on, as before. True peak off: 225 /
+244 / 484 as before. Switching True peak changes the reported latency the way the oversampling switch always did.
+CPU (48 kHz, dense mix, % of one core, g++ −O2, best pass, 0.1.26 → now), True peak on: Off 0.96 → 1.60, 2× 3.52 →
+4.20, 4× 6.36 → 7.00, 8× 11.13 → 11.95; True peak off: unchanged (0.93 / 3.37 / 6.05 / 10.68 → 0.87 / 3.40 / 6.07 /
+10.68).
+
+Parity banks (fxparity score; the reference captures themselves read up to +1.18 dBTP over their ceiling with their
+true-peak switch on, mean +0.30 dB over 100 takes; LYNX 0.1.26 read up to +3.61, mean +1.01; now up to +0.03):
+
+| Bank | Files | Score before → after | Null before → after | Up / same / down |
+|---|---|---|---|---|
+| tp172b, Pro-L 2 | 24 | 7.083 → 7.083 | −41.1 → −40.8 dB | 1 / 22 / 1 |
+| trial187b, Pro-L 2 | 80 | 6.800 → 6.800 | −28.2 → −28.1 dB | 3 / 73 / 4 |
+| tp172c, SSL X-Limit | 16 | 4.938 → 4.938 | −17.0 → −17.0 dB | 0 / 16 / 0 |
+| tp172c, FG-X 2 | 12 | 7.583 → 7.750 | −90.2 → −90.7 dB | 2 / 10 / 0 |
+| tp172c, Bus Clipper | 12 | 3.333 → 3.333 | −12.2 → −12.2 dB | 0 / 12 / 0 |
+
+No bank's score drops. The Pro-L 2 takes that went down a step (tp172b S1 drums, trial187b L15 / L16 drums, L5
+bursts) are takes where the reference lets through more than its ceiling (drums: +0.7 … +1.2 dB over) and 0.1.26
+happened to overshoot with it; the ones that went up are where 0.1.26 overshot more than the reference. trial187b L14
+stair is the scorer, not the sound: LYNX's 3.2 kHz third-octave band is the same before and after (63.0 dB), the
+reference's sits on the 60 dB inclusion threshold (29.5 / 29.6 dB) and crosses it because the longer latency changes
+the aligned overlap by 95 samples. Mean distance between LYNX's and the reference's true peak: 0.71 → 0.33 dB.
+
+FG-X 2 (round 190co2): its captured states store the reference's true-peak switch (`LevelTruePeakLimiting`) at 0.25,
+off, the way they store their bypass switches, and its renders run +2 … +5 dBTP over a sample peak at the ceiling. The
+fitted map left that switch out, so Apex ran with True peak on (its default); now that True peak holds, the bank fell
+to 7.417. The map now carries the switch (core/FittedMaps.inc, by hand until the generator's map in
+`/mnt/e/lynx-work/parity190ar/maps/FG_X_2.json` has it): 7.750.
+Tools and tables: `/mnt/e/lynx-work/apexfix190co` (`tp.py`, `bank.py`, `pb.py`, `partp.py`, `scorediff.py`,
+`metertable.py`; round 190co2's variant search and final runs in `var/`, `parity_final/`, `table.py`).
+
+## Round 190do: deterministic modulation — Spiral Echo, Orbit, Lattice Mod, Gemini Doubler (new instances only)
+
+Plan 0.1.27 §4 item 5 (track B). Each of the four effects got an appended law parameter (**Law**; Gemini Doubler:
+**Head law**), Classic | Measured, default Measured: a project or preset saved before ends one parameter short, so
+`upgradeLoadedEffectParams` loads it as Classic and it renders bit for bit as before (16 of 16 fxrender comparisons with
+the base commit byte-identical; eight render fingerprints from the base commit's objects in `tests/Mod190doTests.inc`,
+hash-checked on glibc ≥ 2.43, energy / sample tolerances everywhere). All facts below are black-box: the tp172d
+reference renders and the refcap0124 one-parameter captures, tracked with the work folder's scripts.
+
+| Effect | What the Measured law changes | Evidence |
+|---|---|---|
+| Spiral Echo | loop cuts as first-order bilinear sections (low cut at 0.8 × the knob), a second-order all-pass at 2875 Hz (Q 0.34) in the loop, loop limiter 0.256 · tanh (x / 0.256), delay changes glide with τ = 0.175 s, the shifter's oscillator as a rotating phasor | per-echo transfer and group delay of S1 / S3 echo trains; level of 100 ms windows against loudness (3 … 4 dB under the classic loop on loud material); refcap delay sweeps (exponential glide, τ 0.16 … 0.18 s); fitted on the 16 bank files |
+| Orbit | Rise: two taps sweep the whole depth (0 … depth; classic 0.25 … 0.75 above a 0.25 ms base). Rise / fall: left channel rises, right channel falls, in phase (classic: one triangle tap). Feedback 0.7 · \|x\|^0.891 (0.377 at +50 %; classic 0.247) | taps tracked over 8 s of music (deconvolution, 60 ms windows): 48 samples/s at 0.10 Hz × 10 ms, L and R a quarter cycle apart, start phase 0 after a reset |
+| Lattice Mod | detune excursion × 3.5 (the classic law multiplied both 50 % settings into a quarter of the ±25-cent swing) | refcap captures: taps anywhere in 340 … 739 samples for a 10 ms delay at the default depth (±200 samples ≈ ±22 cents at 0.5 Hz) |
+| Gemini Doubler | Align off: one read head per voice drifting by (1 − ratio) per sample away from the delay and jumping back by 252 samples (2-sample crossfade), linear reads (classic: two taps half a 13.3 ms window apart, sin weights: a fixed 150 Hz comb inside each voice) | refcap default impulse (one tap per voice); voices tracked over 8 s: V2 within [delay + 2, delay + 254], V1 within [delay − 265, delay − 10], jumps every 1.52 … 1.57 s |
+
+Bank (tp172d, same renders and scorer as SCOREBOARD-v3; tail = `scripts/taillab.py`, round 190bp):
+
+| Reference | LYNX | Files | wave before → after | tail before → after | files up / same / down | mean ESR |
+|---|---|---|---|---|---|---|
+| ValhallaFreqEcho | Spiral Echo | 16 | 3.38 → 3.88 | 5.93 → 6.79 | 7 / 9 / 0 | −3.5 → −7.3 dB |
+| ValhallaSpaceModulator | Orbit | 12 | 3.75 → 5.25 | 6.32 → 8.27 | 9 / 3 / 0 | −2.6 → −9.0 dB |
+| ValhallaUberMod | Lattice Mod | 12 | 3.92 → 4.00 | 6.33 → 7.05 | 1 / 11 / 0 | −0.0 → −0.5 dB |
+| Doubler2 Stereo | Gemini Doubler | 9 | 4.44 → 4.67 | 7.89 → 8.63 | 2 / 6 / 1 | −3.0 → −3.0 dB |
+
+No row drops on either score. The one file down (Gemini D_vocal 6 → 4: 50 ms envelope correlation 0.982 → 0.970) is
+set by where the reference's free-running heads happened to be: its heads are not reset by the host's reset (their
+offset at the start of the vocal and the music file of one setting differ by ~500 samples), so no reset-deterministic
+model can null those files; S2 (direct off) music / vocal went 4 → 6 with spectra 1.8 / 2.0 → 0.5 dB.
+Not modelled (left out): Orbit's other nine modes (not in the bank, no evidence), Spiral's near-zero-delay resonator at
+its default (D: the reference's loop phase is not matched by the fitted all-pass; spectrum 3.5 → 2.8 dB, still step 3),
+the reference's startup glide in the impulse captures (a capture-history effect), Lattice's per-mode LFO designs.
+CPU and the work folder: see `/mnt/e/lynx-work/mod190do/HANDOFF.md`.
+
+## Round 190dm: dynamics parity — Sentry's transient trigger, Glow's cell memory, Hush's Air and Mix, the three-band bus compressor on Prism
+
+Roadmap item 6 of the 0.1.27 parity plan (research190bl §3.15–3.17, §3.19), highest gain per row first. Everything
+was measured black-box on the references' recorded probes (trial190k: `tc`, `stairs`, `pinkst`, `stereo`, `ess`,
+`nburst`); the programme banks were only scored, never fitted. No third-party code. Tooling and logs:
+`/mnt/e/lynx-work/dyn190dm/` (`lab/`, `fit/`, `bank.py`, `runs/`).
+
+**Sentry Gate — Trigger: Level | Transient** (appended `Trigger`, `Sensitivity`, `Release shape`; default Level = every
+gate before, sample for sample). The drum-gate reference is not a level gate: an onset over the threshold opens it at
+once, and its gain then follows one curve whatever the input does, down to the range — a steady tone that jumps from
+−40 to −6 dBFS opens it and is gone 0.8 s later, a stair of +6 dB steps never reopens it, range 40 and 100 run the same
+curve until −40. Measured on the tone-burst probe at six release / shape settings:
+- hold = 18.75 ms + 5.6 % of the release, then −slope · u dB (u = time / release) times a fade to silence
+  (1 − (u / end)^power): Smooth 16.1 dB per release, no fade; Mid 15.8 dB, end 1.45, power 3.5; Sharp 10.0 dB, end 0.86,
+  power 2.5 (rms 0.06 … 0.31 dB over release 52 ms … 3.5 s);
+- the onset detector: the side chain's first difference (unity at 1 kHz — or at the side chain's low-pass when lower —
+  85 %) plus 15 % of the side chain itself, a peak follower (instant / 10 ms) and a slower follower of it (5 / 50 ms);
+  an onset is the fast one over
+  max (slow, threshold) by 8 dB (sensitivity 5), re-armed 3 dB lower. On all 30 probe captures (D, S1, X1–X3 and the
+  release / slope / threshold sweeps) the gain trace is within 0.06 dB mean (a 100 Hz note at −48 dBFS from silence
+  does not open it, 8 kHz at the same level does; clicks on a pink bed do, pink steps do not).
+Sensitivity 1 … 10 scales the 8 dB (own law: 8 · 10 / (s + 5)); the reference's other values were not captured. The
+normalisation at a lower side-chain low-pass is not pinned by the probes (the reference never opens on the X3 probes,
+detection low-pass 150 Hz, and neither law does): it is chosen so a kick's low-passed side chain still sees its onsets,
+and the programme rows at X3 agree (prog182 4.32 → 4.76 with it, every other file the same).
+
+**Glow Leveler — Opto memory** (appended, Opto classic voicing, Compress; default off). The FG-2A-type reference
+recovers fast after a short burst and slowly after a long one (0.09 dB left 1.1 s after a 10 ms burst, 2.0 dB after 2 s).
+The memory law adds an exposure state E (0 … 1) that charges towards the light (drive / (1 + drive)) with 394 ms while
+lit and fades with 2.44 s; both conductances release (1 + 4.24 · E^1.23) times slower, with the round-123 cell refitted
+around it (optofit: Nelder-Mead, tc probe at D / S1 / X1 / X2): mean gain error 0.94 → 0.57 dB (D 0.77 → 0.29). Left
+after a 10 ms burst at 1.1 s: 0.07 dB (round 123's law 1.17); after 2 s: 1.29 dB (reference 2.00). The two other
+optical references whose maps also run round 123's release take it too, decided on their own tc probes (mean gain error
+SD-3A 1.31 → 0.97 dB, Custom Opto 0.99 → 0.85 dB).
+
+**Hush De-esser — Air and Mix** (appended; defaults off / 100 %). The E2-type reference passes a kit and a mix brighter,
+not darker: its wet path carries a static high shelf (on by default) — measured on the noise-burst and stereo probes
+at Dry/Wet 100 %: an RBJ high shelf at 8151 Hz, S 0.5, +8.5 dB (0.05 dB rms, 500 Hz … 16 kHz) — and its default Dry/Wet
+is 50 %. Air (0 … +12 dB) puts that shelf on the processed signal; Mix blends the dry signal back, delayed by the
+latency (Mix 0 nulls with the input below −100 dB). This is what round 190ar's relative detector could not find: the
+kit rows were 1.2 dB low because Hush cut what the reference lifts.
+
+**Re-paired: the two three-band compressors → Prism Multiband** (maps only, no DSP change; plan §3.17 item 5, §7
+question 7, owner: "do the recommended"). SSL G3 MultiBusComp was paired with Crest and MO-TT with Compressor (one band
+each); Prism runs three bands on the reference's own crossovers (120 Hz / 6 kHz, 88 Hz / 2.5 kHz), the three bands set
+alike as the references' settings move them (a tied map, fitted on the probes with parity190ar's fitter;
+`fit/fit190.py`, `fit/specs190dm.py`). MO-TT's upward half has no Prism counterpart in the same band (a band compresses
+up or down by the sign of its range): the fit chose deep downward bands with a high make-up, which levels the bands from
+both sides on programme material; an upward branch per band (plan §3.17) stays open. The missing-plugin table follows
+where the stand-in at its measured default is better on every bank setting (core/PluginSubstitutes.cpp): G3 on Prism
+(2.50 / 2.36 → 4.25 / 2.76, tp172c / programme), the drum gate on Sentry's transient trigger (2.25 / 1.73 → 4.12 / 3.41);
+MO-TT stays on the Compressor (its Prism default would score 2.92 / 2.48 against 3.08 / 2.56).
+
+Scores (same banks and score as SCOREBOARD-v3; before = origin/wip/rollup027 77026c3a2 with the v3 maps, after = the
+branch; per-file up / same / down):
+
+| reference | LYNX plugin | bank | before → after | up / same / down | went down | change |
+|---|---|---|---|---|---|---|
+| VM Gate Drums | Sentry Gate | tp172c | 1.88 → **5.00** | 5 / 3 / 0 | – | Trigger = Transient (map from the probe laws) |
+| VM Gate Drums (programme) | Sentry Gate | prog182 | 1.18 → **4.76** | 18 / 6 / 1 | X2_bass 3→2 | |
+| SSL G3 MultiBusComp | Crest → **Prism Multiband** | tp172c | 3.62 → **6.00** | 7 / 1 / 0 | – | re-paired, three tied bands |
+| SSL G3 MultiBusComp (programme) | Crest → Prism | prog182 | 3.32 → **5.16** | 22 / 3 / 0 | – | |
+| MO-TT | Compressor → **Prism Multiband** | tp172c | 2.92 → **4.08** | 8 / 4 / 0 | – | re-paired, three tied bands |
+| MO-TT (programme) | Compressor → Prism | prog182 | 2.76 → **4.36** | 17 / 7 / 1 | D_drums 4→3 | |
+| Eiosis E2Deesser | Hush De-esser | tp172b | 4.44 → **5.12** | 6 / 5 / 5 | S1/S2/S3_sweep 5→4, S2_drums 3→2, S2_music 5→3 | Air + Mix, map refitted on the probes |
+| Eiosis E2Deesser (programme) | Hush De-esser | prog182 | 5.90 → **6.95** | 13 / 6 / 1 | S2_drums 4→3 | |
+| VM FG-2A | Glow Leveler | tp172c | 3.42 → **3.75** | 3 / 9 / 0 | – | Opto memory on (v2 map + the switch) |
+| VM FG-2A (programme) | Glow Leveler | prog182 | 4.68 → **4.80** | 3 / 21 / 1 | S1_bass 5→3 | |
+| VM SD-3A | Glow Leveler | prog182 | 4.52 → **4.64** | 4 / 19 / 2 | X3_mix 5→4, X4_vocal 6→5 | Opto memory on (v3 map + the switch) |
+| VM Custom Opto | Glow Leveler | prog182 | 4.96 → 4.96 | 0 / 25 / 0 | – | Opto memory on (same scores) |
+
+Per plugin (the v3 rows; the G3 and MO-TT rows move to Prism):
+
+| LYNX plugin | v3 rows | mean before | mean after (same rows) | after, re-paired rows moved to Prism |
+|---|---|---|---|---|
+| Sentry Gate | 8 | 6.35 | **6.74** | 6.74 |
+| Hush De-esser | 5 | 6.28 | **6.42** | 6.42 |
+| Crest Compressor | 13 | 5.10 | **5.28** | 5.22 (12 rows) |
+| Compressor | 10 | 4.76 | **4.87** | 4.96 (9 rows) |
+| Glow Leveler | 4 | 4.52 | **4.64** | 4.64 |
+| Prism Multiband | 1 | 7.60 | 7.60 | 5.89 (3 rows: Pro-MB 7.60, G3 6.00, MO-TT 4.08) |
+
+The other 33 rows of the five plugins score exactly as before (same files, same scores).
+
+Off = the base commit's sound: `tests/Dyn190dmTests.inc` renders 11 settings of the three effects (defaults and the
+other voicings / styles) hash-identical to the base commit (glibc ≥ 2.43 on x86-64; energy and samples within 1e-4 /
+2e-6 elsewhere), and every render of the rows whose map did not change is byte-identical between the base and the branch (824 of 824 files; the 7
+other Sentry rows again on the final binary, 165 of 165). CPU (user time, one instance, 35 s stereo programme, best of five, g++ −O2):
+level gate 0.43 s before and after, Transient 0.34 s; Hush 0.29 s before and after, with Air and Mix 0.29 s; Glow
+0.38 s before and after, with the memory 0.46 s; Prism with three bands 1.43 s where Crest took 0.35 s (the G3 row now
+runs a multiband: about 4 % of one core) No latency changes (Transient and Air / Mix add none; Mix uses the voicing's own latency).
+
+Not done, and why: the Compressor / Crest feedback detector and grey-box refit (plan §3.17 items 1–4) — by gain per row
+it came last (a few tenths per row against +0.3 … +3.1 for the items above), and the remaining FET-family gaps are level
+errors at settings the maps cannot express (FG-116 Modern X2: side-chain HP on, LYNX +4 … 6 dB loud), so it needs its
+own probe lab and five map refits: a round of its own. Prism has no upward branch per band (MO-TT's upward half). The
+drum gate's Debleed is not modelled (its release sweep changes nothing on the probes; a bass line at D still opens LYNX on
+note onsets the reference ignores). No state translators were added for these references (their saved states were never
+captured); the missing-plugin table uses the measured defaults instead.
+
+## Round 190dl: Echoform — H-Delay's clocked modulation, the measured tape stage (Law: Classic | Measured)
+
+Roadmap item 3 of the 0.1.27 parity plan (Echoform, 10 reference rows). Black-box only: every number below comes from
+the reference renders already in the tp172d / tp172c / refcap182 banks; nothing was captured, no third-party binary was
+opened, no open-source code was ported (the open BBD / tape models were reading material; the fitted structure is
+LYNX's own).
+
+**S2-class diagnosis (H-Delay, wave 2–3 on S2).** The failing setting is the only one with modulation (Depth 50 %,
+stored rate 0.1, LoFi on). Its impulse and noise-burst echo trains show the echo time swinging as a **triangle of
+± 87.5 ms (23 % of the 375 ms time) with a 5.0 s period, both sides in step** (fitted to 3 ms rms over 12 echoes);
+LYNX translated it to its ms law (± 5 ms, a quarter period between the sides). The LFO keeps running between the
+capture's files (its phase follows the processed-sample count, not a reset), so the waveform cannot null; the
+statistics can. New appended parameter **Mod clock** (off by default = the ms law): the swing is ½ · Depth of the echo
+time, the sides in step; the H-Delay translator turns it on with the triangle, Depth × 0.932 and rate × 2 (one depth
+and one rate measured: proportional-to-time and linear-in-percent are assumptions, the clocked-line reading of the
+vendor's PCM42 lineage).
+
+**Tape stage (ValhallaDelay's Tape mode, the setting with Wow / Flutter 0 is deterministic).** Echo-train system
+identification: the first echo is a record tone, each further pass adds a feedback-only tone that loses the lows
+(−9 dB at 63 Hz against 1.3 kHz per pass, where Echoform's write-path shelf lost 4 dB), both minimum phase within
+0.02 rad, plus **0.102 ms** more delay per pass. Programme came out 2 … 4 dB under the impulse gain (round 190ca's
+−1.67 dB Output trim covered it on average): a level law with memory. Built as Echoform's **Measured** law for the
+Tape character: record level law (mean-square, fast attack, 44 ms release, ratio 1.06 above −47.5 dB), a harder head
+curve, the record tone, the feedback tone, the extra delay, and the measured **hiss** (−91.5 dBFS at Mix 100 %, pink
+through 4.5 kHz, uncorrelated sides; it plays while the tape holds anything and fades when the insert is idle — an idle
+Echoform still outputs exact zeros). Constants: cookbook sections fitted on the impulse first, then all of it by
+Nelder-Mead on that setting's four renders (ESR + level + third-octave spectrum; mean ESR −3.1 → −11.2 dB); the other
+three settings (default wow, other feedback) only validate it. The translator's Tape trim is back at 0 dB.
+
+**Old projects.** Appended parameter **Law** (Classic | Measured): new instances Measured, a project saved before loads
+Classic; the Classic path is the unchanged code (tape `[[fallthrough]]` into the old case). 10 / 10 classic renders
+hash-identical to the base commit (test, guarded to glibc ≥ 2.43 like round 190bz, with energy / sample tolerances
+everywhere) and 131 / 131 bank renders of the untouched rows byte-identical. The Complete Access delay role (Stellar
+Echo, X-Echo, X-Delay, 3D Delay) keeps Classic (`Law=0` in its preset): the measured stage lowered the multi-head tape
+row's tail score 2.72 → 2.28 because it is another device.
+
+| Row (bank) | files | wave before → after | tail before → after |
+|---|---|---|---|
+| H-Delay (tp172d) | 12 | 5.92 → **6.17** | 5.54 → **6.15** (S2 3.08 → 4.90) |
+| EchoBoy (tp172d) | 20 | 5.15 → 5.15 | 6.34 → 6.34 |
+| EchoBoy Jr (prog182) | 25 | 4.56 → 4.56 | 8.08 → 8.08 (programme only) |
+| ValhallaDelay (tp172d) | 16 | 4.25 → **4.56** | 5.90 → **6.22** (D 6.32 → 6.62, S1 6.71 → 7.08, S3 6.58 → 7.18) |
+| PrimalTap (prog182) | 25 | 3.64 → 3.64 | 7.40 → 7.40 |
+| Stellar Echo (tp172c) | 6 | 3.33 → 3.33 | 2.72 → 2.72 |
+| Little PrimalTap (prog182) | 25 | 2.84 → 2.84 | 6.23 → 6.23 |
+| X-Echo (tp172c) | 9 | 2.78 → 2.78 | 4.55 → 4.55 |
+| 3D Delay (tp172c) | 6 | 1.67 → 1.67 | 2.47 → 2.47 |
+| X-Delay (tp172c) | 3 | 1.67 → 1.67 | 1.90 → 1.90 |
+| **Family mean** | | **3.58 → 3.64** (10 rows) | **4.20 → 4.34** (7 impulse-bank rows) |
+
+Baseline = this branch's base (rollup027 77026c3a2; ValhallaDelay already 4.25 with round 190ca's trim). No file went
+down on the wave score and no setting on the tail score; the 16 renders that changed all moved up on the tail score
+(ValhallaDelay S3 music ESR −7.5 → −16.1 dB, S1 drums / music 4 → 6; H-Delay S2 spectrum 3.7 / 5.6 / 3.2 / 10.0 →
+0.7 / 3.0 / 1.0 / 5.0 dB). CPU per instance (48 kHz, 20 s of bursts, blocks of 512, ten interleaved runs against the
+base build's binary): Tape Classic min 1.32 / median 1.44 % of one core, Tape Measured min 1.34 / median 1.52 %
+(+ 2 … 6 %). That needed: both sides recorded at once (2-double sections), one level follower for the pair whose gain is
+worked out again on a 0.5 dB rise or every 16 samples (polynomial log2 / exp2 from the bits), coefficients only when the
+time / Era / rate change, the hiss read from a 2.7 s table made in prepare () (+ 1 MB per instance), and two weak fitted
+sections left out (the bank scores the same or higher without them). Clean with Mod clock = the ms law within noise.
+Latency: 0 samples reported, unchanged. Not done (next): Hi-Fi tape / the other ValhallaDelay modes (S2 still
+4.0, its wow is random per render), wow / flutter depth law (EchoBoy's mod part), BBD clock stage (no bank row runs a
+BBD mode through the maps), the structure rows (3 taps, multi-head + spring). Lab: `/mnt/e/lynx-work/echo190dl`.
+
+## Round 190dp: Voice Shift's unvoiced path, Quell's noise-floor tracker (Ember: two-stage E tried, not shipped)
+Black-box on the trials' renders (tp172d, trial187b, refcap182's 35 s programme bank, refcap0124's stimulus captures);
+nothing of the reference binaries was opened. Gate: every file of the same banks before (rollup027 77026c3a2) and
+after, through the same translator / fitted settings. New behaviour sits behind an appended `Law` parameter
+(Measured for new instances, Classic for projects saved before); Classic renders hash-identical to the base commit
+(Voice Shift and Quell, 9 cases). LYNX Tune is not changed: it shares the TD-PSOLA shifter, whose new unvoiced path
+only Voice Shift asks for (`Psola::setUnvoicedShift`, off by default), so Tune has no law switch; new Tune instances
+(default, +5 st with Formant +2 and a slow retune, low latency) and a Tune loaded from an older project render
+hash-identical to the base commit's own Psola users (4 of 4 cases in the test).
+
+**Voice Shift.** The reference's sine sweep comes out at exactly the Formant shift wherever its detector finds no
+pitch (above ~1.6 kHz: −2.9 … −3.2 st at Formant −3, +1.7 … +2.0 st at Formant +2, unshifted at Pitch +5 alone);
+drums and a full mix move the same way. LYNX passed unvoiced grains through. Now they are read at the formant factor
+(Link: pitch × formant), in longer flat-topped grains (9.5 ms hop, 60 % crossfade): the first try (3 ms Hann grains)
+combed noise near 1.4 kHz and folded a voice's 250 … 500 Hz energy into the lowest bands.
+
+| Bank | Files | Score before → after | Spectrum error | Up / same / down |
+|---|---|---|---|---|
+| tp172d (Pitch +5, Formant −3, −7 / +2 / Drive 3) | 12 | 3.00 → 3.17 | 3.29 → 3.16 dB | 2 / 10 / 0 |
+| trial187b (13 settings) | 78 | 3.12 → 3.27 | 3.31 → 3.01 dB | 12 / 66 / 0 |
+| refcap182 programme (35 s, 5 signals) | 20 | 3.60 → 3.80 | 2.37 → 2.21 dB | 5 / 14 / 1 |
+
+The one file down: refcap182 Formant −3 vocal 3 → 2 (spectrum 3.56 → 4.34 dB over the 4 dB step; its 63 … 130 Hz
+bands +4 … +6 dB, the grain joins' sidebands). Every constant tried for the grains left one such file on a step edge
+(`vsx/`: Hann grains put tp172d's −7 / +2 music down instead). CPU: 2.15 … 2.74 → 2.20 … 2.56 s per 35 s stereo take
+(inside the noise); latency unchanged (1376 samples at 48 kHz).
+
+**Quell (matched engine).** At a high setting the reference takes a steady programme down more and more over the
+first seconds (a dense mix 10 … 24 dB at 100 %, nothing at 35 … 50 %): a noise floor estimated from the signal. Now
+each band's floor is the minimum of its smoothed power over 1.1 s (minimum statistics, R. Martin, IEEE TSAP 9(5),
+2001; eight sub-windows), seen through its own Q 8.5 band-pass on the channels' mean (a tone sweeping by is not its
+own floor), and sets a second soft-knee expander `off(amount)` dB above it, evaluated every 16 samples; the larger of
+its reduction and the fixed law's is applied (the gains still move every sample).
+Constants fitted (`qfit/`) on refcap182's programme takes at 0 / 20 / 35 / 50 / 100 % and refcap0124's stimulus at
+0 … 100 %: band-envelope distance 4.15 → 2.95 dB. Latency stays 0.
+
+| Bank | Files | Score before → after | Level error | Spectrum error | Up / same / down |
+|---|---|---|---|---|---|
+| tp172d (0 / 50 / 100 %) | 9 | 4.00 → 4.11 | 0.87 → 0.60 dB | 1.67 → 1.80 dB | 1 / 8 / 0 |
+| refcap182 programme (0 / 20 / 35 / 50 / 100 %, 35 s) | 25 | 4.68 → 4.84 | 0.85 → 0.33 dB | 1.34 → 1.08 dB | 2 / 23 / 0 |
+
+At 100 % the level error falls where the reference's floor tracker acts (tp172d music +3.6 → +0.6 dB, refcap182
+guitar +7.7 → +0.5, mix +6.5 → +3.2, bass +2.8 → −0.0 dB); at 0 … 50 % nothing moves (the offset's law,
+−30 + 46 · amount² dB, keeps the floor's threshold under programme there); tp172d's sweep is now 1.6 dB low instead of
+1.0 dB loud (same score). A first version tracked every sample on both channels (refcap182 4.88, tp172d 4.00) at
++35 % CPU; this one: the matched engine on a 35 s stereo take 1.65 … 1.70 → 1.73 … 1.81 s at 100 % (+5 %),
+1.72 … 1.78 → 1.77 … 1.80 s at 50 % (+3 %); the default (Matched off) and old projects cost what they did.
+
+**Ember.** Style E driven hard as two cascaded curve stages with a coupling high-pass (the plan's §3.18 item 1) was
+built in the lab and fitted from two starts on the 22 E takes (`ember/emfit5.cpp`): −4.00 dB (shipped one-stage table)
+→ −3.98 dB at best, the other start diverged. No gain, so nothing shipped; the engine is unchanged (every Ember row
+of the gate identical: tp172b Saturn 2 5.10, tp172d / trial187b Decapitator 5.00 / 3.91, tp172c and refcap182
+X-Saturator, Revival, Fusion rows, Harrison Tape 2.67 / 2.76, Heatwave 3.08 / 3.04). Found for the tape rows (no
+DSP yet): on the 1 kHz stairs the Harrison tape reference is flat at default (−0.0 … −0.3 dB up to −3 dBFS) and
+at Drive 15 / fast tape a hard ceiling (−0.6 / −5.3 / −10.5 dB at −15 / −9 / −3 dBFS), while the fitted Ember map
+loses 2.7 dB flat at default and stays almost linear at Drive 15: Ember's own Tape curve cannot be fitted to that
+law. A tape style with a level-dependent ceiling (hysteresis core) is the next step there.
+Tools and tables: `/mnt/e/lynx-work/vqe190dp` (`bank.sh`, `gate.py`, `vsx/`, `qfit/`, `qv/`, `ember/`, `golden/`).

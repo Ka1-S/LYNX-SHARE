@@ -1,3 +1,4 @@
+#include "ui/CleanVoiceMenu.h"
 #include "ui/FlMods.h"
 #include "platform/Paths.h"
 #include "ui/ColourPicker.h"
@@ -33,6 +34,7 @@
 
 #include "core/Biquad.h"
 #include "core/Effects.h"
+#include "core/GoalKnobs.h"
 #include "engine/Text.h"
 #include "engine/ProjectFile.h"
 #include <numeric>
@@ -3252,8 +3254,21 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                                  : tr ("none");
         menu.addItem (tr ("Audio input: {0}...", { current }), [this, t] { mixerinput::showMenu (engine, t, this); });
     }
-    menu.addItem (tr ("Open audio editor") + "\tCtrl+E", [this] { openAudioEditor (engine); });
-    menu.addItem (tr ("Open audio editor and record") + "\tShift+E", [this] { openAudioEditorRecording (engine); });
+    // FL: the audio editor is loaded into the track's first empty slot (round 190cd); a full track gets the editor
+    // window as before
+    menu.addItem (tr ("Open audio editor") + "\tCtrl+E", [this, t] {
+        if (const auto at = addEdisonSlot (engine, t); at >= 0)
+            openEdisonSlot (engine, t, at);
+        else
+            openAudioEditor (engine);
+    });
+    menu.addItem (tr ("Open audio editor and record") + "\tShift+E", [this, t] {
+        // FL arms an Edison set to On play, 5 min, Append off, Slave on (live check 190cq, shot edison190cd-05b)
+        if (const auto at = addEdisonSlot (engine, t, true); at >= 0)
+            openEdisonSlot (engine, t, at, true);
+        else
+            openAudioEditorRecording (engine);
+    });
     menu.addSeparator(); // (FL: a line before Reset)
     menu.addItem (tr ("Reset selected track(s) to default"), [this, targets] { engine.editSong ([targets] (Song& s) { mixerops::resetToDefault (s, targets); }); });
 
@@ -3423,6 +3438,10 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         });
         if (t > 0)
             menu.addItem (tr ("Render to audio (freeze)..."), [this, t] { bounceInsertToAudio (engine, t); });
+        // round 190ch (LYNX's own, not an FL item): the one-click vocal clean-up chain on this insert. Round 190cm: here
+        // with LYNX's other sound items, no longer between FL's own "File" and audio input rows
+        if (t > 0)
+            menu.addSubMenu (tr ("Clean voice"), lynx::ui::cleanVoiceMenu (engine, t));
     }
 
     // --- FL's "Group" section (REA round 146a) -----------------------------------------------------------
@@ -3566,6 +3585,10 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
                       [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.unarmAfterRender = ! r.unarmAfterRender; }); });
         disk.addItem (tr ("Auto-create audio clip (the rendered files go on the Playlist)"), true, ro.autoCreateClip,
                       [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.autoCreateClip = ! r.autoCreateClip; }); });
+        // FL's "Latency compensation" (RecLatCompMenu, checked by default; round 190dx): off, recorded takes are not moved
+        // back by the round trip, the fine adjust and the PDC (Options › Audio › Recording)
+        disk.addItem (tr ("Latency compensation"), true, ro.latencyCompensation,
+                      [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.latencyCompensation = ! r.latencyCompensation; }); });
         disk.addItem (tr ("Disarm the inserts when recording stops"), true, ro.disarmOnStop,
                       [setRecord] { setRecord ([] (AudioEngine::RecordOptions& r) { r.disarmOnStop = ! r.disarmOnStop; }); });
         // LYNX's own (round 190aq): also in the record button's menu
@@ -4202,6 +4225,11 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       EffectKind::pocketAutoduck, EffectKind::pocketChorus, EffectKind::pocketSpacer, EffectKind::pocketStereoizer, // Pocket (round 189h)
                                       EffectKind::pocketWowFlutter, EffectKind::pocketPhaser, EffectKind::pocketFlanger, EffectKind::pocketTremolo, // Pocket (round 189h)
                                       EffectKind::pocketWaveshaper, EffectKind::pocketCompressor, EffectKind::pocketSpreader, // Pocket (round 189h)
+                                      EffectKind::pocketComb, // Pocket (round 190by)
+                                      EffectKind::pocketMultiband, // Pocket (round 190by)
+                                      EffectKind::pocketTapeStop, // Pocket (round 190by)
+                                      EffectKind::pocketEq, EffectKind::pocketGraphicEq, EffectKind::pocketFilter, // Pocket (round 190dw)
+                                      EffectKind::pocketReverbClassic, EffectKind::pocketReverb2, EffectKind::pocketReverb, // Pocket (round 190dw)
                                       EffectKind::formulaController, EffectKind::peakController, EffectKind::xyController, EffectKind::xyzController,
                                       EffectKind::controlSurface, // controllers (link their output to any knob)
                                       EffectKind::patcher, // FL's Patcher: a graph of effects / instruments / plugins (REA_rodada141)
@@ -4228,7 +4256,8 @@ const EffectKind allEffects[] = { EffectKind::eq,     EffectKind::parametricEq, 
                                       // the plugin's Default preset of the user's FL installation (core/NativeEngines.h)
                                       EffectKind::maximus, EffectKind::vocodex, EffectKind::equo, EffectKind::distructor, EffectKind::lovePhilter,
                                       EffectKind::grossBeat, EffectKind::convolver, EffectKind::flPitchShifter, EffectKind::vintagePhaser,
-                                      EffectKind::squeeze, EffectKind::rhythmGain, EffectKind::newtone, EffectKind::newtime };
+                                      EffectKind::squeeze, EffectKind::rhythmGain, EffectKind::newtone, EffectKind::newtime,
+                                      EffectKind::edison }; // round 190cd: FL's audio editor as a slot plugin
 } // namespace
 
 const std::vector<EffectKind>& addableEffects()
@@ -5433,6 +5462,8 @@ void EffectsPanel::paint (juce::Graphics& g)
             auto name = quickpick::slotName (engine, slot); // (a plugin renamed in the Plugin database: its new name, round 165c)
             if (slot.look != 0) // part of a Master look (round 189k, the Simple workflow's Finish dock)
                 name << " " << tr ("(look)");
+            if (goals::active (slot)) // a one-knob effect of the Simple workflow's dock (round 190bu): its goal's name too
+                name << " (" << (slot.goal == goals::punch ? trc ("@one-knob effect: Punch") : tr (goals::name (slot.goal))) << ")";
             if (slot.sidechain > 0 && slot.sidechain < (int) engine.getSong().mixer.size())
                 name << juce::String::fromUTF8 (" \xe2\x86\x90 ") << juce::String::fromUTF8 (engine.getSong().mixer[(std::size_t) slot.sidechain].name.c_str());
             auto text = textArea;
@@ -6786,6 +6817,12 @@ void EffectsPanel::showSlotMenu (int slot)
     if (extendSlotMenu != nullptr) // (round 183a: the Device View's card adds Fold / Unfold first; the Mixer adds nothing)
         extendSlotMenu (menu, slot);
     menu.addSubMenu (tr ("Replace with"), replace);
+    // round 190ce: hot-swap from the Mixer too (the Device View's card has its own item and button)
+    if (extendSlotMenu == nullptr && onHotSwapSlot != nullptr)
+        menu.addItem (tr ("Hot-swap in the Browser"), [t = track, slot] {
+            if (onHotSwapSlot != nullptr)
+                onHotSwapSlot (t, slot);
+        });
     menu.addItem (tr ("Audio editor (record this insert)..."), [this] { openAudioEditorForInsert (engine, track); });
 
     // FL presets (Plugin presets\Effects\<plugin>) that map to this effect
@@ -6982,6 +7019,11 @@ void EffectsPanel::showSlotMenu (int slot)
     menu.addSeparator();
     menu.addItem (tr ("Delete") + "\tDel", [this, slot] { deleteSlot (slot); });
 
+    if (slotMenuForSnapshot != nullptr) // (the shot routes: the menu itself, nothing opens)
+    {
+        *slotMenuForSnapshot = menu;
+        return;
+    }
     // FL: with the slot's menu open, Delete removes the plugin (issue #11)
     quickpick::showMenu (menu, juce::PopupMenu::Options().withTargetComponent (menuOwner()).withMousePosition(), {},
                          [safe = juce::Component::SafePointer<EffectsPanel> (this), slot] (const juce::KeyPress& key) {
@@ -7128,10 +7170,52 @@ void warnDoubleMonitoring (AudioEngine& engine, int track)
     });
 }
 
+// FL's question when an external input is chosen on an insert that records more than it (core/LiveInput.h
+// asksExternalInputOnly, issue #152): Yes = "External input only", so the take holds the input alone.
+// Live check 190ew ISS152-1: only when the insert had no input before (`inputBefore`), in FL's message window with its
+// "Remember my choice" box (a remembered Yes switches without asking; Settings › Manage messages shows it again).
+void askExternalInputOnly (AudioEngine& engine, int track, int inputBefore)
+{
+    const auto& mixer = engine.getSong().mixer;
+    if (track < 0 || track >= (int) mixer.size())
+        return;
+    const auto& mt = mixer[(std::size_t) track];
+    if (! asksExternalInputOnly (track, inputBefore, mt.inputChannel, mt.recordSource))
+        return;
+    if (! messages::shown ("RecAutoSwitchExternalInput"))
+    {
+        engine.setInsertRecordSource (track, RecordSource::externalInput);
+        return;
+    }
+    // (FL marks "External input only" in its accent colour: the |bars| of its own string)
+    showFlMessage ({ tr ("External input"), tr ("You've selected an external input. Do you want to switch to |External input only| to avoid recording internal audio on this track?"),
+                     { tr ("Yes"), tr ("No") }, true },
+                   [&engine, track] (int button, bool remember) {
+                       if (button != 1)
+                           return;
+                       if (remember)
+                           messages::setShown ("RecAutoSwitchExternalInput", false);
+                       engine.setInsertRecordSource (track, RecordSource::externalInput);
+                   });
+}
+
 void showMenu (AudioEngine& engine, int track, juce::Component* target, std::function<void()> chosen)
 {
     if (track < 0 || track >= (int) engine.getSong().mixer.size())
         return;
+
+    // FL: "The input of a mixer track can't be changed while recording." (a take keeps the channels it started with;
+    // issue #152)
+    if (engine.isRecordingAudioTakes())
+    {
+        juce::AlertWindow::showAsync (juce::MessageBoxOptions()
+                                          .withIconType (juce::MessageBoxIconType::WarningIcon)
+                                          .withTitle (tr ("Warning"))
+                                          .withMessage (tr ("The input of a mixer track can't be changed while recording."))
+                                          .withButton (tr ("OK")),
+                                      nullptr);
+        return;
+    }
 
     // the device input opens on demand (only then does Windows show the microphone as in use)
     if (! engine.hasAudioInput())
@@ -7157,9 +7241,10 @@ void showMenu (AudioEngine& engine, int track, juce::Component* target, std::fun
             menu.addSeparator(); // pairs, then single channels
         const auto ticked = mt.inputChannel == source.channel && mt.inputStereo == source.stereo;
         menu.addItem (juce::String::fromUTF8 (source.name.c_str()) + (source.stereo ? "" : "  " + tr ("(mono)")), true, ticked,
-                      [&engine, track, source, chosen] {
+                      [&engine, track, source, chosen, before = mt.inputChannel] {
                           engine.setInsertInput (track, source.channel, source.stereo);
                           warnDoubleMonitoring (engine, track);
+                          askExternalInputOnly (engine, track, before);
                           if (chosen)
                               chosen();
                       });

@@ -2,9 +2,12 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstring>
 #include <map>
 #include <mutex>
+#include <thread>
 
 #include <juce_gui_extra/juce_gui_extra.h>
 
@@ -283,6 +286,22 @@ public:
                 markDead (true);
             }
         });
+       #elif JUCE_WINDOWS
+        // Windows (issue #159): the same through a thread-pool wait on the process handle. Before, a crash was noticed
+        // only when JUCE's pipe read gave up waiting for the child to connect again (its 10 s timeout) or the ping
+        // failed: until then every message to the child (a state save, a parameter, the close) waited those 10 s on
+        // the pipe of a process that was gone.
+        if (pid <= 0 || childWait != nullptr)
+            return;
+        childProcess = OpenProcess (SYNCHRONIZE, FALSE, (DWORD) pid);
+        if (childProcess == nullptr)
+            return;
+        if (! RegisterWaitForSingleObject (&childWait, childProcess, &SandboxSession::childEnded, this, INFINITE, WT_EXECUTEONLYONCE))
+        {
+            childWait = nullptr;
+            CloseHandle (childProcess);
+            childProcess = nullptr;
+        }
        #else
         juce::ignoreUnused (pid);
        #endif
@@ -389,8 +408,24 @@ private:
         markDead (true);
     }
 
+   #if JUCE_WINDOWS
+    static void CALLBACK childEnded (PVOID context, BOOLEAN /*timedOut*/)
+    {
+        trace ("parent: child process ended");
+        static_cast<SandboxSession*> (context)->markDead (true);
+    }
+   #endif
+
     void stopWatching()
     {
+       #if JUCE_WINDOWS
+        if (childWait != nullptr)
+            UnregisterWaitEx (childWait, INVALID_HANDLE_VALUE); // (waits for a callback in flight)
+        childWait = nullptr;
+        if (childProcess != nullptr)
+            CloseHandle (childProcess);
+        childProcess = nullptr;
+       #endif
        #if JUCE_LINUX
         if (watcher.joinable())
         {
@@ -423,12 +458,64 @@ private:
    #if JUCE_LINUX || JUCE_MAC
     std::thread watcher;
     int stopFd = -1;
+   #elif JUCE_WINDOWS
+    HANDLE childProcess = nullptr, childWait = nullptr;
    #endif
     std::atomic<bool> dead { false }, closing { false };
     std::mutex askMutex, replyMutex;
     juce::ValueTree reply;
     juce::WaitableEvent replyReady;
 };
+
+// Issue #159 (a user's hang report: the window froze for 10 s and more while a project was opened again): ending a
+// session sends the child JUCE's "kill" message, and JUCE's pipe waits up to the connection timeout (10 s) for a child
+// that is gone — crashed, or ended because the machine stalled — to connect again before it gives up. The rack frees
+// plugins on the message thread (AudioEngine::RackDisposer), so every dead separate-process plugin of a project froze
+// LYNX for 10 s when the project was imported again (Missing files › Apply) or closed. A session now ends on a thread
+// of its own; nothing waits for it but the app's exit (finishSandboxTeardowns), and only briefly.
+struct Retirements
+{
+    std::mutex lock;
+    std::condition_variable done;
+    int running = 0;
+};
+Retirements& retirements()
+{
+    static auto* r = new Retirements(); // (never destroyed: a teardown may still run while the process exits)
+    return *r;
+}
+
+void retireSession (std::unique_ptr<SandboxSession> session)
+{
+    if (session == nullptr)
+        return;
+    auto& r = retirements();
+    {
+        const std::scoped_lock l (r.lock);
+        ++r.running;
+    }
+    auto finished = [&r] {
+        {
+            const std::scoped_lock l (r.lock);
+            --r.running;
+        }
+        r.done.notify_all();
+    };
+    try
+    {
+        std::thread ([raw = session.get(), finished] {
+            juce::Thread::setCurrentThreadName ("LYNX sandbox teardown");
+            delete raw;
+            finished();
+        }).detach();
+        session.release(); // (the thread owns it now)
+    }
+    catch (...) // no thread to be had: here, as before
+    {
+        session.reset();
+        finished();
+    }
+}
 
 class RemotePlugin;
 
@@ -565,7 +652,7 @@ public:
         }
     }
 
-    ~RemotePlugin() override { session.reset(); }
+    ~RemotePlugin() override { retireSession (std::move (session)); } // (never waits here: issue #159)
 
     bool dead() const noexcept { return session->isDead(); }
     const bool bits32;
@@ -747,6 +834,20 @@ std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::Pl
     return remote;
 }
 
+bool finishSandboxTeardowns (int timeoutMs)
+{
+    auto& r = retirements();
+    std::unique_lock l (r.lock);
+    return r.done.wait_for (l, std::chrono::milliseconds (std::max (0, timeoutMs)), [&r] { return r.running == 0; });
+}
+
+int sandboxTeardownsRunning()
+{
+    auto& r = retirements();
+    const std::scoped_lock l (r.lock);
+    return r.running;
+}
+
 bool isSandboxedPluginDead (const juce::AudioPluginInstance& plugin)
 {
     const auto* remote = dynamic_cast<const RemotePlugin*> (&plugin);
@@ -791,6 +892,8 @@ std::unique_ptr<juce::AudioPluginInstance> createSandboxedPlugin (const juce::Pl
 }
 
 bool isSandboxedPluginDead (const juce::AudioPluginInstance&) { return false; }
+bool finishSandboxTeardowns (int) { return true; }
+int sandboxTeardownsRunning() { return 0; }
 bool isBridged32 (const juce::AudioPluginInstance&) { return false; }
 int sandboxedPluginProcessId (const juce::AudioPluginInstance&) { return 0; }
 bool isSandboxedPlugin (const juce::AudioPluginInstance&) { return false; }

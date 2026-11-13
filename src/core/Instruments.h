@@ -225,8 +225,49 @@ public:
     };
     virtual int takePortEvents (PortEvent* /*out*/, int /*max*/) noexcept { return 0; }
 
+    // Note identity (round 190ej, NoteEvent::noteId; 0 = none): the note the next noteOn / noteOnAt starts and the note
+    // the next noteOff ends. The rack sets each right before the call and clears it right after, so an instrument's own
+    // calls (allNotesOff's loops, a note on releasing its key first) never see one. FL gives every note its own voice:
+    // of two overlapping notes of one key on one channel, the first note's end ends only its own voice (FL 2026 [EXEC:
+    // /R renders of 21 generators, round 190ej]). An instrument that keeps voices by note stores startingNoteId() in
+    // the voice and ends, at a note off, only the voices endsVoice() accepts; an off without an id (a live key, the
+    // rack's Mono / Max polyphony releases) ends every voice of its key, as before.
+    void setNextNoteId (std::uint32_t id) noexcept { onNoteId = id; }
+    void setNextNoteOffId (std::uint32_t id) noexcept { offNoteId = id; }
+
+protected:
+    std::uint32_t startingNoteId() const noexcept { return onNoteId; }
+    std::uint32_t endingNoteId() const noexcept { return offNoteId; }
+    bool endsVoice (int voiceKey, std::uint32_t voiceNoteId, int key) const noexcept
+    {
+        return voiceKey == key && (offNoteId == 0 || voiceNoteId == offNoteId);
+    }
+
 private:
     float wheel = 0.0f; // (pitchBend's default)
+    std::uint32_t onNoteId = 0, offNoteId = 0;
+};
+
+// The FL generators that keep one sounding note per key (FL 2026 [EXEC: /R renders, round 190ej]: Kepler, Kepler Exo,
+// MiniSynth, PoiZone, Sawer): a second note of a held key takes the key over, and a note off ends the key's sound
+// only when it is the end of the note that took the key last (the earlier note's end does nothing). Per key: the
+// note that holds it. Audio thread, fixed storage.
+class KeyOwners
+{
+public:
+    void start (int key, std::uint32_t id) noexcept
+    {
+        if (key >= 0 && key < 128)
+            owner[(std::size_t) key] = id;
+    }
+    // a note off of `key` with note id `id` (0 = none: always) ends the key's sound
+    bool ends (int key, std::uint32_t id) const noexcept
+    {
+        return id == 0 || key < 0 || key >= 128 || owner[(std::size_t) key] == 0 || owner[(std::size_t) key] == id;
+    }
+
+private:
+    std::array<std::uint32_t, 128> owner {};
 };
 
 // Audio of an already-decoded sample (loaded off the audio thread). Short samples
@@ -242,6 +283,11 @@ struct SampleData
     // the sample's regions and beats (Fruity Granulizer's slices and tempo sync)
     std::vector<std::int64_t> markerStarts;
     float acidBeats = 0.0f;
+    // round 190ey (live check 190ew SMP-1 / SMP-7): the file's slice markers (FL's ACID "strc" list, its entries after the
+    // first; 0 = none) and its sample format (bits per sample, 0 = unknown; float or integer), as FL's Sampler page shows them
+    int sliceMarkers = 0;
+    int bitsPerSample = 0;
+    bool floatData = false;
     // a sample FL's precomputed effects were applied to (core/SamplePrecompute.h): it holds only the played region,
     // which was [cropFrom, cropTo] of the file (fractions); the sampler maps its Start / End knobs into it
     bool cropped = false;

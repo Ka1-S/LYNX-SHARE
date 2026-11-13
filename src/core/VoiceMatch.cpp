@@ -1123,6 +1123,20 @@ constexpr ReleaseLaw release123 { releaseA, releaseN, slowShare, attackSlowMs, r
 // 2.36 → 0.91 dB overall (Limit 80 at 0 dBFS: 14.8 → 2.2 dB)
 constexpr ReleaseLaw release165 { 3.77134, 1.8446, 0.626219, 4622.87, 8.63099, 3.36638, 4.51261, 0.337878,
                                   66.76061, 1.484398, 0.2006814, 0.3369957, 45.57088, 250.0, 48.29348, true };
+// round 190dm [EXEC]: the cell's memory (Settings::memory) — an exposure state E (0 … 1) charges towards the light
+// (drive / (1 + drive)) with expChargeMs while lit and fades with expDecayMs; both conductances release
+// (1 + expGain · E^expPow) times slower. Fitted on an FG-2A-type reference's 1 kHz tone bursts (2 ms … 5 s, then a −40 dBFS
+// probe) at five settings (docs/PARITY.md "Round 190dm")
+struct ExposureLaw
+{
+    ReleaseLaw rl;
+    double expChargeMs, expDecayMs, expGain, expPow;
+};
+// fitted (optofit, Nelder-Mead from round 123's law, the mean gain error over 2 ms frames of the tc probe at D / S1 / X1 / X2):
+// 0.94 → 0.57 dB (D 0.77 → 0.29, S1 1.01 → 0.79, X1 1.31 → 0.72, X2 0.69 → 0.48). Recovery after a 10 ms burst: 0.07 dB left
+// at 1.1 s (the reference 0.09, round 123's law 1.17); after 2 s: 1.29 dB (the reference 2.00, round 123's 1.70)
+constexpr ExposureLaw exposure190dm { { 36.271937, 1.541935, 0.574018, 24369.555222, 11.544317, 2.599897, 0.100913, 0.054922 },
+                                      393.962736, 2439.62311, 4.239615, 1.232323 };
 } // namespace
 
 void Leveler::prepare (double sampleRate) noexcept
@@ -1133,7 +1147,7 @@ void Leveler::prepare (double sampleRate) noexcept
 
 void Leveler::reset() noexcept
 {
-    cf = cs = el = mem = ctl = 0.0;
+    cf = cs = el = mem = ctl = exposure = 0.0;
     for (int c = 0; c < 2; ++c)
     {
         yc[c] = fx1[c] = fy1[c] = xp[c] = 0.0;
@@ -1166,7 +1180,10 @@ void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
     const double Y0 = dbToGain (y0Db + shift), Yt = dbToGain (ytDb + shift), gam = s.limit ? (ml ? limitGamma152 : limitGamma) : gamma;
     const double ff = ml ? limitFeedForward : 0.0, gFloor = ml ? dbToGain (-limitFloorDb) : 0.0;
     const double mk = dbToGain (makeupDb (s.gain) + idleMakeupDb + (s.measured && s.autoMakeup ? autoMakeupDb (s.peakReduction) - autoMakeupDb (s.makeupRef) : 0.0));
-    const auto& rl = s.measuredRelease ? release165 : release123;
+    const bool memory = s.memory && ! s.limit; // round 190dm: the cell's memory (Compress)
+    const auto& rl = memory ? exposure190dm.rl : s.measuredRelease ? release165 : release123;
+    const double eUp = memory ? 1.0 - std::exp (-dt * 1000.0 / exposure190dm.expChargeMs) : 0.0;
+    const double eDn = memory ? 1.0 - std::exp (-dt * 1000.0 / exposure190dm.expDecayMs) : 0.0;
     const double cA = 1.0 - std::exp (-dt * 1000.0 / rl.slowAttackMs), mUp = 1.0 - std::exp (-dt * 1000.0 / memUpMs), mDn = 1.0 - std::exp (-dt * 1000.0 / memDownMs);
     const double slowLp = rl.slowLpMs > 0.0 && ml ? 1.0 - std::exp (-dt * 1000.0 / rl.slowLpMs) : 1.0; // (Limit only)
     const double K = 2.0 * sr;
@@ -1191,6 +1208,13 @@ void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
         else
             ctl = cts0;
         const double cts = ctl;
+        double slow = 1.0;
+        if (memory) // round 190dm: the exposure charges while the cell is lit and slows both releases
+        {
+            const double lit = ct / (1.0 + ct);
+            exposure += (lit > exposure ? eUp : eDn) * (lit - exposure);
+            slow = 1.0 + exposure190dm.expGain * std::pow (exposure, exposure190dm.expPow);
+        }
         if (ctf > cf && rl.rate > 0.0)
         {
             // round 165x: the measured attack (round 123's log-domain approach, or a linear one; the rise rate-limited)
@@ -1211,10 +1235,14 @@ void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
             cd += (std::log1p (ctf) - cd) * (1.0 - std::exp (-dt * 1000.0 * std::pow (1.0 + cf, attackBeta) / attackMs));
             cf = std::expm1 (cd);
         }
+        else if (memory)
+            cf = std::max (ctf, cf - dt * (rl.a * std::pow (cf, rl.n) + rl.b * cf) / slow);
         else
             cf = std::max (ctf, cf - dt * (rl.a * std::pow (cf, rl.n) + rl.b * cf));
         if (cts > cs)
             cs += (cts - cs) * cA;
+        else if (memory)
+            cs = std::max (cts, cs - dt * (rl.a2 * std::pow (cs, rl.n2) + rl.b2 * cs) / slow);
         else
             cs = std::max (cts, cs - dt * (rl.a2 * std::pow (cs, rl.n2) + rl.b2 * cs));
         const double g = std::max (gFloor, 1.0 / (1.0 + cf + cs));
