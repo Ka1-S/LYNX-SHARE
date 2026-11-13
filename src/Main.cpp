@@ -11817,8 +11817,9 @@ private:
             const auto made = (int) song.automations.size() - 1;
             check ("automate_makes_current_clip", made >= 0 && playlist.brush.kind == lynx::ClipKind::automation && playlist.brush.index == made,
                    juce::String (playlist.brush.index));
-            check ("automate_starts_at_147", made >= 0 && std::abs (song.automations.back().points[0].value - 0.734f) < 1.0e-6f
-                                                 && lynx::lasttweak::valueText (song, song.automations.back().target, song.automations.back().points[0].value) == "147%  10.3dB  3.28");
+            // (PL-2: Levels VOL 147 %, FL's clip plays unity)
+            check ("automate_volume_unity", made >= 0 && song.automations.back().points[0].value == 0.5f
+                                                && lynx::lasttweak::valueText (song, song.automations.back().target, song.automations.back().points[0].value) == "100%  0.0dB  1.00");
             const auto again = playlist.getClipMenuForSnapshot (clipIndex);
             const auto* automate2 = findSub (again, lynx::tr ("Automate"));
             check ("automate_second_is_2", automate2 != nullptr && click (*automate2, lynx::tr ("Volume"))

@@ -230,10 +230,18 @@ TEST (flfix190ey_automate_names_and_level)
     link.source.channel = 0;
     song.automations.push_back (link);
     CHECK (clipops::automateName (song, target, base) == base + " #3");
-    // the level: the clip starts at the channel's actual level (147 % stays 147 %; round 190ey brief), shown as FL writes it
+    // PL-2: with Levels VOL at 147 % FL's clip plays unity (range top at unity, line at the top): 0.5 of LYNX's travel
     const auto& a = song.automations[(std::size_t) first];
-    CHECK (std::abs (a.points.front().value - 0.734f) < 1.0e-6f && a.points.front().value == a.points.back().value);
-    CHECK (lasttweak::valueText (song, target, a.points.front().value) == "147%  10.3dB  3.28");
+    CHECK (a.points.front().value == 0.5f && a.points.front().value == a.points.back().value);
+    CHECK (lasttweak::valueText (song, target, a.points.front().value) == "100%  0.0dB  1.00");
+    // below unity the line is at the value (75 % -> 0.375)
+    song.channels[0].misc.levels.volume = 0.75f;
+    const auto low = clipops::automateAudioClip (song, 0, clipops::AutomateWhat::volume, "low");
+    CHECK (low >= 0 && std::abs (song.automations[(std::size_t) low].points.front().value - 0.375f) < 1.0e-6f);
+    // Panning keeps its value
+    song.channels[0].misc.levels.pan = 0.5f;
+    const auto panned = clipops::automateAudioClip (song, 0, clipops::AutomateWhat::panning, "p");
+    CHECK (panned >= 0 && std::abs (song.automations[(std::size_t) panned].points.front().value - 0.75f) < 1.0e-6f);
 }
 
 TEST (flfix190ey_level_volume_text_is_fls)

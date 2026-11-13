@@ -911,8 +911,8 @@ inline float groupNormalizeGain (const std::vector<float>& peaks) noexcept
 // clip's start to its end. FL's parameters are the channel's Misc › "Levels adjustment" pan offset / volume multiplier
 // (channel parameters 0x10 / 0x11; round 190dz: LYNX's AutomationTargetKind::channelAdjust, the same parameters), so the
 // main Pan / Volume knobs stay free. FL's Volume clip sets its range top to unity (half of the multiplier's 0…200 %
-// travel) and the line at that top; LYNX's clips have no range of their own: the line sits at the multiplier's value on
-// its whole travel (0.5 = 100 %, neutral), which plays the same.
+// travel) and the line at that top; LYNX's clips have no range of their own: the line sits at min(value, 0.5) (round
+// 190ey, see automateAudioClip).
 enum class AutomateWhat : std::uint8_t { panning, volume };
 
 inline AutomationTarget automateTarget (const Song& song, int clip, AutomateWhat what)
@@ -941,9 +941,10 @@ inline std::string automateName (const Song& song, const AutomationTarget& targe
 }
 
 // Adds that automation clip (named `name`); returns the new automation's index, −1 when `clip` is no audio clip.
-// (Live check 190ew PL-1: FL makes the new clip the Playlist's current clip, the UI's part.) Live check 190ew PL-2: FL's
-// Volume clip plays unity whatever the Levels VOL is (its range top at unity, the line at the top); LYNX keeps the line at
-// the channel's actual level (147 % stays 147 %: nothing jumps when the clip starts), as round 190ey's brief asks.
+// (Live check 190ew PL-1: FL makes the new clip the Playlist's current clip, the UI's part.) Live check 190ew PL-2 (shot
+// PL-2-automate-volume-147pct-clip-editor.png): FL's Volume clip plays unity whatever the Levels VOL is above it (its
+// range top set to unity, the line at that top: a 147 % multiplier is not kept); below unity the line is at the value.
+// LYNX's clips have no range of their own, so the line sits at min(value, unity) = min(value, 0.5) of the 0…200 % travel.
 
 inline int automateAudioClip (Song& song, int clip, AutomateWhat what, const std::string& name)
 {
@@ -951,7 +952,9 @@ inline int automateAudioClip (Song& song, int clip, AutomateWhat what, const std
     if (target.kind == AutomationTargetKind::none)
         return -1;
     const auto audio = song.playlist[(std::size_t) clip];
-    const auto value = std::clamp (song.targetValue (target), 0.0f, 1.0f);
+    auto value = std::clamp (song.targetValue (target), 0.0f, 1.0f);
+    if (what == AutomateWhat::volume)
+        value = std::min (value, 0.5f); // (FL: unity at most, live check 190ew PL-2)
     const auto length = std::max<std::int64_t> (1, audio.length);
 
     Automation a;
