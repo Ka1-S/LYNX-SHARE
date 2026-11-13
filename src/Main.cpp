@@ -7200,9 +7200,11 @@ private:
         auto* test = new KeyTest();
         test->reportPath = reportPath;
         startFocusTestWindow (*test);
-        // (kept above other apps' windows for its few seconds: JUCE takes a button-down only where the system finds its
-        // window under the point, and the test clicks through LYNX's own peers, not the system's input)
-        test->main->setAlwaysOnTop (true);
+        // Windows: kept above other apps' windows for its few seconds (JUCE takes a button-down only where the system finds
+        // its window under the point, and the test clicks through LYNX's own peers, not the system's input)
+       #if JUCE_WINDOWS
+        test->main->setAlwaysOnTop (true); // (Linux: JUCE makes the X11 window again for it; the private X server has no other windows)
+       #endif
         test->startTimer (700);
     }
 
