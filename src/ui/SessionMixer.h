@@ -14,14 +14,17 @@
 #include "core/MeterBallistics.h"
 #include "core/SessionMixer.h"
 #include "ui/ValueControl.h"
+#include "ui/MapMode.h"
 
 namespace lynx
 {
 class AudioEngine;
 
-class SessionMixerComponent final : public juce::Component, public juce::TooltipClient
+class SessionMixerComponent final : public juce::Component, public juce::TooltipClient, public mapmode::SpotSource
 {
 public:
+    // round 190ef: the volume, pan and send knobs are mappable (MIDI / Key Map Mode)
+    void mapSpots (std::vector<mapmode::Spot>& out) override;
     explicit SessionMixerComponent (AudioEngine& engine);
 
     // The grid's columns: `count` columns `columnWidth` wide, scrolled by `scrollX`, in [0, tracksWidth); the Main strip

@@ -279,6 +279,26 @@ SessionMixerComponent::Hit SessionMixerComponent::hitAt (juce::Point<int> p) con
 
 // --- values ---------------------------------------------------------------------------------------------------------
 
+void SessionMixerComponent::mapSpots (std::vector<mapmode::Spot>& out)
+{
+    for (int column = -2; column < columns; ++column)
+    {
+        if (column == -1 || insertFor (column) < 0) // (a track that plays through no insert of its own shows no controls)
+            continue;
+        auto add = [&] (Part part, int row) {
+            const auto area = partBounds (column, part, row);
+            if (area.isEmpty())
+                return;
+            if (const auto target = specFor ({ column, part, row }).target)
+                out.push_back ({ area, remotemap::Target::parameter (*target) });
+        };
+        add (partBounds (column, Part::fader).isEmpty() ? Part::volume : Part::fader, 0);
+        add (Part::pan, 0);
+        for (int r = 0; r < (int) rows.size(); ++r)
+            add (Part::send, r);
+    }
+}
+
 ui::ValueSpec SessionMixerComponent::specFor (const Hit& hit) const
 {
     const auto insert = insertFor (hit.column);

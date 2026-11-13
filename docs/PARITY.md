@@ -2876,7 +2876,7 @@ laws; one or two rounds), and the factory presets, which were written on the cla
 | Show a search result in its folder | — | Show in Places | ✅ right-click › Show in its folder |
 | Hot-swap (Q): the Browser replaces the linked device, preset or sample in place | Replace in the slot / channel menus (unchanged) | Hot-Swap mode | ✅ `core/HotSwap.h`: effects, instruments, effect / synth presets, samples; bar in the Browser, button on the device card. ❌ rack chains, drum pads, similar-sample swap |
 | Device Cut / Copy / Paste / Duplicate, Ctrl-drag copy, 0 = on / off, Ctrl+G / Ctrl+Shift+G | slot menu, Alt-drag in the Mixer | Device View edit commands | ✅ effect cards of the Device View (Ableton-style layout). ❌ several cards at once, drag to another track |
-| MIDI / Key Map Mode overlay | Link to controller, Multilink | Ctrl+M / Ctrl+K | ❌ not built (REA_rodada190ce.md §4) |
+| MIDI / Key Map Mode overlay | Link to controller, Multilink | Ctrl+M / Ctrl+K | ✅ Clip-launch layout (`ui/MapMode.h`, `core/RemoteMap.h`; REA_rodada190ef.md §3 and §5, checked against Live 12.4.16 in round 190em: Min-first key toggle, Min / Max in units, Path "track \| device"). ❌ Macro Map Mode, relative navigation |
 
 ## Round 190cd: the audio editor as a mixer-slot plugin (FL's Edison)
 Static study of FL's own Edison plugin (docs/analise/REA_rodada190cd.md). The plugin is LYNX's existing audio editor

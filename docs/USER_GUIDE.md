@@ -54,6 +54,26 @@ In the clip grid (Clip-launch workflow):
   the Playlist, or drop an audio file or a pattern from the Browser on a slot. Copy and Paste also work between the
   grid and the Playlist. Ctrl+Shift+M puts a new empty MIDI clip in the selected slot (in the Clip-launch layout; in the
   other layouts the key stays Export › MIDI file and the command is in the slot's menu).
+- **Scenes**: click a scene to select it. Ctrl+D (or the scene's menu › Duplicate) puts a copy of the scene with all its
+  clips under it; **Capture and insert scene** (Ctrl+Shift+I) makes a new scene under the selected one: while clips
+  play, it holds copies of them and playback moves to it at once, without a restart; with nothing playing it is an
+  empty scene with the selected scene's name, tempo and time signature. Ctrl+I inserts an empty scene under it; Ctrl+R
+  renames it; Delete removes it. The scene's menu also has its colour. **Scene tempo and time signature** (View menu,
+  or the grid's options) shows a tempo field and a time signature field ("4 / 4") on every scene: drag one up or down
+  (the tempo moves about 3 BPM per pixel, Ctrl: fine; the signature's two numbers are dragged separately) or
+  double-click to type ("6 / 8"); a dim field is off (the scene keeps the song's value). Right-click › Return to
+  Default, or Del on a clicked field, switches it off again. Launching the scene sets the song's tempo and bar length
+  (LYNX's song meter counts quarter notes, so 6 / 8 plays as a 3-beat bar). Ctrl+I, Ctrl+Shift+I and Ctrl+R act this
+  way in the Clip-launch layout only.
+- **Track titles**: right-click a column's title for Rename and Change color (Ctrl+R renames the title clicked last);
+  name and colour are the Playlist track's.
+- **Capture MIDI** (Ctrl+Shift+Alt+R) with the clip grid on screen: the notes you just played without recording go to
+  the armed track (the selected track when none is armed). When that track plays a MIDI clip, they are written into it:
+  its loop is unrolled up to the bars you just played and its start and loop move there. Otherwise they become a new
+  clip with no name in the selected scene's slot (the next empty slot below when that one is taken), which starts playing at once;
+  played with the transport stopped, the song's tempo is first set from how you played them.
+- **A Playlist clip into a slot**: with the grid beside the Playlist, drag a pattern or audio clip out of the Playlist
+  onto a slot: a copy goes there, the Playlist keeps the clip.
 - **Mixer** (under the slots, as Live's Session mixer): each track has a strip for the mixer track it plays through:
   **In/Out** (Audio From with its input channel, Monitor In / Auto / Off, Audio To: Main or another mixer track),
   **Sends** (a knob per mixer track any track sends to; turning a knob up from zero makes the send), **Track Options**
@@ -72,6 +92,24 @@ In the clip grid (Clip-launch workflow):
   a groove file you own), then pick it for a MIDI clip in the slot's menu › Groove. The clip plays through it without
   changing its notes. Each groove has Base, Quantize, Timing, Random and Velocity; **Global Amount** scales all grooves
   (0 to 130 %). **Commit groove** writes the result into the notes; **Extract groove** makes a groove from a clip.
+- **Draw Mode** (B, or Options › Draw Mode, in the Clip-launch layout): a drag in an automation lane draws steps as wide
+  as the Playlist's grid, each one at the height the mouse had over it; with the grid off (or Alt held) it draws
+  freehand. The automation outside what you drew stays as it was, and each stroke is one undo step. Press B again to go
+  back to adding and moving points. In the other layouts B stays the brush tool.
+- **MIDI Map Mode and Key Map Mode** (Ctrl+M / Ctrl+K, or the **MIDI** / **Key** switches beside Both | Grid | Song,
+  in the Clip-launch layout): every element you can map is tinted (blue for MIDI, orange for keys) and shows what is
+  mapped to it ("1/19" = MIDI channel 1, controller 19; a note name; a key). Click an element, then move a knob or
+  press a pad / key on your MIDI device (MIDI) or press a computer key (Key): it is mapped. You can map clip slots (the
+  mapping belongs to the slot, whatever clip is in it), scene launch buttons, each track's clip stop button, Stop all
+  clips, Session Record, Play, Stop, Record, the metronome, the tempo, the Session mixer's volume, pan and sends, and
+  the Device View's knobs. One control can launch slots on several tracks, but not two slots of one track, and a control
+  on a slot can't also launch a scene. While a map mode is on, the Browser shows the **mapping list** (MIDI: Channel,
+  Note/Control, Path, Name, Min, Max; Key: Key, Path, Name, Min, Max; Path is "track | device", Min and Max are in the
+  parameter's unit, such as dB or 50L): drag Min or Max up or down (or double-click to type) to give a mapping a range; Min above Max inverts it (right-click › Invert Range); Delete removes the selected
+  mappings (Delete over a selected element removes its mapping too). Mappings do nothing while a map mode is on; switch
+  it off and they act: a key on a knob switches it between Min and Max (Min on the first press). Mappings are saved with the project; a MIDI
+  mapping of a knob is the same link as **Link to controller**. In the other layouts
+  Ctrl+M stays the metronome.
 
 ## Online sessions: make a song with a friend (phase 1, packages)
 

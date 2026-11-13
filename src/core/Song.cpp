@@ -444,6 +444,11 @@ void Song::removeDeadMidiLinks()
     initialValues.erase (std::remove_if (initialValues.begin(), initialValues.end(),
                                          [] (const InitialValue& v) { return v.target.kind == AutomationTargetKind::none; }),
                          initialValues.end());
+    remoteMappings.erase (std::remove_if (remoteMappings.begin(), remoteMappings.end(), // (round 190ef)
+                                          [] (const RemoteMapping& m) {
+                                              return m.action == RemoteAction::parameter && m.target.kind == AutomationTargetKind::none;
+                                          }),
+                          remoteMappings.end());
 }
 
 std::vector<MidiLink> linksWithGlobal (const std::vector<MidiLink>& project, const std::vector<MidiLink>& global)

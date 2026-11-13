@@ -40,6 +40,8 @@ add_library(lynx_core STATIC
     src/core/Performance.cpp
     src/core/ClipLauncher.cpp
     src/core/SessionOps.cpp
+    src/core/RemoteMap.cpp
+    src/core/DrawMode.cpp
     src/core/Groove.cpp
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
@@ -585,6 +587,7 @@ if(LYNX_BUILD_APP)
         src/ui/DetailView.cpp
         src/ui/ClipAudioPanel.cpp
         src/ui/SessionMixer.cpp
+        src/ui/MapMode.cpp
         src/ui/MidiToolsPanel.cpp
         src/ui/TouchKeyboard.cpp
         src/ui/QuickAddPalette.cpp

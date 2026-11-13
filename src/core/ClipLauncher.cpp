@@ -1,4 +1,5 @@
 #include "core/ClipLauncher.h"
+#include "core/RemoteMap.h"
 #include "core/Groove.h"
 
 #include <algorithm>
@@ -219,6 +220,7 @@ int insertScene (Song& song, int at)
         if (c.gridSlot >= 0 && c.gridSlot < (int) grid.slots.size())
             if (auto& s = grid.slots[(std::size_t) c.gridSlot]; s.scene >= at)
                 ++s.scene;
+    remotemap::scenesInserted (song, at); // (round 190ef: a mapping belongs to its slot / scene and moves with it)
     return at;
 }
 
@@ -238,6 +240,7 @@ bool removeScene (Song& song, int scene)
         if (c.gridSlot >= 0 && c.gridSlot < (int) grid.slots.size())
             if (auto& s = grid.slots[(std::size_t) c.gridSlot]; s.scene > scene)
                 --s.scene;
+    remotemap::sceneRemoved (song, scene); // (round 190ef)
     return true;
 }
 

@@ -12,6 +12,8 @@
 #include "engine/SessionPack.h"
 
 #include "core/ClipOps.h"
+#include "core/DetailChain.h"
+#include "core/SessionOps.h"
 #include "core/MarkerPlan.h"
 #include "engine/AudioLogger.h"
 
@@ -1201,6 +1203,15 @@ void AudioEngine::logPlayedNote (int channel, int key, float velocity, bool on, 
         stepEditQueue.push_back ({ channel, key, velocity, on });
 }
 
+void AudioEngine::logPlayedNoteForTest (double ms, int channel, int key, float velocity, bool on, double tick)
+{
+    const juce::SpinLock::ScopedLockType lock (scoreLogLock);
+    if (on)
+        scoreLog.noteOn (ms, channel, key, velocity, tick, false);
+    else
+        scoreLog.noteOff (ms, channel, key);
+}
+
 void AudioEngine::setStepEdit (bool on) noexcept
 {
     stepEditOn.store (on, std::memory_order_relaxed);
@@ -1377,6 +1388,72 @@ CaptureResult AudioEngine::captureMidi()
         return {};
     CaptureResult result;
     editSong ([&] (Song& s) { result = lynx::captureMidi (s, log, o); });
+    if (result.newestMs > lastCaptureMs)
+        lastCaptureMs = result.newestMs;
+    return result;
+}
+
+CaptureResult AudioEngine::captureMidiToSlot (int track, int scene, int& placed, bool& into)
+{
+    placed = -1;
+    into = false;
+    CaptureOptions o;
+    o.afterMs = lastCaptureMs;
+    o.nowMs = juce::Time::getMillisecondCounterHiRes();
+    o.gapMs = 2.0 * juce::jmax (1, song.beatsPerBar) * 60000.0 / juce::jmax (1.0, song.bpm);
+    const auto log = scoreLogSnapshot();
+    const auto phrase = capturePhrase (song, log, o);
+    if (phrase.empty() || track < 0 || track >= launcher::maxTracks)
+        return {};
+    CaptureResult result;
+    result.played = phrase.front().startTick >= 0.0;
+    for (const auto& e : phrase)
+        result.newestMs = juce::jmax (result.newestMs, e.startMs);
+    const auto channel = detailchain::forTrack (song, track).channel;
+    const auto running = transport.playing.load();
+
+    // round 190em: into the clip the track plays (Live writes there, no new clip)
+    const auto playingRow = clipLauncher != nullptr ? clipLauncher->tracks[(std::size_t) track].playing.load (std::memory_order_relaxed) : -1;
+    if (running && result.played && playingRow >= 0 && song.clipGrid)
+        if (const auto* clip = launcher::clipAt (*song.clipGrid, track, playingRow); clip != nullptr && clip->kind == ClipKind::pattern)
+        {
+            const auto shift = clipLauncher->clockMinusSong.load (std::memory_order_relaxed)
+                               - clipLauncher->tracks[(std::size_t) track].anchor.load (std::memory_order_relaxed);
+            auto notes = session::clipTimeNotes (phrase, o.nowMs, song.bpm, shift);
+            session::setNotesChannel (notes, channel);
+            result.notes = (int) notes.size();
+            auto ok = false;
+            editSong ([&] (Song& s) { ok = session::captureIntoClip (s, track, playingRow, notes); });
+            if (ok)
+            {
+                placed = playingRow;
+                into = true;
+                if (result.newestMs > lastCaptureMs)
+                    lastCaptureMs = result.newestMs;
+                return result;
+            }
+        }
+
+    // a new clip; played while stopped, the tempo comes from the phrase
+    const auto bpm = running ? song.bpm : session::phraseTempo (phrase, song.bpm);
+    std::int64_t length = 0;
+    auto notes = session::phraseNotes (phrase, o.nowMs, bpm, song.beatsPerBar, length);
+    session::setNotesChannel (notes, channel);
+    result.notes = (int) notes.size();
+    const auto row = session::captureSlot (song, track, scene);
+    editSong ([&] (Song& s) {
+        if (! running)
+            s.bpm = bpm;
+        if (session::placeRecordedPattern (s, track, row, std::move (notes), length, {}) >= 0)
+        {
+            placed = row;
+            if (auto* slot = launcher::settingsAt (*s.clipGrid, track, row))
+                slot->blankName = true; // (Live's captured clip has no name; the pattern keeps LYNX's default one)
+        }
+    });
+    if (placed < 0)
+        return {};
+    launcherCommand ({ launcher::Command::Type::launch, track, row }); // (launched at once; a stopped transport starts)
     if (result.newestMs > lastCaptureMs)
         lastCaptureMs = result.newestMs;
     return result;
@@ -2332,7 +2409,8 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     {
         const auto key = m.getNoteNumber();
         const auto value = m.isNoteOn() ? (int) m.getVelocity() : 0;
-        if ((linkedNotes[(std::size_t) (key >> 6)].load (std::memory_order_relaxed) >> (key & 63) & 1u) != 0)
+        if ((linkedNotes[(std::size_t) (key >> 6)].load (std::memory_order_relaxed) >> (key & 63) & 1u) != 0
+            || mapCaptureNotes.load (std::memory_order_relaxed)) // (round 190ef: MIDI Map Mode takes every key)
         {
             controllerQueue.push ({ linkNoteBase + key, m.getChannel() - 1, value, device.port });
             return;
@@ -2874,11 +2952,11 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
     // a scene with its own tempo and bar length: the song takes them when it is launched
     if (command.type == T::launchScene && command.scene >= 0 && command.scene < (int) song.clipGrid->scenes.size())
         if (const auto& scene = song.clipGrid->scenes[(std::size_t) command.scene]; scene.tempo > 0.0 || scene.beatsPerBar > 0)
-            editSong ([tempo = scene.tempo, bar = scene.beatsPerBar] (Song& s) {
+            editSong ([tempo = scene.tempo, bar = scene.beatsPerBar, unit = scene.beatUnit] (Song& s) {
                 if (tempo > 0.0)
                     s.bpm = tempo;
                 if (bar > 0)
-                    s.beatsPerBar = bar;
+                    s.beatsPerBar = session::sceneBarBeats (bar, unit); // (round 190em: n/d as the same bar in quarter notes)
             }, false);
     if (starts && ! transport.playing.load() && ! isCountingIn())
     {
@@ -4125,6 +4203,13 @@ void AudioEngine::setGlobalLink (const AutomationTarget& target, const std::opti
     sendChangeMessage();
 }
 
+void AudioEngine::setMapMode (remotemap::Mode mode)
+{
+    mapMode = mode;
+    mapCaptured.reset();
+    mapCaptureNotes.store (mode == remotemap::Mode::midi, std::memory_order_relaxed);
+}
+
 void AudioEngine::injectControllerForTest (int cc, int channel, int value, int port)
 {
     controllerQueue.push ({ cc, channel, value, port });
@@ -4499,6 +4584,14 @@ void AudioEngine::applyControllers()
         // Auto detect of the Remote control settings window: controllers, and keys as they are pressed
         if (! isNoteLink (e.cc) || e.value > 0)
             controllerSeen = { e.port, e.channel, e.cc, e.value, controllerSeen.serial + 1 };
+        // round 190ef: in MIDI Map Mode a controller moved or a key pressed is caught for the selected control; nothing
+        // acts ("MIDI-mappings won't function while you're in MIDI Map Mode", the reference's lesson)
+        if (mapMode == remotemap::Mode::midi)
+        {
+            if (! isNoteLink (e.cc) || e.value > 0)
+                mapCaptured = remotemap::MidiControl { e.channel, e.cc, e.port };
+            continue;
+        }
         if (e.seenOnly)
             continue;
         if (isNoteLink (e.cc)) // (MIDI learn and Multilink take controllers, as before)
@@ -4581,12 +4674,28 @@ void AudioEngine::applyControllers()
                 bits[link.cc >> 6] |= std::uint64_t { 1 } << (link.cc & 63);
             else if (isNoteLink (link.cc))
                 notes[(link.cc - linkNoteBase) >> 6] |= std::uint64_t { 1 } << ((link.cc - linkNoteBase) & 63);
+        remotemap::usedNumbers (song, bits, notes); // (round 190ef: the MIDI mappings of slots, scenes, transport)
         for (int w = 0; w < 2; ++w)
         {
             linkedCcs[(std::size_t) w].store (bits[w], std::memory_order_relaxed);
             linkedNotes[(std::size_t) w].store (notes[w], std::memory_order_relaxed);
         }
     }
+    if (mapMode == remotemap::Mode::midi)
+        return;
+
+    // round 190ef: the MIDI mappings of clip slots, scenes, track stop buttons and transport switches (presses and releases)
+    if (! song.remoteMappings.empty())
+        for (const auto& ev : events)
+        {
+            auto& previous = remoteValues.try_emplace ({ ev.cc, ev.channel, ev.port }, -1).first->second;
+            const auto fires = remotemap::midiFires (song, ev.channel, ev.cc, ev.value, previous, ev.port);
+            previous = ev.value;
+            if (onRemoteFire != nullptr)
+                for (const auto& f : fires)
+                    onRemoteFire (f);
+        }
+
     if ((events.empty() || links.empty()) && linkSmoothing.empty())
         return;
 
@@ -4635,7 +4744,8 @@ void AudioEngine::applyControllers()
             const auto mapped = linkformula::linkModeValue (link.mode, *formula, (float) ev.value / 127.0f, current);
             if (! mapped)
                 continue; // (a release in Latch / Inc / Stay)
-            const auto v = *mapped;
+            // round 190ef: the mapping's Min / Max (the reference's range; 0 / 1 keeps the position as it was)
+            const auto v = absolute ? remotemap::applyRange (*mapped, link.min, link.max) : *mapped;
             // takeover: only parameters the song holds (a plugin's own parameters have no value to compare here), and
             // only for links that follow the controller's position
             const auto songHeld = t.kind != AutomationTargetKind::channelParam && t.kind != AutomationTargetKind::effectParam;

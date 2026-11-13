@@ -1,4 +1,7 @@
 #include "core/FlCurve.h"
+#include "core/DrawMode.h"
+#include "core/LayoutStyle.h"
+#include "ui/ClipGridComponent.h"
 #include "ui/CleanVoiceMenu.h"
 #include "ui/FlMods.h"
 #include "ui/Motion.h"
@@ -2901,6 +2904,39 @@ void PlaylistComponent::paintLaneHeaders (juce::Graphics& g, juce::Rectangle<int
     }
 }
 
+bool PlaylistComponent::dragOutToClipGrid (const juce::MouseEvent& e)
+{
+    // only in the Clip-launch layout, with the mouse off the Playlist and over the clip grid beside it
+    if (layoutstyle::current() != layoutstyle::Style::clipLaunch || getLocalBounds().contains (e.getPosition()))
+        return false;
+    const auto& song = engine.getSong();
+    if (dragClip < 0 || dragClip >= (int) song.playlist.size() || dragIndices.size() != dragOriginals.size())
+        return false;
+    const auto kind = song.playlist[(std::size_t) dragClip].kind;
+    if (kind != ClipKind::pattern && kind != ClipKind::audio)
+        return false;
+    if (! isClipGrid (juce::Desktop::getInstance().findComponentAt (e.getScreenPosition())))
+        return false;
+    auto* container = juce::DragAndDropContainer::findParentDragContainerFor (this);
+    if (container == nullptr || container->isDragAndDropActive())
+        return false;
+    engine.editSong ([this] (Song& s) {
+        for (std::size_t j = 0; j < dragIndices.size(); ++j)
+            if (const auto i = dragIndices[j]; i >= 0 && i < (int) s.playlist.size())
+                s.playlist[(std::size_t) i] = dragOriginals[j];
+    });
+    juce::Image image (juce::Image::ARGB, 96, 22, true);
+    {
+        juce::Graphics g (image);
+        g.setColour (theme::colour::accent.withAlpha (0.85f));
+        g.fillRoundedRectangle (image.getBounds().toFloat().reduced (1.0f), 3.0f);
+    }
+    container->startDragging (playlistClipDragDescription (dragClip), this, juce::ScaledImage (image), false);
+    drag = Drag::none;
+    repaint();
+    return true;
+}
+
 bool PlaylistComponent::laneMouseDown (const juce::MouseEvent& e)
 {
     const auto hit = laneAt (e.getPosition());
@@ -2922,6 +2958,22 @@ bool PlaylistComponent::laneMouseDown (const juce::MouseEvent& e)
     const auto& points = engine.getSong().automations[(std::size_t) a].points;
     const auto point = lanePointAt (hit.track, hit.lane, e.getPosition());
     const auto body = laneBody (hit.track, hit.lane);
+
+    // round 190ef, Draw Mode (the Clip-launch layout's B, core/DrawMode.h): a press draws the cell under the mouse at the
+    // grid width, a drag goes on drawing (freehand without a grid or with Alt, the Playlist's "no snap"); the right button
+    // keeps its point menu
+    if (drawmode::isOn() && ! flmods::popup (e.mods) && e.mods.isLeftButtonDown())
+    {
+        laneTrack = hit.track;
+        laneIndex = hit.lane;
+        setSelection ({});
+        drag = Drag::laneDraw;
+        drawFreehand = grid::resolve (snapBox).kind == grid::Kind::none || gridTicks() <= 1 || e.mods.isAltDown();
+        drawTick = juce::jmax<std::int64_t> (0, (std::int64_t) std::floor (xToTick (e.x)));
+        drawValue = laneValueOf (a, juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight())));
+        laneDrawTo (e);
+        return true;
+    }
 
     if (flmods::popup (e.mods) || (e.mods.isAltDown() && point >= 0)) // on a point: delete it (FL's Alt+click too)
     {
@@ -2972,6 +3024,34 @@ bool PlaylistComponent::laneMouseDown (const juce::MouseEvent& e)
     drag = Drag::lanePoint;
     autoPoint = added;
     return true;
+}
+
+// round 190ef: one move of a Draw Mode drag, from the last position to the mouse (one undo step per press: editSong
+// joins the edits made while the button is held)
+void PlaylistComponent::laneDrawTo (const juce::MouseEvent& e)
+{
+    const auto a = laneAutomation (laneTrack, laneIndex);
+    if (a < 0)
+        return;
+    const auto body = laneBody (laneTrack, laneIndex);
+    const auto tick = juce::jmax<std::int64_t> (0, (std::int64_t) std::floor (xToTick (e.x)));
+    const auto value = laneValueOf (a, juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight())));
+    const auto from = drawTick;
+    const auto fromValue = drawValue;
+    if (drawFreehand)
+        engine.editSong ([a, from, fromValue, tick, value] (Song& s) {
+            drawmode::drawLine (s.automations[(std::size_t) a].points, from, fromValue, tick, value);
+        });
+    else
+    {
+        const auto steps = drawmode::stepsAlong (from, fromValue, tick, value, gridTicks());
+        engine.editSong ([a, steps] (Song& s) {
+            for (const auto& step : steps)
+                drawmode::drawStep (s.automations[(std::size_t) a].points, step.cell.from, step.cell.to, step.value);
+        });
+    }
+    drawTick = tick;
+    drawValue = value;
 }
 
 // round 190cg: a tempo lane shows the song's own range (Song::tempoViewLow / High, the reference's lowest / highest BPM
@@ -4560,6 +4640,10 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             repaint();
             return;
 
+        case Drag::laneDraw:
+            laneDrawTo (e);
+            return;
+
         case Drag::lanePoint:
         {
             const auto a = laneAutomation (laneTrack, laneIndex);
@@ -4864,6 +4948,8 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 
         case Drag::move:
         {
+            if (dragOutToClipGrid (e)) // round 190ef
+                return;
             const auto grabbedAt = (std::size_t) (std::find (dragIndices.begin(), dragIndices.end(), dragClip) - dragIndices.begin());
             const auto& grabbed = dragOriginals[grabbedAt];
             auto deltaTicks = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn) + grabOffset) - grabbed.start;
@@ -5020,6 +5106,9 @@ void PlaylistComponent::postDragHint()
         case Drag::warpMarker: hint.text = tr ("Moving the warp marker: the audio around it stretches  [Alt] no snap"); break;
         case Drag::autoPoint: hint.text = tr ("Moving the point: then [Shift] keeps time  [Ctrl] keeps value"); break;
         case Drag::autoTension: hint.text = tr ("Bending the segment: drag up / down  [Ctrl] fine"); break;
+        case Drag::laneDraw:
+            hint.text = drawFreehand ? tr ("Draw Mode: drawing freehand") : tr ("Draw Mode: drawing steps at the grid width  [Alt] freehand");
+            break;
         case Drag::lanePoint:
         case Drag::laneTension:
         {
@@ -8812,8 +8901,11 @@ void PlaylistComponent::updateCursor (juce::ModifierKeys mods)
     }
     if (const auto lane = laneAt (p); lane.track >= 0) // round 177b
     {
-        setMouseCursor (p.x >= headerWidth && lanePointAt (lane.track, lane.lane, p) >= 0 ? juce::MouseCursor::DraggingHandCursor
-                                                                                           : juce::MouseCursor::NormalCursor);
+        if (p.x >= headerWidth && drawmode::isOn()) // round 190ef: Draw Mode's pencil
+            setMouseCursor (editorCursor (gesture::Cursor::draw));
+        else
+            setMouseCursor (p.x >= headerWidth && lanePointAt (lane.track, lane.lane, p) >= 0 ? juce::MouseCursor::DraggingHandCursor
+                                                                                               : juce::MouseCursor::NormalCursor);
         return;
     }
     if (hover.header)
@@ -8847,7 +8939,8 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     {
         const auto a = laneAutomation (lane.track, lane.lane);
         hint.text = p.x < headerWidth ? tr ("Automation lane: [RMB] lane menu  [2xLMB] edit the points")
-                                      : tr ("Automation lane: [LMB] add or drag a point  [RMB] deletes a point  [Alt] drag bends the line  [Shift] adds on the line");
+                    : drawmode::isOn() ? tr ("Automation lane, Draw Mode: [LMB] drag draws steps at the grid width  [Alt] freehand  [RMB] deletes a point")
+                                       : tr ("Automation lane: [LMB] add or drag a point  [RMB] deletes a point  [Alt] drag bends the line  [Shift] adds on the line");
         hint.hasMenu = true;
         if (a >= 0)
         {

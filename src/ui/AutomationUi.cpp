@@ -1033,6 +1033,28 @@ juce::String describeAutomationTarget (AudioEngine& engine, const AutomationTarg
     return tr ("(no target)");
 }
 
+juce::String targetValueTextAt (AudioEngine& engine, const AutomationTarget& target, float value)
+{
+    value = juce::jlimit (0.0f, 1.0f, value);
+    if (target.kind == AutomationTargetKind::channelParam || target.kind == AutomationTargetKind::effectParam)
+    {
+        if (midictl::isMidiParam (target.param))
+            return juce::String (juce::roundToInt (value * 127.0f));
+        if (auto* plugin = pluginFor (engine, target))
+        {
+            if (target.param < 0 || target.param >= plugin->getParameters().size())
+                return {};
+            auto* p = plugin->getParameters()[target.param];
+            auto text = p->getText (value, 40).trim();
+            if (text.isNotEmpty())
+                if (const auto label = p->getLabel().trim(); label.isNotEmpty() && ! text.endsWith (label))
+                    text << " " << label;
+            return text;
+        }
+    }
+    return juce::String::fromUTF8 (lasttweak::valueText (engine.getSong(), target, value).c_str());
+}
+
 juce::String describeTargetValue (AudioEngine& engine, const AutomationTarget& target)
 {
     const auto value = engine.currentTargetValue (target);

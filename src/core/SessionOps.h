@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "core/Recorder.h"
+#include "core/ScoreLog.h"
 #include "core/Song.h"
 
 namespace lynx::session
@@ -90,4 +91,61 @@ bool fromPlaylist (Song& song, std::size_t playlistIndex, int track, int scene, 
 // A pattern, or an audio channel already in the project (a file dropped from the Browser, loaded by the caller), into a slot.
 bool putPattern (Song& song, int track, int scene, int pattern);
 bool putAudio (Song& song, int track, int scene, int channel, std::int64_t length);
+
+// --- scenes (round 190ef; docs/analise/REA_rodada190ef.md) -------------------------------------------------------------
+// The reference's Duplicate on a selected scene: a new row under `scene` with a copy of every slot of the row (clips with
+// their settings, removed stop buttons) and the scene's name, colour, tempo and bar length. Returns the new row, −1 when
+// the grid is full or there is no such scene.
+int duplicateScene (Song& song, int scene);
+// The reference's "Capture and Insert Scene" (Live 12.4.16, live check 190ei): a new row under `below`.
+//   - Clips play (`playing[t]` = the row whose clip track t plays, −1: none): the new row is a plain scene (no name,
+//     tempo and signature off) holding copies of the playing clips, and playback moves to it at once, seamlessly: the
+//     slots that play take the new row and their copies take the old one (the player follows its slot, so nothing
+//     restarts). `moved`, when given, gets the playing slots (ClipGrid::slots index) that now sit in the new row.
+//   - Nothing plays: the new row is empty and takes the name, tempo and time signature of the scene `below`.
+// Returns the new row, −1 when the grid is full.
+int captureScene (Song& song, int below, const std::vector<int>& playing, std::vector<int>* moved = nullptr);
+
+// A scene's own tempo and time signature (the reference's Scene Tempo / Scene Time Signature fields). A value <= 0
+// switches the field off (the reference's "Return to Default"); others are clamped to LYNX's tempo range, 1..32 beats
+// and the denominators 1, 2, 4, 8, 16. False: no such scene.
+constexpr int sceneBeatsMin = 1, sceneBeatsMax = 32;
+bool setSceneTempo (Song& song, int scene, double bpm);
+bool setSceneBeats (Song& song, int scene, int beats);
+bool setSceneSignature (Song& song, int scene, int beats, int unit);
+int sceneBeatUnit (int unit) noexcept;                    // the nearest of 1, 2, 4, 8, 16
+int sceneBeatUnitStep (int unit, int steps) noexcept;     // `steps` denominators up (+) or down (−) from `unit`
+int sceneBarBeats (int beats, int unit) noexcept;         // n/d as LYNX's n/4 meter: the bar's length in quarter notes
+std::string sceneTempoText (double bpm);                  // "120.00"
+std::string sceneSignatureText (int beats, int unit = 4); // "3 / 4" (the reference's spacing)
+// The reference's drag rates on the fields (live check 190ei: 5 px +14 BPM, 10 px +29, 20 px +58, 40 px +112, whole
+// BPM; the numerator 4 → 50 in 10 px): the value after a drag of `pixels` (up = positive) from `start`.
+constexpr double sceneTempoPerPixel = 2.8, sceneBeatsPerPixel = 4.6, sceneUnitPixelsPerStep = 10.0;
+double sceneTempoDragged (double start, double pixels) noexcept;
+int sceneBeatsDragged (int start, double pixels) noexcept;
+int sceneUnitDragged (int start, double pixels) noexcept;
+
+// Capture MIDI into the clip grid (the Clip-launch layout): the slot that takes the captured clip on `track`: `scene`
+// when it is empty, else the first empty one below (a row past the last scene when every one below is taken).
+int captureSlot (const Song& song, int track, int scene);
+// The captured phrase as the notes of a new clip and its `length` (whole bars, at least one): played while the transport
+// ran, the notes keep their place in the bar of the first one; played while stopped, the first starts the clip, the
+// timing kept at `bpm`. `nowMs`: notes still held end there.
+std::vector<Note> phraseNotes (const std::vector<scorelog::Entry>& phrase, double nowMs, double bpm, int beatsPerBar, std::int64_t& length);
+
+// --- Capture MIDI in the Clip-launch layout (round 190em; Live 12.4.16, live check 190ei) ---------------------------
+// Played with the transport stopped, the reference sets the song tempo from the phrase (a s d f a s d f played evenly:
+// 148.00). LYNX's own estimate: the onsets (chords merged within 40 ms), the median gap between them refined by a least-
+// squares fit to its grid, as a tempo folded into [80, 160) BPM, to 0.01 BPM. Fewer than three onsets: `fallback`.
+double phraseTempo (const std::vector<scorelog::Entry>& phrase, double fallback);
+// The phrase on the unwrapped timeline of a clip that plays: a note played at song tick T lands at T + `shift` (shift =
+// the launcher's clock minus the song position, minus the clip's anchor). Notes still held end at `nowMs`.
+std::vector<Note> clipTimeNotes (const std::vector<scorelog::Entry>& phrase, double nowMs, double bpm, double shift);
+// Capture into the clip playing in (track, scene) (the reference writes into it, no new clip): its loop content is
+// unrolled up to the bars just played, the notes are added there, and the clip's start and loop move to those bars (whole
+// bars of `song.beatsPerBar`, from the bar of the first note to the end of the last). A pattern another clip also uses
+// is copied first. False: no pattern clip there, or no notes.
+bool captureIntoClip (Song& song, int track, int scene, const std::vector<Note>& notes);
+// The notes' channel becomes the track's instrument channel (`channel` ≥ 0).
+void setNotesChannel (std::vector<Note>& notes, int channel) noexcept;
 } // namespace lynx::session

@@ -178,6 +178,9 @@ public:
     void setViewForSnapshot (double pixelsPerBar, int firstBar, int firstTrack);
     void selectClipsForSnapshot (const std::vector<int>& clips) { setSelection (clips); repaint(); }
     void setScrollTickForSnapshot (double tick) { scrollTicks = tick; repaint(); }
+    // round 190ef (--drawshot190ef): where a lane's curve is drawn, and the x of a tick
+    juce::Rectangle<float> laneBodyForSnapshot (int track, int lane) const { return laneBody (track, lane); }
+    double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
     juce::PopupMenu getAutomationPointMenuForSnapshot (int clip, int point); // FL's point menu of an automation clip's point (round 190bw)
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
@@ -250,7 +253,7 @@ public:
 
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
-                      lanePoint, laneTension, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };
+                      lanePoint, laneTension, laneDraw, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
@@ -580,12 +583,21 @@ private:
     void paintLanes (juce::Graphics& g, juce::Rectangle<int> grid);
     void paintLaneHeaders (juce::Graphics& g, juce::Rectangle<int> headers);
     bool laneMouseDown (const juce::MouseEvent& e);        // true: the press was on a lane (handled)
+    // Round 190ef: in the Clip-launch layout, the clip being moved dragged off the Playlist over the clip grid: the clips go
+    // back where they were and the grabbed one becomes a drag the grid takes (a copy into a slot). True: done.
+    bool dragOutToClipGrid (const juce::MouseEvent& e);
     void showLaneMenu (int track, int lane);
     void showAddLaneMenu (int track);
     void toggleAutomationLanes();
     bool laneButtonHover = false;
     int laneTrack = -1, laneIndex = -1;                    // the lane a lanePoint / laneTension drag edits
     float tensionStart = 0.0f, tensionSign = 1.0f;
+    // round 190ef, Draw Mode (core/DrawMode.h): a laneDraw drag's last mouse position (tick, value) and whether it draws
+    // freehand (no grid, or Alt) or steps at the grid width
+    std::int64_t drawTick = 0;
+    float drawValue = 0.0f;
+    bool drawFreehand = false;
+    void laneDrawTo (const juce::MouseEvent& e);
     // hover: what a click would hit (drives the cursor, the highlight and the hint)
     struct Hover
     {
