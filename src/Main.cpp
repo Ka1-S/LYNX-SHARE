@@ -17258,8 +17258,9 @@ private:
             const auto error = lynx::flattenChannelNow (offline, 0);
             check (error.isEmpty(), "Bounce Track in Place of the frozen Lead (Flatten)" + (error.isEmpty() ? juce::String() : ": " + error));
             const auto& song = offline.getSong();
-            check (song.channels[0].instrument == lynx::InstrumentKind::audioClip && song.mixer[1].effects.empty() && song.mixer[1].volume == before.mixer[1].volume,
-                   "the Lead is audio now, its insert's effects removed, its fader kept");
+            check (song.channels[0].instrument == lynx::InstrumentKind::audioClip && song.mixer[1].effects.empty() && song.mixer[1].volume == before.mixer[1].volume
+                       && song.channels[0].name == "Lead (Bounce)",
+                   "the Lead is audio now (\"Lead (Bounce)\"), its insert's effects removed, its fader kept");
             int audioClips = 0;
             for (const auto& c : song.playlist)
                 audioClips += c.kind == lynx::ClipKind::audio && c.channel == 0;
@@ -17290,7 +17291,7 @@ private:
             check (savedJson (offline.getSong()) == jsonBefore, "undo of Bounce Track in Place: the project as before");
         }
 
-        // --- Bounce to New Track: the Lead's clips, against the Lead track's devices alone ---
+        // --- Bounce to New Track: the Lead's clips onto a new track (the clips muted, the new track with the Lead's mixer) ---
         {
             std::vector<int> leadClips;
             for (int i = 0; i < (int) offline.getSong().playlist.size(); ++i)
@@ -17300,18 +17301,16 @@ private:
             const auto error = lynx::bounceToNewTrack (offline, leadClips, true);
             check (error.isEmpty(), "Bounce to New Track of the Lead's clips" + (error.isEmpty() ? juce::String() : ": " + error));
             const auto& song = offline.getSong();
-            check (song.channels.size() == channelsBefore + 1 && song.channels.back().instrument == lynx::InstrumentKind::audioClip, "a new audio channel holds the bounce");
-            // the Lead's devices alone (its insert at unity, centre, no EQ) vs the new track alone
-            auto devices = before;
-            for (int c = 1; c < 3; ++c)
-                devices.channels[(std::size_t) c].muted = true;
-            devices.mixer[1].volume = lynx::unityFader;
-            devices.mixer[1].pan = 0.0f;
-            devices.mixer[1].eq = {};
-            auto bounced = song;
-            for (int c = 0; c < (int) bounced.channels.size() - 1; ++c)
-                bounced.channels[(std::size_t) c].muted = true;
-            nullLine ("the new track vs the Lead's devices", renderMix ("lead-devices", &devices), renderMix ("lead-bounced", &bounced), -90.0);
+            check (song.channels.size() == channelsBefore + 1 && song.channels.back().instrument == lynx::InstrumentKind::audioClip
+                       && song.channels.back().mixerTrack > 3 && song.mixer[(std::size_t) song.channels.back().mixerTrack].volume == before.mixer[1].volume,
+                   "a new audio channel holds the bounce, on an insert with the Lead's mixer");
+            // the song's span (the bounce stops at the last clip's end, the live render rings on after it)
+            auto bounced = renderMix ("bounced-new-track");
+            auto reference = live;
+            const auto span = (int) std::llround (before.secondsForTicks (24 * lynx::ppq) * offline.getTransport().sampleRate.load());
+            reference.audio.setSize (2, juce::jmin (span, reference.audio.getNumSamples()), true);
+            bounced.audio.setSize (2, reference.audio.getNumSamples(), true);
+            nullLine ("Bounce to New Track (Lead's clips muted) vs live, over the song", reference, bounced, -90.0);
             write ("bounced-new-track");
             offline.undo();
             offline.dispatchPendingMessages();

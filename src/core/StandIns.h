@@ -119,17 +119,19 @@ bool trackFreezeHolds (const Song& song, int channel) noexcept;
 int frozenByInsert (const Song& song, int insert) noexcept;
 
 // Live's Flatten (Bounce Track in Place on a frozen track, Live 12.2 on): the frozen channel `channel` becomes an audio
-// clip channel for good, playing its whole-song stem in the Playlist — one audio clip at every clip that played it,
-// same place, length and track (a pattern clip's audio named after it), each followed by a tail clip until the next one
-// (Live's "freeze tail" clips), so the arrangement plays the frozen sound bit for bit. Its notes leave every pattern; a
-// track freeze also removes the insert's effects (what drove them, the channel's volume / pan drivers too). Returns
-// false (nothing changed) when the channel is not frozen (or its track freeze does not hold), has no whole-song stem or
-// plays in no clip. After it the audio lives in the Playlist only: Pattern mode no longer plays the channel.
+// clip channel for good ("<name> (Bounce)", as the reference names a bounced track), playing its whole-song stem in the
+// Playlist: one audio clip at every clip that played it, same place, length and track, each followed by a tail clip
+// until the next one (Live's "freeze tail" clips), so the arrangement plays the frozen sound bit for bit. Its notes
+// leave every pattern (pattern clips left empty go); a track freeze also removes the insert's effects and what drove
+// them and the channel's volume / pan. Returns false (nothing changed) when the channel is not frozen (or its track
+// freeze does not hold), has no whole-song stem or plays in no clip. Afterwards the audio lives in the Playlist only:
+// Pattern mode no longer plays the channel.
 bool flatten (Song& song, int channel);
 
 // Live's Bounce to New Track (12.2 on) for the selected clips of one Playlist track: the track's sound (its channel with
 // volume and pan through its insert's effects, as a track freeze hears it) over the clips' span is rendered into one
-// audio clip on a new track below. The selected clips stay as they are.
+// audio clip on a new track below; the selected clips are muted (Live 12 manual, "Bounce to Audio"), and the new track
+// keeps the source's mixer (an unused insert gets the source insert's fader, pan, EQ, sends and routing).
 struct BouncePlan
 {
     int channel = -1;          // the track's channel (detailchain::forTrack)
@@ -143,8 +145,9 @@ const char* planBounceToNewTrack (const Song& song, const std::vector<int>& sele
 // The song to render (exportopts::Range::selection over [start, end), the tail cut): only the plan's clips (and the
 // automation clips) play, through the track's devices; the rest is lightened as for a freeze.
 Song bounceRenderSong (const Song& song, const BouncePlan& plan);
-// After the render: a new Playlist track under the plan's track holds one audio clip of a new audio clip channel
-// (`samplePath`, named after the track's channel, its colour, at unity on the Master) over the span. Returns the channel.
+// After the render: the plan's clips muted; a new Playlist track under the plan's track holds one audio clip of a new
+// audio clip channel (`samplePath`, "<channel> (Bounce)", its colour) over the span, playing into an unused insert set
+// like the source's (none free: the Master at unity). Returns the channel.
 int applyBounceToNewTrack (Song& song, const BouncePlan& plan, const std::string& samplePath, std::int64_t lengthTicks);
 
 // Live's Consolidate (Ctrl+J) for the selected clips of one Playlist track: they become one clip over their span.

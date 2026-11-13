@@ -305,7 +305,7 @@ TEST (livefreeze190ff_flatten_keeps_the_frozen_sound)
     CHECK (lynx::freeze::flatten (flat, 0));
     const auto& lead = flat.channels[0];
     CHECK (lead.instrument == lynx::InstrumentKind::audioClip && ! lead.freeze.on() && lead.samplePath == "track0 whole");
-    CHECK (lead.name == "Lead" && lead.uid == song.channels[0].uid && lead.mixerTrack == 1 && lead.volume == 1.0f);
+    CHECK (lead.name == "Lead (Bounce)" && lead.uid == song.channels[0].uid && lead.mixerTrack == 1 && lead.volume == 1.0f);
     CHECK (flat.mixer[1].effects.empty() && flat.mixer[1].volume == 0.6f && flat.mixer[1].eq == song.mixer[1].eq);
     CHECK (liveFreeze190ffDetached (flat, lynx::AutomationTargetKind::channelVolume, 0) && liveFreeze190ffDetached (flat, lynx::AutomationTargetKind::effectMix, 1));
     for (const auto& p : flat.patterns)
@@ -360,7 +360,7 @@ namespace
 {
 // One instrument per pattern, one track per channel (a Clip-launch song): Lead (insert 1: delay + reverb, fader, pan
 // and EQ set) on track 0 with a gap between its clips, Kick (insert 2) on track 1; an audio channel (a sine burst, its
-// clips with gain and fades) on track 2, insert 3.
+// clips with gain and fades) on track 2, insert 3. Inserts from 4 on are unused.
 lynx::Song liveFreeze190ffTracks (Freeze190ayFiles& files)
 {
     auto s = liveFreeze190ffSong();
@@ -480,27 +480,24 @@ TEST (livefreeze190ff_bounce_to_new_track_and_consolidate)
         CHECK (ticks == plan.end - plan.start);
         auto bounced = song;
         const auto channel = lynx::freeze::applyBounceToNewTrack (bounced, plan, "bounce", ticks);
-        CHECK (channel == 3 && bounced.channels[3].instrument == lynx::InstrumentKind::audioClip && bounced.channels[3].mixerTrack == 0);
-        CHECK (bounced.channels[0] == song.channels[0] && bounced.mixer == song.mixer);
-        int onNew = 0, movedKick = 0;
+        const auto& made = bounced.channels[3];
+        CHECK (channel == 3 && made.instrument == lynx::InstrumentKind::audioClip && made.name == "Lead (Bounce)" && made.mixerTrack == 4);
+        CHECK (bounced.mixer[4].volume == song.mixer[1].volume && bounced.mixer[4].pan == song.mixer[1].pan && bounced.mixer[4].eq == song.mixer[1].eq
+               && bounced.mixer[4].effects.empty());
+        CHECK (bounced.channels[0] == song.channels[0] && bounced.mixer[1] == song.mixer[1]);
+        int onNew = 0, movedKick = 0, mutedLead = 0;
         for (const auto& c : bounced.playlist)
         {
             onNew += c.kind == lynx::ClipKind::audio && c.channel == 3 && c.track == 1 && c.start == 0 && c.length == 4 * 3840;
             movedKick += c.kind == lynx::ClipKind::pattern && c.pattern == 1 && c.track == 2;
+            mutedLead += c.kind == lynx::ClipKind::pattern && c.pattern == 0 && c.muted;
         }
-        CHECK (onNew == 1 && movedKick == 4); // (the tracks below moved down one)
-        // the new track alone against the Lead's devices alone (its insert at unity, centre, no EQ: its mixer)
-        auto devices = song;
-        devices.channels[1].muted = devices.channels[2].muted = true;
-        devices.mixer[1].volume = lynx::unityFader;
-        devices.mixer[1].pan = 0.0f;
-        devices.mixer[1].eq = {};
-        auto alone = bounced;
-        for (int c = 0; c < 3; ++c)
-            alone.channels[(std::size_t) c].muted = true;
-        const auto d = freeze190ayCompare (liveFreeze190ffRender (devices, end, provider, true), liveFreeze190ffRender (alone, end, provider, true), 0, frames (plan.end));
-        std::printf ("  bounce to new track vs the track's devices: peak %.4f, residual %.1f dB\n", d.peak, d.dB());
-        CHECK (d.peak > 0.02f && d.dB() < -100.0);
+        CHECK (onNew == 1 && movedKick == 4 && mutedLead == 3); // (the source clips muted; the tracks below moved down one)
+        // the song with the Lead's clips muted and the new track playing sounds as before over the bounced span (the new
+        // track has the source's mixer)
+        const auto d = freeze190ayCompare (live, liveFreeze190ffRender (bounced, end, provider, true), 0, frames (plan.end));
+        std::printf ("  bounce to new track (sources muted) vs live: peak %.4f, residual %.1f dB\n", d.peak, d.dB());
+        CHECK (d.peak > 0.05f && d.dB() < -100.0);
         // what may not be bounced: clips of two tracks, a track playing two channels
         auto both = liveFreeze190ffClipsOn (song, 0);
         both.push_back (liveFreeze190ffClipsOn (song, 1).front());

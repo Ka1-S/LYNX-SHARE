@@ -987,6 +987,7 @@ bool flatten (Song& song, int channel)
     auto flat = standInChannel (old, whole->path, baked);
     flat.freeze = {};
     flat.standIns.clear();
+    flat.name = old.name + " (Bounce)"; // (the reference names the bounced track and its clips so: Live 12 manual)
     song.channels[(std::size_t) channel] = std::move (flat);
     if (baked)
     {
@@ -1104,21 +1105,70 @@ Song bounceRenderSong (const Song& song, const BouncePlan& plan)
     return s;
 }
 
+namespace
+{
+// an insert nothing uses (no channel, Playlist track or send into it, no effects, its default name); 0 = none
+int unusedInsert (const Song& song)
+{
+    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    {
+        const auto& m = song.mixer[(std::size_t) t];
+        if (! m.effects.empty() || ! (m.name.empty() || m.name == "Insert " + std::to_string (t)) || m.inputChannel >= 0)
+            continue;
+        if (std::any_of (song.channels.begin(), song.channels.end(), [t] (const ChannelDef& c) { return c.mixerTrack == t; })
+            || std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(), [t] (const PlaylistTrack& p) { return p.mixerTrack == t; })
+            || std::any_of (song.mixer.begin(), song.mixer.end(), [t] (const MixerTrack& o) {
+                   return std::any_of (o.sends.begin(), o.sends.end(), [t] (const MixerSend& x) { return x.target == t; });
+               }))
+            continue;
+        return t;
+    }
+    return 0;
+}
+} // namespace
+
 int applyBounceToNewTrack (Song& song, const BouncePlan& plan, const std::string& samplePath, std::int64_t lengthTicks)
 {
     if (plan.channel < 0 || plan.channel >= (int) song.channels.size())
         return -1;
+    // the reference mutes the source clips (Live 12 manual, "Bounce to Audio")
+    for (const auto i : plan.clips)
+        if (i >= 0 && i < (int) song.playlist.size())
+            song.playlist[(std::size_t) i].muted = true;
     const auto below = plan.track + 1;
     noteedit::insertTrack (song, below);
-    const auto& source = song.channels[(std::size_t) plan.channel];
+    const auto source = song.channels[(std::size_t) plan.channel];
     ChannelDef ch;
-    ch.name = quickrender::uniqueChannelName (song, source.name);
+    ch.name = quickrender::uniqueChannelName (song, source.name + " (Bounce)");
     ch.instrument = InstrumentKind::audioClip;
     ch.sampler.declickMode = 0; // (the render's own edges: no attack reshapes its start)
     ch.samplePath = samplePath;
     ch.volume = audioClipUnityVolume;
-    ch.mixerTrack = 0;
     ch.colour = source.colour;
+    // the new track keeps the source's mixer (the reference: volume, pan and sends "preserved in the new track's
+    // settings"): an insert of its own with the source insert's fader, pan, EQ, sends and routing, its effects not
+    // (they are in the audio). No free insert: the Master, at unity.
+    ch.mixerTrack = 0;
+    if (plan.insert > 0 && plan.insert < (int) song.mixer.size())
+        if (const auto t = unusedInsert (song); t > 0)
+        {
+            const auto& from = song.mixer[(std::size_t) plan.insert];
+            auto& to = song.mixer[(std::size_t) t];
+            to.name = ch.name;
+            to.colour = from.colour;
+            to.volume = from.volume;
+            to.pan = from.pan;
+            to.stereo = from.stereo;
+            to.invertPhase = from.invertPhase;
+            to.swapChannels = from.swapChannels;
+            to.eq = from.eq;
+            to.sends = from.sends;
+            to.toMaster = from.toMaster;
+            to.masterLevel = from.masterLevel;
+            to.outputChannel = from.outputChannel;
+            to.outputMode = from.outputMode;
+            ch.mixerTrack = t;
+        }
     song.channels.push_back (ch);
     Clip clip;
     clip.kind = ClipKind::audio;
