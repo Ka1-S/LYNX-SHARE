@@ -5,10 +5,10 @@
 #include <jni.h>
 #include <android/log.h>
 #include <android/native_activity.h>
+#include <android/native_app_glue.h>
 
 extern "C" {
     extern JavaVM* android_jvm;
-    extern struct android_app* android_app;
 }
 
 #define LOG_TAG "LYNX_Audio"
@@ -46,26 +46,23 @@ int AndroidAudioDevice::getDefaultBufferSize()
     return 256; // fallback
 }
 
-juce::StringArray AndroidAudioDevice::getAvailableSampleRates()
+juce::Array<double> AndroidAudioDevice::getAvailableSampleRates()
 {
-    juce::StringArray rates;
-    rates.add("44100");
-    rates.add("48000");
+    juce::Array<double> rates;
+    rates.add(44100.0);
+    rates.add(48000.0);
     // Android commonly supports these rates
     return rates;
 }
 
-juce::Array<juce::AudioIODeviceType::AudioDeviceInfo> AndroidAudioDevice::getAvailableDevices()
+juce::Array<int> AndroidAudioDevice::getAvailableBufferSizes()
 {
-    juce::Array<juce::AudioIODeviceType::AudioDeviceInfo> devices;
-    juce::AudioIODeviceType::AudioDeviceInfo info;
-    info.name = "AAudio Default";
-    info.inputChannels = 2;
-    info.outputChannels = 2;
-    info.isDefaultInput = true;
-    info.isDefaultOutput = true;
-    devices.add(info);
-    return devices;
+    juce::Array<int> sizes;
+    int defaultSize = getDefaultBufferSize();
+    sizes.add(defaultSize);
+    sizes.add(defaultSize * 2);
+    sizes.add(defaultSize * 4);
+    return sizes;
 }
 
 bool AndroidAudioDevice::open(const juce::String& inputDeviceName,
@@ -227,9 +224,9 @@ int AndroidAudioDevice::getInputLatencyInSamples()
 }
 
 aaudio_data_callback_result_t AndroidAudioDevice::onAudioCallback(AAudioStream* stream,
-                                                                   void* userData,
-                                                                   void* audioData,
-                                                                   int32_t numFrames)
+                                                                    void* userData,
+                                                                    void* audioData,
+                                                                    int32_t numFrames)
 {
     auto* device = static_cast<AndroidAudioDevice*>(userData);
     if (!device || !device->currentCallback || !device->isStarted)

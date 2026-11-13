@@ -13,13 +13,13 @@ public:
     AndroidAudioDevice();
     ~AndroidAudioDevice() override;
 
-    // AudioIODevice interface
+    // AudioIODevice interface (JUCE 8)
     const juce::String getName() const override { return "AAudio"; }
     int getDefaultBufferSize() override;
     int getCurrentBufferSizeSamples() override { return currentBufferSize; }
     double getCurrentSampleRate() override { return currentSampleRate; }
-    juce::StringArray getAvailableSampleRates() override;
-    juce::Array<juce::AudioIODeviceType::AudioDeviceInfo> getAvailableDevices() override;
+    juce::Array<double> getAvailableSampleRates() override;
+    juce::Array<int> getAvailableBufferSizes() override;
 
     bool open (const juce::String& inputDeviceName,
                const juce::String& outputDeviceName,
