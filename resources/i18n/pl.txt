@@ -9646,7 +9646,7 @@ countries: pl
 "Capture MIDI: {0} notes put in the playing clip" = "Przechwyć MIDI: {0} nut dodano do odtwarzanego klipu"
 "Track Volume" = "Głośność ścieżki"
 "Track Panning" = "Panorama ścieżki"
-"Key {0}" = "Klawisz {0}"
+"@computer key: Key" = "Klawisz"
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"

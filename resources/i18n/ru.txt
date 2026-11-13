@@ -9646,7 +9646,7 @@ countries: ru by kz
 "Capture MIDI: {0} notes put in the playing clip" = "Захват MIDI: {0} нот добавлено в играющий клип"
 "Track Volume" = "Громкость трека"
 "Track Panning" = "Панорама трека"
-"Key {0}" = "Клавиша {0}"
+"@computer key: Key" = "Клавиша"
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"

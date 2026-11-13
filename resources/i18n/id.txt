@@ -9646,7 +9646,7 @@ countries: id
 "Capture MIDI: {0} notes put in the playing clip" = "Tangkap MIDI: {0} not dimasukkan ke klip yang sedang diputar"
 "Track Volume" = "Volume trek"
 "Track Panning" = "Panning trek"
-"Key {0}" = "Tombol {0}"
+"@computer key: Key" = "Tombol"
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"

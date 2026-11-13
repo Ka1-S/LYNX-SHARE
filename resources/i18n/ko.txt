@@ -9646,7 +9646,7 @@ countries: kr
 "Capture MIDI: {0} notes put in the playing clip" = "MIDI 캡처: 재생 중인 클립에 노트 {0}개를 넣었습니다"
 "Track Volume" = "트랙 볼륨"
 "Track Panning" = "트랙 패닝"
-"Key {0}" = "키 {0}"
+"@computer key: Key" = "키"
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"

@@ -3185,7 +3185,7 @@ public:
             b->setColour (juce::TextButton::buttonOnColourId, b == &key ? theme::colour::warning : theme::colour::info);
             b->setColour (juce::TextButton::textColourOnId, theme::colour::bg0);
         }
-        key.setButtonText (tr ("Key"));
+        key.setButtonText (trc ("@computer key: Key")); // (round 190em: a computer key, not the musical key)
         key.setTooltip (tr ("Key Map Mode: map computer keys to clips, scenes, buttons and controls (Ctrl+K)"));
         key.onClick = [this] { if (onKey != nullptr) onKey(); };
         midi.setButtonText ("MIDI");

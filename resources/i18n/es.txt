@@ -9646,7 +9646,7 @@ countries: es mx ar co cl pe ve
 "Capture MIDI: {0} notes put in the playing clip" = "Capturar MIDI: {0} notas puestas en el clip que suena"
 "Track Volume" = "Volumen de pista"
 "Track Panning" = "Paneo de pista"
-"Key {0}" = "Tecla {0}"
+"@computer key: Key" = "Tecla"
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"

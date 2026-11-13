@@ -122,7 +122,7 @@ juce::String listKeyText (int key)
 {
     // round 190em: the Key Mappings list as Live writes it ("Key w"; live check 190ei); letters in lower case
     const auto text = key > 32 && key < 127 ? juce::String::charToString ((juce::juce_wchar) key).toLowerCase() : keyText (key);
-    return tr ("Key {0}", { text });
+    return trc ("@computer key: Key") + " " + text; // (the computer key's word, not the musical key)
 }
 
 juce::String assignedText (const remotemap::Assigned& a, remotemap::Mode mode)
@@ -519,7 +519,7 @@ void MappingBrowser::paint (juce::Graphics& g)
 
     const auto widths = columnWidths();
     const juce::StringArray heads = mode == remotemap::Mode::key
-                                        ? juce::StringArray { tr ("Key"), tr ("Path"), tr ("Name"), tr ("Min"), tr ("Max") }
+                                        ? juce::StringArray { trc ("@computer key: Key"), tr ("Path"), tr ("Name"), tr ("Min"), tr ("Max") }
                                         : juce::StringArray { widths[0] < 44 ? juce::String ("Ch") : tr ("Channel"), tr ("Note/Control"), tr ("Path"), tr ("Name"), tr ("Min"), tr ("Max") };
     auto header = area.removeFromTop (headerHeight);
     g.setColour (c::bg4);

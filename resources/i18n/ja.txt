@@ -9646,7 +9646,7 @@ countries: jp
 "Capture MIDI: {0} notes put in the playing clip" = "MIDI をキャプチャ: 再生中のクリップに {0} 個のノートを追加しました"
 "Track Volume" = "トラックボリューム"
 "Track Panning" = "トラックパン"
-"Key {0}" = "キー {0}"
+"@computer key: Key" = "キー"
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"

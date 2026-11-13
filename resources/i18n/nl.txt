@@ -9646,7 +9646,7 @@ countries: nl be
 "Capture MIDI: {0} notes put in the playing clip" = "MIDI vastleggen: {0} noten in de spelende clip gezet"
 "Track Volume" = "Spoorvolume"
 "Track Panning" = "Spoorpanning"
-"Key {0}" = "Toets {0}"
+"@computer key: Key" = "Toets"
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"

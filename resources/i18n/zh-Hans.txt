@@ -9646,7 +9646,7 @@ countries: cn sg
 "Capture MIDI: {0} notes put in the playing clip" = "捕获 MIDI：已将 {0} 个音符放入正在播放的片段"
 "Track Volume" = "轨道音量"
 "Track Panning" = "轨道声像"
-"Key {0}" = "按键 {0}"
+"@computer key: Key" = "按键"
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"
