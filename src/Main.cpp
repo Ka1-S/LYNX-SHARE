@@ -19724,7 +19724,7 @@ private:
             s.channels.push_back (ch);
             const auto c = (int) s.channels.size() - 1;
             lynx::clipsample::setWarp (s, c, true, 2.0);
-            s.channels[(std::size_t) c].sampler.stretchMethod = lynx::StretchMethod::beats;
+            lynx::warpmodes::setMode (s, c, (int) lynx::StretchMethod::beats); // (keeps the pitch: Beats, not Re-Pitch)
             lynx::Clip audio;
             audio.kind = lynx::ClipKind::audio;
             audio.channel = c;
@@ -19749,7 +19749,8 @@ private:
             const auto* c = lynx::warpmodes::gridAudioClip (const_cast<lynx::Song&> (offline.getSong()), 0, scene);
             return c != nullptr ? c->channel : -1;
         };
-        check ("01 Beats panel (defaults: Transients, Back-and-Forth, 100)", shoot ("01-beats-defaults"));
+        const auto beatsOn = [&] { const auto& sm = offline.getSong().channels[(std::size_t) channelOf (0)].sampler; return sm.keepPitch && sm.stretchMethod == lynx::StretchMethod::beats; };
+        check ("01 Beats panel (defaults: Transients, Back-and-Forth, 100)", beatsOn() && shoot ("01-beats-defaults"));
         offline.editSong ([&] (lynx::Song& s) {
             const auto c = lynx::warpmodes::ownChannelForGridClip (s, 0, 0);
             lynx::warpmodes::setPreserve (s, c, 3);
@@ -19758,7 +19759,7 @@ private:
         }, false);
         offline.dispatchPendingMessages();
         check ("O16: the first clip moved to its own channel, the second kept the old one", channelOf (0) != channelOf (1) && channelOf (0) >= 0 && channelOf (1) >= 0);
-        check ("02 Beats panel (1/8, Loop Off, 40)", shoot ("02-beats-set"));
+        check ("02 Beats panel (1/8, Loop Off, 40)", beatsOn() && shoot ("02-beats-set"));
         offline.editSong ([&] (lynx::Song& s) { lynx::warpmodes::setMode (s, channelOf (0), (int) lynx::StretchMethod::tones); }, false);
         offline.dispatchPendingMessages();
         check ("03 Tones panel (Grain Size 30)", shoot ("03-tones"));

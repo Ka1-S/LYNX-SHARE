@@ -266,11 +266,11 @@ public:
             grainTones->setBounds (row1);
             grainTexture->setBounds (row1);
             left.removeFromTop (4);
-            auto row2 = left.removeFromTop (20);
-            loopMode.setBounds (row2.removeFromLeft (row2.getWidth() * 3 / 5));
-            row2.removeFromLeft (4);
-            envelopeLabel = row2.removeFromLeft (row2.getWidth() / 2);
-            envelope->setBounds (row2);
+            loopMode.setBounds (left.removeFromTop (20));
+            left.removeFromTop (4);
+            auto row3 = left.removeFromTop (20); // (Envelope on its own row, like Grain Size: its label fits)
+            envelopeLabel = row3.removeFromLeft (row3.getWidth() / 2);
+            envelope->setBounds (row3);
         }
         fade.setBounds (left.removeFromBottom (18).withWidth (left.getWidth() / 2 - 2));
         left.removeFromBottom (4);
