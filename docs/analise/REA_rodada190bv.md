@@ -126,3 +126,23 @@ checked).
 - `src/ui/ClipGridComponent.cpp`, `src/ui/GroovePoolComponent.*` — the status row, record buttons, Session Record,
   clipboard, drag and drop, the pool.
 - Tests: `tests/Session190bvTests.inc`; `.lynx` round trip in `--selftest`; pictures by `--gridshot`.
+
+## 7. Round 190fm: grooves beyond the grid
+
+- **Arrangement clips** [STR: `.GrooveChooser`, `.GrooveCommitButton` in the clip panel's widget list, the same panel for
+  Session and Arrangement clips]: a Playlist pattern clip has its own groove (`Clip::groove`, 0 = none = every clip saved
+  before; saved in `.lynx` as the clip array's index 24). The scheduler plays it as it plays a grid clip (`groove::ofClip`
+  reads only; nothing is allocated on the audio thread). The Playlist's pattern clip menu has Groove (None, the pool's
+  grooves, Add a groove), Commit groove (`commitPlaylistClip`: a pattern other clips play is copied first) and Extract
+  groove (`extractFromClip`: from the clip's offset over its length). The items show in the Clip-launch layout, or once
+  the project has a pool, or on a clip that has a groove: FL's clip menu stays as it was otherwise. A clip moved between
+  the grid and the Playlist keeps its groove (on the grid it is the slot's).
+- **.als**: ALS_FORMAT.md §21.
+- **Classic swing** (LYNX's own, by formula): 8ths / 16ths / 32nds at the swing steps drum machines publish for their
+  timing correction (50, 54, 58, 62, 66, 71, 75 % and 50, 54, 58, 63, 67, 71 %), named "Swing 16ths 54 %" etc. As on
+  those machines the notes are put on the grid first (Quantize 100 %), then every second one is delayed; Timing and
+  Quantize can be lowered in the pool. The machines' own recorded feel (small velocity and timing deviations in Live's
+  library files) is not copied.
+- Left out: grooves on audio clips (LYNX has no groove on audio), the Detail View's chooser for Playlist clips (the
+  Detail View's clip panel shows grid clips only; the Playlist clip menu has the chooser), a default groove for new
+  clips, Live's other library families (Logic, Notator, Double Up / Down / Funker, styles and percussion accents).

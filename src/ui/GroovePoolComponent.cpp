@@ -26,7 +26,7 @@ juce::String utf8 (const std::string& s) { return juce::String::fromUTF8 (s.c_st
 juce::String percent (float v) { return juce::String (juce::roundToInt (v * 100.0f)) + " %"; }
 
 // the folders of LYNX's own grooves, as shown
-const char* const folderNames[] = { TR_NOOP ("Swing"), TR_NOOP ("Feel"), TR_NOOP ("Accent"), TR_NOOP ("Utility") };
+const char* const folderNames[] = { TR_NOOP ("Swing"), TR_NOOP ("Classic swing"), TR_NOOP ("Feel"), TR_NOOP ("Accent"), TR_NOOP ("Utility") };
 
 // A groove file of the user's (.agr; as saved it may be gzip-packed) into the pool. Returns the new id, 0: not read.
 std::uint32_t importGrooveFile (AudioEngine& engine, const juce::File& file)
