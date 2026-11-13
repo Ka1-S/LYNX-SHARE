@@ -9817,6 +9817,7 @@ countries: id
 "Transient Envelope: a fade over each piece (100: no fade)" = "Envelope transien: fade pada tiap potongan (100: tanpa fade)"
 "Grain Size: the length of the pieces the audio is stretched in" = "Ukuran grain: panjang potongan tempat audio diregangkan"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. Only this clip changes: when other clips play the same audio, it gets its own copy" = "Mode warp: cara audio diregangkan. Re-Pitch mengubah kecepatan dan nada bersamaan. Hanya klip ini yang berubah: bila klip lain memutar audio yang sama, klip ini mendapat salinannya sendiri"
+"Classic swing" = "Swing klasik"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"

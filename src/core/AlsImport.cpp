@@ -16,6 +16,7 @@
 #include "core/ClipLauncher.h"
 #include "core/DynamicsSuite.h"
 #include "core/FlWrapper.h"
+#include "core/Groove.h"
 #include "core/Gzip.h"
 #include "core/LiveScales.h"
 #include "core/MissingFiles.h"
@@ -159,6 +160,8 @@ struct Ctx
     // the scale of the first MIDI clip that has Live's clip scale switched on (round 190o)
     std::optional<projectkey::Key> clipKey;
     bool clipKeySeen = false;
+    // round 190fm: the set's GroovePool, a Groove's Id attribute → its id in LYNX's pool
+    std::map<int, std::uint32_t> grooveIds;
 
     explicit Ctx (const AlsImportOptions& o) : options (o), report (o.common.report) {}
 
@@ -1699,6 +1702,8 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
     const auto path = ctx.resolveSample (clip.child ("SampleRef"), "Audio clip: " + user);
     if (path.empty() || length <= 0)
         return;
+    if (intOf (clip.value ("GrooveSettings/GrooveId", "-1"), -1) >= 0) // (round 190fm)
+        ctx.note (&FlpImportReport::unsupported, "Groove on an audio clip (LYNX's grooves play on MIDI clips; the clip plays straight)");
     const auto warped = clip.boolean ("IsWarped", true);
     const auto mode = (int) clip.number ("WarpMode", 0);
     const auto bpm = ctx.song.bpm;
@@ -1807,6 +1812,58 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
     }
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Grooves (round 190fm) [SCHEMA: LiveSet/GroovePool{LomId, Grooves, DefaultGrooveId}, Groove Id=…{LomId, Name, Clip,
+// Grid, QuantizationAmount, TimingAmount, RandomAmount, VelocityAmount, Annotation, Selection, SourceContext},
+// clip GrooveSettings/GrooveId; DATA: the shipped sets, GrooveId = a Groove's Id attribute, −1 none]
+
+// The pool: each Groove → LYNX's pool (core/Groove.h fromGrooveElement: template notes inside its loop → points, Grid →
+// base, amounts in percent); the main track's GlobalGrooveAmount (percent) → the pool's amount
+void readGroovePool (Ctx& ctx, const Element& set, const Element& mainMixer)
+{
+    const auto pool = set.child ("GroovePool");
+    for (const auto& node : pool.path ("Grooves").children ("Groove"))
+    {
+        Groove g;
+        std::string why;
+        if (! groove::fromGrooveElement (node, g, &why))
+        {
+            ctx.note (&FlpImportReport::unsupported, "Groove without a usable template (left out): " + node.value ("Name"));
+            continue;
+        }
+        ctx.grooveIds[intOf (node.attr ("Id"), -1)] = groove::add (ctx.song.grooves, std::move (g));
+        // Live's groove law is not measured: LYNX's own (docs/analise/REA_rodada190bv.md U2) plays the same template
+        ctx.note (&FlpImportReport::approximated, "Grooves (LYNX's groove timing and accents; Live's exact law needs a live check)");
+        if (! node.value ("Annotation").empty())
+            ctx.note (&FlpImportReport::unsupported, "Groove info text (Annotation)");
+    }
+    if (const auto amount = mainMixer.child ("GlobalGrooveAmount"); amount)
+    {
+        const auto percent = amount.number ("Manual", 100.0);
+        ctx.song.grooves.amount = (float) std::clamp (percent / 100.0, 0.0, (double) groove::maxAmount);
+        if (percent > groove::maxAmount * 100.0 + 1e-6)
+            ctx.note (&FlpImportReport::approximated, "Global groove amount above 130 % (kept at 130 %)");
+    }
+    // the pool's default groove for new clips: LYNX has none (groove-023)
+    if (const auto def = intOf (pool.value ("DefaultGrooveId", "-1"), -1); def >= 0 && ctx.grooveIds.count (def) != 0)
+        ctx.note (&FlpImportReport::unsupported, "Default groove for new clips (LYNX's new clips start without a groove)");
+}
+
+// A clip's GrooveSettings/GrooveId → LYNX's id (0: none, −1 in the set, or not in the pool)
+std::uint32_t grooveOfClip (Ctx& ctx, const Element& clip)
+{
+    const auto id = intOf (clip.value ("GrooveSettings/GrooveId", "-1"), -1);
+    if (id < 0)
+        return 0;
+    const auto it = ctx.grooveIds.find (id);
+    if (it == ctx.grooveIds.end())
+    {
+        ctx.note (&FlpImportReport::unsupported, "Clip groove that is not in the set's Groove Pool (left out)");
+        return 0;
+    }
+    return it->second;
+}
+
 void addMidiClip (Ctx& ctx, const Element& clip, int row, int channel, double at, double length, std::vector<Clip>* out = nullptr,
                   const ClipLoop* loopOverride = nullptr)
 {
@@ -1819,6 +1876,7 @@ void addMidiClip (Ctx& ctx, const Element& clip, int row, int channel, double at
     c.start = ticksOf (at);
     c.length = ticksOf (length);
     c.muted = clip.boolean ("Disabled", false);
+    c.groove = grooveOfClip (ctx, clip); // (round 190fm; on the grid launcher::setClip hands it to the slot)
     (out != nullptr ? *out : ctx.song.playlist).push_back (c);
 }
 
@@ -2293,6 +2351,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
     song.mixer[0].volume = mapValue (ValueMap::fader, mainMixer.number ("Volume/Manual", 1));
     song.mixer[0].pan = (float) mainMixer.number ("Pan/Manual", 0);
     registerMixerTargets (ctx, mainMixer, 0, "Main");
+    readGroovePool (ctx, set, mainMixer); // (round 190fm)
 
     // tracks: one insert each (returns too), in order
     const auto tracks = set.child ("Tracks").children();

@@ -88,6 +88,10 @@ int setClip (Song& song, int track, int scene, Clip clip)
         grid.scenes.emplace_back();
     grid.slots[(std::size_t) id] = ClipGridSlot {};
     grid.slots[(std::size_t) id].scene = scene;
+    // (round 190fm) a Playlist clip's groove goes with it: on the grid a clip's groove is its slot's
+    if (clip.kind == ClipKind::pattern)
+        grid.slots[(std::size_t) id].groove = clip.groove;
+    clip.groove = 0;
     clip.track = track;
     clip.start = 0;
     clip.crossfadeIn = clip.crossfadeOut = 0;

@@ -9817,6 +9817,7 @@ countries: tr
 "Transient Envelope: a fade over each piece (100: no fade)" = "Geçiş zarfı: her parçaya bir sönüm (100: sönüm yok)"
 "Grain Size: the length of the pieces the audio is stretched in" = "Tane boyutu: sesin içinde esnetildiği parçaların uzunluğu"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. Only this clip changes: when other clips play the same audio, it gets its own copy" = "Warp modu: sesin nasıl esnetildiği. Re-Pitch hızı ve perdeyi birlikte değiştirir. Yalnızca bu klip değişir: başka klipler aynı sesi çalıyorsa kendi kopyasını alır"
+"Classic swing" = "Klasik swing"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"

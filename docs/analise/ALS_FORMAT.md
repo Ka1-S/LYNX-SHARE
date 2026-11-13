@@ -498,3 +498,35 @@ LYNX (`SamplerSettings::warpModes`, `core/WarpModes.h`, `core/TimeStretch` `Stre
   Complex).
 - The Clip View shows the mode's settings under the mode chooser; an edit from a grid clip whose channel other clips play
   gives that clip its own copy of the channel first (owner decision O16), so only that clip changes, as in Live.
+
+## 22. Grooves in and out (round 190fm, 2026-11-13) [SCHEMA, DATA]
+
+Live 12.4's schema (`Resources/Schema/12.0_12402.txt`, lines 2742-2760) and the shipped sets (7 of 19 hold a groove; a
+Live 11.0.12 public set saves the same members) give:
+
+- `LiveSet/GroovePool {LomId, Grooves, DefaultGrooveId, GroovesListWrapper}`. Live 11's pool has no `DefaultGrooveId`.
+- `Grooves/Groove Id="n" {LomId, Name, Clip/Value/MidiClip (the template), Grid, QuantizationAmount, TimingAmount,
+  RandomAmount, VelocityAmount, Annotation, Selection, SourceContext}`. `Grid` 0…5 = 1/4, 1/8, 1/8T, 1/16, 1/16T, 1/32
+  (LYNX's `GrooveBase` numbers). The amounts are percent (Velocity −100…100). `SourceContext` is empty for a groove
+  that came from no file, else it names the library file it was loaded from.
+- A clip (MIDI or audio, Arrangement or Session) refers to a groove by `GrooveSettings/GrooveId` = the `Id` attribute
+  of a pool `Groove` (sets with `<Groove Id="0">` use 0; −1 = none, 492 clips in the shipped sets).
+- `DefaultGrooveId` is a pool groove's id or −1 (Live's default set: 4, its one groove "Swing 16ths 66").
+- The global amount is the main track's `Mixer/GlobalGrooveAmount` (`Manual` in percent; `MidiControllerRange` 0…131.25).
+
+Import (`AlsImport.cpp readGroovePool`, `grooveOfClip`): every pool groove → LYNX's pool (`groove::fromGrooveElement`,
+the same reader as a user's `.agr`: the template's notes inside its loop, the loudest per Base slot, become the points);
+`GlobalGrooveAmount` → the pool's amount (above 130 % kept at 130 %, reported); an Arrangement MIDI clip's `GrooveId` →
+the Playlist clip's groove (`Clip::groove`), a Session MIDI clip's → its slot's groove. Reported: a groove on an audio
+clip (LYNX's grooves play on MIDI clips), a `GrooveId` that is not in the pool, a `DefaultGrooveId` (LYNX has no
+default groove for new clips), an `Annotation`, and the groove law itself as approximate (LYNX's arithmetic of
+REA_rodada190bv.md §3; Live's is not measured: needs a live check).
+
+Export (`AlsExport.cpp groovePool`, `grooveNode`): the skeleton's pool gets one `Groove` per pool groove, written member by
+member in the schema's order by the exporter's own code (no skeleton of a groove; its template is the exporter's own
+`MidiClip` with one note per point, key 60, a 64th long, `Velocity` = the accent, `LoopOn` true); `Id` = the groove's
+index in LYNX's pool; `SourceContext` empty, `Annotation` empty, `Selection` false; `DefaultGrooveId` −1 (Live 12
+only); `GlobalGrooveAmount` = the pool's amount × 100 (100 % for a project without grooves; the Live 12 skeleton held
+0). A Playlist pattern clip's and a grid slot's groove → `GrooveSettings/GrooveId`. Needs a live check: that Live 12.4
+opens such a pool (the members and order are the schema's and the shipped sets'), and whether Live measures a groove
+from the clip's start (LYNX: the pattern's own ticks) for a clip whose start is not on the groove's length.

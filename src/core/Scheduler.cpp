@@ -532,9 +532,10 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
                             : std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
     const auto repeats = stretchedClipsLoop() && clip.offset + clip.length > period;
     const auto firstPass = repeats ? clip.offset / period : 0, lastPass = repeats ? (clip.offset + clip.length - 1) / period : 0;
-    // a clip of the grid may play through a groove of the pool (round 190bv, core/Groove.h): its notes sound moved and
-    // accented, the pattern stays as written. No groove (every Playlist clip, every project without a pool): nothing here.
-    const auto* clipGroove = clip.gridSlot >= 0 ? groove::ofClip (song, clip) : nullptr;
+    // a clip may play through a groove of the pool (round 190bv, core/Groove.h; Playlist clips too since round 190fm):
+    // its notes sound moved and accented, the pattern stays as written. No groove (every clip saved before, every project
+    // without a pool): nothing here. (ofClip only reads: no allocation on the audio thread)
+    const auto* clipGroove = groove::ofClip (song, clip);
     const auto grooveReach = clipGroove != nullptr ? (double) groove::maxShift (*clipGroove, song.grooves.amount) : 0.0;
 
     // one pass: the notes `shift` ticks later (pass ticks = pattern ticks + shift)

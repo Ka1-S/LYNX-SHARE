@@ -9817,6 +9817,7 @@ countries: fr be ch ca lu
 "Transient Envelope: a fade over each piece (100: no fade)" = "Enveloppe des transitoires : un fondu sur chaque morceau (100 : aucun fondu)"
 "Grain Size: the length of the pieces the audio is stretched in" = "Taille de grain : la longueur des morceaux dans lesquels l'audio est étiré"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. Only this clip changes: when other clips play the same audio, it gets its own copy" = "Mode de warp : comment l'audio est étiré. Re-Pitch change vitesse et hauteur ensemble. Seul ce clip change : si d'autres clips jouent le même audio, il reçoit sa propre copie"
+"Classic swing" = "Swing classique"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] ouvrir/fermer l'éditeur  [Alt]+[LMB] garder les autres ouverts  [Ctrl]+[LMB] écouter  [2xLMB] Piano Roll  [LMB] glisser haut/bas réordonne  [RMB] menu du canal"

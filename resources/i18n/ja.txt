@@ -9817,6 +9817,7 @@ countries: jp
 "Transient Envelope: a fade over each piece (100: no fade)" = "トランジェント エンベロープ: 各ピースにかけるフェード (100: フェードなし)"
 "Grain Size: the length of the pieces the audio is stretched in" = "グレイン サイズ: オーディオを伸縮する単位となるピースの長さ"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. Only this clip changes: when other clips play the same audio, it gets its own copy" = "ワープ モード: オーディオの伸縮方法。Re-Pitch は速度とピッチを一緒に変えます。変わるのはこのクリップだけ: 他のクリップが同じオーディオを再生していると、このクリップに専用のコピーが作られます"
+"Classic swing" = "クラシック・スウィング"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"

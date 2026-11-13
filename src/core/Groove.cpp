@@ -151,6 +151,11 @@ bool remove (Song& song, std::uint32_t id)
         for (auto& s : song.clipGrid->slots)
             if (s.groove == id)
                 s.groove = 0;
+    song.forEachClipList ([id] (std::vector<Clip>& clips) { // (round 190fm: the Playlist's clips)
+        for (auto& c : clips)
+            if (c.groove == id)
+                c.groove = 0;
+    });
     return true;
 }
 
@@ -162,12 +167,22 @@ int users (const Song& song, std::uint32_t id) noexcept
             if (c.length > 0 && c.gridSlot >= 0 && c.gridSlot < (int) song.clipGrid->slots.size()
                 && song.clipGrid->slots[(std::size_t) c.gridSlot].groove == id)
                 ++n;
+    if (id != 0)
+        song.forEachClipList ([&n, id] (const std::vector<Clip>& clips) { // (round 190fm: the Playlist's clips)
+            for (const auto& c : clips)
+                if (c.gridSlot < 0 && c.groove == id && c.kind == ClipKind::pattern && c.length > 0)
+                    ++n;
+        });
     return n;
 }
 
 const Groove* ofClip (const Song& song, const Clip& clip) noexcept
 {
-    if (clip.gridSlot < 0 || ! song.clipGrid || clip.gridSlot >= (int) song.clipGrid->slots.size() || song.grooves.grooves.empty())
+    if (song.grooves.grooves.empty())
+        return nullptr;
+    if (clip.gridSlot < 0) // a Playlist clip (round 190fm): its own groove, 0 for every clip that never had one
+        return clip.kind == ClipKind::pattern ? find (song.grooves, clip.groove) : nullptr;
+    if (! song.clipGrid || clip.gridSlot >= (int) song.clipGrid->slots.size())
         return nullptr;
     return find (song.grooves, song.clipGrid->slots[(std::size_t) clip.gridSlot].groove);
 }
@@ -181,6 +196,20 @@ bool setClipGroove (Song& song, int track, int scene, std::uint32_t id)
         return false;
     slot->groove = id;
     return true;
+}
+
+bool setPlaylistClipGroove (Song& song, const std::vector<int>& clips, std::uint32_t id)
+{
+    if (id != 0 && find (song.grooves, id) == nullptr)
+        return false;
+    auto any = false;
+    for (const auto i : clips)
+        if (i >= 0 && i < (int) song.playlist.size() && song.playlist[(std::size_t) i].kind == ClipKind::pattern)
+        {
+            song.playlist[(std::size_t) i].groove = id;
+            any = true;
+        }
+    return any;
 }
 
 // --- the maths -------------------------------------------------------------------------------------------------------
@@ -236,21 +265,13 @@ std::uint32_t randomBits (std::uint32_t seed, std::size_t noteIndex, std::int64_
     return (std::uint32_t) (chance::mix (chance::context (seed, 0x67726F6F7665ull + (std::uint64_t) noteIndex, pass)) >> 32);
 }
 
-bool commit (Song& song, int track, int scene)
+namespace
 {
-    if (! song.clipGrid)
-        return false;
-    auto& grid = *song.clipGrid;
-    const auto* clip = launcher::clipAt (grid, track, scene);
-    if (clip == nullptr || clip->kind != ClipKind::pattern || clip->pattern < 0 || clip->pattern >= (int) song.patterns.size())
-        return false;
-    const auto* g = ofClip (song, *clip);
-    if (g == nullptr)
-        return false;
-    const auto groove = *g;
-    auto pattern = clip->pattern;
-
-    // a pattern other clips play too: this clip gets its own copy
+// Commit's common part: `clip` (of the grid or the Playlist) plays `groove`; its pattern's notes are written through it. A pattern
+// another clip plays too is copied first and only `clip` moves to the copy.
+void writeThrough (Song& song, Clip& clip, const Groove& groove)
+{
+    auto pattern = clip.pattern;
     auto uses = 0;
     song.forEachClipList ([&] (std::vector<Clip>& clips) {
         for (const auto& c : clips)
@@ -263,11 +284,8 @@ bool commit (Song& song, int track, int scene)
         copy.uid = 0;
         song.patterns.push_back (std::move (copy));
         pattern = (int) song.patterns.size() - 1;
-        for (auto& c : grid.clips)
-            if (&c == clip)
-                c.pattern = pattern;
+        clip.pattern = pattern;
     }
-
     auto& notes = song.patterns[(std::size_t) pattern].notes;
     for (std::size_t i = 0; i < notes.size(); ++i)
     {
@@ -276,8 +294,45 @@ bool commit (Song& song, int track, int scene)
         notes[i].velocity = played.velocity;
     }
     song.patterns[(std::size_t) pattern].sortNotes();
+}
+} // namespace
+
+bool commit (Song& song, int track, int scene)
+{
+    if (! song.clipGrid)
+        return false;
+    auto& grid = *song.clipGrid;
+    const auto* clip = launcher::clipAt (grid, track, scene);
+    if (clip == nullptr || clip->kind != ClipKind::pattern || clip->pattern < 0 || clip->pattern >= (int) song.patterns.size())
+        return false;
+    const auto* g = ofClip (song, *clip);
+    if (g == nullptr)
+        return false;
+    const auto groove = *g;
+    for (auto& c : grid.clips)
+        if (&c == clip)
+        {
+            writeThrough (song, c, groove);
+            break;
+        }
     if (auto* slot = launcher::settingsAt (grid, track, scene))
         slot->groove = 0;
+    return true;
+}
+
+bool commitPlaylistClip (Song& song, std::size_t index)
+{
+    if (index >= song.playlist.size())
+        return false;
+    auto& clip = song.playlist[index];
+    if (clip.kind != ClipKind::pattern || clip.pattern < 0 || clip.pattern >= (int) song.patterns.size())
+        return false;
+    const auto* g = ofClip (song, clip);
+    if (g == nullptr)
+        return false;
+    const auto groove = *g;
+    writeThrough (song, clip, groove);
+    clip.groove = 0;
     return true;
 }
 
@@ -311,6 +366,25 @@ Groove extract (const Pattern& pattern, std::int64_t length, GrooveBase base, st
         }
     tidy (g);
     return g;
+}
+
+Groove extractFromClip (const Song& song, const Clip& clip, GrooveBase base, std::string name)
+{
+    if (clip.kind != ClipKind::pattern || clip.pattern < 0 || clip.pattern >= (int) song.patterns.size() || clip.length <= 0)
+    {
+        Groove none;
+        none.name = std::move (name);
+        none.base = base;
+        return none;
+    }
+    Pattern window; // the notes the clip plays, from its offset on
+    for (auto n : song.patterns[(std::size_t) clip.pattern].notes)
+        if (n.start >= clip.offset && n.start < clip.offset + clip.length)
+        {
+            n.start -= clip.offset;
+            window.notes.push_back (n);
+        }
+    return extract (window, clip.length, base, std::move (name));
 }
 
 // --- LYNX's own grooves ----------------------------------------------------------------------------------------------
@@ -369,6 +443,20 @@ std::vector<BankEntry> makeBank()
     for (const auto percent : { 54, 58, 62, 66, 70, 75 })
         bank.push_back ({ "Swing", swing ("32nds", GrooveBase::thirtySecond, percent) });
 
+    // round 190fm, "Classic swing": the swing steps drum machines publish for their timing correction (one family 50, 54,
+    // 58, 62, 66, 71, 75 %; another 50, 54, 58, 63, 67, 71 %), by the same formula. As on those machines the notes are
+    // first put on the grid (Quantize 100 %), then every second one is delayed: 50 % is the plain grid. LYNX's own
+    // names, no machine's
+    for (const auto* what : { "8ths", "16ths", "32nds" })
+        for (const auto percent : classicSwingSteps())
+        {
+            const auto base = what[0] == '8' ? GrooveBase::eighth : what[0] == '1' ? GrooveBase::sixteenth : GrooveBase::thirtySecond;
+            auto g = swing (what, base, percent);
+            g.name += " %";
+            g.quantize = 1.0f;
+            bank.push_back ({ "Classic swing", std::move (g) });
+        }
+
     bank.push_back ({ "Feel", shaped ("Laid back 16ths", GrooveBase::sixteenth, bar, [] (int i) { return std::pair { i % 2 == 1 ? 26 : (i % 4 == 2 ? 12 : 0), i % 4 == 0 ? 1.0f : 0.82f }; }) });
     bank.push_back ({ "Feel", shaped ("Pushed 16ths", GrooveBase::sixteenth, bar, [] (int i) { return std::pair { i % 2 == 1 ? -22 : (i % 4 == 2 ? -10 : 0), i % 4 == 0 ? 1.0f : 0.85f }; }) });
     bank.push_back ({ "Feel", shaped ("Late backbeat", GrooveBase::quarter, bar, [] (int i) { return std::pair { i % 2 == 1 ? 34 : 0, i % 2 == 1 ? 1.0f : 0.9f }; }) });
@@ -406,6 +494,12 @@ std::vector<BankEntry> makeBank()
 }
 } // namespace
 
+const std::vector<int>& classicSwingSteps()
+{
+    static const std::vector<int> steps { 50, 54, 58, 62, 63, 66, 67, 71, 75 };
+    return steps;
+}
+
 const std::vector<BankEntry>& factoryBank()
 {
     static const auto bank = makeBank();
@@ -415,19 +509,32 @@ const std::vector<BankEntry>& factoryBank()
 // --- a groove file of the user's -------------------------------------------------------------------------------------
 bool parseAgr (std::string text, Groove& out, std::string* error)
 {
+    xml::Document doc;
+    std::string parseError;
+    if (! doc.parse (std::move (text), &parseError))
+    {
+        if (error != nullptr)
+            *error = "not XML";
+        return false;
+    }
+    const auto root = doc.root();
+    const auto node = root.name() == "Groove" ? root : root.find ("Groove");
+    if (! node)
+    {
+        if (error != nullptr)
+            *error = "no groove in the file";
+        return false;
+    }
+    return fromGrooveElement (node, out, error);
+}
+
+bool fromGrooveElement (const xml::Element& node, Groove& out, std::string* error)
+{
     const auto fail = [&] (const char* why) {
         if (error != nullptr)
             *error = why;
         return false;
     };
-    xml::Document doc;
-    std::string parseError;
-    if (! doc.parse (std::move (text), &parseError))
-        return fail ("not XML");
-    const auto root = doc.root();
-    const auto node = root.name() == "Groove" ? root : root.find ("Groove");
-    if (! node)
-        return fail ("no groove in the file");
     const auto clip = node.path ("Clip/Value/MidiClip");
     if (! clip)
         return fail ("the groove has no template");

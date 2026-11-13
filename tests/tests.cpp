@@ -17409,6 +17409,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Session190bvTests.inc"
 #include "DetailView183aTests.inc"
 #include "Als181cTests.inc"
+#include "Groove190fmTests.inc"
 #include "AlsDevices190bqTests.inc"
 #include "AlsDevices190cfTests.inc"
 #include "AlsDevices190edTests.inc"

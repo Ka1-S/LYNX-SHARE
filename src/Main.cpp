@@ -31,6 +31,7 @@
 #include "core/Rack.h"
 #include "ui/RackEditor.h"
 #include "ui/DrumRackShot.h"
+#include "ui/GroovePoolComponent.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
 #include "core/VideoPlayer.h"
@@ -2189,6 +2190,16 @@ public:
             return;
         }
 
+        // --grooveshot190fm <prefix> (round 190fm): a Playlist pattern clip's menu with its Groove items (the chooser, Commit,
+        // Extract) and the "Classic swing" folder, and a Groove Pool holding classic swing grooves, offscreen;
+        // prefix-checks.txt holds the checks (also the .lynx round trip of a Playlist clip's groove)
+        if (args.contains ("--grooveshot190fm"))
+        {
+            setApplicationReturnValue (runGrooveShot190fm (args[args.indexOf ("--grooveshot190fm") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--drumshot190ec"))
         {
             // LYNX.exe --drumshot190ec prefix: round 190ec off-screen: a demo Drum Rack's pad view (default and scrolled), its
@@ -3041,6 +3052,7 @@ private:
             lynx::groove::setClipGroove (original, 1, 2, savedGroove);
             lynx::session::moveClip (original, 1, 2, 0, 1, true);
             lynx::session::moveClip (original, 0, 1, 2, 0, false);
+            original.playlist[0].groove = savedGroove; // round 190fm: a Playlist pattern clip's groove
         }
         original.playlistTracks[2].grouped = true;      // track groups and rack filter groups (round 104)
         original.playlistTracks[1].collapsed = true;
@@ -3097,7 +3109,8 @@ private:
                                              && lynx::launcher::clipAt (grid, 0, 1) == nullptr
                                              && clip != nullptr && clip->pattern == 0 && clip->length == 1920
                                              && moved != nullptr && moved->groove == savedGroove && moved->name == "Clip ação"
-                                             && moved->mode == lynx::LaunchMode::toggle && moved->legato && ! moved->loop;
+                                             && moved->mode == lynx::LaunchMode::toggle && moved->legato && ! moved->loop
+                                             && reloaded->playlist[0].groove == savedGroove && reloaded->playlist[1].groove == 0; // (190fm)
                                   }()
                                && reloaded->playlist[1].kind == lynx::ClipKind::automation && reloaded->playlist[1].automation == 0
                                && reloaded->automations.size() == 1 && reloaded->automations[0].target == automation.target
@@ -12438,6 +12451,131 @@ private:
         }
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
+        return allOk;
+    }
+
+    // --grooveshot190fm (round 190fm): see the dispatch above
+    bool runGrooveShot190fm (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        const auto plain = [] (juce::String t) {
+            t = t.upToFirstOccurrenceOf ("\t", false, false);
+            return t.removeCharacters (juce::String ("&_") + juce::String::charToString (1));
+        };
+        const auto sub = [&plain] (const juce::PopupMenu& menu, const juce::String& start) -> const juce::PopupMenu* {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().subMenu != nullptr && plain (it.getItem().text).startsWith (start))
+                    return it.getItem().subMenu.get();
+            return nullptr;
+        };
+        const auto item = [&plain] (const juce::PopupMenu& menu, const juce::String& text) -> const juce::PopupMenu::Item* {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (plain (it.getItem().text) == text)
+                    return &it.getItem();
+            return nullptr;
+        };
+
+        lynx::AudioEngine engine (false);
+        lynx::MainComponent ui (engine, false);
+        ui.setSize (1600, 900);
+        std::uint32_t classic = 0;
+        {
+            auto song = lynx::Song::makeDefault();
+            song.mode = lynx::PlayMode::song;
+            song.playlist.push_back ({ 0, 0, 0, 4 * lynx::ppq, 0 });
+            song.playlist.push_back ({ 0, 1, 4 * lynx::ppq, 4 * lynx::ppq, 0 });
+            for (const auto& e : lynx::groove::factoryBank())
+                if (juce::String (e.folder) == "Classic swing" && e.groove.base == lynx::GrooveBase::sixteenth
+                    && (e.groove.name == "Swing 16ths 54 %" || e.groove.name == "Swing 16ths 58 %" || e.groove.name == "Swing 16ths 62 %"
+                        || e.groove.name == "Swing 16ths 71 %"))
+                {
+                    const auto id = lynx::groove::add (song.grooves, e.groove);
+                    if (e.groove.name == "Swing 16ths 58 %")
+                        classic = id;
+                }
+            song.playlist[0].groove = classic;
+            engine.setSong (std::move (song));
+        }
+        engine.dispatchPendingMessages();
+        auto& playlist = ui.getPlaylistForSnapshot();
+        const auto menu = playlist.getClipMenuForSnapshot (0);
+        const auto* chooser = sub (menu, lynx::tr ("Groove"));
+        check ("groove_chooser_in_clip_menu", chooser != nullptr);
+        const auto* add = chooser != nullptr ? sub (*chooser, lynx::tr ("Add a groove")) : nullptr;
+        const auto* folder = add != nullptr ? sub (*add, lynx::tr ("Classic swing")) : nullptr;
+        check ("classic_swing_folder", folder != nullptr && folder->getNumItems() == 27, folder != nullptr ? juce::String (folder->getNumItems()) : juce::String ("missing"));
+        const auto* commit = item (menu, lynx::tr ("Commit groove"));
+        check ("commit_enabled_with_a_groove", commit != nullptr && commit->isEnabled);
+        check ("extract_present", item (menu, lynx::tr ("Extract groove")) != nullptr);
+        {
+            juce::StringArray names { "Pattern clip menu" };
+            std::vector<juce::PopupMenu> menus { menu };
+            if (chooser != nullptr)
+            {
+                names.add ("Groove");
+                menus.push_back (*chooser);
+            }
+            if (add != nullptr)
+            {
+                names.add ("Add a groove");
+                menus.push_back (*add);
+            }
+            if (folder != nullptr)
+            {
+                names.add ("Classic swing");
+                menus.push_back (*folder);
+            }
+            saveMenus (names, menus, prefix + "-playlist-clip-menu.png");
+        }
+        // the second clip (no groove): Commit is off; choosing a groove from the menu sets it
+        {
+            const auto other = playlist.getClipMenuForSnapshot (1);
+            const auto* c2 = item (other, lynx::tr ("Commit groove"));
+            check ("commit_disabled_without_a_groove", c2 != nullptr && ! c2->isEnabled);
+            const auto* ch2 = sub (other, lynx::tr ("Groove"));
+            const auto* pick = ch2 != nullptr ? item (*ch2, "Swing 16ths 71 %") : nullptr;
+            if (pick != nullptr && pick->action != nullptr)
+                pick->action();
+            const auto& song = engine.getSong();
+            check ("chooser_sets_the_clip_groove", song.playlist.size() == 2 && lynx::groove::ofClip (song, song.playlist[1]) != nullptr
+                                                       && lynx::groove::ofClip (song, song.playlist[1])->name == "Swing 16ths 71 %");
+        }
+        // the pool with the classic grooves
+        {
+            auto pool = lynx::makeGroovePool (engine);
+            pool->setSize (900, lynx::groovePoolHeight (engine));
+            savePng (pool->createComponentSnapshot (pool->getLocalBounds()), prefix + "-pool.png");
+        }
+        // .lynx: a Playlist clip's groove comes back; a project without one writes nothing new
+        {
+            juce::String error;
+            const auto& song = engine.getSong();
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            check ("lynx_round_trip", back && back->playlist.size() == 2 && back->playlist[0].groove == song.playlist[0].groove
+                                          && back->playlist[1].groove == song.playlist[1].groove && back->grooves == song.grooves,
+                   error);
+            auto old = lynx::Song::makeDefault();
+            old.playlist.push_back ({ 0, 0, 0, 4 * lynx::ppq, 0 });
+            const auto json = lynx::ProjectFile::toJson (old, false);
+            const auto reloaded = lynx::ProjectFile::fromJson (json, error);
+            check ("old_project_unchanged", reloaded && lynx::ProjectFile::toJson (*reloaded, false) == json && reloaded->playlist[0].groove == 0);
+        }
+        // Commit from the menu: the clip's pattern (shared with the second clip) is copied, the groove is off
+        {
+            const auto patterns = engine.getSong().patterns.size();
+            const auto again = playlist.getClipMenuForSnapshot (0);
+            if (const auto* c = item (again, lynx::tr ("Commit groove")); c != nullptr && c->action != nullptr)
+                c->action();
+            const auto& song = engine.getSong();
+            check ("commit_runs", song.playlist[0].groove == 0 && song.patterns.size() == patterns + 1 && song.playlist[0].pattern == (int) patterns);
+        }
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\n" + (allOk ? "ALL OK" : "SOME FAILED") + "\n");
         return allOk;
     }
 

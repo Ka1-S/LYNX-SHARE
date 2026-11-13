@@ -9937,3 +9937,4 @@ countries: br
 "Transient Envelope: a fade over each piece (100: no fade)" = "Envelope dos transientes: um fade sobre cada pedaço (100: sem fade)"
 "Grain Size: the length of the pieces the audio is stretched in" = "Tamanho do grão: a duração dos pedaços em que o áudio é esticado"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. Only this clip changes: when other clips play the same audio, it gets its own copy" = "Modo de warp: como o áudio é esticado. Re-Pitch muda velocidade e tom juntos. Só este clipe muda: quando outros clipes tocam o mesmo áudio, ele ganha uma cópia própria"
+"Classic swing" = "Swing clássico"

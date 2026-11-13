@@ -18,6 +18,7 @@
 #include "core/ClipLauncher.h"
 #include "core/Effects.h"
 #include "core/FlWrapper.h"
+#include "core/Groove.h"
 #include "core/Gzip.h"
 #include "core/Inflate.h"
 #include "core/LiveScales.h"
@@ -879,6 +880,96 @@ struct Exporter
         }
     }
 
+    // ---- grooves (round 190fm) [SCHEMA 2742-2759: GroovePool{LomId, Grooves, DefaultGrooveId (Live 12)}, Groove Id=…
+    // {LomId, Name, Clip, Grid, QuantizationAmount, TimingAmount, RandomAmount, VelocityAmount, Annotation, Selection,
+    // SourceContext}; DATA: the shipped Live 12 sets and a Live 11.0.12 set save the same members, SourceContext empty
+    // for a groove that came from no file]. Live's Groove Id = the groove's index in LYNX's pool.
+    std::string liveGrooveId (std::uint32_t id) const
+    {
+        const auto& list = song.grooves.grooves;
+        for (std::size_t i = 0; i < list.size(); ++i)
+            if (id != 0 && list[i].id == id)
+                return num ((int) i);
+        return "-1";
+    }
+    void setClipGroove (Node& clip, std::uint32_t id) { clip.value ("GrooveSettings/GrooveId", liveGrooveId (id)); }
+
+    static Node member (const char* name, std::string value)
+    {
+        Node n;
+        n.name = name;
+        n.set ("Value", std::move (value));
+        return n;
+    }
+
+    // One groove: its template as a looping MIDI clip (one note per point, Velocity = the accent), Grid = the base
+    Node grooveNode (const Groove& g, int index)
+    {
+        Pattern p;
+        p.name = g.name;
+        for (const auto& point : g.points)
+        {
+            Note n;
+            n.channel = 0;
+            n.key = 60;
+            n.start = point.tick;
+            n.length = ppq / 16;
+            n.velocity = point.velocity;
+            n.release = 64.0f / 127.0f;
+            p.notes.push_back (n);
+        }
+        Node clip = midiClip (p, 0, 0, g.length, 0, false, 0);
+        clip.value ("Loop/LoopOn", "true");
+        Node value;
+        value.name = "Value";
+        value.add (std::move (clip));
+        Node holder;
+        holder.name = "Clip";
+        holder.add (std::move (value));
+
+        Node out;
+        out.name = "Groove";
+        out.set ("Id", num (index));
+        out.add (member ("LomId", "0"));
+        out.add (member ("Name", g.name));
+        out.add (std::move (holder));
+        out.add (member ("Grid", num ((int) g.base)));
+        const auto percent = [] (float v) { return num (std::round ((double) v * 1.0e6) / 1.0e4); };
+        out.add (member ("QuantizationAmount", percent (g.quantize)));
+        out.add (member ("TimingAmount", percent (g.timing)));
+        out.add (member ("RandomAmount", percent (g.random)));
+        out.add (member ("VelocityAmount", percent (g.velocity)));
+        out.add (member ("Annotation", ""));
+        out.add (member ("Selection", "false"));
+        Node source;
+        source.name = "SourceContext";
+        out.add (std::move (source));
+        return out;
+    }
+
+    // The set's pool and the main track's GlobalGrooveAmount (percent; LYNX's pool amount 0…1.3)
+    void groovePool (Node& set, Node* main)
+    {
+        if (main != nullptr)
+            main->value ("DeviceChain/Mixer/GlobalGrooveAmount/Manual", num (std::round ((double) song.grooves.amount * 1.0e6) / 1.0e4));
+        auto* pool = set.child ("GroovePool");
+        if (pool == nullptr)
+        {
+            if (! song.grooves.grooves.empty())
+                note ("Groove Pool not exported (no pool in this Live version's set)");
+            return;
+        }
+        if (auto* list = pool->child ("Grooves"))
+        {
+            list->kids.clear();
+            for (std::size_t i = 0; i < song.grooves.grooves.size(); ++i)
+                list->add (grooveNode (song.grooves.grooves[i], (int) i));
+        }
+        pool->value ("DefaultGrooveId", "-1"); // (Live 12 only; LYNX has no default groove for new clips)
+        if (! song.grooves.grooves.empty())
+            note ("Grooves: Live plays them by its own groove law, which may sound slightly different from LYNX's");
+    }
+
     // ---- clips
     Node midiClip (const Pattern& p, int channel, std::int64_t start, std::int64_t length, std::int64_t offset, bool muted, int id)
     {
@@ -1472,7 +1563,10 @@ struct Exporter
                             return x.channel == t.channel && x.start >= c->offset && x.start < c->offset + c->length;
                         });
                         if (has)
+                        {
                             events->add (midiClip (p, t.channel, c->start, c->length, c->offset, c->muted, clipId++));
+                            setClipGroove (events->kids.back(), c->groove); // (round 190fm)
+                        }
                     }
                 for (const auto* c : gridPatternClips)
                 {
@@ -1485,6 +1579,7 @@ struct Exporter
                     const auto& slot = grid->slots[(std::size_t) c->gridSlot];
                     Node clip = midiClip (p, t.channel, 0, c->length, c->offset, c->muted, clipId++);
                     sessionSettings (clip, slot, 0.0, beats (c->length));
+                    setClipGroove (clip, slot.groove); // (round 190fm)
                     if (! putSessionClip (n, slot.scene, std::move (clip)))
                         note ("Grid clips of one channel in the same scene: only the first is exported (" + ch.name + ")");
                 }
@@ -1570,6 +1665,7 @@ struct Exporter
             for (auto& n : nodes)
                 list->add (std::move (n));
         }
+        groovePool (set, main); // (round 190fm)
         if (auto* pre = set.child ("SendsPre"))
         {
             pre->kids.clear();

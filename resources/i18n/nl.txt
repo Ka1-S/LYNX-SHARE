@@ -9817,6 +9817,7 @@ countries: nl be
 "Transient Envelope: a fade over each piece (100: no fade)" = "Transiënt-envelop: een fade over elk stuk (100: geen fade)"
 "Grain Size: the length of the pieces the audio is stretched in" = "Korrelgrootte: de lengte van de stukken waarin de audio wordt uitgerekt"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. Only this clip changes: when other clips play the same audio, it gets its own copy" = "Warpmodus: hoe de audio wordt uitgerekt. Re-Pitch verandert snelheid en toonhoogte samen. Alleen deze clip verandert: spelen andere clips dezelfde audio, dan krijgt deze een eigen kopie"
+"Classic swing" = "Klassieke swing"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"

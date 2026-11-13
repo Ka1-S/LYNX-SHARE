@@ -1952,6 +1952,10 @@ struct Clip
     // padding after fadeCurve: Clip stays the same size.
     bool followKey = false;
     std::int8_t keyShift = 0;
+    // pattern clips of the Playlist, round 190fm (core/Groove.h): the groove of the project's pool this clip plays
+    // through (Groove::id; 0 = none, as every clip saved before). A clip of the grid keeps its groove in its
+    // ClipGridSlot instead (this stays 0 there). In the padding after keyShift: Clip stays the same size.
+    std::uint32_t groove = 0;
 
     std::int64_t end() const noexcept { return start + length; }
     std::int64_t effectiveFadeIn() const noexcept { return crossfadeIn > 0 ? crossfadeIn : fadeIn; }

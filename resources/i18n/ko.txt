@@ -9817,6 +9817,7 @@ countries: kr
 "Transient Envelope: a fade over each piece (100: no fade)" = "트랜지언트 엔벨로프: 각 조각에 거는 페이드 (100: 페이드 없음)"
 "Grain Size: the length of the pieces the audio is stretched in" = "그레인 크기: 오디오를 늘리는 조각의 길이"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. Only this clip changes: when other clips play the same audio, it gets its own copy" = "워프 모드: 오디오를 늘리는 방식. Re-Pitch는 속도와 피치를 함께 바꿉니다. 이 클립만 바뀝니다: 다른 클립이 같은 오디오를 재생하면 이 클립은 자체 사본을 받습니다"
+"Classic swing" = "클래식 스윙"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"

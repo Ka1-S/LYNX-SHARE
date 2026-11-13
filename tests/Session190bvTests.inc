@@ -815,7 +815,7 @@ TEST (session190bv_groove_bank_is_lynx_own_and_well_formed)
 {
     using namespace lynx;
     const auto& bank = groove::factoryBank();
-    CHECK (bank.size() >= 36 && bank.size() <= 48);
+    CHECK (bank.size() >= 36 && bank.size() <= 72); // (round 190fm: + 27 "Classic swing")
     std::vector<std::string> names, folders;
     for (const auto& e : bank)
     {
