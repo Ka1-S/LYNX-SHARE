@@ -17564,3 +17564,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Fix190eaTests.inc"
 #include "Iss158Tests.inc"
 #include "Voices190ejTests.inc"
+#include "Flfix190ezTests.inc"

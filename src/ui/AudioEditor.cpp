@@ -4074,7 +4074,7 @@ private:
 
     // --- FL's region trigger notes (round 190ee; Edison_x64.dll RegionMenuPopup 0x86d850, DefaultNoteMenuClick
     // 0x8712e0, AssignRegionsMenuClick 0x868c30): the key a region answers when the sample is played by keys
-    // (Marker::keyNum, saved in the WAV's "lxkn" chunk) ------------------------------------------------------------
+    // (Marker::keyNum, saved in the WAV's "tlst" chunk as FL does; round 190ez) -----------------------------------
     int assignWalk = -1;        // the region "Assign trigger notes to all..." is asking about; -1 = no walk
     bool assignChanged = false;
 

@@ -124,7 +124,7 @@ void flip (Pattern& pattern, const std::vector<int>& indices, bool horizontal, b
 // --- randomise --------------------------------------------------------------------------------
 struct RandomiseOptions
 {
-    float velocity = 0.25f;   // maximum change (0..1 of the full range)
+    float velocity = 0.25f;   // amount 0..1: at 1 a level moves at most half its lane (FL, round 190ez)
     float pan = 0.0f;
     float finePitch = 0.0f;   // fraction of ±120 cents
     float modX = 0.0f, modY = 0.0f;

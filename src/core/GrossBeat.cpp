@@ -1325,6 +1325,17 @@ struct Engine::Impl
             f.set (attackSamples * inv, rel * inv);
     }
 
+    // Options › Click reduction (option byte 8: 0 off, 1 low, 2 high): the jump fade and the speed smoothing
+    void setClickReduction() noexcept
+    {
+        const auto opt = std::min<int> (st.options[8], 2);
+        static constexpr float clickMs[3] { 25.0f, 25.0f, 35.0f };
+        static constexpr float speedMs[3] { 1.0f, 1.0f, 5.0f };
+        clickDecay = (float) std::exp (std::log (0.01) / ((double) clickMs[opt] * 0.001 * (double) fs));
+        const auto sm = (double) speedMs[opt] * 0.001 * (double) fs;
+        reader.speed.set (sm, sm);
+    }
+
     void setTension()
     {
         const auto mag = (double) (float) std::fabs ((double) ((float) P[6] * 0.00390625f));
@@ -1364,12 +1375,7 @@ struct Engine::Impl
         fadeReader.setCutoff (1.0);
         fadeLen = (int) std::max<std::int64_t> (roundEven ((double) fs * 0.001), 1);
         jumpLevel = (float) ((double) fs * 0.002);
-        const auto opt = std::min<int> (st.options[8], 2);
-        static constexpr float clickMs[3] { 25.0f, 25.0f, 35.0f };
-        static constexpr float speedMs[3] { 1.0f, 1.0f, 5.0f };
-        clickDecay = (float) std::exp (std::log (0.01) / ((double) clickMs[opt] * 0.001 * (double) fs));
-        const auto sm = (double) speedMs[opt] * 0.001 * (double) fs;
-        reader.speed.set (sm, sm);
+        setClickReduction();
         dcC2 = (float) (44100.0 / (double) fs * 2.2834999999999997e-05);
         span = 0.0;
         timing();
@@ -1416,6 +1422,8 @@ struct Engine::Impl
         st.options = s.options;
         if (oldOptions[5] != st.options[5])
             setFollowers();
+        if (oldOptions[8] != st.options[8]) // round 190ez: the Options menu changes it while playing
+            setClickReduction();
         quality = st.options[6] != 0 ? 16 : 8;
         for (int k = 0; k < 2; ++k)
         {

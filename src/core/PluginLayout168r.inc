@@ -207,7 +207,7 @@ Layout pitcherLayout()
     Layout l;
     l.fl = "Pitcher";
     l.width = 523;
-    l.height = 330;
+    l.height = 352;
     auto& v = l.items;
     static const char* const notes[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     static const char* const offs[12] = { "C off", "C# off", "D off", "D# off", "E off", "F off", "F# off", "G off", "G# off", "A off", "A# off", "B off" };
@@ -253,7 +253,9 @@ Layout pitcherLayout()
     v.push_back (toggle (196, 298, 50, 22, "MIDI", TR_NOOP ("MIDI"), boxed));
     v.push_back (toggle (250, 298, 70, 22, "Octaves", TR_NOOP ("Octaves"), boxed));
     v.push_back (toggle (324, 298, 96, 22, "Harmonize", TR_NOOP ("Harmonize"), boxed));
-    // round 190ee: the MIDI port is set from the window menu (MIDI input port); Port routing is saved state
+    // round 190ez: FL's bottom line "MIDI Input Port Number: ..." (live FL check 190ew PIT-1: "..." = none, a vertical
+    // drag on it sets the number); Port routing is saved state
+    v.push_back (display (8, 332, 300, 18, "pitchport"));
     l.editedElsewhere = { "MIDI port", "Port routing" };
     return l;
 }
