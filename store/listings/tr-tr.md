@@ -39,10 +39,13 @@ LYNX SHARE alfa aşamasındadır: bazı pürüzler olabilir, lütfen sorunları 
 
 ## What's new
 
-LYNX SHARE 0.1.26: yeni başlayanlar için Basit iş akışı; klip ızgarası için Klip görünümü, rack'ler ve nota olasılığı;
-Slicex ve FPC enstrümanları; enstrümanları, efektleri ve otomasyonuyla FL Studio Mobile projeleri; kanallar için
-Dondur; yerleşik plugin pencereleri; MIDI kontrolcü profilleri ve MPE'nin ilk aşaması; çevrimiçi oturumlarda
-paylaşılan plugin'ler; ve birçok düzeltme.
+LYNX SHARE 0.1.27: örnek alındıkları plugin'lere daha yakın ses vermesi için yeniden ayarlanan efektler, kayıtlı
+projeler seslerini korurken; Apex Limiter'ın true peak tavanı düzeltildi; FL Studio'dan daha fazla araç (Uzaktan
+kontrol ayarları, otomasyon eğrileri, bir mixer yuvasında Edison, döngü noktaları ve crossfade'li Sampler sayfası, ses
+klibi menüsü); klip ızgarası için bir Oturum mikseri, bir Drum Rack, sahneler ve eşleme modları ile Ableton Live'ın
+kendi cihazlarının çoğunun .als setlerinden açılması; FL Studio Mobile projelerinden DW Sampler, Slicer ve daha fazla
+efekt; Basit iş akışında bir Efektler sekmesi, bir Akor pedi ve bir ilk şarkı turu; Linux ve macOS'ta plugin'ler için
+bir çökme koruması; yeni bir logo; ve birçok düzeltme.
 
 ## Features
 

@@ -47,9 +47,12 @@ LYNX SHARE is in alpha: expect rough edges, and please report problems on GitHub
 
 ## What's new
 
-LYNX SHARE 0.1.26: a Simple workflow for beginners; a Clip View, racks and note chance for the clip grid; Slicex and
-FPC instruments; FL Studio Mobile projects with instruments, effects and automation; Freeze for channels; docked
-plugin windows; MIDI controller profiles and a first stage of MPE; plugins shared in online sessions; and many fixes.
+LYNX SHARE 0.1.27: effects refitted to sound closer to the plugins they are modelled on, while saved projects keep
+their sound; Apex Limiter's true-peak ceiling fixed; more of FL Studio's tools (Remote control settings, automation
+curves, Edison on a mixer slot, the Sampler page with loop points and crossfade, the audio clip menu); a Session
+mixer, a Drum Rack, scenes and map modes for the clip grid, and many of Ableton Live's own devices opened from .als
+sets; DW Sampler, Slicer and more effects from FL Studio Mobile projects; an Effects tab, a Chord pad and a first-song
+tour in the Simple workflow; a crash guard for plugins on Linux and macOS; a new logo; and many fixes.
 
 ## Features
 
