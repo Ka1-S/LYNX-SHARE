@@ -106,8 +106,8 @@ six wiki pages) in 15 languages. Not done there, for the release:
 - **Pictures**: everything in the 0.1.26 list below that is still open, from the 0.1.27 build. New features the pages
   now describe without a picture: the Session mixer and Drum Rack (Clip-launch), the Simple track dock and the
   first-song tour, Remote control settings, the Sampler page in FL's layout, Edison on a mixer slot.
-- **demo.mp3 / peaks.json**: the demo song was regenerated with the Master looks' true-peak stage (rollup027
-  HANDOFF-8): render `assets/media/demo.mp3` and `peaks.json` again from the new `Demo.lynx`.
+- **demo.mp3 / peaks.json**: done (round 190fd): rendered from the 0.1.27 RC2 `Demo.lynx` (`LYNX.exe --export`,
+  then 160 kb/s MP3): 50 s, -13.0 LUFS, -1.0 dBTP; `peaks.json` = 600 max-abs bars of that MP3; `?v=0.1.27`.
 - **Catalogue** (`_src/catalog.json`, 205 entries): branch wip/site190ex (round 190ex) has the 12 entries new in
   0.1.27, each with its wiki page and 14 translations, and the wiki tables of the 16 editors that changed (the Law:
   Classic | Measured switch on Epoch Verb, Atrium, Foil Plate, Halo, Horizon, Nebula, Orbit, Spiral Echo, Lattice Mod,

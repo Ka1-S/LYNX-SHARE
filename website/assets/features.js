@@ -78,7 +78,7 @@ if (wave && audio){
   const wc = wave.querySelector('canvas'), wx = wc.getContext('2d'), ap = $('#aPlay'), at = $('#atime'), tour = $('#tour');
   const playIc = ap.innerHTML, stopIc = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
   let peaks = [];
-  fetch('/assets/media/peaks.json?v=0.1.23').then(r => r.json()).then(p => { peaks = p; draw(); }).catch(() => {});
+  fetch('/assets/media/peaks.json?v=0.1.27').then(r => r.json()).then(p => { peaks = p; draw(); }).catch(() => {});
   function draw(){
     const d = Math.min(devicePixelRatio || 1, 2), w = wave.clientWidth, h = wave.clientHeight; wc.width = w*d; wc.height = h*d; wx.setTransform(d, 0, 0, d, 0, 0);
     wx.clearRect(0, 0, w, h); if (!peaks.length) return;

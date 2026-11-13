@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="3f45f67a";
+window.LYNX_LANG=lang;window.LYNX_V="175dc530";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=3f45f67a">
+<link rel="stylesheet" href="/assets/site.css?v=175dc530">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -121,7 +121,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <p><code>Ctrl+T</code>, or <code>Options › Typing keyboard to piano</code>, turns the computer keyboard into a piano. The rows from <code>Z</code> to <code>M</code> and from <code>Q</code> to <code>P</code> play the selected channels.</p>
 <ul><li>While it is on, letter and number keys are notes. The single-letter tool keys of the Piano roll and the Playlist work only while it is off.</li><li>It always plays at the Piano roll's velocity. The <code>Velocity</code> setting on the MIDI page is for MIDI devices.</li><li>The same switch is in <code>Options › General settings...</code>.</li></ul>
 <h2 id="the-touch-keyboard">The touch keyboard</h2>
-<figure><a class="shot" href="/assets/img/wiki/touch-keyboard.webp"><img src="/assets/img/wiki/touch-keyboard.webp" srcset="/assets/img/wiki/touch-keyboard.webp 1x, /assets/img/wiki/touch-keyboard@2x.webp 2x" alt="The touch keyboard: octave buttons, key size, velocity mode and a row of piano keys from C4" loading="lazy" width="820" height="210"></a></figure>
+<figure><a class="shot" href="/assets/img/wiki/touch-keyboard.webp"><img src="/assets/img/wiki/touch-keyboard.webp" srcset="/assets/img/wiki/touch-keyboard.webp 1x, /assets/img/wiki/touch-keyboard@2x.webp 2x" alt="The touch keyboard: octave buttons, key size, velocity mode and a row of piano keys from C4" loading="lazy" width="900" height="240"></a></figure>
 <p><code>View › Touch keyboard</code> (<code>Alt+F7</code>) opens a piano you play with the mouse or a touch screen. It plays the channel selected in the Channel rack, and shows its name at the right.</p>
 <div class="tablewrap"><table><thead><tr><th>Setting</th><th>What it does</th></tr></thead><tbody><tr><td><code>-</code> and <code>+</code></td><td>One octave down or up</td></tr><tr><td>Key size</td><td><code>Small keys</code>, <code>Medium keys</code> or <code>Large keys</code></td></tr><tr><td><code>Velocity: where you touch</code></td><td>Near the top of a key plays soft, near the bottom loud</td></tr><tr><td><code>Velocity: fixed</code></td><td>Every note at the velocity set with the slider</td></tr><tr><td><code>Note names</code></td><td>Shows the names on the keys</td></tr></tbody></table></div>
 <h2 id="midi-sync">MIDI sync</h2>
@@ -140,8 +140,8 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=3f45f67a" defer></script>
-<script src="/assets/wiki.js?v=3f45f67a" defer></script>
-<script src="/assets/motion.js?v=3f45f67a" defer></script>
+<script src="/assets/site.js?v=175dc530" defer></script>
+<script src="/assets/wiki.js?v=175dc530" defer></script>
+<script src="/assets/motion.js?v=175dc530" defer></script>
 </body>
 </html>

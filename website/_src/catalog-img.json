@@ -69,6 +69,11 @@
 387,
 2
 ],
+"fx-edison": [
+960,
+540,
+2
+],
 "fx-effector": [
 436,
 438,
@@ -336,7 +341,7 @@
 ],
 "fx-hush-de-esser": [
 720,
-518,
+614,
 2
 ],
 "fx-hyper-chorus": [
@@ -426,7 +431,7 @@
 ],
 "fx-pitch-correction": [
 523,
-356,
+378,
 2
 ],
 "fx-pitch-shift": [
@@ -449,6 +454,11 @@
 122,
 2
 ],
+"fx-pocket-comb-filter": [
+456,
+206,
+2
+],
 "fx-pocket-compressor": [
 456,
 206,
@@ -459,6 +469,16 @@
 232,
 2
 ],
+"fx-pocket-eq": [
+604,
+290,
+2
+],
+"fx-pocket-filter": [
+358,
+122,
+2
+],
 "fx-pocket-flanger": [
 456,
 206,
@@ -467,6 +487,11 @@
 "fx-pocket-gate": [
 674,
 314,
+2
+],
+"fx-pocket-graphic-eq": [
+456,
+206,
 2
 ],
 "fx-pocket-leveller": [
@@ -484,6 +509,11 @@
 244,
 2
 ],
+"fx-pocket-multiband-compressor": [
+604,
+374,
+2
+],
 "fx-pocket-multifx": [
 674,
 353,
@@ -492,6 +522,21 @@
 "fx-pocket-phaser": [
 456,
 206,
+2
+],
+"fx-pocket-reverb": [
+604,
+206,
+2
+],
+"fx-pocket-reverb-2": [
+604,
+290,
+2
+],
+"fx-pocket-reverb-classic": [
+604,
+290,
 2
 ],
 "fx-pocket-spacer": [
@@ -512,6 +557,11 @@
 "fx-pocket-tape-delay": [
 674,
 238,
+2
+],
+"fx-pocket-tape-stop": [
+456,
+206,
 2
 ],
 "fx-pocket-trance-delay": [
@@ -705,13 +755,18 @@
 2
 ],
 "gen-clap": [
-416,
-672,
+700,
+655,
 2
 ],
 "gen-dashboard": [
 580,
 132,
+2
+],
+"gen-drum-rack": [
+900,
+560,
 2
 ],
 "gen-drumaxx": [
@@ -737,6 +792,11 @@
 "gen-fl-slayer": [
 800,
 554,
+2
+],
+"gen-fpc": [
+960,
+437,
 2
 ],
 "gen-fruit-kick": [
@@ -785,8 +845,8 @@
 2
 ],
 "gen-hat": [
-416,
-672,
+700,
+655,
 2
 ],
 "gen-instrument-rack": [
@@ -810,8 +870,8 @@
 2
 ],
 "gen-kick": [
-416,
-672,
+700,
+655,
 2
 ],
 "gen-layer": [
@@ -859,6 +919,11 @@
 422,
 2
 ],
+"gen-pocket-supersaw": [
+716,
+1024,
+2
+],
 "gen-poizone": [
 960,
 629,
@@ -885,8 +950,8 @@
 2
 ],
 "gen-snare": [
-416,
-672,
+700,
+655,
 2
 ],
 "gen-synth": [
