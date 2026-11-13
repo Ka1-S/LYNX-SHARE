@@ -2769,6 +2769,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         }
         root->setProperty ("keyboardChords", chords);
     }
+    if (! song.midiGenerate.isDefault()) // round 190fm: the MIDI Tools generators' settings (core/MidiGenerateOptions.h)
+        root->setProperty ("midiGenerate", juce::String::fromUTF8 (midigen::encode (song.midiGenerate).c_str()));
     if (! song.info.empty())
     {
         auto info = std::make_unique<juce::DynamicObject>();
@@ -3515,6 +3517,8 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 if (song.keyboardChords.size() < 24)
                     song.keyboardChords.push_back (std::move (k));
             }
+    // round 190fm: a project saved without it (every older one) gets the defaults
+    song.midiGenerate = root.hasProperty ("midiGenerate") ? midigen::decode (root.getProperty ("midiGenerate", {}).toString().toStdString()) : midigen::Settings {};
     if (const auto info = root.getProperty ("info", {}); info.isObject())
     {
         auto get = [&info] (const char* key) { return info.getProperty (key, {}).toString().toStdString(); };

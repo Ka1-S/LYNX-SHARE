@@ -282,6 +282,7 @@ target_sources(lynx_core PRIVATE
 target_sources(lynx_core PRIVATE
     src/core/NoteTools.cpp
     src/core/MidiTools.cpp
+    src/core/MidiGenerate.cpp
     src/core/PianoRollTools.cpp
     src/core/EventEdit.cpp
     src/core/AudioEdit.cpp

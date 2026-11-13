@@ -2200,6 +2200,18 @@ public:
             return;
         }
 
+        if (args.contains ("--mtshot190fm"))
+        {
+            // LYNX --mtshot190fm prefix: round 190fm off-screen: the MIDI Tools panel's Generate tab with each generator
+            // (prefix-generate-rhythm.png … -euclidean.png), the five side by side as Live's picture shows them
+            // (prefix-generate-panels.png; Live's: ableton190o/shots/live-04-generate-panels.png), then each generator
+            // written into a one-bar pattern and undone again: prefix-checks.txt.
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            runMtShot190fm (args[args.indexOf ("--mtshot190fm") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--drumshot190ec"))
         {
             // LYNX.exe --drumshot190ec prefix: round 190ec off-screen: a demo Drum Rack's pad view (default and scrolled), its
@@ -4546,6 +4558,27 @@ private:
                 arrange190cgResult = "ERROR round trip " + why;
         }
 
+        // round 190fm: the MIDI Tools generators' settings come back from a project; a project without them loads with
+        // Live's defaults (and saves none)
+        juce::String midigen190fmResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            juce::String why;
+            const auto plainJson = lynx::ProjectFile::toJson (song);
+            const auto plain = lynx::ProjectFile::fromJson (plainJson, why);
+            song.midiGenerate.tool = lynx::midigen::Settings::stacks;
+            song.midiGenerate.rhythmOptions.pattern = 3;
+            song.midiGenerate.seedOptions.voices = 2;
+            song.midiGenerate.shapeOptions.levels[4] = 0.25f;
+            song.midiGenerate.shapeOptions.preset = lynx::midigen::ShapeOptions::custom;
+            song.midiGenerate.stacksOptions.sequence.push_back ({ 4, 3, 67, 1, 1, 0.5f, 2.0f });
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            if (! plain || ! plain->midiGenerate.isDefault() || plainJson.contains ("midiGenerate"))
+                midigen190fmResult = "ERROR defaults " + why;
+            else if (! back || ! (back->midiGenerate == song.midiGenerate))
+                midigen190fmResult = "ERROR round trip " + why;
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -4809,6 +4842,7 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
+                        && midigen190fmResult == "OK"
                         && danceWindowResult == "OK" && clickActivationResult == "OK";
 
         juce::String report;
@@ -4864,6 +4898,7 @@ private:
                << "livescr190dr=" << livescr190drResult << "\n"
                << "livewf190ef=" << livewf190efResult << "\n"
                << "livewf190em=" << livewf190emResult << "\n"
+               << "midigen190fm_saved=" << midigen190fmResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -20239,6 +20274,73 @@ private:
         }
         juce::File (prefix + "-facts.txt").replaceWithText (facts);
         lynx::autolanes::setShown (false);
+    }
+
+    void runMtShot190fm (const juce::String& prefix)
+    {
+        lynx::AudioEngine offline (false);
+        offline.editSong ([] (lynx::Song& s) {
+            if (s.patterns.empty())
+                s.patterns.emplace_back();
+            s.patterns[0].notes.clear();
+            s.patterns[0].lengthTicks = 4 * lynx::ppq;
+            s.currentPattern = 0;
+        }, false);
+        lynx::MidiToolsPanel panel (offline, [] {
+            lynx::MidiToolsPanel::Target t;
+            t.pattern = 0;
+            t.grid = lynx::ppq / 4;
+            t.channel = 0;
+            t.length = 4 * lynx::ppq; // one bar, no time selection
+            return t;
+        });
+        panel.setSize (lynx::MidiToolsPanel::panelWidth, lynx::MidiToolsPanel::panelHeight);
+        panel.setSection (lynx::MidiToolsPanel::generateSection);
+        panel.setGenerateShotSettingsForSnapshot();
+        const auto write = [&prefix] (const juce::Image& image, const juce::String& name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        std::vector<juce::Image> images;
+        juce::String checks;
+        for (int g = 0; g < lynx::midigen::Settings::toolCount; ++g)
+        {
+            panel.setGenerator (g);
+            const auto name = juce::String (lynx::midigen::toolName (g)).toLowerCase();
+            images.push_back (lynx::shot::paint (panel, lynx::theme::colour::bg2));
+            write (images.back(), "generate-" + name);
+            panel.generateNow();
+            offline.dispatchPendingMessages();
+            const auto made = (int) offline.getSong().patterns[0].notes.size();
+            offline.undo();
+            offline.dispatchPendingMessages();
+            const auto after = (int) offline.getSong().patterns[0].notes.size();
+            checks << name << ": generated " << made << " notes, after undo " << after << (made > 0 && after == 0 ? " OK" : " FAIL") << "\n";
+        }
+        // the five side by side (6 px apart, on the window's background)
+        const auto gap = juce::roundToInt (6.0f * lynx::shot::scale());
+        int width = gap, height = 0;
+        for (const auto& image : images)
+        {
+            width += image.getWidth() + gap;
+            height = std::max (height, image.getHeight());
+        }
+        juce::Image strip (juce::Image::RGB, width, height + 2 * gap, true);
+        {
+            juce::Graphics g (strip);
+            g.fillAll (lynx::theme::colour::bg0);
+            int x = gap;
+            for (const auto& image : images)
+            {
+                g.drawImageAt (image, x, gap);
+                x += image.getWidth() + gap;
+            }
+        }
+        write (strip, "generate-panels");
+        checks << "settings saved with the project: " << (offline.getSong().midiGenerate.stacksOptions.sequence.size() == 2 ? "OK" : "FAIL") << "\n";
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
     void runDetailShot (const juce::String& prefix)

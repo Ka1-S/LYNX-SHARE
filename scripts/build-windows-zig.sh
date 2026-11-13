@@ -197,7 +197,7 @@ APP_SOURCES+=(src/platform/FileTypes.cpp src/platform/Paths.cpp src/platform/Pac
 # SEH guard around calls into hosted plugins (round 111): the only unit built with -fms-extensions (__try / __except)
 APP_SOURCES+=(src/platform/CrashGuard.cpp)
 # workflow P2: core (note tools, mixer operations, history labels, browser search)
-APP_SOURCES+=(src/core/NoteTools.cpp src/core/MidiTools.cpp src/core/PianoRollTools.cpp src/core/EventEdit.cpp src/core/AudioEdit.cpp src/core/AudioEditTools.cpp src/core/FlAutoSlicer.cpp src/core/MixerOps.cpp src/core/History.cpp src/core/SearchQuery.cpp src/core/SearchIndex.cpp src/core/SearchService.cpp src/core/BrowserView.cpp src/core/EffectPresets.cpp src/core/PluginPresets.cpp src/core/ParamHelp.cpp)
+APP_SOURCES+=(src/core/NoteTools.cpp src/core/MidiTools.cpp src/core/MidiGenerate.cpp src/core/PianoRollTools.cpp src/core/EventEdit.cpp src/core/AudioEdit.cpp src/core/AudioEditTools.cpp src/core/FlAutoSlicer.cpp src/core/MixerOps.cpp src/core/History.cpp src/core/SearchQuery.cpp src/core/SearchIndex.cpp src/core/SearchService.cpp src/core/BrowserView.cpp src/core/EffectPresets.cpp src/core/PluginPresets.cpp src/core/ParamHelp.cpp)
 # workflow P2: UI (note tool dialogs, tool windows, undo history, quick-add palette)
 APP_SOURCES+=(src/ui/NoteToolDialogs.cpp src/ui/PianoRollScripts.cpp src/ui/MidiClipboard.cpp src/ui/AudioClipboard.cpp src/ui/EventEditor.cpp src/ui/AudioEditor.cpp src/ui/AudioEditorTools.cpp src/ui/ToolWindow.cpp src/ui/TempoTapper.cpp src/ui/TempoDetectionDialog.cpp src/ui/HistoryPanel.cpp src/ui/VersionsPanel.cpp src/ui/PluginsOffPanel.cpp src/ui/QuickAddPalette.cpp src/ui/PluginPickerView.cpp src/ui/PluginThumbs.cpp)
 # start-up: splash screen and its procedurally synthesised sound

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/NoteNames.h"
 #include "core/NoteTools.h"
 #include "core/ProjectKey.h"
 #include "ui/ControllerKnob.h"
@@ -393,6 +394,279 @@ private:
     bool bending = false;
     float startCurve = 0.0f;
 };
+
+// --- round 190fm: the Generate panels' pieces ---------------------------------------------------------------------
+
+juce::String keyText (double v) { return juce::String::fromUTF8 (notenames::keyName (juce::jlimit (0, 127, juce::roundToInt (v))).c_str()); }
+// a duration as log2 of a whole note: -3 = "1/8", 0 = "1/1"
+juce::String log2Text (double v)
+{
+    const auto e = juce::roundToInt (v);
+    return e <= 0 ? "1/" + juce::String (1 << std::min (-e, 10)) : juce::String (1 << std::min (e, 4)) + "/1";
+}
+
+// Seed's pitch / duration / velocity ranges [SHOT live-04: a line with two triangles under it, the values above]: drag
+// the triangle nearest the mouse; the low one never passes the high one.
+class RangeBar final : public juce::Component
+{
+public:
+    RangeBar (double lo, double hi, double stepSize, std::function<double()> low, std::function<double()> high, std::function<void (double, double)> set)
+        : minimum (lo), maximum (hi), step (stepSize), getLow (std::move (low)), getHigh (std::move (high)), setter (std::move (set)) {}
+    void paint (juce::Graphics& g) override
+    {
+        const auto a = area();
+        const auto y = (float) getHeight() * 0.35f;
+        g.setColour (colour::bg5);
+        g.fillRect (a.getX(), y - 1.0f, a.getWidth(), 2.0f);
+        const auto x0 = toX (getLow()), x1 = toX (getHigh());
+        g.setColour (colour::accent);
+        g.fillRect (x0, y - 1.5f, std::max (1.0f, x1 - x0), 3.0f);
+        for (auto x : { x0, x1 })
+        {
+            juce::Path p;
+            p.addTriangle (x, y + 2.0f, x - 4.5f, (float) getHeight() - 1.0f, x + 4.5f, (float) getHeight() - 1.0f);
+            g.setColour (colour::textSecondary);
+            g.fillPath (p);
+        }
+    }
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        const auto x = (float) e.x;
+        draggingHigh = std::abs (x - toX (getHigh())) < std::abs (x - toX (getLow())) || (x > toX (getHigh()));
+        mouseDrag (e);
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        const auto a = area();
+        auto v = minimum + (maximum - minimum) * juce::jlimit (0.0, 1.0, (double) ((e.position.x - a.getX()) / a.getWidth()));
+        if (step > 0.0)
+            v = minimum + std::round ((v - minimum) / step) * step;
+        if (draggingHigh)
+            setter (getLow(), std::max (v, getLow()));
+        else
+            setter (std::min (v, getHigh()), getHigh());
+        repaint();
+    }
+
+private:
+    juce::Rectangle<float> area() const { return getLocalBounds().toFloat().reduced (5.0f, 0.0f); }
+    float toX (double v) const
+    {
+        const auto a = area();
+        return a.getX() + (float) ((juce::jlimit (minimum, maximum, v) - minimum) / std::max (1e-9, maximum - minimum)) * a.getWidth();
+    }
+    double minimum, maximum, step;
+    std::function<double()> getLow, getHigh;
+    std::function<void (double, double)> setter;
+    bool draggingHigh = false;
+};
+
+// Shape's display [SHOT live-04: the levels as dots rising]: the 21 levels as dots joined by a line; click or drag across
+// it to draw them (the preset becomes Custom).
+class ShapeDisplay final : public juce::Component
+{
+public:
+    ShapeDisplay (midigen::ShapeOptions& o, std::function<void()> onDraw) : options (o), drawn (std::move (onDraw))
+    {
+        ui::setHint (*this, tr ("Draw the shape: click or drag across the levels"));
+    }
+    void paint (juce::Graphics& g) override
+    {
+        g.setColour (colour::bg0);
+        g.fillRect (getLocalBounds());
+        g.setColour (colour::accent.withAlpha (0.6f));
+        g.drawRect (getLocalBounds());
+        juce::Path line;
+        for (int i = 0; i < midigen::ShapeOptions::levelCount; ++i)
+        {
+            const auto p = at (i);
+            if (i == 0)
+                line.startNewSubPath (p);
+            else
+                line.lineTo (p);
+        }
+        g.setColour (colour::automation.withAlpha (0.35f));
+        g.strokePath (line, juce::PathStrokeType (1.0f));
+        g.setColour (colour::automation);
+        for (int i = 0; i < midigen::ShapeOptions::levelCount; ++i)
+            g.fillEllipse (juce::Rectangle<float> (4.0f, 4.0f).withCentre (at (i)));
+    }
+    void mouseDown (const juce::MouseEvent& e) override { mouseDrag (e); }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        const auto a = area();
+        const auto i = juce::jlimit (0, midigen::ShapeOptions::levelCount - 1,
+                                     juce::roundToInt ((e.position.x - a.getX()) / a.getWidth() * (float) (midigen::ShapeOptions::levelCount - 1)));
+        options.levels[(std::size_t) i] = (float) juce::jlimit (0.0, 1.0, std::round ((double) ((a.getBottom() - e.position.y) / a.getHeight()) * 100.0) / 100.0);
+        options.preset = midigen::ShapeOptions::custom;
+        repaint();
+        drawn();
+    }
+
+private:
+    juce::Rectangle<float> area() const { return getLocalBounds().toFloat().reduced (6.0f, 6.0f); }
+    juce::Point<float> at (int i) const
+    {
+        const auto a = area();
+        return { a.getX() + a.getWidth() * (float) i / (float) (midigen::ShapeOptions::levelCount - 1),
+                 a.getBottom() - a.getHeight() * options.levels[(std::size_t) i] };
+    }
+    midigen::ShapeOptions& options;
+    std::function<void()> drawn;
+};
+
+// Stacks' chord sequence (LYNX's own display; Live's is a chord map we have no rule for): one cell per chord with its
+// name, the edited chord lit; click a cell to edit that chord.
+class ChordStrip final : public juce::Component
+{
+public:
+    ChordStrip (std::function<int()> countOf, std::function<int()> selectedOf, std::function<juce::String (int)> nameOf, std::function<void (int)> select)
+        : count (std::move (countOf)), selected (std::move (selectedOf)), name (std::move (nameOf)), choose (std::move (select))
+    {
+        ui::setHint (*this, tr ("The chord sequence: click a chord to edit it"));
+    }
+    void paint (juce::Graphics& g) override
+    {
+        g.setColour (colour::bg0);
+        g.fillRect (getLocalBounds());
+        const auto n = std::max (1, count());
+        const auto w = (float) getWidth() / (float) n;
+        g.setFont (font (type::caption, true));
+        for (int i = 0; i < n; ++i)
+        {
+            const juce::Rectangle<float> cell ((float) i * w + 1.0f, 1.0f, w - 2.0f, (float) getHeight() - 2.0f);
+            const auto lit = i == selected();
+            g.setColour (lit ? colour::accent : colour::bg4);
+            g.fillRect (cell);
+            g.setColour (lit ? colour::onAccent : colour::textPrimary);
+            g.drawFittedText (name (i), cell.toNearestInt().reduced (1, 0), juce::Justification::centred, 1, 0.6f);
+        }
+    }
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        const auto n = std::max (1, count());
+        choose (juce::jlimit (0, n - 1, e.x * n / std::max (1, getWidth())));
+    }
+
+private:
+    std::function<int()> count, selected;
+    std::function<juce::String (int)> name;
+    std::function<void (int)> choose;
+};
+
+// Stacks' rule chooser: the chord bank's 16 shapes as two rows of cells (the chord each one makes in the hint line).
+class RuleGrid final : public juce::Component
+{
+public:
+    RuleGrid (std::function<int()> get, std::function<void (int)> set, std::function<juce::String (int)> nameOf)
+        : getter (std::move (get)), setter (std::move (set)), name (std::move (nameOf))
+    {
+        setRepaintsOnMouseActivity (true);
+    }
+    void paint (juce::Graphics& g) override
+    {
+        g.setColour (colour::bg0);
+        g.fillRect (getLocalBounds());
+        g.setFont (font (type::caption));
+        const auto lit = getter();
+        for (int i = 0; i < 16; ++i)
+        {
+            const auto cell = cellBounds (i);
+            g.setColour (i == lit ? colour::accent : (i == hover ? colour::bg5 : colour::bg3));
+            g.fillRect (cell);
+            g.setColour (i == lit ? colour::onAccent : colour::textSecondary);
+            g.drawText (juce::String (i + 1), cell, juce::Justification::centred);
+        }
+    }
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        const auto i = cellAt (e.position);
+        if (i != hover)
+        {
+            hover = i;
+            ui::setHint (*this, i >= 0 ? tr ("Chord shape {0}: {1}").replace ("{0}", juce::String (i + 1)).replace ("{1}", name (i)) : juce::String());
+            repaint();
+        }
+    }
+    void mouseExit (const juce::MouseEvent&) override
+    {
+        hover = -1;
+        repaint();
+    }
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        if (const auto i = cellAt (e.position); i >= 0)
+        {
+            setter (i);
+            repaint();
+        }
+    }
+
+private:
+    juce::Rectangle<int> cellBounds (int i) const
+    {
+        const auto w = getWidth() / 8, h = getHeight() / 2;
+        return { (i % 8) * w + 1, (i / 8) * h + 1, w - 2, h - 2 };
+    }
+    int cellAt (juce::Point<float> p) const
+    {
+        for (int i = 0; i < 16; ++i)
+            if (cellBounds (i).toFloat().expanded (1.0f).contains (p))
+                return i;
+        return -1;
+    }
+    std::function<int()> getter;
+    std::function<void (int)> setter;
+    std::function<juce::String (int)> name;
+    int hover = -1;
+};
+
+// a line of text worked out when painted (the chord's notes)
+class Readout final : public juce::Component
+{
+public:
+    explicit Readout (std::function<juce::String()> textOf) : text (std::move (textOf)) { setInterceptsMouseClicks (false, false); }
+    void paint (juce::Graphics& g) override
+    {
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::caption));
+        g.drawFittedText (text(), getLocalBounds(), juce::Justification::centred, 1, 0.7f);
+    }
+
+private:
+    std::function<juce::String()> text;
+};
+
+// Euclidean's ring [SHOT live-04: rings of steps, the hits lit]: one voice's steps round a circle from the top.
+class EuclidRing final : public juce::Component
+{
+public:
+    explicit EuclidRing (midigen::EuclidOptions& o) : options (o) { setInterceptsMouseClicks (false, false); }
+    void paint (juce::Graphics& g) override
+    {
+        const auto r = getLocalBounds().toFloat().reduced (4.0f);
+        const auto size = std::min (r.getWidth(), r.getHeight());
+        const auto c = r.getCentre();
+        const auto steps = juce::jlimit (1, 32, options.steps);
+        const auto radius = size * 0.5f - 4.0f;
+        const auto dot = juce::jlimit (3.0f, 9.0f, radius * 3.0f / (float) steps);
+        for (int i = 0; i < steps; ++i)
+        {
+            const auto angle = juce::MathConstants<float>::twoPi * (float) i / (float) steps;
+            const juce::Point<float> p { c.x + radius * std::sin (angle), c.y - radius * std::cos (angle) };
+            const auto hit = notetools::euclideanHit (steps, juce::jlimit (0, steps, options.density), options.rotation, i);
+            g.setColour (hit ? colour::accent : colour::bg5);
+            g.fillEllipse (juce::Rectangle<float> (dot, dot).withCentre (p));
+        }
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::caption));
+        g.drawText (juce::String (juce::jlimit (0, steps, options.density)) + "/" + juce::String (steps), juce::Rectangle<float> (40.0f, 14.0f).withCentre (c),
+                    juce::Justification::centred);
+    }
+
+private:
+    midigen::EuclidOptions& options;
+};
 } // namespace
 
 const char* MidiToolsPanel::toolName (int t) noexcept
@@ -420,6 +694,19 @@ struct MidiToolsPanel::Body final : public juce::Component
     Body (MidiToolsPanel& p, int width, int height) : panel (p)
     {
         setSize (width, height);
+        if (panel.section == generateSection)
+        {
+            switch (panel.gen.tool)
+            {
+                case midigen::Settings::rhythm:    buildRhythm(); break;
+                case midigen::Settings::seed:      buildSeed(); break;
+                case midigen::Settings::shape:     buildShape(); break;
+                case midigen::Settings::stacks:    buildStacks(); break;
+                case midigen::Settings::euclidean: buildEuclid(); break;
+                default: break;
+            }
+            return;
+        }
         switch (panel.tool)
         {
             case arpeggiate: buildArpeggiate(); break;
@@ -771,28 +1058,311 @@ struct MidiToolsPanel::Body final : public juce::Component
         choice ({ 2 * (third + 2), 107, third, 16 }, { "1/16", "1/8", tr ("Grid") }, o.division, [&o] (int i) { o.division = i; });
     }
 
+    // --- round 190fm: the generators, laid out as Live 12.4's Generate panels [SHOT ableton190o/shots/live-04-generate-panels.png]
+    // builds the page again once the mouse is up (a control being dragged must not go away under the mouse)
+    void rebuildLater() { rebuildWhenReleased (juce::Component::SafePointer<MidiToolsPanel> (&panel)); }
+    static void rebuildWhenReleased (juce::Component::SafePointer<MidiToolsPanel> safe)
+    {
+        juce::Timer::callAfterDelay (60, [safe] {
+            if (safe == nullptr)
+                return;
+            if (juce::ModifierKeys::currentModifiers.isAnyMouseButtonDown())
+                rebuildWhenReleased (safe);
+            else
+                safe->rebuild();
+        });
+    }
+    static ui::ValueSpec keySpec (int def) { return makeSpec ({}, 0, 127, def, 1.0, keyText); }
+    static ui::ValueSpec wholeSpec (double lo, double hi, double def) { return makeSpec ({}, lo, hi, def, 1.0, whole); }
+    static ui::ValueSpec noteValueSpec (int def)
+    {
+        return makeSpec ({}, 0, midigen::noteValueCount - 1, def, 1.0, [] (double v) { return juce::String (midigen::noteValueName (juce::roundToInt (v))); });
+    }
+    // "Steps / Pattern / Density" knobs, "Step Duration", "Split / Shift (/ Rep.)", velocity / accent / Freq with the
+    // accent's arrows
+    void buildRhythm()
+    {
+        auto& o = panel.gen.rhythmOptions;
+        const auto w = getWidth(), third = w / 3;
+        label (tr ("Pitch"), { 0, 0, 60, 14 });
+        box (tr ("Pitch"), { w - 46, 0, 46, 14 }, keySpec (36), [&o] { return (double) o.pitch; }, [&o] (double v) { o.pitch = juce::roundToInt (v); });
+        const auto relabel = [this] { rebuildLater(); }; // (Pattern's range follows Steps and Density)
+        knob (tr ("Steps"), { 0, 16, third, 50 }, wholeSpec (1, 32, 8), [&o] { return (double) o.steps; }, [&o, relabel] (double v) {
+            const auto before = o.steps;
+            o.steps = juce::roundToInt (v);
+            o.density = std::min (o.density, o.steps);
+            if (o.steps != before)
+                relabel();
+        });
+        const auto count = midigen::rhythmCount (o.steps, o.density);
+        knob (tr ("Pattern"), { third, 16, third, 50 }, wholeSpec (0, (double) std::max<std::int64_t> (0, count - 1), (double) std::min<std::int64_t> (14, count - 1)),
+              [&o, count] { return (double) (((o.pattern % count) + count) % count); }, [&o] (double v) { o.pattern = juce::roundToInt (v); });
+        knob (tr ("Density"), { 2 * third, 16, w - 2 * third, 50 }, wholeSpec (0, 32, 4), [&o] { return (double) o.density; }, [&o, relabel] (double v) {
+            const auto before = o.density;
+            o.density = std::min (juce::roundToInt (v), o.steps);
+            if (o.density != before)
+                relabel();
+        });
+        label (tr ("Step Duration"), { 0, 68, w - 50, 14 }, juce::Justification::centredRight);
+        box (tr ("Step Duration"), { w - 46, 68, 46, 14 }, noteValueSpec (7), [&o] { return (double) o.stepDuration; }, [&o] (double v) { o.stepDuration = juce::roundToInt (v); });
+        label (tr ("Split"), { 0, 85, 28, 14 });
+        box (tr ("Split"), { 28, 85, 40, 14 }, makeSpec ({}, 0.0, 1.0, 0.0, 0.0, percent1), [&o] { return (double) o.split; }, [&o] (double v) { o.split = (float) v; });
+        label (tr ("Shift"), { 72, 85, 28, 14 });
+        box (tr ("Shift"), { 100, 85, 24, 14 }, wholeSpec (-32, 32, 0), [&o] { return (double) o.shift; }, [&o] (double v) { o.shift = juce::roundToInt (v); });
+        label (tr ("Rep."), { 128, 85, 24, 14 });
+        box (tr ("Repetitions"), { w - 20, 85, 20, 14 }, wholeSpec (1, 8, 1), [&o] { return (double) o.repetitions; }, [&o] (double v) { o.repetitions = juce::roundToInt (v); });
+        label (tr ("Vel."), { 0, 102, 22, 16 });
+        box (tr ("Velocity"), { 22, 102, 28, 16 }, wholeSpec (1, 127, 100), [&o] { return (double) o.velocity; }, [&o] (double v) { o.velocity = juce::roundToInt (v); });
+        box (tr ("Accent"), { 52, 102, 28, 16 }, wholeSpec (1, 127, 127), [&o] { return (double) o.accent; }, [&o] (double v) { o.accent = juce::roundToInt (v); });
+        label (tr ("Freq"), { 84, 102, 28, 16 });
+        auto& freq = box (tr ("Accent frequency"), { 112, 102, 24, 16 }, wholeSpec (0, 16, 4), [&o] { return (double) o.period; }, [&o] (double v) { o.period = juce::roundToInt (v); });
+        const auto arrow = [this, &o, &freq] (juce::Rectangle<int> bounds, const char* text, int by, const char* hint) {
+            auto& b = add (std::make_unique<juce::TextButton> (juce::String::fromUTF8 (text)), bounds);
+            b.setConnectedEdges (0);
+            b.setTooltip (tr (hint));
+            b.onClick = [this, &o, &freq, by] {
+                o.offset = std::clamp (o.offset + by, -32, 32);
+                freq.repaint();
+                panel.changed();
+            };
+        };
+        arrow ({ w - 34, 102, 16, 16 }, "\xe2\x86\x90", -1, TR_NOOP ("Accent earlier"));
+        arrow ({ w - 16, 102, 16, 16 }, "\xe2\x86\x92", 1, TR_NOOP ("Accent later"));
+    }
+    // a range row: the low value, the name, the high value, then the two-handled line
+    void rangeRow (int y, const juce::String& name, ui::ValueSpec spec, std::function<double()> low, std::function<double()> high,
+                   std::function<void (double)> setLow, std::function<void (double)> setHigh)
+    {
+        const auto w = getWidth();
+        label (name, { 44, y, w - 88, 12 }, juce::Justification::centred);
+        box (name, { 0, y, 40, 12 }, spec, low, setLow);
+        box (name, { w - 40, y, 40, 12 }, spec, high, setHigh);
+        add (std::make_unique<RangeBar> (spec.minimum, spec.maximum, spec.interval, low, high, [this, setLow, setHigh] (double lo, double hi) {
+                 setLow (lo);
+                 setHigh (hi);
+                 repaint();
+                 panel.changed();
+             }), { 0, y + 13, w, 12 });
+    }
+    void buildSeed()
+    {
+        auto& o = panel.gen.seedOptions;
+        const auto w = getWidth(), half = w / 2;
+        rangeRow (0, tr ("Pitch"), keySpec (60), [&o] { return (double) o.minPitch; }, [&o] { return (double) o.maxPitch; },
+                  [&o] (double v) { o.minPitch = juce::roundToInt (v); }, [&o] (double v) { o.maxPitch = juce::roundToInt (v); });
+        rangeRow (27, tr ("Duration"), makeSpec ({}, -7, 0, -6, 1.0, log2Text), [&o] { return (double) o.minDuration; }, [&o] { return (double) o.maxDuration; },
+                  [&o] (double v) { o.minDuration = (float) v; }, [&o] (double v) { o.maxDuration = (float) v; });
+        rangeRow (54, tr ("Velocity"), wholeSpec (1, 127, 30), [&o] { return (double) o.minVelocity; }, [&o] { return (double) o.maxVelocity; },
+                  [&o] (double v) { o.minVelocity = juce::roundToInt (v); }, [&o] (double v) { o.maxVelocity = juce::roundToInt (v); });
+        label (tr ("Voices"), { 0, 84, half - 4, 12 }, juce::Justification::centred);
+        label (tr ("Density"), { half + 4, 84, half - 4, 12 }, juce::Justification::centred);
+        box (tr ("Voices"), { 0, 97, half - 4, 16 }, wholeSpec (1, 8, 4), [&o] { return (double) o.voices; }, [&o] (double v) { o.voices = juce::roundToInt (v); });
+        box (tr ("Density"), { half + 4, 97, half - 4, 16 }, unipolar (0.5), [&o] { return (double) o.density; }, [&o] (double v) { o.density = (float) v; });
+    }
+    void buildShape()
+    {
+        auto& o = panel.gen.shapeOptions;
+        const auto w = getWidth(), quarter = w / 4;
+        juce::StringArray presets;
+        for (int i = 0; i < midigen::ShapeOptions::presetCount; ++i)
+            presets.add (tr (midigen::shapePresetName (i)));
+        auto* presetBox = &choice ({ 0, 0, w, 18 }, presets, o.preset, [this, &o] (int i) {
+            o.preset = i;
+            if (i != midigen::ShapeOptions::custom)
+                o.levels = midigen::shapePreset (i);
+            repaint();
+        });
+        add (std::make_unique<ShapeDisplay> (o, [this, presetBox] {
+                 presetBox->setSelectedId (midigen::ShapeOptions::custom + 1, juce::dontSendNotification);
+                 panel.changed();
+             }), { 0, 20, w, 52 });
+        box (tr ("Lowest pitch"), { 0, 74, 40, 14 }, keySpec (60), [&o] { return (double) o.minPitch; }, [&o] (double v) { o.minPitch = juce::roundToInt (v); });
+        label (tr ("Pitch"), { 44, 74, w - 88, 14 }, juce::Justification::centred);
+        box (tr ("Highest pitch"), { w - 40, 74, 40, 14 }, keySpec (84), [&o] { return (double) o.maxPitch; }, [&o] (double v) { o.maxPitch = juce::roundToInt (v); });
+        label (tr ("Rate"), { 0, 91, quarter, 12 }, juce::Justification::centred);
+        label (tr ("Tie"), { quarter, 91, quarter, 12 }, juce::Justification::centred);
+        label (tr ("Density"), { 2 * quarter, 91, quarter, 12 }, juce::Justification::centred);
+        label (tr ("Jitter"), { 3 * quarter, 91, w - 3 * quarter, 12 }, juce::Justification::centred);
+        box (tr ("Rate"), { 0, 104, quarter - 2, 16 }, makeSpec ({}, 0, midigen::noteValueCount, 0, 1.0, [] (double v) {
+                 const auto i = juce::roundToInt (v);
+                 return i <= 0 ? tr ("Grid") : juce::String (midigen::noteValueName (i - 1));
+             }), [&o] { return (double) o.rate; }, [&o] (double v) { o.rate = juce::roundToInt (v); });
+        box (tr ("Tie"), { quarter, 104, quarter - 2, 16 }, makeSpec ({}, 0.0, 1.0, 0.0, 0.0, percent1), [&o] { return (double) o.tie; }, [&o] (double v) { o.tie = (float) v; });
+        box (tr ("Density"), { 2 * quarter, 104, quarter - 2, 16 }, unipolar (1.0), [&o] { return (double) o.density; }, [&o] (double v) { o.density = (float) v; });
+        box (tr ("Jitter"), { 3 * quarter, 104, w - 3 * quarter, 16 }, makeSpec ({}, 0.0, 1.0, 0.0, 0.0, percent1), [&o] { return (double) o.jitter; }, [&o] (double v) { o.jitter = (float) v; });
+    }
+    midigen::StackChord& chord() const
+    {
+        auto& s = panel.gen.stacksOptions;
+        if (s.sequence.empty())
+            s.sequence.emplace_back();
+        s.selected = std::clamp (s.selected, 0, (int) s.sequence.size() - 1);
+        return s.sequence[(std::size_t) s.selected];
+    }
+    void buildStacks()
+    {
+        auto& s = panel.gen.stacksOptions;
+        const auto w = getWidth(), quarter = w / 4;
+        const auto scale = panel.projectScale();
+        const auto nameOf = [this, scale] (const midigen::StackChord& c) {
+            return juce::String::fromUTF8 (midigen::stackChordName (c, scale, panel.chordBank()).c_str());
+        };
+        add (std::make_unique<ChordStrip> ([&s] { return (int) s.sequence.size(); }, [&s] { return s.selected; },
+                                           [&s, nameOf] (int i) { return i < (int) s.sequence.size() ? nameOf (s.sequence[(std::size_t) i]) : juce::String(); },
+                                           [this, &s] (int i) {
+                                               s.selected = i;
+                                               panel.storeSettings();
+                                               rebuildLater();
+                                           }), { 0, 0, w - 40, 20 });
+        const auto edit = [this, &s] (juce::Rectangle<int> bounds, const char* text, bool append, const char* hint) {
+            auto& b = add (std::make_unique<juce::TextButton> (juce::String::fromUTF8 (text)), bounds);
+            b.setConnectedEdges (0);
+            b.setTooltip (tr (hint));
+            b.setEnabled (append ? s.sequence.size() < 64 : s.sequence.size() > 1);
+            b.onClick = [this, &s, append] {
+                if (append) // a copy of the edited chord after it
+                {
+                    const auto copy = chord();
+                    s.sequence.insert (s.sequence.begin() + s.selected + 1, copy);
+                    ++s.selected;
+                }
+                else if (s.sequence.size() > 1)
+                {
+                    s.sequence.erase (s.sequence.begin() + s.selected);
+                    s.selected = std::min (s.selected, (int) s.sequence.size() - 1);
+                }
+                panel.changed();
+                rebuildLater();
+            };
+        };
+        edit ({ w - 38, 0, 18, 20 }, "+", true, TR_NOOP ("Add a chord after this one"));
+        edit ({ w - 18, 0, 18, 20 }, "\xe2\x88\x92", false, TR_NOOP ("Delete this chord"));
+        add (std::make_unique<RuleGrid> ([this] { return chord().rule; }, setting ([this] (double v) { chord().rule = juce::roundToInt (v); }),
+                                         [this, nameOf] (int rule) {
+                                             auto c = chord();
+                                             c.rule = rule;
+                                             return nameOf (c);
+                                         }), { 0, 23, w, 30 });
+        add (std::make_unique<Readout> ([this, scale, nameOf] {
+                 const auto& c = chord();
+                 juce::String text = nameOf (c) + ":";
+                 for (auto k : midigen::stackKeys (c, scale, panel.chordBank()))
+                     text << " " << keyText (k);
+                 return text;
+             }), { 0, 55, w, 12 });
+        label (tr ("Root"), { 0, 69, quarter, 12 }, juce::Justification::centred);
+        label (tr ("Inversion"), { quarter, 69, quarter, 12 }, juce::Justification::centred);
+        label (tr ("Duration"), { 2 * quarter, 69, quarter, 12 }, juce::Justification::centred);
+        label (tr ("Offset"), { 3 * quarter, 69, w - 3 * quarter, 12 }, juce::Justification::centred);
+        if (scale.on()) // the root by scale degree: one step = the next note of the key
+        {
+            const auto n = (int) scale.intervals.size();
+            box (tr ("Root"), { 0, 82, quarter - 2, 16 }, makeSpec ({}, -n, 9 * n, 5 * n, 1.0, [this, scale, n] (double v) {
+                     auto c = chord();
+                     const auto i = juce::roundToInt (v);
+                     c.octave = (i >= 0 ? i / n : -((-i + n - 1) / n)) - 2;
+                     c.rootDegree = i - (c.octave + 2) * n;
+                     return keyText (midigen::stackRoot (c, scale));
+                 }), [this, n] { return (double) ((chord().octave + 2) * n + chord().rootDegree); }, [this, scale, n] (double v) {
+                     auto& c = chord();
+                     const auto i = juce::roundToInt (v);
+                     c.octave = (i >= 0 ? i / n : -((-i + n - 1) / n)) - 2;
+                     c.rootDegree = i - (c.octave + 2) * n;
+                     c.rootPitch = midigen::stackRoot (c, scale);
+                 });
+        }
+        else
+            box (tr ("Root"), { 0, 82, quarter - 2, 16 }, keySpec (60), [this] { return (double) chord().rootPitch; },
+                 [this] (double v) { chord().rootPitch = juce::roundToInt (v); });
+        box (tr ("Inversion"), { quarter, 82, quarter - 2, 16 }, wholeSpec (-4, 4, 0), [this] { return (double) chord().inversion; },
+             [this] (double v) { chord().inversion = juce::roundToInt (v); });
+        box (tr ("Duration (bars)"), { 2 * quarter, 82, quarter - 2, 16 }, makeSpec ({}, 0.25, 16.0, 1.0, 0.25, [] (double v) { return juce::String (v, 2).trimCharactersAtEnd ("0").trimCharactersAtEnd ("."); }),
+             [this] { return (double) chord().duration; }, [this] (double v) { chord().duration = (float) v; });
+        box (tr ("Offset (sixteenths)"), { 3 * quarter, 82, w - 3 * quarter, 16 }, wholeSpec (-16, 16, 0), [this] { return (double) chord().offset; },
+             [this] (double v) { chord().offset = (float) v; });
+        auto& bank = add (std::make_unique<juce::TextButton> (s.bankFile.empty() ? tr ("Chord bank: LYNX")
+                                                                                 : tr ("Chord bank: {0}").replace ("{0}", juce::File (juce::String::fromUTF8 (s.bankFile.c_str())).getFileNameWithoutExtension())),
+                          { 0, 102, w, 16 });
+        bank.setConnectedEdges (0);
+        bank.setTooltip (tr ("The chord shapes: LYNX's own bank, or a .stacks chord bank file of yours"));
+        bank.onClick = [this] { panel.chooseChordBank(); };
+    }
+    void buildEuclid()
+    {
+        auto& o = panel.gen.euclidOptions;
+        const auto w = getWidth(), quarter = w / 4;
+        auto* ring = &add (std::make_unique<EuclidRing> (o), { 0, 0, 96, 58 });
+        label (tr ("Pitch"), { 104, 0, w - 104, 12 }, juce::Justification::centred);
+        box (tr ("Pitch"), { 104, 13, w - 104, 16 }, keySpec (36), [&o] { return (double) o.pitch; }, [&o] (double v) { o.pitch = juce::roundToInt (v); });
+        label (tr ("Velocity"), { 104, 31, w - 104, 12 }, juce::Justification::centred);
+        box (tr ("Velocity"), { 104, 44, w - 104, 16 }, wholeSpec (1, 127, 100), [&o] { return (double) o.velocity; }, [&o] (double v) { o.velocity = juce::roundToInt (v); });
+        label (tr ("Steps"), { 0, 64, quarter, 12 }, juce::Justification::centred);
+        label (tr ("Density"), { quarter, 64, quarter, 12 }, juce::Justification::centred);
+        label (tr ("Rotation"), { 2 * quarter, 64, quarter, 12 }, juce::Justification::centred);
+        label (tr ("Division"), { 3 * quarter, 64, w - 3 * quarter, 12 }, juce::Justification::centred);
+        const auto redraw = [ring] (int& field) { return [ring, &field] (double v) { field = juce::roundToInt (v); ring->repaint(); }; };
+        box (tr ("Steps"), { 0, 77, quarter - 2, 16 }, wholeSpec (1, 32, 16), [&o] { return (double) o.steps; }, redraw (o.steps));
+        box (tr ("Density"), { quarter, 77, quarter - 2, 16 }, wholeSpec (0, 32, 8), [&o] { return (double) o.density; }, redraw (o.density));
+        box (tr ("Rotation"), { 2 * quarter, 77, quarter - 2, 16 }, wholeSpec (-32, 32, 0), [&o] { return (double) o.rotation; }, redraw (o.rotation));
+        box (tr ("Division"), { 3 * quarter, 77, w - 3 * quarter, 16 }, noteValueSpec (5), [&o] { return (double) o.division; }, [&o] (double v) { o.division = juce::roundToInt (v); });
+    }
+
     MidiToolsPanel& panel;
     std::vector<std::unique_ptr<juce::Component>> items;
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
 MidiToolsPanel::MidiToolsPanel (AudioEngine& e, std::function<Target()> t, std::function<void (const std::vector<int>&)> s)
-    : engine (e), target (std::move (t)), select (std::move (s)), seed ((std::uint32_t) juce::Random::getSystemRandom().nextInt())
+    : engine (e), target (std::move (t)), select (std::move (s)), seed ((std::uint32_t) juce::Random::getSystemRandom().nextInt()),
+      genSeed ((std::uint32_t) juce::Random::getSystemRandom().nextInt())
 {
-    title.setText (tr ("Transform"), juce::dontSendNotification);
-    title.setFont (font (type::small, true));
-    title.setColour (juce::Label::textColourId, colour::textSecondary);
-    addAndMakeVisible (title);
-    for (int i = 0; i < toolCount; ++i)
-        chooser.addItem (tr (toolName (i)), i + 1);
-    chooser.setSelectedId (tool + 1, juce::dontSendNotification);
-    chooser.setTooltip (tr ("MIDI Tools: changes the selected notes, or every note when none is selected"));
-    chooser.onChange = [this] { setTool (chooser.getSelectedId() - 1); };
+    // round 190fm: Live's two panels as two tabs (Transform, Generate)
+    for (auto* tab : { &transformTab, &generateTab })
+    {
+        tab->setConnectedEdges (0);
+        tab->setClickingTogglesState (true);
+        tab->setRadioGroupId (19011, juce::dontSendNotification);
+        tab->setColour (juce::TextButton::buttonColourId, colour::bg2);
+        tab->setColour (juce::TextButton::buttonOnColourId, colour::bg4);
+        tab->setColour (juce::TextButton::textColourOffId, colour::textSecondary);
+        tab->setColour (juce::TextButton::textColourOnId, colour::textPrimary);
+        addAndMakeVisible (*tab);
+    }
+    transformTab.setButtonText (tr ("Transform"));
+    generateTab.setButtonText (tr ("Generate"));
+    transformTab.setTooltip (tr ("Transform: tools that change the selected notes"));
+    generateTab.setTooltip (tr ("Generate: tools that write new notes into the time selection, or the whole clip"));
+    transformTab.setToggleState (true, juce::dontSendNotification);
+    transformTab.onClick = [this] { if (transformTab.getToggleState()) setSection (transformSection); };
+    generateTab.onClick = [this] { if (generateTab.getToggleState()) setSection (generateSection); };
+    loadSettings();
+    fillChooser();
+    chooser.onChange = [this] {
+        if (section == generateSection)
+            setGenerator (chooser.getSelectedId() - 1);
+        else
+            setTool (chooser.getSelectedId() - 1);
+    };
     addAndMakeVisible (chooser);
     resetButton.setButtonText (juce::String::fromUTF8 ("\xe2\x86\xba"));
     resetButton.setTooltip (tr ("Reset the tool's settings"));
     resetButton.setConnectedEdges (0);
     resetButton.onClick = [this] {
+        if (section == generateSection)
+        {
+            switch (gen.tool)
+            {
+                case midigen::Settings::rhythm:    gen.rhythmOptions = {}; break;
+                case midigen::Settings::seed:      gen.seedOptions = {}; break;
+                case midigen::Settings::shape:     gen.shapeOptions = {}; break;
+                case midigen::Settings::stacks:    gen.stacksOptions = {}; break;
+                case midigen::Settings::euclidean: gen.euclidOptions = {}; break;
+                default: break;
+            }
+            rebuild();
+            changed();
+            return;
+        }
         switch (tool)
         {
             case arpeggiate: arp = {}; break;
@@ -818,12 +1388,17 @@ MidiToolsPanel::MidiToolsPanel (AudioEngine& e, std::function<Target()> t, std::
     autoButton.setColour (juce::TextButton::buttonOnColourId, colour::accent);
     autoButton.setColour (juce::TextButton::textColourOnId, colour::onAccent);
     autoButton.setToggleState (autoApply, juce::dontSendNotification);
-    autoButton.onClick = [this] { autoApply = autoButton.getToggleState(); };
+    autoButton.onClick = [this] { (section == generateSection ? autoGenerate : autoApply) = autoButton.getToggleState(); };
     addAndMakeVisible (autoButton);
     transformButton.setButtonText (tr ("Transform"));
     transformButton.setTooltip (tr ("Applies the tool; the next change starts from the notes as they are now"));
     transformButton.setConnectedEdges (0);
-    transformButton.onClick = [this] { transformNow(); };
+    transformButton.onClick = [this] {
+        if (section == generateSection)
+            generateNow();
+        else
+            transformNow();
+    };
     addAndMakeVisible (transformButton);
     setSize (panelWidth, panelHeight);
     rebuild();
@@ -831,9 +1406,218 @@ MidiToolsPanel::MidiToolsPanel (AudioEngine& e, std::function<Target()> t, std::
 
 MidiToolsPanel::~MidiToolsPanel() = default;
 
+void MidiToolsPanel::fillChooser()
+{
+    chooser.clear (juce::dontSendNotification);
+    if (section == generateSection)
+    {
+        for (int i = 0; i < midigen::Settings::toolCount; ++i)
+            chooser.addItem (tr (midigen::toolName (i)), i + 1);
+        chooser.setSelectedId (gen.tool + 1, juce::dontSendNotification);
+        chooser.setTooltip (tr ("MIDI Tools: writes new notes into the time selection, or the whole clip, in place of the notes there"));
+    }
+    else
+    {
+        for (int i = 0; i < toolCount; ++i)
+            chooser.addItem (tr (toolName (i)), i + 1);
+        chooser.setSelectedId (tool + 1, juce::dontSendNotification);
+        chooser.setTooltip (tr ("MIDI Tools: changes the selected notes, or every note when none is selected"));
+    }
+}
+
+void MidiToolsPanel::setSection (int s)
+{
+    s = s == generateSection ? generateSection : transformSection;
+    transformTab.setToggleState (s == transformSection, juce::dontSendNotification);
+    generateTab.setToggleState (s == generateSection, juce::dontSendNotification);
+    if (s == section && body != nullptr)
+        return;
+    section = s;
+    session.valid = false; // (what the Transform tool did stays)
+    if (section == generateSection)
+        loadSettings(); // (the project's, which an undo may have changed)
+    fillChooser();
+    autoButton.setToggleState (section == generateSection ? autoGenerate : autoApply, juce::dontSendNotification);
+    autoButton.setTooltip (section == generateSection ? tr ("Auto: every change writes the notes again (with the same random choices)")
+                                                      : tr ("Auto: every change runs the tool again on the notes as they were before it"));
+    transformButton.setButtonText (section == generateSection ? tr ("Generate") : tr ("Transform"));
+    transformButton.setTooltip (section == generateSection ? tr ("Writes new notes (new random choices each time); undo takes them back")
+                                                           : tr ("Applies the tool; the next change starts from the notes as they are now"));
+    rebuild();
+}
+
+void MidiToolsPanel::setGenerator (int g)
+{
+    g = std::clamp (g, 0, (int) midigen::Settings::toolCount - 1);
+    if (section != generateSection)
+    {
+        gen.tool = g;
+        setSection (generateSection);
+    }
+    if (g == gen.tool && body != nullptr)
+    {
+        chooser.setSelectedId (g + 1, juce::dontSendNotification);
+        return;
+    }
+    gen.tool = g;
+    chooser.setSelectedId (g + 1, juce::dontSendNotification);
+    storeSettings();
+    rebuild();
+}
+
+void MidiToolsPanel::loadSettings()
+{
+    gen = engine.getSong().midiGenerate;
+}
+
+void MidiToolsPanel::storeSettings()
+{
+    if (engine.getSong().midiGenerate == gen)
+        return;
+    engine.editSong ([settings = gen] (Song& s) { s.midiGenerate = settings; }, false);
+}
+
+midigen::ScaleRef MidiToolsPanel::projectScale() const
+{
+    midigen::ScaleRef scale;
+    if (const auto key = projectkey::get (engine.getSong()))
+    {
+        scale.root = key->root;
+        scale.intervals = projectkey::intervals (*key);
+    }
+    return scale;
+}
+
+const midigen::ChordBank& MidiToolsPanel::chordBank()
+{
+    const auto& path = gen.stacksOptions.bankFile;
+    if (path.empty())
+        return midigen::lynxChordBank();
+    if (loadedBank.path != path)
+    {
+        loadedBank.path = path;
+        loadedBank.bank.reset();
+        const juce::File file (juce::String::fromUTF8 (path.c_str()));
+        if (file.existsAsFile() && file.getSize() < 4 * 1024 * 1024)
+        {
+            std::string error;
+            loadedBank.bank = midigen::readChordBank (file.loadFileAsString().toStdString(), error);
+        }
+    }
+    return loadedBank.bank ? *loadedBank.bank : midigen::lynxChordBank(); // (a file gone or unreadable: LYNX's bank)
+}
+
+void MidiToolsPanel::chooseChordBank()
+{
+    juce::PopupMenu menu;
+    menu.addItem (1, tr ("LYNX chord bank"), true, gen.stacksOptions.bankFile.empty());
+    menu.addItem (2, tr ("Open a .stacks chord bank..."));
+    if (! gen.stacksOptions.bankFile.empty())
+        menu.addItem (3, juce::File (juce::String::fromUTF8 (gen.stacksOptions.bankFile.c_str())).getFileName(), false, true);
+    const juce::Component::SafePointer<MidiToolsPanel> safe (this);
+    menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&transformButton), [safe] (int chosen) {
+        if (safe == nullptr)
+            return;
+        if (chosen == 1)
+        {
+            safe->gen.stacksOptions.bankFile.clear();
+            safe->rebuild();
+            safe->changed();
+        }
+        else if (chosen == 2)
+        {
+            safe->bankChooser = std::make_unique<juce::FileChooser> (tr ("Open a .stacks chord bank"), juce::File(), "*.stacks");
+            safe->bankChooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [safe] (const juce::FileChooser& fc) {
+                if (safe == nullptr || fc.getResult() == juce::File())
+                    return;
+                std::string error;
+                const auto file = fc.getResult();
+                if (! midigen::readChordBank (file.loadFileAsString().toStdString(), error))
+                {
+                    juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Chord bank"),
+                                                            tr ("This file has no chord rules LYNX can read."));
+                    return;
+                }
+                safe->gen.stacksOptions.bankFile = file.getFullPathName().toStdString();
+                safe->rebuild();
+                safe->changed();
+            });
+        }
+    });
+}
+
+midigen::Context MidiToolsPanel::generateContext (const Target& t) const
+{
+    midigen::Context c;
+    const auto& song = engine.getSong();
+    if (t.to > t.from && t.from >= 0)
+    {
+        c.from = t.from;
+        c.to = t.to;
+    }
+    else
+    {
+        c.from = 0;
+        c.to = t.length > 0 ? t.length
+                            : (t.pattern >= 0 && t.pattern < (int) song.patterns.size() ? song.patterns[(std::size_t) t.pattern].effectiveLength (song.beatsPerBar)
+                                                                                        : (std::int64_t) ppq * std::max (1, song.beatsPerBar));
+    }
+    c.channel = t.channel >= 0 ? t.channel : std::max (0, engine.getSelectedChannel());
+    c.grid = std::max<std::int64_t> (1, t.grid);
+    c.scale = projectScale();
+    c.seed = genSeed;
+    c.beatsPerBar = std::max (1, song.beatsPerBar);
+    return c;
+}
+
+void MidiToolsPanel::runGenerate()
+{
+    const auto t = target != nullptr ? target() : Target {};
+    const auto& song = engine.getSong();
+    if (t.pattern < 0 || t.pattern >= (int) song.patterns.size())
+    {
+        storeSettings();
+        return;
+    }
+    const auto c = generateContext (t);
+    const auto notes = midigen::generate (gen, c, chordBank());
+    std::vector<int> out;
+    engine.editSong ([&] (Song& s) {
+        s.midiGenerate = gen;
+        if (t.pattern < (int) s.patterns.size())
+            out = midigen::writeGenerated (s.patterns[(std::size_t) t.pattern], c, notes);
+    });
+    if (select != nullptr)
+        select (out); // (the notes' places changed: the selection is the new notes)
+    if (body != nullptr)
+        body->repaint();
+}
+
+void MidiToolsPanel::generateNow()
+{
+    genSeed = (std::uint32_t) juce::Random::getSystemRandom().nextInt(); // [Live] every press: a new result
+    runGenerate();
+}
+
+void MidiToolsPanel::setGenerateShotSettingsForSnapshot()
+{
+    gen.stacksOptions.sequence = { midigen::StackChord {}, midigen::StackChord {} };
+    gen.stacksOptions.sequence[1].rootPitch = 67;
+    gen.stacksOptions.sequence[1].rule = 1;
+    gen.stacksOptions.selected = 0;
+    storeSettings();
+    rebuild();
+}
+
 void MidiToolsPanel::setTool (int t)
 {
     t = std::clamp (t, 0, (int) toolCount - 1);
+    if (section != transformSection)
+    {
+        tool = t;
+        setSection (transformSection);
+        return;
+    }
     if (t == tool && body != nullptr)
         return;
     tool = t;
@@ -889,7 +1673,9 @@ void MidiToolsPanel::paint (juce::Graphics& g) { g.fillAll (colour::bg2); }
 void MidiToolsPanel::resized()
 {
     auto r = getLocalBounds();
-    title.setBounds (r.removeFromTop (16));
+    auto tabs = r.removeFromTop (16);
+    transformTab.setBounds (tabs.removeFromLeft (tabs.getWidth() / 2));
+    generateTab.setBounds (tabs);
     r.removeFromTop (3);
     auto top = r.removeFromTop (20);
     resetButton.setBounds (top.removeFromLeft (22));
@@ -905,6 +1691,16 @@ void MidiToolsPanel::resized()
 
 void MidiToolsPanel::changed()
 {
+    if (section == generateSection)
+    {
+        if (autoGenerate)
+            runGenerate();
+        else
+            storeSettings();
+        if (body != nullptr)
+            body->repaint();
+        return;
+    }
     if (autoApply)
         run();
 }

@@ -18,6 +18,7 @@
 #include <utility>
 
 #include "core/Adr.h"
+#include "core/MidiGenerateOptions.h"
 #include "core/VideoTrack.h"
 
 namespace lynx
@@ -2603,6 +2604,9 @@ struct Song
     // The project's own chord set for the keyboard's Chord pad (round 190ds, core/ScaleKeys.h): from an FL Studio Mobile
     // project's KEYB chunk, or edited on a pad. Empty = the pads play the project key's diatonic chords.
     std::vector<KeyboardChord> keyboardChords;
+    // Live 12's MIDI Tools generators' settings (round 190fm, core/MidiGenerateOptions.h; Live keeps them in the set's
+    // NoteAlgorithms): the Generate panel's tool and each generator's controls. Default = never used (saved as nothing).
+    midigen::Settings midiGenerate;
     // FL's Options › Project › Data folder (.flp 0xCA, ProjDataPathBtnClick "Select the directory where your project data
     // is to be stored..."): kept and saved (empty = FL's default next to the project)
     std::string dataFolder;
