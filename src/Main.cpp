@@ -2334,7 +2334,7 @@ public:
         }
 
         // the splash first, so it is on screen while the audio device opens; the main window is built
-        // once the pepper has landed (the scene is still for a moment then) and shown when the splash ends
+        // once the logo has landed (the scene is still for a moment then) and shown when the splash ends
         splash = std::make_unique<lynx::SplashScreen>();
         startupTrace.mark ("splash made");
         splash->showOnDesktop();

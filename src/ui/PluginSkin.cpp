@@ -504,14 +504,25 @@ void brandMark (juce::Graphics& g, juce::Rectangle<float> a)
 {
     const auto d = juce::jmin (a.getWidth(), a.getHeight());
     if (d < 6.0f) return;
+    // The logo by w3teal: its round badge fills the button's circle (d + 3, over the place of the old dark edge and
+    // ring) and its ears rise above it, as far as the area's top; a dark disc under it (1 px wider) so the cut-outs
+    // read the same on every skin. Up to 32 physical pixels across (the 1x header buttons) the small-size form (thin
+    // share line filled, ring thickened) is drawn.
+    const auto disc = logoDisc();
+    const auto c = a.getCentre();
+    // (smaller where the ears would rise above the area: a header's top edge)
+    const auto side = juce::jmin ((d + 3.0f) / (2.0f * disc.r), (c.y - a.getY()) / disc.y);
+    const auto circle = side * 2.0f * disc.r;
+    const auto scale = pixelScale (g);
+    const bool small = side * scale <= 32.0f;
     // the logo resampled once per size (×2 for high-DPI)
     static std::map<int, juce::Image> cache;
     static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
-    const auto px = juce::jlimit (8, 128, (int) std::ceil (d * 2.0f));
-    auto& img = cache[px];
+    const auto px = juce::jlimit (8, 160, (int) std::ceil (side * juce::jmax (2.0f, scale)));
+    auto& img = cache[small ? -px : px];
     if (img.isNull())
     {
-        const auto logo = logoImage();
+        const auto logo = small ? logoSmallImage() : logoImage();
         if (logo.isNull()) return;
         // halve step by step: one big jump from 512 px aliases at the 16-24 px header size
         img = logo;
@@ -520,14 +531,13 @@ void brandMark (juce::Graphics& g, juce::Rectangle<float> a)
         if (img.getWidth() != px)
             img = img.rescaled (px, px, juce::Graphics::highResamplingQuality);
     }
-    const auto r = a.withSizeKeepingCentre (d, d);
-    bloom (g, r.getCentre(), d * 1.05f, colour::crimson, 0.55f);
+    bloom (g, c, d * 1.05f, colour::crimson, 0.55f);
     g.setColour (juce::Colours::black.withAlpha (0.5f));
-    g.fillEllipse (r.expanded (1.5f).translated (0.0f, 0.8f));
-    g.setColour (colour::crimson.withAlpha (0.55f));
-    g.drawEllipse (r.expanded (1.2f), 1.0f);
+    g.fillEllipse (juce::Rectangle<float> (circle + 2.0f, circle + 2.0f).withCentre (c).translated (0.0f, 0.8f));
+    g.setColour (juce::Colour (0xff0e0f13));
+    g.fillEllipse (juce::Rectangle<float> (circle + 2.0f, circle + 2.0f).withCentre (c));
     g.setOpacity (1.0f);
-    g.drawImage (img, r, juce::RectanglePlacement::centred);
+    g.drawImage (img, juce::Rectangle<float> (c.x - disc.x * side, c.y - disc.y * side, side, side), juce::RectanglePlacement::stretchToFit);
 }
 
 namespace

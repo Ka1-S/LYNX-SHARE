@@ -941,6 +941,7 @@ countries: nl be
 "Loading the workspace..." = "Werkruimte wordt geladen..."
 "Digital audio workstation" = "Digital audio workstation"
 "Version {0}" = "Versie {0}"
+"Logo by {0}" = "Logo door {0}"
 "Show the splash screen at startup" = "Opstartscherm tonen bij het starten"
 "Play the startup sound" = "Opstartgeluid afspelen"
 

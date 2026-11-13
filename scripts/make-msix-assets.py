@@ -3,8 +3,9 @@
 
 Usage: scripts/make-msix-assets.py   (needs Pillow; the PNGs are committed, so a release build does not run this)
 
-Every logo comes from resources/lynx_badge.png (the app icon: a round dark badge, so it needs no plate) and the
-project-file logo from the largest image in resources/LYNX_doc.ico. Scale and target-size variants follow
+Every logo comes from resources/lynx_badge.png (the app icon: the LYNX SHARE logo by w3teal, a round badge, so it needs
+no plate; written by tools/make_logo.py), the 16-24 px icons from its small-size form
+resources/brand/lynx-share-logo-small.png, and the project-file logo from the largest image in resources/LYNX_doc.ico. Scale and target-size variants follow
 Microsoft's tile/icon asset guidelines; makepri (in the release workflow) indexes them into resources.pri.
 """
 import os
@@ -19,6 +20,10 @@ TARGETS = (16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256)
 
 def badge():
     return Image.open(os.path.join(ROOT, "resources", "lynx_badge.png")).convert("RGBA")
+
+
+def small_badge():
+    return Image.open(os.path.join(ROOT, "resources", "brand", "lynx-share-logo-small.png")).convert("RGBA")
 
 
 def doc_icon():
@@ -46,7 +51,7 @@ def main():
     for f in os.listdir(OUT):
         if f.endswith(".png"):
             os.remove(os.path.join(OUT, f))
-    b, d = badge(), doc_icon()
+    b, d, sb = badge(), doc_icon(), small_badge()
     for s in SCALES:
         k = s / 100.0
         save(placed(b, round(44 * k), round(44 * k), 1.0), f"Square44x44Logo.scale-{s}.png")
@@ -57,7 +62,7 @@ def main():
         save(placed(b, round(50 * k), round(50 * k), 1.0), f"StoreLogo.scale-{s}.png")
         save(placed(d, round(44 * k), round(44 * k), 1.0), f"ProjectFile.scale-{s}.png")
     for t in TARGETS:
-        icon = placed(b, t, t, 1.0)
+        icon = placed(sb if t <= 24 else b, t, t, 1.0)
         for suffix in ("", "_altform-unplated", "_altform-lightunplated"):
             save(icon, f"Square44x44Logo.targetsize-{t}{suffix}.png")
         save(placed(d, t, t, 1.0), f"ProjectFile.targetsize-{t}.png")

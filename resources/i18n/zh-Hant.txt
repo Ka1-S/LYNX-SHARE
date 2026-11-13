@@ -941,6 +941,7 @@ countries: tw hk mo
 "Loading the workspace..." = "正在載入工作區..."
 "Digital audio workstation" = "數位音訊工作站"
 "Version {0}" = "版本{0}"
+"Logo by {0}" = "標誌設計：{0}"
 "Show the splash screen at startup" = "啟動時顯示啟動畫面"
 "Play the startup sound" = "播放啟動音效"
 

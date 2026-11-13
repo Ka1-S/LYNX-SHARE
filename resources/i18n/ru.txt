@@ -941,6 +941,7 @@ countries: ru by kz
 "Loading the workspace..." = "Загрузка рабочей области..."
 "Digital audio workstation" = "Цифровая звуковая рабочая станция"
 "Version {0}" = "Версия {0}"
+"Logo by {0}" = "Автор логотипа: {0}"
 "Show the splash screen at startup" = "Показывать заставку при запуске"
 "Play the startup sound" = "Проигрывать звук запуска"
 

@@ -8190,7 +8190,8 @@ std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
         About()
             : juce::AlertWindow ("LYNX SHARE " JUCE_APPLICATION_VERSION_STRING,
                                  tr ("Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\n"
-                                     "Independent implementation: no Image-Line or Ableton code was copied."),
+                                     "Independent implementation: no Image-Line or Ableton code was copied.")
+                                     + "\n\n" + tr ("Logo by {0}", { "w3teal" }), // the community member who made it
                                  juce::MessageBoxIconType::NoIcon)
         {
             addCustomComponent (&logo);

@@ -1,7 +1,7 @@
 #pragma once
 
 // LYNX's start-up sound, synthesised procedurally (no audio files): an airy whoosh that drops onto a
-// soft "pop" when the pepper lands on the splash screen, then a short plucked chime (root, fifth and
+// soft "pop" when the logo lands on the splash screen, then a short plucked chime (root, fifth and
 // octave) with a light stereo echo. An original sound; about 1.6 s long. No JUCE.
 
 #include <vector>

@@ -941,6 +941,7 @@ countries: es mx ar co cl pe ve
 "Loading the workspace..." = "Cargando el espacio de trabajo..."
 "Digital audio workstation" = "Estación de trabajo de audio digital"
 "Version {0}" = "Versión {0}"
+"Logo by {0}" = "Logotipo de {0}"
 "Show the splash screen at startup" = "Mostrar la pantalla de bienvenida al iniciar"
 "Play the startup sound" = "Reproducir el sonido de inicio"
 

@@ -941,6 +941,7 @@ countries: jp
 "Loading the workspace..." = "ワークスペースを読み込み中..."
 "Digital audio workstation" = "デジタルオーディオワークステーション"
 "Version {0}" = "バージョン{0}"
+"Logo by {0}" = "ロゴ制作: {0}"
 "Show the splash screen at startup" = "起動時にスプラッシュ画面を表示"
 "Play the startup sound" = "起動音を再生"
 
