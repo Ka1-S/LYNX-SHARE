@@ -163,7 +163,7 @@ TEST (ember190fj_measured_tape_renders_as_fitted)
         { { em::style, em::drive, -1, -1 }, { 1.0f / 3.0f, 0.5f }, 48000.0, -1, false, 0xb67612fe3014c6e2ull, 4676.95158, -0.326048017, -0.00826984271 }, // m tape d18 15ips
         { { em::style, em::drive, -1, -1 }, { 1.0f / 3.0f, 28.0f / 36.0f }, 44100.0, -1, false, 0xaef36a4aabcde62aull, 1898.97271, -0.24036774, -0.18424654 }, // m tape d28 15ips 44k
         { { em::style, em::drive, em::tapeSpeed, -1 }, { 1.0f / 3.0f, 33.0f / 36.0f, 1.0f }, 48000.0, -1, false, 0x0f4cc49d1799c8e3ull, 615.87348, -0.123516142, -0.0797277093 }, // m tape d33 1.875ips
-        { { em::style, em::drive, em::tapeSpeed, em::autoGain }, { 1.0f / 3.0f, 22.0f / 36.0f, 0.0f, 0.0f }, 48000.0, -1, false, 0x7ac7713c5fd1db0eull, 55082.6762, -1.17034042, -0.066603139 }, // m tape d22 30ips no auto
+        { { em::style, em::drive, em::tapeSpeed, em::autoGain }, { 1.0f / 3.0f, 22.0f / 36.0f, 0.0f, 0.0f }, 48000.0, -1, false, 0xb1317ed82f8bf30cull, 622164.199, -3.93330026, -0.223841012 }, // m tape d22 30ips no auto
     };
     int sameBits = 0, n = 0;
     for (const auto& c : cases)

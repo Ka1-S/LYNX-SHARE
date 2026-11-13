@@ -157,6 +157,7 @@ TEST (ember_input_output_pan_round150b)
     auto p = makeEffectSlot (EffectKind::ember).params;
     p[em::autoGain] = 0.0f;
     p[em::style] = 1.0f / 3.0f; // tape, drive 0: nearly linear at −40 dBFS
+    p[em::law] = 0.0f;          // (round 190fj: the Classic tape curve, unity at low level; the measured one trims 0.08 dB)
     const double a = 0.01;
     // output pan fully left: the right channel silent
     {

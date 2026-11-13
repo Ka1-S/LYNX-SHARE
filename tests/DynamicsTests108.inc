@@ -622,6 +622,7 @@ TEST (dyn108_ember_multiband_mode)
     p[e::drive] = 0.0f;
     p[e::style] = 1.0f / 3.0f; // tape: odd only, close to linear at drive 0 and low level
     p[e::autoGain] = 0.0f;
+    p[e::law] = 0.0f; // round 190fj: the Classic tape curve on one band, as the bands run it
     // two to four bands with every band clean: the crossovers sum flat (Linkwitz-Riley + all-pass compensation)
     for (int nb = 2; nb <= 4; ++nb)
         for (float slope : { 0.0f, 0.5f, 1.0f })

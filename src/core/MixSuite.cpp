@@ -3186,7 +3186,7 @@ private:
         auto drvA2 = drvA, drvB2 = drvB, compA2 = compA;
         // round 190fj: the measured tape's record level (its law on Ember's drive, + PUNISH, the drive pan) and the
         // make-up that holds the small-signal gain at 0 dB with Auto gain on (the reference's compensated drive), at
-        // the record level's own gain without it
+        // the drive's own gain without it (as every other style)
         // (the oversampler still gets the signal at the drive gain every style gets, so a style switch on a running
         // signal finds its history at the same scale; the record level's difference is applied inside)
         double tapeMkA = 1.0, tapeMkB = 1.0, tapeFieldA = 1.0, tapeFieldB = 1.0;
@@ -3200,8 +3200,8 @@ private:
             tapeFieldB = gb / (double) drvB2;
             const bool autoOn = on (p[autoGain]);
             const auto trim = dbToGain (md.trimDb);
-            tapeMkA = trim / (tapeSsg * (autoOn ? ga : 1.0));
-            tapeMkB = trim / (tapeSsg * (autoOn ? gb : 1.0));
+            tapeMkA = trim / (tapeSsg * ga) * (autoOn ? 1.0 : (double) drvA2);
+            tapeMkB = trim / (tapeSsg * gb) * (autoOn ? 1.0 : (double) drvB2);
         }
         if (chr.k > 0)
         {
