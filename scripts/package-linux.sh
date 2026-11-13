@@ -25,13 +25,14 @@ strip --strip-unneeded "$PKG/LYNX" 2> /dev/null || true
 ./scripts/fetch-onnxruntime.sh linux "$PKG"
 install -m 644 resources/linux/lynx.desktop resources/linux/lynx-mime.xml LICENSE THIRD_PARTY.md PRIVACY.md "$PKG/"
 install -m 644 resources/lynx_icon_256.png "$PKG/lynx.png"
+cp -r resources/linux/icons "$PKG/icons"     # hicolor 16-512 px (tools/make_logo.py; 16 and 24 px: the small-size form)
 install -m 755 resources/linux/install.sh "$PKG/install.sh"
 [[ -n "$DEMO" && -f "$DEMO" ]] && install -m 644 "$DEMO" "$PKG/Demo.lynx"
 tar -C "$WORK" -czf "$OUTDIR/$NAME.tar.gz" "$NAME"
 
 # --- AppImage ----------------------------------------------------------------------------------------------
 APPDIR="$WORK/LYNX.AppDir"
-mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
+mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications" "$APPDIR/usr/share/icons" \
     "$APPDIR/usr/share/mime/packages" "$APPDIR/usr/share/metainfo"
 install -m 755 "$PKG/LYNX" "$PKG"/libonnxruntime.so.* "$APPDIR/usr/bin/"
 install -m 644 resources/linux/lynx.desktop "$APPDIR/usr/share/applications/$APPID.desktop"
@@ -39,7 +40,7 @@ install -m 644 resources/linux/lynx.desktop "$APPDIR/$APPID.desktop"
 # AppStream metadata with this build's version and date (validated by appimagetool when appstreamcli is installed)
 RELDATE="$(git log -1 --format=%cs 2> /dev/null || date -u +%F)"
 sed -e "s/@VERSION@/$LABEL/" -e "s/@DATE@/$RELDATE/" resources/linux/$APPID.appdata.xml > "$APPDIR/usr/share/metainfo/$APPID.appdata.xml"
-install -m 644 resources/lynx_icon_256.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/lynx.png"
+cp -r resources/linux/icons/hicolor "$APPDIR/usr/share/icons/hicolor"
 install -m 644 resources/lynx_icon_256.png "$APPDIR/lynx.png"
 ln -sf lynx.png "$APPDIR/.DirIcon"
 install -m 644 resources/linux/lynx-mime.xml "$APPDIR/usr/share/mime/packages/lynx-mime.xml"

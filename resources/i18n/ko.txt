@@ -941,6 +941,7 @@ countries: kr
 "Loading the workspace..." = "작업 공간 불러오는 중..."
 "Digital audio workstation" = "디지털 오디오 워크스테이션"
 "Version {0}" = "버전 {0}"
+"Logo by {0}" = "로고 제작: {0}"
 "Show the splash screen at startup" = "시작 시 스플래시 화면 표시"
 "Play the startup sound" = "시작 사운드 재생"
 

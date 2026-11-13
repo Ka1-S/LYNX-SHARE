@@ -941,6 +941,7 @@ countries: fr be ch ca lu
 "Loading the workspace..." = "Chargement de l'espace de travail..."
 "Digital audio workstation" = "Station audionumérique"
 "Version {0}" = "Version {0}"
+"Logo by {0}" = "Logo réalisé par {0}"
 "Show the splash screen at startup" = "Afficher l'écran d'accueil au démarrage"
 "Play the startup sound" = "Jouer le son de démarrage"
 

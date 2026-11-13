@@ -941,6 +941,7 @@ countries: cn sg
 "Loading the workspace..." = "正在加载工作区..."
 "Digital audio workstation" = "数字音频工作站"
 "Version {0}" = "版本{0}"
+"Logo by {0}" = "标志设计：{0}"
 "Show the splash screen at startup" = "启动时显示启动画面"
 "Play the startup sound" = "播放启动音效"
 

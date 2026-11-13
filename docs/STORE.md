@@ -8,7 +8,7 @@ is in the repository:
 | What | Where |
 |---|---|
 | Package manifest (template) | [`resources/msix/AppxManifest.xml.in`](../resources/msix/AppxManifest.xml.in) |
-| Logos and tiles (all scales, generated from `resources/lynx_badge.png`) | `resources/msix/Assets/`, made by [`scripts/make-msix-assets.py`](../scripts/make-msix-assets.py) |
+| Logos and tiles (all scales, from `resources/lynx_badge.png`, the logo by w3teal; `tools/make_logo.py` writes it from `resources/brand/lynx-share-logo.svg`) | `resources/msix/Assets/`, made by [`scripts/make-msix-assets.py`](../scripts/make-msix-assets.py) |
 | Package layout (exe + assets + filled manifest) | [`scripts/make-msix-layout.py`](../scripts/make-msix-layout.py) |
 | Build, install test, release asset | job `package` in [`.github/workflows/release.yml`](../.github/workflows/release.yml) → `LYNX-<version>-store.msix` |
 | Runtime differences when packaged | [`src/platform/Package.h`](../src/platform/Package.h), [`src/core/StorePackage.h`](../src/core/StorePackage.h) |

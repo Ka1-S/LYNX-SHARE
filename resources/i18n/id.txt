@@ -941,6 +941,7 @@ countries: id
 "Loading the workspace..." = "Memuat ruang kerja..."
 "Digital audio workstation" = "Digital audio workstation"
 "Version {0}" = "Versi {0}"
+"Logo by {0}" = "Logo oleh {0}"
 "Show the splash screen at startup" = "Tampilkan layar pembuka saat memulai"
 "Play the startup sound" = "Putar suara pembuka"
 

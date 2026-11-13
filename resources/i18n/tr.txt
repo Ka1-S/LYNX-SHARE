@@ -941,6 +941,7 @@ countries: tr
 "Loading the workspace..." = "Çalışma alanı yükleniyor..."
 "Digital audio workstation" = "Dijital ses iş istasyonu"
 "Version {0}" = "Sürüm {0}"
+"Logo by {0}" = "Logo tasarımı: {0}"
 "Show the splash screen at startup" = "Başlangıçta açılış ekranını göster"
 "Play the startup sound" = "Açılış sesini çal"
 

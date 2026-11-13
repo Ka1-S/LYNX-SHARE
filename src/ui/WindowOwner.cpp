@@ -6,6 +6,7 @@
 
 #include "ui/LogoData.h"
 #include "ui/Theme.h"
+#include "ui/ImageCaches.h"
 #include "platform/Paths.h"
 
 #include <algorithm>
@@ -184,6 +185,33 @@ void removeDialogTextFocus()
 juce::Image logoImage()
 {
     return juce::ImageCache::getFromMemory (logo::png512, (int) sizeof (logo::png512));
+}
+
+juce::Image logoSmallImage()
+{
+    return juce::ImageCache::getFromMemory (logo::pngSmall, (int) sizeof (logo::pngSmall));
+}
+
+LogoDisc logoDisc()
+{
+    return { logo::discX, logo::discY, logo::discR };
+}
+
+juce::Image logoAt (int px)
+{
+    px = juce::jlimit (8, 512, px);
+    static std::map<int, juce::Image> cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
+    auto& img = cache[px];
+    if (img.isNull())
+    {
+        img = px <= 32 ? logoSmallImage() : logoImage();
+        while (img.getWidth() / 2 >= px)
+            img = img.rescaled (img.getWidth() / 2, img.getHeight() / 2, juce::Graphics::highResamplingQuality);
+        if (img.getWidth() != px)
+            img = img.rescaled (px, px, juce::Graphics::highResamplingQuality);
+    }
+    return img;
 }
 
 void applyWindowChrome (juce::Component& window)
