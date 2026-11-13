@@ -64,7 +64,7 @@ std::string anvilParamText (int param, float v)
         case a::trim:
         {
             const auto db = a::trimDb (v);
-            return db <= -69.95 ? std::string ("-70.0 dB") : fmt ("%.1f dB", db);
+            return db <= -69.95 ? std::string ("-70.0 dB") : db > -0.05 ? std::string ("0.0 dB") : fmt ("%.1f dB", db);
         }
         case a::output: return fmt ("%+.1f dB", a::outputDb (v));
         default: return {};
