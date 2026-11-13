@@ -939,7 +939,7 @@ public:
         setResizable (true, false);
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
-        keepAboveMainWindow (*this);
+        dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
     }
 
     void closeButtonPressed() override;

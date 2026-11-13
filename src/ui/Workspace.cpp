@@ -12,9 +12,20 @@
 #include "ui/WindowOwner.h"
 
 #include <vector>
+#include "core/DockStack.h"
 
 namespace lynx
 {
+namespace
+{
+// a child window's alpha switches its drawing surface (Direct2D: opaque swap chain <-> layered bitmap, each made new)
+#if JUCE_WINDOWS
+constexpr bool nativeAlphaFlashes = true;
+#else
+constexpr bool nativeAlphaFlashes = false;
+#endif
+} // namespace
+
 using workspace::Panel;
 
 namespace
@@ -1135,7 +1146,9 @@ void Workspace::applyLayout (bool fadePanels)
                 const auto show = state.visible && isVisible();
                 const auto shown = nativeFader->heading (frame);
                 nativeShown[(std::size_t) i] = show && ! shown;
-                if (show != shown && fadePanels && ui::motion::enabled() && isShowing())
+                // (round 190ev, issue #152 "flickering windows": not on Windows, where a fade by the window's alpha
+                // flashed the panel at its start and its end; core/DockStack.h panelFades)
+                if (show != shown && dockstack::panelFades (fadePanels && ui::motion::enabled(), true, nativeAlphaFlashes) && isShowing())
                     nativeFader->start (frame, show);
                 else if (show != shown)
                 {

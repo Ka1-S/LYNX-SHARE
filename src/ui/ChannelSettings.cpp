@@ -5893,7 +5893,7 @@ public:
                 setTopLeftPosition (*at); // "Align all channel editors" set every channel's place (round 169k)
         setVisible (true);
         markLinkedWindow (*this, channel, -1); // FL's Auto select linked modules (round 187a)
-        keepAboveMainWindow (*this);
+        dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
     }
 
     int getChannel() const { return channel; }
@@ -5953,11 +5953,12 @@ void alignAllChannelEditors (int selectedChannel)
             reference = w.get();
     if (reference == nullptr)
         return;
-    const auto at = reference->getPosition();
+    // (on the screen: a docked editor's own position is in the main window, round 190ev)
+    const auto at = reference->getScreenPosition();
     alignedChannelEditorPosition() = at;
     for (auto& w : open)
         if (! w->isModulation())
-            w->setTopLeftPosition (at);
+            setWindowScreenPosition (*w, at);
     reference->toFront (true);
 }
 

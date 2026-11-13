@@ -6,6 +6,8 @@
 
 namespace lynx
 {
+class Workspace;
+
 // Secondary windows (plugin, channel settings, EQ, automation) always stay above the LYNX main window,
 // without staying above other programs: on Windows, the main window becomes their "owner".
 void setMainWindowForOwnership (juce::Component* mainWindow);
@@ -14,6 +16,22 @@ void keepAboveMainWindow (juce::Component& window); // call after the window is 
 // The main window's native handle (HWND / X11 Window id; nullptr without one): a plugin's window in a separate
 // process is kept above it (round 162d).
 void* mainWindowHandle();
+
+// Round 190ev (issue #152, 0.1.26: "the Channel rack almost never comes to the front"): LYNX's own plugin-like editor
+// windows (channel settings, the native effects' and controllers' editors, automation clip settings) are FL's docked
+// plugin windows: child windows of the main window floating in the workspace among the docked panels and plugin
+// windows (issue #116), so a click on a panel brings it in front of them and a click on one of them brings it back. As
+// owned top-level windows they stayed above every panel whatever was clicked. They get LYNX's own title bar (a child
+// window has no native one) with its close button. `setEditorDock` names the workspace (nullptr: none, at shutdown);
+// FL's "Detach all new plugins" (`setEditorsDetached`) or LYNX_DOCKED_PLUGINS=0 keep them owned top-level windows.
+void setEditorDock (Workspace* workspace);
+void setEditorsDetached (bool detached);
+// Call where keepAboveMainWindow was called (after the window is visible): docks the window, or keeps it above the main
+// window when it can't be docked. True when it is docked.
+bool dockOrKeepAbove (juce::DocumentWindow& window);
+// A window's top-left on the screen, and moving it there, docked or not (a docked window's own position is in the main
+// window's client area).
+void setWindowScreenPosition (juce::Component& window, juce::Point<int> screenTopLeft);
 
 // Keys a secondary window does not use (no component in it took them) go to the main window's global shortcuts, as in
 // FL (round 165q / issue #12: Space, F12 or a user's key did nothing while the Undo history, Settings, a plugin window...

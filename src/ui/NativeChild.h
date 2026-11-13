@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include <functional>
 #include <vector>
 
 namespace lynx::nativechild
@@ -18,8 +19,10 @@ namespace lynx::nativechild
 bool dockingEnabled();
 
 // Makes `c` a native child window of `area`'s top-level window (it must not have a parent component). False when that
-// window has no native peer yet; `c` is left as it was.
-bool attach (juce::Component& c, juce::Component& area);
+// window has no native peer yet; `c` is left as it was. `styleFlags`: the ComponentPeer style flags of the child window;
+// -1 = the ones it was attached with before (0 the first time). A juce::TopLevelWindow must get exactly its
+// getDesktopWindowStyleFlags(): JUCE makes it a top-level window again whenever it sees other flags (round 190ev).
+bool attach (juce::Component& c, juce::Component& area, int styleFlags = -1);
 // Back to a plain component (no native window); the caller adds it to a parent again.
 void detach (juce::Component& c);
 bool isAttached (const juce::Component& c);
@@ -76,6 +79,13 @@ void keepFloatersInFront();
 // The attached children of a native window (the main window's handle), from the bottom of their stacking order up.
 std::vector<juce::Component*> attachedChildren (void* parentWindow);
 
+// Round 190ev (issue #152): a click anywhere in the attached component `c` brings it in front of its siblings (under the
+// floaters and overlays), also a click that lands in a native window inside it that JUCE never hears of (a plugin's own
+// view in a docked plugin window): FL's docked windows come in front on any click. `onClick` (optional) runs after a
+// click of that kind. Windows: a message hook of the UI thread sees the button-down messages; elsewhere nothing (the
+// plugin views there are not native children of LYNX's windows in the same way).
+void raiseOnAnyClick (juce::Component& c, std::function<void()> onClick = {});
+
 // Keys nothing in an attached component used: they don't travel up to the main window by themselves (it is another
 // native window), so `c` hands them to the main window's shortcuts (the secondary windows' route, ui/WindowOwner.h).
 void forwardUnusedKeys (juce::Component& c);
@@ -98,6 +108,11 @@ void* ownerOf (void* window);
 // window's transparent pixels let it through), and whether a native window is layered (per-pixel transparency).
 void* windowAt (const juce::Component& c, juce::Point<int> localPoint);
 bool isLayered (void* window);
+// Tests (Windows; elsewhere nothing / nullptr), round 190ev: the innermost first child window of a native window (a
+// plugin's own view inside a docked frame), and a left click posted to a native window of LYNX's own process at a point
+// of its client area, in physical pixels (a message to that window only: nothing goes through the system's input).
+void* innermostChild (void* window);
+void postClickForTest (void* window, juce::Point<int> clientPoint);
 // Tests (Windows; elsewhere 0): the system's hit test of the component's own native window at its local point: 1
 // (HTCLIENT) = the window takes the mouse there, -1 (HTTRANSPARENT) = the click goes to the window under it. (Round
 // 190cj: an attached component that is not opaque answers "transparent" wherever its hitTest says no.)

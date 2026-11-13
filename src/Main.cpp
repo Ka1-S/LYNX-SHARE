@@ -5880,7 +5880,7 @@ private:
             // every panel clicked (it is owned by the main window).
             const std::array<lynx::workspace::Panel, 4> dockPanels { lynx::workspace::Panel::channelRack, lynx::workspace::Panel::playlist,
                                                                      lynx::workspace::Panel::pianoRoll, lynx::workspace::Panel::mixer };
-            const int dockSteps = 2 * 4 + 17; // (the last one reports dock_result)
+            const int dockSteps = 2 * 4 + 18; // (the last one reports dock_result)
             int danceChannel = -1;            // issue #116 slice 4: a dance channel's dancer over the docked plugin
             lynx::MainComponent* ui = nullptr; // dock mode: the real main window's contents
             struct ScaleSpy final : juce::ComponentPeer::ScaleFactorListener
@@ -6105,77 +6105,76 @@ private:
                         stage->update();
                     expect ("dancer_window_gone", stage != nullptr && stage->windowCount() == 0);
                 }
-                else if (at >= 19 && at <= 22)
+                else if (at == 19 || at == 20)
                 {
-                    // round 190i: a native panel the user opens or closes fades by its window's own alpha (round
-                    // 179a's panel fade; LYNX's own, FL has none). Each fade lasts half a step here.
+                    // round 190ev (issue #152, "flickering windows"): on Windows a docked panel no longer fades by its
+                    // window's alpha (each fade switched its drawing surface twice and the panel flashed); it shows and
+                    // hides at once, as FL's docked windows. Elsewhere round 190i's fade stays.
                     auto& frame = workspace->getFrame (Panel::mixer);
-                    const auto fadeMs = juce::jmax (120, stepMs / 2);
-                    workspace->setNativeFadeScale (fadeMs / (double) lynx::ui::motion::panelFadeMs);
-                    auto halfWay = [this, &frame, fadeMs] (const juce::String& name, int direction) {
-                        juce::Timer::callAfterDelay (fadeMs / 2, [this, &frame, name, direction] {
-                            const auto alpha = frame.getAlpha();
-                            step (name + "_alpha=" + juce::String (alpha, 2));
-                            const auto ok = alpha > 0.1f && alpha < 0.9f && frame.isVisible()
-                                            && workspace->nativeFadeDirection (lynx::workspace::Panel::mixer) == direction
-                                            && lynx::nativechild::isLayered (frame.getWindowHandle());
-                            step (name + "=" + juce::String ((int) ok));
-                            dockOk = dockOk && ok;
-                        });
-                    };
                     if (at == 19)
                     {
-                        workspace->show (Panel::mixer); // (in front of the docked plugin: it fades over it)
-                        expect ("mixer_above_plugin_before_fade", lynx::nativechild::isAbove (panelHandle (Panel::mixer), plug));
-                        workspace->hide (Panel::mixer);
-                        expect ("mixer_starts_fading_out", workspace->nativeFadeDirection (Panel::mixer) == -1 && frame.isVisible()
-                                                               && ! workspace->isPanelVisible (Panel::mixer));
-                        halfWay ("mixer_half_faded_out", -1);
-                    }
-                    else if (at == 20)
-                    {
-                        expect ("mixer_hidden_after_fade", ! frame.isVisible() && workspace->nativeFadeDirection (Panel::mixer) == 0
-                                                               && frame.getAlpha() == 1.0f);
                         workspace->show (Panel::mixer);
-                        expect ("mixer_starts_fading_in", workspace->nativeFadeDirection (Panel::mixer) == 1 && frame.isVisible()
-                                                              && frame.getAlpha() == 0.0f);
-                        halfWay ("mixer_half_faded_in", 1);
-                    }
-                    else if (at == 21)
-                    {
-                        expect ("mixer_opaque_after_fade", frame.isVisible() && workspace->nativeFadeDirection (Panel::mixer) == 0
-                                                               && frame.getAlpha() == 1.0f && ! lynx::nativechild::isLayered (frame.getWindowHandle())
-                                                               && lynx::nativechild::isAbove (panelHandle (Panel::mixer), plug));
-                        // closed and called back in the middle of the fade: it turns round from where it is
+                        expect ("mixer_above_plugin_when_shown", lynx::nativechild::isAbove (panelHandle (Panel::mixer), plug));
                         workspace->hide (Panel::mixer);
-                        juce::Timer::callAfterDelay (fadeMs / 2, [this, &frame] {
-                            const auto before = frame.getAlpha();
-                            workspace->show (lynx::workspace::Panel::mixer);
-                            const auto ok = before > 0.1f && before < 0.9f && frame.getAlpha() == before && frame.isVisible()
-                                            && workspace->nativeFadeDirection (lynx::workspace::Panel::mixer) == 1;
-                            step ("mixer_turns_round_mid_fade=" + juce::String ((int) ok));
-                            dockOk = dockOk && ok;
-                        });
+                        expect ("mixer_hides_at_once", ! frame.isVisible() && workspace->nativeFadeDirection (Panel::mixer) == 0
+                                                           && frame.getAlpha() == 1.0f && ! lynx::nativechild::isLayered (frame.getWindowHandle()));
                     }
                     else
                     {
-                        expect ("mixer_shown_after_turning_round", frame.isVisible() && frame.getAlpha() == 1.0f
-                                                                       && workspace->nativeFadeDirection (Panel::mixer) == 0
-                                                                       && ! lynx::nativechild::isLayered (frame.getWindowHandle()));
-                        // Settings > General > Animations off: no fade, no timer
-                        lynx::ui::motion::enabled() = false;
-                        workspace->hide (Panel::mixer);
-                        expect ("no_fade_out_without_animations", ! frame.isVisible() && workspace->nativeFadeDirection (Panel::mixer) == 0);
                         workspace->show (Panel::mixer);
-                        expect ("no_fade_in_without_animations", frame.isVisible() && frame.getAlpha() == 1.0f
-                                                                     && workspace->nativeFadeDirection (Panel::mixer) == 0);
-                        lynx::ui::motion::enabled() = true;
-                        workspace->setNativeFadeScale (1.0);
+                        expect ("mixer_shows_at_once", frame.isVisible() && frame.getAlpha() == 1.0f && workspace->nativeFadeDirection (Panel::mixer) == 0
+                                                           && ! lynx::nativechild::isLayered (frame.getWindowHandle())
+                                                           && lynx::nativechild::isAbove (panelHandle (Panel::mixer), plug));
+                    }
+                }
+                else if (at >= 21 && at <= 23)
+                {
+                    // round 190ev (issue #152, "the Channel rack almost never comes to the front"): LYNX's own editor
+                    // windows (here a channel's settings) are docked like FL's plugin windows, so a click on the rack
+                    // brings the rack in front of them and a click on one brings it back; a click inside a docked
+                    // plugin's own view (a native window JUCE never hears of) brings that plugin window in front.
+                    auto docked = [] {
+                        auto& desktop = juce::Desktop::getInstance();
+                        for (int i = 0; i < desktop.getNumComponents(); ++i)
+                            if (auto* c = desktop.getComponent (i); c != nullptr && c->isVisible() && (bool) c->getProperties()["lynxDockedWindow"])
+                                return c;
+                        return (juce::Component*) nullptr;
+                    };
+                    auto* rack = panelHandle (Panel::channelRack);
+                    if (at == 21)
+                    {
+                        lynx::openChannelSettings (*engine, 0);
+                        auto* ed = docked();
+                        auto* h = ed != nullptr ? ed->getWindowHandle() : nullptr;
+                        expect ("editor_docked", h != nullptr && lynx::nativechild::parentOf (h) == main && lynx::nativechild::ownerOf (h) == nullptr);
+                        expect ("editor_above_rack_when_opened", h != nullptr && lynx::nativechild::isAbove (h, rack));
+                        workspace->activate (Panel::channelRack); // a click on the rack
+                        expect ("rack_above_editor_after_its_click", h != nullptr && lynx::nativechild::isAbove (rack, h));
+                        if (h != nullptr) // a real click (a message to the editor's own window) on its title bar
+                            lynx::nativechild::postClickForTest (h, { 60, 8 });
+                    }
+                    else if (at == 22)
+                    {
+                        auto* ed = docked();
+                        auto* h = ed != nullptr ? ed->getWindowHandle() : nullptr;
+                        expect ("editor_above_rack_after_its_click", h != nullptr && lynx::nativechild::isAbove (h, rack));
+                        workspace->activate (Panel::channelRack);
+                        expect ("rack_above_plugin_after_its_click", lynx::nativechild::isAbove (rack, plug));
+                        auto* view = lynx::nativechild::innermostChild (plug);
+                        step (juce::String ("plugin_view_window=") + (view != nullptr ? "1" : "0"));
+                        if (view != nullptr) // a click in the plugin's own view, near its top-left corner
+                            lynx::nativechild::postClickForTest (view, { 2, 2 });
+                    }
+                    else
+                    {
+                        if (lynx::nativechild::innermostChild (plug) != nullptr)
+                            expect ("plugin_above_rack_after_click_in_its_view", lynx::nativechild::isAbove (plug, rack));
+                        lynx::closeChannelSettings();
                         // FL's Tools > Macros > Switch all plugin editors to > Detached (round 190i)
                         lynx::PluginWindows::setAllDetached (*engine, true);
                     }
                 }
-                else if (at == 23)
+                else if (at == 24)
                 {
                     expect ("macro_detached_the_open_editor", lynx::PluginWindows::isOpen (*instance) && ! lynx::PluginWindows::isDocked (*instance)
                                                                   && plug != nullptr && lynx::nativechild::ownerOf (plug) == main);

@@ -1,5 +1,6 @@
 #include "ui/NativeChild.h"
 #include "ui/WindowOwner.h"
+#include "core/DockStack.h"
 
 #include <algorithm>
 #include <cmath>
@@ -296,6 +297,104 @@ void passMissedClicksThrough (juce::Component& c)
 }
 #endif
 
+#if JUCE_WINDOWS
+// Round 190ev (issue #152): the attached components that come in front on any click inside them, and what runs then.
+struct ClickRaise
+{
+    juce::Component::SafePointer<juce::Component> component;
+    std::function<void()> onClick;
+};
+
+std::vector<ClickRaise>& clickRaises()
+{
+    static std::vector<ClickRaise> list;
+    return list;
+}
+
+bool staysInFront (const juce::Component* c)
+{
+    if (c == nullptr || ! c->isVisible())
+        return true; // (a hidden sibling covers nothing)
+    for (auto* list : { &floaters(), &overlays() })
+        for (const auto& o : *list)
+            if (o.getComponent() == c)
+                return true;
+    return false;
+}
+
+void raiseClicked (juce::Component::SafePointer<juce::Component> safe)
+{
+    auto* c = safe.getComponent();
+    if (c == nullptr || ! isAttached (*c) || ! c->isVisible())
+        return;
+    const auto parent = (void*) (juce::pointer_sized_int) (juce::int64) c->getProperties().getWithDefault ("lynxNativeParent", (juce::int64) 0);
+    const auto siblings = attachedChildrenOf (parent);
+    if (dockstack::needsRaise (siblings, c, [] (juce::Component* w) { return staysInFront (w); }))
+    {
+        c->toFront (false);
+        raiseOverlays();
+    }
+    for (const auto& r : clickRaises())
+        if (r.component == safe && r.onClick != nullptr)
+        {
+            auto run = r.onClick; // (it may close the window and change the list)
+            run();
+            break;
+        }
+}
+
+// A button pressed anywhere in the UI thread's windows: when it lands in a native window INSIDE a registered attached
+// component (a window of a plugin's own view), that component comes in front (after this message: the hook does not
+// move windows itself). A click on the component's own native window goes through JUCE (its mouse listeners).
+LRESULT CALLBACK clickHookProc (int code, WPARAM wParam, LPARAM lParam)
+{
+    if (code == HC_ACTION && wParam == PM_REMOVE && lParam != 0)
+    {
+        const auto* msg = reinterpret_cast<const MSG*> (lParam);
+        switch (msg->message)
+        {
+            case WM_LBUTTONDOWN:
+            case WM_RBUTTONDOWN:
+            case WM_MBUTTONDOWN:
+            case WM_XBUTTONDOWN:
+            case WM_NCLBUTTONDOWN:
+            case WM_NCRBUTTONDOWN:
+            {
+                auto& list = clickRaises();
+                std::erase_if (list, [] (const ClickRaise& r) { return r.component == nullptr; });
+                if (list.empty() || msg->hwnd == nullptr)
+                    break;
+                std::vector<HWND> ancestry;
+                for (auto h = msg->hwnd; h != nullptr && ancestry.size() < 24; h = GetAncestor (h, GA_PARENT))
+                    ancestry.push_back (h);
+                const auto at = dockstack::clickedWindow (ancestry, [&list] (HWND h) {
+                    return std::any_of (list.begin(), list.end(), [h] (const ClickRaise& r) { return r.component->getWindowHandle() == (void*) h; });
+                });
+                if (at <= 0) // (none, or the component's own window: JUCE's mouse listeners take it)
+                    break;
+                for (const auto& r : list)
+                    if (r.component->getWindowHandle() == (void*) ancestry[(std::size_t) at])
+                    {
+                        juce::MessageManager::callAsync ([safe = r.component] { raiseClicked (safe); });
+                        break;
+                    }
+                break;
+            }
+            default:
+                break;
+        }
+    }
+    return CallNextHookEx (nullptr, code, wParam, lParam);
+}
+
+void installClickHook()
+{
+    static HHOOK hook = nullptr;
+    if (hook == nullptr)
+        hook = SetWindowsHookExW (WH_GETMESSAGE, clickHookProc, nullptr, GetCurrentThreadId());
+}
+#endif
+
 struct KeyForwarder final : juce::KeyListener
 {
     bool keyPressed (const juce::KeyPress& key, juce::Component*) override { return runSecondaryWindowKey (key); }
@@ -314,7 +413,7 @@ bool dockingEnabled()
     return on;
 }
 
-bool attach (juce::Component& c, juce::Component& area)
+bool attach (juce::Component& c, juce::Component& area, int styleFlags)
 {
     if (isAttached (c))
         return true;
@@ -322,8 +421,12 @@ bool attach (juce::Component& c, juce::Component& area)
     if (handle == nullptr || c.getParentComponent() != nullptr)
         return false;
     const auto bounds = c.getBounds();
-    // no title bar, no taskbar entry, no shadow: a plain child window the system clips to the main window
-    c.addToDesktop (0, handle);
+    // no title bar, no taskbar entry, no shadow: a plain child window the system clips to the main window. (Round 190ev:
+    // a docked LYNX editor window keeps the flags it was attached with, also when it is attached again.)
+    if (styleFlags < 0)
+        styleFlags = (int) c.getProperties().getWithDefault ("lynxNativeFlags", 0);
+    c.getProperties().set ("lynxNativeFlags", styleFlags);
+    c.addToDesktop (styleFlags, handle);
     c.getProperties().set ("lynxNativeChild", true);
     c.getProperties().set ("lynxNativeParent", (juce::int64) (juce::pointer_sized_int) handle);
    #if JUCE_WINDOWS
@@ -546,6 +649,18 @@ void keepFloatersInFront()
    #endif
 }
 
+void raiseOnAnyClick (juce::Component& c, std::function<void()> onClick)
+{
+   #if JUCE_WINDOWS
+    auto& list = clickRaises();
+    std::erase_if (list, [&c] (const ClickRaise& r) { return r.component == nullptr || r.component.getComponent() == &c; });
+    list.push_back ({ &c, std::move (onClick) });
+    installClickHook();
+   #else
+    juce::ignoreUnused (c, onClick);
+   #endif
+}
+
 void forwardUnusedKeys (juce::Component& c)
 {
     c.addKeyListener (&keyForwarder()); // (JUCE adds a listener once)
@@ -662,6 +777,40 @@ int hitCodeAt (const juce::Component& c, juce::Point<int> localPoint)
    #else
     juce::ignoreUnused (c, localPoint);
     return 0;
+   #endif
+}
+
+void* innermostChild (void* window)
+{
+   #if JUCE_WINDOWS
+    auto h = static_cast<HWND> (window);
+    for (int depth = 0; h != nullptr && depth < 24; ++depth)
+    {
+        const auto child = GetWindow (h, GW_CHILD);
+        if (child == nullptr)
+            break;
+        h = child;
+    }
+    return h != static_cast<HWND> (window) ? (void*) h : nullptr;
+   #else
+    juce::ignoreUnused (window);
+    return nullptr;
+   #endif
+}
+
+void postClickForTest (void* window, juce::Point<int> clientPoint)
+{
+   #if JUCE_WINDOWS
+    auto h = static_cast<HWND> (window);
+    DWORD pid = 0;
+    GetWindowThreadProcessId (h, &pid);
+    if (h == nullptr || pid != GetCurrentProcessId())
+        return;
+    const auto at = MAKELPARAM (clientPoint.x, clientPoint.y);
+    PostMessageW (h, WM_LBUTTONDOWN, MK_LBUTTON, at);
+    PostMessageW (h, WM_LBUTTONUP, 0, at);
+   #else
+    juce::ignoreUnused (window, clientPoint);
    #endif
 }
 

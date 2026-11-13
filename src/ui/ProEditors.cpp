@@ -4231,7 +4231,7 @@ public:
         setResizable (true, false);
         centreWithSize (w, h);
         setVisible (true);
-        keepAboveMainWindow (*this);
+        dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
         // round 126: fade / scale in — on the holder: the editor's own transform is the holder's scale (round 190bj)
         if (content != nullptr)
             if (auto* holder = getContentComponent())

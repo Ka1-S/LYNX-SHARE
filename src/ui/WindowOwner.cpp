@@ -1,6 +1,8 @@
 #include "ui/WindowOwner.h"
 #include "core/HostKeyGate.h"
 #include "ui/NativeChild.h"
+#include "ui/Workspace.h"
+#include "core/DockStack.h"
 
 #include "core/WindowFit.h"
 
@@ -266,6 +268,8 @@ namespace
 {
 void applyOwnership (juce::Component& window)
 {
+    if (nativechild::isAttached (window)) // (round 190ev: a docked window is a child window; its parent is the main window)
+        return;
     applyWindowChrome (window);
 
     if (auto* top = dynamic_cast<juce::TopLevelWindow*> (&window))
@@ -963,6 +967,8 @@ void keepAboveMainWindow (juce::Component& window)
 {
     window.addKeyListener (&keyForwarder()); // (JUCE adds it once)
     applyRenderingChoice (window);
+    if (nativechild::isAttached (window)) // (round 190ev: docked in the main window, not owned by it)
+        return;
     auto& all = keepers();
     auto& keeper = all[&window];
     if (keeper == nullptr)
@@ -975,7 +981,7 @@ void keepAboveMainWindow (juce::Component& window)
 
 void fitWindowOnScreen (juce::Component& window)
 {
-    if (! window.isOnDesktop() || ! window.isVisible())
+    if (! window.isOnDesktop() || ! window.isVisible() || nativechild::isAttached (window)) // (docked: placed in the workspace)
         return;
     auto* resizable = dynamic_cast<juce::ResizableWindow*> (&window);
     if (resizable != nullptr && (resizable->isFullScreen() || resizable->isMinimised()))
@@ -1167,19 +1173,154 @@ void matchWindowOrderToScreen()
                 return i;
         return -1;
     };
-    auto inOrder = true;
-    auto last = indexOf (owner);
-    for (auto* c : above)
-    {
-        const auto at = indexOf (c);
-        inOrder = inOrder && at > last;
-        last = at;
-    }
-    if (inOrder)
+    if (dockstack::listMatches<juce::Component*> (owner, above, indexOf))
         return;
 
+   #if JUCE_WINDOWS
+    // Round 190ev (issue #152, "flickering windows"): only JUCE's list changes. The screen already has this order (the
+    // children were read from the system, the owned windows are always above their owner), and raising every one of
+    // them with SetWindowPos each time the main window was activated made each child window jump to the top for a
+    // moment and be drawn again: every panel and docked window flickered on a focus change.
+    for (auto* c : above)
+        if (auto* peer = c->getPeer())
+            peer->handleBroughtToFront();
+   #else
     for (auto* c : above)
         c->toFront (false);
+   #endif
+}
+
+
+// --- round 190ev: LYNX's own editor windows docked like FL's plugin windows -------------------------------------
+
+namespace
+{
+Workspace* editorDock = nullptr;
+bool editorsDetached = false;
+
+// A click anywhere in a docked editor window brings it in front of the panels and docked windows (JUCE's own
+// "brought to front on click" asks the system to activate a child window, which is not the same thing).
+struct DockClickRaise final : juce::MouseListener
+{
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        auto* top = e.eventComponent != nullptr ? e.eventComponent->getTopLevelComponent() : nullptr;
+        if (top == nullptr || ! nativechild::isAttached (*top))
+            return;
+        top->toFront (false);
+        nativechild::raiseOverlays();
+    }
+};
+
+DockClickRaise& dockClickRaise()
+{
+    static DockClickRaise raiser;
+    return raiser;
+}
+
+// A docked window moved or resized by its title bar or border (JUCE's dragger): its title bar stays inside the
+// workspace, and its native window goes exactly where JUCE meant it (in the parent's own scale, ui/NativeChild.h).
+struct DockPlaceKeeper final : juce::ComponentListener
+{
+    bool busy = false;
+    void componentMovedOrResized (juce::Component& c, bool, bool) override
+    {
+        if (busy || editorDock == nullptr || ! nativechild::isAttached (c))
+            return;
+        const juce::ScopedValueSetter<bool> guard (busy, true);
+        auto r = nativechild::boundsIn (c, *editorDock);
+        const auto area = editorDock->getLocalBounds();
+        r.setX (juce::jlimit (-r.getWidth() + 80, juce::jmax (0, area.getWidth() - 80), r.getX()));
+        r.setY (juce::jlimit (0, juce::jmax (0, area.getHeight() - 24), r.getY()));
+        if (r != nativechild::boundsIn (c, *editorDock) || ! nativechild::isPlacedAt (c, *editorDock, r))
+            nativechild::place (c, *editorDock, r);
+    }
+};
+
+DockPlaceKeeper& dockPlaceKeeper()
+{
+    static DockPlaceKeeper keeper;
+    return keeper;
+}
+} // namespace
+
+void setEditorDock (Workspace* workspace)
+{
+    editorDock = workspace;
+}
+
+void setEditorsDetached (bool detached)
+{
+    editorsDetached = detached;
+}
+
+bool dockOrKeepAbove (juce::DocumentWindow& window)
+{
+    if (nativechild::isAttached (window))
+        return true;
+    auto* area = editorDock;
+    if (area == nullptr || editorsDetached || ! nativechild::dockingEnabled() || ! area->isShowing() || ! window.isOnDesktop())
+    {
+        keepAboveMainWindow (window);
+        return false;
+    }
+
+    // where its code put it (centred, aligned, remembered) and the size of what it shows
+    const auto screen = window.getScreenBounds();
+    auto* content = window.getContentComponent();
+    const auto contentW = content != nullptr ? content->getWidth() : window.getWidth();
+    const auto contentH = content != nullptr ? content->getHeight() : window.getHeight();
+    const auto visible = window.isVisible();
+
+    // off the desktop first, so no top-level window is made again on the way: LYNX's title bar (a child window has no
+    // native one) with the close button alone (no minimise / maximise of the system's kind for a child window), and no
+    // drop shadow (JUCE's shadow is a set of top-level windows)
+    window.setVisible (false);
+    window.removeFromDesktop();
+    window.setDropShadowEnabled (false);
+    window.setUsingNativeTitleBar (false);
+    window.setTitleBarButtonsRequired (juce::DocumentWindow::closeButton, false);
+    window.setTitleBarHeight (26);
+    if (content != nullptr)
+        window.setContentComponentSize (contentW, contentH);
+
+    // a TopLevelWindow keeps its own style flags (JUCE makes it a top-level window again when it sees others)
+    if (! nativechild::attach (window, *area, window.getDesktopWindowStyleFlags()))
+    {
+        window.setUsingNativeTitleBar (true);
+        window.addToDesktop (window.getDesktopWindowStyleFlags());
+        window.setVisible (visible);
+        keepAboveMainWindow (window);
+        return false;
+    }
+    auto r = area->getLocalArea (nullptr, screen).withSize (window.getWidth(), window.getHeight());
+    const auto bounds = area->getLocalBounds();
+    r.setX (juce::jlimit (0, juce::jmax (0, bounds.getWidth() - r.getWidth()), r.getX()));
+    r.setY (juce::jlimit (0, juce::jmax (0, bounds.getHeight() - r.getHeight()), r.getY()));
+    nativechild::place (window, *area, r);
+
+    window.getProperties().set ("lynxDockedWindow", true);
+    area->addDockedFrame (window); // (placed again with the panels when the main window's native window is made again)
+    nativechild::forwardUnusedKeys (window);
+    nativechild::raiseOnAnyClick (window);
+    window.addMouseListener (&dockClickRaise(), true);
+    window.addComponentListener (&dockPlaceKeeper());
+    window.setVisible (visible);
+    if (visible)
+        window.toFront (false);
+    nativechild::raiseOverlays();
+    return true;
+}
+
+void setWindowScreenPosition (juce::Component& window, juce::Point<int> screenTopLeft)
+{
+    if (editorDock != nullptr && nativechild::isAttached (window))
+    {
+        const auto r = nativechild::boundsIn (window, *editorDock);
+        nativechild::place (window, *editorDock, r.withPosition (editorDock->getLocalPoint (nullptr, screenTopLeft)));
+        return;
+    }
+    window.setTopLeftPosition (screenTopLeft);
 }
 
 } // namespace lynx
