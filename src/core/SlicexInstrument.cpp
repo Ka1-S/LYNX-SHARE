@@ -207,6 +207,7 @@ public:
             auto& slot = freeSlot();
             slot.id = id;
             slot.key = k;
+            slot.noteId = startingNoteId();
             slot.volFactor = initVol;
             slot.pan = nextPan;
             slot.cents = nextCents;
@@ -216,8 +217,10 @@ public:
 
     void noteOff (int key) noexcept override
     {
+        // (round 190ej: the note's own voice — FL hands Slicex the ending note's voice, Voice_Release 0x883970 releases that
+        // voice only: REA_rodada190h §6 / VMT slot 10)
         for (auto& n : notes)
-            if (n.id >= 0 && n.key == key && ! n.released)
+            if (n.id >= 0 && endsVoice (n.key, n.noteId, key) && ! n.released)
             {
                 engine.release (n.id);
                 n.released = true;
@@ -286,6 +289,7 @@ private:
         int id = -1, key = 60;
         bool released = false;
         float volFactor = 1.0f, pan = 0.0f, cents = 0.0f;
+        std::uint32_t noteId = 0; // the LYNX note that started it (round 190ej)
     };
 
     void take() noexcept

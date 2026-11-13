@@ -1951,6 +1951,7 @@ struct Voice
     bool used = false, dead = false;
     long long id = 0;
     int lynxKey = -1;
+    std::uint32_t lynxNote = 0; // the note id that started it (round 190ej)
     bool lynxReleased = false;
     double notePan = 0;
     double fvol = 1, fpan = 0, fcutH = 0, fresH = 0, FP = 0, relvel = 0, note = 0, vel = 0;
@@ -2109,6 +2110,8 @@ public:
         startVoice (*v, key, vel, fvol, fpan, pofs, fcut, fres, relvel);
         v->id = ++serial;
         v->lynxKey = lynxKey;
+        v->lynxNote = nextLynxNote;
+        nextLynxNote = 0;
         v->lynxReleased = false;
         v->notePan = notePan;
         v->used = true;
@@ -2126,17 +2129,19 @@ public:
                 voiceRelease (*v);
     }
 
-    // LYNX: releases the oldest held note of a key
-    void releaseKey (int key) noexcept
+    // LYNX: releases the oldest held note of a key; `note` ≠ 0 (round 190ej): that note's own voice — FL's Voice_Release of
+    // one note, whatever the other notes of the key do [EXEC: /R render of Ogun, two overlapping notes of one key]
+    void releaseKey (int key, std::uint32_t note = 0) noexcept
     {
         for (auto* v : order)
-            if (v->lynxKey == key && ! v->lynxReleased)
+            if (v->lynxKey == key && ! v->lynxReleased && (note == 0 || v->lynxNote == note))
             {
                 v->lynxReleased = true;
                 voiceRelease (*v);
                 return;
             }
     }
+    std::uint32_t nextLynxNote = 0; // (the next noteOn's note id)
 
     void killAll() noexcept
     {
@@ -3789,8 +3794,10 @@ public:
         const auto knob = channelCents.load();
         const auto pofs = (double) knob + (double) nextCents;
         engine->nextLiveRef = live.ref (knob);
+        engine->nextLynxNote = startingNoteId();
         engine->noteOn (key, std::clamp ((double) velocity, 0.0, 1.0), channelVol, (double) nextPan + channelPan, pofs, 0.0, 0.0,
                         0.5, 0, key, (double) nextPan);
+        engine->nextLynxNote = 0;
         nextPan = 0.0f, nextCents = 0.0f;
     }
 
@@ -3814,7 +3821,7 @@ public:
     {
         take();
         if (engine != nullptr)
-            engine->releaseKey (key);
+            engine->releaseKey (key, endingNoteId());
     }
 
     void allNotesOff() noexcept override

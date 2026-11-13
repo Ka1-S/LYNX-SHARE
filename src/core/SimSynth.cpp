@@ -1694,6 +1694,8 @@ public:
         eng = build (current, sr);
         for (auto& h : held)
             h = -1;
+        for (auto& o : slotOpen)
+            o = false;
     }
 
     void configure (const ChannelDef& channel, double) noexcept override
@@ -1735,7 +1737,10 @@ public:
     {
         take();
         const auto k = std::clamp (key, 0, 127);
-        if (held[k] >= 0)
+        // a key played again releases its voice first; a scheduled note (round 190ej) starts a voice of its own: FL's
+        // SimSynth plays two overlapping notes of one key as two voices and ends each at its own end [EXEC: /R render]
+        const auto note = startingNoteId();
+        if (held[k] >= 0 && note == 0)
             eng->release (held[k]);
         notePan[k] = nextPan;
         const auto pan = std::clamp (nextPan + (float) channelPan, -1.0f, 1.0f);
@@ -1748,7 +1753,11 @@ public:
                 h = -1;
         held[k] = sl;
         if (sl >= 0)
+        {
             eng->slots[sl].slide.anchor (live.ref (knob));
+            slotNote[sl] = note;
+            slotOpen[sl] = true;
+        }
         nextPan = 0.0f;
         nextCents = 0.0f;
     }
@@ -1782,7 +1791,19 @@ public:
     void noteOff (int key) noexcept override
     {
         take();
-        if (key >= 0 && key < 128 && held[key] >= 0)
+        if (key < 0 || key >= 128)
+            return;
+        // the note's own voice (round 190ej); an off without a note id: every voice of the key
+        const auto note = endingNoteId();
+        for (int v = 0; v < numVoices; ++v)
+            if (slotOpen[v] && eng->slots[v].used && eng->slots[v].id == key && (note == 0 || slotNote[v] == note))
+            {
+                eng->release (v);
+                slotOpen[v] = false;
+                if (held[key] == v)
+                    held[key] = -1;
+            }
+        if (note == 0 && held[key] >= 0) // (as before: the key's held voice)
         {
             eng->release (held[key]);
             held[key] = -1;
@@ -1902,6 +1923,9 @@ private:
     double channelVol = 1.0, channelPan = 0.0;
     int held[128] {};
     float notePan[128] {};
+    // each voice slot's note id and whether its note has not ended yet (round 190ej)
+    std::uint32_t slotNote[numVoices] {};
+    bool slotOpen[numVoices] {};
     float nextPan = 0.0f, nextCents = 0.0f;
     std::vector<int> finished = std::vector<int> (numVoices);
 };

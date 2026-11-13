@@ -59,6 +59,7 @@ private:
     {
         int key = 0;
         double onTick = 0.0;
+        std::uint32_t noteId = 0; // the note's identity (round 190ej): its "off" finds it, its echoes' ids derive from it
         std::array<int, 32> echoKeys {}; // (fat mode: the second, mirrored series after the first)
         int count = 0;
     };

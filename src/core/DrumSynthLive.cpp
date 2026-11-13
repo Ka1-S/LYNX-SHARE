@@ -646,6 +646,7 @@ public:
         v = {};
         v.active = true;
         v.key = key, v.slot = slot, v.mode = mode, v.notePan = pan;
+        v.noteId = startingNoteId(); // (round 190ej)
         // FL velocity (0…128, LYNX 0…1 × 128) → Init.Vol = (11^(vel/100) − 1)/10 (REA_rodada28 §4.1, inference);
         // the engine's own Final.Vol factor is applied with the channel volume at mix time (see render)
         Levels lv;
@@ -660,7 +661,7 @@ public:
     {
         take();
         for (auto& v : voices)
-            if (v.active && ! v.released && v.key == key)
+            if (v.active && ! v.released && endsVoice (v.key, v.noteId, key)) // (round 190ej: the note's own voice, REA_rodada30)
             {
                 v.released = true;
                 v.engine.release (engine, engineParams (settings.patches, key)); // the patch reloaded (with morph)
@@ -736,6 +737,7 @@ private:
     {
         bool active = false, released = false, cut = false;
         int key = 0, slot = 0, mode = 0;
+        std::uint32_t noteId = 0; // the LYNX note that started it (round 190ej)
         float notePan = 0.0f, fade = 1.0f;
         EngineVoice engine;
     };

@@ -910,6 +910,7 @@ struct Note
 {
     bool used = false, ghost = false, released = false, stamped = false;
     int key = 0;
+    std::uint32_t lynxNote = 0; // the LYNX note id that started it (round 190ej)
     double vel = 0, fvol = 0, fpan = 0, finalPitch = 0, volFactor = 1, notePan = 0;
     long long start = 0, stamp = 0;
     std::array<int, 9> records {};
@@ -1134,12 +1135,20 @@ public:
     }
 
     // first note of `key` still held by the host (ghosts included), or −1
-    int findHeld (int key) const noexcept
+    // the oldest held note of a key; `note` ≠ 0: the one that LYNX note started (round 190ej)
+    int findHeld (int key, std::uint32_t note = 0) const noexcept
     {
         for (auto i : order)
-            if (const auto& nt = notes[(std::size_t) i]; nt.key == key && ! nt.released)
+            if (const auto& nt = notes[(std::size_t) i]; nt.key == key && ! nt.released && (note == 0 || nt.lynxNote == note))
                 return i;
         return -1;
+    }
+
+    // the LYNX note id a note was started with (round 190ej)
+    void setLynxNote (int index, std::uint32_t note) noexcept
+    {
+        if (index >= 0 && (std::size_t) index < notes.size())
+            notes[(std::size_t) index].lynxNote = note;
     }
 
     // FL's PITCH knob and main pitch, live (round 167a): a note's pitch at its note on, and the channel's pitch now
@@ -2318,6 +2327,7 @@ public:
         const auto index = engine.noteOn (key, vel, volFactor, channelVol, (double) nextPan, channelPan,
                                           (double) settings.pitchCents + (double) nextCents);
         engine.anchorNote (index, live.ref (settings.pitchCents));
+        engine.setLynxNote (index, startingNoteId());
         nextPan = 0.0f;
         nextCents = 0.0f;
     }
@@ -2325,7 +2335,8 @@ public:
     void noteOff (int key) noexcept override
     {
         take();
-        if (const auto i = engine.findHeld (key); i >= 0)
+        // (round 190ej: the note's own; FL's Harmless plays on the other note of the key [EXEC: /R render])
+        if (const auto i = engine.findHeld (key, endingNoteId()); i >= 0)
             engine.noteOff (i);
     }
 

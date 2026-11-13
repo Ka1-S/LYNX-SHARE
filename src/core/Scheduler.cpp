@@ -233,12 +233,18 @@ void ScheduledNotes::process (EventBuffer& events, int numSamples, double tps) n
         const auto e = events[i];
         const auto note = e.channel >= 0 && e.key >= 0 && e.key < audioClipKeyBase;
 
+        auto id = 0u;
         if (note && e.type == NoteEvent::Type::on)
         {
             if (count < capacity)
+            {
+                id = nextId;
+                nextId = nextId >= 0xffffffu ? 1u : nextId + 1u;
                 entries[(std::size_t) count++] = { e.channel, e.key,
                                                    e.lengthTicks > 0.0f ? clock + e.sampleOffset * tps + (double) e.lengthTicks
-                                                                        : std::numeric_limits<double>::infinity() };
+                                                                        : std::numeric_limits<double>::infinity(),
+                                                   id };
+            }
             else
                 overflow = true;
         }
@@ -258,11 +264,15 @@ void ScheduledNotes::process (EventBuffer& events, int numSamples, double tps) n
                 }
             }
             if (match >= 0)
+            {
+                id = entries[(std::size_t) match].id;
                 entries[(std::size_t) match] = entries[(std::size_t) --count];
+            }
             else if (! overflow)
                 continue; // not the end of a sounding note: a note edited in behind the play head, or changed
         }
-        events.at (kept++) = e;
+        events.at (kept) = e;
+        events.at (kept++).noteId = id;
     }
     events.resize (kept);
 
@@ -281,6 +291,7 @@ void ScheduledNotes::process (EventBuffer& events, int numSamples, double tps) n
         off.key = entries[(std::size_t) k].key;
         off.velocity = 0.0f;
         off.sampleOffset = std::clamp ((int) std::ceil (due - 1.0e-6), 0, numSamples - 1);
+        off.noteId = entries[(std::size_t) k].id;
         events.add (off);
         added = true;
         entries[(std::size_t) k] = entries[(std::size_t) --count];

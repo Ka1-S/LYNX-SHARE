@@ -82,7 +82,8 @@ public:
 
     void noteOn (const NoteParams& note) noexcept;
     void release (std::int64_t id) noexcept;   // FL's Voice_Release for every voice of that note
-    void releaseKey (int key) noexcept;        // releases the held notes of a key
+    // releases the held notes of a key; `id` ≠ 0: only that note's voices (round 190ej, FL's Voice_Release of one note)
+    void releaseKey (int key, std::int64_t id = 0) noexcept;
     // a slide note (issue #14): the unreleased voices glide to `toCents` (Final.Pitch, cents from C5) over `samples`
     void slideTo (double toCents, float samples) noexcept;
     // FL's PITCH knob and main pitch, live (round 167a): the channel pitch the next note starts with (knob + fine tune +

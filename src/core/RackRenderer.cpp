@@ -2737,6 +2737,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
 
         int outCount = 0;
         arp.process (i, arp.input.data(), inCount, chunkStartTick, chunkTps, n, c.arp, arp.output.data(), outCount);
+        for (int k = 0; k < outCount; ++k) // (the arpeggio's notes are its own: no scheduled note's identity, round 190ej)
+            arp.output[(std::size_t) k].noteId = 0;
         // FL cuts an arpeggio note at its gate even on a sample that plays out (REA round 146b [EXEC: FL's renders of
         // its Sampler render test]): the arpeggio is one voice, so its "off" stops the channel's sound (not with the
         // echo delay, whose echoes keep ringing)
@@ -2892,7 +2894,9 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                 if (gain != 1.0f && ! instrument.setNextNoteGain (gain))
                     velocity *= gain;
                 instrument.setNextNoteFinePitch (e.cents); // (issue #63: a hosted plugin's key and VST3 tuning)
+                instrument.setNextNoteId (e.noteId);     // (round 190ej: the voice is this note's)
                 instrument.noteOnAt (e.key, velocity, e.startSeconds);
+                instrument.setNextNoteId (0);
                 HostSlide::pendingGlide() = {};
             }
         }
@@ -2918,7 +2922,10 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                                     (float) (channelpoly::glideBeats (mode.portaBeats) * ppq / std::max (1.0e-9, chunkTps)));
             if (off.release >= 0)
             {
+                // FL ends the note's own voice (round 190ej); a Mono channel's shared voice ends with its last note
+                instrument.setNextNoteOffId (mode.mono ? 0u : e.noteId);
                 instrument.noteOff (off.release);
+                instrument.setNextNoteOffId (0);
                 voiceOrders[(std::size_t) i].noteOff (off.release);
             }
             if (e.key >= 0 && e.key < 128)
