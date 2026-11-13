@@ -7032,10 +7032,16 @@ private:
                         if (auto* demo = find ("tour.welcome.demo"))
                             click (*demo); // Welcome › Open a demo song: the Start from list
                         else
-                            check ("Welcome › Open a demo song found", false);
+                            check ("Welcome > Open a demo song found", false);
                         break;
                     case 3:
                     {
+                        if (! simple->isStartFromShowing()) // (X11: a child window just mapped may miss the first click)
+                            if (auto* demo = find ("tour.welcome.demo"))
+                            {
+                                line ("  the first click was not taken: once more");
+                                click (*demo);
+                            }
                         check ("Start from is up", simple->isStartFromShowing());
                         if (auto* start = dynamic_cast<lynx::StartFromPanel*> (simple->startFromForSnapshot()))
                             check ("a demo song opens from it", start->openForSnapshot (1));
@@ -7043,7 +7049,7 @@ private:
                     }
                     case 4:
                         check ("Start from closed with the demo open", ! simple->isStartFromShowing() && ! engine->getSong().playlist.empty());
-                        spacePlays ("a demo opened from Welcome › Start from");
+                        spacePlays ("a demo opened from Welcome > Start from");
                         instrumentTrack = [] (const lynx::Song& song) { // the first Instrument track (the dock's Keyboard and Editor tabs are for it)
                             for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
                                 if (lynx::simpletracks::kindOf (song, t) == lynx::simpletracks::Kind::instrument)
