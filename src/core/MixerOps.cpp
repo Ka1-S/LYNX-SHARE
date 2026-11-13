@@ -1774,4 +1774,54 @@ int placeRenderedFiles (Song& song, const std::vector<RenderedFile>& files)
         clipops::updateCrossfades (song);
     return placed;
 }
+
+// --- round 190fl: FL's mixer menu tail ----------------------------------------------------------------------------
+int insertCount (const Song& song) noexcept
+{
+    return std::max (0, (int) song.mixer.size() - 1);
+}
+
+bool validInsertCount (const Song& song, int wanted) noexcept
+{
+    return wanted >= insertCount (song) && wanted <= maxMixerTracks - 1;
+}
+
+int increaseInsertsTo (Song& song, int wanted)
+{
+    if (! validInsertCount (song, wanted) || wanted <= insertCount (song))
+        return 0;
+    return insertTracks (song, std::max (1, (int) song.mixer.size()), wanted - insertCount (song));
+}
+
+int setPdcForAllTracks (Song& song)
+{
+    return resetManualLatency (song);
+}
+
+std::vector<int> playlistTracksOn (const Song& song, const std::vector<int>& inserts)
+{
+    const auto on = [&inserts] (int t) { return t > 0 && std::find (inserts.begin(), inserts.end(), t) != inserts.end(); };
+    std::vector<int> out;
+    for (int i = 0; i < (int) song.playlistTracks.size(); ++i)
+    {
+        const auto& track = song.playlistTracks[(std::size_t) i];
+        auto insert = -1;
+        if (track.mode == PlaylistTrackMode::audio)
+            insert = track.mixerTrack;
+        else if (track.mode == PlaylistTrackMode::instrument && track.channel >= 0 && track.channel < (int) song.channels.size())
+            insert = song.channels[(std::size_t) track.channel].mixerTrack;
+        if (on (insert))
+            out.push_back (i);
+    }
+    return out;
+}
+
+std::vector<int> channelsOn (const Song& song, const std::vector<int>& inserts)
+{
+    std::vector<int> out;
+    for (int c = 0; c < (int) song.channels.size(); ++c)
+        if (const auto t = song.channels[(std::size_t) c].mixerTrack; t > 0 && std::find (inserts.begin(), inserts.end(), t) != inserts.end())
+            out.push_back (c);
+    return out;
+}
 } // namespace lynx::mixerops

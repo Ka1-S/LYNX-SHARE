@@ -9846,3 +9846,8 @@ countries: nl be
 "{0} is frozen with its effects: Unfreeze the track to edit them" = "{0} is bevroren met de effecten: ontdooi het spoor om ze te bewerken"
 "Bounce to New Track" = "Bouncen naar nieuw spoor"
 "Consolidate" = "Consolideren"
+"Channels and playlist tracks routed to this track" = "Kanalen en playlistsporen die naar dit spoor gerouteerd zijn"
+"Increase number of tracks to..." = "Aantal sporen verhogen naar..."
+"Enter the number of mixer tracks" = "Voer het aantal mixersporen in"
+"Track count must be between {0} and {1}." = "Het aantal sporen moet tussen {0} en {1} liggen."
+"Set for all tracks" = "Instellen voor alle sporen"

@@ -1807,6 +1807,8 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             selectTrack (juce::jmax (1, count));
         });
         menu.addItem (tr ("Add multiple..."), room, false, [this, count] { askInsertMultiple (juce::jmax (1, count)); });
+        // FL's third item (Tag -1, round 190fl): the number of inserts to have, the new ones at the end
+        menu.addItem (tr ("Increase number of tracks to..."), room, false, [this] { askInsertCount(); });
         // FL's "Add from state" (REA round 167q: AddMixerTracksMenu, FUN_012a87d0 / FUN_012a83b0)
         juce::PopupMenu fromState;
         for (const auto& f : mixerpresets::all())
@@ -3088,6 +3090,45 @@ void MixerStrips::askInsertMultiple (int at)
     }
 }
 
+// FL's "Increase number of tracks to..." (AddOneMixerTrackMenuClick 0x12a8bb0, Tag -1; round 190fl): the box starts at
+// the number of inserts; FL refuses a number below it or above 500 with "Track count must be between N and 500."
+void MixerStrips::askInsertCount()
+{
+    const auto now = mixerops::insertCount (engine.getSong());
+    auto* window = new juce::AlertWindow (tr ("Increase number of tracks to..."), tr ("Enter the number of mixer tracks"), juce::MessageBoxIconType::NoIcon);
+    window->addTextEditor ("count", juce::String (now));
+    if (auto* field = window->getTextEditor ("count"))
+        field->setInputRestrictions (4, "0123456789");
+    window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
+    window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    juce::Component::SafePointer<MixerStrips> safe (this);
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, window] (int result) {
+                                 if (safe == nullptr || result != 1)
+                                     return;
+                                 const auto wanted = window->getTextEditorContents ("count").getIntValue();
+                                 const auto& song = safe->engine.getSong();
+                                 if (! mixerops::validInsertCount (song, wanted))
+                                 {
+                                     juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                                             tr ("Track count must be between {0} and {1}.",
+                                                                                 { juce::String (mixerops::insertCount (song)), juce::String (maxMixerTracks - 1) }));
+                                     return;
+                                 }
+                                 const auto first = (int) song.mixer.size();
+                                 int added = 0;
+                                 safe->engine.editSong ([wanted, &added] (Song& s) { added = mixerops::increaseInsertsTo (s, wanted); });
+                                 for (int i = 0; i < added; ++i)
+                                     safe->revealed.insert (first + i); // shown even while unused
+                                 safe->updateSize();
+                             }),
+                             true);
+    if (auto* field = window->getTextEditor ("count"))
+    {
+        field->grabKeyboardFocus();
+        field->selectAll();
+    }
+}
+
 void MixerStrips::showMenu (int t)
 {
     buildMenu (t).showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withMousePosition());
@@ -3353,6 +3394,19 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
             setSelection (selection, t);
             selectLinkedChannels();
         });
+        // FL's second item (SelectLinkedMenuClick 0x129d110, round 190fl): every selected insert's channels and Playlist
+        // tracks (audio tracks linked to it, instrument tracks whose channel plays into it); the Playlist shows the first
+        {
+            const auto channels = mixerops::channelsOn (song, targets);
+            const auto tracks = mixerops::playlistTracksOn (song, targets);
+            select.addItem (tr ("Channels and playlist tracks routed to this track"), ! channels.empty() || ! tracks.empty(), false,
+                            [this, channels, tracks] {
+                                if (! channels.empty())
+                                    engine.setChannelSelection (channels, channels.front());
+                                if (! tracks.empty() && mixeroptions::selectPlaylistTracks)
+                                    mixeroptions::selectPlaylistTracks (tracks);
+                            });
+        }
         select.addSeparator();
         const auto destinations = mixerops::destinationsOf (song, t);
         const auto sources = mixerops::sourcesOf (song, t);
@@ -3613,6 +3667,9 @@ juce::PopupMenu MixerStrips::buildMenu (int t)
         menu.addSubMenu (tr ("Disk recording"), disk);
         juce::PopupMenu pdc;
         const auto manual = std::count_if (song.mixer.begin(), song.mixer.end(), [] (const MixerTrack& m) { return m.latencyMs != 0.0f; });
+        // FL's first item (SetupPDCMenuClick → FUN_012a3880(1, 1), round 190fl): every track's manual latency back to
+        // 0 without the warning box; the compensation then comes from the plugins again
+        pdc.addItem (tr ("Set for all tracks"), [this] { engine.editSong ([] (Song& s) { mixerops::setPdcForAllTracks (s); }); });
         pdc.addItem (tr ("Reset manual latency on all tracks"), manual > 0, false, [this] {
             juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::WarningIcon, tr ("Warning"),
                                                 tr ("This will reset manual latency values on all mixer tracks."), tr ("OK"), tr ("Cancel"), nullptr,
@@ -4776,6 +4833,7 @@ std::function<void()> changed;
 std::function<void (bool)> setShowUsedOnly;
 std::function<void (bool)> setShowLoudness;
 std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)>)> renderTracks;
+std::function<void (std::vector<int>)> selectPlaylistTracks;
 
 namespace
 {

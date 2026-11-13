@@ -215,6 +215,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         if (safe != nullptr)
             safe->mixer.getStripsForSnapshot().setShowLoudness (on);
     };
+    mixeroptions::selectPlaylistTracks = [safe = juce::Component::SafePointer<MainComponent> (this)] (std::vector<int> tracks) {
+        if (safe != nullptr)
+            safe->playlist.selectTracks (tracks);
+    };
     mixeroptions::renderTracks = [safe = juce::Component::SafePointer<MainComponent> (this)] (std::vector<int> tracks,
                                                                                              std::function<void (const std::vector<juce::File>&)> done) {
         if (safe != nullptr)

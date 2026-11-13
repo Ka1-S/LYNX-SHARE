@@ -9846,3 +9846,8 @@ countries: tw hk mo
 "{0} is frozen with its effects: Unfreeze the track to edit them" = "{0} 已連同效果一起凍結：解凍軌道後才能編輯它們"
 "Bounce to New Track" = "並軌到新軌道"
 "Consolidate" = "合併"
+"Channels and playlist tracks routed to this track" = "路由到此軌道的通道和播放清單軌道"
+"Increase number of tracks to..." = "將軌道數增加到..."
+"Enter the number of mixer tracks" = "輸入混音器軌道數"
+"Track count must be between {0} and {1}." = "軌道數必須在 {0} 到 {1} 之間。"
+"Set for all tracks" = "為所有軌道設定"

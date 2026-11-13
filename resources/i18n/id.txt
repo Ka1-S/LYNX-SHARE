@@ -9846,3 +9846,8 @@ countries: id
 "{0} is frozen with its effects: Unfreeze the track to edit them" = "{0} dibekukan bersama efeknya: cairkan track untuk mengeditnya"
 "Bounce to New Track" = "Bounce ke track baru"
 "Consolidate" = "Konsolidasi"
+"Channels and playlist tracks routed to this track" = "Kanal dan trek playlist yang dirutekan ke trek ini"
+"Increase number of tracks to..." = "Tambah jumlah trek menjadi..."
+"Enter the number of mixer tracks" = "Masukkan jumlah trek mixer"
+"Track count must be between {0} and {1}." = "Jumlah trek harus antara {0} dan {1}."
+"Set for all tracks" = "Atur untuk semua trek"

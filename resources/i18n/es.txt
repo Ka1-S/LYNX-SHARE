@@ -9846,3 +9846,8 @@ countries: es mx ar co cl pe ve
 "{0} is frozen with its effects: Unfreeze the track to edit them" = "{0} está congelado con sus efectos: descongela la pista para editarlos"
 "Bounce to New Track" = "Bounce a nueva pista"
 "Consolidate" = "Consolidar"
+"Channels and playlist tracks routed to this track" = "Canales y pistas de la playlist enrutados a esta pista"
+"Increase number of tracks to..." = "Aumentar el número de pistas a..."
+"Enter the number of mixer tracks" = "Introduce el número de pistas del mezclador"
+"Track count must be between {0} and {1}." = "El número de pistas debe estar entre {0} y {1}."
+"Set for all tracks" = "Establecer para todas las pistas"

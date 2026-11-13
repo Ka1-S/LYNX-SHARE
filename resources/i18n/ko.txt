@@ -9846,3 +9846,8 @@ countries: kr
 "{0} is frozen with its effects: Unfreeze the track to edit them" = "{0}은(는) 이펙트와 함께 프리즈되었습니다. 편집하려면 트랙 프리즈를 해제하세요"
 "Bounce to New Track" = "새 트랙으로 바운스"
 "Consolidate" = "통합"
+"Channels and playlist tracks routed to this track" = "이 트랙으로 라우팅된 채널과 플레이리스트 트랙"
+"Increase number of tracks to..." = "트랙 수를 다음으로 늘리기..."
+"Enter the number of mixer tracks" = "믹서 트랙 수를 입력하세요"
+"Track count must be between {0} and {1}." = "트랙 수는 {0}에서 {1} 사이여야 합니다."
+"Set for all tracks" = "모든 트랙에 설정"

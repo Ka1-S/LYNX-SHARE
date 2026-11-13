@@ -9846,3 +9846,8 @@ countries: ru by kz
 "{0} is frozen with its effects: Unfreeze the track to edit them" = "{0} заморожен вместе с эффектами: разморозьте дорожку, чтобы их редактировать"
 "Bounce to New Track" = "Баунс в новую дорожку"
 "Consolidate" = "Консолидировать"
+"Channels and playlist tracks routed to this track" = "Каналы и дорожки плейлиста, направленные на эту дорожку"
+"Increase number of tracks to..." = "Увеличить число дорожек до..."
+"Enter the number of mixer tracks" = "Введите число дорожек микшера"
+"Track count must be between {0} and {1}." = "Число дорожек должно быть от {0} до {1}."
+"Set for all tracks" = "Установить для всех дорожек"

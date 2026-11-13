@@ -252,6 +252,10 @@ public:
     // the game controller's D-pad).
     int getCurrentTrack() const noexcept { return currentTrack; }
     void selectTrack (int track);
+    // Several tracks selected, the first current and scrolled into view (round 190fl: the mixer's "Select › Channels and
+    // playlist tracks routed to this track")
+    void selectTracks (const std::vector<int>& tracks);
+    const std::vector<int>& getSelectedTracks() const noexcept { return selectedTracks; }
 
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,

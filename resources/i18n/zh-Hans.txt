@@ -9846,3 +9846,8 @@ countries: cn sg
 "{0} is frozen with its effects: Unfreeze the track to edit them" = "{0} 已连同效果一起冻结：解冻轨道后才能编辑它们"
 "Bounce to New Track" = "并轨到新轨道"
 "Consolidate" = "合并"
+"Channels and playlist tracks routed to this track" = "路由到此轨道的通道和播放列表轨道"
+"Increase number of tracks to..." = "将轨道数增加到..."
+"Enter the number of mixer tracks" = "输入混音器轨道数"
+"Track count must be between {0} and {1}." = "轨道数必须在 {0} 到 {1} 之间。"
+"Set for all tracks" = "为所有轨道设置"

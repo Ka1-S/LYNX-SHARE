@@ -9846,3 +9846,8 @@ countries: de at ch li lu
 "{0} is frozen with its effects: Unfreeze the track to edit them" = "{0} ist mit seinen Effekten eingefroren: Taue die Spur auf, um sie zu bearbeiten"
 "Bounce to New Track" = "In neue Spur bouncen"
 "Consolidate" = "Zusammenfügen"
+"Channels and playlist tracks routed to this track" = "Kanäle und Playlist-Spuren, die zu dieser Spur geroutet sind"
+"Increase number of tracks to..." = "Anzahl der Spuren erhöhen auf..."
+"Enter the number of mixer tracks" = "Anzahl der Mixer-Spuren eingeben"
+"Track count must be between {0} and {1}." = "Die Spuranzahl muss zwischen {0} und {1} liegen."
+"Set for all tracks" = "Für alle Spuren festlegen"

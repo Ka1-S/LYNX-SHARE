@@ -96,6 +96,9 @@ extern std::function<void (bool)> setShowLoudness;
 // Opens the Export window for these inserts only (FL's "Render armed / selected tracks to wave file(s)"; the main
 // window sets it, with the project's folder and name). `done` (optional) runs once the files are written.
 extern std::function<void (std::vector<int>, std::function<void (const std::vector<juce::File>&)> done)> renderTracks;
+// Selects these Playlist tracks and scrolls the first into view (FL's "Select › Channels and playlist tracks routed to
+// this track", round 190fl; the main window points it at its Playlist).
+extern std::function<void (std::vector<int>)> selectPlaylistTracks;
 // The items: this project's clean mixer, show only used inserts, remove unused inserts at the end and — with
 // `newProjects` — the new-project choices (inserts, Master chain, clean mixer, Playlist tracks).
 void addItems (juce::PopupMenu& menu, AudioEngine& engine, bool newProjects);
@@ -374,6 +377,7 @@ private:
     std::vector<std::pair<int, float>> groupStart; // (track, value) of the selection when a group drag starts
     float groupGrab = 0.0f;
     void showMenu (int track);
+    void askInsertCount(); // the "+" menu's "Increase number of tracks to..." (round 190fl)
     void askInsertMultiple (int at); // "Insert multiple..." / the "+" menu's "Add multiple..." (at most the room left)
     void showTrackEq (int track);
     ui::ValueSpec specFor (Part part, int track) const;

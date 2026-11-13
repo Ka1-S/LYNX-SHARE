@@ -9846,3 +9846,8 @@ countries: jp
 "{0} is frozen with its effects: Unfreeze the track to edit them" = "{0} はエフェクトごとフリーズされています。編集するにはトラックのフリーズを解除してください"
 "Bounce to New Track" = "新規トラックにバウンス"
 "Consolidate" = "統合"
+"Channels and playlist tracks routed to this track" = "このトラックにルーティングされたチャンネルとプレイリストトラック"
+"Increase number of tracks to..." = "トラック数を増やす..."
+"Enter the number of mixer tracks" = "ミキサートラックの数を入力"
+"Track count must be between {0} and {1}." = "トラック数は {0} から {1} の間にしてください。"
+"Set for all tracks" = "すべてのトラックに設定"

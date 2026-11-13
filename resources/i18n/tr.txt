@@ -9846,3 +9846,8 @@ countries: tr
 "{0} is frozen with its effects: Unfreeze the track to edit them" = "{0} efektleriyle birlikte donduruldu: düzenlemek için izi çözün"
 "Bounce to New Track" = "Yeni ize bounce et"
 "Consolidate" = "Birleştir"
+"Channels and playlist tracks routed to this track" = "Bu kanala yönlendirilen kanallar ve playlist izleri"
+"Increase number of tracks to..." = "Kanal sayısını şuna yükselt..."
+"Enter the number of mixer tracks" = "Mikser kanalı sayısını girin"
+"Track count must be between {0} and {1}." = "Kanal sayısı {0} ile {1} arasında olmalı."
+"Set for all tracks" = "Tüm kanallar için ayarla"

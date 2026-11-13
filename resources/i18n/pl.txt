@@ -9846,3 +9846,8 @@ countries: pl
 "{0} is frozen with its effects: Unfreeze the track to edit them" = "{0} jest zamrożony razem z efektami: odmroź ścieżkę, aby je edytować"
 "Bounce to New Track" = "Bounce do nowej ścieżki"
 "Consolidate" = "Konsoliduj"
+"Channels and playlist tracks routed to this track" = "Kanały i ścieżki playlisty kierowane do tej ścieżki"
+"Increase number of tracks to..." = "Zwiększ liczbę ścieżek do..."
+"Enter the number of mixer tracks" = "Wpisz liczbę ścieżek miksera"
+"Track count must be between {0} and {1}." = "Liczba ścieżek musi wynosić od {0} do {1}."
+"Set for all tracks" = "Ustaw dla wszystkich ścieżek"
