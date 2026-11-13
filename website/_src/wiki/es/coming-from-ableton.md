@@ -1,5 +1,5 @@
 ---
-source: 2285f3e677
+source: d5cc625221
 ---
 ![El diseño de lanzamiento de clips: una cuadrícula de clips con escenas junto a la Playlist](/assets/img/cliplaunch.webp)
 
@@ -27,7 +27,7 @@ LYNX SHARE arranca en el flujo por patrones: un Channel Rack, patrones y una Pla
 | Acciones siguientes | Acción A y Acción B con una probabilidad para cada una |
 | Botones de parada de clip | Una ranura vacía puede tener un botón de parada |
 | Volver a Arrangement | `Volver a la Playlist` |
-| Modos de warp | `Tiempos`, `Tonos`, `Textura` y `Complejo` en `Configuración del canal › Time stretch` |
+| Modos de warp | `Tiempos`, `Tonos`, `Textura` y `Complejo` en `Configuración del canal › Estirar el tiempo` |
 | Simpler, Sampler y racks de batería | Samplers de LYNX SHARE |
 | Set `.als` | Archivo de proyecto `.lynx` |
 
@@ -64,14 +64,14 @@ Las acciones siguientes se ejecutan tras un número de compases o de pasadas del
 | Grupos, retornos y envíos | Rutas de insert a insert |
 | Plugins VST2 y VST3 con su estado | |
 | Marcadores, y automatización de volumen, pan y tempo | |
-| La cuadrícula de clips, como clips de sesión y escenas | |
+| La cuadrícula de clips como clips de sesión y escenas, racks y Drum Racks | |
 
 Un informe tras la exportación lista lo que quedó fuera.
 
 ## Conviene saber
 
-- Los dispositivos propios de Live no se recrean. Los efectos propios de Live se descartan al importar.
-- Los Instrument Racks y los Audio Effect Racks entran con sus cadenas, zonas y macros. Los MIDI Effect Racks de Live todavía no se convierten y aparecen en el informe de importación.
+- Muchos de los dispositivos propios de Live entran como propios de LYNX SHARE, con sus ajustes y automatización: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift y Operator (sin FM). Los demás se descartan y se listan en el informe de importación.
+- Los Instrument Racks y los Audio Effect Racks entran con sus cadenas, zonas y macros, y un Drum Rack pasa a ser el Drum Rack de LYNX SHARE. Los MIDI Effect Racks de Live todavía no se convierten y aparecen en el informe de importación.
 - El informe de importación lista lo que quedó fuera.
 - Live recorta los clips de audio que se solapan en un set exportado.
 - Los marcadores de warp de un set de Live se conservan al importar y se escriben de nuevo al exportar.

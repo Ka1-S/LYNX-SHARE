@@ -1,5 +1,5 @@
 ---
-source: 2285f3e677
+source: d5cc625221
 ---
 ![クリップ起動レイアウト: プレイリストの横にシーン付きのクリップグリッドがある](/assets/img/cliplaunch.webp)
 
@@ -27,7 +27,7 @@ LYNX SHAREは、パターンワークフローで起動します。チャンネ�
 | フォローアクション | アクションAとアクションB。それぞれに確率を設定できる |
 | クリップ停止ボタン | 空のスロットに停止ボタンを付けられる |
 | アレンジメントに戻る | `プレイリストに戻る` |
-| ワープモード | `チャンネル設定 › Time stretch` の `拍`、`トーン`、`テクスチャ`、`コンプレックス` |
+| ワープモード | `チャンネル設定 › タイムストレッチ` の `拍`、`トーン`、`テクスチャ`、`コンプレックス` |
 | Simpler、Sampler、ドラムラック | LYNX SHAREのサンプラー |
 | `.als` セット | `.lynx` プロジェクトファイル |
 
@@ -64,14 +64,14 @@ LYNX SHAREは、パターンワークフローで起動します。チャンネ�
 | グループ、リターン、センド | インサートからインサートへのルート |
 | 状態を含むVST2とVST3のプラグイン | |
 | マーカーと、ボリューム、パン、テンポのオートメーション | |
-| クリップグリッド。セッションクリップとシーンになる | |
+| クリップグリッド。セッションクリップとシーンになる。ラックとDrum Rackも | |
 
 エクスポートのあとに出るレポートに、省かれたものが一覧で載ります。
 
 ## 知っておくと便利なこと
 
-- Live自身のデバイスは再現されません。Live標準のエフェクトは、読み込み時に外されます。
-- インストゥルメントラックとオーディオエフェクトラックは、チェーン、ゾーン、マクロごと読み込まれます。LiveのMIDI Effect Rackはまだ変換されず、インポートレポートに一覧で出ます。
+- Live標準のデバイスの多くは、設定とオートメーションごと、LYNX SHARE独自のものとして読み込まれます: EQ Eight、EQ Three、Channel EQ、Compressor、Glue Compressor、Multiband Dynamics、Limiter、Gate、Utility、Reverb、Delay、Echo、Auto Filter、Saturator、Overdrive、Chorus-Ensemble、Redux、Auto Pan、Drum Buss、Simpler、Drift、Operator (FMなし)。ほかは外され、インポートレポートに一覧で出ます。
+- Instrument RackとAudio Effect Rackは、チェーン、ゾーン、マクロごと読み込まれ、Drum RackはLYNX SHAREのDrum Rackになります。LiveのMIDI Effect Rackはまだ変換されず、インポートレポートに一覧で出ます。
 - 省かれたものは、読み込みレポートに一覧で載ります。
 - 書き出したセットでは、重なっているオーディオクリップをLiveがトリムします。
 - Liveのセットのワープマーカーは、読み込み時に保持され、エクスポート時に書き戻されます。

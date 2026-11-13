@@ -111,6 +111,9 @@ Ordered to get something usable as early as possible without ever breaking the a
 - [x] Racks (round 183c, `docs/analise/REA_rodada183c.md`): Audio Effect and Instrument Racks as a Patcher in rack mode,
       with chains, key / velocity / chain-select zones (Live's measured fade laws), chain volume / pan / solo, 16 macros
       with Map mode, variations, Randomize; LYNX's optional variation morph and launch glide; .als import / export
+- [x] Live's own devices onto LYNX's in .als import, with automation and macros (0.1.27, three lots)
+- [x] Drum Rack, Session mixer, scenes with tempo, Draw Mode, MIDI and Key Map Modes, Groove Pool (0.1.27)
+- [ ] FM Operator, Hybrid Reverb, Grain Delay, Spectral devices, Amp, Roar, Cabinet (dropped for now)
 - [ ] Standalone MIDI Effect Rack playing its child channels (decision R1: the engine routing is still open)
 - [ ] VST3 parameter mappings in .als racks (Live stores plain units and parameter ids)
 
@@ -119,4 +122,5 @@ Ordered to get something usable as early as possible without ever breaking the a
 - [x] DirectWave single-sample programs, rack level / pan / routes on the inserts
 - [x] Mute / solo, automation lanes and the effects as Pocket effects (0.1.26)
 - [x] MiniSynth, Transistor Bass, 3x Osc and GMSynth instruments (0.1.26)
+- [x] DW Sampler and Slicer on FLM's own engines, SuperSaw, more effects on FLM's engines, chord sets and key locker (0.1.27)
 - [ ] FL Studio Mobile's remaining instruments (they play LYNX's built-in synth for now)

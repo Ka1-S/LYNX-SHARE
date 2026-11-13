@@ -1,5 +1,47 @@
 [
   {
+    "version": "0.1.27-alpha",
+    "tag": "v0.1.27-alpha",
+    "date": "2026-11-14",
+    "url": "https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.27-alpha",
+    "title": "Effects closer to the originals, more of FL Studio, Session mixer and Drum Rack, a first-song tour",
+    "summary": "LYNX SHARE's reverbs, delays, modulation effects, dynamics and voice tools were refitted against the plugins they are modelled on, and projects saved earlier keep their sound. More of FL Studio's windows and menus are in, the Clip-launch workflow gains a Session mixer, a Drum Rack and map modes, many of Live's own devices now open from .als sets, FL Studio Mobile projects gain DW Sampler and Slicer, and the Simple workflow gets an Effects tab and a first-song tour. LYNX SHARE also has a new logo, by w3teal.",
+    "new": [
+      "**Effects closer to the originals**: Epoch Verb, Atrium, Foil Plate, Halo, Horizon and Nebula, Orbit, Spiral Echo, Lattice Mod, Gemini Doubler and Echoform have a measured law, and Sentry, Hush, Glow, Voice Shift and Quell gained controls measured on the plugins they are modelled on. Orbit's tail score went from 6.32 to 8.27 and Nebula's from 5.84 to 8.43 (out of 10). New instances use the measured law; projects and presets saved earlier load the classic one and sound exactly as before.",
+      "**Remote control settings**, as in FL Studio: right-click a control › Link to controller... opens the window with the port, channel, controller, the mapping formula, smoothing and FL's Mode list, for knobs, notes and buttons. Automation clips have FL's 13 curve modes per point, and the Piano roll gains Limit, Scale levels, Flip and Randomize tools.",
+      "**Edison** on a mixer slot, as in FL Studio: it records now, on input or on play, keeps recording with its window closed and comes in from FL projects with its audio. Tools › One-click audio recording records into Edison or the Playlist.",
+      "**The Sampler page in FL Studio's layout**: Content, Playback with loop points, ping pong and start offset, Time stretching, Precomputed effects with crossfade and trim, and the waveform. LYNX SHARE's own controls are in a last box. (#156)",
+      "**Session mixer and Drum Rack** (Clip-launch workflow): under the clip grid each track has its input, sends, track delay and volume, as in Live. A Drum Rack has 16 pads, choke groups and return chains; Live sets bring theirs in as one Drum Rack, and .als export writes it.",
+      "**Scenes, Draw Mode and map modes** (Clip-launch workflow): duplicate, capture and insert scenes, give a scene its own tempo and time signature, record into clip slots, draw automation in steps (B), and link MIDI controls or computer keys to clips, scenes and knobs with MIDI and Key Map Modes (Ctrl+M / Ctrl+K). Browser colour collections and hot-swap (Q) are there too.",
+      "**Live's own devices** open from .als sets as LYNX SHARE's own, with their settings and automation: EQ Eight, EQ Three, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Drum Buss and more, plus Simpler, Drift and Operator without FM. Several were fitted to Live's own renders.",
+      "**FL Studio Mobile (.flm)**: DW Sampler and Slicer play on FL Studio Mobile's own engines, nine more effects come in on its own engines, instrument, pitch bend and controller lanes become automation, and chord sets and the key locker become the project's chords and key.",
+      "**Simple workflow**: a track dock with an Effects tab (eight one-knob effects, 22 chain presets and a Blend knob), an Instrument tab, a Keyboard tab with Scale keys and a Chord pad, and an Editor tab with the Piano roll. Loops follow the project key. A Welcome screen offers a seven-step first-song tour and two new demo songs, Late Bus and Sunrise.",
+      "**Lyrics and notes, Reference match and Clean voice** (in every layout): write lyrics beside the Playlist, match the Master's tone and loudness to a reference track, and put a ready voice chain on a track."
+    ],
+    "better": [
+      "**Apex Limiter**: with True peak on, the output now stays under the ceiling at every oversampling setting (it could go up to 2.85 dB over), and the true-peak meters read within 0.03 dB. The Finish dock's Master looks now stay under −1 dBTP.",
+      "**Playback as in FL Studio**: a later clip of the same pattern takes over from an earlier one (#158), and when two notes of the same key overlap, each note's end stops only its own voice.",
+      "**FL Studio menus**: the audio clip menu in FL's two columns, the channel's Levels adjustment (read from and written to .flp), Track mode › Audio track with the list of mixer tracks (thanks to scottholdren), instrument tracks, the multilink menu, plugin A/B states and more of FL's settings.",
+      "**Gross Beat** slots can be triggered by MIDI notes and its Smooth points follow FL's curve. **Pitcher**'s MIDI mode and Harmonize take notes from its MIDI port.",
+      "**Stand-ins**: a project that uses a missing drum gate or a G3-style bus compressor opens with a closer LYNX SHARE effect.",
+      "**New logo**, by w3teal, in the app, the installers, the website and the Store."
+    ],
+    "fixed": [
+      "The metronome count-in and its length were not saved, a recording could land on another mixer insert than the one chosen, and a VST3 knob moved by a MIDI controller did not move in the plugin's window. (#152)",
+      "Spectral Compressor and other plugins with a sidechain input crashed LYNX SHARE. On Linux and macOS a plugin that crashes while it plays is now switched off and LYNX SHARE keeps going. (#155)",
+      "Searching for missing files, such as a SoundFont on a slow disk, could freeze the window. (#159)",
+      "After an edit, every Piano roll note of a Fruity Slicer played the same slice. (#160)",
+      "Find similar samples could wait a long time for an answer on a busy computer."
+    ],
+    "known": [
+      ".als export writes Drum Racks, but no Live has opened one yet. Live's devices with no LYNX SHARE equivalent (Hybrid Reverb, Grain Delay, Amp, Roar, FM Operator patches and others) are dropped on import and listed.",
+      "Some of Live's device settings follow assumed laws that have not been checked against Live yet, and a converted Live Reverb's wet signal is louder than Live's.",
+      "A 6/8 scene plays a three-beat bar.",
+      "The crash guard on Linux and macOS does not cover a plugin that crashes while opening its editor, loading a preset or on its own threads.",
+      "In FL Studio Mobile projects most DirectWave samples are not available, so most programs play a LYNX SHARE stand-in."
+    ]
+  },
+  {
     "version": "0.1.26-alpha",
     "tag": "v0.1.26-alpha",
     "date": "2026-11-12",

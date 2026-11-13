@@ -1,5 +1,5 @@
 ---
-source: 1e4bc038df
+source: b6e9ef0dd0
 ---
 ![De Mixer](/assets/img/mixer.webp)
 
@@ -51,6 +51,18 @@ Het effectenpaneel toont de tien slots van de geselecteerde insert.
 - `Groeperen in audio-effectrack` in het menu van het slot zet het effect in een nieuw rack, en `Alles groeperen in audio-effectrack` doet dat voor de hele keten. `Groep opheffen` zet de effecten van een rack met één keten terug in de slots.
 - De schakelaar in de kop van het paneel zet alle effecten van de insert aan of uit.
 - Je kunt een effect uit de Plugindatabase van de [Browser](/wiki/browser/) naar een insert of een effectslot slepen.
+- `Heldere stem` in het insertmenu zet een kant-en-klare ketting voor het opschonen van zang op de insert.
+
+## Edison in een slot
+
+Edison, de audio-editor en recorder, kan in elk effectslot zitten, meerdere per insert. Zijn venster is de audio-editor met een rij opnameregelaars.
+
+- `Audio-editor openen` (`Ctrl+E`) in het insertmenu laadt Edison in het eerste lege slot van de insert en opent hem. `Audio-editor openen en opnemen` (`Shift+E`) laadt hem klaar om op te nemen wanneer de song speelt.
+- De opnamemodi zijn `Nu`, `Bij ingang` (de standaard: hij wacht tot de ingang een drempel passeert), `Ingang` en `Bij afspelen`. `Toevoegen` zet een nieuwe opname na de audio die er al staat. De maximale opnameduur is `Onbeperkt` of 1, 3, 5, 10, 30 of 60 minuten: een nieuw slot start op 30, `Audio-editor openen en opnemen` zet 5.
+- `Sync` speelt de audio van Edison op de tijd van de song terwijl de song speelt.
+- Edison blijft opnemen nadat je zijn venster sluit.
+- `Extra › Macro's › Alle Edison-instanties verwijderen` leegt na een vraag elk Edison-slot in het project.
+- Edison-slots in FL Studio-projecten (.flp) openen met hun audio.
 
 ## Insert-EQ
 
@@ -78,6 +90,8 @@ Mixergroepen vouw je in met hun pijltje (of `Alt`+klik voor alle groepen). Een V
 
 Elke insert heeft een opname-armknop. Met een gearmde insert nemen Rec en Play zijn audio-ingang op in een Playlist-clip. `Shift+R` armt de geselecteerde insert en start de opname in één stap. Zie [Opnemen](/wiki/recording/).
 
+Wanneer je een externe ingang kiest voor een insert die ook andere audio opneemt, vraagt LYNX SHARE of hij moet omschakelen naar `Alleen externe ingang`, zodat de take alleen de ingang bevat. `Mixer › Opnemen naar schijf › Latentiecompensatie` in het insertmenu staat standaard aan. Wanneer het uit staat, worden opgenomen takes zonder enige latentiecompensatie geplaatst.
+
 ## Toetsen
 
 `Ctrl+L` en `Ctrl+Shift+L` hebben deze betekenis alleen als de Mixer de focus heeft.
@@ -92,6 +106,8 @@ Elke insert heeft een opname-armknop. Met een gearmde insert nemen Rec en Play z
 | Solo met bronnen | `Alt+S` | Zet de geselecteerde inserts en de inserts die ze voeden solo |
 | Inserts verwijderen | `Del` | Verwijdert de geselecteerde inserts, na een vraag |
 | Armen en opnemen | `Shift+R` | Armt de geselecteerde insert en start de opname |
+| Open audio editor | `Ctrl+E` | Laadt Edison in het eerste lege slot van de insert en opent hem |
+| Open audio editor and record | `Shift+E` | Hetzelfde, klaar om op te nemen wanneer de song speelt |
 
 ## Goed om te weten
 
@@ -100,6 +116,8 @@ Elke insert heeft een opname-armknop. Met een gearmde insert nemen Rec en Play z
 - `Ctrl+L` doet verschillende dingen in het Channel Rack en in de Mixer. In het rack kiest het vrije inserts. In de Mixer gebruikt het de geselecteerde insert.
 - De routeschakelaars verschijnen op de andere strips, niet op de geselecteerde.
 - De limiet is 127 inserts per project en tien effectslots per insert.
+- De opname van Edison wordt bewaard als WAV-bestand in de map van het project, niet in het projectbestand zelf.
+- De Sessiemixer onder het clipraster hoort alleen bij de Clip-launch-werkwijze. Hij toont dezelfde inserts als deze Mixer. Zie [Lay-outs](/wiki/layouts/).
 
 ## Gerelateerd
 

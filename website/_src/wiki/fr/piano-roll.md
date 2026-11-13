@@ -1,5 +1,5 @@
 ---
-source: 217f097c97
+source: a73763934f
 ---
 ![Le Piano Roll](/assets/img/pianoroll.webp)
 
@@ -69,6 +69,18 @@ Cliquez sur la règle pour fixer la position. `Ctrl`+glisser, glisser avec le cl
 ## Chance et plage de vélocité
 
 Chaque note a une Chance et une Plage de vélocité. La Chance indique la probabilité que la note joue à chaque passage. La Plage de vélocité laisse sa vélocité varier entre la vélocité de la note et cette vélocité plus la plage. Choisissez `Probabilité` ou `Plage de vélocité (LYNX)` dans la liste du couloir pour les éditer. `Outils › Probabilité (LYNX)` dans le menu du Piano Roll regroupe les notes sélectionnées de façon que toutes jouent ou qu'une seule joue, et propose `Réinitialiser probabilité et plage de vélocité`.
+
+## Outils de notes
+
+Le menu `Outils` du Piano roll ouvre les outils de notes de FL Studio sous forme de boîtes de dialogue. Ils agissent sur les notes sélectionnées, ou sur toutes les notes quand aucune n'est sélectionnée. Quelques-uns :
+
+| Outil | Touche | Ce qu'il fait |
+|---|---|---|
+| Limit | `Alt+K` | Déplace les notes par octaves dans une plage de touches, puis les limite. Sous `Restriction de tonalité / gamme`, il garde les notes sur une touche de base et l'un des accords ou l'une des gammes de FL Studio, avec `Magnétisme` réglé sur `Au-dessus`, `En dessous` ou `Alterner`. `Replier vers le haut / le bas` et `Transposer` règlent où vont les notes hors de la plage |
+| Flip | `Alt+Y` | `Inverser horizontalement` met les notes en miroir dans le temps. Avec `Conserver les temps de début`, activé au départ, les temps de début sont mis en miroir et les notes gardent leur durée. `Inverser verticalement` met les touches en miroir autour du milieu de leur plage |
+| Randomise | `Alt+R` | Changements aléatoires de vélocité, de pan, de hauteur fine, de timing et de durée, et de Mod X, Mod Y et release |
+| Scale levels | `Alt+X` | Met à l'échelle un niveau de note du début à la fin de la sélection, avec `Décalage`, `Centre` (la valeur autour de laquelle il met à l'échelle) et `Tension` |
+| LFO | `Alt+O` | Écrit une forme de LFO dans un niveau de note. Faites un clic droit sur un curseur `Période` pour une liste de 1 pas à 512 pas |
 
 ## Outils MIDI et scripts
 

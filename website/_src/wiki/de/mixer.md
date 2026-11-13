@@ -1,5 +1,5 @@
 ---
-source: 1e4bc038df
+source: b6e9ef0dd0
 ---
 ![Der Mixer](/assets/img/mixer.webp)
 
@@ -51,6 +51,18 @@ Der Effektbereich zeigt die zehn Slots des gewählten Inserts.
 - `In Audio-Effekt-Rack gruppieren` im Menü des Slots legt den Effekt in ein neues Rack, und `Alle in Audio-Effekt-Rack gruppieren` tut das für die ganze Kette. `Gruppierung aufheben` legt die Effekte eines Racks mit einer Kette wieder in die Slots.
 - Der Schalter in der Kopfzeile des Bereichs schaltet alle Effekte des Inserts ein oder aus.
 - Du kannst einen Effekt aus der Plugin-Datenbank des [Browsers](/wiki/browser/) auf ein Insert oder einen Effekt-Slot ziehen.
+- `Klare Stimme` im Insert-Menü legt eine fertige Kette zur Gesangsbereinigung auf den Insert.
+
+## Edison in einem Slot
+
+Edison, der Audioeditor und Recorder, kann in jedem Effekt-Slot sitzen, mehrere pro Insert. Sein Fenster ist der Audioeditor mit einer Reihe von Aufnahme-Reglern.
+
+- `Audio-Editor öffnen` (`Ctrl+E`) im Insert-Menü lädt Edison in den ersten leeren Slot des Inserts und öffnet ihn. `Audio-Editor öffnen und aufnehmen` (`Shift+E`) lädt ihn aufnahmebereit, sobald der Song spielt.
+- Die Aufnahmemodi sind `Jetzt`, `Bei Eingang` (der Standard: er wartet, bis der Eingang eine Schwelle überschreitet), `Eingang` und `Bei Wiedergabe`. `Anhängen` setzt eine neue Aufnahme hinter das bereits vorhandene Audio. Die maximale Aufnahmezeit ist `Unbegrenzt` oder 1, 3, 5, 10, 30 oder 60 Minuten: Ein neuer Slot startet bei 30, `Audio-Editor öffnen und aufnehmen` setzt 5.
+- `Sync` spielt das Audio von Edison zur Songzeit, während der Song spielt.
+- Edison nimmt weiter auf, nachdem du sein Fenster geschlossen hast.
+- `Tools › Makros › Alle Edison-Instanzen entfernen` leert nach einer Rückfrage jeden Edison-Slot im Projekt.
+- Edison-Slots in FL-Studio-Projekten (.flp) öffnen sich mit ihrem Audio.
 
 ## Insert-EQ
 
@@ -78,6 +90,8 @@ Mixer-Gruppen klappst du mit ihrem Pfeil ein (oder mit `Alt`+Klick alle Gruppen)
 
 Jedes Insert hat einen Button zum Scharfschalten der Aufnahme. Ist ein Insert scharf, nehmen Rec und Wiedergabe seinen Audioeingang in einen Playlist-Clip auf. `Shift+R` schaltet das gewählte Insert scharf und startet die Aufnahme in einem Schritt. Siehe [Aufnahme](/wiki/recording/).
 
+Wählst du für einen Insert einen externen Eingang, der auch anderes Audio aufnimmt, fragt LYNX SHARE, ob er auf `Nur externer Eingang` umgeschaltet werden soll, damit die Aufnahme nur den Eingang enthält. `Mixer › Aufnahme auf Festplatte › Latenzausgleich` im Insert-Menü ist standardmäßig an. Ausgeschaltet, werden aufgenommene Takes ganz ohne Latenzausgleich platziert.
+
 ## Tasten
 
 `Ctrl+L` und `Ctrl+Shift+L` haben diese Bedeutung nur, solange der Mixer den Fokus hat.
@@ -92,6 +106,8 @@ Jedes Insert hat einen Button zum Scharfschalten der Aufnahme. Ist ein Insert sc
 | Solo mit Quellen | `Alt+S` | Schaltet die gewählten Inserts und die Inserts solo, die sie speisen |
 | Inserts löschen | `Del` | Löscht die gewählten Inserts, nach einer Nachfrage |
 | Scharfschalten und aufnehmen | `Shift+R` | Schaltet das gewählte Insert scharf und startet die Aufnahme |
+| Audio-Editor öffnen | `Ctrl+E` | Lädt Edison in den ersten leeren Slot des Inserts und öffnet ihn |
+| Audio-Editor öffnen und aufnehmen | `Shift+E` | Dasselbe, aufnahmebereit, sobald der Song spielt |
 
 ## Gut zu wissen
 
@@ -100,6 +116,8 @@ Jedes Insert hat einen Button zum Scharfschalten der Aufnahme. Ist ein Insert sc
 - `Ctrl+L` macht im Channel Rack und im Mixer Unterschiedliches. Im Rack wählt es freie Inserts. Im Mixer nutzt es das gewählte Insert.
 - Die Routing-Schalter erscheinen auf den anderen Streifen, nicht auf dem gewählten.
 - Das Limit sind 127 Inserts pro Projekt und zehn Effekt-Slots pro Insert.
+- Die Aufnahme von Edison wird als WAV-Datei im Ordner des Projekts gespeichert, nicht in der Projektdatei.
+- Der Session-Mixer unter dem Clip-Raster gehört nur zum Clip-Start-Arbeitsablauf. Er zeigt dieselben Inserts wie dieser Mixer. Siehe [Layouts](/wiki/layouts/).
 
 ## Siehe auch
 

@@ -20,7 +20,7 @@
 <p>這個檔案是 FL Studio 2026 專案。取樣器、音訊片段、FL 自己的產生器和效果器、第三方外掛（在 Fruity Wrapper 內）、樣式、播放清單、混音器和自動化，都會連同設定一起轉過去。報告會列出哪些完全照原樣轉出，哪些被算繪、取代或略過。</p>
 <h2 id="fl-studio-mobile-flm">FL Studio Mobile (.flm)</h2>
 <p><code>檔案 › 開啟...</code> 也能開啟 <code>.flm</code> 專案。匯入是部分的。</p>
-<ul><li>會匯入：速度、拍號、每個 FLM 通道一條混音器插入軌、每條車道一條播放清單軌道、樣式（每次循環作為一個片段）、帶有位移和音高的音訊片段、鼓組、DW Sampler 取樣（作為取樣器）、<code>.dwp</code> 程式（在 DirectWave 中）、MiniSynth、Transistor Bass、3x Osc 和 GMSynth 樂器、FLM 的效果器（作為 Pocket 效果器），以及音量、聲像、靜音、獨奏、彎音和傳送的自動化。</li><li>不會匯入：FLM 的其他樂器，它們會改用內建合成器播放。</li><li>取樣會在 <code>.flm</code> 旁邊以及 FL Studio 的 FLM 資源副本中尋找。找不到的 <code>.dwp</code> 會用替身播放。</li></ul>
+<ul><li>會匯入：速度、拍號、每個 FLM 通道一條混音器插入軌、每條車道一條播放清單軌道、樣式（每次循環作為一個片段）、帶有位移和音高的音訊片段、鼓組、DW Sampler 取樣和 <code>.dwp</code> 程式與 Slicer（用 FLM 自己的引擎）、MiniSynth、Transistor Bass、3x Osc、GMSynth 和 SuperSaw 樂器、FLM 的效果器（作為 Pocket 效果器），以及音量、聲像、靜音、獨奏、彎音、傳送和樂器參數的自動化，還有和弦組和調性鎖定。</li><li>不會匯入：FLM 的其他樂器，它們會改用內建合成器播放。</li><li>取樣會在 <code>.flm</code> 旁邊以及 FL Studio 的 FLM 資源副本中尋找。找不到的 <code>.dwp</code> 會用替身播放。</li></ul>
 <h2 id="good-to-know">須知</h2>
 <ul><li>FLEX 套件是加密的，絕不會被開啟。FLEX 通道會得到依預設集名稱挑選的合成器音色。</li><li>調變器不會出現在 <code>.flp</code> 匯出中，匯出報告會說明這一點。</li><li>匯入報告會列出哪些由內建合成器近似處理、哪些沒有對應物、哪些外掛找到了或沒有安裝、哪些效果器被略過或只重現了一部分，以及缺少多少取樣。</li><li>沒有安裝的第三方效果器，會由角色相同的 LYNX SHARE 效果器取代。原外掛仍保留在專案中。</li></ul>
 <h2 id="related">相關頁面</h2>

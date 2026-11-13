@@ -1,5 +1,5 @@
 ---
-source: b4f9b5e040
+source: e15b0e3ba5
 ---
 ![Der Clip-Start-Arbeitsablauf: links ein Raster aus Clips und Szenen, rechts die Auswahl und die Playlist](/assets/img/cliplaunch.webp)
 
@@ -23,6 +23,9 @@ Der Pattern-Arbeitsablauf besteht aus Channel Rack, Patterns und Playlist. Der C
 - Beim ersten Mal ist das Channel Rack ausgeblendet. `F6` oder sein Button in der Werkzeugleiste zeigt es.
 - Die Automationsspuren der Playlist sind eingeschaltet.
 - Das Fensterlayout wird pro Stil gespeichert, sodass jeder Stil so zurückkommt, wie du ihn verlassen hast.
+- Unter dem Raster zeigt oder verbirgt die Schaltfläche `Mixer` den Session-Mixer, wie in Ableton Live: `Ein/Aus` (`Audio von`, `Monitor`, `Audio an`), `Sends`, `Spurverzögerung` und pro Spur die Lautstärke mit ihrem Aktivator, Solo, Aufnahme-Taste und Meter, dazu den Streifen `Haupt`.
+- `Grooves` unter dem Raster zeigt den Groove Pool. `Groove auf Noten anwenden` schreibt einen Groove in die Noten eines MIDI-Clips.
+- Die Schaltflächen `MIDI` und `Tonart` starten den MIDI Map Mode und den Key Map Mode. Siehe [MIDI-Controller](/wiki/midi-controllers/).
 
 ## Das Raster
 
@@ -41,6 +44,8 @@ Klicke mit rechts auf einen Clip für seine Einstellungen.
 
 Klicke mit rechts auf einen leeren Slot für `Stopp-Taste (eine Szene stoppt diese Spur hier)`. Ein Klick auf das Quadrat links von einem leeren Slot hält diese Spur an. Klicke mit rechts auf eine Szene für `Szene einfügen`, `Szene darunter hinzufügen`, `Szene löschen`, `Szene umbenennen...` und das Tempo der Szene.
 
+Clips lassen sich über ihr Menü ausschneiden, kopieren, einfügen und duplizieren (`Ctrl+D`) und zwischen Slots sowie zur oder von der Playlist ziehen. Ein Pattern oder ein Sample, das du aus dem Browser ziehst, oder Audiodateien, die du von außen ablegst, füllen den Slot, auf dem sie landen. Das Menü einer Szene hat außerdem `Duplizieren` und `Szene aufnehmen und einfügen`, das die gerade spielenden Clips in eine neue Szene legt. `Ansicht › Tempo und Taktart der Szenen` zeigt für jede Szene ein Tempo und eine Taktart.
+
 Das Slot-Menü hat außerdem zwei Optionen für das ganze Raster: `Spuren beim Stoppen des Transports an die Playlist zurückgeben` und `Folgeaktionen im gesamten Raster`.
 
 | Befehl | Taste | Was er tut |
@@ -49,10 +54,17 @@ Das Slot-Menü hat außerdem zwei Optionen für das ganze Raster: `Spuren beim S
 | Clip starten | `Enter` | Startet den gewählten Clip |
 | Szene starten | `Ctrl+Enter` | Startet die gewählte Szene |
 | Clip löschen | `Del` | Leert den gewählten Slot |
+| Zeichenmodus | `B` | Ein Ziehen in einer Automationsspur zeichnet Stufen in Rasterbreite oder freihändig bei ausgeschaltetem Einrasten oder gehaltener `Alt`-Taste, wie in Ableton Live. Auch unter `Optionen` |
 
 ## Ableton-Live-Sets
 
 Öffnest du ein Live-Set, kommen dessen Session-Clips und Szenen mit ihren Start-Einstellungen ins Clip-Raster. `Datei › Exportieren › Ableton-Live-Set (.als)` schreibt das Raster als Session-Clips zurück. Unter `Optionen › Allgemeine Einstellungen` gibt es `Session-Clips aus Live-Sets`, wo `Playlist, nach dem Arrangement` sie stattdessen in die Playlist legt.
+
+## Der Einfache Arbeitsablauf
+
+`Ansicht › Layout-Stil › Einfacher Arbeitsablauf` ist ein Fenster mit den Spuren und der Zeitleiste, für einen ersten Song. `Ansicht › Spur-Dock` zeigt unter der Zeitleiste ein Dock für die gewählte Spur, mit den Tabs `Effekte`, `Instrument`, `Tastatur` und `Editor`. In diesem Arbeitsablauf hat das Menü `Hilfe` die Einträge `Tour zum ersten Song` und `Willkommensbildschirm...`, die einen ersten Song in sieben Schritten, einen Demo-Song oder ein leeres Projekt anbieten. Siehe [Einfaches Layout](/wiki/simple-layout/).
+
+`Text und Notizen` und `Referenzabgleich...` im Menü `Ansicht` sowie `Klare Stimme` im Menü eines Mixer-Inserts gibt es in jedem Layout. Im Einfachen Arbeitsablauf ist `Klare Stimme` auch im Menü einer Spur zu finden.
 
 ## Zurückwechseln
 
@@ -61,7 +73,8 @@ Wähle `Ansicht › Layout-Stil › Pattern-Arbeitsablauf (Standard)`. Das Fenst
 ## Gut zu wissen
 
 - Eine Spur, die einen Clip gestartet hat, bleibt in der Playlist stumm, bis du `Zurück zur Playlist` drückst. Die Option `Spuren beim Stoppen des Transports an die Playlist zurückgeben` erledigt das bei jedem Stopp für dich.
-- In 0.1.25 wird ein Slot über sein Menü oder per Doppelklick gefüllt. Einen Clip oder eine Datei in einen Slot zu ziehen geht nicht.
+- Die neuen Tasten des Rasters (`B`, `Q`, `Ctrl+M`, `Ctrl+K` und andere) wirken nur im Clip-Start-Arbeitsablauf so. Im Pattern-Arbeitsablauf behalten sie die Bedeutung von FL Studio.
+- Eine Szene in 6/8 spielt einen Takt aus drei Schlägen, weil der Takt Viertelnoten zählt.
 - Follow Actions gibt es für Clips, nicht für Szenen.
 - Automationsspuren, die du im Clip-Start-Arbeitsablauf von Hand eingeschaltet hast, bleiben beim Zurückwechseln nicht erhalten.
 - Ist der Pattern-Arbeitsablauf gewählt, wird vom Raster nichts geladen.

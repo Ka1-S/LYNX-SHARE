@@ -1,5 +1,5 @@
 ---
-source: a06504f3a0
+source: d2bebc77b1
 ---
 ![Halaman MIDI di pengaturan: perangkat input, perangkat output dengan sinkronisasi master, dan sinkronisasi eksternal](/assets/img/wiki/settings-midi.webp)
 
@@ -36,7 +36,9 @@ Tautan ini disimpan bersama proyek. Untuk menghapusnya, klik kanan kontrolnya la
 
 | Perintah | Tombol | Fungsinya |
 |---|---|---|
-| `Override global link...` | tidak ada | Membuat tautan yang berlaku di setiap proyek. Disimpan di pengaturan, bukan di proyek |
+| `Tautkan ke kontroler...` | tidak ada | Membuka jendela `Pengaturan kontrol jarak jauh` untuk kontrol itu, tempat kamu melihat dan mengatur tautannya secara manual (di bawah) |
+| `Timpa tautan global...` | tidak ada | Membuat tautan yang berlaku di setiap proyek. Disimpan di pengaturan, bukan di proyek |
+| `Timpa tautan global... (untuk semua proyek: gerakkan knob pada kontroler)` | tidak ada | Membuat tautan global dalam satu langkah: gerakkan kontrol hardware berikutnya. Item tanpa tanda kurung membuka jendela `Pengaturan tautan global` |
 | `Hapus tautan global` | tidak ada | Menghapusnya lagi |
 | `Multilink ke kontroler` | `Ctrl+J` | Selama aktif, kontrol yang kamu gerakkan ditautkan, berurutan, ke kontrol hardware yang kamu gerakkan berikutnya. Ada di menu `Opsi` |
 | `Pickup (mode takeover)` | tidak ada | Ada di halaman MIDI. Kontroler baru menggerakkan parameter setelah mencapai nilainya saat ini, jadi tidak ada yang melompat |
@@ -44,6 +46,22 @@ Tautan ini disimpan bersama proyek. Untuk menghapusnya, klik kanan kontrolnya la
 Halaman MIDI mencantumkan tautan di bawah `Tautan (proyek ini, lalu global)`. Perangkat yang `Jenis kontroler`-nya `Pengontrol generik` hanya melakukan apa yang kamu tautkan sendiri.
 
 Parameter plugin pihak ketiga dijangkau lewat `Otomasikan parameter plugin` di menu channel atau menu slot efek. Setiap parameter di sana punya item tautan yang sama. Lihat [Otomasi](/wiki/automation/).
+
+## Pengaturan kontrol jarak jauh
+
+`Tautkan ke kontroler...` membuka jendela ini, seperti di FL Studio. `Pengaturan tautan global` (dari `Timpa tautan global...`) punya kolom yang sama kecuali daftar tautan, `Omni`, kontroler internal, dan `Hapus konflik`. Klik ganda pada sebuah tautan di daftar halaman MIDI juga membukanya.
+
+| Pengaturan | Fungsinya |
+|---|---|
+| `Port`, `Channel`, `Ctrl` | Nomor port input MIDI, channel MIDI, dan nomor kontroler. Klik kanan `Ctrl` untuk kontroler standar menurut namanya. `Not C0` di daftar itu membuat tautan not: naikkan nomornya dari situ untuk tuts lain |
+| `Deteksi otomatis` | Menyala secara bawaan. Gerakkan sebuah kontrol di perangkatmu dan nomornya terisi |
+| `Omni` | Tautan mengikuti channel terpilih, atau untuk efek di slot mixer, track mixer terpilih |
+| `Mode` | Cara kerja tautan not atau tombol. `Bawaan` dan `Hold` mengikuti tuts: velocity-nya selama ditahan, nol saat dilepas. `Latch` berpindah antara kedua ujung pada setiap penekanan. `Inc` menaikkan nilai satu langkah pada setiap penekanan. `Tetap` mengatur velocity dan mempertahankannya setelah dilepas |
+| Kontroler internal | Menautkan kontrol ke salah satu kontroler internal proyek sebagai gantinya. Hanya tampil bila proyek punya kontroler internal. `Rekam otomasi` membiarkan gerakan kontroler itu direkam sebagai otomasi |
+| `Rumus pemetaan` | Bagaimana input dipetakan ke kontrol, dengan variabel `Input`. `Preset` berisi daftar rumus FL. Tekan `Enter` untuk menerapkan rumus yang kamu ketik. Kurva di sampingnya menunjukkan hasilnya |
+| `Penghalusan` | Menghaluskan gerakan kontrol. `Waktu` mengatur berapa lama: 1 pole untuk nilai negatif, 3 pole untuk nilai positif |
+| `Hapus konflik` | Menyala secara bawaan. Menghapus tautan lain yang memakai kontroler yang sama saat kamu klik `Terima`. Berubah merah selama ada tautan seperti itu |
+| `Reset`, `Lewati`, `Terima` | `Terima` menyimpan tautan (satu langkah undo). Jika beberapa kontrol diantrekan oleh multilink, `Lewati` pindah ke kontrol berikutnya |
 
 ## Profil kontroler
 
@@ -79,6 +97,16 @@ MPE masih di tahap pertama. Kontroler MPE memainkan tiap not dengan pitch bend, 
 - Dari instrumen bawaan, Sampler dan synth bawaan mengikuti nilai-nilai ini.
 - Plugin pihak ketiga menerima MPE saat `MPE` menyala di bawah `MIDI` pada `Pengaturan wrapper` jendela plugin. Tiap not lalu keluar di channel MIDI-nya sendiri, 2 sampai 16.
 - Belum dicoba dengan kontroler MPE sungguhan.
+
+## MIDI Map Mode dan Key Map Mode
+
+Dalam [alur kerja Clip-launch](/wiki/layouts/), clip, scene, dan tombol bisa dipetakan seperti di Ableton Live. Tombol `MIDI` dan `Kunci nada` di samping sakelar `Keduanya`, `Grid`, `Song` menyalakan mode ini, begitu juga `Ctrl+M` dan `Ctrl+K`.
+
+1. Tekan `Ctrl+M` untuk MIDI Map Mode, atau `Ctrl+K` untuk Key Map Mode. Setiap elemen yang bisa dipetakan diberi warna, biru untuk MIDI dan oranye untuk tuts.
+2. Klik sebuah elemen: slot clip, scene, tombol stop sebuah track, `Hentikan semua klip`, play, stop, record, `Rekaman Sesi`, metronom, atau knob di mixer Session atau Device View.
+3. Gerakkan kontrol atau tekan tuts di perangkat MIDI-mu, atau tekan tombol komputer di Key Map Mode. Elemen menampilkan penetapannya, misalnya `1/19` (channel dan kontroler).
+4. Pemetaan dicantumkan sebagai ganti Browser: Channel, Note/Control atau Key, Path, Name, Min, dan Max. Seret Min atau Max, atau klik ganda untuk mengetik nilai. Klik kanan sebuah baris untuk `Balik rentang` dan `Delete`.
+5. Tekan tombol yang sama lagi untuk mengakhiri mode.
 
 ## Keyboard ketik
 
@@ -116,6 +144,8 @@ MPE masih di tahap pertama. Kontroler MPE memainkan tiap not dengan pitch bend, 
 - MIDI CC, channel aftertouch, dan pitch bend yang dikirim ke plugin bisa diotomasi dengan `Otomasikan kontroler MIDI (CC, aftertouch, pitch bend)`.
 - Not yang ditahan pedal direkam sampai saat pedal dilepas.
 - Clip otomasi tidak mengambil kembali kontrol saat kamu menggerakkannya dari kontroler. Kontrol mengikuti otomasinya lagi saat pemutaran dimulai berikutnya.
+- Tautan not yang dibuat di `Pengaturan kontrol jarak jauh` tidak ditulis ke ekspor .flp.
+- `Ctrl+M` dan `Ctrl+K` memulai mode peta hanya dalam alur kerja Clip-launch. Map Mode belum punya pemetaan makro atau rentang not.
 
 ## Terkait
 

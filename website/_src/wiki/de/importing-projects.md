@@ -1,5 +1,5 @@
 ---
-source: bcd8a275bd
+source: 358890815a
 ---
 `Datei › Öffnen...` (`Ctrl+O`) öffnet die eigenen `.lynx`-Projekte von LYNX SHARE und außerdem `.flp`-, `.als`-, `.flm`- und `.mid`-Dateien. Ein Projekt aus einem anderen Programm ist ein Import: Es wird zu einem neuen, ungespeicherten LYNX-SHARE-Projekt, und die Originaldatei wird nie beschrieben.
 
@@ -16,8 +16,8 @@ source: bcd8a275bd
 | Format | Umgewandelt | Nicht umgewandelt |
 |---|---|---|
 | `.flp` (FL Studio) | Kanäle, Samples, Patterns, Slide- und Porta-Noten, jedes Arrangement, Marker, Taktartwechsel, Automation, Controller-Verknüpfungen, der Mixer mit Routing, Sidechains, Spur-EQ und native Effekte | FLEX-Packs sind verschlüsselt und werden nie geöffnet. Ein FLEX-Kanal bekommt einen Synth-Patch, der nach seinem Preset-Namen gewählt wird |
-| `.als` (Live 11 und 12) | MIDI-, Audio-, Gruppen- und Return-Spuren, Tempo, Taktart, Locators, der Loop, Lautstärke, Pan, Mute, Solo und Sends mit ihrer Automation, Session-Clips und Szenen, Warp-Marker | Die eigenen Effekte von Live fallen weg. Racks behalten nur ihre erste Kette. Simpler, Sampler und Drum Racks werden zu Samplern von LYNX SHARE |
-| `.flm` (FL Studio Mobile) | Tempo, Taktart, ein Mixer-Insert pro Kanal, eine Playlist-Spur pro Automationsspur, Patterns, Audioclips mit Offset und Tonhöhe, Drum-Kits, DW-Sampler-Samples und `.dwp`-Programme | Die Effekte und Automationsspuren von FLM. Andere FLM-Generatoren spielen den eingebauten Synth |
+| `.als` (Live 11 und 12) | MIDI-, Audio-, Gruppen- und Return-Spuren, Tempo, Taktart, Locators, der Loop, Lautstärke, Pan, Mute, Solo und Sends mit ihrer Automation, Session-Clips und Szenen, Warp-Marker, Racks und Drum Racks sowie viele der eigenen Devices von Live (EQ Eight, Compressor, Glue Compressor, Reverb, Delay, Auto Filter, Saturator, Utility, Simpler, Drift und mehr) als die von LYNX SHARE | Devices von Live ohne Entsprechung in LYNX SHARE (Hybrid Reverb, Grain Delay, Amp, Roar, FM-Operator-Patches und andere) entfallen und werden aufgelistet. MIDI-Effect-Racks werden nicht umgewandelt |
+| `.flm` (FL Studio Mobile) | Tempo, Taktart, ein Mixer-Insert pro Kanal, eine Playlist-Spur pro Spur, Patterns, Audioclips mit Offset und Tonhöhe, Drum-Kits, DW Sampler und `.dwp`-Programme, der Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth und SuperSaw, die Effekte, die Automation und die Akkordsets | Andere FLM-Generatoren spielen den eingebauten Synth |
 | `.mid` | Noten, Taktarten und jeder Tempowechsel | Eine MIDI-Datei enthält keine Klänge: Kanäle bekommen den LYNX-SHARE-Synth oder einen MIDI-Out-Kanal |
 
 Plugins von Drittanbietern (VST2, VST3 und CLAP in einer `.flp`, VST2 und VST3 in einer `.als`) laden mit ihrem gespeicherten Zustand, wenn dasselbe Plugin auf deinem Computer installiert ist.

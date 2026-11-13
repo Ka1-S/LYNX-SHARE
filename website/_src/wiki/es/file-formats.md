@@ -1,5 +1,5 @@
 ---
-source: c457d438ee
+source: a79e43f031
 ---
 LYNX SHARE guarda los proyectos como archivos `.lynx`. También abre proyectos de otros programas, carga los archivos de audio habituales y exporta audio, MIDI y proyectos para otros programas. La tabla lista todos los formatos de la 0.1.26 alpha.
 
@@ -20,8 +20,8 @@ Un proyecto abierto desde el formato de otro programa es una importación. Enton
 | `.zip` | `Archivo › Abrir...` lo extrae a una carpeta y abre el proyecto de dentro | `Archivo › Exportar › Proyecto con samples (.zip)...` | También abre el paquete de loops comprimido de FL Studio |
 | `.lynxpack` | Se abre tras un resumen. Una parte se fusiona con el proyecto del anfitrión | `Archivo › Sesión online › Enviar proyecto...` | Un proyecto o una parte enviados en una [sesión online](/wiki/online-sessions/). Las partes con plugins de terceros viajan como renders de audio más los ajustes del plugin |
 | `.flp` | `Archivo › Abrir...` | `Archivo › Exportar › Proyecto de FL Studio...`, un proyecto de FL Studio 2026 o un paquete de loops comprimido | Los plugins nativos suenan con motores recreados de exactitud variable. Los packs FLEX nunca se abren. Al exportar, los instrumentos y efectos exclusivos de LYNX se renderizan a audio o se cambian por el plugin de FL más cercano, y los moduladores se dejan fuera. Mira [Si vienes de FL Studio](/wiki/coming-from-fl-studio/) |
-| `.flm` | `Archivo › Abrir...` | No | Proyecto de FL Studio Mobile. Parcial: los instrumentos distintos de MiniSynth, Transistor Bass, 3x Osc, GMSynth y DirectWave suenan con el sintetizador integrado |
-| `.als` | `Archivo › Abrir...`, sets de Live 11 y 12 | `Archivo › Exportar › Set de Ableton Live (.als)...`, para Live 12 o Live 11 | Al importar, se descartan los efectos propios de Live. Al exportar, los instrumentos y efectos propios de LYNX SHARE no se convierten, y se descartan la automatización de parámetros de efectos y las rutas de insert a insert. Mira [Si vienes de Ableton Live](/wiki/coming-from-ableton/) |
+| `.flm` | `Archivo › Abrir...` | No | Proyecto de FL Studio Mobile. Parcial: los instrumentos distintos de MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, el Slicer y DirectWave suenan con el sintetizador integrado |
+| `.als` | `Archivo › Abrir...`, sets de Live 11 y 12 | `Archivo › Exportar › Set de Ableton Live (.als)...`, para Live 12 o Live 11 | Al importar, se descartan los dispositivos de Live sin equivalente en LYNX SHARE. Al exportar, los instrumentos y efectos propios de LYNX SHARE no se convierten, y se descartan la automatización de parámetros de efectos y las rutas de insert a insert. Mira [Si vienes de Ableton Live](/wiki/coming-from-ableton/) |
 | `.mid`, `.midi` | `Archivo › Abrir...` crea un proyecto nuevo. `Archivo › Importar › Archivo MIDI...` y el Piano Roll importan al actual | `Archivo › Exportar › Archivo MIDI...` (`Ctrl+Shift+M`) | |
 | `.wav` | Como sample o clip de audio | `Archivo › Exportar › Archivo WAV...`, 16 bits, 24 bits o 32 bits flotante | Dither, información de tempo, marcadores de bucle y marcadores de la Playlist opcionales |
 | `.mp3` | Como sample o clip de audio | `Archivo › Exportar › Archivo MP3...` | Bitrate constante |

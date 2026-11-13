@@ -1,5 +1,5 @@
 ---
-source: 0d51822a6b
+source: 094cbefd18
 ---
 ![Okno Nagrywanie pyta, co nagrywać: audio, nuty i automatykę, wszystko albo audio do edytora audio](/assets/img/wiki/record-dialog.webp)
 
@@ -16,6 +16,17 @@ Przycisk nagrywania w transporcie albo klawisz `R` włącza nagrywanie. Za pierw
 7. Naciśnij stop. Ujęcie to klip audio na Playliście.
 
 `Shift+R` robi kroki od 4 do 6 jednym klawiszem: uzbraja zaznaczony insert, nagrywa tylko audio i uruchamia odtwarzanie. Naciśnij go ponownie, żeby zatrzymać.
+
+Gdy wybierasz wejście dla insertu, który nagrywa więcej niż to wejście (nagrywane są też inne kanały wysyłające do niego), LYNX SHARE pyta, tak jak FL Studio, czy przełączyć na `Tylko wejście zewnętrzne`. Odpowiedz `Tak`, aby nagrać samo wejście na tym insercie.
+
+## Nagrywanie audio jednym kliknięciem
+
+`Narzędzia › Nagrywanie audio jednym kliknięciem` rozpoczyna ujęcie w jednym kroku, jak w FL Studio. Działa na wybranym insercie miksera. Gdy wybrany jest Master albo nic, bierze pierwszy insert z wejściem, a w razie braku wolny insert.
+
+| Polecenie | Co robi |
+|---|---|
+| `Do edytora/rejestratora audio Edison` | Umieszcza Edisona na insercie, ustawionego na nagrywanie od startu odtwarzania, i uruchamia odtwarzanie. Zobacz [Mixer](/wiki/mixer/) |
+| `Do playlisty jako klip audio` | Przełącza na tryb Song, uzbraja insert, pyta o jego wejście, jeśli go nie ma, i uruchamia nagrywanie oraz odtwarzanie. Inserty już uzbrojone nagrywają tak, jak są |
 
 ## Co oferuje okno Nagrywanie
 
@@ -59,7 +70,7 @@ Opcje są w `Opcje › Nagrywanie` i w menu prawego przycisku przycisku nagrywan
 
 | Polecenie | Klawisz | Co robi |
 |---|---|---|
-| `Odliczanie` | `Ctrl+P` | Wyłączone, 1 takt, 2 takty lub 4 takty metronomu przed startem nagrywania |
+| `Odliczanie` | `Ctrl+P` | Wyłączone, 1 takt, 2 takty lub 4 takty metronomu przed startem nagrywania. `Ctrl+P` przełącza między wyłączeniem a ostatnio wybraną długością. Wybór jest zachowywany po zamknięciu programu; nowa instalacja startuje z 1 taktem, jak FL Studio |
 | `Metronom` | `Ctrl+M` | Klik podczas odtwarzania |
 | `Czekaj na pierwszą nutę` | `Ctrl+I` | Nagrywanie czeka, aż zagrasz |
 | `Nagrywanie w pętli` | brak | Nagrywanie zapętla się zamiast iść dalej |
@@ -70,7 +81,17 @@ Opcje są w `Opcje › Nagrywanie` i w menu prawego przycisku przycisku nagrywan
 
 `Niska latencja podczas nagrywania` jest w menu prawego przycisku myszy przy przycisku nagrywania i w menu inserta Mixera w sekcji `Nagrywanie na dysk`. Domyślnie jest wyłączone. Gdy insert z wejściem jest uzbrojony albo jego monitoring ma wartość `Wł.`, efekty dodające latencję na drodze do Master są omijane. Zmienia to tylko to, co słyszysz: insert zachowuje wszystkie swoje efekty, gdy ujęcie jest pobierane po nich, na przykład przez `Po efektach`. Efekty wracają, gdy insert przestaje być uzbrojony.
 
+`Kompensacja opóźnienia` jest w tym samym menu `Nagrywanie na dysk` i jest domyślnie włączone, jak w FL Studio. Przesuwa każde ujęcie wstecz o czas podróży w obie strony urządzenia audio, wartość `Precyzyjna korekta (próbki)` z ustawień audio i kompensację opóźnienia pluginów. Wyłącz je, aby zachować ujęcia tam, gdzie zostały nagrane.
+
 `Narzędzia › Anuluj nagrywanie` wyrzuca to, co zapisał bieżący przebieg nagrywania (jego nuty, automatykę i ujęcia audio) i wyłącza nagrywanie. Odtwarzanie trwa dalej, a uzbrojone inserty zostają uzbrojone.
+
+## Nagrywanie do slotów klipów
+
+W [sposobie pracy Clip-launch](/wiki/layouts/) ujęcia mogą trafiać do siatki klipów zamiast na Playlistę, jak w Ableton Live.
+
+- Uzbrój ścieżkę jej przyciskiem uzbrojenia w Mikser sesji. Jej puste sloty pokazują wtedy okrągły przycisk nagrywania w miejscu kwadratu stop. Kliknij jeden, aby nagrywać do tego slotu.
+- `Nagrywanie sesji` pod siatką nagrywa uzbrojone ścieżki do wybranej sceny. Gdy ich klipy grają, nowe nuty są do nich dodawane (overdub).
+- `Stała długość nagrania` w menu pustego slotu kończy nagrywanie do slotu po 1 lub więcej taktach, a klip gra dalej. `Wył.` nagrywa, dopóki nie zatrzymasz.
 
 ## Nagrywanie w pętli i ujęcia
 

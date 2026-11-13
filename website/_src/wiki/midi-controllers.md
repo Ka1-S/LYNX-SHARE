@@ -38,7 +38,9 @@ The link is saved with the project. To remove it, right-click the control again 
 
 | Command | Key | What it does |
 |---|---|---|
+| `Link to controller...` | none | Opens the `Remote control settings` window for the control, where you see and set its link by hand (below) |
 | `Override global link...` | none | Makes a link that works in every project. It is kept in the settings, not in the project |
+| `Override global link... (for all projects: move a knob on the controller)` | none | Makes a global link in one step: move the hardware control next. The item without the brackets opens the `Global link settings` window instead |
 | `Remove global link` | none | Removes it again |
 | `Multilink to controllers` | `Ctrl+J` | While it is on, the controls you move are linked, in order, to the hardware controls you move next. It is in the `Options` menu |
 | `Pickup (takeover mode)` | none | On the MIDI page. A controller moves a parameter only after reaching its current value, so nothing jumps |
@@ -46,6 +48,22 @@ The link is saved with the project. To remove it, right-click the control again 
 The MIDI page lists the links under `Links (this project, then global)`. A device whose `Controller type` is `Generic controller` does only what you link by hand.
 
 A third-party plugin's parameters are reached through `Automate plugin parameter` in the channel's menu or the effect slot's menu. Each parameter there has the same link items. See [Automation](/wiki/automation/).
+
+## Remote control settings
+
+`Link to controller...` opens this window, as in FL Studio. `Global link settings` (from `Override global link...`) has the same fields except the link list, `Omni`, the internal controller and `Remove conflicts`. A double-click on a link in the MIDI page's list opens it too.
+
+| Setting | What it does |
+|---|---|
+| `Port`, `Channel`, `Ctrl` | The MIDI input port number, the MIDI channel and the controller number. Right-click `Ctrl` for the standard controllers by name. `Note C0` in that list makes a note link: turn the number up from there for another key |
+| `Auto detect` | On by default. Move a control on your device and the numbers are filled in |
+| `Omni` | The link follows the selected channel, or for an effect in a mixer slot, the selected mixer track |
+| `Mode` | How a note or button link acts. `Default` and `Hold` follow the key: its velocity while held, zero on release. `Latch` switches between the two ends on each press. `Inc` steps the value up on each press. `Stay` sets the velocity and keeps it after the release |
+| Internal controller | Links the control to one of the project's internal controllers instead. Shown only when the project has one. `Record automation` lets that controller's moves be recorded as automation |
+| `Mapping formula` | How the input maps to the control, with the variable `Input`. `Presets` has FL's list of formulas. Press `Enter` to apply a formula you typed. The curve beside it shows the result |
+| `Smoothing` | Smooths the control's moves. `Time` sets how long: 1 pole for negative values, 3 poles for positive ones |
+| `Remove conflicts` | On by default. Removes other links that use the same controller when you click `Accept`. It turns red while there is such a link |
+| `Reset`, `Skip`, `Accept` | `Accept` saves the link (one undo step). With several controls queued by multilink, `Skip` goes to the next one |
 
 ## Controller profiles
 
@@ -81,6 +99,16 @@ MPE is at a first stage. An MPE controller plays each note with its own pitch be
 - Of the built-in instruments, the Sampler and the built-in synth follow these values.
 - A third-party plugin receives MPE when `MPE` is on under `MIDI` in the plugin window's `Wrapper settings`. Each note then goes out on its own MIDI channel, 2 to 16.
 - It has not been tried with a real MPE controller yet.
+
+## MIDI Map Mode and Key Map Mode
+
+In the [Clip-launch workflow](/wiki/layouts/), clips, scenes and buttons can be mapped as in Ableton Live. The `MIDI` and `Key` buttons beside the `Both`, `Grid`, `Song` switch turn the modes on, as do `Ctrl+M` and `Ctrl+K`.
+
+1. Press `Ctrl+M` for MIDI Map Mode, or `Ctrl+K` for Key Map Mode. Every element that can be mapped is tinted, blue for MIDI and orange for keys.
+2. Click an element: a clip slot, a scene, a track's stop button, `Stop all clips`, play, stop, record, `Session Record`, the metronome, or a knob of the Session mixer or the Device View.
+3. Move a control or press a key on your MIDI device, or press a computer key in Key Map Mode. The element shows its assignment, for example `1/19` (channel and controller).
+4. The mappings are listed in place of the Browser: Channel, Note/Control or Key, Path, Name, Min and Max. Drag Min or Max, or double-click to type a value. Right-click a row for `Invert Range` and `Delete`.
+5. Press the same key again to end the mode.
 
 ## The typing keyboard
 
@@ -118,6 +146,8 @@ MPE is at a first stage. An MPE controller plays each note with its own pitch be
 - MIDI CC, channel aftertouch and pitch bend sent to a plugin can be automated with `Automate MIDI controller (CC, aftertouch, pitch bend)`.
 - A note held by a pedal is recorded up to the moment the pedal comes up.
 - An automation clip does not take a control back while you move it from a controller. The control follows its automation again when playback next starts.
+- Note links made in `Remote control settings` are not written to a .flp export.
+- `Ctrl+M` and `Ctrl+K` start the map modes in the Clip-launch workflow only. Map Mode has no macro mapping or note ranges yet.
 
 ## Related
 

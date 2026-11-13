@@ -1,5 +1,5 @@
 ---
-source: 2285f3e677
+source: d5cc625221
 ---
 ![Layout Clip-launch: kisi klip dengan scene di samping Playlist](/assets/img/cliplaunch.webp)
 
@@ -64,14 +64,14 @@ Follow action berjalan setelah sejumlah bar atau putaran clip. Aksinya adalah `T
 | Grup, return, dan send | Rute dari insert ke insert |
 | Plugin VST2 dan VST3 beserta state-nya | |
 | Marker, serta otomasi volume, pan, dan tempo | |
-| Kisi klip, sebagai clip Session dan scene | |
+| Kisi klip, sebagai clip Session dan scene, rack dan Drum Rack | |
 
 Laporan setelah ekspor mencantumkan apa yang tidak ikut ditulis.
 
 ## Perlu diketahui
 
-- Device bawaan Live sendiri tidak dibuat ulang. Efek bawaan Live dibuang saat impor.
-- Instrument Rack dan Audio Effect Rack masuk beserta rantai, zona, dan makronya. MIDI Effect Rack milik Live belum dikonversi dan dicantumkan di laporan impor.
+- Banyak device bawaan Live masuk sebagai milik LYNX SHARE sendiri, beserta pengaturan dan otomasinya: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift, dan Operator (tanpa FM). Sisanya dibuang dan dicantumkan di laporan impor.
+- Instrument Rack dan Audio Effect Rack masuk beserta rantai, zona, dan makronya, dan Drum Rack menjadi Drum Rack milik LYNX SHARE. MIDI Effect Rack milik Live belum dikonversi dan dicantumkan di laporan impor.
 - Laporan impor mencantumkan apa yang tidak ikut diimpor.
 - Live memangkas clip audio yang saling tumpang tindih dalam set yang diekspor.
 - Warp marker dari set Live dipertahankan saat impor dan ditulis kembali saat ekspor.

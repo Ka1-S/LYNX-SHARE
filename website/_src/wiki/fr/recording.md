@@ -1,5 +1,5 @@
 ---
-source: 0d51822a6b
+source: 094cbefd18
 ---
 ![La fenêtre d'enregistrement demande quoi enregistrer : audio, notes et automation, tout, ou audio dans l'éditeur audio](/assets/img/wiki/record-dialog.webp)
 
@@ -16,6 +16,17 @@ Le bouton d'enregistrement du transport, ou la touche `R`, active l'enregistreme
 7. Appuyez sur stop. La prise est un clip audio dans la Playlist.
 
 `Shift+R` fait les étapes 4 à 6 en une touche : il arme l'insert sélectionné, enregistre l'audio seulement et lance la lecture. Appuyez dessus de nouveau pour arrêter.
+
+Quand vous choisissez une entrée pour un insert qui enregistre plus que cette entrée (les autres canaux qui y envoient sont enregistrés aussi), LYNX SHARE demande, comme FL Studio, s'il faut passer sur `Entrée externe seule`. Répondez `Oui` pour enregistrer l'entrée seule sur cet insert.
+
+## Enregistrement audio en un clic
+
+`Outils › Enregistrement audio en un clic` lance une prise en une seule étape, comme dans FL Studio. Il agit sur l'insert du Mixer sélectionné. Avec le Master ou rien de sélectionné, il prend le premier insert qui a une entrée, ou sinon un insert libre.
+
+| Commande | Ce qu'elle fait |
+|---|---|
+| `Dans l'éditeur/enregistreur audio Edison` | Place Edison sur l'insert, réglé pour enregistrer au démarrage de la lecture, et lance la lecture. Voir [Mixer](/wiki/mixer/) |
+| `Dans la playlist comme clip audio` | Passe en mode Song, arme l'insert, demande son entrée s'il n'en a pas, et lance l'enregistrement et la lecture. Les inserts déjà armés enregistrent tels quels |
 
 ## Ce que propose la fenêtre d'enregistrement
 
@@ -59,7 +70,7 @@ Les options se trouvent dans `Options › Enregistrement` et dans le menu du cli
 
 | Commande | Touche | Ce qu'elle fait |
 |---|---|---|
-| `Décompte` | `Ctrl+P` | Désactivé, 1 mesure, 2 mesures ou 4 mesures de métronome avant le début de l'enregistrement |
+| `Décompte` | `Ctrl+P` | Off, 1 mesure, 2 mesures ou 4 mesures de métronome avant le début de l'enregistrement. `Ctrl+P` bascule entre désactivé et la durée choisie en dernier. Le choix est conservé quand vous fermez le programme ; une nouvelle installation démarre à 1 mesure, comme FL Studio |
 | `Métronome` | `Ctrl+M` | Clic pendant la lecture |
 | `Attendre la première note pour démarrer` | `Ctrl+I` | L'enregistrement attend que vous jouiez |
 | `Enregistrement en boucle` | aucune | L'enregistrement boucle au lieu de continuer |
@@ -70,7 +81,17 @@ Les options se trouvent dans `Options › Enregistrement` et dans le menu du cli
 
 `Faible latence à l'enregistrement` se trouve dans le menu du clic droit du bouton d'enregistrement et dans le menu d'insert du Mixer sous `Enregistrement sur disque`. Il est désactivé par défaut. Tant qu'un insert avec une entrée est armé, ou que son monitoring est sur `Actif`, les effets qui ajoutent de la latence sur son chemin vers le Master sont contournés. Cela ne change que ce que vous entendez : un insert garde tous ses effets quand la prise est captée après eux, par exemple avec `Après les effets`. Les effets reviennent quand l'insert est désarmé.
 
+`Compensation de latence` est dans le même menu `Enregistrement sur disque` et est activé par défaut, comme dans FL Studio. Elle recule chaque prise de l'aller-retour du périphérique audio, de la valeur `Ajustement fin (échantillons)` des réglages audio et de la compensation de délai des plugins. Désactivez-la pour garder les prises là où elles ont été enregistrées.
+
 `Outils › Annuler l'enregistrement` jette ce que la passe d'enregistrement en cours a écrit (ses notes, son automation et ses prises audio) et désactive l'enregistrement. La lecture continue et les inserts armés restent armés.
+
+## Enregistrer dans des emplacements de clips
+
+Dans le [flux par lancement de clips](/wiki/layouts/), les prises peuvent aller dans la grille de clips au lieu de la Playlist, comme dans Ableton Live.
+
+- Armez une piste avec son bouton d'armement dans la table de mixage de session. Ses emplacements vides affichent alors un bouton d'enregistrement rond à la place du carré d'arrêt. Cliquez sur l'un d'eux pour enregistrer dans cet emplacement.
+- `Enregistrement de session`, sous la grille, enregistre les pistes armées dans la scène sélectionnée. Pendant que leurs clips jouent, les nouvelles notes y sont ajoutées (overdub).
+- `Durée d'enregistrement fixe`, dans le menu d'un emplacement vide, termine un enregistrement dans un emplacement après 1 mesure ou plus, et le clip continue de jouer. `Désactivé` enregistre jusqu'à l'arrêt.
 
 ## Enregistrement en boucle et prises
 

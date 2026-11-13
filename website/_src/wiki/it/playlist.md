@@ -1,5 +1,5 @@
 ---
-source: f245a8e1b7
+source: 1b54c6493f
 ---
 ![La Playlist con clip sulle tracce](/assets/img/playlist.webp)
 
@@ -43,6 +43,8 @@ Le lettere funzionano mentre il pianoforte sulla tastiera del PC (`Ctrl+T`) è s
 - Il clic destro elimina una clip. `Ctrl`+trascina seleziona.
 - Fai doppio clic su una clip per aprirla.
 - Il pulsante in alto a sinistra di una clip apre il menu della clip (rendi unica, rinomina e colora, spezza e, per l'audio: pitch, adatta al tempo, reverse).
+- Il menu di una clip audio segue il layout di FL Studio su due colonne. La colonna sinistra ha la sezione `Clip audio` (`Anteprima`, `Silenziato`, `Rinomina e colora...`, `Cambia colore...`, `Colore casuale`, `Cambia icona...`, `Seleziona canale di origine`, `Impostazioni del canale`, `Rendi unico`, `Seleziona tutte le clip simili`, `Delete`, `Proprietà...`) e la sezione `Regione` (`Seleziona regione`, `Spezza`). La colonna destra ha `Sample` (`Rendi unico come campione`, `Modifica campione`, `Estrai stem dal sample`, `Rileva il tempo`, `Adatta al tempo`), `Automazione` (`Automatizza › Panning` o `Volume`, `Dissolvenza incrociata con`) e `Dissolvenze` (`Reimposta dissolvenze`). Le voci proprie di LYNX SHARE, come `Dividi qui`, `Reverse`, `Normalizza` e `Converti in MIDI`, vengono per ultime, sotto una linea.
+- `Automatizza › Panning` o `Volume` crea una clip di automazione lunga quanto la clip audio, sulla sua traccia, per il pan o il volume della regolazione Levels del canale.
 - Tieni premuto `Alt` mentre trascini per ignorare lo snap.
 - Le clip audio hanno maniglie di fade e un gain della clip che trascini su o giù. Clicca con il tasto destro su una maniglia di fade per il suo menu, con `Crea dissolvenza incrociata`. Clicca con il tasto destro sulla maniglia del gain per `Azzera gain` e `Normalizza`.
 - `Shift+M` attiva Stretch: ridimensionare una clip audio allora allunga l'audio invece di tagliarlo.
@@ -60,6 +62,10 @@ Nell'intestazione di una traccia, il clic seleziona, `Ctrl`+clic aggiunge o togl
 
 `Vista` nel menu della Playlist sceglie cosa mostrano le intestazioni delle tracce: `Mostra i controlli sulle tracce audio`, `Mostra i livelli sulle tracce audio` e `Mostra i livelli sulle tracce strumento`.
 
+`Modalità traccia` nel menu della traccia rende una traccia `Non assegnata`, una `Traccia audio` o una `Traccia strumento`, come in FL Studio. `Traccia audio` elenca prima `Nuova/e traccia/e del mixer` e poi ogni insert del Mixer per numero e nome. La scelta vale per tutte le tracce selezionate. `Traccia strumento` ha `Usa un canale esistente`, `Altri plugin...` e l'elenco degli strumenti del Channel rack.
+
+Il `+` in alto a sinistra nelle intestazioni delle tracce apre le stesse scelte per una nuova traccia: `Aggiungi traccia audio`, `Altri plugin...` e gli strumenti. Un clic destro su `+` aggiunge subito una traccia audio.
+
 ## Pattern Blocks
 
 Con `Blocchi di pattern (progetto attuale)` attivo nel menu della Playlist, una sezione sotto le tracce ha una riga per pattern. Lì la Matita mette un blocco e lo trascina lungo la sua riga, il Pennello dipinge blocchi e la Gomma li elimina. Il clic destro cancella con qualsiasi strumento.
@@ -75,6 +81,8 @@ Con `Blocchi di pattern (progetto attuale)` attivo nel menu della Playlist, una 
 ## Automazione
 
 Fai clic destro su una manopola o un fader e scegli `Crea clip di automazione`. La clip appare sulla Playlist. Con la Matita, trascina i suoi punti e fai clic sulla curva per aggiungerne uno. Le corsie di automazione sotto le tracce sono facoltative e spente di default. Vedi [Automazione](/wiki/automation/).
+
+Clic destro su un punto per il suo menu. La sua lista `Modalità` ha i 13 modi di curva di FL Studio per il segmento che finisce in quel punto: `Smussa`, `Hold`, tre curve singole, tre curve doppie, `Mezza sinusoide`, `Scalini`, `Scalini morbidi`, `Impulso` e `Onda`. Un nuovo punto prende il modo usato per ultimo. I modi vengono letti e scritti nei file .flp.
 
 ## Arrangiamenti
 
@@ -109,6 +117,7 @@ La casella dell'arrangiamento nella barra degli strumenti passa da un arrangiame
 - La Playlist si sente solo in modalità Brano. In modalità Pattern, `Space` riproduce il pattern corrente, qualunque cosa ci sia sulle tracce.
 - `Vista › Stile del layout › Flusso a lancio di clip` aggiunge una griglia di clip e scene accanto alla Playlist. È facoltativo. Vedi [Layout](/wiki/layouts/).
 - Con più clip di automazione sovrapposte su un solo controllo, la scelta di quale suoni può differire da quella di FL Studio (note di rilascio 0.1.25).
+- Come in FL Studio, un pattern suona da una sola clip alla volta. Quando parte una clip successiva dello stesso pattern, su qualsiasi traccia, la clip precedente non avvia più note da lì in poi. Le clip di pattern diversi suonano insieme. Questo vale nei nuovi progetti e nei progetti di FL Studio. Un progetto .lynx salvato prima della 0.1.27 continua a suonare ogni clip per intero.
 - Un tempo spostato da un controller MIDI collegato non ridimensiona le clip audio.
 - Su Linux, il video richiede FFmpeg.
 

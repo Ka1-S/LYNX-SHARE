@@ -1,5 +1,5 @@
 ---
-source: 217f097c97
+source: a73763934f
 ---
 ![Il Piano Roll](/assets/img/pianoroll.webp)
 
@@ -69,6 +69,18 @@ Clicca il righello per impostare la posizione. `Ctrl`+trascina, trascina con il 
 ## Chance e velocity range
 
 Ogni nota ha una Chance e un Velocity range. La Chance è la probabilità che la nota suoni a ogni passaggio. Il Velocity range lascia variare la velocity della nota tra la sua velocity e quella velocity più il range. Scegli `Probabilità` o `Intervallo di velocity (LYNX)` nel riquadro della corsia per modificarli. `Strumenti › Probabilità (LYNX)` nel menu del Piano roll raggruppa le note selezionate in modo che suonino tutte o ne suoni una sola, e ha `Reimposta probabilità e intervallo di velocity`.
+
+## Strumenti per le note
+
+Il menu `Strumenti` del Piano roll apre gli strumenti per le note di FL Studio come finestre di dialogo. Lavorano sulle note selezionate, o su tutte le note quando non ce n'è nessuna selezionata. Alcuni di essi:
+
+| Strumento | Tasto | Cosa fa |
+|---|---|---|
+| Limit | `Alt+K` | Sposta le note per ottave in un intervallo di tasti, poi le limita. Sotto `Restrizione di tonalità / scala` mantiene le note su una tonica e uno degli accordi o delle scale di FL Studio, con `Snap` impostato su `Sopra`, `Sotto` o `Alterna`. `Riporta in alto / in basso` e `Trasponi` impostano dove vanno le note fuori intervallo |
+| Flip | `Alt+Y` | `Capovolgi orizzontalmente` specchia le note nel tempo. Con `Mantieni i tempi di inizio`, attivo all'inizio, gli istanti di inizio vengono specchiati e le note mantengono la loro lunghezza. `Capovolgi verticalmente` specchia i tasti attorno al centro del loro intervallo |
+| Randomise | `Alt+R` | Variazioni casuali di velocity, pan, intonazione fine, timing e lunghezza, e di Mod X, Mod Y e release |
+| Scale levels | `Alt+X` | Scala il livello di una nota dall'inizio alla fine della selezione, con `Offset`, `Centro` (il valore attorno a cui scala) e `Tensione` |
+| LFO | `Alt+O` | Scrive la forma di un LFO in un livello di nota. Clic destro su uno slider `Periodo` per un elenco da 1 step a 512 step |
 
 ## Strumenti MIDI e script
 

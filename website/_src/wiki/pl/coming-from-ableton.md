@@ -1,5 +1,5 @@
 ---
-source: 2285f3e677
+source: d5cc625221
 ---
 ![Układ Clip-launch: siatka klipów ze scenami obok Playlisty](/assets/img/cliplaunch.webp)
 
@@ -27,7 +27,7 @@ LYNX SHARE startuje w trybie pracy na wzorcach: Channel Rack, patterny i Playlis
 | Akcje następcze | Akcja A i Akcja B, każda z własnym prawdopodobieństwem |
 | Przyciski stopu klipów | Pusty slot może mieć przycisk stopu |
 | Back to Arrangement | `Powrót do Playlisty` |
-| Tryby warp | `Miary`, `Tony`, `Tekstura` i `Złożony` w `Ustawienia kanału › Time stretch` |
+| Tryby warp | `Miary`, `Tony`, `Tekstura` i `Złożony` w `Ustawienia kanału › Rozciąganie czasu` |
 | Simpler, Sampler i racki perkusyjne | Samplery LYNX SHARE |
 | Set `.als` | Plik projektu `.lynx` |
 
@@ -64,14 +64,14 @@ Akcje następcze uruchamiają się po określonej liczbie taktów lub przejść 
 | Grupy, returny i wysyłki | Trasy między insertami |
 | Pluginy VST2 i VST3 wraz ze stanem | |
 | Znaczniki oraz automatyka głośności, panoramy i tempa | |
-| Siatka klipów, jako klipy sesji i sceny | |
+| Siatka klipów jako klipy sesji i sceny, racki i Racki perkusyjne | |
 
 Raport po eksporcie wymienia, co pominięto.
 
 ## Warto wiedzieć
 
-- Własne urządzenia Live nie są odtwarzane. Własne efekty Live są przy imporcie pomijane.
-- Racki Instrument i Audio Effect wchodzą ze swoimi łańcuchami, strefami i makrami. Racki MIDI Effect z Live nie są jeszcze konwertowane i są wymienione w raporcie importu.
+- Wiele własnych urządzeń Live wchodzi jako własne urządzenia LYNX SHARE, z ustawieniami i automatyką: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan, Drum Buss, Simpler, Drift i Operator (bez FM). Pozostałe są pomijane i wymienione w raporcie importu.
+- Racki Instrument i Audio Effect wchodzą ze swoimi łańcuchami, strefami i makrami, a Rack perkusyjny staje się Rackiem perkusyjnym LYNX SHARE. Racki MIDI Effect z Live nie są jeszcze konwertowane i są wymienione w raporcie importu.
 - Raport importu wymienia, co pominięto.
 - Live przycina klipy audio, które na siebie nachodzą, w wyeksportowanym secie.
 - Znaczniki warp z setu Live są zachowywane przy imporcie i zapisywane z powrotem przy eksporcie.

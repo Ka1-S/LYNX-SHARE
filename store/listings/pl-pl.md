@@ -39,10 +39,13 @@ LYNX SHARE jest w fazie alfa: możesz trafić na niedoróbki – zgłaszaj probl
 
 ## What's new
 
-LYNX SHARE 0.1.26: Prosty sposób pracy dla początkujących; widok klipu, racki i szansa nut dla siatki klipów;
-instrumenty Slicex i FPC; projekty FL Studio Mobile z instrumentami, efektami i automatyką; Zamroź dla kanałów;
-zadokowane okna pluginów; profile kontrolerów MIDI i pierwszy etap MPE; pluginy udostępniane w sesjach online oraz
-wiele poprawek.
+LYNX SHARE 0.1.27: efekty dopasowane, by brzmiały bliżej pluginów, na których są wzorowane, a zapisane projekty
+zachowują swoje brzmienie; poprawiony sufit true peak w Apex Limiter; więcej narzędzi FL Studio (Ustawienia zdalnego
+sterowania, krzywe automatyki, Edison w slocie miksera, strona Sampler z punktami pętli i crossfade, menu klipu
+audio); Mikser sesji, Rack perkusyjny, sceny i tryby przypisywania dla siatki klipów oraz wiele własnych urządzeń
+Ableton Live otwieranych z setów .als; DW Sampler, Slicer i więcej efektów z projektów FL Studio Mobile; karta Efekty,
+Pad akordów i wycieczka po pierwszym utworze w Prostym sposobie pracy; ochrona pluginów przed awariami w Linuksie i
+macOS; nowe logo i wiele poprawek.
 
 ## Features
 

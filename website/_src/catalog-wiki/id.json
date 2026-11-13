@@ -891,6 +891,73 @@
 "Seed acaknya berbeda per instance, jadi dua render dari not yang sama tidak identik per sample dengan FL Studio, yang memakai seed dari jam."
 ]
 },
+"gen-pocket-supersaw": {
+"source": "59b10d9603",
+"intro": "Pocket SuperSaw adalah synthesizer analog virtual dengan hingga 8 voice. Tiap voice adalah tumpukan 1 sampai 12 gelombang saw yang di-detune dengan saw sub-oktaf, atau oscillator SuperSync, rangkaian pulsa yang menyapu seperti hard sync. Ini adalah mesin tempat proyek FL Studio Mobile (.flm) memuat modul SuperSaw-nya, dan juga ada di pemilih plugin sebagai Pocket SuperSaw. Channel baru dimulai dari nilai bawaan FL Studio Mobile. Halamannya adalah daftar knob polos, satu per parameter (total 59), bukan panel milik FL Studio Mobile.",
+"controls": [
+[
+"Osc unison, Osc unison detune, Osc unison detune curve, Osc unison pan",
+"Jumlah saw per voice (1 sampai 12), seberapa jauh mereka di-detune (hingga 100 cent), bagaimana detune disebar ke seluruh saw, dan seberapa lebar mereka di-pan."
+],
+[
+"Osc pulse width, Osc pulse mode, Osc sub level",
+"Pulse mode mengubah tiap saw menjadi gelombang pulsa, dengan lebarnya. Osc sub level adalah level saw satu oktaf di bawah."
+],
+[
+"Osc re-trig phases, Osc phases offset",
+"Dengan re-trig on, setiap not memulai saw pada fase yang sama, jadi beating-nya sama di setiap not. Off: tiap not dimulai pada fase acak."
+],
+[
+"SuperSync mode, Osc sync, Osc sync pulse width, Osc sync attack / decay / sustain / release, Osc sync EG amount, Osc sync kbd dir",
+"Oscillator SuperSync dan envelope-nya sendiri, yang menyapu jumlah sync."
+],
+[
+"Filter cutoff, Filter resonance, Filter kbd, Filter vel",
+"Filter low-pass ladder 4-pole, hingga 20 kHz, dengan keyboard tracking dan velocity tracking."
+],
+[
+"Filter EG attack / decay / sustain / release, Filter EG amount",
+"Envelope filter. Jumlahnya bipolar, -100 % sampai +100 %."
+],
+[
+"Level EG attack / decay / sustain / release, Level, Pan",
+"Envelope volume serta level output dan pan. Waktu envelope berkisar dari 0 sampai 31 detik."
+],
+[
+"LFO shape, LFO rate, LFO mode, LFO beat, LFO amount, LFO dest, LFO fade in",
+"Satu LFO per voice: Sine, Ramp, Square, atau Random; Free, One shot, atau Tempo sync. LFO dest memilih Cutoff, Resonance, Pitch, Sync, Pulse width, Detune, Level, atau Pan."
+],
+[
+"Arp rate, Arp range, Arp mode",
+"Arpeggiator: Off, Up, Down, Up-down, Up-down (ends twice), atau Random, hingga 3 oktaf tambahan."
+],
+[
+"Monophonic mode, Number of voices, Slide held mode, Slide time, Slide time static",
+"Memainkan satu voice atau hingga 8, dan bagaimana not meluncur."
+],
+[
+"Transpose, Pitch bend range",
+"Transpose sebesar -12 sampai +12 semiton. Pitch wheel membengkokkan nada 1 sampai 12 semiton."
+],
+[
+"Distortion, Output trim",
+"Distorsi tanh dan output trim sebesar -18 sampai 0 dB."
+],
+[
+"Delay time, Delay feedback, Delay mix, Delay filter",
+"Delay stereo sinkron tempo, 1/4 beat sampai 1 beat, dengan filter low-pass atau high-pass di dalam loop-nya."
+],
+[
+"Mod wheel amount, Mod wheel dest",
+"Apa yang digerakkan mod wheel: Cutoff, Resonance, Sync, Pulse width, Detune, Level, Pan, LFO amount, atau LFO rate."
+]
+],
+"tips": [
+"Setiap knob bisa diotomasi. Saw dibatasi band, jadi nada tinggi tidak mengalami aliasing.",
+"Fase awal dan LFO Random berasal dari generator milik tiap instance, jadi hasil render tidak pernah sama dengan render FL Studio Mobile tertentu sample demi sample. Energi dan spektrumnya sama.",
+"Knob pitch channel, fine tune, Mono dan Porta, serta slide note di Piano roll bekerja pada voice seperti pada generator FL Studio."
+]
+},
 "gen-poizone": {
 "source": "09b740f9c1",
 "intro": "PoiZone adalah generator subtraktif yang dibangun di atas engine plugin FL dengan nama yang sama: dua osilator saw atau pulse dengan noise, hard sync, dan ring modulation, filter 4-pole, LFO, envelope modulasi, dan envelope amp, lalu gate 16 step, chorus, tape delay stereo, dan arpeggiator. Ia bisa ditambahkan tanpa FL Studio dan kemudian dimulai dari bank preset LYNX SHARE sendiri.",
@@ -1424,6 +1491,54 @@
 "Voice berjalan pada 44,1 kHz internal dan di-resample ke rate proyek."
 ]
 },
+"gen-drum-rack": {
+"source": "67ab8ab312",
+"intro": "Drum Rack adalah Instrument Rack yang rantainya berupa pad. Tiap pad menerima satu not dan memainkan instrumen dan efek dari rantainya. Tambahkan dari pemilih plugin sebagai Drum Rack. Drum Rack baru hanya menampilkan pad dan panel perangkat, dengan C1 terpilih. Jatuhkan sample ke pad, atau klik kanan pad kosong untuk memuat sample atau instrumen. Drum Rack di set Ableton Live (.als) terbuka sebagai satu Drum Rack lengkap dengan pad, send, dan rantai return-nya, dan Drum Rack ditulis saat kamu mengekspor set Live.",
+"controls": [
+[
+"Pads",
+"Tampilan pad 4 x 4, dengan strip ikhtisar semua 128 pad di atasnya: klik, seret, atau gulir untuk menggeser tampilan. Pad yang terisi menampilkan namanya dengan M (mute), tombol play, dan S (solo). Seret sebuah pad ke pad lain untuk menukarnya. Menjatuhkan beberapa sample mengisi pad berurutan."
+],
+[
+"Pad menu",
+"Rename (Ctrl+R), Delete, Save as Default Pad, Next Similar (Ctrl+Right), Previous Similar (Ctrl+Left), Save as Similarity Reference (Ctrl+Up), Return to Reference (Ctrl+Down), serta item LYNX SHARE Duplicate dan Choke."
+],
+[
+"M, V, P, C, I-O, S, R, D",
+"Strip di sebelah kiri menampilkan atau menyembunyikan makro, variasi makro, pad, daftar rantai, kolom I-O, send, dan return, serta panel perangkat."
+],
+[
+"Receive, Play, Choke",
+"Per pad: not masuk yang direspons (atau All), not yang diberikannya ke instrumennya, dan grup chokenya (None atau 1 sampai 16). Pad dalam sebuah grup choke memotong pad lain di grup itu."
+],
+[
+"Send-a, Send-b",
+"Level yang dikirim tiap pad ke tiap rantai return."
+],
+[
+"Return chains",
+"Rantai efek audio yang diumpan oleh send, ditampilkan sebagai a, b, dan seterusnya, misalnya \"a Mix Bus\"."
+],
+[
+"Audio ke",
+"Ke mana rantai sebuah pad pergi: Rack Output, atau langsung ke rantai return."
+],
+[
+"Vel, Chain, Hide",
+"Tambahan LYNX SHARE di bawah daftar rantai: zona velocity dan pemilihan rantai. Pad menggantikan zona tuts."
+],
+[
+"Makro",
+"Hingga 16 knob makro, dengan Map, Rand, dan Macro Variations, seperti di Instrument Rack."
+]
+],
+"tips": [
+"Slice to Drum Rack di menu channel Sampler menaruh tiap slice sample-nya di sebuah pad. Slice to New MIDI Track... pada clip audio di Playlist memotongnya per transien, bar, nilai not, atau marker warp menjadi channel Drum Rack baru dengan pola yang memainkan slice-nya.",
+"Di layout Clip-launch, Piano roll channel Drum Rack menampilkan satu baris bernama per pad yang terisi. Di layout Pattern, ia mempertahankan tuts piano, dengan nama pad di atasnya.",
+"Next Similar dan Previous Similar menukar sample pad memakai indeks Find similar samples milik Browser.",
+"Pada ekspor .als, efek bawaan LYNX SHARE dalam sebuah rantai tidak ditulis; Sampler pada pad ditulis sebagai Simpler milik Live. Belum ada Live yang membuka Drum Rack hasil ekspor."
+]
+},
 "gen-drumaxx": {
 "source": "271635956e",
 "intro": "Drumaxx adalah generator drum untuk Channel Rack. Plugin ini memodelkan mallet dan membran dari tiap 16 pad-nya, ditampilkan di dua halaman (1-8 dan 9-16). Ia membuka pengaturan plugin FL Studio yang sama saat impor .flp.",
@@ -1599,6 +1714,63 @@
 "Karena not dilacak dengan laju setengah, satu oktaf di keyboard menggeser pitch awal setengah oktaf.",
 "Envelope dan LFO channel untuk pan, volume, cutoff, dan resonansi dijalankan sekali per tick sequencer.",
 "Not yang dilepas tanpa envelope volume berakhir dengan fade 10 ms."
+]
+},
+"fx-edison": {
+"source": "d470ae5709",
+"intro": "Edison adalah editor audio yang berada di slot mixer. Ia meneruskan input slot tanpa diubah, merekam input itu selama Record menyala, dan menambahkan pemutarannya sendiri ke output. Beberapa slot Edison bisa ada di satu track. Tambahkan dari daftar plugin slot, atau pakai menu track mixer: Open audio editor (Ctrl+E) menaruhnya di slot kosong pertama, dan Open audio editor and record (Shift+E) juga mengaktifkannya dengan Record mode On play, 5 min, Append off, dan Slave on. Jendelanya adalah editor audio LYNX SHARE, dengan kontrol rekaman slot ditambahkan. Perekaman tetap berjalan saat jendela ditutup. Slot Edison di proyek .flp terbuka sebagai Edison, lengkap dengan pengaturan dan audionya.",
+"controls": [
+[
+"Rekam",
+"Merekam input slot, tergantung mode. Tombol R."
+],
+[
+"Now, On input, Input, On play",
+"Mode rekam. Now mulai seketika. On input mulai saat input melewati threshold noise dan menyimpan 0,1 detik dari sebelumnya. Input merekam hanya selama input terdengar dan berhenti sejenak setelah 1 detik hening. On play merekam selama lagu diputar dan menambahkan marker Song jump setiap kali posisi lagu melompat, jadi lagu yang di-loop menghasilkan satu take dengan satu marker per putaran. Slot baru dimulai dengan On input."
+],
+[
+"Waktu rekam maksimum",
+"Forever, 1, 3, 5, 10, 30, atau 60 menit. Slot baru dimulai dengan 30 menit."
+],
+[
+"Tambahkan",
+"On: take baru ditaruh setelah audio yang sudah ada. Off: take baru menggantikannya. On secara bawaan."
+],
+[
+"Sync",
+"Slave playback to host: selama lagu diputar, audio diputar pada waktu lagu. Tombol H. Menu Record juga punya Ignore own selection."
+],
+[
+"Mute input",
+"Input slot tidak diteruskan, hanya pemutaran Edison. Tombol I."
+],
+[
+"Loop",
+"Mengulang pemutaran. Tombol L."
+],
+[
+"Snap",
+"Snap ke grid, ke region, ke sample, atau ke zero crossing, tombol 1 sampai 4."
+],
+[
+"Seret",
+"Seret sample atau seleksi sebagai WAV ke Playlist atau Channel Rack. Klik kanan menyalinnya ke clipboard editor."
+],
+[
+"Kirim",
+"Kirim ke Playlist sebagai clip audio, ke channel terpilih, atau ke channel Sampler baru."
+],
+[
+"Nada pemicu",
+"Di menu sebuah region: not yang ditautkan ke region. Regions › Assign trigger notes to all... dan Assign all untuk mengaturnya di setiap region."
+]
+],
+"tips": [
+"Audio disimpan sebagai file WAV di folder rekaman proyek, bukan di dalam file proyek.",
+"Tools › Acquire noise threshold, pada seleksi yang hanya berisi noise latar, mengatur level yang dicari oleh On input dan Input.",
+"Tools › Macros › Remove all Edison instances menghapus semua slot Edison di proyek.",
+"Slot yang dibuat di LYNX SHARE tidak ditulis ke .flp saat ekspor. Slot Edison yang berasal dari .flp dan tidak diedit tetap membawa data FL Studio.",
+"Not pemicu disimpan bersama region dan dibaca oleh skrip audio. Memutar sebuah region dari notnya belum tersedia."
 ]
 },
 "gen-fruity-granulizer": {
@@ -2538,6 +2710,143 @@
 "Linear phase adalah bagian dari engine; lihat dokumentasi untuk latensinya."
 ]
 },
+"fx-pocket-comb-filter": {
+"source": "1845ad22a7",
+"intro": "Pocket Comb Filter menambahkan delay pendek dengan feedback ke sinyal dry, sehingga suara berdering pada pitch yang dituning. Pitch bisa diatur manual, mengikuti tuts terendah yang ditahan di Channel Rack, atau mengikuti pitch yang terdeteksi pada input. Ini adalah mesin tempat proyek FL Studio Mobile (.flm) memuat modul Comb Filter-nya, dengan setiap nilai disalin apa adanya, dan bisa juga ditambahkan ke slot mixer mana pun.",
+"controls": [
+[
+"Mode",
+"Manual, Lowest Note, atau Detect Pitch. Manual memakai Pitch, atau Pitch oct dan Pitch note saat Snap on. Lowest Note mengikuti tuts terendah yang ditahan di Channel Rack dan mempertahankan yang terakhir setelah dilepas. Detect Pitch mengikuti pitch input."
+],
+[
+"Pitch",
+"Frekuensi pada mode Manual saat Snap off, 1 Hz sampai 2,50 kHz dengan hukum pangkat empat."
+],
+[
+"Feedback",
+"Seberapa banyak sinyal tertunda yang diumpankan kembali, 0 sampai 100 %. Nilai lebih tinggi berdering lebih lama."
+],
+[
+"Mix",
+"Level sinyal comb yang ditambahkan ke sinyal dry, 0 sampai 100 %. Sinyal dry tetap pada level penuh."
+],
+[
+"Offset",
+"Menggeser pitch sebesar -2 sampai +2 oktaf pada mode Lowest Note dan Detect Pitch."
+],
+[
+"Penghalusan",
+"Seberapa lambat pitch meluncur ke nilai baru, 0 sampai 100 %."
+],
+[
+"Snap",
+"On: mode Manual memainkan not yang diatur oleh Pitch oct dan Pitch note. Off: memakai frekuensi Pitch."
+],
+[
+"Polaritas",
+"Tanda feedback per sisi: Both +, Left -, Right -, atau Both -."
+],
+[
+"Asimetri",
+"-5,0 sampai +5,0 %. Menurunkan frekuensi sisi kiri dan menaikkan frekuensi sisi kanan sebesar nilai ini (nilai negatif melakukan sebaliknya)."
+],
+[
+"Oktaf nada",
+"Oktaf not, -1 sampai 6."
+],
+[
+"Not nada",
+"Nama not, C sampai B. Selama belum ada tuts yang ditahan, Lowest Note juga mulai pada not ini (E3 secara bawaan)."
+]
+],
+"tips": [
+"Lowest Note membaca tuts yang ditahan di semua channel Channel Rack. Di FL Studio Mobile ia hanya membaca rack tempat efek itu berada.",
+"Detect Pitch paling baik untuk suara ber-pitch. Pada drum atau noise ia bisa terkunci ke pitch yang salah, dan detektor milik FL Studio Mobile sendiri juga tidak konsisten di situ.",
+"Penalaannya mengikuti loop delay FL Studio Mobile, yang sekitar 19 cent melenceng dari comb ideal pada not yang sama.",
+"Efek ini punya halaman knob polos, bukan panel milik FL Studio Mobile."
+]
+},
+"fx-pocket-eq": {
+"source": "3ee10840e7",
+"intro": "Pocket EQ punya empat band. Tiap band adalah low shelf, peak, atau high shelf dengan gain, frekuensi, dan lebar pita sendiri, dan bisa bekerja di kedua sisi, di satu sisi saja, atau di kedua sisi dengan arah berlawanan. Ini adalah mesin tempat proyek FL Studio Mobile (.flm) memuat modul Equalizer-nya, dengan setiap nilai disalin apa adanya, dan bisa juga ditambahkan ke slot mixer mana pun.",
+"controls": [
+[
+"Gain 1 to Gain 4",
+"Gain band, ditampilkan sebagai -12 sampai +12 dB. Seperti di FL Studio Mobile, band menaikkan atau memotong dua kali jumlah yang ditampilkan, jadi rentang penuhnya -24 sampai +24 dB."
+],
+[
+"Frequency 1 to Frequency 4",
+"Frekuensi band, 32 Hz sampai sekitar 19,5 kHz."
+],
+[
+"Bandwidth 1 to Bandwidth 4",
+"Lebar band, 0,25 sampai 7,25 oktaf."
+],
+[
+"Kind 1 to Kind 4",
+"Low shelf, Peak, atau High shelf. Low shelf adalah separuh bawah rentang, Peak separuh atasnya, dan High shelf hanya bagian paling atas."
+],
+[
+"Channel 1 to Channel 4",
+"Sisi tempat band bekerja: Both, Left, Right, Left + / right - (sisi kanan mendapat gain berlawanan), atau Left - / right + (sisi kiri mendapat gain berlawanan)."
+]
+],
+"tips": [
+"Band berjalan pada dua kali sample rate, seperti di FL Studio Mobile.",
+"Keempat band dirangkai dengan cara FL Studio Mobile, yang menunda suara 1,5 sample. Seperti FL Studio Mobile, efek ini tidak melaporkannya ke kompensasi delay.",
+"Efek ini punya halaman knob polos, bukan panel EQ milik FL Studio Mobile."
+]
+},
+"fx-pocket-filter": {
+"source": "9f7f27becb",
+"intro": "Pocket Filter adalah filter resonan yang terdiri dari satu, dua, atau empat pasang tahap filter identik. Ini adalah mesin tempat proyek FL Studio Mobile (.flm) memuat modul Filter-nya, dengan setiap nilai disalin apa adanya, dan bisa juga ditambahkan ke slot mixer mana pun.",
+"controls": [
+[
+"Frekuensi",
+"Cutoff atau frekuensi tengah, 16 Hz sampai sekitar 20 kHz."
+],
+[
+"Q",
+"Resonansi, ditampilkan sebagai 0,80 sampai 2,80, dengan hukum kuadrat."
+],
+[
+"Jenis",
+"LP (low-pass), BP (band-pass), atau HP (high-pass). LP adalah separuh bawah rentang, BP separuh atasnya, dan HP hanya bagian paling atas."
+],
+[
+"Slope",
+"24 dB/O, 48 dB/O, atau 96 dB/O. 24 dB/O adalah separuh bawah rentang, 48 dB/O separuh atasnya, dan 96 dB/O hanya bagian paling atas."
+]
+],
+"tips": [
+"Seperti di FL Studio Mobile, low-pass menurunkan level sekitar 2 dB per pasang tahap: sekitar 2, 4, dan 8 dB pada 24, 48, dan 96 dB/O. Band-pass menaikkan bagian tengah sebesar nilai Q, hingga sekitar 9 dB.",
+"Perubahan Slope langsung berpindah, dan level low-pass baru mengikuti pada perubahan Frequency, Q, atau Type berikutnya. FL Studio Mobile melakukan hal yang sama.",
+"Setiap pasang tahap menunda suara satu sample, yang tidak dilaporkan ke kompensasi delay, seperti di FL Studio Mobile."
+]
+},
+"fx-pocket-graphic-eq": {
+"source": "3fcecfce15",
+"intro": "Pocket Graphic EQ punya delapan band tetap selebar satu oktaf: low shelf di 80 Hz, peak di 160 Hz, 375 Hz, 750 Hz, 1,5 kHz, 3 kHz, dan 6 kHz, serta high shelf di 12 kHz. Ini adalah mesin tempat proyek FL Studio Mobile (.flm) memuat modul Graphic EQ-nya, dengan setiap nilai disalin apa adanya, dan bisa juga ditambahkan ke slot mixer mana pun.",
+"controls": [
+[
+"80 Hz",
+"Low shelf. Gain ditampilkan sebagai -12 sampai +12 dB."
+],
+[
+"160 Hz, 375 Hz, 750 Hz, 1.5 kHz, 3 kHz, 6 kHz",
+"Band peak. Gain ditampilkan sebagai -12 sampai +12 dB."
+],
+[
+"12 kHz",
+"High shelf. Gain ditampilkan sebagai -12 sampai +12 dB."
+]
+],
+"tips": [
+"Seperti di FL Studio Mobile, tiap band menaikkan atau memotong dua kali jumlah yang ditampilkan, jadi rentang penuhnya -24 sampai +24 dB.",
+"Band dirangkai dengan cara FL Studio Mobile, yang menunda suara 8 sample. Seperti FL Studio Mobile, efek ini tidak melaporkannya ke kompensasi delay.",
+"Efek ini punya halaman knob polos, bukan slider milik FL Studio Mobile."
+]
+},
 "fx-ridge-strip": {
 "source": "4b27e2d1f5",
 "intro": "Ridge Strip adalah channel strip asli LYNX SHARE untuk insert mixer. Ia menggabungkan filter, equalizer, dan dinamika dalam satu jendela, dengan kurva dan meter gain di tengah.",
@@ -3049,7 +3358,7 @@
 ]
 },
 "fx-glow-leveler": {
-"source": "c674a036c1",
+"source": "c97ebe6b51",
 "intro": "Glow Leveler adalah leveler optik: model sel elektro-optik dengan attack yang bergantung pada program dan release dua tahap. Ada dua voicing, Modern dan Opto classic, dan instance baru mulai di Opto classic. Meter VU ada di antara knob Gain dan Peak reduction.",
 "controls": [
 [
@@ -3097,6 +3406,10 @@
 "Hanya Opto classic. Dua saklar kecil mempertahankan hukum limit dan make-up serta timing attack dan release dari proyek yang disimpan dengan versi lebih lama, atau memakai yang terukur."
 ],
 [
+"Memori sel",
+"Hanya Opto classic, mode Compress. Saat On, release melambat setelah gain reduction yang panjang atau kuat, sehingga leveler pulih cepat setelah puncak singkat dan lambat setelah yang panjang. Mati secara bawaan."
+],
+[
 "Ref. makeup",
 "Hanya Opto classic. Nilai peak reduction saat Makeup otomatis dinyalakan. Make-up mengikuti dial dari situ."
 ]
@@ -3107,7 +3420,7 @@
 ]
 },
 "fx-hush-de-esser": {
-"source": "a7ecd8dcb9",
+"source": "7fb1e34f17",
 "intro": "Hush De-esser adalah efek bawaan LYNX SHARE yang mengurangi sibilance kasar pada vokal. Ia bisa bekerja hanya pada band sibilan atau pada seluruh sinyal. Tampilan besar menunjukkan sinyal dengan garis threshold, yang bisa kamu seret.",
 "controls": [
 [
@@ -3149,6 +3462,14 @@
 [
 "Dengarkan",
 "Memungkinkan kamu mendengarkan band yang dideteksi."
+],
+[
+"Air",
+"High shelf sekitar 8 kHz pada sinyal yang diproses, dari off sampai +12 dB. Off secara bawaan."
+],
+[
+"Mix",
+"Keseimbangan antara sinyal dry dan sinyal yang diproses. Sinyal dry ditunda agar sesuai dengan lookahead. 100 % secara bawaan."
 ]
 ],
 "tips": [
@@ -3432,6 +3753,73 @@
 "Tidak ada look-ahead dan tidak menambah latensi. Gain turun dalam satu sample saat sebuah peak melewati threshold."
 ]
 },
+"fx-pocket-multiband-compressor": {
+"source": "bb45f9448b",
+"intro": "Pocket Multiband Compressor membagi suara menjadi band low, mid, dan high dengan dua crossover 24 dB dan mengompresi tiap band sendiri-sendiri. Rasionya bekerja pada amplitudo sinyal, bukan pada desibel, jadi lebih lembut daripada kompresor biasa pada angka yang sama. Ini adalah mesin tempat proyek FL Studio Mobile (.flm) memuat modul Multiband Compressor-nya, dengan setiap nilai disalin apa adanya, dan bisa juga ditambahkan ke slot mixer mana pun. Editornya adalah halaman knob polos, satu baris nama per band (Low, Mid, High).",
+"controls": [
+[
+"Gain master",
+"Level output seluruh efek, -24 dB sampai +24 dB."
+],
+[
+"Crossover rendah",
+"Pemisah antara band low dan mid, 20 Hz sampai 10,2 kHz."
+],
+[
+"Crossover tinggi",
+"Pemisah antara band mid dan high, 20 Hz sampai 10,2 kHz."
+],
+[
+"Solo",
+"Off, Low, Mid, atau High: hanya memutar band itu. Kontrol ini milik LYNX SHARE sendiri; FL Studio Mobile menyimpan pengaturan editor di tempatnya, yang direset ke Off oleh impor .flm."
+],
+[
+"Mix kering",
+"Menambahkan band yang tidak dikompresi ke band yang dikompresi, 0 sampai 100%, untuk kompresi paralel."
+],
+[
+"Low / Mid / High input gain",
+"Gain ke dalam band, -24 dB sampai +24 dB. Ia mengumpan detektor sekaligus audionya."
+],
+[
+"Low / Mid / High threshold",
+"Level di atas mana band dikompresi, -48 dB sampai 0 dB."
+],
+[
+"Low / Mid / High ratio",
+"1 sampai 31."
+],
+[
+"Low / Mid / High attack",
+"Seberapa cepat kompresor band bereaksi, 0 sampai 50 ms dengan hukum kuadrat."
+],
+[
+"Low / Mid / High release",
+"Seberapa cepat ia melepas, 10 ms sampai 1 detik."
+],
+[
+"Low / Mid / High gain",
+"Output gain band, -24 dB sampai +24 dB."
+],
+[
+"Low / Mid / High state",
+"On mengompresi band, Bypass meneruskannya apa adanya setelah dipisah, Mute membuatnya hening."
+],
+[
+"Low / Mid / High width",
+"Lebar stereo band, 0 sampai 200%. 100% membiarkannya apa adanya, 0% adalah mono."
+],
+[
+"Mode lebar",
+"Mode 1: di atas 100% lebar bergerak menuju sinyal samping saja. Mode 2: di atas 100% sebagian channel lain dikurangkan dari tiap sisi."
+]
+],
+"tips": [
+"Band yang di-bypass juga melewati input gain, output gain, dan lebarnya.",
+"Attack dan release dihitung untuk 44,1 kHz pada setiap sample rate, seperti yang dilakukan FL Studio Mobile. Pada 48 kHz atau 96 kHz keduanya lebih pendek daripada nilai yang ditampilkan.",
+"Untuk mix baru, Fruity Multiband Compressor atau Prism Multiband adalah alat yang lebih lengkap. Yang ini ada supaya lagu FL Studio Mobile terdengar seperti di ponsel."
+]
+},
 "fx-prism-multiband": {
 "source": "f559a7fa07",
 "intro": "Prism Multiband adalah efek bawaan LYNX SHARE untuk insert mixer. Plugin ini membagi sinyal menjadi empat band dan menerapkan kompresi atau ekspansi pada masing-masing. Band yang tidak mengubah gain membiarkan sinyal tidak tersentuh, jadi efek ini transparan saat diam.",
@@ -3483,7 +3871,7 @@
 ]
 },
 "fx-quell-denoiser": {
-"source": "cb9b3b14e9",
+"source": "1b2cc8c181",
 "intro": "Quell Denoiser adalah efek bawaan LYNX SHARE untuk insert mixer. Ia mengurangi noise broadband yang stabil seperti hiss dengan satu kontrol Jumlah. Secara internal sinyal dibagi menjadi enam band yang koheren fase, masing-masing dengan expander downward soft-knee.",
 "controls": [
 [
@@ -3501,6 +3889,14 @@
 [
 "Meter",
 "Meter level di kiri dengan pembacaan pengurangan yang ditahan di bawahnya."
+],
+[
+"Matched",
+"Beralih dari expander enam band ke mesin matched: memotong pada tujuh band oktaf, tanpa latensi. Mati secara bawaan."
+],
+[
+"Classic / Measured",
+"Hanya mesin matched. Measured membuat tiap band mengikuti noise floor yang diukurnya selama sekitar satu detik, sehingga noise yang stabil diturunkan lebih jauh. Pemakaian CPU bertambah. Sakelarnya hanya tampil untuk instance dari proyek atau preset yang disimpan sebelum 0.1.27, yang dimuat dengan Classic dan terdengar seperti sebelumnya. Setelah kamu beralih ke Measured, sakelar itu disembunyikan. Instance baru memakai Measured."
 ]
 ],
 "tips": [
@@ -3509,7 +3905,7 @@
 ]
 },
 "fx-sentry-gate": {
-"source": "50e9527a46",
+"source": "0384d6aa45",
 "intro": "Sentry Gate adalah gate dan expander bawaan LYNX SHARE untuk insert mixer. Plugin ini memotong sinyal di bawah threshold, dari ekspansi lembut sampai gate penuh tergantung ratio dan range. Tampilan menunjukkan kurva transfer di atas level langsung.",
 "controls": [
 [
@@ -3559,6 +3955,22 @@
 [
 "Oversampling, In and Out",
 "Menu oversampling serta gain input dan output."
+],
+[
+"Model",
+"Classic atau Measured. Measured menambahkan peredam noise gaya Vocal; gaya lain mengabaikannya. Proyek yang disimpan sebelum 0.1.26 dimuat dengan Classic."
+],
+[
+"Pemicu",
+"Level atau Transient. Level adalah gate seperti sebelumnya. Transient adalah gate drum: pukulan di atas threshold membukanya sepenuhnya, ia tetap terbuka selama Hold dan menutup selama Release mengikuti bentuk yang dipilih, apa pun yang terjadi pada level di antaranya. Ratio, Knee, dan kurva gaya tidak dipakai pada Transient. Level secara bawaan."
+],
+[
+"Bentuk",
+"Hanya Transient. Bentuk release: Smooth, Mid, atau Sharp."
+],
+[
+"Sensitivitas",
+"Hanya Transient. 1 sampai 10, bawaan 5. Nilai lebih tinggi membuka gate pada pukulan yang lebih kecil."
 ]
 ],
 "tips": [
@@ -3788,7 +4200,7 @@
 ]
 },
 "fx-atrium": {
-"source": "5f968c5de3",
+"source": "595c3b57b8",
 "intro": "Atrium adalah reverb ruangan dan chamber dengan bagian early dan late yang terpisah serta decay tiga band. Enam fader mengatur reverb secara keseluruhan, tab Early dan Late mengalihkan dial di sebelah kanan antara kedua bagian itu, dan menu Mode reverb memilih salah satu dari dua belas jenis ruangan.",
 "controls": [
 [
@@ -3850,6 +4262,10 @@
 [
 "Mode reverb",
 "Jenis ruang: Large Room, Medium Room, Bright Room, Large Chamber, Dark Room, Dark Chamber, Dark Space, Deep Space, Mirror Space, Vast Space, Distant Space, atau Dense Room."
+],
+[
+"Classic / Measured",
+"Measured adalah mesin reverb dari 0.1.27: decay diatur per band oktaf, korektor nada mengikuti jaringan reverb, dan jaringan difusi membentuk awal bunyi. Pemakaian CPU-nya lebih rendah daripada Classic. Instance baru dimulai dengan Measured. Proyek dan preset yang disimpan sebelum 0.1.27 dimuat dengan Classic dan terdengar seperti sebelumnya."
 ]
 ],
 "tips": [
@@ -3858,7 +4274,7 @@
 ]
 },
 "fx-epoch-verb": {
-"source": "30c0764f87",
+"source": "e15dd52216",
 "intro": "Epoch Verb adalah plugin slot efek reverb. Ia punya 22 algoritma dan tiga warna (1970s, 1980s, dan Now). Pakai untuk hall, plate, dan room di send atau insert.",
 "controls": [
 [
@@ -3916,6 +4332,10 @@
 [
 "Low cut",
 "Filter high-pass pada reverb."
+],
+[
+"Classic / Measured",
+"Measured adalah mesin reverb dari 0.1.27: decay diatur per band oktaf, korektor nada mengikuti jaringan reverb, dan jaringan difusi membentuk awal bunyi. Pemakaian CPU-nya lebih rendah daripada Classic. Instance baru dimulai dengan Measured. Proyek dan preset yang disimpan sebelum 0.1.27 dimuat dengan Classic dan terdengar seperti sebelumnya."
 ]
 ],
 "tips": [
@@ -3924,7 +4344,7 @@
 ]
 },
 "fx-foil-plate": {
-"source": "1156cb5a2f",
+"source": "b0e5038719",
 "intro": "Foil Plate adalah plugin slot efek reverb plate. Ada dua belas jenis plate dan decay yang bergantung pada frekuensi. Pakai di snare, vokal, dan bus.",
 "controls": [
 [
@@ -3982,6 +4402,10 @@
 [
 "Low cut",
 "Filter high-pass pada reverb."
+],
+[
+"Classic / Measured",
+"Measured adalah mesin reverb dari 0.1.27: decay diatur per band oktaf, korektor nada mengikuti jaringan reverb, dan jaringan difusi membentuk awal bunyi. Pemakaian CPU-nya lebih rendah daripada Classic. Instance baru dimulai dengan Measured. Proyek dan preset yang disimpan sebelum 0.1.27 dimuat dengan Classic dan terdengar seperti sebelumnya."
 ]
 ],
 "tips": [
@@ -4039,7 +4463,7 @@
 ]
 },
 "fx-halo": {
-"source": "f4b3fc155b",
+"source": "f8f93f7d26",
 "intro": "Halo adalah reverb shimmer asli LYNX SHARE. Sebuah pitch shifter di dalam jalur feedback menaikkan atau menurunkan setiap pengulangan, sehingga tail naik atau turun saat memudar. Kamu menambahkannya ke insert atau send untuk pad, vokal, dan tekstur ambient.",
 "controls": [
 [
@@ -4089,6 +4513,10 @@
 [
 "Warna",
 "Nada reverb, misalnya bright."
+],
+[
+"Classic / Measured",
+"Measured adalah mesin reverb dari 0.1.27: decay diatur per band oktaf, korektor nada mengikuti jaringan reverb, dan jaringan difusi membentuk awal bunyi. Pemakaian CPU-nya lebih rendah daripada Classic. Instance baru dimulai dengan Measured. Proyek dan preset yang disimpan sebelum 0.1.27 dimuat dengan Classic dan terdengar seperti sebelumnya."
 ]
 ],
 "tips": [
@@ -4097,7 +4525,7 @@
 ]
 },
 "fx-horizon": {
-"source": "8b29b30bb7",
+"source": "6cc0736add",
 "intro": "Horizon adalah efek asli LYNX SHARE yang menggabungkan echo dan reverb dalam satu plugin. Kamu memilih apakah echo mengumpan reverb atau mengikutinya. Cocok untuk vokal, gitar, dan synth saat kamu ingin pengulangan yang melebur ke dalam sebuah ruang.",
 "controls": [
 [
@@ -4155,6 +4583,10 @@
 [
 "Echo mode, Reverb mode, Color",
 "Menu untuk jenis echo, jenis reverb, dan nada."
+],
+[
+"Classic / Measured",
+"Measured adalah mesin reverb dari 0.1.27: decay diatur per band oktaf, korektor nada mengikuti jaringan reverb, dan jaringan difusi membentuk awal bunyi. Pemakaian CPU-nya lebih rendah daripada Classic. Instance baru dimulai dengan Measured. Proyek dan preset yang disimpan sebelum 0.1.27 dimuat dengan Classic dan terdengar seperti sebelumnya."
 ]
 ],
 "tips": [
@@ -4238,7 +4670,7 @@
 ]
 },
 "fx-nebula": {
-"source": "87313c4ef1",
+"source": "338ff67e03",
 "intro": "Nebula membangun ruang echo dan reverb yang luas dari jaringan delay. Kamu memilih salah satu dari 22 bentuk jaringan dengan kontrol Mode dan mengatur waktu delay, feedback, dan kepadatan. Tambahkan ke insert mixer, atau ke send untuk efek ambient.",
 "controls": [
 [
@@ -4284,11 +4716,260 @@
 [
 "Mode",
 "Bentuk jaringan."
+],
+[
+"Model",
+"Classic atau Measured. Measured menjalankan enam bentuk (Ripple, Fold, Drift, Abyss, Glint, dan Mirage) pada model jaringan yang berbeda, diport dari model berlisensi MIT. Bentuk lainnya terdengar sama di keduanya. Instance baru dimulai dengan Measured. Proyek dan preset yang disimpan sebelum 0.1.27 dimuat dengan Classic dan terdengar seperti sebelumnya."
 ]
 ],
 "tips": [
 "Tekan Clear untuk membungkam tail yang menumpuk setelah perubahan feedback.",
 "Baris di bagian bawah menjelaskan mode yang dipilih."
+]
+},
+"fx-pocket-reverb": {
+"source": "6722c47417",
+"intro": "Pocket Reverb adalah modul reverb terkini milik FL Studio Mobile pada plate milik FL Studio Mobile sendiri. Ia memakai kontrol modul yang lebih lama, dengan pantulan awal dan tail plate pada level tetap, dan memadukannya sendiri dengan sinyal dry. Ini adalah mesin tempat proyek FL Studio Mobile (.flm) memuat modul Reverb-nya, dengan setiap nilai disalin apa adanya, dan bisa juga ditambahkan ke slot mixer mana pun. Editornya adalah halaman knob polos.",
+"controls": [
+[
+"Decay",
+"Panjang tail, 0,1 detik sampai 20 detik. Knob mengikuti hukum pangkat tiga, jadi sebagian besar rentang geraknya mencakup waktu yang pendek."
+],
+[
+"Redaman tinggi",
+"Frekuensi di atas mana tail kehilangan nada tingginya lebih cepat, 0,5 kHz sampai 22,1 kHz. Ujung atas rentang tertulis Off."
+],
+[
+"Mix",
+"Perpaduan dry dan reverb. Di bawah tengah, dry tetap pada level penuh dan reverb naik; di atasnya reverb tetap pada level penuh dan dry turun. Di tengah keduanya pada level penuh."
+],
+[
+"Pan",
+"Mem-pan reverb, bukan sinyal dry."
+],
+[
+"ER",
+"Level pantulan awal, 0 sampai 100% dengan hukum kuadrat."
+],
+[
+"Predelay",
+"Waktu sebelum reverb dimulai, 0 sampai 250 ms."
+],
+[
+"Ukuran ruang",
+"Ukuran plate, 1 sampai 100."
+],
+[
+"Difusi",
+"Seberapa cepat gema melebur menjadi tail yang halus, 0 sampai 100%."
+],
+[
+"Lebar",
+"Lebar stereo reverb, 0 sampai 200%."
+],
+[
+"Low cut",
+"Memotong nada rendah sinyal yang masuk ke reverb, 19 Hz sampai 3000 Hz. Ujung bawah rentang tertulis Off."
+],
+[
+"High cut",
+"Memotong nada tinggi sinyal yang masuk ke reverb, 0,5 kHz sampai 22,1 kHz. Ujung atas rentang tertulis Off."
+],
+[
+"Rate mod",
+"Kecepatan modulasi pada tail, 0,1 Hz sampai 10 Hz."
+],
+[
+"Kedalaman mod",
+"Jumlah modulasi pada tail, 0 sampai 100%."
+],
+[
+"Gain wet",
+"Level keseluruhan reverb, 0 sampai 100%."
+],
+[
+"Level dry",
+"Level keseluruhan sinyal dry, 0 sampai 100%."
+]
+],
+"tips": [
+"Perubahan level meluncur selama beberapa milidetik, jadi menggerakkan Mix, Pan, ER, atau kedua level tidak menimbulkan bunyi klik.",
+"Plate ini bukan Fruity Reeverb 2: pada pengaturan yang sama, nada rendahnya berdering lebih lama.",
+"Modulasi belum dibandingkan dengan FL Studio Mobile lewat telinga: tidak ada proyek yang dipakai untuk mengukurnya yang menggunakannya."
+]
+},
+"fx-pocket-reverb-2": {
+"source": "dcde5cb65f",
+"intro": "Pocket Reverb 2 menjalankan plate FL Studio Mobile pada level penuh dan memadukan sendiri sinyal dry, pantulan awal, dan tail, lalu mengatur separasi stereo dan mem-pan reverb. Ini adalah mesin tempat proyek FL Studio Mobile (.flm) memuat modul Reverb 2-nya, dengan setiap nilai disalin apa adanya, dan bisa juga ditambahkan ke slot mixer mana pun. Editornya adalah halaman knob polos.",
+"controls": [
+[
+"High cut",
+"Memotong nada tinggi sinyal yang masuk ke reverb, 0,5 kHz sampai 22,1 kHz. Ujung atas rentang tertulis Off."
+],
+[
+"Low cut",
+"Memotong nada rendah sinyal yang masuk ke reverb, 19 Hz sampai 3000 Hz. Ujung bawah rentang tertulis Off."
+],
+[
+"Ukuran",
+"Ukuran plate, 1 sampai 100."
+],
+[
+"Decay",
+"Panjang tail, 0,1 detik sampai 20 detik, dengan skala lurus."
+],
+[
+"Difusi",
+"Seberapa cepat gema melebur menjadi tail yang halus, 0 sampai 100%."
+],
+[
+"Redaman",
+"Frekuensi di atas mana tail kehilangan nada tingginya lebih cepat, 0,5 kHz sampai 22,1 kHz. Ujung atas rentang tertulis Off."
+],
+[
+"Dry",
+"Level sinyal asli, 0 sampai 125%."
+],
+[
+"ER",
+"Level pantulan awal, 0 sampai 125%."
+],
+[
+"Wet",
+"Level reverb, 0 sampai 125%."
+],
+[
+"Input samping",
+"On mengumpan reverb dengan selisih kiri dan kanan, bukan jumlahnya, sehingga hanya bagian stereo dari suara yang diberi reverb."
+],
+[
+"Delay",
+"Waktu sebelum reverb dimulai, 0 sampai 1000 ms."
+],
+[
+"Tempo",
+"On membuat Delay menjadi sejumlah sixteenth beat pada tempo lagu, hingga satu beat. Delay yang lebih panjang dari 1000 ms dipendekkan satu sixteenth demi satu sixteenth sampai muat."
+],
+[
+"Mod",
+"Jumlah modulasi pada tail, 0 sampai 100%."
+],
+[
+"Bass",
+"Decay nada rendah dibandingkan bagian tail lainnya, x0,2 sampai x3,0."
+],
+[
+"Separasi",
+"Lebar stereo reverb, 0 sampai 200%. 100% membiarkannya seperti yang dihasilkan plate."
+],
+[
+"Kecepatan",
+"Kecepatan modulasi, 0,1 Hz sampai 10 Hz dengan hukum pangkat tiga."
+],
+[
+"Crossover",
+"Frekuensi di bawah mana Bass bekerja, 25 Hz sampai 2000 Hz."
+],
+[
+"Pan",
+"Mem-pan reverb, bukan sinyal dry."
+]
+],
+"tips": [
+"Berbeda dari dua reverb Pocket lainnya, sinyal dry punya level sendiri di sini, jadi Dry di 0% menghasilkan reverb saja.",
+"Delay selalu tertulis dalam ms, juga saat Tempo on.",
+"Modulasi belum dibandingkan dengan FL Studio Mobile lewat telinga: tidak ada proyek yang dipakai untuk mengukurnya yang menggunakannya."
+]
+},
+"fx-pocket-reverb-classic": {
+"source": "5bf9dfb5b3",
+"intro": "Pocket Reverb Classic adalah modul reverb lama milik FL Studio Mobile pada plate milik FL Studio Mobile sendiri, jaringan yang mirip Fruity Reeverb 2 tetapi tidak sama. Sinyal asli selalu lewat pada level penuh dan reverb ditambahkan ke dalamnya. Ini adalah mesin tempat proyek FL Studio Mobile (.flm) memuat modul Reverb (legacy)-nya, dengan setiap nilai disalin apa adanya, dan bisa juga ditambahkan ke slot mixer mana pun. Editornya adalah halaman knob polos.",
+"controls": [
+[
+"Decay",
+"Panjang tail, 0,1 detik sampai 20 detik. Knob mengikuti hukum pangkat tiga, jadi sebagian besar rentang geraknya mencakup waktu yang pendek."
+],
+[
+"Redaman tinggi",
+"Frekuensi di atas mana tail kehilangan nada tingginya lebih cepat, 0,5 kHz sampai 22,1 kHz. Ujung atas rentang tertulis Off."
+],
+[
+"Mix",
+"Level reverb, ditampilkan dalam dB dari -inf sampai +6,0 dB."
+],
+[
+"Predelay",
+"Waktu sebelum reverb dimulai, 0 sampai 250 ms."
+],
+[
+"Ukuran ruang",
+"Ukuran plate, 1 sampai 100."
+],
+[
+"Difusi",
+"Seberapa cepat gema melebur menjadi tail yang halus, 0 sampai 100%."
+],
+[
+"Lebar",
+"Lebar stereo reverb, 0 sampai 200%."
+],
+[
+"Low cut",
+"Memotong nada rendah sinyal yang masuk ke reverb, 19 Hz sampai 3000 Hz. Ujung bawah rentang tertulis Off."
+],
+[
+"High cut",
+"Memotong nada tinggi sinyal yang masuk ke reverb, 0,5 kHz sampai 22,1 kHz. Ujung atas rentang tertulis Off."
+],
+[
+"Input",
+"Level sinyal yang dikirim ke reverb, -inf sampai +6,0 dB."
+],
+[
+"ER",
+"Level pantulan awal, -inf sampai +6,0 dB."
+],
+[
+"Level dry",
+"Sinyal dry tambahan yang ditambahkan oleh reverb, -inf sampai +6,0 dB. Nilainya -inf pada instance baru."
+],
+[
+"Input mati",
+"Me-mute sinyal yang dikirim ke reverb. Tertulis On atau Muted."
+],
+[
+"Dry mati",
+"Me-mute sinyal dry tambahan dari Dry level. Tertulis On atau Muted."
+],
+[
+"ER mati",
+"Me-mute pantulan awal. Tertulis On atau Muted."
+],
+[
+"Wet mati",
+"Me-mute tail reverb. Tertulis On atau Muted."
+],
+[
+"Mult bass",
+"Decay nada rendah dibandingkan bagian tail lainnya, x0,2 sampai x3,0."
+],
+[
+"Crossover",
+"Frekuensi di bawah mana Bass mult bekerja, 25 Hz sampai 2000 Hz."
+],
+[
+"Rate mod",
+"Kecepatan modulasi pada tail, 0,1 Hz sampai 10 Hz."
+],
+[
+"Kedalaman mod",
+"Jumlah modulasi pada tail, 0 sampai 100%."
+]
+],
+"tips": [
+"Sinyal asli tidak pernah diturunkan: Dry off dan Dry level hanya mengubah salinan dry tambahan, bukan sinyal yang lewat.",
+"Dari tiga reverb Pocket, hanya ini yang punya sakelar mute dan level dalam dB. Pocket Reverb 2 mengatur levelnya dalam persen dan Pocket Reverb punya satu knob Mix.",
+"Modulasi belum dibandingkan dengan FL Studio Mobile lewat telinga: tidak ada proyek yang dipakai untuk mengukurnya yang menggunakannya."
 ]
 },
 "fx-reeverb": {
@@ -4465,7 +5146,7 @@
 ]
 },
 "fx-echoform": {
-"source": "0505e5d72c",
+"source": "5a830ced10",
 "intro": "Echoform adalah echo dengan dua belas gaya dan lima tata letak echo. Halaman Main punya tiga bagian: Echo untuk waktu, feedback, dan filter, Tap tempo untuk groove dan mode echo, serta Style untuk saturasi, level, dan menu gaya. Halaman Tweak berisi kontrol sisanya.",
 "controls": [
 [
@@ -4531,6 +5212,14 @@
 [
 "Tape",
 "Memilih voicing loop tape terukur: Off, Ping-pong tape, Studio tape, atau Studio tape hot."
+],
+[
+"Classic / Measured",
+"Halaman Tweak. Measured menjalankan tahap tape terukur pada gaya Tape saat menu Tape Off: nada output dan loop, hiss tape, serta lag dari wow. Pemakaian CPU sedikit lebih tinggi. Instance baru dimulai dengan Measured. Proyek dan preset yang disimpan sebelum 0.1.27 dimuat dengan Classic dan terdengar seperti sebelumnya."
+],
+[
+"Clock",
+"Halaman Tweak. Modulasi menggoyang waktu echo sebesar sebagian dari waktunya sendiri, hingga 50 persen pada depth penuh, di kedua sisi sekaligus, seperti delay line ber-clock. Mati secara bawaan."
 ]
 ],
 "tips": [
@@ -4733,7 +5422,7 @@
 ]
 },
 "fx-lattice-mod": {
-"source": "f7f92d15d2",
+"source": "21239e3a70",
 "intro": "Lattice Mod adalah delay termodulasi bawaan LYNX SHARE. Plugin ini menyebar satu sampai enam belas tap di sepanjang waktu delay dan memodulasi masing-masing dengan detune dan vibrato yang lambat. Kamu memakainya untuk tekstur chorus, flanging, ensemble, dan delay.",
 "controls": [
 [
@@ -4775,6 +5464,10 @@
 [
 "Over-mod",
 "Pengali modulasi tambahan."
+],
+[
+"Classic / Measured",
+"Tab WARP. Measured membuat ayunan detune yang lambat 3,5 kali lebih jauh daripada Classic, seperti hasil pengukuran. Instance baru dimulai dengan Measured. Proyek dan preset yang disimpan sebelum 0.1.27 dimuat dengan Classic dan terdengar seperti sebelumnya."
 ]
 ],
 "tips": [
@@ -4878,6 +5571,45 @@
 "Gerakkan Waktu selagi suara diputar untuk efek kecepatan tape."
 ]
 },
+"fx-pocket-tape-stop": {
+"source": "68a5a737c8",
+"intro": "Pocket Tape Stop merekam inputnya sepanjang waktu. Mematikan Play memutar rekaman dengan kecepatan menurun sampai berhenti, dan menyalakan Play lagi mempercepatnya dan memudar kembali ke input langsung selama 0,1 detik terakhir. Otomasikan Play untuk menempatkan henti di dalam lagu. Ini adalah mesin tempat proyek FL Studio Mobile (.flm) memuat modul Tape Stop-nya, dengan setiap nilai disalin apa adanya, dan bisa juga ditambahkan ke slot mixer mana pun. Editornya adalah halaman knob polos.",
+"controls": [
+[
+"Waktu berhenti",
+"Lama perlambatan saat Sync off, hingga 5 detik. Ditampilkan dalam ms di bawah satu detik. Ujung bawah rentang tertulis Off: tape berhenti dalam 5 ms."
+],
+[
+"Waktu awal",
+"Lama percepatan saat Sync off, hingga 5 detik."
+],
+[
+"Waktu berhenti (sinkron)",
+"Lama perlambatan saat Sync on: Off, 1/4 beat, 3/8 beat, 1/2 beat, 3/4 beat, 1 beat, 2, 4, 8, atau 16 beat."
+],
+[
+"Waktu mulai (sinkron)",
+"Lama percepatan saat Sync on, dengan langkah yang sama."
+],
+[
+"Putar",
+"On memutar input. Off menghentikan tape. Setiap perubahan memulai perlambatan atau percepatan."
+],
+[
+"Warp",
+"Bentuk kurva kecepatan, -100% sampai +100%."
+],
+[
+"Sinkron",
+"On memakai waktu sinkron pada tempo lagu, Off memakai waktu dalam detik."
+]
+],
+"tips": [
+"Hanya bekerja selama lagu diputar. Saat lagu berhenti, audio diteruskan dan tidak ada yang direkam.",
+"Setelah tape berhenti, output memudar menjadi hening sampai Play dinyalakan lagi.",
+"Menyalakan Play kembali saat perlambatan berlangsung mempercepat dari kecepatan yang sudah dicapai."
+]
+},
 "fx-pocket-trance-delay": {
 "source": "390a4b427a",
 "intro": "Pocket Trance Delay adalah delay yang terkunci ke tempo lagu. Gema ditambahkan ke sinyal dry, yang selalu tetap pada level penuh. Ia adalah mesin tempat proyek FL Studio Mobile (.flm) memuat modul Trance Delay-nya, dan juga bisa ditambahkan ke slot mixer mana pun.",
@@ -4913,7 +5645,7 @@
 ]
 },
 "fx-spiral-echo": {
-"source": "60ff7072a7",
+"source": "10033a87c7",
 "intro": "Spiral Echo adalah delay bawaan LYNX SHARE untuk insert mixer. Setiap pengulangan digeser frekuensinya sedikit lebih jauh dari yang sebelumnya, sehingga echo naik atau turun, bukan sekadar berulang. Pada stereo, sisi kanan mendengar tiap pengulangan dengan pergeseran yang berlawanan.",
 "controls": [
 [
@@ -4947,6 +5679,10 @@
 [
 "Output",
 "Mode output (Stereo pada gambar)."
+],
+[
+"Classic / Measured",
+"Measured memakai loop feedback terukur: filternya, all-pass tambahan, limiter, dan glide saat waktu delay berubah. Pemakaian CPU sedikit lebih rendah. Instance baru dimulai dengan Measured. Proyek dan preset yang disimpan sebelum 0.1.27 dimuat dengan Classic dan terdengar seperti sebelumnya."
 ]
 ],
 "tips": [
@@ -5308,8 +6044,8 @@
 ]
 },
 "fx-gemini-doubler": {
-"source": "d9526268fd",
-"intro": "Gemini Doubler adalah efek bawaan LYNX SHARE yang menebalkan vokal atau sumber mono lain dengan dua salinan tertunda yang sedikit di-detune. Tambahkan ke insert track yang ingin kamu double. Tiap voice adalah delay pitch-shifting yang terdiri dari dua grain yang di-crossfade.",
+"source": "c1f0d8a7eb",
+"intro": "Gemini Doubler adalah efek bawaan LYNX SHARE yang menebalkan vokal atau sumber mono lain dengan dua salinan tertunda yang sedikit di-detune. Tambahkan ke insert track yang ingin kamu double. Tiap voice adalah delay pitch-shifting.",
 "controls": [
 [
 "Langsung",
@@ -5358,6 +6094,10 @@
 [
 "L / L+R / L-R",
 "Sumber untuk voice 1: kiri, jumlah, atau selisih."
+],
+[
+"Classic / Measured",
+"Read head voice saat Align mati. Measured membaca tiap voice dengan satu head yang bergeser dan melompat kembali, seperti hasil pengukuran, dan memakai CPU kurang dari separuhnya. Classic memakai dua tap yang di-crossfade. Instance baru dimulai dengan Measured. Proyek dan preset yang disimpan sebelum 0.1.27 dimuat dengan Classic dan terdengar seperti sebelumnya."
 ]
 ],
 "tips": [
@@ -5462,7 +6202,7 @@
 ]
 },
 "fx-orbit": {
-"source": "5aec5c0bbd",
+"source": "e0ee24a093",
 "intro": "Orbit mencakup flanging, chorus, dan doubling dalam satu efek untuk insert mixer. Kamu memilih karakternya dengan Mode, misalnya flange barber-pole yang menanjak, dan membentuknya dengan lima knob. Baris petunjuk di bawah kontrol Mode menjelaskan mode saat ini.",
 "controls": [
 [
@@ -5488,6 +6228,10 @@
 [
 "Mode",
 "Barber-pole, flange through-zero, chorus tri dan octo, doubler, ensemble, symphonic, dan lainnya."
+],
+[
+"Classic / Measured",
+"Measured mengubah sapuan Rise dan Rise / fall, delay dasar pada Manual, dan kurva feedback menjadi yang terukur. Pada Rise / fall sisi kiri naik sementara sisi kanan turun. Instance baru dimulai dengan Measured. Proyek dan preset yang disimpan sebelum 0.1.27 dimuat dengan Classic dan terdengar seperti sebelumnya."
 ]
 ],
 "tips": [
@@ -6943,7 +7687,7 @@
 ]
 },
 "fx-voice-shift": {
-"source": "040e0a998d",
+"source": "5906a3c3c3",
 "intro": "Voice Shift adalah pitch dan formant shifter untuk satu suara atau satu garis monofonik. Plugin ini mendeteksi pitch antara 70 Hz dan 1000 Hz. Ia melaporkan latensinya untuk kompensasi delay dan menunda sinyal dry agar sesuai.",
 "controls": [
 [
@@ -6973,6 +7717,10 @@
 [
 "Channel MIDI",
 "Off, atau sebuah channel Channel Rack yang not tahanannya mengatur pitch. Transpose dan Kuantisasi menggeser sebesar jarak not tertinggi yang ditahan dari C4, dan Robot menyanyikan not itu."
+],
+[
+"Classic / Measured",
+"Measured membuat suara yang tidak ditemukan detektor sebagai bersuara, seperti bunyi s dan t, mengikuti pergeseran formant (dengan Link on, pitch dan formant). Sakelarnya hanya tampil untuk instance dari proyek atau preset yang disimpan sebelum 0.1.27, yang dimuat dengan Classic dan terdengar seperti sebelumnya. Setelah kamu beralih ke Measured, sakelar itu disembunyikan. Instance baru memakai Measured."
 ]
 ],
 "tips": [

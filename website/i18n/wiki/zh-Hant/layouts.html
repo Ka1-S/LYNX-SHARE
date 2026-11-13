@@ -4,20 +4,24 @@
 <h2 id="launch-clips-in-the-grid">在網格中啟動片段</h2>
 <ol><li>選擇 <code>檢視 › 版面樣式 › 片段啟動工作流程</code>。片段網格會出現在播放清單旁邊。</li><li>在空的格子上按右鍵，選擇 <code>在此放置模式</code>，再選一個樣式。在空格子上按兩下，則會把目前的樣式放進去。</li><li>點擊片段左側的三角形來啟動它。如果走帶是停止的，它就會開始。</li><li>點擊 <code>場景</code> 欄中場景的三角形，啟動那一列的所有片段。</li><li>按一下 <code>停止所有片段</code> 來停止它們。</li><li>按一下 <code>返回播放清單</code>，讓軌道再次播放它們的播放清單片段。</li></ol>
 <h2 id="what-changes-on-screen">畫面上有什麼變化</h2>
-<ul><li>片段網格顯示在播放清單旁邊。播放清單軌道是欄，場景是列。</li><li>播放清單的標題列多了一個 <code>兩者</code>、<code>網格</code>、<code>歌曲</code> 切換。<code>網格</code> 只顯示網格，<code>歌曲</code> 只顯示播放清單。</li><li>第一次進入時，通道機架是隱藏的。按 <code>F6</code> 或它的工具列按鈕即可顯示。</li><li>播放清單的自動化軌道會被開啟。</li><li>視窗佈局是依樣式分別儲存的，所以每種樣式都會回到你離開時的樣子。</li></ul>
+<ul><li>片段網格顯示在播放清單旁邊。播放清單軌道是欄，場景是列。</li><li>播放清單的標題列多了一個 <code>兩者</code>、<code>網格</code>、<code>歌曲</code> 切換。<code>網格</code> 只顯示網格，<code>歌曲</code> 只顯示播放清單。</li><li>第一次進入時，通道機架是隱藏的。按 <code>F6</code> 或它的工具列按鈕即可顯示。</li><li>播放清單的自動化軌道會被開啟。</li><li>視窗佈局是依樣式分別儲存的，所以每種樣式都會回到你離開時的樣子。</li><li>在網格下方，<code>混音器</code> 按鈕會顯示或隱藏 Session 混音器，與 Ableton Live 相同：<code>輸入/輸出</code>（<code>音訊來源</code>、<code>監聽</code>、<code>音訊輸出到</code>）、<code>傳送</code>、<code>軌道延遲</code>，以及每個軌道的音量（附啟用開關、獨奏、預備按鈕和電平表），另外還有 <code>主要</code> 軌。</li><li>網格下方的 <code>律動</code> 會顯示 Groove Pool。<code>將律動套用到音符</code> 會把律動寫入 MIDI 片段的音符中。</li><li><code>MIDI</code> 和 <code>調</code> 按鈕會啟動 MIDI 對應模式和按鍵對應模式。請參閱 <a href="/wiki/midi-controllers/">MIDI 控制器</a>。</li></ul>
 <h2 id="the-grid">網格</h2>
 <p>被啟動的片段不會馬上開始。它要等到下一個啟動量化點，在那之前它的三角形會閃爍。網格底部的選單設定全域啟動量化，所有設為 <code>全域</code> 的片段都使用它。停止也是同樣等待。</p>
 <p>在片段上按右鍵可看它的設定。</p>
 <div class="tablewrap"><table><thead><tr><th>設定</th><th>作用</th></tr></thead><tbody><tr><td><code>啟動量化</code></td><td>這個片段何時開始：<code>全域</code>、<code>無</code>、<code>8小節</code> 一直到 <code>1/32</code></td></tr><tr><td><code>啟動模式</code></td><td><code>觸發</code>、<code>門限</code>、<code>切換</code> 或 <code>重複</code></td></tr><tr><td><code>連奏（保持位置）</code></td><td>片段接手同一軌道上前一個播放中片段的播放位置</td></tr><tr><td><code>循環</code></td><td>開啟：片段重複。關閉：播放一次，然後軌道停止</td></tr><tr><td><code>跟隨動作</code></td><td>片段結束後會發生什麼：兩個動作，各有一個機率，以及動作觸發前經過的時間</td></tr><tr><td><code>Delete</code></td><td>清空格子</td></tr></tbody></table></div>
 <p>在空格子上按右鍵可看到 <code>停止按鈕（場景在此停止該音軌）</code>。點擊空格子左側的方塊會停止該軌道。在場景上按右鍵可看到 <code>插入場景</code>、<code>在下方新增場景</code>、<code>刪除場景</code>、<code>重新命名場景...</code> 以及場景的速度。</p>
+<p>片段可以從其選單剪下、複製、貼上和複製一份（<code>Ctrl+D</code>），也可以在格子之間拖曳，或拖曳到播放清單或從播放清單拖出。從瀏覽器拖來的樣式或取樣，或從外部放入的音訊檔案，會填入它們落下的那個格子。場景的選單中還有 <code>複製</code> 和 <code>擷取並插入場景</code>，後者會把目前正在播放的片段放進新的場景。<code>檢視 › 場景速度與拍號</code> 會為每個場景顯示速度和拍號。</p>
 <p>格子選單中還有兩個作用於整個網格的選項：<code>走帶停止時將音軌交還給播放清單</code> 和 <code>整個格線的跟隨動作</code>。</p>
-<div class="tablewrap"><table><thead><tr><th>指令</th><th>按鍵</th><th>作用</th></tr></thead><tbody><tr><td>移動</td><td>方向鍵</td><td>選取另一個格子</td></tr><tr><td>啟動片段</td><td><code>Enter</code></td><td>啟動所選的片段</td></tr><tr><td>啟動場景</td><td><code>Ctrl+Enter</code></td><td>啟動所選的場景</td></tr><tr><td>刪除片段</td><td><code>Del</code></td><td>清空所選的格子</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>指令</th><th>按鍵</th><th>作用</th></tr></thead><tbody><tr><td>移動</td><td>方向鍵</td><td>選取另一個格子</td></tr><tr><td>啟動片段</td><td><code>Enter</code></td><td>啟動所選的片段</td></tr><tr><td>啟動場景</td><td><code>Ctrl+Enter</code></td><td>啟動所選的場景</td></tr><tr><td>刪除片段</td><td><code>Del</code></td><td>清空所選的格子</td></tr><tr><td>繪製模式</td><td><code>B</code></td><td>在自動化軌道中拖曳，會繪製與網格同寬的階梯，或在貼齊關閉或按住 <code>Alt</code> 時手繪，與 Ableton Live 相同。也在 <code>選項</code> 中</td></tr></tbody></table></div>
 <h2 id="ableton-live-sets">Ableton Live 套裝</h2>
 <p>開啟 Live 套裝時，它的 Session 片段和場景會連同啟動設定一起進入片段網格。<code>檔案 › 匯出 › Ableton Live 套裝 (.als)</code> 會把網格寫回成 Session 片段。<code>選項 › 一般設定</code> 中有 <code>Live 專案的工作階段片段</code>，選 <code>播放清單，編曲之後</code> 則會改把它們放到播放清單上。</p>
+<h2 id="the-simple-workflow">簡易工作流程</h2>
+<p><code>檢視 › 版面樣式 › 簡易工作流程</code> 是一個含有軌道和時間軸的視窗，適合第一首歌。<code>檢視 › 音軌面板</code> 會在時間軸下方顯示所選軌道的面板，有 <code>效果器</code>、<code>樂器</code>、<code>鍵盤</code> 和 <code>編輯器</code> 分頁。在這個工作流程中，<code>說明</code> 選單有 <code>首支歌曲導覽</code> 和 <code>歡迎畫面...</code>，後者提供七步驟的第一首歌、示範歌曲或空白專案。請參閱 <a href="/wiki/simple-layout/">簡易版面</a>。</p>
+<p><code>檢視</code> 選單中的 <code>歌詞和筆記</code> 和 <code>參考比對...</code>，以及混音器插入軌選單中的 <code>清晰人聲</code>，在每種版面中都有。在簡易工作流程中，<code>清晰人聲</code> 也在軌道的選單中。</p>
 <h2 id="switch-back">切換回來</h2>
 <p>選擇 <code>檢視 › 版面樣式 › 模式工作流程（預設）</code>。你在樣式工作流程中的視窗佈局會回來，自動化軌道也回到之前的設定。網格中的片段仍留在專案裡。</p>
 <h2 id="good-to-know">須知</h2>
-<ul><li>啟動過片段的軌道，在你按下 <code>返回播放清單</code> 之前，在播放清單中會保持靜音。選項 <code>走帶停止時將音軌交還給播放清單</code> 會在每次停止時替你做這件事。</li><li>在 0.1.25 中，格子要從它的選單或按兩下來填入。你不能把片段或檔案拖進格子。</li><li>跟隨動作只有片段才有，場景沒有。</li><li>在片段啟動工作流程中手動開啟的自動化軌道，切換回去時不會保留。</li><li>選擇樣式工作流程時，不會載入網格的任何內容。</li></ul>
+<ul><li>啟動過片段的軌道，在你按下 <code>返回播放清單</code> 之前，在播放清單中會保持靜音。選項 <code>走帶停止時將音軌交還給播放清單</code> 會在每次停止時替你做這件事。</li><li>網格的新按鍵（<code>B</code>、<code>Q</code>、<code>Ctrl+M</code>、<code>Ctrl+K</code> 等）只在片段啟動工作流程中這樣運作。在樣式工作流程中，它們保持 FL Studio 的意義。</li><li>6/8 的場景會播放三拍一小節，因為拍號是以四分音符計算。</li><li>跟隨動作只有片段才有，場景沒有。</li><li>在片段啟動工作流程中手動開啟的自動化軌道，切換回去時不會保留。</li><li>選擇樣式工作流程時，不會載入網格的任何內容。</li></ul>
 <h2 id="related">相關頁面</h2>
 <ul><li><a href="/wiki/playlist/">播放清單</a></li><li><a href="/wiki/coming-from-ableton/">從 Ableton Live 轉換</a></li><li><a href="/wiki/importing-projects/">匯入專案</a></li><li><a href="/why/#workflows">只有 LYNX 能做到的事：工作流程</a></li></ul>
 <p>第三個項目是給第一首歌用的單一視窗。見<a href="/wiki/simple-layout/">簡易版面</a>。</p>

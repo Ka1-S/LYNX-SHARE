@@ -1,5 +1,5 @@
 ---
-source: c457d438ee
+source: a79e43f031
 ---
 LYNX SHARE menyimpan proyek sebagai file `.lynx`. Program ini juga membuka proyek dari program lain, memuat file audio yang umum, dan mengekspor audio, MIDI, dan proyek untuk program lain. Tabel mencantumkan setiap format di 0.1.26 alpha.
 
@@ -20,8 +20,8 @@ Proyek yang dibuka dari format program lain adalah impor. `File › Simpan` lalu
 | `.zip` | `File › Buka...` mengekstraknya ke folder dan membuka proyek di dalamnya | `File › Ekspor › Proyek beserta sample (.zip)...` | Juga membuka paket loop zip FL Studio |
 | `.lynxpack` | Terbuka setelah ringkasan. Sebuah bagian digabungkan ke proyek host | `File › Sesi online › Kirim proyek...` | Proyek atau bagian yang dikirim dalam [sesi online](/wiki/online-sessions/). Bagian plugin pihak ketiga dikirim sebagai render audio plus pengaturan plugin |
 | `.flp` | `File › Buka...` | `File › Ekspor › Proyek FL Studio...`, proyek FL Studio 2026 atau paket loop zip | Plugin bawaan dimainkan di engine buatan ulang dengan tingkat kemiripan yang beragam. Paket FLEX tidak pernah dibuka. Saat ekspor, instrumen dan efek yang hanya ada di LYNX di-render ke audio atau ditukar dengan plugin FL terdekat, dan modulator dilewati. Lihat [Pindahan dari FL Studio](/wiki/coming-from-fl-studio/) |
-| `.flm` | `File › Buka...` | Tidak | Proyek FL Studio Mobile. Parsial: instrumen selain MiniSynth, Transistor Bass, 3x Osc, GMSynth, dan DirectWave dimainkan dengan synth bawaan |
-| `.als` | `File › Buka...`, set Live 11 dan 12 | `File › Ekspor › Set Ableton Live (.als)...`, untuk Live 12 atau Live 11 | Saat impor, efek bawaan Live dibuang. Saat ekspor, instrumen dan efek bawaan LYNX SHARE tidak dikonversi, dan otomasi parameter efek serta rute antar insert dibuang. Lihat [Pindahan dari Ableton Live](/wiki/coming-from-ableton/) |
+| `.flm` | `File › Buka...` | Tidak | Proyek FL Studio Mobile. Parsial: instrumen selain MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler, Slicer, dan DirectWave dimainkan dengan synth bawaan |
+| `.als` | `File › Buka...`, set Live 11 dan 12 | `File › Ekspor › Set Ableton Live (.als)...`, untuk Live 12 atau Live 11 | Saat impor, device Live yang tidak punya padanan di LYNX SHARE dibuang. Saat ekspor, instrumen dan efek bawaan LYNX SHARE tidak dikonversi, dan otomasi parameter efek serta rute antar insert dibuang. Lihat [Pindahan dari Ableton Live](/wiki/coming-from-ableton/) |
 | `.mid`, `.midi` | `File › Buka...` membuat proyek baru. `File › Impor › File MIDI...` dan Piano Roll mengimpor ke proyek yang sedang terbuka | `File › Ekspor › File MIDI...` (`Ctrl+Shift+M`) | |
 | `.wav` | Sebagai sample atau clip audio | `File › Ekspor › File Wave...`, 16 bit, 24 bit, atau 32 bit float | Dither, informasi tempo, marker loop, dan marker Playlist bersifat opsional |
 | `.mp3` | Sebagai sample atau clip audio | `File › Ekspor › File MP3...` | Bitrate konstan |

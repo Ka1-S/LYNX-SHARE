@@ -1,5 +1,5 @@
 ---
-source: 0d51822a6b
+source: 094cbefd18
 ---
 ![Het venster Opname vraagt wat er opgenomen moet worden: audio, noten en automatisering, alles, of audio in de audio-editor](/assets/img/wiki/record-dialog.webp)
 
@@ -16,6 +16,17 @@ De opnameknop in het transport, of de toets `R`, zet opnemen aan. De eerste keer
 7. Druk op stop. De take is een audioclip op de Playlist.
 
 `Shift+R` doet stap 4 tot 6 met één toets: het armt de geselecteerde insert, neemt alleen audio op en start het afspelen. Druk er nogmaals op om te stoppen.
+
+Wanneer je een ingang kiest voor een insert die meer opneemt dan alleen die ingang (andere kanalen die er naartoe sturen worden ook opgenomen), vraagt LYNX SHARE, zoals FL Studio doet, of hij moet omschakelen naar `Alleen externe ingang`. Antwoord `Ja` om de ingang alleen op die insert op te nemen.
+
+## Audio-opname met één klik
+
+`Extra › Audio opnemen met één klik` start een take in één stap, zoals in FL Studio. Het werkt op de geselecteerde mixerinsert. Met de Master of niets geselecteerd neemt het de eerste insert met een ingang, of anders een vrije insert.
+
+| Commando | Wat het doet |
+|---|---|
+| `In de Edison-audio-editor/-recorder` | Zet Edison op de insert, ingesteld om op te nemen wanneer het afspelen begint, en start het afspelen. Zie [Mixer](/wiki/mixer/) |
+| `In de playlist als audioclip` | Schakelt over naar Song-modus, armeert de insert, vraagt om zijn ingang als hij er geen heeft, en start opname en afspelen. Inserts die al zijn gearmeerd nemen op zoals ze zijn |
 
 ## Wat het venster Opname biedt
 
@@ -59,7 +70,7 @@ De opties staan in `Opties › Opname` en in het rechtsklikmenu van de opnamekno
 
 | Opdracht | Toets | Wat het doet |
 |---|---|---|
-| `Aftellen` | `Ctrl+P` | Uit, 1 maat, 2 maten of 4 maten metronoom voordat de opname begint |
+| `Aftellen` | `Ctrl+P` | Uit, 1 maat, 2 maten of 4 maten metronoom voordat de opname begint. `Ctrl+P` schakelt tussen uit en de laatst gekozen lengte. De keuze blijft bewaard wanneer je het programma sluit; een nieuwe installatie start met 1 maat, zoals FL Studio |
 | `Metronoom` | `Ctrl+M` | Klik tijdens het afspelen |
 | `Wachten op de eerste noot om te starten` | `Ctrl+I` | De opname wacht tot je speelt |
 | `Loop-opname` | none | De opname loopt in een loop in plaats van door te lopen |
@@ -70,7 +81,17 @@ De opties staan in `Opties › Opname` en in het rechtsklikmenu van de opnamekno
 
 `Lage latentie tijdens opnemen` staat in het rechtsklikmenu van de opnameknop en in het insertmenu van de Mixer onder `Opnemen naar schijf`. Het staat standaard uit. Zolang een insert met een ingang is scherpgesteld, of zijn monitoring `Aan` staat, worden de effecten die latentie toevoegen op zijn weg naar de Master gebypasst. Dit verandert alleen wat je hoort: een insert houdt al zijn effecten als de take erachter wordt afgetapt, bijvoorbeeld met `Na de effecten`. De effecten komen terug als de insert niet meer is scherpgesteld.
 
+`Latentiecompensatie` zit in hetzelfde menu `Opnemen naar schijf` en staat standaard aan, zoals in FL Studio. Het verschuift elke take terug met de round trip van het audioapparaat, de waarde `Fijnafstelling (samples)` van de audio-instellingen en de vertragingscompensatie van de plugins. Zet het uit om de takes te houden waar ze zijn opgenomen.
+
 `Extra › Opname annuleren` gooit weg wat de huidige opnamedoorgang schreef (de noten, automatisering en audiotakes) en zet opnemen uit. Het afspelen gaat door en de scherpgestelde inserts blijven scherpgesteld.
+
+## Opnemen in clipslots
+
+In de [Clip-launch-werkwijze](/wiki/layouts/) kunnen takes in het clipraster in plaats van de Playlist, zoals in Ableton Live.
+
+- Armeer een track met zijn arm-knop in de Sessiemixer. Zijn lege slots tonen dan een ronde opnameknop in plaats van het stopvierkant. Klik erop om in dat slot op te nemen.
+- `Sessie-opname`, onder het raster, neemt de gearmeerde tracks op in de geselecteerde scene. Terwijl hun clips spelen, worden nieuwe noten eraan toegevoegd (overdub).
+- `Vaste opnamelengte`, in het menu van een leeg slot, beëindigt een opname in een slot na 1 of meer maten, en de clip speelt door. `Uit` neemt op tot je stopt.
 
 ## Loopopname en takes
 

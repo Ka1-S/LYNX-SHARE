@@ -1,5 +1,5 @@
 ---
-source: bcd8a275bd
+source: 358890815a
 ---
 `File › Buka...` (`Ctrl+O`) membuka proyek `.lynx` milik LYNX SHARE sendiri dan juga file `.flp`, `.als`, `.flm`, dan `.mid`. Proyek dari program lain adalah impor: ia menjadi proyek LYNX SHARE baru yang belum disimpan, dan file aslinya tidak pernah ditulisi.
 
@@ -16,8 +16,8 @@ source: bcd8a275bd
 | Format | Dikonversi | Tidak dikonversi |
 |---|---|---|
 | `.flp` (FL Studio) | Channel, sample, pattern, not slide dan porta, semua aransemen, marker, perubahan birama, otomasi, tautan kontroler, Mixer beserta rutenya, sidechain, EQ track, dan efek bawaan | Paket FLEX dienkripsi dan tidak pernah dibuka. Channel FLEX mendapat patch synth yang dipilih berdasarkan nama presetnya |
-| `.als` (Live 11 dan 12) | Track MIDI, audio, grup, dan return, tempo, birama, locator, loop, volume, pan, mute, solo, dan send beserta otomasinya, clip Session dan scene, warp marker | Efek bawaan Live dibuang. Rack hanya mempertahankan rantai pertamanya. Simpler, Sampler, dan drum rack menjadi sampler LYNX SHARE |
-| `.flm` (FL Studio Mobile) | Tempo, birama, satu insert mixer per channel, satu track Playlist per lajur, pattern, clip audio dengan offset dan pitch, drum kit, sample DW Sampler, dan program `.dwp` | Efek dan lajur otomasi FLM. Generator FLM lainnya memakai synth bawaan |
+| `.als` (Live 11 dan 12) | Track MIDI, audio, grup, dan return, tempo, birama, locator, loop, volume, pan, mute, solo, dan send beserta otomasinya, clip Session dan scene, warp marker, rack dan Drum Rack, dan banyak device bawaan Live (EQ Eight, Compressor, Glue Compressor, Reverb, Delay, Auto Filter, Saturator, Utility, Simpler, Drift, dan lainnya) sebagai milik LYNX SHARE sendiri | Device Live yang tidak punya padanan di LYNX SHARE (Hybrid Reverb, Grain Delay, Amp, Roar, patch FM Operator, dan lainnya) dibuang dan dicantumkan. MIDI Effect Rack tidak dikonversi |
+| `.flm` (FL Studio Mobile) | Tempo, birama, satu insert mixer per channel, satu track Playlist per lajur, pattern, clip audio dengan offset dan pitch, drum kit, DW Sampler dan program `.dwp`, Slicer, MiniSynth, Transistor Bass, 3x Osc, GMSynth, dan SuperSaw, efek, otomasi, dan chord set | Generator FLM lainnya memakai synth bawaan |
 | `.mid` | Not, birama, dan setiap perubahan tempo | File MIDI tidak membawa suara: channel mendapat synth LYNX SHARE atau channel MIDI Out |
 
 Plugin pihak ketiga VST2, VST3, dan CLAP di file `.flp`, serta plugin VST2 dan VST3 di file `.als`, dimuat dengan state yang tersimpan jika plugin yang sama terinstal di komputermu.
