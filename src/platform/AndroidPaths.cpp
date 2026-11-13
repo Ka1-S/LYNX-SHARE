@@ -5,10 +5,12 @@
 #if JUCE_ANDROID || defined(LYNX_ANDROID)
 #include <android/native_activity.h>
 #include <android/asset_manager.h>
+#include <android/native_app_glue.h>
 #include <jni.h>
 
 extern "C" {
     extern JavaVM* android_jvm;
+    extern struct android_app* android_app;
 }
 
 namespace lynx::platform
