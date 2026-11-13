@@ -660,8 +660,7 @@ if(LYNX_BUILD_APP)
             juce::juce_recommended_config_flags)
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Android")
-        # JUCE Android modules
-        target_link_libraries(LYNX PRIVATE juce::juce_android)
+        # JUCE Android modules are linked automatically by juce_add_gui_app in JUCE 8
     endif()
     # LTO for the shipped app; the Tests workflow builds without it (round speed185a: the LTO link was 7 of the 8.5
     # minutes of a cached CI App build). -DLYNX_LTO=OFF
