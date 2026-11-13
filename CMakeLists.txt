@@ -621,7 +621,7 @@ if(LYNX_BUILD_APP)
             JUCE_PLUGINHOST_LV2=0
             LYNX_ANDROID=1)
         # Android uses AAudio (API 26+) with OpenSL ES fallback
-        target_link_libraries(LYNX PRIVATE OpenSLES log android)
+        target_link_libraries(LYNX PRIVATE OpenSLES log android aaudio)
         # Android-specific sources
         target_sources(LYNX PRIVATE
             src/engine/AndroidAudioDevice.cpp

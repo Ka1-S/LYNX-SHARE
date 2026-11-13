@@ -4,6 +4,7 @@
 #include <jni.h>
 #include <android/log.h>
 #include <android/native_activity.h>
+#include <aaudio/AAudio.h>
 
 extern "C" {
     extern JavaVM* android_jvm;

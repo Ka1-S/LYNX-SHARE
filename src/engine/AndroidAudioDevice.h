@@ -42,8 +42,6 @@ public:
 
 private:
     juce::String deviceName { "AAudio" };
-    void initializeAAudio();
-    void cleanupAAudio();
 
     AAudioStream* inputStream = nullptr;
     AAudioStream* outputStream = nullptr;
