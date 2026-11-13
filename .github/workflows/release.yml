@@ -135,8 +135,10 @@ jobs:
           if-no-files-found: warn
 
   # ---------------------------------------------------------------------------------------------
-  # SignPath code signing: PLACEHOLDER, disabled until the SignPath Foundation approves LYNX.
-  # To enable (docs/CODE_SIGNING.md):
+  # SignPath code signing (docs/CODE_SIGNING.md). Build and signing are separate jobs: with the
+  # release-signing policy (SignPath Foundation certificate) every request waits for a manual
+  # approval in the SignPath web app; test-signing is approved automatically.
+  # Settings:
   #   repository secret    SIGNPATH_API_TOKEN        API token of the SignPath CI user (submitter role)
   #   repository variable  SIGNPATH_ORGANIZATION_ID  organization id shown in the SignPath web app
   #   repository variable  SIGNPATH_PROJECT_SLUG     project slug (default: LYNX)
@@ -148,7 +150,7 @@ jobs:
     needs: build
     if: vars.SIGNPATH_ENABLED == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 200
+    timeout-minutes: 355  # GitHub-hosted jobs stop at 6 h
     permissions:
       actions: read     # SignPath reads the job details and downloads the unsigned artifact
       contents: read
@@ -162,7 +164,7 @@ jobs:
           signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
           github-artifact-id: ${{ needs.build.outputs.artifact-id }}
           wait-for-completion: true
-          wait-for-completion-timeout-in-seconds: 10800   # a release request waits up to 3 h for manual approval
+          wait-for-completion-timeout-in-seconds: 20700   # a release request waits up to 5 h 45 min for the manual approval
           output-artifact-directory: signed
 
       - name: Upload signed LYNX.exe

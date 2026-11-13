@@ -99,7 +99,7 @@ English and `PT` strings) remove "pending approval", and drop the SmartScreen no
    `git tag vX.Y.Z-alpha && git push origin vX.Y.Z-alpha`.
 2. The `Release` workflow starts; the `sign` job submits a signing request and waits.
 3. Open the request in <https://app.signpath.io> (you also get an e-mail), check that it comes from the expected
-   commit and workflow run, and click **Approve** within 3 hours (otherwise the job times out; re-run it from the Actions tab).
+   commit and workflow run, and click **Approve** within 5 h 45 min (GitHub stops a hosted job at 6 h; if it times out, re-run the `sign` job from the Actions tab and then the jobs after it).
 4. The `package` job self-tests the signed exe and attaches `LYNX.exe`, the zip and `SHA256SUMS.txt` to the release
    (a draft is created if the release does not exist yet). Edit the notes and publish.
 
