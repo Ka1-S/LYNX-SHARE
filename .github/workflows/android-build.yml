@@ -61,8 +61,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
-          build-root-directory: 'android'
+          cache: false
 
       # ---------------------------------------------------------
       # 3. Setup Android NDK (manual download - more reliable)
