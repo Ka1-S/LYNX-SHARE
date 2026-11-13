@@ -1229,7 +1229,7 @@ int consolidatePatternClips (Song& song, const ConsolidatePlan& plan)
         if (c.muted)
             continue;
         const auto& p = song.patterns[(std::size_t) c.pattern];
-        const auto length = std::max<std::int64_t> (1, p.effectiveLength (song.beatsPerBar));
+        const auto length = std::max<std::int64_t> (1, p.effectiveLength (song.meter()));
         const auto passes = clipPasses (c, length);
         for (auto k = passes.first; k <= passes.last; ++k)
             for (const auto& n : p.notes)
