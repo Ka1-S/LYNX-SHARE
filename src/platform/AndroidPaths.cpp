@@ -5,8 +5,14 @@
 #if JUCE_ANDROID || defined(LYNX_ANDROID)
 #include <android/native_activity.h>
 #include <android/asset_manager.h>
-#include <android/native_app_glue.h>
 #include <jni.h>
+
+// native_app_glue.h is in NDK sysroot - include via full path or use the JUCE provided one
+#if __has_include(<android/native_app_glue.h>)
+#include <android/native_app_glue.h>
+#else
+#include <android/native_app_glue.h>  // fallback
+#endif
 
 extern "C" {
     extern JavaVM* android_jvm;

@@ -17,7 +17,7 @@ public:
     ~AndroidAudioDevice() override;
 
     // AudioIODevice interface (JUCE 8) - exact signatures from base class
-    juce::String getName() const override { return deviceName; }
+    juce::String getName() const { return deviceName; }
     int getDefaultBufferSize() override;
     int getCurrentBufferSizeSamples() override { return currentBufferSize; }
     double getCurrentSampleRate() override { return currentSampleRate; }

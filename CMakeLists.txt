@@ -11,6 +11,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Android")
     set(CMAKE_ANDROID_API 26)
     set(CMAKE_ANDROID_STL_TYPE c++_shared)
     set(CMAKE_ANDROID_ARCH_ABI arm64-v8a)
+    # Force API 26 for all targets
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__ANDROID_API__=26")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__ANDROID_API__=26")
 endif()
 
 project(LYNX VERSION 0.1.26 LANGUAGES C CXX)
