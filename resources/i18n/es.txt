@@ -1186,7 +1186,7 @@ countries: es mx ar co cl pe ve
 "Huge" = "Enorme"
 "Height of every track" = "Altura de todas las pistas"
 "Previewing the clip: release the mouse to stop" = "Preescuchando el clip: suelta el ratón para detener"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "Divisor de pista: [LMB] arrastrar redimensiona esta pista  [Shift][LMB] arrastrar: todas las pistas  [2xLMB] altura predeterminada"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "Tamaño de pista: [LMB] arrastrar redimensiona esta pista (seleccionada: todas las seleccionadas)  [Shift][LMB] arrastrar: todas las pistas  [Alt][LMB] o [MMB] tamaño predeterminado  [2xLMB] bloquear / desbloquear el tamaño"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + arrastrar: una copia única  [Alt][RMB] mantener: escucharlo"
 "Long view (level over time)" = "Vista larga (nivel en el tiempo)"
 "Spectrum (low frequencies on the left)" = "Espectro (frecuencias graves a la izquierda)"
@@ -5787,7 +5787,7 @@ countries: es mx ar co cl pe ve
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Inserta columnas vacías antes de la canción para los clips que se van a lanzar, un marcador en cada una y un marcador Start donde empieza la canción; se activa el modo performance."
 "Marker count" = "Número de marcadores"
 "2 steps" = "2 pasos"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Pista: [LMB] seleccionar  [Ctrl][LMB] añadir / quitar  [Shift][LMB] rango  [RMB] menú  [2xLMB] abrir el origen del clip  [Shift][Wheel] subir / bajar"
+"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Pista: [LMB] seleccionar  [Ctrl][LMB] con sus clips (arrastrar: más pistas)  [Ctrl][Shift][LMB] añadir / quitar  [Shift][LMB] rango  [RMB] menú  [2xLMB] abrir el origen del clip  [Shift][Wheel] subir / bajar"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Latencia de la pista: {0}"

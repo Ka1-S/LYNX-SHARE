@@ -1186,7 +1186,7 @@ countries: de at ch li lu
 "Huge" = "Riesig"
 "Height of every track" = "Höhe aller Spuren"
 "Previewing the clip: release the mouse to stop" = "Clip wird vorgehört: zum Stoppen die Maus loslassen"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "Spurtrenner: [LMB] Ziehen ändert die Höhe dieser Spur  [Shift][LMB] Ziehen: alle Spuren  [2xLMB] Standardhöhe"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "Spurgröße: [LMB] Ziehen ändert die Höhe dieser Spur (ausgewählt: aller ausgewählten Spuren)  [Shift][LMB] Ziehen: alle Spuren  [Alt][LMB] oder [MMB] Standardgröße  [2xLMB] Größe sperren / entsperren"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + Ziehen: eine eigenständige Kopie  [Alt][RMB] halten: anhören"
 "Long view (level over time)" = "Langzeitansicht (Pegel über die Zeit)"
 "Spectrum (low frequencies on the left)" = "Spektrum (tiefe Frequenzen links)"
@@ -5787,7 +5787,7 @@ countries: de at ch li lu
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Fügt vor dem Song leere Spalten für die zu startenden Clips ein, je einen Marker darauf und einen Start-Marker, wo der Song beginnt; der Performance-Modus wird eingeschaltet."
 "Marker count" = "Anzahl der Marker"
 "2 steps" = "2 Steps"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Spur: [LMB] auswählen  [Strg][LMB] hinzufügen / entfernen  [Shift][LMB] Bereich  [RMB] Menü  [2xLMB] Quelle des Clips öffnen  [Shift][Wheel] nach oben / unten verschieben"
+"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Spur: [LMB] auswählen  [Strg][LMB] mit ihren Clips (Ziehen: weitere Spuren)  [Strg][Shift][LMB] hinzufügen / entfernen  [Shift][LMB] Bereich  [RMB] Menü  [2xLMB] Quelle des Clips öffnen  [Shift][Wheel] nach oben / unten verschieben"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Insert-Latenz: {0}"

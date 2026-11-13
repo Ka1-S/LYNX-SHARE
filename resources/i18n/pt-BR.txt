@@ -1187,7 +1187,7 @@ countries: br
 "Huge" = "Enorme"
 "Height of every track" = "Altura de todas as faixas"
 "Previewing the clip: release the mouse to stop" = "Ouvindo o clipe: solte o mouse para parar"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "Divisória da faixa: [LMB] arraste para redimensionar esta faixa  [Shift][LMB] arraste: todas as faixas  [2xLMB] altura padrão"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "Tamanho da faixa: [LMB] arraste para redimensionar esta faixa (selecionada: todas as selecionadas)  [Shift][LMB] arraste: todas as faixas  [Alt][LMB] ou [MMB] tamanho padrão  [2xLMB] trava / destrava o tamanho"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + arrastar: uma cópia única  [Alt][RMB] segure: ouvir"
 "Long view (level over time)" = "Visão longa (nível ao longo do tempo)"
 "Spectrum (low frequencies on the left)" = "Espectro (graves à esquerda)"
@@ -5869,7 +5869,7 @@ countries: br
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Insere colunas vazias antes da música para os clipes a disparar, um marcador em cada uma e um marcador Start onde a música começa; o modo performance é ligado."
 "Marker count" = "Número de marcadores"
 "2 steps" = "2 passos"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Faixa: [LMB] seleciona  [Ctrl][LMB] inclui / tira  [Shift][LMB] intervalo  [RMB] menu  [2xLMB] abre a fonte do clipe  [Shift][Wheel] move para cima / baixo"
+"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Faixa: [LMB] seleciona  [Ctrl][LMB] com os clipes dela (arraste: mais faixas)  [Ctrl][Shift][LMB] inclui / tira  [Shift][LMB] intervalo  [RMB] menu  [2xLMB] abre a fonte do clipe  [Shift][Wheel] move para cima / baixo"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Latência da faixa: {0}"

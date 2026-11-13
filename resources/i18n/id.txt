@@ -1186,7 +1186,7 @@ countries: id
 "Huge" = "Sangat besar"
 "Height of every track" = "Tinggi semua track"
 "Previewing the clip: release the mouse to stop" = "Mempratinjau clip: lepaskan mouse untuk berhenti"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "Pembatas track: [LMB] seret mengubah ukuran track ini  [Shift][LMB] seret: semua track  [2xLMB] tinggi bawaan"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "Ukuran track: [LMB] seret mengubah ukuran track ini (terpilih: semua track terpilih)  [Shift][LMB] seret: semua track  [Alt][LMB] atau [MMB] ukuran bawaan  [2xLMB] kunci / buka kunci ukuran"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + seret: salinan unik  [Alt][RMB] tahan: dengarkan"
 "Long view (level over time)" = "Tampilan panjang (level sepanjang waktu)"
 "Spectrum (low frequencies on the left)" = "Spektrum (frekuensi rendah di kiri)"
@@ -5787,7 +5787,7 @@ countries: id
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Menyisipkan kolom kosong sebelum song untuk clip yang akan diluncurkan, satu marker di tiap kolom, dan marker Start tempat song dimulai; mode performance dinyalakan."
 "Marker count" = "Jumlah marker"
 "2 steps" = "2 step"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Track: [LMB] pilih  [Ctrl][LMB] tambah / buang  [Shift][LMB] rentang  [RMB] menu  [2xLMB] buka sumber clip  [Shift][Wheel] pindah ke atas / bawah"
+"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Track: [LMB] pilih  [Ctrl][LMB] beserta clip-nya (seret: track lain)  [Ctrl][Shift][LMB] tambah / buang  [Shift][LMB] rentang  [RMB] menu  [2xLMB] buka sumber clip  [Shift][Wheel] pindah ke atas / bawah"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Latensi track: {0}"

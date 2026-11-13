@@ -11,6 +11,7 @@
 #include <numeric>
 #include <set>
 
+#include "core/EditorPolish.h"
 #include "core/Effects.h"
 #include "core/FlEffects.h"
 #include "core/FlStateWrite.h"
@@ -1566,6 +1567,7 @@ struct Converter
         info.expanded = ! t.collapsed;
         info.lockedToContent = t.lockedToContent;
         info.lockedHeight = t.lockedHeight;
+        info.heightScale = t.height > 0 ? polish::flSizeForHeight (t.height) : 1.0f; // (round 190ft: FL's size factor)
         info.mode = t.mode == PlaylistTrackMode::audio ? 1 : t.mode == PlaylistTrackMode::instrument ? 3 : 0;
         info.mixerTrack = t.mixerTrack;
         info.channel = t.channel;

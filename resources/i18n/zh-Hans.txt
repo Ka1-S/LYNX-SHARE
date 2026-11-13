@@ -1186,7 +1186,7 @@ countries: cn sg
 "Huge" = "特大"
 "Height of every track" = "所有轨道的高度"
 "Previewing the clip: release the mouse to stop" = "正在预览片段：松开鼠标停止"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "轨道分隔线：[LMB] 拖动调整此轨道大小  [Shift][LMB] 拖动：所有轨道  [2xLMB] 默认高度"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "轨道大小：[LMB] 拖动调整此轨道大小（已选中：所有选中的轨道）  [Shift][LMB] 拖动：所有轨道  [Alt][LMB] 或 [MMB] 默认大小  [2xLMB] 锁定 / 解锁大小"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + 拖动：唯一副本  [Alt][RMB] 按住：试听"
 "Long view (level over time)" = "长视图（电平随时间变化）"
 "Spectrum (low frequencies on the left)" = "频谱（低频在左侧）"
@@ -5787,7 +5787,7 @@ countries: cn sg
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "在歌曲之前插入空白列用于放置要触发的片段，每列放一个标记，并在歌曲开始处放置Start标记；同时开启表演模式。"
 "Marker count" = "标记数量"
 "2 steps" = "2步"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "轨道：[LMB] 选择  [Ctrl][LMB] 添加 / 移除  [Shift][LMB] 范围  [RMB] 菜单  [2xLMB] 打开片段来源  [Shift][Wheel] 向上 / 向下移动"
+"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "轨道：[LMB] 选择  [Ctrl][LMB] 连同其片段（拖动：更多轨道）  [Ctrl][Shift][LMB] 添加 / 移除  [Shift][LMB] 范围  [RMB] 菜单  [2xLMB] 打开片段来源  [Shift][Wheel] 向上 / 向下移动"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "轨道延迟：{0}"

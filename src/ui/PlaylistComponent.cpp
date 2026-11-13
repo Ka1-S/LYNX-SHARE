@@ -46,6 +46,7 @@
 #include "core/NoteEdit.h"
 #include "core/PlaylistOps.h"
 #include "core/PlaylistTrackOps.h"
+#include "core/TrackHeaderGestures.h"
 #include "core/KeyFollow.h"
 #include "core/SimpleTracks.h"
 #include "core/QuickRender.h"
@@ -1264,17 +1265,21 @@ int PlaylistComponent::yToTrack (int y) const
 
 int PlaylistComponent::dividerAt (juce::Point<int> p) const
 {
-    // the bottom edge of a track header (4 px band) resizes that track
+    // FL's resize band (FUN_00ea93a0, round 190ft): the bottom quarter of the header, 4 to 14 px, inside the row and
+    // left of its buttons (the LED, the group arrow, the audio track's buttons)
     if (p.x >= headerWidth || p.y < tracksTop() || p.y >= gridArea().getBottom())
         return -1;
 
-    const auto track = yToTrack (p.y);
-
-    for (auto t : { track - 1, track })
-        if (t >= 0 && ! noteedit::isFoldedAway (engine.getSong(), t) && std::abs (p.y - (trackToY (t) + heightOf (t))) <= 3)
-            return t;
-
-    return -1;
+    const auto t = yToTrack (p.y);
+    if (t < 0 || noteedit::isFoldedAway (engine.getSong(), t) || ! trackhdr::inResizeBand (heightOf (t), p.y - trackToY (t)))
+        return -1;
+    if (const auto led = trackLed (t); ! led.isEmpty() && p.x >= led.getX() - 2)
+        return -1;
+    for (const auto& r : { trackArrow (t), trackArm (t), trackInput (t), trackAudition (t), trackSolo (t), trackVolume (t), trackPan (t), trackFx (t),
+                           trackLaneArrow (t), trackAddLane (t) })
+        if (! r.isEmpty() && r.expanded (2).contains (p))
+            return -1;
+    return t;
 }
 
 void PlaylistComponent::setTrackHeights (std::vector<int> tracks, int height)
@@ -3829,9 +3834,23 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    // track header divider: drag resizes the track above it (Shift: every track)
-    if (const auto divider = dividerAt (e.getPosition()); divider >= 0 && e.mods.isLeftButtonDown())
+    // the resize band at the bottom of a header (FL AUTracksPanelMouseDown, round 190ft): drag resizes the track (and
+    // every selected track when it is one of them; LYNX's Shift: every track); Alt+click or a middle click = 100 %
+    // and unlocked; a double click or a click on a locked row flips "Lock to this size"
+    if (const auto divider = dividerAt (e.getPosition()); divider >= 0 && (e.mods.isLeftButtonDown() || e.mods.isMiddleButtonDown()))
     {
+        const auto press = e.mods.isMiddleButtonDown() ? trackhdr::BandPress::reset
+                         : trackhdr::bandPress (pltracks::isSizeLocked (engine.getSong(), divider), e.getNumberOfClicks() > 1, e.mods.isAltDown());
+        if (press == trackhdr::BandPress::toggleLock)
+        {
+            bandToggleLock (divider);
+            return;
+        }
+        if (press == trackhdr::BandPress::reset)
+        {
+            bandReset (divider);
+            return;
+        }
         drag = Drag::trackResize;
         resizeTrack = divider;
         resizeAll = e.mods.isShiftDown();
@@ -3943,7 +3962,17 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
                 noteedit::soloTrack (s, track, count, &flsettings::trackSoloMemory(), flsettings::options().restoreStateAfterSolo.load());
             });
         else if (flmods::popup (e.mods))
+        {
+            // FL: a right-click on a track that is not selected selects it alone first
+            if (! isTrackSelected (track))
+            {
+                selectedTracks = { track };
+                currentTrack = track;
+                followLinkedTrack (track);
+                repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
+            }
             showTrackMenu (track);
+        }
         else if (onLed)
             editTrack (track, [] (PlaylistTrack& t) { t.muted = ! t.muted; });
         else if (onArrow)
@@ -3953,26 +3982,39 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             });
         else if (! noteedit::isFoldedAway (engine.getSong(), track))
         {
-            // Ctrl+click adds / removes a track, Shift+click selects the tracks from the last clicked one (round 165m:
-            // FL's track menu settings, e.g. Performance settings, apply to every selected track)
-            if (flmods::ctrl (e.mods))
-            {
-                if (selectedTracks.empty() && currentTrack >= 0)
-                    selectedTracks.push_back (currentTrack);
-                if (const auto it = std::find (selectedTracks.begin(), selectedTracks.end(), track); it != selectedTracks.end())
-                    selectedTracks.erase (it);
-                else
-                    selectedTracks.push_back (track);
-            }
-            else if (e.mods.isShiftDown() && currentTrack >= 0)
+            // FL's header press (AUTracksPanelMouseDown, round 190ft, core/TrackHeaderGestures.h): a click selects the
+            // track alone; Ctrl+click selects it alone with every clip on it, Ctrl+drag adds the tracks crossed (and
+            // their clips); Ctrl+Shift+click adds / removes the track (and a drag adds / removes the tracks crossed).
+            // LYNX keeps its Shift+click: the tracks from the last clicked one (round 165m).
+            const auto plan = trackhdr::planPress (flmods::ctrl (e.mods), e.mods.isShiftDown(), e.mods.isAltDown());
+            if (plan.lynxShiftRange && currentTrack >= 0)
             {
                 selectedTracks.clear();
                 for (int t = juce::jmin (currentTrack, track); t <= juce::jmax (currentTrack, track); ++t)
                     selectedTracks.push_back (t);
             }
             else
-                selectedTracks = { track };
-            currentTrack = track;
+            {
+                auto sel = sortedTrackSelection();
+                trackhdr::applySelection (sel, track, plan.mode);
+                selectedTracks = sel;
+                const auto nowSelected = std::binary_search (sel.begin(), sel.end(), track);
+                if (plan.clips != trackhdr::ClipPick::none)
+                {
+                    headerClipBase = plan.clips == trackhdr::ClipPick::add ? selection : std::vector<int> {};
+                    selectClipsOnTracks (track, track, plan.clips == trackhdr::ClipPick::add);
+                }
+                if (const auto range = trackhdr::dragAfter (plan, nowSelected); range != trackhdr::RangeDrag::none)
+                {
+                    drag = Drag::headerSelect;
+                    headerDragAnchor = track;
+                    headerDragAdding = range == trackhdr::RangeDrag::select;
+                    headerDragClips = plan.clips != trackhdr::ClipPick::none;
+                }
+                if (plan.mode == trackhdr::SelMode::only && ! simpleHeaders)
+                    followLinkedTrack (track);
+            }
+            currentTrack = selectedTracks.empty() ? -1 : track; // (the last track removed: nothing is selected)
             if (simpleHeaders)
                 selectTrackChannel (track); // (the typing piano and the touch keyboard play the track)
             repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
@@ -4615,19 +4657,85 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
 
     if (drag == Drag::trackResize)
     {
-        // the size shown, kept at 100% zoom (the vertical zoom scales every track)
-        const auto height = polish::clampTrackHeight ((int) std::lround ((resizeStartHeight + e.getDistanceFromDragStartY()) / trackZoom));
+        if (resizeTrack < 0)
+            return; // (ended by the group gesture: FL ignores the rest of the drag)
+        // the size shown, kept at 100% zoom (the vertical zoom scales every track); FL (AUTracksPanelMouseMove,
+        // round 190ft): a selected track resizes every selected track to the same height (FUN_012eda20)
+        auto height = trackhdr::draggedHeight ((int) std::lround (resizeStartHeight / trackZoom),
+                                               (int) std::lround (e.getDistanceFromDragStartY() / trackZoom));
         std::vector<int> tracks;
+        auto rowTop = trackToY (resizeTrack);
+        const auto sel = sortedTrackSelection();
         if (resizeAll)
             for (int t = 0; t < numTracks(); ++t)
                 tracks.push_back (t);
+        else if (sel.size() > 1 && std::binary_search (sel.begin(), sel.end(), resizeTrack))
+        {
+            rowTop = trackToY (sel.front());
+            const auto shared = trackhdr::selectedHeight (sel, resizeTrack, rowTop, e.y);
+            tracks = sel;
+            if (shared > 0)
+                height = polish::evenTrackHeight ((int) std::lround (shared / trackZoom));
+            else
+                tracks.clear(); // (FL leaves the sizes alone below the smallest row)
+        }
         else
             tracks.push_back (resizeTrack);
 
-        if (heightOf (resizeTrack) != scaledHeight (height))
+        // past the top of a row at its smallest: "Group with above track" flips, the size goes back to 100 % (FL)
+        if (! resizeAll && ! liveStyle && resizeTrack > 0 && trackhdr::groupGesture (height, e.y, rowTop))
+        {
+            auto targets = sel.size() > 1 && std::binary_search (sel.begin(), sel.end(), resizeTrack) ? sel : std::vector<int> { resizeTrack };
+            if (targets.size() == 1)
+            {
+                selectedTracks = targets;
+                currentTrack = resizeTrack;
+            }
+            const auto group = ! (resizeTrack < (int) engine.getSong().playlistTracks.size() && engine.getSong().playlistTracks[(std::size_t) resizeTrack].grouped);
+            engine.editSong ([targets, group] (Song& s) {
+                for (auto t : targets)
+                {
+                    if (t <= 0)
+                        continue;
+                    if ((int) s.playlistTracks.size() <= t)
+                        s.playlistTracks.resize ((std::size_t) t + 1);
+                    s.playlistTracks[(std::size_t) t].height = 0;
+                    if (group)
+                        noteedit::groupWithAbove (s, t);
+                    else
+                        noteedit::ungroupTrack (s, t);
+                }
+            });
+            resizeTrack = -1;
+            refreshTrackLayout();
+            updateScrollBars();
+            repaint();
+            ui::postHint ({ group ? tr ("Group with above track") : tr ("Ungroup"), {}, false, false });
+            return;
+        }
+
+        if (! tracks.empty() && heightOf (resizeTrack) != scaledHeight (height))
             setTrackHeights (tracks, height);
 
-        ui::postHint ({ resizeAll ? tr ("Resizing every track") : tr ("Resizing the track"), juce::String (scaledHeight (height)) + " px", false, false });
+        // FL's hint: the size in % of the default row
+        const auto percent = juce::roundToInt (polish::flSizeForHeight (height) * 100.0f);
+        ui::postHint ({ resizeAll ? tr ("Resizing every track") : tr ("Resizing the track"),
+                        juce::String (scaledHeight (height)) + " px (" + juce::String (percent) + "%)", false, false });
+        return;
+    }
+
+    if (drag == Drag::headerSelect)
+    {
+        // FL FUN_012e8740 on every move: the tracks from the press to the mouse are added (or removed); the range only grows
+        const auto track = yToTrack (e.y);
+        auto sel = sortedTrackSelection();
+        trackhdr::applyRange (sel, headerDragAnchor, track, headerDragAdding);
+        selectedTracks = sel;
+        if (selectedTracks.empty())
+            currentTrack = -1;
+        if (headerDragClips) // (the clip box from the header spans the song: the clips of the tracks crossed)
+            selectClipsOnTracks (headerDragAnchor, track, ! headerClipBase.empty());
+        repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
         return;
     }
 
@@ -4646,6 +4754,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
     {
         case Drag::none:
         case Drag::trackResize:
+        case Drag::headerSelect:
         case Drag::trackZoom:
         case Drag::heightZoom:
         case Drag::timeZoom:
@@ -5166,6 +5275,7 @@ void PlaylistComponent::postDragHint()
         case Drag::pan:
         case Drag::zoomRange:
         case Drag::trackResize:
+        case Drag::headerSelect:
         case Drag::trackZoom:
         case Drag::heightZoom:
         case Drag::timeZoom:
@@ -5987,7 +6097,106 @@ juce::Rectangle<int> PlaylistComponent::trackInput (int track) const
 
 bool PlaylistComponent::isTrackSelected (int track) const
 {
-    return track == currentTrack || std::find (selectedTracks.begin(), selectedTracks.end(), track) != selectedTracks.end();
+    // the selected tracks; with none (set elsewhere through currentTrack alone) the current one (round 190ft: a
+    // Ctrl+Shift+click can leave the clicked track out of the selection)
+    if (! selectedTracks.empty())
+        return std::find (selectedTracks.begin(), selectedTracks.end(), track) != selectedTracks.end();
+    return track == currentTrack;
+}
+
+std::vector<int> PlaylistComponent::sortedTrackSelection() const
+{
+    auto sel = selectedTracks;
+    if (sel.empty() && currentTrack >= 0)
+        sel.push_back (currentTrack);
+    std::sort (sel.begin(), sel.end());
+    sel.erase (std::unique (sel.begin(), sel.end()), sel.end());
+    return sel;
+}
+
+void PlaylistComponent::selectClipsOnTracks (int fromTrack, int toTrack, bool add)
+{
+    // FL's clip box started from a header (FUN_00e684e0 with the "from the header" flag): the whole song, the tracks
+    // from the press to the mouse
+    const auto lo = juce::jmin (fromTrack, toTrack), hi = juce::jmax (fromTrack, toTrack);
+    std::vector<int> chosen = add ? headerClipBase : std::vector<int> {};
+    const auto& song = engine.getSong();
+    for (int i = 0; i < (int) song.playlist.size(); ++i)
+    {
+        const auto& c = song.playlist[(std::size_t) i];
+        if (c.gridSlot >= 0 || c.track < lo || c.track > hi || noteedit::isFoldedAway (song, c.track))
+            continue;
+        if (std::find (chosen.begin(), chosen.end(), i) == chosen.end())
+            chosen.push_back (i);
+    }
+    setSelection (chosen);
+}
+
+void PlaylistComponent::followLinkedTrack (int track)
+{
+    // FL FUN_012e3aa0 (selecting a track alone): an instrument track selects its channel; with the mixer showing, an
+    // audio track's linked mixer track or the instrument channel's mixer track becomes the mixer's current track
+    const auto& song = engine.getSong();
+    if (track < 0 || track >= (int) song.playlistTracks.size())
+        return;
+    const auto t = song.playlistTracks[(std::size_t) track];
+    int insert = -1;
+    if (t.mode == PlaylistTrackMode::instrument && t.channel >= 0 && t.channel < (int) song.channels.size())
+    {
+        if (engine.getSelectedChannel() != t.channel || engine.getSelectedChannels().size() != 1)
+            engine.setSelectedChannel (t.channel);
+        insert = engine.getSong().channels[(std::size_t) t.channel].mixerTrack;
+    }
+    else if (t.mode == PlaylistTrackMode::audio)
+        insert = t.mixerTrack;
+    if (insert > 0 && insert < (int) engine.getSong().mixer.size() && onLinkedMixerTrack)
+        onLinkedMixerTrack (insert);
+}
+
+std::vector<int> PlaylistComponent::bandTargets (int track) const
+{
+    // FL FUN_012eafa0: a change made on a selected track is copied to the other selected tracks
+    auto sel = sortedTrackSelection();
+    if (sel.size() > 1 && std::binary_search (sel.begin(), sel.end(), track))
+    {
+        sel.erase (std::find (sel.begin(), sel.end(), track));
+        sel.insert (sel.begin(), track);
+        return sel;
+    }
+    return { track };
+}
+
+void PlaylistComponent::bandToggleLock (int track)
+{
+    // FL: the locked size is negated (a row never locked gets 1 = the smallest), the selected tracks copy it (mask 0x10)
+    engine.editSong ([tracks = bandTargets (track)] (Song& s) {
+        for (auto t : tracks)
+            if ((int) s.playlistTracks.size() <= t)
+                s.playlistTracks.resize ((std::size_t) t + 1);
+        const auto value = trackhdr::flippedLock (s.playlistTracks[(std::size_t) tracks.front()].lockedHeight);
+        for (auto t : tracks)
+            s.playlistTracks[(std::size_t) t].lockedHeight = value;
+    });
+    refreshTrackLayout();
+    updateScrollBars();
+    repaint();
+}
+
+void PlaylistComponent::bandReset (int track)
+{
+    // FL: size 1.0 and unlocked (−1), the selected tracks copy both (mask 0x90)
+    engine.editSong ([tracks = bandTargets (track)] (Song& s) {
+        for (auto t : tracks)
+        {
+            if ((int) s.playlistTracks.size() <= t)
+                s.playlistTracks.resize ((std::size_t) t + 1);
+            s.playlistTracks[(std::size_t) t].height = 0;
+            s.playlistTracks[(std::size_t) t].lockedHeight = -1;
+        }
+    });
+    refreshTrackLayout();
+    updateScrollBars();
+    repaint();
 }
 
 std::vector<int> PlaylistComponent::tracksForMenu (int track) const
@@ -6165,7 +6374,8 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
 
         for (int percent : { 33, 50, 100, 150, 200 })
         {
-            const auto h = polish::clampTrackHeight ((int) std::lround (trackHeight * percent / 100.0));
+            // FL's Size menu sets the size factor (0.333, 0.5, 1, 1.5, 2): 16 px + factor × (default − 16) (round 190ft)
+            const auto h = percent == 100 ? (int) trackHeight : polish::heightForFlSize (percent == 33 ? 1.0 / 3.0 : percent / 100.0);
             size.addItem (juce::String (percent) + "%", true, current == scaledHeight (h), [this, track, h] { setTrackHeights ({ track }, h); });
             all.addItem (juce::String (percent) + "%", [this, count, h] {
                 std::vector<int> tracks;
@@ -8901,9 +9111,9 @@ void PlaylistComponent::updateCursor (juce::ModifierKeys mods)
     const auto p = lastMouse;
     auto cursor = gesture::Cursor::normal;
 
-    if ((hover.header && hover.divider >= 0) || trackZoomHandle().contains (p))
+    if ((hover.header && hover.divider >= 0 && ! pltracks::isSizeLocked (engine.getSong(), hover.divider)) || trackZoomHandle().contains (p))
     {
-        setMouseCursor (juce::MouseCursor::UpDownResizeCursor);
+        setMouseCursor (juce::MouseCursor::UpDownResizeCursor); // (a locked row's band: a click unlocks it, no resize)
         return;
     }
     if (const auto lane = laneAt (p); lane.track >= 0) // round 177b
@@ -8976,7 +9186,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
 
     if (h.header && h.divider >= 0)
     {
-        hint.text = tr ("Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height");
+        hint.text = tr ("Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size");
         hint.value = juce::String (heightOf (h.divider)) + " px";
         return hint;
     }
@@ -9008,7 +9218,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
                     : h.input ? tr ("Audio track: [LMB] audio input source and monitoring (its mixer track)")
                     : h.led   ? tr ("Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo")
                     : h.arrow ? tr ("Track group: [LMB] collapse / expand the grouped tracks")
-                              : tr ("Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down");
+                              : tr ("Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down");
         hint.value = trackName (h.track);
         if (const auto mode = trackmodes::describe (song, h.track); ! mode.empty()) // FL's "(Instrument track)" / "(Audio track, ...)"
             hint.value += " " + (mode.rfind ("(Audio", 0) == 0 ? tr ("(Audio track, linked to mixer track {0})", { juce::String (song.playlistTracks[(std::size_t) h.track].mixerTrack) })
@@ -9084,12 +9294,9 @@ void PlaylistComponent::mouseDoubleClick (const juce::MouseEvent& e)
         return;
     }
 
-    // double-click a track divider: back to the default height
-    if (const auto divider = dividerAt (e.getPosition()); divider >= 0)
-    {
-        setTrackHeights ({ divider }, trackHeight);
+    // a double click on a header's resize band flips "Lock to this size" (FL; done by the second press in mouseDown)
+    if (dividerAt (e.getPosition()) >= 0)
         return;
-    }
 
     // double-click a track header: open the source of the track's first clip (FL); empty tracks: rename
     if (e.x < headerWidth && e.y >= tracksTop() && e.y < gridArea().getBottom() && e.mods.isLeftButtonDown())

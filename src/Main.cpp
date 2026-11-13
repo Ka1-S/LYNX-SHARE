@@ -3,6 +3,8 @@
 #include "platform/Paths.h"
 
 #include "core/KeyGuess.h"
+#include "core/EditorPolish.h"
+#include "core/FlpExport.h"
 #include "core/Groove.h"
 #include "core/DrawMode.h"
 #include "core/SessionOps.h"
@@ -2086,6 +2088,15 @@ public:
         // --flplshot <prefix> (round 190dx): the audio clip menu (Preview, Automate › Panning / Volume), the Playlist's "+"
         // and its menu, Track mode › Instrument track, the Channel rack's "Assign to new instrument track", Tools › One-click
         // audio recording and Mixer › Disk recording › Latency compensation, offscreen; prefix-checks.txt holds the checks
+        // --hdrshot190ft <prefix> (round 190ft, issues #163 / #164): FL's track-header selection and resize rules driven
+        // with synthetic mouse events on the Playlist headers and the mixer strips, offscreen; prefix-checks.txt
+        if (args.contains ("--hdrshot190ft"))
+        {
+            setApplicationReturnValue (runHdrShot190ft (args[args.indexOf ("--hdrshot190ft") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--flplshot"))
         {
             setApplicationReturnValue (runFlPlShot (args[args.indexOf ("--flplshot") + 1].unquoted()) ? 0 : 1);
@@ -11869,6 +11880,208 @@ private:
     }
 
     // --flplshot (round 190dx): see the dispatch above
+    bool runHdrShot190ft (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        const auto list = [] (const std::vector<int>& v) {
+            juce::StringArray out;
+            for (auto i : v)
+                out.add (juce::String (i));
+            return out.joinIntoString (",");
+        };
+
+        lynx::AudioEngine engine (false);
+        lynx::MainComponent ui (engine, false);
+        ui.setSize (1600, 900);
+        {
+            auto song = lynx::Song::makeDefault();
+            song.playlist.clear();
+            for (int t = 0; t < 6; ++t)
+            {
+                if ((int) song.playlistTracks.size() <= t)
+                    song.playlistTracks.resize ((std::size_t) t + 1);
+                song.playlistTracks[(std::size_t) t].name = juce::String ("Track " + juce::String (t + 1)).toStdString();
+                for (int k = 0; k < 2; ++k)
+                {
+                    lynx::Clip c;
+                    c.kind = lynx::ClipKind::pattern;
+                    c.pattern = 0;
+                    c.track = t;
+                    c.start = (std::int64_t) (k * 4 + t % 3) * lynx::ppq;
+                    c.length = 2 * lynx::ppq;
+                    song.playlist.push_back (c);
+                }
+            }
+            if (song.mixer.size() < 4)
+                song.mixer.resize (4);
+            song.playlistTracks[2].mode = lynx::PlaylistTrackMode::audio; // an audio track linked to mixer track 3
+            song.playlistTracks[2].mixerTrack = 3;
+            song.playlistTracks[2].name = "Vox";
+            engine.setSong (std::move (song));
+        }
+        engine.dispatchPendingMessages();
+        ui.selectTabForSnapshot (2);
+        engine.dispatchPendingMessages();
+        auto& pl = ui.getPlaylistForSnapshot();
+        pl.setSize (juce::jmax (pl.getWidth(), 900), juce::jmax (pl.getHeight(), 600));
+
+        auto source = juce::Desktop::getInstance().getMainMouseSource();
+        const auto now = juce::Time::getCurrentTime();
+        const juce::ModifierKeys left (juce::ModifierKeys::leftButtonModifier);
+        const auto ctrl = juce::ModifierKeys (juce::ModifierKeys::commandModifier); // (FL's Ctrl: Cmd on a Mac)
+        const auto shift = juce::ModifierKeys (juce::ModifierKeys::shiftModifier);
+        const auto alt = juce::ModifierKeys (juce::ModifierKeys::altModifier);
+        const auto event = [&] (juce::Component& c, juce::Point<int> p, juce::ModifierKeys mods, juce::Point<int> down, int clicks, bool dragged) {
+            return juce::MouseEvent (source, p.toFloat(), mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &c, &c, now, down.toFloat(), now, clicks, dragged);
+        };
+        // a press (and release) at p with the modifiers; `to`: a drag there before the release
+        const auto press = [&] (juce::Component& c, juce::Point<int> p, juce::ModifierKeys mods, std::optional<juce::Point<int>> to = {}, int clicks = 1) {
+            const auto down = mods.withFlags (juce::ModifierKeys::leftButtonModifier);
+            c.mouseMove (event (c, p, mods, p, 1, false));
+            c.mouseDown (event (c, p, down, p, clicks, false));
+            if (to)
+                c.mouseDrag (event (c, *to, down, p, clicks, true));
+            c.mouseUp (event (c, to ? *to : p, mods, p, clicks, to.has_value()));
+        };
+        const auto headerPoint = [&] (int track) { const auto r = pl.trackRowForSnapshot (track); return juce::Point<int> (40, r.getY() + juce::jmin (10, r.getHeight() / 3)); };
+        const auto bandPoint = [&] (int track) { const auto r = pl.trackRowForSnapshot (track); return juce::Point<int> (40, r.getBottom() - 2); };
+        const auto clipsOn = [&] (const std::vector<int>& tracks) {
+            std::vector<int> out;
+            const auto& song = engine.getSong();
+            for (int i = 0; i < (int) song.playlist.size(); ++i)
+                if (std::find (tracks.begin(), tracks.end(), song.playlist[(std::size_t) i].track) != tracks.end())
+                    out.push_back (i);
+            return out;
+        };
+        const auto sortedClips = [&] { auto v = pl.getSelectedClips(); std::sort (v.begin(), v.end()); return v; };
+        const auto headerShot = [&] (const juce::String& name, int rows) {
+            const auto bottom = pl.trackRowForSnapshot (rows).getY();
+            savePng (pl.createComponentSnapshot ({ 0, 0, juce::jmin (pl.getWidth(), 760), juce::jmin (pl.getHeight(), bottom + 12) }), prefix + name);
+        };
+
+        // ---- 1. selection (AUTracksPanelMouseDown / FUN_012e83e0)
+        press (pl, headerPoint (1), {});
+        check ("click_selects_alone", pl.selectedTracksForSnapshot() == std::vector<int> { 1 }, list (pl.selectedTracksForSnapshot()));
+        press (pl, headerPoint (3), ctrl);
+        check ("ctrl_click_alone_with_clips", pl.selectedTracksForSnapshot() == std::vector<int> { 3 } && sortedClips() == clipsOn ({ 3 }),
+               list (pl.selectedTracksForSnapshot()) + " clips " + list (sortedClips()));
+        press (pl, headerPoint (1), ctrl | shift);
+        press (pl, headerPoint (5), ctrl | shift);
+        check ("ctrl_shift_click_adds", pl.selectedTracksForSnapshot() == std::vector<int> { 1, 3, 5 }, list (pl.selectedTracksForSnapshot()));
+        check ("ctrl_shift_click_adds_clips", sortedClips() == clipsOn ({ 1, 3, 5 }), list (sortedClips()));
+        press (pl, headerPoint (3), ctrl | shift);
+        check ("ctrl_shift_click_removes", pl.selectedTracksForSnapshot() == std::vector<int> { 1, 5 }, list (pl.selectedTracksForSnapshot()));
+        press (pl, headerPoint (3), ctrl | shift);
+        check ("ctrl_shift_click_adds_again", pl.selectedTracksForSnapshot() == std::vector<int> { 1, 3, 5 }, list (pl.selectedTracksForSnapshot()));
+        pl.selectClipsForSnapshot ({});
+        headerShot ("-ctrl-multiselect.png", 6);
+        press (pl, headerPoint (0), ctrl, headerPoint (2));
+        check ("ctrl_drag_range_with_clips", pl.selectedTracksForSnapshot() == std::vector<int> { 0, 1, 2 } && sortedClips() == clipsOn ({ 0, 1, 2 }),
+               list (pl.selectedTracksForSnapshot()) + " clips " + list (sortedClips()));
+        press (pl, headerPoint (1), shift); // LYNX's own Shift+click range (from the last clicked track, 0)
+        check ("lynx_shift_range_kept", pl.selectedTracksForSnapshot() == std::vector<int> { 0, 1 }, list (pl.selectedTracksForSnapshot()));
+        {
+            int linked = -1;
+            auto old = pl.onLinkedMixerTrack;
+            pl.onLinkedMixerTrack = [&linked] (int insert) { linked = insert; };
+            press (pl, headerPoint (2), {});
+            check ("audio_track_click_links_mixer_track", linked == 3, juce::String (linked));
+            pl.onLinkedMixerTrack = old;
+        }
+
+        // ---- 2. the resize band (FUN_00ea93a0, AUTracksPanelMouseMove)
+        const auto heightOf = [&] (int t) { return pl.trackRowForSnapshot (t).getHeight(); };
+        const auto& tracks = [&]() -> const std::vector<lynx::PlaylistTrack>& { return engine.getSong().playlistTracks; };
+        press (pl, headerPoint (4), {}); // (track 4 alone selected)
+        {
+            const auto start = bandPoint (4);
+            press (pl, start, {}, start + juce::Point<int> (0, 41));
+            check ("drag_resizes", tracks()[4].height == 78 && heightOf (4) == 78, juce::String (tracks()[4].height) + " / " + juce::String (heightOf (4)));
+            headerShot ("-resized.png", 6);
+            const auto again = bandPoint (4);
+            press (pl, again, {}, again + juce::Point<int> (0, -200 + 40)); // (up past the top, but not 32 px above it)
+            check ("drag_stops_at_16", heightOf (4) == 16, juce::String (heightOf (4)));
+            press (pl, bandPoint (4), alt);
+            check ("alt_click_resets", tracks()[4].height == 0 && tracks()[4].lockedHeight == -1 && heightOf (4) == 38, juce::String (heightOf (4)));
+            press (pl, bandPoint (4), {}, {}, 2); // the second press of a double click
+            check ("double_click_locks_small", tracks()[4].lockedHeight == 1 && heightOf (4) == 16, juce::String (tracks()[4].lockedHeight));
+            press (pl, bandPoint (4), {});
+            check ("click_on_locked_band_unlocks", tracks()[4].lockedHeight == -1 && heightOf (4) == 38, juce::String (tracks()[4].lockedHeight));
+            const auto top = pl.trackRowForSnapshot (4).getY();
+            const auto b = bandPoint (4);
+            press (pl, b, {}, juce::Point<int> (b.x, top - 40));
+            check ("drag_past_the_top_groups", tracks()[4].grouped && tracks()[4].height == 0, juce::String ((int) tracks()[4].grouped));
+            const auto b2 = bandPoint (4);
+            press (pl, b2, {}, juce::Point<int> (b2.x, pl.trackRowForSnapshot (4).getY() - 40));
+            check ("again_ungroups", ! tracks()[4].grouped, juce::String ((int) tracks()[4].grouped));
+        }
+        {
+            // every selected track: the same height, from the first one's top to the mouse
+            press (pl, headerPoint (1), {});
+            press (pl, headerPoint (2), ctrl | shift);
+            press (pl, headerPoint (3), ctrl | shift);
+            const auto top = pl.trackRowForSnapshot (1).getY();
+            const auto b = bandPoint (2);
+            press (pl, b, {}, juce::Point<int> (b.x, top + 2 * 50));
+            check ("selected_tracks_share_the_height", tracks()[1].height == 50 && tracks()[2].height == 50 && tracks()[3].height == 50,
+                   juce::String (tracks()[1].height) + "," + juce::String (tracks()[2].height) + "," + juce::String (tracks()[3].height));
+            headerShot ("-selected-resized.png", 6);
+        }
+
+        // ---- 3. saved: .lynx round trip and the .flp size factor
+        {
+            engine.editSong ([] (lynx::Song& s) { s.playlistTracks[5].height = 300; s.playlistTracks[0].lockedHeight = 60; });
+            const auto json = lynx::ProjectFile::toJson (engine.getSong());
+            juce::String error;
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            check ("lynx_round_trip", back && back->playlistTracks.size() > 5 && back->playlistTracks[5].height == 300 && back->playlistTracks[1].height == 50
+                                          && back->playlistTracks[0].lockedHeight == 60, error);
+            lynx::flpexport::Options options;
+            lynx::flpexport::Report flpReport;
+            const auto project = lynx::flp::parseProject (lynx::flpexport::exportFlp (engine.getSong(), options, flpReport));
+            float size5 = -1.0f, size1 = -1.0f;
+            for (const auto& arrangement : project.arrangements)
+                for (const auto& t : arrangement.tracks)
+                {
+                    if (t.index == 5) size5 = t.heightScale;
+                    if (t.index == 1) size1 = t.heightScale;
+                }
+            check ("flp_size_factor", std::abs (size5 - lynx::polish::flSizeForHeight (300)) < 1.0e-4f && std::abs (size1 - lynx::polish::flSizeForHeight (50)) < 1.0e-4f,
+                   juce::String (size5) + " " + juce::String (size1));
+        }
+
+        // ---- 4. the mixer strips (round 170b's FL rules): Ctrl+click alone, Ctrl+Shift+click adds / removes
+        {
+            ui.selectTabForSnapshot (3);
+            engine.editSong ([] (lynx::Song& s) { if (s.mixer.size() < 9) s.mixer.resize (9); });
+            engine.dispatchPendingMessages();
+            auto& mixer = ui.getMixerForSnapshot();
+            mixer.setSize (1400, 640);
+            auto& strips = mixer.getStripsForSnapshot();
+            strips.setSize (juce::jmax (strips.getWidth(), 1300), juce::jmax (strips.getHeight(), 560));
+            const auto at = [&] (int t) { return juce::Point<int> (strips.stripLeft (t) + 8, strips.getHeight() / 2 + 40); };
+            press (strips, at (2), ctrl);
+            check ("mixer_ctrl_click_alone", strips.getSelection() == std::vector<int> { 2 }, list (strips.getSelection()));
+            press (strips, at (4), ctrl | shift);
+            press (strips, at (6), ctrl | shift);
+            check ("mixer_ctrl_shift_click_adds", strips.getSelection() == std::vector<int> { 2, 4, 6 }, list (strips.getSelection()));
+            press (strips, at (4), ctrl | shift);
+            check ("mixer_ctrl_shift_click_removes", strips.getSelection() == std::vector<int> { 2, 6 }, list (strips.getSelection()));
+            press (strips, at (5), ctrl | shift);
+            check ("mixer_ctrl_shift_click_adds_again", strips.getSelection() == std::vector<int> { 2, 5, 6 }, list (strips.getSelection()));
+            savePng (mixer.createComponentSnapshot ({ 0, 0, juce::jmin (mixer.getWidth(), 900), mixer.getHeight() }), prefix + "-mixer-ctrl-multiselect.png");
+        }
+
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
+        return allOk;
+    }
+
     bool runFlPlShot (const juce::String& prefix)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);

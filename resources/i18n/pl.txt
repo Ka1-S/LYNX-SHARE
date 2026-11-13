@@ -1186,7 +1186,7 @@ countries: pl
 "Huge" = "Ogromna"
 "Height of every track" = "Wysokość wszystkich ścieżek"
 "Previewing the clip: release the mouse to stop" = "Odsłuch klipu: puść mysz, aby zatrzymać"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "Separator ścieżki: [LMB] przeciągnij zmienia wysokość tej ścieżki  [Shift][LMB] przeciągnij: wszystkie ścieżki  [2xLMB] domyślna wysokość"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "Rozmiar ścieżki: [LMB] przeciągnij zmienia wysokość tej ścieżki (zaznaczonej: wszystkich zaznaczonych)  [Shift][LMB] przeciągnij: wszystkie ścieżki  [Alt][LMB] lub [MMB] domyślny rozmiar  [2xLMB] zablokuj / odblokuj rozmiar"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + przeciągnij: unikalna kopia  [Alt][RMB] przytrzymaj: odsłuch"
 "Long view (level over time)" = "Długi widok (poziom w czasie)"
 "Spectrum (low frequencies on the left)" = "Widmo (niskie częstotliwości po lewej)"
@@ -5787,7 +5787,7 @@ countries: pl
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Wstawia puste kolumny przed utworem na klipy do uruchamiania, znacznik na każdej z nich i znacznik Start tam, gdzie zaczyna się utwór; tryb performance zostaje włączony."
 "Marker count" = "Liczba znaczników"
 "2 steps" = "2 kroki"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Ścieżka: [LMB] zaznacz  [Ctrl][LMB] dodaj / usuń  [Shift][LMB] zakres  [RMB] menu  [2xLMB] otwórz źródło klipu  [Shift][Wheel] przesuń w górę / w dół"
+"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Ścieżka: [LMB] zaznacz  [Ctrl][LMB] razem z jej klipami (przeciągnij: więcej ścieżek)  [Ctrl][Shift][LMB] dodaj / usuń  [Shift][LMB] zakres  [RMB] menu  [2xLMB] otwórz źródło klipu  [Shift][Wheel] przesuń w górę / w dół"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Latencja ścieżki: {0}"

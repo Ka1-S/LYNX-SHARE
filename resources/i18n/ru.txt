@@ -1186,7 +1186,7 @@ countries: ru by kz
 "Huge" = "Огромная"
 "Height of every track" = "Высота всех дорожек"
 "Previewing the clip: release the mouse to stop" = "Прослушивание клипа: отпустите мышь, чтобы остановить"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "Разделитель дорожек: [LMB] перетаскивание меняет размер дорожки  [Shift][LMB] перетаскивание: все дорожки  [2xLMB] высота по умолчанию"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "Размер дорожки: [LMB] перетаскивание меняет размер дорожки (выбранной: всех выбранных)  [Shift][LMB] перетаскивание: все дорожки  [Alt][LMB] или [MMB] размер по умолчанию  [2xLMB] закрепить / открепить размер"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + перетаскивание: уникальная копия  [Alt][RMB] удерживать: прослушать"
 "Long view (level over time)" = "Длинный вид (уровень во времени)"
 "Spectrum (low frequencies on the left)" = "Спектр (низкие частоты слева)"
@@ -5787,7 +5787,7 @@ countries: ru by kz
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Вставляет пустые столбцы перед песней для запускаемых клипов, по маркеру на каждом и маркер Start там, где начинается песня; режим выступления включается."
 "Marker count" = "Число маркеров"
 "2 steps" = "2 шага"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Дорожка: [LMB] выбрать  [Ctrl][LMB] добавить / убрать  [Shift][LMB] диапазон  [RMB] меню  [2xLMB] открыть источник клипа  [Shift][Wheel] вверх / вниз"
+"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Дорожка: [LMB] выбрать  [Ctrl][LMB] вместе с её клипами (перетаскивание: ещё дорожки)  [Ctrl][Shift][LMB] добавить / убрать  [Shift][LMB] диапазон  [RMB] меню  [2xLMB] открыть источник клипа  [Shift][Wheel] вверх / вниз"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Задержка канала: {0}"

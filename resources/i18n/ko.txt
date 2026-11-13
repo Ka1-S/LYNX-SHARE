@@ -1186,7 +1186,7 @@ countries: kr
 "Huge" = "매우 크게"
 "Height of every track" = "모든 트랙 높이"
 "Previewing the clip: release the mouse to stop" = "클립 미리 듣기 중: 마우스를 놓으면 정지"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "트랙 구분선: [LMB] 드래그로 이 트랙 크기 조절  [Shift][LMB] 드래그: 모든 트랙  [2xLMB] 기본 높이"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "트랙 크기: [LMB] 드래그로 이 트랙 크기 조절 (선택됨: 선택한 모든 트랙)  [Shift][LMB] 드래그: 모든 트랙  [Alt][LMB] 또는 [MMB] 기본 크기  [2xLMB] 크기 잠금 / 해제"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + 드래그: 고유 복사본  [Alt][RMB] 누르고 있기: 미리 듣기"
 "Long view (level over time)" = "긴 보기(시간에 따른 레벨)"
 "Spectrum (low frequencies on the left)" = "스펙트럼(왼쪽이 저주파)"
@@ -5787,7 +5787,7 @@ countries: kr
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "송 앞에 실행할 클립용 빈 열을 삽입하고, 각 열에 마커를, 송이 시작되는 곳에 Start 마커를 둡니다. 퍼포먼스 모드가 켜집니다."
 "Marker count" = "마커 수"
 "2 steps" = "2스텝"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "트랙: [LMB] 선택  [Ctrl][LMB] 추가 / 제거  [Shift][LMB] 범위  [RMB] 메뉴  [2xLMB] 클립 소스 열기  [Shift][Wheel] 위 / 아래로 이동"
+"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "트랙: [LMB] 선택  [Ctrl][LMB] 클립까지 선택 (드래그: 더 많은 트랙)  [Ctrl][Shift][LMB] 추가 / 제거  [Shift][LMB] 범위  [RMB] 메뉴  [2xLMB] 클립 소스 열기  [Shift][Wheel] 위 / 아래로 이동"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "트랙 레이턴시: {0}"

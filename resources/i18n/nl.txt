@@ -1186,7 +1186,7 @@ countries: nl be
 "Huge" = "Enorm"
 "Height of every track" = "Hoogte van elke track"
 "Previewing the clip: release the mouse to stop" = "Clip voorbeluisteren: laat de muis los om te stoppen"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "Trackscheiding: [LMB] slepen wijzigt de hoogte van deze track  [Shift][LMB] slepen: alle tracks  [2xLMB] standaardhoogte"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "Trackgrootte: [LMB] slepen wijzigt de hoogte van deze track (geselecteerd: alle geselecteerde tracks)  [Shift][LMB] slepen: alle tracks  [Alt][LMB] of [MMB] standaardgrootte  [2xLMB] grootte vergrendelen / ontgrendelen"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + slepen: een unieke kopie  [Alt][RMB] ingedrukt houden: beluisteren"
 "Long view (level over time)" = "Lange weergave (niveau in de tijd)"
 "Spectrum (low frequencies on the left)" = "Spectrum (lage frequenties links)"
@@ -5787,7 +5787,7 @@ countries: nl be
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Voegt lege kolommen in vóór de song voor de clips die gestart worden, met op elke kolom een marker, en een Start-marker waar de song begint; de performance-modus wordt aangezet."
 "Marker count" = "Aantal markers"
 "2 steps" = "2 steps"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Track: [LMB] selecteren  [Ctrl][LMB] toevoegen / weghalen  [Shift][LMB] bereik  [RMB] menu  [2xLMB] bron van de clip openen  [Shift][Wheel] omhoog / omlaag verplaatsen"
+"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Track: [LMB] selecteren  [Ctrl][LMB] met de clips erop (slepen: meer tracks)  [Ctrl][Shift][LMB] toevoegen / weghalen  [Shift][LMB] bereik  [RMB] menu  [2xLMB] bron van de clip openen  [Shift][Wheel] omhoog / omlaag verplaatsen"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Tracklatentie: {0}"

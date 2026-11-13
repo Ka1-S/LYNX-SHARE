@@ -1186,7 +1186,7 @@ countries: tr
 "Huge" = "Dev"
 "Height of every track" = "Tüm izlerin yüksekliği"
 "Previewing the clip: release the mouse to stop" = "Klip önizleniyor: durdurmak için fareyi bırakın"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "İz ayırıcı: [LMB] sürükle bu izi boyutlandırır  [Shift][LMB] sürükle: tüm izler  [2xLMB] varsayılan yükseklik"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "İz boyutu: [LMB] sürükle bu izi boyutlandırır (seçiliyse: tüm seçili izler)  [Shift][LMB] sürükle: tüm izler  [Alt][LMB] veya [MMB] varsayılan boyut  [2xLMB] boyutu kilitle / kilidi aç"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + sürükle: benzersiz kopya  [Alt][RMB] basılı tut: dinle"
 "Long view (level over time)" = "Uzun görünüm (zamana göre seviye)"
 "Spectrum (low frequencies on the left)" = "Spektrum (düşük frekanslar solda)"
@@ -5787,7 +5787,7 @@ countries: tr
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Başlatılacak klipler için şarkının önüne boş sütunlar, her birine bir işaretçi ve şarkının başladığı yere bir Start işaretçisi ekler; performans modu açılır."
 "Marker count" = "İşaretçi sayısı"
 "2 steps" = "2 step"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "İz: [LMB] seç  [Ctrl][LMB] ekle / çıkar  [Shift][LMB] aralık  [RMB] menü  [2xLMB] klibin kaynağını aç  [Shift][Wheel] yukarı / aşağı taşı"
+"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "İz: [LMB] seç  [Ctrl][LMB] klipleriyle birlikte (sürükle: daha fazla iz)  [Ctrl][Shift][LMB] ekle / çıkar  [Shift][LMB] aralık  [RMB] menü  [2xLMB] klibin kaynağını aç  [Shift][Wheel] yukarı / aşağı taşı"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Kanal gecikmesi: {0}"
