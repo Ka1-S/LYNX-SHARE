@@ -96,6 +96,27 @@ the earlier pepper in the logo button of a plugin's header: `scripts/site-shots.
 repainted that button with the mark (without the tile, on a dark disc, as the program draws it from 0.1.27). At the
 next release, whose program draws the new logo itself, run `site-shots.py` again WITHOUT `--logo-was` so nothing is painted.
 
+## 0.1.27 release: what the texts do not cover yet
+
+Branch wip/rel190eu (round 190eu) has the 0.1.27 Updates entry and the page texts (features, fixes, why, home, FAQ,
+six wiki pages) in 15 languages. Not done there, for the release:
+
+- **Date**: `_src/updates.json` has the placeholder `"date": "2026-11-14"` on the 0.1.27 entry: set the release day,
+  build, check.
+- **Pictures**: everything in the 0.1.26 list below that is still open, from the 0.1.27 build. New features the pages
+  now describe without a picture: the Session mixer and Drum Rack (Clip-launch), the Simple track dock and the
+  first-song tour, Remote control settings, the Sampler page in FL's layout, Edison on a mixer slot.
+- **demo.mp3 / peaks.json**: the demo song was regenerated with the Master looks' true-peak stage (rollup027
+  HANDOFF-8): render `assets/media/demo.mp3` and `peaks.json` again from the new `Demo.lynx`.
+- **Catalogue** (`_src/catalog.json`): no entries yet for the plugins new in 0.1.27: Pocket EQ, Pocket Graphic EQ,
+  Pocket Filter, Pocket Reverb Classic, Pocket Reverb 2, Pocket Reverb, Pocket Comb Filter, Pocket Multiband
+  Compressor, Pocket Tape Stop, Pocket SuperSaw, Edison (mixer slot) and Drum Rack; and the changed editors (Sentry
+  Trigger, Hush Air / Mix, Glow Opto memory, the Law switch on the reverbs, Spiral Echo, Orbit, Lattice Mod, Gemini
+  Doubler, Echoform, Voice Shift and Quell) need their pictures and wiki tables refreshed.
+- **Wiki** still written for 0.1.26 or earlier: Mixer (Session mixer is Clip-launch only), Playlist (FL's audio clip
+  menu, Track mode, curve modes), Piano roll (Limit, Scale levels, Flip), MIDI controllers (Remote control settings,
+  map modes), Recording (one-click audio recording, latency compensation, count-in), Layouts (track dock, tour).
+
 ## 0.1.26 release: pictures and catalogue still to do (texts are ready)
 
 The 0.1.26 texts are in the page sources; every picture is still from 0.1.25. No picture was added or changed for
