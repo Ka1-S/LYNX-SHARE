@@ -621,17 +621,17 @@ if(LYNX_BUILD_APP)
             JUCE_PLUGINHOST_LV2=0
             LYNX_ANDROID=1)
         # Android uses AAudio (API 26+) with OpenSL ES fallback
-        target_link_libraries(LYNX PRIVATE OpenSLES log android native_app_glue)
+        target_link_libraries(LYNX PRIVATE OpenSLES log android)
         # Android-specific sources
         target_sources(LYNX PRIVATE
             src/engine/AndroidAudioDevice.cpp
             src/platform/AndroidPaths.cpp
             src/platform/AndroidLifecycle.cpp
             src/platform/android/jni/AndroidJNI.cpp)
-        # Include Android JNI headers and native_app_glue
+        # Include Android JNI headers
         target_include_directories(LYNX PRIVATE src/platform/android/jni)
-        # native_app_glue headers are in NDK's sysroot; ensure we can find them
-        target_include_directories(LYNX SYSTEM PRIVATE $ENV{ANDROID_NDK_HOME}/sysroot/usr/include)
+        # Link against JUCE's native_app_glue (provides android_main and android_app)
+        target_link_libraries(LYNX PRIVATE juce::juce_android_native_app_glue)
         # JUCE Android needs the native app glue
         # Fix: use juce_android_native_app_glue if defined, or ignore if JUCE 8 handles it automatically
         # target_link_libraries(LYNX PRIVATE juce::juce_android_native_app_glue)

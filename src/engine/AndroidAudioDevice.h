@@ -4,6 +4,11 @@
 
 #include <juce_audio_devices/juce_audio_devices.h>
 
+#if JUCE_ANDROID || defined(LYNX_ANDROID)
+#include <jni.h>
+#include <aaudio/AAudio.h>
+#endif
+
 namespace lynx::engine
 {
 #if JUCE_ANDROID || defined(LYNX_ANDROID)
@@ -13,28 +18,26 @@ public:
     AndroidAudioDevice();
     ~AndroidAudioDevice() override;
 
-    // AudioIODevice interface (JUCE 8)
-    const juce::String getName() const override;
+    // AudioIODevice interface (JUCE 8) - exact signatures from base class
+    const juce::String& getName() const override { return deviceName; }
     int getDefaultBufferSize() override;
-    int getCurrentBufferSizeSamples() const override;
-    double getCurrentSampleRate() const override;
+    int getCurrentBufferSizeSamples() override { return currentBufferSize; }
+    double getCurrentSampleRate() override { return currentSampleRate; }
     juce::Array<double> getAvailableSampleRates() override;
     juce::Array<int> getAvailableBufferSizes() override;
 
-    bool open(const juce::String& inputDeviceName,
-              const juce::String& outputDeviceName,
-              int numberOfInputChannelsNeeded,
-              int numberOfOutputChannelsNeeded,
-              int sampleRate,
+    bool open(const juce::BigInteger& inputChannels,
+              const juce::BigInteger& outputChannels,
+              double sampleRate,
               int bufferSizeSamples) override;
     void close() override;
     void start(juce::AudioIODeviceCallback* callback) override;
     void stop() override;
-    bool isOpen() const override;
-    bool isPlaying() const override;
-    int getOutputLatencyInSamples() const override;
-    int getInputLatencyInSamples() const override;
-    int getXRunCount() const noexcept override;
+    bool isOpen() override { return isOpened; }
+    bool isPlaying() override { return isStarted; }
+    int getOutputLatencyInSamples() override;
+    int getInputLatencyInSamples() override;
+    int getXRunCount() const noexcept override { return xrunCount; }
 
     // AAudio stream callbacks
     static aaudio_data_callback_result_t onAudioCallback(AAudioStream* stream, void* userData, void* audioData, int32_t numFrames);
