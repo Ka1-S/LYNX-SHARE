@@ -694,6 +694,40 @@ std::optional<GeneratorLaneTarget> generatorLaneTarget (const Song& song, int in
                 out = GeneratorLaneTarget { { AutomationTargetKind::channelPan, index, 0, 0 },
                                             [wet] (float v) { return std::clamp (std::clamp (v, 0.0f, 1.0f) + wet - 0.5f, 0.0f, 1.0f); } };
             }
+            // --- round 190fe: every other 3x Osc parameter the engine moves while it plays (core/ThreeOsc.h, FLM's own
+            // value through the import's laws); the cutoff / resonance and their offsets, the Volume and its envelope
+            // amount fold the other half of their pair at its saved value
+            else if (m.type == flm::module::threeOsc && threeOscIsFlm (c))
+            {
+                const auto saved = [&m] (int k, float fallback) {
+                    return (std::size_t) k < m.params.size() && std::isfinite (m.params[(std::size_t) k]) ? std::clamp (m.params[(std::size_t) k], 0.0f, 1.0f) : fallback;
+                };
+                const auto target = [index] (int k, std::function<float (float)> law) {
+                    return GeneratorLaneTarget { { AutomationTargetKind::channelParam, index, 0, threeosc::flmParamBase + k }, std::move (law) };
+                };
+                const auto unit = [] (float v) { return std::clamp (v, 0.0f, 1.0f); };
+                if (param == 111 || param == 115)
+                {
+                    const auto other = saved (param == 111 ? 115 : 111, param == 111 ? 0.5f : 1.0f);
+                    out = target (111, [param, other, unit] (float v) { v = unit (v); return unit (param == 111 ? v + 2.0f * other - 1.0f : other + 2.0f * v - 1.0f); });
+                }
+                else if (param == 112 || param == 116)
+                {
+                    const auto other = saved (param == 112 ? 116 : 112, param == 112 ? 0.5f : 0.0f);
+                    out = target (112, [param, other, unit] (float v) { v = unit (v); return unit (param == 112 ? v + 2.0f * other - 1.0f : other + 2.0f * v - 1.0f); });
+                }
+                else if (param == 114 || param == 106)
+                {
+                    const auto other = saved (param == 114 ? 106 : 114, param == 114 ? 1.0f : 0.5f);
+                    out = target (114, [param, other, unit] (float v) {
+                        v = unit (v);
+                        return param == 114 ? v * std::clamp (2.0f * other - 1.0f, 0.0f, 1.0f) : other * std::clamp (2.0f * v - 1.0f, 0.0f, 1.0f);
+                    });
+                }
+                else if (threeosc::isFlmTarget (param))
+                    out = target (param, unit);
+            }
+            // --- end of round 190fe
             break;
         // --- end of round 190dw item 4
         default: break;
@@ -2045,6 +2079,72 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
         const auto timeline = std::any_of (rack.modules.begin(), rack.modules.end(), [] (const flm::Module& m) {
             return flmnotefx::timeEffectActive (m.type, m.params);
         });
+        // --- round 190fe: the rack's stages (PROVEN-REA 0x18059d3b0 and the wrapper 0x180799750, FLM_FORMAT §6.1 / §7.4).
+        // The rack's sounds are one buffer the modules work on in order: an effect hears only what comes before it, and
+        // an instrument's wrapper scales what the buffer holds by (1 − Mix) + Post Gain · Mix. A new stage starts at an
+        // instrument that follows an effect, or whose wrapper scales sounds already there; each stage but the last is an
+        // insert of its own (no route to the Master) sending into the next stage at that factor, and the last stage is
+        // the channel's own insert. The drum pads enter the first stage. One stage = one insert, as before.
+        std::map<const flm::Module*, int> stageOf;
+        std::set<const flm::Module*> scaledByStage; // instruments whose wrapper factor is the route into their stage
+        std::vector<int> stageInserts { insert };
+        {
+            std::vector<float> entry { 1.0f };
+            int stage = 0;
+            bool effectInStage = false, sounds = ! rack.kit.empty();
+            for (const auto& m : rack.modules)
+            {
+                if (flm::isGenerator (m.type))
+                {
+                    const auto off = ! m.params.empty() && std::isfinite (m.params[0]) && m.params[0] < 0.5f;
+                    const auto mix = m.reserved.size() > 1 && std::isfinite (m.reserved[1]) ? std::clamp ((double) m.reserved[1], 0.0, 1.0) : 1.0;
+                    const auto factor = off || mix <= 0.0 ? 1.0 : 1.0 - mix + generatorWrapperGain (m);
+                    const auto scales = sounds && std::abs (factor - 1.0) > 1.0e-4;
+                    if (effectInStage || scales)
+                    {
+                        ++stage;
+                        entry.push_back (scales ? (float) factor : 1.0f);
+                        if (scales)
+                            scaledByStage.insert (&m);
+                        effectInStage = false;
+                    }
+                    stageOf[&m] = stage;
+                    sounds = true;
+                    continue;
+                }
+                if (flm::moduleCategory (m.type) == flm::ModuleCategory::noteEffect || m.type == flm::module::tuner || m.type == flm::module::analyzer)
+                    continue;
+                effectInStage = true;
+                stageOf[&m] = stage;
+            }
+            if (stage > 0 && insert > 0 && (int) song.mixer.size() + stage <= maxMixerTracks)
+            {
+                stageInserts.assign ((std::size_t) stage + 1, insert);
+                for (int k = 0; k < stage; ++k)
+                {
+                    MixerTrack part;
+                    part.name = name + " (rack part " + std::to_string (k + 1) + ")";
+                    part.toMaster = false;
+                    song.mixer.push_back (std::move (part));
+                    stageInserts[(std::size_t) k] = (int) song.mixer.size() - 1;
+                }
+                for (int k = 0; k < stage; ++k)
+                {
+                    const auto level = entry[(std::size_t) k + 1];
+                    if (level > maxFaderGain * 1.0001f)
+                        ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: instrument Post Gain on the rack's other sounds above +5.6 dB (capped)");
+                    song.mixer[(std::size_t) stageInserts[(std::size_t) k]].sends.push_back ({ stageInserts[(std::size_t) k + 1], std::min (level, maxFaderGain) });
+                }
+                ctx.note (&FlpImportReport::converted, "FL Studio Mobile: rack whose instruments and effects take turns (one insert per part)");
+            }
+            else
+                scaledByStage.clear();
+        }
+        const auto stageInsert = [&] (const flm::Module* m) {
+            const auto it = stageOf.find (m);
+            return it == stageOf.end() || stageInserts.size() == 1 ? insert : stageInserts[(std::size_t) it->second];
+        };
+        // --- end of round 190fe
         for (const auto& m : rack.modules)
         {
             if (flm::isGenerator (m.type))
@@ -2077,7 +2177,8 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                 return l.kind() == flm::LaneKind::automation && l.targetModule == (int) m.instanceId && ! l.clips.empty();
             });
             auto mapped = flmfx::map (m, live);
-            auto& effects = song.mixer[(std::size_t) insert].effects;
+            const auto effectInsert = stageInsert (&m); // round 190fe
+            auto& effects = song.mixer[(std::size_t) effectInsert].effects;
             if (mapped.slots.empty())
             {
                 ctx.note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type));
@@ -2089,7 +2190,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                 continue;
             }
             effectSeen = true;
-            mappedModules[m.instanceId] = { &m, insert, (int) effects.size(), (int) mapped.slots.size() };
+            mappedModules[m.instanceId] = { &m, effectInsert, (int) effects.size(), (int) mapped.slots.size() };
             for (auto& slot : mapped.slots)
                 effects.push_back (std::move (slot));
             ctx.note (&FlpImportReport::converted, mapped.label);
@@ -2097,7 +2198,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                 ctx.note (&FlpImportReport::partialEffects, what);
         }
 
-        if (generatorAfterEffect)
+        if (generatorAfterEffect && stageInserts.size() == 1) // (round 190fe: else the rack's parts are inserts of their own)
             ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: an instrument placed after an effect in its rack (the effect processes it too)");
         if (noteFx.random())
             ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: Randomizer (drawn once at import; FLM draws at every playback)");
@@ -2152,13 +2253,16 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             {
                 song.channels.push_back (instrumentChannel (ctx, generators.empty() ? nullptr : generators.front(), ch, insert));
                 instrument = (int) song.channels.size() - 1;
+                if (! generators.empty()) // round 190fe: its stage of the rack
+                    song.channels.back().mixerTrack = stageInsert (generators.front());
                 const auto range = generators.empty() ? -1.0f : bendRangeOf (*generators.front());
                 bend (song.channels.back(), range);
                 if (range > 0.0f)
                     bendChannels.push_back (instrument);
                 if (! generators.empty())
                 {
-                    applyGeneratorWrapper (ctx, *generators.front(), song.channels.back(), enableLane (*generators.front()), rack.kit.empty()); // round 190de
+                    applyGeneratorWrapper (ctx, *generators.front(), song.channels.back(), enableLane (*generators.front()),
+                                           rack.kit.empty() || scaledByStage.count (generators.front()) > 0); // round 190de, 190fe
                     generatorChannels[generators.front()->instanceId].push_back (instrument);
                     keyLow = song.channels.back().keyLow = generators.front()->keyLow;
                     keyHigh = song.channels.back().keyHigh = generators.front()->keyHigh;
@@ -2175,12 +2279,13 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             for (const auto* g : generators)
             {
                 auto c = instrumentChannel (ctx, g, ch, insert);
+                c.mixerTrack = stageInsert (g); // round 190fe: its stage of the rack
                 c.name = name + " (" + moduleLabel (g->type) + ")";
                 c.keyLow = g->keyLow;
                 c.keyHigh = g->keyHigh;
                 const auto range = bendRangeOf (*g);
                 bend (c, range);
-                applyGeneratorWrapper (ctx, *g, c, enableLane (*g), rack.kit.empty() && g == generators.front()); // round 190de
+                applyGeneratorWrapper (ctx, *g, c, enableLane (*g), (rack.kit.empty() && g == generators.front()) || scaledByStage.count (g) > 0); // round 190de, 190fe
                 song.channels.push_back (std::move (c));
                 song.channels[(std::size_t) instrument].layer.children.push_back ((int) song.channels.size() - 1);
                 generatorChannels[g->instanceId].push_back ((int) song.channels.size() - 1);
@@ -2206,7 +2311,7 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                         c.name = name + " " + std::to_string (k + 1);
                     c.instrument = InstrumentKind::sampler;
                     c.samplePath = ctx.resolveSample (s, name + ": " + c.name);
-                    c.mixerTrack = insert;
+                    c.mixerTrack = stageInserts.front(); // (round 190fe: the drum pads enter the rack's first part)
                     c.volume = 1.0f;
                     applyPad (ctx, s, c, soloed, holds, song.bpm);
                     if (! s.polyphonic)
@@ -2218,9 +2323,10 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                         outputLinks.push_back ({ kitChannels.back(), s.outputChannel });
                     bendChannels.push_back (kitChannels.back());
                 }
-                // cut groups A / B / C: a hit silences the group's other pads (FLM_FORMAT §6.1). LYNX's cut groups
-                // also cut the channel that plays: exact for a pair (two one-way links), listed for bigger groups
-                // whose pads are polyphonic
+                // cut groups A / B / C: a hit fades out the group's *other* pads, never its own (FLM_FORMAT §6.1). A
+                // pair is two one-way links; a bigger group shares one id with ChannelDef::cutOthersOnly (round 190fe),
+                // so each member cuts the others and keeps its own voices (a monophonic pad still cuts itself through
+                // the sampler's own cut, as in FLM)
                 for (int group = 1; group <= 3; ++group)
                 {
                     std::vector<int> members;
@@ -2239,16 +2345,16 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
                     else
                     {
                         const auto id = ++ctx.cutGroups;
-                        bool selfCut = false;
                         for (const auto m : members)
                         {
                             auto& c = song.channels[(std::size_t) m];
                             c.cutGroup = c.cutBy = id;
-                            selfCut = selfCut || ! c.sampler.cut;
+                            c.cutOthersOnly = true;
                         }
-                        if (selfCut)
-                            ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: cut group of three or more pads (a hit also cuts its own pad)");
                     }
+                    if (holds) // round 190fe: a held note's end cuts the group's other pads too (0x1807503a0)
+                        for (const auto m : members)
+                            song.channels[(std::size_t) m].cutAtNoteEnd = true;
                     ctx.note (&FlpImportReport::converted, "FL Studio Mobile: drum pad cut group");
                 }
                 if (! rack.kit.empty())

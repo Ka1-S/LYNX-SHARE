@@ -936,6 +936,7 @@ struct Setup
     int ppq = 96;
     double tempo = 140.0;
     bool mobile = false; // a channel from a .flm: FLM's envelope stepping and whole-sample ticks (core/ThreeOsc.h)
+    std::array<std::uint8_t, stateSize> raw {}; // round 190fe: the normalised state as saved (the .flm lanes write on a copy)
 };
 
 class ThreeOscInstrument final : public Instrument
@@ -963,6 +964,7 @@ public:
         engine.hostHq = hostHq != nullptr && hostHq();
         engine.S.setMobile (current.mobile);
         engine.init (current.P, sr, current.snap.data(), current.ppq, current.tempo);
+        reapplyFlm(); // round 190fe
         engine.reset();
         tickPhase = 0.0;
         lastTicks = -1.0;
@@ -988,6 +990,7 @@ public:
         s->P = p;
         std::memcpy (s->snap.data(), channel.pluginState.data() + 0x60, snapshotSize);
         s->ppq = ppq, s->tempo = tempo, s->mobile = mobile;
+        std::memcpy (s->raw.data(), channel.pluginState.data(), (std::size_t) stateSize); // (parseNormalised: ≥ stateSize)
         if (channel.samplePath == wavePath)
             s->custom = uiCustom;
         else if (auto w = channel.samplePath.empty() ? std::vector<float> {} : threeOscCustomWave (channel.samplePath); ! w.empty())
@@ -1032,7 +1035,8 @@ public:
         take();
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
         const auto mobile = flmLevel.load();
-        const auto initVol = mobile >= 0.0f ? (float) (vel * (double) mobile) : (float) ((std::pow (11.0, 1.28 * vel) - 1.0) / 10.0);
+        const auto gain = std::isfinite (autoGain) ? autoGain : mobile; // (round 190fe: a lane on Volume / its envelope amount)
+        const auto initVol = mobile >= 0.0f ? (float) (vel * (double) gain) : (float) ((std::pow (11.0, 1.28 * vel) - 1.0) / 10.0);
         const auto k = std::clamp (key, 0, 127);
         const auto knob = pitchCents.load();
         const auto finalPitch = (float) (100.0 * (k - 60) + (double) knob + (double) nextCents);
@@ -1040,6 +1044,7 @@ public:
                                           (float) std::clamp ((double) nextPan + channelPan, -1.0, 1.0));
         engine.voices[(std::size_t) slot].slide.anchor (live.ref (knob));
         volFactor[(std::size_t) slot] = initVol;
+        slotVel[(std::size_t) slot] = (float) vel;
         slotNote[(std::size_t) slot] = startingNoteId(); // (round 190ej: the note whose end releases it)
         notePan[(std::size_t) slot] = nextPan;
         nextPan = 0.0f;
@@ -1068,6 +1073,29 @@ public:
     }
 
     bool idle() const noexcept override { return engine.count == 0; }
+
+    // round 190fe: a lane of an imported .flm on FLM's parameter k (threeosc::flmParamBase + k, FLM's own value)
+    void setParameter (int index, float value) noexcept override
+    {
+        const auto k = index - threeosc::flmParamBase;
+        if (k < 1 || k >= threeosc::flmParamCount || ! threeosc::isFlmTarget (k) || ! std::isfinite (value))
+            return;
+        take();
+        if (! current.mobile)
+            return;
+        value = std::clamp (value, 0.0f, 1.0f);
+        if (flmAuto[(std::size_t) k] == value)
+            return;
+        flmAuto[(std::size_t) k] = value;
+        anyFlmAuto = true;
+        if (k == 114)
+            applyGain();
+        else
+        {
+            threeosc::writeFlmParam (work.data(), k, value, flmStepsPerBeat(), current.tempo);
+            loadWork();
+        }
+    }
 
     // while the transport moves, FL's sequencer ticks fall on the song's PPQ grid
     void setSongPosition (double ticks) noexcept override
@@ -1151,8 +1179,63 @@ private:
             engine.timing (current.ppq, current.tempo); // (FL: parameters and tempo reach the plugin while voices play)
             engine.update();
             retired.store (s);
+            reapplyFlm(); // round 190fe
         }
     }
+
+    // --- round 190fe: the .flm lanes on the engine
+    int flmStepsPerBeat() const noexcept { return (int) std::lround (384.0 / (double) std::max (current.ppq, 1)); }
+    // the working state into the engine (the parameters and the snapshot; HQ stays: its tables are built off this thread)
+    void loadWork() noexcept
+    {
+        auto& P = engine.P;
+        for (int i = 0; i < paramCount; ++i)
+            P.P[(std::size_t) i] = i32At (work.data() + 4 + 4 * i);
+        for (int k = 0; k < 3; ++k)
+            P.inv[(std::size_t) k] = work[0x58 + (std::size_t) k];
+        P.am = work[0x5b] != 0;
+        std::memcpy (engine.snap.data(), work.data() + 0x60, snapshotSize);
+        engine.timing (current.ppq, current.tempo);
+        engine.update();
+    }
+    // FLM's gain (2 × target 114) moves the sounding voices: its gain stage runs per sample
+    void applyGain() noexcept
+    {
+        autoGain = 2.0f * flmAuto[114];
+        for (int i = 0; i < engine.count; ++i)
+        {
+            const auto slot = (std::size_t) engine.order[(std::size_t) i];
+            volFactor[slot] = slotVel[slot] * autoGain;
+            engine.voices[slot].fvol = (float) (channelVol * (double) volFactor[slot]);
+        }
+    }
+    // a new state from the channel: the lanes' values written again on top of it
+    void reapplyFlm() noexcept
+    {
+        work = current.raw;
+        autoGain = NAN;
+        if (! anyFlmAuto || ! current.mobile)
+            return;
+        bool gain = false, state = false;
+        for (int k = 1; k < threeosc::flmParamCount; ++k)
+            if (std::isfinite (flmAuto[(std::size_t) k]))
+            {
+                if (k == 114)
+                    gain = true;
+                else
+                    state = threeosc::writeFlmParam (work.data(), k, flmAuto[(std::size_t) k], flmStepsPerBeat(), current.tempo) || state;
+            }
+        if (state)
+            loadWork();
+        if (gain)
+            applyGain();
+    }
+    std::array<float, threeosc::flmParamCount> flmAuto = [] { std::array<float, threeosc::flmParamCount> a; a.fill (NAN); return a; }();
+    std::array<std::uint8_t, stateSize> work {};
+    std::array<float, maxVoices> slotVel {};
+    float autoGain = NAN;
+    bool anyFlmAuto = false;
+    // --- end of round 190fe
 
     static constexpr int blockSize = 512;
     Engine engine;
@@ -1263,5 +1346,103 @@ std::vector<float> renderReference (const std::vector<std::uint8_t>& state, cons
     }
     return out;
 }
+
+// --- round 190fe: the laws of FlmImport's threeOscState, one FLM parameter at a time (flm190n spec-3xosc.md §4)
+bool isFlmTarget (int k) noexcept
+{
+    return (k >= 1 && k <= 112 && k != 25 && k != 106) || k == 114;
+}
+
+bool writeFlmParam (std::uint8_t* state, int k, double v, int stepsPerBeat, double bpm) noexcept
+{
+    if (state == nullptr || ! isFlmTarget (k) || k == 106 || k == 114)
+        return false;
+    v = std::isfinite (v) ? std::clamp (v, 0.0, 1.0) : 0.0;
+    const auto rnd = [] (double x) { return (std::int32_t) std::lround (x); };
+    const auto put = [state] (std::size_t at, std::int32_t x) { std::memcpy (state + at, &x, 4); };
+    const auto get = [state] (std::size_t at) { return i32At (state + at); };
+    const auto time = [&rnd] (double x) { return std::clamp (rnd (65536.0 * x), 0, 65536); };
+    stepsPerBeat = std::clamp (stepsPerBeat, 1, 32);
+    if (k <= 26) // the oscillators (osc i at 4 + 28·i: pan, shape, coarse, fine, stereo phase, stereo detune)
+    {
+        if (k <= 3)
+            put (4 + 28 * (std::size_t) (k - 1) + 4, rnd (6.0 * v));
+        else if (k <= 6)
+            state[0x58 + (std::size_t) (k - 4)] = v > 0.5 ? 1 : 0;
+        else if (k <= 9)
+            put (4 + 28 * (std::size_t) (k - 7) + 16, rnd (128.0 * (v - 0.5)));
+        else if (k <= 12)
+            put (4 + 28 * (std::size_t) (k - 10) + 20, rnd (100.0 * (v - 0.5)));
+        else if (k <= 15)
+            put (4 + 28 * (std::size_t) (k - 13) + 8, rnd (48.0 * (v - 0.5)));
+        else if (k <= 18)
+            put (4 + 28 * (std::size_t) (k - 16) + 12, rnd (200.0 * (v - 0.5)));
+        else if (k <= 21)
+            put (4 + 28 * (std::size_t) (k - 19), rnd (128.0 * (v - 0.5)));
+        else if (k == 22)
+            put (4 + 4 * 6, rnd (128.0 * v));
+        else if (k == 23)
+            put (4 + 4 * 13, rnd (128.0 * v));
+        else if (k == 24)
+            state[0x5b] = v > 0.5 ? 1 : 0;
+        else if (k == 26)
+            put (4 + 4 * 20, rnd (64.0 * v));
+        return true;
+    }
+    const auto rec = [] (int j, int i) { return (std::size_t) (0x60 + 0x44 * j + 4 * i); };
+    const auto flag = [&] (int j, std::int32_t bit, bool on) { put (rec (j, 0), on ? (get (rec (j, 0)) | bit) : (get (rec (j, 0)) & ~bit)); };
+    if (k <= 61) // the five LFOs (records 0 pan, 1 volume, 2 Mod X, 3 Mod Y, 4 pitch)
+    {
+        const auto j = (k - 27) % 5;
+        switch ((k - 27) / 5)
+        {
+            case 0: flag (j, 0x20, v > 0.5); break;
+            case 1: flag (j, 2, v > 0.5); break;
+            case 2: put (rec (j, 13), rnd (2.0 * v)); break;
+            case 3: put (rec (j, 9), time (v)); break;
+            case 4: put (rec (j, 10), time (v)); break;
+            case 5: put (rec (j, 11), rnd ((j == 0 ? 128.0 : j == 4 ? 4800.0 : 256.0) * (v - 0.5))); break;
+            default: put (rec (j, 12), time (v)); break;
+        }
+        return true;
+    }
+    if (k <= 109) // the four envelopes (records 1…4)
+    {
+        const auto e = (k - 62) % 4, j = e + 1;
+        switch ((k - 62) / 4)
+        {
+            case 0: put (rec (j, 1), v > 0.5 ? 1 : 0); break;
+            case 1: flag (j, 1, v > 0.5); break;
+            case 2: put (rec (j, 2), time (v)); break;
+            case 3:
+            {
+                put (rec (j, 3), time (v));
+                // an attack of no tick starts the envelope at its top: the desktop's attack raw 100
+                const auto tempo = (get (rec (j, 0)) & 1) != 0;
+                if (std::lround ((std::exp (6.908755 * v) - 1.0) * 49.152 / (double) stepsPerBeat * (tempo ? 1.0 : bpm / 120.0)) == 0)
+                    put (rec (j, 3), 100);
+                break;
+            }
+            case 4: put (rec (j, 14), rnd (256.0 * (v - 0.5))); break;
+            case 5: put (rec (j, 4), time (v)); break;
+            case 6: put (rec (j, 5), time (v)); break;
+            case 7: put (rec (j, 15), rnd (256.0 * (v - 0.5))); break;
+            case 8: put (rec (j, 6), rnd (128.0 * v)); break;
+            case 9: put (rec (j, 7), time (v)); break;
+            case 10: put (rec (j, 16), rnd (256.0 * (v - 0.5))); break;
+            default: put (rec (j, 8), rnd ((j == 4 ? 4800.0 : 256.0) * (v - 0.5))); break; // (e = 0 is 106: the gain)
+        }
+        return true;
+    }
+    // the filter: type, cutoff and resonance (their offsets folded in by the import)
+    if (k == 110)
+        put (0x60 + 0x168, std::clamp (rnd (7.0 * v), 0, 7));
+    else if (k == 111)
+        put (0x60 + 0x15c, std::clamp (rnd (256.0 * v), 0, 256));
+    else if (k == 112)
+        put (0x60 + 0x160, std::clamp (rnd (256.0 * v), 0, 256));
+    return true;
+}
+// --- end of round 190fe
 } // namespace threeosc
 } // namespace lynx

@@ -342,6 +342,22 @@ Mapped map (const flm::Module& m, bool live, bool postGainLive)
     const auto enabled = param (m, 0, 1.0f) >= 0.5f;
     const auto mix = std::clamp (reserved (m, 1, 1.0f), 0.0f, 1.0f);
     const auto postDb = 40.0 * (double) reserved (m, 0, 0.5f) - 20.0;
+    // round 190fe: a Mix below 100% on a module that takes several LYNX slots, or with a Post Gain, is FLM's blend
+    // itself — dry × (1 − Mix) + Post Gain × wet × Mix — as a parallel container: a dry branch and the module's slots
+    // in a branch (exact for every module whose slots need no side input). Automated modules keep the plain slots
+    // (their lanes address the slots one by one).
+    const auto sideInput = std::any_of (out.slots.begin(), out.slots.end(), [] (const EffectSlot& x) { return x.sidechain >= 0 || x.sidechain2 >= 0; });
+    if (mix < 0.9999f && ! live && ! sideInput && ! out.slots.empty() && (out.slots.size() > 1 || std::abs (postDb) > 1e-3))
+    {
+        auto container = makeEffectSlot (EffectKind::parallel);
+        container.branches.push_back ({ {}, 1.0f - mix });
+        container.branches.push_back ({ std::move (out.slots), (float) ((double) mix * std::pow (10.0, postDb / 20.0)) });
+        container.enabled = enabled;
+        out.slots = { std::move (container) };
+        if (std::abs (reserved (m, 2, 0.5f) - 0.5f) > 1e-4f)
+            out.partial.push_back ("FL Studio Mobile: effect Wet Pan (not reproduced)");
+        return out;
+    }
     if (std::abs (postDb) > 1e-3 || postGainLive)
     {
         if (mix >= 0.9999f)
@@ -360,7 +376,7 @@ Mapped map (const flm::Module& m, bool live, bool postGainLive)
             g = (float) std::clamp (db / 48.0 + 0.5, 0.0, 1.0);
         }
         else
-            out.partial.push_back ("FL Studio Mobile: effect Post Gain with Mix below 100% (not reproduced)");
+            out.partial.push_back ("FL Studio Mobile: effect Post Gain with Mix below 100% on an automated module (not reproduced)");
     }
     for (auto& s : out.slots)
         s.enabled = enabled;
@@ -369,7 +385,7 @@ Mapped map (const flm::Module& m, bool live, bool postGainLive)
         if (out.slots.size() == 1)
             out.slots[0].mix *= mix;
         else
-            out.partial.push_back ("FL Studio Mobile: Mix of an effect that takes two LYNX slots (played fully wet)");
+            out.partial.push_back ("FL Studio Mobile: Mix of an automated effect that takes two LYNX slots (played fully wet)");
     }
     if (std::abs (reserved (m, 2, 0.5f) - 0.5f) > 1e-4f)
         out.partial.push_back ("FL Studio Mobile: effect Wet Pan (not reproduced)");

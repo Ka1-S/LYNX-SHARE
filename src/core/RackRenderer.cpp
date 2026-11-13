@@ -11,6 +11,7 @@
 #include "core/FlmDwSampler.h"
 #include "core/FlmSlicer.h"
 #include "core/SamplePrecompute.h"
+#include "core/ThreeOsc.h" // round 190fe
 #include "core/TimeStretch.h"
 #include "core/MetronomeVoice.h"
 
@@ -1038,7 +1039,8 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     for (std::size_t c = 0; c < channels.size(); ++c)
         if (channels[c].cutGroup > 0)
             for (std::size_t d = 0; d < channels.size(); ++d)
-                if (channels[d].cutBy == channels[c].cutGroup && flCutsIt (channels[d].instrument))
+                if (channels[d].cutBy == channels[c].cutGroup && flCutsIt (channels[d].instrument)
+                    && ! (d == c && channels[c].cutOthersOnly)) // (round 190fe: FLM's groups spare the pad that plays)
                 {
                     state->cutTargets[c].push_back ((int) d);
                     state->hasCutGroups = true;
@@ -1734,6 +1736,9 @@ void RackState::buildAutomationTables()
                                       && t.param < flmdw::automationBase + flmdw::paramCount)
                                   || (flmslicer::isChannel (song.channels[(std::size_t) t.index]) && t.param >= flmslicer::automationBase
                                       && t.param < flmslicer::automationBase + flmslicer::paramCount)
+                                  // FL Studio Mobile's 3x Osc: FLM's own values of its parameters (an imported .flm's lanes, round 190fe)
+                                  || (threeOscIsFlm (song.channels[(std::size_t) t.index]) && t.param > threeosc::flmParamBase
+                                      && threeosc::isFlmTarget (t.param - threeosc::flmParamBase))
                                   // FL Studio Mobile's GMSynth: its own 75 values P[k] (an imported .flm's lanes, round 190de)
                                   || (song.channels[(std::size_t) t.index].instrument == InstrumentKind::gms
                                       && song.channels[(std::size_t) t.index].modelParams.size() == 1
@@ -4337,7 +4342,11 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         {
             const auto e = events[i];
 
-            if (e.type != NoteEvent::Type::on || e.channel < 0 || e.channel >= (int) state.cutTargets.size())
+            if (e.channel < 0 || e.channel >= (int) state.cutTargets.size())
+                continue;
+            // (round 190fe: an FL Studio Mobile pad of a lane that holds its notes cuts at the note's end as well)
+            if (e.type != NoteEvent::Type::on
+                && ! (e.type == NoteEvent::Type::off && (std::size_t) e.channel < song.channels.size() && song.channels[(std::size_t) e.channel].cutAtNoteEnd))
                 continue;
 
             for (auto target : state.cutTargets[(std::size_t) e.channel])

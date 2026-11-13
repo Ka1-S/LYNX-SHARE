@@ -295,7 +295,11 @@ and the clip compiler 0x18075d6b0):
   - f64 **time shift** in beats, added to the start of every drum note of the slot (never before the clip's start);
   - f32 (0.5 in every file; not used by the playback code that was read);
   - u8 **cut group**: 0 = none, 1…3 = "A", "B", "C". Any trigger of a slot fades out (about 2 ms) the voices of the
-    *other* slots of its group, not its own;
+    *other* slots of its group, not its own. Round 190fe (PROVEN-REA 0x1807503a0, the drum sampler's trigger): the cut
+    runs after the trigger whatever its velocity, so a note-off (velocity 0: the release a lane that holds its notes
+    sends at a note's end) cuts the group's other slots too; each of their voices gets target 0 at rate 0.01 per
+    sample. LYNX: a pair is two one-way cut links; three or more share one group with `ChannelDef::cutOthersOnly`;
+    pads of a channel with a note-holding drum lane get `ChannelDef::cutAtNoteEnd` (both saved);
   - u8 **polyphonic** (1 in almost every file): 0 = a new hit fades out the slot's own voices;
   - optional lp16.
 - `LINk`: i32 **slot id** inside the drum set; i32; u16 pad key (−1 = by order); i32 **output link** (−1 = the slot
@@ -305,7 +309,13 @@ and the clip compiler 0x18075d6b0):
 - `STR1`: u8 **stretch mode**, f64 stretch ratio, f64 **pitch in semitones**. PROVEN-REA (round 190bs, the loader
   0x180747a50 / 0x180740330): FLM renders a stretched copy of the file when it loads it. The copy has
   frames × ratio frames — the ratio is a **length** ratio (2 = twice as long) — and is used only when the mode is
-  not 0; the pitch is rounded to whole semitones and shifts without changing the length.
+  not 0; the pitch is rounded to whole semitones and shifts without changing the length. Round 190fe (the stream
+  opener 0x18074d4e0, reached through the file decoder chooser 0x18074ca20, which tries the WAV, MP3, FLAC and OGG readers in turn):
+  when the length ratio or the pitch ratio is not 1, the decoder creates a time-stretch object with blocks of 512
+  frames, the file's channels and rate and a minimum combined factor of 0.1, and hands it (ratio, pitch ratio) once;
+  the stretched frames are pulled through that object. The object comes from a licensed third-party time-stretch
+  library linked into the DLL, not Image-Line code: it stays a black box (no static study of it; only renders can
+  match it, see §9 point 6).
 - `PATH` (legacy, still read): char[2048] absolute path.
 - `PTH1`: path (section 5).
 - `PRST`: lp32 absolute path + lp32 relative name.
@@ -345,7 +355,11 @@ Use in FL's 20 sample projects (272 kit samples, 261 audio clips): Level 262, Sp
 EG A 10, Pan 8, cut group 5, Sample Start 3, Mute 2; Length, reverse and time shift 0.
 
 A rack renders its drum slots first, then its modules in order on the same buffer: an effect processes only the
-generators before it (PROVEN-REA 0x18059d3b0; LYNX's insert processes them all, which the import report lists).
+generators before it (PROVEN-REA 0x18059d3b0). Since round 190fe LYNX splits such a rack into parts: a new part starts
+at an instrument that follows an effect, or whose wrapper scales the sounds already in the buffer (§7.4); every part
+but the last is an insert of its own ("<rack> (rack part n)", no route to the Master) sending into the next part, at the
+wrapper's factor (1 − Mix) + Post Gain · Mix of the instrument that starts it; the last part is the channel's insert.
+The drum pads enter the first part.
 
 ## 7. Module type registry (complete)
 
@@ -534,8 +548,12 @@ PROVEN-REA 0x180799750 (the wrapper the rack's render 0x18059d3b0 calls for ever
   buffer and the Post Gain then scales that whole buffer (what earlier modules and the drum slots put there too).
 - LYNX: a generator's channel is muted when its Enable is off; Post Gain × Mix is the channel's level (above 0 dB: the
   sampler's gain, capped at 0 dB on other engines and listed); Wet Pan is added to the channel's pan. Exact for the
-  first generator of a rack without drum slots (its "dry" buffer is silent); with other sounds before it in the rack
-  a Mix below 1 would also lower them in FLM, which is listed. In FL's 20 sample projects: 3 generators switched off,
+  first generator of a rack without drum slots (its "dry" buffer is silent); with other sounds before it the rack is
+  split into parts (round 190fe, §6.1) and the route into the generator's part carries (1 − Mix) + Post Gain · Mix,
+  so those sounds are scaled as in FLM (the Wet Pan's balance on them is not: listed).
+- The same wrapper on an effect (round 190fe): with Mix below 1 and a Post Gain, or a module that takes several LYNX
+  slots, the module becomes a parallel container — a dry branch at 1 − Mix and the module's slots in a branch at
+  Post Gain · Mix: FLM's blend exactly. An automated module keeps its plain slots (its lanes address them; listed). In FL's 20 sample projects: 3 generators switched off,
   one Post Gain (−6 dB) and one Mix (0.045).
 
 Automation lanes on a generator's parameters (their names in §7.1, values the module's own 0…1): every FLM engine
@@ -552,7 +570,17 @@ int(11·P37 + 1), GMSynth b/2 × its CSTM range {1, 2, 7, 12}, MiniSynth b semit
 is and added to the note). LYNX: the channel's bend range is set to that range (24 on drum slots); a held value moves
 the channel's PITCH knob by (2v − 1) × range, a lane becomes LYNX pitch-bend automation of every such channel (LYNX
 bends by (2v − 1) × the range: the same semitones). Modules whose bend was not traced (Transistor Bass, 3x Osc,
-SoundFont Player) are listed. Three sample projects bend this way (one lane holds 114 clips). Aftertouch and MIDI CC
+SoundFont Player) are listed.
+
+3x Osc lanes (round 190fe): FLM's oscillator render 0x1807d9eb0 reads the module's oscillator fields (shape, coarse,
+fine, detune, gain with its invert, pan gains) on every call, so a parameter change reaches the voices that sound. A
+lane on 3x Osc parameter k becomes automation of the channel's target `threeosc::flmParamBase + k` with FLM's value; the
+engine writes it into its state with the import's own law (`threeosc::writeFlmParam`, tested equal to the import for
+every target) and recomputes the oscillators and the voice processor's records. The cutoff and resonance (111 / 112)
+and their offsets (115 / 116) fold the other half of their pair at its saved value; the Volume (114) and the volume
+envelope's amount (106) are FLM's gain 2·v114·clamp(2·v106 − 1), on the sounding voices. Not targets: HQ (25: its
+tables are built off the audio thread), Pan (113: already the channel's pan), the voice settings 117…145 (polyphony,
+porta, mono, tracking, gate, echo, arpeggiator: the host's), Free Run (146…148). Three sample projects bend this way (one lane holds 114 clips). Aftertouch and MIDI CC
 lanes stay listed.
 
 ### 7.5 DW Sampler (round 190de)
@@ -749,6 +777,7 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
    code: 30 = 11, 32 = 16 (14 and 15 are unnamed wet and dry levels), 42 = 8.
 5. HEAD 272/280 (loop range).
 6. (round 190bs) The sample slot: the third `MAIN` tail field (f32 0.5) and `LINk`'s second word; where a slot with
-   an output link plays; the stretch modes' algorithms (LYNX uses its own stretcher) (round 190dw: where a linked slot plays is settled, §7.9); how a kit sample's legacy `STRC`
+   an output link plays; the stretch modes' algorithms (LYNX uses its own stretcher; round 190fe: the stretch is a third-party library's, a
+   black box: what a render must measure is in round 190fe's notes) (round 190dw: where a linked slot plays is settled, §7.9); how a kit sample's legacy `STRC`
    stretch sounds (two samples of one demo song; since round 190de LYNX stretches them with its own stretcher); the module's octave shift
    and the second dispatch switch next to the key range (0x420 / 0x42c in the module object: not found in the file).
