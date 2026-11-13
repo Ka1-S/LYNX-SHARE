@@ -3334,7 +3334,8 @@ anhysteretic curve (without it the loop keeps a remanent offset after loud passa
 a DC blocker instead cost the default's sweep 19 dB of ESR) → small-signal make-up (Auto gain on: 0 dB at quiet
 levels, as the reference) → playback EQ (the record EQ's exact inverse) → playback loss (one-pole low-pass per speed)
 → trim. Ember's half-band oversampler around the core as for every style; a switch onto the measured Tape on a running
-signal starts its filters and loop at the signal's state (no click; FxAudit clean).
+signal starts its filters and loop at the signal's state (no click; FxAudit clean). Auto gain off: the small-signal
+gain is Ember's drive gain, as for every other style.
 Constants fitted with `fit/tapefit` (Nelder–Mead on mean ESR + level error, the model compiled from the same header):
 the loop, record EQ and drive law at 15 ips on the default and Drive +10 takes (tp172c stairs, sweeps, drums, music);
 1⅞ ips on Drive +15 (tp172c + refcap182 programme); 30 ips on refcap182's X1; 7½ ips on X2 (a take with "Average"
