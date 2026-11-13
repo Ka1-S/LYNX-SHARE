@@ -977,6 +977,18 @@ public:
     void noteOn (int key, float velocity) noexcept override
     {
         readSettings(); // the note's lengths and laws come from the latest settings
+        // FL's Sakura keeps one note per key (round 190ej [EXEC: /R render]: two overlapping notes of a key sound as loud
+        // as one, the earlier note's end does nothing, the later note's end ends the key): a scheduled note of a held key
+        // releases the key's voice first and takes the key over
+        if (const auto note = startingNoteId(); note != 0)
+        {
+            for (auto& v : voices)
+                if (v.active && v.key == key && v.release < 0.0)
+                    releaseVoice (v);
+            owners.start (key, note);
+        }
+        else
+            owners.start (key, 0);
         SakuraVoice* target = nullptr;
         for (auto& v : voices)
             if (! v.active)
@@ -997,13 +1009,19 @@ public:
     // release (and matrix source 8 "release gate") from the next chunk on, i.e. the start of the next host block
     void noteOff (int key) noexcept override
     {
+        if (! owners.ends (key, endingNoteId())) // (round 190ej: only the end of the note that holds the key ends it)
+            return;
         for (auto& v : voices)
             if (v.active && v.key == key && v.release < 0.0)
-            {
-                v.release = 0.0;
-                v.gate = 1.0;
-                v.eg.release (egRelease);
-            }
+                releaseVoice (v);
+    }
+    KeyOwners owners; // the note that holds each key (round 190ej)
+
+    void releaseVoice (SakuraVoice& v) noexcept
+    {
+        v.release = 0.0;
+        v.gate = 1.0;
+        v.eg.release (egRelease);
     }
 
     void allNotesOff() noexcept override
@@ -1963,6 +1981,7 @@ public:
         // FL's final pitch = 100·(key − 60) cents (round 28 §4); p = trunc(pitch + 2400) cents above 16.35 Hz.
         // Keys below 36 (p < 0) read outside FL's table: LYNX clamps p at 0 (its own choice)
         currentKey = key;
+        currentNote = startingNoteId();
         // + the channel's PITCH knob, fine tune and main pitch: FL's Final.Pitch (issue #14)
         const auto knob = pitchCents.load();
         finalPitch = 100.0f * (key - 60) + (knob + nextCents);
@@ -1998,7 +2017,9 @@ public:
 
     void noteOff (int key) noexcept override
     {
-        if (active && key == currentKey && stage < 3)
+        // (round 190ej: one voice; a later note of the key takes it over and only that note's end releases it — FL's
+        // BooBass ignores the earlier note's end [EXEC: /R render])
+        if (active && key == currentKey && stage < 3 && (endingNoteId() == 0 || currentNote == 0 || endingNoteId() == currentNote))
         {
             const auto r = counts[3];
             countdown = r;
@@ -2196,6 +2217,7 @@ private:
     float bassSat = 0.0f;
     bool active = false;
     int zone = 0, pitch = 0, currentKey = -1, stage = 0, countdown = 0;
+    std::uint32_t currentNote = 0; // the note that holds the voice (round 190ej)
     std::atomic<float> pitchCents { 0.0f }; // the channel's PITCH knob (configure)
     LiveChannelPitch live; // (audio thread, round 167a)
     float nextCents = 0.0f, finalPitch = 0.0f;

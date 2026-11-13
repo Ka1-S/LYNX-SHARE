@@ -156,7 +156,8 @@ std::int64_t estimatedBytes (const Options& o, double seconds) noexcept;
 
 // The notes FL's File › Export › "MIDI file..." writes (REA round 139): in song mode, each pattern clip's part of its
 // pattern placed at the clip (notes from `offset` to `offset + length`, cut at the clip's end; muted clips / notes /
-// playlist tracks left out), sorted; in pattern mode or with no pattern clip, the current pattern's notes.
+// playlist tracks left out; with Song::patternClipTakeover, none from where a later clip of the same pattern starts —
+// issue #158, as playback), sorted; in pattern mode or with no pattern clip, the current pattern's notes.
 std::vector<Note> midiExportNotes (const Song& song);
 
 // Remembered between sessions as "key=value" lines; unknown or bad values fall back to the defaults (clamped).

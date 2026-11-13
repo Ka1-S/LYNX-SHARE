@@ -3910,6 +3910,7 @@ struct NoteRec
     double vel = 1, fv = 1, fp = 0, fpitch = 0, notePan = 0;
     float liveRef = NAN; // the channel pitch it started with (round 167a: its records follow the live knob)
     long long st = 0, seq = 0;
+    std::uint32_t lynxNote = 0; // the LYNX note id that started it (round 190ej)
     std::array<int, 18> voices {};
 };
 
@@ -4182,13 +4183,22 @@ public:
         maybeFree (slot);
     }
 
-    int findPressed (int key) const noexcept
+    // the LYNX note id a note was started with (round 190ej)
+    void setLynxNote (int slot, std::uint32_t note) noexcept
+    {
+        if (slot >= 0 && slot < maxNotes)
+            notes[(std::size_t) slot].lynxNote = note;
+    }
+
+    // the newest pressed note of a key; `note` ≠ 0: the one that LYNX note started (round 190ej)
+    int findPressed (int key, std::uint32_t note = 0) const noexcept
     {
         int best = -1;
         for (int i = 0; i < maxNotes; ++i)
         {
             const auto& nt = notes[(std::size_t) i];
-            if (nt.used && nt.pressed && nt.key == key && (best < 0 || nt.seq > notes[(std::size_t) best].seq))
+            if (nt.used && nt.pressed && nt.key == key && (note == 0 || nt.lynxNote == note)
+                && (best < 0 || nt.seq > notes[(std::size_t) best].seq))
                 best = i;
         }
         return best;
@@ -6449,7 +6459,7 @@ public:
         const auto knob = pitchCents.load();
         const auto fpitch = 100.0 * key - 6000.0 + (double) knob + (double) nextCents;
         engine.nextLiveRef = live.ref (knob);
-        engine.noteOn (key, vel, channelVol, (double) nextPan + channelPan, fpitch, (double) nextPan);
+        engine.setLynxNote (engine.noteOn (key, vel, channelVol, (double) nextPan + channelPan, fpitch, (double) nextPan), startingNoteId());
         nextPan = 0.0f;
         nextCents = 0.0f;
     }
@@ -6457,7 +6467,8 @@ public:
     void noteOff (int key) noexcept override
     {
         take();
-        if (const auto i = engine.findPressed (key); i >= 0)
+        // (round 190ej: the note's own; FL's Harmor plays on the other note of the key [EXEC: /R render])
+        if (const auto i = engine.findPressed (key, endingNoteId()); i >= 0)
             engine.noteOff (i);
     }
 

@@ -349,6 +349,7 @@ public:
                 note.velocity = velocity;
                 note.startSeconds = startSeconds;
                 note.glide = HostSlide::pendingGlide();
+                note.noteId = startingNoteId();
             }
         }
         next = {};
@@ -363,7 +364,10 @@ public:
                     if (l.sampler != nullptr)
                     {
                         l.sampler->setNextNoteRelease (nextRelease);
+                        // (round 190ej: the note's own layer voices, as the channel sampler ends them)
+                        l.sampler->setNextNoteOffId (endingNoteId());
                         l.sampler->noteOff (padKey);
+                        l.sampler->setNextNoteOffId (0);
                     }
     }
 
@@ -531,6 +535,7 @@ private:
         bool porta = false;
         float gain = 1.0f;
         HostSlide::GlideIn glide {};
+        std::uint32_t noteId = 0; // the scheduled note it belongs to (round 190ej)
     };
 
     struct Output
@@ -637,7 +642,9 @@ private:
                 sampler.setNextNoteGain (note.gain);
             sampler.setNextNoteFinePitch (note.fine);
             // (a layer that does not scale its volume with the velocity: FPC divides the velocity's level out)
+            sampler.setNextNoteId (note.noteId);
             sampler.noteOnAt (padKey, layer.scaleVolume ? note.velocity : 1.0f, note.startSeconds);
+            sampler.setNextNoteId (0);
         }
         HostSlide::pendingGlide() = held;
         pendingCount = 0;

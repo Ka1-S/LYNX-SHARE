@@ -1040,6 +1040,7 @@ public:
                                           (float) std::clamp ((double) nextPan + channelPan, -1.0, 1.0));
         engine.voices[(std::size_t) slot].slide.anchor (live.ref (knob));
         volFactor[(std::size_t) slot] = initVol;
+        slotNote[(std::size_t) slot] = startingNoteId(); // (round 190ej: the note whose end releases it)
         notePan[(std::size_t) slot] = nextPan;
         nextPan = 0.0f;
         nextCents = 0.0f;
@@ -1051,7 +1052,7 @@ public:
         {
             const auto slot = engine.order[(std::size_t) i];
             const auto& v = engine.voices[(std::size_t) slot];
-            if (v.key == key && ! v.proc.released)
+            if (endsVoice (v.key, slotNote[(std::size_t) slot], key) && ! v.proc.released) // (round 190ej: the note's own voice, as FL)
                 engine.release (slot);
         }
     }
@@ -1169,6 +1170,7 @@ private:
     bool lastMobile = false;
     std::array<float, blockSize> bufL {}, bufR {};
     std::array<float, maxVoices> volFactor {}, notePan {};
+    std::array<std::uint32_t, maxVoices> slotNote {}; // each voice slot's note id (round 190ej)
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0, tickPhase = 0.0, lastTicks = -1.0;
     float nextPan = 0.0f, nextCents = 0.0f;
 };

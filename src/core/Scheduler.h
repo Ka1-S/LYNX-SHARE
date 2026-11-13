@@ -67,6 +67,11 @@ struct NoteEvent
     std::int16_t port = -1;
     // a scheduled note's "on" (round 169d): the ticks from it to the note's "off" (0 = not known), for ScheduledNotes
     float lengthTicks = 0.0f;
+    // The note's identity (round 190ej): ScheduledNotes gives each scheduled note's "on" a number and its "off" the same
+    // one (0 = none: a live key, an arpeggio, a VFX's output). FL gives every note its own voice and ends that voice at
+    // the note's end, so of two overlapping notes of one key on one channel the first "off" ends only its own voice
+    // (FL 2026 [EXEC: /R renders, round 190ej]); the instruments that keep voices by note use it (Instrument::setNextNoteId).
+    std::uint32_t noteId = 0;
 };
 
 // Fixed-capacity buffer. Events beyond capacity are dropped
@@ -117,6 +122,7 @@ public:
         overflow = false;
         clock = 0.0;
     }
+    // (the ids keep counting across clear(): an "off" sent after a stop or a jump never matches a new note's voice)
     void process (EventBuffer& events, int numSamples, double tps) noexcept;
     // The sounding notes of (channel, key) end `offsetTicks` into the next process() block at the latest. False when
     // none sounds. (A launched clip cut off, core/ClipLauncher.h.)
@@ -140,12 +146,20 @@ private:
     {
         int channel = 0, key = 0;
         double end = 0.0; // on `clock`; +inf = its "off" comes from the scheduler only
+        std::uint32_t id = 0; // the note's identity (NoteEvent::noteId), which its "off" gets too
     };
     std::array<Entry, capacity> entries {};
     int count = 0;
     bool overflow = false; // a note could not be kept: every "off" passes until the next clear()
     double clock = 0.0;    // ticks played since clear()
+    std::uint32_t nextId = 1; // (round 190ej: 1 … 2^24 − 1; the top byte is left for NoteEcho's repeats, noteEchoId)
 };
+
+// The identity of the `repeat`-th echo (1 …) of the note `id` (FL's echo delay plays each repeat as a voice of its own)
+constexpr std::uint32_t noteEchoId (std::uint32_t id, int repeat) noexcept
+{
+    return id == 0 ? 0u : (id & 0xffffffu) | ((std::uint32_t) (repeat & 0xff) << 24);
+}
 
 inline double ticksPerSample (double bpm, double sampleRate) noexcept
 {
@@ -194,7 +208,17 @@ struct ScheduleIndex
     std::vector<std::int64_t> maxNoteLength; // per pattern
     std::vector<std::int64_t> patternLength; // per pattern: effectiveLength, the period of a long clip's repeats
     std::int64_t maxShift = 0;               // the largest channel time shift (FL's Misc › Shift), ticks
+    // per Playlist clip: the next clip of the same pattern by start (the same start: later in the list), -1 = none or
+    // not a pattern clip (Song::patternClipTakeover, issue #158)
+    std::vector<int> nextOfPattern;
 };
+
+// FL's pattern clip takeover (Song::patternClipTakeover, issue #158): the song tick from which Playlist clip `clipIndex`
+// starts no more notes — the start of the first later clip of its pattern that plays (on any track; the same start:
+// the clip later in the list wins). Muted clips, clips on muted tracks and Performance-mode zone clips take nothing
+// over. Max = never (the option off, not a pattern clip, no later clip). With an index built from this song, O(1) in
+// the usual case; without one, a scan of the Playlist.
+std::int64_t patternClipStopsAt (const Song& song, std::size_t clipIndex, const ScheduleIndex* index = nullptr) noexcept;
 
 // When a note plays (ticks within its pattern) and for how long: the swing (with the channel's swing mix), FL's
 // Misc › Time › Shift and Gate (REA round 146b). c = the note's channel (nullptr: only the swing).

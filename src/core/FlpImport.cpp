@@ -956,6 +956,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
     song.muteRunsEffects = true;                          // FL's muted insert (round 190y)
+    song.patternClipTakeover = true;                      // FL's pattern clip takeover (issue #158)
     song.fastDeclick = project.fastDeclick;               // 0x28 (REA round 167h)
     song.panTriangular = (project.panLaw >> 1) == 1;       // 0x17: FL saves 2 × its pan-law mode (REA round 167j §1)
     song.flPluginLevels = true; // hosted plugins at Fruity Wrapper's level and velocity law (REA_rodada190ad.md)
@@ -3919,7 +3920,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
             clips.push_back (clip);
         }
 
-        std::sort (clips.begin(), clips.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
+        // stable: on the same start the file's order stays, and the clip later in it wins a pattern clip takeover (issue #158)
+        std::stable_sort (clips.begin(), clips.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
 
         Arrangement a;
         a.name = arrangement.name.empty() ? "Arrangement " + std::to_string (song.arrangements.size() + 1) : arrangement.name;

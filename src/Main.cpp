@@ -3240,6 +3240,21 @@ private:
                        && ! plain.contains ("patternBlocks");
         }
 
+        // FL's pattern clip takeover (issue #158): saved when on; a project saved before it (no key) loads with it off and
+        // keeps playing every overlapping clip of a pattern in full; new projects have it on
+        bool takeoverOk = false;
+        {
+            auto song = lynx::Song::makeDefault();
+            const auto plain = lynx::ProjectFile::toJson (song);
+            song.patternClipTakeover = true;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            const auto plainBack = lynx::ProjectFile::fromJson (plain, error);
+            takeoverOk = back && back->patternClipTakeover && json.contains ("patternClipTakeover") && plainBack
+                         && ! plainBack->patternClipTakeover && ! plain.contains ("patternClipTakeover")
+                         && lynx::makeNewProject().patternClipTakeover;
+        }
+
         // comping (round 177c): a comp's equal-power crossfades (Clip::fadeCurve) and the crossfade length are saved; a
         // project without them has neither in its file
         bool compOk = false;
@@ -4449,7 +4464,7 @@ private:
         const auto faultResult = faultReportSelfTest();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
         const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR")
-                        && mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
+                        && mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
@@ -4467,6 +4482,7 @@ private:
                << "flp168j_fields=" << (flp168jOk ? "OK" : "ERROR") << "\n"
                << "clip_fades_180d=" << (clipFades180dOk ? "OK" : "ERROR") << "\n"
                << "pattern_blocks=" << (blocksOk ? "OK" : "ERROR") << "\n"
+               << "pattern_clip_takeover=" << (takeoverOk ? "OK" : "ERROR") << "\n"
                << "comp_crossfades=" << (compOk ? "OK" : "ERROR") << "\n"
                << "channel_polyphony=" << (polyOk ? "OK" : "ERROR") << "\n"
                << "track_latency=" << (latencyOk ? "OK" : "ERROR") << "\n"

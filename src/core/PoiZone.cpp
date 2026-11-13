@@ -2000,6 +2000,7 @@ public:
         const auto vel = std::clamp ((double) velocity, 0.0, 1.0);
         const auto initVol = (std::pow (11.0, 1.28 * vel) - 1.0) / 10.0;
         const auto k = std::clamp (key, 0, 127);
+        owners.start (k, startingNoteId());
         notePan[k] = nextPan;
         const auto knob = pitchCents.load();
         plugin->noteOn (k, initVol, channelVol, std::clamp ((double) nextPan + channelPan, -1.0, 1.0), (double) knob + (double) nextCents);
@@ -2010,10 +2011,15 @@ public:
 
     void noteOff (int key) noexcept override
     {
+        // (round 190ej: FL's PoiZone keeps one note per key: a later note of the key takes it over and only the end of
+        // the note holding it ends it; the earlier note's end does nothing [EXEC: /R render, round 190ej])
+        if (! owners.ends (key, endingNoteId()))
+            return;
         take();
         if (plugin != nullptr)
             plugin->noteOff (key);
     }
+    KeyOwners owners; // the note that holds each key (round 190ej)
 
     // FL's PITCH knob and main pitch move the sounding notes too (round 167a)
     void setChannelPitchNow (float knob, float rest) noexcept override

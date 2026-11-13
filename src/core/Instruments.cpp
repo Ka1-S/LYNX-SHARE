@@ -759,6 +759,7 @@ struct SynthVoice
     float tone[2][2] {};    // states of the two low-passes of the 3-band tone control (per side)
     int controlCountdown = 0;
     int age = 0;
+    std::uint32_t noteId = 0; // the note it plays (round 190ej): only that note's end releases it
 };
 
 // Settings exchange without blocking the audio thread: the UI writes under a short flag and audio
@@ -891,6 +892,7 @@ public:
 
                 auto& v = *sounding;
                 v.key = key;
+                v.noteId = startingNoteId();
                 v.velocity = velocity;
                 v.releasing = false;
                 v.stage = 0;
@@ -928,6 +930,7 @@ public:
         *target = {};
         target->active = true;
         target->key = key;
+        target->noteId = startingNoteId();
         target->velocity = velocity;
         const auto cents = nextCents + channelPitch.load (std::memory_order_relaxed);
         const auto delta = midiToHz (key) / sampleRate * std::pow (2.0, cents / 1200.0);
@@ -991,8 +994,9 @@ public:
 
     void noteOff (int key) noexcept override
     {
+        // (round 190ej: the note's own voice, as FL's generators end it)
         for (auto& v : voices)
-            if (v.active && ! v.releasing && v.key == key)
+            if (v.active && ! v.releasing && endsVoice (v.key, v.noteId, key))
             {
                 v.releasing = true;
                 v.stage = 3;
@@ -1537,6 +1541,7 @@ struct SamplerVoice
     bool clipEndHard = false; // the clip's end is a sharp cut (FL: Disabled, a manual side, a seamless join, a fade out)
     int age = 0;
     int key = 60;
+    std::uint32_t noteId = 0; // the note that started it (round 190ej): only that note's end releases it
     float env = 1.0f;      // envelope
     float envStep = 0.0f;  // attack step (> 0) or release step (< 0)
     // FL Studio Mobile's pad envelope (core/FlmPad.h, round 190bs): `env` moves towards padTarget by padRate each sample
@@ -1905,6 +1910,7 @@ public:
         *target = {};
         target->active = true;
         target->key = key;
+        target->noteId = startingNoteId();
         // FL plays a Playlist audio clip at unity gain at the channel's default volume (78%): the channel volume
         // curve is relative to that point for clips (REA_rodada89 §4.2 [EXEC]: +5.2 dB at every volume and pan)
         target->velocity = clipMode                                         ? velocity * audioClipUnity()
@@ -2368,14 +2374,16 @@ public:
             return;
         }
 
+        // (round 190ej: of two overlapping notes of one key, FL's sampler ends only the note's own voice [EXEC: issue #158's
+        // 25 renders and round 190ej's]; endsVoice() takes every voice of the key for an off without a note id)
         if (shaper != nullptr)
             for (auto& v : voices)
-                if (v.active && v.key == key)
+                if (v.active && endsVoice (v.key, v.noteId, key))
                     shaper->voiceReleased ((int) (&v - voices.data()));
 
         // the cutoff/pitch envelopes always release
         for (auto& v : voices)
-            if (v.active && v.key == key && v.stage < 3)
+            if (v.active && endsVoice (v.key, v.noteId, key) && v.stage < 3)
                 for (std::size_t e = 0; e < 2; ++e)
                     modEnv[e].release (v.mod[e]);
 
@@ -2383,7 +2391,7 @@ public:
         // volume envelope the note-off changes nothing — the sample plays on and the other envelopes hold (EXEC: FL's
         // renders, REA_rodada76 §6)
         for (auto& v : voices)
-            if (v.active && v.key == key && v.flVoice && v.stage < 3)
+            if (v.active && endsVoice (v.key, v.noteId, key) && v.flVoice && v.stage < 3)
             {
                 if (modulation.fl.recs[1].enabled != 0)
                     for (int k = 1; k < 5; ++k)
@@ -2399,7 +2407,7 @@ public:
 
         // FL's volume articulator enters its release stage from the current level
         for (auto& v : voices)
-            if (v.active && v.key == key && v.flEnvelope && v.stage < 3)
+            if (v.active && endsVoice (v.key, v.noteId, key) && v.flEnvelope && v.stage < 3)
             {
                 v.volumeArt.release (modulation.volume);
                 v.stage = 3; // released (stops "while held" loops); the ADSR level stays at 1
@@ -2408,7 +2416,7 @@ public:
         // FL Studio Mobile's pad: the note's end starts the release only on a lane that holds its notes (core/FlmPad.h)
         if (padHold.load (std::memory_order_relaxed))
             for (auto& v : voices)
-                if (v.active && v.key == key && v.padEnv && v.stage < 3)
+                if (v.active && endsVoice (v.key, v.noteId, key) && v.padEnv && v.stage < 3)
                 {
                     v.stage = 3;
                     v.padTarget = 0.0f;
@@ -2423,7 +2431,7 @@ public:
 
         // linear release from the current level (like FL)
         for (auto& v : voices)
-            if (v.active && v.key == key && v.stage < 3 && ! v.flEnvelope && ! v.flVoice && ! v.padEnv)
+            if (v.active && endsVoice (v.key, v.noteId, key) && v.stage < 3 && ! v.flEnvelope && ! v.flVoice && ! v.padEnv)
             {
                 v.stage = 3;
                 v.envStep = -(float) (std::max (v.env, 0.001f) / (seconds * sampleRate));

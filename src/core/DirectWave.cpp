@@ -2233,6 +2233,7 @@ public:
         Note n;
         n.id = nextId++;
         n.key = std::clamp (key, 0, 127);
+        n.noteId = startingNoteId();
         n.initVol = initVol;
         n.pan = nextPan;
         const auto knob = pitchCents.load();
@@ -2248,8 +2249,9 @@ public:
 
     void noteOff (int key) noexcept override
     {
+        // (round 190ej: the note's own voice — FL's DirectWave plays on the other note of the key [EXEC: /R render])
         for (std::size_t i = 0; i < notes.size();)
-            if (notes[i].key == key)
+            if (endsVoice (notes[i].key, notes[i].noteId, key))
             {
                 engine.noteOff (notes[i].id);
                 notes.erase (notes.begin() + (std::ptrdiff_t) i);
@@ -2309,6 +2311,7 @@ private:
     {
         std::uint64_t id = 0;
         int key = 0;
+        std::uint32_t noteId = 0; // the scheduled note's id (round 190ej)
         double initVol = 1.0, pan = 0.0, cents = 0.0;
         HostSlide slide {}; // a slide note moving its Final.Pitch (issue #14; the zone stays the key's)
     };

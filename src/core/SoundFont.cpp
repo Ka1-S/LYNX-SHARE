@@ -806,6 +806,7 @@ struct Voice
     bool active = false, released = false, held = false /* by the pedal */, dying = false;
     const Region* region = nullptr;
     int key = 60, velocity = 100, presetIndex = -1;
+    std::uint32_t noteId = 0; // the LYNX note that started it (round 190ej)
     std::uint64_t age = 0;
     double pos = 0;
     bool looping = false, loopUntilRelease = false;
@@ -1035,8 +1036,13 @@ public:
         }
     }
 
-    void noteOn (int key, float velocity) noexcept override { pending.push ({ key, velocity, true, nextPan, nextCents }); nextPan = 0, nextCents = 0; }
-    void noteOff (int key) noexcept override { pending.push ({ key, 0.0f, false, 0, 0 }); }
+    void noteOn (int key, float velocity) noexcept override
+    {
+        pending.push ({ key, velocity, true, nextPan, nextCents, startingNoteId() });
+        nextPan = 0, nextCents = 0;
+    }
+    // (round 190ej: the note's own voices — FL's SoundFont Player plays on the other note of the key [EXEC: /R render])
+    void noteOff (int key) noexcept override { pending.push ({ key, 0.0f, false, 0, 0, endingNoteId() }); }
     void setNextNoteExpression (float pan, float cents, bool) noexcept override { nextPan = pan, nextCents = cents; }
     // The channel's PITCH knob (issue #73: an FL project's SoundFont Player detuned −400 cents played undetuned) and its
     // fine tune + main pitch, before every render. FL's generators follow both on the sounding notes (round 167a): the
@@ -1144,10 +1150,14 @@ public:
         {
             const auto& e = pending.events[(std::size_t) i];
             if (e.on)
+            {
+                startingId = e.id;
                 startNote (*font, e.key, e.velocity, e.pan, e.cents);
+                startingId = 0;
+            }
             else
             {
-                stopNote (e.key);
+                stopNote (e.key, e.id);
                 startReleaseRegions (*font, e.key);
             }
         }
@@ -1170,7 +1180,7 @@ public:
     }
 
 private:
-    struct NoteMsg { int key; float velocity; bool on; float pan, cents; };
+    struct NoteMsg { int key; float velocity; bool on; float pan, cents; std::uint32_t id; };
     struct Pending
     {
         std::array<NoteMsg, 256> events {};
@@ -1417,6 +1427,7 @@ private:
         v.active = true;
         v.region = &r;
         v.key = key, v.velocity = vel, v.presetIndex = presetIndex;
+        v.noteId = startingId;
         v.age = ++clock;
         v.oneShot = drums || r.oneShot;
         v.pos = r.start;
@@ -1464,10 +1475,13 @@ private:
         v.filter.on = v.filterBaseCents < 13450.0f || qDb > 0.0f || r.modEnvToFilterFc != 0 || r.modLfoToFilterFc != 0 || param (pCutoffMod) > 0.0f;
     }
 
-    void stopNote (int key) noexcept
+    std::uint32_t startingId = 0; // (the note id startNote gives its voices)
+
+    // `id` ≠ 0: only that note's voices (round 190ej)
+    void stopNote (int key, std::uint32_t id = 0) noexcept
     {
         for (auto& v : voices)
-            if (v.active && v.key == key && ! v.released)
+            if (v.active && v.key == key && ! v.released && (id == 0 || v.noteId == id))
             {
                 if (v.oneShot && ! v.looping)
                     continue; // drums: the note-off is ignored, the sample plays out

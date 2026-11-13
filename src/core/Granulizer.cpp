@@ -1122,6 +1122,7 @@ public:
         {
             engine.voices[(std::size_t) slot].slide.anchor (live.ref (knob));
             volFactor[(std::size_t) slot] = initVol;
+            slotNote[(std::size_t) slot] = startingNoteId(); // (round 190ej)
             notePan[(std::size_t) slot] = nextPan;
         }
         nextPan = 0.0f;
@@ -1134,7 +1135,7 @@ public:
         {
             const auto slot = engine.order[(std::size_t) i];
             const auto& v = engine.voices[(std::size_t) slot];
-            if (v.key == key && ! v.proc.released)
+            if (endsVoice (v.key, slotNote[(std::size_t) slot], key) && ! v.proc.released) // (round 190ej: the note's own voice)
                 engine.release (slot);
         }
     }
@@ -1303,6 +1304,7 @@ private:
     std::array<bool, 2> slicesReady { false, false };
     std::array<float, blockSize> bufL {}, bufR {};
     std::array<float, maxVoices> volFactor {}, notePan {};
+    std::array<std::uint32_t, maxVoices> slotNote {}; // each voice slot's LYNX note id (round 190ej)
     double rate = 44100.0, channelVol = 1.0, channelPan = 0.0, tickPhase = 0.0, lastTicks = -1.0;
     float nextPan = 0.0f, nextCents = 0.0f;
 };
