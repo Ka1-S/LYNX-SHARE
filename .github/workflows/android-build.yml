@@ -90,7 +90,15 @@ jobs:
           ls -la "$NDK_DIR"
 
       # ---------------------------------------------------------
-      # 4. Cache CMake/Ninja build
+      # 4. Clear CMake build cache (fresh build for Android NDK headers)
+      # ---------------------------------------------------------
+      - name: Clear CMake cache
+        run: |
+          rm -rf build-android
+          rm -f ~/.cache/cmake/*-android-*-*
+      
+      # ---------------------------------------------------------
+      # 5. CMake build cache
       # ---------------------------------------------------------
       - name: Cache CMake build
         uses: actions/cache@v4
@@ -98,7 +106,7 @@ jobs:
           path: |
             ~/.cache/cmake
             build-android
-          key: ${{ runner.os }}-android-${{ env.ANDROID_ABI }}-${{ env.CMAKE_BUILD_TYPE }}-${{ hashFiles('**/CMakeLists.txt', '**/CMakePresets.json', 'cmake/*') }}
+          key: ${{ runner.os }}-android-${{ env.ANDROID_ABI }}-${{ env.CMAKE_BUILD_TYPE }}-${{ hashFiles('**/CMakeLists.txt', '**/CMakePresets.json', 'cmake/*') }}-fresh
           restore-keys: |
             ${{ runner.os }}-android-${{ env.ANDROID_ABI }}-${{ env.CMAKE_BUILD_TYPE }}-
 
