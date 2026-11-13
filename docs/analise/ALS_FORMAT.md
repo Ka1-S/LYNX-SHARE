@@ -393,7 +393,7 @@ exists yet: every law that is not plain unit maths is [ASSUMED] and listed in th
 | Live device (tag) | LYNX | Translated | Listed in the report |
 |---|---|---|---|
 | EQ Three (`FilterEQ3`) | Prism Multiband, 3 bands, minimum-phase (the crossover sum), no dynamics | FreqLo / FreqHi → crossovers, Slope → 24 / 48 dB/oct, GainLo / Mid / Hi (linear) → band levels (dB), kill switches and −inf gains → the bands that still sound are soloed | the pair (fitted), gains under −30 dB, all bands off (Prism's lowest output) |
-| Drum Buss (`DrumBuss`) | an Audio Effect Rack "Drum Buss": Ember Saturator → Shell Channel, plus a "Dry" chain when Dry/Wet is under 100 % or can move | Drive (24 dB at 100 %) and Soft / Medium / Hard → Ember tube / tape / transistor; Damping → Ember's high cut; Input Trim → Ember's input; Transients → Shell's transient shaper (Amount, Invert below 0); Boom → Shell's low enhancer at the boom's pitch; Crunch → Shell's high enhancer; Comp → Shell's listen-mic compressor; Output → Shell's output; Dry/Wet → the chains' volumes. The rack's macros (Drive, Crunch, Damping, Transients, Boom, Boom Freq, Trim, Output, Dry/Wet) each span their control: Live's envelopes and macros reach them | every fitted part, Boom decay, negative transients under automation |
+| Drum Buss (`DrumBuss`) | an Audio Effect Rack "Drum Buss": Ember Saturator → Facet EQ → Crest Compressor (with Comp on) → Shell Channel, plus a "Dry" chain when Dry/Wet is under 100 % or can move (refit to Live's renders in round 190ek, §19) | Drive and its type → Ember's Pentode voicing at the measured small-signal gain per type and amount (+ the type's own EQ: Medium a bell, Hard a low shelf, in proportion to the drive); the device's own colour → three Facet bells and the output; Damping → Ember's 6 dB/oct high cut; Input Trim → Ember's input; Crunch → its mid band (two Facet shelves under the output's lift); Boom → a Facet bell at the Boom frequency and a resonant 12 dB/oct high pass (decay sets their gain / Q / place); Comp → Crest at 4 : 1, −19 dB, 1 / 200 ms, +11 dB; Transients → Shell's transient shaper (Amount, Invert below 0); Output → Shell's output; Dry/Wet → the chains' volumes. The rack's macros (Drive, Crunch, Damping, Transients, Boom, Boom Freq, Trim, Output, Dry/Wet) run through the imported values: Live's envelopes and macros reach them | every fitted part, the type's EQ at other drives, Boom's tail, Crunch's distortion, the transient shaper's tail lift, Soft's wave folding, negative transients under automation |
 | Auto Filter's LFO / envelope follower / side chain | a Peak Controller (FL's internal-controller link) in front of the Filter — or at the end of the side-chain source track's insert — whose output 0 (peak + LFO) drives the Filter's cutoff through a 33-point curve | LFO rate (Hz at the set's tempo, or synced), shape, phase offset, amount; the follower's amount and release (a straight fall); the cutoff's base | amounts (law assumed), the follower's attack, stereo LFO offset, falling saw, inside a rack (no link possible) |
 | Operator (`Operator`) | the built-in synth, only when no FM is in use: operator A alone (B … D off or at −inf), or algorithm 11's carriers (≤ 3) | waveforms Sine (0), White noise (21), User (22 → the synth's harmonic table), coarse / fine ratio → pitch, volume, A's envelope (ms → s), filter, glide, global volume / pan | the pair (fitted), envelope levels / slopes / loop, LFO, pitch envelope, spread, tone; with FM the device stays unsupported ("FM synthesis: no LYNX engine for it yet") |
 | Drift (`Drift`) | the built-in synth | oscillator 1 / 2 types → nearest waves, transposes, detune, levels, noise; filter I / II (12 dB / 24 dB ladder), frequency, resonance, key tracking; envelope 1 (amp ADSR); voice mode mono; glide; volume | the pair (fitted), shape, high pass, envelope 2 / LFO / cycling envelope / matrix, drift, stereo / unison voices |
@@ -408,5 +408,31 @@ devices on a track's own chain came in. Now also:
   the device's law;
 - a VST2 plugin's parameter (`ParameterId` = its index [model]) on an insert or as the track's instrument;
 - a Simpler's filter frequency / resonance → the Sampler's Cutoff / Resonance knobs.
-A VST3 plugin's parameter keeps the plugin's own id, not LYNX's index: listed once with that reason. Envelopes of devices
-LYNX does not translate stay listed as "Automation of a device parameter (track)".
+(round 190ek) A VST3 plugin's parameter on an insert or as the track's instrument is carried by the plugin's own
+ParamID: slot k = its place among the device's parameters with an id (`ParameterId` ≥ 0), the ParamIDs written into
+the plugin's state as FL's record 4 so the plugin host puts slot k on the plugin's own parameter when it opens it; Live's
+plain values are mapped linearly over the saved `MidiControllerRange` (exact for 0 … 1; another range is listed as
+approximate). Inside a rack it stays listed. Envelopes of devices LYNX does not translate stay listed as "Automation of a
+device parameter (track)".
+
+## 19. Lot 3 refit to Live 12.4's renders (round 190ek, 2026-11-12)
+Evidence: round 190ei's renders and saves (`/mnt/e/lynx-work/live190ei/`: RESULTS.md, CASES.md, renders, the VST3 save),
+re-analysed with LYNX's own renders of the same devices (`/mnt/e/lynx-work/als190ek/`: measure3.cpp runs the importer's
+translations on the same stimuli, compare3.py scores both against Live; dbfit / dbeval try every Ember curve on the
+Drum Buss staircases). Live's devices were not decompiled; renders, the menus' shots, Live's own saves and the rate
+labels read as plain strings from Live's engine binary were used.
+- **Auto Filter (new device).** `Lfo_Amount` 94 semitones per 1.0 (0.5 → ±47 st), `Envelope_Amount` 96 semitones per
+  1.0 at a full-scale peak; `Lfo_TimeMode` 0 Hz, 1 time (`Lfo_Time` s), 2 synced, 3 triplet (× 2/3), 4 dotted (× 1.5),
+  5 sixteenths (`Lfo_Sixteenth`); `Lfo_SyncedRate` 0 … 21 = the older `BeatRate` table turned round (8 bars … 1/64:
+  index 9 = 3/8 = 1.5 beats measured; the engine holds the same 22 labels for both).
+- **Auto Filter (older device).** `ModHub` 0.94 semitone per unit at a full-scale peak (linear in the peak); LFO shapes:
+  0 sine (0 rising at song time 0), 1 square (+ first), 2 triangle (from the bottom: the controller's is shifted half a
+  cycle), 3 saw up, 4 saw down (alone: the rising saw with the curve turned over), 5 and 6 random steps four per cycle.
+  The Peak Controller follows a sine's peak exactly; on noise it reads about 1.9 × Live's follower (block peak vs a
+  smoothed one) and it has no attack (Live's side-chained kick peaks 80 ms after the hit).
+- **Drift.** `Global_VoiceMode` 3 = Unison (menu: Poly, Mono, Stereo, Unison); 2 and 3 listed.
+- **Drum Buss.** As in the §18 table; the laws and their fits are in `AlsDevices.h` (`namespace drumbuss`).
+- **Unchanged and pinned by tests:** EQ Three (flat within 0.31 dB, Slope 0 / 1 = 24 / 48 dB/oct, kills, gains,
+  FlatResponse has no effect), Operator's waves 0 / 21 / 22 and algorithm 10, Drift's oscillator maps, filter slopes and
+  envelope 1.
+

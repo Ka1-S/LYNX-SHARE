@@ -428,26 +428,82 @@ void pluginMappings (Ctx& ctx, const Element& device, PatcherDoc& doc, int node)
         }
 }
 
-// (round 190ed) The envelopes on a plugin's parameters. Live keeps a plugin parameter as 0..1 [DATA, model]; a VST2's
-// ParameterId is its index [model], which LYNX's plugin parameters use too; a VST3's is the plugin's own parameter id,
-// not an index: listed, not kept
+// (round 190ed) The envelopes on a plugin's parameters. Live keeps a VST2 parameter as 0..1 [DATA, model] and its
+// ParameterId is its index [model], which LYNX's plugin parameters use too. (round 190ek) A VST3's ParameterId is the
+// plugin's own ParamID and its envelope holds the parameter's plain value, between the MidiControllerRange Live saves
+// for it [MEASURED in a Live 12.4 save, round 190ei: kHs Gain's "Gain" ParamID 1, range 0.0316 … 31.62, envelope points
+// 0.2486 … 28.52; "mode" ParamID 414, 0 … 1; 126 unused entries ParameterId −1]. Such a parameter is carried as slot k
+// = its place among the device's parameters with an id (FL's VST3 automation slots, core/FlWrapper.h, which the plugin
+// host turns into the plugin's own order when it opens it: `vst3Slots` gets the ParamIDs), its value mapped linearly over
+// that range (exact for 0 … 1, the usual range; another range is listed as approximate — the plugin's own curve
+// between the ends is known only to the plugin). `inRack`: the host does not remap a plugin inside a rack: listed there.
 void pluginAutos (Ctx& ctx, const Element& device, const std::string& plugin,
-                  const std::function<void (const std::string& id, int param, float current, const std::string& name)>& sink)
+                  const std::function<void (const std::string& id, int param, float current, const std::string& name, std::function<float (double)> law)>& sink,
+                  std::vector<std::int32_t>* vst3Slots = nullptr, bool inRack = false)
 {
     const auto vst3 = (bool) device.path ("PluginDesc/Vst3PluginInfo");
+    int slot = 0;
     for (const auto& p : device.path ("ParameterList").children ("PluginFloatParameter"))
-        if (const auto id = targetId (p.child ("ParameterValue")); ! id.empty() && ctx.automated.count (id) != 0)
+    {
+        const auto paramId = (std::int64_t) p.number ("ParameterId", -1);
+        const auto mySlot = paramId >= 0 ? slot++ : -1;
+        const auto id = targetId (p.child ("ParameterValue"));
+        if (id.empty() || ctx.automated.count (id) == 0)
+            continue;
+        auto name = p.value ("ParameterName");
+        if (! vst3)
         {
-            const auto index = (int) p.number ("ParameterId", -1);
-            if (vst3 || index < 0)
-            {
-                ctx.note (&FlpImportReport::unsupported, "Automation of a VST3 plugin's parameter (" + plugin + ": Live keeps the plugin's own id, not its index)");
-                ctx.explained.insert (id);
+            if (paramId < 0)
                 continue;
-            }
-            auto name = p.value ("ParameterName");
-            sink (id, index, (float) std::clamp (p.number ("ParameterValue/Manual", 0.0), 0.0, 1.0), plugin + " " + (name.empty () ? "#" + std::to_string (index) : name));
+            sink (id, (int) paramId, (float) std::clamp (p.number ("ParameterValue/Manual", 0.0), 0.0, 1.0),
+                  plugin + " " + (name.empty () ? "#" + std::to_string (paramId) : name), [] (double v) { return (float) std::clamp (v, 0.0, 1.0); });
+            continue;
         }
+        if (inRack || vst3Slots == nullptr || mySlot < 0)
+        {
+            ctx.note (&FlpImportReport::unsupported, "Automation of a VST3 plugin's parameter inside a rack (" + plugin + ": LYNX maps a VST3's own parameter ids on inserts and channels)");
+            ctx.explained.insert (id);
+            continue;
+        }
+        const auto lo = p.number ("ParameterValue/MidiControllerRange/Min", 0.0), hi = p.number ("ParameterValue/MidiControllerRange/Max", 1.0);
+        const auto span = std::abs (hi - lo) > 1.0e-12 ? hi - lo : 1.0;
+        if (std::abs (lo) > 1.0e-6 || std::abs (hi - 1.0) > 1.0e-6)
+            ctx.note (&FlpImportReport::approximated, "Automation of a VST3 parameter with its own range (" + plugin + " " + name
+                                                          + ": Live's plain values mapped linearly between the range's ends)");
+        if ((std::size_t) mySlot >= vst3Slots->size())
+            vst3Slots->resize ((std::size_t) mySlot + 1, -1);
+        (*vst3Slots)[(std::size_t) mySlot] = (std::int32_t) paramId;
+        const auto law = [lo, span] (double v) { return (float) std::clamp ((v - lo) / span, 0.0, 1.0); };
+        sink (id, mySlot, law (p.number ("ParameterValue/Manual", lo)), plugin + " " + (name.empty () ? "#" + std::to_string (paramId) : name), law);
+    }
+    // every parameter with an id keeps its slot (the host gives the slots it does not list the next free ones)
+    if (vst3 && vst3Slots != nullptr && ! vst3Slots->empty())
+    {
+        slot = 0;
+        for (const auto& p : device.path ("ParameterList").children ("PluginFloatParameter"))
+            if (const auto paramId = (std::int64_t) p.number ("ParameterId", -1); paramId >= 0)
+            {
+                if ((std::size_t) slot >= vst3Slots->size())
+                    vst3Slots->resize ((std::size_t) slot + 1, -1);
+                (*vst3Slots)[(std::size_t) slot++] = (std::int32_t) paramId;
+            }
+    }
+}
+
+// (round 190ek) The automation slots of a VST3 as FL's record 4 (u32 N + N × i32 ParamID) in its state (FL's record
+// layout, which pluginOf writes), read by the plugin host to put each automation on the plugin's own parameter
+void appendVst3Slots (ForeignPlugin& plugin, const std::vector<std::int32_t>& slots)
+{
+    if (slots.empty() || plugin.format != ForeignPlugin::Format::vst3 || plugin.state.size() < 4)
+        return;
+    auto put32 = [&plugin] (std::uint32_t v) { for (int k = 0; k < 4; ++k) plugin.state.push_back ((std::uint8_t) (v >> (8 * k))); };
+    put32 (4);
+    const auto size = (std::uint64_t) (4 + 4 * slots.size());
+    for (int k = 0; k < 8; ++k)
+        plugin.state.push_back ((std::uint8_t) (size >> (8 * k)));
+    put32 ((std::uint32_t) slots.size());
+    for (const auto id : slots)
+        put32 ((std::uint32_t) id);
 }
 
 // (round 190ed) The macro of rack `doc` that drives a target `path` leads to from `depth`: the target itself when it is
@@ -644,10 +700,13 @@ int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool
         if (n >= 0)
         {
             pluginMappings (ctx, d, doc, n);
-            pluginAutos (ctx, d, p->name, [&ctx, n] (const std::string& id, int param, float current, const std::string& name) {
-                if (ctx.rackAutos != nullptr)
-                    ctx.rackAutos->push_back ({ id, {}, n, param, [] (double v) { return (float) std::clamp (v, 0.0, 1.0); }, current, name });
-            });
+            pluginAutos (
+                ctx, d, p->name,
+                [&ctx, n] (const std::string& id, int param, float current, const std::string& name, std::function<float (double)> law) {
+                    if (ctx.rackAutos != nullptr)
+                        ctx.rackAutos->push_back ({ id, {}, n, param, std::move (law), current, name });
+                },
+                nullptr, true);
         }
         return n;
     }
@@ -915,9 +974,16 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
             ctx.note (&FlpImportReport::converted, "Plugin: " + p->name);
             // (round 190ed) envelopes on the plugin's parameters (the track's own instrument only)
             if (depth == 0 && ! ctx.inDrumPad)
-                pluginAutos (ctx, device, p->name, [&ctx] (const std::string& id, int param, float, const std::string& name) {
-                    ctx.channelTargets.push_back ({ id, Target { AutomationTarget { AutomationTargetKind::channelParam, -1, 0, param }, ValueMap::plain, name, {} } });
-                });
+            {
+                std::vector<std::int32_t> slots;
+                pluginAutos (
+                    ctx, device, p->name,
+                    [&ctx] (const std::string& id, int param, float, const std::string& name, std::function<float (double)> law) {
+                        ctx.channelTargets.push_back ({ id, Target { AutomationTarget { AutomationTargetKind::channelParam, -1, 0, param }, ValueMap::plain, name, std::move (law) } });
+                    },
+                    &slots);
+                appendVst3Slots (channel.plugin.foreign, slots); // (round 190ek)
+            }
             return true;
         }
         return false;
@@ -1261,9 +1327,14 @@ void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& ins
                 ctx.note (&FlpImportReport::converted, "Plugin: " + p->name);
                 // (round 190ed) envelopes on the plugin's parameters
                 const auto track = (int) (&insert - ctx.song.mixer.data()), at = (int) insert.effects.size() - 1;
-                pluginAutos (ctx, d, p->name, [&ctx, track, at] (const std::string& id, int param, float, const std::string& name) {
-                    ctx.targets[id] = { AutomationTarget { AutomationTargetKind::effectParam, track, at, param }, ValueMap::plain, name, {} };
-                });
+                std::vector<std::int32_t> slots;
+                pluginAutos (
+                    ctx, d, p->name,
+                    [&ctx, track, at] (const std::string& id, int param, float, const std::string& name, std::function<float (double)> law) {
+                        ctx.targets[id] = { AutomationTarget { AutomationTargetKind::effectParam, track, at, param }, ValueMap::plain, name, std::move (law) };
+                    },
+                    &slots);
+                appendVst3Slots (insert.effects.back().plugin.foreign, slots); // (round 190ek)
             }
             continue;
         }

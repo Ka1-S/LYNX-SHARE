@@ -7,6 +7,8 @@
 #include "core/AlsImport.h"
 #include "core/DynamicsSuite.h"
 #include "core/Effects.h"
+#include "core/FacetEq.h"
+#include "core/FlWrapper.h"
 #include "core/MixSuite.h"
 #include "core/Patcher.h"
 #include "core/Rack.h"
@@ -191,7 +193,9 @@ TEST (als190ed_drum_buss_becomes_a_rack)
     namespace sh = mixsuite::shell;
     using als190ed::near;
     using als190ed::par;
-    // Drive 50 % medium, damping 6 kHz, transients +0.4, boom 0.3 at 60 Hz, trim −6 dB, output −3 dB, 100 % wet, compressor on
+    // (round 190ek: the chain refitted to Live's renders — Ember → Facet EQ → Crest → Shell Channel; als190ek tests hold the
+    // measured numbers) Drive 50 % medium, damping 6 kHz, transients +0.4, boom 0.3 at 60 Hz, trim −6 dB, output −3 dB,
+    // 100 % wet, compressor on
     const auto extra = als190ed::flag ("EnableCompression", true) + par ("DriveAmount", 0.5) + par ("DriveType", 1) + par ("CrunchAmount", 0.0) +
                        par ("DampingFrequency", 6000.0) + par ("TransientShaping", 0.4) + par ("BoomFrequency", 60.0) + par ("BoomAmount", 0.3) +
                        par ("BoomDecay", 1.0) + par ("InputTrim", 0.501187) + par ("OutputGain", 0.707946) + par ("DryWet", 1.0);
@@ -201,27 +205,31 @@ TEST (als190ed_drum_buss_becomes_a_rack)
         return;
     const auto& doc = t->slot.patcher;
     const auto* r = rack::rackOf (doc);
-    CHECK (r->chains.size() == 1 && r->chains[0].nodes.size() == 2 && r->name == "Drum Buss");
-    if (r->chains.size() != 1 || r->chains[0].nodes.size() != 2)
+    CHECK (r->chains.size() == 1 && r->chains[0].nodes.size() == 4 && r->name == "Drum Buss");
+    if (r->chains.size() != 1 || r->chains[0].nodes.size() != 4)
         return;
     const auto& e = doc.nodes[(std::size_t) r->chains[0].nodes[0]].effect;
-    const auto& s = doc.nodes[(std::size_t) r->chains[0].nodes[1]].effect;
-    CHECK (e.kind == EffectKind::ember && s.kind == EffectKind::shellChannel);
-    CHECK (near (em::driveDb (e.params[em::drive]), 12.0, 0.01) && em::styleOf (e.params[em::style]) == em::Style::tape && e.params[em::autoGain] == 0.0f);
-    CHECK (near (em::highCutHz (e.params[em::highCut]), 6000.0, 1.0) && e.params[em::wideCuts] == 0.0f);
+    const auto& f = doc.nodes[(std::size_t) r->chains[0].nodes[1]].effect;
+    const auto& c = doc.nodes[(std::size_t) r->chains[0].nodes[2]].effect;
+    const auto& s = doc.nodes[(std::size_t) r->chains[0].nodes[3]].effect;
+    CHECK (e.kind == EffectKind::ember && f.kind == EffectKind::facetEq && c.kind == EffectKind::crestCompressor && s.kind == EffectKind::shellChannel);
+    const auto stage = drumBussDriveStage (1, 0.5);
+    CHECK (near (em::driveDb (e.params[em::drive]), stage.driveDb, 0.01) && e.params[em::autoGain] == 0.0f);
+    CHECK (near (em::highCutWideHz (e.params[em::highCutWide]), 6000.0, 1.0) && e.params[em::wideCuts] == 1.0f);
     CHECK (near (e.params[em::inputGain], (float) ((-6.0 + 24.0) / 48.0), 1.0e-4));
     CHECK (s.params[sh::tsOn] == 1.0f && near (s.params[sh::tsAmount], 0.4, 1.0e-6) && s.params[sh::tsInvert] == 0.0f);
-    CHECK (s.params[sh::lfOn] == 1.0f && near (sh::lfHz (s.params[sh::lfFreq]) * 0.72, 60.0, 0.1) && near (s.params[sh::lfAmount], 0.3, 1.0e-6));
-    CHECK (s.params[sh::hfOn] == 0.0f && s.params[sh::lmcOn] == 1.0f && near (sh::gainDb (s.params[sh::output]), -3.0, 0.01));
-    // the macros sit where their controls are; Live's parameters reach the controls through them
-    CHECK (r->macros[dbDrive].name == "Drive" && near (r->macros[dbDrive].value, e.params[em::drive] * 127.0f, 1.0e-3) && r->macros[dbDrive].mappings.size() == 1);
-    CHECK (r->macros[dbBoomFreq].mappings.size() == 1 && r->macros[dbBoomFreq].mappings[0].param == sh::lfFreq);
+    const auto boom = drumBussBoom (0.3, 60.0, 1.0);
+    CHECK (near (facet::hz (f.params[(std::size_t) facet::param (2, 1)]), 60.0, 0.1) && near (facet::gainDb (f.params[(std::size_t) facet::param (2, 2)]), boom.bellDb, 0.01));
+    CHECK (s.params[sh::lfOn] == 0.0f && s.params[sh::hfOn] == 0.0f && s.params[sh::lmcOn] == 0.0f && near (sh::gainDb (s.params[sh::output]), -3.0, 0.01));
+    // the macros sit where Live's controls are; Live's parameters reach the controls through them
+    CHECK (r->macros[dbDrive].name == "Drive" && near (r->macros[dbDrive].value, 63.5f, 1.0e-3) && r->macros[dbDrive].mappings.size() == 3);
+    CHECK (r->macros[dbBoomFreq].mappings.size() == 1 && r->macros[dbBoomFreq].mappings[0].param == facet::param (2, 1));
     const auto* drive = als190cf::linkOf (*t, "DriveAmount");
     const auto* trans = als190cf::linkOf (*t, "TransientShaping");
-    CHECK (drive != nullptr && drive->param == dbDrive && near (em::driveDb (drive->value (1.0)), 24.0, 0.01) && trans != nullptr && trans->param == dbTransients);
+    CHECK (drive != nullptr && drive->param == dbDrive && near (drive->value (1.0), 1.0, 1.0e-6) && trans != nullptr && trans->param == dbTransients);
     CHECK (als190cf::linkOf (*t, "DryWet") == nullptr); // (no dry chain: nothing moves Dry/Wet)
-    CHECK (als190bq::hasNote (t->notes.approximated, "drive as Ember's tape style") && als190bq::hasNote (t->notes.approximated, "Boom as Shell Channel's low enhancer"));
-    // it runs: a 100 Hz sine through the rack comes out (Ember + Shell in series), no NaN
+    CHECK (als190bq::hasNote (t->notes.approximated, "drive type Medium") && als190bq::hasNote (t->notes.approximated, "Boom as a resonant bell"));
+    // it runs: a 100 Hz sine through the rack comes out, no NaN
     {
         auto g = als190ed::graphOf (doc);
         double energy = 0.0;
@@ -250,9 +258,9 @@ TEST (als190ed_drum_buss_becomes_a_rack)
         const auto* w = rack::rackOf (wet->slot.patcher);
         CHECK (w->chains.size() == 2 && near (w->chains[0].volume, 0.41, 1.0e-6) && near (w->chains[1].volume, 0.59, 1.0e-6) && w->chains[1].nodes.empty());
         const auto& we = wet->slot.patcher.nodes[(std::size_t) w->chains[0].nodes[0]].effect;
-        const auto& ws = wet->slot.patcher.nodes[(std::size_t) w->chains[0].nodes[1]].effect;
-        CHECK (em::styleOf (we.params[em::style]) == em::Style::transistor && we.params[em::wideCuts] == 1.0f && near (em::highCutWideHz (we.params[em::highCutWide]), 1200.0, 1.0));
-        CHECK (ws.params[sh::tsInvert] == 1.0f && near (ws.params[sh::tsAmount], 0.45, 1.0e-6) && ws.params[sh::lfOn] == 0.0f);
+        const auto& ws = wet->slot.patcher.nodes[(std::size_t) w->chains[0].nodes[2]].effect;
+        CHECK (we.kind == EffectKind::ember && we.params[em::wideCuts] == 1.0f && near (em::highCutWideHz (we.params[em::highCutWide]), 1200.0, 1.0));
+        CHECK (ws.kind == EffectKind::shellChannel && ws.params[sh::tsInvert] == 1.0f && near (ws.params[sh::tsAmount], 0.45, 1.0e-6));
         CHECK (w->macros[dbDryWet].mappings.size() == 2 && als190cf::linkOf (*wet, "DryWet") != nullptr && als190cf::linkOf (*wet, "TransientShaping") == nullptr);
         CHECK (als190bq::hasNote (wet->notes.approximated, "negative transients"));
     }
@@ -368,7 +376,8 @@ TEST (als190ed_auto_filter_modulation_is_a_linked_peak_controller)
         // ±1 octave of LFO and +2 octaves of envelope in the cutoff's units (log2 1000 octaves per unit)
         const double perOct = 1.0 / 9.965784284662087;
         const double c0 = fx[1].params[1];
-        CHECK (near (link->curve.front(), c0 - perOct, 1.0e-4) && near (link->curve.back(), c0 - perOct + 4.0 * perOct, 1.0e-4));
+        // (round 190ek: ModHub is 0.94 semitone per unit at a full-scale peak [MEASURED])
+        CHECK (near (link->curve.front(), c0 - perOct, 1.0e-4) && near (link->curve.back(), c0 - perOct + (2.0 + 2.0 * 0.94) * perOct, 1.0e-4));
         // the controller: no base, a quarter-note LFO, the envelope's amount and release
         CHECK (fx[0].params[0] == 0.0f && fx[0].params[4] == 0.0f && fx[0].params[10] == 0.0f && fx[0].params[11] == 0.0f);
         CHECK (near (fx[0].params[7], alsdev::peakLfoSpeedValue (1.0), 1.0e-6) && near (fx[0].params[3], alsdev::peakDecayValue (200.0, 120.0), 1.0e-6));
@@ -479,7 +488,7 @@ TEST (als190ed_envelopes_of_racks_and_plugins_follow)
     using als175a::v;
     // Bus: an Audio Effect Rack with macro 0 (target 700) mapped on a Saturator's drive and automated, the Saturator's
     // Dry/Wet automated (701: a free macro carries it), a nested rack whose macro 2 is automated (702); a VST2 plugin whose
-    // parameter 3 is automated (703); a VST3 plugin whose parameter is automated (704: listed)
+    // parameter 3 is automated (703); a VST3 plugin whose parameter is automated (704: carried by its id since round 190ek)
     const auto saturator = "<Saturator Id=\"0\">" + als190ed::on() + v ("UserName", "") + target ("PreDrive", 6.0, 600, als190cf::mapped (0, 0.0, 12.0)) +
                            par ("Type", 0) + par ("PostDrive", 0.0) + target ("DryWet", 0.5, 701) + "</Saturator>";
     const auto innerMacros = [] {
@@ -569,7 +578,11 @@ TEST (als190ed_envelopes_of_racks_and_plugins_follow)
     // the VST2 plugin's parameter 3; the VST3 one listed once, without the generic line
     const auto* gain = als190ed::automationOn (*song, { AutomationTargetKind::effectParam, bus, 1, 3 });
     CHECK (gain != nullptr && gain->points.size() == 2 && gain != nullptr && near (gain->points[0].value, 0.1) && near (gain->points[1].value, 0.9));
-    CHECK (report.unsupported.count ("Automation of a VST3 plugin's parameter (kHs Gain: Live keeps the plugin's own id, not its index)") == 1);
+    // (round 190ek) the VST3 one is carried by the plugin's own id: slot 0, its state holding that id
+    const auto* v3 = als190ed::automationOn (*song, { AutomationTargetKind::effectParam, bus, 2, 0 });
+    CHECK (v3 != nullptr && v3->points.size() == 2 && v3 != nullptr && near (v3->points[0].value, 0.0) && near (v3->points[1].value, 1.0));
+    CHECK (flVst3ParamSlots (song->mixer[(std::size_t) bus].effects[2].plugin.foreign.state) == (std::vector<std::int32_t> { 12345678 }));
+    CHECK (report.unsupported.count ("Automation of a VST3 plugin's parameter (kHs Gain: Live keeps the plugin's own id, not its index)") == 0);
     CHECK (report.unsupported.count ("Automation of a device parameter (Bus)") == 0);
     // the Instrument Rack's macro 1 on the Keys channel: 0 … 63.5 → 0 … 0.5
     int keys = -1;

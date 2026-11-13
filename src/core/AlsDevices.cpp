@@ -778,7 +778,7 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
     else if (tag == "DrumBuss")
     {
         t.from = "Drum Buss";
-        t.to = "Drum Buss rack (Ember Saturator, Shell Channel)";
+        t.to = "Drum Buss rack (Ember Saturator, Facet EQ, Crest Compressor, Shell Channel)"; // (round 190ek: Crest only with Comp on)
         t.approximate = true;
         ok = drumBussToRack (device, t);
     }

@@ -32,7 +32,8 @@
 // and, for every translated device, which Live parameter drives which LYNX parameter (automation, rack macros).
 // Lot 3 (round 190ed):
 //   EQ Three                       → Prism Multiband (3 bands, crossover sum, no dynamics)
-//   Drum Buss                      → an Audio Effect Rack "Drum Buss": Ember Saturator → Shell Channel (+ a dry chain)
+//   Drum Buss                      → an Audio Effect Rack "Drum Buss": Ember Saturator → Facet EQ → (Crest Compressor) →
+//                                    Shell Channel (+ a dry chain); refit to Live's renders in round 190ek
 //   Auto Filter's LFO / envelope follower / side chain → a Peak Controller linked to the Filter's cutoff
 //   Operator (no FM in use), Drift → the built-in synth
 
@@ -350,10 +351,55 @@ bool eqThreeToPrism (const xml::Element& device, Translated& out);
 // ---- Drum Buss → a rack -----------------------------------------------------------------------------------------
 // The generated rack's macros, in order (each mapped over the whole range of its LYNX control)
 enum DrumBussMacro { dbDrive, dbCrunch, dbDamping, dbTransients, dbBoom, dbBoomFreq, dbTrim, dbOutput, dbDryWet, dbMacros };
-// Live's Drive (0 … 1, shown 0 … 100 %) as Ember's drive in dB [ASSUMED: 24 dB at 100 %]
-double drumBussDriveDb (double drive) noexcept;
-// the Boom frequency (30 … 90 Hz) as Shell's Low freq. (its 6th-order low pass sits at 0.72 × that: the boom's pitch)
-double drumBussBoomLfHz (double boomHz) noexcept;
+// (round 190ek) fitted to Live 12.4's renders (round 190ei): the rack's chain is Ember (trim, drive, damping) → Facet EQ
+// (the device's own colour, Crunch's band, Boom) → Crest Compressor (only with Comp on) → Shell Channel (transients,
+// output). A dedicated drum-bus engine (a later round) would add what these stages cannot hold: the type's own EQ under
+// drive, Boom's ringing tail and its decay law at other amounts, Crunch's distortion, the transient shaper's tail lift,
+// the follower-based compressor's own timing.
+namespace drumbuss
+{
+// the colour at every setting [FITTED to the all-zero device on noise at −20 dBFS rms, on top of the drive stage's own
+// EQ (Ember's Pentode voicing: +2 dB near 110 Hz, −1 dB at 31 Hz): three bells and the output, rms 0.14 dB, 31 Hz … 16 kHz]
+constexpr double colourGainDb = -2.63;
+constexpr double lowBellHz = 96.1, lowBellDb = 11.03, lowBellQ = 0.288;
+constexpr double highBellHz = 4578.3, highBellDb = 8.14, highBellQ = 0.262;
+constexpr double dipBellHz = 89.0, dipBellDb = -6.37, dipBellQ = 0.711;
+constexpr double colourAt1kHzDb = 2.17; // what those bands give at 1 kHz (the drive stage's levels are set around it)
+// Crunch's band edges (cookbook shelves) [FITTED on Crunch 0.5, rms 0.07 dB]
+constexpr double crunchLowHz = 95.2, crunchLowQ = 0.743, crunchHighHz = 9041.0, crunchHighQ = 0.826;
+// the compressor [FITTED on the staircase and the drum loop with Comp on: level rms 0.11 dB over the 21 steps, drum
+// segments rms 1.33 dB; 13 settings of threshold / knee / attack / release tried, round 190ek]
+constexpr double compThresholdDb = -19.0, compRatio = 4.0, compKneeDb = 0.0, compAttackMs = 1.0, compReleaseMs = 200.0, compMakeupDb = 11.0;
+// the drive stage per type (Soft, Medium, Hard): Ember's Pentode voicing (5) with its drive = the measured small-signal
+// gain (dB, all-zero device included: 1.97 dB) at DriveAmount 0 / 0.25 / 0.5 / 1, and its output under the colour's
+// 1 kHz gain [FITTED: dbfit.cpp / dbeval.cpp, every Ember style, voicing and character against the ten Live staircases;
+// the Pentode at the measured gain is the closest for all three types: summed score 14.3 against 23.7 with the Wavefold
+// character on type 0 (the type folds the loudest peaks over, which the Pentode does not), 29.5 … 38.7 for the others]
+constexpr int voice = 5;
+// the type's own EQ under drive, in proportion to DriveAmount [FITTED at 100 % on noise at −20 dBFS rms, against the
+// all-zero device and normalised at 1 kHz: Medium a bell −16 dB, Q 0.75 at 181 Hz (rms 6.8 → 3.3 dB), Hard a low shelf
+// +15.7 dB, Q 0.875 at 98 Hz (rms 6.3 → 0.8 dB); Soft none; the proportion ASSUMED]
+constexpr double typeEqDb[3] { 0.0, -16.0, 15.69 }, typeEqHz[3] { 1000.0, 181.0, 98.0 }, typeEqQ[3] { 1.0, 0.75, 0.875 };
+constexpr double emberDriveDb[3][4] { { 1.97, 3.92, 8.91, 11.52 }, { 1.97, 5.73, 9.48, 16.98 }, { 1.97, 5.94, 7.75, 14.23 } };
+constexpr double emberOutputDb = -0.04 - colourAt1kHzDb;
+} // namespace drumbuss
+// the drive's small-signal gain over the all-zero device, dB [MEASURED, 1 kHz at −60 dBFS], piecewise linear in the amount
+double drumBussDriveGainDb (int type, double drive) noexcept;
+struct DrumBussDriveStage
+{
+    int voice = drumbuss::voice;
+    double driveDb = 0.0, outputDb = 0.0;
+    double eqDb = 0.0; // the type's EQ band (Facet band 7: Medium a bell, Hard a low shelf); Ember's output is lowered by its 1 kHz gain
+};
+DrumBussDriveStage drumBussDriveStage (int type, double drive) noexcept;
+// Boom (amount 0 … 1, 30 … 90 Hz, decay 0 … 1) as Facet's bell and resonant 12 dB/oct high pass
+struct BoomBands
+{
+    double hz = 50.0, bellDb = 0.0, bellQ = 2.0, cutHz = 10.0, cutQ = 0.5;
+};
+BoomBands drumBussBoom (double amount, double hz, double decay) noexcept;
+// Crunch's lift of its band in dB (the shelves cut the same outside it)
+double drumBussCrunchDb (double crunch) noexcept;
 bool drumBussToRack (const xml::Element& device, Translated& out);
 // ---- Auto Filter's modulation → a Peak Controller ---------------------------------------------------------------
 // The Peak Controller's controls for an amount (its laws, core/Effects.cpp PeakController): the peak's amount k (−2 … 2,
@@ -374,7 +420,19 @@ struct CutoffModulation
     bool invert = false;
     std::vector<float> curve;
 };
-CutoffModulation cutoffModulation (double c0, double lfoDepth, double envDepth) noexcept;
+CutoffModulation cutoffModulation (double c0, double lfoDepth, double envDepth, bool turnOver = false) noexcept;
+// (round 190ek, measured in Live 12.4 by round 190ei: the cutoff tracked on noise and on a sine staircase) the depths in
+// semitones of the cutoff: the older device's LfoAmount is semitones as it stands, its ModHub 0.94 semitone per unit at a
+// full-scale peak; the new device's Lfo_Amount 94 and Envelope_Amount 96 semitones per 1.0
+constexpr double legacyEnvelopeSemitonesPerUnit = 0.94;
+constexpr double af2LfoSemitonesPerUnit = 94.0;
+constexpr double af2EnvelopeSemitonesPerUnit = 96.0;
+// the new device's synced rates (Lfo_SyncedRate 0 … 21) in quarter notes: the older table turned round, 8 bars … 1/64
+// [MEASURED: 9 = 1.5 beats]
+double autoFilter2SyncedBeats (int index) noexcept;
+// the new device's LFO period in quarter notes for Lfo_TimeMode 0 Hz, 1 time (s), 2 synced, 3 triplet, 4 dotted, 5
+// sixteenths [MEASURED]; `synced` = it follows the tempo (modes 2 … 5)
+double autoFilter2LfoBeats (int timeMode, double hz, double seconds, int syncedRate, double sixteenths, double bpm, bool* synced = nullptr) noexcept;
 // Fills `out.modulator` from the device's LFO / envelope follower / side chain (nothing when both are off)
 void autoFilterModulation (const xml::Element& device, const Context& context, Translated& out);
 
