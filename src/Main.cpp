@@ -1954,6 +1954,16 @@ public:
             return;
         }
 
+        if (args.contains ("--trackfreezetest"))
+        {
+            // LYNX --trackfreezetest prefix: round 190ff's Freeze Track, Flatten / Bounce Track in Place, Bounce to New
+            // Track and Consolidate end to end in the Clip-launch workflow, off-screen (see runTrackFreezeTest)
+            const auto i = args.indexOf ("--trackfreezetest");
+            setApplicationReturnValue (runTrackFreezeTest (args[i + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--gridshot"))
         {
             // LYNX.exe --gridshot prefix [project]: the Clip-launch workflow's layout off-screen, with a grid of sample
@@ -16972,6 +16982,363 @@ private:
         ui.selectTabForSnapshot (0);
         flush();
         data.deleteRecursively();
+        return failures == 0;
+    }
+
+    // Round 190ff, the Clip-launch workflow's track commands end to end with the real engine, files and export
+    // (LYNX --trackfreezetest prefix). A demo song of three tracks (Lead through a delay and a reverb whose mix is
+    // automated, Bass through a delay, Drums on a bare insert; each insert's fader, pan and EQ set) is rendered live; then
+    // Freeze Track on every track (the instrument with its volume and pan through its insert's effects), the same render
+    // again (must null), the effects and instruments unloaded, the render time (the CPU while frozen), what a save holds;
+    // Flatten (Bounce Track in Place on a frozen track) with its undo; Bounce Track in Place of a live track; Bounce to New
+    // Track of a track's clips against that track's device output; Consolidate of pattern clips; Unfreeze. Written to
+    // prefix-report.txt; shots of the grid, the column menus, the Detail View's frozen devices and the Playlist's clip
+    // menu. True = every check passed.
+    bool runTrackFreezeTest (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        const auto write = [&prefix, &ui] (const char* name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (ui), out);
+        };
+        juce::String report;
+        int failures = 0;
+        const auto check = [&] (bool ok, const juce::String& what) {
+            report << (ok ? "ok    " : "FAIL  ") << what << "\n";
+            failures += ok ? 0 : 1;
+        };
+        const auto flush = [&] { juce::File (prefix + "-report.txt").replaceWithText (report + "failures=" + juce::String (failures) + "\n"); };
+        const juce::File data (prefix + "-data");
+        data.deleteRecursively();
+        offline.setRecordingTarget (data.getChildFile ("Audio").getChildFile ("Recorded"), "trackfreezetest");
+
+        ui.setVisible (true);
+        lynx::DetailView::shownSetting = lynx::DetailView::devicesPage = true;
+        ui.setClipLaunchWorkflow (true);
+        offline.editSong ([] (lynx::Song& s) {
+            s.channels.clear();
+            s.patterns.clear();
+            s.playlist.clear();
+            s.automations.clear();
+            s.bpm = 120.0;
+            s.mode = lynx::PlayMode::song;
+            const char* names[] = { "Lead", "Bass", "Drums" };
+            for (int c = 0; c < 3; ++c)
+            {
+                lynx::ChannelDef d;
+                d.name = names[c];
+                d.instrument = c == 2 ? lynx::InstrumentKind::kick : lynx::InstrumentKind::synth;
+                d.synth.release = c == 0 ? 0.6f : 0.2f;
+                d.synth.cutoff = c == 0 ? 2400.0f : 900.0f;
+                d.volume = c == 0 ? 0.65f : 0.78f;
+                d.pan = c == 0 ? 0.25f : 0.0f;
+                d.mixerTrack = c + 1;
+                s.channels.push_back (d);
+            }
+            if (s.mixer.size() < 5)
+                s.mixer.resize (5);
+            s.mixer[1].effects = { lynx::makeEffectSlot (lynx::EffectKind::delay), lynx::makeEffectSlot (lynx::EffectKind::reverb) };
+            s.mixer[2].effects = { lynx::makeEffectSlot (lynx::EffectKind::delay) };
+            s.mixer[3].effects.clear();
+            for (int t = 1; t <= 3; ++t)
+            {
+                s.mixer[(std::size_t) t].name = names[t - 1];
+                s.mixer[(std::size_t) t].volume = 0.7f;
+                s.mixer[(std::size_t) t].pan = t == 1 ? -0.3f : 0.1f;
+                s.mixer[(std::size_t) t].eq.gainDb[1] = 3.0f;
+            }
+            for (int p = 0; p < 3; ++p)
+            {
+                auto& pattern = s.patterns.emplace_back();
+                pattern.name = names[p];
+                pattern.lengthTicks = 4 * lynx::ppq * 2;
+                for (int step = 0; step < 8; ++step)
+                {
+                    lynx::Note n;
+                    n.channel = p;
+                    n.start = (std::int64_t) step * lynx::ppq;
+                    n.length = p == 2 ? lynx::ppq / 4 : lynx::ppq / 2;
+                    n.key = p == 2 ? 36 : (p == 0 ? 60 : 36) + (step * 5) % 12;
+                    pattern.notes.push_back (n);
+                }
+            }
+            s.playlistTracks.resize (std::max<std::size_t> (s.playlistTracks.size(), 4));
+            for (int t = 0; t < 3; ++t)
+            {
+                s.playlistTracks[(std::size_t) t].name = names[t];
+                for (int k = 0; k < 3; ++k)
+                {
+                    if (t == 0 && k == 1)
+                        continue; // (a gap in the Lead: its tail rings into it)
+                    lynx::Clip clip;
+                    clip.pattern = t;
+                    clip.track = t;
+                    clip.start = (std::int64_t) k * 8 * lynx::ppq;
+                    clip.length = 8 * lynx::ppq;
+                    s.playlist.push_back (clip);
+                }
+            }
+            // the Lead's reverb mix rises over the song (automation the freeze takes into its audio)
+            lynx::Automation a;
+            a.name = "Lead reverb mix";
+            a.target = { lynx::AutomationTargetKind::effectMix, 1, 1, 0 };
+            a.points = { { 0, 0.2f }, { 24 * lynx::ppq, 0.9f } };
+            s.automations.push_back (a);
+            lynx::Clip lane;
+            lane.kind = lynx::ClipKind::automation;
+            lane.automation = 0;
+            lane.track = 3;
+            lane.length = 24 * lynx::ppq;
+            s.playlist.push_back (lane);
+            std::stable_sort (s.playlist.begin(), s.playlist.end(), [] (const lynx::Clip& x, const lynx::Clip& y) { return x.start < y.start; });
+        });
+        offline.dispatchPendingMessages();
+
+        const auto megabytes = [] (std::int64_t bytes) { return juce::String ((double) bytes / 1048576.0, 1); };
+        struct Mix
+        {
+            juce::AudioBuffer<float> audio;
+            double renderSeconds = 0.0, audioSeconds = 0.0;
+        };
+        const auto renderMix = [&] (const char* name, const lynx::Song* other = nullptr) {
+            Mix m;
+            offline.dispatchPendingMessages();
+            offline.freeRetiredRacks();
+            const juce::File file (prefix + "-" + name + ".wav");
+            lynx::ExportSettings settings;
+            settings.format = lynx::ExportSettings::Format::wav32Float;
+            settings.sampleRate = offline.getTransport().sampleRate.load();
+            settings.tailSeconds = 2.0;
+            juce::String error;
+            auto options = settings.toOptions();
+            options.hqAllPlugins = false;
+            options.disableMaxPolyphony = false;
+            {
+                lynx::ExportJob job (other != nullptr ? *other : offline.getSong(), options, file);
+                const auto started = juce::Time::getMillisecondCounterHiRes();
+                const auto ok = job.run ([] (double) { return true; }, error);
+                m.renderSeconds = (juce::Time::getMillisecondCounterHiRes() - started) / 1000.0;
+                check (ok, juce::String ("render ") + name + (ok ? juce::String() : ": " + error));
+            }
+            juce::WavAudioFormat wav;
+            if (std::unique_ptr<juce::AudioFormatReader> reader { wav.createReaderFor (file.createInputStream().release(), true) })
+            {
+                m.audio.setSize (2, (int) reader->lengthInSamples);
+                reader->read (&m.audio, 0, (int) reader->lengthInSamples, 0, true, true);
+                m.audioSeconds = (double) reader->lengthInSamples / reader->sampleRate;
+            }
+            file.deleteFile();
+            return m;
+        };
+        const auto residual = [] (const Mix& a, const Mix& b, float& peak) {
+            float worst = 0.0f;
+            peak = 0.0f;
+            const auto n = juce::jmin (a.audio.getNumSamples(), b.audio.getNumSamples());
+            for (int ch = 0; ch < 2; ++ch)
+                for (int i = 0; i < n; ++i)
+                {
+                    worst = juce::jmax (worst, std::abs (a.audio.getSample (ch, i) - b.audio.getSample (ch, i)));
+                    peak = juce::jmax (peak, std::abs (a.audio.getSample (ch, i)));
+                }
+            return worst <= 0.0f ? -200.0 : 20.0 * std::log10 ((double) worst / (double) juce::jmax (peak, 1.0e-12f));
+        };
+        const auto nullLine = [&] (const char* what, const Mix& a, const Mix& b, double limit) {
+            float peak = 0.0f;
+            const auto r = residual (a, b, peak);
+            report << what << ": " << juce::String (r, 1) << " dB (peak " << juce::String (peak, 4) << ", " << a.audio.getNumSamples() << " / "
+                   << b.audio.getNumSamples() << " samples)\n";
+            check (peak > 0.001f && r < limit && a.audio.getNumSamples() == b.audio.getNumSamples(), juce::String (what) + " below " + juce::String (limit, 0) + " dB");
+            return r;
+        };
+        const auto savedJson = [] (lynx::Song song) {
+            song.info.workSeconds = 0.0;
+            return lynx::ProjectFile::toJson (song, false);
+        };
+
+        // --- live ---
+        offline.capturePluginStates();
+        offline.editSong ([] (lynx::Song&) {}, false);
+        const auto before = offline.getSong();
+        const auto jsonBefore = savedJson (before);
+        auto* grid = ui.getClipGridForSnapshot();
+        check (grid != nullptr, "the Clip-launch workflow's grid is there");
+        if (grid == nullptr)
+        {
+            flush();
+            return false;
+        }
+        ui.setClipGridView (lynx::PlaylistArea::GridView::beside);
+        write ("live");
+        saveMenus (juce::StringArray { "Track title (live)" }, std::vector<juce::PopupMenu> { lynx::clipGridHeaderMenu (*grid, 0) }, prefix + "-menu-track-live.png");
+        int leadClip = -1;
+        for (int i = 0; i < (int) before.playlist.size() && leadClip < 0; ++i)
+            if (before.playlist[(std::size_t) i].track == 0 && before.playlist[(std::size_t) i].kind == lynx::ClipKind::pattern)
+                leadClip = i;
+        ui.getPlaylistForSnapshot().selectForSnapshot ({ leadClip });
+        saveMenus (juce::StringArray { "Playlist clip (Clip-launch workflow)" }, std::vector<juce::PopupMenu> { ui.getPlaylistForSnapshot().getClipMenuForSnapshot (leadClip) },
+                   prefix + "-menu-clip.png");
+        const auto live = renderMix ("live");
+        report << "live: render " << juce::String (live.renderSeconds, 2) << " s for " << juce::String (live.audioSeconds, 2) << " s of audio\n";
+
+        // --- Freeze Track on every track ---
+        std::vector<int> channels;
+        for (int t = 0; t < 3; ++t)
+        {
+            const auto c = lynx::detailchain::forTrack (before, t).channel;
+            check (c == t, "track " + juce::String (t + 1) + " shows channel " + juce::String (t + 1));
+            const auto* why = lynx::freeze::whyNotTrack (before, c);
+            check (why == nullptr, "track " + juce::String (t + 1) + " can be frozen" + (why != nullptr ? juce::String (": ") + why : juce::String()));
+            const auto error = lynx::freezeTrackNow (offline, c);
+            check (error.isEmpty(), "Freeze Track " + juce::String (t + 1) + (error.isEmpty() ? juce::String() : ": " + error));
+            channels.push_back (c);
+        }
+        offline.dispatchPendingMessages();
+        offline.freeRetiredRacks();
+        int loadedEffects = 0;
+        for (int t = 1; t <= 3; ++t)
+            for (int slot = 0; slot < (int) offline.getSong().mixer[(std::size_t) t].effects.size(); ++slot)
+                loadedEffects += offline.getEffect (t, slot) != nullptr ? 1 : 0;
+        check (loadedEffects == 0, "no effect of a frozen track is loaded (" + juce::String (loadedEffects) + " left)");
+        bool fresh = true;
+        for (const auto c : channels)
+        {
+            const auto& f = offline.getSong().channels[(std::size_t) c].freeze;
+            fresh = fresh && f.on() && f.insert == c + 1 && lynx::freeze::trackFreezeHolds (offline.getSong(), c) && ! offline.freezeOutOfDate (c)
+                    && ! offline.frozenAudioMissing (c);
+        }
+        check (fresh, "every track is frozen with its insert, its audio on disk and up to date");
+        check (offline.getSong().mixer == before.mixer, "the project keeps every effect as it was (Unfreeze brings them back)");
+        const auto frozenSong = offline.getSong();
+        const auto frozen = renderMix ("frozen");
+        report << "frozen: render " << juce::String (frozen.renderSeconds, 2) << " s (" << juce::String (100.0 * frozen.renderSeconds / juce::jmax (0.001, live.renderSeconds), 0)
+               << " % of the live render's time)\n";
+        nullLine ("frozen vs live", live, frozen, -90.0);
+        write ("frozen");
+        saveMenus (juce::StringArray { "Track title (frozen)" }, std::vector<juce::PopupMenu> { lynx::clipGridHeaderMenu (*grid, 0) }, prefix + "-menu-track-frozen.png");
+        if (auto* detail = ui.getDetailViewForSnapshot())
+        {
+            detail->showSelection (0, 0);
+            detail->setPage (lynx::DetailView::Page::devices);
+            write ("detail-frozen");
+        }
+        // the insert's fader is live: moved, the frozen and the live song change alike
+        {
+            auto liveLouder = before, frozenLouder = frozenSong;
+            liveLouder.mixer[1].volume = frozenLouder.mixer[1].volume = 0.8f;
+            nullLine ("frozen vs live, the Lead's fader moved afterwards", renderMix ("live-louder", &liveLouder), renderMix ("frozen-louder", &frozenLouder), -90.0);
+        }
+
+        // --- what a save holds ---
+        {
+            const auto json = lynx::ProjectFile::toJson (offline.getSong(), false);
+            juce::String error;
+            const auto loaded = lynx::ProjectFile::fromJson (json, error);
+            check (json.contains ("\"trackFreeze\"") && ! json.contains ("\"freeze\""), "a track freeze is saved under its own key (older versions play it live)");
+            check (loaded.has_value() && loaded->channels.size() == frozenSong.channels.size() && loaded->channels[0].freeze == frozenSong.channels[0].freeze,
+                   "a track-frozen project loads frozen, with its insert and audio files");
+            check (savedJson (lynx::freeze::thawed (offline.getSong())) == jsonBefore, "without the frozen state the project saves as before the freeze");
+        }
+        // --- an edit of a frozen device's insert routing: the freeze stops holding, the track plays live ---
+        {
+            offline.editSong ([] (lynx::Song& s) { s.channels[1].mixerTrack = 1; }); // (the Bass into the Lead's insert)
+            check (! lynx::freeze::trackFreezeHolds (offline.getSong(), 0) && offline.freezeOutOfDate (0), "another channel routed into a frozen insert: out of date, plays live");
+            offline.undo();
+            offline.dispatchPendingMessages();
+            check (lynx::freeze::trackFreezeHolds (offline.getSong(), 0) && ! offline.freezeOutOfDate (0), "undo: frozen again");
+        }
+
+        // --- Flatten: Bounce Track in Place on the frozen Lead, and its undo ---
+        {
+            const auto error = lynx::flattenChannelNow (offline, 0);
+            check (error.isEmpty(), "Bounce Track in Place of the frozen Lead (Flatten)" + (error.isEmpty() ? juce::String() : ": " + error));
+            const auto& song = offline.getSong();
+            check (song.channels[0].instrument == lynx::InstrumentKind::audioClip && song.mixer[1].effects.empty() && song.mixer[1].volume == before.mixer[1].volume,
+                   "the Lead is audio now, its insert's effects removed, its fader kept");
+            int audioClips = 0;
+            for (const auto& c : song.playlist)
+                audioClips += c.kind == lynx::ClipKind::audio && c.channel == 0;
+            report << "flattened Lead: " << audioClips << " audio clips\n";
+            write ("flattened");
+            nullLine ("flattened (Lead) + frozen (others) vs live", live, renderMix ("flattened"), -90.0);
+            offline.undo();
+            offline.dispatchPendingMessages();
+            check (savedJson (offline.getSong()) == savedJson (frozenSong), "undo of the Flatten: the frozen project exactly as before");
+        }
+
+        // --- Unfreeze every track ---
+        for (const auto c : channels)
+            lynx::unfreezeChannel (offline, c);
+        offline.dispatchPendingMessages();
+        check (savedJson (offline.getSong()) == jsonBefore, "Unfreeze: the project saves byte for byte as before the freeze");
+        nullLine ("unfrozen vs live", live, renderMix ("unfrozen"), -90.0);
+
+        // --- Bounce Track in Place of a live track (render and flatten in one step, one undo) ---
+        {
+            const auto error = lynx::freezeTrackNow (offline, 1, true);
+            check (error.isEmpty(), "Bounce Track in Place of the live Bass" + (error.isEmpty() ? juce::String() : ": " + error));
+            check (offline.getSong().channels[1].instrument == lynx::InstrumentKind::audioClip && ! offline.getSong().channels[1].freeze.on(),
+                   "the Bass is audio, not frozen");
+            nullLine ("Bass bounced in place vs live", live, renderMix ("bounced"), -90.0);
+            offline.undo();
+            offline.dispatchPendingMessages();
+            check (savedJson (offline.getSong()) == jsonBefore, "undo of Bounce Track in Place: the project as before");
+        }
+
+        // --- Bounce to New Track: the Lead's clips, against the Lead track's devices alone ---
+        {
+            std::vector<int> leadClips;
+            for (int i = 0; i < (int) offline.getSong().playlist.size(); ++i)
+                if (offline.getSong().playlist[(std::size_t) i].track == 0 && offline.getSong().playlist[(std::size_t) i].kind == lynx::ClipKind::pattern)
+                    leadClips.push_back (i);
+            const auto channelsBefore = offline.getSong().channels.size();
+            const auto error = lynx::bounceToNewTrack (offline, leadClips, true);
+            check (error.isEmpty(), "Bounce to New Track of the Lead's clips" + (error.isEmpty() ? juce::String() : ": " + error));
+            const auto& song = offline.getSong();
+            check (song.channels.size() == channelsBefore + 1 && song.channels.back().instrument == lynx::InstrumentKind::audioClip, "a new audio channel holds the bounce");
+            // the Lead's devices alone (its insert at unity, centre, no EQ) vs the new track alone
+            auto devices = before;
+            for (int c = 1; c < 3; ++c)
+                devices.channels[(std::size_t) c].muted = true;
+            devices.mixer[1].volume = lynx::unityFader;
+            devices.mixer[1].pan = 0.0f;
+            devices.mixer[1].eq = {};
+            auto bounced = song;
+            for (int c = 0; c < (int) bounced.channels.size() - 1; ++c)
+                bounced.channels[(std::size_t) c].muted = true;
+            nullLine ("the new track vs the Lead's devices", renderMix ("lead-devices", &devices), renderMix ("lead-bounced", &bounced), -90.0);
+            write ("bounced-new-track");
+            offline.undo();
+            offline.dispatchPendingMessages();
+            check (savedJson (offline.getSong()) == jsonBefore, "undo of Bounce to New Track: the project as before");
+        }
+
+        // --- Consolidate: the Bass's three pattern clips become one ---
+        {
+            std::vector<int> bassClips;
+            for (int i = 0; i < (int) offline.getSong().playlist.size(); ++i)
+                if (offline.getSong().playlist[(std::size_t) i].track == 1 && offline.getSong().playlist[(std::size_t) i].kind == lynx::ClipKind::pattern)
+                    bassClips.push_back (i);
+            const auto error = lynx::consolidateClips (offline, bassClips, true);
+            check (error.isEmpty(), "Consolidate of the Bass's clips" + (error.isEmpty() ? juce::String() : ": " + error));
+            int left = 0;
+            for (const auto& c : offline.getSong().playlist)
+                left += c.track == 1 && c.kind == lynx::ClipKind::pattern;
+            check (left == 1, "one clip on the Bass track (" + juce::String (left) + ")");
+            nullLine ("consolidated vs live", live, renderMix ("consolidated"), -90.0);
+            offline.undo();
+            offline.dispatchPendingMessages();
+            check (savedJson (offline.getSong()) == jsonBefore, "undo of Consolidate: the project as before");
+        }
+        report << "frozen audio folder: " << offline.getFreezeFolder().getFullPathName() << "\n";
+        flush();
+        data.deleteRecursively();
+        (void) megabytes;
         return failures == 0;
     }
 

@@ -1,4 +1,5 @@
 #include "ui/DetailView.h"
+#include "core/StandIns.h"
 #include "ui/MapMode.h"
 
 #include <algorithm>
@@ -224,7 +225,17 @@ public:
             juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (area);
             for (int i = 0; i < (int) cards.size(); ++i)
+            {
                 paintCard (g, i);
+                if (const auto& card = cards[(std::size_t) i]; card.kind != Card::add && cardLocked (card))
+                {
+                    // (round 190ff) a frozen device: dimmed, with the freeze tag on its title
+                    g.setColour (colour::bg1.withAlpha (0.45f));
+                    g.fillRect (card.bounds.reduced (1));
+                    theme::drawFrozenTag (g, juce::Rectangle<float> ((float) card.bounds.getRight() - 22.0f, (float) card.bounds.getY() + 4.0f, 14.0f, 13.0f),
+                                          colour::info.withAlpha (0.85f), colour::bg1);
+                }
+            }
             if (insert < 0 && channel < 0)
             {
                 g.setColour (colour::textDisabled);
@@ -274,10 +285,13 @@ public:
         const auto& card = cards[(std::size_t) hit.card];
         if (card.kind == Card::add)
         {
-            slotActions.showAddMenuFor (nextFreeRow());
+            if (! refuseLocked (card))
+                slotActions.showAddMenuFor (nextFreeRow());
             return;
         }
         select (hit.card);
+        if (hit.part != Part::title && hit.part != Part::folded && refuseLocked (card, hit.part == Part::knob ? hit.knob : -2))
+            return;
 
         if (hit.part == Part::knob)
         {
@@ -384,7 +398,8 @@ public:
         const auto& card = cards[(std::size_t) hit.card];
         if (hit.part == Part::knob)
         {
-            setKnob (card, hit.knob, knobSpec (card, hit.knob).defaultValue);
+            if (! refuseLocked (card, hit.knob))
+                setKnob (card, hit.knob, knobSpec (card, hit.knob).defaultValue);
             return;
         }
         if (hit.part == Part::title || hit.part == Part::folded) // fold / unfold (the reference: double-click the title bar)
@@ -394,7 +409,7 @@ public:
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override
     {
         const auto hit = hitAt (e.getPosition());
-        if (hit.part == Part::knob)
+        if (hit.part == Part::knob && ! cardLocked (cards[(std::size_t) hit.card], hit.knob))
         {
             const auto& card = cards[(std::size_t) hit.card];
             const auto spec = knobSpec (card, hit.knob);
@@ -567,6 +582,11 @@ public:
         const auto position = effectPositionFor (positionAt (details.localPosition.x));
         dropBefore = -1;
         repaint();
+        if (freeze::frozenByInsert (engine.getSong(), insert) >= 0) // (round 190ff: a frozen track's devices stay as they are)
+        {
+            ui::postNotice ({ tr ("This track is frozen: Unfreeze the track to edit its devices"), {} }, 3000);
+            return;
+        }
         // round 190dr: a card that left the chain and came back: a move inside the chain (Ctrl: a copy), as a plain drag
         if (int from = -1, slot = -1; detailDeviceDrag (details.description, from, slot))
         {
@@ -694,6 +714,29 @@ private:
         repaint();
     }
 
+    // Freeze (round 190ff): a frozen track's devices are not loaded and cannot be edited, as in the reference (its frozen
+    // devices are greyed out). The instrument card of a frozen channel (its body; with a track freeze its volume and pan
+    // too) and every card of an insert whose effects a track freeze holds.
+    bool cardLocked (const Card& c, int knob = -2) const
+    {
+        const auto& song = engine.getSong();
+        if (c.kind == Card::instrument)
+        {
+            if (c.index < 0 || c.index >= (int) song.channels.size() || ! song.channels[(std::size_t) c.index].freeze.on())
+                return false;
+            const auto levelsLive = song.channels[(std::size_t) c.index].freeze.insert == 0; // (a channel freeze: they apply live)
+            return ! (levelsLive && knob >= 0);
+        }
+        return freeze::frozenByInsert (song, insert) >= 0;
+    }
+    bool refuseLocked (const Card& c, int knob = -2)
+    {
+        if (! cardLocked (c, knob))
+            return false;
+        ui::postNotice ({ tr ("This track is frozen: Unfreeze the track to edit its devices"), {} }, 3000);
+        return true;
+    }
+
     void layoutCards()
     {
         cards.clear();
@@ -755,6 +798,9 @@ private:
             cards.push_back (std::move (c));
         }
         placeCustomCards();
+        for (const auto& c : cards) // (round 190ff: a frozen device's own body takes no clicks)
+            if (c.custom != nullptr)
+                c.custom->setEnabled (! cardLocked (c));
         contentWidth = x + scroll - area.getX();
         const auto overflow = contentWidth > area.getWidth();
         scrollBar.setVisible (overflow);

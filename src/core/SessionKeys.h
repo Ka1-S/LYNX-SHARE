@@ -13,6 +13,8 @@
 //   B             Draw Mode on / off                                      × playlist.tool.brush, pianoRoll.tool.brush
 //   Ctrl+M        MIDI Map Mode on / off                                  × transport.metronome
 //   Ctrl+K        Key Map Mode on / off                                   × rack.graphEditor (Channel Rack focus)
+// Round 190ff adds the reference's Freeze Track key (its clip menu shows it [SHOT live190ei/shots/live-audioclip-context-menu.png]):
+//   Ctrl+Shift+Alt+F  Freeze / Unfreeze the selected track, clip grid focused  (free in the key map today)
 // They act as default keys only in the Clip-launch (Ableton-style) layout: there the panel's key wins, as in the
 // reference. In FL's Pattern layout and in the Simple layout the commands stay in their menus without a key, the
 // chord is not taken and falls through to the key map — "Recording waits for input" keeps Ctrl+I and "Export a MIDI
@@ -26,7 +28,8 @@ enum class Command
 {
     gridNewMidiClip, audioInsertWarpMarkers, audioQuantize,
     gridInsertScene, gridCaptureInsertScene, gridRename, // round 190ef
-    drawMode, midiMapMode, keyMapMode                    // round 190ef
+    drawMode, midiMapMode, keyMapMode,                   // round 190ef
+    freezeTrack                                          // round 190ff: Freeze / Unfreeze Track, the clip grid focused
 };
 
 constexpr bool defaultKeyActs (Command, layoutstyle::Style style) noexcept { return style == layoutstyle::Style::clipLaunch; }
@@ -49,6 +52,7 @@ inline const char* menuKey (Command c, layoutstyle::Style style) noexcept
         case Command::drawMode: return "\tB";
         case Command::midiMapMode: return "\tCtrl+M";
         case Command::keyMapMode: return "\tCtrl+K";
+        case Command::freezeTrack: return "\tCtrl+Shift+Alt+F";
     }
     return "";
 }

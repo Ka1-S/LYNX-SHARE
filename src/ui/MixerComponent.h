@@ -544,6 +544,9 @@ private:
     void showSlotMenu (int slot);
     juce::Rectangle<int> pluginButtonBounds() const;
     void openEditor (int slot);
+    // Freeze (round 190ff): a track freeze holds this insert's effects (not loaded): a click, wheel or drop on the slots
+    // (the FX switch, the side-chain button) is refused with a notice; the EQ, fader and routing stay live. True = refused.
+    bool refuseFrozenSlots (juce::Point<int> p);
     void toggleEditor (int slot); // FL: a click on the slot's name shows or hides its window (round 170b)
     juce::Rectangle<int> editorButtonBounds() const;
     // Round 177b: the selected effect's "Sidechain from" picker (effects with a side input; empty bounds = none)

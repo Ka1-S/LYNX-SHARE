@@ -59,6 +59,8 @@
 #include "ui/BrowserComponent.h"
 #include "ui/ClipGridComponent.h"
 #include "core/SessionOps.h"
+#include "core/DetailChain.h"
+#include "core/StandIns.h"
 #include "ui/AutomationUi.h"
 #include "ui/ChannelSettings.h"
 #include "ui/Dialogs.h"
@@ -6860,6 +6862,49 @@ std::unique_ptr<juce::Component> makeSliceDialogForSnapshot (AudioEngine& engine
     return holder;
 }
 
+namespace
+{
+// Round 190ff, the Clip-launch workflow only: the reference's group in its arrangement clip menu — Freeze Track, Bounce
+// Track in Place, Bounce to New Track [SHOT live190ei/shots/live-audioclip-context-menu.png] — and Consolidate (its
+// Ctrl+J, Edit menu) for the clip's track (core/StandIns.h lynx::freeze). Elsewhere nothing is added.
+void addLiveTrackItems (AudioEngine& engine, juce::PopupMenu& menu, int index, const std::vector<int>& targets, std::function<void()> changed)
+{
+    if (! EditorGlobals::get().clipLaunchWorkflow)
+        return;
+    const auto& song = engine.getSong();
+    if (index < 0 || index >= (int) song.playlist.size())
+        return;
+    const auto track = song.playlist[(std::size_t) index].track;
+    const auto channel = detailchain::forTrack (song, track).channel;
+    const auto valid = channel >= 0 && channel < (int) song.channels.size();
+    const auto frozen = valid && song.channels[(std::size_t) channel].freeze.on();
+    const auto audioChannel = valid && song.channels[(std::size_t) channel].instrument == InstrumentKind::audioClip;
+    menu.addSeparator();
+    menu.addItem (frozen ? tr ("Unfreeze Track") : tr ("Freeze Track"), valid && ! audioChannel, false, [&engine, channel, frozen, changed] {
+        if (frozen)
+        {
+            unfreezeChannel (engine, channel);
+            changed();
+        }
+        else
+            freezeTrack (engine, channel, [changed] (bool) { changed(); });
+    });
+    menu.addItem (tr ("Bounce Track in Place"), valid && ! audioChannel, false, [&engine, channel, changed] {
+        bounceTrackInPlace (engine, channel);
+        changed();
+    });
+    freeze::BouncePlan bounce;
+    menu.addItem (tr ("Bounce to New Track"), freeze::planBounceToNewTrack (song, targets, bounce) == nullptr, false, [&engine, targets] {
+        bounceToNewTrack (engine, targets);
+    });
+    freeze::ConsolidatePlan consolidate;
+    menu.addItem (tr ("Consolidate"), targets.size() > 1 && freeze::planConsolidate (song, targets, consolidate) == nullptr, false, [&engine, targets, changed] {
+        consolidateClips (engine, targets);
+        changed();
+    });
+}
+} // namespace
+
 juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
 {
     const auto& song = engine.getSong();
@@ -7010,6 +7055,13 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         setSelection ({});
         engine.editSong ([targets] (Song& s) { clipops::mergeClips (s, targets); });
         sortClips();
+    });
+    addLiveTrackItems (engine, menu, index, targets, [safe = juce::Component::SafePointer<PlaylistComponent> (this)] {
+        if (safe != nullptr)
+        {
+            safe->setSelection ({});
+            safe->sortClips();
+        }
     });
 
     // --- pattern -------------------------------------------------------------------------------------
@@ -7343,6 +7395,13 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
             convert.addItem (tr (text), [this, index, m = mode] { convertClipToMidi (engine, index, m, [this] { sortClips(); }); });
         menu.addSubMenu (tr ("Convert to MIDI"), convert, sample != nullptr);
     }
+    addLiveTrackItems (engine, menu, index, targets, [safe = juce::Component::SafePointer<PlaylistComponent> (this)] {
+        if (safe != nullptr)
+        {
+            safe->setSelection ({});
+            safe->sortClips();
+        }
+    });
     // Live's Slice to New MIDI Track (round 190ec): a Drum Rack with a pad per slice and a pattern that replays them
     menu.addItem (tr ("Slice to New MIDI Track..."), sample != nullptr && ! clipops::playsBackwards (channel, clip), false,
                   [this, index] { showSliceToNewTrackDialog (engine, *this, index, [this] { sortClips(); }); });

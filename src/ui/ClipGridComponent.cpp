@@ -578,6 +578,13 @@ public:
             repaint();
             return true;
         }
+        // round 190ff: the reference's Freeze Track key (Ctrl+Shift+Alt+F) toggles the selected track's freeze
+        if (key.getModifiers().isCommandDown() && key.getModifiers().isAltDown() && key.getModifiers().isShiftDown()
+            && juce::CharacterFunctions::toUpperCase ((juce::juce_wchar) code) == 'F' && sessionkeys::defaultKeyActs (sessionkeys::Command::freezeTrack))
+        {
+            toggleTrackFreeze (selectedTrack);
+            return true;
+        }
         // round 190bv: the clipboard, duplicate and a new empty MIDI clip
         if (key.getModifiers().isCommandDown() && ! key.getModifiers().isAltDown())
         {
@@ -1343,7 +1350,29 @@ private:
     }
 
 public:
-    // A column title's menu: Rename and the colour (round 190ef, the reference's track title menu), Freeze (round 190ay).
+    // Freeze Track / Unfreeze Track (round 190ff, the reference's Freeze Track: the track's instrument with its volume
+    // and pan through its insert's effects; core/StandIns.h lynx::freeze track freeze)
+    void toggleTrackFreeze (int track)
+    {
+        const auto& song = engine.getSong();
+        const auto channel = detailchain::forTrack (song, track).channel;
+        if (channel < 0 || channel >= (int) song.channels.size())
+            return;
+        if (song.channels[(std::size_t) channel].freeze.on())
+        {
+            unfreezeChannel (engine, channel);
+            repaint();
+            return;
+        }
+        freezeTrack (engine, channel, [safe = juce::Component::SafePointer<juce::Component> (this)] (bool) {
+            if (safe != nullptr)
+                safe->repaint();
+        });
+    }
+
+public:
+    // A column title's menu: Rename and the colour (round 190ef, the reference's track title menu); the reference's
+    // Freeze Track / Unfreeze Track and Bounce Track in Place (round 190ff; round 190ay had the channel freeze here).
     juce::PopupMenu buildHeaderMenu (int track)
     {
         const auto& song = engine.getSong();
@@ -1352,26 +1381,21 @@ public:
         juce::PopupMenu menu;
         menu.addItem (tr ("Rename") + sessionkeys::menuKey (sessionkeys::Command::gridRename), [this, track] { renameTrack (track); });
         menu.addSeparator();
-        if (! valid || ! song.channels[(std::size_t) channel].freeze.on())
-            menu.addItem (trc ("@channel: Freeze"), valid, false, [this, channel] {
-                freezeChannel (engine, channel, [safe = juce::Component::SafePointer<juce::Component> (this)] (bool) {
-                    if (safe != nullptr)
-                        safe->repaint();
-                });
-            });
-        else
-        {
-            menu.addItem (tr ("Unfreeze"), [this, channel] {
-                unfreezeChannel (engine, channel);
-                repaint();
-            });
+        const auto frozen = valid && song.channels[(std::size_t) channel].freeze.on();
+        menu.addItem ((frozen ? tr ("Unfreeze Track") : tr ("Freeze Track")) + sessionkeys::menuKey (sessionkeys::Command::freezeTrack), valid, false,
+                      [this, track] { toggleTrackFreeze (track); });
+        // (LYNX's own: a frozen track whose audio no longer matches is rendered again without unfreezing first)
+        if (frozen && (engine.freezeOutOfDate (channel) || engine.frozenAudioMissing (channel)))
             menu.addItem (tr ("Re-freeze"), [this, channel] {
-                freezeChannel (engine, channel, [safe = juce::Component::SafePointer<juce::Component> (this)] (bool) {
+                freezeTrack (engine, channel, [safe = juce::Component::SafePointer<juce::Component> (this)] (bool) {
                     if (safe != nullptr)
                         safe->repaint();
                 });
             });
-        }
+        menu.addItem (tr ("Bounce Track in Place"), valid, false, [this, channel] {
+            bounceTrackInPlace (engine, channel);
+            repaint();
+        });
         menu.addSeparator();
         const auto colour = track < (int) song.playlistTracks.size() ? song.playlistTracks[(std::size_t) track].colour : 0u;
         menu.addSubMenu (tr ("Change color"), ui::colourMenu (colour, [this, track] (std::uint32_t c) {

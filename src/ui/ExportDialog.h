@@ -41,6 +41,23 @@ void freezeChannel (AudioEngine& engine, int channel, std::function<void (bool)>
 juce::String freezeRefusal (AudioEngine& engine, int channel);
 // The instrument plays again and the frozen audio is deleted.
 void unfreezeChannel (AudioEngine& engine, int channel);
+// Live's Freeze Track (round 190ff, the Clip-launch workflow; core/StandIns.h lynx::freeze track freeze): the channel
+// with its volume and pan through its insert's effects (the track's devices) is rendered and plays in their place; the
+// instrument and the insert's effects are not loaded; the insert's EQ, fader, pan and sends stay live. Unfreeze with
+// unfreezeChannel. Refused, with the reason, when something else plays into the insert or an effect reaches out of it.
+void freezeTrack (AudioEngine& engine, int channel, std::function<void (bool)> done = {});
+// Live's Bounce Track in Place (12.2 on; it also stands for Flatten and Freeze and Flatten there): the track's sound
+// becomes audio clips at its clips' places for good (freeze::flatten), its notes and devices gone; a frozen track whose
+// audio is current is flattened from that audio without a new render. One undo step.
+void bounceTrackInPlace (AudioEngine& engine, int channel);
+// The same without a window on the calling (message) thread, for the command-line modes and the tests. Empty = done.
+juce::String freezeTrackNow (AudioEngine& engine, int channel, bool flattenAfter = false, const std::function<bool (double)>& progress = {});
+juce::String flattenChannelNow (AudioEngine& engine, int channel);
+// Live's Bounce to New Track (round 190ff, freeze::planBounceToNewTrack) and Consolidate (freeze::planConsolidate) for the
+// selected Playlist clips of one track. In the background with progress; `now`: on the calling (message) thread with
+// no window or alert (command-line modes, tests). Returns why not (translated), empty = done / started.
+juce::String bounceToNewTrack (AudioEngine& engine, const std::vector<int>& clips, bool now = false);
+juce::String consolidateClips (AudioEngine& engine, const std::vector<int>& clips, bool now = false);
 // The same without a window, on the calling (message) thread: the command-line modes and the tests. Empty = frozen.
 juce::String freezeChannelNow (AudioEngine& engine, int channel, const std::function<bool (double)>& progress = {});
 // FL's renders that come back into the project as audio clips (REA round 168e, core/QuickRender.h). Each opens the

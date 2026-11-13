@@ -11,6 +11,7 @@
 #include "ui/ChannelSettings.h"
 #include "ui/PatcherEditor.h"
 #include "ui/PluginWindow.h"
+#include "ui/SlotWatch.h"
 #include "core/Mastering.h"
 #include "core/EffectPresets.h"
 #include "core/PluginPresets.h"
@@ -1413,23 +1414,27 @@ struct FreezePlan
     double rate = 44100.0;
     juce::File folder;
     juce::String name;
+    int insert = 0;          // round 190ff: a track freeze through this insert's effects (0 = the channel freeze)
+    bool flattenAfter = false; // round 190ff: Bounce Track in Place — frozen and flattened in one step
 };
 
-// what stops a freeze before any render, as a sentence for the user; empty = go
-juce::String whyNoFreeze (AudioEngine& engine, int channel)
+// what stops a freeze before any render, as a sentence for the user; empty = go (track: the track freeze, round 190ff)
+juce::String whyNoFreeze (AudioEngine& engine, int channel, bool track = false)
 {
     const auto& song = engine.getSong();
-    if (const auto* why = freeze::whyNot (song, channel))
+    if (const auto* why = track ? freeze::whyNotTrack (song, channel) : freeze::whyNot (song, channel))
         return tr (why);
     std::vector<const PluginRef*> refs;
     standins::pluginsOf (song.channels[(std::size_t) channel], refs);
+    if (const auto insert = freeze::trackInsert (song, channel); track && insert > 0)
+        standins::pluginsOf (song.mixer[(std::size_t) insert], refs);
     for (const auto* r : refs)
         if (! engine.getPluginHost().isInstalled (*r))
             return tr ("The plugin {0} is not installed on this PC: there is nothing to render.", { juce::String::fromUTF8 (r->name.c_str()) });
     return {};
 }
 
-FreezePlan planFreeze (AudioEngine& engine, int channel)
+FreezePlan planFreeze (AudioEngine& engine, int channel, bool track = false)
 {
     engine.capturePluginStates(); // the plugin as it sounds now is what is rendered, and what Unfreeze brings back
     // the channel's windows go: a plugin window holds its plugin, which could then not be unloaded
@@ -1445,6 +1450,15 @@ FreezePlan planFreeze (AudioEngine& engine, int channel)
     plan.rate = engine.getTransport().sampleRate.load();
     plan.folder = engine.getFreezeFolder();
     plan.name = juce::String::fromUTF8 (plan.song.channels[(std::size_t) channel].name.c_str());
+    // a track freeze (round 190ff) unloads the insert's effects too: their windows go as well
+    plan.insert = track ? freeze::trackInsert (plan.song, channel) : 0;
+    if (plan.insert > 0)
+        for (int slot = 0; slot < (int) plan.song.mixer[(std::size_t) plan.insert].effects.size(); ++slot)
+        {
+            if (auto* effect = dynamic_cast<PluginEffect*> (engine.getEffect (plan.insert, slot).get()))
+                PluginWindows::close (effect->getInstance());
+            ui::SlotGoneWatcher::closeWindow (engine, plan.insert, slot);
+        }
     return plan;
 }
 
@@ -1470,8 +1484,15 @@ void finishFreeze (AudioEngine& engine, const FreezePlan& plan, std::vector<Stan
         deleteStems (stems);
         return;
     }
-    const auto source = sessionpack::freezeSource (plan.song, plan.channel, plan.rate);
-    engine.editSong ([&] (Song& s) { freeze::apply (s, plan.uid, stems, source); });
+    const auto source = sessionpack::freezeSource (plan.song, plan.channel, plan.rate, plan.insert);
+    // (Bounce Track in Place: the freeze and its Flatten are one edit, one undo step)
+    engine.editSong ([&] (Song& s) {
+        freeze::apply (s, plan.uid, stems, source, plan.insert);
+        if (plan.flattenAfter)
+            for (int c = 0; c < (int) s.channels.size(); ++c)
+                if (s.channels[(std::size_t) c].uid == plan.uid)
+                    freeze::flatten (s, c);
+    });
     for (const auto& o : old)
         if (std::none_of (stems.begin(), stems.end(), [&o] (const StandIn& n) { return n.path == o.path; }))
             juce::File (juce::String::fromUTF8 (o.path.c_str())).deleteFile();
@@ -1490,7 +1511,7 @@ public:
         ok = sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, [this] (double p) {
             setProgress (p);
             return ! threadShouldExit();
-        }, error);
+        }, error, plan.insert, plan.flattenAfter);
     }
 
     void threadComplete (bool userPressedCancel) override
@@ -1498,7 +1519,12 @@ public:
         if (ok)
         {
             finishFreeze (engine, plan, std::move (stems));
-            ui::postHint ({ tr ("{0} is frozen: its audio plays and its instrument is unloaded. Right-click the channel to unfreeze it.", { plan.name }), {} }, 8000);
+            if (plan.flattenAfter)
+                ui::postHint ({ tr ("{0} is bounced in place: its clips are audio now.", { plan.name }), {} }, 6000);
+            else if (plan.insert > 0)
+                ui::postHint ({ tr ("{0} is frozen with its effects: its audio plays and its devices are unloaded. Right-click the track to unfreeze it.", { plan.name }), {} }, 8000);
+            else
+                ui::postHint ({ tr ("{0} is frozen: its audio plays and its instrument is unloaded. Right-click the channel to unfreeze it.", { plan.name }), {} }, 8000);
         }
         else if (! userPressedCancel)
             juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not freeze"), error);
@@ -1517,6 +1543,235 @@ private:
 };
 } // namespace
 
+namespace
+{
+void startFreeze (AudioEngine& engine, FreezePlan plan, std::function<void (bool)> done)
+{
+    auto* thread = new FreezeThread (engine, std::move (plan), std::move (done));
+    // round 190bj (QA: the progress window's first frame was a blank white box): the window is shown and painted once,
+    // here on the message thread, before the render starts (launchThread starts the thread first and shows it after)
+    if (auto* window = thread->getAlertWindow())
+    {
+        window->setVisible (true);
+        if (auto* peer = window->getPeer())
+        {
+            window->repaint();
+            peer->performAnyPendingRepaintsNow();
+        }
+    }
+    thread->launchThread();
+}
+
+juce::String trackName (const Song& song, int channel)
+{
+    return channel >= 0 && channel < (int) song.channels.size() ? juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) : juce::String();
+}
+
+// a frozen channel whose audio matches what it was rendered from (its track freeze holding), so Flatten can use it
+bool freezeIsCurrent (AudioEngine& engine, int channel)
+{
+    const auto& song = engine.getSong();
+    if (channel < 0 || channel >= (int) song.channels.size() || ! song.channels[(std::size_t) channel].freeze.on())
+        return false;
+    const auto& f = song.channels[(std::size_t) channel].freeze;
+    return (f.insert == 0 || freeze::trackFreezeHolds (song, channel)) && ! engine.frozenAudioMissing (channel) && ! engine.freezeOutOfDate (channel);
+}
+} // namespace
+
+void freezeTrack (AudioEngine& engine, int channel, std::function<void (bool)> done)
+{
+    if (const auto refusal = whyNoFreeze (engine, channel, true); refusal.isNotEmpty())
+    {
+        const auto name = trackName (engine.getSong(), channel);
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, name.isNotEmpty() ? tr ("Can't freeze {0}", { name }) : tr ("Can't freeze this track"), refusal);
+        if (done)
+            done (false);
+        return;
+    }
+    startFreeze (engine, planFreeze (engine, channel, true), std::move (done));
+}
+
+juce::String freezeTrackNow (AudioEngine& engine, int channel, bool flattenAfter, const std::function<bool (double)>& progress)
+{
+    if (const auto refusal = whyNoFreeze (engine, channel, true); refusal.isNotEmpty())
+        return refusal;
+    auto plan = planFreeze (engine, channel, true);
+    plan.flattenAfter = flattenAfter;
+    std::vector<StandIn> stems;
+    juce::String error;
+    if (! sessionpack::renderFreeze (plan.song, plan.channel, plan.rate, plan.folder, stems, progress, error, plan.insert, plan.flattenAfter))
+        return error.isEmpty() ? juce::String ("cancelled") : error;
+    finishFreeze (engine, plan, std::move (stems));
+    return {};
+}
+
+juce::String flattenChannelNow (AudioEngine& engine, int channel)
+{
+    if (! freezeIsCurrent (engine, channel))
+        return tr ("The frozen audio is out of date or missing: freeze the track again first.");
+    juce::String result;
+    engine.editSong ([&] (Song& s) {
+        if (! freeze::flatten (s, channel))
+            result = tr ("This track plays in no clip of the Playlist: there is nothing to flatten.");
+    });
+    return result;
+}
+
+void bounceTrackInPlace (AudioEngine& engine, int channel)
+{
+    // Live's Bounce Track in Place (12.2 on, where it also takes Flatten's place): a frozen track whose audio is current
+    // is flattened at once from that audio; any other track is rendered with its devices and flattened in one step
+    const auto name = trackName (engine.getSong(), channel);
+    if (freezeIsCurrent (engine, channel))
+    {
+        if (const auto error = flattenChannelNow (engine, channel); error.isNotEmpty())
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Can't bounce {0}", { name }), error);
+        else
+            ui::postHint ({ tr ("{0} is bounced in place: its clips are audio now.", { name }), {} }, 6000);
+        return;
+    }
+    if (auto refusal = whyNoFreeze (engine, channel, true); refusal.isEmpty())
+    {
+        // nothing in the Playlist plays it: the bounce would leave nothing behind
+        const auto& song = engine.getSong();
+        auto probe = song;
+        freeze::apply (probe, probe.channels[(std::size_t) channel].uid, { StandIn { 0, false, "probe", "", 1, "", "" } }, "", freeze::trackInsert (song, channel));
+        if (! freeze::flatten (probe, channel))
+            refusal = tr ("This track plays in no clip of the Playlist: there is nothing to bounce.");
+        if (refusal.isNotEmpty())
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Can't bounce {0}", { name }), refusal);
+            return;
+        }
+    }
+    else
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Can't bounce {0}", { name }), refusal);
+        return;
+    }
+    auto plan = planFreeze (engine, channel, true);
+    plan.flattenAfter = true;
+    startFreeze (engine, std::move (plan), {});
+}
+
+namespace
+{
+// one render of a song's time selection in the background, with progress; `apply` (message thread) gets the file
+class SelectionRenderThread final : public juce::ThreadWithProgressWindow
+{
+public:
+    SelectionRenderThread (const juce::String& title, Song s, double r, juce::File f, std::function<void (const juce::File&)> a)
+        : juce::ThreadWithProgressWindow (title, true, true), song (std::move (s)), rate (r), file (std::move (f)), apply (std::move (a))
+    {
+    }
+    void run() override
+    {
+        ok = sessionpack::renderSelection (song, rate, file, [this] (double p) {
+            setProgress (p);
+            return ! threadShouldExit();
+        }, error);
+    }
+    void threadComplete (bool userPressedCancel) override
+    {
+        if (ok)
+            apply (file);
+        else
+        {
+            file.deleteFile();
+            if (! userPressedCancel)
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Could not render"), error);
+        }
+        juce::MessageManager::callAsync ([this] { delete this; });
+    }
+
+private:
+    Song song;
+    double rate;
+    juce::File file;
+    std::function<void (const juce::File&)> apply;
+    juce::String error;
+    bool ok = false;
+};
+
+juce::File liveRenderFile (AudioEngine& engine, const char* folder, const std::string& name)
+{
+    // next to the project's recordings and frozen audio, as Live keeps them in Samples/Processed/<folder>
+    const auto dir = engine.getFreezeFolder().getSiblingFile (folder);
+    dir.createDirectory();
+    return dir.getNonexistentChildFile (juce::File::createLegalFileName (juce::String::fromUTF8 (name.c_str())), ".wav", false);
+}
+
+void bounceApply (AudioEngine& engine, const freeze::BouncePlan& plan, const juce::File& file)
+{
+    const auto path = file.getFullPathName().toStdString();
+    engine.editSong ([&] (Song& s) { freeze::applyBounceToNewTrack (s, plan, path, plan.end - plan.start); });
+}
+
+void consolidateApply (AudioEngine& engine, const freeze::ConsolidatePlan& plan, const juce::File& file)
+{
+    const auto path = file.getFullPathName().toStdString();
+    engine.editSong ([&] (Song& s) { freeze::applyAudioConsolidation (s, plan, path, plan.end - plan.start); });
+}
+} // namespace
+
+juce::String bounceToNewTrack (AudioEngine& engine, const std::vector<int>& clips, bool now)
+{
+    freeze::BouncePlan plan;
+    if (const auto* why = freeze::planBounceToNewTrack (engine.getSong(), clips, plan))
+    {
+        if (! now)
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Can't bounce"), tr (why));
+        return tr (why);
+    }
+    engine.capturePluginStates();
+    const auto& song = engine.getSong();
+    auto renderSong = freeze::bounceRenderSong (song, plan);
+    const auto rate = engine.getTransport().sampleRate.load();
+    const auto file = liveRenderFile (engine, "Bounced", song.channels[(std::size_t) plan.channel].name + " (bounce)");
+    if (now)
+    {
+        juce::String error;
+        if (! sessionpack::renderSelection (renderSong, rate, file, {}, error))
+            return error.isEmpty() ? juce::String ("cancelled") : error;
+        bounceApply (engine, plan, file);
+        return {};
+    }
+    (new SelectionRenderThread (tr ("Bouncing..."), std::move (renderSong), rate, file, [&engine, plan] (const juce::File& f) { bounceApply (engine, plan, f); }))
+        ->launchThread();
+    return {};
+}
+
+juce::String consolidateClips (AudioEngine& engine, const std::vector<int>& clips, bool now)
+{
+    freeze::ConsolidatePlan plan;
+    if (const auto* why = freeze::planConsolidate (engine.getSong(), clips, plan))
+    {
+        if (! now)
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Can't consolidate"), tr (why));
+        return tr (why);
+    }
+    if (! plan.audio) // MIDI: the notes are joined, nothing is rendered
+    {
+        engine.editSong ([&] (Song& s) { freeze::consolidatePatternClips (s, plan); });
+        return {};
+    }
+    const auto& song = engine.getSong();
+    auto renderSong = freeze::consolidateRenderSong (song, plan);
+    const auto rate = engine.getTransport().sampleRate.load();
+    const auto file = liveRenderFile (engine, "Consolidated", song.channels[(std::size_t) plan.channel].name + " (consolidated)");
+    if (now)
+    {
+        juce::String error;
+        if (! sessionpack::renderSelection (renderSong, rate, file, {}, error))
+            return error.isEmpty() ? juce::String ("cancelled") : error;
+        consolidateApply (engine, plan, file);
+        return {};
+    }
+    (new SelectionRenderThread (tr ("Consolidating..."), std::move (renderSong), rate, file, [&engine, plan] (const juce::File& f) { consolidateApply (engine, plan, f); }))
+        ->launchThread();
+    return {};
+}
+
 void freezeChannel (AudioEngine& engine, int channel, std::function<void (bool)> done)
 {
     if (const auto refusal = whyNoFreeze (engine, channel); refusal.isNotEmpty())
@@ -1530,19 +1785,7 @@ void freezeChannel (AudioEngine& engine, int channel, std::function<void (bool)>
             done (false);
         return;
     }
-    auto* thread = new FreezeThread (engine, planFreeze (engine, channel), std::move (done));
-    // round 190bj (QA: the progress window's first frame was a blank white box): the window is shown and painted once,
-    // here on the message thread, before the render starts (launchThread starts the thread first and shows it after)
-    if (auto* window = thread->getAlertWindow())
-    {
-        window->setVisible (true);
-        if (auto* peer = window->getPeer())
-        {
-            window->repaint();
-            peer->performAnyPendingRepaintsNow();
-        }
-    }
-    thread->launchThread();
+    startFreeze (engine, planFreeze (engine, channel), std::move (done));
 }
 
 juce::String freezeRefusal (AudioEngine& engine, int channel)
