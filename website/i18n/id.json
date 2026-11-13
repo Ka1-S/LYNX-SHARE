@@ -262,6 +262,10 @@
 "home.comm1": "<a href=\"https://discord.gg/XHKkbtbkY\" rel=\"noopener\">Discord</a>: obrolan, bantuan, masukan, dan pengumuman rilis.",
 "home.comm2": "<a href=\"https://github.com/Kenneth-Cho-InfoSec/Radiant\" rel=\"noopener\">Radiant</a> adalah adaptasi Android dari LYNX SHARE yang independen dan tidak resmi untuk tablet dan ponsel. Ini proyek komunitas terpisah, bukan rilis resmi LYNX SHARE, dan tidak kami kelola maupun kami tinjau.",
 "home.srcN": "Petunjuk build untuk tiap sistem ada di <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md\">docs/SETUP_DEV.md</a>.",
+"sup.t": "Dukung LYNX SHARE",
+"sup.p1": "LYNX SHARE gratis dan open source, dibuat oleh seorang pengembang independen. Donasi membuat proyek ini terus berjalan: donasi membayar server di balik fitur berbagi, relay, dan pengujian, alat AI yang dipakai dalam pengembangan, situs web ini, akun pengembang Apple untuk build Mac yang ditandatangani, serta plugin referensi untuk memeriksa kualitas suara.",
+"sup.p2": "Donasi bersifat opsional dan tidak pernah membuka apa pun. Semua yang ada di LYNX SHARE tetap gratis untuk semua orang.",
+"sup.btn": "Dukung di Ko-fi",
 "sig.title": "Kebijakan penandatanganan kode",
 "sig.pending": "menunggu persetujuan",
 "sig.p1": "Penandatanganan kode gratis disediakan oleh <a href=\"https://about.signpath.io\">SignPath.io</a>, sertifikat dari <a href=\"https://signpath.org\">SignPath Foundation</a>.",
@@ -510,6 +514,7 @@
 "nav.updates": "Pembaruan",
 "nav.wiki": "Wiki",
 "f.logo": "Logo oleh w3teal",
+"f.support": "Dukung",
 "f.sign": "Tanda tangan kode &amp; privasi",
 "legal": "LYNX SHARE adalah proyek independen, tidak berafiliasi dengan atau didukung oleh Image-Line, Ableton, maupun BandLab. FL Studio dan FL Studio Mobile adalah merek dagang Image-Line Software; Ableton dan Live adalah merek dagang Ableton AG; BandLab adalah merek dagang BandLab Technologies.",
 "aria.lang": "Bahasa"

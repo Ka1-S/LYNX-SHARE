@@ -26,6 +26,7 @@ SRC = Path(__file__).resolve().parent
 OUT = SRC.parent
 SITE = "https://lynx-share.com"
 REPO = "https://github.com/Ka1-S/LYNX-SHARE"
+KOFI = "https://ko-fi.com/lynxshare"  # the donation page (optional; = lynx::links::donate in src/core/Links.h)
 LOGO_V = "0.1.26-logo2"  # cache-buster of the logo pictures (logo by w3teal; its app-icon form since 2026-11-13)
 # the header/footer logo: at 1x the icon's small-size form (32 px, tools/make_logo.py), at 2x the 64 px icon, above that 256 px
 LOGO_SRCSET = (f"/assets/img/favicon-32.png?v={LOGO_V} 1x, /assets/img/favicon.png?v={LOGO_V} 2x, "
@@ -282,7 +283,7 @@ def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", ho
   <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v={LOGO_V}" srcset="{LOGO_SRCSET}" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
   <span>© 2026 · AGPL-3.0</span>
   <span data-i18n="f.logo">Logo by w3teal</span>
-  <div class="links2"><a href="{REPO}">GitHub</a><a href="{REPO}/releases">Releases</a><a href="{REPO}/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <div class="links2"><a href="{REPO}">GitHub</a><a href="{REPO}/releases">Releases</a><a href="{REPO}/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#support" data-i18n="f.support">Support</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={json.dumps(STR["js"], ensure_ascii=False, separators=(",", ":"))};</script>
@@ -652,7 +653,7 @@ def main():
            "OS_BTNS": "".join('<a class="btn btn-ghost" data-os="%s" data-dl="%s.main" href="%s/releases/latest">%s<span>%s</span><small data-i18n="%s">%s</small><em data-yours></em><i class="sh" aria-hidden="true"></i></a>'
                               % (o, o, REPO, IC[o], name, k, T[k]) for o, name, k in (("win", "Windows", "dl.fInstaller"), ("mac", "macOS", "dl.fUniversal"), ("linux", "Linux", "dl.fAppImage"))),
            "WHYROW": render_whyrow(cat), "CAT_SUB": tr("cat.sub", len(cat), latest["version"].split("-")[0], tag="p", count=len(cat)),
-           "WHY_FL_P1": T["why.fl.p1"], "WHY_FL_X2": T["why.fl.x2"]}
+           "WHY_FL_P1": T["why.fl.p1"], "WHY_FL_X2": T["why.fl.x2"], "KOFI": KOFI}
 
     def page(name):
         body = (SRC / "pages" / (name + ".html")).read_text(encoding="utf-8")

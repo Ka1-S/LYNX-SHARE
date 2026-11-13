@@ -262,6 +262,10 @@
 "home.comm1": "<a href=\"https://discord.gg/XHKkbtbkY\" rel=\"noopener\">Discord</a>: czat, pomoc, opinie i ogłoszenia o wydaniach.",
 "home.comm2": "<a href=\"https://github.com/Kenneth-Cho-InfoSec/Radiant\" rel=\"noopener\">Radiant</a> to niezależna, nieoficjalna adaptacja LYNX SHARE na Androida dla tabletów i telefonów. To odrębny projekt społeczności, a nie oficjalne wydanie LYNX SHARE, i nie jest przez nas utrzymywany ani sprawdzany.",
 "home.srcN": "Instrukcje budowania dla każdego systemu są w <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md\">docs/SETUP_DEV.md</a>.",
+"sup.t": "Wesprzyj LYNX SHARE",
+"sup.p1": "LYNX SHARE jest darmowy i otwartoźródłowy, tworzony przez niezależnego dewelopera. Darowizny pozwalają rozwijać projekt: opłacają serwer obsługujący udostępnianie, przekaźnik i testy, narzędzia AI używane przy tworzeniu, tę stronę, konto deweloperskie Apple do podpisanych wersji na Maca oraz wtyczki referencyjne, którymi sprawdzana jest jakość dźwięku.",
+"sup.p2": "Darowizna jest dobrowolna i nigdy niczego nie odblokowuje. Wszystko w LYNX SHARE pozostaje darmowe dla wszystkich.",
+"sup.btn": "Wesprzyj na Ko-fi",
 "sig.title": "Zasady podpisywania kodu",
 "sig.pending": "oczekuje na zatwierdzenie",
 "sig.p1": "Darmowe podpisywanie kodu zapewnia <a href=\"https://about.signpath.io\">SignPath.io</a>, certyfikat — <a href=\"https://signpath.org\">SignPath Foundation</a>.",
@@ -510,6 +514,7 @@
 "nav.updates": "Aktualizacje",
 "nav.wiki": "Wiki",
 "f.logo": "Autor logo: w3teal",
+"f.support": "Wsparcie",
 "f.sign": "Podpisywanie kodu i prywatność",
 "legal": "LYNX SHARE to niezależny projekt, niepowiązany z Image-Line, Ableton ani BandLab i przez nie niepopierany. FL Studio i FL Studio Mobile to znaki towarowe Image-Line Software; Ableton i Live to znaki towarowe Ableton AG; BandLab to znak towarowy BandLab Technologies.",
 "aria.lang": "Język"

@@ -59,7 +59,7 @@ lang=pick(q)||pick(saved);
 if(!lang){var nl=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language];for(var i=0;i<nl.length&&!lang;i++)lang=pick(nl[i]);}
 lang=lang||"en";
 if(q&&pick(q))try{localStorage.setItem("lynx-lang",lang);}catch(e){}
-window.LYNX_LANG=lang;window.LYNX_V="175dc530";
+window.LYNX_LANG=lang;window.LYNX_V="e9c076ea";
 var F={"ja":"JP","ko":"KR","zh-Hans":"SC","zh-Hant":"TC"};
 (window.LYNX_FONT=function(l){if(!F[l]||document.getElementById("cjk-"+l))return;var k=document.createElement("link");k.id="cjk-"+l;k.rel="stylesheet";
   k.href="https://fonts.googleapis.com/css2?family=Noto+Sans+"+F[l]+":wght@400;500;700&display=swap";document.head.appendChild(k);})(lang);
@@ -77,7 +77,7 @@ if(lang!=="en"){h.classList.add("i18n-wait");setTimeout(function(){h.classList.r
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/site.css?v=175dc530">
+<link rel="stylesheet" href="/assets/site.css?v=e9c076ea">
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -175,6 +175,17 @@ LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
   </div>
 </section>
 
+<section class="sec" id="support">
+  <div class="wrap">
+    <div class="prose">
+      <h2 data-i18n="sup.t">Support LYNX SHARE</h2>
+      <p data-i18n="sup.p1">LYNX SHARE is free and open source, made by an independent developer. Donations keep the project going: they pay for the server behind sharing, the relay and the tests, the AI tools used in development, this website, the Apple developer account for signed Mac builds, and the reference plugins used to check the sound quality.</p>
+      <p data-i18n="sup.p2">Donating is optional and never unlocks anything. Everything in LYNX SHARE stays free for everyone.</p>
+      <p><a class="btn btn-ghost btn-sm" href="https://ko-fi.com/lynxshare" rel="noopener" data-i18n="sup.btn">Support on Ko-fi</a></p>
+    </div>
+  </div>
+</section>
+
 <section class="sec">
   <div class="wrap">
     <div class="policy" id="signing">
@@ -208,11 +219,11 @@ LYNX --showcase Demo.lynx     # writes the demo project</code></pre>
   <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.26-logo2" srcset="/assets/img/favicon-32.png?v=0.1.26-logo2 1x, /assets/img/favicon.png?v=0.1.26-logo2 2x, /assets/img/logo.png?v=0.1.26-logo2 4x" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
   <span>© 2026 · AGPL-3.0</span>
   <span data-i18n="f.logo">Logo by w3teal</span>
-  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
+  <div class="links2"><a href="https://github.com/Ka1-S/LYNX-SHARE">GitHub</a><a href="https://github.com/Ka1-S/LYNX-SHARE/releases">Releases</a><a href="https://github.com/Ka1-S/LYNX-SHARE/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#support" data-i18n="f.support">Support</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
 <script>window.LYNX_EN={"dl.yours":"Your system","aria.step":"{0}, step {1}","ws.none":"Nothing found","ws.ph":"Search the wiki"};</script>
-<script src="/assets/site.js?v=175dc530" defer></script>
-<script src="/assets/motion.js?v=175dc530" defer></script>
+<script src="/assets/site.js?v=e9c076ea" defer></script>
+<script src="/assets/motion.js?v=e9c076ea" defer></script>
 </body>
 </html>

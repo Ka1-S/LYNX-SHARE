@@ -262,6 +262,10 @@
 "home.comm1": "<a href=\"https://discord.gg/XHKkbtbkY\" rel=\"noopener\">Discord</a>: 채팅, 도움말, 피드백, 릴리스 공지.",
 "home.comm2": "<a href=\"https://github.com/Kenneth-Cho-InfoSec/Radiant\" rel=\"noopener\">Radiant</a> 는 태블릿과 휴대폰용 LYNX SHARE의 독립적인 비공식 Android 버전입니다. 별도의 커뮤니티 프로젝트이며 공식 LYNX SHARE 릴리스가 아니고, 저희가 유지보수하거나 검토하지 않습니다.",
 "home.srcN": "시스템별 빌드 방법은 <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md\">docs/SETUP_DEV.md</a>에 있습니다.",
+"sup.t": "LYNX SHARE 후원하기",
+"sup.p1": "LYNX SHARE는 무료 오픈 소스이며, 독립 개발자가 만듭니다. 후원은 프로젝트를 계속 이어 가게 합니다. 공유, 릴레이, 테스트를 위한 서버, 개발에 쓰는 AI 도구, 이 웹사이트, 서명된 Mac 빌드를 위한 Apple 개발자 계정, 그리고 음질 확인에 쓰는 레퍼런스 플러그인 비용에 쓰입니다.",
+"sup.p2": "후원은 선택 사항이며 아무것도 잠금 해제하지 않습니다. LYNX SHARE의 모든 것은 누구에게나 계속 무료입니다.",
+"sup.btn": "Ko-fi에서 후원하기",
 "sig.title": "코드 서명 정책",
 "sig.pending": "승인 대기 중",
 "sig.p1": "무료 코드 서명은 <a href=\"https://about.signpath.io\">SignPath.io</a>에서, 인증서는 <a href=\"https://signpath.org\">SignPath Foundation</a>에서 제공합니다.",
@@ -510,6 +514,7 @@
 "nav.updates": "업데이트",
 "nav.wiki": "위키",
 "f.logo": "로고 제작: w3teal",
+"f.support": "후원",
 "f.sign": "코드 서명 &amp; 개인정보",
 "legal": "LYNX SHARE는 독립 프로젝트이며 Image-Line, Ableton, BandLab과 제휴하거나 그들의 보증을 받지 않았습니다. FL Studio와 FL Studio Mobile은 Image-Line Software의, Ableton과 Live는 Ableton AG의, BandLab은 BandLab Technologies의 상표입니다.",
 "aria.lang": "언어"

@@ -521,6 +521,14 @@ docs/         architecture, status, roadmap and the behavioural analysis of FL S
 - **Discord:** [discord.gg/XHKkbtbkY](https://discord.gg/XHKkbtbkY). Chat, help, feedback and release announcements.
 - **Radiant** ([Kenneth-Cho-InfoSec/Radiant](https://github.com/Kenneth-Cho-InfoSec/Radiant)): an independent, unofficial Android adaptation of LYNX SHARE for tablets and phones. It's a separate community project, not an official LYNX SHARE release, and it isn't maintained or reviewed by us.
 
+## Support LYNX SHARE
+
+LYNX SHARE is free and open source, made by an independent developer. If it helps your music, you can support it on
+[Ko-fi](https://ko-fi.com/lynxshare). Donations keep the project going: they pay for the server (VPS) behind sharing,
+the relay and the tests, the AI tools and tokens used in development, the website, the Apple developer account for
+signed Mac builds, and the reference plugins used to check the sound quality. Donating is optional and never unlocks
+anything: everything in LYNX SHARE stays free for everyone. In the app: Help › Support LYNX SHARE...
+
 ## Credits and notice
 
 LYNX SHARE is an independent implementation. FL Studio, FL Studio Mobile and Ableton Live were studied only to understand their behaviour and file formats; no Image-Line or Ableton code was copied, and no protected content (such as FLEX packs) is ever opened.

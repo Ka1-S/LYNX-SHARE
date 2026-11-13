@@ -201,6 +201,7 @@
 #include "ui/StemExtract.h"
 #include "ui/AudioToMidi.h"
 #include "ui/ShotScale.h"
+#include "core/Links.h"
 
 #include <atomic>
 #include <chrono>
@@ -1978,6 +1979,18 @@ public:
             return;
         }
 
+        if (args.contains ("--donateshot"))
+        {
+            // LYNX --donateshot prefix: round 190fq off-screen (no window) — Help › Support LYNX SHARE... in the three
+            // layouts, the Support window, the About window's Support button, the start-up support note in the main
+            // window, and the note's rules end to end on its saved state (run it with LYNX_PROFILE_DIR: it writes
+            // support-note.txt there, and puts the old one back at the end); report prefix-report.txt, exit 0 = OK
+            const auto i = args.indexOf ("--donateshot");
+            setApplicationReturnValue (runDonateShot (args[i + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--simpleclosetest"))
         {
             // LYNX --simpleclosetest <report.txt>: round 190fc off-screen (no window) — the main window in the Simple
@@ -2453,6 +2466,7 @@ public:
             startupTrace.mark ("startup file opened");
             startOpenTimeProbe();
             startUpdateCheck();
+            startSupportNote();
             juce::MessageManager::callAsync ([] { startupTrace.mark ("first message loop turn"); });
             return;
         }
@@ -2496,6 +2510,7 @@ public:
                     startupTrace.mark ("startup file opened");
                     startOpenTimeProbe();
                     startUpdateCheck();
+                    startSupportNote();
                     juce::MessageManager::callAsync ([] { startupTrace.mark ("first message loop turn"); });
                     // first run: language, audio, plugin folders (FL Studio's included) and a background scan
                     if (! lynx::setupWizardDone() && lynx::platform::testMode())
@@ -2505,6 +2520,20 @@ public:
                 });
             });
         });
+    }
+
+    // round 190fq: the start-up support note (ui/SupportLynx.h) counts this start and, from the 10th on, may show its
+    // card once at a quiet moment. Only here, on the normal start path (the command-line modes returned earlier); test
+    // mode and CI machines neither count nor show it.
+    void startSupportNote()
+    {
+        if (mainWindow == nullptr)
+            return;
+        const auto env = [] (const char* name) { return juce::SystemStats::getEnvironmentVariable (name, {}).toStdString(); };
+        const auto quiet = lynx::supportnote::quietEnvironment (lynx::platform::testMode(), env ("CI"), env ("GITHUB_ACTIONS"), env ("LYNX_NO_SUPPORT_NOTE"));
+        if (quiet && lynx::platform::testMode())
+            lynx::platform::testModeLog ("support note: not counted (test mode)");
+        mainWindow->getContent().startSupportNote (quiet);
     }
 
     void startEngine()
@@ -17482,6 +17511,224 @@ private:
     // tab (the Editor tab docks the Piano roll), Finish, Lyrics, the chooser — then destroyed as the app's shutdown does.
     // A second main window goes Simple -> Pattern -> Simple and closes too. Checks: no Simple workflow outlives its main
     // window's destructor body, none is left at all. (Under ASan on Linux the old order is a heap-use-after-free.)
+    bool runDonateShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::String report;
+        bool ok = true;
+        const auto line = [&report, &prefix] (const juce::String& text) {
+            report << text << "\n";
+            juce::File (prefix + "-report.txt").replaceWithText (report); // (written as it goes)
+        };
+        const auto check = [&line, &ok] (const juce::String& what, bool good) {
+            line ((good ? "ok   " : "FAIL ") + what);
+            ok = ok && good;
+        };
+        const auto writeImage = [&prefix] (const juce::Image& image, const juce::String& name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        // a window as the --snapshot route saves one (off the desktop, on the theme's panel colour), at 1x and 2x
+        const auto saveAlert = [&] (juce::AlertWindow& w, const juce::String& name) {
+            if (w.isOnDesktop())
+                w.removeFromDesktop();
+            w.setOpaque (true);
+            juce::Component frame;
+            frame.setSize (w.getWidth(), w.getHeight());
+            frame.setOpaque (true);
+            frame.addAndMakeVisible (w);
+            w.setTopLeftPosition (0, 0);
+            writeImage (lynx::shot::paint (frame, lynx::theme::panel), name);
+            writeImage (frame.createComponentSnapshot (frame.getLocalBounds(), true, 2.0f), name + "@2x");
+            frame.removeChildComponent (&w);
+        };
+        const auto buttonTexts = [] (juce::AlertWindow& w) {
+            juce::StringArray texts;
+            for (int b = 0; b < w.getNumButtons(); ++b)
+                if (auto* button = w.getButton (b))
+                    texts.add (button->getButtonText());
+            return texts;
+        };
+
+        check ("the donation page is one constant, on Ko-fi", juce::String (lynx::links::donate).startsWith ("https://ko-fi.com/"));
+        line ("donate URL: " + juce::String (lynx::links::donate));
+
+        const auto stateFile = lynx::PluginHost::settingsFolder().getChildFile ("support-note.txt");
+        const auto hadState = stateFile.existsAsFile();
+        const auto oldState = stateFile.loadFileAsString();
+        line ("state file: " + stateFile.getFullPathName() + (hadState ? " (exists; put back at the end)" : ""));
+
+        {
+            lynx::AudioEngine offline (false);
+            lynx::MainComponent ui (offline, false);
+            const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+            ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+            ui.setVisible (true);
+            const auto settle = [&] {
+                for (int k = 0; k < 3; ++k)
+                    offline.dispatchPendingMessages();
+            };
+
+            // --- Help › Support LYNX SHARE..., right above About, in the three layouts ----------------------------------
+            for (auto [style, name] : { std::pair { lynx::layoutstyle::Style::pattern, "pattern" }, { lynx::layoutstyle::Style::clipLaunch, "cliplaunch" },
+                                        { lynx::layoutstyle::Style::simple, "simple" } })
+            {
+                ui.setLayoutStyle (style);
+                settle();
+                const auto help = ui.getMenuForSnapshot (ui.getMenuNamesForSnapshot().indexOf (lynx::tr ("Help")));
+                juce::StringArray items;
+                for (juce::PopupMenu::MenuItemIterator it (help); it.next();)
+                    if (! it.getItem().isSeparator)
+                        items.add (it.getItem().text);
+                const auto support = items.indexOf (lynx::tr ("Support LYNX SHARE..."));
+                const auto about = items.indexOf (lynx::tr ("About LYNX SHARE"));
+                check (juce::String ("Help has Support LYNX SHARE... right above About LYNX SHARE (") + name + " layout)",
+                       support >= 0 && about == support + 1);
+                saveMenus ({ lynx::tr ("Help") }, { help }, prefix + "-menu-help-" + name + ".png");
+            }
+            ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+            settle();
+
+            // --- the Support window -------------------------------------------------------------------------------------
+            {
+                auto w = lynx::support::makeSupportWindow();
+                const auto texts = buttonTexts (*w);
+                check ("Support window: Donate on Ko-fi, Close", texts == juce::StringArray { lynx::tr ("Donate on Ko-fi"), lynx::tr ("Close") });
+                check ("Support window: Donate on Ko-fi points at the constant",
+                       w->getButton (0) != nullptr && w->getButton (0)->getTooltip() == juce::String (lynx::links::donate));
+                check ("Support window title", w->getName() == lynx::tr ("Support LYNX SHARE"));
+                saveAlert (*w, "support");
+            }
+            // --- the About window ---------------------------------------------------------------------------------------
+            {
+                auto w = lynx::MainComponent::makeAboutWindow();
+                const auto texts = buttonTexts (*w);
+                check ("About window: Support LYNX SHARE (result 2) and OK", texts == juce::StringArray { lynx::tr ("Support LYNX SHARE"), lynx::tr ("OK") });
+                saveAlert (*w, "about");
+            }
+            // --- Settings › General › Show the support note -------------------------------------------------------------
+            {
+                auto page = lynx::makeGeneralPage (offline, {}, false);
+                bool found = false;
+                std::function<void (juce::Component&)> walk = [&] (juce::Component& c) {
+                    if (auto* t = dynamic_cast<juce::ToggleButton*> (&c); t != nullptr && t->getButtonText() == lynx::tr ("Show the support note"))
+                        found = t->getToggleState();
+                    for (auto* child : c.getChildren())
+                        walk (*child);
+                };
+                walk (*page);
+                check ("Settings > General: \"Show the support note\", ticked by default", found);
+            }
+
+            // --- the start-up note's rules, end to end on the saved state ----------------------------------------------
+            lynx::supportnote::Moment moment; // (the main window here is off-screen: the moment is set by hand)
+            lynx::support::StartupNote note (ui, [&moment] { return moment; }, [] { return 0; });
+            const auto state = [] { return lynx::support::loadState(); };
+            const auto setState = [] (int launches, int next, bool show) { lynx::support::saveState ({ launches, next, show }); };
+            stateFile.deleteFile();
+            for (int k = 0; k < 15; ++k)
+                note.begin (true);
+            note.pollForSnapshot();
+            check ("test mode / CI runs: 15 starts, nothing counted, no file, no card", ! stateFile.existsAsFile() && ! note.isCardShowing());
+            check ("a first start's defaults: next at start 10, shown", state() == lynx::supportnote::State { 0, 10, true });
+
+            for (int k = 1; k <= 9; ++k)
+            {
+                note.begin (false);
+                note.pollForSnapshot();
+            }
+            check ("starts 1 to 9: counted, no card", state().launches == 9 && ! note.isCardShowing());
+            moment.playing = true;
+            note.begin (false); // the 10th start
+            note.pollForSnapshot();
+            check ("10th start while playing: the card waits", state().launches == 10 && ! note.isCardShowing());
+            moment = {};
+            moment.dialogOpen = true;
+            note.pollForSnapshot();
+            check ("... and while a dialog is open", ! note.isCardShowing());
+            moment = {};
+            note.pollForSnapshot();
+            check ("10th start, a quiet moment: the card shows", note.isCardShowing());
+            check ("shown: left without an answer it comes back 30 starts later", state().nextAt == 40);
+            if (auto* card = note.cardForSnapshot())
+            {
+                const auto b = card->getBounds();
+                check ("the card sits in the bottom-right corner", b.getRight() <= ui.getWidth() - 8 && b.getRight() >= ui.getWidth() - 40
+                                                                      && b.getBottom() <= ui.getHeight() - 4 && b.getBottom() >= ui.getHeight() - 40);
+                writeImage (ui.createComponentSnapshot (ui.getLocalBounds(), true, 1.0f), "note-in-window");
+                writeImage (card->createComponentSnapshot (card->getLocalBounds(), true, 2.0f), "note@2x");
+                // the corner of the window around the card, at 2x
+                writeImage (ui.createComponentSnapshot (b.expanded (220, 120).getIntersection (ui.getLocalBounds()), true, 2.0f), "note-corner@2x");
+            }
+            moment.playing = true;
+            note.pollForSnapshot();
+            check ("playback starts: the card steps aside", ! note.isCardShowing());
+            moment = {};
+
+            // Not now: again after 30 more starts
+            setState (10, 10, true);
+            note.begin (false); // start 11
+            note.pollForSnapshot();
+            if (auto* card = note.cardForSnapshot(); card != nullptr && card->buttonForSnapshot (lynx::supportnote::Choice::notNow) != nullptr)
+                card->buttonForSnapshot (lynx::supportnote::Choice::notNow)->onClick();
+            note.closeCard(); // (the click closes it on the next message turn)
+            check ("Not now: next at start 41", state() == lynx::supportnote::State { 11, 41, true });
+            for (int k = 12; k <= 40; ++k)
+            {
+                note.begin (false);
+                note.pollForSnapshot();
+                if (note.isCardShowing())
+                    break;
+            }
+            check ("Not now: starts 12 to 40 without the card", ! note.isCardShowing() && state().launches == 40);
+            note.begin (false);
+            note.pollForSnapshot();
+            check ("Not now: the card again at start 41", note.isCardShowing());
+
+            // Don't show again: never, and Settings shows the box unticked
+            if (auto* card = note.cardForSnapshot())
+                card->buttonForSnapshot (lynx::supportnote::Choice::never)->onClick();
+            note.closeCard();
+            check ("Don't show again: off", ! state().show && ! lynx::support::noteEnabled());
+            for (int k = 0; k < 200; ++k)
+            {
+                note.begin (false);
+                note.pollForSnapshot();
+            }
+            check ("Don't show again: 200 more starts, never", ! note.isCardShowing());
+
+            // Support: opens the Support window (on the next message turn) and the note doesn't come back
+            setState (20, 10, true);
+            note.begin (false);
+            note.pollForSnapshot();
+            if (auto* card = note.cardForSnapshot())
+                card->buttonForSnapshot (lynx::supportnote::Choice::support)->onClick();
+            note.closeCard();
+            check ("Support: the note has done its job", ! state().show);
+
+            // Settings off: never; on again: counts from now
+            setState (5, 10, true);
+            lynx::support::setNoteEnabled (false);
+            for (int k = 0; k < 100; ++k)
+            {
+                note.begin (false);
+                note.pollForSnapshot();
+            }
+            check ("Settings off: 100 starts, never", ! note.isCardShowing() && state().launches == 105);
+            lynx::support::setNoteEnabled (true);
+            check ("Settings on again: next 30 starts later", state() == lynx::supportnote::State { 105, 135, true });
+            note.closeCard();
+        }
+
+        stateFile.deleteFile();
+        if (hadState)
+            stateFile.replaceWithText (oldState);
+        line (ok ? "result=OK" : "result=FAILED");
+        return ok;
+    }
+
     bool runSimpleCloseTest (const juce::String& reportPath)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -21290,6 +21537,7 @@ private:
             };
             saveAlert (ui.makeConfirmDiscardWindow(), "-confirm.png");
             saveAlert (lynx::MainComponent::makeAboutWindow(), "-about.png");
+            saveAlert (lynx::support::makeSupportWindow(), "-support.png"); // round 190fq: Help › Support LYNX SHARE...
             saveAlert (lynx::makeNameAndColourDialog (lynx::tr ("Rename pattern"), "Pattern 2", lynx::lynxPalette()[6]), "-rename.png");
             saveAlert (lynx::makeRecordChoiceDialog(), "-record-dialog.png");
             // round 190ah: Online Sessions — a guest's "go back in?" at start-up, the host's question at a guest's file limit
