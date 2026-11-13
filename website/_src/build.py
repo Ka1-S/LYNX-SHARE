@@ -250,7 +250,7 @@ def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", ho
 <meta property="og:title" content="{esc(title)}">
 <meta property="og:description" content="{esc(desc)}">
 <meta property="og:site_name" content="LYNX SHARE">
-<meta property="og:image" content="{SITE}/assets/img/hero.webp?v=0.1.26">
+<meta property="og:image" content="{SITE}/assets/img/hero.webp?v=0.1.27">
 <meta property="og:url" content="{url}">
 <meta property="og:locale" content="en_US">
 {ogl}<link rel="canonical" href="{url}">

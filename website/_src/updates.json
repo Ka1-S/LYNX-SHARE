@@ -2,7 +2,7 @@
   {
     "version": "0.1.27-alpha",
     "tag": "v0.1.27-alpha",
-    "date": "2026-11-14",
+    "date": "2026-11-13",
     "url": "https://github.com/Ka1-S/LYNX-SHARE/releases/tag/v0.1.27-alpha",
     "title": "Effects closer to the originals, more of FL Studio, Session mixer and Drum Rack, a first-song tour",
     "summary": "LYNX SHARE's reverbs, delays, modulation effects, dynamics and voice tools were refitted against the plugins they are modelled on, and projects saved earlier keep their sound. More of FL Studio's windows and menus are in, the Clip-launch workflow gains a Session mixer, a Drum Rack and map modes, many of Live's own devices now open from .als sets, FL Studio Mobile projects gain DW Sampler and Slicer, and the Simple workflow gets an Effects tab and a first-song tour. LYNX SHARE also has a new logo, by w3teal.",
@@ -133,7 +133,7 @@
     ],
     "shots": [
       {
-        "src": "/assets/img/cliplaunch.webp?v=0.1.26",
+        "src": "/assets/img/cliplaunch.webp?v=0.1.27",
         "alt": "Clip-launch workflow"
       }
     ]
