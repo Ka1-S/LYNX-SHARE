@@ -107,9 +107,9 @@ With insert 7 soloed, the Master (where the take now plays) and insert 7 (its li
 `win190ev_soloing_the_recording_insert_keeps_its_input_and_take_audible`.
 
 ### Needs a decision / live check
-- **Input monitoring default.** FL's fresh insert hints "Recording: Post EQ, Monitoring: When armed"
-  (REA_rodada165-issue11c shot); LYNX's default is "Auto" (round 88, a model: like When armed but silent during
-  playback without recording). With insert 7 armed and soloed during plain playback, FL plays the input, LYNX does
-  not. Recommended: FL's "When armed" as the default for new inserts (projects keep what they saved). Not changed in
-  this round.
+- **Input monitoring default (decided: FL-exact).** FL's fresh insert hints "Recording: Post EQ, Monitoring: When
+  armed" (REA_rodada165-issue11c shot); LYNX's default was "Auto" (round 88, a model: silent during plain playback),
+  so an armed, soloed insert 7 was not heard while the song played. New inserts now default to "When armed"; saved
+  projects open as saved (a .lynx without the `monitor` key is "Auto"; an .flp without FL's monitor/input events
+  keeps "Auto"). Test `win190ev_new_inserts_monitor_when_armed_old_projects_keep_auto`.
 - A live check of the rule in FL (record Post EQ on an insert routed to a bus) would confirm the static reading.
