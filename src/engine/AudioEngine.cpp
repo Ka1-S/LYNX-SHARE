@@ -1523,7 +1523,7 @@ AudioEngine::LiveRecording AudioEngine::liveRecording() const
             const auto from = (std::int64_t) span.start, to = from + std::max<std::int64_t> (1, (std::int64_t) span.length);
             for (const auto& take : openTakes)
             {
-                auto track = takes::takeTrack (song, take->playThrough > 0 ? take->playThrough : -1, from, to);
+                auto track = takes::takeTrack (song, take->track > 0 ? take->track : -1, from, to);
                 for (const auto used : liveTakeTracks)
                     if (used >= track)
                         track = used + 1;
@@ -1896,11 +1896,10 @@ void AudioEngine::startAudioTake()
             slot.point.store ((int) w.point);
             slot.track.store (w.track);
         }
-        // a tap after the slots plays back through a new insert (through its own one it would get the effects twice)
-        if (w.point >= RecordSource::postEffects)
-            take->playThrough = 0;
-        else
-            take->playThrough = w.track;
+        // FL (round 190ev, REA_rodada190ev §2): "External input only" plays back through the recording insert, as does any
+        // take of an insert a Playlist audio track is linked to; a take that holds the insert's processing (Post EQ, the
+        // default) goes where the insert goes (Master, usually). It used to play through a new free insert.
+        take->playThrough = takes::playbackInsert (song, w.track, w.point);
         // ~22 s at 48 kHz of room between the audio thread and the disk
         take->stream = std::make_unique<takes::TakeStream> (w.channels, 1 << 20);
         if (! take->writer.open (file.getFullPathName().toStdString(), takeSampleRate, w.channels, format))
@@ -2096,7 +2095,8 @@ void AudioEngine::finishAudioTake()
 
     std::vector<takes::TakeFile> made;
     for (const auto& take : kept)
-        made.push_back ({ take->file.getFullPathName().toStdString(), take->file.getFileNameWithoutExtension().toStdString(), take->playThrough });
+        made.push_back ({ take->file.getFullPathName().toStdString(), take->file.getFileNameWithoutExtension().toStdString(), take->playThrough,
+                          take->track > 0 ? take->track : -1 });
 
     // FL: Loop record over a loop region, without a punch
     const auto loopRecorded = recordOptions.loopRecord && ! keepPunch.has_value() && song.mode == PlayMode::song && song.loopPlays();

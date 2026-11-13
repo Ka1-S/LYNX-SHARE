@@ -124,6 +124,27 @@ std::vector<Part> loopPasses (const Placement& p, std::int64_t loopStart, std::i
     return out;
 }
 
+int playbackInsert (const Song& song, int recordedOn, RecordSource point)
+{
+    const auto inserts = (int) song.mixer.size();
+    if (recordedOn <= 0 || recordedOn >= inserts)
+        return -1;
+    if (point == RecordSource::externalInput)
+        return recordedOn;
+    // a Playlist audio track linked to the insert (FL looks in the current arrangement: LYNX's tracks are shared by all)
+    if (std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(),
+                     [recordedOn] (const PlaylistTrack& pt) { return pt.mode == PlaylistTrackMode::audio && pt.mixerTrack == recordedOn; }))
+        return recordedOn;
+    const auto& mt = song.mixer[(std::size_t) recordedOn];
+    if (mt.toMaster)
+        return 0;
+    auto lowest = -1;
+    for (const auto& send : mt.sends)
+        if (send.target > 0 && send.target < inserts && send.target != recordedOn && (lowest < 0 || send.target < lowest))
+            lowest = send.target;
+    return lowest > 0 ? lowest : 0;
+}
+
 int takeTrack (const Song& song, int insert, std::int64_t start, std::int64_t end)
 {
     const auto freeAt = [&] (int track) {
@@ -204,10 +225,14 @@ void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::
         c.instrument = InstrumentKind::audioClip;
         c.sampler.declickMode = audioClipDeclickMode; // FL's AudioTrack.fst
         c.samplePath = f.path;
-        c.mixerTrack = f.insert > 0 && f.insert < (int) song.mixer.size() ? f.insert : song.claimFreeInsert();
+        c.mixerTrack = f.insert >= 0 && f.insert < (int) song.mixer.size() ? f.insert : song.claimFreeInsert();
         song.channels.push_back (c);
         const auto channel = (int) song.channels.size() - 1;
-        const auto insert = c.mixerTrack;
+        // the recording insert's audio track holds the take; the track is linked only to an insert the clip plays
+        // through (a take that plays through Master or a bus leaves its track as it was, as FL)
+        const auto recorded = f.recordedOn >= 0 ? f.recordedOn : c.mixerTrack;
+        const auto insert = recorded;
+        const auto linkTo = recorded == c.mixerTrack ? recorded : -1;
 
         const auto add = [&] (const Part& part, int track, bool muted) {
             Clip clip;
@@ -236,7 +261,7 @@ void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::
             const auto track = takeTrack (song, insert, from, to);
             for (const auto& part : parts)
                 add (part, track, false);
-            linkTakeTrack (song, track, insert);
+            linkTakeTrack (song, track, linkTo);
             continue;
         }
 
@@ -254,7 +279,7 @@ void placeTakeClips (Song& song, const std::vector<TakeFile>& files, const std::
                 if (top < 0)
                 {
                     top = track;
-                    linkTakeTrack (song, track, insert);
+                    linkTakeTrack (song, track, linkTo);
                 }
                 else
                     contiguous = contiguous && track == previous + 1;
@@ -951,7 +976,8 @@ std::string journalText (const Journal& j)
     std::ostringstream s;
     s.precision (17);
     s << "lynxrec=1\nwav=" << j.wav << "\nfirstTick=" << j.firstTick << "\nticksPerSample=" << j.ticksPerSample << "\nsampleRate=" << j.sampleRate
-      << "\nlatency=" << j.latency << "\ninsert=" << j.insert << "\nplaylistTrack=" << j.playlistTrack << "\nproject=" << j.project << "\n";
+      << "\nlatency=" << j.latency << "\ninsert=" << std::max (0, j.insert) << "\nplaysThrough=" << j.insert << "\nplaylistTrack=" << j.playlistTrack
+      << "\nproject=" << j.project << "\n";
     return s.str();
 }
 
@@ -959,7 +985,7 @@ bool parseJournal (const std::string& text, Journal& j)
 {
     std::istringstream in (text);
     std::string line;
-    bool any = false;
+    bool any = false, through = false;
     while (std::getline (in, line))
     {
         if (! line.empty() && line.back() == '\r')
@@ -982,8 +1008,10 @@ bool parseJournal (const std::string& text, Journal& j)
                 j.sampleRate = std::stod (v);
             else if (key == "latency")
                 j.latency = std::stoi (v);
-            else if (key == "insert")
-                j.insert = std::stoi (v);
+            else if (key == "insert" && ! through) // (older journals: 0 = a new insert)
+                j.insert = std::stoi (v) > 0 ? std::stoi (v) : -1;
+            else if (key == "playsThrough")
+                j.insert = std::stoi (v), through = true;
             else if (key == "playlistTrack")
                 j.playlistTrack = std::stoi (v);
             else if (key == "project")
