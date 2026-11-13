@@ -6,6 +6,7 @@
 #include "ui/GamepadInput.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
+#include "core/AutoScanPolicy.h"
 #include "core/DrawMode.h"
 #include "core/SessionKeys.h"
 #include "core/EditorLimit.h"
@@ -816,9 +817,9 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
 
     // new or updated plugins since the last run: an incremental scan in the background (unchanged files are
     // skipped), a few seconds after start so it doesn't compete with loading; the first run asks in the wizard
-    if (persistent && setupWizardDone() && backgroundScanAtStart() && platform::testMode())
+    if (autoscan::atStartup (persistent, setupWizardDone(), backgroundScanAtStart()) && platform::testMode())
         platform::testModeLog ("background plugin scan at start");
-    else if (persistent && setupWizardDone() && backgroundScanAtStart())
+    else if (autoscan::atStartup (persistent, setupWizardDone(), backgroundScanAtStart()))
         juce::Timer::callAfterDelay (4000, [safe = juce::Component::SafePointer<MainComponent> (this)] {
             if (safe != nullptr)
                 safe->engine.getPluginHost().startBackgroundScan();
