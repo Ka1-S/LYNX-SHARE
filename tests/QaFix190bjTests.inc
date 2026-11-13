@@ -58,7 +58,8 @@ TEST (qafix190bj_channel_freeze_has_its_own_translation)
     }
     const auto rack = readFile ("src/ui/ChannelRackComponent.cpp"), grid = readFile ("src/ui/ClipGridComponent.cpp");
     CHECK (rack.find ("trc (\"@channel: Freeze\")") != std::string::npos);
-    CHECK (grid.find ("trc (\"@channel: Freeze\")") != std::string::npos);
+    // (round 190ff: the clip grid's column menu has the reference's own "Freeze Track", a key of its own)
+    CHECK (grid.find ("tr (\"Freeze Track\")") != std::string::npos);
     CHECK (grid.find ("menu.addItem (tr (\"Freeze\")") == std::string::npos);
 }
 
