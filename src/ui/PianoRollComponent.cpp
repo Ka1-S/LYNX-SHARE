@@ -3309,6 +3309,9 @@ void PianoRollComponent::openMidiTools()
                 t.pattern = safe->engine.getSong().currentPattern;
                 t.indices = safe->midiToolNotes (t.selected);
                 t.grid = safe->midiToolGrid();
+                t.from = safe->timeSelectionFrom(); // round 190fm: Generate writes into the time selection
+                t.to = safe->timeSelectionTo();
+                t.channel = safe->engine.getSelectedChannel();
             }
             return t;
         },
