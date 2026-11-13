@@ -615,6 +615,7 @@ const EffectInfo& kilnInfo();
 const EffectInfo& fretInfo();
 const EffectInfo& shellInfo();
 const EffectInfo& strikeInfo(); // round trans189d: Strike Shaper (core/StrikeShaper.h)
+const EffectInfo& anvilInfo();  // round 190fk: Anvil Bus (core/AnvilBus.h)
 
 std::string paramText (EffectKind kind, int param, float v);
 std::unique_ptr<Effect> make (EffectKind kind);

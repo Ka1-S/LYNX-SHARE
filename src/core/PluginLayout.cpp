@@ -2332,6 +2332,34 @@ Layout strikeLayout()
     return l;
 }
 
+// round 190fk: Anvil Bus, LYNX's drum-bus processor. The generic layout: DRIVE (type keys, Drive big, Crunch, Damp) on
+// the left, TRANSIENTS big in the middle, BOOM (amount big, frequency, decay) on the right, Comp, Trim, Output and Dry/Wet
+// along the bottom (the editor, ui/ProEditors.cpp AnvilEditor, draws the forged-steel look)
+Layout anvilLayout()
+{
+    Layout l;
+    l.width = 600;
+    l.height = 330;
+    auto& v = l.items;
+    v.push_back (section (4, 4, 196, 250, TR_NOOP ("Drive")));
+    v.push_back (tabs (16, 30, 172, 22, "Drive type", TR_NOOP ("Soft|Medium|Hard"), { 0.0f, 0.5f, 1.0f }));
+    v.push_back (dial (102, 100, 64, "Drive", TR_NOOP ("Drive"), big));
+    v.push_back (dial (56, 196, 36, "Crunch", TR_NOOP ("Crunch")));
+    v.push_back (dial (148, 196, 36, "Damp", TR_NOOP ("Damp")));
+    v.push_back (section (204, 4, 192, 250, TR_NOOP ("Transients")));
+    v.push_back (dial (300, 110, 80, "Transients", TR_NOOP ("Transients"), bipolar | big));
+    v.push_back (section (400, 4, 196, 250, TR_NOOP ("Boom")));
+    v.push_back (dial (498, 100, 64, "Boom", TR_NOOP ("Boom"), big));
+    v.push_back (dial (452, 196, 36, "Boom freq.", TR_NOOP ("Freq.")));
+    v.push_back (dial (544, 196, 36, "Boom decay", TR_NOOP ("Decay")));
+    v.push_back (section (4, 258, 592, 68, "", boxed));
+    v.push_back (toggle (24, 278, 80, 26, "Comp", TR_NOOP ("Comp")));
+    v.push_back (dial (220, 280, 28, "Trim", TR_NOOP ("Trim")));
+    v.push_back (dial (360, 280, 28, "Output", TR_NOOP ("Output")));
+    v.push_back (dial (500, 280, 28, "Dry/Wet", TR_NOOP ("Dry/Wet")));
+    return l;
+}
+
 // round tp172c8: Shell Channel, LYNX's drum channel strip (its role: the drum channel strip measured on the SSL Native
 // Drumstrip trial). The generic layout: input column, GATE and TRANSIENT SHAPER on top, the LOW / HIGH FREQ ENHANCERS and
 // the LISTEN MIC COMPRESSOR below, the process order under them, output column
@@ -4017,7 +4045,7 @@ const std::vector<EffectKind>& flLayoutKinds()
 const std::vector<EffectKind>& ownLayoutKinds()
 {
     static const std::vector<EffectKind> kinds { EffectKind::ridgeStrip, EffectKind::glowLeveler, EffectKind::hushDeEsser,
-                                                 EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::epochVerb, EffectKind::atrium,
+                                                 EffectKind::aether, EffectKind::ember, EffectKind::kilnChannel, EffectKind::fretChannel, EffectKind::shellChannel, EffectKind::strikeShaper, EffectKind::anvilBus, EffectKind::epochVerb, EffectKind::atrium,
                                                  EffectKind::foilPlate, EffectKind::nebula, EffectKind::halo, EffectKind::horizon,
                                                  EffectKind::echoform, EffectKind::spiralEcho, EffectKind::orbit, EffectKind::latticeMod,
                                                  EffectKind::crestCompressor, EffectKind::prismMultiband, EffectKind::sentryGate,
@@ -4105,6 +4133,7 @@ const Layout& layoutFor (EffectKind kind)
         case EffectKind::fretChannel: l = fretLayout(); break;
         case EffectKind::shellChannel: l = shellLayout(); break;
         case EffectKind::strikeShaper: l = strikeLayout(); break;
+        case EffectKind::anvilBus: l = anvilLayout(); break;
         case EffectKind::epochVerb: l = captionsAbove (epochVerbLayout()); break;
         case EffectKind::atrium: l = captionsAbove (atriumLayout()); break;
         case EffectKind::foilPlate: l = captionsAbove (foilPlateLayout()); break;

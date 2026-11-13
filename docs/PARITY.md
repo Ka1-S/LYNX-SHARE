@@ -3313,3 +3313,23 @@ at Drive 15 / fast tape a hard ceiling (−0.6 / −5.3 / −10.5 dB at −15 / 
 loses 2.7 dB flat at default and stays almost linear at Drive 15: Ember's own Tape curve cannot be fitted to that
 law. A tape style with a level-dependent ceiling (hysteresis core) is the next step there.
 Tools and tables: `/mnt/e/lynx-work/vqe190dp` (`bank.sh`, `gate.py`, `vsx/`, `qfit/`, `qv/`, `ember/`, `golden/`).
+
+## Round 190fk: Anvil Bus — LYNX's drum-bus engine in the role of Ableton Live's Drum Buss
+
+Owner decision O20: Live's Drum Buss colours even at its all-zero setting, so it imports onto a dedicated engine
+instead of the round-190ek rack (Ember → Facet → Crest → Shell; projects that hold the rack keep it). Anvil Bus is a
+built-in effect (mixer menu, eight factory presets, generic editor in its own forged-gunmetal theme, 14 languages).
+Laws from LYNX's own analysis of Live 12.4.16's renders (round 190ei); nothing of Live's is used.
+
+| Item | Live's Drum Buss | Anvil Bus | |
+|---|---|---|---|
+| Controls | Drive, type (3), Crunch, Damp, Transients, Boom amount / freq / decay, Comp, Trim, Output, Dry/Wet | the same twelve, Live's ranges (Output to +12 dB) | ✅ |
+| Boom audition / Force to note | yes | not built (the import lists audition) | ❌ |
+| Colour at zero | EQ "smile" + soft saturation | the same (fitted, noise TF rms 0.22 dB) | ✅ |
+| Drive curves | Soft folds, Medium / Hard clip with their EQ | fitted per type and amount (staircase level rms 0.04 … 0.46 dB; Soft's fold null −40 vs −130 dBFS) | ⚠️ |
+| Comp | fixed ≈ 4 : 1, +11 dB | the same (staircase 0.09 dB, drums 0.73 dB) | ✅ |
+| Transients | attack + sustain above the lows | Strike's detector above 330 Hz (drums 1.1 … 2.4 dB) | ⚠️ |
+| Latency | 188 samples | 55 samples (rack: 254) | ✅ |
+
+Before → after on Live's 31 Drum Buss renders (headline error, rack → engine): mean 2.13 → 1.19 dB, no case worse;
+per case in `/mnt/e/lynx-work/drumbus190fk/HANDOFF.md`.

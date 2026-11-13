@@ -1137,10 +1137,11 @@ enum class EffectKind : std::uint8_t
     pocketReverb,        // Pocket Reverb, FL Studio Mobile's Reverb (module 32): FLM's 15 values
     // --- end of round 190dw
     rackMixer,       // a rack chain's mixer (round 183c, core/Rack.h): volume (Live's chain taper), pan, chain-select gain; inside racks only
-    edison           // FL's Edison (round 190cd, core/EdisonFx.h): an audio editor in the slot — records the slot's input, plays into it; its audio in samplePath
+    edison,          // FL's Edison (round 190cd, core/EdisonFx.h): an audio editor in the slot — records the slot's input, plays into it; its audio in samplePath
+    anvilBus         // LYNX's drum-bus processor (round 190fk, core/AnvilBus.h): drive (3 types), crunch, damp, transients, boom, comp; Live's Drum Buss imports onto it
 };
 // the last EffectKind (loops over every kind; update when one is appended)
-constexpr EffectKind lastEffectKind = EffectKind::edison;
+constexpr EffectKind lastEffectKind = EffectKind::anvilBus;
 
 // round 165x: 160 → 192 (Ember had reached 160; a slot's parameters are 768 bytes, project files store only an engine's
 // own count, so older projects load unchanged). Round 150: 128 → 160 (Prism Multiband 155, Ember 133).

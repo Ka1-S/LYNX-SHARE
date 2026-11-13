@@ -13,6 +13,7 @@
 #include "core/LrCrossover.h"
 #include "core/ParametricEqLinear.h"
 #include "core/StrikeShaper.h"
+#include "core/AnvilBus.h"
 #include "core/VoiceMatch.h"
 #include "core/VoxStrip.h"
 
@@ -3822,11 +3823,13 @@ std::unique_ptr<Effect> makeHush (const EffectParams* params) { return std::make
 std::unique_ptr<Effect> makeFret();  // round tp172c8 (core/StripSuite.inc)
 std::unique_ptr<Effect> makeShell();
 std::unique_ptr<Effect> makeStrike(); // round trans189d (core/StrikeSuite.inc)
+std::unique_ptr<Effect> makeAnvil(); // round 190fk (core/AnvilSuite.inc)
 bool isSuiteKind (EffectKind kind) noexcept
 {
     return kind == EffectKind::ridgeStrip || kind == EffectKind::glowLeveler || kind == EffectKind::hushDeEsser
            || kind == EffectKind::aether || kind == EffectKind::ember || kind == EffectKind::kilnChannel
-           || kind == EffectKind::fretChannel || kind == EffectKind::shellChannel || kind == EffectKind::strikeShaper;
+           || kind == EffectKind::fretChannel || kind == EffectKind::shellChannel || kind == EffectKind::strikeShaper
+           || kind == EffectKind::anvilBus;
 }
 
 std::unique_ptr<Effect> make (EffectKind kind)
@@ -3842,6 +3845,7 @@ std::unique_ptr<Effect> make (EffectKind kind)
         case EffectKind::fretChannel: return makeFret();
         case EffectKind::shellChannel: return makeShell();
         case EffectKind::strikeShaper: return makeStrike();
+        case EffectKind::anvilBus: return makeAnvil();
         default: return nullptr;
     }
 }
@@ -3874,6 +3878,7 @@ std::string onOff (float v) { return on (v) ? "on" : "off"; }
 
 #include "core/StripSuite.inc" // round tp172c8: Fret Channel, Shell Channel
 #include "core/StrikeSuite.inc" // round trans189d: Strike Shaper
+#include "core/AnvilSuite.inc" // round 190fk: Anvil Bus
 
 namespace glow
 {
@@ -4004,6 +4009,8 @@ std::string paramText (EffectKind kind, int param, float v)
         return shellParamText (param, v);
     if (kind == EffectKind::strikeShaper)
         return strikeParamText (param, v);
+    if (kind == EffectKind::anvilBus)
+        return anvilParamText (param, v);
     if (kind == EffectKind::kilnChannel)
     {
         namespace k = kiln;

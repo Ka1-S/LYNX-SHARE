@@ -393,7 +393,7 @@ exists yet: every law that is not plain unit maths is [ASSUMED] and listed in th
 | Live device (tag) | LYNX | Translated | Listed in the report |
 |---|---|---|---|
 | EQ Three (`FilterEQ3`) | Prism Multiband, 3 bands, minimum-phase (the crossover sum), no dynamics | FreqLo / FreqHi → crossovers, Slope → 24 / 48 dB/oct, GainLo / Mid / Hi (linear) → band levels (dB), kill switches and −inf gains → the bands that still sound are soloed | the pair (fitted), gains under −30 dB, all bands off (Prism's lowest output) |
-| Drum Buss (`DrumBuss`) | an Audio Effect Rack "Drum Buss": Ember Saturator → Facet EQ → Crest Compressor (with Comp on) → Shell Channel, plus a "Dry" chain when Dry/Wet is under 100 % or can move (refit to Live's renders in round 190ek, §19) | Drive and its type → Ember's Pentode voicing at the measured small-signal gain per type and amount (+ the type's own EQ: Medium a bell, Hard a low shelf, in proportion to the drive); the device's own colour → three Facet bells and the output; Damping → Ember's 6 dB/oct high cut; Input Trim → Ember's input; Crunch → its mid band (two Facet shelves under the output's lift); Boom → a Facet bell at the Boom frequency and a resonant 12 dB/oct high pass (decay sets their gain / Q / place); Comp → Crest at 4 : 1, −19 dB, 1 / 200 ms, +11 dB; Transients → Shell's transient shaper (Amount, Invert below 0); Output → Shell's output; Dry/Wet → the chains' volumes. The rack's macros (Drive, Crunch, Damping, Transients, Boom, Boom Freq, Trim, Output, Dry/Wet) run through the imported values: Live's envelopes and macros reach them | every fitted part, the type's EQ at other drives, Boom's tail, Crunch's distortion, the transient shaper's tail lift, Soft's wave folding, negative transients under automation |
+| Drum Buss (`DrumBuss`) | **Anvil Bus**, LYNX's own drum-bus engine (round 190fk, §21; until then a rack "Drum Buss": Ember Saturator → Facet EQ → Crest Compressor → Shell Channel, which projects that already hold it keep) | every control one to one: Drive / Drive type / Crunch / Damping / Transients / Boom amount, frequency, decay / Comp / Input Trim / Output / Dry/Wet → the engine's own; Live's envelopes and macros on them reach the engine through `links` | Boom audition (listed); drive amounts between 0 / 25 / 50 / 100 %, the type EQ below 100 %, Boom and Crunch away from 0.5 are interpolated / scaled (reported) |
 | Auto Filter's LFO / envelope follower / side chain | a Peak Controller (FL's internal-controller link) in front of the Filter — or at the end of the side-chain source track's insert — whose output 0 (peak + LFO) drives the Filter's cutoff through a 33-point curve | LFO rate (Hz at the set's tempo, or synced), shape, phase offset, amount; the follower's amount and release (a straight fall); the cutoff's base | amounts (law assumed), the follower's attack, stereo LFO offset, falling saw, inside a rack (no link possible) |
 | Operator (`Operator`) | the built-in synth, only when no FM is in use: operator A alone (B … D off or at −inf), or algorithm 11's carriers (≤ 3) | waveforms Sine (0), White noise (21), User (22 → the synth's harmonic table), coarse / fine ratio → pitch, volume, A's envelope (ms → s), filter, glide, global volume / pan | the pair (fitted), envelope levels / slopes / loop, LFO, pitch envelope, spread, tone; with FM the device stays unsupported ("FM synthesis: no LYNX engine for it yet") |
 | Drift (`Drift`) | the built-in synth | oscillator 1 / 2 types → nearest waves, transposes, detune, levels, noise; filter I / II (12 dB / 24 dB ladder), frequency, resonance, key tracking; envelope 1 (amp ADSR); voice mode mono; glide; volume | the pair (fitted), shape, high pass, envelope 2 / LFO / cycling envelope / matrix, drift, stereo / unison voices |
@@ -468,3 +468,26 @@ envelope; volume, pan, transpose, reverse; one sample part per zone or the sampl
 `AlsExportOptions::sampleFormat`). Live's Slicing defaults (Defaults/Slicing) hold one `DrumBranchPreset` each: "Default"
 is a Classic Simpler with a 50 ms release, one voice, `ChokeGroup` 1; the drum ones are One-Shot, polyphonic, no choke;
 LYNX's Slice to Drum Rack templates follow those facts with its own names.
+
+## 21. Drum Buss on its own engine: Anvil Bus (round 190fk, 2026-11-13)
+Owner decision O20: Live's Drum Buss colours even at its all-zero setting, which the rack of §18 / §19 could not hold, so
+it now imports onto **Anvil Bus** (`core/AnvilBus.h`, LYNX's own name, look and code), a built-in effect like the others
+(mixer menu, presets, editor art, 14 languages). Laws from round 190ei's renders of Live 12.4.16 (§19), re-fitted on
+the engine (`/mnt/e/lynx-work/drumbus190fk/`: `p/dbrun.cpp` renders the engine on the same stimuli, `ana/fit.py` fits a
+constant against Live's renders with the round-190ek metrics, never letting a case get worse than the rack):
+- **Signal flow:** Trim → colour pre-emphasis (a +2.5 dB bell at 100 Hz) → Drive gain → the type's curve, 4×
+  oversampled → Damp → colour EQ (three bells), the type's EQ, Crunch's band, Boom's bell and resonant high pass →
+  Comp → Transients → Output → Dry/Wet against the raw input. Latency 55 samples (Live 188, the rack 254).
+- **Curve:** y = s (u) + (sin (k·u) / k − s (u))·m with s (u) = u / √(1 + u²) and u = the driven input: a soft
+  saturation blended with a sine folder, m and k per type at 0 / 25 / 50 / 100 % (fitted on the 1 kHz staircases:
+  level rms 0.04 … 0.46 dB). Soft at 100 % folds a 0 dBFS sine's fundamental away (Live −130 dBFS, the engine
+  −40 dBFS); Medium and Hard clip with their own EQ under the drive (Soft: −4.2 dB at 37 Hz, Medium −16.4 dB at 181 Hz,
+  Hard a +14 dB low shelf at 120 Hz, at 100 % and in proportion below; normalised at 1 kHz).
+- **Damp:** a one-pole low pass (no zero at Nyquist: the top flattens like Live's) at the set frequency.
+- **Comp:** feed-forward, stereo-linked peak detector, 4 : 1 above −18.3 dB, knee 1.2 dB, attack 0.45 ms, release
+  145 ms, +11.1 dB make-up.
+- **Transients:** the band above 330 Hz (a one-pole split) through Strike Shaper's level-independent detector; attack
+  min (15, 22.6·t) dB and sustain 19.0·t dB for t > 0, attack 14.6·|t| and sustain −22.5·|t| dB for t < 0.
+- **Boom / Crunch / colour:** §19's fits, unchanged (Boom's high pass stays at 10 Hz with Boom at 0).
+Before → after per case (the rack against the engine, same stimuli, same metrics) and what still needs a live render:
+`/mnt/e/lynx-work/drumbus190fk/HANDOFF.md`.
