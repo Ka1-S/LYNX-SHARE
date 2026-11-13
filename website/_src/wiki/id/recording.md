@@ -1,5 +1,5 @@
 ---
-source: 0d51822a6b
+source: 094cbefd18
 ---
 ![Jendela Rekaman menanyakan apa yang direkam: audio, not dan otomasi, semuanya, atau audio ke editor audio](/assets/img/wiki/record-dialog.webp)
 
@@ -16,6 +16,17 @@ Tombol rekam di transport, atau tombol `R`, menyalakan perekaman. Pada pertama k
 7. Tekan stop. Take-nya menjadi clip audio di Playlist.
 
 `Shift+R` melakukan langkah 4 sampai 6 dengan satu tombol: menyiagakan insert terpilih, merekam hanya audio, dan memulai pemutaran. Tekan lagi untuk berhenti.
+
+Saat kamu memilih input untuk insert yang merekam lebih dari input itu (channel lain yang mengirim ke sana juga direkam), LYNX SHARE bertanya, seperti FL Studio, apakah akan beralih ke `Hanya input eksternal`. Jawab `Ya` untuk merekam input itu saja pada insert tersebut.
+
+## Perekaman audio satu klik
+
+`Alat › Rekaman audio sekali klik` memulai take dalam satu langkah, seperti di FL Studio. Ia bekerja pada insert mixer yang dipilih. Jika Master dipilih atau tidak ada yang dipilih, ia mengambil insert pertama yang punya input, atau jika tidak ada, insert yang kosong.
+
+| Perintah | Fungsinya |
+|---|---|
+| `Ke editor/perekam audio Edison` | Menaruh Edison di insert, diatur untuk merekam saat pemutaran dimulai, dan memulai pemutaran. Lihat [Mixer](/wiki/mixer/) |
+| `Ke playlist sebagai klip audio` | Beralih ke mode Song, meng-arm insert, menanyakan inputnya jika belum ada, dan memulai perekaman dan pemutaran. Insert yang sudah di-arm merekam apa adanya |
 
 ## Yang ditawarkan jendela Rekaman
 
@@ -59,7 +70,7 @@ Opsinya ada di `Opsi › Rekaman` dan di menu klik kanan tombol rekam.
 
 | Perintah | Tombol | Fungsinya |
 |---|---|---|
-| `Hitungan awal` | `Ctrl+P` | Mati, 1 bar, 2 bar, atau 4 bar metronom sebelum rekaman dimulai |
+| `Hitungan awal` | `Ctrl+P` | Off, 1 bar, 2 bar, atau 4 bar metronom sebelum rekaman dimulai. `Ctrl+P` beralih antara off dan panjang yang terakhir kamu pilih. Pilihan ini tersimpan saat kamu menutup program; instalasi baru dimulai dengan 1 bar, seperti FL Studio |
 | `Metronom` | `Ctrl+M` | Klik selama memutar |
 | `Tunggu not pertama untuk mulai` | `Ctrl+I` | Rekaman menunggu sampai kamu bermain |
 | `Rekam berulang` | tidak ada | Rekaman berulang, bukan berjalan terus |
@@ -70,7 +81,17 @@ Opsinya ada di `Opsi › Rekaman` dan di menu klik kanan tombol rekam.
 
 `Latensi rendah saat merekam` ada di menu klik kanan tombol rekam dan di menu insert Mixer di bawah `Perekaman ke disk`. Secara bawaan mati. Selama insert yang punya input sedang di-arm, atau monitoring-nya `Aktif`, efek yang menambah latensi di jalurnya menuju Master dilewati. Ini hanya mengubah apa yang kamu dengar: insert tetap memakai semua efeknya saat take diambil setelah efek-efek itu, misalnya dengan `Setelah efek`. Efeknya kembali saat insert di-disarm.
 
+`Kompensasi latensi` ada di menu `Perekaman ke disk` yang sama dan menyala secara bawaan, seperti di FL Studio. Ia menggeser tiap take mundur sebesar round trip perangkat audio, nilai `Penyesuaian halus (sample)` pada pengaturan audio, dan kompensasi delay plugin. Matikan untuk mempertahankan take di tempat ia direkam.
+
 `Alat › Batalkan perekaman` membuang apa yang ditulis putaran rekaman saat ini (not, otomasi, dan take audionya) dan mematikan perekaman. Pemutaran terus berjalan dan insert yang di-arm tetap di-arm.
+
+## Merekam ke slot clip
+
+Dalam [alur kerja Clip-launch](/wiki/layouts/), take bisa masuk ke grid clip, bukan ke Playlist, seperti di Ableton Live.
+
+- Arm sebuah track dengan tombol arm-nya di mixer Session. Slot kosongnya lalu menampilkan tombol rekam bulat sebagai ganti kotak stop. Klik salah satu untuk merekam ke slot itu.
+- `Rekaman Sesi`, di bawah grid, merekam track yang di-arm ke scene terpilih. Selama clip mereka diputar, not baru ditambahkan ke dalamnya (overdub).
+- `Durasi rekaman tetap`, di menu slot kosong, mengakhiri rekaman ke slot setelah 1 bar atau lebih, dan clip terus diputar. `Mati` merekam sampai kamu berhenti.
 
 ## Rekam loop dan take
 

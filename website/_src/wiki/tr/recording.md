@@ -1,5 +1,5 @@
 ---
-source: 0d51822a6b
+source: 094cbefd18
 ---
 ![Kayıt penceresi ne kaydedileceğini soruyor: ses, notalar ve otomasyon, her şey ya da ses editörüne ses](/assets/img/wiki/record-dialog.webp)
 
@@ -16,6 +16,17 @@ Aktarımdaki kayıt düğmesi ya da `R` tuşu kaydı açar. İlk seferde bir pen
 7. Durdur'a basın. Kayıt, Playlist'te bir ses klibidir.
 
 `Shift+R` 4'ten 6'ya kadar olan adımları tek tuşta yapar: seçili insert'i kayda hazırlar, yalnızca ses kaydeder ve çalmayı başlatır. Durdurmak için yeniden basın.
+
+Bir insert için girişten fazlasını kaydeden bir giriş seçtiğinizde (ona gönderen diğer kanallar da kaydedilir), LYNX SHARE FL Studio'nun yaptığı gibi `Yalnızca harici giriş` olarak değiştirmek isteyip istemediğinizi sorar. O insert'te girişi tek başına kaydetmek için `Evet` yanıtını verin.
+
+## Tek tıkla ses kaydı
+
+`Araçlar › Tek tıkla ses kaydı` FL Studio'daki gibi bir kaydı tek adımda başlatır. Seçili mixer insert'i üzerinde çalışır. Master veya hiçbiri seçili değilse girişi olan ilk insert'i, o da yoksa boş bir insert'i alır.
+
+| Komut | Ne yapar |
+|---|---|
+| `Edison ses düzenleyici/kaydediciye` | Edison'ı insert'e koyar, çalma başlayınca kaydedecek şekilde ayarlar ve çalmayı başlatır. Bkz. [Mixer](/wiki/mixer/) |
+| `Ses klibi olarak çalma listesine` | Song moduna geçer, insert'i arm eder, girişi yoksa sorar ve kaydı ile çalmayı başlatır. Zaten arm edilmiş insert'ler olduğu gibi kaydeder |
 
 ## Kayıt penceresinin sunduğu seçenekler
 
@@ -59,7 +70,7 @@ Seçenekler `Seçenekler › Kayıt` içinde ve kayıt düğmesinin sağ tık me
 
 | Komut | Tuş | Ne yapar |
 |---|---|---|
-| `Geri sayım` | `Ctrl+P` | Kayıt başlamadan önce Off, 1 ölçü, 2 ölçü veya 4 ölçü metronom |
+| `Geri sayım` | `Ctrl+P` | Kayıt başlamadan önce Off, 1 ölçü, 2 ölçü veya 4 ölçü metronom. `Ctrl+P` kapalı ile en son seçtiğiniz uzunluk arasında geçiş yapar. Seçim program kapatılınca korunur; yeni bir kurulum FL Studio'daki gibi 1 ölçü ile başlar |
 | `Metronom` | `Ctrl+M` | Çalarken tık sesi |
 | `Başlamak için ilk notayı bekle` | `Ctrl+I` | Kayıt siz çalana kadar bekler |
 | `Döngülü kayıt` | yok | Kayıt devam etmek yerine döngüye girer |
@@ -70,7 +81,17 @@ Seçenekler `Seçenekler › Kayıt` içinde ve kayıt düğmesinin sağ tık me
 
 `Kayıt sırasında düşük gecikme`, kayıt düğmesinin sağ tık menüsünde ve Mixer'ın insert menüsünde `Diske kayıt` altındadır. Varsayılan olarak kapalıdır. Girişi olan bir insert kayda hazırken veya izlemesi `Açık` iken, Master'a giden yolda gecikme ekleyen efektler devre dışı bırakılır. Bu yalnızca duyduğunuzu değiştirir: kayıt efektlerden sonra alınıyorsa, örneğin `Efektlerden sonra` ile, insert tüm efektlerini korur. İnsert'in kayda hazırlığı kaldırılınca efektler geri gelir.
 
+`Gecikme telafisi` aynı `Diske kayıt` menüsündedir ve FL Studio'daki gibi varsayılan olarak açıktır. Her kaydı ses aygıtının gidiş dönüş süresi, ses ayarlarındaki `İnce ayar (sample)` değeri ve eklentilerin gecikme telafisi kadar geri alır. Kayıtları kaydedildikleri yerde tutmak için kapatın.
+
 `Araçlar › Kaydı iptal et`, geçerli kayıt geçişinin yazdıklarını (notalarını, otomasyonunu ve ses kayıtlarını) atar ve kaydı kapatır. Çalma sürer ve kayda hazır insert'ler hazır kalır.
+
+## Klip slotlarına kayıt
+
+[Klip başlatma iş akışında](/wiki/layouts/) kayıtlar, Ableton Live'daki gibi Playlist yerine klip gridine gidebilir.
+
+- Session mixer'daki arm düğmesiyle bir izi arm edin. Boş slotları durdurma karesi yerine yuvarlak bir kayıt düğmesi gösterir. O slota kaydetmek için birine tıklayın.
+- Grid'in altındaki `Oturum Kaydı`, arm edilmiş izleri seçili sahneye kaydeder. Klipleri çalarken yeni notalar onlara eklenir (overdub).
+- Boş bir slotun menüsündeki `Sabit kayıt uzunluğu`, bir slota kaydı 1 veya daha fazla ölçü sonra bitirir ve klip çalmaya devam eder. `Kapalı` siz durdurana kadar kaydeder.
 
 ## Döngülü kayıt ve kayıtlar
 

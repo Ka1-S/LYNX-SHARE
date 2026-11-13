@@ -1,5 +1,5 @@
 ---
-source: a06504f3a0
+source: d2bebc77b1
 ---
 ![De MIDI-pagina van de instellingen: ingangsapparaten, uitgangsapparaten met master sync, en externe sync](/assets/img/wiki/settings-midi.webp)
 
@@ -36,7 +36,9 @@ De koppeling wordt met het project opgeslagen. Om haar te verwijderen klik je op
 
 | Opdracht | Toets | Wat het doet |
 |---|---|---|
-| `Override global link...` | none | Maakt een koppeling die in elk project werkt. Ze wordt in de instellingen bewaard, niet in het project |
+| `Koppelen aan controller...` | geen | Opent het venster `Instellingen voor afstandsbediening` voor de regelaar, waar je de koppeling ervan met de hand ziet en instelt (hieronder) |
+| `Globale koppeling overschrijven...` | none | Maakt een koppeling die in elk project werkt. Ze wordt in de instellingen bewaard, niet in het project |
+| `Globale koppeling overschrijven... (voor alle projecten: beweeg een knop op de controller)` | geen | Maakt in één stap een globale koppeling: beweeg daarna de hardwareregelaar. Het item zonder de haakjes opent in plaats daarvan het venster `Instellingen voor globale koppeling` |
 | `Globale koppeling verwijderen` | none | Verwijdert haar weer |
 | `Multilink naar controllers` | `Ctrl+J` | Zolang dit aan staat, worden de regelaars die je beweegt in volgorde gekoppeld aan de hardwareregelaars die je daarna beweegt. Het staat in het menu `Opties` |
 | `Pickup (takeover-modus)` | none | Op de MIDI-pagina. Een controller beweegt een parameter pas nadat hij de huidige waarde heeft bereikt, zodat niets springt |
@@ -44,6 +46,22 @@ De koppeling wordt met het project opgeslagen. Om haar te verwijderen klik je op
 De MIDI-pagina toont de koppelingen onder `Koppelingen (project, dan globaal)`. Een apparaat waarvan `Type controller` op `Generieke controller` staat, doet alleen wat je met de hand koppelt.
 
 De parameters van een plugin van derden bereik je via `Pluginparameter automatiseren` in het menu van het kanaal of het menu van het effectslot. Elke parameter daar heeft dezelfde koppelitems. Zie [Automation](/wiki/automation/).
+
+## Instellingen voor afstandsbediening
+
+`Koppelen aan controller...` opent dit venster, zoals in FL Studio. `Instellingen voor globale koppeling` (uit `Globale koppeling overschrijven...`) heeft dezelfde velden behalve de koppelingenlijst, `Omni`, de interne controller en `Conflicten verwijderen`. Een dubbelklik op een koppeling in de lijst van de MIDI-pagina opent het ook.
+
+| Instelling | Wat het doet |
+|---|---|
+| `Poort`, `Kanaal`, `Ctrl` | Het poortnummer van de MIDI-ingang, het MIDI-kanaal en het controllernummer. Klik met rechts op `Ctrl` voor de standaardcontrollers bij naam. `Noot C0` in die lijst maakt een notenkoppeling: draai het nummer vanaf daar omhoog voor een andere toets |
+| `Automatisch detecteren` | Standaard aan. Beweeg een regelaar op je apparaat en de nummers worden ingevuld |
+| `Omni` | De koppeling volgt het geselecteerde kanaal, of voor een effect in een mixerslot, de geselecteerde mixertrack |
+| `Modus` | Hoe een noot- of knopkoppeling werkt. `Standaard` en `Hold` volgen de toets: zijn velocity zolang hij is ingedrukt, nul bij het loslaten. `Latch` schakelt bij elke druk tussen de twee uiteinden. `Inc` verhoogt de waarde bij elke druk. `Blijven` stelt de velocity in en houdt die na het loslaten vast |
+| Internal controller | Koppelt de regelaar in plaats daarvan aan een van de interne controllers van het project. Alleen zichtbaar wanneer het project er een heeft. Met `Automatisering opnemen` kunnen de bewegingen van die controller als automatisering worden opgenomen |
+| `Mappingformule` | Hoe de ingang op de regelaar wordt afgebeeld, met de variabele `Ingang`. `Presets` heeft de lijst formules van FL. Druk op `Enter` om een getypte formule toe te passen. De curve ernaast toont het resultaat |
+| `Afvlakking` | Maakt de bewegingen van de regelaar vloeiender. `Tijd` bepaalt hoe lang: 1 pool voor negatieve waarden, 3 polen voor positieve |
+| `Conflicten verwijderen` | Standaard aan. Verwijdert andere koppelingen die dezelfde controller gebruiken wanneer je op `Accepteren` klikt. Het wordt rood zolang zo'n koppeling bestaat |
+| `Reset`, `Overslaan`, `Accepteren` | `Accepteren` bewaart de koppeling (één stap voor ongedaan maken). Met meerdere regelaars in de wachtrij door multilink gaat `Overslaan` naar de volgende |
 
 ## Controllerprofielen
 
@@ -79,6 +97,16 @@ MPE zit in een eerste fase. Een MPE-controller speelt elke noot met zijn eigen p
 - Van de ingebouwde instrumenten volgen de Sampler en de ingebouwde synth deze waarden.
 - Een plugin van derden ontvangt MPE als `MPE` aan staat onder `MIDI` in de `Wrapper-instellingen` van het pluginvenster. Elke noot gaat dan uit op een eigen MIDI-kanaal, 2 tot 16.
 - Het is nog niet uitgeprobeerd met een echte MPE-controller.
+
+## MIDI Map Mode en Key Map Mode
+
+In de [Clip-launch-werkwijze](/wiki/layouts/) kunnen clips, scenes en knoppen worden gekoppeld zoals in Ableton Live. De knoppen `MIDI` en `Toonsoort` naast de schakelaar `Beide`, `Raster`, `Song` zetten de modi aan, net als `Ctrl+M` en `Ctrl+K`.
+
+1. Druk op `Ctrl+M` voor MIDI Map Mode, of op `Ctrl+K` voor Key Map Mode. Elk element dat kan worden gekoppeld krijgt een kleur, blauw voor MIDI en oranje voor toetsen.
+2. Klik op een element: een clipslot, een scene, de stopknop van een track, `Alle clips stoppen`, play, stop, record, `Sessie-opname`, het metronoom, of een knop van de Sessiemixer of de Device View.
+3. Beweeg een regelaar of druk op een toets van je MIDI-apparaat, of druk in Key Map Mode op een computertoets. Het element toont zijn toewijzing, bijvoorbeeld `1/19` (kanaal en controller).
+4. De koppelingen staan in een lijst in plaats van de Browser: Channel, Note/Control of Key, Path, Name, Min en Max. Sleep Min of Max, of dubbelklik om een waarde te typen. Klik met rechts op een rij voor `Bereik omkeren` en `Delete`.
+5. Druk nogmaals op dezelfde toets om de modus te beëindigen.
 
 ## Het typetoetsenbord
 
@@ -116,6 +144,8 @@ MPE zit in een eerste fase. Een MPE-controller speelt elke noot met zijn eigen p
 - MIDI CC, channel aftertouch en pitch bend die naar een plugin worden gestuurd, kun je automatiseren met `MIDI-controller automatiseren (CC, aftertouch, pitch bend)`.
 - Een noot die door een pedaal wordt vastgehouden, wordt opgenomen tot het moment dat het pedaal omhoogkomt.
 - Een automation clip neemt een regelaar niet terug terwijl je hem vanaf een controller beweegt. De regelaar volgt zijn automatisering weer als het afspelen de volgende keer start.
+- Notenkoppelingen die in `Instellingen voor afstandsbediening` zijn gemaakt, worden niet naar een .flp-export geschreven.
+- `Ctrl+M` en `Ctrl+K` starten de map-modi alleen in de Clip-launch-werkwijze. Map Mode heeft nog geen macrokoppeling of notenbereiken.
 
 ## Gerelateerd
 

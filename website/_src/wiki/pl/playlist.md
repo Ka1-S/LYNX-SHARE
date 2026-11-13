@@ -1,5 +1,5 @@
 ---
-source: f245a8e1b7
+source: 1b54c6493f
 ---
 ![Playlist z klipami na ścieżkach](/assets/img/playlist.webp)
 
@@ -43,6 +43,8 @@ Litery działają, gdy pianino z klawiatury komputera (`Ctrl+T`) jest wyłączon
 - Prawy klik usuwa klip. `Ctrl`+przeciąganie zaznacza.
 - Kliknij klip dwukrotnie, aby go otworzyć.
 - Przycisk w lewym górnym rogu klipu otwiera menu klipu (uczyń unikalnym, zmień nazwę i kolor, potnij, a dla audio: wysokość, dopasuj do tempa, odwróć).
+- Menu klipu audio podąża za układem FL Studio w dwóch kolumnach. Lewa kolumna ma sekcję `Klip audio` (`Podgląd`, `Wyciszony`, `Zmień nazwę i kolor...`, `Zmień kolor...`, `Losowy kolor`, `Zmień ikonę...`, `Zaznacz kanał źródłowy`, `Ustawienia kanału`, `Uczyń unikalnym`, `Zaznacz wszystkie podobne klipy`, `Delete`, `Właściwości...`) i sekcję `Region` (`Wybierz region`, `Tnij`). Prawa kolumna ma `Sample` (`Uczyń unikalnym jako sampel`, `Edytuj sampel`, `Wyodrębnij stemy z sampla`, `Wykryj tempo`, `Dopasuj do tempa`), `Automatyka` (`Automatyzuj › Panorama` lub `Głośność`, `Przenikanie z`) i `Wejścia i wyjścia` (`Resetuj wejścia i wyjścia`). Własne pozycje LYNX SHARE, takie jak `Podziel tutaj`, `Odwróć`, `Normalizuj` i `Konwertuj na MIDI`, są na końcu, pod linią.
+- `Automatyzuj › Panorama` lub `Głośność` tworzy klip automatyzacji tak długi jak klip audio, na jego ścieżce, dla panoramy lub głośności z Levels adjustment kanału.
 - Przytrzymaj `Alt` podczas przeciągania, aby zignorować przyciąganie.
 - Klipy audio mają uchwyty fade i wzmocnienie klipu, które przeciągasz w górę lub w dół. Kliknij prawym przyciskiem uchwyt fade, żeby otworzyć jego menu z `Utwórz przenikanie`. Kliknij prawym przyciskiem uchwyt wzmocnienia, żeby dostać `Resetuj gain` i `Normalizuj`.
 - `Shift+M` przełącza Stretch: zmiana rozmiaru klipu audio rozciąga wtedy dźwięk zamiast go przycinać.
@@ -60,6 +62,10 @@ W nagłówku ścieżki klik zaznacza, `Ctrl`+klik dodaje lub usuwa, `Shift`+klik
 
 `Widok` w menu Playlisty wybiera, co pokazują nagłówki ścieżek: `Pokazuj kontrolki na ścieżkach audio`, `Pokazuj poziomy na ścieżkach audio` i `Pokazuj poziomy na ścieżkach instrumentów`.
 
+`Tryb ścieżki` w menu ścieżki ustawia ścieżkę jako `Nieprzypisana`, `Ścieżka audio` lub `Ścieżka instrumentu`, jak w FL Studio. `Ścieżka audio` wymienia najpierw `Nowe ścieżki miksera`, a potem każdy insert miksera według numeru i nazwy. Wybór dotyczy wszystkich zaznaczonych ścieżek. `Ścieżka instrumentu` ma `Użyj istniejącego kanału`, `Więcej wtyczek...` i listę instrumentów z Channel rack.
+
+Znak `+` w lewym górnym rogu nagłówków ścieżek otwiera te same wybory dla nowej ścieżki: `Dodaj ścieżkę audio`, `Więcej wtyczek...` i instrumenty. Kliknięcie `+` prawym przyciskiem od razu dodaje ścieżkę audio.
+
 ## Bloki patternów
 
 Gdy w menu Playlisty włączone jest `Bloki patternów (bieżący projekt)`, sekcja pod ścieżkami ma jeden wiersz na pattern. Tam Ołówek stawia jeden blok i przeciąga go wzdłuż wiersza, Pędzel maluje bloki, a Gumka je usuwa. Prawy przycisk myszy kasuje dowolnym narzędziem.
@@ -75,6 +81,8 @@ Gdy w menu Playlisty włączone jest `Bloki patternów (bieżący projekt)`, sek
 ## Automatyka
 
 Kliknij gałkę lub suwak prawym przyciskiem i wybierz `Utwórz klip automatyki`. Klip pojawia się na Playliście. Ołówkiem przeciągaj jego punkty, a kliknięcie na krzywej dodaje nowy. Tory automatyki pod ścieżkami są opcjonalne i domyślnie wyłączone. Zobacz [Automatyka](/wiki/automation/).
+
+Kliknij punkt prawym przyciskiem, aby zobaczyć jego menu. Jego lista `Tryb` ma 13 trybów krzywej z FL Studio dla odcinka kończącego się w tym punkcie: `Wygładź`, `Hold`, trzy krzywe pojedyncze, trzy krzywe podwójne, `Półsinus`, `Schody`, `Gładkie schody`, `Puls` i `Fala`. Nowy punkt przyjmuje ostatnio używany tryb. Tryby są odczytywane z plików .flp i do nich zapisywane.
 
 ## Aranżacje
 
@@ -109,6 +117,7 @@ Pole aranżacji na pasku narzędzi przełącza między aranżacjami. Projekt mo�
 - Playlist słychać tylko w trybie Song. W trybie Pattern `Space` gra bieżący pattern, niezależnie od tego, co leży na ścieżkach.
 - `Widok › Styl układu › Praca z uruchamianiem klipów` dodaje obok Playlisty siatkę klipów i scen. Jest opcjonalny. Zobacz [Układy](/wiki/layouts/).
 - Gdy na jednym elemencie sterującym leży kilka nakładających się klipów automatyki, wybór tego, który gra, może się różnić od FL Studio (notatki do wydania 0.1.25).
+- Jak w FL Studio, pattern gra z jednego klipu naraz. Gdy zaczyna się późniejszy klip tego samego patternu, na dowolnej ścieżce, wcześniejszy klip od tego miejsca nie startuje już żadnych nut. Klipy różnych patternów grają razem. Dotyczy to nowych projektów i projektów FL Studio. Projekt .lynx zapisany przed 0.1.27 nadal gra każdy klip w całości.
 - Tempo przesunięte przez powiązany kontroler MIDI nie zmienia rozmiaru klipów audio.
 - W Linuksie wideo wymaga FFmpeg.
 

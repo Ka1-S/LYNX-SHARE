@@ -1,5 +1,5 @@
 ---
-source: 217f097c97
+source: a73763934f
 ---
 ![Piano Roll](/assets/img/pianoroll.webp)
 
@@ -69,6 +69,18 @@ Kliknij linijkę, żeby ustawić pozycję. `Ctrl`+przeciągnięcie, przeciągni�
 ## Szansa i zakres velocity
 
 Każda nuta ma Szansę i Zakres velocity. Szansa to prawdopodobieństwo, że nuta zagra za każdym razem, gdy przychodzi jej kolej. Zakres velocity pozwala jej velocity zmieniać się między velocity nuty a tym velocity plus zakres. Wybierz `Szansa` lub `Zakres velocity (LYNX)` w polu ścieżki, żeby je edytować. `Narzędzia › Szansa (LYNX)` w menu Piano Roll grupuje zaznaczone nuty tak, że gra albo każda z nich, albo tylko jedna, i ma `Resetuj szansę i zakres velocity`.
+
+## Narzędzia nut
+
+Menu `Narzędzia` w Piano roll otwiera narzędzia nut z FL Studio jako okna dialogowe. Działają na zaznaczonych nutach albo na wszystkich nutach, gdy nic nie jest zaznaczone. Niektóre z nich:
+
+| Narzędzie | Klawisz | Co robi |
+|---|---|---|
+| Limit | `Alt+K` | Przesuwa nuty o oktawy do zakresu klawiszy, a potem je przycina. W `Ograniczenie tonacji / skali` utrzymuje nuty na klawiszu bazowym i jednym z akordów lub skal FL Studio, z `Przyciąganie` ustawionym na `Powyżej`, `Poniżej` lub `Naprzemiennie`. `Zawijaj do góry / dołu` i `Transpozycja` ustawiają, dokąd trafiają nuty spoza zakresu |
+| Flip | `Alt+Y` | `Odwróć w poziomie` odbija nuty w czasie. Z `Zachowaj czasy początku`, na początku włączonym, czasy startu są odbijane, a nuty zachowują swoje długości. `Odwróć w pionie` odbija klawisze względem środka ich zakresu |
+| Randomise | `Alt+R` | Losowe zmiany velocity, panoramy, drobnej wysokości, czasu i długości oraz Mod X, Mod Y i release |
+| Scale levels | `Alt+X` | Skaluje poziom nuty od początku do końca zaznaczenia, z `Przesunięcie`, `Środek` (wartość, wokół której skaluje) i `Napięcie` |
+| LFO | `Alt+O` | Zapisuje kształt LFO w poziomie nuty. Kliknij suwak `Okres` prawym przyciskiem, aby zobaczyć listę od 1 kroku do 512 kroków |
 
 ## Narzędzia MIDI i skrypty
 

@@ -1,5 +1,5 @@
 ---
-source: a06504f3a0
+source: d2bebc77b1
 ---
 ![La page MIDI des réglages : périphériques d'entrée, périphériques de sortie avec synchro maître, et synchro externe](/assets/img/wiki/settings-midi.webp)
 
@@ -36,7 +36,9 @@ Le lien est enregistré avec le projet. Pour le retirer, faites de nouveau un cl
 
 | Commande | Touche | Ce qu'elle fait |
 |---|---|---|
-| `Override global link...` | aucune | Crée un lien valable dans tous les projets. Il est conservé dans les réglages, pas dans le projet |
+| `Lier à un contrôleur...` | none | Ouvre la fenêtre `Réglages de la télécommande` pour le contrôle, où vous voyez et réglez sa liaison à la main (ci-dessous) |
+| `Remplacer le lien global...` | aucune | Crée un lien valable dans tous les projets. Il est conservé dans les réglages, pas dans le projet |
+| `Remplacer le lien global... (pour tous les projets : bougez un bouton du contrôleur)` | none | Crée une liaison globale en une étape : bougez ensuite le contrôle matériel. L'élément sans les parenthèses ouvre à la place la fenêtre `Réglages du lien global` |
 | `Retirer le lien global` | aucune | Le retire |
 | `Multilien vers les contrôleurs` | `Ctrl+J` | Tant qu'il est actif, les commandes que vous bougez sont liées, dans l'ordre, aux commandes du matériel que vous bougez ensuite. Il se trouve dans le menu `Options` |
 | `Reprise (mode takeover)` | aucune | Sur la page MIDI. Un contrôleur ne déplace un paramètre qu'après avoir atteint sa valeur actuelle, de sorte que rien ne saute |
@@ -44,6 +46,22 @@ Le lien est enregistré avec le projet. Pour le retirer, faites de nouveau un cl
 La page MIDI liste les liens sous `Liens (ce projet, puis globaux)`. Un périphérique dont le `Type de contrôleur` est `Contrôleur générique` ne fait que ce que vous liez à la main.
 
 Les paramètres d'un plugin tiers sont accessibles par `Automatiser un paramètre du plugin` dans le menu du canal ou le menu de l'emplacement d'effet. Chaque paramètre y a les mêmes entrées de lien. Voir [Automation](/wiki/automation/).
+
+## Réglages de la télécommande
+
+`Lier à un contrôleur...` ouvre cette fenêtre, comme dans FL Studio. `Réglages du lien global` (depuis `Remplacer le lien global...`) a les mêmes champs sauf la liste des liaisons, `Omni`, le contrôleur interne et `Supprimer les conflits`. Un double-clic sur une liaison dans la liste de la page MIDI l'ouvre aussi.
+
+| Réglage | Ce qu'il fait |
+|---|---|
+| `Port`, `Canal`, `Ctrl` | Le numéro du port d'entrée MIDI, le canal MIDI et le numéro de contrôleur. Faites un clic droit sur `Ctrl` pour les contrôleurs standard par nom. `Note C0` dans cette liste crée une liaison de note : augmentez le numéro à partir de là pour une autre touche |
+| `Détection automatique` | Activé par défaut. Bougez un contrôle de votre appareil et les numéros se remplissent |
+| `Omni` | La liaison suit le canal sélectionné, ou pour un effet dans un emplacement du Mixer, la piste du Mixer sélectionnée |
+| `Mode` | La façon dont agit une liaison de note ou de bouton. `Par défaut` et `Hold` suivent la touche : sa vélocité tant qu'elle est tenue, zéro au relâchement. `Verrouiller` bascule entre les deux extrémités à chaque pression. `Inc` fait monter la valeur d'un pas à chaque pression. `Rester` règle la vélocité et la garde après le relâchement |
+| Internal controller | Lie le contrôle à l'un des contrôleurs internes du projet à la place. Affiché seulement quand le projet en a un. `Enregistrer l'automation` permet d'enregistrer les mouvements de ce contrôleur comme automation |
+| `Formule de mappage` | La façon dont l'entrée correspond au contrôle, avec la variable `Entrée`. `Presets` propose la liste de formules de FL. Appuyez sur `Enter` pour appliquer une formule saisie. La courbe à côté montre le résultat |
+| `Lissage` | Lisse les mouvements du contrôle. `Temps` règle la durée : 1 pôle pour les valeurs négatives, 3 pôles pour les valeurs positives |
+| `Supprimer les conflits` | Activé par défaut. Supprime les autres liaisons qui utilisent le même contrôleur quand vous cliquez sur `Accepter`. Il devient rouge tant qu'une telle liaison existe |
+| `Réinitialiser`, `Passer`, `Accepter` | `Accepter` enregistre la liaison (une étape d'annulation). Avec plusieurs contrôles en file d'attente par multilink, `Passer` passe au suivant |
 
 ## Profils de contrôleur
 
@@ -79,6 +97,16 @@ Le MPE en est à un premier stade. Un contrôleur MPE joue chaque note avec son 
 - Parmi les instruments intégrés, le Sampler et le synthé intégré suivent ces valeurs.
 - Un plugin tiers reçoit le MPE quand `MPE` est activé sous `MIDI` dans les `Réglages du wrapper` de la fenêtre du plugin. Chaque note part alors sur son propre canal MIDI, de 2 à 16.
 - Il n'a pas encore été essayé avec un vrai contrôleur MPE.
+
+## MIDI Map Mode et Key Map Mode
+
+Dans le [flux par lancement de clips](/wiki/layouts/), les clips, les scènes et les boutons peuvent être mappés comme dans Ableton Live. Les boutons `MIDI` et `Tonalité` à côté du sélecteur `Les deux`, `Grille`, `Song` activent les modes, tout comme `Ctrl+M` et `Ctrl+K`.
+
+1. Appuyez sur `Ctrl+M` pour le MIDI Map Mode, ou sur `Ctrl+K` pour le Key Map Mode. Chaque élément qui peut être mappé est teinté, en bleu pour le MIDI et en orange pour les touches.
+2. Cliquez sur un élément : un emplacement de clip, une scène, le bouton d'arrêt d'une piste, `Arrêter tous les clips`, lecture, arrêt, enregistrement, `Enregistrement de session`, le métronome, ou un bouton de la table de mixage de session ou de la Device View.
+3. Bougez un contrôle ou appuyez sur une touche de votre appareil MIDI, ou appuyez sur une touche de l'ordinateur en Key Map Mode. L'élément affiche son assignation, par exemple `1/19` (canal et contrôleur).
+4. Les mappages sont listés à la place du Browser : Channel, Note/Control ou Key, Path, Name, Min et Max. Glissez Min ou Max, ou double-cliquez pour saisir une valeur. Faites un clic droit sur une ligne pour `Inverser la plage` et `Delete`.
+5. Appuyez de nouveau sur la même touche pour quitter le mode.
 
 ## Le clavier de saisie
 
@@ -116,6 +144,8 @@ Le MPE en est à un premier stade. Un contrôleur MPE joue chaque note avec son 
 - Les CC MIDI, l'aftertouch de canal et le pitch bend envoyés à un plugin peuvent être automatisés avec `Automatiser un contrôleur MIDI (CC, aftertouch, pitch bend)`.
 - Une note maintenue par une pédale est enregistrée jusqu'au moment où la pédale est relevée.
 - Un clip d'automation ne reprend pas un contrôle tant que vous le déplacez depuis un contrôleur. Le contrôle suit de nouveau son automation au prochain démarrage de la lecture.
+- Les liaisons de note créées dans `Réglages de la télécommande` ne sont pas écrites dans un export .flp.
+- `Ctrl+M` et `Ctrl+K` ne lancent les modes de mappage que dans le flux par lancement de clips. Le Map Mode n'a pas encore de mappage de macros ni de plages de notes.
 
 ## Voir aussi
 

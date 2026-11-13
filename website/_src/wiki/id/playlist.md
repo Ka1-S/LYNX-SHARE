@@ -1,5 +1,5 @@
 ---
-source: f245a8e1b7
+source: 1b54c6493f
 ---
 ![Playlist dengan clip di track](/assets/img/playlist.webp)
 
@@ -43,6 +43,8 @@ Tombol hurufnya bekerja selama piano keyboard ketik (`Ctrl+T`) mati.
 - Klik kanan menghapus clip. `Ctrl`+seret memilih.
 - Klik dua kali sebuah clip untuk membukanya.
 - Tombol di kiri atas clip membuka menu clip (jadikan unik, ganti nama dan warna, cacah, dan untuk audio: pitch, sesuaikan ke tempo, balik).
+- Menu clip audio mengikuti layout FL Studio dalam dua kolom. Kolom kiri berisi bagian `Clip audio` (`Pratinjau`, `Dibisukan`, `Ganti nama dan warna...`, `Ubah warna...`, `Warna acak`, `Ubah ikon...`, `Pilih channel sumber`, `Pengaturan channel`, `Jadikan unik`, `Pilih semua klip serupa`, `Delete`, `Properti...`) dan bagian `Region` (`Pilih region`, `Cacah`). Kolom kanan berisi `Sample` (`Jadikan unik sebagai sampel`, `Edit sampel`, `Ekstrak stem dari sample`, `Deteksi tempo`, `Sesuaikan ke tempo`), `Otomasi` (`Otomatiskan › Panning` atau `Volume`, `Crossfade dengan`) dan `Fade` (`Atur ulang fade`). Item milik LYNX SHARE sendiri, seperti `Pisah di sini`, `Balik`, `Normalisasi`, dan `Konversi ke MIDI`, ada di bagian akhir, di bawah sebuah garis.
+- `Otomatiskan › Panning` atau `Volume` membuat clip otomasi sepanjang clip audio, pada track-nya, untuk pan atau volume penyesuaian Levels channel.
 - Tahan `Alt` saat menyeret untuk mengabaikan snap.
 - Clip audio punya pegangan fade dan gain clip yang bisa kamu seret ke atas atau bawah. Klik kanan pegangan fade untuk menunya, dengan `Buat crossfade`. Klik kanan pegangan gain untuk `Reset gain` dan `Normalisasi`.
 - `Shift+M` mengganti Stretch: mengubah ukuran clip audio lalu meregangkan audionya, bukan memotongnya.
@@ -60,6 +62,10 @@ Di header track, klik memilih, `Ctrl`+klik menambah atau mencabut, `Shift`+klik 
 
 `Tampilan` di menu Playlist memilih apa yang ditampilkan header track: `Tampilkan kontrol pada trek audio`, `Tampilkan level pada trek audio`, dan `Tampilkan level pada trek instrumen`.
 
+`Mode track` di menu track menjadikan sebuah track `Belum ditetapkan`, `Track audio`, atau `Track instrumen`, seperti di FL Studio. `Track audio` mencantumkan `Trek mixer baru` terlebih dahulu lalu setiap insert mixer menurut nomor dan nama. Pilihan berlaku untuk semua track terpilih. `Track instrumen` punya `Gunakan channel yang ada`, `Plugin lainnya...`, dan daftar instrumen Channel Rack.
+
+Tanda `+` di kiri atas header track membuka pilihan yang sama untuk track baru: `Tambah trek audio`, `Plugin lainnya...`, dan instrumen. Klik kanan pada `+` langsung menambahkan track audio.
+
 ## Pattern Blocks
 
 Dengan `Blok pattern (proyek saat ini)` menyala di menu Playlist, sebuah bagian di bawah track berisi satu baris untuk tiap pattern. Di sana, Pencil menaruh satu blok dan menyeretnya di sepanjang barisnya, Brush melukis blok, dan Eraser menghapusnya. Klik kanan menghapus dengan alat apa pun.
@@ -75,6 +81,8 @@ Dengan `Blok pattern (proyek saat ini)` menyala di menu Playlist, sebuah bagian 
 ## Otomasi
 
 Klik kanan knob atau fader dan pilih `Buat clip otomasi`. Clip muncul di Playlist. Dengan Pensil, seret titik-titiknya, dan klik di kurva untuk menambah satu titik. Lajur otomasi di bawah track bersifat opsional dan mati secara default. Lihat [Otomasi](/wiki/automation/).
+
+Klik kanan sebuah titik untuk menunya. Daftar `Mode`-nya berisi 13 mode kurva FL Studio untuk segmen yang berakhir di titik itu: `Halus`, `Hold`, tiga kurva tunggal, tiga kurva ganda, `Setengah sine`, `Tangga`, `Tangga halus`, `Pulse`, dan `Gelombang`. Titik baru memakai mode yang terakhir dipakai. Mode dibaca dari dan ditulis ke file .flp.
 
 ## Aransemen
 
@@ -109,6 +117,7 @@ Kotak aransemen di toolbar berpindah antar aransemen. Sebuah proyek bisa punya b
 - Playlist hanya terdengar dalam mode Song. Dalam mode Pattern, `Space` memutar pattern saat ini, apa pun yang ada di track.
 - `Tampilan › Gaya tata letak › Alur kerja peluncuran klip` menambahkan kisi clip dan scene di samping Playlist. Ini opsional. Lihat [Tata letak](/wiki/layouts/).
 - Jika beberapa clip otomasi saling tumpang tindih pada satu kontrol, pilihan clip mana yang diputar bisa berbeda dari FL Studio (catatan rilis 0.1.25).
+- Seperti di FL Studio, sebuah pattern dimainkan dari satu clip pada satu waktu. Saat clip pattern yang sama berikutnya dimulai, di track mana pun, clip sebelumnya tidak memulai not lagi dari situ. Clip dari pattern berbeda diputar bersamaan. Ini berlaku di proyek baru dan proyek FL Studio. Proyek .lynx yang disimpan sebelum 0.1.27 tetap memutar setiap clip secara penuh.
 - Tempo yang digeser oleh kontroler MIDI yang tertaut tidak mengubah ukuran clip audio.
 - Di Linux, video membutuhkan FFmpeg.
 

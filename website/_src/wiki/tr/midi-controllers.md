@@ -1,5 +1,5 @@
 ---
-source: a06504f3a0
+source: d2bebc77b1
 ---
 ![Ayarların MIDI sayfası: giriş aygıtları, master sync'li çıkış aygıtları ve harici sync](/assets/img/wiki/settings-midi.webp)
 
@@ -36,7 +36,9 @@ Bağlantı projeyle birlikte kaydedilir. Kaldırmak için kontrole yeniden sağ 
 
 | Komut | Tuş | Ne yapar |
 |---|---|---|
-| `Override global link...` | yok | Her projede çalışan bir bağlantı kurar. Projede değil, ayarlarda saklanır |
+| `Kontrolcüye bağla...` | yok | Kontrol için `Uzaktan kontrol ayarları` penceresini açar; bağlantısını orada elle görür ve ayarlarsınız (aşağıda) |
+| `Genel bağlantıyı geçersiz kıl...` | yok | Her projede çalışan bir bağlantı kurar. Projede değil, ayarlarda saklanır |
+| `Genel bağlantıyı geçersiz kıl... (tüm projeler için: kontrolcüde bir knob oynatın)` | yok | Tek adımda genel bir bağlantı yapar: ardından donanım kontrolünü oynatın. Parantezsiz öğe bunun yerine `Genel bağlantı ayarları` penceresini açar |
 | `Genel bağlantıyı kaldır` | yok | Onu yeniden kaldırır |
 | `Denetleyicilere çoklu bağlantı` | `Ctrl+J` | Açıkken, oynattığınız kontroller sırayla, sonra oynatacağınız donanım kontrolleriyle bağlanır. `Seçenekler` menüsündedir |
 | `Pickup (devralma modu)` | yok | MIDI sayfasında. Kontrolcü, bir parametreyi ancak şu anki değerine ulaştıktan sonra oynatır; böylece hiçbir şey sıçramaz |
@@ -44,6 +46,22 @@ Bağlantı projeyle birlikte kaydedilir. Kaldırmak için kontrole yeniden sağ 
 MIDI sayfası bağlantıları `Bağlantılar (proje > genel)` altında listeler. `Kontrolcü türü` değeri `Genel denetleyici` olan bir cihaz yalnızca elle bağladığınızı yapar.
 
 Üçüncü taraf bir plugin'in parametrelerine, kanalın menüsündeki ya da efekt yuvasının menüsündeki `Plugin parametresini otomatikleştir` ile ulaşılır. Oradaki her parametrenin aynı bağlantı öğeleri vardır. Bkz. [Otomasyon](/wiki/automation/).
+
+## Uzaktan kontrol ayarları
+
+`Kontrolcüye bağla...` FL Studio'daki gibi bu pencereyi açar. `Genel bağlantı ayarları` (`Genel bağlantıyı geçersiz kıl...` ile açılır) bağlantı listesi, `Omni`, dahili kontrolcü ve `Çakışmaları kaldır` dışında aynı alanlara sahiptir. MIDI sayfasındaki listede bir bağlantıya çift tıklamak da onu açar.
+
+| Ayar | Ne yapar |
+|---|---|
+| `Port`, `Kanal`, `Ctrl` | MIDI giriş portu numarası, MIDI kanalı ve kontrolcü numarası. Standart kontrolcüleri adlarıyla görmek için `Ctrl` üzerine sağ tıklayın. O listedeki `Nota C0` bir nota bağlantısı yapar: başka bir tuş için numarayı oradan yukarı çıkarın |
+| `Otomatik algıla` | Varsayılan olarak açık. Cihazınızda bir kontrolü oynatın, numaralar kendiliğinden dolar |
+| `Omni` | Bağlantı seçili kanalı izler; bir mixer yuvasındaki efekt için seçili mixer izini izler |
+| `Mod` | Bir nota veya düğme bağlantısının nasıl davrandığı. `Varsayılan` ve `Hold` tuşu izler: basılıyken velocity'sini, bırakılınca sıfırı verir. `Kilitle` her basışta iki uç arasında geçiş yapar. `Inc` her basışta değeri bir adım yukarı çıkarır. `Kal` velocity'yi ayarlar ve bırakıldıktan sonra korur |
+| Dahili kontrolcü | Kontrolü bunun yerine projenin dahili kontrolcülerinden birine bağlar. Yalnızca projede biri varsa gösterilir. `Otomasyon kaydet`, o kontrolcünün hareketlerinin otomasyon olarak kaydedilmesini sağlar |
+| `Eşleme formülü` | Girişin kontrole nasıl eşlendiği; `Giriş` değişkeni kullanılır. `Preset'ler` FL'nin formül listesini içerir. Yazdığınız formülü uygulamak için `Enter`'a basın. Yanındaki eğri sonucu gösterir |
+| `Yumuşatma` | Kontrolün hareketlerini yumuşatır. `Zaman` süreyi belirler: negatif değerler için 1 kutup, pozitif değerler için 3 kutup |
+| `Çakışmaları kaldır` | Varsayılan olarak açık. `Kabul et`'e tıkladığınızda aynı kontrolcüyü kullanan diğer bağlantıları kaldırır. Böyle bir bağlantı varken kırmızıya döner |
+| `Sıfırla`, `Atla`, `Kabul et` | `Kabul et` bağlantıyı kaydeder (bir geri alma adımı). Multilink ile sıraya alınmış birden çok kontrol varsa `Atla` bir sonrakine geçer |
 
 ## Kontrolcü profilleri
 
@@ -79,6 +97,16 @@ MPE ilk aşamadadır. Bir MPE kontrolcüsü her notayı kendi pitch bend'i, timb
 - Dahili enstrümanlardan Sampler ve dahili synth bu değerleri izler.
 - Üçüncü taraf bir plugin, plugin penceresinin `Wrapper ayarları` bölümünde `MIDI` altındaki `MPE` açıkken MPE alır. Her nota o zaman kendi MIDI kanalından, 2 ile 16 arasında çıkar.
 - Henüz gerçek bir MPE kontrolcüsüyle denenmedi.
+
+## MIDI Map Mode ve Key Map Mode
+
+[Klip başlatma iş akışında](/wiki/layouts/) klipler, sahneler ve düğmeler Ableton Live'daki gibi eşlenebilir. `İkisi de`, `Grid`, `Song` anahtarının yanındaki `MIDI` ve `Ton` düğmeleri, `Ctrl+M` ve `Ctrl+K` gibi, modları açar.
+
+1. MIDI Map Mode için `Ctrl+M`'ye, Key Map Mode için `Ctrl+K`'ye basın. Eşlenebilen her öğe renklenir: MIDI için mavi, tuşlar için turuncu.
+2. Bir öğeye tıklayın: bir klip slotu, bir sahne, bir izin durdurma düğmesi, `Tüm klipleri durdur`, play, stop, record, `Oturum Kaydı`, metronom veya Session mixer ya da Device View'un bir düğmesi.
+3. MIDI cihazınızda bir kontrolü oynatın veya bir tuşa basın; Key Map Mode'da ise bilgisayar tuşuna basın. Öğe atamasını gösterir, örneğin `1/19` (kanal ve kontrolcü).
+4. Eşlemeler Browser'ın yerine listelenir: Channel, Note/Control veya Key, Path, Name, Min ve Max. Min veya Max'ı sürükleyin ya da bir değer yazmak için çift tıklayın. Bir satıra sağ tıklayınca `Aralığı ters çevir` ve `Delete` çıkar.
+5. Moddan çıkmak için aynı tuşa tekrar basın.
 
 ## Bilgisayar klavyesi
 
@@ -116,6 +144,8 @@ MIDI sayfasındaki `Çıkış aygıtları`, aktarımı donanıma ve diğer yazı
 - Bir plugin'e gönderilen MIDI CC, kanal aftertouch ve pitch bend, `MIDI kontrolcüyü otomatikleştir (CC, aftertouch, pitch bend)` ile otomatikleştirilebilir.
 - Pedalla tutulan bir nota, pedal kalkana kadar kaydedilir.
 - Bir otomasyon klibi, bir kontrolü kontrolcüden oynatırken onu geri almaz. Kontrol, çalma bir sonraki başladığında otomasyonunu yeniden izler.
+- `Uzaktan kontrol ayarları` içinde yapılan nota bağlantıları bir .flp dışa aktarımına yazılmaz.
+- `Ctrl+M` ve `Ctrl+K` eşleme modlarını yalnızca Klip başlatma iş akışında başlatır. Map Mode'da henüz makro eşleme veya nota aralığı yoktur.
 
 ## İlgili sayfalar
 

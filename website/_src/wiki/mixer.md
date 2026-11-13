@@ -53,6 +53,18 @@ The effects panel shows the ten slots of the selected insert.
 - `Group into Audio Effect Rack` in the slot's menu puts the effect into a new rack, and `Group all into Audio Effect Rack` does it for the whole chain. `Ungroup` puts a one-chain rack's effects back into the slots.
 - The switch in the panel's header turns all effects of the insert on or off.
 - You can drag an effect from the [Browser](/wiki/browser/)'s Plugin database onto an insert or an effect slot.
+- `Clean voice` in the insert menu puts a ready vocal clean-up chain on the insert.
+
+## Edison in a slot
+
+Edison, the audio editor and recorder, can sit in any effect slot, several per insert. Its window is the audio editor with a row of recording controls.
+
+- `Open audio editor` (`Ctrl+E`) in the insert menu loads Edison into the insert's first empty slot and opens it. `Open audio editor and record` (`Shift+E`) loads it ready to record when the song plays.
+- The record modes are `Now`, `On input` (the default: it waits for the input to pass a threshold), `Input` and `On play`. `Append` puts a new recording after the audio already there. The maximum recording time is `Forever` or 1, 3, 5, 10, 30 or 60 minutes: a new slot starts at 30, `Open audio editor and record` sets 5.
+- `Slave` plays Edison's audio at the song's time while the song plays.
+- Edison keeps recording after you close its window.
+- `Tools › Macros › Remove all Edison instances` empties every Edison slot in the project, after a question.
+- Edison slots in FL Studio projects (.flp) open with their audio.
 
 ## Insert EQ
 
@@ -80,6 +92,8 @@ Mixer groups fold with their chevron (or `Alt`+click for all groups). A VCA fade
 
 Each insert has a record-arm button. With an insert armed, Rec and Play record its audio input into a Playlist clip. `Shift+R` arms the selected insert and starts recording in one step. See [Recording](/wiki/recording/).
 
+When you pick an external input for an insert that also records other audio, LYNX SHARE asks whether to switch it to `External input only`, so the take holds the input alone. `Mixer › Disk recording › Latency compensation` in the insert menu is on by default. Turned off, recorded takes are placed with no latency compensation at all.
+
 ## Keys
 
 `Ctrl+L` and `Ctrl+Shift+L` have this meaning only while the Mixer has focus.
@@ -94,6 +108,8 @@ Each insert has a record-arm button. With an insert armed, Rec and Play record i
 | Solo with sources | `Alt+S` | Solos the selected inserts and the inserts that feed them |
 | Delete inserts | `Del` | Deletes the selected inserts, after a question |
 | Arm and record | `Shift+R` | Arms the selected insert and starts recording |
+| Open audio editor | `Ctrl+E` | Loads Edison into the insert's first empty slot and opens it |
+| Open audio editor and record | `Shift+E` | The same, ready to record when the song plays |
 
 ## Good to know
 
@@ -102,6 +118,8 @@ Each insert has a record-arm button. With an insert armed, Rec and Play record i
 - `Ctrl+L` does different things in the Channel rack and in the Mixer. In the rack it picks free inserts. In the Mixer it uses the selected insert.
 - The route switches appear on the other strips, not on the selected one.
 - The limit is 127 inserts per project and ten effect slots per insert.
+- Edison's recording is kept as a WAV file in the project's folder, not inside the project file.
+- The Session mixer under the clip grid belongs to the Clip-launch workflow only. It shows the same inserts as this Mixer. See [Layouts](/wiki/layouts/).
 
 ## Related
 

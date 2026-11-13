@@ -1,5 +1,5 @@
 ---
-source: b4f9b5e040
+source: e15b0e3ba5
 ---
 ![Praca z uruchamianiem klipów: siatka klipów i scen po lewej, wybór pluginu i Playlist po prawej](/assets/img/cliplaunch.webp)
 
@@ -23,6 +23,9 @@ Praca na wzorcach to Channel Rack, patterny i Playlist. Praca z uruchamianiem kl
 - Za pierwszym razem Channel Rack jest ukryty. Pokazuje go `F6` albo przycisk na pasku narzędzi.
 - Ścieżki automatyzacji Playlisty są włączone.
 - Układ okien jest zapamiętywany osobno dla każdego stylu, więc każdy styl wraca tak, jak go zostawiłeś.
+- Pod siatką przycisk `Mixer` pokazuje lub ukrywa Mikser sesji, jak w Ableton Live: `Wejście/Wyjście` (`Audio z`, `Odsłuch`, `Audio do`), `Sendy`, `Opóźnienie ścieżki` oraz głośność każdej ścieżki z jej aktywatorem, solo, przyciskiem uzbrojenia i miernikiem, a także pasek `Główne`.
+- `Grooves` pod siatką pokazuje Groove Pool. `Zastosuj groove do nut` zapisuje groove w nutach klipu MIDI.
+- Przyciski `MIDI` i `Tonacja` uruchamiają MIDI Map Mode i Key Map Mode. Zobacz [Kontrolery MIDI](/wiki/midi-controllers/).
 
 ## Siatka
 
@@ -41,6 +44,8 @@ Kliknij klip prawym przyciskiem, żeby zobaczyć jego ustawienia.
 
 Kliknij pusty slot prawym przyciskiem, żeby zobaczyć `Przycisk stopu (scena zatrzymuje tu tę ścieżkę)`. Kliknięcie kwadratu po lewej stronie pustego slotu zatrzymuje tę ścieżkę. Kliknij scenę prawym przyciskiem, żeby zobaczyć `Wstaw scenę`, `Dodaj scenę poniżej`, `Usuń scenę`, `Zmień nazwę sceny...` i tempo sceny.
 
+Klipy można wycinać, kopiować, wklejać i duplikować (`Ctrl+D`) z ich menu oraz przeciągać między slotami i na Playlistę lub z niej. Pattern lub sample przeciągnięte z Browsera albo pliki audio upuszczone z zewnątrz wypełniają slot, na który trafią. Menu sceny ma też `Duplikuj` i `Przechwyć i wstaw scenę`, które umieszcza w nowej scenie klipy grające w tej chwili. `Widok › Tempo i metrum scen` pokazuje tempo i metrum dla każdej sceny.
+
 Menu slotu ma też dwie opcje dla całej siatki: `Oddawaj ścieżki Playliście po zatrzymaniu transportu` i `Akcje następcze w całej siatce`.
 
 | Polecenie | Klawisz | Co robi |
@@ -49,10 +54,17 @@ Menu slotu ma też dwie opcje dla całej siatki: `Oddawaj ścieżki Playliście 
 | Uruchom klip | `Enter` | Uruchamia zaznaczony klip |
 | Uruchom scenę | `Ctrl+Enter` | Uruchamia zaznaczoną scenę |
 | Usuń klip | `Del` | Opróżnia zaznaczony slot |
+| Draw Mode | `B` | Przeciągnięcie na ścieżce automatyzacji rysuje stopnie tak szerokie jak siatka, albo odręcznie przy wyłączonym przyciąganiu lub z przytrzymanym `Alt`, jak w Ableton Live. Także w `Opcje` |
 
 ## Sety Ableton Live
 
 Gdy otwierasz set Live, jego klipy i sceny Session trafiają do siatki klipów razem z ustawieniami uruchamiania. `Plik › Eksportuj › Set Ableton Live (.als)` zapisuje siatkę z powrotem jako klipy Session. `Opcje › Ustawienia ogólne` ma `Klipy sesji z zestawów Live`, gdzie `Playlista, po aranżacji` umieszcza je zamiast tego na Playliście.
+
+## Prosty sposób pracy
+
+`Widok › Styl układu › Prosty sposób pracy` to jedno okno ze ścieżkami i osią czasu, na pierwszy utwór. `Widok › Panel ścieżki` pokazuje pod osią czasu dok wybranej ścieżki, z kartami `Efekty`, `Instrument`, `Klawiatura` i `Edytor`. W tym sposobie pracy menu `Pomoc` ma `Samouczek pierwszej piosenki` i `Ekran powitalny...`, które oferuje siedmiokrokowy pierwszy utwór, utwór demo albo pusty projekt. Zobacz [Prosty układ](/wiki/simple-layout/).
+
+`Tekst i notatki` i `Dopasowanie do referencji...` w menu `Widok` oraz `Czysty wokal` w menu insertu Mixera są dostępne w każdym układzie. W prostym sposobie pracy `Czysty wokal` jest też w menu ścieżki.
 
 ## Wróć
 
@@ -61,7 +73,8 @@ Wybierz `Widok › Styl układu › Praca na wzorcach (domyślnie)`. Układ okie
 ## Warto wiedzieć
 
 - Ścieżka, która uruchomiła klip, milczy w Playliście, dopóki nie naciśniesz `Powrót do Playlisty`. Opcja `Oddawaj ścieżki Playliście po zatrzymaniu transportu` robi to za ciebie przy każdym zatrzymaniu.
-- W 0.1.25 slot wypełnia się z jego menu albo dwuklikiem. Nie można przeciągnąć klipu ani pliku do slotu.
+- Nowe klawisze siatki (`B`, `Q`, `Ctrl+M`, `Ctrl+K` i inne) działają w ten sposób tylko w sposobie pracy Clip-launch. W sposobie pracy Pattern zachowują znaczenie z FL Studio.
+- Scena w 6/8 gra takt z trzech uderzeń, ponieważ metrum liczy ćwierćnuty.
 - Akcje następcze istnieją dla klipów, nie dla scen.
 - Ścieżki automatyzacji włączone ręcznie podczas pracy z uruchamianiem klipów nie są zachowywane po powrocie.
 - Przy wybranej pracy na wzorcach nic z siatki nie jest wczytywane.

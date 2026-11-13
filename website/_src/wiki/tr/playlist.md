@@ -1,5 +1,5 @@
 ---
-source: f245a8e1b7
+source: 1b54c6493f
 ---
 ![İzlerde kliplerle Playlist](/assets/img/playlist.webp)
 
@@ -43,6 +43,8 @@ Harfler, yazı klavyesi piyanosu (`Ctrl+T`) kapalıyken çalışır.
 - Sağ tık bir klibi siler. `Ctrl`+sürükleme seçer.
 - Açmak için bir klibe çift tıklayın.
 - Klibin sol üstündeki düğme klip menüsünü açar (benzersiz yap, yeniden adlandır ve renklendir, doğra; ses için ayrıca: pitch, tempoya uydur, ters).
+- Bir ses klibinin menüsü FL Studio'nun düzenini iki sütunda izler. Sol sütunda `Ses klibi` bölümü (`Önizleme`, `Sessiz`, `Yeniden adlandır ve renklendir...`, `Rengi değiştir...`, `Rastgele renk`, `Simgeyi değiştir...`, `Kaynak kanalı seç`, `Kanal ayarları`, `Benzersiz yap`, `Tüm benzer klipleri seç`, `Delete`, `Özellikler...`) ve `Bölge` bölümü (`Bölge seç`, `Doğra`) vardır. Sağ sütunda `Sample` (`Örnek olarak benzersiz yap`, `Örneği düzenle`, `Sample'dan stem'leri çıkar`, `Tempoyu algıla`, `Tempoya uydur`), `Otomasyon` (`Otomatikleştir › Pan` veya `Ses`, `Şununla çapraz geçiş`) ve `Geçişler` (`Geçişleri sıfırla`) bulunur. `Burada böl`, `Ters`, `Normalize et` ve `MIDI'ye dönüştür` gibi LYNX SHARE'in kendi öğeleri en sonda, bir çizginin altında yer alır.
+- `Otomatikleştir › Pan` veya `Ses`, kanalın Levels ayarındaki pan veya ses seviyesi için, kendi izinde, ses klibi kadar uzun bir otomasyon klibi oluşturur.
 - Snap'i yok saymak için sürüklerken `Alt` tuşunu basılı tutun.
 - Ses kliplerinin fade tutamaçları ve yukarı veya aşağı sürüklediğiniz bir klip gain'i vardır. Bir fade tutamacına sağ tıklarsanız `Çapraz geçiş oluştur` içeren menüsü açılır. Gain tutamacına sağ tıklarsanız `Gain'i sıfırla` ve `Normalize et` çıkar.
 - `Shift+M` Stretch'i açıp kapatır: açıkken bir ses klibini boyutlandırmak sesi kesmek yerine uzatıp sıkıştırır.
@@ -60,6 +62,10 @@ Bir izin başlığında tıklamak seçer, `Ctrl`+tık ekler veya çıkarır, `Sh
 
 Playlist menüsündeki `Görünüm`, iz başlıklarının ne göstereceğini seçer: `Ses parçalarında denetimleri göster`, `Ses parçalarında seviyeleri göster` ve `Enstrüman parçalarında seviyeleri göster`.
 
+İz menüsündeki `İz modu`, FL Studio'daki gibi bir izi `Atanmamış`, `Ses izi` veya `Enstrüman izi` yapar. `Ses izi` önce `Yeni mikser kanal(lar)ı` öğesini, sonra her mixer insert'ini numarası ve adıyla listeler. Seçim, seçili tüm izlere uygulanır. `Enstrüman izi` içinde `Mevcut kanalı kullan`, `Daha fazla eklenti...` ve Channel Rack'in enstrüman listesi vardır.
+
+İz başlıklarının sol üstündeki `+` yeni bir iz için aynı seçenekleri açar: `Ses parçası ekle`, `Daha fazla eklenti...` ve enstrümanlar. `+` üzerine sağ tık hemen bir ses izi ekler.
+
 ## Pattern blokları
 
 Playlist menüsünde `Pattern blokları (geçerli proje)` açıkken izlerin altındaki bir bölümde her pattern için bir satır bulunur. Orada Kalem bir blok yerleştirir ve satırı boyunca sürükler, Fırça blokları boyar, Silgi onları siler. Sağ tık, hangi araç olursa olsun siler.
@@ -75,6 +81,8 @@ Playlist menüsünde `Pattern blokları (geçerli proje)` açıkken izlerin alt�
 ## Otomasyon
 
 Bir knob'a veya fader'a sağ tıklayın ve `Otomasyon klibi oluştur` seçeneğini seçin. Klip Playlist'te görünür. Kalemle noktalarını sürükleyin, bir tane eklemek için eğri üzerine tıklayın. İzlerin altındaki otomasyon şeritleri isteğe bağlıdır ve varsayılan olarak kapalıdır. Bkz. [Otomasyon](/wiki/automation/).
+
+Menüsü için bir noktaya sağ tıklayın. `Mod` listesi, o noktada biten bölüm için FL Studio'nun 13 eğri modunu içerir: `Yumuşak`, `Hold`, üç tek eğri, üç çift eğri, `Yarım sinüs`, `Merdiven`, `Yumuşak merdiven`, `Pulse` ve `Dalga`. Yeni bir nokta en son kullanılan modu alır. Modlar .flp dosyalarından okunur ve onlara yazılır.
 
 ## Aranjmanlar
 
@@ -109,6 +117,7 @@ Araç çubuğundaki aranjman kutusu aranjmanlar arasında geçiş yapar. Bir pro
 - Playlist yalnızca Song modunda duyulur. Pattern modunda `Space`, izlerde ne olursa olsun geçerli pattern'i çalar.
 - `Görünüm › Yerleşim stili › Klip başlatma iş akışı`, Playlist'in yanına bir klip ve sahne ızgarası ekler. İsteğe bağlıdır. Bkz. [Yerleşimler](/wiki/layouts/).
 - Tek bir kontrolde üst üste binen birkaç otomasyon klibi varsa hangisinin çalacağı seçimi FL Studio'dan farklı olabilir (0.1.25 sürüm notları).
+- FL Studio'daki gibi bir pattern aynı anda tek bir klipten çalar. Aynı pattern'in sonraki bir klibi, herhangi bir izde başladığında, önceki klip oradan sonra yeni nota başlatmaz. Farklı pattern'lerin klipleri birlikte çalar. Bu, yeni projelerde ve FL Studio projelerinde geçerlidir. 0.1.27'den önce kaydedilmiş bir .lynx projesi her klibi tam olarak çalmaya devam eder.
 - Bağlı bir MIDI kontrolcüsüyle taşınan tempo ses kliplerini yeniden boyutlandırmaz.
 - Linux'ta video için FFmpeg gerekir.
 

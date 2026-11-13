@@ -1,5 +1,5 @@
 ---
-source: 217f097c97
+source: a73763934f
 ---
 ![Piano Roll](/assets/img/pianoroll.webp)
 
@@ -69,6 +69,18 @@ Klik penggaris untuk mengatur posisi. `Ctrl`+seret, seret dengan klik kanan, ata
 ## Chance dan velocity range
 
 Setiap not punya Chance dan Velocity range. Chance adalah seberapa besar kemungkinan not itu diputar setiap kali gilirannya tiba. Velocity range membuat velocity-nya bervariasi antara velocity not dan velocity itu ditambah range-nya. Pilih `Peluang` atau `Rentang velocity (LYNX)` di kotak jalur untuk mengeditnya. `Alat › Peluang (LYNX)` di menu Piano roll mengelompokkan not terpilih agar semuanya atau hanya satu di antaranya yang diputar, dan punya `Atur ulang peluang dan rentang velocity`.
+
+## Alat not
+
+Menu `Alat` di Piano roll membuka alat not FL Studio sebagai dialog. Alat-alat ini bekerja pada not terpilih, atau pada semua not bila tidak ada yang dipilih. Beberapa di antaranya:
+
+| Alat | Tombol | Fungsinya |
+|---|---|---|
+| Limit | `Alt+K` | Menggeser not per oktaf ke dalam rentang tuts, lalu membatasinya. Di bawah `Pembatasan kunci / tangga nada` ia menjaga not tetap pada satu tuts dasar dan salah satu chord atau tangga nada FL Studio, dengan `Snap` diatur ke `Di atas`, `Di bawah`, atau `Bergantian`. `Lipat ke atas / bawah` dan `Transpose` menentukan ke mana not di luar rentang pergi |
+| Flip | `Alt+Y` | `Balik horizontal` mencerminkan not dalam waktu. Dengan `Pertahankan waktu mulai`, yang pada awalnya menyala, waktu mulai dicerminkan dan panjang not tetap. `Balik vertikal` mencerminkan tuts di sekitar titik tengah rentangnya |
+| Randomise | `Alt+R` | Perubahan acak pada velocity, pan, fine pitch, timing, dan panjang, serta pada Mod X, Mod Y, dan release |
+| Scale levels | `Alt+X` | Menskalakan level not dari awal sampai akhir seleksi, dengan `Offset`, `Tengah` (nilai yang menjadi pusat skala), dan `Tegangan` |
+| LFO | `Alt+O` | Menulis bentuk LFO ke level not. Klik kanan slider `Periode` untuk daftar dari 1 step sampai 512 step |
 
 ## Alat MIDI dan skrip
 

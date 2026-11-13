@@ -1,5 +1,5 @@
 ---
-source: 0d51822a6b
+source: 094cbefd18
 ---
 ![La ventana Grabación pregunta qué grabar: audio, notas y automatización, todo, o audio en el editor de audio](/assets/img/wiki/record-dialog.webp)
 
@@ -16,6 +16,17 @@ El botón de grabar del transporte, o la tecla `R`, activa la grabación. La pri
 7. Pulsa detener. La toma es un clip de audio en la Playlist.
 
 `Shift+R` hace los pasos 4 a 6 con una sola tecla: arma el insert seleccionado, graba solo audio e inicia la reproducción. Púlsala de nuevo para detener.
+
+Cuando eliges una entrada para un insert que graba más que esa entrada (también se graban otros canales que le envían), LYNX SHARE pregunta, como hace FL Studio, si quieres cambiar a `Solo entrada externa`. Responde `Sí` para grabar solo la entrada en ese insert.
+
+## Grabación de audio con un clic
+
+`Herram. › Grabación de audio con un clic` inicia una toma en un solo paso, como en FL Studio. Actúa sobre el insert del mixer seleccionado. Con el Master o nada seleccionado, toma el primer insert con una entrada, o si no un insert libre.
+
+| Comando | Qué hace |
+|---|---|
+| `En el editor/grabador de audio Edison` | Pone Edison en el insert, fijado para grabar cuando empieza la reproducción, e inicia la reproducción. Mira [Mixer](/wiki/mixer/) |
+| `En la playlist como clip de audio` | Cambia al modo Song, arma el insert, pide su entrada si no la tiene, e inicia la grabación y la reproducción. Los inserts que ya están armados graban tal como están |
 
 ## Qué ofrece la ventana Grabación
 
@@ -59,7 +70,7 @@ Las opciones están en `Opciones › Grabación` y en el menú de clic derecho d
 
 | Comando | Tecla | Qué hace |
 |---|---|---|
-| `Cuenta previa` | `Ctrl+P` | Desactivada, 1 compás, 2 compases o 4 compases de metrónomo antes de empezar a grabar |
+| `Cuenta previa` | `Ctrl+P` | Off, 1 compás, 2 compases o 4 compases de metrónomo antes de empezar a grabar. `Ctrl+P` alterna entre desactivado y la duración que elegiste en último lugar. La elección se conserva al cerrar el programa; una instalación nueva empieza con 1 compás, como FL Studio |
 | `Metrónomo` | `Ctrl+M` | Clic durante la reproducción |
 | `Esperar a la primera nota para empezar` | `Ctrl+I` | La grabación espera hasta que toques |
 | `Grabación en bucle` | ninguna | La grabación se repite en bucle en lugar de seguir de largo |
@@ -70,7 +81,17 @@ Las opciones están en `Opciones › Grabación` y en el menú de clic derecho d
 
 `Baja latencia al grabar` está en el menú de clic derecho del botón de grabar y en el menú del insert del Mixer, en `Grabación en disco`. Está desactivado por defecto. Mientras un insert con entrada está armado, o su monitorización está en `Act.`, se omiten los efectos que añaden latencia en su camino al Master. Esto cambia solo lo que oyes: un insert conserva todos sus efectos cuando la toma se captura después de ellos, por ejemplo con `Post efectos`. Los efectos vuelven cuando el insert se desarma.
 
+`Compensación de latencia` está en el mismo menú `Grabación en disco` y está activado por defecto, como en FL Studio. Mueve cada toma hacia atrás según el viaje de ida y vuelta del dispositivo de audio, el valor `Ajuste fino (muestras)` de la configuración de audio y el retardo de compensación de los plugins. Desactívalo para dejar las tomas donde se grabaron.
+
 `Herram. › Cancelar grabación` descarta lo que escribió la pasada de grabación actual (sus notas, automatización y tomas de audio) y desactiva la grabación. La reproducción continúa y los inserts armados siguen armados.
+
+## Grabar en ranuras de clip
+
+En el [flujo Clip-launch](/wiki/layouts/), las tomas pueden ir a la cuadrícula de clips en lugar de a la Playlist, como en Ableton Live.
+
+- Arma una pista con su botón de armado en el mixer de Session. Sus ranuras vacías muestran entonces un botón de grabación redondo en lugar del cuadrado de parada. Haz clic en una para grabar en esa ranura.
+- `Grabación de sesión`, bajo la cuadrícula, graba las pistas armadas en la escena seleccionada. Mientras suenan sus clips, se añaden notas nuevas a ellos (overdub).
+- `Duración de grabación fija`, en el menú de una ranura vacía, termina una grabación en una ranura tras 1 o más compases, y el clip sigue sonando. `Desact.` graba hasta que lo detengas.
 
 ## Grabación en bucle y tomas
 

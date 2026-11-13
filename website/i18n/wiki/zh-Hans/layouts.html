@@ -4,20 +4,24 @@
 <h2 id="launch-clips-in-the-grid">在网格中启动片段</h2>
 <ol><li>选择 <code>视图 › 布局样式 › 片段启动工作流程</code>。片段网格会出现在播放列表旁边。</li><li>右键单击一个空槽，选择 <code>在此放置模式</code>，再选一个样式。双击空槽则会把当前样式放进去。</li><li>点击片段左侧的三角形来启动它。如果走带处于停止状态，它会开始播放。</li><li>点击 <code>场景</code> 列中某个场景的三角形，可启动那一行的所有片段。</li><li>点击 <code>停止所有片段</code> 来停止它们。</li><li>点击 <code>返回播放列表</code>，让各条轨道重新播放它们的播放列表片段。</li></ol>
 <h2 id="what-changes-on-screen">屏幕上有什么变化</h2>
-<ul><li>片段网格显示在播放列表旁边。播放列表轨道是列，场景是行。</li><li>播放列表的标题栏上多了一个 <code>两者</code>、<code>网格</code>、<code>歌曲</code> 切换开关。<code>网格</code> 只显示网格，<code>歌曲</code> 只显示播放列表。</li><li>第一次切换时，通道机架会被隐藏。按 <code>F6</code> 或点击它的工具栏按钮可以显示。</li><li>播放列表的自动化轨道会被打开。</li><li>窗口布局按样式分别保存，所以每种样式都会恢复成你离开时的样子。</li></ul>
+<ul><li>片段网格显示在播放列表旁边。播放列表轨道是列，场景是行。</li><li>播放列表的标题栏上多了一个 <code>两者</code>、<code>网格</code>、<code>歌曲</code> 切换开关。<code>网格</code> 只显示网格，<code>歌曲</code> 只显示播放列表。</li><li>第一次切换时，通道机架会被隐藏。按 <code>F6</code> 或点击它的工具栏按钮可以显示。</li><li>播放列表的自动化轨道会被打开。</li><li>窗口布局按样式分别保存，所以每种样式都会恢复成你离开时的样子。</li><li>网格下方的 <code>混音台</code> 按钮显示或隐藏 Session 混音台，与 Ableton Live 中一样：<code>输入/输出</code>（<code>音频来源</code>、<code>监听</code>、<code>音频输出到</code>）、<code>发送</code>、<code>轨道延迟</code>，以及每条轨道的音量及其激活开关、独奏、录音准备按钮和电平表，另有 <code>主要</code> 通道条。</li><li>网格下方的 <code>律动</code> 显示 Groove Pool。<code>将律动应用到音符</code> 把律动写入 MIDI 片段的音符中。</li><li><code>MIDI</code> 和 <code>调</code> 按钮启动 MIDI Map Mode 和 Key Map Mode。参见 <a href="/wiki/midi-controllers/">MIDI 控制器</a>。</li></ul>
 <h2 id="the-grid">网格</h2>
 <p>被启动的片段不会立即开始。它要等到下一个启动量化点，在此之前它的三角形会闪烁。网格底部的下拉框设置全局启动量化，所有设为 <code>全局</code> 的片段都使用它。停止也以同样的方式等待。</p>
 <p>右键单击片段可以打开它的设置。</p>
 <div class="tablewrap"><table><thead><tr><th>设置</th><th>作用</th></tr></thead><tbody><tr><td><code>启动量化</code></td><td>这个片段何时开始：<code>全局</code>、<code>无</code>，以及从 <code>8小节</code> 到 <code>1/32</code></td></tr><tr><td><code>启动模式</code></td><td><code>触发</code>、<code>门限</code>、<code>切换</code> 或 <code>重复</code></td></tr><tr><td><code>连奏（保持位置）</code></td><td>片段接管该轨道上先前播放的片段的播放位置</td></tr><tr><td><code>循环</code></td><td>开：片段重复播放。关：只播放一次，然后该轨道停止</td></tr><tr><td><code>跟随动作</code></td><td>片段结束之后发生什么：两个动作，各有一个概率，以及它们生效前的等待时间</td></tr><tr><td><code>Delete</code></td><td>清空这个槽</td></tr></tbody></table></div>
 <p>右键单击空槽可得到 <code>停止按钮（场景在此停止该轨道）</code>。点击空槽左侧的方块会停止该轨道。右键单击场景可得到 <code>插入场景</code>、<code>在下方添加场景</code>、<code>删除场景</code>、<code>重命名场景...</code> 和该场景的速度。</p>
+<p>可以从片段的菜单中剪切、复制、粘贴和复制片段（<code>Ctrl+D</code>），也可以在插槽之间拖动，或拖到播放列表或从播放列表拖回。从浏览器拖来的样式或采样，或从外部拖入的音频文件，会填充它们落入的插槽。场景的菜单中还有 <code>复制</code> 和 <code>捕获并插入场景</code>，后者会把当前正在播放的片段放入一个新场景。<code>视图 › 场景速度和拍号</code> 为每个场景显示速度和拍号。</p>
 <p>槽的菜单中还有两个作用于整个网格的选项：<code>走带停止时将轨道交还给播放列表</code> 和 <code>整个网格的跟随动作</code>。</p>
-<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td>移动</td><td>方向键</td><td>选择另一个槽</td></tr><tr><td>启动片段</td><td><code>Enter</code></td><td>启动所选片段</td></tr><tr><td>启动场景</td><td><code>Ctrl+Enter</code></td><td>启动所选场景</td></tr><tr><td>删除片段</td><td><code>Del</code></td><td>清空所选槽</td></tr></tbody></table></div>
+<div class="tablewrap"><table><thead><tr><th>命令</th><th>按键</th><th>作用</th></tr></thead><tbody><tr><td>移动</td><td>方向键</td><td>选择另一个槽</td></tr><tr><td>启动片段</td><td><code>Enter</code></td><td>启动所选片段</td></tr><tr><td>启动场景</td><td><code>Ctrl+Enter</code></td><td>启动所选场景</td></tr><tr><td>删除片段</td><td><code>Del</code></td><td>清空所选槽</td></tr><tr><td>Draw Mode</td><td><code>B</code></td><td>在自动化轨道上拖动会绘制与网格同宽的阶梯，关闭吸附或按住 <code>Alt</code> 时则徒手绘制，与 Ableton Live 中一样。也在 <code>选项</code> 中</td></tr></tbody></table></div>
 <h2 id="ableton-live-sets">Ableton Live 套装</h2>
 <p>打开 Live 套装时，它的 Session 片段和场景会连同启动设置一起进入片段网格。<code>文件 › 导出 › Ableton Live 套装 (.als)</code> 会把网格作为 Session 片段写回去。<code>选项 › 常规设置</code> 中有 <code>Live 工程的会话片段</code>，选择 <code>播放列表，编曲之后</code> 则会改为把它们放在播放列表上。</p>
+<h2 id="the-simple-workflow">简易工作流程</h2>
+<p><code>视图 › 布局样式 › 简易工作流程</code> 是一个带有轨道和时间线的窗口，适合第一首歌。<code>视图 › 音轨面板</code> 会在时间线下方为所选轨道显示一个停靠栏，带有 <code>效果器</code>、<code>乐器</code>、<code>键盘</code> 和 <code>编辑器</code> 标签页。在这个工作流程中，<code>帮助</code> 菜单有 <code>首支歌曲导览</code> 和 <code>欢迎屏幕...</code>，后者提供七步的第一首歌、一首演示歌曲或一个空工程。参见<a href="/wiki/simple-layout/">简易布局</a>。</p>
+<p><code>视图</code> 菜单中的 <code>歌词和笔记</code> 和 <code>参考匹配...</code>，以及混音台插入轨菜单中的 <code>清晰人声</code>，在每种布局中都有。在简易工作流程中，轨道菜单里也有 <code>清晰人声</code>。</p>
 <h2 id="switch-back">切换回去</h2>
 <p>选择 <code>视图 › 布局样式 › 模式工作流程（默认）</code>。你在样式工作流程中使用的窗口布局会恢复，自动化轨道也回到之前的设置。网格中的片段仍保留在工程里。</p>
 <h2 id="good-to-know">须知</h2>
-<ul><li>启动过片段的轨道在播放列表中保持静音，直到你按下 <code>返回播放列表</code>。选项 <code>走带停止时将轨道交还给播放列表</code> 会在每次停止时替你完成这一步。</li><li>在 0.1.25 中，槽要通过它的菜单或双击来填充。不能把片段或文件拖进槽里。</li><li>跟随动作只用于片段，不用于场景。</li><li>在片段启动工作流程中手动打开的自动化轨道，切换回去时不会保留。</li><li>选择了样式工作流程时，不会加载网格中的任何内容。</li></ul>
+<ul><li>启动过片段的轨道在播放列表中保持静音，直到你按下 <code>返回播放列表</code>。选项 <code>走带停止时将轨道交还给播放列表</code> 会在每次停止时替你完成这一步。</li><li>网格的新快捷键（<code>B</code>、<code>Q</code>、<code>Ctrl+M</code>、<code>Ctrl+K</code> 等）只在片段启动工作流程中这样起作用。在样式工作流程中，它们保持 FL Studio 的含义。</li><li>6/8 拍的场景播放一小节三拍，因为拍子按四分音符计数。</li><li>跟随动作只用于片段，不用于场景。</li><li>在片段启动工作流程中手动打开的自动化轨道，切换回去时不会保留。</li><li>选择了样式工作流程时，不会加载网格中的任何内容。</li></ul>
 <h2 id="related">相关页面</h2>
 <ul><li><a href="/wiki/playlist/">播放列表</a></li><li><a href="/wiki/coming-from-ableton/">从 Ableton Live 转来</a></li><li><a href="/wiki/importing-projects/">导入工程</a></li><li><a href="/why/#workflows">只有 LYNX 才有的功能：工作流程</a></li></ul>
 <p>第三个条目是适合第一首歌的一个窗口。见<a href="/wiki/simple-layout/">简易布局</a>。</p>

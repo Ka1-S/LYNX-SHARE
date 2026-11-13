@@ -45,6 +45,8 @@ The letters work while the typing keyboard piano (`Ctrl+T`) is off.
 - Right-click deletes a clip. `Ctrl`+drag selects.
 - Double-click a clip to open it.
 - The button at a clip's top left opens the clip menu (make unique, rename and colour, chop, and for audio: pitch, fit to tempo, reverse).
+- An audio clip's menu follows FL Studio's layout in two columns. The left column has the `Audio clip` section (`Preview`, `Muted`, `Rename and color...`, `Change color...`, `Random color`, `Change icon...`, `Select source channel`, `Channel settings`, `Make unique`, `Select all similar clips`, `Delete`, `Properties...`) and the `Region` section (`Select region`, `Chop`). The right column has `Sample` (`Make unique as sample`, `Edit sample`, `Extract stems from sample`, `Detect tempo`, `Fit to tempo`), `Automation` (`Automate › Panning` or `Volume`, `Crossfade with`) and `Fades` (`Reset fades`). LYNX SHARE's own items, such as `Split here`, `Reverse`, `Normalize` and `Convert to MIDI`, come last, below a line.
+- `Automate › Panning` or `Volume` makes an automation clip as long as the audio clip, on its track, for the channel's Levels adjustment pan or volume.
 - Hold `Alt` while dragging to ignore the snap.
 - Audio clips have fade handles and a clip gain you drag up or down. Right-click a fade handle for its menu, with `Create crossfade`. Right-click the gain handle for `Reset gain` and `Normalize`.
 - `Shift+M` switches Stretch: resizing an audio clip then stretches the audio instead of cutting it.
@@ -62,6 +64,10 @@ In a track's header, click selects, `Ctrl`+click adds or removes, `Shift`+click 
 
 `View` in the Playlist's menu chooses what the track headers show: `Show controls on audio tracks`, `Show levels on audio tracks` and `Show levels on instrument tracks`.
 
+`Track mode` in the track menu makes a track `Unassigned`, an `Audio track` or an `Instrument track`, as in FL Studio. `Audio track` lists `New mixer track(s)` first and then every mixer insert by number and name. The pick applies to all selected tracks. `Instrument track` has `Use existing channel`, `More plugins...` and the Channel rack's list of instruments.
+
+The `+` at the top left of the track headers opens the same choices for a new track: `Add audio track`, `More plugins...` and the instruments. A right click on `+` adds an audio track at once.
+
 ## Pattern Blocks
 
 With `Pattern blocks (current project)` on in the Playlist's menu, a section under the tracks has one row per pattern. There, the Pencil places one block and drags it along its row, the Brush paints blocks and the Eraser deletes them. Right-click erases with any tool.
@@ -77,6 +83,8 @@ With `Pattern blocks (current project)` on in the Playlist's menu, a section und
 ## Automation
 
 Right-click a knob or fader and choose `Create automation clip`. The clip appears on the Playlist. With the Pencil, drag its points, and click on the curve to add one. Automation lanes under tracks are optional and off by default. See [Automation](/wiki/automation/).
+
+Right-click a point for its menu. Its `Mode` list has FL Studio's 13 curve modes for the segment that ends at that point: `Smooth`, `Hold`, three single curves, three double curves, `Half sine`, `Stairs`, `Smooth stairs`, `Pulse` and `Wave`. A new point takes the mode used last. Modes are read from and written to .flp files.
 
 ## Arrangements
 
@@ -111,6 +119,7 @@ The arrangement box in the toolbar switches between arrangements. A project can 
 - The Playlist is heard only in Song mode. In Pattern mode, `Space` plays the current pattern, whatever is on the tracks.
 - `View › Layout style › Clip-launch workflow` adds a grid of clips and scenes next to the Playlist. It is optional. See [Layouts](/wiki/layouts/).
 - With several overlapping automation clips on one control, the choice of which one plays can differ from FL Studio's (0.1.25 release notes).
+- As in FL Studio, a pattern plays from one clip at a time. When a later clip of the same pattern starts, on any track, the earlier clip starts no more notes from there. Clips of different patterns play together. This holds in new projects and FL Studio projects. A .lynx project saved before 0.1.27 keeps playing every clip in full.
 - A tempo moved by a linked MIDI controller does not resize audio clips.
 - On Linux, video needs FFmpeg.
 

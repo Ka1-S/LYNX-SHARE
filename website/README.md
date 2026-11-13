@@ -108,14 +108,36 @@ six wiki pages) in 15 languages. Not done there, for the release:
   first-song tour, Remote control settings, the Sampler page in FL's layout, Edison on a mixer slot.
 - **demo.mp3 / peaks.json**: the demo song was regenerated with the Master looks' true-peak stage (rollup027
   HANDOFF-8): render `assets/media/demo.mp3` and `peaks.json` again from the new `Demo.lynx`.
-- **Catalogue** (`_src/catalog.json`): no entries yet for the plugins new in 0.1.27: Pocket EQ, Pocket Graphic EQ,
-  Pocket Filter, Pocket Reverb Classic, Pocket Reverb 2, Pocket Reverb, Pocket Comb Filter, Pocket Multiband
-  Compressor, Pocket Tape Stop, Pocket SuperSaw, Edison (mixer slot) and Drum Rack; and the changed editors (Sentry
-  Trigger, Hush Air / Mix, Glow Opto memory, the Law switch on the reverbs, Spiral Echo, Orbit, Lattice Mod, Gemini
-  Doubler, Echoform, Voice Shift and Quell) need their pictures and wiki tables refreshed.
-- **Wiki** still written for 0.1.26 or earlier: Mixer (Session mixer is Clip-launch only), Playlist (FL's audio clip
-  menu, Track mode, curve modes), Piano roll (Limit, Scale levels, Flip), MIDI controllers (Remote control settings,
-  map modes), Recording (one-click audio recording, latency compensation, count-in), Layouts (track dock, tour).
+- **Catalogue** (`_src/catalog.json`, 205 entries): branch wip/site190ex (round 190ex) has the 12 entries new in
+  0.1.27, each with its wiki page and 14 translations, and the wiki tables of the 16 editors that changed (the Law:
+  Classic | Measured switch on Epoch Verb, Atrium, Foil Plate, Halo, Horizon, Nebula, Orbit, Spiral Echo, Lattice Mod,
+  Echoform (+ Clock), Gemini Doubler (Head law), Voice Shift, Quell (+ Matched); Sentry Trigger / Release shape /
+  Sensitivity; Hush Air / Mix; Glow Opto memory). The new entries have no picture yet (name plate); each `img` names
+  the render `LYNX.exe --pluginthumbs R\thumbs` writes, so at the release: draw the thumbs with the 0.1.27 build, run
+  `import-shots.py R`, build. Expected files:
+
+  | Plugin | Render in `R/thumbs/` | Picture the import writes |
+  |---|---|---|
+  | `Pocket EQ` | `fx-pocket-eq-e381890e.png` | `assets/img/plugins/fx-pocket-eq.webp` |
+  | `Pocket Graphic EQ` | `fx-pocket-graphic-eq-94da1872.png` | `assets/img/plugins/fx-pocket-graphic-eq.webp` |
+  | `Pocket Filter` | `fx-pocket-filter-5341844e.png` | `assets/img/plugins/fx-pocket-filter.webp` |
+  | `Pocket Comb Filter` | `fx-pocket-comb-filter-74ccea05.png` | `assets/img/plugins/fx-pocket-comb-filter.webp` |
+  | `Pocket Reverb Classic` | `fx-pocket-reverb-classic-e47dfa68.png` | `assets/img/plugins/fx-pocket-reverb-classic.webp` |
+  | `Pocket Reverb 2` | `fx-pocket-reverb-2-616cce9e.png` | `assets/img/plugins/fx-pocket-reverb-2.webp` |
+  | `Pocket Reverb` | `fx-pocket-reverb-de000728.png` | `assets/img/plugins/fx-pocket-reverb.webp` |
+  | `Pocket Multiband Compressor` | `fx-pocket-multiband-compressor-0166a4bb.png` | `assets/img/plugins/fx-pocket-multiband-compressor.webp` |
+  | `Pocket Tape Stop` | `fx-pocket-tape-stop-052705cc.png` | `assets/img/plugins/fx-pocket-tape-stop.webp` |
+  | `Pocket SuperSaw` | `gen-pocket-supersaw-f93c6894.png` | `assets/img/plugins/gen-pocket-supersaw.webp` |
+  | `Edison` | `fx-edison-95160c7e.png` | `assets/img/plugins/fx-edison.webp` |
+  | `Drum Rack` | `gen-drum-rack-a4ce4351.png` | `assets/img/plugins/gen-drum-rack.webp` |
+
+  The changed editors keep their 0.1.25 / 0.1.26 `art/<name>-after-100.png` pictures, which do not show the new
+  switches: draw them again with `--artshot` from the 0.1.27 build (Epoch Verb, Atrium, Foil Plate, Halo, Horizon,
+  Nebula, Orbit, Spiral Echo, Lattice Mod, Gemini Doubler, Echoform, Voice Shift, Quell Denoiser, Sentry Gate, Hush
+  De-esser, Glow Leveler).
+- **Wiki**: updated for 0.1.27 on wip/site190ex (English + 14 languages, line for line): Mixer, Playlist, Piano
+  roll, MIDI controllers, Recording, Layouts. Pictures those pages would gain (not referenced yet, so nothing is
+  broken without them): see /mnt/e/lynx-work/site190ex/HANDOFF.md.
 
 ## 0.1.26 release: pictures and catalogue still to do (texts are ready)
 

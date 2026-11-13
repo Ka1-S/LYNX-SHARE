@@ -1,5 +1,5 @@
 ---
-source: b4f9b5e040
+source: e15b0e3ba5
 ---
 ![Le flux par lancement de clips : une grille de clips et de scènes à gauche, la Pipette et la Playlist à droite](/assets/img/cliplaunch.webp)
 
@@ -23,6 +23,9 @@ Le flux par patterns, c'est le Channel Rack, les patterns et la Playlist. Le flu
 - La première fois, le Channel Rack est masqué. `F6` ou son bouton de la barre d'outils l'affiche.
 - Les couloirs d'automation de la Playlist sont activés.
 - La disposition des fenêtres est mémorisée par style, de sorte que chaque style revient comme vous l'avez laissé.
+- Sous la grille, le bouton `Mixer` affiche ou masque la table de mixage de session, comme dans Ableton Live : `Entrée/Sortie` (`Audio depuis`, `Écoute`, `Audio vers`), `Sends`, `Délai de piste`, et pour chaque piste son volume avec son activateur, son solo, son bouton d'armement et son vumètre, plus la bande `Principal`.
+- `Grooves`, sous la grille, affiche le Groove Pool. `Appliquer le groove aux notes` écrit un groove dans les notes d'un clip MIDI.
+- Les boutons `MIDI` et `Tonalité` lancent le MIDI Map Mode et le Key Map Mode. Voir [Contrôleurs MIDI](/wiki/midi-controllers/).
 
 ## La grille
 
@@ -41,6 +44,8 @@ Faites un clic droit sur un clip pour ses réglages.
 
 Faites un clic droit sur un emplacement vide pour `Bouton d'arrêt (une scène arrête cette piste ici)`. Un clic sur le carré à gauche d'un emplacement vide arrête cette piste. Faites un clic droit sur une scène pour `Insérer une scène`, `Ajouter une scène en dessous`, `Supprimer la scène`, `Renommer la scène...` et le tempo de la scène.
 
+Les clips peuvent être coupés, copiés, collés et dupliqués (`Ctrl+D`) depuis leur menu, et glissés entre les emplacements et vers ou depuis la Playlist. Un pattern ou un sample glissé depuis le Browser, ou des fichiers audio déposés depuis l'extérieur, remplissent l'emplacement où ils arrivent. Le menu d'une scène propose aussi `Dupliquer` et `Capturer et insérer une scène`, qui place les clips en cours de lecture dans une nouvelle scène. `Vue › Tempo et signature rythmique des scènes` affiche un tempo et une signature rythmique pour chaque scène.
+
 Le menu de l'emplacement a aussi deux options pour toute la grille : `Rendre les pistes à la Playlist à l'arrêt du transport` et `Actions suivantes sur toute la grille`.
 
 | Commande | Touche | Ce qu'elle fait |
@@ -49,10 +54,17 @@ Le menu de l'emplacement a aussi deux options pour toute la grille : `Rendre les
 | Lancer un clip | `Enter` | Lance le clip sélectionné |
 | Lancer une scène | `Ctrl+Enter` | Lance la scène sélectionnée |
 | Supprimer un clip | `Del` | Vide l'emplacement sélectionné |
+| Draw Mode | `B` | Un glissement dans un couloir d'automation dessine des paliers aussi larges que la grille, ou à main levée avec le magnétisme désactivé ou `Alt` maintenu, comme dans Ableton Live. Aussi dans `Options` |
 
 ## Sets Ableton Live
 
 Quand vous ouvrez un set Live, ses clips de session et ses scènes vont dans la grille de clips, avec leurs réglages de lancement. `Fichier › Exporter › Set Ableton Live (.als)` réécrit la grille sous forme de clips de session. `Options › Réglages généraux` a `Clips de session des sets Live`, où `Playlist, après l'arrangement` les place plutôt dans la Playlist.
+
+## Le flux simple
+
+`Vue › Style de disposition › Flux simple` est une fenêtre unique avec les pistes et la timeline, pour un premier morceau. `Vue › Panneau de la piste` affiche sous la timeline un dock pour la piste sélectionnée, avec les onglets `Effets`, `Instrument`, `Clavier` et `Éditeur`. Dans ce flux, le menu `Aide` propose `Tour de la première chanson` et `Écran d'accueil...`, qui offre un premier morceau en sept étapes, un morceau de démonstration ou un projet vide. Voir [Disposition simple](/wiki/simple-layout/).
+
+`Paroles et notes` et `Correspondance de référence...` du menu `Vue`, et `Voix claire` dans le menu d'un insert du Mixer, existent dans toutes les dispositions. Dans le flux simple, `Voix claire` est aussi dans le menu d'une piste.
 
 ## Revenir en arrière
 
@@ -61,7 +73,8 @@ Choisissez `Vue › Style de disposition › Flux par patterns (par défaut)`. L
 ## Bon à savoir
 
 - Une piste qui a lancé un clip reste muette dans la Playlist jusqu'à ce que vous appuyiez sur `Retour à la Playlist`. L'option `Rendre les pistes à la Playlist à l'arrêt du transport` le fait pour vous à chaque arrêt.
-- Dans la version 0.1.25, un emplacement se remplit depuis son menu ou par double-clic. Vous ne pouvez pas glisser un clip ou un fichier dans un emplacement.
+- Les nouvelles touches de la grille (`B`, `Q`, `Ctrl+M`, `Ctrl+K` et d'autres) n'agissent ainsi que dans le flux par lancement de clips. Dans le flux par patterns, elles gardent le sens qu'elles ont dans FL Studio.
+- Une scène en 6/8 joue une mesure de trois temps, parce que la métrique compte des noires.
 - Les actions suivantes existent pour les clips, pas pour les scènes.
 - Les couloirs d'automation activés à la main dans le flux par lancement de clips ne sont pas conservés quand vous revenez en arrière.
 - Avec le flux par patterns sélectionné, rien de la grille n'est chargé.

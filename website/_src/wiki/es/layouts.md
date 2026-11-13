@@ -1,5 +1,5 @@
 ---
-source: b4f9b5e040
+source: e15b0e3ba5
 ---
 ![El flujo de lanzamiento de clips: una cuadrícula de clips y escenas a la izquierda, el Selector y la Playlist a la derecha](/assets/img/cliplaunch.webp)
 
@@ -23,6 +23,9 @@ El flujo por patrones es el Channel Rack, los patrones y la Playlist. El flujo p
 - La primera vez, el Channel Rack queda oculto. `F6` o su botón de la barra de herramientas lo muestra.
 - Se activan los carriles de automatización de la Playlist.
 - El diseño de la ventana se guarda por estilo, así que cada estilo vuelve como lo dejaste.
+- Bajo la cuadrícula, el botón `Mixer` muestra u oculta el mixer de Session, como en Ableton Live: `Entrada/Salida` (`Audio desde`, `Monitor`, `Audio hacia`), `Envíos`, `Retardo de pista`, y el volumen de cada pista con su activador, solo, botón de armado y medidor, además de la tira `Principal`.
+- `Grooves`, bajo la cuadrícula, muestra el Groove Pool. `Aplicar groove a las notas` escribe un groove en las notas de un clip MIDI.
+- Los botones `MIDI` y `Tonalidad` inician el MIDI Map Mode y el Key Map Mode. Mira [Controladores MIDI](/wiki/midi-controllers/).
 
 ## La cuadrícula
 
@@ -41,6 +44,8 @@ Haz clic derecho en un clip para ver sus ajustes.
 
 Haz clic derecho en una ranura vacía para ver `Botón de parada (una escena detiene esta pista aquí)`. Al hacer clic en el cuadrado a la izquierda de una ranura vacía, esa pista se detiene. Haz clic derecho en una escena para ver `Insertar escena`, `Añadir escena debajo`, `Eliminar escena`, `Renombrar escena...` y el tempo de la escena.
 
+Los clips se pueden cortar, copiar, pegar y duplicar (`Ctrl+D`) desde su menú, y arrastrar entre ranuras y hacia o desde la Playlist. Un patrón o un sample arrastrado desde el Browser, o archivos de audio soltados desde fuera, rellenan la ranura en la que caen. El menú de una escena también tiene `Duplicar` y `Capturar e insertar escena`, que pone los clips que suenan ahora en una escena nueva. `Ver › Tempo y compás de las escenas` muestra un tempo y un compás para cada escena.
+
 El menú de la ranura también tiene dos opciones para toda la cuadrícula: `Devolver las pistas a la Playlist al detener el transporte` y `Acciones siguientes en toda la cuadrícula`.
 
 | Comando | Tecla | Qué hace |
@@ -49,10 +54,17 @@ El menú de la ranura también tiene dos opciones para toda la cuadrícula: `Dev
 | Lanzar clip | `Enter` | Lanza el clip seleccionado |
 | Lanzar escena | `Ctrl+Enter` | Lanza la escena seleccionada |
 | Borrar clip | `Del` | Vacía la ranura seleccionada |
+| Draw Mode | `B` | Un arrastre en un carril de automatización dibuja pasos tan anchos como la cuadrícula, o a mano alzada con el ajuste desactivado o `Alt` pulsado, como en Ableton Live. También en `Opciones` |
 
 ## Sets de Ableton Live
 
 Cuando abres un set de Live, sus clips y escenas de Session pasan a la cuadrícula de clips, con sus ajustes de lanzamiento. `Archivo › Exportar › Set de Ableton Live (.als)` escribe la cuadrícula de vuelta como clips de Session. `Opciones › Configuración general` tiene `Clips de sesión de sets de Live`, donde `Playlist, después del arreglo` los coloca en la Playlist.
+
+## El flujo Simple
+
+`Ver › Estilo de diseño › Flujo simple` es una sola ventana con las pistas y la línea de tiempo, para una primera canción. `Ver › Panel de la pista` muestra bajo la línea de tiempo un panel para la pista seleccionada, con las pestañas `Efectos`, `Instrumento`, `Teclado` y `Editor`. En este flujo, el menú `Ayuda` tiene `Tour de la primera canción` y `Pantalla de bienvenida...`, que ofrece una primera canción en siete pasos, una canción de demostración o un proyecto vacío. Mira [Diseño Simple](/wiki/simple-layout/).
+
+`Letra y notas` y `Igualar a la referencia...` en el menú `Ver`, y `Voz limpia` en el menú de un insert del Mixer, están en todos los diseños. En el flujo Simple, `Voz limpia` también está en el menú de una pista.
 
 ## Volver atrás
 
@@ -61,7 +73,8 @@ Elige `Ver › Estilo de diseño › Flujo por patrones (predeterminado)`. Vuelv
 ## Conviene saber
 
 - Una pista que lanzó un clip queda en silencio en la Playlist hasta que pulsas `Volver a la Playlist`. La opción `Devolver las pistas a la Playlist al detener el transporte` lo hace por ti en cada detención.
-- En la 0.1.25 una ranura se rellena desde su menú o con doble clic. No puedes arrastrar un clip ni un archivo a una ranura.
+- Las teclas nuevas de la cuadrícula (`B`, `Q`, `Ctrl+M`, `Ctrl+K` y otras) actúan así solo en el flujo Clip-launch. En el flujo Pattern conservan el significado de FL Studio.
+- Una escena en 6/8 toca un compás de tres tiempos, porque el metro cuenta negras.
 - Las follow actions existen para clips, no para escenas.
 - Los carriles de automatización activados a mano en el flujo por lanzamiento de clips no se conservan al volver.
 - Con el flujo por patrones seleccionado, no se carga nada de la cuadrícula.
