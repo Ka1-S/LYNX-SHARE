@@ -5,6 +5,7 @@
 #include <android/log.h>
 #include <android/native_activity.h>
 #include <aaudio/AAudio.h>
+#include <vector>
 
 extern "C" {
     extern JavaVM* android_jvm;
@@ -229,20 +230,38 @@ aaudio_data_callback_result_t AndroidAudioDevice::onAudioCallback(AAudioStream* 
 
     if (device->inputStream && numInChannels > 0)
     {
+        // AAudioStream_read expects a flat interleaved buffer
+        // We need to read into a temporary buffer and then de-interleave
+        std::vector<float> tempBuffer(numFrames * numInChannels);
         aaudio_result_t result = AAudioStream_read(device->inputStream,
-                                                   device->mixingBuffer.getArrayOfWritePointers(),
+                                                   tempBuffer.data(),
                                                    numFrames,
                                                    0);
         if (result < 0)
         {
             device->xrunCount++;
         }
+        else
+        {
+            // De-interleave temp buffer into mixingBuffer
+            for (int ch = 0; ch < numInChannels; ++ch)
+            {
+                float* dst = device->mixingBuffer.getWritePointer(ch);
+                for (int i = 0; i < numFrames; ++i)
+                {
+                    dst[i] = tempBuffer[i * numInChannels + ch];
+                }
+            }
+        }
     }
+
+    // Create a default callback context
+    juce::AudioIODeviceCallbackContext context;
 
     device->currentCallback->audioDeviceIOCallbackWithContext(
         device->mixingBuffer.getArrayOfReadPointers(), numInChannels,
         device->mixingBuffer.getArrayOfWritePointers(), numOutChannels,
-        numFrames, nullptr);
+        numFrames, context);
 
     for (int ch = 0; ch < numOutChannels; ++ch)
     {

@@ -7,15 +7,13 @@
 #include <android/asset_manager.h>
 #include <jni.h>
 
-// native_app_glue.h is in NDK sysroot - include via full path or use the JUCE provided one
-#if __has_include(<android/native_app_glue.h>)
-#include <android/native_app_glue.h>
-#else
-#include <android/native_app_glue.h>  // fallback
-#endif
+// native_app_glue.h is provided by JUCE's juce_android_native_app_glue module
+// Include via the JUCE module path
+#include <juce_audio_devices/native/juce_android_AndroidApp.h>
 
 extern "C" {
     extern JavaVM* android_jvm;
+    extern struct android_app* android_app;
 }
 
 namespace lynx::platform
