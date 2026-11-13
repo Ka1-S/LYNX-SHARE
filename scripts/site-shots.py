@@ -20,9 +20,9 @@ WebP: lossless when that costs little (flat interface pictures), else quality 92
 
 --logo-was LOGO.png: the logo the build that made the renders draws (its src/ui/LogoData.h image), for renders made
 before a logo change. Wherever that build drew its logo button (plugin headers), the button is repainted with the
-brand's mark (website/assets/img/logo.png; up to 32 px resources/brand/lynx-share-logo-small.png, the form for
-small sizes made by tools/make_logo.py): a dark disc over the old button and the mark on it, its ears inside the
-picture, as the program draws it since the logo by w3teal (src/ui/PluginSkin.cpp brandMark). Leave it out for renders of a build that draws the current logo.
+brand's mark (the logo by w3teal without its app-icon tile, rendered by tools/make_logo.py from resources/brand; up to
+32 px its small-size form, below 24 px without the pepper stem): a dark disc over the old button and the mark on it,
+its ears inside the picture, as the program draws it (src/ui/PluginSkin.cpp brandMark). Leave it out for renders of a build that draws the current logo.
 """
 import argparse
 import io
@@ -73,18 +73,17 @@ def render(root, ref, scale):
 
 
 class LogoPainter:
-    """Finds the old logo button in a render and paints the brand's mark over it (see --logo-was)."""
+    """Finds the old logo button in a render and paints the brand's button over it (see --logo-was)."""
     DARK = (14, 15, 19)        # the disc under the mark (src/ui/PluginSkin.cpp brandMark)
 
-    def __init__(self, old, mark, small):
+    def __init__(self, old):
         import numpy as np
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+        import make_logo                                  # the brand's pictures, from resources/brand/*.svg
         self.np = np
+        self.logo = make_logo.Logo()
         self.old = Image.open(old).convert("RGBA")
-        self.mark = Image.open(mark).convert("RGBA")
-        self.small = Image.open(small).convert("RGBA").resize(self.mark.size, Image.LANCZOS)
-        x0, y0, x1, y1 = self.mark.getchannel("A").getbbox()
-        r = (x1 - x0) / 2.0
-        self.disc = ((x0 + x1) / 2.0 / self.mark.width, (y1 - r) / self.mark.height, r / self.mark.width)
+        self.disc = (0.5, 0.5, 184.0 / 512.0)             # the mark's ring in its 512-unit frame (centre, radius)
         self.pts = {}
         self.count = 0
 
@@ -142,24 +141,28 @@ class LogoPainter:
             return im, 0
         out = im.convert("RGBA")
         for x, y, d in hits:
-            cx, cy = x + d / 2.0, y + d / 2.0
-            r = d / 2.0 + 1.5 * scale                 # over the old button's dark edge and red ring
-            fx, fy, fr = self.disc
-            side = min(r / fr, cy / fy)               # (the ears stay inside the picture, as the program keeps them in the header)
-            r0, r = r, side * fr
-            k = 4                                     # the disc drawn 4x and scaled down (smooth edge)
-            rd = max(r0, r + scale)                   # the dark disc: over the old button, at least 1 px beyond the mark
-            box = (int(cx - rd) - 2, int(cy - rd) - 2, int(cx + rd) + 3, int(cy + rd) + 3)
-            w, h = box[2] - box[0], box[3] - box[1]
-            mask = Image.new("L", (w * k, h * k), 0)
-            ImageDraw.Draw(mask).ellipse(((cx - rd - box[0]) * k, (cy - rd - box[1]) * k, (cx + rd - box[0]) * k, (cy + rd - box[1]) * k), fill=255)
-            disc = Image.new("RGBA", (w, h), self.DARK + (255,))
-            disc.putalpha(mask.resize((w, h), Image.LANCZOS))
-            out.alpha_composite(disc, box[:2])
-            mark = (self.small if side <= 32 else self.mark).resize((max(1, round(side)), max(1, round(side))), Image.LANCZOS)
-            out.alpha_composite(mark, (round(cx - fx * side), round(cy - fy * side)))
+            self.draw(out, x + d / 2.0, y + d / 2.0, d, scale)
         self.count += len(hits)
         return out.convert(im.mode if im.mode in ("RGB", "RGBA") else "RGB"), len(hits)
+
+    def draw(self, out, cx, cy, d, scale):
+        """The brand's button over an old one of diameter d centred at (cx, cy) in the RGBA picture out."""
+        r = d / 2.0 + 1.5 * scale                 # over the old button's dark edge and red ring
+        fx, fy, fr = self.disc
+        side = min(r / fr, cy / fy)               # (the ears stay inside the picture, as the program keeps them in the header)
+        r0, r = r, side * fr
+        k = 4                                     # the disc drawn 4x and scaled down (smooth edge)
+        rd = max(r0, r + scale)                   # the dark disc: over the old button, at least 1 px beyond the mark
+        box = (int(cx - rd) - 2, int(cy - rd) - 2, int(cx + rd) + 3, int(cy + rd) + 3)
+        w, h = box[2] - box[0], box[3] - box[1]
+        mask = Image.new("L", (w * k, h * k), 0)
+        ImageDraw.Draw(mask).ellipse(((cx - rd - box[0]) * k, (cy - rd - box[1]) * k, (cx + rd - box[0]) * k, (cy + rd - box[1]) * k), fill=255)
+        disc = Image.new("RGBA", (w, h), self.DARK + (255,))
+        disc.putalpha(mask.resize((w, h), Image.LANCZOS))
+        out.alpha_composite(disc, box[:2])
+        px = max(1, round(side))
+        mark = self.logo.mark(px, small=side <= 32)
+        out.alpha_composite(mark, (round(cx - fx * side), round(cy - fy * side)))
 
 
 def webp(im, quality):
@@ -243,7 +246,7 @@ def main():
     a = ap.parse_args()
     root, site, docs = Path(a.renders), Path(a.site), Path(a.docs)
     img, src = site / "assets/img", site / "_src"
-    w = Writer(a.dry_run, LogoPainter(a.logo_was, img / "logo.png", Path(__file__).resolve().parent.parent / "resources/brand/lynx-share-logo-small.png") if a.logo_was else None)
+    w = Writer(a.dry_run, LogoPainter(a.logo_was) if a.logo_was else None)
 
     sizes = {}
     for name, (ref, box) in TOP.items():
