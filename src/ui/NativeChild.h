@@ -76,6 +76,23 @@ void keepFloatersInFront();
 // The attached children of a native window (the main window's handle), from the bottom of their stacking order up.
 std::vector<juce::Component*> attachedChildren (void* parentWindow);
 
+// Issue #161: a click in an attached component when its window is not the foreground window (LYNX was in another app's
+// background, or a detached panel / plugin window of LYNX was the active one) activates the main window, as a click
+// anywhere in FL's window does, so its shortcuts (Space...) work at once. JUCE answers the system's "activate?" question
+// from the clicked window's own component, and the panels don't take the keyboard focus on a click (their keys reach the
+// main window), so it said no. A component that takes the focus on a click activates as before; a click blocked by a
+// modal dialog is left to JUCE; inside the active window nothing changes (the focus stays where it is: a text field, a
+// plugin's editor). After the activation the main window gets the system focus, and JUCE gives it back to the control
+// that had it (else MainComponent takes it).
+bool clickActivatesWindow (const juce::Component& c, bool windowIsForeground);
+// Tests (Windows; elsewhere 0): what the attached component's native window answers the system's WM_MOUSEACTIVATE
+// (MA_ACTIVATE = 1, MA_NOACTIVATE = 3), as if LYNX were in the background when `asInactive`.
+int mouseActivateAnswerForTest (const juce::Component& c, bool asInactive);
+
+// --selftest (issue #161): the decision above for a panel-like component (no focus on a click), a modal dialog's block and,
+// on Windows, the answer of a real attached child window of a never-shown window. "OK" or "ERROR ...".
+juce::String clickActivationSelfTest();
+
 // Keys nothing in an attached component used: they don't travel up to the main window by themselves (it is another
 // native window), so `c` hands them to the main window's shortcuts (the secondary windows' route, ui/WindowOwner.h).
 void forwardUnusedKeys (juce::Component& c);
