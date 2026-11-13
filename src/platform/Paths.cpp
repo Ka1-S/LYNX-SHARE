@@ -16,6 +16,10 @@
 
 namespace lynx::platform
 {
+#if JUCE_ANDROID || defined(LYNX_ANDROID)
+#include "platform/AndroidPaths.h"
+#endif
+
 namespace
 {
 juce::File home() { return juce::File::getSpecialLocation (juce::File::userHomeDirectory); }
@@ -29,10 +33,6 @@ juce::File xdgFolder (const char* variable, const char* fallback)
         return juce::File (value);
     return home().getChildFile (fallback);
 }
-#endif
-
-#if JUCE_ANDROID || defined(LYNX_ANDROID)
-#include "platform/AndroidPaths.h"
 #endif
 } // namespace
 
