@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-10-27 (release 0.1.19 alpha). Everything below is verified by the core tests (more than a million checks), the
+Last updated: 2026-11-14 (release 0.1.27 alpha). Everything below is verified by the core tests (more than a million checks), the
 app's self-test (`LYNX.exe --selftest`), off-screen UI snapshots (`--snapshot`) and a regression run that
 exports the 30 demo projects shipped with FL Studio 2026.
 
@@ -203,13 +203,24 @@ Core Audio / ALSA + JACK (PipeWire).
 - Import and export (`docs/analise/ALS_FORMAT.md`): MIDI / audio / group / return tracks, clips and notes, warp
   markers and modes, mixer and sends with their automation, tempo, time signature, locators; Session clips and scenes
   ↔ the clip grid (launch settings, follow actions, stop buttons).
-- Third-party VST2 / VST3 plugins keep their state both ways. Live's Simpler / Sampler / Drum Rack import as the
-  closest LYNX instrument; other Live devices are listed in the report. LYNX's own instruments and
+- Third-party VST2 / VST3 plugins keep their state both ways. Live's Simpler / Sampler import as the closest LYNX
+  instrument; other Live devices that have no LYNX equivalent are listed in the report. LYNX's own instruments and
   effects are not converted in exported sets yet (listed in the export report).
 - Since 0.1.26: Instrument and Audio Effect Racks (chains, zones, macros) both ways; MIDI Effect Racks are written
   on export only (Live's own are listed as unsupported on import); note chance,
   velocity range and probability groups, the project key as Live's Scale Mode, and Live 12's MIDI Transformations in
   the Clip View. A Clip View and Device View are part of the Clip-launch workflow.
+- Since 0.1.27 (rounds 190bq, 190cf, 190ed and their refits 190cx, 190da, 190ek): Live's own devices onto LYNX's
+  with settings, automation and macros: EQ Eight → Facet EQ, EQ Three → Prism, Channel EQ → EQ, Compressor / Glue →
+  Crest (Expand → Sentry), Multiband Dynamics → Prism, Limiter → Apex, Gate → Sentry, Utility, Reverb → Atrium,
+  Delay / Echo → Echoform, Auto Filter → Filter (+ Peak Controller for its LFO / follower), Saturator → Ember,
+  Overdrive → Distortion, Chorus-Ensemble → Chorus, Redux → Lo-fi, Auto Pan, Drum Buss → an Audio Effect Rack;
+  Drift and non-FM Operator → built-in synth; Arpeggiator; Pitch / Velocity / Chord / Note Length baked into the
+  notes; VST2 / VST3 automation by parameter id. Laws of EQ Eight, Utility, Auto Filter, Saturator, Glue, Drum Buss
+  and Reverb decay fitted to Live 12.4.16 renders; others marked [ASSUMED] in docs/analise/ALS_FORMAT.md. Dropped
+  device lines in the 19 sample sets: 182 → 61. A Drum Rack is LYNX's Drum Rack both ways (export not yet opened in
+  Live). Still dropped: Hybrid Reverb, Grain Delay, Spectral devices, Amp, Roar, Cabinet, Vinyl, FM Operator, other
+  synths, devices past an insert's 10 slots.
 
 ### FL Studio Mobile import (`.flm`, partial)
 - `docs/analise/FLM_FORMAT.md`: tempo, time signature, title; note, drum and audio lanes → patterns, clips and audio
@@ -219,6 +230,11 @@ Core Audio / ALSA + JACK (PipeWire).
   as the Pocket effects, with their automation; rack mute / solo, level, pan, pitch bend and send automation as
   automation clips; note pan, drum note pitch, repeats and slides. Other instruments play LYNX's built-in synth for
   now; what is not converted is listed in the import report.
+- Since 0.1.27: DW Sampler (within 0.02 dB of FLM's renders) and Slicer on FLM's own engines, Pocket SuperSaw,
+  Pitcher → LYNX Tune, Arpeggiator / Note Echo baked; drum pads with their own level, pan, speed, envelope and cut
+  group; Pocket EQ, Graphic EQ, Filter, three reverbs, Comb Filter, Multiband Compressor and Tape Stop on FLM's
+  engines; instrument, pitch bend, mod wheel and CC lanes; chord sets and the HEAD key locker (field order inferred).
+  A DW Sampler whose every sample is missing plays a LYNX stand-in of the same category.
 
 ## Confirmed vs approximated (FL import)
 
@@ -832,6 +848,9 @@ Confirmed empirically on the demo projects:
   output 6 ms / input 19 ms, real project + recording without glitches (`--rtstress ... --record take.wav`).
 
 ## Plugin hosting
+- Crash guard (Windows: SEH; Linux / macOS since 0.1.27, `src/platform/CrashGuard.cpp`): a hosted plugin that faults
+  while processing, or while its saved state loads, is switched off and LYNX keeps running. Not covered: editor open,
+  preset loads, SIGABRT, stack overflow and the plugin's own threads; `--crashguardtest` checks it.
 - Optional separate-process plugins: each plugin runs in a child `LYNX.exe --lynx-plugin-host`. Audio
   (up to 8 channels × 4096), MIDI (up to 1024 events) and parameter changes (up to 512 per block, both ways) go
   through shared memory with a pair of events per block; state and editor through messages. If the child does

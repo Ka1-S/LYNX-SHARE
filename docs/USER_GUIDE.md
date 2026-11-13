@@ -10,8 +10,8 @@ Piano Roll, Playlist, Mixer) see [WORKFLOW_FL.md](WORKFLOW_FL.md); for the built
 | File | From | What happens |
 |---|---|---|
 | `.flp` | FL Studio | imported: channels, samples, patterns, arrangement, automation, mixer and FL's native plugins |
-| `.als` | Ableton Live 11 / 12 | imported: tracks, clips (warped audio too), groups, returns, mixer and automation; Session clips go to the clip grid (Settings › Session clips of Live sets: or onto the Playlist) |
-| `.flm` | FL Studio Mobile | imported, partial: arrangement, samples, drum kits, levels and routing, automation, the effects (as Pocket effects), MiniSynth, Transistor Bass, 3x Osc and GMSynth; other instruments play a built-in synth for now |
+| `.als` | Ableton Live 11 / 12 | imported: tracks, clips (warped audio too), groups, returns, mixer and automation, racks and Drum Racks, and many of Live's own devices as LYNX's; Session clips go to the clip grid (Settings › Session clips of Live sets: or onto the Playlist) |
+| `.flm` | FL Studio Mobile | imported, partial: arrangement, samples, drum kits, levels and routing, automation, the effects (as Pocket effects), MiniSynth, Transistor Bass, 3x Osc, GMSynth, SuperSaw, DW Sampler and Slicer, chord sets and the key; other instruments play a built-in synth for now |
 | `.mid` | any app | opened as a project |
 
 After an import, **Help › Last project import report** lists what was converted, approximated or left out, and
@@ -110,6 +110,21 @@ In the clip grid (Clip-launch workflow):
   it off and they act: a key on a knob switches it between Min and Max (Min on the first press). Mappings are saved with the project; a MIDI
   mapping of a knob is the same link as **Link to controller**. In the other layouts
   Ctrl+M stays the metronome.
+
+In the Simple workflow, the **track dock** under the timeline (View › Track dock) has the selected track's
+**Instrument** (LYNX's sounds, your plugins and SoundFonts, with a preview), **Keyboard** (Keys, Scale keys or a Chord
+pad, with Lock to key), **Editor** (the Piano roll on the track's pattern) and **Effects** tabs. The Effects tab chains
+one-knob effects (Brighter, Echo, Punch, Room, Bass, Level, Dirty, Warm), loads one of 22 chain presets or your own,
+and has a Blend knob for the whole chain. A loop dropped in the Simple workflow follows the project key (Follow the
+project key, per clip). In every layout, View › **Lyrics and notes** keeps the song's lyrics beside the Playlist, View ›
+**Reference match...** matches the Master's tone and loudness to a reference track, and **Clean voice** (Mixer and
+track menus) puts a ready voice chain on a track.
+
+From FL Studio: right-click a control › **Link to controller...** opens **Remote control settings** (port, channel,
+controller, mapping formula, smoothing and FL's Mode list, also for note and button links). **Edison** sits on any
+mixer slot (mixer menu › Open audio editor / ...and record) and records with its window closed. The **Sampler page**
+follows FL's layout (Content, Playback with loop points, Time stretching, Precomputed effects); LYNX's own controls are
+in its last box, LYNX extras.
 
 ## Online sessions: make a song with a friend (phase 1, packages)
 
