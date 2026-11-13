@@ -4956,6 +4956,32 @@ void BrowserComponent::findSimilar (const juce::File& file)
     runSearch();
 }
 
+void BrowserComponent::findSimilarSamples (const juce::File& file, std::function<void (juce::Array<juce::File>)> done)
+{
+    BrowserComponent* main = nullptr;
+    for (auto* b : liveBrowsers())
+        if (b->role == Role::main)
+            main = b;
+    if (main == nullptr || main->similar == nullptr || ! file.existsAsFile())
+    {
+        if (done)
+            juce::MessageManager::callAsync ([done] { done ({}); });
+        return;
+    }
+    if (! main->allRoots.isEmpty() && ! std::exchange (main->similar->passAsked, true))
+        main->similar->service->refresh (toPaths (main->withMerged (main->allRoots)));
+    main->similar->service->findSimilar (file.getFullPathName().toStdString(), toPaths (main->similarScope()), (std::size_t) maxSimilar,
+                                         [done] (const similarity::Result& r) {
+                                             juce::Array<juce::File> found;
+                                             for (const auto& m : r.matches)
+                                                 found.add (juce::File (juce::String::fromUTF8 (m.path.c_str())));
+                                             juce::MessageManager::callAsync ([done, found] {
+                                                 if (done)
+                                                     done (found);
+                                             });
+                                         });
+}
+
 void BrowserComponent::runSimilar (bool quiet)
 {
     resultsView->setVisible (true);

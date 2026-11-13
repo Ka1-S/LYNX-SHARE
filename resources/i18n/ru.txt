@@ -9390,8 +9390,6 @@ countries: ru by kz
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Щёлкните, чтобы загрузить этот плагин на дорожку и послушать его (Ctrl+Z — отменить)"
 "Add \"{0}\" to favourites" = "Добавить «{0}» в избранное"
 "Remove \"{0}\" from favourites" = "Убрать «{0}» из избранного"
-"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Выбран внешний вход. Переключиться на \"Только внешний вход\", чтобы не записывать внутренний звук на этой дорожке?"
-"The input of a mixer track can't be changed while recording." = "Вход дорожки микшера нельзя менять во время записи."
 
 # --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
 "{0} parameters selected" = "Выбрано параметров: {0}"
@@ -9414,6 +9412,8 @@ countries: ru by kz
 "Spare state" = "Запасное состояние"
 "Store in spare state" = "Сохранить в запасное состояние"
 "Flip with spare state" = "Поменять с запасным состоянием"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Выбран внешний вход. Переключиться на \"Только внешний вход\", чтобы не записывать внутренний звук на этой дорожке?"
+"The input of a mixer track can't be changed while recording." = "Вход дорожки микшера нельзя менять во время записи."
 "All Ins" = "Все входы"
 "Arm Recording (Ctrl-click: arm several tracks)" = "Подготовка к записи (Ctrl+щелчок: несколько дорожек)"
 "Audio From" = "Аудио из"
@@ -9465,6 +9465,11 @@ countries: ru by kz
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "Начало: где клип начинается в источнике (такт. доля. шестнадцатая; секунды для аудио без warp)"
 "The groove this clip plays through (the Groove Pool)" = "Грув, через который играет этот клип (Groove Pool)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Режим warp: как растягивается аудио. Re-Pitch меняет скорость и высоту вместе. Относится к каналу"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Память ячейки"
+"Level|Transient" = "Уровень|Транзиент"
+"Smooth|Mid|Sharp" = "Плавно|Средне|Резко"
 "Follow the project key" = "Следовать тональности проекта"
 "Loop key" = "Тональность лупа"
 "Edit chord" = "Изменить аккорд"
@@ -9569,6 +9574,41 @@ countries: ru by kz
 "Continue the tour" = "Продолжить тур"
 "LYNX demo: {0} ({1})" = "Демо LYNX: {0} ({1})"
 "Step done" = "Шаг выполнен"
+"Drum Rack" = "Драм-рэк"
+"Choke" = "Глушение"
+"All Notes" = "Все ноты"
+"Empty chain" = "Пустая цепь"
+"Add return chain" = "Добавить возвратную цепь"
+"Delete return chain" = "Удалить возвратную цепь"
+"Drop an instrument or sample here" = "Перетащите сюда инструмент или сэмпл"
+"Slice to Drum Rack" = "Нарезать в Drum Rack"
+"Slice to New MIDI Track..." = "Нарезать в новую MIDI-дорожку..."
+"Slice to New MIDI Track" = "Нарезать в новую MIDI-дорожку"
+"Only the first {0} slices got a pad." = "Пэды получили только первые {0} фрагментов."
+"1 Bar" = "1 такт"
+"Warp Marker" = "Маркер варпа"
+"Create one slice per" = "Один фрагмент на"
+"Default (choke, gated)" = "По умолчанию (choke, гейт)"
+"One-shot" = "Однократно (one-shot)"
+"Slicing template" = "Шаблон нарезки"
+"Send-{0}" = "Send-{0}"
+"Rack Output" = "Выход рэка"
+"Save as Default Pad" = "Сохранить как пэд по умолчанию"
+"Next Similar" = "Следующий похожий"
+"Previous Similar" = "Предыдущий похожий"
+"Save as Similarity Reference" = "Сохранить как эталон сходства"
+"Return to Reference" = "Вернуться к эталону"
+"Replace the default pad?" = "Заменить пэд по умолчанию?"
+"Slice to New MIDI track" = "Нарезать на новую MIDI-дорожку"
+"1/2 Note" = "1/2 ноты"
+"1/4 Note" = "1/4 ноты"
+"1/8 Note" = "1/8 ноты"
+"1/16 Note" = "1/16 ноты"
+"1/32 Note" = "1/32 ноты"
+"Create one slice per:" = "Один срез на:"
+"Slicing Preset:" = "Пресет нарезки:"
+"Preserve warped timing:" = "Сохранить тайминг варпа:"
+"The current clip region is {0} beats long - this will result in {1} slices." = "Текущая область клипа длится {0} долей - получится {1} срезов."
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"
@@ -9630,9 +9670,6 @@ countries: ru by kz
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"
 
 # --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
-"Cell memory" = "Память ячейки"
-"Level|Transient" = "Уровень|Транзиент"
-"Smooth|Mid|Sharp" = "Плавно|Средне|Резко"
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 
 # --- Round 190dh: FL's Sampler page (Content, Playback, Time stretching, Precomputed effects, the waveform)

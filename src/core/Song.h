@@ -667,6 +667,10 @@ struct PatchZone
     float selectorMin = 0.0f, selectorMax = 1.0f; // the selector's range over the Surface value (a macro-mapped selector)
     bool selectorScalesVelocity = false;
     bool selectorFiltersCtrl = false; // Live's "Chain Selector Filters MIDI Ctrl"
+    // A Drum Rack pad (round 190ec): the note the chain's devices get instead of the one received (−1 = the same), the
+    // pad's choke group (0 none, 1…16) and the chain's instrument node, which a note entering another zone of the same
+    // choke group cuts (Live's ChokeGroup)
+    int playKey = -1, choke = 0, chokeNode = -1;
     bool operator== (const PatchZone&) const = default;
 };
 
@@ -1277,6 +1281,15 @@ struct RackVariation
     bool operator== (const RackVariation&) const = default;
 };
 
+// A Drum Rack chain's send to one of the rack's return chains (round 190ec; Live's DrumBranch MixerDevice/SendInfos/
+// AudioBranchSendInfo): a linear gain (Live: −inf … 0 dB) and whether the send is on (EnabledByUser)
+struct RackSend
+{
+    float level = 0.0f;
+    bool on = true;
+    bool operator== (const RackSend&) const = default;
+};
+
 struct RackChain
 {
     std::string name;
@@ -1288,6 +1301,11 @@ struct RackChain
     std::vector<int> nodes; // the Patcher's nodes in signal order: MIDI effects (VFX), the instrument, audio effects
     int mixer = -1;         // the chain's "rack chain mixer" node (volume, pan, chain-select gain)
     int gate = -1;          // an Audio Effect Rack chain's input gate (a zone without a fade closes the input)
+    // A Drum Rack pad (round 190ec, Live's DrumBranch/BranchInfo and its chain's Audio To): the note it receives (0…127,
+    // −1 = all notes), the note it plays into its devices, its choke group (0 none, 1…16), where its audio goes (−1 the
+    // rack's output, k = return chain k) and its sends to the return chains (one per return)
+    int receive = 36, play = 60, choke = 0, audioTo = -1;
+    std::vector<RackSend> sends;
     bool operator== (const RackChain&) const = default;
 };
 
@@ -1313,8 +1331,17 @@ struct RackDoc
     // the views (saved with the project, as Live saves them)
     bool showMacros = true, showChains = false, showDevices = false, showVariations = false;
     int zoneEditor = -1; // −1 hidden, 0 key, 1 velocity, 2 chain select
-    int selectedChain = 0;
+    int selectedChain = 0; // (a Drum Rack: chains.size() + k selects return chain k)
     bool autoSelect = false;
+    // Live's Drum Rack (round 190ec, docs/analise/REA_rodada190ec.md): an Instrument Rack whose chains are pads (a note
+    // received, a note played, a choke group) with sends to return chains. Saved as an Instrument Rack plus these, so a
+    // LYNX without Drum Racks opens it as a key-split Instrument Rack.
+    bool drum = false;
+    std::vector<RackChain> returns; // the return chains: audio effects, summed into the rack's output
+    // the Drum Rack's views: the pads, the chain list's I/O and send columns, the return chains; the pad view's top row
+    // counted from the top of the 32 rows of 4 (Live's PadScrollPosition; 19 shows C1…D#2 at the bottom)
+    bool showPads = true, showIO = false, showSends = false, showReturns = false;
+    int padScroll = 19;
     bool operator== (const RackDoc&) const = default;
 };
 

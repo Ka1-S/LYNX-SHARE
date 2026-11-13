@@ -929,7 +929,23 @@ void Graph::forLayeredTargets (const std::vector<MidiTarget>& targets, int type,
     }
 }
 
-bool Graph::zoneGate (int zone, bool on, int key, int midiChannel, float& velocity) noexcept
+void Graph::choke (int zone) noexcept
+{
+    // Live's choke groups (round 190ec): a pad that starts a note stops every other pad of its group (their
+    // instruments' cut: the sampler's short declick, as an FL cut group)
+    const auto& self = zoneStates[(std::size_t) zone].zone;
+    for (std::size_t z = 0; z < zoneStates.size(); ++z)
+    {
+        const auto& other = zoneStates[z].zone;
+        if ((int) z == zone || other.choke != self.choke || other.chokeNode < 0 || other.chokeNode == self.chokeNode
+            || other.chokeNode >= (int) nodes.size())
+            continue;
+        if (auto& i = nodes[(std::size_t) other.chokeNode]->instrument)
+            i->cut();
+    }
+}
+
+bool Graph::zoneGate (int zone, bool on, int& key, int midiChannel, float& velocity) noexcept
 {
     if (zone < 0 || zone >= (int) zoneStates.size())
         return true;
@@ -941,6 +957,8 @@ bool Graph::zoneGate (int zone, bool on, int key, int midiChannel, float& veloci
         if ((s.held[k] & bit) == 0)
             return false;
         s.held[k] = (std::uint16_t) (s.held[k] & ~bit);
+        if (s.zone.playKey >= 0)
+            key = s.zone.playKey;
         return true;
     }
     const auto& surface = active->surface;
@@ -952,6 +970,10 @@ bool Graph::zoneGate (int zone, bool on, int key, int midiChannel, float& veloci
         return false;
     velocity = v;
     s.held[k] = (std::uint16_t) (s.held[k] | bit);
+    if (s.zone.choke > 0)
+        choke (zone);
+    if (s.zone.playKey >= 0)
+        key = s.zone.playKey;
     return true;
 }
 
@@ -961,7 +983,7 @@ void Graph::deliver (int pin, bool on, int key, float velocityIn, int midiChanne
         return;
     forLayeredTargets (pinTargets[(std::size_t) pin], on ? 1 : 0, key, [&] (const MidiTarget& t, int k, float gain, float pan, float cents, bool viaLayer) {
         auto velocity = velocityIn;
-        if (t.zone >= 0 && ! zoneGate (t.zone, on, k, midiChannel, velocity))
+        if (t.zone >= 0 && ! zoneGate (t.zone, on, k, midiChannel, velocity)) // (k: a Drum Rack pad's Play note)
             return;
         if (t.vfx)
         {

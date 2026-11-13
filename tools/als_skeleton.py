@@ -8,10 +8,13 @@ Those sets are local only: none is committed, and the generated header holds no 
 
 usage: tools/als_skeleton.py --live12 <folder of decompressed Live 12 sets> --probe12 <folder with gainprobe.xml and
        warpref.als (Live-saved plugin probes)> --live11 <a Live 11 set .als> [--live11-extra <more Live 11 sets>]
-       [--out src/core/AlsSkeleton.h]
+       [--drum12 <folder with sample-on-drum-pad.xml: Live's default pad Simpler, decompressed>] [--out src/core/AlsSkeleton.h]
        round 175a used --live11 XRJAM.als (11.0.12) --live11-extra abletoolz 11.0.12.als (GroupTrack, AudioClip, VST3)
        WithPlugins.als (11.3.3, Locator); all public sets, kept local. Round 183c added the rack kinds (the Live 12 demo
-       and template sets, gainprobe's plugin parameter) with the same arguments.
+       and template sets, gainprobe's plugin parameter) with the same arguments. Round 190ec added the Drum Rack kinds
+       (DrumGroupDevice, DrumBranch, ReturnBranch, AudioBranchSendInfo from Quick_Start_Song; OriginalSimpler from Live's
+       default pad Simpler, Core Library/Defaults/Dropping Samples/On Drum Rack, given by --drum12; MultiSamplePart from
+       Quick_Start_Song): the earlier kinds come out byte for byte the same.
 """
 import argparse, copy, gzip, os, re, xml.etree.ElementTree as ET, zlib
 
@@ -109,6 +112,40 @@ def to11(e):
     return e
 
 
+# Drum Rack kinds (round 190ec): their own lists are emptied too (sends, sample parts, slice points), only in these kinds
+DRUM_KINDS = {'DrumGroupDevice': './/DrumGroupDevice', 'DrumBranch': './/DrumGroupDevice/Branches/DrumBranch',
+              'ReturnBranch': './/DrumGroupDevice/ReturnBranches/ReturnBranch', 'AudioBranchSendInfo': './/AudioBranchSendInfo',
+              'OriginalSimpler': './/OriginalSimpler', 'MultiSamplePart': './/OriginalSimpler//MultiSamplePart'}
+DRUM_LISTS = {'SendInfos', 'SampleParts', 'SlicePoints', 'ManualSlicePoints', 'BeatSlicePoints', 'RegionSlicePoints',
+              'InitialSlicePointsFromOnsets', 'UserOnsets', 'TimeSignatures'}
+
+
+def empty_lists(e, names):
+    for c in e.iter():
+        if c.tag in names:
+            for x in list(c):
+                c.remove(x)
+    return e
+
+
+def drum_kinds(roots, default_simpler=None, required=True):
+    out = {}
+    for k, path in DRUM_KINDS.items():
+        src = [default_simpler] if k == 'OriginalSimpler' and default_simpler is not None else roots
+        e = next((r.find(path) for r in src if r is not None and r.find(path) is not None), None)
+        if e is None:
+            if required:
+                raise SystemExit(f'missing {path}')
+            continue
+        e = empty_lists(copy.deepcopy(e), DRUM_LISTS)
+        if k in ('DrumBranch', 'ReturnBranch'):  # (the sample's routing into its own set's tracks: the export sets it)
+            t = e.find('MixerDevice/RoutingHelper/Routable/Target')
+            if t is not None:
+                t.set('Value', 'AudioOut/None')
+        out[k] = e
+    return out
+
+
 def kinds12(a):
     x = lambda f: ET.parse(os.path.join(a.live12, f)).getroot()
     base, beat, demo, pod = x('DefaultLiveSet.xml'), x('Quick_Start_Beat.xml'), x('Chuck_Sutton_-_Patience__Live_12_Suite_Demo_.xml'), x('Podcast___Radio.xml')
@@ -126,6 +163,8 @@ def kinds12(a):
         'PluginDeviceVst3': find(gain, './/PluginDevice'), 'PluginDeviceVst2': find(vst2, './/PluginDevice'),
         # racks (round 183c): the rack devices, a chain of each kind, a macro variation, a macro mapping, a plugin parameter
         **rack_kinds([demo, x('Guitar_Recording.xml'), x('Quick_Start_Song.xml')], gain),
+        # Drum Racks (round 190ec)
+        **(drum_kinds([x('Quick_Start_Song.xml')], ET.parse(os.path.join(a.drum12, 'sample-on-drum-pad.xml')).getroot()) if a.drum12 else {}),
     }
 
 
@@ -202,6 +241,16 @@ def kinds11(a, k12):
         else:
             print(f'Live 11: {k} downgraded from Live 12 (no Live 11 sample has one)')
             out[k] = to11(copy.deepcopy(k12[k]))
+    # Drum Racks (round 190ec): from the Live 11 sets that hold them, else downgraded from Live 12 (the pad Simpler is
+    # always Live 12's default, downgraded)
+    if 'DrumGroupDevice' in k12:
+        found = drum_kinds([r] + extra, None, required=False)
+        for k in DRUM_KINDS:
+            if k in found and k != 'OriginalSimpler':
+                out[k] = found[k]
+            else:
+                print(f'Live 11: {k} downgraded from Live 12')
+                out[k] = to11(copy.deepcopy(k12[k]))
     return out
 
 
@@ -211,12 +260,13 @@ def main():
     p.add_argument('--probe12', required=True)
     p.add_argument('--live11', required=True)
     p.add_argument('--live11-extra', nargs='*', default=[], help='more Live 11 sets, for the kinds the first one lacks (first match wins)')
+    p.add_argument('--drum12', default=None, help="folder with sample-on-drum-pad.xml (Live 12's default pad Simpler, decompressed)")
     p.add_argument('--out', default='src/core/AlsSkeleton.h')
     a = p.parse_args()
     k12 = kinds12(a)
     k11 = kinds11(a, k12)
     lines = ['#pragma once', '',
-             '// Generated by tools/als_skeleton.py (rounds 175a, 183c): the element skeletons of Live 12 and Live 11 sets that the .als',
+             '// Generated by tools/als_skeleton.py (rounds 175a, 183c, 190ec): the element skeletons of Live 12 and Live 11 sets that the .als',
              '// export fills in (member names and default values in Live\'s order; lists empty; no song content). One zlib',
              '// stream per version: <Skeletons><Kind name="MidiTrack">…</Kind>…</Skeletons>. Do not edit by hand.', '',
              '#include <cstddef>', '#include <cstdint>', '', 'namespace lynx::alsskeleton', '{']

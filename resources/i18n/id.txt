@@ -9390,8 +9390,6 @@ countries: id
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Klik untuk memuat plugin ini di trek dan mendengarnya (Ctrl+Z kembali)"
 "Add \"{0}\" to favourites" = "Tambah \"{0}\" ke favorit"
 "Remove \"{0}\" from favourites" = "Hapus \"{0}\" dari favorit"
-"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Input eksternal telah dipilih. Beralih ke \"Hanya input eksternal\" agar audio internal tidak terekam di trek ini?"
-"The input of a mixer track can't be changed while recording." = "Input trek mixer tidak dapat diubah saat merekam."
 
 # --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
 "{0} parameters selected" = "{0} parameter dipilih"
@@ -9414,6 +9412,8 @@ countries: id
 "Spare state" = "Status cadangan"
 "Store in spare state" = "Simpan ke status cadangan"
 "Flip with spare state" = "Tukar dengan status cadangan"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Input eksternal telah dipilih. Beralih ke \"Hanya input eksternal\" agar audio internal tidak terekam di trek ini?"
+"The input of a mixer track can't be changed while recording." = "Input trek mixer tidak dapat diubah saat merekam."
 "All Ins" = "Semua input"
 "Arm Recording (Ctrl-click: arm several tracks)" = "Siapkan rekaman (Ctrl+klik: beberapa trek)"
 "Audio From" = "Audio dari"
@@ -9465,6 +9465,11 @@ countries: id
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "Mulai: tempat klip dimulai di sumbernya (bar. ketukan. seperenambelas; detik untuk audio tanpa warp)"
 "The groove this clip plays through (the Groove Pool)" = "Groove yang dipakai klip ini (Groove Pool)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Mode warp: cara audio diregangkan. Re-Pitch mengubah kecepatan dan nada bersamaan. Milik kanal"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Memori sel"
+"Level|Transient" = "Level|Transien"
+"Smooth|Mid|Sharp" = "Halus|Sedang|Tajam"
 "Follow the project key" = "Ikuti kunci nada proyek"
 "Loop key" = "Kunci nada loop"
 "Edit chord" = "Edit chord"
@@ -9569,6 +9574,41 @@ countries: id
 "Continue the tour" = "Lanjutkan tur"
 "LYNX demo: {0} ({1})" = "Demo LYNX: {0} ({1})"
 "Step done" = "Langkah selesai"
+"Drum Rack" = "Rak drum"
+"Choke" = "Choke"
+"All Notes" = "Semua nada"
+"Empty chain" = "Rantai kosong"
+"Add return chain" = "Tambah rantai return"
+"Delete return chain" = "Hapus rantai return"
+"Drop an instrument or sample here" = "Letakkan instrumen atau sampel di sini"
+"Slice to Drum Rack" = "Iris ke Drum Rack"
+"Slice to New MIDI Track..." = "Iris ke trek MIDI baru..."
+"Slice to New MIDI Track" = "Iris ke trek MIDI baru"
+"Only the first {0} slices got a pad." = "Hanya {0} irisan pertama yang mendapat pad."
+"1 Bar" = "1 birama"
+"Warp Marker" = "Penanda warp"
+"Create one slice per" = "Buat satu irisan per"
+"Default (choke, gated)" = "Bawaan (choke, gate)"
+"One-shot" = "One-shot"
+"Slicing template" = "Templat pengirisan"
+"Send-{0}" = "Send-{0}"
+"Rack Output" = "Output rak"
+"Save as Default Pad" = "Simpan sebagai pad bawaan"
+"Next Similar" = "Mirip berikutnya"
+"Previous Similar" = "Mirip sebelumnya"
+"Save as Similarity Reference" = "Simpan sebagai referensi kemiripan"
+"Return to Reference" = "Kembali ke referensi"
+"Replace the default pad?" = "Ganti pad bawaan?"
+"Slice to New MIDI track" = "Iris ke trek MIDI baru"
+"1/2 Note" = "1/2 nada"
+"1/4 Note" = "1/4 nada"
+"1/8 Note" = "1/8 nada"
+"1/16 Note" = "1/16 nada"
+"1/32 Note" = "1/32 nada"
+"Create one slice per:" = "Buat satu irisan per:"
+"Slicing Preset:" = "Preset pengirisan:"
+"Preserve warped timing:" = "Pertahankan timing warp:"
+"The current clip region is {0} beats long - this will result in {1} slices." = "Wilayah klip saat ini sepanjang {0} ketukan - hasilnya {1} irisan."
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"
@@ -9630,9 +9670,6 @@ countries: id
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"
 
 # --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
-"Cell memory" = "Memori sel"
-"Level|Transient" = "Level|Transien"
-"Smooth|Mid|Sharp" = "Halus|Sedang|Tajam"
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 
 # --- Round 190dh: FL's Sampler page (Content, Playback, Time stretching, Precomputed effects, the waveform)

@@ -4,12 +4,14 @@
 #include <charconv>
 #include <cctype>
 #include <cmath>
+#include <filesystem>
 #include <iomanip>
 #include <locale>
 #include <map>
 #include <mutex>
 #include <set>
 #include <sstream>
+#include <utility>
 
 #include "core/AlsImport.h"
 #include "core/AlsSkeleton.h"
@@ -374,14 +376,202 @@ struct Exporter
         }
     }
 
+    // ---- Drum Racks (round 190ec, ALS_FORMAT.md §7): a pad's BranchInfo, its sends and Audio To, the return chains, and
+    // a LYNX Sampler on a pad as Live's Simpler
+    std::string drumTarget {}; // "AudioOut/Track.<track Id>/DeviceIn.<device Id>" of the Drum Rack about to be written (top level)
+    static constexpr const char* sendFloor = "0.0003162277571"; // (Live's −70 dB send floor = −inf [DATA])
+
+    void drumBranch (Node& b, const RackDoc& r, const RackChain& chain, const std::string& selfTarget)
+    {
+        // ReceivingNote = 128 − the key (0 = all notes), SendingNote = the key played, ChokeGroup 0 / 1…16 [DATA]
+        b.value ("BranchInfo/ReceivingNote", num (chain.receive < 0 ? 0 : 128 - std::clamp (chain.receive, 0, 127)));
+        b.value ("BranchInfo/SendingNote", num (std::clamp (chain.play, 0, 127)));
+        b.value ("BranchInfo/ChokeGroup", num (std::clamp (chain.choke, 0, rack::drumChokeGroups)));
+        if (auto* infos = b.at ("MixerDevice/SendInfos"))
+            for (int k = 0; k < (int) r.returns.size(); ++k)
+            {
+                Node x = sk["AudioBranchSendInfo"];
+                if (x.name.empty())
+                    break;
+                const auto send = k < (int) chain.sends.size() ? chain.sends[(std::size_t) k] : RackSend {};
+                x.set ("Id", num (k));
+                x.value ("Send/Manual", send.level > 0.0003163f ? num ((double) std::min (send.level, 1.0f)) : std::string (sendFloor));
+                x.value ("EnabledByUser", boolean (send.on));
+                x.value ("Index", num (k));
+                infos->add (std::move (x));
+            }
+        std::string target = "AudioOut/None";
+        if (chain.audioTo >= 0 && chain.audioTo < (int) r.returns.size())
+        {
+            if (! selfTarget.empty())
+                target = selfTarget + ".R" + std::to_string (chain.audioTo) + ",ChainIn";
+            else
+                note ("Drum rack pad playing into a return chain inside another rack: exported to the rack's output (" + chain.name + ")");
+        }
+        b.value ("MixerDevice/RoutingHelper/Routable/Target", target);
+    }
+
+    void drumReturns (const PatcherDoc& doc, const RackDoc& r, Node& out)
+    {
+        auto* list = out.child ("ReturnBranches");
+        if (list == nullptr)
+            return;
+        for (int k = 0; k < (int) r.returns.size(); ++k)
+        {
+            const auto& ret = r.returns[(std::size_t) k];
+            Node b = sk["ReturnBranch"];
+            if (b.name.empty())
+                return note ("Drum rack return chains not exported (no skeleton)");
+            b.set ("Id", num (k));
+            b.value ("Name/EffectiveName", rack::returnLabel (r, k)); // ("a Mix Bus": Live's shown name, the letter first)
+            b.value ("Name/UserName", ret.name);
+            b.value ("IsSoloed", boolean (ret.solo));
+            b.value ("MixerDevice/Speaker/Manual", boolean (ret.active));
+            b.value ("MixerDevice/Volume/Manual", num (std::clamp ((double) ret.volume, minGain, maxGain)));
+            b.value ("MixerDevice/Panorama/Manual", num ((double) ret.pan));
+            b.value ("MixerDevice/RoutingHelper/Routable/Target", "AudioOut/None");
+            if (auto* infos = b.at ("MixerDevice/SendInfos")) // (a return chain's own sends: there, switched off [DATA])
+                for (int j = 0; j < (int) r.returns.size(); ++j)
+                {
+                    Node x = sk["AudioBranchSendInfo"];
+                    x.set ("Id", num (j));
+                    x.value ("Send/Manual", sendFloor);
+                    x.value ("EnabledByUser", "false");
+                    x.value ("Index", num (j));
+                    infos->add (std::move (x));
+                }
+            if (auto* devices = b.at ("DeviceChain/AudioToAudioDeviceChain/Devices"))
+                for (const auto n : ret.nodes)
+                {
+                    if (n < 0 || n >= (int) doc.nodes.size())
+                        continue;
+                    const auto& node = doc.nodes[(std::size_t) n];
+                    Node d;
+                    bool made = false;
+                    if (! node.generator && node.effect.kind == EffectKind::plugin)
+                        made = pluginDevice (node.effect.plugin, false, node.effect.enabled, d);
+                    else if (! node.generator && rack::isRack (node.effect))
+                        made = rackDevice (node.effect.patcher, node.effect.enabled, node.label, d, 1);
+                    if (! made)
+                    {
+                        note ("Rack device not exported (LYNX built-in or not VST2 / VST3): " + patcher::nodeName (node) + " in " + ret.name);
+                        continue;
+                    }
+                    d.set ("Id", num ((int) devices->kids.size()));
+                    devices->add (std::move (d));
+                }
+            list->add (std::move (b));
+        }
+    }
+
+    // A LYNX Sampler on a pad → Live's Simpler [DATA: Live's default pad Simpler; the import's laws backwards
+    // (core/AlsDevices.cpp applySimpler)]: One-Shot when it plays the whole sample (release 0), else Classic with its
+    // envelope; Volume (dB), Pan, Transpose, Reverse; one sample part per zone (or the sample, its region in frames)
+    bool simplerDevice (const ChannelDef& ch, Node& out)
+    {
+        out = sk["OriginalSimpler"];
+        Node partSkeleton = sk["MultiSamplePart"];
+        if (out.name.empty() || partSkeleton.name.empty() || (ch.samplePath.empty() && ch.zones.empty()))
+            return false;
+        const auto& s = ch.sampler;
+        out.value ("On/Manual", "true");
+        out.value ("UserName", "");
+        const auto oneShot = s.release <= 0.0f;
+        out.value ("Globals/PlaybackMode", oneShot ? "1" : "0");
+        out.value ("VolumeAndPan/OneShotEnvelope/SustainMode/Manual", "0");
+        out.value ("VolumeAndPan/Envelope/AttackTime/Manual", num (std::max (0.1, s.attack * 1000.0)));
+        out.value ("VolumeAndPan/Envelope/DecayTime/Manual", num (s.decay > 0.0f ? s.decay * 1000.0 : 600.0));
+        out.value ("VolumeAndPan/Envelope/SustainLevel/Manual", num (s.decay > 0.0f ? (double) s.sustain : 1.0));
+        out.value ("VolumeAndPan/Envelope/ReleaseTime/Manual", num (std::max (1.0, s.release * 1000.0)));
+        out.value ("VolumeAndPan/Volume/Manual", num (std::clamp ((double) s.gainDb, -36.0, 36.0)));
+        out.value ("VolumeAndPan/Panorama/Manual", num (std::clamp ((double) ch.pan, -1.0, 1.0)));
+        const auto semis = std::round ((double) s.pitch);
+        out.value ("Pitch/TransposeKey/Manual", num (semis));
+        out.value ("Pitch/TransposeFine/Manual", num (std::round (((double) s.pitch - semis) * 100.0)));
+        out.value ("Player/Reverse/Manual", boolean (s.reverse));
+        auto* parts = out.at ("Player/MultiSampleMap/SampleParts");
+        if (parts == nullptr)
+            return false;
+        auto addPart = [&] (const SampleZone& z, float from, float to) {
+            Node part = partSkeleton;
+            part.set ("Id", num ((int) parts->kids.size()));
+            const auto stem = std::filesystem::path (z.path).stem().string();
+            part.value ("Name", stem);
+            part.value ("KeyRange/Min", num (z.lowKey));
+            part.value ("KeyRange/Max", num (z.highKey));
+            part.value ("KeyRange/CrossfadeMin", num (z.lowKey));
+            part.value ("KeyRange/CrossfadeMax", num (z.highKey));
+            part.value ("VelocityRange/Min", num (std::max (1, z.lowVelocity)));
+            part.value ("VelocityRange/Max", num (z.highVelocity));
+            part.value ("VelocityRange/CrossfadeMin", num (std::max (1, z.lowVelocity)));
+            part.value ("VelocityRange/CrossfadeMax", num (z.highVelocity));
+            part.value ("RootKey", num (z.rootKey));
+            part.value ("Detune", num (std::round (z.tune * 100.0)));
+            part.value ("Volume", num ((double) z.gain));
+            part.value ("Panorama", "0");
+            double frames = 0.0, rate = 0.0;
+            const auto known = options.sampleFormat && options.sampleFormat (z.path, frames, rate) && frames > 0.0 && rate > 0.0;
+            if (! known && (from > 0.0f || to < 1.0f))
+                note ("Drum rack pad: sample region not exported (sample length unknown): " + ch.name);
+            const auto start = known ? std::floor ((double) from * frames) : 0.0;
+            const auto end = known ? std::max (start + 1.0, std::floor ((double) to * frames) - 1.0) : 0.0;
+            part.value ("SampleStart", num (start));
+            part.value ("SampleEnd", num (end));
+            for (const auto* loop : { "SustainLoop", "ReleaseLoop" })
+            {
+                part.value (std::string (loop) + "/Start", num (start));
+                part.value (std::string (loop) + "/End", num (end));
+            }
+            part.value ("SustainLoop/Mode", z.loopMode != 0 && z.loopEnd > z.loopStart ? "1" : "0");
+            if (z.loopMode != 0 && z.loopEnd > z.loopStart)
+            {
+                part.value ("SustainLoop/Start", num ((double) z.loopStart));
+                part.value ("SustainLoop/End", num ((double) z.loopEnd));
+            }
+            if (auto* ref = part.at ("SampleRef/FileRef"))
+            {
+                bool relative = false;
+                const auto path = options.samplePath ? options.samplePath (z.path, relative) : z.path;
+                ref->value ("RelativePathType", relative ? "1" : "0");
+                ref->value ("RelativePath", relative ? path : std::string());
+                ref->value ("Path", relative ? std::string() : path);
+                ref->value ("Type", "1");
+                ref->value ("LivePackName", "");
+                ref->value ("LivePackId", "");
+                ref->value ("OriginalFileSize", "0");
+                ref->value ("OriginalCrc", "0");
+            }
+            if (auto* sref = part.child ("SampleRef"))
+            {
+                sref->value ("LastModDate", "0");
+                sref->value ("DefaultDuration", num (known ? frames : 0.0));
+                sref->value ("DefaultSampleRate", num (known ? rate : 0.0));
+            }
+            part.value ("SampleWarpProperties/IsWarped", "false");
+            parts->add (std::move (part));
+        };
+        if (ch.zones.empty())
+        {
+            SampleZone z;
+            z.path = ch.samplePath;
+            addPart (z, s.regionStart, s.regionEnd);
+        }
+        else
+            for (const auto& z : ch.zones)
+                addPart (z, 0.0f, 1.0f);
+        return ! parts->kids.empty();
+    }
+
     bool rackDevice (const PatcherDoc& doc, bool on, const std::string& label, Node& out, int depth = 0)
     {
         const auto* r = rack::rackOf (doc);
         if (r == nullptr || depth > 8)
             return false;
         const auto kind = r->kind;
-        const std::string tag = kind == RackDoc::Kind::instrument ? "InstrumentGroupDevice" : kind == RackDoc::Kind::midiEffect ? "MidiEffectGroupDevice" : "AudioEffectGroupDevice";
-        const std::string branchTag = kind == RackDoc::Kind::instrument ? "InstrumentBranch" : kind == RackDoc::Kind::midiEffect ? "MidiEffectBranch" : "AudioEffectBranch";
+        const auto drum = r->drum && kind == RackDoc::Kind::instrument; // (round 190ec: Live's Drum Rack)
+        const auto selfTarget = std::exchange (drumTarget, std::string()); // (this rack's own "Audio To" prefix; nested racks: none)
+        const std::string tag = drum ? "DrumGroupDevice" : kind == RackDoc::Kind::instrument ? "InstrumentGroupDevice" : kind == RackDoc::Kind::midiEffect ? "MidiEffectGroupDevice" : "AudioEffectGroupDevice";
+        const std::string branchTag = drum ? "DrumBranch" : kind == RackDoc::Kind::instrument ? "InstrumentBranch" : kind == RackDoc::Kind::midiEffect ? "MidiEffectBranch" : "AudioEffectBranch";
         const std::string chainPath = kind == RackDoc::Kind::instrument ? "DeviceChain/MidiToAudioDeviceChain/Devices"
                                       : kind == RackDoc::Kind::midiEffect ? "DeviceChain/MidiToMidiDeviceChain/Devices"
                                                                          : "DeviceChain/AudioToAudioDeviceChain/Devices";
@@ -414,6 +604,8 @@ struct Exporter
             zone ("BranchSelectorRange", chain.select);
             zone ("ZoneSettings/KeyRange", chain.key);
             zone ("ZoneSettings/VelocityRange", chain.velocity);
+            if (drum)
+                drumBranch (b, *r, chain, selfTarget);
             if (auto* devices = b.at (chainPath))
                 for (const auto n : chain.nodes)
                 {
@@ -424,6 +616,8 @@ struct Exporter
                     bool made = false;
                     if (node.generator && node.channel.instrument == InstrumentKind::plugin)
                         made = pluginDevice (node.channel.plugin, true, true, d);
+                    else if (drum && node.generator && node.channel.instrument == InstrumentKind::sampler) // (round 190ec)
+                        made = simplerDevice (node.channel, d);
                     else if (node.generator && rack::isRack (node.channel))
                         made = rackDevice (node.channel.patcher, true, node.label, d, depth + 1);
                     else if (! node.generator && node.effect.kind == EffectKind::plugin)
@@ -442,6 +636,8 @@ struct Exporter
             if (branches != nullptr)
                 branches->add (std::move (b));
         }
+        if (drum)
+            drumReturns (doc, *r, out);
         for (int k = 0; k < rackMacroCount; ++k)
         {
             const auto n = std::to_string (k);
@@ -461,6 +657,14 @@ struct Exporter
         out.value ("AreDevicesVisible", boolean (r->showDevices));
         out.value ("IsRangesEditorVisible", boolean (r->zoneEditor >= 0));
         out.value ("AreMacroVariationsControlsVisible", boolean (r->showVariations));
+        if (drum) // the Drum Rack's views [DATA member names]
+        {
+            out.value ("ArePadsVisible", boolean (r->showPads));
+            out.value ("IsMidiSectionVisible", boolean (r->showIO));
+            out.value ("AreSendsVisible", boolean (r->showSends));
+            out.value ("IsReturnBranchesListVisible", boolean (r->showReturns));
+            out.value ("PadScrollPosition", num (std::clamp (r->padScroll, 0, rack::drumPadRows - 4)));
+        }
         if (auto* snapshots = out.at ("MacroVariations/MacroSnapshots"))
             for (int i = 0; i < (int) r->variations.size(); ++i)
             {
@@ -1243,6 +1447,9 @@ struct Exporter
                 else if (rack::isRack (ch)) // (round 183c: an Instrument Rack)
                 {
                     Node d;
+                    // (round 190ec) a Drum Rack's chains route into its return chains by this track's and device's Ids [DATA]
+                    const auto* devs = n.at ("DeviceChain/DeviceChain/Devices");
+                    drumTarget = "AudioOut/Track." + std::to_string (trackIds[i]) + "/DeviceIn." + std::to_string (devs != nullptr ? devs->kids.size() : 0);
                     if (rackDevice (ch.patcher, true, {}, d))
                         addDevice (n, std::move (d));
                 }

@@ -3135,6 +3135,7 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     layoutstyle::setCurrent (style); // (round 190cm: the clip grid's and the audio editor's Ableton-style keys follow it)
     browser.setLiveItemMenus (clipLaunch); // (round 190cy: Live's flat collection labels in the rows' menus)
     EditorGlobals::get().clipLaunchWorkflow = clipLaunch; // (round 190db: the audio editor's beat-time view)
+    EditorGlobals::get().sendChangeMessage(); // (round 190el: the Piano roll's Drum Rack pad rows follow the layout)
     if (clipGridView != nullptr || clipLaunch)
     {
         playlistArea.setClipGrid (clipLaunch ? clipGridView.get() : nullptr, PlaylistArea::GridView::beside);

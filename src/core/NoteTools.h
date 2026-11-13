@@ -77,6 +77,9 @@ struct KeyRows
     int step (int key, int rows) const noexcept;
 };
 KeyRows keyRows (int root, int scale, bool fold) noexcept;
+// Rows of these keys only, highest at the top (round 190el: a Drum Rack's filled pads in the Clip-launch layout's note
+// editor, Live's pad-name list); every key when `keys` is empty
+KeyRows keyRowsOf (const std::vector<int>& keys) noexcept;
 
 // --- chords -----------------------------------------------------------------------------------
 // Groups the notes into chords: same channel and same start. Each group is sorted by key (low first);

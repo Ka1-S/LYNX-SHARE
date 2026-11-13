@@ -19,7 +19,9 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -163,4 +165,109 @@ bool deleteVariation (PatcherDoc& doc, int index);
 // every macro both hold and that isn't excluded; the others keep `current`.
 std::array<float, rackMacroCount> morphValues (const RackDoc& rack, float amount) noexcept;
 void setMorph (PatcherDoc& doc, float amount);
+
+// ---------------------------------------------------------------------------------------------------------------
+// Drum Rack (round 190ec, docs/analise/REA_rodada190ec.md; Live's DrumGroupDevice): an Instrument Rack whose chains are
+// pads. A pad's chain gets the notes of one key (its Receive note, or every note), turned into its Play note, so a
+// Simpler on any pad plays at its own pitch; a note into a pad of a choke group cuts the other pads of that group; a
+// chain's audio goes to the rack's output or into one of its return chains, and it sends to the return chains.
+// Live's defaults [DATA: every shipped kit and the Slicing defaults]: Play C3 (60), the first pad C1 (36), no choke.
+
+constexpr int drumPadCount = 128, drumPadColumns = 4, drumPadRows = 32;
+constexpr int drumFirstPad = 36, drumPlayNote = 60, drumChokeGroups = 16;
+constexpr int drumDefaultScroll = 19; // (the pad view's top row from the top: C1 at the bottom left)
+
+// A new Drum Rack: no pads yet. Its views as Live opens an empty Drum Rack (round 190el, live check 190ei
+// shots/live-drumrack-empty.png): the pads only (C1 selected at the bottom left) and the selected pad's devices
+// ("Drop an Instrument or Sample Here"); the macros, the variations and the chain list hidden
+PatcherDoc makeDrumRack();
+bool isDrumRack (const PatcherDoc& doc) noexcept;
+bool isDrumRack (const ChannelDef& channel) noexcept;
+// The pad view's row (from the top) of a key, and the first key of a row
+int padRow (int key) noexcept;
+int rowFirstKey (int row) noexcept;
+
+// Chain slots: 0 … chains − 1 are the chains, chains … chains + returns − 1 the return chains (null outside)
+int chainSlots (const RackDoc& rack) noexcept;
+bool isReturnSlot (const RackDoc& rack, int slot) noexcept;
+RackChain* chainAt (RackDoc& rack, int slot) noexcept;
+const RackChain* chainAt (const RackDoc& rack, int slot) noexcept;
+
+// The chain playing pad `key` (the first one receiving that note), or −1
+int padChain (const RackDoc& rack, int key) noexcept;
+// What the pad of `key` shows: its chain's name; "" for an empty pad
+std::string padName (const RackDoc& rack, int key);
+// Every named pad: key → its chain's name (the Piano roll's key column, Live's pad names in the note editor)
+std::map<int, std::string> padNames (const RackDoc& rack);
+// The keys of the filled pads, highest first (round 190el: the rows of Live's note editor for a Drum Rack, 190ei B8:
+// only the pads that hold a chain, named, no piano keys)
+std::vector<int> filledPadKeys (const RackDoc& rack);
+// A return chain as Live shows it: its letter, lowercase, before its name ("a Mix Bus" for the first, "b" alone when it
+// has no name; 190ei B1e, Live's EffectiveName). The name itself is stored without the letter (Live's UserName).
+std::string returnLabel (const RackDoc& rack, int returnChain);
+// The letter of return chain k ("a", "b"…; the send columns are "Send-a", "Send-b")
+std::string returnLetter (int returnChain);
+// A pad chain on `key` (Receive key, Play 60) named `name`, holding `instrument` when given (as the first device of its
+// kind). Returns the chain's index, or −1 (not a Drum Rack). A key that has a pad gets another chain on it (Live layers
+// chains that receive the same note).
+int addPad (PatcherDoc& doc, int key, const std::string& name, std::optional<PatchNode> instrument = {});
+// A pad chain of `from` copied onto pad `key` of the Drum Rack `to`: its devices in order, its name, volume, pan,
+// activator, Play note and choke group (round 190el: Live's pad menu › "Save as Default Pad", and a sample dropped on an
+// empty pad once a default pad is saved). `samplePath`: the copy's Sampler plays this file instead and the pad takes its
+// name (a pad without a Sampler gets one in place of its instrument). Returns the new chain's index, or −1.
+int copyPad (const PatcherDoc& from, int chain, PatcherDoc& to, int key, const std::string& samplePath = {});
+// Live's drag of a pad onto another: the chains of the two keys trade their Receive notes (also onto an empty pad)
+bool swapPads (PatcherDoc& doc, int fromKey, int toKey);
+// The I/O section (each recompiles): Receive (0…127, −1 all notes), Play (0…127), Choke (0 none, 1…16), Audio To
+// (−1 the rack's output, k return chain k), a send (return k: linear gain and on)
+void setReceive (PatcherDoc& doc, int chain, int key);
+void setPlay (PatcherDoc& doc, int chain, int key);
+void setChoke (PatcherDoc& doc, int chain, int group);
+void setAudioTo (PatcherDoc& doc, int chain, int target);
+void setSend (PatcherDoc& doc, int chain, int returnChain, float level, bool on = true);
+// Return chains: a new one (its sends start at −inf on every chain; `name` without the letter, which Live adds), and
+// removing one (chains that played into it go to the rack's output; their sends to it go)
+int addReturn (PatcherDoc& doc, const std::string& name = {});
+bool removeReturn (PatcherDoc& doc, int returnChain);
+
+// Slice to Drum Rack / Slice to New MIDI Track (Live's Simpler › Slice to Drum Rack and the audio clip's Slice to New
+// MIDI Track; LYNX's own slicing templates, after the facts of Live's Slicing defaults [DATA]): one pad per slice from C1
+// up (at most 92: C1…G8), each a Sampler on that slice of the sample.
+enum class SliceTemplate : std::uint8_t
+{
+    gated,   // Live's "Default" facts: every pad in choke group 1, the slice plays while the note is held (50 ms release)
+    oneShot, // every slice plays to its end, pads overlap (no choke group)
+};
+constexpr int maxSlicePads = drumPadCount - drumFirstPad;
+// `slices`: the slice starts as fractions of the sample (sorted, the first usually 0); the slice ends at the next start
+// (the last at `end`). `baseName`: the pads are "<baseName> 1", "<baseName> 2"… (Live's Slice to New MIDI Track:
+// "Slice 1", "Slice 2"…, 190ei B6b). `rackName`: the channel's and the rack's name (Live names the rack after the clip;
+// empty: the channel takes `baseName` and the rack keeps its kind's name).
+ChannelDef sliceToDrumRack (const std::string& samplePath, const std::vector<float>& slices, const std::string& baseName,
+                            SliceTemplate preset = SliceTemplate::gated, float end = 1.0f, const std::string& rackName = {});
+// Slicing helpers (round 190ec: Slice to Drum Rack on a Sampler channel, Slice to New MIDI Track on an audio clip).
+// Slice starts are fractions of the sample file.
+// The starts that fall in the played part [from, to) (sorted, duplicates dropped), with `from` itself as the first
+// (a slice always starts where the part starts)
+std::vector<float> slicesInRegion (const std::vector<float>& starts, float from, float to);
+// A start every `secondsPerSlice` from `from` to `to` (a file `fileSeconds` long): Live's "one slice per" bar / beat
+// division; a single slice when the division or the file length is unknown
+std::vector<float> gridSlices (double fileSeconds, float from, float to, double secondsPerSlice);
+// The notes that replay the slices where they were: slice i on pad C1 + i (the first maxSlicePads only), from `tickOf`
+// its start to the next slice's start (the last one to `end`), on channel `channel`. Notes before tick 0 are left out.
+std::vector<Note> sliceNotes (const std::vector<float>& starts, float end, const std::function<double (float fraction)>& tickOf, int channel);
+// Slice to New MIDI Track as LYNX lays it out: `drumRack` becomes a new channel with its own mixer insert, `notes` (their
+// channel set to it) a new pattern named `patternName`, played by a pattern clip on a new Playlist track right under the
+// audio clip `clipIndex`, at its start and as long (as the audio clip's Convert to MIDI does). The new track is named
+// `patternName` too (Live names the new MIDI track, its clip and its rack after the audio clip, 190ei B6b). Run inside
+// AudioEngine::editSong (one undo step). Returns the new channel's index, or -1 (song untouched) when the clip is not an
+// audio clip or no note is left.
+int addSliceTrack (Song& song, int clipIndex, ChannelDef drumRack, std::vector<Note> notes, const std::string& patternName);
+// Live's Slice to New MIDI Track dialog (190ei B6a, shots/live-slice-dialog.png / live-slice-per-menu.png): "Create one
+// slice per" Warp Marker, Transient (the default), Bar, 1/2 Note … 1/32 Note, in that order
+enum class SlicePer : std::uint8_t { warpMarker, transient, bar, half, quarter, eighth, sixteenth, thirtySecond };
+constexpr int slicePerCount = 8;
+const char* slicePerName (SlicePer per) noexcept; // (English, translated by the UI: "Warp Marker", "Bar", "1/2 Note"…)
+// The beats one slice spans for a bar / note division (a whole note = 4 beats); 0 for warp markers and transients
+double slicePerBeats (SlicePer per, int beatsPerBar) noexcept;
 } // namespace lynx::rack

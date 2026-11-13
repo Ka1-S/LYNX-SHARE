@@ -9390,8 +9390,6 @@ countries: jp
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "クリックでこのプラグインをトラックに読み込んで試聴します (Ctrl+Z で元に戻します)"
 "Add \"{0}\" to favourites" = "「{0}」をお気に入りに追加"
 "Remove \"{0}\" from favourites" = "「{0}」をお気に入りから削除"
-"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "外部入力が選択されました。このトラックで内部オーディオを録音しないよう、\"外部入力のみ\" に切り替えますか?"
-"The input of a mixer track can't be changed while recording." = "録音中はミキサートラックの入力を変更できません。"
 
 # --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
 "{0} parameters selected" = "{0} 個のパラメーターを選択中"
@@ -9414,6 +9412,8 @@ countries: jp
 "Spare state" = "スペアステート"
 "Store in spare state" = "スペアステートに保存"
 "Flip with spare state" = "スペアステートと入れ替え"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "外部入力が選択されました。このトラックで内部オーディオを録音しないよう、\"外部入力のみ\" に切り替えますか?"
+"The input of a mixer track can't be changed while recording." = "録音中はミキサートラックの入力を変更できません。"
 "All Ins" = "すべての入力"
 "Arm Recording (Ctrl-click: arm several tracks)" = "録音待機 (Ctrl+クリック: 複数のトラック)"
 "Audio From" = "オーディオ入力元"
@@ -9465,6 +9465,11 @@ countries: jp
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "開始: ソース内でクリップが始まる位置 (小節. 拍. 16分。ワープなしのオーディオは秒)"
 "The groove this clip plays through (the Groove Pool)" = "このクリップが通るグルーヴ (グルーヴプール)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "ワープモード: オーディオの伸縮方法。Re-Pitch は速度と音程を一緒に変える。チャンネルに属します"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "セルのメモリー"
+"Level|Transient" = "レベル|トランジェント"
+"Smooth|Mid|Sharp" = "なめらか|中間|急峻"
 "Follow the project key" = "プロジェクトのキーに従う"
 "Loop key" = "ループのキー"
 "Edit chord" = "コードを編集"
@@ -9569,6 +9574,41 @@ countries: jp
 "Continue the tour" = "ツアーを続ける"
 "LYNX demo: {0} ({1})" = "LYNX デモ: {0} ({1})"
 "Step done" = "ステップ完了"
+"Drum Rack" = "ドラムラック"
+"Choke" = "チョーク"
+"All Notes" = "すべてのノート"
+"Empty chain" = "空のチェーン"
+"Add return chain" = "リターンチェーンを追加"
+"Delete return chain" = "リターンチェーンを削除"
+"Drop an instrument or sample here" = "ここに楽器またはサンプルをドロップ"
+"Slice to Drum Rack" = "Drum Rackにスライス"
+"Slice to New MIDI Track..." = "新規MIDIトラックにスライス..."
+"Slice to New MIDI Track" = "新規MIDIトラックにスライス"
+"Only the first {0} slices got a pad." = "最初の{0}個のスライスだけにパッドが割り当てられました。"
+"1 Bar" = "1小節"
+"Warp Marker" = "ワープマーカー"
+"Create one slice per" = "スライスの単位"
+"Default (choke, gated)" = "デフォルト（チョーク、ゲート）"
+"One-shot" = "ワンショット"
+"Slicing template" = "スライステンプレート"
+"Send-{0}" = "Send-{0}"
+"Rack Output" = "ラック出力"
+"Save as Default Pad" = "デフォルトのパッドとして保存"
+"Next Similar" = "次の類似サンプル"
+"Previous Similar" = "前の類似サンプル"
+"Save as Similarity Reference" = "類似の基準として保存"
+"Return to Reference" = "基準に戻す"
+"Replace the default pad?" = "デフォルトのパッドを置き換えますか？"
+"Slice to New MIDI track" = "新規MIDIトラックにスライス"
+"1/2 Note" = "1/2音符"
+"1/4 Note" = "1/4音符"
+"1/8 Note" = "1/8音符"
+"1/16 Note" = "1/16音符"
+"1/32 Note" = "1/32音符"
+"Create one slice per:" = "スライスの単位:"
+"Slicing Preset:" = "スライスプリセット:"
+"Preserve warped timing:" = "ワープのタイミングを保持:"
+"The current clip region is {0} beats long - this will result in {1} slices." = "現在のクリップ範囲は{0}拍です - {1}個のスライスになります。"
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"
@@ -9630,9 +9670,6 @@ countries: jp
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "ピークメーター (左/右) とピークホールド  [LMB] クリップランプをクリア"
 
 # --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
-"Cell memory" = "セルのメモリー"
-"Level|Transient" = "レベル|トランジェント"
-"Smooth|Mid|Sharp" = "なめらか|中間|急峻"
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 
 # --- Round 190dh: FL's Sampler page (Content, Playback, Time stretching, Precomputed effects, the waveform)

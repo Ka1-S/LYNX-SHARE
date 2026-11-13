@@ -9390,8 +9390,6 @@ countries: pl
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Kliknij, aby wczytać ten plugin na ścieżkę i go posłuchać (Ctrl+Z cofa)"
 "Add \"{0}\" to favourites" = "Dodaj „{0}” do ulubionych"
 "Remove \"{0}\" from favourites" = "Usuń „{0}” z ulubionych"
-"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Wybrano wejście zewnętrzne. Przełączyć na \"Tylko wejście zewnętrzne\", aby nie nagrywać wewnętrznego dźwięku na tej ścieżce?"
-"The input of a mixer track can't be changed while recording." = "Wejścia ścieżki miksera nie można zmienić podczas nagrywania."
 
 # --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
 "{0} parameters selected" = "Wybrane parametry: {0}"
@@ -9414,6 +9412,8 @@ countries: pl
 "Spare state" = "Stan zapasowy"
 "Store in spare state" = "Zapisz w stanie zapasowym"
 "Flip with spare state" = "Zamień ze stanem zapasowym"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Wybrano wejście zewnętrzne. Przełączyć na \"Tylko wejście zewnętrzne\", aby nie nagrywać wewnętrznego dźwięku na tej ścieżce?"
+"The input of a mixer track can't be changed while recording." = "Wejścia ścieżki miksera nie można zmienić podczas nagrywania."
 "All Ins" = "Wszystkie wejścia"
 "Arm Recording (Ctrl-click: arm several tracks)" = "Uzbrój nagrywanie (Ctrl+klik: kilka ścieżek)"
 "Audio From" = "Audio z"
@@ -9465,6 +9465,11 @@ countries: pl
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "Początek: gdzie klip zaczyna się w źródle (takt. miara. szesnastka; sekundy dla audio bez warp)"
 "The groove this clip plays through (the Groove Pool)" = "Groove, przez który gra ten klip (Groove Pool)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Tryb warp: jak rozciągane jest audio. Re-Pitch zmienia prędkość i wysokość razem. Należy do kanału"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Pamięć ogniwa"
+"Level|Transient" = "Poziom|Transjent"
+"Smooth|Mid|Sharp" = "Łagodnie|Średnio|Ostro"
 "Follow the project key" = "Podążaj za tonacją projektu"
 "Loop key" = "Tonacja loopa"
 "Edit chord" = "Edytuj akord"
@@ -9569,6 +9574,41 @@ countries: pl
 "Continue the tour" = "Kontynuuj samouczek"
 "LYNX demo: {0} ({1})" = "Demo LYNX: {0} ({1})"
 "Step done" = "Krok wykonany"
+"Drum Rack" = "Rack perkusyjny"
+"Choke" = "Choke"
+"All Notes" = "Wszystkie nuty"
+"Empty chain" = "Pusty łańcuch"
+"Add return chain" = "Dodaj łańcuch powrotny"
+"Delete return chain" = "Usuń łańcuch powrotny"
+"Drop an instrument or sample here" = "Upuść tutaj instrument lub sampel"
+"Slice to Drum Rack" = "Pokrój do Drum Rack"
+"Slice to New MIDI Track..." = "Pokrój do nowej ścieżki MIDI..."
+"Slice to New MIDI Track" = "Pokrój do nowej ścieżki MIDI"
+"Only the first {0} slices got a pad." = "Tylko pierwsze {0} plasterki dostały pad."
+"1 Bar" = "1 takt"
+"Warp Marker" = "Znacznik warp"
+"Create one slice per" = "Jeden plasterek na"
+"Default (choke, gated)" = "Domyślny (choke, bramka)"
+"One-shot" = "One-shot"
+"Slicing template" = "Szablon cięcia"
+"Send-{0}" = "Send-{0}"
+"Rack Output" = "Wyjście racka"
+"Save as Default Pad" = "Zapisz jako domyślny pad"
+"Next Similar" = "Następny podobny"
+"Previous Similar" = "Poprzedni podobny"
+"Save as Similarity Reference" = "Zapisz jako odniesienie podobieństwa"
+"Return to Reference" = "Wróć do odniesienia"
+"Replace the default pad?" = "Zastąpić domyślny pad?"
+"Slice to New MIDI track" = "Pokrój do nowej ścieżki MIDI"
+"1/2 Note" = "1/2 nuty"
+"1/4 Note" = "1/4 nuty"
+"1/8 Note" = "1/8 nuty"
+"1/16 Note" = "1/16 nuty"
+"1/32 Note" = "1/32 nuty"
+"Create one slice per:" = "Jeden plaster na:"
+"Slicing Preset:" = "Preset krojenia:"
+"Preserve warped timing:" = "Zachowaj timing warpu:"
+"The current clip region is {0} beats long - this will result in {1} slices." = "Bieżący obszar klipu ma {0} uderzeń - powstanie {1} plastrów."
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"
@@ -9630,9 +9670,6 @@ countries: pl
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Miernik szczytowy (lewy/prawy) z podtrzymaniem  [LMB] gasi lampkę przesterowania"
 
 # --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
-"Cell memory" = "Pamięć ogniwa"
-"Level|Transient" = "Poziom|Transjent"
-"Smooth|Mid|Sharp" = "Łagodnie|Średnio|Ostro"
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 
 # --- Round 190dh: FL's Sampler page (Content, Playback, Time stretching, Precomputed effects, the waveform)

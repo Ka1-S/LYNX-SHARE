@@ -82,6 +82,8 @@ std::vector<GeneratorEntry> generatorEntries (AudioEngine& engine, bool withUnav
     // round 183c: Live-style Instrument Rack (a Patcher in rack mode, core/Rack.h)
     builtIn (TR_NOOP ("Instrument Rack"), tr ("Instrument Rack"), 2, InstrumentKind::patcher,
              [] (ChannelDef& c) { c.patcher = rack::makeRack (RackDoc::Kind::instrument); });
+    // round 190ec: Live's Drum Rack (an Instrument Rack whose chains are pads, core/Rack.h)
+    builtIn (TR_NOOP ("Drum Rack"), tr ("Drum Rack"), 2, InstrumentKind::patcher, [] (ChannelDef& c) { c.patcher = rack::makeDrumRack(); });
     // ...and a standalone MIDI Effect Rack: its chains' notes play its children (decision R1, like a Layer's)
     builtIn (TR_NOOP ("MIDI Effect Rack"), tr ("MIDI Effect Rack"), 2, InstrumentKind::patcher,
              [] (ChannelDef& c) { c.patcher = rack::makeRack (RackDoc::Kind::midiEffect); });

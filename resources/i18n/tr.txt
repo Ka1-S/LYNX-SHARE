@@ -9390,8 +9390,6 @@ countries: tr
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "Bu plugin'i parçaya yükleyip dinlemek için tıkla (Ctrl+Z geri alır)"
 "Add \"{0}\" to favourites" = "\"{0}\" favorilere ekle"
 "Remove \"{0}\" from favourites" = "\"{0}\" favorilerden kaldır"
-"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Harici bir giriş seçildi. Bu kanalda dahili sesi kaydetmemek için \"Yalnızca harici giriş\" seçeneğine geçilsin mi?"
-"The input of a mixer track can't be changed while recording." = "Kayıt sırasında bir mikser kanalının girişi değiştirilemez."
 
 # --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
 "{0} parameters selected" = "{0} parametre seçildi"
@@ -9414,6 +9412,8 @@ countries: tr
 "Spare state" = "Yedek durum"
 "Store in spare state" = "Yedek duruma kaydet"
 "Flip with spare state" = "Yedek durumla değiştir"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "Harici bir giriş seçildi. Bu kanalda dahili sesi kaydetmemek için \"Yalnızca harici giriş\" seçeneğine geçilsin mi?"
+"The input of a mixer track can't be changed while recording." = "Kayıt sırasında bir mikser kanalının girişi değiştirilemez."
 "All Ins" = "Tüm girişler"
 "Arm Recording (Ctrl-click: arm several tracks)" = "Kayda hazırla (Ctrl+tık: birkaç parça)"
 "Audio From" = "Ses kaynağı"
@@ -9465,6 +9465,11 @@ countries: tr
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "Başlangıç: klibin kaynağında başladığı yer (ölçü. vuruş. onaltılık; warp'sız ses için saniye)"
 "The groove this clip plays through (the Groove Pool)" = "Bu klibin içinden çaldığı groove (Groove Pool)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "Warp modu: sesin nasıl esnetildiği. Re-Pitch hızı ve perdeyi birlikte değiştirir. Kanala aittir"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "Hücre belleği"
+"Level|Transient" = "Seviye|Geçici"
+"Smooth|Mid|Sharp" = "Yumuşak|Orta|Keskin"
 "Follow the project key" = "Proje tonunu takip et"
 "Loop key" = "Loop tonu"
 "Edit chord" = "Akoru düzenle"
@@ -9569,6 +9574,41 @@ countries: tr
 "Continue the tour" = "Tura devam et"
 "LYNX demo: {0} ({1})" = "LYNX demo: {0} ({1})"
 "Step done" = "Adım tamam"
+"Drum Rack" = "Davul rafı"
+"Choke" = "Choke"
+"All Notes" = "Tüm notalar"
+"Empty chain" = "Boş zincir"
+"Add return chain" = "Dönüş zinciri ekle"
+"Delete return chain" = "Dönüş zincirini sil"
+"Drop an instrument or sample here" = "Buraya bir enstrüman veya örnek bırakın"
+"Slice to Drum Rack" = "Drum Rack'e dilimle"
+"Slice to New MIDI Track..." = "Yeni MIDI parçasına dilimle..."
+"Slice to New MIDI Track" = "Yeni MIDI parçasına dilimle"
+"Only the first {0} slices got a pad." = "Yalnızca ilk {0} dilime bir pad verildi."
+"1 Bar" = "1 ölçü"
+"Warp Marker" = "Warp işaretçisi"
+"Create one slice per" = "Dilim başına"
+"Default (choke, gated)" = "Varsayılan (choke, gate)"
+"One-shot" = "Tek atış (one-shot)"
+"Slicing template" = "Dilimleme şablonu"
+"Send-{0}" = "Send-{0}"
+"Rack Output" = "Raf çıkışı"
+"Save as Default Pad" = "Varsayılan pad olarak kaydet"
+"Next Similar" = "Sonraki benzer"
+"Previous Similar" = "Önceki benzer"
+"Save as Similarity Reference" = "Benzerlik referansı olarak kaydet"
+"Return to Reference" = "Referansa dön"
+"Replace the default pad?" = "Varsayılan pad değiştirilsin mi?"
+"Slice to New MIDI track" = "Yeni MIDI parçasına dilimle"
+"1/2 Note" = "1/2 nota"
+"1/4 Note" = "1/4 nota"
+"1/8 Note" = "1/8 nota"
+"1/16 Note" = "1/16 nota"
+"1/32 Note" = "1/32 nota"
+"Create one slice per:" = "Şunun başına bir dilim:"
+"Slicing Preset:" = "Dilimleme ön ayarı:"
+"Preserve warped timing:" = "Warp zamanlamasını koru:"
+"The current clip region is {0} beats long - this will result in {1} slices." = "Geçerli klip bölgesi {0} vuruş uzunluğunda - {1} dilim oluşacak."
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"
@@ -9630,9 +9670,6 @@ countries: tr
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"
 
 # --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
-"Cell memory" = "Hücre belleği"
-"Level|Transient" = "Seviye|Geçici"
-"Smooth|Mid|Sharp" = "Yumuşak|Orta|Keskin"
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 
 # --- Round 190dh: FL's Sampler page (Content, Playback, Time stretching, Precomputed effects, the waveform)

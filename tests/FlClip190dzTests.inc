@@ -135,7 +135,7 @@ TEST (flclip190dz_menu_model_is_fl_order_and_sections)
 
     // LYNX's own items after FL's, in this order, none of them an FL label
     const auto extras = flclipmenu::lynxExtras();
-    CHECK (extras.size() == 13 && extras.front() == "Color palette" && extras.back() == "Paste here");
+    CHECK (extras.size() == 14 && extras.front() == "Color palette" && extras.back() == "Paste here");
     for (const auto& x : extras)
         CHECK (std::none_of (fl.begin(), fl.end(), [&x] (const std::string& f) { return f == x || f == x + " >"; }));
 

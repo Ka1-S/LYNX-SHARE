@@ -9390,8 +9390,6 @@ countries: kr
 "Click to load this plugin on the track and hear it (Ctrl+Z goes back)" = "클릭하면 이 플러그인을 트랙에 불러와 들려줍니다 (Ctrl+Z로 되돌리기)"
 "Add \"{0}\" to favourites" = "\"{0}\"을(를) 즐겨찾기에 추가"
 "Remove \"{0}\" from favourites" = "\"{0}\"을(를) 즐겨찾기에서 제거"
-"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "외부 입력을 선택했습니다. 이 트랙에서 내부 오디오가 녹음되지 않도록 \"외부 입력만\"으로 전환할까요?"
-"The input of a mixer track can't be changed while recording." = "녹음 중에는 믹서 트랙의 입력을 바꿀 수 없습니다."
 
 # --- Round 190df: FL's multilink menu, the plugin menu's Link all parameters, the sampler's File row, channel envelope presets
 "{0} parameters selected" = "매개변수 {0}개 선택됨"
@@ -9414,6 +9412,8 @@ countries: kr
 "Spare state" = "예비 상태"
 "Store in spare state" = "예비 상태에 저장"
 "Flip with spare state" = "예비 상태와 교체"
+"You've selected an external input. Do you want to switch to \"External input only\" to avoid recording internal audio on this track?" = "외부 입력을 선택했습니다. 이 트랙에서 내부 오디오가 녹음되지 않도록 \"외부 입력만\"으로 전환할까요?"
+"The input of a mixer track can't be changed while recording." = "녹음 중에는 믹서 트랙의 입력을 바꿀 수 없습니다."
 "All Ins" = "모든 입력"
 "Arm Recording (Ctrl-click: arm several tracks)" = "녹음 대기 (Ctrl+클릭: 여러 트랙)"
 "Audio From" = "오디오 입력"
@@ -9465,6 +9465,11 @@ countries: kr
 "Start: where the clip starts in its source (bar. beat. sixteenth; seconds for unwarped audio)" = "시작: 소스에서 클립이 시작하는 위치 (마디. 박. 16분음표, 워프 없는 오디오는 초)"
 "The groove this clip plays through (the Groove Pool)" = "이 클립이 따르는 그루브 (그루브 풀)"
 "Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel" = "워프 모드: 오디오를 늘이는 방식. Re-Pitch는 속도와 음높이를 함께 바꿈. 채널에 속함"
+
+# --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
+"Cell memory" = "셀 메모리"
+"Level|Transient" = "레벨|트랜지언트"
+"Smooth|Mid|Sharp" = "부드럽게|중간|가파르게"
 "Follow the project key" = "프로젝트 키 따라가기"
 "Loop key" = "루프 키"
 "Edit chord" = "코드 편집"
@@ -9569,6 +9574,41 @@ countries: kr
 "Continue the tour" = "투어 계속하기"
 "LYNX demo: {0} ({1})" = "LYNX 데모: {0} ({1})"
 "Step done" = "단계 완료"
+"Drum Rack" = "드럼 랙"
+"Choke" = "초크"
+"All Notes" = "모든 노트"
+"Empty chain" = "빈 체인"
+"Add return chain" = "리턴 체인 추가"
+"Delete return chain" = "리턴 체인 삭제"
+"Drop an instrument or sample here" = "여기에 악기나 샘플을 놓으세요"
+"Slice to Drum Rack" = "Drum Rack으로 슬라이스"
+"Slice to New MIDI Track..." = "새 MIDI 트랙으로 슬라이스..."
+"Slice to New MIDI Track" = "새 MIDI 트랙으로 슬라이스"
+"Only the first {0} slices got a pad." = "처음 {0}개 슬라이스에만 패드가 할당되었습니다."
+"1 Bar" = "1마디"
+"Warp Marker" = "워프 마커"
+"Create one slice per" = "슬라이스 단위"
+"Default (choke, gated)" = "기본 (초크, 게이트)"
+"One-shot" = "원샷"
+"Slicing template" = "슬라이스 템플릿"
+"Send-{0}" = "Send-{0}"
+"Rack Output" = "랙 출력"
+"Save as Default Pad" = "기본 패드로 저장"
+"Next Similar" = "다음 유사 샘플"
+"Previous Similar" = "이전 유사 샘플"
+"Save as Similarity Reference" = "유사성 기준으로 저장"
+"Return to Reference" = "기준으로 돌아가기"
+"Replace the default pad?" = "기본 패드를 바꿀까요?"
+"Slice to New MIDI track" = "새 MIDI 트랙으로 슬라이스"
+"1/2 Note" = "1/2음표"
+"1/4 Note" = "1/4음표"
+"1/8 Note" = "1/8음표"
+"1/16 Note" = "1/16음표"
+"1/32 Note" = "1/32음표"
+"Create one slice per:" = "슬라이스 단위:"
+"Slicing Preset:" = "슬라이스 프리셋:"
+"Preserve warped timing:" = "워프된 타이밍 유지:"
+"The current clip region is {0} beats long - this will result in {1} slices." = "현재 클립 구간은 {0}박입니다 - 슬라이스 {1}개가 만들어집니다."
 
 # --- Round 190dw: FL Studio Mobile's EQ, Graphic EQ, Filter and reverbs as Pocket engines
 "Pocket EQ" = "Pocket EQ"
@@ -9630,9 +9670,6 @@ countries: kr
 "Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "피크 홀드 기능이 있는 피크 미터(좌/우)  [LMB] 클립 표시등 지우기"
 
 # --- Round 190dm: Sentry Gate's transient trigger, Glow Leveler's cell memory
-"Cell memory" = "셀 메모리"
-"Level|Transient" = "레벨|트랜지언트"
-"Smooth|Mid|Sharp" = "부드럽게|중간|가파르게"
 # --- Round 190cr: Playlist Track mode › Audio track (PR #151 follow-up)
 
 # --- Round 190dh: FL's Sampler page (Content, Playback, Time stretching, Precomputed effects, the waveform)
