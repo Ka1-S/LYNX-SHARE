@@ -3430,6 +3430,27 @@ std::string userOf (const Song& song, std::size_t track)
 
 namespace
 {
+// Round 190fn (O1): the FL Studio Mobile resources folders of Settings › Files (flm-resources.txt, one per line), each
+// taken down to the folder "@R@" paths start from; only folders that exist.
+std::vector<std::string> flmResourceFolders()
+{
+    std::vector<std::string> out;
+    const auto file = PluginHost::settingsFolder().getChildFile ("flm-resources.txt");
+    if (! file.existsAsFile())
+        return out;
+    juce::StringArray lines;
+    lines.addLines (file.loadFileAsString());
+    const auto exists = [] (const std::string& p) { return platform::localFile (p).exists(); };
+    for (auto line : lines)
+    {
+        line = line.trim();
+        if (line.isEmpty() || ! platform::localFile (line.toStdString()).isDirectory())
+            continue;
+        out.push_back (flmResourceRootFrom (line.toStdString(), exists));
+    }
+    return out;
+}
+
 // Where a Live set's library-relative samples live (Core Library, packs, User Library), newest install first; only
 // folders that exist. Read-only: nothing is ever written there.
 std::vector<std::string> liveLibraryRoots()
@@ -3496,6 +3517,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
         FlpImportOptions options;
         options.roots = findFlStudioRoots();
         options.projectFolder = file.getParentDirectory().getFullPathName().toStdString();
+        options.flmResourceRoots = flmResourceFolders(); // round 190fn (O1): FL Studio Mobile Rack generators in an .flp
         // samples on a drive that is not there (unplugged external drive, dead network share): one probe per root
         auto roots = std::make_shared<loadtrace::RootProbe> ([] (const std::string& root) {
             const auto t = std::chrono::steady_clock::now();
@@ -3562,6 +3584,8 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 if (! options.roots.factoryData.empty())
                     if (const auto root = flmResourceRootIn (options.roots.factoryData); platform::localFile (root).isDirectory())
                         flmOptions.resourceRoot = root;
+                // round 190fn (O1): the user's own FL Studio Mobile "Resources" folders (Settings › Files), searched first
+                flmOptions.userResourceRoots = options.flmResourceRoots;
                 std::string flmError;
                 auto song = importFlm (std::vector<std::uint8_t> (fileBytes, fileBytes + data.getSize()), flmOptions, &flmError);
                 if (! song)

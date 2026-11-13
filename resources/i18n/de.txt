@@ -9814,3 +9814,5 @@ countries: de at ch li lu
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "Optionen: Slots per MIDI-Noten auslösen (Zeit-Slots: Tasten C5 bis B7, Lautstärke-Slots: C2 bis B4), Klickreduzierung, Attack-Ausgleich, DC-Offset, HQ-Resampling, Scratch-Uhr; MIDI-Eingangsport"
 "MIDI Input Port Number:" = "MIDI-Eingangsportnummer:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "MIDI-Eingangsportnummer: nach oben / unten ziehen (\"...\" = keiner). Die MIDI-Out-Kanäle auf diesem Port spielen Pitchers MIDI-Modus und Harmonize"
+"FL Studio Mobile resources" = "FL Studio Mobile-Ressourcen"
+"Factory sounds for .flm projects: the app's own Resources folder. LYNX SHARE ships none." = "Werksklänge für .flm-Projekte: der eigene Resources-Ordner der App. LYNX SHARE liefert keine mit."

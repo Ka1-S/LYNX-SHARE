@@ -9814,3 +9814,5 @@ countries: cn sg
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "选项：用 MIDI 音符触发槽位（时间槽：琴键 C5 至 B7，音量槽：C2 至 B4）、咔嗒声抑制、起音补偿、直流偏移、HQ 重采样、搓碟时钟；MIDI 输入端口"
 "MIDI Input Port Number:" = "MIDI 输入端口号："
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "MIDI 输入端口号：上下拖动（\"...\" = 无）。此端口上的 MIDI Out 通道演奏 Pitcher 的 MIDI 模式和 Harmonize"
+"FL Studio Mobile resources" = "FL Studio Mobile 资源"
+"Factory sounds for .flm projects: the app's own Resources folder. LYNX SHARE ships none." = ".flm 项目的出厂音色：应用自己的 Resources 文件夹。LYNX SHARE 不附带任何内容。"

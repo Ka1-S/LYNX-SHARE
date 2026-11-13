@@ -394,8 +394,29 @@ Mapped map (const flm::Module& m, bool live, bool postGainLive)
 
 std::vector<LaneTarget> automate (const flm::Module& m, int param, const std::vector<float>& values)
 {
-    if (param == 0 || values.empty())
-        return {}; // Enable: a switch LYNX doesn't automate
+    if (values.empty())
+        return {};
+    // Round 190fn (automation-0010): Enable. Below 0.5 FLM's wrapper does not call the module, so the rack's buffer
+    // passes as it is (FLM_FORMAT §7.4, PROVEN-REA 0x180799750): on LYNX, every slot of the module at its own mix while
+    // on and at mix 0 (dry) while off. (FLM also freezes the module's state while it is off; LYNX's slots keep running
+    // on the input, so a reverb switched back on starts from the current tail, not the frozen one.)
+    if (param == 0)
+    {
+        auto on = m;
+        if (on.params.empty())
+            on.params.resize (1);
+        on.params[0] = 1.0f;
+        const auto base = map (on, true, false);
+        std::vector<LaneTarget> out;
+        for (std::size_t s = 0; s < base.slots.size(); ++s)
+        {
+            LaneTarget t { AutomationTargetKind::effectMix, (int) s, 0, {} };
+            for (const auto v : values)
+                t.values.push_back (v >= 0.5f ? base.slots[s].mix : 0.0f);
+            out.push_back (std::move (t));
+        }
+        return out;
+    }
     const auto at = [&] (float v) {
         auto copy = m;
         if (param == -2 || param == -3)

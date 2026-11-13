@@ -17403,6 +17403,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "FlmEffects190dwTests.inc" // round 190dw: the .flm effect laws against FLM's renders
 #include "FlmImport190dwInstTests.inc" // round 190dw item 4
 #include "FlmImport190feTests.inc" // round 190fe: cut groups, 3x Osc lanes, effect Mix, rack parts
+#include "FlmImport190fnTests.inc" // round 190fn: FLM resources folders (O1), FL Studio Mobile Rack in an .flp, META, short SEND
 #include "Bridge176aTests.inc"
 #include "Issues178aTests.inc"
 #include "Mixer177aTests.inc"
