@@ -515,6 +515,8 @@ LYNX SHARE is an independent implementation. FL Studio, FL Studio Mobile and Abl
 
 FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies. LYNX SHARE is not affiliated with, endorsed or sponsored by any of them. VST is a registered trademark of Steinberg Media Technologies GmbH.
 
+Logo by **w3teal**, a member of the LYNX SHARE community, who made it and gave it to the project.
+
 Built with [JUCE](https://juce.com), [CLAP](https://github.com/free-audio/clap), the [WavPack](https://www.wavpack.com) decoder and the Steinberg ASIO SDK — their licences are listed in [`THIRD_PARTY.md`](THIRD_PARTY.md).
 
 ## Code signing policy

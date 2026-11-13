@@ -257,6 +257,9 @@
 "home.src1": "LYNX SHARE is geschreven in C++20 met JUCE 8. De code, de tests en de notities over elk FL Studio-gedrag dat het nabootst staan in één openbare repository. FL Studio en Live zijn van buitenaf bestudeerd en de code is van nul af aan geschreven: er zit niets van Image-Line of Ableton in.",
 "home.src2": "Bugmeldingen en pull requests zijn welkom. Meerdere fixes in recente versies kwamen van gebruikers.",
 "home.issues": "Een bug melden",
+"home.commT": "Community",
+"home.comm1": "<a href=\"https://discord.gg/XHKkbtbkY\" rel=\"noopener\">Discord</a>: chat, hulp, feedback en release-aankondigingen.",
+"home.comm2": "<a href=\"https://github.com/Kenneth-Cho-InfoSec/Radiant\" rel=\"noopener\">Radiant</a> is een onafhankelijke, onofficiële Android-versie van LYNX SHARE voor tablets en telefoons. Het is een apart communityproject, geen officiële LYNX SHARE-release, en wij onderhouden of beoordelen het niet.",
 "home.srcN": "Bouwinstructies voor elk systeem staan in <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md\">docs/SETUP_DEV.md</a>.",
 "sig.title": "Beleid voor code signing",
 "sig.pending": "goedkeuring in behandeling",
@@ -500,6 +503,7 @@
 "nav.features": "Functies",
 "nav.updates": "Updates",
 "nav.wiki": "Wiki",
+"f.logo": "Logo door w3teal",
 "f.sign": "Code signing &amp; privacy",
 "legal": "LYNX SHARE is een onafhankelijk project, niet verbonden aan of goedgekeurd door Image-Line, Ableton of BandLab. FL Studio en FL Studio Mobile zijn handelsmerken van Image-Line Software; Ableton en Live zijn handelsmerken van Ableton AG; BandLab is een handelsmerk van BandLab Technologies.",
 "aria.lang": "Taal"

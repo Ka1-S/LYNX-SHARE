@@ -257,6 +257,9 @@
 "home.src1": "LYNX SHARE ist in C++20 mit JUCE 8 geschrieben. Der Code, die Tests und die Notizen zu jedem FL-Studio-Verhalten, das es nachbildet, liegen in einem öffentlichen Repository. FL Studio und Live wurden von außen untersucht und der Code wurde von Grund auf neu geschrieben: Nichts von Image-Line oder Ableton steckt darin.",
 "home.src2": "Fehlerberichte und Pull Requests sind willkommen. Mehrere Fixes der letzten Releases kamen von Nutzern.",
 "home.issues": "Fehler melden",
+"home.commT": "Community",
+"home.comm1": "<a href=\"https://discord.gg/XHKkbtbkY\" rel=\"noopener\">Discord</a>: Chat, Hilfe, Feedback und Release-Ankündigungen.",
+"home.comm2": "<a href=\"https://github.com/Kenneth-Cho-InfoSec/Radiant\" rel=\"noopener\">Radiant</a> ist eine unabhängige, inoffizielle Android-Adaption von LYNX SHARE für Tablets und Smartphones. Es ist ein eigenständiges Community-Projekt, kein offizielles LYNX SHARE-Release, und wird von uns weder gepflegt noch geprüft.",
 "home.srcN": "Anleitungen zum Bauen für jedes System stehen in <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md\">docs/SETUP_DEV.md</a>.",
 "sig.title": "Richtlinie zur Code-Signierung",
 "sig.pending": "Freigabe ausstehend",
@@ -500,6 +503,7 @@
 "nav.features": "Features",
 "nav.updates": "Updates",
 "nav.wiki": "Wiki",
+"f.logo": "Logo von w3teal",
 "f.sign": "Code-Signierung &amp; Datenschutz",
 "legal": "LYNX SHARE ist ein unabhängiges Projekt, weder mit Image-Line, Ableton oder BandLab verbunden noch von ihnen unterstützt. FL Studio und FL Studio Mobile sind Marken von Image-Line Software; Ableton und Live sind Marken der Ableton AG; BandLab ist eine Marke von BandLab Technologies.",
 "aria.lang": "Sprache"

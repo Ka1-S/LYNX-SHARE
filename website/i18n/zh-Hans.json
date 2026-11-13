@@ -257,6 +257,9 @@
 "home.src1": "LYNX SHARE 用 C++20 和 JUCE 8 编写。代码、测试，以及它所重现的每一种 FL Studio 行为的记录，都在同一个公开仓库里。FL Studio 和 Live 都是从外部研究的，代码从零编写：其中没有任何来自 Image-Line 或 Ableton 的内容。",
 "home.src2": "欢迎提交错误报告和拉取请求。最近几个版本里的一些修复就来自用户。",
 "home.issues": "报告错误",
+"home.commT": "社区",
+"home.comm1": "<a href=\"https://discord.gg/XHKkbtbkY\" rel=\"noopener\">Discord</a>：聊天、求助、反馈和版本发布公告。",
+"home.comm2": "<a href=\"https://github.com/Kenneth-Cho-InfoSec/Radiant\" rel=\"noopener\">Radiant</a>是 LYNX SHARE 面向平板和手机的独立非官方 Android 适配版。它是单独的社区项目，不是 LYNX SHARE 的官方版本，我们也不负责维护或审核。",
 "home.srcN": "各系统的构建说明见 <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md\">docs/SETUP_DEV.md</a>。",
 "sig.title": "代码签名政策",
 "sig.pending": "待批准",
@@ -500,6 +503,7 @@
 "nav.features": "功能",
 "nav.updates": "更新",
 "nav.wiki": "Wiki",
+"f.logo": "标志设计：w3teal",
 "f.sign": "代码签名 &amp; 隐私",
 "legal": "LYNX SHARE是独立项目，与Image-Line、Ableton或BandLab无关联，也未获其认可。FL Studio和FL Studio Mobile是Image-Line Software的商标；Ableton和Live是Ableton AG的商标；BandLab是BandLab Technologies的商标。",
 "aria.lang": "语言"

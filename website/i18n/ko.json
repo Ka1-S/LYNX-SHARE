@@ -257,6 +257,9 @@
 "home.src1": "LYNX SHARE는 JUCE 8과 C++20으로 작성했습니다. 코드, 테스트, 그리고 재현한 FL Studio 동작 하나하나에 대한 기록이 모두 하나의 공개 저장소에 있습니다. FL Studio와 Live는 외부에서 관찰만 했고 코드는 처음부터 새로 작성했습니다. Image-Line이나 Ableton의 코드는 들어 있지 않습니다.",
 "home.src2": "버그 신고와 풀 리퀘스트를 환영합니다. 최근 릴리스의 수정 몇 건은 사용자가 보내 준 것입니다.",
 "home.issues": "버그 신고",
+"home.commT": "커뮤니티",
+"home.comm1": "<a href=\"https://discord.gg/XHKkbtbkY\" rel=\"noopener\">Discord</a>: 채팅, 도움말, 피드백, 릴리스 공지.",
+"home.comm2": "<a href=\"https://github.com/Kenneth-Cho-InfoSec/Radiant\" rel=\"noopener\">Radiant</a> 는 태블릿과 휴대폰용 LYNX SHARE의 독립적인 비공식 Android 버전입니다. 별도의 커뮤니티 프로젝트이며 공식 LYNX SHARE 릴리스가 아니고, 저희가 유지보수하거나 검토하지 않습니다.",
 "home.srcN": "시스템별 빌드 방법은 <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md\">docs/SETUP_DEV.md</a>에 있습니다.",
 "sig.title": "코드 서명 정책",
 "sig.pending": "승인 대기 중",
@@ -500,6 +503,7 @@
 "nav.features": "기능",
 "nav.updates": "업데이트",
 "nav.wiki": "위키",
+"f.logo": "로고 제작: w3teal",
 "f.sign": "코드 서명 &amp; 개인정보",
 "legal": "LYNX SHARE는 독립 프로젝트이며 Image-Line, Ableton, BandLab과 제휴하거나 그들의 보증을 받지 않았습니다. FL Studio와 FL Studio Mobile은 Image-Line Software의, Ableton과 Live는 Ableton AG의, BandLab은 BandLab Technologies의 상표입니다.",
 "aria.lang": "언어"

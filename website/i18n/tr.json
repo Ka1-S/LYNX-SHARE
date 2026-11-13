@@ -257,6 +257,9 @@
 "home.src1": "LYNX SHARE, JUCE 8 ile C++20 kullanılarak yazıldı. Kod, testler ve yeniden ürettiği her FL Studio davranışının notları tek bir herkese açık depoda. FL Studio ve Live dışarıdan incelendi ve kod sıfırdan yazıldı: içinde Image-Line'dan veya Ableton'dan hiçbir şey yok.",
 "home.src2": "Hata raporları ve pull request'ler memnuniyetle karşılanır. Son sürümlerdeki birkaç düzeltme kullanıcılardan geldi.",
 "home.issues": "Hata bildir",
+"home.commT": "Topluluk",
+"home.comm1": "<a href=\"https://discord.gg/XHKkbtbkY\" rel=\"noopener\">Discord</a>: sohbet, yardım, geri bildirim ve sürüm duyuruları.",
+"home.comm2": "<a href=\"https://github.com/Kenneth-Cho-InfoSec/Radiant\" rel=\"noopener\">Radiant</a>, LYNX SHARE'in tabletler ve telefonlar için bağımsız, resmî olmayan bir Android uyarlamasıdır. Ayrı bir topluluk projesidir, resmî bir LYNX SHARE sürümü değildir ve bizim tarafımızdan bakımı yapılmaz ya da incelenmez.",
 "home.srcN": "Her sistem için derleme talimatları <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md\">docs/SETUP_DEV.md</a> içinde.",
 "sig.title": "Kod imzalama politikası",
 "sig.pending": "onay bekliyor",
@@ -500,6 +503,7 @@
 "nav.features": "Özellikler",
 "nav.updates": "Güncellemeler",
 "nav.wiki": "Wiki",
+"f.logo": "Logo tasarımı: w3teal",
 "f.sign": "Kod imzalama ve gizlilik",
 "legal": "LYNX SHARE bağımsız bir projedir; Image-Line, Ableton veya BandLab ile bağlantılı değildir ve onlar tarafından onaylanmamıştır. FL Studio ve FL Studio Mobile, Image-Line Software'in; Ableton ve Live, Ableton AG'nin; BandLab ise BandLab Technologies'in ticari markalarıdır.",
 "aria.lang": "Dil"

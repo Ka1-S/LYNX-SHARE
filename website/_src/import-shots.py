@@ -21,9 +21,9 @@ writes width and height from catalog-img.json and img-sizes.json). --artshot als
 0.1.25 program draw at 100% only, so their pictures have no @2x file. Small pictures are kept lossless, the rest at
 quality 90 (@2x: 84).
 
-The logo: 0.1.25 still draws the earlier pepper in the round button of a plugin's header (src/ui/LogoData.h was not
-regenerated when the logo became the vector pepper). The site shows the brand's mark, so that button, where a render
-has it, is painted over with assets/img/logo.png at the same place and size. LOGO (below) is the 0.1.25 button.
+The logo: where a render's program drew an older logo in the round button of a plugin's header, that button is
+painted over with assets/img/logo.png (the brand's mark) at the same place and size. LOGO (below) is the old button.
+(This importer belongs to the 0.1.25 pictures; scripts/site-shots.py --logo-was does the same for the current ones.)
 """
 import io
 import json

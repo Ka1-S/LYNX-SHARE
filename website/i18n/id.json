@@ -257,6 +257,9 @@
 "home.src1": "LYNX SHARE ditulis dalam C++20 dengan JUCE 8. Kode, tes, dan catatan tentang setiap perilaku FL Studio yang ditirunya ada di satu repositori publik. FL Studio dan Live dipelajari dari luar dan kodenya ditulis dari nol: tidak ada apa pun dari Image-Line atau Ableton di dalamnya.",
 "home.src2": "Laporan bug dan pull request diterima dengan senang hati. Beberapa perbaikan di rilis-rilis terakhir datang dari pengguna.",
 "home.issues": "Laporkan bug",
+"home.commT": "Komunitas",
+"home.comm1": "<a href=\"https://discord.gg/XHKkbtbkY\" rel=\"noopener\">Discord</a>: obrolan, bantuan, masukan, dan pengumuman rilis.",
+"home.comm2": "<a href=\"https://github.com/Kenneth-Cho-InfoSec/Radiant\" rel=\"noopener\">Radiant</a> adalah adaptasi Android dari LYNX SHARE yang independen dan tidak resmi untuk tablet dan ponsel. Ini proyek komunitas terpisah, bukan rilis resmi LYNX SHARE, dan tidak kami kelola maupun kami tinjau.",
 "home.srcN": "Petunjuk build untuk tiap sistem ada di <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md\">docs/SETUP_DEV.md</a>.",
 "sig.title": "Kebijakan penandatanganan kode",
 "sig.pending": "menunggu persetujuan",
@@ -500,6 +503,7 @@
 "nav.features": "Fitur",
 "nav.updates": "Pembaruan",
 "nav.wiki": "Wiki",
+"f.logo": "Logo oleh w3teal",
 "f.sign": "Tanda tangan kode &amp; privasi",
 "legal": "LYNX SHARE adalah proyek independen, tidak berafiliasi dengan atau didukung oleh Image-Line, Ableton, maupun BandLab. FL Studio dan FL Studio Mobile adalah merek dagang Image-Line Software; Ableton dan Live adalah merek dagang Ableton AG; BandLab adalah merek dagang BandLab Technologies.",
 "aria.lang": "Bahasa"

@@ -26,6 +26,7 @@ SRC = Path(__file__).resolve().parent
 OUT = SRC.parent
 SITE = "https://lynx-share.com"
 REPO = "https://github.com/Ka1-S/LYNX-SHARE"
+LOGO_V = "0.1.26-logo"   # cache-buster of the logo pictures (logo by w3teal, 2026-11-13)
 LANGS = [["en", "English"], ["zh-Hans", "简体中文"], ["zh-Hant", "繁體中文"], ["nl", "Nederlands"], ["fr", "Français"],
          ["de", "Deutsch"], ["id", "Bahasa Indonesia"], ["it", "Italiano"], ["ja", "日本語"], ["ko", "한국어"],
          ["pl", "Polski"], ["pt-BR", "Português (Brasil)"], ["ru", "Русский"], ["es", "Español"], ["tr", "Türkçe"]]
@@ -253,7 +254,10 @@ def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", ho
 {alts}<link rel="alternate" hreflang="x-default" href="{url}">
 {head_script(version)}
 <meta name="theme-color" content="#0d0e12">
-<link rel="icon" href="/assets/img/favicon.png?v=0.1.23">
+<link rel="icon" type="image/png" sizes="64x64" href="/assets/img/favicon.png?v={LOGO_V}">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png?v={LOGO_V}">
+<link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicon-16.png?v={LOGO_V}">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png?v={LOGO_V}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
@@ -261,7 +265,7 @@ def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", ho
 </head>
 <body>
 <header class="top"><div class="wrap">
-  <a href="/" class="brand"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="32" height="32">LYNX SHARE</a>
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v={LOGO_V}" alt="" width="32" height="32">LYNX SHARE</a>
   <nav class="links" aria-label="Site">{nav}</nav>
   <div class="navbtns">
     <label class="lang">{GLOBE}<span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
@@ -272,8 +276,9 @@ def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", ho
 {body}
 </main>
 <footer><div class="wrap">
-  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v=0.1.23" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v={LOGO_V}" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
   <span>© 2026 · AGPL-3.0</span>
+  <span data-i18n="f.logo">Logo by w3teal</span>
   <div class="links2"><a href="{REPO}">GitHub</a><a href="{REPO}/releases">Releases</a><a href="{REPO}/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
   <p class="legal" data-i18n="legal">LYNX SHARE is an independent project, not affiliated with or endorsed by Image-Line, Ableton or BandLab. FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies.</p>
 </div></footer>
