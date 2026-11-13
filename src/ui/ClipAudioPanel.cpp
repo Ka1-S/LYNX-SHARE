@@ -108,8 +108,6 @@ public:
                 return (double) (texture ? w.textureGrain : w.tonesGrain);
             }, [this] (double v) { editMode ([v] (Song& s, int c) { warpmodes::setGrain (s, c, v); }); });
         }
- [this] (double v) { editMode ([v] (Song& s, int c) { warpmodes::setGrain (s, c, v); }); });
-        }
 
         // BPM with ÷2 and ×2 (the audio editor's commands, round 190cy, on this clip)
         {
