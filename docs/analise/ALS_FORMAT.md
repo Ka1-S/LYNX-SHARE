@@ -286,7 +286,7 @@ Import (the default, the user's choice of 2026-11-08; `AlsImportOptions::session
 - A looping clip → one pass of its loop region `[LoopStart, LoopEnd)` with the slot's Loop on; a start marker inside the loop (`StartRelative` ≠ 0) is reported as approximated. A one-shot → `[LoopStart + StartRelative, OutMarker)` with Loop off. MIDI clips get their own pattern, audio clips the same channel and warp handling as arrangement clips.
 - `LaunchMode`, `LaunchQuantisation`, `Legato`, `Name`, `Color`, and `FollowAction{FollowActionEnabled, FollowActionA/B, FollowChanceA/B, JumpIndexA/B, IsLinked, LoopIterations, FollowTime}` → the slot's settings.
 - An empty slot with `HasStop` false → no stop button.
-- Scenes: `Name`, `Color`, `Tempo` when `IsTempoEnabled`, the numerator of `TimeSignatureId` when `IsTimeSignatureEnabled` (n/4 only; other denominators reported). Scene follow actions are reported (not built).
+- Scenes: `Name`, `Color`, `Tempo` when `IsTempoEnabled`, `TimeSignatureId` when `IsTimeSignatureEnabled` (n / d; round 190fg: a launch gives the song that meter). Scene follow actions are reported (not built).
 - A set whose slots are all empty adds no grid.
 
 Export:

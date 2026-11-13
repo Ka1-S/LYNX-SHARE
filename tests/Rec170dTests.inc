@@ -22,7 +22,7 @@ struct Take
     Take (lynx::Song& s, std::int64_t start, std::int64_t window, std::int64_t countIn) : song (s)
     {
         q.grid = 0;
-        const auto loop = song.patterns[(std::size_t) song.currentPattern].effectiveLength (song.beatsPerBar);
+        const auto loop = song.patterns[(std::size_t) song.currentPattern].effectiveLength (song.meter());
         catcher.start = start;
         catcher.window = window;
         catcher.songMode = song.mode == lynx::PlayMode::song;
@@ -227,7 +227,7 @@ TEST (rec170d_pattern_mode_count_in_is_the_previous_loop_pass)
     CHECK (one != nullptr && one->start == 0 && one->length == 400);
     CHECK (four != nullptr && four->start == 2880 && four->length == 480);
     CHECK (two != nullptr && two->start == 960);
-    CHECK (s.patterns[0].effectiveLength (s.beatsPerBar) == (std::int64_t) rec170d::bar);
+    CHECK (s.patterns[0].effectiveLength (s.meter()) == (std::int64_t) rec170d::bar);
 }
 
 TEST (rec170d_capture_midi_played_while_playing_lands_where_played)

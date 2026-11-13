@@ -73,7 +73,7 @@ TEST (transport162_piano_roll_playhead)
 
     // Pattern mode: the current pattern loops; another pattern is not playing
     song.mode = lynx::PlayMode::pattern;
-    const auto len = (double) song.patterns[0].effectiveLength (4);
+    const auto len = (double) song.patterns[0].effectiveLength (lynx::Meter (4, 4));
     CHECK (std::abs (patternPlayhead (song, 0, len + 100.0) - 100.0) < 1e-9);
     CHECK (patternPlayhead (song, 1, 100.0) < 0.0);
 

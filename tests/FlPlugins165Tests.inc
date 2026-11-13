@@ -66,10 +66,10 @@ TEST (fl165g_big_clock_text)
     song.mode = lynx::PlayMode::pattern;
     song.bpm = 120.0;
     const double ticks = 11.0 * 4 * lynx::ppq + 2.0 * lynx::ppq + 1.0 * lynx::ticksPerStep + 170.0; // bar 12, beat 3, step 10 (+170)
-    CHECK (clockText (song, ticks, 4, Display::barBeatTick) == "12:03:41");  // 240 + 170 LYNX ticks = 41 FL ticks (96 ppq)
-    CHECK (clockText (song, ticks, 4, Display::barStepTick) == "12:10:17");  // step 10 of the bar, 170 ticks = 17
-    CHECK (clockText (song, 0.0, 4, Display::barBeatTick) == "1:01:00");
-    CHECK (clockText (song, (double) lynx::ppq * 2 * 61.5, 4, Display::minSecHundredths) == "1:01:50"); // 123 beats at 120 BPM = 61.5 s
+    CHECK (clockText (song, ticks, lynx::Meter (4, 4), Display::barBeatTick) == "12:03:41");  // 240 + 170 LYNX ticks = 41 FL ticks (96 ppq)
+    CHECK (clockText (song, ticks, lynx::Meter (4, 4), Display::barStepTick) == "12:10:17");  // step 10 of the bar, 170 ticks = 17
+    CHECK (clockText (song, 0.0, lynx::Meter (4, 4), Display::barBeatTick) == "1:01:00");
+    CHECK (clockText (song, (double) lynx::ppq * 2 * 61.5, lynx::Meter (4, 4), Display::minSecHundredths) == "1:01:50"); // 123 beats at 120 BPM = 61.5 s
     CHECK (displayOf (displayValue (Display::minSecHundredths)) == Display::minSecHundredths);
     CHECK (paramText (display, 1.0f) == "Bar:Step:Tick");
     CHECK (lynx::effectFromFl ("Fruity Big Clock", {}, 120.0)->kind == lynx::EffectKind::bigClock);

@@ -158,7 +158,7 @@ int splitPatternByChannel (Song& song, int index)
         const auto channelName = channel >= 0 && channel < (int) song.channels.size() ? song.channels[(std::size_t) channel].name
                                                                                          : "Channel " + std::to_string (channel + 1);
         p.name = source.name + " - " + channelName;
-        p.lengthTicks = source.lengthTicks != 0 ? source.lengthTicks : source.effectiveLength (song.beatsPerBar);
+        p.lengthTicks = source.lengthTicks != 0 ? source.lengthTicks : source.effectiveLength (song.meter());
         p.colour = channel >= 0 && channel < (int) song.channels.size() ? song.channels[(std::size_t) channel].colour : source.colour;
 
         for (const auto& n : source.notes)
@@ -427,7 +427,7 @@ int mergeIdenticalPatterns (Song& song)
 
 int patternSteps (const Song& song, const Pattern& pattern) noexcept
 {
-    return std::clamp ((int) (pattern.effectiveLength (song.beatsPerBar) / ticksPerStep), 16, 512);
+    return std::clamp ((int) (pattern.effectiveLength (song.meter()) / ticksPerStep), 16, 512);
 }
 
 bool showsNotePreview (const Pattern& pattern, int channel) noexcept
@@ -1026,10 +1026,10 @@ std::string cutGroupText (int group, int channel)
     return std::to_string (group);
 }
 
-std::string stepPositionText (std::int64_t tick, int beatsPerBar)
+std::string stepPositionText (std::int64_t tick, Meter meter)
 {
     tick = std::max<std::int64_t> (0, tick);
-    const auto barTicks = (std::int64_t) ppq * std::max (1, beatsPerBar);
+    const auto barTicks = meter.bar();
     const auto bar = tick / barTicks + 1;
     const auto inBar = tick % barTicks;
     const auto step = inBar / ticksPerStep + 1;

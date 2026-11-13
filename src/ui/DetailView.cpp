@@ -1710,7 +1710,7 @@ public:
                 notetools::humanize (p, all, o);
             });
         };
-        duplicate.onClick = [this] { notes ([] (Pattern& p, const std::vector<int>& all, const Song& song) { noteedit::duplicateBars (p, all, song.beatsPerBar); }); };
+        duplicate.onClick = [this] { notes ([] (Pattern& p, const std::vector<int>& all, const Song& song) { noteedit::duplicateBars (p, all, song.meter()); }); };
         quantize.onClick = [this] { notes ([] (Pattern& p, const std::vector<int>& all, const Song&) { noteedit::quantize (p, all, ppq / 4); }); };
         randomize.onClick = [this] {
             notes ([seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt()] (Pattern& p, const std::vector<int>& all, const Song&) {
@@ -1951,13 +1951,13 @@ private:
     juce::String fieldText (std::int64_t ticks, bool asLength, bool seconds) const
     {
         const auto& song = engine.getSong();
-        return juce::String (seconds ? clipsample::secondsText (ticks, song.bpm) : clipsample::positionText (ticks, song.beatsPerBar, asLength));
+        return juce::String (seconds ? clipsample::secondsText (ticks, song.bpm) : clipsample::positionText (ticks, song.meter(), asLength));
     }
     std::int64_t fieldTicks (const juce::TextEditor& ed, bool asLength, bool seconds) const
     {
         const auto& song = engine.getSong();
         const auto text = ed.getText().trim().toStdString();
-        return seconds ? clipsample::parseSeconds (text, song.bpm) : clipsample::parsePosition (text, song.beatsPerBar, asLength);
+        return seconds ? clipsample::parseSeconds (text, song.bpm) : clipsample::parsePosition (text, song.meter(), asLength);
     }
 
     // the grid clip of the slot (const) and its settings
@@ -1988,7 +1988,7 @@ private:
             position.setText (fieldText (c->offset, false, secs), false);
         if (! length.hasKeyboardFocus (false))
             length.setText (fieldText (c->length, true, secs), false);
-        signature.setText (juce::String (bpb) + " / 4", n);
+        signature.setText (juce::String (bpb) + " / " + juce::String (meterUnit (song.beatUnit)), n);
         {
             // the Groove chooser: None + the pool's grooves; MIDI clips only
             const juce::ScopedValueSetter<bool> guard (loading, true);

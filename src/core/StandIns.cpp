@@ -218,7 +218,7 @@ void pluginsOf (const MixerTrack& t, std::vector<const PluginRef*>& out)
 
 std::int64_t tailTicks (const Song& song) noexcept
 {
-    return (std::int64_t) 4 * ppq * std::max (1, song.beatsPerBar);
+    return 4 * song.barTicks();
 }
 
 float stemGain() noexcept
@@ -251,7 +251,7 @@ ChannelRender channelPatternRender (const Song& song, int channel)
         Segment seg;
         seg.pattern = p;
         seg.patternUid = song.patterns[(std::size_t) p].uid;
-        seg.length = song.patterns[(std::size_t) p].effectiveLength (song.beatsPerBar);
+        seg.length = song.patterns[(std::size_t) p].effectiveLength (song.meter());
         s.patterns[(std::size_t) p].lengthTicks = seg.length; // (fixed: the render's clips have that length)
         seg.once = at;
         seg.loopFrom = at + 2 * seg.length + r.tail;

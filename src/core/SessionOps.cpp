@@ -155,12 +155,12 @@ std::string recordedClipName (const Song& song, const std::string& trackName)
             return name;
 }
 
-std::string lengthCounter (double ticks, int beatsPerBar)
+std::string lengthCounter (double ticks, Meter meter)
 {
     const auto whole = (std::int64_t) std::floor (std::max (0.0, ticks) + 1.0e-6);
-    const auto bar = (std::int64_t) std::max (1, beatsPerBar) * ppq;
+    const auto bar = meter.bar(), beat = meter.beat(); // (round 190fg: the meter's beats; sixteenths below them)
     const auto inBar = whole % bar;
-    return std::to_string (whole / bar) + "." + std::to_string (inBar / ppq) + "." + std::to_string ((inBar % ppq) / (ppq / 4));
+    return std::to_string (whole / bar) + "." + std::to_string (inBar / beat) + "." + std::to_string ((inBar % beat) / (ppq / 4));
 }
 
 int placeRecordedPattern (Song& song, int track, int scene, std::vector<Note> notes, std::int64_t length, const std::string& name)
@@ -222,7 +222,7 @@ int insertEmptyClip (Song& song, int track, int scene)
 {
     if (! slotFree (song, track, scene))
         return -1;
-    return placeRecordedPattern (song, track, scene, {}, (std::int64_t) std::max (1, song.beatsPerBar) * ppq);
+    return placeRecordedPattern (song, track, scene, {}, song.barTicks());
 }
 
 // --- clips between slots ---------------------------------------------------------------------------------------------
@@ -333,7 +333,7 @@ bool putPattern (Song& song, int track, int scene, int pattern)
         return false;
     Clip clip;
     clip.pattern = pattern;
-    clip.length = std::max<std::int64_t> (ppq, song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar));
+    clip.length = std::max<std::int64_t> (ppq, song.patterns[(std::size_t) pattern].effectiveLength (song.meter()));
     return launcher::setClip (song, track, scene, clip) >= 0;
 }
 
@@ -546,10 +546,10 @@ int captureSlot (const Song& song, int track, int scene)
     return scene;
 }
 
-std::vector<Note> phraseNotes (const std::vector<scorelog::Entry>& phrase, double nowMs, double bpm, int beatsPerBar, std::int64_t& length)
+std::vector<Note> phraseNotes (const std::vector<scorelog::Entry>& phrase, double nowMs, double bpm, Meter meter, std::int64_t& length)
 {
     std::vector<Note> notes;
-    const auto bar = (std::int64_t) std::max (1, beatsPerBar) * ppq;
+    const auto bar = meter.bar();
     length = bar;
     if (phrase.empty())
         return notes;
@@ -669,7 +669,7 @@ bool captureIntoClip (Song& song, int track, int scene, const std::vector<Note>&
         song.patterns.push_back (song.patterns[(std::size_t) pattern]);
         pattern = (int) song.patterns.size() - 1;
     }
-    const auto bar = (std::int64_t) std::max (1, song.beatsPerBar) * ppq;
+    const auto bar = song.barTicks();
     auto first = notes.front().start, reach = (std::int64_t) 0;
     for (const auto& n : notes)
     {

@@ -1230,7 +1230,7 @@ int sendToPlaylist (Song& song, int pattern, std::int64_t at)
 {
     if (pattern < 0 || pattern >= (int) song.patterns.size())
         return -1;
-    const auto length = std::max<std::int64_t> (ticksPerStep, song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar));
+    const auto length = std::max<std::int64_t> (ticksPerStep, song.patterns[(std::size_t) pattern].effectiveLength (song.meter()));
     at = std::max<std::int64_t> (0, at);
     // FL: "There aren't enough empty playlist tracks available." — the first track free over the clip's span
     constexpr int maxTracks = 500;

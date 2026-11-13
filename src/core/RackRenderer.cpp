@@ -2407,7 +2407,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
             if (current >= 0 && current < (int) song.patterns.size())
             {
                 const auto& pattern = song.patterns[(std::size_t) current];
-                const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+                const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
                 const auto t = std::fmod (std::max (0.0, startTick), length);
 
                 for (const auto& lane : state.eventLanes)
@@ -3808,7 +3808,7 @@ double RackRenderer::ticksToNextEvent (const RackState& state, double tick) noex
         if (current < 0 || current >= (int) song.patterns.size())
             return best;
         const auto& pattern = song.patterns[(std::size_t) current];
-        const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+        const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
         const auto t = std::fmod (std::max (0.0, tick), length);
         for (const auto& lane : state.eventLanes)
             if (lane.pattern == current)
@@ -4119,6 +4119,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         timeline.bpm.store (bpm, std::memory_order_relaxed);
         timeline.sampleRate.store (sampleRate, std::memory_order_relaxed);
         timeline.beatsPerBar.store (std::max (1, song.beatsPerBar), std::memory_order_relaxed);
+        timeline.beatUnit.store (meterUnit (song.beatUnit), std::memory_order_relaxed);
         timeline.playing.store (playing, std::memory_order_relaxed);
         timeline.looping.store (song.hasLoop(), std::memory_order_relaxed);
         timeline.loopStart.store ((double) song.loopStart, std::memory_order_relaxed);
@@ -4206,7 +4207,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     {
         const auto patternIndex = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
         const auto& pattern = song.patterns[(std::size_t) patternIndex];
-        schedulePatternLoop (pattern, pattern.effectiveLength (song.beatsPerBar), startTick, numSamples,
+        schedulePatternLoop (pattern, pattern.effectiveLength (song.meter()), startTick, numSamples,
                              ticksPerSample (bpm, sampleRate), events, song.swing, &song.channels, chaseNotes,
                              liveInput != nullptr ? liveInput->patternOrigin.load (std::memory_order_relaxed) : -1.0, song.chanceSeed);
     }

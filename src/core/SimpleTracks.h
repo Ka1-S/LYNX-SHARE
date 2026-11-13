@@ -136,10 +136,10 @@ int insertOf (const Song& song, int track);
 //  - an ACID beat count is taken as it is;
 //  - else the tempo written in the name: "... 98 bpm ..." (autowarp::bpmInName), or a number from 60 to 200 standing
 //    alone between separators ("DL_102_Dm_Stack", "Funky Guitar 98"). With it the file must come out as whole bars
-//    (within a quarter of a beat: 1, 2, 3 ... bars of `beatsPerBar`), or as whole beats when shorter than a bar; a name
+//    (within a quarter of a beat: 1, 2, 3 ... bars of `meter`), or as whole beats when shorter than a bar; a name
 //    that says "bpm" also keeps a loop with a tail (its exact beats).
 //  - files longer than 70 seconds are never taken as loops.
-float loopBeats (const std::string& name, double seconds, float acidBeats, int beatsPerBar) noexcept;
+float loopBeats (const std::string& name, double seconds, float acidBeats, Meter meter) noexcept;
 // The tempo `loopBeats` reads in a name (0 = none) and whether the name says "bpm" (`*explicitBpm`, may be null).
 double tempoInName (const std::string& name, bool* explicitBpm = nullptr);
 

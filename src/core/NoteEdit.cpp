@@ -93,9 +93,9 @@ std::vector<int> duplicate (Pattern& pattern, const std::vector<int>& indices, s
     return paste (pattern, notes, offset);
 }
 
-std::vector<int> duplicateBars (Pattern& pattern, const std::vector<int>& indices, int beatsPerBar)
+std::vector<int> duplicateBars (Pattern& pattern, const std::vector<int>& indices, Meter meter)
 {
-    return duplicate (pattern, indices, (std::int64_t) ppq * std::max (1, beatsPerBar));
+    return duplicate (pattern, indices, meter.bar());
 }
 
 void quantize (Pattern& pattern, const std::vector<int>& indices, std::int64_t grid)
@@ -401,9 +401,9 @@ std::int64_t flLineStep (double pixelsPerTick, int numerator, int denominator, d
     return bars;
 }
 
-std::string formatTime (std::int64_t ticks, int beatsPerBar, bool isLength)
+std::string formatTime (std::int64_t ticks, Meter meter, bool isLength)
 {
-    const auto bar = (std::int64_t) ppq * std::max (1, beatsPerBar);
+    const auto bar = meter.bar();
     ticks = std::max<std::int64_t> (0, ticks);
     const auto base = isLength ? 0 : 1;
     char text[64];
@@ -412,7 +412,7 @@ std::string formatTime (std::int64_t ticks, int beatsPerBar, bool isLength)
     return text;
 }
 
-bool parseTime (const std::string& text, int beatsPerBar, std::int64_t& ticks, bool isLength)
+bool parseTime (const std::string& text, Meter meter, std::int64_t& ticks, bool isLength)
 {
     long long parts[3] = { 0, 0, 0 };
     int count = 0;
@@ -441,13 +441,13 @@ bool parseTime (const std::string& text, int beatsPerBar, std::int64_t& ticks, b
     }
 
     const auto base = isLength ? 0 : 1;
-    const auto stepsPerBar = (long long) std::max (1, beatsPerBar) * stepsPerBeat;
+    const auto stepsPerBar = (long long) (meter.bar() / ticksPerStep);
 
     if (count == 0 || parts[0] < base || (count >= 2 && (parts[1] < base || parts[1] - base >= stepsPerBar))
         || (count == 3 && parts[2] >= ticksPerStep))
         return false;
 
-    const auto bar = (std::int64_t) ppq * std::max (1, beatsPerBar);
+    const auto bar = meter.bar();
     ticks = (parts[0] - base) * bar + (count >= 2 ? (parts[1] - base) * ticksPerStep : 0) + (count == 3 ? parts[2] : 0);
     return true;
 }
@@ -1112,21 +1112,21 @@ int addPatternAutoMarker (Pattern& pattern, std::int64_t tick)
     return addPatternMarker (pattern, m);
 }
 
-std::pair<int, int> patternSignatureAt (const Pattern& pattern, std::int64_t tick, int beatsPerBar)
+std::pair<int, int> patternSignatureAt (const Pattern& pattern, std::int64_t tick, Meter meter)
 {
-    std::pair<int, int> out { std::max (1, beatsPerBar), 4 };
+    std::pair<int, int> out { std::max (1, meter.beats), meterUnit (meter.unit) };
     for (const auto& m : pattern.markers)
         if (m.isSignature() && m.tick <= tick)
             out = { m.numerator, m.denominator };
     return out;
 }
 
-void addPatternSignatureChange (Pattern& pattern, std::int64_t from, std::int64_t to, int numerator, int denominator, int beatsPerBar)
+void addPatternSignatureChange (Pattern& pattern, std::int64_t from, std::int64_t to, int numerator, int denominator, Meter meter)
 {
     numerator = std::clamp (numerator, 1, 32);
     denominator = std::clamp (denominator, 1, 32);
     from = std::max<std::int64_t> (0, from / ppq * ppq); // (floored to a beat, like the Playlist's)
-    const auto before = patternSignatureAt (pattern, from, beatsPerBar);
+    const auto before = patternSignatureAt (pattern, from, meter);
     auto add = [&pattern] (std::int64_t tick, int n, int d) {
         pattern.markers.erase (std::remove_if (pattern.markers.begin(), pattern.markers.end(),
                                                [tick] (const Marker& m) { return m.isSignature() && m.tick == tick; }),

@@ -148,6 +148,7 @@ Song extract (const Song& song, std::uint32_t tag)
     Song part;
     part.bpm = song.bpm;
     part.beatsPerBar = song.beatsPerBar;
+    part.beatUnit = song.beatUnit;
     part.swing = song.swing;
     part.masterPitch = song.masterPitch;
     part.projectId = song.projectId;

@@ -930,7 +930,7 @@ private:
         slide.setToggleState (shown.slide, juce::dontSendNotification);
         porta.setToggleState (shown.porta, juce::dontSendNotification);
         slideTouched = portaTouched = false;
-        const auto bpb = engine.getSong().beatsPerBar;
+        const auto bpb = engine.getSong().meter();
         time.editor.setText (noteedit::formatTime (shown.start, bpb), juce::dontSendNotification);
         length.editor.setText (noteedit::formatTime (shown.length, bpb, true), juce::dontSendNotification);
         time.touched = length.touched = false;
@@ -940,7 +940,7 @@ private:
 
     void apply()
     {
-        const auto bpb = engine.getSong().beatsPerBar;
+        const auto bpb = engine.getSong().meter();
         std::int64_t start = shown.start, len = shown.length;
         auto ok = true;
 

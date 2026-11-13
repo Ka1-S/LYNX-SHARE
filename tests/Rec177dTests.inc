@@ -6,7 +6,7 @@ TEST (rec177d_preview_shows_held_notes_without_changing_the_take)
 {
     auto song = rec170d::emptySong (lynx::PlayMode::pattern);
     lynx::NoteRecorder r;
-    r.begin (song.patterns[0].effectiveLength (song.beatsPerBar));
+    r.begin (song.patterns[0].effectiveLength (song.meter()));
     CHECK (r.preview (song, 0.0).notes.empty());
     r.add (song, { 240.0, 0, 60, 0.8f, true });
     r.add (song, { 480.0, 0, 64, 0.5f, true });
@@ -37,7 +37,7 @@ TEST (rec177d_preview_song_mode_origin_and_reach_before_the_first_release)
 {
     auto song = rec170d::emptySong (lynx::PlayMode::song);
     lynx::NoteRecorder r;
-    r.begin (song.patterns[0].effectiveLength (song.beatsPerBar));
+    r.begin (song.patterns[0].effectiveLength (song.meter()));
     r.setLinear (true);
     // the first note held in bar 3: the take's origin is that bar, no clip yet
     r.add (song, { 2.0 * rec170d::bar + 100.0, 0, 60, 0.8f, true });

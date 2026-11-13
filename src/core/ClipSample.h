@@ -114,12 +114,13 @@ inline bool setPositionAt (Clip& c, std::int64_t tick) noexcept
 // A place in the content: "bar. beat. sixteenth" from 1 ("1. 1. 1"); a length from 0 ("8. 0. 0") [SHOT
 // live-clipview-audio-panel.png: Start 1. 1. 1, End 9. 1. 1, Length 8. 0. 0]. An unwarped audio clip shows seconds
 // instead, "m:ss:mmm" (its content has no beats).
-inline std::string positionText (std::int64_t ticks, int beatsPerBar, bool asLength = false)
+inline std::string positionText (std::int64_t ticks, Meter meter, bool asLength = false)
 {
-    const auto bpb = (std::int64_t) std::max (1, beatsPerBar);
+    // (round 190fg: the meter's bars and beats: in 6/8 the beats are eighths, as Live counts them)
+    const auto barLength = meter.bar(), beatLength = meter.beat();
     const auto sixteenth = std::max<std::int64_t> (1, ppq / 4);
     ticks = std::max<std::int64_t> (0, ticks);
-    const auto bar = ticks / (bpb * ppq), beat = (ticks % (bpb * ppq)) / ppq, six = (ticks % ppq) / sixteenth;
+    const auto bar = ticks / barLength, beat = (ticks % barLength) / beatLength, six = (ticks % beatLength) / sixteenth;
     const auto base = asLength ? 0 : 1;
     char text[48];
     std::snprintf (text, sizeof (text), "%lld. %lld. %lld", (long long) (bar + base), (long long) (beat + base), (long long) (six + base));
@@ -134,7 +135,7 @@ inline std::string secondsText (std::int64_t ticks, double bpm)
 }
 // The ticks a typed field means (-1: not readable). Bars-beats-sixteenths: "9. 1. 1", "9.1.1", "9 1 1" or "9" (missing
 // parts are the first beat / sixteenth); seconds: "m:ss:mmm", "ss:mmm" or plain seconds "1.25".
-inline std::int64_t parsePosition (const std::string& text, int beatsPerBar, bool asLength = false)
+inline std::int64_t parsePosition (const std::string& text, Meter meter, bool asLength = false)
 {
     long long part[3] = { 0, 0, 0 };
     int count = 0;
@@ -163,8 +164,7 @@ inline std::int64_t parsePosition (const std::string& text, int beatsPerBar, boo
         part[i] = base;
     if (! asLength && (part[0] < 1 || part[1] < 1 || part[2] < 1))
         return -1;
-    const auto bpb = (std::int64_t) std::max (1, beatsPerBar);
-    return (part[0] - base) * bpb * ppq + (part[1] - base) * ppq + (part[2] - base) * std::max<std::int64_t> (1, ppq / 4);
+    return (part[0] - base) * meter.bar() + (part[1] - base) * meter.beat() + (part[2] - base) * std::max<std::int64_t> (1, ppq / 4);
 }
 inline std::int64_t parseSeconds (const std::string& text, double bpm)
 {

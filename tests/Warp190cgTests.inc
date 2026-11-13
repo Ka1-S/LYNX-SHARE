@@ -293,8 +293,9 @@ TEST (warp190cg_als_keeps_signature_changes_loop_range_and_tempo_view)
     if (sixBack)
     {
         CHECK (sixBack->loopPlays() && sixBack->loopEnd == 4 * ppq); // (a range that loops, as before)
+        // (round 190fg: the song start's 6/8 is the song's meter now, Song::beatUnit; before, a signature marker at 0)
         const auto first = signatures (*sixBack);
-        CHECK (first.size() == 1 && first[0].tick == 0 && first[0].numerator == 6 && first[0].denominator == 8);
+        CHECK (first.empty() && sixBack->beatsPerBar == 6 && sixBack->beatUnit == 8 && sixBack->barAt (0).length == 3 * ppq);
     }
 }
 

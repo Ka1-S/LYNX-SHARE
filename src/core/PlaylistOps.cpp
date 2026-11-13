@@ -150,17 +150,17 @@ void changeGain (Song& song, const std::vector<int>& clips, float value, bool re
 
 namespace
 {
-std::string bbt (std::int64_t ticks, int beatsPerBar, int base)
+std::string bbt (std::int64_t ticks, Meter meter, int base)
 {
-    const auto beat = (std::int64_t) ppq;
-    const auto bar = beat * std::max (1, beatsPerBar);
+    const auto beat = meter.beat(); // (round 190fg: the meter's beats, eighths in 6/8)
+    const auto bar = meter.bar();
     const auto t = std::max<std::int64_t> (0, ticks);
     char text[48];
     std::snprintf (text, sizeof (text), "%lld:%lld:%03lld", (long long) (t / bar + base), (long long) ((t % bar) / beat + base), (long long) (t % beat));
     return text;
 }
 
-std::int64_t parseBbt (const std::string& text, int beatsPerBar, int base)
+std::int64_t parseBbt (const std::string& text, Meter meter, int base)
 {
     long long parts[3] = { 0, base, 0 };
     int count = 0;
@@ -189,17 +189,17 @@ std::int64_t parseBbt (const std::string& text, int beatsPerBar, int base)
     }
     if (! flush())
         return -1;
-    if (parts[0] < base || parts[1] < base || parts[1] - base >= std::max (1, beatsPerBar) || parts[2] >= ppq)
+    const auto beat = meter.beat();
+    if (parts[0] < base || parts[1] < base || parts[1] - base >= std::max (1, meter.beats) || parts[2] >= beat)
         return -1;
-    const auto beat = (std::int64_t) ppq;
-    return (parts[0] - base) * beat * std::max (1, beatsPerBar) + (parts[1] - base) * beat + parts[2];
+    return (parts[0] - base) * meter.bar() + (parts[1] - base) * beat + parts[2];
 }
 } // namespace
 
-std::string formatPosition (std::int64_t ticks, int beatsPerBar) { return bbt (ticks, beatsPerBar, 1); }
-std::string formatLength (std::int64_t ticks, int beatsPerBar) { return bbt (ticks, beatsPerBar, 0); }
-std::int64_t parsePosition (const std::string& text, int beatsPerBar) { return parseBbt (text, beatsPerBar, 1); }
-std::int64_t parseLength (const std::string& text, int beatsPerBar) { return parseBbt (text, beatsPerBar, 0); }
+std::string formatPosition (std::int64_t ticks, Meter meter) { return bbt (ticks, meter, 1); }
+std::string formatLength (std::int64_t ticks, Meter meter) { return bbt (ticks, meter, 0); }
+std::int64_t parsePosition (const std::string& text, Meter meter) { return parseBbt (text, meter, 1); }
+std::int64_t parseLength (const std::string& text, Meter meter) { return parseBbt (text, meter, 0); }
 
 std::vector<std::pair<int, std::string>> sourcesFor (const Song& song, ClipKind kind)
 {
@@ -253,7 +253,7 @@ std::int64_t positionTick (const Song& song, MergePosition position, std::int64_
         case MergePosition::end:
         {
             const auto end = lengthOf (song, song.currentArrangement);
-            const auto bar = (std::int64_t) ppq * std::max (1, song.beatsPerBar);
+            const auto bar = song.barTicks();
             return (end + bar - 1) / bar * bar; // the next bar line
         }
     }
@@ -946,7 +946,7 @@ bool dropOnHeader (Song& song, int track, const std::string& path, const std::st
         clip.pattern = pattern;
         clip.track = track;
         clip.start = 0;
-        clip.length = song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar);
+        clip.length = song.patterns[(std::size_t) pattern].effectiveLength (song.meter());
         song.playlist.push_back (clip);
     }
     if (lock)
@@ -1018,7 +1018,7 @@ namespace lynx::autoclipplace
 {
 Place forNewClip (const Song& song, bool atPlayback, std::int64_t playTick)
 {
-    const auto bar = (std::int64_t) ppq * std::max (1, song.beatsPerBar);
+    const auto bar = song.barTicks();
     const auto songEnd = song.playlist.empty() ? (std::int64_t) 0 : song.songLength();
     Place place;
     if (song.hasLoop())
@@ -1063,7 +1063,7 @@ namespace
 {
 std::int64_t songEnd (const Song& song)
 {
-    const auto bar = (std::int64_t) ppq * std::max (1, song.beatsPerBar);
+    const auto bar = song.barTicks();
     return std::max (bar * 4, song.playlist.empty() ? 0 : song.songLength());
 }
 

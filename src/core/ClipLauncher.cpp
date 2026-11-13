@@ -244,9 +244,9 @@ bool removeScene (Song& song, int scene)
     return true;
 }
 
-double quantTicks (LaunchQuant quant, int beatsPerBar) noexcept
+double quantTicks (LaunchQuant quant, Meter meter) noexcept
 {
-    const auto beat = (double) ppq, bar = beat * std::max (1, beatsPerBar);
+    const auto beat = (double) ppq, bar = (double) meter.bar(); // (beat: a quarter note; Live's 1/4 is a quarter in any meter)
     switch (quant)
     {
         case LaunchQuant::global:
@@ -292,7 +292,7 @@ double slotQuant (const Song& song, const ClipGrid& grid, int slot) noexcept
     auto q = slot >= 0 && slot < (int) grid.slots.size() ? grid.slots[(std::size_t) slot].quant : LaunchQuant::global;
     if (q == LaunchQuant::global)
         q = grid.globalQuant;
-    return quantTicks (q, song.beatsPerBar);
+    return quantTicks (q, song.meter());
 }
 
 double nextGrid (double now, double step) noexcept
@@ -356,7 +356,7 @@ void Player::endRecording (const Song& song, const ClipGrid& grid, TrackState& t
 {
     if (t.recScene < 0)
         return;
-    const auto quant = quantTicks (grid.globalQuant, song.beatsPerBar);
+    const auto quant = quantTicks (grid.globalQuant, song.meter());
     if (! t.recStarted) // not begun yet (or asked for while the transport stood still): nothing was recorded
     {
         t.recUntil = t.recFrom;
@@ -462,7 +462,7 @@ void Player::follow (const Song& song, const ClipGrid& grid, const GridIndex& in
         return;
     const auto slot = (int) target->gridSlot;
     const auto own = grid.slots[(std::size_t) slot].quant;
-    const auto from = own == LaunchQuant::global ? at : nextGrid (at, quantTicks (own, song.beatsPerBar));
+    const auto from = own == LaunchQuant::global ? at : nextGrid (at, quantTicks (own, song.meter()));
     const auto length = (double) std::max<std::int64_t> (1, target->length);
     t.next = Play {};
     t.next.slot = slot;
@@ -500,7 +500,7 @@ void Player::stopTrack (const Song& song, const ClipGrid& grid, TrackState& t, d
     }
     if (t.current.slot < 0)
         return;
-    const auto at = nextGrid (now, quantTicks (grid.globalQuant, song.beatsPerBar));
+    const auto at = nextGrid (now, quantTicks (grid.globalQuant, song.meter()));
     t.current.until = std::min (t.current.until, std::max (at, t.current.from));
     t.current.stopping = true;
 }
@@ -535,7 +535,7 @@ void Player::apply (const Song& song, const ClipGrid& grid, const GridIndex& ind
                 return;
             }
             {
-                const auto from = nextGrid (now, quantTicks (grid.globalQuant, song.beatsPerBar));
+                const auto from = nextGrid (now, quantTicks (grid.globalQuant, song.meter()));
                 t->next = Play {};
                 t->wantScene = -1;
                 t->heldSlot = -1;
@@ -954,7 +954,7 @@ void cutPatternNotes (const Song& song, const Clip& clip, double position, doubl
     const auto& p = song.patterns[(std::size_t) clip.pattern];
     const auto period = std::max<std::int64_t> (1, index != nullptr && (std::size_t) clip.pattern < index->patternLength.size()
                                                        ? index->patternLength[(std::size_t) clip.pattern]
-                                                       : p.effectiveLength (song.beatsPerBar));
+                                                       : p.effectiveLength (song.meter()));
     const auto loops = stretchedClipsLoop() && clip.offset + clip.length > period;
     const auto at = std::max (0.0, position);
     auto slack = (double) ticksPerStep + (index != nullptr ? (double) index->maxShift : 0.0);

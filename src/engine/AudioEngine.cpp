@@ -894,7 +894,7 @@ void AudioEngine::startPlayback()
         takeCatch.songMode = song.mode == PlayMode::song;
         if (! song.patterns.empty())
             takeCatch.wrap = countInWrap (length, song.patterns[(std::size_t) juce::jlimit (0, (int) song.patterns.size() - 1, song.currentPattern)]
-                                                      .effectiveLength (song.beatsPerBar));
+                                                      .effectiveLength (song.meter()));
         transport.countIn.store ((double) length);
         sendChangeMessage();
         return;
@@ -1417,7 +1417,7 @@ CaptureResult AudioEngine::captureMidi()
     CaptureOptions o;
     o.afterMs = lastCaptureMs;
     o.nowMs = juce::Time::getMillisecondCounterHiRes();
-    o.gapMs = 2.0 * juce::jmax (1, song.beatsPerBar) * 60000.0 / juce::jmax (1.0, song.bpm); // two bars of silence end a phrase
+    o.gapMs = 2.0 * (double) song.barTicks() / ppq * 60000.0 / juce::jmax (1.0, song.bpm); // two bars of silence end a phrase
     o.playhead = (std::int64_t) std::llround (songPlayheadTicks());
     o.mode = recordOptions.mode;
     o.quantize.grid = recordOptions.quantise;
@@ -1442,7 +1442,7 @@ CaptureResult AudioEngine::captureMidiToSlot (int track, int scene, int& placed,
     CaptureOptions o;
     o.afterMs = lastCaptureMs;
     o.nowMs = juce::Time::getMillisecondCounterHiRes();
-    o.gapMs = 2.0 * juce::jmax (1, song.beatsPerBar) * 60000.0 / juce::jmax (1.0, song.bpm);
+    o.gapMs = 2.0 * (double) song.barTicks() / ppq * 60000.0 / juce::jmax (1.0, song.bpm);
     const auto log = scoreLogSnapshot();
     const auto phrase = capturePhrase (song, log, o);
     if (phrase.empty() || track < 0 || track >= launcher::maxTracks)
@@ -1479,7 +1479,7 @@ CaptureResult AudioEngine::captureMidiToSlot (int track, int scene, int& placed,
     // a new clip; played while stopped, the tempo comes from the phrase
     const auto bpm = running ? song.bpm : session::phraseTempo (phrase, song.bpm);
     std::int64_t length = 0;
-    auto notes = session::phraseNotes (phrase, o.nowMs, bpm, song.beatsPerBar, length);
+    auto notes = session::phraseNotes (phrase, o.nowMs, bpm, song.meter(), length);
     session::setNotesChannel (notes, channel);
     result.notes = (int) notes.size();
     const auto row = session::captureSlot (song, track, scene);
@@ -2886,12 +2886,12 @@ void AudioEngine::updateRecording()
             return;
 
         const auto& pattern = std::as_const (song).activePattern();
-        recorder.begin (pattern.effectiveLength (song.beatsPerBar));
+        recorder.begin (pattern.effectiveLength (song.meter()));
         // Pattern mode with Loop record off (round 170e5, FL's "never" play end [DECOMP 0x11d4800]): the pattern plays
         // once from the start of this pass and on past its end; the notes stay where they were played, so it grows
         if (recordloop::patternLinear (song.mode, recordOptions.loopRecord))
         {
-            const auto origin = recordloop::patternOrigin (at, pattern.effectiveLength (song.beatsPerBar));
+            const auto origin = recordloop::patternOrigin (at, pattern.effectiveLength (song.meter()));
             recorder.setPatternOrigin (origin);
             liveInput.patternOrigin.store (origin);
         }
@@ -2998,7 +2998,11 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
                 if (tempo > 0.0)
                     s.bpm = tempo;
                 if (bar > 0)
-                    s.beatsPerBar = session::sceneBarBeats (bar, unit); // (round 190em: n/d as the same bar in quarter notes)
+                {
+                    // round 190fg: the song takes the scene's meter as it is (6 / 8: six eighths a bar; it was 3/4)
+                    s.beatsPerBar = bar;
+                    s.beatUnit = session::sceneBeatUnit (unit);
+                }
             }, false);
     if (starts && ! transport.playing.load() && ! isCountingIn())
     {
@@ -4041,22 +4045,26 @@ void AudioEngine::publishSong()
     }
     transport.bpm.store (song.bpm);
     transport.beatsPerBar.store (song.beatsPerBar);
+    transport.beatUnit.store (meterUnit (song.beatUnit));
 
     {
-        // time-signature table for the metronome: the start (beatsPerBar/4) and each signature change
+        // time-signature table for the metronome: the start (the song's meter) and each signature change
         transport.signatureVersion.fetch_add (1, std::memory_order_acq_rel); // odd: writing
         int count = 0;
         transport.signatureTick[0].store (0, std::memory_order_relaxed);
-        transport.signatureLength[0].store ((std::int64_t) ppq * juce::jmax (1, song.beatsPerBar), std::memory_order_relaxed);
+        transport.signatureLength[0].store (song.barTicks(), std::memory_order_relaxed);
+        transport.signatureBeat[0].store (song.beatTicks(), std::memory_order_relaxed);
         ++count;
 
         for (const auto& m : song.markers())
             if (m.isSignature() && count < Transport::maxSignatures)
             {
                 const auto length = juce::jmax<std::int64_t> (1, (std::int64_t) ppq * 4 * m.numerator / juce::jmax (1, m.denominator));
+                const auto beat = juce::jmax<std::int64_t> (1, length / juce::jmax (1, m.numerator)); // (round 190fg: its own beats)
                 const auto slot = m.tick <= 0 ? 0 : count++; // at position 0 it replaces the default
                 transport.signatureTick[(std::size_t) slot].store (juce::jmax<std::int64_t> (0, m.tick), std::memory_order_relaxed);
                 transport.signatureLength[(std::size_t) slot].store (length, std::memory_order_relaxed);
+                transport.signatureBeat[(std::size_t) slot].store (beat, std::memory_order_relaxed);
             }
 
         transport.signatureCount.store (count, std::memory_order_relaxed);
@@ -4542,7 +4550,7 @@ void AudioEngine::updateAutomationRecording (bool active)
         automationPattern = song.currentPattern;
         automationLoopLength = song.patterns.empty() ? ppq * 4
                                                      : song.patterns[(std::size_t) juce::jlimit (0, (int) song.patterns.size() - 1, song.currentPattern)]
-                                                           .effectiveLength (song.beatsPerBar);
+                                                           .effectiveLength (song.meter());
     }
 
     const auto tick = estimatedPositionNow();
@@ -5261,7 +5269,7 @@ void AudioEngine::updateRealtimeStats()
     if ((stats.overBudget > loggedOver || stats.lateCalls > loggedLate) && juce::Time::getMillisecondCounterHiRes() - lastLogMs > 2000.0)
     {
         // (appended by fileJobs: this runs on the message thread, and at a small buffer glitches come every 2 s)
-        const auto bar = transport.positionTicks.load() / (double) (ppq * juce::jmax (1, song.beatsPerBar)) + 1.0;
+        const auto bar = transport.positionTicks.load() / (double) song.barTicks() + 1.0;
         auto line = juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H:%M:%S") + "  over deadline +" + juce::String ((juce::int64) (stats.overBudget - loggedOver))
                     + ", late calls +" + juce::String ((juce::int64) (stats.lateCalls - loggedLate)) + ", at bar " + juce::String (bar, 2)
                     + (transport.playing.load() ? "" : " (stopped)") + "\n" + describeRealtime() + "\n";

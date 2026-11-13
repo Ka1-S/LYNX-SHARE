@@ -335,6 +335,7 @@ struct HostTimeline
     std::atomic<double> sampleRate { 44100.0 };
     std::atomic<bool> playing { false };
     std::atomic<int> beatsPerBar { 4 };
+    std::atomic<int> beatUnit { 4 }; // (round 190fg: the meter's denominator)
     // round 169c (issue #32): the chunk's tempo in ticks per sample (0 = stopped) and a count raised for each chunk.
     // A generator is called once per stretch between its notes, so one chunk can be several plugin blocks: each block
     // reports the position where it starts (tickAt), not the chunk's start again. Before, every block of a chunk said

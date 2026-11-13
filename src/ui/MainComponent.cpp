@@ -539,7 +539,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     // the pattern length in bars (issue #12)
     rackLengthBox.onSet = [this] (int bars) {
         const auto index = engine.getSong().currentPattern;
-        const auto ticks = (std::int64_t) juce::jlimit (0, 999, bars) * ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+        const auto ticks = (std::int64_t) juce::jlimit (0, 999, bars) * engine.getSong().barTicks();
         if (index >= 0 && index < (int) engine.getSong().patterns.size() && engine.getSong().patterns[(std::size_t) index].lengthTicks != ticks)
             engine.editSong ([index, ticks] (Song& s) { s.patterns[(std::size_t) index].lengthTicks = ticks; });
         refreshRackLengthBox();
@@ -4204,7 +4204,7 @@ void MainComponent::updateRecordQuantise()
         if (option.kind == grid::Kind::ticks)
             ticks = option.ticks;
         else if (option.kind == grid::Kind::bar)
-            ticks = (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+            ticks = engine.getSong().barTicks();
     }
 
     if (engine.getRecordOptions().quantise != ticks || engine.getRecordOptions().quantiseStarts != recordQuantiseOn)
@@ -4515,6 +4515,7 @@ void MainComponent::dumpScoreLog (int minutes)
     options.minutes = minutes;
     options.bpm = song.bpm;
     options.beatsPerBar = song.beatsPerBar;
+    options.beatUnit = song.beatUnit;
     auto notes = scorelog::dump (engine.scoreLogSnapshot(), options);
     // (channels deleted since the notes were played are left out)
     notes.erase (std::remove_if (notes.begin(), notes.end(), [&song] (const Note& n) { return n.channel < 0 || n.channel >= (int) song.channels.size(); }),
@@ -4858,8 +4859,8 @@ void MainComponent::refreshRackLengthBox()
     if (song.currentPattern < 0 || song.currentPattern >= (int) song.patterns.size())
         return;
     const auto& pattern = song.activePattern();
-    const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
-    const auto bars = (int) juce::jmax<std::int64_t> (1, (pattern.effectiveLength (song.beatsPerBar) + bar - 1) / bar);
+    const auto bar = song.barTicks();
+    const auto bars = (int) juce::jmax<std::int64_t> (1, (pattern.effectiveLength (song.meter()) + bar - 1) / bar);
     const auto automatic = pattern.lengthTicks == 0;
     if (bars != rackLengthBox.bars || automatic != rackLengthBox.automatic)
     {
@@ -4875,7 +4876,7 @@ void MainComponent::showPatternLengthMenu()
 {
     const auto& song = engine.getSong();
     const auto& pattern = song.activePattern();
-    const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+    const auto bar = song.barTicks();
     juce::PopupMenu menu;
     menu.addSectionHeader (tr ("Pattern length"));
     menu.addItem (tr ("Automatic (from notes)"), true, pattern.lengthTicks == 0, [this] { rackLengthBox.onSet (0); });
@@ -5048,7 +5049,7 @@ juce::PopupMenu MainComponent::makePatternMenu (std::vector<int> picked)
 
     for (int bars : { 1, 2, 4, 8, 16, 32 })
     {
-        const auto ticks = (std::int64_t) bars * ppq * juce::jmax (1, song.beatsPerBar);
+        const auto ticks = (std::int64_t) bars * song.barTicks();
         lengths.addItem (bars == 1 ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars) }), true, pattern.lengthTicks == ticks,
                          [this, index, ticks] { engine.editSong ([index, ticks] (Song& s) { s.patterns[(std::size_t) index].lengthTicks = ticks; }); });
     }
@@ -5083,8 +5084,11 @@ juce::PopupMenu MainComponent::makePatternMenu (std::vector<int> picked)
     juce::PopupMenu signatures;
 
     for (int beats : { 2, 3, 4, 5, 6, 7, 8, 9, 12 })
-        signatures.addItem (juce::String (beats) + "/4", true, song.beatsPerBar == beats,
-                            [this, beats] { engine.editSong ([beats] (Song& s) { s.beatsPerBar = beats; }); });
+        signatures.addItem (juce::String (beats) + "/4", true, song.beatsPerBar == beats && song.beatUnit == 4,
+                            [this, beats] { engine.editSong ([beats] (Song& s) {
+                                s.beatsPerBar = beats;
+                                s.beatUnit = 4;
+                            }); });
 
     menu.addSubMenu (tr ("Song time signature"), signatures);
     menu.addSeparator();
@@ -5553,7 +5557,7 @@ void MainComponent::applyStepEdit()
     // the toolbar (main) snap is FL's step-edit step (round 170e5)
     const auto& mainSnap = grid::options()[(std::size_t) juce::jlimit (0, (int) grid::options().size() - 1, EditorGlobals::get().getGridOption())];
     const auto mainTicks = mainSnap.kind == grid::Kind::ticks ? (std::int64_t) mainSnap.ticks
-                           : mainSnap.kind == grid::Kind::bar ? (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar)
+                           : mainSnap.kind == grid::Kind::bar ? engine.getSong().barTicks()
                                                               : 0;
     const auto step = stepedit::stepLength (mainTicks, pianoRoll.gridForSnapshot());
     for (const auto& p : played)
@@ -9043,7 +9047,7 @@ void MainComponent::gamepadChanges (const gamepad::Changes& c, const gamepad::St
             case Action::barForward:
             {
                 // to the previous / next bar line (from inside a bar, back goes to its start)
-                const auto bar = (double) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+                const auto bar = (double) engine.getSong().barTicks();
                 const auto at = engine.getTransport().positionTicks.load() / bar;
                 const auto target = action == Action::barForward ? std::floor (at + 1e-6) + 1.0 : std::ceil (at - 1e-6) - 1.0;
                 engine.seek (juce::jmax (0.0, target) * bar);

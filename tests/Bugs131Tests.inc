@@ -49,7 +49,7 @@ TEST (bugs131_pattern_length_is_respected_on_the_first_recording_in_song_mode)
     // a note recorded on bar 2 stays on bar 2 of the song and the clip placed for the take is 2 bars long; FL places
     // the take's clip from the bar of its first note (round 168k, REA_rodada165z-b fh2–fh5), so it starts at bar 2
     lynx::NoteRecorder recorder;
-    recorder.begin (s.patterns[0].effectiveLength (s.beatsPerBar));
+    recorder.begin (s.patterns[0].effectiveLength (s.meter()));
     recorder.add (s, { (double) (bar + lynx::ppq), 0, 60, 0.8f, true });
     recorder.add (s, { (double) (bar + 2 * lynx::ppq), 0, 60, 0.0f, false });
     auto notes = recorder.takeFinished();
@@ -120,7 +120,7 @@ TEST (bugs131_song_mode_loops_back_to_the_start_at_the_song_end)
     // hosted plugins see the position within the song (Song mode) or within the pattern (Pattern mode)
     CHECK (lynx::hostPositionTick (s, (double) (4 * bar + 10), s.songLength()) == 10.0);
     s.mode = lynx::PlayMode::pattern;
-    const auto patternLength = (double) s.patterns[0].effectiveLength (s.beatsPerBar);
+    const auto patternLength = (double) s.patterns[0].effectiveLength (s.meter());
     CHECK (std::abs (lynx::hostPositionTick (s, patternLength * 3 + 5.0, s.songLength()) - 5.0) < 1e-9);
     s.mode = lynx::PlayMode::song;
 

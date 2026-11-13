@@ -11,13 +11,13 @@ TEST (wfqa170h_piano_roll_duplicate_goes_whole_bars_later)
     // two notes over steps 1-8 (C5 at step 1, D5 at step 7, one step each): the copy starts at bar 2
     lynx::Pattern p;
     p.notes = { { 0, step, 0, 60 }, { 6 * step, step, 0, 62 } };
-    auto added = ne::duplicateBars (p, { 0, 1 }, 4);
+    auto added = ne::duplicateBars (p, { 0, 1 }, lynx::Meter (4, 4));
     CHECK (added.size() == 2);
     CHECK (p.notes[(std::size_t) added[0]].start == bar);
     CHECK (p.notes[(std::size_t) added[1]].start == bar + 6 * step);
 
     // the four notes now span 1.5 bars (steps 1-24): the next copy starts at bar 3
-    added = ne::duplicateBars (p, { 0, 1, 2, 3 }, 4);
+    added = ne::duplicateBars (p, { 0, 1, 2, 3 }, lynx::Meter (4, 4));
     CHECK (added.size() == 4);
     std::int64_t first = std::int64_t { 1 } << 62;
     for (auto i : added)
@@ -27,17 +27,17 @@ TEST (wfqa170h_piano_roll_duplicate_goes_whole_bars_later)
     // a riff whose last note ends before the bar line keeps its place in the bar (was: right after the last note)
     lynx::Pattern q;
     q.notes = { { 0, 2 * step, 0, 60 }, { 8 * step, 2 * step, 0, 63 } }; // ends at step 10
-    added = ne::duplicateBars (q, { 0, 1 }, 4);
+    added = ne::duplicateBars (q, { 0, 1 }, lynx::Meter (4, 4));
     CHECK (q.notes[(std::size_t) added[0]].start == bar && q.notes[(std::size_t) added[1]].start == bar + 8 * step);
 
     // a 3/4 bar is three beats
     lynx::Pattern w;
     w.notes = { { 0, step, 0, 60 } };
-    added = ne::duplicateBars (w, { 0 }, 3);
+    added = ne::duplicateBars (w, { 0 }, lynx::Meter (3, 4));
     CHECK (w.notes[(std::size_t) added[0]].start == (std::int64_t) lynx::ppq * 3);
 
     // nothing selected: nothing added
-    CHECK (ne::duplicateBars (w, {}, 4).empty());
+    CHECK (ne::duplicateBars (w, {}, lynx::Meter (4, 4)).empty());
 }
 
 // Driven LYNX (h-13/h-16): "Sidechain to this track" first, then add the compressor as the box said — the

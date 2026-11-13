@@ -168,7 +168,7 @@ public:
         const auto& pattern = currentPattern();
         const auto area = plotArea();
         const auto length = patternLength();
-        const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+        const auto bar = song.barTicks();
 
         g.setColour (colour::bg0);
         g.fillRect (area.withTop (area.getY() - rulerHeight));
@@ -559,14 +559,14 @@ private:
 
     std::int64_t patternLength() const
     {
-        return juce::jmax<std::int64_t> (ticksPerStep, currentPattern().effectiveLength (engine.getSong().beatsPerBar));
+        return juce::jmax<std::int64_t> (ticksPerStep, currentPattern().effectiveLength (engine.getSong().meter()));
     }
 
     std::int64_t gridTicks() const
     {
         static const std::int64_t steps[] = { ticksPerStep / 2, ticksPerStep, ppq / 2, ppq, -1 };
         const auto i = juce::jlimit (0, 4, gridBox.getSelectedItemIndex());
-        return steps[i] > 0 ? steps[i] : (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+        return steps[i] > 0 ? steps[i] : engine.getSong().barTicks();
     }
 
     std::int64_t snap (double tick) const

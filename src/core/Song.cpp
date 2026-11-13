@@ -24,12 +24,12 @@ void Pattern::sortNotes()
     std::stable_sort (notes.begin(), notes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
 }
 
-std::int64_t Pattern::effectiveLength (int beatsPerBar) const noexcept
+std::int64_t Pattern::effectiveLength (Meter meter) const noexcept
 {
     if (lengthTicks > 0)
         return lengthTicks;
 
-    const std::int64_t bar = (std::int64_t) ppq * std::max (1, beatsPerBar);
+    const std::int64_t bar = meter.bar();
     std::int64_t end = 0;
 
     for (auto& n : notes)
@@ -80,7 +80,7 @@ void Pattern::toggleStep (int channel, int step, bool muteRemoved)
 
 std::int64_t Song::songLength() const noexcept
 {
-    const std::int64_t bar = (std::int64_t) ppq * std::max (1, beatsPerBar);
+    const std::int64_t bar = barTicks();
     std::int64_t end = 0;
 
     for (const auto& c : playlist)
@@ -97,7 +97,7 @@ std::int64_t Song::songLength() const noexcept
 
     // an empty Playlist (e.g. recording the first take in Song mode) loops the current pattern's length, not one bar
     if (! arranged && currentPattern >= 0 && currentPattern < (int) patterns.size())
-        end = patterns[(std::size_t) currentPattern].effectiveLength (beatsPerBar);
+        end = patterns[(std::size_t) currentPattern].effectiveLength (meter());
 
     // FL: Song mode loops at the exact end of the last clip (a clip ending at 3:05 loops at 3:05), not at the bar end
     if (arranged && end > 0)
@@ -122,7 +122,7 @@ void followPatternLengths (const std::vector<std::int64_t>& before, Song& song)
 
     for (std::size_t i = 0; i < before.size(); ++i)
     {
-        const auto now = song.patterns[i].effectiveLength (song.beatsPerBar);
+        const auto now = song.patterns[i].effectiveLength (song.meter());
         if (now == before[i] || before[i] <= 0)
             continue;
 
@@ -210,7 +210,7 @@ std::vector<std::int64_t> patternLengths (const Song& song)
     std::vector<std::int64_t> lengths;
     lengths.reserve (song.patterns.size());
     for (const auto& p : song.patterns)
-        lengths.push_back (p.effectiveLength (song.beatsPerBar));
+        lengths.push_back (p.effectiveLength (song.meter()));
     return lengths;
 }
 
@@ -1060,7 +1060,7 @@ std::vector<Bar> Song::barsBetween (std::int64_t from, std::int64_t to) const
         return std::max<std::int64_t> (1, (std::int64_t) ppq * 4 * std::max (1, numerator) / std::max (1, denominator));
     };
 
-    Bar bar { 0, barLength (beatsPerBar, 4), 1 };
+    Bar bar { 0, barLength (beatsPerBar, beatUnit), 1 };
     const auto& list = markers();
     std::size_t next = 0;
 
@@ -1097,7 +1097,7 @@ std::vector<Bar> Song::barsBetween (std::int64_t from, std::int64_t to) const
 Bar Song::barAt (std::int64_t tick) const
 {
     const auto bars = barsBetween (std::max<std::int64_t> (0, tick), std::max<std::int64_t> (0, tick) + 1);
-    return bars.empty() ? Bar { 0, (std::int64_t) ppq * std::max (1, beatsPerBar), 1 } : bars.front();
+    return bars.empty() ? Bar { 0, barTicks(), 1 } : bars.front();
 }
 
 void Song::selectArrangement (int index)
@@ -1905,7 +1905,7 @@ Song makeExportSong (const Song& song, bool wholeSong, std::int64_t tailTicks, s
         const auto index = std::clamp (out.currentPattern, 0, (int) out.patterns.size() - 1);
         Clip clip;
         clip.pattern = index;
-        clip.length = out.patterns[(std::size_t) index].effectiveLength (out.beatsPerBar);
+        clip.length = out.patterns[(std::size_t) index].effectiveLength (out.meter());
         out.playlist = { clip };
         musicLength = clip.length;
     }
@@ -1921,7 +1921,7 @@ Song makeExportSong (const Song& song, bool wholeSong, std::int64_t tailTicks, s
     // because the last rendered block goes slightly past the end and must not wrap to the start.
     if (tailTicks > 0)
     {
-        tailTicks += (std::int64_t) ppq * std::max (1, out.beatsPerBar);
+        tailTicks += out.barTicks();
         out.patterns.emplace_back().name = "(tail)";
         Clip tail;
         tail.pattern = (int) out.patterns.size() - 1;

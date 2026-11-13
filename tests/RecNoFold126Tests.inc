@@ -81,7 +81,7 @@ TEST (recnofold126_take_over_an_empty_clip_fills_every_bar)
         take.stop ((double) (4 * bar - 1));
         CHECK ((startsAndKeys (s.patterns[0])
                 == std::vector<std::pair<std::int64_t, int>> { { 0, 60 }, { bar + beat, 62 }, { 2 * bar + 2 * beat, 64 }, { 3 * bar + 3 * beat, 65 } }));
-        CHECK (s.patterns[0].effectiveLength (s.beatsPerBar) == 4 * bar);
+        CHECK (s.patterns[0].effectiveLength (s.meter()) == 4 * bar);
         CHECK (s.playlist.size() == 1 && s.playlist[0].length == 4 * bar && s.playlist[0].offset == 0);
         for (const auto key : { 60, 62, 64, 65 })
             CHECK (onsOfKey (s, key, 4 * bar) == 1);
@@ -102,7 +102,7 @@ TEST (recnofold126_take_in_a_clip_with_notes_folds_into_the_loop)
         take.note ((double) (3 * bar + beat), beat / 2, 65);
         take.stop ((double) (3 * bar + 3 * beat));
         CHECK ((startsAndKeys (s.patterns[0]) == std::vector<std::pair<std::int64_t, int>> { { 0, 36 }, { 0, 62 }, { beat, 65 }, { 2 * beat, 64 } }));
-        CHECK (s.patterns[0].effectiveLength (s.beatsPerBar) == bar);
+        CHECK (s.patterns[0].effectiveLength (s.meter()) == bar);
         CHECK (s.playlist.size() == 1 && s.playlist[0].length == 4 * bar && s.playlist[0].offset == 0);
         for (const auto key : { 62, 64, 65 })
             CHECK (onsOfKey (s, key, 4 * bar) == 4);
@@ -117,7 +117,7 @@ TEST (recnofold126_take_in_a_clip_with_notes_folds_into_the_loop)
         take.stop ((double) (3 * bar + 3 * beat));
         CHECK ((startsAndKeys (s.patterns[0])
                 == std::vector<std::pair<std::int64_t, int>> { { 0, 36 }, { bar, 62 }, { 2 * bar + 2 * beat, 64 }, { 3 * bar + beat, 65 } }));
-        CHECK (s.patterns[0].effectiveLength (s.beatsPerBar) == 4 * bar);
+        CHECK (s.patterns[0].effectiveLength (s.meter()) == 4 * bar);
         CHECK (onsOfKey (s, 62, 4 * bar) == 1);
     }
 }
@@ -151,7 +151,7 @@ TEST (recnofold126_offset_clip_folds_from_its_offset)
     take.note ((double) (3 * beat), beat / 4, 64); // pattern beat 4 = beat 0 of the second pass
     take.stop ((double) (7 * beat));
     CHECK ((startsAndKeys (s.patterns[0]) == std::vector<std::pair<std::int64_t, int>> { { 0, 36 }, { 0, 64 }, { 2 * beat, 60 }, { 2 * beat, 62 } }));
-    CHECK (s.patterns[0].effectiveLength (s.beatsPerBar) == bar);
+    CHECK (s.patterns[0].effectiveLength (s.meter()) == bar);
     CHECK (s.playlist.size() == 1 && s.playlist[0].offset == beat && s.playlist[0].length == 8 * beat);
 }
 
@@ -167,7 +167,7 @@ TEST (recnofold126_folded_notes_at_the_loop_end)
         take.note ((double) (bar + 3 * beat + beat / 2), beat, 70);
         take.stop ((double) (3 * bar));
         const auto& p = s.patterns[0];
-        CHECK (p.effectiveLength (s.beatsPerBar) == bar);
+        CHECK (p.effectiveLength (s.meter()) == bar);
         const auto it = std::find_if (p.notes.begin(), p.notes.end(), [] (const lynx::Note& n) { return n.key == 70; });
         CHECK (it != p.notes.end() && it->start == 3 * beat + beat / 2 && it->length == beat / 2);
     }
@@ -178,7 +178,7 @@ TEST (recnofold126_folded_notes_at_the_loop_end)
         take.note ((double) (2 * bar + 4 * beat - 10), beat / 4, 71);
         take.stop ((double) (3 * bar + beat));
         const auto& p = s.patterns[0];
-        CHECK (p.effectiveLength (s.beatsPerBar) == bar);
+        CHECK (p.effectiveLength (s.meter()) == bar);
         const auto it = std::find_if (p.notes.begin(), p.notes.end(), [] (const lynx::Note& n) { return n.key == 71; });
         CHECK (it != p.notes.end() && it->start == 0 && it->length >= 1 && it->start + it->length <= bar);
     }

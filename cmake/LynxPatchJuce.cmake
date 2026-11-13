@@ -141,6 +141,15 @@
 #    links, automation recording) stayed stale. The mapped change now also goes to the edit controller (JUCE's
 #    parameter dispatcher, on the message thread) and to the host's value and listeners, as JUCE already does for a
 #    plugin's own output parameter changes.
+# 26. Every platform, juce_audio_processors/format_types/juce_VST3Common.h (round 190fg, the 190ej follow-up): fix 14 gives
+#    a note off the id of the OLDEST sounding note of its key. Of two overlapping notes of one key that end inner note
+#    first (LIFO: a long note with a short one inside it), the inner note's end then carried the outer note's id, and a
+#    VST3 that keys its voices by noteId ended the outer voice and left the inner one sounding. FL ends each note's own
+#    voice (round 190ej [EXEC]; its wrapper sends a note off with the id of the voice it ends, REA 173a). LYNX knows which
+#    note each note on and note off belongs to (NoteEvent::noteId); MidiEventList now asks `lynxNoteTagHook` (set by LYNX,
+#    engine/Vst3NoteTuning.h, while fix 18's context is set) for that tag of each note on and note off it converts, keeps
+#    it beside the id it gave the note on, and gives a tagged note off the id of the note on with the same tag. A note off
+#    without a tag (a live key, all notes off) or with an unknown tag keeps fix 14's oldest-note rule.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -342,6 +351,18 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("VST3 note tuning" "LYNX patch (issue #63): the note's tuning"
             "                e.noteOn.noteId = id;|NL|"
             "                e.noteOn.noteId = id;|NL|                // LYNX patch (issue #63): the note's tuning (FL's wrapper sends a note's fine pitch there)|NL|                if (lynxNoteTuningHook != nullptr && lynxNoteTuningContext != nullptr)|NL|                    e.noteOn.tuning = lynxNoteTuningHook (lynxNoteTuningContext, (int) e.noteOn.channel, (int) e.noteOn.pitch);|NL|")
+        lynx_juce_fix("VST3 note tags: hook" "LYNX patch (round 190fg): the note tag hook"
+            "inline thread_local void* lynxNoteTuningContext = nullptr;"
+            "inline thread_local void* lynxNoteTuningContext = nullptr;|NL|// LYNX patch (round 190fg): the note tag hook. LYNX (engine/Vst3NoteTuning.h, the same declaration) answers, while the|NL|// context above is set, which of its notes a converted note on / note off belongs to (0: none).|NL|inline unsigned int (*lynxNoteTagHook) (void* context, bool noteOn, int channel, int key) = nullptr;")
+        lynx_juce_fix("VST3 note tags: note on" "LYNX patch (round 190fg): the LYNX note this note on starts"
+            "                if (key.count == (int) key.ids.size()) // (notes that never ended: the oldest is forgotten)|NL|                {|NL|                    std::rotate (key.ids.begin(), key.ids.begin() + 1, key.ids.end());|NL|                    --key.count;|NL|                }|NL|                key.ids[(size_t) key.count++] = id;|NL|                e.noteOn.noteId = id;"
+            "                if (key.count == (int) key.ids.size()) // (notes that never ended: the oldest is forgotten)|NL|                {|NL|                    std::rotate (key.ids.begin(), key.ids.begin() + 1, key.ids.end());|NL|                    std::rotate (key.tags.begin(), key.tags.begin() + 1, key.tags.end());|NL|                    --key.count;|NL|                }|NL|                // LYNX patch (round 190fg): the LYNX note this note on starts, kept beside its id|NL|                key.tags[(size_t) key.count] = lynxNoteTag (true, (int) e.noteOn.channel, (int) e.noteOn.pitch);|NL|                key.ids[(size_t) key.count++] = id;|NL|                e.noteOn.noteId = id;")
+        lynx_juce_fix("VST3 note tags: note off" "LYNX patch (round 190fg): a note off LYNX tagged"
+            "                e.noteOff.noteId = -1;|NL|                if (key.count > 0)|NL|                {|NL|                    e.noteOff.noteId = key.ids[0];|NL|                    std::rotate (key.ids.begin(), key.ids.begin() + 1, key.ids.end());|NL|                    --key.count;|NL|                }"
+            "                e.noteOff.noteId = -1;|NL|                // LYNX patch (round 190fg): a note off LYNX tagged ends the note on with the same tag; else the oldest|NL|                const auto tag = lynxNoteTag (false, (int) e.noteOff.channel, (int) e.noteOff.pitch);|NL|                int at = 0;|NL|                for (int i = 0; tag != 0 && i < key.count; ++i)|NL|                    if (key.tags[(size_t) i] == tag)|NL|                    {|NL|                        at = i;|NL|                        break;|NL|                    }|NL|                if (key.count > 0)|NL|                {|NL|                    e.noteOff.noteId = key.ids[(size_t) at];|NL|                    std::rotate (key.ids.begin() + at, key.ids.begin() + at + 1, key.ids.end());|NL|                    std::rotate (key.tags.begin() + at, key.tags.begin() + at + 1, key.tags.end());|NL|                    --key.count;|NL|                }")
+        lynx_juce_fix("VST3 note tags: storage" "LYNX patch (round 190fg): the LYNX note each id belongs to"
+            "    struct LynxKey|NL|    {|NL|        std::array<Steinberg::int32, 4> ids {};|NL|        int count = 0;|NL|    };"
+            "    struct LynxKey|NL|    {|NL|        std::array<Steinberg::int32, 4> ids {};|NL|        std::array<unsigned int, 4> tags {}; // LYNX patch (round 190fg): the LYNX note each id belongs to (0: none)|NL|        int count = 0;|NL|    };|NL||NL|    // LYNX patch (round 190fg): which LYNX note a converted note on / off belongs to (0 when LYNX has not set the hook)|NL|    static unsigned int lynxNoteTag (bool noteOn, int channel, int key) noexcept|NL|    {|NL|        return lynxNoteTagHook != nullptr && lynxNoteTuningContext != nullptr ? lynxNoteTagHook (lynxNoteTuningContext, noteOn, channel, key) : 0u;|NL|    }")
     else()
         lynx_juce_fix("drop target search after an unused drop" "LYNX patch (issue #11): a drop nobody took"
             "bool ComponentPeer::handleDragDrop (const ComponentPeer::DragInfo& info)|NL|{|NL|    handleDragMove (info);|NL|"

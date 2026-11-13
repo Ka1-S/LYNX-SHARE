@@ -181,6 +181,7 @@ private:
     mpe::Allocator mpeNotes;      // issue #108 (the wrapper's MPE switch): each note's member channel
     void sendExpression (int channel, mpe::Expr expr, float value) noexcept; // on a member channel (0-based)
     hostpitch::SentKeys sentKeys; // issue #63: the key each note went out on; the VST3 tunings waiting for the host
+    void tagSent (bool noteOn, int channel, int key, std::uint32_t note) noexcept; // round 190fg (SentKeys::tag)
     hostpitch::Format noteFormat = hostpitch::Format::midi; // how FL's wrapper sends this format's notes
     bool takesTuning = false;     // a VST3 plugin (its note ons carry the tuning)
     bool bendRangeSent = false;

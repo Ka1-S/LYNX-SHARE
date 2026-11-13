@@ -438,6 +438,9 @@ struct Project
     std::uint32_t versionNumber = 0; // major*1e6 + minor*1e3 + patch
     double tempo = 140.0;
     int beatsPerBar = 4; // event 0x11 (the first one, the project's)
+    // event 0x12 right after it: the denominator (REA_rodada167g-gaps #11, the saver [DECOMP]; FL's time signature
+    // with "Set as time signature" sets the steps per beat to 16 / it, REA_rodada168j E14c). Round 190fg: read.
+    int beatUnit = 4;
     int swing = 0;       // event 0x0B: 0..128
     int currentPattern = 0;     // event 0x43: FL's pattern number selected when saved (1…999; 0 = not in the file)
     int songMode = -1;          // event 0x09: 1 = SONG, 0 = PAT (−1 = not in the file)

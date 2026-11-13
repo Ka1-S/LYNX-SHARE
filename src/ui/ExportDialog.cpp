@@ -1158,7 +1158,7 @@ private:
         const auto shown = realtime ? ExportJob::realtimeOptions (options, engine.getTransport().sampleRate.load()) : options;
         const auto seconds = exportMusicSeconds (song, shown);
         // FL's line: "Length: 144 bars  Total time: 3'57''  Disk space: 38.76 MB" (REA round 134)
-        const auto bars = lengthInBars (seconds, song.bpm, song.beatsPerBar);
+        const auto bars = lengthInBars (seconds, song.bpm, song.meter());
         auto info = tr ("Length: {0} bars", { juce::String ((int) std::ceil (bars - 0.01)) }) + "  ·  " // whole bars, as FL
                     + tr ("Total time: {0}", { juce::String (formatDuration (seconds)) });
         if (options.tail == TailMode::leave)

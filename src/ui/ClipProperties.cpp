@@ -318,9 +318,9 @@ private:
             source.addItem (juce::String::fromUTF8 (text.c_str()), id + 1);
         source.setSelectedId (props.source + 1, n);
         track.setValue (props.track + 1, n);
-        start.setText (clipprops::formatPosition (props.start, song.beatsPerBar), false);
-        length.setText (clipprops::formatLength (props.length, song.beatsPerBar), false);
-        offset.setText (clipprops::formatLength (props.offset, song.beatsPerBar), false);
+        start.setText (clipprops::formatPosition (props.start, song.meter()), false);
+        length.setText (clipprops::formatLength (props.length, song.meter()), false);
+        offset.setText (clipprops::formatLength (props.offset, song.meter()), false);
         muted.setToggleState (props.muted, n);
         gain.setValue (juce::Decibels::gainToDecibels (props.gain, -24.0f), n);
         pan.setValue (props.pan * 100.0, n);
@@ -353,11 +353,11 @@ private:
         p.colour = colours.colour;
         p.source = source.getSelectedId() - 1;
         p.track = (int) track.getValue() - 1;
-        if (const auto t = clipprops::parsePosition (start.getText().toStdString(), song.beatsPerBar); t >= 0)
+        if (const auto t = clipprops::parsePosition (start.getText().toStdString(), song.meter()); t >= 0)
             p.start = t;
-        if (const auto t = clipprops::parseLength (length.getText().toStdString(), song.beatsPerBar); t > 0)
+        if (const auto t = clipprops::parseLength (length.getText().toStdString(), song.meter()); t > 0)
             p.length = t;
-        if (const auto t = clipprops::parseLength (offset.getText().toStdString(), song.beatsPerBar); t >= 0)
+        if (const auto t = clipprops::parseLength (offset.getText().toStdString(), song.meter()); t >= 0)
             p.offset = t;
         p.muted = muted.getToggleState();
         p.gain = gain.getValue() <= -24.0 ? 0.0f : juce::Decibels::decibelsToGain ((float) gain.getValue());
@@ -581,7 +581,7 @@ private:
         g.setColour (theme::colour::textPrimary);
         g.setFont (theme::font (theme::type::body, current));
         g.drawText (juce::String::fromUTF8 (song.arrangements[(std::size_t) row].name.c_str()), 12, 0, width - 160, height, juce::Justification::centredLeft, true);
-        const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+        const auto bar = song.barTicks();
         const auto bars = (arrangeops::lengthOf (song, row) + bar - 1) / bar;
         const auto clips = (int) arrangeops::clipsOf (song, row).size();
         g.setColour (theme::colour::textSecondary);

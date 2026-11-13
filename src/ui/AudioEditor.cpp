@@ -954,7 +954,7 @@ public:
             g.drawText (tr ("No warp markers: double-click here to add one, or Auto-warp"), warpLane.reduced (6, 0), juce::Justification::centredLeft);
             return;
         }
-        const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        const auto perBar = juce::jmax (1, (int) std::lround ((double) engine.getSong().barTicks() / ppq)); // (quarter notes; round 190fg)
         g.setFont (font (type::small));
         // in beats the axis holds the markers as drawn (a held drag's preview included): each sits on its beat
         const auto inBeats = axis.valid() && axis.markers.size() == markers.size();
@@ -1202,7 +1202,7 @@ public:
             sample.right.assign (doc.audio.channels[1].begin() + (std::ptrdiff_t) from, doc.audio.channels[1].end());
         autowarp::Options o;
         o.songBpm = bpm;
-        o.beatsPerBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        o.beatsPerBar = (double) engine.getSong().barTicks() / ppq; // (round 190fg: a bar in quarter notes)
         if (variant == 1)
             o.knownBpm = bpm;
         if (variant == 2)
@@ -1278,7 +1278,7 @@ public:
     {
         const auto has = ! doc.audio.empty();
         const auto bpm = juce::String (engine.getSong().bpm, 2);
-        const auto perBar = (double) juce::jmax (1, engine.getSong().beatsPerBar);
+        const auto perBar = (double) engine.getSong().barTicks() / ppq; // (in quarter notes)
         const auto bars = warptools::loopBars (warpFileSeconds(), engine.getSong().bpm, perBar);
         menu.addSeparator();
         menu.addItem (tr ("Warp from here"), has, false, [this, seconds] { warpFromHere (seconds, 0); });
@@ -1313,7 +1313,7 @@ public:
             sample.right = doc.audio.channels[1];
         autowarp::Options o;
         o.songBpm = engine.getSong().bpm;
-        o.beatsPerBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        o.beatsPerBar = (double) engine.getSong().barTicks() / ppq; // (round 190fg: a bar in quarter notes)
         o.knownBpm = autowarp::bpmInName (juce::File (source.path).getFileNameWithoutExtension().toStdString());
         const auto result = autowarp::analyse (sample, o);
         if (result.markers.size() < 2)
@@ -2007,7 +2007,7 @@ private:
             return f;
         if (axis.valid())
         {
-            const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
+            const auto perBar = juce::jmax (1, (int) std::lround ((double) engine.getSong().barTicks() / ppq)); // (quarter notes; round 190fg)
             const auto pixelsPerBeat = axis.unitsPerBeat / fpp;
             const auto step = warpview::rulerStep (pixelsPerBeat, perBar);
             const auto tick = step <= 1.0 ? 0.25 : (step <= perBar ? 1.0 : (double) perBar);
@@ -2280,7 +2280,7 @@ private:
     void paintBeatGrid (juce::Graphics& g)
     {
         using namespace theme;
-        const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        const auto perBar = juce::jmax (1, (int) std::lround ((double) engine.getSong().barTicks() / ppq)); // (quarter notes; round 190fg)
         const auto step = warpview::rulerStep (axis.unitsPerBeat / fpp, perBar);
         const auto firstBeat = axis.beatOfUnit (viewStart), lastBeat = axis.beatOfUnit (viewStart + (double) waveArea.getWidth() * fpp);
         for (auto b = std::floor (firstBeat / step) * step; b <= lastBeat; b += step)
@@ -2449,7 +2449,7 @@ private:
     void paintBeatRuler (juce::Graphics& g)
     {
         using namespace theme;
-        const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
+        const auto perBar = juce::jmax (1, (int) std::lround ((double) engine.getSong().barTicks() / ppq)); // (quarter notes; round 190fg)
         const auto pixelsPerBeat = axis.unitsPerBeat / fpp;
         const auto step = warpview::rulerStep (pixelsPerBeat, perBar);
         const auto tick = step <= 1.0 ? 0.25 : (step <= perBar ? 1.0 : (double) perBar);
@@ -2681,7 +2681,7 @@ private:
             case TimeFormat::bars:
             {
                 const auto beats = (double) frames / rate * engine.getSong().bpm / 60.0;
-                const auto perBar = juce::jmax (1, engine.getSong().beatsPerBar);
+                const auto perBar = juce::jmax (1, (int) std::lround ((double) engine.getSong().barTicks() / ppq)); // (quarter notes; round 190fg)
                 const auto bar = (int) (beats / perBar);
                 const auto beat = (int) beats - bar * perBar;
                 const auto tick = (int) ((beats - std::floor (beats)) * 96.0);

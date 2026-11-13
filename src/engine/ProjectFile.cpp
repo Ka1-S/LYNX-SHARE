@@ -2689,6 +2689,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("savedBy", JUCE_APPLICATION_VERSION_STRING); // the build that wrote it (round 177d, pain point 37)
     root->setProperty ("bpm", song.bpm);
     root->setProperty ("beatsPerBar", song.beatsPerBar);
+    if (song.beatUnit != 4) // (round 190fg: the meter's denominator; older files read n/4)
+        root->setProperty ("beatUnit", meterUnit (song.beatUnit));
 
     if (song.swing > 0.0f)
         root->setProperty ("swing", juce::roundToInt (song.swing * 1000.0f) / 1000.0);
@@ -3449,6 +3451,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     Song song;
     song.bpm = juce::jlimit (10.0, 999.0, (double) root.getProperty ("bpm", 130.0));
     song.beatsPerBar = juce::jlimit (1, 32, (int) root.getProperty ("beatsPerBar", 4));
+    song.beatUnit = meterUnit ((int) root.getProperty ("beatUnit", 4));
     song.swing = juce::jlimit (0.0f, 1.0f, (float) (double) root.getProperty ("swing", 0.0));
     song.chanceSeed = (std::uint32_t) (juce::int64) root.getProperty ("chanceSeed", 0);
     if (auto* groups = root["channelGroups"].getArray())

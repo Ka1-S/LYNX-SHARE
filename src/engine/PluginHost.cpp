@@ -149,11 +149,13 @@ public:
         // (the block's own start: a generator's chunk is split at its notes, round 169c)
         const auto quarters = t.tickAt (hostBlockOffset()) / (double) ppq;
         const auto beatsPerBar = juce::jmax (1, t.beatsPerBar.load (std::memory_order_relaxed));
+        const auto beatUnit = meterUnit (t.beatUnit.load (std::memory_order_relaxed));
+        const auto barQuarters = (double) Meter (beatsPerBar, beatUnit).bar() / ppq; // (round 190fg: 6/8 = 3 quarters)
         PositionInfo info;
         info.setBpm (bpm);
-        info.setTimeSignature (TimeSignature { beatsPerBar, 4 });
+        info.setTimeSignature (TimeSignature { beatsPerBar, beatUnit });
         info.setPpqPosition (quarters);
-        info.setPpqPositionOfLastBarStart (std::floor (quarters / beatsPerBar) * beatsPerBar);
+        info.setPpqPositionOfLastBarStart (std::floor (quarters / barQuarters) * barQuarters);
         info.setTimeInSeconds (quarters * 60.0 / juce::jmax (1.0, bpm));
         info.setTimeInSamples ((juce::int64) std::llround (quarters * 60.0 / juce::jmax (1.0, bpm) * rate));
         info.setIsPlaying (t.playing.load (std::memory_order_relaxed));
@@ -338,16 +340,33 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
     noteFormat = format == "VST3" ? hostpitch::Format::vst3 : format == ClapPluginFormat::formatName ? hostpitch::Format::clap : hostpitch::Format::midi;
     takesTuning = noteFormat == hostpitch::Format::vst3;
     if (takesTuning)
+    {
         juce::lynxNoteTuningHook = [] (void* context, int channel, int key) noexcept {
             return channel == 0 ? static_cast<hostpitch::SentKeys*> (context)->takeTuning (key) : 0.0f;
         };
+        // round 190fg: and which LYNX note each note on / off belongs to, so a note off carries its own note's id
+        juce::lynxNoteTagHook = [] (void* context, bool noteOn, int channel, int key) noexcept -> unsigned int {
+            return channel == 0 ? static_cast<hostpitch::SentKeys*> (context)->takeTag (noteOn, key) : 0u;
+        };
+    }
 }
 
 void PluginInstrument::releaseHeldKeys() noexcept
 {
-    heldKeys.releaseAll ([this] (int ch, int key) { midi.addEvent (juce::MidiMessage::noteOff (ch + 1, key), 0); });
+    heldKeys.releaseAll ([this] (int ch, int key) {
+        midi.addEvent (juce::MidiMessage::noteOff (ch + 1, key), 0);
+        tagSent (false, ch, key, 0); // (round 190fg: no note of its own)
+    });
     mpeNotes.reset(); // (issue #108: their member channels are free again)
     sentKeys.played = {}; // (their note offs went out with these)
+}
+
+// Round 190fg: a note on / off just written on MIDI channel 1 of a VST3 queues the LYNX note it belongs to (0 = none),
+// for the patched host to pair the note off with its own note on's id (core/HostNotePitch.h SentKeys::tag)
+void PluginInstrument::tagSent (bool noteOn, int channel, int key, std::uint32_t note) noexcept
+{
+    if (takesTuning && channel == 0)
+        sentKeys.tag (noteOn, key, note);
 }
 
 void PluginInstrument::transportStopped() noexcept
@@ -441,13 +460,16 @@ juce::uint8 PluginInstrument::midiVelocity (float velocity) const noexcept
 
 void PluginInstrument::noteOnMidi (int key, float velocity, int midiChannel) noexcept
 {
-    midi.addEvent (juce::MidiMessage::noteOn (juce::jlimit (0, 15, midiChannel) + 1, juce::jlimit (0, 127, key), midiVelocity (velocity)), 0);
+    const auto byte = midiVelocity (velocity);
+    midi.addEvent (juce::MidiMessage::noteOn (juce::jlimit (0, 15, midiChannel) + 1, juce::jlimit (0, 127, key), byte), 0);
+    tagSent (byte > 0, juce::jlimit (0, 15, midiChannel), juce::jlimit (0, 127, key), 0);
     hold (juce::jlimit (0, 15, midiChannel), key, true);
 }
 
 void PluginInstrument::noteOffMidi (int key, int midiChannel) noexcept
 {
     midi.addEvent (juce::MidiMessage::noteOff (juce::jlimit (0, 15, midiChannel) + 1, juce::jlimit (0, 127, key)), 0);
+    tagSent (false, juce::jlimit (0, 15, midiChannel), juce::jlimit (0, 127, key), 0);
     hold (juce::jlimit (0, 15, midiChannel), key, false);
 }
 
@@ -553,6 +575,7 @@ void PluginInstrument::noteOn (int key, float velocity) noexcept
         sendExpression (ch, mpe::Expr::timbre, nextModX);
         sendExpression (ch, mpe::Expr::pressure, mpe::pressureOfModY (nextModY));
         midi.addEvent (juce::MidiMessage::noteOn (ch + 1, k, juce::jlimit (0.0f, 1.0f, velocity)), 0);
+        tagSent (true, ch, k, startingNoteId()); // (member channels are not 1: nothing is queued)
         hold (ch, k, true);
         nextModX = nextModY = 0.5f;
         return;
@@ -573,7 +596,10 @@ void PluginInstrument::noteOn (int key, float velocity) noexcept
         glide.taken = true;
     }
     addBend (0);
-    midi.addEvent (juce::MidiMessage::noteOn (1, k, midiVelocity (velocity)), 0);
+    const auto byte = midiVelocity (velocity);
+    midi.addEvent (juce::MidiMessage::noteOn (1, k, byte), 0);
+    // (round 190fg: the note this note on starts; a velocity of 0 goes out as a note off, so it queues as one)
+    tagSent (byte > 0, 0, k, byte > 0 ? startingNoteId() : 0);
     hold (0, k, true);
     // FL's "Send MOD X as polyphonic aftertouch": the note's Mod X right after its note on
     if (options.modXAftertouch)
@@ -591,6 +617,7 @@ void PluginInstrument::noteOff (int key) noexcept
         midi.addEvent (juce::MidiMessage::noteOff (ch + 1, k, juce::jlimit (0.0f, 1.0f, nextRelease)), 0);
     else
         midi.addEvent (juce::MidiMessage::noteOff (ch + 1, k), 0);
+    tagSent (false, ch, k, endingNoteId()); // (round 190fg: the note this note off ends)
     nextRelease = 0.5f;
     hold (ch, k, false);
 }

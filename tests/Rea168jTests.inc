@@ -133,7 +133,7 @@ TEST (rea168j_flp_pattern_length)
     const auto song = importFlp (flp::parseProject (b.bytes));
     REA168J_REQUIRE (song.patterns.size() == 1);
     CHECK (song.patterns[0].lengthTicks == 16 * ppq);
-    CHECK (song.patterns[0].effectiveLength (4) == 16 * ppq);
+    CHECK (song.patterns[0].effectiveLength (lynx::Meter (4, 4)) == 16 * ppq);
 }
 
 // §2 FL's reference scales: the 37 scales in FL's order; the ones LYNX lists map onto its own

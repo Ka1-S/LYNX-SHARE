@@ -2419,9 +2419,9 @@ TEST (pattern_toggle_step_and_length)
     p.toggleStep (0, 4);
     CHECK (p.hasStep (0, 4));
     CHECK (p.notes.size() == 1 && p.notes[0].start == 4 * lynx::ticksPerStep);
-    CHECK (p.effectiveLength (4) == 4 * lynx::ppq); // one bar
+    CHECK (p.effectiveLength (lynx::Meter (4, 4)) == 4 * lynx::ppq); // one bar
     p.toggleStep (1, 20);                            // second bar
-    CHECK (p.effectiveLength (4) == 8 * lynx::ppq);
+    CHECK (p.effectiveLength (lynx::Meter (4, 4)) == 8 * lynx::ppq);
     p.toggleStep (0, 4);
     CHECK (! p.hasStep (0, 4) && p.notes.size() == 1);
 }
@@ -2465,7 +2465,7 @@ TEST (scheduler_places_events_at_exact_samples)
     const auto tps = lynx::ticksPerSample (bpm, sr);
     lynx::EventBuffer ev;
 
-    lynx::schedulePatternLoop (p, p.effectiveLength (4), 23900.0 * tps, 512, tps, ev);
+    lynx::schedulePatternLoop (p, p.effectiveLength (lynx::Meter (4, 4)), 23900.0 * tps, 512, tps, ev);
     // the beat-2 note starts at sample 24000 -> offset 100 in this block
     int ons = 0;
     for (auto& e : ev)
@@ -2481,7 +2481,7 @@ TEST (scheduler_wraps_the_loop)
 {
     lynx::Pattern p;
     p.toggleStep (2, 0);
-    const auto len = p.effectiveLength (4); // 3840 ticks
+    const auto len = p.effectiveLength (lynx::Meter (4, 4)); // 3840 ticks
     const double sr = 48000.0;
     const auto tps = lynx::ticksPerSample (120.0, sr);
     lynx::EventBuffer ev;
@@ -2510,7 +2510,7 @@ TEST (scheduler_off_before_on_at_same_sample)
     p.notes = { a, b };
     const auto tps = lynx::ticksPerSample (120.0, 48000.0);
     lynx::EventBuffer ev;
-    lynx::schedulePatternLoop (p, p.effectiveLength (4), 200.0, 4000, tps, ev);
+    lynx::schedulePatternLoop (p, p.effectiveLength (lynx::Meter (4, 4)), 200.0, 4000, tps, ev);
 
     CHECK (ev.size() >= 2);
     CHECK (ev[0].type == lynx::NoteEvent::Type::off);
@@ -4988,15 +4988,15 @@ TEST (note_edit_grid_and_time_text)
     CHECK (ne::screenStep (8.0 / bar, bar) == 2 * bar);
     CHECK (ne::screenStep (200.0 / step, bar) == step / 4);
 
-    CHECK (ne::formatTime (0, 4) == "1:1:0" && ne::formatTime (bar + 5 * step + 7, 4) == "2:6:7");
-    CHECK (ne::formatTime (step * 2, 4, true) == "0:2:0");
+    CHECK (ne::formatTime (0, lynx::Meter (4, 4)) == "1:1:0" && ne::formatTime (bar + 5 * step + 7, lynx::Meter (4, 4)) == "2:6:7");
+    CHECK (ne::formatTime (step * 2, lynx::Meter (4, 4), true) == "0:2:0");
     std::int64_t t = 0;
-    CHECK (ne::parseTime ("2:6:7", 4, t) && t == bar + 5 * step + 7);
-    CHECK (ne::parseTime ("3", 4, t) && t == 2 * bar);
-    CHECK (ne::parseTime ("0:2:0", 4, t, true) && t == 2 * step);
-    CHECK (! ne::parseTime ("0:1:0", 4, t) && ! ne::parseTime ("1:17:0", 4, t) && ! ne::parseTime ("1:1:240", 4, t)
-           && ! ne::parseTime ("a", 4, t) && ! ne::parseTime ("", 4, t));
-    CHECK (ne::parseTime ("1:12:0", 3, t) && ! ne::parseTime ("1:13:0", 3, t)); // 3/4: 12 steps per bar
+    CHECK (ne::parseTime ("2:6:7", lynx::Meter (4, 4), t) && t == bar + 5 * step + 7);
+    CHECK (ne::parseTime ("3", lynx::Meter (4, 4), t) && t == 2 * bar);
+    CHECK (ne::parseTime ("0:2:0", lynx::Meter (4, 4), t, true) && t == 2 * step);
+    CHECK (! ne::parseTime ("0:1:0", lynx::Meter (4, 4), t) && ! ne::parseTime ("1:17:0", lynx::Meter (4, 4), t) && ! ne::parseTime ("1:1:240", lynx::Meter (4, 4), t)
+           && ! ne::parseTime ("a", lynx::Meter (4, 4), t) && ! ne::parseTime ("", lynx::Meter (4, 4), t));
+    CHECK (ne::parseTime ("1:12:0", lynx::Meter (3, 4), t) && ! ne::parseTime ("1:13:0", lynx::Meter (3, 4), t)); // 3/4: 12 steps per bar
 }
 
 TEST (playlist_clip_edges_and_time_selection)
@@ -5053,7 +5053,7 @@ TEST (playlist_clip_edges_and_time_selection)
 TEST (recorder_builds_notes_in_pattern_and_song_mode)
 {
     auto song = lynx::Song::makeDefault();
-    const auto loop = song.patterns[0].effectiveLength (4); // 1 bar = 3840
+    const auto loop = song.patterns[0].effectiveLength (lynx::Meter (4, 4)); // 1 bar = 3840
     lynx::NoteRecorder r;
     r.add (song, { 100.0, 4, 60, 0.5f, true }); // no take: ignored
     CHECK (r.takeFinished().empty());
@@ -5769,7 +5769,7 @@ TEST (swing_delays_offbeat_sixteenths)
     p.notes = { { 0, 100, 0, 60 }, { lynx::ticksPerStep, 100, 0, 62 } };
     lynx::EventBuffer ev;
     const auto tps = lynx::ticksPerSample (120.0, 48000.0);
-    lynx::schedulePatternLoop (p, p.effectiveLength (4), 0.0, 12000, tps, ev, 1.0f);
+    lynx::schedulePatternLoop (p, p.effectiveLength (lynx::Meter (4, 4)), 0.0, 12000, tps, ev, 1.0f);
     int onOffset = -1;
     for (auto& e : ev)
         if (e.type == lynx::NoteEvent::Type::on && e.key == 62)
@@ -5870,7 +5870,7 @@ TEST (note_pan_pitch_and_mute)
     p.notes = { a, b };
     lynx::EventBuffer ev;
     const auto tps = lynx::ticksPerSample (120.0, 48000.0);
-    lynx::schedulePatternLoop (p, p.effectiveLength (4), 0.0, 48000, tps, ev);
+    lynx::schedulePatternLoop (p, p.effectiveLength (lynx::Meter (4, 4)), 0.0, 48000, tps, ev);
     int ons = 0;
     for (auto& e : ev)
         if (e.type == lynx::NoteEvent::Type::on)
@@ -6089,7 +6089,7 @@ TEST (slide_notes_glide_without_retrigger)
     p.notes = { base, glide };
     lynx::EventBuffer ev;
     const auto tps = lynx::ticksPerSample (120.0, 48000.0);
-    lynx::schedulePatternLoop (p, p.effectiveLength (4), 0.0, 30000, tps, ev);
+    lynx::schedulePatternLoop (p, p.effectiveLength (lynx::Meter (4, 4)), 0.0, 30000, tps, ev);
     int ons = 0, offs = 0, slides = 0;
     for (auto& e : ev)
     {
@@ -6361,7 +6361,7 @@ TEST (arpeggiator_plays_held_chord_in_steps)
     for (double tick = 0.0; tick < lynx::ppq * 2.0; tick += 512 * tps)
     {
         ev.clear();
-        lynx::schedulePatternLoop (song.patterns[0], song.patterns[0].effectiveLength (4), tick, 512, tps, ev);
+        lynx::schedulePatternLoop (song.patterns[0], song.patterns[0].effectiveLength (lynx::Meter (4, 4)), tick, 512, tps, ev);
         int in = 0, out = 0;
         for (auto& e : ev)
             if (e.channel == 4)
@@ -16083,22 +16083,22 @@ TEST (prtools_articulate)
     using namespace lynx::prtools;
     Pattern p;
     p.notes = { prNote (0, 100), prNote (480, 100), prNote (960, 100) };
-    articulate (p, allOf (p), articulatePreset (ArticulatePreset::legato), 4);
+    articulate (p, allOf (p), articulatePreset (ArticulatePreset::legato), lynx::Meter (4, 4));
     CHECK (p.notes[0].length == 480 && p.notes[1].length == 480 && p.notes[2].length == 3840 - 960); // to the bar line
 
     p.notes = { prNote (0, 100), prNote (480, 100), prNote (960, 2880) };
-    articulate (p, allOf (p), articulatePreset (ArticulatePreset::staccato), 4);
+    articulate (p, allOf (p), articulatePreset (ArticulatePreset::staccato), lynx::Meter (4, 4));
     CHECK (p.notes[0].length == 96 && p.notes[1].length == 96 && p.notes[2].length == 576); // ends on a bar: own length
 
     auto o = articulatePreset (ArticulatePreset::legato);
     o.gap = 20;
     p.notes = { prNote (0, 100), prNote (480, 100) };
-    articulate (p, allOf (p), o, 4);
+    articulate (p, allOf (p), o, lynx::Meter (4, 4));
     CHECK (p.notes[0].length == 460);
 
     // chop chords: a held note is cut where the next one starts
     p.notes = { prNote (0, 960, 48), prNote (480, 480, 60) };
-    articulate (p, allOf (p), articulatePreset (ArticulatePreset::chopChordsOnly), 4);
+    articulate (p, allOf (p), articulatePreset (ArticulatePreset::chopChordsOnly), lynx::Meter (4, 4));
     CHECK (p.notes.size() == 3 && p.notes[0].length == 480 && p.notes[1].start == 480 && p.notes[2].start == 480);
 
     // variation is seeded (MT19937): same seed, same result; lengths only get shorter
@@ -16107,8 +16107,8 @@ TEST (prtools_articulate)
     o.seed = 7;
     Pattern a, b2;
     a.notes = b2.notes = { prNote (0, 100), prNote (480, 100), prNote (960, 100) };
-    articulate (a, allOf (a), o, 4);
-    articulate (b2, allOf (b2), o, 4);
+    articulate (a, allOf (a), o, lynx::Meter (4, 4));
+    articulate (b2, allOf (b2), o, lynx::Meter (4, 4));
     CHECK (a.notes[0].length == b2.notes[0].length && a.notes[0].length <= 480 && a.notes[0].length >= 240);
 }
 
@@ -16176,7 +16176,7 @@ TEST (prtools_riff_machine)
     RiffOptions o;
     o.channel = 1;
     o.bars = 2;
-    const auto notes = riffMachine (p, { 0 }, o, 4);
+    const auto notes = riffMachine (p, { 0 }, o, lynx::Meter (4, 4));
     CHECK (! notes.empty() && notes.size() == p.notes.size());
     CHECK (std::all_of (p.notes.begin(), p.notes.end(), [] (auto& n) {
         return n.channel == 1 && n.start >= 0 && n.start < 2 * 3840 && n.key >= 36 && n.key <= 84;
@@ -16185,7 +16185,7 @@ TEST (prtools_riff_machine)
     // only the first step: the progression shape, chopped from one note at key 48
     o.stepsUpTo = 0;
     Pattern q;
-    const auto first = riffMachine (q, {}, o, 4);
+    const auto first = riffMachine (q, {}, o, lynx::Meter (4, 4));
     CHECK (first.size() == builtInRiffProgression (0).notes.size() * 2 && q.notes[0].key == 48);
 }
 
@@ -17566,3 +17566,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Voices190ejTests.inc"
 #include "Flfix190ezTests.inc"
 #include "Rcfix190fcTests.inc"
+#include "Follow190fgTests.inc"
