@@ -931,10 +931,17 @@ struct StandIn
 // plays in (what Pattern mode plays). `source` = what they were rendered from (sessionpack::freezeSource): another
 // value now = the notes, tempo or arrangement changed since, the audio is out of date. Saved only while frozen; a
 // LYNX SHARE that does not know the field plays the instrument live.
+//
+// Track freeze (round 190ff, the Clip-launch workflow's "Freeze Track", as Live's): `insert` > 0 = the stems also hold
+// the channel's volume, pan and the effects of that insert (the track's devices; the insert's EQ, fader, pan and sends
+// stay live). The insert's effects are not loaded while it plays the stems. It holds only while the channel still
+// plays into that insert and nothing else does (freeze::trackFreezeHolds); otherwise the channel and the insert play
+// live. -1 = its insert was deleted (it plays live). 0 = the channel freeze of round 190ay.
 struct FreezeState
 {
     std::vector<StandIn> stems;
     std::string source;
+    int insert = 0;
     bool on() const noexcept { return ! stems.empty(); }
     bool operator== (const FreezeState&) const = default;
 };
@@ -2513,6 +2520,11 @@ struct Song
     // "Start" marker (the performance zone) don't play with the song; they are launched live (click, controller pads)
     // and loop on their track by its Performance settings, while the song plays from the Start marker on.
     bool performanceMode = false;
+    // Round 190ff, runtime only (never saved): render in the short chunks the renderer uses while automation plays, as
+    // if some did. A stand-in or freeze render song whose automation was taken away keeps the chunking of the song it
+    // stands for — some instruments sound a hair different (about -66 dB) at another chunk size, and frozen audio must
+    // null against its instrument.
+    bool automationChunks = false;
     std::optional<ClipGrid> clipGrid; // the Clip-launch workflow's grid (round 181a); empty until it is first used
     GroovePool grooves; // the groove pool (round 190bv); empty in every project that never used one
     // The end of the performance zone: the first Start marker's tick, or 0 (no zone) without one / when off.

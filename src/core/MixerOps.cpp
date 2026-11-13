@@ -204,6 +204,8 @@ void remapTrackReferences (Song& song, const std::function<int (int)>& map)
         if (c.instrument == InstrumentKind::patcher)
             remapPatcherOutputs (c, c.mixerTrack, map);
         c.mixerTrack = std::max (0, map (c.mixerTrack));
+        if (c.freeze.insert > 0) // (round 190ff: a track freeze follows its insert; deleted, it plays live — -1)
+            c.freeze.insert = map (c.freeze.insert) > 0 ? map (c.freeze.insert) : -1;
 
         if (c.instrument == InstrumentKind::soundfont)
             for (const auto p : { sf::pReverbTrack, sf::pChorusTrack })

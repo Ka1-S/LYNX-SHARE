@@ -2121,7 +2121,11 @@ juce::var channelToVar (const ChannelDef& c)
         auto f = std::make_unique<juce::DynamicObject>();
         f->setProperty ("stems", standInsToVar (c.freeze.stems));
         f->setProperty ("source", str (c.freeze.source));
-        o->setProperty ("freeze", juce::var (f.release()));
+        // a track freeze (round 190ff) goes under a key of its own: a LYNX SHARE from before it would play its stems
+        // through the insert's effects a second time; not knowing the key, it plays the channel live instead
+        if (c.freeze.insert != 0)
+            f->setProperty ("insert", c.freeze.insert);
+        o->setProperty (c.freeze.insert != 0 ? "trackFreeze" : "freeze", juce::var (f.release()));
     }
 
     return juce::var (o.release());
@@ -2478,11 +2482,13 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.patcher = patcherFromVar (c["patcher"], song);
     def.uid = uidFrom (c.getProperty ("uid", {}));
     def.standIns = standInsFromVar (c["standIns"]);
-    if (const auto& f = c["freeze"]; f.isObject())
-    {
-        def.freeze.stems = standInsFromVar (f["stems"]);
-        def.freeze.source = f["source"].toString().toStdString();
-    }
+    for (const auto* key : { "freeze", "trackFreeze" })
+        if (const auto& f = c[key]; f.isObject())
+        {
+            def.freeze.stems = standInsFromVar (f["stems"]);
+            def.freeze.source = f["source"].toString().toStdString();
+            def.freeze.insert = juce::String (key) == "trackFreeze" ? (int) f.getProperty ("insert", -1) : 0;
+        }
     // projects saved before round 168l: an FL engine's (or another generator's) Mono / Porta, imported from FL, was
     // only in the LYNX Synth's settings (the Mono box came from FL's Mono flag or a Max of 1; a Max of 1 is not Mono)
     if (const auto& misc = c["misc"]; def.instrument != InstrumentKind::synth && ! misc.hasProperty ("mono") && ! misc.hasProperty ("porta"))

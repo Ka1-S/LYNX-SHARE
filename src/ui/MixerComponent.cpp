@@ -43,6 +43,7 @@
 #include "ui/PluginEditors.h"
 #include "ui/PluginWindow.h"
 #include "ui/HintBar.h"
+#include "core/StandIns.h"
 #include "ui/I18n.h"
 #include "ui/LiveRemoteUi.h"
 #include "core/LynxTune.h"
@@ -5734,11 +5735,29 @@ void EffectsPanel::paint (juce::Graphics& g)
     }
 }
 
+bool EffectsPanel::refuseFrozenSlots (juce::Point<int> p)
+{
+    const auto& song = engine.getSong();
+    const auto channel = freeze::frozenByInsert (song, track);
+    if (channel < 0)
+        return false;
+    bool inSlots = fxSwitchBounds().contains (p) || sidechainButtonBounds().contains (p) || knobAt (p) >= 0;
+    for (int row = 0; row < maxEffectSlots && ! inSlots; ++row)
+        inSlots = slotBounds (row).contains (p);
+    if (! inSlots)
+        return false;
+    ui::postNotice ({ tr ("{0} is frozen with its effects: Unfreeze the track to edit them", { juce::String::fromUTF8 (song.channels[(std::size_t) channel].name.c_str()) }), {} },
+                    3000);
+    return true;
+}
+
 void EffectsPanel::mouseDown (const juce::MouseEvent& e)
 {
     const auto* s = slots();
 
     if (s == nullptr)
+        return;
+    if (refuseFrozenSlots (e.getPosition()))
         return;
 
     if (const auto sc = sidechainButtonBounds(); ! sc.isEmpty() && sc.contains (e.getPosition()))
@@ -6085,6 +6104,8 @@ void EffectsPanel::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseW
         return;
     }
 
+    if (freeze::frozenByInsert (engine.getSong(), track) >= 0 && refuseFrozenSlots (e.getPosition()))
+        return;
     if (auto eqControl = eqControlAt (e.getPosition()); eqControl != 0)
     {
         if (isEqPoint (eqControl)) // the wheel over a handle changes the band's width
@@ -6431,6 +6452,8 @@ void EffectsPanel::mouseUp (const juce::MouseEvent& e)
 
 void EffectsPanel::mouseDoubleClick (const juce::MouseEvent& e)
 {
+    if (refuseFrozenSlots (e.getPosition()))
+        return;
     if (const auto eqControl = eqControlAt (e.getPosition()); eqControl != 0)
     {
         if (isEqPoint (eqControl)) // the band back to 0 dB
@@ -6501,6 +6524,8 @@ void EffectsPanel::filesDropped (const juce::StringArray& files, int x, int y)
 
 bool EffectsPanel::dropPreset (const juce::File& file, juce::Point<int> position)
 {
+    if (freeze::frozenByInsert (engine.getSong(), track) >= 0 && refuseFrozenSlots (position))
+        return false;
     juce::MemoryBlock data;
 
     if (slots() == nullptr || ! file.loadFileAsData (data))
@@ -6521,6 +6546,8 @@ bool EffectsPanel::dropPreset (const juce::File& file, juce::Point<int> position
 
 bool EffectsPanel::dropEffect (EffectSlot fx, juce::Point<int> position)
 {
+    if (freeze::frozenByInsert (engine.getSong(), track) >= 0 && refuseFrozenSlots (position))
+        return false;
     if (slots() == nullptr)
         return false;
 
@@ -6593,6 +6620,8 @@ juce::Rectangle<int> EffectsPanel::pluginButtonBounds() const
 
 void EffectsPanel::openEditor (int slot)
 {
+    if (freeze::frozenByInsert (engine.getSong(), track) >= 0) // (round 190ff: its effects are not loaded)
+        return;
     const auto* s = slots();
     if (s == nullptr || slot < 0 || slot >= (int) s->size())
         return;
@@ -6607,6 +6636,8 @@ void EffectsPanel::openEditor (int slot)
 
 void EffectsPanel::toggleEditor (int slot)
 {
+    if (freeze::frozenByInsert (engine.getSong(), track) >= 0) // (round 190ff: its effects are not loaded)
+        return;
     const auto* s = slots();
     if (s == nullptr || slot < 0 || slot >= (int) s->size())
         return;

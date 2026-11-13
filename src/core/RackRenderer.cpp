@@ -1798,6 +1798,7 @@ void RackState::buildAutomationTables()
 
         hasAutomation = hasAutomation || used;
     };
+    hasAutomation = song.automationChunks; // (round 190ff: a render song standing in for one with automation)
 
     // issue #97: the automations with clips on one target share a slot, the clip that plays decides (automationValueAt)
     automationGroups.assign ((std::size_t) count, {});

@@ -3313,3 +3313,29 @@ at Drive 15 / fast tape a hard ceiling (−0.6 / −5.3 / −10.5 dB at −15 / 
 loses 2.7 dB flat at default and stays almost linear at Drive 15: Ember's own Tape curve cannot be fitted to that
 law. A tape style with a level-dependent ceiling (hysteresis core) is the next step there.
 Tools and tables: `/mnt/e/lynx-work/vqe190dp` (`bank.sh`, `gate.py`, `vsx/`, `qfit/`, `qv/`, `ember/`, `golden/`).
+
+## Round 190ff: Live's Freeze Track with the insert effects, Bounce Track in Place (Flatten), Bounce to New Track, Consolidate (Clip-launch workflow)
+
+Evidence: Live 12.4.16's own command list (`ableton/live-exe-strings.txt`: `Edit>Freeze Track(s)`, `Edit>Bounce
+Track(s) in Place`, `Edit>Bounce to New Track(s)`, `Edit>Paste Bounced Audio`, menu keys `sMenuFreeze` / `sMenuUnfreeze`
+/ `sMenuBounceTrackInPlace` / `sMenuBounceToNewTrack`; no `sMenuFlatten` — Flatten survives only as the scripting API's
+`NTrackApi::Flatten`), the arrangement clip menu of 12.4.16 [SHOT live190ei/shots/live-audioclip-context-menu.png:
+Freeze Track Ctrl+Shift+Alt+F, Bounce Track in Place, Bounce to New Track Ctrl+B, Paste Bounced Audio Ctrl+Alt+V],
+its errors (`sErrorRouteInFreeze`, `sErrorMonitoringStateFreeze`, `sErrorGroupExternalFreeze`) and the folders
+`Samples/Processed/Freeze|Bounce|Consolidate`.
+
+| Live | LYNX (Clip-launch workflow) | Status |
+|---|---|---|
+| Freeze Track: the track with all its devices; the mixer stays live | Column title menu / Playlist clip menu › Freeze Track (Ctrl+Shift+Alt+F in the grid): the channel with its volume and pan through its insert's effects, before the insert's EQ, fader, pan and sends; the instrument and the effects are not loaded | ✅ null −139 dB (core), real export: `--trackfreezetest` |
+| Unfreeze Track | the same item | ✅ project byte for byte as before |
+| A routing into the track / an input refuses the freeze | refused with the reason: another channel or insert into the insert, a side-chain or send out of it, an audio input, a live controller link | ✅ (a freeze that stops holding plays live) |
+| Frozen devices locked | Mixer slots and knobs refuse with a notice; the Device view dims them with the freeze tag | ✅ |
+| Flatten (12.2+: Bounce Track in Place on a frozen track) | Bounce Track in Place on a frozen track: the channel becomes an audio clip channel of its stem, one clip per clip at its place and length plus tail clips, devices removed | ✅ bit-identical to the frozen playback |
+| Freeze and Flatten / Bounce Track in Place | Bounce Track in Place on a live track: rendered and flattened, one undo step | ✅ |
+| Bounce to New Track | the selected clips of one track through its devices, onto a new track below (the clips stay) | ✅ −135 dB vs the track's devices |
+| Consolidate (Ctrl+J) | pattern clips: one pattern, no render; audio clips of one channel: rendered into one clip | ✅ bit-identical / −134 dB |
+| Session clips of a frozen track, group tracks, Paste Bounced Audio, Consolidate Time to New Scene, files in the project's Samples/Processed | — | open (see the round's HANDOFF) |
+
+Also: `Song::automationChunks` (runtime only): stand-in / freeze render songs and projections keep the chunking of the
+song they stand for (the renderer works in 128-sample chunks while any automation plays; some instruments sound about
+−66 dB different at 512): frozen audio now nulls where the freeze took the song's automation away.
