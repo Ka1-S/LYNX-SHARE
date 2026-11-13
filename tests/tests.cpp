@@ -17523,6 +17523,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "LiveWf190efMapTests.inc"
 #include "LiveWf190efDrawTests.inc"
 #include "LiveWf190efScenesTests.inc"
+#include "LiveWf190emTests.inc"
 #include "BandlabExtras190chTests.inc"
 #include "DanceFix190cjTests.inc"
 #include "Reverb190bzTests.inc"

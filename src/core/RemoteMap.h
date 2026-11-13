@@ -48,7 +48,8 @@ inline bool isButton (const Target& t) noexcept { return t.action != RemoteActio
 // --- ranges ------------------------------------------------------------------------------------------------------------
 // The control's position for a controller at `x` (0..1): Min + (Max − Min) · x (Min above Max: inverted).
 float applyRange (float x, float min, float max) noexcept;
-// A key (or a button) mapped to a parameter: each press toggles it between Min and Max (Max first, Min when it is at Max).
+// A key (or a button) mapped to a parameter: each press toggles it between Min and Max (round 190em, as Live 12.4.16
+// does: Min first, Max when it is at Min).
 float keyToggle (float current, float min, float max) noexcept;
 
 // --- buttons -----------------------------------------------------------------------------------------------------------

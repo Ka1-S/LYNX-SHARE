@@ -47,16 +47,23 @@ In the clip grid (Clip-launch workflow):
   grid and the Playlist. Ctrl+Shift+M puts a new empty MIDI clip in the selected slot (in the Clip-launch layout; in the
   other layouts the key stays Export › MIDI file and the command is in the slot's menu).
 - **Scenes**: click a scene to select it. Ctrl+D (or the scene's menu › Duplicate) puts a copy of the scene with all its
-  clips under it; **Capture and insert scene** (Ctrl+Shift+I) makes a new scene under the selected one with copies of
-  the clips playing now; Ctrl+I inserts an empty scene under it; Ctrl+R renames it; Delete removes it. The scene's menu
-  also has its colour. **Scene tempo and time signature** (View menu, or the grid's options) shows a tempo field and a
-  time signature field on every scene: drag one up or down (Ctrl: fine) or double-click to type; a greyed field is off
-  (the scene keeps the song's value), right-click › Disable switches it off again. Launching the scene sets the song's
-  tempo and bar length (n/4). Ctrl+I, Ctrl+Shift+I and Ctrl+R act this way in the Clip-launch layout only.
+  clips under it; **Capture and insert scene** (Ctrl+Shift+I) makes a new scene under the selected one: while clips
+  play, it holds copies of them and playback moves to it at once, without a restart; with nothing playing it is an
+  empty scene with the selected scene's name, tempo and time signature. Ctrl+I inserts an empty scene under it; Ctrl+R
+  renames it; Delete removes it. The scene's menu also has its colour. **Scene tempo and time signature** (View menu,
+  or the grid's options) shows a tempo field and a time signature field ("4 / 4") on every scene: drag one up or down
+  (the tempo moves about 3 BPM per pixel, Ctrl: fine; the signature's two numbers are dragged separately) or
+  double-click to type ("6 / 8"); a dim field is off (the scene keeps the song's value). Right-click › Return to
+  Default, or Del on a clicked field, switches it off again. Launching the scene sets the song's tempo and bar length
+  (LYNX's song meter counts quarter notes, so 6 / 8 plays as a 3-beat bar). Ctrl+I, Ctrl+Shift+I and Ctrl+R act this
+  way in the Clip-launch layout only.
 - **Track titles**: right-click a column's title for Rename and Change color (Ctrl+R renames the title clicked last);
   name and colour are the Playlist track's.
-- **Capture MIDI** (Ctrl+Shift+Alt+R) with the clip grid on screen: the notes you just played without recording become a
-  new clip in the selected slot of the selected track (the next empty slot below when that one is taken).
+- **Capture MIDI** (Ctrl+Shift+Alt+R) with the clip grid on screen: the notes you just played without recording go to
+  the armed track (the selected track when none is armed). When that track plays a MIDI clip, they are written into it:
+  its loop is unrolled up to the bars you just played and its start and loop move there. Otherwise they become a new
+  clip in the selected scene's slot (the next empty slot below when that one is taken), which starts playing at once;
+  played with the transport stopped, the song's tempo is first set from how you played them.
 - **A Playlist clip into a slot**: with the grid beside the Playlist, drag a pattern or audio clip out of the Playlist
   onto a slot: a copy goes there, the Playlist keeps the clip.
 - **Mixer** (under the slots, as Live's Session mixer): each track has a strip for the mixer track it plays through:
@@ -89,10 +96,10 @@ In the clip grid (Clip-launch workflow):
   clips, Session Record, Play, Stop, Record, the metronome, the tempo, the Session mixer's volume, pan and sends, and
   the Device View's knobs. One control can launch slots on several tracks, but not two slots of one track, and a control
   on a slot can't also launch a scene. While a map mode is on, the Browser shows the **mapping list** (MIDI: Channel,
-  Note/Control, Path, Name, Min, Max; Key: Key, Path, Name, Min, Max): drag Min or Max up or down (or double-click to
-  type) to give a mapping a range; Min above Max inverts it (right-click › Invert Range); Delete removes the selected
+  Note/Control, Path, Name, Min, Max; Key: Key, Path, Name, Min, Max; Path is "track | device", Min and Max are in the
+  parameter's unit, such as dB or 50L): drag Min or Max up or down (or double-click to type) to give a mapping a range; Min above Max inverts it (right-click › Invert Range); Delete removes the selected
   mappings (Delete over a selected element removes its mapping too). Mappings do nothing while a map mode is on; switch
-  it off and they act: a key on a knob switches it between Min and Max. Mappings are saved with the project; a MIDI
+  it off and they act: a key on a knob switches it between Min and Max (Min on the first press). Mappings are saved with the project; a MIDI
   mapping of a knob is the same link as **Link to controller**. In the other layouts
   Ctrl+M stays the metronome.
 

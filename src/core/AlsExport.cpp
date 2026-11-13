@@ -1394,7 +1394,7 @@ struct Exporter
                     }
                     if (g.beatsPerBar > 0)
                     {
-                        s.value ("TimeSignatureId", num (alsTimeSignatureCode (g.beatsPerBar, 4)));
+                        s.value ("TimeSignatureId", num (alsTimeSignatureCode (g.beatsPerBar, g.beatUnit)));
                         s.value ("IsTimeSignatureEnabled", "true");
                     }
                 }

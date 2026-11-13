@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "core/Effects.h"
 #include "engine/AudioEngine.h"
 #include "ui/AutomationUi.h"
 #include "ui/I18n.h"
@@ -60,13 +61,39 @@ std::pair<juce::String, juce::String> describe (AudioEngine& engine, const remot
     {
         case RemoteAction::parameter:
         {
+            // round 190em: Path "<track> | <device>" and the parameter's name, as Live's list shows them (live check
+            // 190ei: "T1 | Mixer", "Track Volume")
             const auto text = describeAutomationTarget (engine, t.param);
             const auto cut = text.lastIndexOf (" - ");
-            if (cut > 0)
-                return { text.substring (0, cut), text.substring (cut + 3) };
-            return { {}, text };
+            const auto owner = cut > 0 ? text.substring (0, cut) : juce::String();
+            const auto name = cut > 0 ? text.substring (cut + 3) : text;
+            const auto mixerPath = (t.param.kind == AutomationTargetKind::mixerSend ? owner.upToFirstOccurrenceOf (juce::String::fromUTF8 (" \xe2\x86\x92 "), false, false) : owner)
+                                   + " | " + tr ("Mixer");
+            switch (t.param.kind)
+            {
+                case AutomationTargetKind::mixerVolume: return { mixerPath, tr ("Track Volume") };
+                case AutomationTargetKind::mixerPan: return { mixerPath, tr ("Track Panning") };
+                case AutomationTargetKind::mixerSend: return { mixerPath, name.isNotEmpty() && owner.contains (juce::String::fromUTF8 ("\xe2\x86\x92"))
+                                                                             ? tr ("Send to {0}", { owner.fromFirstOccurrenceOf (juce::String::fromUTF8 (" \xe2\x86\x92 "), false, false) })
+                                                                             : name };
+                case AutomationTargetKind::effectParam:
+                {
+                    // the device: the effect in that insert slot
+                    const auto& mixer = song.mixer;
+                    if (t.param.index >= 0 && t.param.index < (int) mixer.size() && t.param.slot >= 0
+                        && t.param.slot < (int) mixer[(std::size_t) t.param.index].effects.size())
+                    {
+                        const auto& fx = mixer[(std::size_t) t.param.index].effects[(std::size_t) t.param.slot];
+                        auto device = fx.kind == EffectKind::plugin && ! fx.plugin.name.empty() ? utf8 (fx.plugin.name) : utf8 (effectInfo (fx.kind).name);
+                        if (device.isNotEmpty())
+                            return { owner + " | " + device, name };
+                    }
+                    return { owner, name };
+                }
+                default: return { owner, name };
+            }
         }
-        case RemoteAction::clipSlot: return { trackName (song, t.track), tr ("Clip slot {0}", { juce::String (t.scene + 1) }) };
+        case RemoteAction::clipSlot: return { trackName (song, t.track), tr ("Slot {0}", { juce::String (t.scene + 1) }) };
         case RemoteAction::trackStop: return { trackName (song, t.track), tr ("Clip stop") };
         case RemoteAction::sceneLaunch:
         {
@@ -101,11 +128,63 @@ juce::String assignedText (const remotemap::Assigned& a, remotemap::Mode mode)
     return channel + "/" + (isNoteLink (a.number) ? juce::String (remotemap::noteText (a.number - linkNoteBase)) : juce::String (a.number));
 }
 
-juce::String rangeText (const remotemap::Target& target, float value)
+juce::String rangeText (AudioEngine& engine, const remotemap::Target& target, float value)
 {
     if (target.action != RemoteAction::parameter)
         return {};
-    return automationPointValueText (target.param, value);
+    // round 190em: in the parameter's own unit, as Live's list ("-∞ dB", "6.0 dB", "50L"; live check 190ei)
+    auto text = targetValueTextAt (engine, target.param, value);
+    if (text.isEmpty())
+        return automationPointValueText (target.param, value);
+    if (text.startsWith ("-inf"))
+        return juce::String::fromUTF8 ("\xe2\x88\x92\xe2\x88\x9e") + text.substring (4);
+    const auto pan = target.param.kind == AutomationTargetKind::mixerPan || target.param.kind == AutomationTargetKind::channelPan;
+    if (pan && (text.startsWith ("L") || text.startsWith ("R")))
+        return text.substring (1) + text.substring (0, 1); // (Live writes the side after the number)
+    return text;
+}
+
+std::optional<float> rangeValueOf (AudioEngine& engine, const remotemap::Target& target, const juce::String& typed)
+{
+    const auto t = typed.trim().toUpperCase();
+    if (target.action != RemoteAction::parameter || t.isEmpty())
+        return std::nullopt;
+    const auto& p = target.param;
+    if (p.kind == AutomationTargetKind::mixerPan || p.kind == AutomationTargetKind::channelPan)
+    {
+        if (t.startsWith ("C"))
+            return 0.5f;
+        const auto amount = juce::jlimit (0.0f, 100.0f, t.retainCharacters ("0123456789.").getFloatValue()) / 100.0f;
+        const auto left = t.containsChar ('L') || t.startsWith ("-");
+        return 0.5f + (left ? -0.5f : 0.5f) * amount;
+    }
+    if (p.kind == AutomationTargetKind::tempo)
+        return juce::jlimit (0.0f, 1.0f, valueFromTempo (t.retainCharacters ("0123456789.").getDoubleValue()));
+    if (t.startsWith ("-INF") || t.startsWith (juce::String::fromUTF8 ("\xe2\x88\x92\xe2\x88\x9e")))
+        return 0.0f;
+    // any other unit: the value whose text shows the number closest to the one typed
+    const auto number = t.replace (juce::String::fromUTF8 ("\xe2\x88\x92"), "-").retainCharacters ("0123456789.-");
+    if (! number.containsAnyOf ("0123456789"))
+        return std::nullopt;
+    const auto wanted = number.getDoubleValue();
+    auto best = -1.0f;
+    auto bestGap = 1.0e300;
+    for (int i = 0; i <= 1000; ++i)
+    {
+        const auto v = (float) i / 1000.0f;
+        const auto shown = targetValueTextAt (engine, p, v).replace (juce::String::fromUTF8 ("\xe2\x88\x92"), "-");
+        if (! shown.containsAnyOf ("0123456789"))
+            continue;
+        const auto gap = std::abs (shown.retainCharacters ("0123456789.-").getDoubleValue() - wanted);
+        if (gap < bestGap)
+        {
+            bestGap = gap;
+            best = v;
+        }
+    }
+    if (best < 0.0f)
+        return juce::jlimit (0.0f, 1.0f, (float) wanted / 100.0f); // (no unit: percent)
+    return best;
 }
 
 juce::Colour modeColour (remotemap::Mode mode)
@@ -480,7 +559,7 @@ void MappingBrowser::paint (juce::Graphics& g)
                     g.setColour (isMax ? modeColour (mode).withAlpha (0.55f) : c::bg5);
                     g.fillRect (box);
                     g.setColour (c::textPrimary);
-                    g.drawText (rangeText (row.target, isMax ? row.max : row.min), box, juce::Justification::centred, true);
+                    g.drawText (rangeText (engine, row.target, isMax ? row.max : row.min), box, juce::Justification::centred, true);
                 }
             }
             else
@@ -573,18 +652,17 @@ void MappingBrowser::typeRange (int r, bool isMax)
 {
     const auto row = list[(std::size_t) r];
     auto* window = new juce::AlertWindow (isMax ? tr ("Max") : tr ("Min"), describe (engine, row.target).second, juce::MessageBoxIconType::NoIcon, this);
-    const auto tempo = row.target.param.kind == AutomationTargetKind::tempo;
     const auto now = isMax ? row.max : row.min;
-    window->addTextEditor ("value", tempo ? juce::String (tempoFromValue (now), 2) : juce::String (now * 100.0f, 1));
+    window->addTextEditor ("value", rangeText (engine, row.target, now)); // (round 190em: in the parameter's unit)
     window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
     window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
     juce::Component::SafePointer<MappingBrowser> self (this);
-    window->enterModalState (true, juce::ModalCallbackFunction::create ([self, window, r, isMax, tempo] (int result) {
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([self, window, r, isMax] (int result) {
         const std::unique_ptr<juce::AlertWindow> owned (window);
         if (result != 1 || self == nullptr || r >= (int) self->list.size())
             return;
-        const auto typed = owned->getTextEditorContents ("value").retainCharacters ("0123456789.-").getFloatValue();
-        self->editRange (r, isMax, juce::jlimit (0.0f, 1.0f, tempo ? valueFromTempo (typed) : typed / 100.0f));
+        if (const auto v = rangeValueOf (self->engine, self->list[(std::size_t) r].target, owned->getTextEditorContents ("value")))
+            self->editRange (r, isMax, juce::jlimit (0.0f, 1.0f, *v));
     }), false);
 }
 

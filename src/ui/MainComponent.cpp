@@ -1975,19 +1975,24 @@ bool MainComponent::runAction (const std::string& id)
     }
     else if (is ("record.captureMidi")) // round 170d (Ableton's Capture MIDI, Logic's Capture as Recording)
     {
-        // round 190ef: in the Clip-launch layout with the clip grid on screen, the phrase becomes a new clip in a slot of
-        // the grid's selected track (as the reference captures into its Session view); elsewhere into the pattern
+        // round 190ef / 190em: in the Clip-launch layout with the clip grid on screen, the phrase goes to the ARMED track
+        // (Live 12.4.16, live check 190ei; no armed track: the grid's selected track), in the selected scene's slot as a
+        // new clip that is launched at once, or into the clip that track plays
         if (isClipLaunchWorkflow() && clipGridView != nullptr && clipGridView->isShowing())
         {
-            const auto [track, scene] = clipGridSelection (*clipGridView);
-            const auto& tracks = engine.getSong().playlistTracks;
-            const auto trackName = track < (int) tracks.size() && ! tracks[(std::size_t) track].name.empty()
-                                       ? tracks[(std::size_t) track].name
-                                       : tr ("Track {0}", { juce::String (track + 1) }).toStdString();
+            auto [track, scene] = clipGridSelection (*clipGridView);
+            for (int t = 0; t < launcher::maxTracks; ++t)
+                if (engine.isGridTrackArmed (t))
+                {
+                    track = t;
+                    break;
+                }
             int placed = -1;
-            const auto r = engine.captureMidiToSlot (track, scene, session::recordedClipName (engine.getSong(), trackName), placed);
+            bool into = false;
+            const auto r = engine.captureMidiToSlot (track, scene, placed, into);
             if (r.notes > 0 && placed >= 0)
-                ui::postHint ({ tr ("Capture MIDI: {0} notes put in a new clip", { juce::String (r.notes) }), {}, false, false }, 4000);
+                ui::postHint ({ into ? tr ("Capture MIDI: {0} notes put in the playing clip", { juce::String (r.notes) })
+                                     : tr ("Capture MIDI: {0} notes put in a new clip", { juce::String (r.notes) }), {}, false, false }, 4000);
             else
                 ui::postHint ({ tr ("Capture MIDI: nothing to capture (play some notes first, without recording)"), {}, false, false }, 4000);
             return true;

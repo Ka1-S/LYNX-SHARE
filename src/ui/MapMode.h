@@ -52,7 +52,9 @@ juce::String keyText (int key);
 // The label of a mapped element: "1/19" (channel / controller), "1/C3" (channel / key), a computer key's name.
 juce::String assignedText (const remotemap::Assigned& a, remotemap::Mode mode);
 // A value of a target's range as text (a parameter's own units where LYNX knows them, else percent).
-juce::String rangeText (const remotemap::Target& target, float value);
+// A mapping's Min / Max in the parameter's own unit (round 190em), and a typed one back to 0..1.
+juce::String rangeText (AudioEngine& engine, const remotemap::Target& target, float value);
+std::optional<float> rangeValueOf (AudioEngine& engine, const remotemap::Target& target, const juce::String& typed);
 // The colour of a map mode's highlights.
 juce::Colour modeColour (remotemap::Mode mode);
 

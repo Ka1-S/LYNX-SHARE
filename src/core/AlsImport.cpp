@@ -19,6 +19,7 @@
 #include "core/Gzip.h"
 #include "core/LiveScales.h"
 #include "core/MissingFiles.h"
+#include "core/SessionOps.h"
 #include "core/TimeStretch.h"
 #include "core/XmlLite.h"
 
@@ -1477,8 +1478,9 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
         if (scenes[s].boolean ("IsTimeSignatureEnabled", false) && alsTimeSignature ((int) scenes[s].number ("TimeSignatureId", 201), n, d))
         {
             sc.beatsPerBar = n;
+            sc.beatUnit = session::sceneBeatUnit (d); // (round 190em: the scene keeps its denominator)
             if (d != 4)
-                ctx.note (&FlpImportReport::approximated, "Scene time signatures other than n/4 (the numerator is kept)");
+                ctx.note (&FlpImportReport::approximated, "Scene time signatures other than n/4 (a launch plays the same bar length in quarter notes)");
         }
         if (scenes[s].boolean ("FollowAction/FollowActionEnabled", false))
             ctx.note (&FlpImportReport::unsupported, "Scene follow actions");

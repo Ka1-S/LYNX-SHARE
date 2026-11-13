@@ -389,24 +389,51 @@ int duplicateScene (Song& song, int scene)
     return at;
 }
 
-int captureScene (Song& song, int below, const std::vector<int>& playing)
+int captureScene (Song& song, int below, const std::vector<int>& playing, std::vector<int>* moved)
 {
-    if (! song.clipGrid || below < -1 || below + 1 >= launcher::maxScenes)
+    if (moved != nullptr)
+        moved->clear();
+    if (below < -1 || below + 1 >= launcher::maxScenes)
         return -1;
-    std::vector<std::pair<int, int>> taken; // (track, row)
+    auto& grid = launcher::ensureGrid (song);
+    std::vector<std::pair<int, int>> taken; // (track, slot playing)
     for (int t = 0; t < (int) playing.size(); ++t)
-        if (playing[(std::size_t) t] >= 0 && launcher::clipAt (*song.clipGrid, t, playing[(std::size_t) t]) != nullptr)
-            taken.push_back ({ t, playing[(std::size_t) t] });
-    if (taken.empty())
-        return -1;
-    while ((int) song.clipGrid->scenes.size() <= below)
-        song.clipGrid->scenes.emplace_back();
+        if (const auto* clip = playing[(std::size_t) t] >= 0 ? launcher::clipAt (grid, t, playing[(std::size_t) t]) : nullptr)
+            taken.push_back ({ t, clip->gridSlot });
+    while ((int) grid.scenes.size() <= below)
+        grid.scenes.emplace_back();
+    // nothing plays: an empty row like the selected scene (name, tempo, signature; live check 190ei Q1a)
+    ClipGridScene like;
+    if (taken.empty() && below >= 0)
+    {
+        const auto& from = grid.scenes[(std::size_t) below];
+        like.name = from.name;
+        like.tempo = from.tempo;
+        like.beatsPerBar = from.beatsPerBar;
+        like.beatUnit = from.beatUnit;
+    }
     const auto at = launcher::insertScene (song, below + 1);
     if (at < 0)
         return -1;
-    for (const auto& [t, row] : taken)
-        if (const auto content = copyOf (song, t, row < at ? row : row + 1)) // (rows from `at` on moved down one)
-            paste (song, t, at, *content);
+    auto& g = *song.clipGrid;
+    g.scenes[(std::size_t) at] = like;
+    for (const auto& [t, slot] : taken)
+    {
+        if (slot < 0 || slot >= (int) g.slots.size())
+            continue;
+        const auto row = g.slots[(std::size_t) slot].scene; // (rows from `at` on moved down one)
+        const auto content = copyOf (song, t, row);
+        if (! content || ! paste (song, t, at, *content))
+            continue;
+        // the playing slot takes the new row, its copy the old one: playback moves with no restart
+        if (const auto* copy = launcher::clipAt (g, t, at); copy != nullptr && copy->gridSlot >= 0 && copy->gridSlot != slot)
+        {
+            g.slots[(std::size_t) copy->gridSlot].scene = row;
+            g.slots[(std::size_t) slot].scene = at;
+            if (moved != nullptr)
+                moved->push_back (slot);
+        }
+    }
     return at;
 }
 
@@ -438,7 +465,47 @@ bool setSceneBeats (Song& song, int scene, int beats)
     if (s == nullptr)
         return false;
     s->beatsPerBar = beats > 0 ? std::clamp (beats, sceneBeatsMin, sceneBeatsMax) : 0;
+    if (s->beatsPerBar == 0)
+        s->beatUnit = 4;
     return true;
+}
+
+bool setSceneSignature (Song& song, int scene, int beats, int unit)
+{
+    if (! setSceneBeats (song, scene, beats))
+        return false;
+    auto& s = song.clipGrid->scenes[(std::size_t) scene];
+    s.beatUnit = s.beatsPerBar > 0 ? sceneBeatUnit (unit) : 4;
+    return true;
+}
+
+namespace
+{
+constexpr int beatUnits[] { 1, 2, 4, 8, 16 };
+int unitIndex (int unit) noexcept
+{
+    auto best = 2;
+    for (int i = 0; i < 5; ++i)
+        if (std::abs (beatUnits[i] - unit) < std::abs (beatUnits[best] - unit))
+            best = i;
+    return best;
+}
+} // namespace
+
+int sceneBeatUnit (int unit) noexcept
+{
+    return unit > 0 ? beatUnits[unitIndex (unit)] : 4;
+}
+
+int sceneBeatUnitStep (int unit, int steps) noexcept
+{
+    return beatUnits[std::clamp (unitIndex (sceneBeatUnit (unit)) + steps, 0, 4)];
+}
+
+int sceneBarBeats (int beats, int unit) noexcept
+{
+    const auto quarters = (double) std::max (1, beats) * 4.0 / (double) sceneBeatUnit (unit);
+    return std::clamp ((int) std::lround (quarters), sceneBeatsMin, sceneBeatsMax);
 }
 
 std::string sceneTempoText (double bpm)
@@ -448,9 +515,25 @@ std::string sceneTempoText (double bpm)
     return text;
 }
 
-std::string sceneSignatureText (int beats)
+std::string sceneSignatureText (int beats, int unit)
 {
-    return std::to_string (std::max (1, beats)) + "/4";
+    return std::to_string (std::max (1, beats)) + " / " + std::to_string (sceneBeatUnit (unit));
+}
+
+double sceneTempoDragged (double start, double pixels) noexcept
+{
+    return std::clamp (std::round (start + pixels * sceneTempoPerPixel), minTempo, maxTempo);
+}
+
+int sceneBeatsDragged (int start, double pixels) noexcept
+{
+    return std::clamp ((int) std::lround ((double) start + pixels * sceneBeatsPerPixel), sceneBeatsMin, sceneBeatsMax);
+}
+
+int sceneUnitDragged (int start, double pixels) noexcept
+{
+    const auto steps = (int) std::trunc (pixels / sceneUnitPixelsPerStep);
+    return sceneBeatUnitStep (start, steps);
 }
 
 int captureSlot (const Song& song, int track, int scene)
@@ -502,5 +585,130 @@ std::vector<Note> phraseNotes (const std::vector<scorelog::Entry>& phrase, doubl
         n.length = std::clamp<std::int64_t> (n.length, 1, std::max<std::int64_t> (1, length - n.start));
     std::stable_sort (notes.begin(), notes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
     return notes;
+}
+// --- Capture MIDI in the Clip-launch layout (round 190em) --------------------------------------------------------------
+double phraseTempo (const std::vector<scorelog::Entry>& phrase, double fallback)
+{
+    std::vector<double> onsets;
+    for (const auto& e : phrase)
+        onsets.push_back (e.startMs);
+    std::sort (onsets.begin(), onsets.end());
+    std::vector<double> merged; // (a chord is one onset)
+    for (const auto t : onsets)
+        if (merged.empty() || t - merged.back() > 40.0)
+            merged.push_back (t);
+    if (merged.size() < 3)
+        return fallback;
+    std::vector<double> gaps;
+    for (std::size_t i = 1; i < merged.size(); ++i)
+        gaps.push_back (merged[i] - merged[i - 1]);
+    std::sort (gaps.begin(), gaps.end());
+    auto unit = gaps[gaps.size() / 2];
+    if (! (unit > 0.0))
+        return fallback;
+    // the grid of that gap: each onset's whole number of units from the first, then the unit that fits them best
+    double sxy = 0.0, sxx = 0.0;
+    for (const auto t : merged)
+    {
+        const auto k = std::round ((t - merged.front()) / unit);
+        sxy += (t - merged.front()) * k;
+        sxx += k * k;
+    }
+    if (sxx > 0.0)
+        unit = sxy / sxx;
+    auto bpm = 60000.0 / unit;
+    for (int guard = 0; guard < 16 && bpm < 80.0; ++guard)
+        bpm *= 2.0;
+    for (int guard = 0; guard < 16 && bpm >= 160.0; ++guard)
+        bpm *= 0.5;
+    if (! std::isfinite (bpm))
+        return fallback;
+    return std::clamp (std::round (bpm * 100.0) / 100.0, minTempo, maxTempo);
+}
+
+std::vector<Note> clipTimeNotes (const std::vector<scorelog::Entry>& phrase, double nowMs, double bpm, double shift)
+{
+    std::vector<Note> notes;
+    const auto ticksPerMs = std::max (1.0, bpm) * ppq / 60000.0;
+    for (const auto& e : phrase)
+    {
+        if (e.startTick < 0.0)
+            continue;
+        Note n;
+        n.start = std::max<std::int64_t> (0, (std::int64_t) std::llround (e.startTick + shift));
+        const auto endMs = e.endMs >= 0.0 ? e.endMs : std::max (e.startMs, nowMs);
+        n.length = std::max<std::int64_t> (ticksPerStep / 8, (std::int64_t) std::llround ((endMs - e.startMs) * ticksPerMs));
+        n.channel = e.channel;
+        n.key = std::clamp (e.key, 0, 127);
+        n.velocity = std::clamp (e.velocity, 1.0f / 127.0f, 1.0f);
+        notes.push_back (n);
+    }
+    std::stable_sort (notes.begin(), notes.end(), [] (const Note& a, const Note& b) { return a.start < b.start; });
+    return notes;
+}
+
+bool captureIntoClip (Song& song, int track, int scene, const std::vector<Note>& notes)
+{
+    if (! song.clipGrid || notes.empty())
+        return false;
+    const auto* found = launcher::clipAt (*song.clipGrid, track, scene);
+    if (found == nullptr || found->kind != ClipKind::pattern || found->pattern < 0 || found->pattern >= (int) song.patterns.size()
+        || found->length <= 0)
+        return false;
+    const auto clipIndex = (std::size_t) (found - song.clipGrid->clips.data());
+    const auto loopStart = found->offset, loopLength = found->length;
+    auto pattern = found->pattern;
+    // a pattern another clip plays too is copied, so only this clip changes
+    auto users = 0;
+    song.forEachClipList ([&] (const std::vector<Clip>& list) {
+        for (const auto& c : list)
+            users += c.kind == ClipKind::pattern && c.pattern == pattern ? 1 : 0;
+    });
+    if (users > 1)
+    {
+        song.patterns.push_back (song.patterns[(std::size_t) pattern]);
+        pattern = (int) song.patterns.size() - 1;
+    }
+    const auto bar = (std::int64_t) std::max (1, song.beatsPerBar) * ppq;
+    auto first = notes.front().start, reach = (std::int64_t) 0;
+    for (const auto& n : notes)
+    {
+        first = std::min (first, n.start);
+        reach = std::max (reach, n.start + n.length);
+    }
+    const auto from = first / bar * bar;
+    const auto to = std::max (from + bar, (reach + bar - 1) / bar * bar);
+    // the loop's content, unrolled pass after pass up to the end of the bars played
+    auto& p = song.patterns[(std::size_t) pattern];
+    std::vector<Note> loop;
+    for (const auto& n : p.notes)
+        if (n.start >= loopStart && n.start < loopStart + loopLength)
+            loop.push_back (n);
+    std::vector<Note> unrolled;
+    for (std::int64_t pass = 0; pass < to; pass += loopLength)
+        for (auto n : loop)
+        {
+            n.start = pass + (n.start - loopStart);
+            if (n.start >= to)
+                continue;
+            n.length = std::clamp<std::int64_t> (n.length, 1, std::max<std::int64_t> (1, std::min (pass + loopLength, to) - n.start));
+            unrolled.push_back (n);
+        }
+    p.notes = std::move (unrolled);
+    p.sortNotes();
+    mergeNotes (p, notes);
+    p.lengthTicks = to;
+    auto& clip = song.clipGrid->clips[clipIndex];
+    clip.pattern = pattern;
+    clip.offset = from;
+    clip.length = to - from;
+    return true;
+}
+
+void setNotesChannel (std::vector<Note>& notes, int channel) noexcept
+{
+    if (channel >= 0)
+        for (auto& n : notes)
+            n.channel = channel;
 }
 } // namespace lynx::session

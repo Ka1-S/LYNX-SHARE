@@ -47,6 +47,9 @@ juce::PopupMenu clipGridSceneFieldMenu (juce::Component& grid, int scene, int fi
 // --sceneshot190ef: select a scene; Duplicate it; Capture and Insert Scene with the given rows playing per track (nothing
 // plays off-screen). The new row, −1: none.
 void selectClipGridScene (juce::Component& grid, int scene);
+// round 190em: select a scene's field (1 tempo, 2 / 3 the time signature), as a click on it does (Del then returns it to
+// its default)
+void selectClipGridSceneField (juce::Component& grid, int scene, int field);
 int duplicateClipGridScene (juce::Component& grid, int scene);
 int captureClipGridScene (juce::Component& grid, int scene, const std::vector<int>& playing);
 // Is `component` the clip grid or inside it? (the Playlist starts a clip's drag out over it)

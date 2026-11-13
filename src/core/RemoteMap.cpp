@@ -63,7 +63,8 @@ float applyRange (float x, float min, float max) noexcept
 
 float keyToggle (float current, float min, float max) noexcept
 {
-    return std::abs (current - max) < 1.0e-4f ? clamp01 (min) : clamp01 (max);
+    // Live 12.4.16 (live check 190ei): from anywhere but Min the first press goes to Min, then Max, then Min
+    return std::abs (current - min) < 1.0e-4f ? clamp01 (max) : clamp01 (min);
 }
 
 Edge midiEdge (int number, int value, int previous) noexcept

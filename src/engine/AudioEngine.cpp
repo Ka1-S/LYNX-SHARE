@@ -12,6 +12,7 @@
 #include "engine/SessionPack.h"
 
 #include "core/ClipOps.h"
+#include "core/DetailChain.h"
 #include "core/SessionOps.h"
 #include "core/MarkerPlan.h"
 #include "engine/AudioLogger.h"
@@ -1200,6 +1201,15 @@ void AudioEngine::logPlayedNote (int channel, int key, float velocity, bool on, 
         stepEditQueue.push_back ({ channel, key, velocity, on });
 }
 
+void AudioEngine::logPlayedNoteForTest (double ms, int channel, int key, float velocity, bool on, double tick)
+{
+    const juce::SpinLock::ScopedLockType lock (scoreLogLock);
+    if (on)
+        scoreLog.noteOn (ms, channel, key, velocity, tick, false);
+    else
+        scoreLog.noteOff (ms, channel, key);
+}
+
 void AudioEngine::setStepEdit (bool on) noexcept
 {
     stepEditOn.store (on, std::memory_order_relaxed);
@@ -1381,9 +1391,10 @@ CaptureResult AudioEngine::captureMidi()
     return result;
 }
 
-CaptureResult AudioEngine::captureMidiToSlot (int track, int scene, const std::string& name, int& placed)
+CaptureResult AudioEngine::captureMidiToSlot (int track, int scene, int& placed, bool& into)
 {
     placed = -1;
+    into = false;
     CaptureOptions o;
     o.afterMs = lastCaptureMs;
     o.nowMs = juce::Time::getMillisecondCounterHiRes();
@@ -1392,20 +1403,51 @@ CaptureResult AudioEngine::captureMidiToSlot (int track, int scene, const std::s
     const auto phrase = capturePhrase (song, log, o);
     if (phrase.empty() || track < 0 || track >= launcher::maxTracks)
         return {};
-    std::int64_t length = 0;
-    auto notes = session::phraseNotes (phrase, o.nowMs, song.bpm, song.beatsPerBar, length);
     CaptureResult result;
-    result.notes = (int) notes.size();
     result.played = phrase.front().startTick >= 0.0;
     for (const auto& e : phrase)
         result.newestMs = juce::jmax (result.newestMs, e.startMs);
+    const auto channel = detailchain::forTrack (song, track).channel;
+    const auto running = transport.playing.load();
+
+    // round 190em: into the clip the track plays (Live writes there, no new clip)
+    const auto playingRow = clipLauncher != nullptr ? clipLauncher->tracks[(std::size_t) track].playing.load (std::memory_order_relaxed) : -1;
+    if (running && result.played && playingRow >= 0 && song.clipGrid)
+        if (const auto* clip = launcher::clipAt (*song.clipGrid, track, playingRow); clip != nullptr && clip->kind == ClipKind::pattern)
+        {
+            const auto shift = clipLauncher->clockMinusSong.load (std::memory_order_relaxed)
+                               - clipLauncher->tracks[(std::size_t) track].anchor.load (std::memory_order_relaxed);
+            auto notes = session::clipTimeNotes (phrase, o.nowMs, song.bpm, shift);
+            session::setNotesChannel (notes, channel);
+            result.notes = (int) notes.size();
+            auto ok = false;
+            editSong ([&] (Song& s) { ok = session::captureIntoClip (s, track, playingRow, notes); });
+            if (ok)
+            {
+                placed = playingRow;
+                into = true;
+                if (result.newestMs > lastCaptureMs)
+                    lastCaptureMs = result.newestMs;
+                return result;
+            }
+        }
+
+    // a new clip; played while stopped, the tempo comes from the phrase
+    const auto bpm = running ? song.bpm : session::phraseTempo (phrase, song.bpm);
+    std::int64_t length = 0;
+    auto notes = session::phraseNotes (phrase, o.nowMs, bpm, song.beatsPerBar, length);
+    session::setNotesChannel (notes, channel);
+    result.notes = (int) notes.size();
     const auto row = session::captureSlot (song, track, scene);
     editSong ([&] (Song& s) {
-        if (session::placeRecordedPattern (s, track, row, std::move (notes), length, name) >= 0)
+        if (! running)
+            s.bpm = bpm;
+        if (session::placeRecordedPattern (s, track, row, std::move (notes), length, {}) >= 0)
             placed = row;
     });
     if (placed < 0)
         return {};
+    launcherCommand ({ launcher::Command::Type::launch, track, row }); // (launched at once; a stopped transport starts)
     if (result.newestMs > lastCaptureMs)
         lastCaptureMs = result.newestMs;
     return result;
@@ -2904,11 +2946,11 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
     // a scene with its own tempo and bar length: the song takes them when it is launched
     if (command.type == T::launchScene && command.scene >= 0 && command.scene < (int) song.clipGrid->scenes.size())
         if (const auto& scene = song.clipGrid->scenes[(std::size_t) command.scene]; scene.tempo > 0.0 || scene.beatsPerBar > 0)
-            editSong ([tempo = scene.tempo, bar = scene.beatsPerBar] (Song& s) {
+            editSong ([tempo = scene.tempo, bar = scene.beatsPerBar, unit = scene.beatUnit] (Song& s) {
                 if (tempo > 0.0)
                     s.bpm = tempo;
                 if (bar > 0)
-                    s.beatsPerBar = bar;
+                    s.beatsPerBar = session::sceneBarBeats (bar, unit); // (round 190em: n/d as the same bar in quarter notes)
             }, false);
     if (starts && ! transport.playing.load() && ! isCountingIn())
     {

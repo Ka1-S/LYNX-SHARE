@@ -26,6 +26,9 @@ void createUnlinkedAutomationClip (AudioEngine& engine);
 // Round 165: shared by the point editor and the Playlist's in-clip editing — a point's value as text (percent, or BPM
 // for the tempo), the copied value of FL's "Copy value" (< 0 = none) and FL's "Type in value..." dialog.
 juce::String automationPointValueText (const AutomationTarget& target, float value);
+// Round 190em: a target's value `value` (0..1) in the unit its control shows (dB, pan, BPM, a LYNX effect's own unit, a
+// hosted plugin's own text); "" when there is none.
+juce::String targetValueTextAt (AudioEngine& engine, const AutomationTarget& target, float value);
 float& copiedAutomationValue();
 void typeAutomationPointValue (AudioEngine& engine, int automation, int point);
 

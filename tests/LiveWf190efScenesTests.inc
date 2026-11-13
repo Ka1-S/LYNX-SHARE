@@ -115,19 +115,24 @@ TEST (live190ef_scene_capture_copies_the_playing_clips_into_a_new_row)
     CHECK (launcher::settingsAt (*s.clipGrid, 0, 2)->name == "Fill");
 }
 
-TEST (live190ef_scene_capture_needs_a_playing_clip)
+TEST (live190ef_scene_capture_with_nothing_playing_inserts_a_scene_like_the_selected_one)
 {
+    // round 190em (Live 12.4.16, live check 190ei Q1a): nothing plays: an empty scene below, with the selected scene's
+    // name, tempo and time signature (it used to make no row)
     using namespace lynx;
     auto s = live190ef_scene::song();
     const auto before = s.clipGrid->scenes.size();
-    CHECK (session::captureScene (s, 0, {}) == -1);
-    CHECK (session::captureScene (s, 0, { -1, -1, -1 }) == -1);
-    CHECK (session::captureScene (s, 0, { -1, 1, -1 }) == -1); // Bass "plays" a row where it has no clip
-    CHECK (s.clipGrid->scenes.size() == before);
+    CHECK (session::captureScene (s, 1, {}) == 2);
+    CHECK (s.clipGrid->scenes.size() == before + 1 && live190ef_scene::clipsIn (s, 2) == 0);
+    CHECK (s.clipGrid->scenes[2].name == "Verse" && s.clipGrid->scenes[2].tempo == 128.0 && s.clipGrid->scenes[2].beatsPerBar == 3
+           && s.clipGrid->scenes[2].colour == 0u);
+    CHECK (session::captureScene (s, 0, { -1, -1, -1 }) == 1 && live190ef_scene::clipsIn (s, 1) == 0);
+    CHECK (session::captureScene (s, 0, { -1, 1, -1 }) == 1); // Bass "plays" a row where it has no clip: as nothing plays
     Song none;
-    CHECK (session::captureScene (none, 0, { 0 }) == -1);
+    CHECK (session::captureScene (none, 0, { 0 }) == 1 && none.clipGrid && none.clipGrid->scenes.size() == 2);
     // under the last scene
-    CHECK (session::captureScene (s, 2, { 0, 0, -1 }) == 3 && live190ef_scene::clipsIn (s, 3) == 2);
+    auto t = live190ef_scene::song();
+    CHECK (session::captureScene (t, 2, { 0, 0, -1 }) == 3 && live190ef_scene::clipsIn (t, 3) == 2);
 }
 
 TEST (live190ef_scene_tempo_and_time_signature_fields)
@@ -146,7 +151,7 @@ TEST (live190ef_scene_tempo_and_time_signature_fields)
     // a row shown under the last scene becomes one
     CHECK (session::setSceneTempo (s, 5, 140.0) && s.clipGrid->scenes.size() == 6 && s.clipGrid->scenes[5].tempo == 140.0);
     CHECK (session::sceneTempoText (120.0) == "120.00" && session::sceneTempoText (92.456) == "92.46");
-    CHECK (session::sceneSignatureText (3) == "3/4" && session::sceneSignatureText (0) == "1/4");
+    CHECK (session::sceneSignatureText (3) == "3 / 4" && session::sceneSignatureText (0) == "1 / 4"); // (round 190em: Live's spacing)
 }
 
 TEST (live190ef_scene_capture_into_a_slot_picks_the_slot)

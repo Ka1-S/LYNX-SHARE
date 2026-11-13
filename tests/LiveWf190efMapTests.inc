@@ -44,12 +44,24 @@ TEST (live190ef_map_range_maps_the_travel_onto_min_max)
 TEST (live190ef_map_key_toggles_between_min_and_max)
 {
     using namespace lynx::remotemap;
-    CHECK (keyToggle (0.3f, 0.0f, 1.0f) == 1.0f); // anywhere but Max: to Max
+    // round 190em (Live 12.4.16, live check 190ei: Track Volume at 0 dB, the 1st press -inf, the 2nd +6 dB, the 3rd -inf)
+    CHECK (keyToggle (0.3f, 0.0f, 1.0f) == 0.0f); // anywhere but Min: to Min first
+    CHECK (keyToggle (0.0f, 0.0f, 1.0f) == 1.0f); // at Min: to Max
     CHECK (keyToggle (1.0f, 0.0f, 1.0f) == 0.0f); // at Max: to Min
+    {
+        auto v = 0.8f; // three presses from "0 dB"
+        v = keyToggle (v, 0.0f, 1.0f);
+        CHECK (v == 0.0f);
+        v = keyToggle (v, 0.0f, 1.0f);
+        CHECK (v == 1.0f);
+        v = keyToggle (v, 0.0f, 1.0f);
+        CHECK (v == 0.0f);
+    }
     CHECK (std::abs (keyToggle (0.75f, 0.25f, 0.75f) - 0.25f) < 1e-6f);
     CHECK (std::abs (keyToggle (0.25f, 0.25f, 0.75f) - 0.75f) < 1e-6f);
-    // inverted: Max is the lower value, the toggle still alternates
-    CHECK (std::abs (keyToggle (0.5f, 0.9f, 0.1f) - 0.1f) < 1e-6f && std::abs (keyToggle (0.1f, 0.9f, 0.1f) - 0.9f) < 1e-6f);
+    CHECK (std::abs (keyToggle (0.5f, 0.25f, 0.75f) - 0.25f) < 1e-6f);
+    // inverted: Min is the higher value, the toggle still alternates
+    CHECK (std::abs (keyToggle (0.5f, 0.9f, 0.1f) - 0.9f) < 1e-6f && std::abs (keyToggle (0.9f, 0.9f, 0.1f) - 0.1f) < 1e-6f);
 }
 
 TEST (live190ef_map_button_edges)

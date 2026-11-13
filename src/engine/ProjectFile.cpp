@@ -20,6 +20,7 @@
 #include "core/PluginSubstitutes.h"
 #include "core/ProjectSafety.h"
 #include "core/RemotePlugins.h"
+#include "core/SessionOps.h"
 #include "engine/Text.h"
 
 namespace lynx::ProjectFile
@@ -1559,6 +1560,8 @@ juce::var clipGridToVar (const ClipGrid& grid)
             o->setProperty ("tempo", scene.tempo);
         if (scene.beatsPerBar > 0)
             o->setProperty ("beatsPerBar", scene.beatsPerBar);
+        if (scene.beatsPerBar > 0 && scene.beatUnit != 4) // (round 190em)
+            o->setProperty ("beatUnit", scene.beatUnit);
         scenes.add (juce::var (o.release()));
     }
     root->setProperty ("scenes", scenes);
@@ -1617,6 +1620,7 @@ std::optional<ClipGrid> clipGridFromVar (const juce::var& v, const Song& song)
             scene.colour = (std::uint32_t) (juce::int64) o.getProperty ("colour", 0);
             scene.tempo = (double) o.getProperty ("tempo", 0.0);
             scene.beatsPerBar = (int) o.getProperty ("beatsPerBar", 0);
+            scene.beatUnit = scene.beatsPerBar > 0 ? session::sceneBeatUnit ((int) o.getProperty ("beatUnit", 4)) : 4;
             grid.scenes.push_back (std::move (scene));
         }
     if (const auto* clips = v["clips"].getArray())

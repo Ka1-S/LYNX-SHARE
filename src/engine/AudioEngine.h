@@ -355,10 +355,15 @@ public:
     // Record › Capture MIDI (round 170d, LYNX's own): the last phrase played without recording into the current pattern
     // (core/Recorder.h captureMidi), one undo step. UI thread.
     CaptureResult captureMidi();
-    // Round 190ef (the Clip-launch layout with the clip grid shown, as the reference captures into the Session view): the
-    // same phrase as a new clip in the grid, on `track` in the slot core session::captureSlot picks from `scene`, named
-    // `name`; one undo step. `placed`: the row it took (−1: nothing captured).
-    CaptureResult captureMidiToSlot (int track, int scene, const std::string& name, int& placed);
+    // Round 190ef / 190em (the Clip-launch layout with the clip grid shown, as Live 12.4.16 captures into its Session
+    // view, live check 190ei): the same phrase on `track` (the caller passes the armed track), one undo step.
+    //   - `track` plays a MIDI clip while the transport runs: the notes go INTO that clip; its loop content is unrolled up
+    //     to the bars just played and its start / loop move there (session::captureIntoClip). `into` = true.
+    //   - else a new, unnamed clip in the slot session::captureSlot picks from `scene` (the selected scene), launched at
+    //     once (a stopped transport starts). Played while stopped, the song tempo is set from the phrase first
+    //     (session::phraseTempo).
+    // `placed`: the row written (−1: nothing captured). The notes play on the track's instrument channel.
+    CaptureResult captureMidiToSlot (int track, int scene, int& placed, bool& into);
 
     // Per-insert record arm: each armed insert records its own audio input (Mixer › insert › input source) into
     // its own take (arming one turns audio recording on; disarming the last one turns it off). Not saved.
@@ -660,6 +665,8 @@ public:
     ControllerSeen lastControllerSeen() const noexcept { return controllerSeen; }
     // A controller message as if a device had sent it (tests, --snapshot). Message thread.
     void injectControllerForTest (int cc, int channel, int value, int port = -1);
+    // Round 190em: a played note in the score log (Capture MIDI's source) at a given time (--selftest).
+    void logPlayedNoteForTest (double ms, int channel, int key, float velocity, bool on, double tick = -1.0);
     // Round 190ef, the reference's MIDI Map Mode / Key Map Mode (core/RemoteMap.h). In MIDI Map Mode the controllers and
     // keys received pick the control the map overlay selected instead of moving anything (no mapping acts, no key plays);
     // takeMapCapture gives the last one (once). Message thread.

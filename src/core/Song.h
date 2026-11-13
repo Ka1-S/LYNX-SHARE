@@ -2147,6 +2147,9 @@ struct ClipGridScene
     std::uint32_t colour = 0;
     double tempo = 0.0;   // > 0: the song takes this tempo when the scene is launched
     int beatsPerBar = 0;  // > 0: and this bar length
+    // round 190em: the scene time signature's denominator (Live's field is "n / d"; 1, 2, 4, 8 or 16). The song's meter
+    // is n/4 in LYNX: a launch gives it the same bar length in quarter notes (session::sceneBarBeats)
+    int beatUnit = 4;
     bool operator== (const ClipGridScene&) const = default;
 };
 

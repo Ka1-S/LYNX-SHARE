@@ -89,3 +89,43 @@ activator / solo / arm buttons, double-click on a row to show the device.
 5. Draw Mode: how a step's edges are stored; a click without a drag; fast moves; the step width vs the zoom grid.
 6. Map modes: Live 12's overlay colours; the status-bar text; whether Delete over a selected element removes its
    mapping; a key on a continuous control (toggle between Min and Max?); a controller's threshold on a button.
+
+## 5. Round 190em: what the live check showed, and the changes
+
+Source: live check 190ei on Live 12.4.16 (`/mnt/e/lynx-work/live190ei/ANSWERS.md` section C, `s/notes.md`, shots
+`live-capture-insert-scene-playing.png`, `live-scene-tempo-field-menu.png`, `live-scenes-tempo-sig-on.png`,
+`live-capture-midi-session.png`, `live-capture-into-playing-clip-full.png`, `live-key-toggle-volume.png`,
+`live-key-mappings-list.png`).
+
+- **Capture and Insert Scene** (§4.1): while clips play, the new scene has no name and its fields are off, holds copies
+  of the playing clips, and playback moves to it at once while the transport runs on. LYNX does the same: the playing
+  slots take the new row and their copies the old row, so the player, which follows its slot, never restarts. With
+  nothing playing, Live still inserts an empty scene with the selected scene's name, tempo and signature, and selects
+  it. LYNX does the same; the colour is not copied, because the check did not show it.
+- **Scene fields** (§4.3): the tempo drag is ≈ 2.8 BPM per screen pixel in whole BPM (5 px +14, 10 px +29, 20 px +58,
+  40 px +112). LYNX uses 2.8 per pixel, which comes within 2 BPM of every measured point. The numerator drags at ≈ 4.6
+  per pixel (LYNX caps it at 32). Numerator and denominator are separate drag targets: the left and right halves of
+  "n / d". The denominator's drag rate was not measured, so LYNX's 10 px per step (1, 2, 4, 8, 16) is its own choice.
+  The field's menu has one item, "Return to Default   Del", and Del on a selected field does the same.
+- **Scene denominator**: the scene keeps n / d (.lynx "beatUnit" only when it is not 4; .als TimeSignatureId both
+  ways). LYNX's song meter is n/4, so a launch sets the bar to the same length in quarter notes (6 / 8 → 3 beats).
+  **Approximate.**
+- **Capture MIDI** (§4.4):
+  - Live captures to the armed track, in the selected scene's slot, and launches the clip at once (a stopped transport
+    starts).
+  - Played while stopped, the song tempo is set from the phrase (148.00).
+  - Into a playing clip, the notes are written into it, and its start and loop move to the bar just played, with the
+    old loop unrolled before it.
+  - LYNX does all of this. The tempo estimate is LYNX's own (median gap, least-squares grid fit, folded into
+    [80, 160) BPM) and is **approximate**.
+  - The new clip takes LYNX's default pattern name, as every new MIDI clip in LYNX does, not "<track> <n>". Live leaves
+    it unnamed.
+  - With several armed tracks, LYNX captures into the first one only.
+- **Key on a continuous control** (§4.6): the first press goes to Min (−∞ dB from 0 dB), then Max, then Min. LYNX
+  changed from Max-first to this.
+- **Mapping list**:
+  - Min and Max are shown in the parameter's unit ("−∞ dB", "6.0 dB", "50L"; typed back the same way).
+  - Path is "<track> | Mixer" for the mixer and "<track> | <device>" for device knobs.
+  - Name is "Track Volume", "Track Panning", or "Slot n" for a clip slot.
+- **Not checkable**: the controller threshold on a button (no MIDI controller on the machine). It stays at 64.
+
