@@ -87,7 +87,15 @@ struct GuardFrame
 
 // The armed frame of this thread. The handler reads it, so it must not allocate on first use: Linux' thread_local
 // pointer in the executable is static TLS (initial-exec); macOS' thread_local may allocate lazily, so a pthread key.
-#if defined(__APPLE__)
+// LYNX's exported plugins (this file is in their runtime, cmake/LynxPlugins.cmake, the only build that defines
+// LYNX_EXPORT_VERSION) are modules a host loads with dlopen: there one initial-exec variable makes the module's whole
+// TLS block static (DF_STATIC_TLS), glibc keeps only a small reserve for that, and hosts on glibc 2.35 failed to load
+// the 0.1.27 Linux plugins ("cannot allocate memory in static TLS block", round 190fp). They use the key as well
+// (pthread_getspecific does not allocate; scripts/check-linux-compat.sh fails a plugin that asks for static TLS).
+#if defined(LYNX_EXPORT_VERSION)
+ #define LYNX_GUARD_FRAME_KEY 1
+#endif
+#if defined(__APPLE__) || defined(LYNX_GUARD_FRAME_KEY)
 pthread_key_t frameKey;
 GuardFrame* currentFrame() noexcept { return static_cast<GuardFrame*> (pthread_getspecific (frameKey)); }
 void setCurrentFrame (GuardFrame* f) noexcept { pthread_setspecific (frameKey, f); }
@@ -297,7 +305,7 @@ void installFaultGuard() noexcept
     Dl_info self {};
     if (dladdr (reinterpret_cast<const void*> (&installFaultGuard), &self) != 0)
         ownImage = self.dli_fbase;
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(LYNX_GUARD_FRAME_KEY)
     pthread_key_create (&frameKey, nullptr);
 #endif
     {
