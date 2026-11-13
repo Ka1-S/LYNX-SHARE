@@ -24,10 +24,10 @@ public:
     juce::Array<double> getAvailableSampleRates() override;
     juce::Array<int> getAvailableBufferSizes() override;
 
-    bool open(const juce::BigInteger& inputChannels,
-              const juce::BigInteger& outputChannels,
-              double sampleRate,
-              int bufferSizeSamples) override;
+    juce::String open(const juce::BigInteger& inputChannels,
+                      const juce::BigInteger& outputChannels,
+                      double sampleRate,
+                      int bufferSizeSamples) override;
     void close() override;
     void start(juce::AudioIODeviceCallback* callback) override;
     void stop() override;
@@ -42,6 +42,8 @@ public:
 
 private:
     juce::String deviceName { "AAudio" };
+    void initializeAAudio();
+    void cleanupAAudio();
 
     AAudioStream* inputStream = nullptr;
     AAudioStream* outputStream = nullptr;

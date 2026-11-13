@@ -19,7 +19,11 @@ namespace lynx::engine
 
 AndroidAudioDevice::AndroidAudioDevice() : juce::AudioIODevice("AAudio", "AAudio")
 {
-    AAudio_createStreamBuilder(&builder);
+    aaudio_result_t result = AAudio_createStreamBuilder(&builder);
+    if (result != AAUDIO_OK)
+    {
+        LOGE("Failed to create stream builder: %s", AAudio_convertResultToText(result));
+    }
 }
 
 AndroidAudioDevice::~AndroidAudioDevice()
@@ -61,13 +65,13 @@ juce::Array<int> AndroidAudioDevice::getAvailableBufferSizes()
     return sizes;
 }
 
-bool AndroidAudioDevice::open(const juce::BigInteger& inputChannels,
-                              const juce::BigInteger& outputChannels,
-                              double sampleRate,
-                              int bufferSizeSamples)
+juce::String AndroidAudioDevice::open(const juce::BigInteger& inputChannels,
+                                      const juce::BigInteger& outputChannels,
+                                      double sampleRate,
+                                      int bufferSizeSamples)
 {
     if (isOpened)
-        return true;
+        return {};
 
     numInputChannels = inputChannels.countNumberOfSetBits();
     numOutputChannels = outputChannels.countNumberOfSetBits();
@@ -88,7 +92,7 @@ bool AndroidAudioDevice::open(const juce::BigInteger& inputChannels,
     if (result != AAUDIO_OK)
     {
         LOGE("Failed to open output stream: %s", AAudio_convertResultToText(result));
-        return false;
+        return "Failed to open output stream: " + juce::String(AAudio_convertResultToText(result));
     }
 
     if (numInputChannels > 0)
@@ -101,7 +105,7 @@ bool AndroidAudioDevice::open(const juce::BigInteger& inputChannels,
             LOGE("Failed to open input stream: %s", AAudio_convertResultToText(result));
             AAudioStream_close(outputStream);
             outputStream = nullptr;
-            return false;
+            return "Failed to open input stream: " + juce::String(AAudio_convertResultToText(result));
         }
     }
 
@@ -114,7 +118,7 @@ bool AndroidAudioDevice::open(const juce::BigInteger& inputChannels,
     LOGI("AAudio opened: %d Hz, %d frames, %d in, %d out",
          (int)currentSampleRate, currentBufferSize, numInputChannels, numOutputChannels);
 
-    return true;
+    return {};
 }
 
 void AndroidAudioDevice::close()
