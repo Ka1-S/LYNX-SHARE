@@ -283,6 +283,11 @@ struct SampleData
     // the sample's regions and beats (Fruity Granulizer's slices and tempo sync)
     std::vector<std::int64_t> markerStarts;
     float acidBeats = 0.0f;
+    // round 190ey (live check 190ew SMP-1 / SMP-7): the file's slice markers (FL's ACID "strc" list, its entries after the
+    // first; 0 = none) and its sample format (bits per sample, 0 = unknown; float or integer), as FL's Sampler page shows them
+    int sliceMarkers = 0;
+    int bitsPerSample = 0;
+    bool floatData = false;
     // a sample FL's precomputed effects were applied to (core/SamplePrecompute.h): it holds only the played region,
     // which was [cropFrom, cropTo] of the file (fractions); the sampler maps its Start / End knobs into it
     bool cropped = false;

@@ -99,6 +99,12 @@ public:
     // An audio clip's own audio through its channel's instrument (core renderClipAudio), at the engine's sample rate, with
     // the samples, stretches and plugins the rack uses (round 189l, Make unique as sample). UI thread.
     ClipAudio renderClipAudio (std::size_t clipIndex);
+    // Round 190ey (live check 190ew PL-3): the Playlist clip menu's Preview as FL plays it — the clip through its own
+    // channel, so its mixer insert's effects and meter, from the clip's start to its end (core audioClipNote on the live
+    // note queue). Transport start / stop end it, as does the next preview. False: no audio clip there. UI thread.
+    bool previewClipThroughChannel (std::size_t clipIndex);
+    void stopClipPreview() noexcept;
+    bool isClipPreviewing() const noexcept { return clipPreviewKey >= 0; }
     MeterBank& getMeters() noexcept { return meters; }
     // Tools > Audio logger (REA round 153): records everything the Master plays to a WAV in the background.
     AudioLogger& getAudioLogger();
@@ -1051,6 +1057,8 @@ private:
     std::uint64_t loggedOver = 0, loggedLate = 0;
     double lastLogMs = 0.0;
     class PreviewPlayer* preview = nullptr; // graph node (owned by the graph)
+    int clipPreviewChannel = -1, clipPreviewKey = -1; // the clip previewed through its channel (round 190ey), -1 = none
+    std::uint64_t clipPreviewSerial = 0;
     double previewVolume = 1.0;
     // "Preview in time" (round 190aq)
     bool previewInTime = false;

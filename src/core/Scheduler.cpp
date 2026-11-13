@@ -426,6 +426,50 @@ double hostPositionTick (const Song& song, double tick, std::int64_t songLength)
     return std::fmod (tick, (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar)));
 }
 
+// An audio clip's note (round 190ey: out of scheduleClip, so a Playlist preview plays the clip through its channel the
+// same way, AudioEngine::previewClipThroughChannel): the "on" at the clip's start.
+NoteEvent audioClipNote (const Song& song, const Clip& clip, std::size_t clipIndex, double tps) noexcept
+{
+    const auto secondsPerTick = 60.0 / (std::max (song.bpm, 1.0) * ppq);
+    NoteEvent e;
+    e.channel = clip.channel;
+    e.key = audioClipKey (clipIndex);
+    e.velocity = clip.gain;
+    e.pan = clip.pan;
+    e.fadeIn = (float) ((double) clip.effectiveFadeIn() / tps);
+    e.fadeOut = (float) ((double) clip.effectiveFadeOut() / tps);
+    e.fadeShape = (std::uint16_t) ((clip.crossfadeIn > 0 || (clip.fadeIn > 0 && (clip.linearFades & 1) == 0) ? 1 : 0)
+                                   | (clip.crossfadeOut > 0 || (clip.fadeOut > 0 && (clip.linearFades & 2) == 0) ? 2 : 0)
+                                   | (clip.reversed ? 4 : 0)
+                                   // a comp crossfade (round 177c): the equal-power curve, which wins over bits 0 / 1
+                                   | ((clip.fadeCurve & 1) != 0 ? 8 : 0) | ((clip.fadeCurve & 2) != 0 ? 16 : 0));
+    // an automatic crossfade, or a comp crossfade, has no tension of its own here
+    e.fadeInTension = clip.crossfadeIn > 0 || (clip.fadeCurve & 1) != 0 ? 0.0f : clip.fadeInTension;
+    e.fadeOutTension = clip.crossfadeOut > 0 || (clip.fadeCurve & 2) != 0 ? 0.0f : clip.fadeOutTension;
+    e.clipPitch = clip.pitch; // FL 2026's clip pitch (round 167k): shifted, the clip's length stays
+    e.clipStretch = (float) clip.stretch; // FL 2026's clip stretch (round 167l)
+
+    // FL's per-clip edge declicker (round 189i, clipops::declickChoice): a Disabled side plays without the channel's
+    // declicker, a manual side neither. FL /R renders (round 189l): a side FL marks as joined seamlessly (choice 1)
+    // still takes it, so two clips that continue each other crossfade through the release and the attack
+    const auto declickBits = [&]
+    {
+        std::uint16_t bits = 0;
+        for (int side = 0; side < 2; ++side)
+        {
+            const auto off = clipops::declickChoice (clip, side) == clipops::declickDisabled;
+            bits |= (std::uint16_t) ((off ? (side == 0 ? 32 : 64) : 0) | (clipops::manualFade (clip, side) ? (side == 0 ? 128 : 256) : 0));
+        }
+        return bits;
+    };
+    e.fadeShape |= declickBits();
+    e.type = NoteEvent::Type::on;
+    e.startSeconds = std::max (0.0, ((double) clip.offset + (double) clip.offsetFraction) * secondsPerTick);
+    e.clipElapsed = 0.0f;
+    e.clipRemaining = (float) ((double) clip.length / std::max (1.0e-12, tps));
+    return e;
+}
+
 namespace
 {
 // One clip of the Playlist (or a performance-mode launch, played as a clip of its own), its events in the block.
@@ -444,41 +488,10 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         if (clip.channel < 0 || clip.channel >= (int) song.channels.size() || clip.length <= 0)
             return;
 
-        NoteEvent e;
-        e.channel = clip.channel;
-        e.key = audioClipKey (clipIndex);
-        e.velocity = clip.gain;
-        e.pan = clip.pan;
-        e.fadeIn = (float) ((double) clip.effectiveFadeIn() / tps);
-        e.fadeOut = (float) ((double) clip.effectiveFadeOut() / tps);
-        e.fadeShape = (std::uint16_t) ((clip.crossfadeIn > 0 || (clip.fadeIn > 0 && (clip.linearFades & 1) == 0) ? 1 : 0)
-                                       | (clip.crossfadeOut > 0 || (clip.fadeOut > 0 && (clip.linearFades & 2) == 0) ? 2 : 0)
-                                       | (clip.reversed ? 4 : 0)
-                                       // a comp crossfade (round 177c): the equal-power curve, which wins over bits 0 / 1
-                                       | ((clip.fadeCurve & 1) != 0 ? 8 : 0) | ((clip.fadeCurve & 2) != 0 ? 16 : 0));
-        // an automatic crossfade, or a comp crossfade, has no tension of its own here
-        e.fadeInTension = clip.crossfadeIn > 0 || (clip.fadeCurve & 1) != 0 ? 0.0f : clip.fadeInTension;
-        e.fadeOutTension = clip.crossfadeOut > 0 || (clip.fadeCurve & 2) != 0 ? 0.0f : clip.fadeOutTension;
-        e.clipPitch = clip.pitch; // FL 2026's clip pitch (round 167k): shifted, the clip's length stays
-        e.clipStretch = (float) clip.stretch; // FL 2026's clip stretch (round 167l)
-
-        // FL's per-clip edge declicker (round 189i, clipops::declickChoice): a Disabled side plays without the channel's
-        // declicker, a manual side neither. FL /R renders (round 189l): a side FL marks as joined seamlessly (choice 1)
-        // still takes it, so two clips that continue each other crossfade through the release and the attack
-        const auto declickBits = [&]
-        {
-            std::uint16_t bits = 0;
-            for (int side = 0; side < 2; ++side)
-            {
-                const auto off = clipops::declickChoice (clip, side) == clipops::declickDisabled;
-                bits |= (std::uint16_t) ((off ? (side == 0 ? 32 : 64) : 0) | (clipops::manualFade (clip, side) ? (side == 0 ? 128 : 256) : 0));
-            }
-            return bits;
-        };
+        auto e = audioClipNote (song, clip, clipIndex, tps);
 
         if (resume && loopStart > (double) clip.start && loopStart < (double) clip.end())
         {
-            e.fadeShape |= declickBits();
             e.type = NoteEvent::Type::on;
             e.sampleOffset = 0;
             e.startSeconds = ((double) clip.offset + (double) clip.offsetFraction + loopStart - (double) clip.start) * secondsPerTick;
@@ -490,7 +503,6 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         if (! overlaps ((double) clip.start, (double) clip.end() + 1.0))
             return;
 
-        e.fadeShape |= declickBits();
         e.type = NoteEvent::Type::on;
         e.startSeconds = std::max (0.0, ((double) clip.offset + (double) clip.offsetFraction) * secondsPerTick);
         e.clipElapsed = 0.0f;

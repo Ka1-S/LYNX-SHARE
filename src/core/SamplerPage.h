@@ -10,7 +10,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <string>
 #include <utility>
+#include <vector>
 
 #ifndef TR_NOOP
  #define TR_NOOP(text) text // marks a literal for translation (tools/i18n_keys.py scans core too)
@@ -24,6 +27,15 @@ namespace lynx::samplerpage
 inline double mulFactor (int mul) noexcept
 {
     return std::pow (2.0, (double) std::clamp (mul, -20000, 20000) / 10000.0);
+}
+
+// MUL's value text (live check 190ew SMP-5: FL's hint reads "Time stretch (multiplicator): 105.70%"): the factor in
+// percent with two decimals
+inline std::string mulText (int mul)
+{
+    char text[32];
+    std::snprintf (text, sizeof (text), "%.2f%%", mulFactor (mul) * 100.0);
+    return text;
 }
 
 // The TIME knob (beats): the length without MUL's factor (SamplerSettings::stretchBeats is TIME × factor)
@@ -205,12 +217,21 @@ inline void setLoopEnd (SamplerSettings& s, std::int64_t frame, std::int64_t fra
 
 // ---- Precomputed effects: CROSSFADE (FL's FXAttackWheelChange 0xf66590) ----
 
-// CROSSFADE above 0 switches "Use loop points" on when it is off
-inline void turnCrossfade (SamplerSettings& s, int value) noexcept
+// CROSSFADE above 0 switches "Use loop points" on when it is off. Live check 190ew SMP-4: on a sample with no loop (no
+// loop knob points, no loop in the file) FL also sets END to the sample's end, START staying at 0, so the whole sample
+// loops (`frames` = the sample's length, 0 = unknown: no loop is made; the file's loop as fileLoopStart / fileLoopEnd,
+// end exclusive, −1 = none).
+inline void turnCrossfade (SamplerSettings& s, int value, std::int64_t frames = 0, std::int64_t fileLoopStart = -1,
+                           std::int64_t fileLoopEnd = -1) noexcept
 {
+    const auto before = s.precompute.crossfade;
     s.precompute.crossfade = std::clamp (value, 0, 2048);
-    if (s.precompute.crossfade > 0)
-        s.useLoopPoints = true;
+    if (s.precompute.crossfade <= 0)
+        return;
+    s.useLoopPoints = true;
+    const auto fileLoop = fileLoopStart >= 0 && fileLoopEnd > fileLoopStart;
+    if (before <= 0 && frames > 1 && ! s.hasLoopOverride() && ! fileLoop)
+        s.loopStart = 0, s.loopEnd = frames - 1;
 }
 
 // ---- Content / Declicking mode ----
@@ -238,6 +259,81 @@ inline void setContentFlags (SamplerSettings& s, int flags) noexcept
     s.loadSliceMarkers = (flags & 4) != 0;
     s.useLoopPoints = (flags & 8) != 0;
     s.keepOnDisk = (flags & 0x100) != 0;
+}
+
+// Live check 190ew SMP-1 / SMP-2: FL greys the whole Content box while no sample is loaded; "Resample" when the sample
+// already plays at the project's rate (enabled for a 48 kHz sample in a 44.1 kHz project, greyed for 44.1 kHz ones);
+// "Load regions" / "Load slice markers" when the file has no regions / no ACID slice markers
+inline bool resampleAvailable (bool hasSample, double sampleRate, double projectRate) noexcept
+{
+    return hasSample && sampleRate > 0.0 && projectRate > 0.0 && std::abs (sampleRate - projectRate) > 0.5;
+}
+inline bool loadRegionsAvailable (bool hasSample, bool hasRegions) noexcept { return hasSample && hasRegions; }
+inline bool loadSliceMarkersAvailable (bool hasSample, bool hasSliceMarkers) noexcept { return hasSample && hasSliceMarkers; }
+
+// The number in the waveform's bottom-right box (live check 190ew SMP-7b): the sample's bit depth, "16" for a 16-bit
+// wav and "32" once FL has precomputed it (a crossfade or Normalize, any of the precomputed effects). 0 = no box.
+inline int bitDepthShown (int fileBits, bool precomputed) noexcept
+{
+    if (precomputed)
+        return 32;
+    return std::max (0, fileBits);
+}
+
+// FL's hint over the waveform (live check 190ew SMP-7): "44100Hz, 16Bit int stereo, 0:263, in RAM" — the rate, the
+// format, the length as seconds:milliseconds and where the sample is kept
+inline std::string sampleSummary (double sampleRate, int bits, bool floatData, bool stereo, double seconds, bool onDisk)
+{
+    const auto ms = (long long) std::llround (std::max (0.0, seconds) * 1000.0);
+    char text[128];
+    std::snprintf (text, sizeof (text), "%dHz, %dBit %s %s, %lld:%03lld, %s", (int) std::lround (sampleRate), std::max (0, bits),
+                   floatData ? "float" : "int", stereo ? "stereo" : "mono", ms / 1000, ms % 1000, onDisk ? "on disk" : "in RAM");
+    return text;
+}
+
+// The waveform's right-click menu (live check 190ew SMP-7, FL 2026 shot), in FL's order. `have` = whether LYNX performs
+// it; the page shows only those (no dead stubs) and keeps FL's lines between the groups. (The ones LYNX leaves out are
+// not marked for translation: they are never shown.)
+struct WaveMenuEntry
+{
+    const char* text; // nullptr = a line
+    bool have = true;
+    const char* shortcut = "";
+};
+inline std::vector<WaveMenuEntry> waveMenu()
+{
+    return { { TR_NOOP ("Reload") },
+             { TR_NOOP ("Save as...") },
+             { TR_NOOP ("Locate file") },
+             { TR_NOOP ("Copy audio to clipboard"), true, "Ctrl+C" },
+             { TR_NOOP ("Paste audio from clipboard"), true, "Ctrl+V" },
+             { nullptr },
+             { TR_NOOP ("Edit in audio editor"), true, "Ctrl+E" },
+             { "Edit in pitch corrector", false },  // (FL: Newtone; LYNX has no pitch corrector editor)
+             { "Edit in time warper", false },      // (FL: Newtime)
+             { nullptr },
+             { TR_NOOP ("Open in new sampler channel") },
+             { TR_NOOP ("Open in new Fruity Granulizer channel") },
+             // (Fruity Slicer / Slicex slice the file as their editors load it: not reachable from here yet; no Slicer 2)
+             { "Open in new Fruity Slicer channel", false },
+             { "Open in new Fruity Slicer 2 channel", false },
+             { "Open in new Slicex channel", false },
+             { nullptr },
+             { TR_NOOP ("Detect tempo") },
+             { "Get properties", false }, // (FL's properties dialog: not built)
+             { nullptr },
+             { "Spectrum view", false },              // (FL's faded ticks: display modes LYNX's page doesn't have)
+             { "Multichannel waveform view", false } };
+}
+
+// Remove sample (live check 190ew CTL-4): FL clears the sample and renames the channel "Sampler" without asking
+inline void removeSample (ChannelDef& d)
+{
+    d.samplePath.clear();
+    d.zones.clear();
+    d.sampler.slices.clear();
+    d.sampler.loopStart = d.sampler.loopEnd = -1;
+    d.name = "Sampler";
 }
 
 // FL greys "Keep on disk" while a loop plays (FL's FUN_00f5d2c0: Use loop points on and a loop in the sample): a

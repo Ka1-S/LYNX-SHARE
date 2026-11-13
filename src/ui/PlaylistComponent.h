@@ -137,7 +137,8 @@ public:
     // in FL's order, FL 2026 shots f04 / f06), for the Playlist's options menu and its right-click menu.
     juce::PopupMenu editMenu();
     // FL's fade handle menu for an audio clip's fade in (side 0) / out (1) (round 189i; shown by a right-click on the handle)
-    juce::PopupMenu fadeHandleMenu (int index, int side);
+    // `clipMenu` (round 190ey): the clip menu's "Fade in / out curve" submenu (core flclipmenu::fadeCurve)
+    juce::PopupMenu fadeHandleMenu (int index, int side, bool clipMenu = false);
     // FL's gain handle menu of clip `index` (round 166e; Normalize items round 189n): what showGainMenu opens; public for
     // --snapshot, which also sets the selection it reads (selectForSnapshot)
     juce::PopupMenu gainMenu (int index);
@@ -441,7 +442,7 @@ private:
     juce::PopupMenu buildAudioClipMenu (int index, int mouseX);
     std::function<void (float, bool)> clipFitter (int index, std::shared_ptr<const SampleData> sample);
     juce::PopupMenu fitToTempoMenu (int index, std::shared_ptr<const SampleData> sample);
-    juce::PopupMenu detectTempoMenu (int index, std::shared_ptr<const SampleData> sample);
+    void showDetectTempo (int index, std::shared_ptr<const SampleData> sample);
     void duplicateSelection();
     void seekTo (int x, bool snapOn = true); // Alt held while scrubbing: snapOn false (free position, FL)
     void paintAudioClip (juce::Graphics& g, const Clip& clip, juce::Rectangle<float> bounds);

@@ -1276,6 +1276,13 @@ WavExtras decodeWavExtras (const std::uint8_t* data, std::size_t size, std::int6
             const auto beats = get32 (data + body + 12);
             x.acidBeats = beats > 0 && beats < 65536 ? (float) beats : 0.0f;
         }
+        // FL's slice list (round 190aj layout: u32, u32 count = regions + 1, 20 header bytes, 24-byte entries; the first
+        // entry is no slice): what FL's Sampler page calls the sample's slice markers (round 190ey, live check 190ew SMP-1)
+        if (std::memcmp (data + p, "strc", 4) == 0 && len >= 28)
+        {
+            const auto count = get32 (data + body + 4);
+            x.sliceMarkers = count > 1 && count < 65536 ? (int) count - 1 : 0;
+        }
         p = body + len + (len & 1);
     }
     return x;

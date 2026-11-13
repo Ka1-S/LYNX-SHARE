@@ -357,7 +357,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     multilinkButton.setWantsKeyboardFocus (false);
     multilinkButton.onClick = [this] { runAction ("options.multilink"); };
     multilinkButton.onRightClick = [this] {
-        auto menu = multilinkButtonMenu (engine); // (round 190df: FL's menu, then LYNX's own items)
+        auto menu = getMultilinkMenuForSnapshot();
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&multilinkButton));
     };
 
@@ -461,6 +461,19 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     locateInBrowserHandler() = [this] (const juce::File& file) { // (the sampler's File row, round 190df)
         showPanel (Panel::browser);
         browser.locateFile (file);
+    };
+    // the Sampler waveform menu's "Open in new sampler channel" / "... Fruity Granulizer channel" (round 190ey): the file in
+    // a new channel of that kind (as the audio clip menu's Open in a new Sampler channel), its editor open
+    openInNewChannelHandler() = [this] (const juce::File& file, InstrumentKind kind) {
+        if (! file.existsAsFile())
+            return;
+        ChannelDef c;
+        c.instrument = kind;
+        audioclips::loadSampleInto (c, file.getFullPathName().toStdString(), file.getFileNameWithoutExtension().toStdString());
+        c.instrument = kind; // (loadSampleInto keeps the Granulizer; a sampler stays one)
+        const auto added = rack.addChannel (c, false);
+        showPanel (Panel::channelRack);
+        rack.toggleEditor (added, false);
     };
     mixer.onInstrumentDropped = [this] (int insert, ChannelDef c) { rack.addChannel (std::move (c), true, insert); };
     rackViewport.setViewedComponent (&rack, false);
@@ -933,6 +946,7 @@ MainComponent::~MainComponent()
     mixerinput::openAudioSettings = nullptr;
     openMixerInsertHandler() = nullptr;
     locateInBrowserHandler() = nullptr;
+    openInNewChannelHandler() = nullptr;
     PatcherWindows::onBrowsePluginDatabase = nullptr;
     EditorGlobals::get().onOptionsChanged = nullptr;
     PianoRollComponent::shortcutText = nullptr;
@@ -7895,22 +7909,34 @@ juce::PopupMenu MainComponent::makeLastTweakedMenu (int which)
     const auto valueNow = describeTargetValue (engine, *target); // (round 162d: with its value, as the read-out shows it)
     ui::addItemHeader (menu, tr ("Parameter"), describeAutomationTarget (engine, *target) + (valueNow.isNotEmpty() ? ": " + valueNow : juce::String()),
                        juce::Colours::transparentBlack);
-    const auto& song = engine.getSong();
-    int clip = -1;
-    for (int a = 0; a < (int) song.automations.size(); ++a)
-        if (song.automations[(std::size_t) a].target == *target)
-            clip = a;
-    juce::ignoreUnused (clip);
-    addAutomationItem (menu, engine, *target, true);
+    addLastTweakedItems (menu, *target);
+    return menu;
+}
+
+juce::PopupMenu MainComponent::getMultilinkMenuForSnapshot()
+{
+    // (round 190df: FL's menu, then LYNX's own items; round 190ey: with multilink off, the last tweaked control's own
+    // menu as FL's left column, captioned with its name)
+    return multilinkButtonMenu (engine, [this] (juce::PopupMenu& column) {
+        if (const auto target = engine.getLastTweaked (0))
+        {
+            column.addSectionHeader (describeAutomationTarget (engine, *target));
+            addLastTweakedItems (column, *target);
+        }
+    });
+}
+
+void MainComponent::addLastTweakedItems (juce::PopupMenu& menu, const AutomationTarget& target)
+{
+    addAutomationItem (menu, engine, target, true);
     menu.addSectionHeader (tr ("Value"));
-    const auto value = engine.currentTargetValue (*target);
+    const auto value = engine.currentTargetValue (target);
     menu.addItem (tr ("Copy value"), value >= 0.0f, false, [value] { lastTweakedClipboard() = value; });
-    menu.addItem (tr ("Paste value"), lastTweakedClipboard() >= 0.0f, false, [this, t = *target] { setTweakedValue (t, lastTweakedClipboard()); });
-    menu.addItem (tr ("Type in value..."), value >= 0.0f, false, [this, t = *target, value] {
+    menu.addItem (tr ("Paste value"), lastTweakedClipboard() >= 0.0f, false, [this, t = target] { setTweakedValue (t, lastTweakedClipboard()); });
+    menu.addItem (tr ("Type in value..."), value >= 0.0f, false, [this, t = target, value] {
         auto spec = ui::percentSpec (describeAutomationTarget (engine, t), value);
         ui::typeValue (*this, spec, value, [this, t] (double v) { setTweakedValue (t, (float) v); });
     });
-    return menu;
 }
 
 float& MainComponent::lastTweakedClipboard()

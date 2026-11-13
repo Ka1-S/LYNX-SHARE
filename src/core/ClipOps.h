@@ -929,7 +929,22 @@ inline AutomationTarget automateTarget (const Song& song, int clip, AutomateWhat
     return t;
 }
 
+// The new clip's name (live check 190ew PL-1 / PL-2): "<channel> - Volume multiplier", and " #2", " #3"... when clips of
+// that target already exist (FL: "Amount Too - Bass - Volume multiplier #2")
+inline std::string automateName (const Song& song, const AutomationTarget& target, const std::string& base)
+{
+    int same = 0;
+    for (const auto& a : song.automations)
+        if (a.target == target && ! a.isLive())
+            ++same;
+    return same == 0 ? base : base + " #" + std::to_string (same + 1);
+}
+
 // Adds that automation clip (named `name`); returns the new automation's index, −1 when `clip` is no audio clip.
+// (Live check 190ew PL-1: FL makes the new clip the Playlist's current clip, the UI's part.) Live check 190ew PL-2: FL's
+// Volume clip plays unity whatever the Levels VOL is (its range top at unity, the line at the top); LYNX keeps the line at
+// the channel's actual level (147 % stays 147 %: nothing jumps when the clip starts), as round 190ey's brief asks.
+
 inline int automateAudioClip (Song& song, int clip, AutomateWhat what, const std::string& name)
 {
     const auto target = automateTarget (song, clip, what);

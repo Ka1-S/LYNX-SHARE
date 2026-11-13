@@ -39,7 +39,9 @@ bool remoteControlPanelFinished (juce::Component& panel);           // the last 
 void addMultilinkControlsItems (juce::PopupMenu& menu, AudioEngine& engine);
 // The Multilink button's right-click menu: FL's items above, then LYNX's own "Link to controller" / "Override global
 // links" (one-step linking of the queued controls, round 177b-4) below a line
-juce::PopupMenu multilinkButtonMenu (AudioEngine& engine);
+// (round 190ey, live check 190ew CTL-1: with multilink off and a last tweaked control, `lastTweakedColumn` fills FL's
+// left column, that control's own menu; LYNX's one-step items show only while multilink is on)
+juce::PopupMenu multilinkButtonMenu (AudioEngine& engine, const std::function<void (juce::PopupMenu&)>& lastTweakedColumn = {});
 // What one of its items does (seed: Randomize / Humanize's random numbers, 0 = from the clock; for the shot checks)
 void runMultilinkAction (AudioEngine& engine, mlmenu::Action action, const std::vector<AutomationTarget>& targets, std::uint32_t seed);
 std::vector<AutomationTarget> multilinkMenuTargets (AudioEngine& engine);

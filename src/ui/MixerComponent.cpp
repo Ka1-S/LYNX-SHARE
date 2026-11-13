@@ -7172,25 +7172,31 @@ void warnDoubleMonitoring (AudioEngine& engine, int track)
 
 // FL's question when an external input is chosen on an insert that records more than it (core/LiveInput.h
 // asksExternalInputOnly, issue #152): Yes = "External input only", so the take holds the input alone.
-void askExternalInputOnly (AudioEngine& engine, int track)
+// Live check 190ew ISS152-1: only when the insert had no input before (`inputBefore`), in FL's message window with its
+// "Remember my choice" box (a remembered Yes switches without asking; Settings › Manage messages shows it again).
+void askExternalInputOnly (AudioEngine& engine, int track, int inputBefore)
 {
     const auto& mixer = engine.getSong().mixer;
     if (track < 0 || track >= (int) mixer.size())
         return;
     const auto& mt = mixer[(std::size_t) track];
-    if (! asksExternalInputOnly (track, mt.inputChannel, mt.recordSource))
+    if (! asksExternalInputOnly (track, inputBefore, mt.inputChannel, mt.recordSource))
         return;
-    auto options = juce::MessageBoxOptions()
-                       .withIconType (juce::MessageBoxIconType::QuestionIcon)
-                       .withTitle (tr ("External input"))
-                       .withMessage (tr ("You've selected an external input. Do you want to switch to \"External input only\" to avoid recording "
-                                         "internal audio on this track?"))
-                       .withButton (tr ("Yes"))
-                       .withButton (tr ("No"));
-    juce::AlertWindow::showAsync (options, [&engine, track] (int result) {
-        if (result == 1)
-            engine.setInsertRecordSource (track, RecordSource::externalInput);
-    });
+    if (! messages::shown ("RecAutoSwitchExternalInput"))
+    {
+        engine.setInsertRecordSource (track, RecordSource::externalInput);
+        return;
+    }
+    // (FL marks "External input only" in its accent colour: the |bars| of its own string)
+    showFlMessage ({ tr ("External input"), tr ("You've selected an external input. Do you want to switch to |External input only| to avoid recording internal audio on this track?"),
+                     { tr ("Yes"), tr ("No") }, true },
+                   [&engine, track] (int button, bool remember) {
+                       if (button != 1)
+                           return;
+                       if (remember)
+                           messages::setShown ("RecAutoSwitchExternalInput", false);
+                       engine.setInsertRecordSource (track, RecordSource::externalInput);
+                   });
 }
 
 void showMenu (AudioEngine& engine, int track, juce::Component* target, std::function<void()> chosen)
@@ -7235,10 +7241,10 @@ void showMenu (AudioEngine& engine, int track, juce::Component* target, std::fun
             menu.addSeparator(); // pairs, then single channels
         const auto ticked = mt.inputChannel == source.channel && mt.inputStereo == source.stereo;
         menu.addItem (juce::String::fromUTF8 (source.name.c_str()) + (source.stereo ? "" : "  " + tr ("(mono)")), true, ticked,
-                      [&engine, track, source, chosen] {
+                      [&engine, track, source, chosen, before = mt.inputChannel] {
                           engine.setInsertInput (track, source.channel, source.stereo);
                           warnDoubleMonitoring (engine, track);
-                          askExternalInputOnly (engine, track);
+                          askExternalInputOnly (engine, track, before);
                           if (chosen)
                               chosen();
                       });

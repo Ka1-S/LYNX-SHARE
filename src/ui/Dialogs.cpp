@@ -878,7 +878,10 @@ namespace messages
 const std::vector<Entry>& all()
 {
     // FL's entries LYNX shows (the rest of FL's list belongs to features with their own setting in LYNX)
-    static const std::vector<Entry> entries { { "DeleteMixerTrack", TR_NOOP ("Delete mixer track"), TR_NOOP ("File/Data") } };
+    // (round 190ey: FL's "RecAutoSwitchExternalInput", the External input question of issue #152; its heading "Audio" is
+    // inferred from FL's table order, not decoded)
+    static const std::vector<Entry> entries { { "DeleteMixerTrack", TR_NOOP ("Delete mixer track"), TR_NOOP ("File/Data") },
+                                              { "RecAutoSwitchExternalInput", TR_NOOP ("Auto switch to external input only"), TR_NOOP ("Audio") } };
     return entries;
 }
 
