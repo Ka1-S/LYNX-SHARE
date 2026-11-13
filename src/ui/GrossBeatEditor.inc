@@ -703,11 +703,7 @@
         static const char* const levels[3] { TR_NOOP ("Off"), TR_NOOP ("Low (drums)"), TR_NOOP ("High (melodic)") };
         for (int i = 0; i < 3; ++i)
         {
-            juce::PopupMenu::Item item (tr (levels[i]));
-            item.setTicked (level == i);
-            item.setAction ([option, i] { option (8, (std::uint8_t) i); });
-            item.isRadioButton = true;
-            click.addItem (std::move (item));
+            click.addItem (tr (levels[i]), true, level == i, [option, i] { option (8, (std::uint8_t) i); });
         }
         menu.addSubMenu (tr ("Click reduction"), click);
         toggle (menu, tr ("Smoothing attack compensation"), 5);
