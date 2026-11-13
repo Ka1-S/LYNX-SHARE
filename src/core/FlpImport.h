@@ -60,6 +60,10 @@ struct FlpImportOptions
     // Samples the user located (the "Missing files" window): saved path (FL's variables resolved) → file to use instead.
     std::map<std::string, std::string> relocations;
 
+    // Round 190fn (O1): the user's own copies of FL Studio Mobile's "Resources" folder, for the FL Studio Mobile Rack
+    // generator's factory content (FL's copy in its install folder is searched after these)
+    std::vector<std::string> flmResourceRoots;
+
     bool threeOscAsSynth = false; // 3x Osc → the built-in synth conversion instead of FL's engine (the synth's preset menu)
     bool fpcAsPads = false;       // FPC → one sampler channel per pad (the import before round 190q) instead of one FPC channel
     bool fpcAsChannel = false;    // FPC → always one FPC channel, also a kit with pads on other inserts or without a sample

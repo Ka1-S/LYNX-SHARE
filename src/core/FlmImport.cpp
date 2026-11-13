@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <deque> // round 190dw item 4
 #include <functional>
@@ -13,6 +14,7 @@
 #include "core/FlmDwSampler.h"
 #include "core/FlmSlicer.h"
 #include "core/SoundLibrary.h"
+#include "core/Effects.h" // round 190fn: makeEffectSlot (the Rack FX container)
 #include "core/FlmEffects.h"
 #include "core/FlmNoteFx.h"
 #include "core/FlmPad.h"
@@ -63,6 +65,51 @@ std::string moduleLabel (std::uint32_t type)
     return name != nullptr ? std::string (name) : "Module #" + std::to_string (type);
 }
 
+// META's dates, "YYYY-MM-DD HH-MM-SS" as the device wrote them → seconds since 1970 (the file has no time zone: read as
+// UTC), 0 when the text is not such a date (round 190fn)
+double flmDateSeconds (const std::string& text)
+{
+    int y = 0, mo = 0, d = 0, h = 0, mi = 0, se = 0;
+    if (std::sscanf (text.c_str(), "%d-%d-%d %d-%d-%d", &y, &mo, &d, &h, &mi, &se) != 6 || y < 1970 || y > 9999 || mo < 1 || mo > 12 || d < 1
+        || d > 31 || h < 0 || h > 23 || mi < 0 || mi > 59 || se < 0 || se > 60)
+        return 0.0;
+    // days from 1970-01-01 (the civil-calendar formula)
+    const auto yy = (long long) y - (mo <= 2 ? 1 : 0);
+    const auto era = (yy >= 0 ? yy : yy - 399) / 400;
+    const auto yoe = yy - era * 400;
+    const auto doy = (153LL * (mo + (mo > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+    const auto doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    const auto days = era * 146097 + doe - 719468;
+    return (double) (days * 86400LL + h * 3600LL + mi * 60LL + se);
+}
+
+// "5.1.0" vs "5.0.4": whether `version` is newer (dot-separated numbers; text that is not a version is never newer)
+bool flmVersionNewer (const std::string& version, const std::string& known)
+{
+    const auto parts = [] (const std::string& v) {
+        std::vector<int> out;
+        int n = -1;
+        for (const auto ch : v)
+        {
+            if (ch >= '0' && ch <= '9')
+                n = (n < 0 ? 0 : n) * 10 + (ch - '0');
+            else if (ch == '.' && n >= 0)
+                out.push_back (n), n = -1;
+            else
+                return std::vector<int> {};
+            if (n > 100000)
+                return std::vector<int> {};
+        }
+        if (n >= 0)
+            out.push_back (n);
+        return out;
+    };
+    const auto a = parts (version), b = parts (known);
+    if (a.empty() || b.empty())
+        return false;
+    return std::lexicographical_compare (b.begin(), b.end(), a.begin(), a.end());
+}
+
 struct Ctx
 {
     const FlmImportOptions& options;
@@ -73,7 +120,38 @@ struct Ctx
     int cutGroups = 0;    // cut-group ids handed out (drum pads, round 190bs)
     int stepsPerBeat = 4; // TDIV's second byte (the song's +0xa9): the grid's steps per beat, and 384 / it = the modules' tick rate
 
-    explicit Ctx (const FlmImportOptions& o) : options (o), report (o.common.report) {}
+    explicit Ctx (const FlmImportOptions& o) : options (o), report (o.common.report)
+    {
+        // round 190fn (O1): the user's own resources folders first, then FL's copy
+        for (const auto& r : o.userResourceRoots)
+            if (! r.empty() && std::find (resourceRoots.begin(), resourceRoots.end(), r) == resourceRoots.end())
+                resourceRoots.push_back (r);
+        if (! o.resourceRoot.empty() && std::find (resourceRoots.begin(), resourceRoots.end(), o.resourceRoot) == resourceRoots.end())
+            resourceRoots.push_back (o.resourceRoot);
+    }
+
+    std::vector<std::string> resourceRoots; // where "@R@" paths may live, in search order
+
+    // "@R@" + rel in every resources folder, in search order
+    std::vector<std::string> inResources (const std::string& rel) const
+    {
+        std::vector<std::string> out;
+        for (const auto& r : resourceRoots)
+            out.push_back (joinPath (r, rel));
+        return out;
+    }
+
+    // the first resources folder that holds every one of `files` ("" = none)
+    std::string resourceRootWith (std::initializer_list<std::string> files) const
+    {
+        const auto& exists = options.common.fileExists;
+        if (! exists)
+            return {};
+        for (const auto& r : resourceRoots)
+            if (std::all_of (files.begin(), files.end(), [&] (const std::string& f) { return exists (joinPath (r, f)); }))
+                return r;
+        return {};
+    }
 
     void note (std::map<std::string, int> FlpImportReport::* list, const std::string& what)
     {
@@ -129,8 +207,9 @@ struct Ctx
             const auto at = p.find (marker);
             return at == std::string::npos ? std::string() : p.substr (at + marker.size());
         };
-        if (const auto r = below ("/Resources/"); ! r.empty() && ! options.resourceRoot.empty())
-            out.push_back (joinPath (options.resourceRoot, r));
+        if (const auto r = below ("/Resources/"); ! r.empty())
+            for (const auto& c : inResources (r))
+                out.push_back (c);
         for (const auto* marker : { "/com.imageline.FLM/files/", "/LocalState/" })
             if (const auto r = below (marker); ! r.empty())
                 out.push_back (joinPath (options.common.projectFolder, r));
@@ -144,7 +223,12 @@ struct Ctx
         if (! s.path.empty())
         {
             if (s.root == "@R@")
-                candidates.push_back (options.resourceRoot.empty() ? std::string() : joinPath (options.resourceRoot, s.path));
+            {
+                const auto in = inResources (s.path);
+                if (in.empty())
+                    candidates.push_back ({}); // (no resources folder: reported under the saved path)
+                candidates.insert (candidates.end(), in.begin(), in.end());
+            }
             else
                 candidates.push_back (joinPath (folder, s.path)); // "@L@" (and a file without a root)
         }
@@ -155,7 +239,17 @@ struct Ctx
         candidates.push_back (s.savedPath);
         if (const auto name = pathFileName (s.path.empty() ? s.savedPath : s.path); ! name.empty())
             candidates.push_back (joinPath (folder, name));
-        return resolve (candidates, user);
+        return resolvedOrFlagged (resolve (candidates, user), s.root);
+    }
+
+    // round 190fn (O1): a factory file ("@R@") that was not found → the report says where to point LYNX at the app's
+    // resources (once per import)
+    bool resourceMissing = false;
+    std::string resolvedOrFlagged (std::string found, const std::string& root)
+    {
+        if (found.empty() && root == "@R@")
+            resourceMissing = true;
+        return found;
     }
 };
 
@@ -369,8 +463,8 @@ bool miniSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     if (m.params.size() < 44 || ! o.fileExists)
         return false;
     std::vector<std::string> candidates;
-    if (! ctx.options.resourceRoot.empty())
-        candidates.push_back (joinPath (ctx.options.resourceRoot, "oscdata.dat"));
+    for (const auto& r : ctx.inResources ("oscdata.dat"))
+        candidates.push_back (r);
     if (! o.roots.factoryData.empty())
         candidates.push_back (joinPath (o.roots.factoryData, "Plugins/Fruity/Generators/Minisynth/oscdata.dat"));
     std::string oscdata;
@@ -449,7 +543,7 @@ bool gmSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
 {
     namespace gm = gmsmobile;
     const auto& o = ctx.options.common;
-    if (m.params.size() < (std::size_t) gm::paramCount || ! o.fileExists || ctx.options.resourceRoot.empty())
+    if (m.params.size() < (std::size_t) gm::paramCount || ! o.fileExists || ctx.resourceRoots.empty())
         return false;
     gm::Patch patch;
     for (int i = 0; i < gm::paramCount; ++i)
@@ -465,11 +559,13 @@ bool gmSynthState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
         patch.waveA = a;
         patch.waveB = b;
     }
-    const auto& root = ctx.options.resourceRoot;
     const auto waveA = gm::waveFileName (patch.waveA), waveB = gm::waveFileName (patch.waveB);
-    if (waveA.empty() || waveB.empty() || ! o.fileExists (joinPath (root, "FilterTable_Ctf_Res.data"))
-        || ! o.fileExists (joinPath (root, "GMSynthWaveshapes/" + waveA + ".spectra"))
-        || ! o.fileExists (joinPath (root, "GMSynthWaveshapes/" + waveB + ".spectra")))
+    if (waveA.empty() || waveB.empty())
+        return false;
+    // (the engine reads all three files from one folder: the first resources folder that holds them)
+    const auto root = ctx.resourceRootWith ({ "FilterTable_Ctf_Res.data", "GMSynthWaveshapes/" + waveA + ".spectra",
+                                              "GMSynthWaveshapes/" + waveB + ".spectra" });
+    if (root.empty())
         return false;
     auto state = gm::writeState (patch);
     if (! gm::readState (state))
@@ -771,8 +867,11 @@ std::string flmCustomPath (Ctx& ctx, const flm::Module& m, const std::string& ow
     if (rel.empty())
         return {};
     std::vector<std::string> candidates;
-    if (root == "@R@" && ! ctx.options.resourceRoot.empty())
-        candidates.push_back (joinPath (ctx.options.resourceRoot, rel));
+    if (root == "@R@")
+    {
+        for (const auto& r : ctx.inResources (rel))
+            candidates.push_back (r);
+    }
     else if (root == "@L@")
         candidates.push_back (joinPath (ctx.options.common.projectFolder, rel));
     for (const auto& d : ctx.deviceCandidates (rel))
@@ -780,7 +879,7 @@ std::string flmCustomPath (Ctx& ctx, const flm::Module& m, const std::string& ow
     if (root.empty())
         candidates.push_back (rel);
     candidates.push_back (joinPath (ctx.options.common.projectFolder, pathFileName (rel)));
-    return ctx.resolve (candidates, owner);
+    return ctx.resolvedOrFlagged (ctx.resolve (candidates, owner), root);
 }
 // --- end of round 190dw item 4
 
@@ -981,10 +1080,10 @@ bool soundFontState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
         return false;
     std::vector<std::string> candidates = ctx.deviceCandidates (saved);
     const auto file = pathFileName (saved);
-    if (! ctx.options.resourceRoot.empty())
+    for (const auto& r : ctx.resourceRoots)
     {
-        candidates.push_back (joinPath (ctx.options.resourceRoot, saved));
-        candidates.push_back (joinPath (joinPath (ctx.options.resourceRoot, "SoundFonts"), file));
+        candidates.push_back (joinPath (r, saved));
+        candidates.push_back (joinPath (joinPath (r, "SoundFonts"), file));
     }
     candidates.push_back (joinPath (o.projectFolder, file));
     candidates.push_back (saved);
@@ -1115,14 +1214,16 @@ bool dwSamplerState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     // a saved path → the candidates on this PC
     const auto candidatesOf = [&] (const std::string& root, const std::string& rel) {
         std::vector<std::string> out;
-        const auto& res = ctx.options.resourceRoot;
-        if (root == "@R@" && ! res.empty())
+        if (root == "@R@")
         {
-            out.push_back (joinPath (res, rel));
-            // FLM's "migrated factory preset" folders: the content packs
-            for (const auto* pack : { "DirectWave Samples/", "Drumaxx/", "Sliced Beats/" })
-                if (rel.rfind (pack, 0) == 0)
-                    out.push_back (joinPath (res, std::string (pack).substr (0, std::strlen (pack) - 1) + " EXP/" + rel.substr (std::strlen (pack))));
+            for (const auto& res : ctx.resourceRoots)
+            {
+                out.push_back (joinPath (res, rel));
+                // FLM's "migrated factory preset" folders: the content packs
+                for (const auto* pack : { "DirectWave Samples/", "Drumaxx/", "Sliced Beats/" })
+                    if (rel.rfind (pack, 0) == 0)
+                        out.push_back (joinPath (res, std::string (pack).substr (0, std::strlen (pack) - 1) + " EXP/" + rel.substr (std::strlen (pack))));
+            }
         }
         else if (root == "@L@")
             out.push_back (joinPath (o.projectFolder, rel));
@@ -1140,11 +1241,11 @@ bool dwSamplerState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     {
         zones = custom->zones;
         for (const auto& z : zones)
-            paths.push_back (ctx.resolve (candidatesOf (z.root, z.path), user));
+            paths.push_back (ctx.resolvedOrFlagged (ctx.resolve (candidatesOf (z.root, z.path), user), z.root));
     }
     else if (! custom->path.empty())
     {
-        const auto file = ctx.resolve (candidatesOf (custom->pathRoot, custom->path), user);
+        const auto file = ctx.resolvedOrFlagged (ctx.resolve (candidatesOf (custom->pathRoot, custom->path), user), custom->pathRoot);
         auto lower = custom->path;
         std::transform (lower.begin(), lower.end(), lower.begin(), [] (unsigned char ch) { return (char) std::tolower (ch); });
         if (lower.size() > 4 && lower.compare (lower.size() - 4, 4, ".dwp") == 0)
@@ -1272,8 +1373,11 @@ bool slicerState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
     if (rel.empty())
         return false;
     std::vector<std::string> candidates;
-    if (root == "@R@" && ! ctx.options.resourceRoot.empty())
-        candidates.push_back (joinPath (ctx.options.resourceRoot, rel));
+    if (root == "@R@")
+    {
+        for (const auto& r : ctx.inResources (rel))
+            candidates.push_back (r);
+    }
     else if (root == "@L@")
         candidates.push_back (joinPath (ctx.options.common.projectFolder, rel));
     for (const auto& d : ctx.deviceCandidates (rel))
@@ -1282,7 +1386,7 @@ bool slicerState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
         candidates.push_back (rel);
     candidates.push_back (joinPath (ctx.options.common.projectFolder, pathFileName (rel)));
     c.instrument = InstrumentKind::sampler;
-    c.samplePath = ctx.resolve (candidates, c.name);
+    c.samplePath = ctx.resolvedOrFlagged (ctx.resolve (candidates, c.name), root);
     c.volume = 1.0f;
     c.modelParams = flmslicer::channelParams (m.params, std::isfinite (sensitivity) ? sensitivity : 0.25f, m.keyLow);
     ctx.note (&FlpImportReport::converted, "FL Studio Mobile: Slicer (FLM's engine)");
@@ -1822,6 +1926,11 @@ bool addEffectLane (Ctx& ctx, const flm::Lane& lane, const MappedModule& mm, int
     if (kept.empty() || kept.size() > 9)
         return false;
     auto& song = ctx.song;
+    // round 190fn: an Enable lane drives the slots' mix, so the slots themselves stay switched on
+    if (lane.targetParam == 0)
+        for (int k = 0; k < mm.slotCount; ++k)
+            if (const auto at = (std::size_t) (mm.firstSlot + k); mm.insert >= 0 && mm.insert < (int) song.mixer.size() && at < song.mixer[(std::size_t) mm.insert].effects.size())
+                song.mixer[(std::size_t) mm.insert].effects[at].enabled = true;
     const auto baseName = song.playlistTracks[(std::size_t) rowIndex].name;
     for (std::size_t k = 0; k < kept.size(); ++k)
     {
@@ -1950,6 +2059,29 @@ std::string flmResourceRootIn (const std::string& flInstallFolder)
     return joinPath (flInstallFolder, "Plugins/Fruity/Generators/FL Studio Mobile/Installed");
 }
 
+bool looksLikeFlmResources (const std::string& folder, const std::function<bool (const std::string&)>& exists)
+{
+    if (folder.empty() || ! exists)
+        return false;
+    // the app's own resource folders and data files (the same names in FL's copy and in the Android app's pack,
+    // round 190bn's index of it): any one of them marks the folder
+    for (const auto* marker : { "Drum Samples", "DirectWave Samples", "Synth Presets2", "Loop Samples", "Drum Templates",
+                                "GMSynthWaveshapes", "3xOsc Shapes", "oscdata.dat", "FilterTable_Ctf_Res.data" })
+        if (exists (joinPath (folder, marker)))
+            return true;
+    return false;
+}
+
+std::string flmResourceRootFrom (const std::string& picked, const std::function<bool (const std::string&)>& exists)
+{
+    if (picked.empty() || looksLikeFlmResources (picked, exists))
+        return picked;
+    for (const auto* below : { "Resources", "Installed", "Plugins/Fruity/Generators/FL Studio Mobile/Installed" })
+        if (const auto inside = joinPath (picked, below); looksLikeFlmResources (inside, exists))
+            return inside;
+    return picked;
+}
+
 bool isFlmData (const std::uint8_t* data, std::size_t size) { return flm::isFlmData (data, size); }
 
 std::optional<Song> importFlm (const std::vector<std::uint8_t>& fileBytes, const FlmImportOptions& options, std::string* error)
@@ -1958,6 +2090,178 @@ std::optional<Song> importFlm (const std::vector<std::uint8_t>& fileBytes, const
     if (! project)
         return std::nullopt;
     return importFlmProject (*project, options);
+}
+
+namespace
+{
+// "SSLF" + u32 size + an FLM project body ("10LF" + chunks): the FL Studio Mobile Rack plugins' state (FLM_FORMAT §8;
+// the layout of FL's own "FL Studio Mobile Rack.fst" / "FL Studio Mobile Rack FX.fst" and their presets)
+std::optional<flm::Rack> rackOfPluginState (const std::vector<std::uint8_t>& state)
+{
+    if (state.size() < 16 || std::memcmp (state.data(), "SSLF", 4) != 0)
+        return std::nullopt;
+    std::uint32_t size = 0;
+    std::memcpy (&size, state.data() + 4, 4);
+    const auto body = std::min<std::size_t> (size, state.size() - 8);
+    auto project = flm::parse ({ state.data() + 8, body }, nullptr, true);
+    if (! project || project->racks.size() != 1)
+        return std::nullopt;
+    return project->racks.front();
+}
+} // namespace
+
+std::optional<EffectSlot> flmRackFxSlot (const std::vector<std::uint8_t>& state, FlpImportReport* report)
+{
+    const auto note = [report] (std::map<std::string, int> FlpImportReport::* list, const std::string& what) {
+        if (report != nullptr)
+            ++(report->*list)[what];
+    };
+    const auto rack = rackOfPluginState (state);
+    if (! rack)
+    {
+        note (&FlpImportReport::droppedEffects, "FL Studio Mobile Rack FX (state not readable)");
+        return std::nullopt;
+    }
+    std::vector<EffectSlot> chain;
+    std::vector<std::pair<std::string, std::string>> lines; // (converted, partial…) noted only when the slot is kept
+    for (const auto& m : rack->modules)
+    {
+        if (m.type == flm::module::tuner || m.type == flm::module::analyzer)
+            continue; // (sound-neutral)
+        if (flm::isGenerator (m.type) || flm::moduleCategory (m.type) == flm::ModuleCategory::noteEffect)
+        {
+            note (&FlpImportReport::droppedEffects, "FL Studio Mobile Rack FX: " + moduleLabel (m.type) + " (an effect rack plays no notes)");
+            continue;
+        }
+        auto mapped = flmfx::map (m);
+        if (mapped.slots.empty())
+        {
+            note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type));
+            continue;
+        }
+        if (chain.size() + mapped.slots.size() > (std::size_t) maxEffectSlots)
+        {
+            note (&FlpImportReport::droppedEffects, "FL Studio Mobile: " + moduleLabel (m.type) + " (the rack holds more than LYNX's slots)");
+            continue;
+        }
+        for (auto& slot : mapped.slots)
+            chain.push_back (std::move (slot));
+        note (&FlpImportReport::converted, mapped.label);
+        for (const auto& what : mapped.partial)
+            note (&FlpImportReport::partialEffects, what);
+    }
+    const auto param = [&rack] (int i, float fallback) {
+        return i < (int) rack->params.size() && std::isfinite (rack->params[(std::size_t) i]) ? rack->params[(std::size_t) i] : fallback;
+    };
+    namespace rp = flm::rackparam;
+    // the rack's level (FLM's fader law, RPRM [0]) and its pan (a balance, [1]) after the modules, as on a .flm's insert
+    const auto gain = flmGain (param (rp::level, 0.853124f));
+    const auto pan = std::clamp (param (rp::pan, 0.5f) * 2.0f - 1.0f, -1.0f, 1.0f);
+    if (chain.empty() && std::abs (gain - 1.0f) < 1.0e-3f && std::abs (pan) < 1.0e-4f)
+    {
+        note (&FlpImportReport::converted, "FL Studio Mobile Rack FX (empty)");
+        return std::nullopt; // (nothing to do: the slot passes the sound)
+    }
+    if (std::abs (pan) > 1.0e-4f)
+    {
+        auto utility = makeEffectSlot (EffectKind::utility);
+        utility.params[0] = 0.5f; // 0 dB
+        utility.params[1] = std::clamp (0.5f + 0.5f * pan, 0.0f, 1.0f); // (the utility's balance is FLM's: p > 0 lowers the left by 1 − p)
+        chain.push_back (std::move (utility));
+    }
+    auto container = makeEffectSlot (EffectKind::parallel);
+    container.branches.push_back ({ std::move (chain), std::min (gain, maxFaderGain) });
+    container.enabled = param (rp::mute, 0.0f) < 0.5f;
+    note (&FlpImportReport::converted, "FL Studio Mobile Rack FX");
+    return container;
+}
+
+std::optional<FlmRackChannel> importFlmRackState (const std::vector<std::uint8_t>& state, const FlmImportOptions& options, double bpm,
+                                                  const std::string& channelName, std::string* why)
+{
+    const auto fail = [why] (const std::string& text) -> std::optional<FlmRackChannel> {
+        if (why != nullptr)
+            *why = text;
+        return std::nullopt;
+    };
+    auto decoded = rackOfPluginState (state);
+    if (! decoded)
+        return fail ("FL Studio Mobile Rack (state not readable)");
+    auto rack = std::move (*decoded);
+    rack.kind = flm::kindNormal;
+    // what one channel of FL's cannot hold the way FLM plays it: more than one instrument, drum slots (their own
+    // channels in a .flm), stages (rack parts), note effects (baked into a .flm's notes; an .flp's notes are FL's)
+    int generators = 0;
+    bool effectBeforeInstrument = false, effectSeen = false, noteEffect = false;
+    for (const auto& m : rack.modules)
+    {
+        if (flm::isGenerator (m.type))
+        {
+            ++generators;
+            effectBeforeInstrument = effectBeforeInstrument || effectSeen;
+        }
+        else if (flm::moduleCategory (m.type) == flm::ModuleCategory::noteEffect)
+            noteEffect = noteEffect || m.params.empty() || ! std::isfinite (m.params[0]) || m.params[0] >= 0.5f; // (parameter 0 = Enable)
+        else if (m.type != flm::module::tuner && m.type != flm::module::analyzer)
+            effectSeen = true;
+    }
+    if (! rack.kit.empty())
+        return fail ("FL Studio Mobile Rack (drum kit: not reproduced yet)");
+    if (generators != 1)
+        return fail (generators == 0 ? "FL Studio Mobile Rack (no instrument)" : "FL Studio Mobile Rack (several instruments: not reproduced yet)");
+    if (effectBeforeInstrument)
+        return fail ("FL Studio Mobile Rack (an effect before the instrument: not reproduced yet)");
+    if (noteEffect)
+        return fail ("FL Studio Mobile Rack (note effects: not reproduced yet)");
+
+    // a one-channel FLM song: the master and the rack's channel, no lanes
+    flm::Project song;
+    song.tempo = bpm;
+    flm::Channel master;
+    master.kind = flm::kindMaster;
+    master.channelId = 0;
+    master.name = "Master";
+    flm::Channel channel;
+    channel.kind = flm::kindNormal;
+    channel.channelId = 1;
+    channel.order = 1.0;
+    channel.name = channelName;
+    flm::Rack masterRack;
+    masterRack.kind = flm::kindMaster;
+    song.racks = { masterRack, rack };
+    song.channels = { master, channel };
+
+    FlpImportReport own;
+    auto o = options;
+    o.common.report = &own;
+    const auto imported = importFlmProject (song, o);
+    if (! imported || imported->channels.size() != 1 || imported->mixer.size() != 2)
+        return fail ("FL Studio Mobile Rack (not reproduced yet)");
+    const auto& c = imported->channels.front();
+    if (c.instrument == InstrumentKind::synth || c.mixerTrack != 1)
+        return fail ("FL Studio Mobile Rack (" + moduleLabel (std::find_if (rack.modules.begin(), rack.modules.end(), [] (const flm::Module& m) {
+                                                     return flm::isGenerator (m.type);
+                                                 })->type) + ": not reproduced)");
+    FlmRackChannel out;
+    out.channel = c;
+    out.insert = imported->mixer[1];
+    const MixerTrack plain;
+    out.insertUsed = ! out.insert.effects.empty() || std::abs (out.insert.volume - plain.volume) > 1.0e-4f || std::abs (out.insert.pan) > 1.0e-4f
+                     || out.insert.muted;
+    // the sub-import's report lines count in the caller's report
+    if (auto* r = options.common.report; r != nullptr)
+    {
+        for (const auto list : { &FlpImportReport::converted, &FlpImportReport::approximated, &FlpImportReport::unsupported,
+                                 &FlpImportReport::droppedEffects, &FlpImportReport::partialEffects })
+            for (const auto& [what, n] : own.*list)
+                if (what.rfind ("FL Studio Mobile factory content", 0) != 0 || (r->*list).count (what) == 0)
+                    (r->*list)[what] += n;
+        r->missingSamples += own.missingSamples;
+        r->relocatedSamples += own.relocatedSamples;
+        r->missingFiles.insert (r->missingFiles.end(), own.missingFiles.begin(), own.missingFiles.end());
+        r->relocatedFiles.insert (r->relocatedFiles.end(), own.relocatedFiles.begin(), own.relocatedFiles.end());
+    }
+    return out;
 }
 
 std::optional<Song> importFlmProject (const flm::Project& project, const FlmImportOptions& options)
@@ -1971,6 +2275,17 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
     song.mode = PlayMode::song;
     song.arrangements = { Arrangement { "Arrangement", {}, 0, 0, {} } };
     song.info.title = project.title;
+    // META's credits (round 190fn, format-0020…0023; FLM_FORMAT §2 META) on Settings › Info: the author, the notes, the
+    // creation date and the time spent on the song
+    song.info.author = project.author;
+    song.info.comments = project.notes;
+    song.info.created = flmDateSeconds (project.created);
+    if (std::isfinite (project.editSeconds) && project.editSeconds > 0.0 && project.editSeconds < 1.0e9)
+        song.info.workSeconds = project.editSeconds;
+    // HEAD's app version (format-0018): FLM warns about a song from a newer app; LYNX's reader was last checked against
+    // the files of FLM 5.0.4, so a newer one is named in the report (its new fields, if any, are not read)
+    if (flmVersionNewer (project.appVersion, "5.0.4"))
+        ctx.note (&FlpImportReport::unsupported, "FL Studio Mobile " + project.appVersion + " (newer than this import knows: new settings may be missing)");
     song.bpm = std::clamp (project.tempo > 0.0 ? project.tempo : 120.0, minTempo, maxTempo);
     // KEYB: the keyboard's chord set becomes the project's chord set for LYNX's Chord pad (round 190ds, core/ScaleKeys.h)
     if (! project.chordSetJson.empty())
@@ -2019,6 +2334,34 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
         const auto& ch = project.channels[i];
         const auto& rack = i < project.racks.size() ? project.racks[i] : noRack;
         const auto name = ch.name.empty() ? ch.typeName : ch.name;
+        // round 190fn (mixer-0016): the channel's colour (CHHD's hue, FLM's own HSL law) on everything this FLM channel
+        // becomes — its channels, Playlist rows and inserts (the Master keeps LYNX's) — once the channel is done
+        struct Colours
+        {
+            Song& song;
+            std::size_t firstChannel, firstRow, firstInsert;
+            std::uint32_t colour;
+            ~Colours()
+            {
+                if (colour == 0)
+                    return;
+                for (auto k = firstChannel; k < song.channels.size(); ++k)
+                {
+                    auto& c = song.channels[k];
+                    if (c.colour == 0)
+                        c.colour = colour;
+                    if (c.mixerTrack > 0 && c.mixerTrack < (int) song.mixer.size() && song.mixer[(std::size_t) c.mixerTrack].colour == 0)
+                        song.mixer[(std::size_t) c.mixerTrack].colour = colour;
+                }
+                for (auto k = firstRow; k < song.playlistTracks.size(); ++k)
+                    if (song.playlistTracks[k].colour == 0)
+                        song.playlistTracks[k].colour = colour;
+                for (auto k = std::max<std::size_t> (1, firstInsert); k < song.mixer.size(); ++k)
+                    if (song.mixer[k].colour == 0)
+                        song.mixer[k].colour = colour;
+            }
+        } colours { song, song.channels.size(), song.playlistTracks.size(), song.mixer.size(),
+                    ch.hue >= 0.0f && ch.kind != flm::kindMaster ? flm::channelColour (ch.hue) : 0u };
 
         // the insert: FLM's master is LYNX's Master; every other channel (bus/AUX tracks too) gets one
         int insert = 0;
@@ -2029,6 +2372,8 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             song.mixer.push_back (std::move (m));
             insert = (int) song.mixer.size() - 1;
         }
+        else if (ch.kind != flm::kindMaster) // round 190fn (mixer-0013): said, not silent
+            ctx.note (&FlpImportReport::partialEffects, "FL Studio Mobile: channels past LYNX's insert count (on the Master, without their own level and effects)");
         // the rack's level and pan on it (F2: RPRM [0] volume with FLM's fader law, [1] pan 0…1 → −1…1)
         if (rack.params.size() >= 2)
         {
@@ -2627,7 +2972,16 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
             float level = 0.853f;
             if (w.size() >= 6)
                 std::memcpy (&level, &w[5], 4);
-            const auto gain = std::min (flmGain (level), maxFaderGain);
+            auto gain = std::min (flmGain (level), maxFaderGain);
+            // a short SEND (no [5]): FLM's reader rebuilds the level from the linear gain [2] (FLM_FORMAT §4 SEND, PROVEN-REA
+            // 0x180758ac0), so the route plays at that gain (round 190fn, format-0049)
+            if (w.size() >= 3 && w.size() < 6)
+            {
+                float linear = 1.0f;
+                std::memcpy (&linear, &w[2], 4);
+                if (std::isfinite (linear) && linear >= 0.0f)
+                    gain = std::min (linear, std::min (1.0f, maxFaderGain));
+            }
             if (target == masterId)
             {
                 toMaster = true;
@@ -2676,6 +3030,11 @@ std::optional<Song> importFlmProject (const flm::Project& project, const FlmImpo
         song.patterns.push_back (std::move (first));
     }
     song.currentPattern = 0;
+    // round 190fn (O1): factory files missing → say where LYNX looks for them (it never ships Image-Line content)
+    if (ctx.resourceMissing)
+        ctx.note (&FlpImportReport::unsupported, ctx.options.userResourceRoots.empty()
+                                                     ? "FL Studio Mobile factory content not found: add the app's Resources folder in Settings > Files"
+                                                     : "FL Studio Mobile factory content not found in the Resources folders of Settings > Files");
     return std::move (ctx.song);
 }
 } // namespace lynx

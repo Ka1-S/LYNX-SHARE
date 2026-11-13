@@ -623,6 +623,22 @@ public:
                 host.setPluginFolders (path);
             }, persistent);
 
+        // Round 190fn (decision O1, LYNX's own): FL Studio Mobile's factory content for .flm projects, from the user's own
+        // copy of the app's "Resources" folder (FL's copy, when FL is installed, is searched after these)
+        flmResources = std::make_unique<FolderList> (
+            tr ("FL Studio Mobile resources"), tr ("Factory sounds for .flm projects: the app's own Resources folder. LYNX SHARE ships none."),
+            [persistent, sample] {
+                juce::StringArray list;
+                if (persistent)
+                    list.addLines (PluginHost::settingsFolder().getChildFile ("flm-resources.txt").loadFileAsString());
+                list.removeEmptyStrings();
+                return sample (list, { "D:\\FL Studio Mobile\\Resources" });
+            },
+            [persistent] (const juce::StringArray& list) {
+                if (persistent)
+                    PluginHost::settingsFolder().getChildFile ("flm-resources.txt").replaceWithText (list.joinIntoString ("\n"));
+            }, persistent);
+
         // FL's File page has "Manage plugins" next to the plugin settings (REA round 143b)
         if (managePlugins)
             pluginFolders->addExtraButton (tr ("Plugin manager..."), managePlugins);
@@ -630,21 +646,24 @@ public:
         addAndMakeVisible (*searchFolders);
         addAndMakeVisible (*browserFolders);
         addAndMakeVisible (*pluginFolders);
+        addAndMakeVisible (*flmResources);
     }
 
     void resized() override
     {
         auto area = getLocalBounds().reduced (20, 14);
-        const auto h = (area.getHeight() - 24) / 3;
+        const auto h = (area.getHeight() - 36) / 4;
         searchFolders->setBounds (area.removeFromTop (h));
         area.removeFromTop (12);
         browserFolders->setBounds (area.removeFromTop (h));
         area.removeFromTop (12);
-        pluginFolders->setBounds (area);
+        pluginFolders->setBounds (area.removeFromTop (h));
+        area.removeFromTop (12);
+        flmResources->setBounds (area);
     }
 
 private:
-    std::unique_ptr<FolderList> searchFolders, browserFolders, pluginFolders;
+    std::unique_ptr<FolderList> searchFolders, browserFolders, pluginFolders, flmResources;
 };
 
 class SettingsPanel final : public juce::Component

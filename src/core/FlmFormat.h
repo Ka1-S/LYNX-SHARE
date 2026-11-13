@@ -122,6 +122,10 @@ struct Channel
     std::string typeName;  // "DW Sampler 3", "Audio 4"
     std::string userName;
     double order = 0.0;    // display order
+    // CHHD +1036: the channel's colour as a hue 0…1 (−1 = not in the file). FLM clamps it to 0…1 and shows
+    // HSL(frac(0.83 + 0.73·hue), 0.9, 0.63) — the theme's accent saturation and lightness (round 190fn, PROVEN-REA on the
+    // 5.0.3 library: CSeqChannel::SetState / MakeChannelColor, CColor::SetHSL, Theme::accentSaturation / accentLightness)
+    float hue = -1.0f;
     int channelId = -1;
     std::vector<std::vector<std::uint32_t>> sends; // SEND chunks, raw 32-bit words (F2)
     std::vector<Lane> lanes;
@@ -166,17 +170,23 @@ struct Project
     std::uint32_t root = 0, scale = 0; // the "key locker" (FLM_FORMAT §2): HEAD +344 root 0..11, +348 FLM's scale index
     std::string appVersion; // "5.0.4"
     std::string created, saved, author, originalName;
+    std::string notes;        // META: the song's notes / description (round 190fn)
+    double editSeconds = 0.0; // META: the time spent on the song, seconds (round 190fn)
     std::string chordSetJson; // KEYB
     std::vector<Rack> racks;
     std::vector<Channel> channels; // channels[i] belongs to racks[i]
     int unknownChunks = 0;         // top-level chunks this reader skipped
 };
 
+// A channel hue (Channel::hue) as FLM draws it: 0xFFRRGGBB (round 190fn)
+std::uint32_t channelColour (float hue) noexcept;
+
 // True when the bytes start like an FLM project ("10LF" and a first chunk that fits).
 bool isFlmData (const std::uint8_t* data, std::size_t size) noexcept;
 
 // The whole project, or nullopt with `error` (not an FLM file, or a chunk that runs past the end of the file).
-std::optional<Project> parse (std::span<const std::uint8_t> bytes, std::string* error = nullptr);
+// `racksOnly` (round 190fn): the FL Studio Mobile Rack plugins' state, an FLM body with racks and no channels
+std::optional<Project> parse (std::span<const std::uint8_t> bytes, std::string* error = nullptr, bool racksOnly = false);
 
 // Module registry (FLM_FORMAT §7)
 enum class ModuleCategory : int { unknown = 0, generator = 1, delayReverb = 2, dynamics = 3, eqFilter = 4, modulation = 5, noteEffect = 6 };
