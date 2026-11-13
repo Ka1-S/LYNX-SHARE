@@ -137,7 +137,11 @@ six wiki pages) in 15 languages. Not done there, for the release:
   De-esser, Glow Leveler).
 - **Wiki**: updated for 0.1.27 on wip/site190ex (English + 14 languages, line for line): Mixer, Playlist, Piano
   roll, MIDI controllers, Recording, Layouts. Pictures those pages would gain (not referenced yet, so nothing is
-  broken without them): see /mnt/e/lynx-work/site190ex/HANDOFF.md.
+  broken without them; add the `![...]` line to the English page and the same line to the 14 bodies):
+  `assets/img/wiki/mixer-edison-slot.webp` (Edison open from a mixer slot), `playlist-audio-clip-menu.webp`,
+  `playlist-point-modes.webp` (an automation point's Mode list), `pianoroll-limit.webp` (the Limit dialog),
+  `remote-control-settings.webp`, `map-mode.webp` (the clip grid in MIDI Map Mode with the mapping list),
+  `session-mixer.webp`, `track-dock.webp` (the Simple workflow's Effects tab), `one-click-record.webp`.
 
 ## 0.1.26 release: pictures and catalogue still to do (texts are ready)
 
