@@ -41,6 +41,7 @@ public:
     static aaudio_data_callback_result_t onAudioCallback(AAudioStream* stream, void* userData, void* audioData, int32_t numFrames);
 
 private:
+    juce::String deviceName { "AAudio" };
     void initializeAAudio();
     void cleanupAAudio();
 
