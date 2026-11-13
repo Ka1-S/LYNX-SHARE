@@ -1904,6 +1904,9 @@ juce::var channelToVar (const ChannelDef& c)
         o->setProperty ("flOrigin", flOriginToVar (c.flOrigin));
     if (c.loopStarterPattern >= 0) // FL's Loop Starter (round 168b): [pattern, slot, category, locked]
         o->setProperty ("loopStarter", juce::Array<juce::var> { c.loopStarterPattern, str (c.loopStarterSlot), str (c.loopStarterCategory), c.loopStarterLocked });
+    if (c.simplePad.index >= 0) // round 190fo: a Simple Sampler track's pad: [index, mode, tone, release, group, colour]
+        o->setProperty ("simplePad", juce::Array<juce::var> { c.simplePad.index, (int) c.simplePad.mode, c.simplePad.tone, c.simplePad.release,
+                                                             c.simplePad.group, c.simplePad.colour });
     if (c.instrument == InstrumentKind::layer)
     {
         auto l = std::make_unique<juce::DynamicObject>();
@@ -2226,6 +2229,15 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
     {
         def.receiveFrom = from[0].toString().toStdString();
         def.receiveMidiChannel = juce::jlimit (0, 16, (int) from[1]);
+    }
+    if (const auto& sp = c["simplePad"]; sp.isArray() && sp.size() >= 6 && (int) sp[0] >= 0) // round 190fo
+    {
+        def.simplePad.index = juce::jlimit (0, 15, (int) sp[0]);
+        def.simplePad.mode = (std::uint8_t) juce::jlimit (0, 2, (int) sp[1]);
+        def.simplePad.tone = juce::jlimit (-1.0f, 1.0f, (float) (double) sp[2]);
+        def.simplePad.release = juce::jlimit (0.0f, 4.0f, (float) (double) sp[3]);
+        def.simplePad.group = juce::jlimit (0, 4, (int) sp[4]);
+        def.simplePad.colour = juce::jlimit (0, 8, (int) sp[5]);
     }
     if (const auto& ls = c["loopStarter"]; ls.isArray() && ls.size() >= 4 && (int) ls[0] >= 0)
     {

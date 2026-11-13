@@ -6311,6 +6311,47 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
             consolidate.addItem (theme::mnemonic (tr ("From song start"), 's'), hasClips, false, [this, track] { consolidatePlaylistTrack (engine, track, true); });
             menu.addSubMenu (theme::mnemonic (tr ("Consolidate track"), 'o'), consolidate, hasClips);
         }
+        if (simpleHeaders && onExportTrack && simpletracks::kindOf (song, track).has_value())
+        {
+            // round 190fo (Simple workflow, as the original's track menu): the track as a WAV, a note track's notes as MIDI
+            const auto kind = simpletracks::kindOf (song, track);
+            const auto notes = std::any_of (seen.begin(), seen.end(), [] (const std::pair<ClipKind, int>& k) { return k.first == ClipKind::pattern; });
+            juce::PopupMenu exportTrack;
+            exportTrack.addItem (tr ("As audio (WAV)..."), hasClips, false, [this, track] { onExportTrack (track, false); });
+            exportTrack.addItem (tr ("As MIDI..."), notes && ! simpletracks::isAudioKind (*kind) && kind != simpletracks::Kind::audio, false,
+                                 [this, track] { onExportTrack (track, true); });
+            menu.addSubMenu (tr ("Export this track"), exportTrack, hasClips);
+        }
+        if (simpleHeaders && simpletracks::kindOf (song, track).has_value() && ! simpletracks::isAudioKind (*simpletracks::kindOf (song, track))
+            && simpletracks::kindOf (song, track) != simpletracks::Kind::audio)
+        {
+            // round 190fo (Simple workflow, as the original's track menu): Freeze / Unfreeze the track — its instrument
+            // channels (a Drums or Sampler track: all of them), with the Channel Rack's own freeze (round 190ay)
+            std::vector<std::uint64_t> uids;
+            bool anyFrozen = false;
+            const auto insert = simpletracks::insertOf (song, track);
+            for (const auto& c : song.channels)
+                if (c.mixerTrack == insert && c.instrument != InstrumentKind::audioClip && c.instrument != InstrumentKind::controller
+                    && (c.instrument != InstrumentKind::sampler || ! c.samplePath.empty() || c.simplePad.index < 0) && c.uid != 0)
+                {
+                    uids.push_back (c.uid);
+                    anyFrozen = anyFrozen || c.freeze.on();
+                }
+            if (anyFrozen)
+                menu.addItem (tr ("Unfreeze track"), [this, uids] {
+                    for (auto uid : uids)
+                        for (int c = 0; c < (int) engine.getSong().channels.size(); ++c)
+                            if (engine.getSong().channels[(std::size_t) c].uid == uid && engine.getSong().channels[(std::size_t) c].freeze.on())
+                                unfreezeChannel (engine, c);
+                });
+            else
+                menu.addItem (tr ("Freeze track"), ! uids.empty() && hasClips, false, [this, uids] { freezeTrackChannels (uids); });
+        }
+        if (simpleHeaders && simpletracks::kindOf (song, track).has_value())
+            // round 190fo (the original's mobile app: "Reset all tracks"): every Simple track's level and pan back to the start
+            menu.addItem (tr ("Reset all tracks (level and pan)"), [this] {
+                engine.editSong ([] (Song& s) { simpletracks::resetLevels (s); });
+            });
         menu.addItem (tr ("Merge clips"), hasClips, false, [this, track] {
             setSelection ({});
             engine.editSong ([track] (Song& s) { clipops::mergeTrackClips (s, track); });
@@ -6343,6 +6384,26 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
     menu.addItem (theme::mnemonic (tr ("Move up"), 'u'), track > 0, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track - 1); }); });
     menu.addItem (theme::mnemonic (tr ("Move down"), 'd'), track + 1 < count, false, [this, track] { engine.editSong ([track] (Song& s) { noteedit::swapTracks (s, track, track + 1); }); });
     return menu;
+}
+
+// round 190fo: the Simple track menu's Freeze, one channel after the other (each freeze runs in the background)
+void PlaylistComponent::freezeTrackChannels (std::vector<std::uint64_t> uids)
+{
+    while (! uids.empty())
+    {
+        const auto uid = uids.front();
+        uids.erase (uids.begin());
+        for (int c = 0; c < (int) engine.getSong().channels.size(); ++c)
+            if (engine.getSong().channels[(std::size_t) c].uid == uid && ! engine.getSong().channels[(std::size_t) c].freeze.on()
+                && freezeRefusal (engine, c).isEmpty())
+            {
+                freezeChannel (engine, c, [safe = juce::Component::SafePointer<PlaylistComponent> (this), uids] (bool) {
+                    if (safe != nullptr)
+                        safe->freezeTrackChannels (uids);
+                });
+                return;
+            }
+    }
 }
 
 void PlaylistComponent::renameTrack (int track)
@@ -9251,8 +9312,8 @@ bool PlaylistComponent::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (const auto& f : files)
         if (SampleLibrary::isSampleFile (juce::File (f)) || videotracks::isVideoFile (juce::File (f))
-            || (simpleHeaders && onSimpleFilesDropped && juce::File (f).hasFileExtension ("mid;midi")))
-            return true;
+            || (simpleHeaders && onSimpleFilesDropped && (juce::File (f).hasFileExtension ("mid;midi") || juce::File (f).isDirectory())))
+            return true; // (round 190fo: a folder of stems and MIDI files, Simple workflow)
 
     return false;
 }
@@ -9341,7 +9402,9 @@ void PlaylistComponent::filesDropped (const juce::StringArray& files, int x, int
     // its tracks), and MIDI files anywhere, become new tracks of their own
     if (simpleHeaders && onSimpleFilesDropped)
     {
-        const auto midi = std::any_of (files.begin(), files.end(), [] (const juce::String& f) { return juce::File (f).hasFileExtension ("mid;midi"); });
+        const auto midi = std::any_of (files.begin(), files.end(), [] (const juce::String& f) {
+            return juce::File (f).hasFileExtension ("mid;midi") || juce::File (f).isDirectory(); // (round 190fo: a folder of stems)
+        });
         if (midi || ! simpletracks::kindOf (engine.getSong(), track).has_value())
         {
             onSimpleFilesDropped (files, x >= headerWidth ? start : 0);

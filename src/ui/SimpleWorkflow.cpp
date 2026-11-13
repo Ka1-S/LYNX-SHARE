@@ -6,6 +6,7 @@
 #include "core/KeyFollow.h"
 #include "core/LoopStarter.h"
 #include "core/MidiImport.h"
+#include "core/SimplePads.h"
 #include "engine/AudioEngine.h"
 #include "engine/MidiFileIo.h"
 #include "ui/FileChoosers.h"
@@ -189,7 +190,8 @@ std::string trackNameFor (Kind kind)
         case Kind::voice: return tr ("Voice").toStdString();
         case Kind::instrument: return tr ("Instrument").toStdString();
         case Kind::drums: return tr ("Drums").toStdString();
-        case Kind::sampler: return tr ("Sampler").toStdString();
+        case Kind::sampler:
+        case Kind::pads: return tr ("Sampler").toStdString();
         case Kind::guitar: return tr ("Guitar").toStdString();
         case Kind::bass: return trc ("@instrument: Bass").toStdString();
         case Kind::audio: break;
@@ -207,7 +209,7 @@ public:
           voice (Glyph::voice, kindColour (Kind::voice), tr ("Voice / audio"), tr ("Record your voice or any sound from a microphone.")),
           instrument (Glyph::instrument, kindColour (Kind::instrument), tr ("Instrument"), tr ("Play a sound with the computer keys, the mouse or a MIDI keyboard.")),
           drums (Glyph::drums, kindColour (Kind::drums), tr ("Drums"), tr ("Make a beat on a step grid, or start from a starter beat.")),
-          sampler (Glyph::sampler, kindColour (Kind::sampler), tr ("Sampler"), tr ("Turn any sound into an instrument you play on keys.")),
+          sampler (Glyph::sampler, kindColour (Kind::sampler), tr ("Sampler"), tr ("16 pads: put a sound on each and play them with the keys.")),
           guitar (Glyph::guitar, kindColour (Kind::guitar), tr ("Guitar / bass"), tr ("Plug in a guitar or a bass and play it through the track's effects.")),
           import (Glyph::import, kindColour (Kind::audio), tr ("Import"), tr ("Bring in audio or MIDI files: one track each.")),
           loops (Glyph::loops, kindColour (Kind::audio), tr ("Loops"), tr ("Browse loops and drag them onto the timeline."))
@@ -245,9 +247,23 @@ public:
         moreInstruments.onClick = [this] { owner.chooseInstrument (moreInstruments); };
         instrument.addAndMakeVisible (moreInstruments);
         drums.onClick = [this] { showStarterPage(); };
-        sampler.onClick = [this] { owner.chooseSample(); };
+        // round 190fo: the Sampler track is 16 pads (the original's multipad sampler); one sample over the keys stays
+        // one click away
+        sampler.onClick = [this] { owner.addPads(); };
+        sampler.setComponentID ("simple.tile.sampler");
+        sampler.rightReserve = 104;
+        samplerKeys.setButtonText (tr ("On keys..."));
+        samplerKeys.setTooltip (tr ("One sound played over the whole keyboard, at every pitch"));
+        samplerKeys.onClick = [this] { owner.chooseSample(); };
+        sampler.addAndMakeVisible (samplerKeys);
         guitar.onClick = [this] { owner.addAudio (bassButton.getToggleState() ? Kind::bass : Kind::guitar); };
         import.onClick = [this] { owner.importFiles(); };
+        // round 190fo: a whole folder of stems and MIDI files (another app's "download stems", LYNX's own export)
+        import.rightReserve = 104;
+        importFolder.setButtonText (tr ("Folder..."));
+        importFolder.setTooltip (tr ("A folder of stems and MIDI files: one track each, all from the start"));
+        importFolder.onClick = [this] { owner.importFolder(); };
+        import.addAndMakeVisible (importFolder);
         loops.onClick = [this] {
             if (owner.host.showLoops)
                 owner.host.showLoops();
@@ -363,9 +379,11 @@ public:
         pair (voice, instrument);
         moreInstruments.setBounds (instrument.getLocalBounds().removeFromRight (instrument.rightReserve).reduced (8, 0).withSizeKeepingCentre (instrument.rightReserve - 16, 28));
         pair (drums, sampler);
+        samplerKeys.setBounds (sampler.getLocalBounds().removeFromRight (sampler.rightReserve).reduced (8, 0).withSizeKeepingCentre (sampler.rightReserve - 16, 28));
         auto g = row();
         guitar.setBounds (g);
         pair (import, loops);
+        importFolder.setBounds (import.getLocalBounds().removeFromRight (import.rightReserve).reduced (8, 0).withSizeKeepingCentre (import.rightReserve - 16, 28));
         auto sw = guitar.getLocalBounds().removeFromRight (guitar.rightReserve).reduced (8, 0).withSizeKeepingCentre (guitar.rightReserve - 16, 28);
         guitarButton.setBounds (sw.removeFromLeft (sw.getWidth() / 2));
         bassButton.setBounds (sw);
@@ -423,7 +441,7 @@ private:
 
     SimpleWorkflow& owner;
     juce::Label title, footer, starterTitle;
-    juce::TextButton close, back, guitarButton, bassButton, moreInstruments, startFrom, tourButton;
+    juce::TextButton close, back, guitarButton, bassButton, moreInstruments, samplerKeys, importFolder, startFrom, tourButton;
     juce::ToggleButton useTempo;
     Tile voice, instrument, drums, sampler, guitar, import, loops;
     std::vector<std::unique_ptr<juce::TextButton>> genreButtons;
@@ -778,6 +796,7 @@ void SimpleWorkflow::updateDock()
                 host.settingsChanged();
         };
         dock = std::make_unique<SimpleDock> (engine, std::move (hooks));
+        dock->onBrowseSounds = host.showLoops; // (round 190fo: the Pads tab's "Browse sounds")
     }
     // the track it shows: the Playlist's current track while that is one of the song's tracks, else the first track
     const auto& song = engine.getSong();
@@ -985,6 +1004,39 @@ void SimpleWorkflow::addDefaultInstrument()
         showKeysForNewTrack();
 }
 
+bool SimpleWorkflow::addPads()
+{
+    // round 190fo: 16 empty pads on a new track, with a 4-bar pattern to record into; the dock opens on the pads
+    simpletracks::Request q;
+    q.kind = Kind::pads;
+    q.name = trackNameFor (q.kind);
+    q.kit = simplepads::emptyKit();
+    Pattern pattern;
+    pattern.lengthTicks = (std::int64_t) 4 * engine.getSong().barTicks(); // (bars of the song's meter, round 190fg)
+    q.pattern = std::move (pattern);
+    if (! add (std::move (q)))
+        return false;
+    if (SimpleDock::shownSetting && active)
+    {
+        dockTrack = lastAddedTrack;
+        updateDock();
+        if (dock != nullptr)
+            dock->setTab (SimpleDock::Tab::pads);
+    }
+    return true;
+}
+
+int SimpleWorkflow::padChannelForKey (int keyCode)
+{
+    if (! active || dock == nullptr || dock->getParentComponent() == nullptr || ! dock->isVisible() || dock->getTab() != SimpleDock::Tab::pads)
+        return -1;
+    const auto pad = simplepads::padForKey (keyCode);
+    const auto channel = pad >= 0 ? simplepads::padChannel (engine.getSong(), dock->shownTrack(), pad) : -1;
+    if (channel >= 0)
+        dock->lightPad (pad);
+    return channel;
+}
+
 void SimpleWorkflow::showKeysForNewTrack()
 {
     if (SimpleDock::shownSetting && active)
@@ -1056,6 +1108,16 @@ void SimpleWorkflow::importFiles()
                        [this] (const juce::FileChooser& fc) { addFiles (fc.getResults(), 0); });
 }
 
+void SimpleWorkflow::importFolder()
+{
+    fileChooser = ui::makeFileChooser (tr ("Choose a folder of stems and MIDI files"), juce::File(), {});
+    ui::launchChooser (fileChooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                       [this] (const juce::FileChooser& fc) {
+                           if (fc.getResult().isDirectory())
+                               addFiles ({ fc.getResult() }, 0);
+                       });
+}
+
 void SimpleWorkflow::dropFiles (const juce::StringArray& files, std::int64_t tick)
 {
     juce::Array<juce::File> list;
@@ -1068,8 +1130,45 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
 {
     juce::StringArray failed;
     std::optional<keyfollow::LoopKey> firstKey; // the first keyed loop (a project without a key is offered its key)
+    // round 190fo: a folder of stems and MIDI files (BandLab's "Download Stems", LYNX's own export for other apps): its
+    // files, one track each, all from `start`, named without their numbers; stems play at their own speed and key
+    struct One
+    {
+        juce::File file;
+        std::string name; // empty: the file's
+        bool stem = false, muted = false;
+    };
+    std::vector<One> list;
     for (const auto& file : files)
     {
+        if (! file.isDirectory())
+        {
+            list.push_back ({ file, {}, false, false });
+            continue;
+        }
+        std::vector<std::string> relative;
+        for (const auto& entry : juce::RangedDirectoryIterator (file, true, "*", juce::File::findFiles))
+        {
+            const auto f = entry.getFile();
+            if (f.getParentDirectory() != file && f.getParentDirectory().getParentDirectory() != file)
+                continue; // (the folder and its sub-folders one level down: LYNX's "Stems/" and "MIDI/")
+            relative.push_back (f.getRelativePathFrom (file).replaceCharacter ('\\', '/').toStdString());
+        }
+        for (const auto& item : simpletracks::folderPlan (relative))
+            list.push_back ({ file.getChildFile (juce::String::fromUTF8 (item.path.c_str())), item.name, true, item.muted });
+    }
+    const auto muteLast = [this] (int firstTrack) {
+        const auto last = lastAddedTrack;
+        if (last < firstTrack || last < 0)
+            return;
+        engine.editSong ([firstTrack, last] (Song& s) {
+            for (int t = juce::jmax (0, firstTrack); t <= last && t < (int) s.playlistTracks.size(); ++t)
+                s.playlistTracks[(std::size_t) t].muted = true;
+        }, false);
+    };
+    for (const auto& one : list)
+    {
+        const auto& file = one.file;
         if (file.hasFileExtension ("mid;midi"))
         {
             // one instrument track (LYNX's synth) per MIDI track with notes, from `start`
@@ -1082,13 +1181,19 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
             }
             midiimport::Options options;
             bool any = false;
-            for (auto& group : midiimport::groups (*midi, options))
+            const auto before = lastAddedTrack;
+            int firstNew = -1;
+            auto groups = midiimport::groups (*midi, options);
+            const auto withNotes = std::count_if (groups.begin(), groups.end(), [] (const auto& g) { return ! g.notes.empty(); });
+            for (auto& group : groups)
             {
                 if (group.notes.empty())
                     continue;
                 simpletracks::Request q;
                 q.kind = Kind::instrument;
-                q.name = group.name.empty() ? file.getFileNameWithoutExtension().toStdString() : group.name;
+                q.name = ! one.name.empty() && (withNotes == 1 || group.name.empty()) ? one.name
+                         : group.name.empty()                                         ? file.getFileNameWithoutExtension().toStdString()
+                                                                                      : group.name;
                 ChannelDef synth;
                 synth.instrument = InstrumentKind::synth;
                 q.channel = synth;
@@ -1096,10 +1201,17 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
                 notes.notes = std::move (group.notes);
                 q.pattern = std::move (notes);
                 q.start = start;
-                any = add (std::move (q)) || any;
+                if (add (std::move (q)))
+                {
+                    any = true;
+                    if (firstNew < 0)
+                        firstNew = lastAddedTrack;
+                }
             }
             if (! any)
                 failed.add (file.getFileName());
+            else if (one.muted && lastAddedTrack != before)
+                muteLast (firstNew); // (the stem of the same name already plays these notes)
             continue;
         }
         const auto data = engine.getSampleLibrary().load (file.getFullPathName());
@@ -1112,13 +1224,18 @@ void SimpleWorkflow::addFiles (const juce::Array<juce::File>& files, std::int64_
         const auto seconds = (double) data->frames() / data->sampleRate;
         simpletracks::Request q;
         q.kind = Kind::audio;
-        q.name = file.getFileNameWithoutExtension().toStdString();
+        q.name = one.name.empty() ? file.getFileNameWithoutExtension().toStdString() : one.name;
         q.audioFile = file.getFullPathName().toStdString();
         q.audioLength = juce::jmax<std::int64_t> (ppq / 4, (std::int64_t) (seconds * engine.getSong().bpm / 60.0 * ppq));
+        q.start = start;
+        if (one.stem)
+        {
+            add (std::move (q)); // (a stem is a part of a song: it keeps its own speed and key)
+            continue;
+        }
         // a loop made for a tempo (ACID beats, or a tempo in its name that makes whole bars) keeps time: it lasts its
         // beats at the project's tempo, at its own pitch, and follows the tempo from then on (round 190p)
         q.audioBeats = simpletracks::loopBeats (file.getFileName().toStdString(), seconds, data->acidBeats, engine.getSong().meter());
-        q.start = start;
         // round 190ds: a loop follows the project key — its key from its name, else detected from a loop's audio (a
         // file made for a tempo); voice takes and songs (over 70 s) are left alone
         if (seconds <= 70.0)

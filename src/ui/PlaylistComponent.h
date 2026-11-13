@@ -226,6 +226,8 @@ public:
     std::function<void (int track)> onSimpleTrackSelected; // the Simple workflow: a track was selected (its dock follows)
     // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
     std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
+    // round 190fo: the Simple workflow's track menu "Export this track" › As audio / As MIDI (nullptr: not offered)
+    std::function<void (int track, bool asMidi)> onExportTrack;
 
     // FL's legacy Pattern Blocks (round 170f, issue #60): the section under the clip tracks while the project's option is
     // on (ui/PatternBlocksView.h). `height` = the section's height in px (the divider drag); clamped to the window.
@@ -460,6 +462,7 @@ private:
     void arrangementChosen();
     void renameArrangement();
     void renameTrack (int track);
+    void freezeTrackChannels (std::vector<std::uint64_t> uids); // round 190fo: the Simple track menu's Freeze
     void showTrackMenu (int track);
     juce::PopupMenu buildTrackMenu (int track);
     void openClipSource (int clip, bool other); // double click: the clip's pattern / automation (Alt: the other editor)

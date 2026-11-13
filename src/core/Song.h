@@ -1011,6 +1011,20 @@ struct ChannelDef
     std::string loopStarterSlot, loopStarterCategory;
     bool loopStarterLocked = false;
     FlOrigin flOrigin;    // imported from FL: the original generator (round 171e)
+    // Round 190fo (core/SimplePads.h): a pad of a Simple Sampler track (16 pads, one Sampler channel each, in one group
+    // through one insert). index −1 = not a pad. The pad's own settings that a Sampler channel has no field for; the
+    // rest (sample, region, reverse, attack, pitch, gain, volume, pan, cut groups) live in the channel as usual.
+    struct SimplePad
+    {
+        int index = -1;           // 0…15, bottom-left first
+        std::uint8_t mode = 0;    // 0 gate (plays while held), 1 one-shot (plays to its end), 2 loop (repeats while held)
+        float tone = 0.0f;        // −1…1: below 0 a low-pass closes, above 0 a high-pass opens, 0 = off
+        float release = 0.0f;     // seconds, 0…4 (gate and loop)
+        int group = 0;            // 0 none, 1…4: a pad cuts the other pads of its group
+        int colour = 0;           // 0 = the track's colour, 1…8 a pad colour (ui: SimpleDock's pad palette)
+        bool operator== (const SimplePad&) const = default;
+    };
+    SimplePad simplePad;
     InstanceTag instance; // runtime identity of the channel (never saved)
 
     bool hasKeyRegion() const noexcept { return keyLow > 0 || keyHigh < 127; }
