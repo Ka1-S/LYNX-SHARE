@@ -1,7 +1,7 @@
 {
   "format": "lynx-project",
   "version": 1,
-  "savedBy": "0.1.26",
+  "savedBy": "0.1.27",
   "bpm": 112.0,
   "beatsPerBar": 4,
   "channelGroups": [
@@ -1501,6 +1501,7 @@
       "pan": 0.0,
       "muted": false,
       "solo": false,
+      "monitor": 1,
       "effects": [
         {
           "kind": "peq",
@@ -1694,7 +1695,8 @@
       "pan": 0.0,
       "muted": false,
       "solo": false,
-      "colour": "d39b3e"
+      "colour": "d39b3e",
+      "monitor": 1
     },
     {
       "name": "Chords",
@@ -1703,6 +1705,7 @@
       "muted": false,
       "solo": false,
       "colour": "4fa3a5",
+      "monitor": 1,
       "effects": [
         {
           "kind": "atrium",
@@ -1743,7 +1746,8 @@
       "pan": 0.0,
       "muted": false,
       "solo": false,
-      "colour": "4fa3a5"
+      "colour": "4fa3a5",
+      "monitor": 1
     },
     {
       "name": "Lead",
@@ -1752,6 +1756,7 @@
       "muted": false,
       "solo": false,
       "colour": "4fa3a5",
+      "monitor": 1,
       "effects": [
         {
           "kind": "echoform",
@@ -1876,84 +1881,96 @@
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     },
     {
       "name": "Insert 6",
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     },
     {
       "name": "Insert 7",
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     },
     {
       "name": "Insert 8",
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     },
     {
       "name": "Insert 9",
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     },
     {
       "name": "Insert 10",
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     },
     {
       "name": "Insert 11",
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     },
     {
       "name": "Insert 12",
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     },
     {
       "name": "Insert 13",
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     },
     {
       "name": "Insert 14",
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     },
     {
       "name": "Insert 15",
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     },
     {
       "name": "Insert 16",
       "volume": 0.800000011920929,
       "pan": 0.0,
       "muted": false,
-      "solo": false
+      "solo": false,
+      "monitor": 1
     }
   ],
   "mode": "song"
