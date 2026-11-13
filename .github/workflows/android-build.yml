@@ -108,7 +108,7 @@ jobs:
       - name: Configure CMake
         run: |
           cmake -B build-android -S . \
-            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
             -DANDROID_ABI=${{ env.ANDROID_ABI }} \
             -DANDROID_PLATFORM=android-${{ env.ANDROID_API_LEVEL }} \
             -DANDROID_STL=c++_shared \
@@ -116,7 +116,10 @@ jobs:
             -DLYNX_BUILD_PLUGINS=OFF \
             -DLYNX_LTO=OFF \
             -DCMAKE_BUILD_TYPE=${{ env.CMAKE_BUILD_TYPE }} \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -GNinja
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
 
       # ---------------------------------------------------------
       # 6. Build native library (limit parallel jobs for memory)
