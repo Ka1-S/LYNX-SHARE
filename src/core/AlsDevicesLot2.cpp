@@ -525,12 +525,8 @@ bool autoFilterToFilter (const Element& device, Translated& out)
     const auto outputGain = newer ? manual (device, "Output", 1.0) : 1.0;
     if (std::abs (outputGain - 1.0) > 1.0e-3)
         out.notes.dropped.push_back (text ("output gain %.1f dB", dbOfGain (outputGain)));
-    const auto lfo = manual (device, newer ? "Lfo_Amount" : "LfoAmount", 0.0);
-    if (std::abs (lfo) > 1.0e-4)
-        out.notes.dropped.push_back ("LFO on the cutoff");
-    const auto envelope = manual (device, newer ? "Envelope_Amount" : "ModHub", 0.0);
-    if (std::abs (envelope) > 1.0e-4)
-        out.notes.dropped.push_back ("envelope follower on the cutoff");
+    // (190ed) the LFO, the envelope follower and its side chain: autoFilterModulation (lot 3) — a Peak Controller linked
+    // to the cutoff, or the importer's line where no link can be made
     if (manual (device, newer ? "Filter_Drive" : "Drive", 0.0) > 1.0e-4 || (int) manual (device, newer ? "Filter_Circuit" : "CircuitLpHp", 0) != 0)
         out.notes.dropped.push_back ("filter circuit / drive");
     // Slope [MEASURED 190cz a08 / a30–a33 / b08 / b30–b33: on = a second cookbook stage at the same cutoff with Q2 =
@@ -540,8 +536,6 @@ bool autoFilterToFilter (const Element& device, Translated& out)
     p[4] = steep ? 1.0f : 0.0f;
     if (steep && type != 0)
         out.notes.approximated.push_back (type == 1 ? "24 dB/oct high pass (Live's measured on the low pass)" : "24 dB/oct band pass (Live's measured on the low pass)");
-    if (manualBool (device, "SideChain/OnOff", false))
-        out.notes.dropped.push_back ("side-chain input of the envelope follower");
     return true;
 }
 

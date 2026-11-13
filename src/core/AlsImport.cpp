@@ -100,6 +100,20 @@ struct Target
     std::function<float (double)> law;
 };
 
+// (round 190ed) an automated parameter inside a rack, or one of a rack's own macros, kept until the rack has its place
+// (an insert's slot or a channel): then a macro of that rack carries the envelope (core/Rack.h macros are the slot's
+// automatable parameters 0 … 15)
+struct RackAuto
+{
+    std::string id;         // the parameter's AutomationTarget Id
+    std::vector<int> path;  // rack nodes from the rack being read down to the document that holds the target
+    int node = -1;          // −1: macro `param` of that document; else the node whose parameter `param` the envelope moves
+    int param = 0;
+    std::function<float (double)> law; // Live's value → the target's 0..1
+    float current = 0.0f;   // the target's 0..1 as imported (a new macro starts there: no change in sound)
+    std::string name;
+};
+
 struct Ctx
 {
     const AlsImportOptions& options;
@@ -121,6 +135,25 @@ struct Ctx
     std::map<int, std::vector<alsdev::NoteEffect>> noteEffects;
     int skipLeadingMidi = 0;
     std::string signatureTarget; // the main track's TimeSignature AutomationTarget Id (round 190cg)
+    // round 190ed: every AutomationTarget Id an arrangement envelope points at; where the rack being read collects its
+    // automated parameters; targets on the channel being read (their index is set when the channel is placed)
+    std::set<std::string> automated;
+    std::vector<RackAuto>* rackAutos = nullptr;
+    std::vector<std::pair<std::string, Target>> channelTargets;
+    std::set<std::string> explained; // envelopes already listed with their own reason
+    // round 190ed: a Peak Controller linked to a translated effect's parameter (Auto Filter's LFO / envelope follower),
+    // placed once its slots are known: the controller's insert and slot (−1 = appended to that insert after every
+    // track is read: a side-chain source), the effect's insert and slot
+    struct PendingLink
+    {
+        int sourceInsert = -1, sourceSlot = -1;
+        EffectSlot controller;
+        int targetTrack = -1, targetSlot = -1, param = 0;
+        std::vector<float> curve;
+        std::vector<std::string> notes;
+        std::string from, what;
+    };
+    std::vector<PendingLink> pendingLinks;
 
     // the scale of the first MIDI clip that has Live's clip scale switched on (round 190o)
     std::optional<projectkey::Key> clipKey;
@@ -395,19 +428,191 @@ void pluginMappings (Ctx& ctx, const Element& device, PatcherDoc& doc, int node)
         }
 }
 
+// (round 190ed) The envelopes on a plugin's parameters. Live keeps a VST2 parameter as 0..1 [DATA, model] and its
+// ParameterId is its index [model], which LYNX's plugin parameters use too. (round 190ek) A VST3's ParameterId is the
+// plugin's own ParamID and its envelope holds the parameter's plain value, between the MidiControllerRange Live saves
+// for it [MEASURED in a Live 12.4 save, round 190ei: kHs Gain's "Gain" ParamID 1, range 0.0316 … 31.62, envelope points
+// 0.2486 … 28.52; "mode" ParamID 414, 0 … 1; 126 unused entries ParameterId −1]. Such a parameter is carried as slot k
+// = its place among the device's parameters with an id (FL's VST3 automation slots, core/FlWrapper.h, which the plugin
+// host turns into the plugin's own order when it opens it: `vst3Slots` gets the ParamIDs), its value mapped linearly over
+// that range (exact for 0 … 1, the usual range; another range is listed as approximate — the plugin's own curve
+// between the ends is known only to the plugin). `inRack`: the host does not remap a plugin inside a rack: listed there.
+void pluginAutos (Ctx& ctx, const Element& device, const std::string& plugin,
+                  const std::function<void (const std::string& id, int param, float current, const std::string& name, std::function<float (double)> law)>& sink,
+                  std::vector<std::int32_t>* vst3Slots = nullptr, bool inRack = false)
+{
+    const auto vst3 = (bool) device.path ("PluginDesc/Vst3PluginInfo");
+    int slot = 0;
+    for (const auto& p : device.path ("ParameterList").children ("PluginFloatParameter"))
+    {
+        const auto paramId = (std::int64_t) p.number ("ParameterId", -1);
+        const auto mySlot = paramId >= 0 ? slot++ : -1;
+        const auto id = targetId (p.child ("ParameterValue"));
+        if (id.empty() || ctx.automated.count (id) == 0)
+            continue;
+        auto name = p.value ("ParameterName");
+        if (! vst3)
+        {
+            if (paramId < 0)
+                continue;
+            sink (id, (int) paramId, (float) std::clamp (p.number ("ParameterValue/Manual", 0.0), 0.0, 1.0),
+                  plugin + " " + (name.empty () ? "#" + std::to_string (paramId) : name), [] (double v) { return (float) std::clamp (v, 0.0, 1.0); });
+            continue;
+        }
+        if (inRack || vst3Slots == nullptr || mySlot < 0)
+        {
+            ctx.note (&FlpImportReport::unsupported, "Automation of a VST3 plugin's parameter inside a rack (" + plugin + ": LYNX maps a VST3's own parameter ids on inserts and channels)");
+            ctx.explained.insert (id);
+            continue;
+        }
+        const auto lo = p.number ("ParameterValue/MidiControllerRange/Min", 0.0), hi = p.number ("ParameterValue/MidiControllerRange/Max", 1.0);
+        const auto span = std::abs (hi - lo) > 1.0e-12 ? hi - lo : 1.0;
+        if (std::abs (lo) > 1.0e-6 || std::abs (hi - 1.0) > 1.0e-6)
+            ctx.note (&FlpImportReport::approximated, "Automation of a VST3 parameter with its own range (" + plugin + " " + name
+                                                          + ": Live's plain values mapped linearly between the range's ends)");
+        if ((std::size_t) mySlot >= vst3Slots->size())
+            vst3Slots->resize ((std::size_t) mySlot + 1, -1);
+        (*vst3Slots)[(std::size_t) mySlot] = (std::int32_t) paramId;
+        const auto law = [lo, span] (double v) { return (float) std::clamp ((v - lo) / span, 0.0, 1.0); };
+        sink (id, mySlot, law (p.number ("ParameterValue/Manual", lo)), plugin + " " + (name.empty () ? "#" + std::to_string (paramId) : name), law);
+    }
+    // every parameter with an id keeps its slot (the host gives the slots it does not list the next free ones)
+    if (vst3 && vst3Slots != nullptr && ! vst3Slots->empty())
+    {
+        slot = 0;
+        for (const auto& p : device.path ("ParameterList").children ("PluginFloatParameter"))
+            if (const auto paramId = (std::int64_t) p.number ("ParameterId", -1); paramId >= 0)
+            {
+                if ((std::size_t) slot >= vst3Slots->size())
+                    vst3Slots->resize ((std::size_t) slot + 1, -1);
+                (*vst3Slots)[(std::size_t) slot++] = (std::int32_t) paramId;
+            }
+    }
+}
+
+// (round 190ek) The automation slots of a VST3 as FL's record 4 (u32 N + N × i32 ParamID) in its state (FL's record
+// layout, which pluginOf writes), read by the plugin host to put each automation on the plugin's own parameter
+void appendVst3Slots (ForeignPlugin& plugin, const std::vector<std::int32_t>& slots)
+{
+    if (slots.empty() || plugin.format != ForeignPlugin::Format::vst3 || plugin.state.size() < 4)
+        return;
+    auto put32 = [&plugin] (std::uint32_t v) { for (int k = 0; k < 4; ++k) plugin.state.push_back ((std::uint8_t) (v >> (8 * k))); };
+    put32 (4);
+    const auto size = (std::uint64_t) (4 + 4 * slots.size());
+    for (int k = 0; k < 8; ++k)
+        plugin.state.push_back ((std::uint8_t) (size >> (8 * k)));
+    put32 ((std::uint32_t) slots.size());
+    for (const auto id : slots)
+        put32 ((std::uint32_t) id);
+}
+
+// (round 190ed) The macro of rack `doc` that drives a target `path` leads to from `depth`: the target itself when it is
+// a macro of `doc`, else a free macro of `doc` (no mapping, no name of its own, not under an envelope itself) mapped
+// over the target's whole range and set to the target's value (nothing moves; Rand and variations leave it alone).
+// A target in a nested rack goes through a free macro of each rack on the way. −1 when no macro is free.
+int bindMacro (PatcherDoc& doc, const std::vector<RackAuto>& all, const RackAuto& a, std::size_t depth)
+{
+    auto* r = rack::rackOf (doc);
+    if (r == nullptr)
+        return -1;
+    if (depth == a.path.size() && a.node < 0)
+        return a.param >= 0 && a.param < rackMacroCount ? a.param : -1;
+    RackMapping target;
+    auto value = a.current;
+    if (depth == a.path.size())
+    {
+        target.node = a.node;
+        target.param = a.param;
+    }
+    else
+    {
+        const auto n = a.path[depth];
+        if (n < 0 || n >= (int) doc.nodes.size())
+            return -1;
+        auto& node = doc.nodes[(std::size_t) n];
+        auto& inner = node.generator ? node.channel.patcher : node.effect.patcher;
+        const auto k = bindMacro (inner, all, a, depth + 1);
+        if (k < 0 || rack::rackOf (inner) == nullptr)
+            return -1;
+        target.node = n;
+        target.param = k;
+        value = rack::rackOf (inner)->macros[(std::size_t) k].value / 127.0f;
+        r = rack::rackOf (doc);
+    }
+    // a second envelope reaching the same target uses the macro already bound to it
+    for (int k = 0; k < rackMacroCount; ++k)
+        for (const auto& m : r->macros[(std::size_t) k].mappings)
+            if (m.target == RackMapping::Target::param && m.node == target.node && m.param == target.param && m.min == 0.0f && m.max == 1.0f)
+                return k;
+    std::set<int> reserved;
+    for (const auto& other : all)
+        if (other.node < 0 && other.path.size() == depth && std::equal (other.path.begin(), other.path.end(), a.path.begin()))
+            reserved.insert (other.param);
+    for (int k = 0; k < rackMacroCount; ++k)
+    {
+        auto& m = r->macros[(std::size_t) k];
+        if (! m.mappings.empty() || ! m.name.empty() || reserved.count (k) != 0)
+            continue;
+        target.min = 0.0f;
+        target.max = 1.0f;
+        if (! rack::map (doc, k, target))
+            return -1;
+        r = rack::rackOf (doc);
+        auto& bound = r->macros[(std::size_t) k];
+        bound.name = a.name;
+        bound.excludeFromRandom = bound.excludeFromVariations = true;
+        while (r->shownMacros <= k && r->shownMacros < rackMacroCount)
+            r->shownMacros = rack::moreMacros (r->shownMacros);
+        rack::setMacro (doc, k, std::clamp (value, 0.0f, 1.0f) * 127.0f);
+        rack::compile (doc);
+        return k;
+    }
+    return -1;
+}
+
+// (round 190ed) A rack has its place: each envelope it collected targets the rack's macro that carries it
+void placeRackAutos (Ctx& ctx, PatcherDoc& doc, const std::vector<RackAuto>& autos, const std::function<AutomationTarget (int macro)>& at,
+                     bool onChannel = false)
+{
+    for (const auto& a : autos)
+    {
+        const auto k = bindMacro (doc, autos, a, 0);
+        if (k < 0)
+        {
+            ctx.note (&FlpImportReport::unsupported, "Automation inside a rack whose macros are all in use (" + a.name + ")");
+            ctx.explained.insert (a.id);
+            continue;
+        }
+        if (onChannel)
+            ctx.channelTargets.push_back ({ a.id, Target { at (k), ValueMap::plain, a.name, a.law } });
+        else
+            ctx.targets[a.id] = { at (k), ValueMap::plain, a.name, a.law };
+    }
+}
+
 bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth);
 
 // One of Live's own audio effects as the LYNX effect in its role, settings translated (round 190bq, core/AlsDevices.h).
 // The report lists the pair — under "converted" when the maths is the same, under "kept but approximated" when the
 // pair is fitted — and every setting that is clamped, fitted or has no counterpart. False: not a device LYNX maps (or
 // its element lacks the parameters): the caller drops and lists it as before.
-bool nativeEffectFrom (Ctx& ctx, const Element& d, EffectSlot& slot, std::vector<alsdev::ParamLink>* links = nullptr, std::string* name = nullptr)
+bool nativeEffectFrom (Ctx& ctx, const Element& d, EffectSlot& slot, std::vector<alsdev::ParamLink>* links = nullptr, std::string* name = nullptr,
+                       std::optional<alsdev::Translated::Modulator>* modulator = nullptr)
 {
     alsdev::Context context;
     context.bpm = ctx.song.bpm;
     auto t = alsdev::effectFromLiveDevice (d, context);
     if (! t)
         return false;
+    // (round 190ed) a modulation from outside the effect (Auto Filter's LFO / envelope follower): the caller places
+    // its Peak Controller and link; inside a rack chain no link can be made, so it is listed
+    if (t->modulator)
+    {
+        if (modulator != nullptr)
+            *modulator = std::move (t->modulator);
+        else
+            t->notes.dropped.push_back (t->modulator->what + " on the cutoff inside a rack");
+    }
     if (links != nullptr)
         *links = t->links;
     if (name != nullptr)
@@ -493,13 +698,27 @@ int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool
         ctx.note (&FlpImportReport::converted, "Plugin: " + p->name);
         const auto n = rack::addDevice (doc, chain, std::move (node));
         if (n >= 0)
+        {
             pluginMappings (ctx, d, doc, n);
+            pluginAutos (
+                ctx, d, p->name,
+                [&ctx, n] (const std::string& id, int param, float current, const std::string& name, std::function<float (double)> law) {
+                    if (ctx.rackAutos != nullptr)
+                        ctx.rackAutos->push_back ({ id, {}, n, param, std::move (law), current, name });
+                },
+                nullptr, true);
+        }
         return n;
     }
     if ((tag == "AudioEffectGroupDevice" || tag == "InstrumentGroupDevice") && depth < 8)
     {
         auto inner = rack::makeRack (tag == "InstrumentGroupDevice" ? RackDoc::Kind::instrument : RackDoc::Kind::audioEffect);
-        if (! rackFrom (ctx, d, inner, depth + 1))
+        // (round 190ed) the inner rack's automated targets: reached from here through this node
+        std::vector<RackAuto> innerAutos;
+        auto* const outerAutos = std::exchange (ctx.rackAutos, &innerAutos);
+        const auto read = rackFrom (ctx, d, inner, depth + 1);
+        ctx.rackAutos = outerAutos;
+        if (! read)
             return -1;
         if (tag == "InstrumentGroupDevice")
         {
@@ -518,6 +737,12 @@ int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool
         const auto n = rack::addDevice (doc, chain, std::move (node));
         if (n < 0)
             return -1;
+        if (ctx.rackAutos != nullptr)
+            for (auto& a : innerAutos)
+            {
+                a.path.insert (a.path.begin(), n);
+                ctx.rackAutos->push_back (std::move (a));
+            }
         // the inner rack's macros mapped onto the outer rack's (0…127 → 0..1) [DATA]
         for (int k = 0; k < rackMacroCount; ++k)
             if (const auto m = mappingOf (d.child ("MacroControls." + std::to_string (k))))
@@ -548,12 +773,19 @@ int rackDeviceFrom (Ctx& ctx, const Element& d, PatcherDoc& doc, int chain, bool
     }
     // (round 190bq) Live's own effects LYNX has an engine for: the LYNX effect in the chain
     std::vector<alsdev::ParamLink> links;
-    if (! isInstrumentDevice (tag) && nativeEffectFrom (ctx, d, node.effect, &links))
+    std::string from;
+    if (! isInstrumentDevice (tag) && nativeEffectFrom (ctx, d, node.effect, &links, &from))
     {
         node.label = d.value ("UserName");
         const auto n = rack::addDevice (doc, chain, std::move (node));
         if (n >= 0 && native != nullptr)
             *native = true;
+        // (round 190ed) envelopes on its parameters: carried by a macro of the rack once the rack has its place
+        if (n >= 0 && ctx.rackAutos != nullptr)
+            for (const auto& l : links)
+                if (const auto id = targetId (d.path (l.live)); ! id.empty() && ctx.automated.count (id) != 0)
+                    ctx.rackAutos->push_back ({ id, {}, n, l.param, l.value, doc.nodes[(std::size_t) n].effect.params[(std::size_t) l.param],
+                                                from + " " + spacedName (pathFileName (l.live)) });
         // (round 190cf) the rack's macros drive the LYNX effect's parameters over the range the mapping holds, each
         // end through the parameter's law (between the ends the macro moves LYNX's control in a straight line)
         if (n >= 0)
@@ -681,6 +913,12 @@ bool rackFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int depth)
         if (auto& m = r->macros[(std::size_t) k]; m.name.empty() && m.mappings.empty() && droppedTargets[(std::size_t) k].size() == 1)
             m.name = droppedTargets[(std::size_t) k].front();
     r->shownMacros = std::clamp ((int) device.number ("NumVisibleMacroControls", 8), 1, rackMacroCount);
+    // (round 190ed) the macros an envelope moves (0…127 → the slot's parameter k, 0..1)
+    if (ctx.rackAutos != nullptr)
+        for (int k = 0; k < rackMacroCount; ++k)
+            if (const auto id = targetId (device.child ("MacroControls." + std::to_string (k))); ! id.empty() && ctx.automated.count (id) != 0)
+                ctx.rackAutos->push_back ({ id, {}, -1, k, [] (double v) { return (float) std::clamp (v / 127.0, 0.0, 1.0); },
+                                            r->macros[(std::size_t) k].value / 127.0f, rack::macroName (*r, k) });
     r->selector = (float) std::clamp (device.number ("ChainSelector/Manual", 0.0), 0.0, 127.0);
     r->selectorFiltersCtrl = device.boolean ("ChainSelectorFilterMidiCtrl", false);
     r->autoSelect = device.boolean ("IsAutoSelectEnabled", false);
@@ -734,6 +972,18 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
             channel.plugin.name = p->name;
             channel.plugin.foreign = *p;
             ctx.note (&FlpImportReport::converted, "Plugin: " + p->name);
+            // (round 190ed) envelopes on the plugin's parameters (the track's own instrument only)
+            if (depth == 0 && ! ctx.inDrumPad)
+            {
+                std::vector<std::int32_t> slots;
+                pluginAutos (
+                    ctx, device, p->name,
+                    [&ctx] (const std::string& id, int param, float, const std::string& name, std::function<float (double)> law) {
+                        ctx.channelTargets.push_back ({ id, Target { AutomationTarget { AutomationTargetKind::channelParam, -1, 0, param }, ValueMap::plain, name, std::move (law) } });
+                    },
+                    &slots);
+                appendVst3Slots (channel.plugin.foreign, slots); // (round 190ek)
+            }
             return true;
         }
         return false;
@@ -791,6 +1041,18 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
             else
             {
                 ctx.pendingKeyShift = r.keyShift;
+                // (round 190ed) envelopes on the filter's frequency (Hz, the same law) and resonance (as the import
+                // reads it) move the Sampler's Cutoff / Resonance knobs
+                const auto filter = device.path ("Filter/Slot/Value/SimplerFilter");
+                if (depth == 0 && device.boolean ("Filter/IsOn/Manual", false) && filter)
+                {
+                    if (const auto id = targetId (filter.child ("Freq")); ! id.empty() && ctx.automated.count (id) != 0)
+                        ctx.channelTargets.push_back ({ id, Target { AutomationTarget { AutomationTargetKind::channelParam, -1, 0, samplerparam::cutoff }, ValueMap::plain,
+                                                                     "Simpler Filter Freq", [] (double hz) { return samplerparam::toValue (samplerparam::cutoff, (float) std::clamp (hz, 20.0, 20000.0)); } } });
+                    if (const auto id = targetId (filter.child ("Res")); ! id.empty() && ctx.automated.count (id) != 0)
+                        ctx.channelTargets.push_back ({ id, Target { AutomationTarget { AutomationTargetKind::channelParam, -1, 0, samplerparam::resonance }, ValueMap::plain,
+                                                                     "Simpler Filter Res", [] (double r) { return samplerparam::toValue (samplerparam::resonance, (float) std::clamp (r, 0.0, 1.0)); } } });
+                }
                 for (const auto& n : notes.approximated)
                     ctx.note (&FlpImportReport::approximated, "Simpler: " + n);
                 for (const auto& n : notes.dropped)
@@ -860,10 +1122,17 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
     if (tag == "InstrumentGroupDevice" && depth < 8) // (round 183c: a LYNX Instrument Rack)
     {
         auto doc = rack::makeRack (RackDoc::Kind::instrument);
-        if (rackFrom (ctx, device, doc, depth))
+        // (round 190ed) the envelopes inside the rack and on its macros (the track's own instrument only): the channel's
+        // macro parameters
+        std::vector<RackAuto> autos;
+        auto* const saved = std::exchange (ctx.rackAutos, depth == 0 && ! ctx.inDrumPad ? &autos : nullptr);
+        const auto read = rackFrom (ctx, device, doc, depth);
+        ctx.rackAutos = saved;
+        if (read)
         {
             channel.instrument = InstrumentKind::patcher;
             channel.patcher = std::move (doc);
+            placeRackAutos (ctx, channel.patcher, autos, [] (int k) { return AutomationTarget { AutomationTargetKind::channelParam, -1, 0, k }; }, true);
             return true;
         }
         return false;
@@ -880,6 +1149,29 @@ bool instrumentFrom (Ctx& ctx, const Element& device, ChannelDef& channel, std::
                         return true;
                     }
         return false;
+    }
+    // (round 190ed) Operator without FM in use and Drift: the built-in synth with their oscillators, filter and amp
+    // envelope (core/AlsDevices.h); the report lists the pair as fitted and what has no place
+    if (tag == "Operator" || tag == "Drift")
+    {
+        alsdev::Notes notes;
+        ChannelDef synth = channel;
+        if (tag == "Operator" ? alsdev::operatorToSynth (device, synth, ctx.song.bpm, notes) : alsdev::driftToSynth (device, synth, ctx.song.bpm, notes))
+        {
+            channel = std::move (synth);
+            ctx.note (&FlpImportReport::partialEffects, tag + " -> built-in synth (settings fitted to LYNX's engine)");
+            for (const auto& n : notes.approximated)
+                ctx.note (&FlpImportReport::partialEffects, tag + ": " + n);
+            for (const auto& n : notes.dropped)
+                ctx.note (&FlpImportReport::partialEffects, tag + ": " + n + " (not applied)");
+            return true;
+        }
+        if (tag == "Operator")
+        {
+            // FM (or a waveform whose order is not settled): no LYNX engine holds it yet
+            ctx.note (&FlpImportReport::unsupported, deviceName (device) + " (FM synthesis: no LYNX engine for it yet)");
+            return false;
+        }
     }
     // Live's synths: no LYNX equivalent; the channel keeps a built-in synth, as for an unknown FL generator
     ctx.note (&FlpImportReport::unsupported, deviceName (device));
@@ -935,6 +1227,87 @@ bool midiEffectFrom (Ctx& ctx, const Element& d, ChannelDef& channel, std::vecto
     return true;
 }
 
+// (round 190ed) The Peak Controller of a translated effect's modulation (core/AlsDevices.h Translated::Modulator): in
+// front of the effect on its insert, or (a side-chain envelope follower) at the end of the source track's insert once
+// every track is read; the link is made then (finishLinks)
+void placeModulator (Ctx& ctx, const Element& d, MixerTrack& insert, int track, alsdev::Translated::Modulator& mod, std::vector<alsdev::ParamLink>& links,
+                     const std::string& from)
+{
+    // the parameter the link moves keeps no envelope of its own (the link would fight it)
+    for (auto it = links.begin(); it != links.end(); ++it)
+        if (it->param == mod.param)
+        {
+            if (const auto id = targetId (d.path (it->live)); ! id.empty() && ctx.automated.count (id) != 0)
+            {
+                ctx.note (&FlpImportReport::partialEffects, from + ": automation of the cutoff under its " + mod.what + " (the link moves the cutoff; not carried)");
+                ctx.explained.insert (id);
+            }
+            links.erase (it);
+            break;
+        }
+    Ctx::PendingLink link;
+    link.controller = std::move (mod.controller);
+    link.targetTrack = track;
+    link.param = mod.param;
+    link.curve = std::move (mod.curve);
+    link.notes = std::move (mod.notes);
+    link.from = from;
+    link.what = mod.what;
+    if (mod.sideTrackId >= 0)
+        if (const auto it = ctx.insertOfTrack.find (mod.sideTrackId); it != ctx.insertOfTrack.end())
+        {
+            link.sourceInsert = it->second;
+            link.notes.push_back ("envelope follower on the side-chain source: its Peak Controller sits at the end of that track's insert");
+            ctx.pendingLinks.push_back (std::move (link));
+            return;
+        }
+    if (mod.sideTrackId >= 0 || mod.sideOther)
+        link.notes.push_back ("side-chain input of the envelope follower (its source is not a track of the set; the follower hears the effect's input)");
+    if (insert.effects.size() + 2 > (std::size_t) maxEffectSlots)
+    {
+        ctx.note (&FlpImportReport::partialEffects, from + ": " + mod.what + " on the cutoff (no free effect slot for its Peak Controller) (not applied)");
+        return;
+    }
+    insert.effects.push_back (std::move (link.controller));
+    link.sourceInsert = track;
+    link.sourceSlot = (int) insert.effects.size() - 1;
+    ctx.pendingLinks.push_back (std::move (link));
+}
+
+// (round 190ed) Every track is read: the side-chain controllers go to the end of their source inserts and each link is made
+void finishLinks (Ctx& ctx)
+{
+    auto& song = ctx.song;
+    for (auto& link : ctx.pendingLinks)
+    {
+        if (link.targetSlot < 0 || link.sourceInsert < 0 || link.sourceInsert >= (int) song.mixer.size())
+            continue;
+        if (link.sourceSlot < 0)
+        {
+            auto& source = song.mixer[(std::size_t) link.sourceInsert];
+            if (source.effects.size() >= (std::size_t) maxEffectSlots)
+            {
+                ctx.note (&FlpImportReport::partialEffects, link.from + ": " + link.what + " on the cutoff (no free effect slot on the side-chain source) (not applied)");
+                continue;
+            }
+            source.effects.push_back (std::move (link.controller));
+            link.sourceSlot = (int) source.effects.size() - 1;
+        }
+        Automation a;
+        a.name = song.mixer[(std::size_t) link.targetTrack].name + " " + link.from + " cutoff (" + link.what + ")";
+        a.target = { AutomationTargetKind::effectParam, link.targetTrack, link.targetSlot, link.param };
+        a.source.track = link.sourceInsert;
+        a.source.slot = link.sourceSlot;
+        a.source.output = 0; // peak + LFO
+        a.curve = link.curve;
+        song.automations.push_back (std::move (a));
+        ctx.note (&FlpImportReport::partialEffects, link.from + " " + link.what + " -> Peak Controller linked to the Filter's cutoff");
+        for (const auto& n : link.notes)
+            ctx.note (&FlpImportReport::partialEffects, link.from + ": " + n);
+    }
+    ctx.pendingLinks.clear();
+}
+
 // Audio effects of a track (after its instrument): plugins carried over, the rest listed
 void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& insert)
 {
@@ -952,6 +1325,16 @@ void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& ins
                 slot.plugin.foreign = *p;
                 insert.effects.push_back (std::move (slot));
                 ctx.note (&FlpImportReport::converted, "Plugin: " + p->name);
+                // (round 190ed) envelopes on the plugin's parameters
+                const auto track = (int) (&insert - ctx.song.mixer.data()), at = (int) insert.effects.size() - 1;
+                std::vector<std::int32_t> slots;
+                pluginAutos (
+                    ctx, d, p->name,
+                    [&ctx, track, at] (const std::string& id, int param, float, const std::string& name, std::function<float (double)> law) {
+                        ctx.targets[id] = { AutomationTarget { AutomationTargetKind::effectParam, track, at, param }, ValueMap::plain, name, std::move (law) };
+                    },
+                    &slots);
+                appendVst3Slots (insert.effects.back().plugin.foreign, slots); // (round 190ek)
             }
             continue;
         }
@@ -959,8 +1342,19 @@ void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& ins
         {
             auto slot = rack::makeRackSlot (RackDoc::Kind::audioEffect);
             slot.enabled = d.boolean ("On/Manual", true);
-            if (rackFrom (ctx, d, slot.patcher, 0))
+            // (round 190ed) the envelopes inside the rack and on its macros: the slot's macro parameters
+            std::vector<RackAuto> autos;
+            auto* const saved = std::exchange (ctx.rackAutos, &autos);
+            const auto read = rackFrom (ctx, d, slot.patcher, 0);
+            ctx.rackAutos = saved;
+            if (read)
+            {
                 insert.effects.push_back (std::move (slot));
+                const auto track = (int) (&insert - ctx.song.mixer.data()), at = (int) insert.effects.size() - 1;
+                placeRackAutos (ctx, insert.effects.back().patcher, autos, [track, at] (int k) {
+                    return AutomationTarget { AutomationTargetKind::effectParam, track, at, k };
+                });
+            }
             continue;
         }
         if (isMidiEffect (tag))
@@ -971,11 +1365,19 @@ void effectsFrom (Ctx& ctx, const std::vector<Element>& devices, MixerTrack& ins
         // (round 190bq) Live's own effects LYNX has an engine for: the LYNX effect, settings translated
         std::vector<alsdev::ParamLink> links;
         std::string from;
-        if (EffectSlot slot; insert.effects.size() < (std::size_t) maxEffectSlots && nativeEffectFrom (ctx, d, slot, &links, &from))
+        std::optional<alsdev::Translated::Modulator> modulator;
+        if (EffectSlot slot; insert.effects.size() < (std::size_t) maxEffectSlots && nativeEffectFrom (ctx, d, slot, &links, &from, &modulator))
         {
-            insert.effects.push_back (std::move (slot));
-            // (round 190cf) automation of the device's parameters follows onto the LYNX effect's, by the same laws
             const auto track = (int) (&insert - ctx.song.mixer.data());
+            // (round 190ed) the modulation's Peak Controller: in front of the effect, or at the end of the side-chain
+            // source's insert once every track is read; the link drives the parameter the modulation moves, so that
+            // parameter's own envelope is not carried as well
+            if (modulator)
+                placeModulator (ctx, d, insert, track, *modulator, links, from);
+            insert.effects.push_back (std::move (slot));
+            if (modulator && ! ctx.pendingLinks.empty() && ctx.pendingLinks.back().targetSlot == -1)
+                ctx.pendingLinks.back().targetSlot = (int) insert.effects.size() - 1;
+            // (round 190cf) automation of the device's parameters follows onto the LYNX effect's, by the same laws
             for (auto& l : links)
                 if (const auto id = targetId (d.path (l.live)); ! id.empty())
                     ctx.targets[id] = { AutomationTarget { AutomationTargetKind::effectParam, track, (int) insert.effects.size() - 1, l.param },
@@ -1343,7 +1745,8 @@ void addAutomation (Ctx& ctx, const Element& envelopes, const std::string& owner
         const auto it = ctx.targets.find (id);
         if (it == ctx.targets.end())
         {
-            ctx.note (&FlpImportReport::unsupported, "Automation of a device parameter (" + owner + ")");
+            if (ctx.explained.count (id) == 0)
+                ctx.note (&FlpImportReport::unsupported, "Automation of a device parameter (" + owner + ")");
             continue;
         }
         std::vector<std::pair<double, double>> events;
@@ -1753,6 +2156,13 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
 
     // tracks: one insert each (returns too), in order
     const auto tracks = set.child ("Tracks").children();
+    // (round 190ed) the parameters an arrangement envelope moves
+    for (const auto& owner : { main.child ("AutomationEnvelopes") })
+        for (const auto& env : owner.path ("Envelopes").children ("AutomationEnvelope"))
+            ctx.automated.insert (env.path ("EnvelopeTarget/PointeeId").attr ("Value"));
+    for (const auto& t : tracks)
+        for (const auto& env : t.path ("AutomationEnvelopes/Envelopes").children ("AutomationEnvelope"))
+            ctx.automated.insert (env.path ("EnvelopeTarget/PointeeId").attr ("Value"));
     std::vector<int> insertOf (tracks.size(), 0), rowOf (tracks.size(), -1);
     std::map<std::string, int> groupInsert, groupRow;
     std::vector<int> returns;
@@ -1887,6 +2297,14 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
             }
             song.channels.push_back (std::move (c));
             channelOf[i] = (int) song.channels.size() - 1;
+            // (round 190ed) the envelopes on the channel's instrument (a plugin's parameters, an Instrument Rack's macros,
+            // a Simpler's filter)
+            for (auto& [id, target] : ctx.channelTargets)
+            {
+                target.target.index = channelOf[i];
+                ctx.targets[id] = std::move (target);
+            }
+            ctx.channelTargets.clear();
             if (! noteEffects.empty())
                 ctx.noteEffects[channelOf[i]] = std::move (noteEffects);
             if (ctx.pendingKeyShift != 0)
@@ -1914,6 +2332,8 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         if (! t.path ("TakeLanes/TakeLanes").children ("TakeLane").empty())
             ctx.note (&FlpImportReport::unsupported, "Take lanes (only the main lane is kept)");
     }
+
+    finishLinks (ctx); // (round 190ed)
 
     // Session clips: in the clip grid (round 181c, the default: the user's choice of 2026-11-08), or on the Playlist
     // after the arrangement, one section per scene (an option; the default before)
