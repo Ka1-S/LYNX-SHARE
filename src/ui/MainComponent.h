@@ -180,6 +180,8 @@ public:
     void scrollRackForSnapshot (int x) { rackViewport.setViewPosition (x, rackViewport.getViewPositionY()); }
     BrowserComponent& getBrowserForSnapshot() { return browser; }
     MixerComponent& getMixerForSnapshot() { return mixer; }
+    // the Multilink button's right-click menu (round 190ey: shown by it, and the shot route's)
+    juce::PopupMenu getMultilinkMenuForSnapshot();
     PlaylistComponent& getPlaylistForSnapshot() { return playlist; }
     juce::Component& getRackViewportForSnapshot() { return rackViewport; }
     std::unique_ptr<juce::Component> makeQuickAddForSnapshot();
@@ -304,6 +306,9 @@ private:
     juce::PopupMenu playlistTrackExportMenu (bool groups); // File › Export / Playlist Tools: the three starts (round 168e)
     // Tools › Last tweaked / Next to last tweaked (REA round 143): the parameter menu of a recently moved control
     juce::PopupMenu makeLastTweakedMenu (int which);
+    // the last tweaked control's own items (automation, remote control, value): its menu, and FL's left column of the
+    // Multilink button's menu while multilink is off (round 190ey)
+    void addLastTweakedItems (juce::PopupMenu& menu, const AutomationTarget& target);
     // File › Import › MIDI file... (REA round 143)
     void importMidiFile();
     void importMidiFile (const juce::File& file, const MidiFileIo::ImportOptions& options);

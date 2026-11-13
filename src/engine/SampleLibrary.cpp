@@ -610,6 +610,8 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStreamed (const juce::File&
 
     auto data = std::make_shared<SampleData>();
     data->sampleRate = reader.sampleRate;
+    data->bitsPerSample = (int) reader.bitsPerSample;
+    data->floatData = reader.usesFloatingPointData;
     data->mappedFrames = (std::size_t) frames;
     data->mappedLeft = reinterpret_cast<const float*> (static_cast<const char*> (mapped->left->getData()) + cacheHeader);
     data->mappedRight = mapped->right != nullptr
@@ -711,7 +713,8 @@ void readWavExtras (const juce::File& file, SampleData& data)
             break;
         const auto len = (std::int64_t) ((std::uint32_t) h[4] | ((std::uint32_t) h[5] << 8) | ((std::uint32_t) h[6] << 16) | ((std::uint32_t) h[7] << 24));
         const auto next = in.getPosition() + len + (len & 1);
-        const auto wanted = std::memcmp (h, "cue ", 4) == 0 || std::memcmp (h, "LIST", 4) == 0 || std::memcmp (h, "acid", 4) == 0;
+        const auto wanted = std::memcmp (h, "cue ", 4) == 0 || std::memcmp (h, "LIST", 4) == 0 || std::memcmp (h, "acid", 4) == 0
+                            || std::memcmp (h, "strc", 4) == 0;
         if (wanted && len <= (1 << 20) && in.getPosition() + len <= total)
         {
             const auto at = riff.size();
@@ -727,6 +730,7 @@ void readWavExtras (const juce::File& file, SampleData& data)
         return;
     const auto x = audioedit::decodeWavExtras (riff.data(), riff.size(), (std::int64_t) data.frames());
     data.markerStarts = x.markerStarts;
+    data.sliceMarkers = x.sliceMarkers;
     // (FL's General › "Read sample tempo information", round 190bx: off = the tempo stored in the file is ignored)
     data.acidBeats = flsettings::sampleTempoBeats (x.acidBeats);
 }
@@ -782,6 +786,8 @@ std::shared_ptr<const SampleData> SampleLibrary::decode (const juce::String& pat
 
     auto data = std::make_shared<SampleData>();
     data->sampleRate = reader->sampleRate;
+    data->bitsPerSample = (int) reader->bitsPerSample;
+    data->floatData = reader->usesFloatingPointData;
     data->left.assign (buffer.getReadPointer (0), buffer.getReadPointer (0) + frames);
     // the file's own loop (WAV smpl, first loop; JUCE gives the end frame inclusive)
     {

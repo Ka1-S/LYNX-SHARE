@@ -3590,6 +3590,33 @@ void RackRenderer::process (const RackState* state,
 
             auto& instrument = *state->instruments[(std::size_t) e.channel];
 
+            // Round 190ey (live check 190ew PL-3): a Playlist audio clip previewed through its channel, so through the
+            // channel's mixer insert as FL plays it: its key is a clip key (above the MIDI range, which nothing played live
+            // uses) and it carries the clip's note as the Scheduler makes it (core audioClipNote)
+            if (e.key >= audioClipKeyBase && (e.type == NoteEvent::Type::on || e.type == NoteEvent::Type::off))
+            {
+                if (e.type == NoteEvent::Type::off)
+                {
+                    instrument.noteOff (e.key);
+                    continue;
+                }
+                const auto* c = (std::size_t) e.channel < state->song.channels.size() ? &state->song.channels[(std::size_t) e.channel] : nullptr;
+                const auto cents = e.cents + (c != nullptr ? c->misc.fineTune : 0.0f) + instrument.wheelCents();
+                instrument.setNextNoteExpression (e.pan, cents, false);
+                instrument.setNextNoteModulation (e.modX, e.modY);
+                if (e.clipPitch != 0.0f)
+                    instrument.setNextClipPitch (e.clipPitch);
+                if (e.clipStretch != 1.0f)
+                    instrument.setNextClipStretch (e.clipStretch);
+                if (e.fadeIn > 0.0f || e.fadeOut > 0.0f || e.fadeShape != 0)
+                    instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape, e.fadeInTension, e.fadeOutTension);
+                auto velocity = e.velocity;
+                if (e.gain != 1.0f && ! instrument.setNextNoteGain (e.gain))
+                    velocity *= e.gain;
+                instrument.noteOnAt (e.key, velocity, e.startSeconds);
+                continue;
+            }
+
             if (e.type == NoteEvent::Type::voiceProp) // issue #108: a played MPE note's bend / timbre / pressure
             {
                 auto base = instrument.wheelCents();

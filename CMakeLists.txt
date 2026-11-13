@@ -564,6 +564,7 @@ if(LYNX_BUILD_APP)
         src/ui/ToolWindow.cpp
         src/ui/SpeechDialog.cpp
         src/ui/TempoTapper.cpp
+        src/ui/TempoDetectionDialog.cpp
         src/ui/LoopStarterWindow.cpp
         src/ui/SimpleWorkflow.cpp
         src/ui/FinishDock.cpp

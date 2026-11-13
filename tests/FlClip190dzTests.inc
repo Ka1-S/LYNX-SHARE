@@ -123,12 +123,12 @@ TEST (flclip190dz_menu_model_is_fl_order_and_sections)
         "Select source channel >", "Channel settings", "Make unique", "Select all similar clips", "Delete", "-", "Properties...",
         "[Region]", "Select region >", "Chop >", "||",
         "[Sample]", "Make unique as sample", "Edit sample", "Extract stems from sample", "Detect tempo", "Fit to tempo",
-        "[Automation]", "Automate >", "Crossfade with >", "[Fades]", "Reset fades"
+        "[Automation]", "Automate >", "Crossfade with >", "[Fades]", "Reset fades", "Fade in curve >", "Fade out curve >"
     };
     CHECK (flclip190dz::texts (flclipmenu::shown (true, false)) == usual);
     auto overlapped = usual;
     overlapped.erase (std::find (overlapped.begin(), overlapped.end(), "Crossfade with >"));
-    overlapped.push_back ("Crossfade selected");
+    overlapped.insert (std::find (overlapped.begin(), overlapped.end(), "Fade in curve >"), "Crossfade selected"); // (round 190ey: the curves shown)
     CHECK (flclip190dz::texts (flclipmenu::shown (false, true)) == overlapped);
     for (const auto& e : flclipmenu::shown (true, true))
         CHECK (e.have != flclipmenu::Entry::Have::missing);
@@ -214,7 +214,7 @@ TEST (flclip190dz_level_adjustment_automation_target)
     song.removeChannel (0);
     CHECK (song.automations.back().target.kind == AutomationTargetKind::none);
     // the last-tweaked read-out
-    CHECK (lasttweak::valueText (song, volume, 0.5f) == "100%" && lasttweak::valueText (song, pan, 0.25f) == "L50");
+    CHECK (lasttweak::valueText (song, volume, 0.5f) == "100%  0.0dB  1.00" && lasttweak::valueText (song, pan, 0.25f) == "L50"); // (round 190ey: FL's text)
 }
 
 TEST (flclip190dz_level_adjustment_plays_as_fl)

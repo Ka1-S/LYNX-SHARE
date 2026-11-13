@@ -166,6 +166,11 @@ inline double ticksPerSample (double bpm, double sampleRate) noexcept
     return bpm * ppq / (60.0 * sampleRate);
 }
 
+// An audio clip's "on" note as the song plays it at the clip's start (its key, gain, pan, fades in samples, pitch, stretch,
+// declick bits, where its file starts): the Scheduler's, and the Playlist's clip Preview through the clip's channel
+// (round 190ey, live check 190ew PL-3). `tps` = ticks per sample.
+NoteEvent audioClipNote (const Song& song, const Clip& clip, std::size_t clipIndex, double tps) noexcept;
+
 // Generates the pattern's events (playing in a loop) in the interval [startTick, startTick + numSamples * tps).
 // A note starting at t generates "on" at t and "off" at t + length.
 void schedulePatternLoop (const Pattern& pattern,

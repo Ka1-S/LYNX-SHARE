@@ -17,6 +17,9 @@
 #include "core/MixerOps.h"
 #include "core/ClipOps.h"
 #include "core/TempoDetect.h"
+#include "ui/AudioClipboard.h"
+#include "ui/AudioEditor.h"
+#include "ui/TempoDetectionDialog.h"
 
 #include <cstring>
 #include <functional>
@@ -3057,7 +3060,8 @@ public:
         knob (stretchPitchKnob, stretchPitchLabel, TR_NOOP ("Pitch"), TR_NOOP ("Pitch shift"), -1200.0, 1200.0, 1.0, 0.0);
         stretchPitchKnob.textFromValueFunction = [] (double v) { return tr ("{0} cents", { (v > 0.5 ? "+" : "") + juce::String (juce::roundToInt (v)) }); };
         knob (mulKnob, mulLabel, TR_NOOP ("Mul"), TR_NOOP ("Time stretch (multiplicator)"), -20000.0, 20000.0, 1.0, 0.0);
-        mulKnob.textFromValueFunction = [] (double v) { return juce::String::charToString (0x00d7) + juce::String (samplerpage::mulFactor ((int) v), 3); };
+        // (live check 190ew SMP-5: FL's hint reads "105.70%")
+        mulKnob.textFromValueFunction = [] (double v) { return juce::String (samplerpage::mulText ((int) v)); };
         knob (stretch, stretchLabel, TR_NOOP ("Time"), TR_NOOP ("Time stretch (time)"), 0.0, 1024.0, 0.01, 0.0);
         stretch.textFromValueFunction = [] (double v) { return v <= 0.0 ? tr ("(none)") : tr ("{0} beats", { juce::String (v, 2) }); };
         // issue #32 #7: "Fit to tempo" sets exact lengths (16.45 beats for a loop with a tail, 128 for 32 bars)
@@ -3129,6 +3133,12 @@ public:
         // round 190w: FL 2026 previews the sample when its display is clicked (from the start offset, to its end) and shows
         // the playback locator over it (What's New 21138; [SHOT] flgap190w burst n2 / o3)
         wave.onClick = [this] { previewFromDisplay(); };
+        // round 190ey (live check 190ew SMP-7): FL's waveform menu on a right-click
+        wave.onRightClick = [this] {
+            auto menu = waveMenu();
+            if (menu.getNumItems() > 0)
+                menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&wave).withMousePosition());
+        };
         addAndMakeVisible (wave);
         waveScroll.setRangeLimits (0.0, 1.0, juce::dontSendNotification);
         waveScroll.setCurrentRange (0.0, 1.0, juce::dontSendNotification);
@@ -3446,7 +3456,25 @@ public:
         return done;
     }
     bool shotLegacyShown() const { return boost.isVisible() && ! removeDc.isVisible(); }
-    bool shotEnabled (const juce::String& what) const { return what == "keepOnDisk" ? keepOnDisk.isEnabled() : what == "loopStart" ? loopStartKnob.isEnabled() : false; }
+    bool shotEnabled (const juce::String& what) const
+    {
+        return what == "keepOnDisk"    ? keepOnDisk.isEnabled()
+               : what == "loopStart"   ? loopStartKnob.isEnabled()
+               : what == "resample"    ? resampleBox.isEnabled()
+               : what == "loadRegions" ? loadRegionsBox.isEnabled()
+               : what == "loadMarkers" ? loadMarkersBox.isEnabled()
+                                       : false;
+    }
+    juce::String shotText (const juce::String& what)
+    {
+        if (what == "mulText")
+            return mulKnob.getTextFromValue (mulKnob.getValue());
+        if (what == "corner")
+            return wave.getCornerText();
+        if (what == "waveHint")
+            return wave.getTooltip();
+        return {};
+    }
     double shotScrollStart() const { return waveScroll.getCurrentRangeStart(); }
     juce::String shotModeText() const { return stretchMethod.getText(); }
 
@@ -3585,15 +3613,133 @@ private:
         if (c == nullptr || (c->samplePath.empty() && c->zones.empty()))
             return;
         stopPreview();
-        ref.edit (engine, [] (ChannelDef& d) {
-            d.samplePath.clear();
-            d.zones.clear();
-            d.sampler.slices.clear();
-            d.sampler.loopStart = d.sampler.loopEnd = -1;
-        });
+        // (live check 190ew CTL-4: FL also renames the channel "Sampler", without asking)
+        ref.edit (engine, [] (ChannelDef& d) { samplerpage::removeSample (d); });
+    }
+
+    // FL's waveform menu (live check 190ew SMP-7, samplerpage::waveMenu): the items LYNX performs, in FL's order and groups
+    juce::PopupMenu waveMenu()
+    {
+        juce::PopupMenu menu;
+        const auto* c = current();
+        if (c == nullptr)
+            return menu;
+        const auto sample = sampleOf (*c);
+        const juce::File file (juce::String::fromUTF8 (c->samplePath.c_str()));
+        const auto has = sample != nullptr && sample->frames() > 0;
+        auto pendingLine = false;
+        for (const auto& e : samplerpage::waveMenu())
+        {
+            if (e.text == nullptr)
+            {
+                pendingLine = menu.getNumItems() > 0;
+                continue;
+            }
+            if (! e.have)
+                continue;
+            if (pendingLine)
+                menu.addSeparator();
+            pendingLine = false;
+            const juce::String key (e.text);
+            const auto text = tr (e.text) + (juce::String (e.shortcut).isNotEmpty() ? "\t" + juce::String (e.shortcut) : juce::String());
+            auto safe = juce::Component::SafePointer<SettingsPanel> (this);
+            if (key == "Reload")
+                menu.addItem (text, file.existsAsFile(), false, [safe, file] {
+                    if (safe == nullptr)
+                        return;
+                    // (the file may have changed on disk: the library reads it again)
+                    safe->engine.getSampleLibrary().forget (file.getFullPathName());
+                    safe->ref.edit (safe->engine, [path = file.getFullPathName().toStdString()] (ChannelDef& d) { d.samplePath = path; });
+                    safe->refresh();
+                });
+            else if (key == "Save as...")
+                menu.addItem (text, has, false, [safe] { if (safe != nullptr) safe->saveSampleAs(); });
+            else if (key == "Locate file")
+                menu.addItem (text, file.existsAsFile(), false, [file] { file.revealToUser(); });
+            else if (key == "Copy audio to clipboard")
+                menu.addItem (text, has, false, [sample] {
+                    audioedit::Audio a;
+                    a.sampleRate = sample->sampleRate;
+                    a.channels.emplace_back (sample->leftData(), sample->leftData() + sample->frames());
+                    if (sample->isStereo())
+                        a.channels.emplace_back (sample->rightData(), sample->rightData() + sample->frames());
+                    audioclipboard::editor() = std::move (a);
+                });
+            else if (key == "Paste audio from clipboard")
+                menu.addItem (text, audioclipboard::hasAudio(), false, [safe] {
+                    const auto wav = audioclipboard::wav();
+                    if (safe == nullptr || wav.empty())
+                        return;
+                    // (FL loads the clipboard's audio as the channel's sample: LYNX writes it to the clipboard files first)
+                    const auto saved = audioclipboard::save ("Audio clipboard", ".wav", wav.data(), wav.size());
+                    if (saved.existsAsFile())
+                        safe->replaceSample (saved);
+                });
+            else if (key == "Edit in audio editor")
+                menu.addItem (text, has && ref.index >= 0, false, [safe] {
+                    if (safe != nullptr)
+                        openAudioEditorForChannel (safe->engine, safe->ref.index);
+                });
+            else if (key == "Open in new sampler channel" || key == "Open in new Fruity Granulizer channel")
+            {
+                const auto kind = key == "Open in new sampler channel" ? InstrumentKind::sampler : InstrumentKind::granulizer;
+                menu.addItem (text, file.existsAsFile() && openInNewChannelHandler() != nullptr, false, [file, kind] {
+                    if (openInNewChannelHandler())
+                        openInNewChannelHandler() (file, kind);
+                });
+            }
+            else if (key == "Detect tempo")
+                menu.addItem (text, has, false, [safe, sample] {
+                    if (safe == nullptr)
+                        return;
+                    const auto* ch = safe->current();
+                    ui::TempoDetectionRequest r;
+                    r.name = ch != nullptr ? juce::String::fromUTF8 (ch->name.c_str()) : juce::String();
+                    r.sample = sample;
+                    r.projectBpm = safe->engine.getSong().bpm;
+                    r.hasTempoInfo = sample->acidBeats > 0.0f;
+                    // (the tempo picked: the sample lasts that many beats, TIME on the page; no tempo: TIME off)
+                    r.apply = [safe] (double beats) {
+                        if (safe != nullptr)
+                            safe->ref.edit (safe->engine, [beats] (ChannelDef& d) { samplerpage::setStretchTime (d.sampler, (float) beats); });
+                    };
+                    ui::showTempoDetectionDialog (std::move (r));
+                });
+        }
+        return menu;
+    }
+
+    void saveSampleAs()
+    {
+        const auto* c = current();
+        const auto sample = c != nullptr ? sampleOf (*c) : nullptr;
+        if (sample == nullptr)
+            return;
+        const juce::File now (juce::String::fromUTF8 (c->samplePath.c_str()));
+        sampleChooser = lynx::ui::makeFileChooser (tr ("Save as..."), now.getParentDirectory().getChildFile (now.getFileNameWithoutExtension() + ".wav"), "*.wav");
+        lynx::ui::launchChooser (sampleChooser, juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
+                                                    | juce::FileBrowserComponent::warnAboutOverwriting,
+                                 [sample] (const juce::FileChooser& fc) {
+                                     auto target = fc.getResult();
+                                     if (target == juce::File())
+                                         return;
+                                     audioedit::Document doc;
+                                     doc.audio.sampleRate = sample->sampleRate;
+                                     doc.audio.channels.emplace_back (sample->leftData(), sample->leftData() + sample->frames());
+                                     if (sample->isStereo())
+                                         doc.audio.channels.emplace_back (sample->rightData(), sample->rightData() + sample->frames());
+                                     doc.loopStart = sample->loopStart;
+                                     doc.loopEnd = sample->loopEnd;
+                                     const auto format = sample->floatData || sample->bitsPerSample > 24 ? audioedit::WavFormat::float32
+                                                         : sample->bitsPerSample > 16                    ? audioedit::WavFormat::int24
+                                                                                                         : audioedit::WavFormat::int16;
+                                     const auto bytes = audioedit::encodeWav (doc, format);
+                                     target.withFileExtension ("wav").replaceWithData (bytes.data(), bytes.size());
+                                 });
     }
 
 public:
+    juce::PopupMenu waveMenuForShot() { return waveMenu(); }
     // (the shot route: the history menu without showing it, and the row's buttons)
     juce::PopupMenu sampleHistoryMenuForShot() { return sampleHistoryMenu(); }
     void pressFileRow (int button)
@@ -3629,9 +3775,14 @@ private:
         const juce::ScopedValueSetter<bool> guard (updating, true);
         const auto sample = sampleOf (*c);
         const auto frames = sample != nullptr ? (std::int64_t) sample->frames() : 0;
-        // Content
+        // Content (live check 190ew SMP-1 / SMP-2: all greyed without a sample; Resample at the project's rate, Load
+        // regions / Load slice markers without regions / slice markers in the file)
+        const auto hasSample = sample != nullptr;
         keepOnDisk.setToggleState (s.keepOnDisk, juce::dontSendNotification);
-        keepOnDisk.setEnabled (samplerpage::keepOnDiskAvailable (s, sample != nullptr && sample->loopStart >= 0 && sample->loopEnd > sample->loopStart));
+        keepOnDisk.setEnabled (hasSample && samplerpage::keepOnDiskAvailable (s, sample->loopStart >= 0 && sample->loopEnd > sample->loopStart));
+        resampleBox.setEnabled (samplerpage::resampleAvailable (hasSample, hasSample ? sample->sampleRate : 0.0, engine.getTransport().sampleRate.load()));
+        loadRegionsBox.setEnabled (samplerpage::loadRegionsAvailable (hasSample, hasSample && ! sample->markerStarts.empty()));
+        loadMarkersBox.setEnabled (samplerpage::loadSliceMarkersAvailable (hasSample, hasSample && sample->sliceMarkers > 0));
         resampleBox.setToggleState (s.resampleOnLoad, juce::dontSendNotification);
         loadRegionsBox.setToggleState (s.loadRegions, juce::dontSendNotification);
         loadMarkersBox.setToggleState (s.loadSliceMarkers, juce::dontSendNotification);
@@ -3657,6 +3808,20 @@ private:
         }
         else
             wave.setLoop (-1.0f, -1.0f);
+        // round 190ey (live check 190ew SMP-7 / SMP-7b): FL's bit-depth box, and its summary as the waveform's hint
+        if (hasSample)
+        {
+            const auto bits = samplerpage::bitDepthShown (sample->bitsPerSample, s.precompute.any());
+            wave.setCornerText (bits > 0 ? juce::String (bits) : juce::String());
+            wave.setTooltip (juce::String (samplerpage::sampleSummary (sample->sampleRate, sample->floatData && ! s.precompute.any() ? sample->bitsPerSample : bits,
+                                                                       sample->floatData || s.precompute.any(), sample->isStereo(),
+                                                                       (double) frames / juce::jmax (1.0, sample->sampleRate), sample->isMapped())));
+        }
+        else
+        {
+            wave.setCornerText ({});
+            wave.setTooltip (tr ("Waveform") + " - " + tr ("click: preview the sample; mouse wheel: zoom"));
+        }
         // Time stretching
         stretchPitchKnob.setValue (s.flStretchPitch, juce::dontSendNotification);
         mulKnob.setValue (s.stretchMul, juce::dontSendNotification);
@@ -3824,7 +3989,8 @@ private:
         else if (changed == &crossfade)
         {
             const auto loopsBefore = s.useLoopPoints;
-            samplerpage::turnCrossfade (s, juce::roundToInt (value (changed)));
+            // (live check 190ew SMP-4: on a loopless sample FL also sets END to the sample's end)
+            samplerpage::turnCrossfade (s, juce::roundToInt (value (changed)), shownFrames, shownFileLoop.first, shownFileLoop.second);
             // (FL ticks "Use loop points" the way a click does, so the channel cuts itself as with the click)
             if (s.useLoopPoints && ! loopsBefore && ! cutOn && ref.index >= 0)
                 cutOn = cutChanged = true;
@@ -4827,6 +4993,7 @@ public:
         volume = knob ([this, name] {
                            auto s = ui::percentSpec (name() + " - " + tr ("Volume multiplier"), 1.0);
                            s.maximum = 2.0; // FL: 0…25600, 12800 = 100 % (FL's volume curve, up to +21.6 dB)
+                           s.toText = [] (double v) { return juce::String (levelVolumeText ((float) v)); }; // (live check 190ew PL-6)
                            s.target = AutomationTarget { AutomationTargetKind::channelAdjust, channel, 0, leveladjust::volume };
                            return s;
                        },
@@ -6179,6 +6346,12 @@ std::function<void (const juce::File&)>& locateInBrowserHandler()
     return handler;
 }
 
+std::function<void (const juce::File&, InstrumentKind)>& openInNewChannelHandler()
+{
+    static std::function<void (const juce::File&, InstrumentKind)> handler;
+    return handler;
+}
+
 namespace
 {
 SettingsPanel* findSamplerPage (juce::Component& c)
@@ -6216,7 +6389,17 @@ juce::String samplerPageQuery (juce::Component& root, const juce::String& what)
         return p->shotModeText();
     if (what == "scroll")
         return juce::String (p->shotScrollStart(), 3);
+    if (what == "mulText" || what == "corner" || what == "waveHint")
+        return p->shotText (what);
     return p->shotEnabled (what) ? "1" : "0";
+}
+
+std::optional<juce::PopupMenu> samplerWaveMenu (juce::Component& root)
+{
+    auto* p = findSamplerPage (root);
+    if (p == nullptr)
+        return std::nullopt;
+    return p->waveMenuForShot();
 }
 
 bool samplerFileRowPress (juce::Component& root, int button)

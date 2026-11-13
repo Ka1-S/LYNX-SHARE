@@ -10,6 +10,7 @@
 #include "core/FlCurve.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <iterator>
 #include <cmath>
 #include <functional>
@@ -1864,6 +1865,18 @@ float levelAdjustGain (float multiplier) noexcept
 {
     const auto x = std::clamp (multiplier, 0.0f, 2.0f);
     return x == 1.0f ? 1.0f : (std::pow (11.0f, x) - 1.0f) / 10.0f;
+}
+
+std::string levelVolumeText (float multiplier)
+{
+    const auto x = std::clamp (multiplier, 0.0f, 2.0f);
+    const auto gain = levelAdjustGain (x);
+    char text[64];
+    if (gain <= 1.0e-6f)
+        std::snprintf (text, sizeof (text), "%d%%  -INF dB  0.00", (int) std::lround (x * 100.0f));
+    else
+        std::snprintf (text, sizeof (text), "%d%%  %.1fdB  %.2f", (int) std::lround (x * 100.0f), 20.0 * std::log10 ((double) gain), (double) gain);
+    return text;
 }
 
 float faderGain (float position) noexcept

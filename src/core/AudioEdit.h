@@ -246,6 +246,7 @@ struct WavExtras
 {
     std::vector<std::int64_t> markerStarts;
     float acidBeats = 0.0f;
+    int sliceMarkers = 0; // round 190ey: the entries of FL's "strc" slice list after its first (0 = no list)
 };
 WavExtras decodeWavExtras (const std::uint8_t* data, std::size_t size, std::int64_t frames);
 } // namespace lynx::audioedit

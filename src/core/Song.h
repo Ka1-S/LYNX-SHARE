@@ -839,6 +839,9 @@ struct ChannelMisc
 // FL's channel gain law for the Levels adjustment's Volume multiplier (REA_rodada3 §2, FUN_00fe9d20, round 190dz):
 // x = multiplier (0…2, FL's raw / 12800), f(x) = 1 at x = 1, else (11^x − 1) / 10 — up to +21.6 dB at 200 %.
 float levelAdjustGain (float multiplier) noexcept;
+// The Levels adjustment volume's value text as FL's hint writes it (live check 190ew PL-6): "147%  10.3dB  3.28" — the
+// percent, the gain in dB and the gain (levelAdjustGain), two spaces apart
+std::string levelVolumeText (float multiplier);
 // The channel's pan with its Levels adjustment (FL FUN_00fe9bf0: pan + offset), kept in −1…1.
 inline float adjustedPan (float pan, float offset) noexcept { return std::clamp (pan + offset, -1.0f, 1.0f); }
 // A Mod X / Mod Y knob position (0…1) with its offset (FL FUN_00fea140: the two raw values add up), kept in 0…1.

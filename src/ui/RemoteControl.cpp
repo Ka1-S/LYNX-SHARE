@@ -1007,15 +1007,27 @@ void addMultilinkControlsItems (juce::PopupMenu& menu, AudioEngine& engine)
     }
 }
 
-juce::PopupMenu multilinkButtonMenu (AudioEngine& engine)
+juce::PopupMenu multilinkButtonMenu (AudioEngine& engine, const std::function<void (juce::PopupMenu&)>& lastTweakedColumn)
 {
-    // FL's menu first, in FL's order (live shot link190bt-09a); LYNX's own one-step items (round 177b-4: the queued
-    // controls link to the next controllers moved) after it, below a line
     juce::PopupMenu menu;
+    // Live check 190ew CTL-1 (FL 2026 shot CTL-1-multilink-off-menu.png): with multilink off FL shows two columns, the
+    // last tweaked control's own menu (captioned with its name) on the left, then the menu of the last tweaked
+    // parameters; LYNX's greyed one-step items are not shown then (mlmenu::showsLynxOneStepItems)
+    const auto on = engine.isMultilinkOn();
+    if (mlmenu::showsOwnColumn (on, engine.getLastTweaked (0).has_value()) && lastTweakedColumn != nullptr)
+    {
+        lastTweakedColumn (menu);
+        menu.addColumnBreak();
+    }
+    // FL's menu, in FL's order (live shot link190bt-09a); LYNX's own one-step items (round 177b-4: the queued controls
+    // link to the next controllers moved) after it, below a line, while multilink is on
     addMultilinkControlsItems (menu, engine);
-    menu.addSeparator();
-    menu.addItem (tr ("Link to controller"), engine.isMultilinkOn(), false, [&engine] { engine.multilinkToControllers (false); });
-    menu.addItem (tr ("Override global links"), engine.isMultilinkOn(), false, [&engine] { engine.multilinkToControllers (true); });
+    if (mlmenu::showsLynxOneStepItems (on))
+    {
+        menu.addSeparator();
+        menu.addItem (tr ("Link to controller"), [&engine] { engine.multilinkToControllers (false); });
+        menu.addItem (tr ("Override global links"), [&engine] { engine.multilinkToControllers (true); });
+    }
     return menu;
 }
 

@@ -83,6 +83,14 @@ inline bool asksExternalInputOnly (int track, int channel, RecordSource source) 
     return track > 0 && channel >= 0 && source != RecordSource::externalInput;
 }
 
+// Live check 190ew ISS152-1 (FL 2026, shot ISS152-1-external-input-question.png): FL asks only when the insert goes from
+// no input to an input; changing one input for another does not ask. The box has FL's "Remember my choice" check
+// (message "RecAutoSwitchExternalInput", "Auto switch to external input only" in Manage messages).
+inline bool asksExternalInputOnly (int track, int channelBefore, int channelNow, RecordSource source) noexcept
+{
+    return channelBefore < 0 && asksExternalInputOnly (track, channelNow, source);
+}
+
 // Whether an insert hears its external input now.
 inline bool inputMonitored (InputMonitor mode, bool armed, bool playing, bool recording) noexcept
 {

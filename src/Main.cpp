@@ -14,6 +14,7 @@
 #include "core/DetailChain.h"
 #include "core/SessionMixer.h"
 #include "core/PlaylistOps.h"
+#include "core/LastTweaked.h"
 #include "core/ClipOps.h"
 #include "core/FlTrackMenus.h"
 #include "core/FlClipMenu.h"
@@ -115,6 +116,8 @@
 #include "ui/AutomationUi.h"
 #include "ui/PluginSkin.h"
 #include "ui/ChannelSettings.h"
+#include "ui/TempoDetectionDialog.h"
+#include "ui/AudioClipboard.h"
 #include "ui/FlVoicePanel.h"
 #include "ui/SlicexEditor.h"
 #include "core/LynxBanks.h"
@@ -2065,6 +2068,15 @@ public:
         if (args.contains ("--flplshot"))
         {
             setApplicationReturnValue (runFlPlShot (args[args.indexOf ("--flplshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --flfixshot <prefix> (round 190ey): what the live FL session 190ew found different (the Sampler page, the
+        // Multilink menu, the Playlist, issue #152's question), offscreen; prefix-checks.txt holds the checks
+        if (args.contains ("--flfixshot"))
+        {
+            setApplicationReturnValue (runFlFixShot (args[args.indexOf ("--flfixshot") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -11802,6 +11814,274 @@ private:
             }
         }
         return image;
+    }
+
+    // --flfixshot (round 190ey): see the dispatch above
+    bool runFlFixShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        const auto shoot = [&prefix] (juce::Component& c, const char* name) {
+            savePng (c.createComponentSnapshot (c.getLocalBounds()), prefix + "-" + name + ".png");
+        };
+        const auto plain = [] (juce::String t) {
+            t = t.upToFirstOccurrenceOf ("\t", false, false);
+            if (const auto at = t.indexOf (juce::String (" (") + juce::String::charToString (1)); at >= 0)
+                t = t.substring (0, at);
+            return t.removeCharacters (juce::String ("&_") + juce::String::charToString (1));
+        };
+        const auto texts = [&plain] (const juce::PopupMenu& menu) {
+            juce::StringArray out;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                out.add (it.getItem().isSeparator ? juce::String ("-") : it.getItem().isSectionHeader ? "[" + plain (it.getItem().text) + "]" : plain (it.getItem().text));
+            return out;
+        };
+        const auto findSub = [&plain] (const juce::PopupMenu& menu, const juce::String& text) -> const juce::PopupMenu* {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().subMenu != nullptr && plain (it.getItem().text) == plain (text))
+                    return it.getItem().subMenu.get();
+            return nullptr;
+        };
+        const auto click = [&plain] (const juce::PopupMenu& menu, const juce::String& text) {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (plain (it.getItem().text) == plain (text) && it.getItem().isEnabled && it.getItem().action != nullptr)
+                {
+                    it.getItem().action();
+                    return true;
+                }
+            return false;
+        };
+        const auto folder = juce::File (prefix).getParentDirectory().getChildFile ("flfix-samples");
+        folder.createDirectory();
+        const auto writeWav = [] (const juce::File& file, double rate, int frames, double hz) {
+            juce::AudioBuffer<float> buffer (1, frames);
+            for (int i = 0; i < frames; ++i)
+                buffer.setSample (0, i, (float) (0.8 * std::sin (juce::MathConstants<double>::twoPi * hz * i / rate) * std::exp (-i / (rate * 0.12))));
+            file.deleteFile();
+            juce::WavAudioFormat wav;
+            if (auto out = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (file.createOutputStream().release(), rate, 1, 16, {}, 0)))
+                out->writeFromAudioSampleBuffer (buffer, 0, frames);
+            return file;
+        };
+
+        // ---- 1. the Sampler page (SMP-1 / 4 / 5 / 7, CTL-4)
+        {
+            lynx::AudioEngine engine (false);
+            const auto clap = writeWav (folder.getChildFile ("Basic 808 Clap.wav"), 44100.0, 11600, 180.0);
+            const auto loop48 = writeWav (folder.getChildFile ("Loop 48k.wav"), 48000.0, 48000, 220.0);
+            engine.editSong ([&] (lynx::Song& s) {
+                if (s.channels.empty())
+                    s.channels.resize (1);
+                lynx::audioclips::loadSampleInto (s.channels[0], clap.getFullPathName().toStdString(), "808 Clap");
+            });
+            const auto sampler = [&engine] { return engine.getSong().channels[0].sampler; };
+            auto frame = lynx::makeChannelFrame (engine, 0, 0);
+            frame->setSize (frame->getWidth() > 0 ? frame->getWidth() : 700, frame->getHeight() > 0 ? frame->getHeight() : 720);
+            frame->createComponentSnapshot (frame->getLocalBounds());
+            lynx::ui::WaveformCache::getInstance()->waitUntilIdle (8000);
+            auto& f = *frame;
+            lynx::samplerPageTurn (f, "show", 0.0);
+            const auto rate = engine.getTransport().sampleRate.load();
+            check ("resample_greyed_at_project_rate", lynx::samplerPageQuery (f, "resample") == (std::abs (rate - 44100.0) < 0.5 ? "0" : "1"), juce::String (rate));
+            check ("load_regions_greyed_without_regions", lynx::samplerPageQuery (f, "loadRegions") == "0");
+            check ("load_markers_greyed_without_markers", lynx::samplerPageQuery (f, "loadMarkers") == "0");
+            check ("bit_depth_16", lynx::samplerPageQuery (f, "corner") == "16", lynx::samplerPageQuery (f, "corner"));
+            check ("wave_hint_summary", lynx::samplerPageQuery (f, "waveHint").startsWith ("44100Hz, 16Bit int mono, 0:263"), lynx::samplerPageQuery (f, "waveHint"));
+            shoot (f, "sampler-44k");
+            // SMP-5: MUL's text
+            lynx::samplerPageTurn (f, "mul", 800.0);
+            check ("mul_text", lynx::samplerPageQuery (f, "mulText") == "105.70%", lynx::samplerPageQuery (f, "mulText"));
+            lynx::samplerPageTurn (f, "mul", 0.0);
+            // SMP-4: CROSSFADE on a loopless sample: Use loop points on, the loop = the whole sample, the box reads 32
+            engine.editSong ([] (lynx::Song& s) { s.channels[0].sampler.useLoopPoints = false; });
+            lynx::samplerPageTurn (f, "crossfade", 120.0);
+            check ("crossfade_loops_whole_sample", sampler().useLoopPoints && sampler().loopStart == 0 && sampler().loopEnd == 11599,
+                   juce::String (sampler().loopStart) + ".." + juce::String (sampler().loopEnd));
+            check ("bit_depth_32_precomputed", lynx::samplerPageQuery (f, "corner") == "32", lynx::samplerPageQuery (f, "corner"));
+            frame->createComponentSnapshot (frame->getLocalBounds());
+            lynx::ui::WaveformCache::getInstance()->waitUntilIdle (8000);
+            shoot (f, "sampler-crossfade-red-loop");
+            lynx::samplerPageTurn (f, "crossfade", 0.0);
+            // SMP-3: a loop set with END alone, drawn red (FL: 0..276)
+            engine.editSong ([] (lynx::Song& s) {
+                s.channels[0].sampler.loopStart = 0;
+                s.channels[0].sampler.loopEnd = 2400;
+            });
+            lynx::samplerPageTurn (f, "show", 0.0);
+            shoot (f, "sampler-end-loop-red");
+            // SMP-7: the waveform menu
+            const auto waveMenu = lynx::samplerWaveMenu (f);
+            const juce::StringArray expected { lynx::tr ("Reload"), lynx::tr ("Save as..."), lynx::tr ("Locate file"), lynx::tr ("Copy audio to clipboard"),
+                                               lynx::tr ("Paste audio from clipboard"), "-", lynx::tr ("Edit in audio editor"), "-",
+                                               lynx::tr ("Open in new sampler channel"), lynx::tr ("Open in new Fruity Granulizer channel"), "-",
+                                               lynx::tr ("Detect tempo") };
+            check ("wave_menu_items", waveMenu.has_value() && texts (*waveMenu) == expected, waveMenu.has_value() ? texts (*waveMenu).joinIntoString ("|") : juce::String ("none"));
+            if (waveMenu.has_value())
+                saveMenus (juce::StringArray { "Sampler waveform" }, std::vector<juce::PopupMenu> { *waveMenu }, prefix + "-wave-menu.png");
+            check ("copy_audio_to_clipboard", waveMenu.has_value() && click (*waveMenu, lynx::tr ("Copy audio to clipboard"))
+                                                  && lynx::audioclipboard::editor().frames() == 11600);
+            // SMP-1: a 48 kHz sample in this project: Resample enabled
+            lynx::samplerPageTurn (f, "show", 0.0);
+            engine.editSong ([&] (lynx::Song& s) { s.channels[0].samplePath = loop48.getFullPathName().toStdString(); });
+            lynx::samplerPageTurn (f, "show", 0.0);
+            check ("resample_enabled_48k", lynx::samplerPageQuery (f, "resample") == (std::abs (rate - 48000.0) < 0.5 ? "0" : "1"), juce::String (rate));
+            frame->createComponentSnapshot (frame->getLocalBounds()); // (starts the new file's waveform)
+            lynx::ui::WaveformCache::getInstance()->waitUntilIdle (8000);
+            shoot (f, "sampler-48k");
+            // CTL-4: Remove sample renames the channel "Sampler"
+            lynx::samplerFileRowPress (f, 3);
+            check ("remove_sample_renames", engine.getSong().channels[0].name == "Sampler" && engine.getSong().channels[0].samplePath.empty(),
+                   juce::String::fromUTF8 (engine.getSong().channels[0].name.c_str()));
+            lynx::samplerPageTurn (f, "show", 0.0);
+            check ("no_sample_content_greyed", lynx::samplerPageQuery (f, "keepOnDisk") == "0" && lynx::samplerPageQuery (f, "resample") == "0");
+            shoot (f, "sampler-removed");
+        }
+
+        // ---- 2. the Multilink button's menu with multilink off (CTL-1)
+        lynx::AudioEngine engine (false);
+        lynx::MainComponent ui (engine, false);
+        ui.setSize (1600, 900);
+        {
+            using lynx::AutomationTarget;
+            using lynx::AutomationTargetKind;
+            engine.editSong ([] (lynx::Song& s) {
+                if (s.channels.empty())
+                    s.channels.resize (1);
+                s.channels[0].name = "808 Kick";
+            });
+            engine.setMultilink (false);
+            engine.noteTweaked ({ AutomationTargetKind::channelVolume, 0 });
+            engine.noteTweaked ({ AutomationTargetKind::channelPan, 0 });
+            const auto menu = ui.getMultilinkMenuForSnapshot();
+            juce::PopupMenu::MenuItemIterator first (menu);
+            first.next();
+            const auto caption = first.getItem().text;
+            bool columnBreak = false, lynxLines = false;
+            juce::String rightCaption;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+            {
+                if (columnBreak && rightCaption.isEmpty() && it.getItem().isSectionHeader)
+                    rightCaption = it.getItem().text;
+                columnBreak = columnBreak || it.getItem().shouldBreakAfter;
+                lynxLines = lynxLines || it.getItem().text == lynx::tr ("Link to controller");
+            }
+            check ("ml_off_left_column_named", first.getItem().isSectionHeader && caption == lynx::describeAutomationTarget (engine, { AutomationTargetKind::channelPan, 0 }), caption);
+            check ("ml_off_two_columns", columnBreak && rightCaption == lynx::tr ("Last 2 tweaked parameters"), rightCaption);
+            check ("ml_off_no_lynx_greyed_lines", ! lynxLines);
+            savePng (columnMenuImage (menu), prefix + "-multilink-off-menu.png");
+        }
+
+        // ---- 3. the Playlist (PL-1 / 2 / 3 / 6 / 7 / 8)
+        auto& playlist = ui.getPlaylistForSnapshot();
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::ChannelDef bass;
+            bass.name = "Amount Too - Bass";
+            bass.instrument = lynx::InstrumentKind::audioClip;
+            bass.samplePath = writeWav (folder.getChildFile ("bass.wav"), 44100.0, 88200, 82.0).getFullPathName().toStdString();
+            bass.misc.levels.volume = 1.468f;
+            song.channels.push_back (bass);
+            lynx::Clip c;
+            c.kind = lynx::ClipKind::audio;
+            c.channel = (int) song.channels.size() - 1;
+            c.track = 3;
+            c.start = 4 * lynx::ppq;
+            c.length = 2 * lynx::ppq;
+            song.playlist.push_back (c);
+            engine.setSong (std::move (song));
+        }
+        engine.dispatchPendingMessages();
+        const auto clipIndex = (int) engine.getSong().playlist.size() - 1;
+        {
+            const auto menu = playlist.getClipMenuForSnapshot (clipIndex);
+            const auto* automate = findSub (menu, lynx::tr ("Automate"));
+            check ("automate_volume_runs", automate != nullptr && click (*automate, lynx::tr ("Volume")));
+            const auto& song = engine.getSong();
+            const auto made = (int) song.automations.size() - 1;
+            check ("automate_makes_current_clip", made >= 0 && playlist.brush.kind == lynx::ClipKind::automation && playlist.brush.index == made,
+                   juce::String (playlist.brush.index));
+            // (PL-2: Levels VOL 147 %, FL's clip plays unity)
+            check ("automate_volume_unity", made >= 0 && song.automations.back().points[0].value == 0.5f
+                                                && lynx::lasttweak::valueText (song, song.automations.back().target, song.automations.back().points[0].value) == "100%  0.0dB  1.00");
+            const auto again = playlist.getClipMenuForSnapshot (clipIndex);
+            const auto* automate2 = findSub (again, lynx::tr ("Automate"));
+            check ("automate_second_is_2", automate2 != nullptr && click (*automate2, lynx::tr ("Volume"))
+                                               && juce::String::fromUTF8 (engine.getSong().automations.back().name.c_str()).endsWith (" #2"),
+                   juce::String::fromUTF8 (engine.getSong().automations.back().name.c_str()));
+            // PL-7: Fade in / out curve
+            const auto* fadeIn = findSub (menu, lynx::tr ("Fade in curve"));
+            const auto* fadeOut = findSub (menu, lynx::tr ("Fade out curve"));
+            const juce::StringArray curve { lynx::tr ("Reset"), lynx::tr ("Normalize"), lynx::tr ("Normalize selection as a group"), lynx::tr ("Create crossfade"),
+                                            lynx::tr ("Manual"), "[" + lynx::tr ("Declicker") + "]", lynx::tr ("Automatic"), lynx::tr ("Disabled"), lynx::tr ("Enabled"),
+                                            "[" + lynx::tr ("Curve shape") + "]", lynx::tr ("Smooth curve"), lynx::tr ("Single curve") };
+            check ("fade_curve_submenus", fadeIn != nullptr && fadeOut != nullptr && texts (*fadeIn) == curve && texts (*fadeOut) == curve,
+                   fadeIn != nullptr ? texts (*fadeIn).joinIntoString ("|") : juce::String ("missing"));
+            if (fadeOut != nullptr)
+                saveMenus (juce::StringArray { "Audio clip menu", "Fade out curve" }, std::vector<juce::PopupMenu> { menu, *fadeOut }, prefix + "-fade-curve-menu.png");
+            // PL-8: Detect tempo is one item now
+            bool detectItem = false;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (plain (it.getItem().text) == plain (lynx::tr ("Detect tempo")))
+                    detectItem = it.getItem().subMenu == nullptr && it.getItem().action != nullptr;
+            check ("detect_tempo_item", detectItem);
+            // PL-3: Preview through the channel; transport start ends it
+            check ("preview_through_channel", engine.previewClipThroughChannel ((std::size_t) clipIndex) && engine.isClipPreviewing());
+            engine.play();
+            check ("preview_stops_on_transport", ! engine.isClipPreviewing());
+            engine.stop();
+            check ("preview_again_then_stop", engine.previewClipThroughChannel ((std::size_t) clipIndex) && engine.isClipPreviewing());
+            engine.stop();
+            check ("preview_stops_on_stop", ! engine.isClipPreviewing());
+        }
+        // PL-8: the dialog
+        {
+            lynx::ui::TempoDetectionRequest r;
+            r.name = "Amount Too - Bass";
+            // (a drum-like loop at 117.5 BPM, 100 beats as in FL's dialog: clicks on every beat)
+            {
+                auto beats = std::make_shared<lynx::SampleData>();
+                beats->sampleRate = 44100.0;
+                const auto period = 44100.0 * 60.0 / 117.5;
+                beats->left.assign ((std::size_t) std::llround (period * 100.0), 0.0f);
+                for (int b = 0; b < 100; ++b)
+                    for (int i = 0; i < 2000; ++i)
+                        if (const auto at = (std::size_t) std::llround (b * period) + (std::size_t) i; at < beats->left.size())
+                            beats->left[at] = (float) (0.9 * std::sin (i * 0.09) * std::exp (-i / 400.0));
+                r.sample = beats;
+            }
+            r.projectBpm = 100.0;
+            double applied = -1.0;
+            r.apply = [&applied] (double beats) { applied = beats; };
+            auto panel = lynx::ui::makeTempoDetectionPanel (r);
+            panel->setSize (panel->getWidth(), panel->getHeight());
+            shoot (*panel, "tempo-detection");
+            report.add ("tempo dialog title: " + lynx::ui::tempoDetectionTitle (r.name));
+            const auto project = lynx::ui::pressTempoDetectionButton (*panel, panel->getNumChildComponents() - 3);
+            const auto seconds = (double) r.sample->frames() / r.sample->sampleRate; // (100 beats at 117.5 BPM)
+            check ("tempo_project_button", std::abs (applied - seconds * 100.0 / 60.0) < 1.0e-6, project + " -> " + juce::String (applied));
+            const auto none = lynx::ui::pressTempoDetectionButton (*panel, panel->getNumChildComponents() - 2);
+            check ("tempo_no_tempo_button", applied == 0.0, none);
+        }
+
+        // ---- 4. issue #152's question (ISS152-1): FL's message with "Remember my choice"
+        {
+            auto box = lynx::makeFlMessageDialog ({ lynx::tr ("External input"),
+                                                    lynx::tr ("You've selected an external input. Do you want to switch to |External input only| to avoid recording internal audio on this track?"),
+                                                    { lynx::tr ("Yes"), lynx::tr ("No") }, true });
+            shoot (*box, "external-input-question");
+            bool listed = false;
+            for (const auto& m : lynx::messages::all())
+                listed = listed || juce::String (m.id) == "RecAutoSwitchExternalInput";
+            check ("external_input_in_manage_messages", listed);
+        }
+
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
+        return allOk;
     }
 
     bool runFlClipShot (const juce::String& prefix)

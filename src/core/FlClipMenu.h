@@ -80,8 +80,31 @@ inline std::vector<Entry> fl()
         { K::header, TR_NOOP ("Fades") },
         { K::item, TR_NOOP ("Reset fades") },
         { K::item, TR_NOOP ("Crossfade selected"), H::yes, 0, true },
-        { K::submenu, TR_NOOP ("Fade in curve"), H::missing },
-        { K::submenu, TR_NOOP ("Fade out curve"), H::missing },
+        { K::submenu, TR_NOOP ("Fade in curve") },  // (round 190ey: fadeCurve() below)
+        { K::submenu, TR_NOOP ("Fade out curve") },
+    };
+}
+
+// The clip menu's "Fade in curve" / "Fade out curve" submenu (live check 190ew PL-7, FL 2026 shot PL-7-fade-curve-submenu.png),
+// the same for both sides: the fade handle menu's items without its value ones (Copy / Paste / Type in value), with the
+// gain handle's two Normalize items after Reset; Manual shows the side's state greyed (FL's faded tick).
+inline std::vector<Entry> fadeCurve()
+{
+    using K = Entry::Kind;
+    using H = Entry::Have;
+    return {
+        { K::item, TR_NOOP ("Reset") },
+        { K::item, TR_NOOP ("Normalize") },
+        { K::item, TR_NOOP ("Normalize selection as a group") },
+        { K::item, TR_NOOP ("Create crossfade") },
+        { K::check, TR_NOOP ("Manual"), H::greyedOnly },
+        { K::header, TR_NOOP ("Declicker") },
+        { K::check, TR_NOOP ("Automatic") },
+        { K::check, TR_NOOP ("Disabled") },
+        { K::check, TR_NOOP ("Enabled") },
+        { K::header, TR_NOOP ("Curve shape") },
+        { K::check, TR_NOOP ("Smooth curve") },
+        { K::check, TR_NOOP ("Single curve") },
     };
 }
 

@@ -696,8 +696,49 @@ ProcessTimes* AudioEngine::getProcessTimes() noexcept
     return rackProcessor != nullptr ? &rackProcessor->processTimes() : nullptr;
 }
 
+bool AudioEngine::previewClipThroughChannel (std::size_t clipIndex)
+{
+    if (clipIndex >= song.playlist.size())
+        return false;
+    const auto& c = song.playlist[clipIndex];
+    if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size() || c.length <= 0)
+        return false;
+    stopClipPreview(); // (the next preview replaces the last)
+    const auto rate = transport.sampleRate.load() > 0.0 ? transport.sampleRate.load() : 44100.0;
+    auto e = audioClipNote (song, c, clipIndex, ticksPerSample (std::max (song.bpm, 1.0), rate));
+    e.sampleOffset = 0;
+    if (! liveEvents.push (e))
+        return false;
+    clipPreviewChannel = c.channel;
+    clipPreviewKey = e.key;
+    const auto serial = ++clipPreviewSerial;
+    // FL stops it at the clip's end (mouse-up and clicks elsewhere don't): the note's off then
+    const auto ms = (int) std::ceil ((double) c.length * 60000.0 / (std::max (song.bpm, 1.0) * ppq)) + 10;
+    juce::Timer::callAfterDelay (ms, [this, serial, alive = previewAlive] {
+        if (alive->load() && serial == clipPreviewSerial)
+            stopClipPreview();
+    });
+    return true;
+}
+
+void AudioEngine::stopClipPreview() noexcept
+{
+    // (the live note queue has one producer, the UI thread: play() / stop() called from the audio or a MIDI thread leave it
+    // to the preview's own end)
+    if (clipPreviewKey < 0 || ! juce::MessageManager::existsAndIsCurrentThread())
+        return;
+    NoteEvent e;
+    e.type = NoteEvent::Type::off;
+    e.channel = clipPreviewChannel;
+    e.key = clipPreviewKey;
+    liveEvents.push (e);
+    clipPreviewChannel = clipPreviewKey = -1;
+    ++clipPreviewSerial;
+}
+
 void AudioEngine::play() noexcept
 {
+    stopClipPreview(); // (live check 190ew PL-3: transport start ends a clip preview)
     if (! transport.playing.load())
     {
         resetToInitialValues();
@@ -748,6 +789,7 @@ void AudioEngine::resetToInitialValues() noexcept
 
 void AudioEngine::stop() noexcept
 {
+    stopClipPreview(); // (live check 190ew PL-3: and transport stop)
     waitingForInput.store (false);
     transport.countIn.store (0.0);
     transport.playing.store (false);

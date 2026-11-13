@@ -618,6 +618,14 @@ void WaveformDisplay::setLocator (float fraction)
     }
 }
 
+void WaveformDisplay::setCornerText (const juce::String& text)
+{
+    if (text == cornerText)
+        return;
+    cornerText = text;
+    repaint();
+}
+
 void WaveformDisplay::setCaption (const juce::String& text)
 {
     caption = text;
@@ -712,16 +720,35 @@ void WaveformDisplay::paint (juce::Graphics& g)
         g.fillRect (x - 0.75f, inner.getY(), 1.5f, inner.getHeight());
     }
 
-    // round 190dh: the loop the sampler plays (its start and end, in the information colour)
+    // round 190dh: the loop the sampler plays. Live check 190ew SMP-3 / SMP-4 (FL 2026 shots): a red shaded band with
+    // red edges, and a red "Loop" label at the band's bottom left (START = END: no band, as in FL)
     if (loopStart >= 0.0f && loopEnd >= loopStart)
     {
-        g.setColour (colour::info);
-        for (const auto f : { loopStart, loopEnd })
-            g.fillRect (displayX (reversed ? 1.0 - (double) f : (double) f) - 0.5f, inner.getY(), 1.5f, inner.getHeight());
         const auto xa = displayX (reversed ? 1.0 - (double) loopEnd : (double) loopStart);
         const auto xb = displayX (reversed ? 1.0 - (double) loopStart : (double) loopEnd);
-        g.setColour (colour::info.withAlpha (0.10f));
-        g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xa, inner.getY(), juce::jmax (xa + 1.0f, xb), inner.getBottom()));
+        if (loopEnd > loopStart)
+        {
+            g.setColour (colour::accent.withAlpha (0.20f));
+            g.fillRect (juce::Rectangle<float>::leftTopRightBottom (xa, inner.getY(), juce::jmax (xa + 1.0f, xb), inner.getBottom()));
+        }
+        g.setColour (colour::accent);
+        for (const auto x : { xa, xb })
+            g.fillRect (x - 0.5f, inner.getY(), 1.5f, inner.getHeight());
+        if (loopEnd > loopStart)
+        {
+            g.setFont (font (type::caption));
+            g.drawText (tr ("Loop"), juce::Rectangle<float> (xa + 4.0f, inner.getBottom() - 13.0f, 40.0f, 12.0f), juce::Justification::centredLeft, false);
+            g.setFont (font (type::small));
+        }
+    }
+
+    // round 190ey (live check 190ew SMP-7b): FL's bit-depth box at the bottom right ("16", "32" once precomputed)
+    if (cornerText.isNotEmpty())
+    {
+        g.setColour (colour::textSecondary);
+        g.setFont (font (type::caption));
+        g.drawText (cornerText, inner.reduced (6.0f, 3.0f).removeFromBottom (12.0f), juce::Justification::centredRight, false);
+        g.setFont (font (type::small));
     }
 
     // caption: the file name and its length

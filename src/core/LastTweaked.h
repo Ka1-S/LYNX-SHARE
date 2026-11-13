@@ -56,8 +56,8 @@ inline std::string valueText (const Song& song, const AutomationTarget& t, float
                     return "C";
                 std::snprintf (text, sizeof (text), "%c%d", v < 0.5f ? 'L' : 'R', percent);
             }
-            else if (t.param == leveladjust::volume)
-                std::snprintf (text, sizeof (text), "%d%%", (int) std::lround (v * 200.0f));
+            else if (t.param == leveladjust::volume) // (live check 190ew PL-6: "147%  10.3dB  3.28")
+                return levelVolumeText (v * 2.0f);
             else
                 std::snprintf (text, sizeof (text), "%d%%", (int) std::lround ((v * 2.0f - 1.0f) * 100.0f));
             break;
