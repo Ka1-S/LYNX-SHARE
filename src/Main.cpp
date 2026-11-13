@@ -2659,6 +2659,9 @@ public:
         lynx::updater::shutdown(); // (a check or download in flight stops)
         crashEngine = nullptr;
         engine = nullptr;
+        // separate-process plugins end on threads of their own (issue #159): a moment for them, never the 10 s a dead
+        // child's pipe can take
+        lynx::finishSandboxTeardowns (2000);
         // CLAP plugins whose instance another thread deleted while this one was busy: deactivated and destroyed now
         lynx::ClapPluginFormat::finishPendingTeardowns();
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
@@ -7843,6 +7846,11 @@ private:
                 }
             }
         }
+        void release()
+        {
+            instrument.reset();
+            effect.reset();
+        }
         std::unique_ptr<lynx::PluginInstrument> instrument;
         std::unique_ptr<juce::AudioPluginInstance> effect;
         double phase = 0.0;
@@ -8001,6 +8009,14 @@ private:
                     const auto crashDead = lynx::isSandboxedPluginDead (proxy2);
                     report << "crash_ms=" << crashMs << " crash_dead=" << (crashDead ? 1 : 0) << " crash_peak_after=" << peakOf() << "\n";
                     crashOk = crashDead && crashMs < 3000.0;
+                    // issue #159: freeing the crashed plugin doesn't wait on its pipe (JUCE waited up to 10 s there for
+                    // the gone child, on the message thread when the rack freed it); its teardown ends on its own
+                    const auto freeStart = juce::Time::getMillisecondCounterHiRes();
+                    voice2.release();
+                    const auto freeMs = juce::Time::getMillisecondCounterHiRes() - freeStart;
+                    const auto endedAll = lynx::finishSandboxTeardowns (15000);
+                    report << "crashed_free_ms=" << freeMs << " teardown_done=" << (endedAll ? 1 : 0) << "\n";
+                    crashOk = crashOk && freeMs < 250.0 && endedAll;
                 }
                 step ("crash");
 

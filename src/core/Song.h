@@ -433,6 +433,9 @@ struct SamplerSettings
     // Fruity Slicer (round 180c, set from its state when the rack is built, not saved): the key of slice 1, and "play to
     // end" (a slice plays on to the sample's end instead of stopping at the next slice)
     int sliceFirstKey = 60;
+    // Fruity Slicer's key table (FL's FUN_0076c200, issue #160): key 0…124 → the slice it plays (index into `slices`),
+    // −1 = none; a slice's own key (SliceKeyMenu) is in it. Empty = key sliceFirstKey + i plays slice i. Not saved.
+    std::vector<int> sliceKeys;
     bool slicesToEnd = false;
     bool slicesCutAtEnd = false; // Fruity Slicer: a slice's voice stops at its end (no 10 ms end fade; FL render)
     bool porta = false;        // portamento (with "cut", the 808 glide): the note starts from the previous note's pitch

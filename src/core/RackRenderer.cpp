@@ -365,18 +365,12 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
     // Fruity Slicer (round 180c): FL's edits to the sample (reverse, declick, fades), then the sampler on the slices
     if (kind == InstrumentKind::fruityslicer)
     {
-        auto def = channel;
         if (const auto state = fslicer::parse (channel.pluginState); state && sample != nullptr)
-        {
-            auto prepared = fslicer::prepare (*sample, *state);
-            fslicer::configureSampler (def, *state, (std::int64_t) prepared->frames());
-            sample = std::move (prepared);
-        }
-        else
-            def.sampler.slices.clear();
+            sample = fslicer::prepare (*sample, *state);
+        // (the instrument takes its slices, key table and voice from the channel's state, at every configure)
         std::shared_ptr<Instrument> instrument = makeInstrument (kind, std::move (sample));
         instrument->prepare (sampleRate);
-        instrument->configure (def, bpm);
+        instrument->configure (channel, bpm);
         instrument->settleNew();
         return instrument;
     }
@@ -805,7 +799,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                     && sameHostedPlugin (previous->song.channels[p], channel))))
         {
             state->instruments.push_back (previous->instruments[p]);
-            state->instruments.back()->configure (channel, song.bpm);
+            state->instruments.back()->configure (channel, song.bpm); // (a Slicer takes its slices from its state: issue #160)
             continue;
         }
 

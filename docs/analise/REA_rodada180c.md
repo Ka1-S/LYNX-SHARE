@@ -179,8 +179,15 @@ scales to its 960. Random uses LYNX's generator (Delphi's seed is not shared).
 1. PS and the Elastique methods (2–7) are not reproduced (above).
 2. Auto-slicing (Dull / Medium / Sharp with LOW / HIGH) uses LYNX's transient detector; FL's detector was not read.
 3. Open (`.zgr` beat grooves) opens samples only; "Open in Edison" and "View › Spectrum" are not there.
-4. A slice's own key is saved and shown; the voices still map the slices from the first note up (the key table is not
-   rebuilt from custom keys).
+4. ~~A slice's own key is saved and shown; the voices still map the slices from the first note up (the key table is not
+   rebuilt from custom keys).~~ Closed by issue #160 (round 190eg): the voices use FL's key table, `FUN_0076c200`
+   **[REA, static, Fruity Slicer_x64.dll sha256 7616d1f8…]**: all 125 entries −1, then for each slice in order
+   `table[FUN_0076b4f0(i)] = i` (its own key, else first note + i, clamped 0…124), so a later slice wins a shared key.
+   TriggerVoice (`FUN_00768230`) starts no voice for a key outside 0…124 or whose entry is −1: below the first slice's
+   key, past the last one, or a key a custom key left empty, nothing plays (`fslicer::keyTable`, tests
+   `issue160_*`). Issue #160 itself was LYNX's rack: a kept Slicer was configured with the bare channel at the next edit,
+   which emptied its slice table, so every key played the sample from its start; the instrument now takes its slices,
+   key table and voice block from its state at every configure (also inside a Patcher).
 5. The editor is LYNX's own drawing in FL's layout, at twice its size.
 
 ## A new Fruity Slicer, and FL's Envelope / instrument settings page (round 190m) **[EXEC: FL 2026 GUI + saved .flp]**

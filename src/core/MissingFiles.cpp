@@ -211,7 +211,8 @@ int relocateByName (std::vector<MissingFile>& missing, const std::vector<std::st
 
 std::vector<std::string> searchFolderForMissing (const std::vector<MissingFile>& missing, const std::string& folder,
                                                  const std::function<void (const std::string&, const std::function<bool (const std::string&, bool)>&)>& listFolder,
-                                                 std::size_t maxEntries, const std::function<bool()>& cancelled)
+                                                 std::size_t maxEntries, const std::function<bool()>& cancelled,
+                                                 const std::function<void (const std::string&)>& onHit)
 {
     std::set<std::string> wanted;
     for (const auto& m : missing)
@@ -243,11 +244,24 @@ std::vector<std::string> searchFolderForMissing (const std::vector<MissingFile>&
             if (isFolder)
                 pending.push_back (path);
             else if (wanted.count (pathKey (pathFileName (path))) != 0)
+            {
                 hits.push_back (path);
+                if (onHit)
+                    onHit (path);
+            }
             return true;
         });
     }
     return hits;
+}
+
+int relocateFromSearch (std::vector<MissingFile>& missing, const std::vector<bool>& placedBySearch, const std::vector<std::string>& candidates)
+{
+    for (std::size_t i = 0; i < missing.size() && i < placedBySearch.size(); ++i)
+        if (placedBySearch[i] && ! missing[i].skipped)
+            missing[i].found.clear();
+    // (relocateByName places only the files without a place that aren't skipped: these)
+    return relocateByName (missing, candidates);
 }
 
 std::map<std::string, std::string> relocationMap (const std::vector<MissingFile>& missing)
