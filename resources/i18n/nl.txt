@@ -9564,6 +9564,7 @@ countries: nl be
 "Capture MIDI: {0} notes put in the playing clip" = "MIDI vastleggen: {0} noten in de spelende clip gezet"
 "Track Volume" = "Spoorvolume"
 "Track Panning" = "Spoorpanning"
+"Key {0}" = "Toets {0}"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"

@@ -9564,6 +9564,7 @@ countries: ru by kz
 "Capture MIDI: {0} notes put in the playing clip" = "Захват MIDI: {0} нот добавлено в играющий клип"
 "Track Volume" = "Громкость трека"
 "Track Panning" = "Панорама трека"
+"Key {0}" = "Клавиша {0}"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"

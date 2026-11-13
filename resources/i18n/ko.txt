@@ -9564,6 +9564,7 @@ countries: kr
 "Capture MIDI: {0} notes put in the playing clip" = "MIDI 캡처: 재생 중인 클립에 노트 {0}개를 넣었습니다"
 "Track Volume" = "트랙 볼륨"
 "Track Panning" = "트랙 패닝"
+"Key {0}" = "키 {0}"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"

@@ -40,6 +40,8 @@ constexpr int fixedLengths[] = { 1, 2, 4, 8, 16, 32 };
 // and a time signature field at its right; the scene column grows by their width
 constexpr int tempoFieldWidth = 46, signatureFieldWidth = 42, sceneFieldsWidth = tempoFieldWidth + signatureFieldWidth + 4;
 bool sceneFieldsOn = false;
+// round 190em: Live 12.4.16's launch triangle of a scene without its own tempo / signature (190ei shot: #1E1E1E)
+const juce::Colour liveSceneTriangle { 0xff1e1e1e };
 int sceneWidthNow() noexcept { return sceneBaseWidth + (sceneFieldsOn ? sceneFieldsWidth : 0); }
 constexpr const char* playlistDragDescription = "lynx-playlist-clip";
 
@@ -798,6 +800,8 @@ private:
         const auto& slot = grid.slots[(std::size_t) clip.gridSlot];
         if (! slot.name.empty())
             return utf8 (slot.name);
+        if (slot.blankName && layoutstyle::current() == layoutstyle::Style::clipLaunch) // (round 190em: Live's unnamed clip)
+            return {};
         if (clip.kind == ClipKind::pattern && clip.pattern >= 0 && clip.pattern < (int) song.patterns.size())
             return utf8 (song.patterns[(std::size_t) clip.pattern].name);
         if (clip.kind == ClipKind::audio && clip.channel >= 0 && clip.channel < (int) song.channels.size())
@@ -994,7 +998,9 @@ private:
         const auto a = cell.withWidth (launchZone).toFloat().withSizeKeepingCentre (9.0f, 11.0f);
         triangle.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
         // (round 190em: a scene with its own tempo or time signature has a coloured launch triangle, as Live's cyan one)
-        g.setColour (scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info : c::textPrimary);
+        // (a plain scene's triangle: Live's dark grey, measured in the 190ei shot live-scenes-tempo-sig-on.png)
+        g.setColour (scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info
+                     : layoutstyle::current() == layoutstyle::Style::clipLaunch ? liveSceneTriangle : c::textPrimary);
         g.fillPath (triangle);
         g.setFont (theme::font (theme::type::small));
         auto nameArea = cell.withTrimmedLeft (launchZone);

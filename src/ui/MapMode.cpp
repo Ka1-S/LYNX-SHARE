@@ -118,6 +118,13 @@ juce::String keyText (int key)
     return juce::KeyPress (key).getTextDescription();
 }
 
+juce::String listKeyText (int key)
+{
+    // round 190em: the Key Mappings list as Live writes it ("Key w"; live check 190ei); letters in lower case
+    const auto text = key > 32 && key < 127 ? juce::String::charToString ((juce::juce_wchar) key).toLowerCase() : keyText (key);
+    return tr ("Key {0}", { text });
+}
+
 juce::String assignedText (const remotemap::Assigned& a, remotemap::Mode mode)
 {
     if (! a.found)
@@ -461,7 +468,8 @@ std::vector<int> MappingBrowser::columnWidths() const
     const auto range = juce::jlimit (40, 64, w / 8);
     if (mode == remotemap::Mode::key)
     {
-        const auto key = juce::jlimit (30, 56, w / 10), rest = juce::jmax (40, w - key - 2 * range);
+        // (round 190em: room for "Key w")
+        const auto key = juce::jlimit (50, 72, w / 5), rest = juce::jmax (40, w - key - 2 * range);
         return { key, rest * 2 / 5, rest - rest * 2 / 5, range, range };
     }
     const auto channel = juce::jlimit (22, 56, w / 12), control = juce::jlimit (40, 80, w / 9), rest = juce::jmax (40, w - channel - control - 2 * range);
@@ -542,7 +550,7 @@ void MappingBrowser::paint (juce::Graphics& g)
         const auto [path, name] = describe (engine, row.target);
         juce::StringArray cells;
         if (mode == remotemap::Mode::key)
-            cells = { keyText (row.key), path, name };
+            cells = { listKeyText (row.key), path, name };
         else
             cells = { row.channel < 0 ? tr ("All") : juce::String (row.channel + 1), juce::String (remotemap::controlText (row.number)), path, name };
         auto x = 0;

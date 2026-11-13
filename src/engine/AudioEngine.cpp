@@ -1443,7 +1443,11 @@ CaptureResult AudioEngine::captureMidiToSlot (int track, int scene, int& placed,
         if (! running)
             s.bpm = bpm;
         if (session::placeRecordedPattern (s, track, row, std::move (notes), length, {}) >= 0)
+        {
             placed = row;
+            if (auto* slot = launcher::settingsAt (*s.clipGrid, track, row))
+                slot->blankName = true; // (Live's captured clip has no name; the pattern keeps LYNX's default one)
+        }
     });
     if (placed < 0)
         return {};

@@ -9564,6 +9564,7 @@ countries: id
 "Capture MIDI: {0} notes put in the playing clip" = "Tangkap MIDI: {0} not dimasukkan ke klip yang sedang diputar"
 "Track Volume" = "Volume trek"
 "Track Panning" = "Panning trek"
+"Key {0}" = "Tombol {0}"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"

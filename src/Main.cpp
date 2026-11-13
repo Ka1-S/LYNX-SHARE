@@ -4459,6 +4459,23 @@ private:
             const auto back = lynx::ProjectFile::fromJson (json, why);
             if (! back || ! back->clipGrid || back->clipGrid->scenes != song.clipGrid->scenes || back->clipGrid->scenes[1].beatUnit != 8)
                 livewf190emResult = "ERROR round trip " + why;
+            {
+                // a captured clip's blank label (ClipGridSlot::blankName) survives the round trip
+                auto withClip = song;
+                lynx::Clip c;
+                c.pattern = 0;
+                c.length = 4 * lynx::ppq;
+                if (withClip.patterns.empty())
+                    withClip.patterns.emplace_back();
+                const auto slot = lynx::launcher::setClip (withClip, 0, 0, c);
+                if (slot >= 0)
+                    withClip.clipGrid->slots[(std::size_t) slot].blankName = true;
+                const auto again = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (withClip), why);
+                const auto* keptClip = again && again->clipGrid ? lynx::launcher::clipAt (*again->clipGrid, 0, 0) : nullptr;
+                const auto* kept = keptClip != nullptr ? &again->clipGrid->slots[(std::size_t) keptClip->gridSlot] : nullptr;
+                if (livewf190emResult == "OK" && (slot < 0 || kept == nullptr || ! kept->blankName))
+                    livewf190emResult = "ERROR blank clip name round trip";
+            }
             auto parsed = juce::JSON::parse (json);
             if (auto* scenes = parsed.getProperty ("clipGrid", {}).getProperty ("scenes", {}).getArray(); scenes != nullptr && scenes->size() > 1)
                 if (auto* o = (*scenes)[1].getDynamicObject())
@@ -17010,6 +17027,8 @@ private:
             const auto typed = lynx::mapmode::rangeValueOf (offline, volume, "0 dB");
             check ("browser: typing 0 dB", typed.has_value() && std::abs (lynx::mapmode::rangeText (offline, volume, *typed).getDoubleValue()) < 0.15);
             check ("browser: typing 50L", lynx::mapmode::rangeValueOf (offline, pan, "50L") == std::optional<float> (0.25f));
+            check ("browser: Key column = " + lynx::mapmode::listKeyText ('V') + ", " + lynx::mapmode::listKeyText ('3'),
+                   lynx::mapmode::listKeyText ('V') == "Key v" && lynx::mapmode::listKeyText ('3') == "Key 3");
             check ("browser: slot row Name = " + lynx::mapmode::describe (offline, Target::slot (0, 2)).second,
                    lynx::mapmode::describe (offline, Target::slot (0, 2)) == std::pair<juce::String, juce::String> ("Drums", "Slot 3"));
         }
@@ -17119,6 +17138,17 @@ private:
         lynx::refreshClipGrid (*gridView);
         lynx::selectClipGridScene (*gridView, 1);
         write (*gridView, "01-scene-fields");
+        {
+            // round 190em: a plain scene's launch triangle in Live's dark grey (#1E1E1E), scene 4 (row 3)
+            const auto image = lynx::shot::snapshot (*gridView);
+            int dark = 0;
+            for (int y = 0; y < image.getHeight(); ++y)
+                for (int x = image.getWidth() - 240; x < image.getWidth() - 180; ++x)
+                    if (const auto p = image.getPixelAt (x, y); y > 3 * 24 + 26 && y < 4 * 24 + 26 && std::abs (p.getRed() - 0x1e) <= 2
+                                                                && std::abs (p.getGreen() - 0x1e) <= 2 && std::abs (p.getBlue() - 0x1e) <= 2)
+                        ++dark;
+            check ("plain scene triangle in Live's #1E1E1E (" + juce::String (dark) + " px)", dark >= 20);
+        }
         saveMenus (juce::StringArray { "Scene menu (Verse)" }, std::vector<juce::PopupMenu> { lynx::clipGridSceneMenu (*gridView, 1) }, prefix + "-02-scene-menu.png");
         saveMenus (juce::StringArray { "Scene tempo field", "Scene time signature field" },
                    std::vector<juce::PopupMenu> { lynx::clipGridSceneFieldMenu (*gridView, 1, 1), lynx::clipGridSceneFieldMenu (*gridView, 2, 2) },
@@ -17214,6 +17244,10 @@ private:
             offline.dispatchPendingMessages();
             check ("Capture MIDI: 8 notes into Bass row " + juce::String (placed) + ", tempo " + juce::String (offline.getSong().bpm, 2),
                    r.notes == 8 && placed == empty && ! into && std::abs (offline.getSong().bpm - 148.0) < 0.5 && offline.getTransport().playing.load());
+            const auto& capturedGrid = *offline.getSong().clipGrid;
+            const auto* capturedClip = lynx::launcher::clipAt (capturedGrid, 1, placed);
+            const auto* slot = capturedClip != nullptr ? &capturedGrid.slots[(std::size_t) capturedClip->gridSlot] : nullptr;
+            check ("Capture MIDI: the clip has no name of its own (blank label, as Live)", slot != nullptr && slot->name.empty() && slot->blankName);
             if (auto* runtime = offline.launcherStateForSnapshot())
                 runtime->tracks[1].playing.store (placed);
             lynx::refreshClipGrid (*gridView);

@@ -9564,6 +9564,7 @@ countries: tw hk mo
 "Capture MIDI: {0} notes put in the playing clip" = "擷取 MIDI：已將 {0} 個音符放入正在播放的片段"
 "Track Volume" = "軌道音量"
 "Track Panning" = "軌道聲像"
+"Key {0}" = "按鍵 {0}"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"

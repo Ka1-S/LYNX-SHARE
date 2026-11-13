@@ -118,8 +118,8 @@ Source: live check 190ei on Live 12.4.16 (`/mnt/e/lynx-work/live190ei/ANSWERS.md
     old loop unrolled before it.
   - LYNX does all of this. The tempo estimate is LYNX's own (median gap, least-squares grid fit, folded into
     [80, 160) BPM) and is **approximate**.
-  - The new clip takes LYNX's default pattern name, as every new MIDI clip in LYNX does, not "<track> <n>". Live leaves
-    it unnamed.
+  - The new clip has no name, as in Live: its slot label is blank in the Clip-launch layout
+    (`ClipGridSlot::blankName`, .lynx "blankName"). The pattern behind it keeps LYNX's default name.
   - With several armed tracks, LYNX captures into the first one only.
 - **Key on a continuous control** (§4.6): the first press goes to Min (−∞ dB from 0 dB), then Max, then Min. LYNX
   changed from Max-first to this.
@@ -128,4 +128,6 @@ Source: live check 190ei on Live 12.4.16 (`/mnt/e/lynx-work/live190ei/ANSWERS.md
   - Path is "<track> | Mixer" for the mixer and "<track> | <device>" for device knobs.
   - Name is "Track Volume", "Track Panning", or "Slot n" for a clip slot.
 - **Not checkable**: the controller threshold on a button (no MIDI controller on the machine). It stays at 64.
-
+- **Look** (coordinator, after 190em's first pass): the Key column writes "Key a", as Live's list does. A plain scene's
+  launch triangle is Live's dark grey #1E1E1E, measured in `live-scenes-tempo-sig-on.png`; it is drawn on LYNX's darker
+  cell, so the contrast is lower than in Live. Both apply in the Clip-launch layout only.

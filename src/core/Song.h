@@ -2136,6 +2136,9 @@ struct ClipGridSlot
     bool legato = false;            // takes over the position of the clip it replaces
     bool loop = true;               // off: plays once, then the track stops
     bool noStop = false;            // an empty slot without its stop button (a scene leaves that track alone): its Clip has length 0
+    // round 190em: an unnamed clip as Live makes it (Capture MIDI): with no `name`, the Clip-launch layout's label is blank
+    // instead of the pattern's name. Saved in .lynx ("blankName")
+    bool blankName = false;
     ClipFollow follow;
     std::uint32_t groove = 0;       // the groove of the project's pool this clip plays through (Groove::id; 0 = none; core/Groove.h)
     bool operator== (const ClipGridSlot&) const = default;

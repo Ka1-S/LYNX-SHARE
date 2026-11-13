@@ -62,7 +62,7 @@ In the clip grid (Clip-launch workflow):
 - **Capture MIDI** (Ctrl+Shift+Alt+R) with the clip grid on screen: the notes you just played without recording go to
   the armed track (the selected track when none is armed). When that track plays a MIDI clip, they are written into it:
   its loop is unrolled up to the bars you just played and its start and loop move there. Otherwise they become a new
-  clip in the selected scene's slot (the next empty slot below when that one is taken), which starts playing at once;
+  clip with no name in the selected scene's slot (the next empty slot below when that one is taken), which starts playing at once;
   played with the transport stopped, the song's tempo is first set from how you played them.
 - **A Playlist clip into a slot**: with the grid beside the Playlist, drag a pattern or audio clip out of the Playlist
   onto a slot: a copy goes there, the Playlist keeps the clip.

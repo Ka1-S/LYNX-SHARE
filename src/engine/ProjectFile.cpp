@@ -1587,6 +1587,8 @@ juce::var clipGridToVar (const ClipGrid& grid)
             o->setProperty ("loop", false);
         if (slot.noStop)
             o->setProperty ("noStop", true);
+        if (slot.blankName) // (round 190em)
+            o->setProperty ("blankName", true);
         if (slot.groove != 0)
             o->setProperty ("groove", (juce::int64) slot.groove);
         if (slot.follow != ClipFollow {})
@@ -1638,6 +1640,7 @@ std::optional<ClipGrid> clipGridFromVar (const juce::var& v, const Song& song)
             slot.legato = (bool) o.getProperty ("legato", false);
             slot.loop = (bool) o.getProperty ("loop", true);
             slot.noStop = (bool) o.getProperty ("noStop", false);
+            slot.blankName = (bool) o.getProperty ("blankName", false);
             slot.groove = (std::uint32_t) (juce::int64) o.getProperty ("groove", 0);
             if (const auto f = o["follow"]; f.isArray() && f.size() >= 10)
             {
