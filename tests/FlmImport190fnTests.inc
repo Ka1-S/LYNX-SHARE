@@ -7,51 +7,52 @@
 namespace flm190fn
 {
 using namespace flm182c;
+using Bytes = flm182c::Bytes; // (other test files have a Bytes of their own)
 namespace flm = lynx::flm;
 
 inline Bytes meta (const std::string& created, double editSeconds, const std::string& author, const std::string& notes, const std::string& saved)
 {
     Bytes m;
-    fixed (m, created, 256);
-    f64 (m, editSeconds);
-    fixed (m, author, 256);
-    fixed (m, "New Song (7)", 256);
-    u8 (m, 0);
-    fixed (m, notes, 2048);
-    fixed (m, saved, 256);
-    return chunk ("META", m);
+    flm182c::fixed (m, created, 256);
+    flm182c::f64 (m, editSeconds);
+    flm182c::fixed (m, author, 256);
+    flm182c::fixed (m, "New Song (7)", 256);
+    flm182c::u8 (m, 0);
+    flm182c::fixed (m, notes, 2048);
+    flm182c::fixed (m, saved, 256);
+    return flm182c::chunk ("META", m);
 }
 
 // a one-rack song: the master and one channel whose drum kit plays "@R@" samples
 inline Bytes kitSong()
 {
     Bytes f;
-    tag (f, "10LF");
-    return cat ({ f, head ("Kit", 120.0), rack (flm::kindMaster, {}),
-                  rack (flm::kindNormal, {}, { sample ("Kick", "@R@", "Drum Samples\\Kick\\Kick 1.wav"), sample ("Clap", "@R@", "Drum Samples\\Clap\\Clap 2.wav") }),
-                  channel (flm::kindMaster, "MASTER", 0, {}),
-                  channel (flm::kindNormal, "Drums", 1, { lane (3, "Drums", { clip (0, 4, 4, 0, 1, { { 0, 0.1249, 0 }, { 1, 0.1249, 1 } }) }) }) });
+    flm182c::tag (f, "10LF");
+    return flm182c::cat ({ f, flm182c::head ("Kit", 120.0), flm182c::rack (flm::kindMaster, {}),
+                  flm182c::rack (flm::kindNormal, {}, { flm182c::sample ("Kick", "@R@", "Drum Samples\\Kick\\Kick 1.wav"), flm182c::sample ("Clap", "@R@", "Drum Samples\\Clap\\Clap 2.wav") }),
+                  flm182c::channel (flm::kindMaster, "MASTER", 0, {}),
+                  flm182c::channel (flm::kindNormal, "Drums", 1, { flm182c::lane (3, "Drums", { flm182c::clip (0, 4, 4, 0, 1, { { 0, 0.1249, 0 }, { 1, 0.1249, 1 } }) }) }) });
 }
 
 // the FL Studio Mobile Rack generator's state: "SSLF" + "10LF" + a short HEAD + one RACK (FLM_FORMAT §8)
 inline Bytes rackState (const Bytes& rackChunk)
 {
     Bytes body;
-    tag (body, "10LF");
+    flm182c::tag (body, "10LF");
     Bytes h (8, 0);
-    body = cat ({ body, chunk ("HEAD", h), rackChunk });
-    return chunk ("SSLF", body);
+    body = flm182c::cat ({ body, flm182c::chunk ("HEAD", h), rackChunk });
+    return flm182c::chunk ("SSLF", body);
 }
 
 inline Bytes withReserved (Bytes rmod, float postGain, float mix, float wetPan)
 {
     // append an SMPR chunk inside the RMOd (Post Gain, Mix, Wet Pan; FLM_FORMAT §3.1)
     Bytes smpr;
-    f32 (smpr, postGain);
-    f32 (smpr, mix);
-    f32 (smpr, wetPan);
-    const auto c = chunk ("SMPR", smpr);
-    put (rmod, c.data(), c.size());
+    flm182c::f32 (smpr, postGain);
+    flm182c::f32 (smpr, mix);
+    flm182c::f32 (smpr, wetPan);
+    const auto c = flm182c::chunk ("SMPR", smpr);
+    flm182c::put (rmod, c.data(), c.size());
     const auto size = (std::uint32_t) (rmod.size() - 8);
     std::memcpy (rmod.data() + 4, &size, 4);
     return rmod;
@@ -151,22 +152,23 @@ TEST (flm190fn_short_send_plays_at_its_linear_gain)
 {
     using namespace lynx;
     using namespace flm182c;
+    using Bytes = flm182c::Bytes;
     // a channel whose SEND to the bus has only words [0]…[2] (FLM rebuilds the level from the linear gain [2])
     Bytes f;
-    tag (f, "10LF");
-    auto ch = channel (flm::kindNormal, "Lead", 1, {});
+    flm182c::tag (f, "10LF");
+    auto ch = flm182c::channel (flm::kindNormal, "Lead", 1, {});
     {
         Bytes w;
-        u32 (w, 2);         // the bus's channel id
-        f32 (w, 1.0f);
-        f32 (w, 0.25f);     // linear gain
-        const auto c = chunk ("SEND", w);
-        put (ch, c.data(), c.size());
+        flm182c::u32 (w, 2);         // the bus's channel id
+        flm182c::f32 (w, 1.0f);
+        flm182c::f32 (w, 0.25f);     // linear gain
+        const auto c = flm182c::chunk ("SEND", w);
+        flm182c::put (ch, c.data(), c.size());
         const auto size = (std::uint32_t) (ch.size() - 8);
         std::memcpy (ch.data() + 4, &size, 4);
     }
-    const auto bytes = cat ({ f, head ("Send", 120.0), rack (flm::kindMaster, {}), rack (flm::kindNormal, {}), rack (flm::kindBus, {}),
-                              channel (flm::kindMaster, "MASTER", 0, {}), ch, channel (flm::kindBus, "Bus", 2, {}) });
+    const auto bytes = flm182c::cat ({ f, flm182c::head ("Send", 120.0), flm182c::rack (flm::kindMaster, {}), flm182c::rack (flm::kindNormal, {}), flm182c::rack (flm::kindBus, {}),
+                              flm182c::channel (flm::kindMaster, "MASTER", 0, {}), ch, flm182c::channel (flm::kindBus, "Bus", 2, {}) });
     FlpImportReport report;
     auto o = flm182c::options (&report);
     const auto s = importFlm (bytes, o);
@@ -197,10 +199,11 @@ TEST (flm190fn_meta_credits_reach_project_info)
 {
     using namespace lynx;
     using namespace flm182c;
+    using Bytes = flm182c::Bytes;
     Bytes f;
-    tag (f, "10LF");
-    const auto bytes = cat ({ f, head ("Credits", 120.0), flm190fn::meta ("2025-07-06 11-39-10", 5400.0, "Kai", "Line one\nLine two", "2026-11-08 02:09:36"),
-                              rack (flm::kindMaster, {}), channel (flm::kindMaster, "MASTER", 0, {}) });
+    flm182c::tag (f, "10LF");
+    const auto bytes = flm182c::cat ({ f, flm182c::head ("Credits", 120.0), flm190fn::meta ("2025-07-06 11-39-10", 5400.0, "Kai", "Line one\nLine two", "2026-11-08 02:09:36"),
+                              flm182c::rack (flm::kindMaster, {}), flm182c::channel (flm::kindMaster, "MASTER", 0, {}) });
     const auto p = flm::parse ({ bytes.data(), bytes.size() });
     CHECK (p && p->author == "Kai" && p->notes == "Line one\nLine two" && std::abs (p->editSeconds - 5400.0) < 1e-9);
     FlpImportReport report;
@@ -211,7 +214,7 @@ TEST (flm190fn_meta_credits_reach_project_info)
     CHECK (s && std::abs (s->info.created - 1751801950.0) < 0.5);
     CHECK (s && std::abs (s->info.workSeconds - 5400.0) < 1e-6);
     // no META, or empty fields: nothing set
-    const auto bare = cat ({ f, head ("Bare", 120.0), rack (flm::kindMaster, {}), channel (flm::kindMaster, "MASTER", 0, {}) });
+    const auto bare = flm182c::cat ({ f, flm182c::head ("Bare", 120.0), flm182c::rack (flm::kindMaster, {}), flm182c::channel (flm::kindMaster, "MASTER", 0, {}) });
     const auto t = importFlm (bare, flm182c::options (&report));
     CHECK (t && t->info.author.empty() && t->info.comments.empty() && t->info.created == 0.0 && t->info.workSeconds == 0.0);
 }
@@ -220,9 +223,10 @@ TEST (flm190fn_flp_mobile_rack_plays_on_the_flm_engine)
 {
     using namespace lynx;
     using namespace flm182c;
+    using Bytes = flm182c::Bytes;
     // a SuperSaw (type 23) at Post Gain −6 dB-ish and Wet Pan right, then a Filter (type 9): FLM's rack in an .flp
-    auto saw = flm190fn::withReserved (module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount), 0.35f, 1.0f, 0.75f);
-    const auto state = flm190fn::rackState (rack (flm::kindNormal, { saw, module (9, 3, {}, "Default/Default", 0, 127, 5) }));
+    auto saw = flm190fn::withReserved (flm182c::module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount), 0.35f, 1.0f, 0.75f);
+    const auto state = flm190fn::rackState (flm182c::rack (flm::kindNormal, { saw, flm182c::module (9, 3, {}, "Default/Default", 0, 127, 5) }));
     FlpImportReport report;
     FlpImportOptions o;
     o.report = &report;
@@ -256,6 +260,7 @@ TEST (flm190fn_flp_mobile_rack_left_as_stand_in_when_not_rebuilt)
 {
     using namespace lynx;
     using namespace flm182c;
+    using Bytes = flm182c::Bytes;
     const auto check = [] (const Bytes& state, const std::string& line) {
         FlpImportReport report;
         FlpImportOptions o;
@@ -268,15 +273,15 @@ TEST (flm190fn_flp_mobile_rack_left_as_stand_in_when_not_rebuilt)
         CHECK (report.converted.empty());
     };
     // a drum kit, two instruments, an effect first, an active note effect, a state that is not a rack
-    check (flm190fn::rackState (rack (flm::kindNormal, {}, { sample ("Kick", "@R@", "Drum Samples\\Kick\\Kick 1.wav") })), "FL Studio Mobile Rack (drum kit: not reproduced yet)");
-    check (flm190fn::rackState (rack (flm::kindNormal, { module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount),
-                                                         module (23, 3, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
+    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, {}, { flm182c::sample ("Kick", "@R@", "Drum Samples\\Kick\\Kick 1.wav") })), "FL Studio Mobile Rack (drum kit: not reproduced yet)");
+    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, { flm182c::module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount),
+                                                         flm182c::module (23, 3, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
            "FL Studio Mobile Rack (several instruments: not reproduced yet)");
-    check (flm190fn::rackState (rack (flm::kindNormal, { module (9, 3, {}, "Default/Default", 0, 127, 5),
-                                                         module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
+    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, { flm182c::module (9, 3, {}, "Default/Default", 0, 127, 5),
+                                                         flm182c::module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
            "FL Studio Mobile Rack (an effect before the instrument: not reproduced yet)");
-    check (flm190fn::rackState (rack (flm::kindNormal, { module (48, 4, {}, "Default/Default", 0, 127, 3),
-                                                         module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
+    check (flm190fn::rackState (flm182c::rack (flm::kindNormal, { flm182c::module (48, 4, {}, "Default/Default", 0, 127, 3),
+                                                         flm182c::module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) })),
            "FL Studio Mobile Rack (note effects: not reproduced yet)");
     check (Bytes { 'n', 'o', 'p', 'e', 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8 }, "FL Studio Mobile Rack (state not readable)");
 }
@@ -285,24 +290,25 @@ TEST (flm190fn_newer_app_version_is_named)
 {
     using namespace lynx;
     using namespace flm182c;
+    using Bytes = flm182c::Bytes;
     const auto song = [] (const std::string& version) {
         Bytes h;
-        u32 (h, 0);
-        u32 (h, 0);
-        fixed (h, "V", 256);
-        f64 (h, 120.0);
+        flm182c::u32 (h, 0);
+        flm182c::u32 (h, 0);
+        flm182c::fixed (h, "V", 256);
+        flm182c::f64 (h, 120.0);
         for (int k = 0; k < 7; ++k)
-            f64 (h, 0.0);
+            flm182c::f64 (h, 0.0);
         h.resize (h.size() + 16, 0);
-        u32 (h, 0);
-        u32 (h, 0);
-        u8 (h, 0);
-        u8 (h, 0);
-        u32 (h, 2);
-        lp32 (h, version);
+        flm182c::u32 (h, 0);
+        flm182c::u32 (h, 0);
+        flm182c::u8 (h, 0);
+        flm182c::u8 (h, 0);
+        flm182c::u32 (h, 2);
+        flm182c::lp32 (h, version);
         Bytes f;
-        tag (f, "10LF");
-        return cat ({ f, chunk ("HEAD", h), rack (flm::kindMaster, {}), channel (flm::kindMaster, "MASTER", 0, {}) });
+        flm182c::tag (f, "10LF");
+        return flm182c::cat ({ f, flm182c::chunk ("HEAD", h), flm182c::rack (flm::kindMaster, {}), flm182c::channel (flm::kindMaster, "MASTER", 0, {}) });
     };
     const auto lines = [&song] (const std::string& version) {
         FlpImportReport report;
@@ -322,16 +328,17 @@ TEST (flm190fn_effect_enable_lane_switches_the_slots)
 {
     using namespace lynx;
     using namespace flm182c;
+    using Bytes = flm182c::Bytes;
     // a Filter (type 9) with an Enable lane: on (65535) at beat 0, off (0) at beat 2, on at beat 4
     Bytes f;
-    tag (f, "10LF");
-    auto filter = module (9, 3, {}, "Default/Default", 0, 127, 5);
-    const auto bytes = cat ({ f, head ("Enable", 120.0), rack (flm::kindMaster, {}),
-                              rack (flm::kindNormal, { module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount), filter }),
-                              channel (flm::kindMaster, "MASTER", 0, {}),
-                              channel (flm::kindNormal, "Pad", 1,
-                                       { lane (1, "Enable : FX Filter",
-                                               { clip (0, 8, 8, 0, 1, { { 0, 0, -1, 200, 127, 0xFFFF }, { 2, 0, -1, 200, 127, 0 }, { 4, 0, -1, 200, 127, 0xFFFF } }) },
+    flm182c::tag (f, "10LF");
+    auto filter = flm182c::module (9, 3, {}, "Default/Default", 0, 127, 5);
+    const auto bytes = flm182c::cat ({ f, flm182c::head ("Enable", 120.0), flm182c::rack (flm::kindMaster, {}),
+                              flm182c::rack (flm::kindNormal, { flm182c::module (23, 2, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount), filter }),
+                              flm182c::channel (flm::kindMaster, "MASTER", 0, {}),
+                              flm182c::channel (flm::kindNormal, "Pad", 1,
+                                       { flm182c::lane (1, "Enable : FX Filter",
+                                               { flm182c::clip (0, 8, 8, 0, 1, { { 0, 0, -1, 200, 127, 0xFFFF }, { 2, 0, -1, 200, 127, 0 }, { 4, 0, -1, 200, 127, 0xFFFF } }) },
                                                3, 0) }) });
     FlpImportReport report;
     const auto s = importFlm (bytes, flm182c::options (&report));
@@ -358,11 +365,12 @@ TEST (flm190fn_flp_mobile_rack_fx_on_the_flm_engines)
 {
     using namespace lynx;
     using namespace flm182c;
+    using Bytes = flm182c::Bytes;
     // a Rack FX: Filter (9) → Equalizer (3) → a Tuner (24, sound-neutral) → a SuperSaw (an instrument: an effect rack
     // plays no notes); the rack at level 0.9 and pan 0.75 (RPRM as written by rack(): level 0.9, pan 0.5 → patched)
-    auto r = rack (flm::kindNormal, { module (9, 3, {}, "Default/Default", 0, 127, 5), module (3, 4, {}, "Default/Default", 0, 127, 12),
-                                      module (24, 5, {}, "Default/Default", 0, 127, 2),
-                                      module (23, 6, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) });
+    auto r = flm182c::rack (flm::kindNormal, { flm182c::module (9, 3, {}, "Default/Default", 0, 127, 5), flm182c::module (3, 4, {}, "Default/Default", 0, 127, 12),
+                                      flm182c::module (24, 5, {}, "Default/Default", 0, 127, 2),
+                                      flm182c::module (23, 6, {}, "Default/Default", 0, 127, pocketsaw::flmParamCount) });
     {
         // RPRM sits after the RACK header (8), "RACK"+size (8) and RHED (8 + 16): its [1] (pan) at +8 + 8 + 24 + 8 + 4
         const float pan = 0.75f;
@@ -403,7 +411,7 @@ TEST (flm190fn_flp_mobile_rack_fx_on_the_flm_engines)
     CHECK (report.droppedEffects.count ("FL Studio Mobile Rack FX (its modules are not reproduced; the slot is left out)") == 0);
     // FL's own default Rack FX state shape: an empty rack at 0 dB passes the sound, no slot
     FlpImportReport empty;
-    const auto e = flmRackFxSlot (flm190fn::rackState (rack (flm::kindNormal, {})), &empty);
+    const auto e = flmRackFxSlot (flm190fn::rackState (flm182c::rack (flm::kindNormal, {})), &empty);
     // (rack() writes level 0.9: not 0 dB, so a gain-only container)
     CHECK (e && e->kind == EffectKind::parallel && e->branches.size() == 1 && e->branches[0].chain.empty());
     CHECK (! flmRackFxSlot ({ 1, 2, 3 }, &empty));
