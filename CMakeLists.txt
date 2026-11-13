@@ -638,6 +638,7 @@ if(LYNX_BUILD_APP)
         # Include Android JNI headers
         target_include_directories(LYNX PRIVATE src/platform/android/jni)
         # Add native_app_glue include path for android_app struct (needed by AndroidPaths.cpp, AndroidLifecycle.cpp)
+        # Header is android_native_app_glue.h in NDK r27+
         target_include_directories(LYNX PRIVATE ${ANDROID_NDK}/sources/android/native_app_glue)
         # JUCE's native app glue is automatically included by juce_add_gui_app
         # target_link_libraries(LYNX PRIVATE juce::juce_android_native_app_glue)

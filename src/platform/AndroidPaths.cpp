@@ -5,8 +5,8 @@
 #if JUCE_ANDROID || defined(LYNX_ANDROID)
 #include <android/native_activity.h>
 #include <android/asset_manager.h>
-// native_app_glue.h is provided via CMake include path (-I/tmp/android-ndk-r27/sources/android/native_app_glue)
-#include "native_app_glue.h"
+// android_native_app_glue.h is provided via CMake include path (-I${ANDROID_NDK}/sources/android/native_app_glue)
+#include "android_native_app_glue.h"
 #include <jni.h>
 
 extern "C" {
