@@ -4340,6 +4340,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190ar: … and before the Classic voicing's high-drive coupling keeps round trial187b's high-drive tables
     if (slot.kind == EffectKind::ember && savedCount <= (std::size_t) mixsuite::ember::classicHot)
         slot.params[(std::size_t) mixsuite::ember::classicHot] = 0.0f;
+    // round 190fj: … and before the measured tape core keeps the Classic tape curve
+    if (slot.kind == EffectKind::ember && savedCount <= (std::size_t) mixsuite::ember::law)
+        slot.params[(std::size_t) mixsuite::ember::law] = 0.0f;
     if (slot.kind == EffectKind::echoform && savedCount <= (std::size_t) echosuite::echoform::voicingStereo
         && slot.params.size() > (std::size_t) echosuite::echoform::voicingStereo)
         slot.params[(std::size_t) echosuite::echoform::voicingStereo] = 0.0f;

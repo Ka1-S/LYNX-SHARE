@@ -10,6 +10,7 @@
 #include "core/DynamicsSuite.h"
 #include "core/Effects.h"
 #include "core/EmberClassic.h"
+#include "core/EmberTape.h"
 #include "core/LrCrossover.h"
 #include "core/ParametricEqLinear.h"
 #include "core/StrikeShaper.h"
@@ -2362,6 +2363,12 @@ double lowCutHz (float v) noexcept { return v <= 0.0f ? 0.0 : logMap (v, 20.0, 5
 double highCutHz (float v) noexcept { return v >= 1.0f ? 0.0 : logMap (v, 2000.0, 20000.0); }
 int oversampling (float v) noexcept { return v < 0.25f ? 2 : (v < 0.75f ? 4 : 8); }
 int voiceIndex (float v) noexcept { return std::clamp ((int) std::lround (std::clamp (v, 0.0f, 1.0f) * voices), 0, voices); }
+int tapeSpeedIndex (float v) noexcept { return std::clamp ((int) std::lround (std::clamp (v, 0.0f, 1.0f) * (tapeSpeeds - 1)), 0, tapeSpeeds - 1); }
+const char* tapeSpeedName (int k) noexcept
+{
+    static const char* const names[tapeSpeeds] { "30 ips", "15 ips", "7.5 ips", "3.75 ips", "1.875 ips" };
+    return names[std::clamp (k, 0, tapeSpeeds - 1)];
+}
 const char* voiceName (int k) noexcept
 {
     static const char* const names[voices + 1] { "Off", "Tape pre", "Console", "Grit", "Triode", "Pentode" };
@@ -2415,6 +2422,12 @@ std::pair<float, float> bandCountValues (int n) noexcept
     return { (float) (std::min (n, firstBands) - 1) / 3.0f, n <= firstBands ? 0.0f : (float) (n - firstBands) / 2.0f };
 }
 int characterIndex (float v) noexcept { return std::clamp ((int) std::lround (std::clamp (v, 0.0f, 1.0f) * characters), 0, characters); }
+bool measuredTape (const EffectParams& p) noexcept
+{
+    return on (p[law]) && ! on (p[voicing]) && activeBands (p) <= 1 && styleOf (p[style]) == Style::tape
+        && voiceIndex (p[voice]) == 0 && characterIndex (p[characterParam (0)]) == 0
+        && feedbackAmount (p[bandExtra (0, 6)]) <= 0.0;
+}
 
 // ---- round 152 (REA_rodada152b): own crossover slopes, linear phase, modulation, the effect characters' law ----
 namespace
@@ -2899,6 +2912,25 @@ struct LongDelay
     }
 };
 
+// round 190fj: the measured tape core's constants per tape speed (30, 15, 7½, 3¾, 1⅞ ips), fitted black-box with
+// /mnt/e/lynx-work/ember190fj/fit/tapefit on the reference tape saturator's recorded renders: the loop, record EQ and
+// drive law at 15 ips on round tp172c's stairs, sweeps, drums and music at its default and Drive +10; 1⅞ ips on its
+// Drive +15 takes and round 182's programme; 30 ips and 7½ ips on round 182's programme (7½ ips: a take with "Average"
+// tape and flutter on — its level law, not its flutter); 3¾ ips interpolated between 7½ and 1⅞ (log speed). The
+// record level is gain0Db + gainPerDb × (Ember drive − 18 dB): Ember's drive 18 dB is the reference's 0 dB.
+constexpr double tapeDriveCentreDb = 18.0;
+const embertape::Model& tapeModel (int speed) noexcept
+{
+    static const embertape::Model models[tapeSpeeds] {
+        embertape::Model { .a = 1, .k = 0.263145, .c = 0.994581, .alpha = 0.00063721, .gain0Db = 5.93642, .gainPerDb = 1.38367, .clip = 0, .preLowHz = 678.98, .preLowDb = 1.11462, .preHighHz = 353.281, .preHighDb = -0.23233, .lossHz = 18118.8, .dcHz = 0, .relaxMs = 5, .bumpHz = 0, .bumpDb = 0, .bumpQ = 1, .postHighHz = 10000, .postHighDb = 0, .trimDb = 0.123784 }, // 30 ips
+        embertape::Model { .a = 1, .k = 0.263145, .c = 0.994581, .alpha = 0.00063721, .gain0Db = 5.94306, .gainPerDb = 1.38367, .clip = 0, .preLowHz = 678.98, .preLowDb = 1.11462, .preHighHz = 640.246, .preHighDb = -1.03777, .lossHz = 0, .dcHz = 0, .relaxMs = 5, .bumpHz = 0, .bumpDb = 0, .bumpQ = 1, .postHighHz = 10000, .postHighDb = 0, .trimDb = -0.0842768 }, // 15 ips
+        embertape::Model { .a = 1, .k = 0.263145, .c = 0.994581, .alpha = 0.00063721, .gain0Db = 14.4142, .gainPerDb = 1.38367, .clip = 0, .preLowHz = 678.98, .preLowDb = 1.11462, .preHighHz = 306.064, .preHighDb = -2.4425, .lossHz = 2053.87, .dcHz = 0, .relaxMs = 5, .bumpHz = 0, .bumpDb = 0, .bumpQ = 1, .postHighHz = 10000, .postHighDb = 0, .trimDb = 1.05349 }, // 7.5 ips
+        embertape::Model { .a = 1, .k = 0.263145, .c = 0.994581, .alpha = 0.00063721, .gain0Db = 9.15819, .gainPerDb = 1.38367, .clip = 2.60431, .preLowHz = 678.98, .preLowDb = 1.11462, .preHighHz = 361.372, .preHighDb = -1.95647, .lossHz = 2299, .dcHz = 0, .relaxMs = 5, .bumpHz = 0, .bumpDb = 0, .bumpQ = 1, .postHighHz = 10000, .postHighDb = 0, .trimDb = 0.757945 }, // 3.75 ips (interpolated)
+        embertape::Model { .a = 1, .k = 0.263145, .c = 0.994581, .alpha = 0.00063721, .gain0Db = 3.90216, .gainPerDb = 1.38367, .clip = 2.60431, .preLowHz = 678.98, .preLowDb = 1.11462, .preHighHz = 426.675, .preHighDb = -1.47044, .lossHz = 2573.39, .dcHz = 0, .relaxMs = 5, .bumpHz = 0, .bumpDb = 0, .bumpQ = 1, .postHighHz = 10000, .postHighDb = 0, .trimDb = 0.462396 }, // 1.875 ips
+    };
+    return models[std::clamp (speed, 0, tapeSpeeds - 1)];
+}
+
 class Saturator final : public Effect
 {
 public:
@@ -2935,12 +2967,26 @@ public:
             d.set (sr, 8.0);
         splitBands = 0; // redesign the crossovers at the new rate
         lastVoice = -1;
+        tapeNow = -1; // round 190fj: the tape filters at the new rate
         reset();
     }
 
     void reset() noexcept override
     {
         classic.reset();
+        tapeWasOn = false;
+        for (int c = 0; c < 2; ++c) // round 190fj
+        {
+            tapeCore[(std::size_t) c].reset();
+            tapePreLo[(std::size_t) c].reset();
+            tapePreHi[(std::size_t) c].reset();
+            tapeDeLo[(std::size_t) c].reset();
+            tapeDeHi[(std::size_t) c].reset();
+            tapeLoss[(std::size_t) c].reset();
+            tapeDc[(std::size_t) c].reset();
+            tapePost[(std::size_t) c].reset();
+            tapeBump[(std::size_t) c].reset();
+        }
         for (auto& o : os)
             o.reset();
         dry.reset();
@@ -3110,6 +3156,14 @@ private:
         const auto drvB = drivePanned ? (float) dbToGain (driveDb (p[drive]) * dsB + (on (p[punish]) ? punishDb : 0.0)) : drv;
         const auto [panA, panB] = panScales (panOf (p[bandPanParam (0)]));
         const bool tape = s == Style::tape && vk == 0 && chr.k == 0;
+        // round 190fj: the measured tape core (core/EmberTape.h) in place of the Classic tape curve
+        const bool mtape = tape && measuredTape (p);
+        if (mtape)
+            configureTape (tapeSpeedIndex (p[tapeSpeed]), factor);
+        // switched in on a running signal (another style or the Classic law before): its filters and loop start at the
+        // signal's state, not at rest (no step at the switch)
+        bool tapeFresh = mtape && ! tapeWasOn;
+        tapeWasOn = mtape;
         const auto [lc, hc] = configureCuts (p);
         configureVoice (vk);
         // tape: pre-emphasis before the drive and the inverse after it, so the highs saturate first (DAFX 4.3)
@@ -3130,6 +3184,25 @@ private:
         const auto compA = drivePanned && on (p[autoGain]) ? autoMakeup (s, drvA) : comp;
         auto compB = drivePanned && on (p[autoGain]) ? autoMakeup (s, drvB) : comp;
         auto drvA2 = drvA, drvB2 = drvB, compA2 = compA;
+        // round 190fj: the measured tape's record level (its law on Ember's drive, + PUNISH, the drive pan) and the
+        // make-up that holds the small-signal gain at 0 dB with Auto gain on (the reference's compensated drive), at
+        // the record level's own gain without it
+        // (the oversampler still gets the signal at the drive gain every style gets, so a style switch on a running
+        // signal finds its history at the same scale; the record level's difference is applied inside)
+        double tapeMkA = 1.0, tapeMkB = 1.0, tapeFieldA = 1.0, tapeFieldB = 1.0;
+        if (mtape)
+        {
+            const auto& md = tapeModel (tapeNow);
+            const auto extra = on (p[punish]) ? punishDb : 0.0;
+            auto rec = [&md, extra] (double driveDbNow) { return dbToGain (md.gain0Db + md.gainPerDb * (driveDbNow + extra - tapeDriveCentreDb)); };
+            const auto ga = rec (driveDb (p[drive]) * dsA), gb = rec (driveDb (p[drive]) * dsB);
+            tapeFieldA = ga / (double) drvA2;
+            tapeFieldB = gb / (double) drvB2;
+            const bool autoOn = on (p[autoGain]);
+            const auto trim = dbToGain (md.trimDb);
+            tapeMkA = trim / (tapeSsg * (autoOn ? ga : 1.0));
+            tapeMkB = trim / (tapeSsg * (autoOn ? gb : 1.0));
+        }
         if (chr.k > 0)
         {
             const auto extra = on (p[punish]) ? punishDb : 0.0;
@@ -3153,7 +3226,17 @@ private:
                 a = voicePre.process (a, 0);
                 b = voicePre.process (b, 1);
             }
-            if (tape)
+            if (mtape)
+            {
+                if (tapeFresh && i == 0)
+                {
+                    tapePreHi[0].prime (tapePreLo[0].prime (a));
+                    tapePreHi[1].prime (tapePreLo[1].prime (b));
+                }
+                a = (float) tapePreHi[0].process (tapePreLo[0].process (a));
+                b = (float) tapePreHi[1].process (tapePreLo[1].process (b));
+            }
+            else if (tape)
             {
                 a = emphasis.process (a, 0);
                 b = emphasis.process (b, 1);
@@ -3183,6 +3266,26 @@ private:
                 os[1].process (wr.data(), n, curve);
             }
         }
+        else if (mtape)
+        {
+            const double clip = tapeModel (tapeNow).clip;
+            bool freshL = tapeFresh, freshR = tapeFresh;
+            auto core = [clip] (embertape::Hysteresis& hy, double field, double mk, float x, bool& fresh) noexcept
+            {
+                double h = x * field;
+                if (clip > 0.0) h = clip * embertape::tanhFast (h / clip);
+                if (fresh)
+                {
+                    hy.prime (h);
+                    fresh = false;
+                }
+                return (float) (hy.process (h) * mk);
+            };
+            auto left = [this, &core, &freshL, tapeFieldA, tapeMkA] (float x) noexcept { return core (tapeCore[0], tapeFieldA, tapeMkA, x, freshL); };
+            auto right = [this, &core, &freshR, tapeFieldB, tapeMkB] (float x) noexcept { return core (tapeCore[1], tapeFieldB, tapeMkB, x, freshR); };
+            os[0].process (wl.data(), n, left);
+            os[1].process (wr.data(), n, right);
+        }
         else if (ex.fbGain > 0.0)
         {
             auto left = [&ex, s] (float x) noexcept { return ex.shapeWithFeedback (s, x, 0); };
@@ -3207,10 +3310,27 @@ private:
 
         for (int i = 0; i < n; ++i)
         {
-            auto a = dc.process (wl[(std::size_t) i], 0) * compA2, b = dc.process (wr[(std::size_t) i], 1) * compB;
+            float a, b;
+            if (mtape) // round 190fj: the playback EQ (the record EQ's inverse), the playback loss and the output shelf
+            {
+                if (tapeFresh && i == 0)
+                    for (int c = 0; c < 2; ++c)
+                    {
+                        const auto k = (std::size_t) c;
+                        const double w = c == 0 ? wl[0] : wr[0];
+                        tapePost[k].prime (tapeBump[k].prime (tapeLoss[k].prime (tapeDeHi[k].prime (tapeDeLo[k].prime (tapeDc[k].prime (w))))));
+                    }
+                a = (float) tapePost[0].process (tapeBump[0].process (tapeLoss[0].process (tapeDeHi[0].process (tapeDeLo[0].process (tapeDc[0].process (wl[(std::size_t) i]))))));
+                b = (float) tapePost[1].process (tapeBump[1].process (tapeLoss[1].process (tapeDeHi[1].process (tapeDeLo[1].process (tapeDc[1].process (wr[(std::size_t) i]))))));
+            }
+            else
+            {
+                a = dc.process (wl[(std::size_t) i], 0) * compA2;
+                b = dc.process (wr[(std::size_t) i], 1) * compB;
+            }
             if (chr.k > 0) chr.post (a, b);
             if (collapse) pitch[0].run (a, b, cRatio); // round 152
-            if (tape)
+            if (tape && ! mtape)
             {
                 a = deemphasis.process (a, 0);
                 b = deemphasis.process (b, 1);
@@ -3570,6 +3690,38 @@ private:
     emberclassic::Engine classic;
     emberclassic::Settings classicSet;
     bool classicOn = false;
+    // round 190fj: the measured tape core, per channel, and its filters for the speed in use
+    std::array<embertape::Hysteresis, 2> tapeCore;
+    std::array<embertape::First, 2> tapePreLo, tapePreHi, tapeDeLo, tapeDeHi, tapeLoss, tapeDc, tapePost;
+    std::array<embertape::Peak, 2> tapeBump;
+    int tapeNow = -1, tapeFactor = 0;
+    bool tapeWasOn = false;
+    double tapeSsg = 1.0;
+
+    void configureTape (int speed, int factor) noexcept
+    {
+        if (speed == tapeNow && factor == tapeFactor)
+            return;
+        const auto& md = tapeModel (speed);
+        for (int c = 0; c < 2; ++c)
+        {
+            const auto k = (std::size_t) c;
+            tapePreLo[k].shelf (sr, md.preLowHz, md.preLowDb, false);
+            tapePreHi[k].shelf (sr, md.preHighHz, md.preHighDb, true);
+            tapeDeLo[k].shelf (sr, md.preLowHz, -md.preLowDb, false);
+            tapeDeHi[k].shelf (sr, md.preHighHz, -md.preHighDb, true);
+            if (md.lossHz > 0.0) tapeLoss[k].lowPass (sr, md.lossHz); else tapeLoss[k].flat();
+            if (md.dcHz > 0.0) tapeDc[k].highPass (sr, md.dcHz); else tapeDc[k].flat();
+            tapePost[k].shelf (sr, md.postHighHz, md.postHighDb, true);
+            tapeBump[k].set (sr, md.bumpHz, md.bumpDb, md.bumpQ);
+            tapeCore[k].set (md.a, md.k, md.c, md.alpha);
+            tapeCore[k].setRelax (md.relaxMs, sr * factor);
+        }
+        // the loop's small-signal gain at the oversampled rate (a few hundred steps of a −60 dBFS sine)
+        tapeSsg = embertape::smallSignalGain (md, dbToGain (md.gain0Db), sr * factor);
+        tapeNow = speed;
+        tapeFactor = factor;
+    }
 
     void chunkClassic (float* l, float* r, int n, const EffectParams& p) noexcept
     {
@@ -3813,7 +3965,9 @@ const EffectInfo& emberInfo()
                                      // round 165 (Decapitator: Auto, the Classic law)
                                      { "Classic auto", 1.0f }, { "Classic law", 1.0f },
                                      // round 190ar (the Classic voicing's high-drive coupling; old projects load it off)
-                                     { "Classic hot law", 1.0f } } };
+                                     { "Classic hot law", 1.0f },
+                                     // round 190fj (the measured tape core; old projects load the Classic law)
+                                     { "Law", 1.0f }, { "Tape speed", 0.25f } } };
     return info;
 }
 
@@ -4186,6 +4340,8 @@ std::string paramText (EffectKind kind, int param, float v)
             case classicAuto: return onOff (v);
             case classicLaw: return on (v) ? "measured" : "round 136";
             case classicHot: return on (v) ? "measured" : "round 187";
+            case law: return on (v) ? "Measured" : "Classic";
+            case tapeSpeed: return tapeSpeedName (tapeSpeedIndex (v));
             case band2Style: case band3Style: case band4Style: case band5Style: case band6Style:
             {
                 static const char* names[] = { "tube", "tape", "transistor", "fuzz" };

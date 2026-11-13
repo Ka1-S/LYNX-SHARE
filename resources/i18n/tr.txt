@@ -9814,3 +9814,4 @@ countries: tr
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "Seçenekler: slotları MIDI notalarıyla tetikle (zaman slotları: C5–B7 tuşları, ses slotları: C2–B4), tık azaltma, atak telafisi, DC ofseti, HQ yeniden örnekleme, scratch saati; MIDI giriş portu"
 "MIDI Input Port Number:" = "MIDI giriş portu numarası:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "MIDI giriş portu numarası: yukarı / aşağı sürükleyin (\"...\" = yok). Bu porttaki MIDI Out kanalları Pitcher'ın MIDI modunu ve Harmonize'ını çalar"
+"30 ips|15|7.5|3.75|1.875" = "30 ips|15|7,5|3,75|1,875"

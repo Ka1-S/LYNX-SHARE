@@ -2395,7 +2395,13 @@ Layout emberLayout()
     l.height = 230;
     auto& v = l.items;
     v.push_back (section (4, 4, 200, 222, TR_NOOP ("Style")));
-    v.push_back (display (12, 26, 184, 110, "embercurve"));
+    v.push_back (display (12, 26, 184, 96, "embercurve"));
+    // round 190fj: Tape's speed on the measured core; projects saved before it keep the Classic tape until switched
+    // (their own third condition: hidden on the Classic voicing's page like the rest of this page)
+    v.push_back (when (when (when (tabs (12, 124, 184, 16, "Tape speed", TR_NOOP ("30 ips|15|7.5|3.75|1.875"), {}, compactKeys),
+                                   "Style", 0.17f, 0.5f), "Law", 0.5f, 1.0f), "Voicing", 0.0f, 0.5f));
+    v.push_back (when (when (when (tabs (12, 124, 184, 16, "Law", TR_NOOP ("Classic|Measured"), {}, compactKeys), "Style", 0.17f, 0.5f),
+                             "Law", 0.0f, 0.5f), "Voicing", 0.0f, 0.5f));
     auto styles = radio (12, 144, 184, 76, "Style", TR_NOOP ("Tube|Tape|Transistor|Fuzz"));
     styles.columns = 2;
     v.push_back (styles);

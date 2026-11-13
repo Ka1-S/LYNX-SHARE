@@ -344,6 +344,7 @@ TEST (mixsuite96_ember_thd_and_aliasing)
         auto p = defaults (EffectKind::ember);
         p[style] = styleValue;
         p[drive] = driveValue;
+        p[law] = 0.0f; // round 190fj: the Style menu's curves (the measured Tape: Ember190fjTests.inc)
         const auto y = run (EffectKind::ember, p, sine (1000.0, amp, 32768));
         const auto f = amplitude (y, 1000.0, 16384, 16384);
         double sum = 0.0;
