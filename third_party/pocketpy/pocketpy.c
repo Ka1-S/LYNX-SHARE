@@ -27,6 +27,19 @@ static int py_lynx_heap_allows(size_t grow) {
     return 1;
 }
 
+// LYNX: one operation that asks for more than the heap has left in a single go (a big repeat such as
+// 'x' * 2_000_000_000 or [0] * 300_000_000, list() of a long iterator) is stopped with the memory message before it
+// allocates: past twice the limit an allocation fails, and pocketpy's growth code aborts the process on a failed
+// allocation (c11_vector__reserve) or writes through the null pointer (a big string), taking the host down with it.
+static int py_lynx_heap_room(size_t bytes) {
+    if(bytes > py_lynx_heap_limit || py_lynx_heap_bytes + bytes > py_lynx_heap_limit) {
+        py_lynx_out_of_memory = 1;
+        py_lynx_interrupt = 1;
+        return 0;
+    }
+    return 1;
+}
+
 void* py_lynx_malloc(size_t size) {
     if(!py_lynx_heap_allows(size)) return NULL;
     size_t* p = (size_t*)malloc(size + LYNX_HEAP_HEADER);
@@ -8364,6 +8377,10 @@ static bool str__mul__(int argc, py_Ref argv) {
         if(n <= 0) {
             py_newstr(py_retval(), "");
         } else {
+            // LYNX: the whole result is one allocation (and its size an int): asked for before it is made
+            const size_t bytes = n > (py_i64)(0x7fffffff / (self->size > 0 ? self->size : 1)) ? (size_t)-1
+                                                                                             : (size_t)self->size * (size_t)n;
+            if(!py_lynx_heap_room(bytes)) return RuntimeError("out of memory");
             char* p = py_newstrn(py_retval(), self->size * n);
             for(int i = 0; i < n; i++) {
                 memcpy(p + i * self->size, self->data, self->size);
@@ -33473,6 +33490,11 @@ static bool list__new__(int argc, py_Ref argv) {
             }
             if(!res) break;
             py_list_append(list, py_retval());
+            // LYNX: list() of a long iterator grows inside one call, where no opcode checks the heap limit
+            if(py_lynx_out_of_memory) {
+                py_shrink(2);
+                return RuntimeError("out of memory");
+            }
         }
         *py_retval() = *list;
         py_shrink(2);
@@ -33567,10 +33589,17 @@ static bool list__mul__(int argc, py_Ref argv) {
     py_Ref _0 = py_arg(0);
     py_Ref _1 = py_arg(1);
     if(py_istype(_1, tp_int)) {
-        int n = py_toint(_1);
+        py_i64 n64 = py_toint(_1);
+        List* list_0 = py_touserdata(_0);
+        // LYNX: the result's size is known: a repeat past the heap's room stops the script before it allocates
+        if(n64 > 0 && list_0->length > 0 &&
+           !py_lynx_heap_room(n64 > (py_i64)(0x7fffffff / list_0->length)
+                                  ? (size_t)-1
+                                  : (size_t)n64 * (size_t)list_0->length * sizeof(py_TValue)))
+            return RuntimeError("out of memory");
+        int n = list_0->length > 0 && n64 > 0 ? (int)n64 : 0;
         py_newlist(py_retval());
         List* list = py_touserdata(py_retval());
-        List* list_0 = py_touserdata(_0);
         for(int i = 0; i < n; i++) {
             c11_vector__extend(list, list_0->data, list_0->length);
         }
