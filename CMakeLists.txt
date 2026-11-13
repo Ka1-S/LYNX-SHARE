@@ -665,6 +665,8 @@ if(LYNX_BUILD_APP)
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Android")
         # JUCE Android modules are linked automatically by juce_add_gui_app in JUCE 8
+        # Add native_app_glue include path for android_app struct
+        target_include_directories(LYNX PRIVATE ${ANDROID_NDK}/sources/android/native_app_glue)
     endif()
     # LTO for the shipped app; the Tests workflow builds without it (round speed185a: the LTO link was 7 of the 8.5
     # minutes of a cached CI App build). -DLYNX_LTO=OFF
