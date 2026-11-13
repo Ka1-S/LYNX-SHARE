@@ -390,10 +390,29 @@ void PianoRollComponent::updateKeyRows()
 {
     // keep the key at the top of the view where it is when the rows change (fold on/off, another scale)
     const auto topKey = yToKey (headerHeight);
-    rows = notetools::keyRows (scaleRoot(), scaleIndex(), foldToScale);
+    rows = ! padRows.empty() ? notetools::keyRowsOf (padRows) : notetools::keyRows (scaleRoot(), scaleIndex(), foldToScale);
     scrollY = juce::jlimit (0, juce::jmax (0, rows.count * rowHeight - gridArea().getHeight()), rowFor (topKey) * rowHeight);
     updateScrollBars();
     repaint();
+}
+
+std::vector<int> PianoRollComponent::wantedPadRows() const
+{
+    const auto& song = engine.getSong();
+    const auto channel = engine.getSelectedChannel();
+    if (! EditorGlobals::get().clipLaunchWorkflow || allChannels || channel < 0 || channel >= (int) song.channels.size()
+        || ! rack::isDrumRack (song.channels[(std::size_t) channel]))
+        return {};
+    return rack::filledPadKeys (*rack::rackOf (song.channels[(std::size_t) channel].patcher));
+}
+
+void PianoRollComponent::syncPadRows()
+{
+    if (auto wanted = wantedPadRows(); wanted != padRows)
+    {
+        padRows = std::move (wanted);
+        updateKeyRows();
+    }
 }
 
 void PianoRollComponent::setFoldToScale (bool on)
@@ -895,7 +914,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
             g.setColour (row);
             g.fillRect (grid.getX(), y, grid.getWidth(), rowHeight);
 
-            if (key % 12 == (folded() ? scaleRoot() : 0)) // folded: the octave line under each root
+            if (! padRows.empty() || key % 12 == (folded() ? scaleRoot() : 0)) // folded: the octave line under each root (pads: each row)
             {
                 g.setColour (gridBeat);
                 g.drawHorizontalLine (y + rowHeight - 1, (float) grid.getX(), (float) grid.getRight());
@@ -1388,6 +1407,11 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 g.setFont (theme::font (fontHeight, false));
                 g.setColour (pressed ? onAccent : bg0);
                 g.drawFittedText (juce::String::fromUTF8 (label->second.c_str()), area.reduced (1, 0), juce::Justification::centredLeft, 1, 0.8f);
+            }
+            if (! padRows.empty()) // (a Drum Rack's pad rows: a strip at the right in the key's piano colour, as Live's list)
+            {
+                g.setColour (isBlackKey (key) ? keyBlack : keyWhite.darker (0.25f));
+                g.fillRect (keyboardWidth - 12, y, 11, rowHeight - 1);
             }
         }
 
@@ -4470,6 +4494,7 @@ void PianoRollComponent::changeListenerCallback (juce::ChangeBroadcaster*)
     }
 
     followButton.setToggleState (EditorGlobals::get().isFollowing (true), juce::dontSendNotification);
+    syncPadRows();
     refreshChannelBox();
     rebuildLaneBox();
     updateScrollBars();

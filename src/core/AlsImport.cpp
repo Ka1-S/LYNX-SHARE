@@ -619,8 +619,16 @@ void drumReturnsFrom (Ctx& ctx, const Element& device, PatcherDoc& doc, int dept
     for (const auto& branch : device.path ("ReturnBranches").children())
     {
         auto name = branch.value ("Name/UserName");
-        if (name.empty())
+        if (name.empty()) // (Live's EffectiveName carries the letter it shows, "a Mix Bus": LYNX adds it itself)
+        {
             name = branch.value ("Name/EffectiveName");
+            const auto* before = rack::rackOf (doc);
+            const auto letter = rack::returnLetter (before != nullptr ? (int) before->returns.size() : 0);
+            if (name == letter)
+                name.clear();
+            else if (name.size() > 2 && name.compare (0, 2, letter + " ") == 0)
+                name = name.substr (2);
+        }
         const auto k = rack::addReturn (doc, name);
         auto* r = rack::rackOf (doc);
         if (k < 0)

@@ -423,7 +423,7 @@ struct Exporter
             if (b.name.empty())
                 return note ("Drum rack return chains not exported (no skeleton)");
             b.set ("Id", num (k));
-            b.value ("Name/EffectiveName", ret.name);
+            b.value ("Name/EffectiveName", rack::returnLabel (r, k)); // ("a Mix Bus": Live's shown name, the letter first)
             b.value ("Name/UserName", ret.name);
             b.value ("IsSoloed", boolean (ret.solo));
             b.value ("MixerDevice/Speaker/Manual", boolean (ret.active));

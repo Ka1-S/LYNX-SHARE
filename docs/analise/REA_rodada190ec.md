@@ -56,3 +56,25 @@ projects have no such keys and load unchanged.
 ## 4. Open (needs a live check)
 
 See `/mnt/e/lynx-work/drumrack190ec/HANDOFF.md` §Live checks.
+
+## 5. Round 190el: what the real Live showed (live check 190ei)
+
+Evidence: `/mnt/e/lynx-work/live190ei/ANSWERS.md` §B and its shots `shots/live-drumrack-*.png`, `live-slice-*.png`,
+`live-midieditor-padnames*.png` (Live 12.4.16 Trial, 2026-11-12). LYNX now follows it:
+
+| Live (190ei) | LYNX since 190el |
+|---|---|
+| A new Drum Rack shows only its pads (C1 selected, bottom left) and "Drop an Instrument or Sample Here" (B1a) | `makeDrumRack`: pads + devices pane; macros, variations, chain list hidden; C1 selected while the rack is empty |
+| The rack's left strip: macros, + / −, variations, pads, chain list, then I·O, S, R (B1c) | the view column in that order (+ / − while the macros show, I-O / S / R while the chain list shows); LYNX's D (devices) last, set apart |
+| Chain list: Chain · Receive · Play · Choke · Send-a · Send-b · Vol · Pan · activator · S · Audio To (B1d) | same order and titles; Live's zone editor buttons don't exist on a Drum Rack: LYNX's Vel / Chain / Hide sit under the list |
+| Return chains "a Mix Bus", "b Reverb": EffectiveName = letter + UserName (B1e, set XML) | `rack::returnLabel`; the name is stored without the letter; .als export writes both, import strips the letter from an EffectiveName-only return |
+| Audio To: "Rack Output", "<rack> \| a Mix Bus" (B1f) | same wording, cell and menu |
+| Receive "All" greys Play and Choke (B2 shot) | cell "All", Play / Choke drawn dim and not editable |
+| Slice dialog "Slice to New MIDI track": per Warp Marker, Transient (default), Bar, 1/2 Note … 1/32 Note; the count line; "Slicing Preset"; "Preserve warped timing" On (B6a) | same list, labels, count line ("The current clip region is N beats long - this will result in M slices."), preset "Default" / LYNX's "One-shot", the switch (On: notes at the clip's warped timing; Off: at the file's own timing) |
+| Pads "Slice 1…", new MIDI track, clip and rack named after the clip (B6b) | same (`sliceToDrumRack` rackName, `addSliceTrack` names the track) |
+| Pad menu: Rename Ctrl+R, Delete Del \| Save as Default Pad \| Next Similar, Previous Similar, Save as Similarity Reference, Return to Reference (B7b) | Live's items in Live's order with their shortcuts, then LYNX's Duplicate and Choke ▸ below a line (decision 3). Similar = the Browser's "Find similar samples" index; Default Pad = a settings-folder preset used when a sample lands on an empty pad |
+| Empty pad: a click selects it, no menu (B7a) | a click selects it; LYNX's load menu stays on the right button (decision 3) |
+| Note editor of a Drum Rack: a list of the filled pads' names, no piano keys, Fold on or off (B8) | Clip-launch layout: one named row per filled pad with a key-colour strip (decision 2); the Pattern layout keeps FL's piano roll with pad names on the keys |
+
+Not done: Live's GM-suggestion columns in the Receive menu, return chains sending to each other, a return chain routed to
+the set's return tracks, the Simpler's Warp on sliced pads (LYNX pads play the slice unwarped), the new track armed.

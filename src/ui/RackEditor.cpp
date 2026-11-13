@@ -9,7 +9,10 @@
 #include "core/Rack.h"
 #include "core/Vfx.h"
 #include "engine/PluginHost.h"
+#include "engine/ProjectFile.h"
 #include "engine/SampleLibrary.h"
+#include "platform/Paths.h"
+#include "ui/BrowserComponent.h"
 #include "ui/ControllerKnob.h"
 #include "ui/DetailView.h"
 #include "ui/FileChoosers.h"
@@ -36,9 +39,12 @@ namespace col = theme::colour;
 
 constexpr int viewColumn = 22, variationsWidth = 150, macroWidth = 64, chainListWidth = 236, zoneWidth = 268, deviceWidth = 112, mapListWidth = 330;
 constexpr int rowHeight = 18, headerStrip = 22;
-// Drum Rack (round 190ec): the pad view (overview strip + 4 × 4 pads), the I-O columns, a send column, the S / R / I-O toggles
+// Drum Rack (round 190ec): the pad view (overview strip + 4 × 4 pads). Its chain list (round 190el, Live's columns from
+// 190ei shots/live-drumrack-chainlist-zoom.png): Chain · Receive · Play · Choke · Send-a · Send-b … · Vol · Pan ·
+// activator · S · Audio To (Receive / Play / Choke / Audio To with I-O on, a send per return chain with S on)
 constexpr int padOverviewWidth = 26, padCellMax = 50, padsWidth = 6 + padOverviewWidth + 6 + 4 * padCellMax + 6;
-constexpr int ioWidths[] { 36, 36, 34, 52 }, ioWidth = 36 + 36 + 34 + 52, sendWidth = 38, toggleWidth = 26;
+constexpr int drumNameWidth = 92, receiveWidth = 40, playWidth = 36, chokeWidth = 40, sendWidth = 44, audioToWidth = 128;
+constexpr int volWidth = 52, panWidth = 30, ledWidth = 18, soloWidth = 18;
 
 juce::String str (const std::string& s) { return juce::String::fromUTF8 (s.c_str()); }
 
@@ -111,6 +117,18 @@ struct RackView::Impl
     // list's scroll (rows), the sample chooser
     juce::Rectangle<int> pads, padGrid, overview;
     int emptyPadKey = -1, dragKey = -1, dragReturn = -1, previewKey = -1, listScroll = 0;
+    // Live's similar-sample swapping on a pad (round 190el, its pad menu's Next / Previous Similar, Save as Similarity
+    // Reference, Return to Reference): per pad key, the reference sample, the samples like it (the Browser's "Find
+    // similar samples" index, nearest first) and the one playing (−1 = the reference). View-local, as a session's
+    // browsing.
+    struct PadSwap
+    {
+        juce::String reference;
+        juce::Array<juce::File> list;
+        int index = -1;
+        bool asked = false;
+    };
+    std::map<int, PadSwap> swaps;
     std::unique_ptr<juce::FileChooser> chooser;
     float dragStartValue = 0.0f;
     juce::Point<int> dragStart;
@@ -305,7 +323,64 @@ struct RackView::Impl
     {
         if (! r.drum)
             return chainListWidth;
-        return chainListWidth + (r.showIO ? ioWidth : 0) + (r.showSends ? sendWidth * (int) r.returns.size() : 0);
+        return 4 + drumNameWidth + (r.showIO ? receiveWidth + playWidth + chokeWidth + audioToWidth : 0) + (r.showSends ? sendWidth * (int) r.returns.size() : 0)
+             + volWidth + panWidth + ledWidth + soloWidth + 6;
+    }
+
+    // a chain list row's cells: the name, the chain's volume, pan, activator and solo; a Drum Rack's in Live's column
+    // order with its Receive / Play / Choke, sends and Audio To (empty when hidden; a return chain has no Receive / Play
+    // / Choke and LYNX has no sends between return chains)
+    struct RowCells
+    {
+        juce::Rectangle<int> name, receive, play, choke, vol, pan, led, solo, audioTo;
+        std::vector<juce::Rectangle<int>> sends;
+    };
+    RowCells rowCells (const RackDoc& r, juce::Rectangle<int> row, bool isReturn = false) const
+    {
+        RowCells x;
+        auto cells = row.reduced (2, 1);
+        x.name = cells.removeFromLeft (drumNameWidth);
+        if (! r.drum)
+        {
+            if (r.kind != RackDoc::Kind::midiEffect) // (MIDI chains have no volume / pan)
+            {
+                x.vol = cells.removeFromLeft (volWidth);
+                x.pan = cells.removeFromLeft (panWidth);
+            }
+            x.led = cells.removeFromLeft (ledWidth);
+            x.solo = cells.removeFromLeft (soloWidth);
+            return x;
+        }
+        cells.removeFromLeft (2);
+        if (r.showIO)
+        {
+            x.receive = cells.removeFromLeft (receiveWidth);
+            x.play = cells.removeFromLeft (playWidth);
+            x.choke = cells.removeFromLeft (chokeWidth);
+            if (isReturn)
+                x.receive = x.play = x.choke = {};
+        }
+        if (r.showSends)
+            for (int k = 0; k < (int) r.returns.size(); ++k)
+            {
+                const auto cell = cells.removeFromLeft (sendWidth);
+                x.sends.push_back (isReturn ? juce::Rectangle<int>() : cell);
+            }
+        x.vol = cells.removeFromLeft (volWidth);
+        x.pan = cells.removeFromLeft (panWidth);
+        x.led = cells.removeFromLeft (ledWidth);
+        x.solo = cells.removeFromLeft (soloWidth);
+        if (r.showIO)
+            x.audioTo = cells.removeFromLeft (audioToWidth).withTrimmedLeft (2);
+        return x;
+    }
+    // a Drum Rack's zone editor buttons (Vel / Chain / Hide, LYNX's: Live's Drum Rack has none) sit in a strip under its
+    // chain list, the column titles taking the strip above it
+    juce::Rectangle<int> chainsFooter() const { return chains.withTrimmedTop (std::max (0, chains.getHeight() - headerStrip)); }
+    juce::Rectangle<int> chainRowsArea (const RackDoc& r) const
+    {
+        auto area = chains.withTrimmedTop (headerStrip);
+        return r.drum ? area.withTrimmedBottom (headerStrip) : area;
     }
 
     // (`devicesOnly`: the narrowest width, with the devices pane one card wide; it scrolls)
@@ -403,7 +478,75 @@ struct RackView::Impl
 
     juce::Rectangle<int> powerLed() const { return { header.getX() + 7, header.getCentreY() - 5, 10, 10 }; }
     juce::Rectangle<int> columnButton (int k) const { return { column.getX() + 2, column.getY() + 4 + k * 20, viewColumn - 4, 18 }; }
-    int columnButtons() const { return drum() ? 7 : 6; }
+    // the view column's buttons, top to bottom. An Instrument / Audio Effect / MIDI Effect Rack: M C D V + −. A Drum
+    // Rack in Live's order (round 190el, 190ei B1c: macros, + / − while the macros show, variations, pads, chain list,
+    // then I-O / S / R while the chain list shows), then LYNX's devices toggle (D) last
+    enum class ColumnItem { macros, chains, devices, variations, more, fewer, pads, io, sends, returns };
+    std::vector<ColumnItem> columnItems() const
+    {
+        using I = ColumnItem;
+        const auto* r = rack();
+        if (r == nullptr || ! r->drum)
+            return { I::macros, I::chains, I::devices, I::variations, I::more, I::fewer };
+        std::vector<ColumnItem> items { I::macros };
+        if (r->showMacros)
+            items.insert (items.end(), { I::more, I::fewer });
+        items.insert (items.end(), { I::variations, I::pads, I::chains });
+        if (r->showChains)
+            items.insert (items.end(), { I::io, I::sends, I::returns });
+        items.push_back (I::devices);
+        return items;
+    }
+    static const char* columnLabel (ColumnItem item)
+    {
+        switch (item)
+        {
+            case ColumnItem::macros: return "M";
+            case ColumnItem::chains: return "C";
+            case ColumnItem::devices: return "D";
+            case ColumnItem::variations: return "V";
+            case ColumnItem::more: return "+";
+            case ColumnItem::fewer: return "-";
+            case ColumnItem::pads: return "P";
+            case ColumnItem::io: return "I-O";
+            case ColumnItem::sends: return "S";
+            case ColumnItem::returns: return "R";
+        }
+        return "";
+    }
+    static bool columnLit (const RackDoc& r, ColumnItem item)
+    {
+        switch (item)
+        {
+            case ColumnItem::macros: return r.showMacros;
+            case ColumnItem::chains: return r.showChains;
+            case ColumnItem::devices: return r.showDevices;
+            case ColumnItem::variations: return r.showVariations;
+            case ColumnItem::pads: return r.showPads;
+            case ColumnItem::io: return r.showIO;
+            case ColumnItem::sends: return r.showSends;
+            case ColumnItem::returns: return r.showReturns;
+            case ColumnItem::more:
+            case ColumnItem::fewer: break;
+        }
+        return false;
+    }
+    static void toggleColumn (RackDoc& x, ColumnItem item)
+    {
+        switch (item)
+        {
+            case ColumnItem::macros: x.showMacros = ! x.showMacros; break;
+            case ColumnItem::chains: x.showChains = ! x.showChains; break;
+            case ColumnItem::devices: x.showDevices = ! x.showDevices; break;
+            case ColumnItem::variations: x.showVariations = ! x.showVariations; break;
+            case ColumnItem::pads: x.showPads = ! x.showPads; break;
+            case ColumnItem::io: x.showIO = ! x.showIO; break;
+            case ColumnItem::sends: x.showSends = ! x.showSends; break;
+            case ColumnItem::returns: x.showReturns = ! x.showReturns; break;
+            case ColumnItem::more: x.shownMacros = rack::moreMacros (x.shownMacros); break;
+            case ColumnItem::fewer: x.shownMacros = rack::fewerMacros (x.shownMacros); break;
+        }
+    }
     juce::Rectangle<int> chainRow (int c) const { return { chains.getX(), chains.getY() + headerStrip + (c - listScroll) * rowHeight, chains.getWidth(), rowHeight }; }
     juce::Rectangle<int> zoneRow (int c) const { return { zones.getX() + 6, zones.getY() + headerStrip + (c - listScroll) * rowHeight, zones.getWidth() - 12, rowHeight }; }
     // the chain list's rows: the chains, then (a Drum Rack with R on) a divider and the return chains. A row's chain slot
@@ -502,29 +645,23 @@ struct RackView::Impl
             g.setFont (theme::font (theme::type::caption));
         }
 
-        // view column: macros, chains, devices, variations, + / − (Live's selectors [SHOT])
+        // view column: macros, chains, devices, variations, + / − (Live's selectors [SHOT]); a Drum Rack's in Live's order
         g.setColour (col::bg3);
         g.fillRect (column);
-        // (a Drum Rack: P, the pad view, before + / −)
-        const bool on[] { r->showMacros, r->showChains, r->showDevices, r->showVariations, false, false };
-        const char* labels[] { "M", "C", "D", "V", "+", "-" };
-        const bool drumOn[] { r->showMacros, r->showChains, r->showDevices, r->showVariations, r->showPads, false, false };
-        const char* drumLabels[] { "M", "C", "D", "V", "P", "+", "-" };
-        for (int k = 0; k < columnButtons(); ++k)
+        const auto items = columnItems();
+        for (int k = 0; k < (int) items.size(); ++k)
         {
             const auto b = columnButton (k).toFloat();
-            if (r->drum)
+            const auto lit = columnLit (*r, items[(std::size_t) k]);
+            if (r->drum && items[(std::size_t) k] == ColumnItem::devices) // (LYNX's own toggle: set apart from Live's)
             {
-                g.setColour (drumOn[k] ? col::accent : col::bg4);
-                g.fillRoundedRectangle (b, theme::radius::sm);
-                g.setColour (drumOn[k] ? col::onAccent : col::textSecondary);
-                g.drawText (drumLabels[k], b, juce::Justification::centred);
-                continue;
+                g.setColour (col::border);
+                g.drawHorizontalLine (juce::roundToInt (b.getY()) - 2, b.getX() + 2.0f, b.getRight() - 2.0f);
             }
-            g.setColour (on[k] ? col::accent : col::bg4);
+            g.setColour (lit ? col::accent : col::bg4);
             g.fillRoundedRectangle (b, theme::radius::sm);
-            g.setColour (on[k] ? col::onAccent : col::textSecondary);
-            g.drawText (labels[k], b, juce::Justification::centred);
+            g.setColour (lit ? col::onAccent : col::textSecondary);
+            g.drawFittedText (columnLabel (items[(std::size_t) k]), b.toNearestInt(), juce::Justification::centred, 1, 0.6f);
         }
 
         if (! variations.isEmpty())
@@ -616,13 +753,33 @@ struct RackView::Impl
         }
     }
 
+    // the zone editor's buttons' strip (Live: above the chain list [SHOT]; a Drum Rack: under it, its column titles above)
+    juce::Rectangle<int> zoneButtonStrip (const RackDoc& r) const
+    {
+        return (r.drum ? chainsFooter() : chains.withWidth (chainListWidth).withHeight (headerStrip)).reduced (4, 3);
+    }
+
+    // the rack's name as its title bar shows it (Live's Audio To menu: "<rack> | a Mix Bus")
+    juce::String rackTitle (const RackDoc& r) const
+    {
+        return ! r.name.empty() ? str (r.name)
+             : r.drum           ? tr ("Drum Rack")
+             : r.kind == RackDoc::Kind::instrument ? tr ("Instrument Rack") : r.kind == RackDoc::Kind::midiEffect ? tr ("MIDI Effect Rack") : tr ("Audio Effect Rack");
+    }
+    // a chain's name in the list (a return chain with its letter: "a Mix Bus")
+    juce::String slotName (const RackDoc& r, int slot) const
+    {
+        if (rack::isReturnSlot (r, slot))
+            return str (rack::returnLabel (r, slot - (int) r.chains.size()));
+        const auto* c = rack::chainAt (r, slot);
+        return c != nullptr ? str (c->name) : juce::String();
+    }
+
     void paintChains (juce::Graphics& g, const RackDoc& r)
     {
         g.setColour (col::bg1);
         g.fillRect (chains.reduced (1));
-        // the zone editor's buttons (Live: above the chain list [SHOT]); a Drum Rack has no Key zones (its pads take the key)
-        // and its I-O / S / R toggles at the left (their place: needs a live check)
-        auto strip = chains.withWidth (chainListWidth).withHeight (headerStrip).reduced (4, 3);
+        auto strip = zoneButtonStrip (r);
         const auto instrumentLike = r.kind != RackDoc::Kind::audioEffect;
         const juce::String names[] { tr ("Key"), tr ("Vel"), tr ("Chain"), tr ("Hide") };
         for (int k = 3; k >= 0; --k)
@@ -636,31 +793,26 @@ struct RackView::Impl
             g.setColour (lit ? col::onAccent : col::textSecondary);
             g.drawText (names[k], b, juce::Justification::centred);
         }
-        if (r.drum)
+        if (r.drum) // the column titles (Live: Chain, Receive, Play, Choke, Send-a, Send-b, Vol, Pan, Audio To)
         {
-            const bool lit[] { r.showIO, r.showSends, r.showReturns };
-            const char* labels[] { "I-O", "S", "R" };
-            for (int k = 0; k < 3; ++k)
-            {
-                auto b = drumToggle (k).toFloat();
-                g.setColour (lit[k] ? col::accent : col::bg4);
-                g.fillRoundedRectangle (b, theme::radius::sm);
-                g.setColour (lit[k] ? col::onAccent : col::textSecondary);
-                g.drawText (labels[k], b, juce::Justification::centred);
-            }
-            // the I-O and send columns' titles over their columns
+            const auto head = rowCells (r, chains.withHeight (headerStrip));
             g.setColour (col::textSecondary);
-            const juce::String io[] { tr ("Receive"), tr ("Play"), tr ("Choke"), tr ("Audio To") };
-            auto head = chains.withHeight (headerStrip).withTrimmedLeft (chainListWidth);
-            if (r.showIO)
-                for (int k = 0; k < 4; ++k)
-                    g.drawFittedText (io[k], head.removeFromLeft (ioWidths[k]), juce::Justification::centred, 1, 0.7f);
-            if (r.showSends)
-                for (int k = 0; k < (int) r.returns.size(); ++k)
-                    g.drawFittedText (str (r.returns[(std::size_t) k].name).substring (0, 1).toUpperCase(), head.removeFromLeft (sendWidth), juce::Justification::centred, 1, 0.7f);
+            const auto title = [&g] (const juce::String& text, juce::Rectangle<int> cell) {
+                if (! cell.isEmpty())
+                    g.drawFittedText (text, cell.reduced (2, 0), juce::Justification::centredLeft, 1, 0.7f);
+            };
+            title (tr ("Chain"), head.name);
+            title (tr ("Receive"), head.receive);
+            title (tr ("Play"), head.play);
+            title (tr ("Choke"), head.choke);
+            for (int k = 0; k < (int) head.sends.size(); ++k)
+                title (tr ("Send-{0}", { str (rack::returnLetter (k)) }), head.sends[(std::size_t) k]);
+            title (tr ("Vol"), head.vol);
+            title (tr ("Pan"), head.pan);
+            title (tr ("Audio To"), head.audioTo);
         }
         const juce::Graphics::ScopedSaveState clip (g);
-        g.reduceClipRegion (chains.withTrimmedTop (headerStrip));
+        g.reduceClipRegion (chainRowsArea (r));
         for (int slot = 0; slot < listedSlots (r); ++slot)
         {
             const auto& chain = *rack::chainAt (r, slot);
@@ -680,56 +832,60 @@ struct RackView::Impl
                 g.setColour (col::accentMuted);
                 g.fillRect (row);
             }
-            auto cells = row.reduced (2, 1);
-            auto nameCell = cells.removeFromLeft (92).toFloat();
-            const auto tint = chainColour (chain, slot);
+            const auto cells = rowCells (r, row, isReturn);
+            auto nameCell = cells.name.toFloat();
+            const auto tint = isReturn ? col::warning : chainColour (chain, slot); // (Live: return chains in their own colour)
             g.setColour (chain.active ? tint : tint.withSaturation (0.1f).darker (0.6f));
             g.fillRoundedRectangle (nameCell, theme::radius::sm);
             g.setColour (tint.getPerceivedBrightness() > 0.55f ? col::bg0 : col::textPrimary);
-            g.drawText (str (chain.name), nameCell.reduced (4, 0), juce::Justification::centredLeft);
-            if (r.kind != RackDoc::Kind::midiEffect) // (MIDI chains have no volume / pan)
+            g.drawText (slotName (r, slot), nameCell.reduced (4, 0), juce::Justification::centredLeft);
+            const auto box = [&g] (juce::Rectangle<int> cell, const juce::String& text, bool enabled = true) {
+                if (cell.isEmpty())
+                    return;
+                const auto b = cell.reduced (1, 0).toFloat();
+                g.setColour (col::bg4);
+                g.fillRoundedRectangle (b, theme::radius::sm);
+                g.setColour (enabled ? col::textPrimary : col::textDisabled);
+                g.drawFittedText (text, b.toNearestInt().reduced (2, 0), juce::Justification::centred, 1, 0.7f);
+            };
+            if (r.drum && ! isReturn)
             {
-                g.setColour (col::textPrimary);
-                g.drawText (volumeText (chain.volume), cells.removeFromLeft (52), juce::Justification::centred);
-                g.drawText (panText (chain.pan), cells.removeFromLeft (30), juce::Justification::centred);
-            }
-            auto led = cells.removeFromLeft (18).toFloat().withSizeKeepingCentre (9.0f, 9.0f);
-            g.setColour (chain.active ? col::ledOn : col::ledOff);
-            g.fillEllipse (led);
-            auto solo = cells.removeFromLeft (18).toFloat().reduced (1.0f, 2.0f);
-            g.setColour (chain.solo ? col::warning : col::bg4);
-            g.fillRoundedRectangle (solo, theme::radius::sm);
-            g.setColour (chain.solo ? col::bg0 : col::textSecondary);
-            g.drawText ("S", solo, juce::Justification::centred);
-            if (! r.drum || isReturn)
-                continue;
-            auto extra = row.withTrimmedLeft (chainListWidth).reduced (0, 1);
-            if (r.showIO)
-                for (int k = 0; k < 4; ++k)
-                {
-                    auto cell = extra.removeFromLeft (ioWidths[k]).reduced (1, 0).toFloat();
-                    g.setColour (col::bg4);
-                    g.fillRoundedRectangle (cell, theme::radius::sm);
-                    g.setColour (col::textPrimary);
-                    g.drawFittedText (ioText (r, chain, k), cell.toNearestInt().reduced (2, 0), juce::Justification::centred, 1, 0.7f);
-                }
-            if (r.showSends)
-                for (int k = 0; k < (int) r.returns.size(); ++k)
+                const auto all = chain.receive < 0; // (Live greys Play and Choke out for "All Notes" [190ei B2])
+                box (cells.receive, ioText (r, chain, 0));
+                box (cells.play, ioText (r, chain, 1), ! all);
+                box (cells.choke, ioText (r, chain, 2), ! all);
+                for (int k = 0; k < (int) cells.sends.size(); ++k)
                 {
                     const auto send = k < (int) chain.sends.size() ? chain.sends[(std::size_t) k] : RackSend {};
-                    auto cell = extra.removeFromLeft (sendWidth).reduced (1, 0).toFloat();
+                    const auto cell = cells.sends[(std::size_t) k].reduced (1, 0).toFloat();
                     g.setColour (col::bg4);
                     g.fillRoundedRectangle (cell, theme::radius::sm);
                     g.setColour (col::info.withAlpha (send.on ? 0.55f : 0.2f));
                     g.fillRoundedRectangle (cell.withWidth (cell.getWidth() * std::clamp (rack::volumeValue (send.level) / rack::unityVolume, 0.0f, 1.0f)), theme::radius::sm);
                     g.setColour (send.on ? col::textPrimary : col::textDisabled);
-                    g.drawFittedText (send.level > 0.0f ? juce::String (juce::roundToInt (20.0f * std::log10 (send.level))) : juce::String ("-inf"), cell.toNearestInt(),
-                                      juce::Justification::centred, 1, 0.7f);
+                    g.drawFittedText (volumeText (send.level), cell.toNearestInt(), juce::Justification::centred, 1, 0.7f);
                 }
+            }
+            if (! cells.vol.isEmpty())
+            {
+                g.setColour (col::textPrimary);
+                g.drawText (volumeText (chain.volume), cells.vol, juce::Justification::centred);
+                g.drawText (panText (chain.pan), cells.pan, juce::Justification::centred);
+            }
+            auto led = cells.led.toFloat().withSizeKeepingCentre (9.0f, 9.0f);
+            g.setColour (chain.active ? col::ledOn : col::ledOff);
+            g.fillEllipse (led);
+            auto solo = cells.solo.toFloat().reduced (1.0f, 2.0f);
+            g.setColour (chain.solo ? col::warning : col::bg4);
+            g.fillRoundedRectangle (solo, theme::radius::sm);
+            g.setColour (chain.solo ? col::bg0 : col::textSecondary);
+            g.drawText ("S", solo, juce::Justification::centred);
+            if (r.drum)
+                box (cells.audioTo, isReturn ? tr ("Rack Output") : ioText (r, chain, 3));
         }
         const auto rows = listedSlots (r) + (r.drum && r.showReturns && ! r.returns.empty() ? 1 : 0);
         const auto hintTop = headerStrip + (rows - listScroll) * rowHeight + 6;
-        if (hintTop < chains.getHeight() - 14)
+        if (hintTop < chainRowsArea (r).getBottom() - chains.getY() - 14)
         {
             g.setColour (col::textDisabled);
             g.drawText (r.drum ? tr ("Drop an instrument or sample here")
@@ -738,18 +894,21 @@ struct RackView::Impl
         }
     }
 
-    juce::Rectangle<int> drumToggle (int k) const { return { chains.getX() + 4 + k * (toggleWidth + 2), chains.getY() + 3, toggleWidth, headerStrip - 6 }; }
-
-    // an I-O cell's text: Receive (a key / All), Play (a key), Choke (None / 1…16), Audio To (Rack / a return chain)
+    // an I-O cell's text: Receive (a key / All), Play (a key), Choke (None / 1…16), Audio To (Live's "Rack Output", or
+    // "<rack> | a Mix Bus" for a return chain, 190ei B1f)
     juce::String ioText (const RackDoc& r, const RackChain& c, int column) const
     {
         switch (column)
         {
-            case 0: return c.receive < 0 ? tr ("All Notes") : keyText (c.receive);
+            case 0: return c.receive < 0 ? tr ("All") : keyText (c.receive); // (Live's cell: "All" [190ei shots/live-drumrack-receive-allnotes.png])
             case 1: return keyText (c.play);
             case 2: return c.choke <= 0 ? tr ("None") : juce::String (c.choke);
-            default: return c.audioTo >= 0 && c.audioTo < (int) r.returns.size() ? str (r.returns[(std::size_t) c.audioTo].name) : tr ("Rack");
+            default: return audioToText (r, c.audioTo);
         }
+    }
+    juce::String audioToText (const RackDoc& r, int target) const
+    {
+        return target >= 0 && target < (int) r.returns.size() ? rackTitle (r) + " | " + str (rack::returnLabel (r, target)) : tr ("Rack Output");
     }
 
     // --- the pad view (Drum Rack) -----------------------------------------------------------------------------------
@@ -784,6 +943,8 @@ struct RackView::Impl
     {
         if (emptyPadKey >= 0)
             return emptyPadKey;
+        if (r.chains.empty()) // (Live's new Drum Rack: C1 selected [190ei shots/live-drumrack-empty.png])
+            return rack::drumFirstPad;
         return r.selectedChain >= 0 && r.selectedChain < (int) r.chains.size() ? r.chains[(std::size_t) r.selectedChain].receive : -1;
     }
     static int firstFreeKey (const RackDoc& r)
@@ -1040,29 +1201,12 @@ struct RackView::Impl
         if (ownHeader && header.contains (p) && e.getNumberOfClicks() > 1)
             return renameRack();
 
-        for (int k = 0; k < columnButtons(); ++k)
+        const auto items = columnItems();
+        for (int k = 0; k < (int) items.size(); ++k)
             if (columnButton (k).contains (p))
             {
-                edit ([k] (PatcherDoc& d) {
-                    auto* x = rack::rackOf (d);
-                    if (x->drum && k >= 4) // (a Drum Rack's column: P, then + / −)
-                    {
-                        if (k == 4)
-                            x->showPads = ! x->showPads;
-                        else
-                            x->shownMacros = k == 5 ? rack::moreMacros (x->shownMacros) : rack::fewerMacros (x->shownMacros);
-                        return;
-                    }
-                    switch (k)
-                    {
-                        case 0: x->showMacros = ! x->showMacros; break;
-                        case 1: x->showChains = ! x->showChains; break;
-                        case 2: x->showDevices = ! x->showDevices; break;
-                        case 3: x->showVariations = ! x->showVariations; break;
-                        case 4: x->shownMacros = rack::moreMacros (x->shownMacros); break;
-                        default: x->shownMacros = rack::fewerMacros (x->shownMacros); break;
-                    }
-                });
+                const auto item = items[(std::size_t) k];
+                edit ([item] (PatcherDoc& d) { toggleColumn (*rack::rackOf (d), item); });
                 return;
             }
 
@@ -1119,7 +1263,7 @@ struct RackView::Impl
     {
         const auto p = e.getPosition();
         // the zone editor's buttons
-        auto strip = chains.withWidth (chainListWidth).withHeight (headerStrip).reduced (4, 3);
+        auto strip = zoneButtonStrip (r);
         const auto instrumentLike = r.kind != RackDoc::Kind::audioEffect;
         for (int k = 3; k >= 0; --k)
         {
@@ -1128,14 +1272,7 @@ struct RackView::Impl
             if (strip.removeFromRight (40).contains (p))
                 return edit ([k] (PatcherDoc& d) { rack::rackOf (d)->zoneEditor = k < 3 ? k : -1; }, false);
         }
-        if (r.drum)
-            for (int k = 0; k < 3; ++k)
-                if (drumToggle (k).contains (p))
-                    return edit ([k] (PatcherDoc& d) {
-                        auto* x = rack::rackOf (d);
-                        (k == 0 ? x->showIO : k == 1 ? x->showSends : x->showReturns) = ! (k == 0 ? x->showIO : k == 1 ? x->showSends : x->showReturns);
-                    }, false);
-        if (p.y < chains.getY() + headerStrip)
+        if (p.y < chains.getY() + headerStrip || (r.drum && chainsFooter().contains (p)))
             return;
         for (int c = 0; c < listedSlots (r); ++c)
         {
@@ -1145,20 +1282,15 @@ struct RackView::Impl
             if (e.mods.isPopupMenu())
                 return showChainMenu (c);
             const auto& chain = *rack::chainAt (r, c);
-            auto cells = row.reduced (2, 1);
-            const auto nameCell = cells.removeFromLeft (92);
-            const auto volCell = r.kind != RackDoc::Kind::midiEffect ? cells.removeFromLeft (52) : juce::Rectangle<int>();
-            const auto panCell = r.kind != RackDoc::Kind::midiEffect ? cells.removeFromLeft (30) : juce::Rectangle<int>();
-            const auto ledCell = cells.removeFromLeft (18);
-            const auto soloCell = cells.removeFromLeft (18);
-            (void) nameCell;
+            const auto isReturn = rack::isReturnSlot (r, c);
+            const auto cells = rowCells (r, row, isReturn);
             emptyPadKey = -1;
             edit ([c] (PatcherDoc& d) { rack::rackOf (d)->selectedChain = c; }, false);
-            if (ledCell.contains (p))
+            if (cells.led.contains (p))
                 return edit ([c, on = ! chain.active] (PatcherDoc& d) { rack::setActive (d, c, on); });
-            if (soloCell.contains (p))
+            if (cells.solo.contains (p))
                 return edit ([c, on = ! chain.solo] (PatcherDoc& d) { rack::setSolo (d, c, on); });
-            if (volCell.contains (p))
+            if (cells.vol.contains (p))
             {
                 drag = Drag::volume;
                 dragChain = c;
@@ -1167,7 +1299,7 @@ struct RackView::Impl
                     edit ([c] (PatcherDoc& d) { rack::setChainVolume (d, c, 1.0f); });
                 return;
             }
-            if (panCell.contains (p))
+            if (cells.pan.contains (p))
             {
                 drag = Drag::pan;
                 dragChain = c;
@@ -1176,8 +1308,8 @@ struct RackView::Impl
                     edit ([c] (PatcherDoc& d) { rack::setChainPan (d, c, 0.0f); });
                 return;
             }
-            if (r.drum && ! rack::isReturnSlot (r, c) && p.x >= chains.getX() + chainListWidth)
-                return drumCellDown (e, r, c, row);
+            if (r.drum && drumCellDown (e, r, c, cells, isReturn))
+                return;
             if (owner.isShowing() && r.showDevices == false)
                 edit ([] (PatcherDoc& d) { rack::rackOf (d)->showDevices = true; }, false);
             return;
@@ -1186,40 +1318,64 @@ struct RackView::Impl
             showChainMenu (-1);
     }
 
-    // a Drum Rack chain's I-O cell (a menu) or send cell (a drag; a reset click: −inf)
-    void drumCellDown (const juce::MouseEvent& e, const RackDoc& r, int c, juce::Rectangle<int> row)
+    // a Drum Rack chain's I-O cell (a menu) or send cell (a drag; a reset click: −inf); false: none was hit
+    bool drumCellDown (const juce::MouseEvent& e, const RackDoc& r, int c, const RowCells& cells, bool isReturn)
     {
         const auto p = e.getPosition();
-        auto extra = row.withTrimmedLeft (chainListWidth).reduced (0, 1);
-        if (r.showIO)
-            for (int k = 0; k < 4; ++k)
-                if (extra.removeFromLeft (ioWidths[k]).contains (p))
-                    return showIoMenu (c, k);
-        if (r.showSends)
-            for (int k = 0; k < (int) r.returns.size(); ++k)
-                if (extra.removeFromLeft (sendWidth).contains (p))
+        if (isReturn) // (a return chain plays into the rack's output: Live's only choice in a preset)
+        {
+            if (cells.audioTo.contains (p))
+            {
+                juce::PopupMenu menu;
+                menu.addItem (tr ("Rack Output"), true, true, [] {});
+                menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&owner).withMousePosition());
+                return true;
+            }
+            return false;
+        }
+        const juce::Rectangle<int> io[] { cells.receive, cells.play, cells.choke, cells.audioTo };
+        for (int k = 0; k < 4; ++k)
+            if (io[k].contains (p))
+            {
+                if ((k == 1 || k == 2) && r.chains[(std::size_t) c].receive < 0) // (greyed out for "All Notes", as Live)
+                    return true;
+                showIoMenu (c, k);
+                return true;
+            }
+        for (int k = 0; k < (int) cells.sends.size(); ++k)
+            if (cells.sends[(std::size_t) k].contains (p))
+            {
+                const auto& chain = r.chains[(std::size_t) c];
+                const auto send = k < (int) chain.sends.size() ? chain.sends[(std::size_t) k] : RackSend {};
+                if (ui::isResetClick (e))
                 {
-                    const auto& chain = r.chains[(std::size_t) c];
-                    const auto send = k < (int) chain.sends.size() ? chain.sends[(std::size_t) k] : RackSend {};
-                    if (ui::isResetClick (e))
-                        return edit ([c, k] (PatcherDoc& d) { rack::setSend (d, c, k, 0.0f); });
-                    drag = Drag::send;
-                    dragChain = c;
-                    dragReturn = k;
-                    dragStartValue = rack::volumeValue (send.level);
-                    return;
+                    edit ([c, k] (PatcherDoc& d) { rack::setSend (d, c, k, 0.0f); });
+                    return true;
                 }
+                drag = Drag::send;
+                dragChain = c;
+                dragReturn = k;
+                dragStartValue = rack::volumeValue (send.level);
+                return true;
+            }
+        return false;
     }
 
-    // Receive (All Notes + the keys by octave), Play (the keys), Choke (None, 1…16), Audio To (the rack's output — "Rack":
-    // Live's wording needs a live check — or a return chain)
+    // Receive (All Notes + the keys by octave), Play (the keys), Choke (None, 1…16), Audio To (the rack's output or a
+    // return chain)
     void showIoMenu (int c, int column)
     {
+        auto menu = ioMenu (c, column);
+        if (menu.getNumItems() > 0)
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&owner).withMousePosition());
+    }
+    juce::PopupMenu ioMenu (int c, int column)
+    {
+        juce::PopupMenu menu;
         const auto* r = rack();
         if (r == nullptr || c < 0 || c >= (int) r->chains.size())
-            return;
+            return menu;
         const auto& chain = r->chains[(std::size_t) c];
-        juce::PopupMenu menu;
         auto keys = [this, c] (juce::PopupMenu& m, int current, bool receive) {
             for (int octave = 0; octave < 11; ++octave)
             {
@@ -1249,13 +1405,13 @@ struct RackView::Impl
                         edit ([c, group] (PatcherDoc& d) { rack::setChoke (d, c, group); });
                     });
                 break;
-            default:
-                menu.addItem (tr ("Rack"), true, chain.audioTo < 0, [this, c] { edit ([c] (PatcherDoc& d) { rack::setAudioTo (d, c, -1); }); });
+            default: // (Live: "Rack Output", then "<rack> | a Mix Bus" per return chain, 190ei B1f)
+                menu.addItem (audioToText (*r, -1), true, chain.audioTo < 0, [this, c] { edit ([c] (PatcherDoc& d) { rack::setAudioTo (d, c, -1); }); });
                 for (int k = 0; k < (int) r->returns.size(); ++k)
-                    menu.addItem (str (r->returns[(std::size_t) k].name), true, chain.audioTo == k, [this, c, k] { edit ([c, k] (PatcherDoc& d) { rack::setAudioTo (d, c, k); }); });
+                    menu.addItem (audioToText (*r, k), true, chain.audioTo == k, [this, c, k] { edit ([c, k] (PatcherDoc& d) { rack::setAudioTo (d, c, k); }); });
                 break;
         }
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&owner).withMousePosition());
+        return menu;
     }
 
     // the pad view: the overview scrolls, a pad selects its chain (or, empty, itself), its M / ▶ / S buttons, a drag
@@ -1271,6 +1427,8 @@ struct RackView::Impl
         const auto key = padAt (r, p);
         if (key < 0)
             return;
+        if (owner.isShowing()) // (the pad's shortcuts: Ctrl+R, Del, Ctrl+arrows)
+            owner.grabKeyboardFocus();
         const auto c = rack::padChain (r, key);
         if (e.mods.isPopupMenu())
             return c >= 0 ? showPadMenu (key, c) : showPadAddMenu (key);
@@ -1517,8 +1675,8 @@ struct RackView::Impl
                 edit ([from, to] (PatcherDoc& d) { rack::swapPads (d, from, to); });
                 emptyPadKey = had ? -1 : to;
             }
-            else if (r != nullptr && from >= 0 && rack::padChain (*r, from) < 0 && e.getDistanceFromDragStart() <= 4)
-                showPadAddMenu (from); // (a click on an empty pad: what to put on it)
+            // (a click on an empty pad only selects it, as Live [190ei B7a]: its instrument comes from the devices pane's
+            // "+", a drop, or LYNX's right-click menu)
             owner.repaint();
             return;
         }
@@ -1921,26 +2079,251 @@ struct RackView::Impl
     }
 
     // --- Drum Rack pads (round 190ec) ---------------------------------------------------------------------------------
-    // a pad's menu: Rename, Duplicate, Delete, its choke group
+    // a pad's menu (round 190el, decision 3 of 190ei): Live's items in Live's order (shots/live-drumrack-pad-context-menu
+    // .png: Rename Ctrl+R, Delete Del | Save as Default Pad | Next Similar Ctrl+Right, Previous Similar Ctrl+Left, Save as
+    // Similarity Reference Ctrl+Up, Return to Reference Ctrl+Down), then LYNX's own below a line (Duplicate, Choke)
+    // written as Live's menu writes them ("Ctrl+R", "Del", "Ctrl+→"; Cmd on a Mac)
+    static juce::String shortcut (int key, bool command)
+    {
+        juce::String name;
+        if (key == juce::KeyPress::deleteKey)
+            name = "Del";
+        else if (key == juce::KeyPress::rightKey)
+            name = juce::String::fromUTF8 ("\xe2\x86\x92");
+        else if (key == juce::KeyPress::leftKey)
+            name = juce::String::fromUTF8 ("\xe2\x86\x90");
+        else if (key == juce::KeyPress::upKey)
+            name = juce::String::fromUTF8 ("\xe2\x86\x91");
+        else if (key == juce::KeyPress::downKey)
+            name = juce::String::fromUTF8 ("\xe2\x86\x93");
+        else
+            name = juce::String::charToString ((juce::juce_wchar) key);
+#if JUCE_MAC
+        const char* modifier = "Cmd+";
+#else
+        const char* modifier = "Ctrl+";
+#endif
+        return command ? modifier + name : name;
+    }
+    void addMenuItem (juce::PopupMenu& menu, const juce::String& text, const juce::String& keys, bool enabled, std::function<void()> action)
+    {
+        juce::PopupMenu::Item item (text);
+        item.shortcutKeyDescription = keys;
+        item.isEnabled = enabled;
+        item.action = std::move (action);
+        menu.addItem (std::move (item));
+    }
+
     void showPadMenu (int key, int c)
     {
+        auto menu = padMenu (key, c);
+        if (menu.getNumItems() > 0)
+            menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&owner).withMousePosition());
+    }
+    juce::PopupMenu padMenu (int key, int c)
+    {
+        juce::PopupMenu menu;
         const auto* r = rack();
         if (r == nullptr || c < 0 || c >= (int) r->chains.size())
-            return;
-        juce::PopupMenu menu;
-        menu.addSectionHeader (keyText (key));
-        menu.addItem (tr ("Rename"), [this, c] { renameChain (c); });
+            return menu;
+        addMenuItem (menu, tr ("Rename"), shortcut ('R', true), true, [this, c] { renameChain (c); });
+        addMenuItem (menu, tr ("Delete"), shortcut (juce::KeyPress::deleteKey, false), true, [this, key] { deletePad (key); });
+        menu.addSeparator();
+        menu.addItem (tr ("Save as Default Pad"), [this, c] { saveDefaultPad (c); });
+        menu.addSeparator();
+        addMenuItem (menu, tr ("Next Similar"), shortcut (juce::KeyPress::rightKey, true), canSwap (key, 1), [this, key] { swapSimilar (key, 1); });
+        addMenuItem (menu, tr ("Previous Similar"), shortcut (juce::KeyPress::leftKey, true), canSwap (key, -1), [this, key] { swapSimilar (key, -1); });
+        addMenuItem (menu, tr ("Save as Similarity Reference"), shortcut (juce::KeyPress::upKey, true), awayFromReference (key), [this, key] { saveReference (key); });
+        addMenuItem (menu, tr ("Return to Reference"), shortcut (juce::KeyPress::downKey, true), awayFromReference (key), [this, key] { returnToReference (key); });
+        menu.addSeparator(); // (LYNX's own)
         menu.addItem (tr ("Duplicate"), [this, c] { edit ([c] (PatcherDoc& d) { rack::duplicateChain (d, c); }); });
-        menu.addItem (tr ("Delete"), [this, c, key] {
-            emptyPadKey = key;
-            edit ([c] (PatcherDoc& d) { rack::removeChain (d, c); });
-        });
         juce::PopupMenu choke;
         for (int group = 0; group <= rack::drumChokeGroups; ++group)
             choke.addItem (group == 0 ? tr ("None") : juce::String (group), true, r->chains[(std::size_t) c].choke == group,
                            [this, c, group] { edit ([c, group] (PatcherDoc& d) { rack::setChoke (d, c, group); }); });
         menu.addSubMenu (tr ("Choke"), choke);
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&owner).withMousePosition());
+        return menu;
+    }
+
+    // Live's Delete on a pad: its chains go, the pad stays selected (empty)
+    void deletePad (int key)
+    {
+        emptyPadKey = key;
+        edit ([key] (PatcherDoc& d) {
+            for (auto* r = rack::rackOf (d); r != nullptr;)
+            {
+                const auto c = rack::padChain (*r, key);
+                if (c < 0)
+                    break;
+                rack::removeChain (d, c);
+                r = rack::rackOf (d);
+            }
+        });
+    }
+
+    // the pad's own keys while it has the keyboard focus (Live's shortcuts in its pad menu)
+    bool padKey (const juce::KeyPress& k)
+    {
+        const auto* r = rack();
+        if (r == nullptr || ! r->drum || emptyPadKey >= 0)
+            return false;
+        const auto key = selectedPadKey (*r);
+        const auto c = key >= 0 ? rack::padChain (*r, key) : -1;
+        if (c < 0)
+            return false;
+        const auto command = k.getModifiers().isCommandDown();
+        if (command && (k.getKeyCode() == 'R' || k.getKeyCode() == 'r'))
+            return renameChain (c), true;
+        if (! command && (k.getKeyCode() == juce::KeyPress::deleteKey))
+            return deletePad (key), true;
+        if (command && k.getKeyCode() == juce::KeyPress::rightKey)
+            return canSwap (key, 1) ? swapSimilar (key, 1) : void(), true;
+        if (command && k.getKeyCode() == juce::KeyPress::leftKey)
+            return canSwap (key, -1) ? swapSimilar (key, -1) : void(), true;
+        if (command && k.getKeyCode() == juce::KeyPress::upKey)
+            return awayFromReference (key) ? saveReference (key) : void(), true;
+        if (command && k.getKeyCode() == juce::KeyPress::downKey)
+            return awayFromReference (key) ? returnToReference (key) : void(), true;
+        return false;
+    }
+
+    // --- Save as Default Pad (Live: the pad saved as the default pad preset; a sample dropped on an empty pad then gets
+    // that pad's devices and settings, its Sampler playing the sample). One per user, in the settings folder.
+    static juce::File defaultPadFile() { return platform::settingsFile ("drum-default-pad.lynx"); }
+
+    void saveDefaultPad (int c)
+    {
+        Song song;
+        song.channels.resize (1);
+        auto& channel = song.channels[0];
+        channel.instrument = InstrumentKind::patcher;
+        channel.name = "Default Pad";
+        channel.patcher = rack::makeDrumRack();
+        if (rack::copyPad (shown, c, channel.patcher, rack::drumFirstPad) < 0)
+            return;
+        auto write = [song] {
+            juce::String error;
+            const auto file = defaultPadFile();
+            file.getParentDirectory().createDirectory();
+            if (! ProjectFile::save (song, file, error))
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save as Default Pad"), error);
+        };
+        if (! defaultPadFile().existsAsFile())
+            return write();
+        // (Live asks before it overwrites the default pad preset)
+        juce::AlertWindow::showOkCancelBox (juce::MessageBoxIconType::QuestionIcon, tr ("Save as Default Pad"), tr ("Replace the default pad?"), tr ("Replace"),
+                                            tr ("Cancel"), &owner, juce::ModalCallbackFunction::create ([write] (int result) {
+                                                if (result != 0)
+                                                    write();
+                                            }));
+    }
+
+    // the saved default pad (its Drum Rack, the pad its first chain), if any
+    static std::optional<PatcherDoc> defaultPad()
+    {
+        const auto file = defaultPadFile();
+        if (! file.existsAsFile())
+            return std::nullopt;
+        juce::String error;
+        auto song = ProjectFile::load (file, error);
+        if (! song || song->channels.empty() || ! rack::isDrumRack (song->channels[0]) || rack::rackOf (song->channels[0].patcher)->chains.empty())
+            return std::nullopt;
+        return song->channels[0].patcher;
+    }
+
+    // --- similar-sample swapping (Live's Next / Previous Similar on a pad) --------------------------------------------
+    // the file the pad's Sampler plays ("" when the pad has no Sampler with a sample)
+    juce::String padSample (int key) const
+    {
+        const auto* r = rack();
+        const auto c = r != nullptr ? rack::padChain (*r, key) : -1;
+        if (c < 0)
+            return {};
+        for (const auto n : r->chains[(std::size_t) c].nodes)
+            if (const auto& x = shown.nodes[(std::size_t) n]; x.generator && x.channel.instrument == InstrumentKind::sampler && ! x.channel.samplePath.empty())
+                return str (x.channel.samplePath);
+        return {};
+    }
+    bool canSwap (int key, int step) const
+    {
+        if (padSample (key).isEmpty())
+            return false;
+        const auto s = swaps.find (key);
+        if (step < 0)
+            return s != swaps.end() && s->second.index >= 0;
+        return s == swaps.end() || ! s->second.asked || s->second.index + 1 < s->second.list.size();
+    }
+    bool awayFromReference (int key) const
+    {
+        const auto s = swaps.find (key);
+        return s != swaps.end() && s->second.reference.isNotEmpty() && padSample (key).isNotEmpty() && padSample (key) != s->second.reference;
+    }
+    void swapSimilar (int key, int step)
+    {
+        const auto current = padSample (key);
+        if (current.isEmpty())
+            return;
+        auto& s = swaps[key];
+        if (s.reference.isEmpty())
+            s.reference = current;
+        if (step > 0 && ! s.asked) // (the first Next: the samples like the reference, from the Browser's index)
+        {
+            s.asked = true;
+            juce::Component::SafePointer<RackView> safe (&owner);
+            BrowserComponent::findSimilarSamples (juce::File (s.reference), [safe, key] (juce::Array<juce::File> found) {
+                if (safe == nullptr)
+                    return;
+                auto& x = safe->impl->swaps[key];
+                found.removeIf ([&x] (const juce::File& f) { return f.getFullPathName() == x.reference; });
+                x.list = found;
+                if (! found.isEmpty())
+                {
+                    x.index = 0;
+                    safe->impl->setPadSample (key, found.getReference (0));
+                }
+            });
+            return;
+        }
+        const auto next = s.index + step;
+        if (next < -1 || next >= s.list.size())
+            return;
+        s.index = next;
+        setPadSample (key, next < 0 ? juce::File (s.reference) : s.list[next]);
+    }
+    void saveReference (int key)
+    {
+        swaps[key] = PadSwap { padSample (key), {}, -1, false };
+        owner.repaint();
+    }
+    void returnToReference (int key)
+    {
+        auto& s = swaps[key];
+        if (s.reference.isEmpty())
+            return;
+        s.index = -1;
+        setPadSample (key, juce::File (s.reference));
+    }
+    // the pad's Sampler plays `file`; a pad (and Sampler) named after its old sample takes the new one's name
+    void setPadSample (int key, const juce::File& file)
+    {
+        edit ([key, path = file.getFullPathName().toStdString(), stem = file.getFileNameWithoutExtension().toStdString()] (PatcherDoc& d) {
+            auto* r = rack::rackOf (d);
+            const auto c = r != nullptr ? rack::padChain (*r, key) : -1;
+            if (c < 0)
+                return;
+            for (const auto n : r->chains[(std::size_t) c].nodes)
+                if (auto& x = d.nodes[(std::size_t) n]; x.generator && x.channel.instrument == InstrumentKind::sampler)
+                {
+                    const auto old = juce::File (juce::String::fromUTF8 (x.channel.samplePath.c_str())).getFileNameWithoutExtension().toStdString();
+                    if (r->chains[(std::size_t) c].name == old || r->chains[(std::size_t) c].name == x.channel.name)
+                        r->chains[(std::size_t) c].name = stem;
+                    if (x.channel.name == old || x.channel.name.empty())
+                        x.channel.name = stem;
+                    x.channel.samplePath = path;
+                    break;
+                }
+            rack::compile (d);
+        });
     }
 
     // what to put on an empty pad: a sample (a Sampler, as Live's pad Simpler), the Synth, a rack, a plugin, an empty chain
@@ -2020,6 +2403,15 @@ struct RackView::Impl
     // a sample on pad `key`: a Sampler playing it whole (release 0: one-shot, Live's default pad Simpler [DATA])
     void loadSampleOnPad (int key, const juce::File& file)
     {
+        if (const auto* r = rack(); r != nullptr && rack::padChain (*r, key) < 0)
+            if (auto def = defaultPad()) // (a default pad saved: its devices and settings, playing this sample)
+            {
+                emptyPadKey = -1;
+                return edit ([key, pad = std::move (*def), path = file.getFullPathName().toStdString()] (PatcherDoc& d) {
+                    if (const auto c = rack::copyPad (pad, 0, d, key, path); c >= 0)
+                        rack::rackOf (d)->selectedChain = c;
+                });
+            }
         PatchNode n;
         n.generator = true;
         n.channel.instrument = InstrumentKind::sampler;
@@ -2088,10 +2480,22 @@ RackView::RackView (AudioEngine& engine, RackLocator locate, std::optional<Autom
     : impl (std::make_unique<Impl> (*this, engine, std::move (locate), std::move (automation), std::move (key), ownHeader, std::move (openNode)))
 {
     impl->refresh();
+    setWantsKeyboardFocus (true); // (a Drum Rack's pad shortcuts; taken only by a click on a pad)
+    setMouseClickGrabsKeyboardFocus (false);
     startTimerHz (30);
 }
 
 RackView::~RackView() = default;
+
+bool RackView::keyPressed (const juce::KeyPress& key) { return impl->padKey (key); }
+
+juce::PopupMenu RackView::padMenuForSnapshot (int key)
+{
+    const auto* r = impl->rack();
+    return r != nullptr ? impl->padMenu (key, rack::padChain (*r, key)) : juce::PopupMenu();
+}
+
+juce::PopupMenu RackView::ioMenuForSnapshot (int chain, int column) { return impl->ioMenu (chain, column); }
 
 int RackView::preferredWidth (int height) const { return impl->width (height); }
 int RackView::minimumWidth (int height) const { return impl->width (height, true); }

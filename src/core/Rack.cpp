@@ -1404,7 +1404,10 @@ PatcherDoc makeDrumRack()
     RackDoc r;
     r.kind = RackDoc::Kind::instrument;
     r.drum = true;
-    r.showMacros = true;
+    r.showMacros = false; // (Live's empty Drum Rack: the pads and the devices pane only, 190ei B1a)
+    r.showChains = false;
+    r.showVariations = false;
+    r.showDevices = true;
     r.showPads = true;
     r.padScroll = drumDefaultScroll;
     r.selectedChain = 0;
@@ -1462,6 +1465,79 @@ std::map<int, std::string> padNames (const RackDoc& rack)
         if (c.receive >= 0 && c.receive < drumPadCount && ! c.name.empty())
             names.emplace (c.receive, c.name); // (the first chain on a key names its pad)
     return names;
+}
+
+std::vector<int> filledPadKeys (const RackDoc& rack)
+{
+    std::vector<int> keys;
+    if (! rack.drum)
+        return keys;
+    for (int key = drumPadCount - 1; key >= 0; --key)
+        if (padChain (rack, key) >= 0)
+            keys.push_back (key);
+    return keys;
+}
+
+int copyPad (const PatcherDoc& from, int chain, PatcherDoc& to, int key, const std::string& samplePath)
+{
+    const auto* src = rackOf (from);
+    if (src == nullptr || chain < 0 || chain >= (int) src->chains.size() || ! isDrumRack (to))
+        return -1;
+    const auto& c = src->chains[(std::size_t) chain];
+    auto name = c.name;
+    std::optional<PatchNode> instrument;
+    std::vector<PatchNode> others;
+    for (const auto n : c.nodes)
+        if (n >= 0 && n < (int) from.nodes.size())
+        {
+            const auto& node = from.nodes[(std::size_t) n];
+            if (! instrument && isInstrumentNode (node))
+                instrument = node;
+            else
+                others.push_back (node);
+        }
+    if (! samplePath.empty())
+    {
+        const auto slash = samplePath.find_last_of ("/\\");
+        auto stem = samplePath.substr (slash == std::string::npos ? 0 : slash + 1);
+        if (const auto dot = stem.find_last_of ('.'); dot != std::string::npos && dot > 0)
+            stem.resize (dot);
+        if (! instrument || instrument->channel.instrument != InstrumentKind::sampler)
+        {
+            PatchNode n;
+            n.generator = true;
+            n.channel.instrument = InstrumentKind::sampler;
+            n.channel.sampler.release = 0.0f; // (Live's pad Simpler: one-shot)
+            instrument = n;
+        }
+        instrument->channel.samplePath = samplePath;
+        instrument->channel.name = stem;
+        name = stem;
+    }
+    const auto k = addPad (to, key, name, instrument);
+    if (k < 0)
+        return -1;
+    for (const auto& node : others)
+        addDevice (to, k, node);
+    auto* r = rackOf (to);
+    auto& dst = r->chains[(std::size_t) k];
+    dst.volume = c.volume;
+    dst.pan = c.pan;
+    dst.active = c.active;
+    dst.play = c.play;
+    dst.choke = c.choke;
+    compile (to);
+    return k;
+}
+
+std::string returnLetter (int k) { return std::string (1, (char) ('a' + std::clamp (k, 0, 25))); }
+
+std::string returnLabel (const RackDoc& rack, int k)
+{
+    if (k < 0 || k >= (int) rack.returns.size())
+        return {};
+    const auto& name = rack.returns[(std::size_t) k].name;
+    return name.empty() ? returnLetter (k) : returnLetter (k) + " " + name;
 }
 
 int addPad (PatcherDoc& doc, int key, const std::string& name, std::optional<PatchNode> instrument)
@@ -1551,8 +1627,9 @@ int addReturn (PatcherDoc& doc, const std::string& name)
     if (r == nullptr || ! r->drum)
         return -1;
     RackChain ret;
-    // Live names the return chains with a letter ("a Reverb" [DATA]); a new one LYNX's way: its letter
-    ret.name = name.empty() ? std::string (1, (char) ('A' + (int) (r->returns.size() % 26))) : name;
+    // Live shows a return chain with its letter before its name ("a Reverb", returnLabel); the name is kept without it
+    // (Live's UserName [DATA]), so a new unnamed one shows its letter alone
+    ret.name = name;
     ret.receive = -1;
     addChainNodes (doc, ret, RackDoc::Kind::instrument);
     r = rackOf (doc);
@@ -1587,12 +1664,14 @@ bool removeReturn (PatcherDoc& doc, int k)
     return true;
 }
 
-ChannelDef sliceToDrumRack (const std::string& samplePath, const std::vector<float>& slices, const std::string& baseName, SliceTemplate preset, float end)
+ChannelDef sliceToDrumRack (const std::string& samplePath, const std::vector<float>& slices, const std::string& baseName, SliceTemplate preset, float end,
+                            const std::string& rackName)
 {
     ChannelDef channel;
     channel.instrument = InstrumentKind::patcher;
-    channel.name = baseName;
+    channel.name = rackName.empty() ? baseName : rackName;
     channel.patcher = makeDrumRack();
+    rackOf (channel.patcher)->name = rackName;
     std::vector<float> starts;
     for (const auto x : slices)
         if (x >= 0.0f && x < end && (starts.empty() || x > starts.back()))
@@ -1697,6 +1776,8 @@ int addSliceTrack (Song& song, int clipIndex, ChannelDef drumRack, std::vector<N
     song.patterns.push_back (std::move (pattern));
     const auto track = source.track + 1;
     noteedit::insertTrack (song, track);
+    if (track < (int) song.playlistTracks.size())
+        song.playlistTracks[(std::size_t) track].name = patternName; // (Live: the new MIDI track is named after the clip)
     Clip clip;
     clip.kind = ClipKind::pattern;
     clip.pattern = (int) song.patterns.size() - 1;
@@ -1705,5 +1786,37 @@ int addSliceTrack (Song& song, int clipIndex, ChannelDef drumRack, std::vector<N
     clip.length = source.length;
     song.playlist.push_back (clip);
     return channel;
+}
+
+const char* slicePerName (SlicePer per) noexcept
+{
+    switch (per)
+    {
+        case SlicePer::warpMarker: return "Warp Marker";
+        case SlicePer::transient: return "Transient";
+        case SlicePer::bar: return "Bar";
+        case SlicePer::half: return "1/2 Note";
+        case SlicePer::quarter: return "1/4 Note";
+        case SlicePer::eighth: return "1/8 Note";
+        case SlicePer::sixteenth: return "1/16 Note";
+        case SlicePer::thirtySecond: return "1/32 Note";
+    }
+    return "";
+}
+
+double slicePerBeats (SlicePer per, int beatsPerBar) noexcept
+{
+    switch (per)
+    {
+        case SlicePer::bar: return (double) std::max (1, beatsPerBar);
+        case SlicePer::half: return 2.0;
+        case SlicePer::quarter: return 1.0;
+        case SlicePer::eighth: return 0.5;
+        case SlicePer::sixteenth: return 0.25;
+        case SlicePer::thirtySecond: return 0.125;
+        case SlicePer::warpMarker:
+        case SlicePer::transient: break;
+    }
+    return 0.0;
 }
 } // namespace lynx::rack

@@ -194,6 +194,25 @@ KeyRows keyRows (int root, int scale, bool fold) noexcept
     return rows;
 }
 
+KeyRows keyRowsOf (const std::vector<int>& keys) noexcept
+{
+    if (keys.empty())
+        return keyRows (0, 0, false);
+    std::array<bool, 128> shown {};
+    for (const auto k : keys)
+        if (k >= 0 && k < 128)
+            shown[(std::size_t) k] = true;
+    KeyRows rows;
+    rows.count = 0;
+    for (int key = 127; key >= 0; --key)
+    {
+        rows.rowOfKey[(std::size_t) key] = shown[(std::size_t) key] ? rows.count : -1;
+        if (shown[(std::size_t) key])
+            rows.keyOfRow[(std::size_t) rows.count++] = key;
+    }
+    return rows;
+}
+
 int KeyRows::step (int key, int rows) const noexcept
 {
     key = std::clamp (key, 0, 127);

@@ -22,6 +22,10 @@
 
 namespace lynx
 {
+// (shots, round 190el) the audio clip's Slice to New MIDI Track dialog for clip `clipIndex`, built but not shown, with
+// "Create one slice per" at item `per` (rack::SlicePer)
+std::unique_ptr<juce::Component> makeSliceDialogForSnapshot (AudioEngine& engine, int clipIndex, int per);
+
 class PatternBlocksView;
 class VideoLanesView;
 

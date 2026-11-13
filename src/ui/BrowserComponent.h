@@ -54,6 +54,10 @@ class BrowserComponent final : public juce::Component,
                                private juce::Timer
 {
 public:
+    // Live's pad menu › Next Similar (round 190el, ui/RackEditor.cpp): the samples most like `file` in the main
+    // Browser's folders, nearest first, from its "Find similar samples" index (the first use starts the analysis, as the
+    // Browser's own does). `done` runs on the message thread, with an empty list when there is no Browser or no match yet.
+    static void findSimilarSamples (const juce::File& file, std::function<void (juce::Array<juce::File>)> done);
     // The main Browser (a panel) or the separate Sample browser window (round 163): each keeps its own view (which
     // top-level folders it shows, which kinds of files it lists).
     enum class Role

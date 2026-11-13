@@ -64,6 +64,9 @@ public:
     void mouseDoubleClick (const juce::MouseEvent& e) override;
     void mouseMove (const juce::MouseEvent& e) override;
     void mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& w) override;
+    // a Drum Rack's selected pad (round 190el, Live's pad menu shortcuts): Ctrl+R rename, Del delete, Ctrl+Right / Left
+    // next / previous similar sample, Ctrl+Up save as similarity reference, Ctrl+Down return to it
+    bool keyPressed (const juce::KeyPress& key) override;
     // a Drum Rack (round 190ec): samples dropped on its pads become Samplers there
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
     void filesDropped (const juce::StringArray& files, int x, int y) override;
@@ -77,6 +80,10 @@ public:
     juce::Rectangle<int> padBounds (int key) const;
     int padKeyAt (juce::Point<int> p) const;
     bool mapMode() const noexcept { return mapping; }
+    // (shots, a Drum Rack) the menu of the pad of `key` (empty for an empty pad) and of an I-O cell (0 Receive, 1 Play,
+    // 2 Choke, 3 Audio To) of chain `chain`
+    juce::PopupMenu padMenuForSnapshot (int key);
+    juce::PopupMenu ioMenuForSnapshot (int chain, int column);
 
 private:
     struct Impl;

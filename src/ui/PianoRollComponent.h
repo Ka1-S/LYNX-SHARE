@@ -251,6 +251,12 @@ private:
     void updateKeyRows();                 // after the scale or the fold changed
     notetools::KeyRows rows = notetools::keyRows (0, 0, false);
     bool foldToScale = false;
+    // round 190el (decision 2 of the 190ei Live check): in the Clip-launch layout a Drum Rack channel's editor shows a
+    // row per filled pad, named, instead of the piano keys (Live's note editor for a Drum Rack, Fold on or off); the
+    // Pattern layout keeps FL's piano roll. The filled pads' keys (highest first), empty = the usual rows.
+    std::vector<int> padRows;
+    std::vector<int> wantedPadRows() const;
+    void syncPadRows(); // the rows follow the layout, the channel and its pads
     bool folded() const noexcept { return rows.count < 128; }
     bool ghostShown (int channel) const noexcept;
     void setGhostChannels (const std::function<bool (int channel, bool shown)>& show);

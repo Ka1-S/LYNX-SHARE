@@ -6507,56 +6507,95 @@ void PlaylistComponent::addKeyFollowItems (juce::PopupMenu& menu, int index, con
 
 namespace
 {
-// Live's audio clip › Slice to New MIDI Track (round 190ec): a dialog "Create one slice per" (transients, a bar or a
-// note division, warp markers) and a slicing template, then a new channel holding a Drum Rack with one pad per slice
-// (C1 up) and a pattern that replays the slices where they were, on a new track under the clip (core/Rack.h). The
-// templates are LYNX's own (Live's slicing presets are Live content): gated with choke (the facts of Live's Default)
-// or one-shot.
-void sliceClipToNewTrack (AudioEngine& engine, int clipIndex, int per, bool oneShot, std::function<void()> done)
+// Live's audio clip › Slice to New MIDI Track (round 190ec; dialog as Live's since round 190el, 190ei B6): "Create one
+// slice per" (Warp Marker, Transient, Bar, 1/2 Note … 1/32 Note), the count line, "Slicing Preset" and "Preserve warped
+// timing", then a new channel holding a Drum Rack named after the clip with one pad per slice ("Slice 1"… from C1) and
+// a pattern that replays the slices where they were, on a new track under the clip, all named after the clip
+// (core/Rack.h). The presets are LYNX's own (Live's slicing presets are Live content): Default (the facts of Live's
+// Default: gated, choke group 1) or One-shot.
+struct ClipSlices
 {
+    std::vector<float> slices; // starts, fractions of the file
+    float from = 0.0f, to = 1.0f;
+    double beats = 0.0;        // the clip region's length
+    std::function<double (float)> tickOf;
+    std::string name, samplePath;
+    std::uint32_t colour = 0;
+    bool ok = false;
+};
+
+ClipSlices clipSlices (AudioEngine& engine, int clipIndex, rack::SlicePer per, bool preserveWarpedTiming)
+{
+    ClipSlices out;
     const auto& song = engine.getSong();
     if (clipIndex < 0 || clipIndex >= (int) song.playlist.size())
-        return;
+        return out;
     const auto clip = song.playlist[(std::size_t) clipIndex];
     if (clip.kind != ClipKind::audio || clip.channel < 0 || clip.channel >= (int) song.channels.size())
-        return;
+        return out;
     const auto channel = song.channels[(std::size_t) clip.channel];
     const auto sample = engine.getSampleLibrary().load (juce::String::fromUTF8 (channel.samplePath.c_str()));
     if (sample == nullptr || sample->frames() == 0 || sample->sampleRate <= 0.0 || clipops::playsBackwards (channel, clip))
-        return;
+        return out;
     // the part of the file the clip plays, as fractions of the file (the clip's own timing: its trim, stretch and pitch)
     const auto fileFrames = (double) sample->frames();
     const auto span = clipops::clipSpan (channel, sample);
     const auto perTick = clipops::framesPerTick (channel, clip, (double) span.frames, sample->sampleRate, song.bpm);
     if (perTick <= 0.0)
-        return;
-    const auto from = (float) std::clamp (((double) span.first + (double) clip.offset * perTick) / fileFrames, 0.0, 1.0);
-    const auto to = (float) std::clamp (((double) span.first + (double) (clip.offset + clip.length) * perTick) / fileFrames, (double) from, 1.0);
-    std::vector<float> slices;
-    if (per == 0) // transients
-        slices = rack::slicesInRegion (detectSlices (*sample, 0.5f, rack::drumPadCount), from, to);
-    else if (per == 7) // warp markers (seconds of the file)
+        return out;
+    out.from = (float) std::clamp (((double) span.first + (double) clip.offset * perTick) / fileFrames, 0.0, 1.0);
+    out.to = (float) std::clamp (((double) span.first + (double) (clip.offset + clip.length) * perTick) / fileFrames, (double) out.from, 1.0);
+    out.beats = (double) clip.length / (double) ppq;
+    switch (per)
     {
-        std::vector<float> marks;
-        for (const auto& w : channel.sampler.warp)
-            marks.push_back ((float) (w.seconds * sample->sampleRate / fileFrames));
-        slices = rack::slicesInRegion (marks, from, to);
+        case rack::SlicePer::transient:
+            out.slices = rack::slicesInRegion (detectSlices (*sample, 0.5f, rack::drumPadCount), out.from, out.to);
+            break;
+        case rack::SlicePer::warpMarker: // (seconds of the file)
+        {
+            std::vector<float> marks;
+            for (const auto& w : channel.sampler.warp)
+                marks.push_back ((float) (w.seconds * sample->sampleRate / fileFrames));
+            out.slices = rack::slicesInRegion (marks, out.from, out.to);
+            break;
+        }
+        default: // a bar or a note division (a whole note = 4 beats), in the clip's time
+        {
+            const auto secondsPerSlice = rack::slicePerBeats (per, song.beatsPerBar) * ppq * perTick / sample->sampleRate;
+            out.slices = rack::gridSlices (fileFrames / sample->sampleRate, out.from, out.to, secondsPerSlice);
+            break;
+        }
     }
-    else // one bar, 1/2 … 1/32 (a whole note = 4 beats), in the clip's time
-    {
-        const double beats[] { (double) std::max (1, song.beatsPerBar), 2.0, 1.0, 0.5, 0.25, 0.125 };
-        const auto secondsPerSlice = beats[std::clamp (per - 1, 0, 5)] * ppq * perTick / sample->sampleRate;
-        slices = rack::gridSlices (fileFrames / sample->sampleRate, from, to, secondsPerSlice);
-    }
-    const auto tickOf = [&] (float fraction) { return ((double) fraction * fileFrames - (double) span.first) / perTick - (double) clip.offset; };
-    auto notes = rack::sliceNotes (slices, to, tickOf, 0);
+    // Preserve warped timing on: the notes where the clip plays each slice (its stretch and pitch); off: at the file's
+    // own timing from the clip's start, at the song tempo
+    const auto fromFrame = (double) span.first + (double) clip.offset * perTick;
+    if (preserveWarpedTiming)
+        out.tickOf = [=] (float fraction) { return ((double) fraction * fileFrames - (double) span.first) / perTick - (double) clip.offset; };
+    else
+        out.tickOf = [=, rate = sample->sampleRate, bpm = song.bpm] (float fraction) {
+            return ((double) fraction * fileFrames - fromFrame) / rate * std::max (1.0, bpm) / 60.0 * (double) ppq;
+        };
     const auto stem = juce::File (juce::String::fromUTF8 (channel.samplePath.c_str())).getFileNameWithoutExtension().toStdString();
-    auto drum = rack::sliceToDrumRack (channel.samplePath, slices, stem, oneShot ? rack::SliceTemplate::oneShot : rack::SliceTemplate::gated, to);
-    drum.colour = channel.colour;
-    const auto capped = (int) slices.size() > rack::maxSlicePads;
+    out.name = ! channel.name.empty() ? channel.name : stem; // (the audio clip's name: its channel's, as the Playlist shows it)
+    out.samplePath = channel.samplePath;
+    out.colour = channel.colour;
+    out.ok = true;
+    return out;
+}
+
+void sliceClipToNewTrack (AudioEngine& engine, int clipIndex, rack::SlicePer per, bool oneShot, bool preserveWarpedTiming, std::function<void()> done)
+{
+    const auto cut = clipSlices (engine, clipIndex, per, preserveWarpedTiming);
+    if (! cut.ok)
+        return;
+    auto notes = rack::sliceNotes (cut.slices, cut.to, cut.tickOf, 0);
+    auto drum = rack::sliceToDrumRack (cut.samplePath, cut.slices, tr ("Slice").toStdString(), oneShot ? rack::SliceTemplate::oneShot : rack::SliceTemplate::gated,
+                                       cut.to, cut.name);
+    drum.colour = cut.colour;
+    const auto capped = (int) cut.slices.size() > rack::maxSlicePads;
     auto added = -1;
     engine.editSong ([&] (Song& s) {
-        added = rack::addSliceTrack (s, clipIndex, std::move (drum), std::move (notes), stem);
+        added = rack::addSliceTrack (s, clipIndex, std::move (drum), std::move (notes), cut.name);
         if (added >= 0)
             s.currentPattern = (int) s.patterns.size() - 1;
     });
@@ -6567,26 +6606,88 @@ void sliceClipToNewTrack (AudioEngine& engine, int clipIndex, int per, bool oneS
         done();
 }
 
-void showSliceToNewTrackDialog (AudioEngine& engine, juce::Component& owner, int clipIndex, bool hasWarpMarkers, std::function<void()> done)
+// Live's line under "Create one slice per": "The current clip region is 64 beats long - this will result in 128 slices."
+juce::String sliceCountLine (const ClipSlices& cut)
 {
-    auto* box = new juce::AlertWindow (tr ("Slice to New MIDI Track"), {}, juce::MessageBoxIconType::NoIcon, &owner);
-    juce::StringArray per { tr ("Transient"), tr ("1 Bar"), "1/2", "1/4", "1/8", "1/16", "1/32" };
-    if (hasWarpMarkers)
-        per.add (tr ("Warp Marker"));
-    box->addComboBox ("per", per, tr ("Create one slice per"));
-    box->addComboBox ("preset", { tr ("Default (choke, gated)"), tr ("One-shot") }, tr ("Slicing template"));
+    const auto beats = std::abs (cut.beats - std::round (cut.beats)) < 0.005 ? juce::String (juce::roundToInt (cut.beats)) : juce::String (cut.beats, 2);
+    return tr ("The current clip region is {0} beats long - this will result in {1} slices.", { beats, juce::String ((int) cut.slices.size()) });
+}
+
+// The dialog's own rows: the count line and the Preserve warped timing switch (an AlertWindow holds them, not owns them)
+struct SliceDialogExtras
+{
+    juce::Label count;
+    juce::Label preserveLabel;
+    juce::TextButton preserve;
+    juce::Component preserveRow;
+};
+
+juce::AlertWindow* buildSliceDialog (AudioEngine& engine, juce::Component* owner, int clipIndex, const std::shared_ptr<SliceDialogExtras>& extras)
+{
+    auto* box = new juce::AlertWindow (tr ("Slice to New MIDI track"), {}, juce::MessageBoxIconType::NoIcon, owner);
+    const juce::StringArray per { tr ("Warp Marker"), tr ("Transient"), tr ("Bar"), tr ("1/2 Note"), tr ("1/4 Note"), tr ("1/8 Note"), tr ("1/16 Note"), tr ("1/32 Note") };
+    box->addComboBox ("per", per, tr ("Create one slice per:"));
+    box->getComboBoxComponent ("per")->setSelectedItemIndex ((int) rack::SlicePer::transient, juce::dontSendNotification);
+    extras->count.setJustificationType (juce::Justification::centredLeft);
+    extras->count.setSize (380, 40);
+    extras->count.setMinimumHorizontalScale (0.8f);
+    box->addCustomComponent (&extras->count);
+    box->addComboBox ("preset", { tr ("Default"), tr ("One-shot") }, tr ("Slicing Preset:"));
+    extras->preserveLabel.setText (tr ("Preserve warped timing:"), juce::dontSendNotification);
+    extras->preserve.setClickingTogglesState (true);
+    extras->preserve.setToggleState (true, juce::dontSendNotification);
+    extras->preserve.setButtonText (tr ("On"));
+    extras->preserveRow.addAndMakeVisible (extras->preserveLabel);
+    extras->preserveRow.addAndMakeVisible (extras->preserve);
+    extras->preserveRow.setSize (380, 26);
+    extras->preserveLabel.setBounds (0, 2, 300, 22);
+    extras->preserve.setBounds (310, 2, 60, 22);
+    box->addCustomComponent (&extras->preserveRow);
+    const auto update = [box, &engine, clipIndex, x = extras.get()] { // (raw: whoever holds the dialog keeps the extras)
+        const auto cut = clipSlices (engine, clipIndex, (rack::SlicePer) std::clamp (box->getComboBoxComponent ("per")->getSelectedItemIndex(), 0, rack::slicePerCount - 1),
+                                     x->preserve.getToggleState());
+        x->count.setText (cut.ok ? sliceCountLine (cut) : juce::String(), juce::dontSendNotification);
+        x->preserve.setButtonText (x->preserve.getToggleState() ? tr ("On") : tr ("Off"));
+    };
+    box->getComboBoxComponent ("per")->onChange = update;
+    extras->preserve.onClick = update;
+    update();
     box->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
     box->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
-    box->enterModalState (true, juce::ModalCallbackFunction::create ([box, &engine, clipIndex, done] (int result) {
+    return box;
+}
+
+void showSliceToNewTrackDialog (AudioEngine& engine, juce::Component& owner, int clipIndex, std::function<void()> done)
+{
+    auto extras = std::make_shared<SliceDialogExtras>();
+    auto* box = buildSliceDialog (engine, &owner, clipIndex, extras);
+    box->enterModalState (true, juce::ModalCallbackFunction::create ([box, &engine, clipIndex, done, extras] (int result) {
                               if (result != 1)
                                   return;
-                              const auto per = box->getComboBoxComponent ("per")->getSelectedItemIndex();
+                              const auto per = (rack::SlicePer) std::clamp (box->getComboBoxComponent ("per")->getSelectedItemIndex(), 0, rack::slicePerCount - 1);
                               const auto oneShot = box->getComboBoxComponent ("preset")->getSelectedItemIndex() == 1;
-                              sliceClipToNewTrack (engine, clipIndex, per, oneShot, done);
+                              sliceClipToNewTrack (engine, clipIndex, per, oneShot, extras->preserve.getToggleState(), done);
                           }),
                           true);
 }
 } // namespace
+
+std::unique_ptr<juce::Component> makeSliceDialogForSnapshot (AudioEngine& engine, int clipIndex, int per)
+{
+    struct Holder final : juce::Component
+    {
+        std::shared_ptr<SliceDialogExtras> extras = std::make_shared<SliceDialogExtras>();
+        std::unique_ptr<juce::AlertWindow> box;
+        ~Holder() override { box.reset(); }
+    };
+    auto holder = std::make_unique<Holder>();
+    holder->box.reset (buildSliceDialog (engine, nullptr, clipIndex, holder->extras));
+    holder->box->getComboBoxComponent ("per")->setSelectedItemIndex (std::clamp (per, 0, rack::slicePerCount - 1), juce::sendNotificationSync);
+    holder->addAndMakeVisible (*holder->box);
+    holder->box->setTopLeftPosition (0, 0);
+    holder->setSize (holder->box->getWidth(), holder->box->getHeight());
+    return holder;
+}
 
 juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
 {
@@ -6819,7 +6920,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         }
         // Live's Slice to New MIDI Track (round 190ec): a Drum Rack with a pad per slice and a pattern that replays them
         menu.addItem (tr ("Slice to New MIDI Track..."), sample != nullptr && ! clipops::playsBackwards (channel, clip), false,
-                      [this, index, warp = ! channel.sampler.warp.empty()] { showSliceToNewTrackDialog (engine, *this, index, warp, [this] { sortClips(); }); });
+                      [this, index] { showSliceToNewTrackDialog (engine, *this, index, [this] { sortClips(); }); });
 
         menu.addItem (tr ("Pitch... (semitones, cents, keep length)"), sample != nullptr, false,
                       [this, ch = clip.channel] { showSamplePitchDialog (engine, ch); });
