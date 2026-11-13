@@ -17133,7 +17133,8 @@ private:
                 reader->read (&m.audio, 0, (int) reader->lengthInSamples, 0, true, true);
                 m.audioSeconds = (double) reader->lengthInSamples / reader->sampleRate;
             }
-            file.deleteFile();
+            if (juce::SystemStats::getEnvironmentVariable ("LYNX_TRACKFREEZE_KEEP", {}).isEmpty()) // (kept: to look at a residual)
+                file.deleteFile();
             return m;
         };
         const auto residual = [] (const Mix& a, const Mix& b, float& peak) {
@@ -17266,7 +17267,14 @@ private:
                 audioClips += c.kind == lynx::ClipKind::audio && c.channel == 0;
             report << "flattened Lead: " << audioClips << " audio clips\n";
             write ("flattened");
-            nullLine ("flattened (Lead) + frozen (others) vs live", live, renderMix ("flattened"), -90.0);
+            // over the song (the flattened clips end where the arrangement ends, as a frozen track plays; an export's
+            // ring-out after the song's end is not in them)
+            const auto span = (int) std::llround (before.secondsForTicks (24 * lynx::ppq) * offline.getTransport().sampleRate.load());
+            auto flatMix = renderMix ("flattened");
+            auto reference = live;
+            reference.audio.setSize (2, juce::jmin (span, reference.audio.getNumSamples()), true);
+            flatMix.audio.setSize (2, reference.audio.getNumSamples(), true);
+            nullLine ("flattened (Lead) + frozen (others) vs live, over the song", reference, flatMix, -90.0);
             offline.undo();
             offline.dispatchPendingMessages();
             check (savedJson (offline.getSong()) == savedJson (frozenSong), "undo of the Flatten: the frozen project exactly as before");
@@ -17285,7 +17293,12 @@ private:
             check (error.isEmpty(), "Bounce Track in Place of the live Bass" + (error.isEmpty() ? juce::String() : ": " + error));
             check (offline.getSong().channels[1].instrument == lynx::InstrumentKind::audioClip && ! offline.getSong().channels[1].freeze.on(),
                    "the Bass is audio, not frozen");
-            nullLine ("Bass bounced in place vs live", live, renderMix ("bounced"), -90.0);
+            auto bouncedMix = renderMix ("bounced");
+            auto reference = live;
+            const auto span = (int) std::llround (before.secondsForTicks (24 * lynx::ppq) * offline.getTransport().sampleRate.load());
+            reference.audio.setSize (2, juce::jmin (span, reference.audio.getNumSamples()), true);
+            bouncedMix.audio.setSize (2, reference.audio.getNumSamples(), true);
+            nullLine ("Bass bounced in place vs live, over the song", reference, bouncedMix, -90.0);
             offline.undo();
             offline.dispatchPendingMessages();
             check (savedJson (offline.getSong()) == jsonBefore, "undo of Bounce Track in Place: the project as before");
