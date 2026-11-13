@@ -213,6 +213,17 @@ public:
             status.setText (tr ("{0} still missing, {1} found", { "2", "2" }), juce::dontSendNotification);
     }
 
+    // (shots, round 190eo) a search of `where` started as the Search button starts one, and what the window shows
+    void startSearchForSnapshot (const juce::StringArray& where) { startSearch (where, false); }
+    bool searchStateForSnapshot (juce::String& text, bool& stopShown, bool& applyEnabled) const
+    {
+        text = status.getText();
+        stopShown = stopButton.isVisible();
+        applyEnabled = applyButton.isEnabled();
+        return search != nullptr;
+    }
+    void stopSearchForSnapshot() { stopSearch(); }
+
     // the remembered search folders and the Browser's folders, searched without asking
     void searchRememberedFolders()
     {
@@ -718,6 +729,26 @@ std::unique_ptr<juce::Component> makeMissingFilesPanel (MissingFilesInfo info, i
     auto panel = std::make_unique<MissingFilesPanel> (std::move (info), false);
     panel->showPageForSnapshot (page, selectedRow);
     return panel;
+}
+
+std::unique_ptr<juce::Component> makeMissingFilesPanelSearching (MissingFilesInfo info, const juce::StringArray& folders)
+{
+    auto panel = std::make_unique<MissingFilesPanel> (std::move (info), false);
+    panel->showPageForSnapshot (0, -1);
+    panel->startSearchForSnapshot (folders);
+    return panel;
+}
+
+bool missingFilesSearchState (juce::Component& panel, juce::String& status, bool& stopShown, bool& applyEnabled)
+{
+    auto* p = dynamic_cast<MissingFilesPanel*> (&panel);
+    return p != nullptr && p->searchStateForSnapshot (status, stopShown, applyEnabled);
+}
+
+void stopMissingFilesSearch (juce::Component& panel)
+{
+    if (auto* p = dynamic_cast<MissingFilesPanel*> (&panel))
+        p->stopSearchForSnapshot();
 }
 
 MissingFilesInfo missingFilesSnapshotInfo()

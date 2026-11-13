@@ -38,6 +38,13 @@ void showMissingFilesDialog (MissingFilesInfo info, std::function<void (const st
 // 2 found automatically; `selectedRow` ≥ 0 selects a row.
 std::unique_ptr<juce::Component> makeMissingFilesPanel (MissingFilesInfo info, int page = 0, int selectedRow = -1);
 
+// (shots, round 190eo) the samples page with a real search of `folders` running for the files of `info` (issue #159:
+// matches stream in while it walks); `missingFilesSearchState` = true while that search still runs, with the status line
+// and whether Stop / Apply are shown; `stopMissingFilesSearch` lets the search go (it ends at its next entry).
+std::unique_ptr<juce::Component> makeMissingFilesPanelSearching (MissingFilesInfo info, const juce::StringArray& folders);
+bool missingFilesSearchState (juce::Component& panel, juce::String& status, bool& stopShown, bool& applyEnabled);
+void stopMissingFilesSearch (juce::Component& panel);
+
 // Sample content for the snapshots: a project with missing, located, skipped and relocated files and missing plugins.
 MissingFilesInfo missingFilesSnapshotInfo();
 } // namespace lynx

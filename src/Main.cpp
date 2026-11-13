@@ -2107,6 +2107,42 @@ public:
             return;
         }
 
+        if (args.contains ("--missingsearchshot190eo"))
+        {
+            // LYNX --missingsearchshot190eo prefix folder...: round 190eo (integration of issue #159's fix) off-screen: the
+            // Missing files window's Samples page while a real search of the folders runs (matches streamed in, Stop
+            // shown, Apply usable). Writes prefix-searching.png and prefix-checks.txt; the search is let go at the end.
+            const auto i = args.indexOf ("--missingsearchshot190eo");
+            const auto prefix = args[i + 1].unquoted();
+            juce::StringArray folders;
+            for (int k = i + 2; k < args.size(); ++k)
+                folders.add (args[k].unquoted());
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            std::shared_ptr<juce::Component> panel = lynx::makeMissingFilesPanelSearching (lynx::missingFilesSnapshotInfo(), folders);
+            juce::Timer::callAfterDelay (700, [this, panel, prefix] {
+                juce::String status;
+                bool stopShown = false, applyEnabled = false;
+                const auto searching = lynx::missingFilesSearchState (*panel, status, stopShown, applyEnabled);
+                auto image = lynx::shot::paint (*panel, lynx::theme::panel);
+                const auto file = juce::File (prefix + "-searching.png");
+                file.deleteFile();
+                if (auto out = file.createOutputStream())
+                    juce::PNGImageFormat().writeImageToStream (image, *out);
+                juce::String checks;
+                auto check = [&checks] (const char* name, bool ok, const juce::String& detail) {
+                    checks << name << "=" << (ok ? "OK" : "FAIL") << " " << detail << "\n";
+                };
+                check ("still_searching_at_the_shot", searching, {});
+                check ("status_shows_the_walk", status.contains (lynx::tr ("Searching {0}... {1} files looked at").upToFirstOccurrenceOf ("{0}", false, false)), status);
+                check ("stop_shown", stopShown, {});
+                check ("apply_usable_during_the_search", applyEnabled, {});
+                lynx::stopMissingFilesSearch (*panel);
+                juce::File (prefix + "-checks.txt").replaceWithText (checks);
+                quit();
+            });
+            return;
+        }
+
         if (args.contains ("--drumshot190ec"))
         {
             // LYNX.exe --drumshot190ec prefix: round 190ec off-screen: a demo Drum Rack's pad view (default and scrolled), its
