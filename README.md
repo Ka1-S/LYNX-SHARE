@@ -62,7 +62,7 @@ AGPL-3.0, and still an **alpha**.
 
 | | |
 |---|---|
-| 🍒 **The FL Studio workflow** | Channel Rack, Piano Roll, Playlist with several arrangements, and a Mixer with inserts, sends and sidechain. The default layout, never watered down. |
+| 🎹 **The FL Studio workflow** | Channel Rack, Piano Roll, Playlist with several arrangements, and a Mixer with inserts, sends and sidechain. The default layout, never watered down. |
 | 📂 **Your projects come with you** | Opens `.flp`, `.als` (Live 11 and 12) and `.flm`; exports `.flp` and `.als`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
 | 🎛️ **Three layouts, one program** | Patterns by default, a clip grid with scenes when you want to jam, or one simple window for a first song. Switch any time in *View › Layout style*. |
 | 🤝 **Make music together** | Send a project to a friend as one file, or work on it live with up to three other people, end-to-end encrypted. |
@@ -329,7 +329,7 @@ place with [Gear Lever](https://github.com/mijorus/gearlever) or AppImageUpdate.
    folders in the background: the standard VST3 and CLAP folders plus the ones FL Studio uses on the same computer. You
    can skip it and reopen it later from *Options › Setup wizard*.
 3. **Open a project** with *File › Open*: one of yours (`.flp`, `.als`, `.flm`, MIDI), or the demo project
-   (`Demo.lynx`, included with the Windows builds).
+   (`Demo.lynx`, included with every download).
 4. **Learn as you go** with the [wiki](https://lynx-share.com/wiki/):
    [Your first song](https://lynx-share.com/wiki/first-song/),
    [Coming from FL Studio](https://lynx-share.com/wiki/coming-from-fl-studio/),
