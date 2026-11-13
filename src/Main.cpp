@@ -1363,6 +1363,17 @@ public:
             return;
         }
 
+        if (args.contains ("--focustest"))
+        {
+            // LYNX --focustest report.txt (issue #161): the main window with the Playlist and the Piano roll (native
+            // child windows with docking on). For each: LYNX goes to the background (the main window loses the focus),
+            // the user comes back with a click in the panel, then presses Space: playback must start. Also: inside the
+            // active window a click in a panel leaves a text field's focus alone, and that focus comes back with the
+            // window. Shows a window (takes the foreground on Windows: GUI lock); exit code 0 = OK.
+            runFocusTest (args[args.indexOf ("--focustest") + 1].unquoted());
+            return;
+        }
+
         if (args.contains ("--pluginstyle")) // round 126: force one style for this run (glow, neon, hardware, vivid; auto = per plugin)
         {
             const auto i = args.indexOf ("--pluginstyle");
@@ -4418,6 +4429,9 @@ private:
         // moved a transparent child window by the main window's client offset on every repaint)
         juce::String danceWindowDetail;
         const auto danceWindowResult = lynx::danceWindowSelfTest (&danceWindowDetail);
+        // issue #161: a click in a panel (a native child window that takes no focus on a click) of an inactive main
+        // window activates it (back from another app, Space played nothing until the Browser was clicked)
+        const auto clickActivationResult = lynx::nativechild::clickActivationSelfTest();
 
         // round 177b: automation lanes come back from a project (track, automation, height, folded)
         juce::String lanesResult = "OK";
@@ -4737,7 +4751,7 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
-                        && danceWindowResult == "OK";
+                        && danceWindowResult == "OK" && clickActivationResult == "OK";
 
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
@@ -4786,6 +4800,7 @@ private:
                << "plugins_off=" << pluginsOffResult << "\n"
                << "dance_window=" << danceWindowResult << "\n"
                << "dance_window_detail=" << danceWindowDetail << "\n"
+               << "click_activation=" << clickActivationResult << "\n"
                << "lanes_saved=" << lanesResult << "\n"
                << "arrange190cg_saved=" << arrange190cgResult << "\n"
                << "livescr190dr=" << livescr190drResult << "\n"
@@ -6691,6 +6706,177 @@ private:
         test->percent = juce::jlimit (50, 300, percent);
         test->done = [this] { juce::MessageManager::callAsync ([this] { test.reset(); quit(); }); };
         test->start();
+    }
+
+    void runFocusTest (const juce::String& reportPath)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+
+        struct FocusTest final : juce::Timer
+        {
+            juce::String reportPath, report;
+            bool ok = true;
+            int stepIndex = 0;
+            std::unique_ptr<lynx::AudioEngine> engine;
+            lynx::MainComponent* ui = nullptr;
+            std::unique_ptr<juce::DocumentWindow> main;
+            std::function<void()> done;
+
+            void line (const juce::String& text)
+            {
+                report << text << "\n";
+                juce::File (reportPath).replaceWithText (report);
+            }
+
+            void check (const juce::String& what, bool passed)
+            {
+                line ((passed ? "ok   " : "FAIL ") + what);
+                ok = ok && passed;
+            }
+
+            juce::ComponentPeer* mainPeer() const { return main != nullptr ? main->getPeer() : nullptr; }
+
+            bool focusInMain() const
+            {
+                auto* f = juce::Component::getCurrentlyFocusedComponent();
+                return f != nullptr && main->isParentOf (f);
+            }
+
+            // a click (press and release) at the middle of the panel's content, through the native window it is in
+            static void click (juce::Component& frame, bool right)
+            {
+                auto* peer = frame.getPeer();
+                if (peer == nullptr)
+                    return;
+                const auto at = peer->getComponent().getLocalPoint (&frame, frame.getLocalBounds().getCentre().toFloat());
+                const auto button = right ? juce::ModifierKeys::rightButtonModifier : juce::ModifierKeys::leftButtonModifier;
+                const auto now = juce::Time::currentTimeMillis();
+                peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, at, juce::ModifierKeys (button), 1.0f, 0.0f, now);
+                peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, at, juce::ModifierKeys(), 1.0f, 0.0f, now + 40);
+            }
+
+            bool space()
+            {
+                auto* peer = mainPeer(); // (the system sends the key to the window with the focus: the main one)
+                return peer != nullptr && peer->handleKeyPress (juce::KeyPress (juce::KeyPress::spaceKey, juce::ModifierKeys(), ' '));
+            }
+
+            juce::TextEditor* firstField (juce::Component& c)
+            {
+                if (auto* t = dynamic_cast<juce::TextEditor*> (&c); t != nullptr && t->isShowing() && t->getWantsKeyboardFocus())
+                    return t;
+                for (auto* child : c.getChildren())
+                    if (auto* t = firstField (*child))
+                        return t;
+                return nullptr;
+            }
+
+            // the user tabs away and comes back with a click in `panel`
+            void backWithClickIn (lynx::workspace::Panel panel, bool right)
+            {
+                auto& frame = ui->workspaceForTest().getFrame (panel);
+                const auto name = juce::String (lynx::workspace::panelId (panel)) + (right ? " (right click)" : "");
+                auto* peer = mainPeer();
+                line (name + ": native child window=" + juce::String ((int) lynx::nativechild::isAttached (frame)));
+                check (name + ": the main window has the keys before", ui->hasKeyboardFocus (true));
+                peer->handleFocusLoss(); // (another app is in front: the main window lost the system focus)
+                check (name + ": nothing in LYNX has the keys while it is in the background", ! focusInMain());
+                // the cause: JUCE answers the system's "activate?" from the panel's own component, which takes no focus on a click
+                line (name + ": JUCE's answer alone would activate the window=" + juce::String ((int) frame.getMouseClickGrabsKeyboardFocus()));
+                const auto activates = lynx::nativechild::clickActivatesWindow (frame, false);
+                check (name + ": a click in it activates the inactive main window", activates);
+               #if JUCE_WINDOWS
+                if (lynx::nativechild::isAttached (frame))
+                    check (name + ": its native window answers WM_MOUSEACTIVATE with MA_ACTIVATE",
+                           lynx::nativechild::mouseActivateAnswerForTest (frame, true) == 1 /* MA_ACTIVATE */);
+               #endif
+                if (activates)
+                    peer->handleFocusGain(); // (the system activates the main window and gives it the focus)
+                click (frame, right);
+            }
+
+            void spacePlays (lynx::workspace::Panel panel, bool right)
+            {
+                const auto name = juce::String (lynx::workspace::panelId (panel)) + (right ? " (right click)" : "");
+                check (name + ": the main window has the keys after the click", ui->hasKeyboardFocus (true));
+                auto& transport = engine->getTransport();
+                if (transport.playing.load())
+                    engine->stop();
+                const auto used = space();
+                check (name + ": Space starts playback", used && transport.playing.load());
+                engine->stop();
+            }
+
+            void timerCallback() override
+            {
+                using lynx::workspace::Panel;
+                auto& ws = ui->workspaceForTest();
+                switch (stepIndex++)
+                {
+                    case 0:
+                        line ("docking=" + juce::String ((int) lynx::nativechild::dockingEnabled()));
+                        ws.show (Panel::playlist);
+                        ws.show (Panel::pianoRoll);
+                        ui->grabKeyboardFocus();
+                        break;
+                    case 1: backWithClickIn (Panel::playlist, false); break;
+                    case 2: spacePlays (Panel::playlist, false); ui->grabKeyboardFocus(); break;
+                    case 3: backWithClickIn (Panel::pianoRoll, false); break;
+                    case 4: spacePlays (Panel::pianoRoll, false); ui->grabKeyboardFocus(); break;
+                    case 5: backWithClickIn (Panel::playlist, true); break;
+                    case 6:
+                        juce::PopupMenu::dismissAllActiveMenus(); // (the right click's menu)
+                        spacePlays (Panel::playlist, true);
+                        break;
+                    case 7:
+                    {
+                        // inside the active window: a click in a panel leaves a text field's focus where it is
+                        auto* field = firstField (*ui);
+                        line ("text field found=" + juce::String ((int) (field != nullptr)));
+                        if (field != nullptr)
+                        {
+                            field->grabKeyboardFocus();
+                            auto& frame = ws.getFrame (Panel::playlist);
+                            check ("active window: a click in a panel does not activate it again", ! lynx::nativechild::clickActivatesWindow (frame, true));
+                            click (frame, false);
+                            check ("active window: the text field keeps the keys after a click in the Playlist", field->hasKeyboardFocus (false));
+                            mainPeer()->handleFocusLoss();
+                            mainPeer()->handleFocusGain();
+                            check ("the text field gets the keys back with the window", field->hasKeyboardFocus (false));
+                            ui->grabKeyboardFocus();
+                        }
+                        line (ok ? "result=OK" : "result=FAILED");
+                        stopTimer();
+                        done();
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        };
+
+        auto* test = new FocusTest();
+        test->reportPath = reportPath;
+        test->engine = std::make_unique<lynx::AudioEngine> (false);
+        test->main = std::make_unique<juce::DocumentWindow> ("LYNX focus test", lynx::theme::window, juce::DocumentWindow::allButtons);
+        test->main->setUsingNativeTitleBar (true);
+        test->ui = new lynx::MainComponent (*test->engine, false);
+        test->main->setContentOwned (test->ui, true);
+        test->main->setResizable (true, true);
+        test->main->centreWithSize (1280, 760);
+        test->main->setVisible (true);
+        lynx::setMainWindowForOwnership (test->main.get());
+        test->done = [this, test] {
+            setApplicationReturnValue (test->ok ? 0 : 1);
+            juce::MessageManager::callAsync ([this, test] {
+                lynx::setMainWindowForOwnership (nullptr);
+                test->main = nullptr;
+                delete test;
+                quit();
+            });
+        };
+        test->startTimer (600);
     }
 
     void runWindowTest (const juce::String& reportPath)
