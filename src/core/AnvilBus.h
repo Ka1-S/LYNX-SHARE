@@ -90,8 +90,10 @@ struct Tuning
     // input — a gentle saturation blended with a sine folder (unit slope at 0 for every m and k) [FITTED per measured
     // staircase, round 190fk: level rms 0.04 … 0.46 dB; at 0 % the plain soft curve (the blend fits the 1 kHz staircase a
     // little better, 0.115 vs 0.124 dB, but lifts the drum loop's kick attack: the plain curve keeps every 0 % case)]
-    double curveM[3][4] { { 0.0, 0.14, 0.28, 0.82 }, { 0.0, 0.40, 0.18, 0.20 }, { 0.0, 0.12, 0.12, 0.18 } };
-    double curveK[3][4] { { 1.0, 1.68, 1.40, 1.12 }, { 1.0, 1.26, 1.36, 1.42 }, { 1.0, 1.64, 1.62, 1.22 } };
+    // (round 190fk, second pass: where the level-only fit raised the staircase's THD above the rack's, (m, k) were refitted
+    // for the lowest level error with THD at or under the rack's: Soft 25 %, Medium 100 %, Hard 25 / 50 / 100 %)
+    double curveM[3][4] { { 0.0, 0.1911, 0.28, 0.82 }, { 0.0, 0.40, 0.18, 0.1121 }, { 0.0, 0.1740, 0.0587, 0.0744 } };
+    double curveK[3][4] { { 1.0, 1.5246, 1.40, 1.12 }, { 1.0, 1.26, 1.36, 1.1761 }, { 1.0, 1.4394, 1.491, 1.1656 } };
     // Crunch: the mid band's lift 20·log10 (1 + crunchK · amount) between two shelves, and its grit
     double crunchK = 2.14, crunchLowHz = 95.2, crunchLowQ = 0.743, crunchHighHz = 9041.0, crunchHighQ = 0.826;
     double crunchGrit = 0.0;
