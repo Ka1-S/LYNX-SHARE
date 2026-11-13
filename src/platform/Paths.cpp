@@ -17,7 +17,7 @@
 namespace lynx::platform
 {
 #if JUCE_ANDROID || defined(LYNX_ANDROID)
-#include "platform/AndroidPaths.h"
+    using namespace lynx::platform;
 #endif
 
 namespace
