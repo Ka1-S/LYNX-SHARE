@@ -31,9 +31,55 @@ juce::File androidAppDataFolder()
 juce::File androidCacheFolder()
 {
     // Returns the cache directory (/data/data/com.ka1-s.lynx/cache)
-    if (android_app && android_app->activity && android_app->activity->cacheDir)
+    // ANativeActivity doesn't have cacheDir member, so we get it via JNI from Context.getCacheDir()
+    if (android_app && android_app->activity)
     {
-        return juce::File(android_app->activity->cacheDir);
+        JNIEnv* env = android_app->activity->env;
+        jobject activity = android_app->activity->clazz;
+        if (env && activity)
+        {
+            // Get Context class and getCacheDir() method
+            jclass contextClass = env->GetObjectClass(activity);
+            if (contextClass)
+            {
+                jmethodID getCacheDirMethod = env->GetMethodID(contextClass, "getCacheDir", "()Ljava/io/File;");
+                if (getCacheDirMethod)
+                {
+                    jobject cacheDirFile = env->CallObjectMethod(activity, getCacheDirMethod);
+                    if (cacheDirFile)
+                    {
+                        // Get absolute path from File object
+                        jclass fileClass = env->GetObjectClass(cacheDirFile);
+                        if (fileClass)
+                        {
+                            jmethodID getAbsolutePathMethod = env->GetMethodID(fileClass, "getAbsolutePath", "()Ljava/lang/String;");
+                            if (getAbsolutePathMethod)
+                            {
+                                jstring pathString = (jstring)env->CallObjectMethod(cacheDirFile, getAbsolutePathMethod);
+                                if (pathString)
+                                {
+                                    const char* pathChars = env->GetStringUTFChars(pathString, nullptr);
+                                    if (pathChars)
+                                    {
+                                        juce::File result(pathChars);
+                                        env->ReleaseStringUTFChars(pathString, pathChars);
+                                        env->DeleteLocalRef(pathString);
+                                        env->DeleteLocalRef(fileClass);
+                                        env->DeleteLocalRef(cacheDirFile);
+                                        env->DeleteLocalRef(contextClass);
+                                        return result;
+                                    }
+                                    env->DeleteLocalRef(pathString);
+                                }
+                            }
+                            env->DeleteLocalRef(fileClass);
+                        }
+                        env->DeleteLocalRef(cacheDirFile);
+                    }
+                }
+                env->DeleteLocalRef(contextClass);
+            }
+        }
     }
     return juce::File();
 }
