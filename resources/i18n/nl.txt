@@ -9814,3 +9814,8 @@ countries: nl be
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "Opties: slots activeren met MIDI-noten (tijdslots: toetsen C5 t/m B7, volumeslots: C2 t/m B4), klikreductie, attackcompensatie, DC-offset, HQ-resampling, scratchklok; MIDI-invoerpoort"
 "MIDI Input Port Number:" = "MIDI-invoerpoortnummer:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "MIDI-invoerpoortnummer: sleep omhoog / omlaag (\"...\" = geen). De MIDI Out-kanalen op deze poort spelen de MIDI-modus en Harmonize van Pitcher"
+"Channels and playlist tracks routed to this track" = "Kanalen en playlistsporen die naar dit spoor gerouteerd zijn"
+"Increase number of tracks to..." = "Aantal sporen verhogen naar..."
+"Enter the number of mixer tracks" = "Voer het aantal mixersporen in"
+"Track count must be between {0} and {1}." = "Het aantal sporen moet tussen {0} en {1} liggen."
+"Set for all tracks" = "Instellen voor alle sporen"

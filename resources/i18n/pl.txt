@@ -9814,3 +9814,8 @@ countries: pl
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "Opcje: wyzwalanie slotów nutami MIDI (sloty czasu: klawisze C5–B7, sloty głośności: C2–B4), redukcja trzasków, kompensacja ataku, przesunięcie DC, resampling HQ, zegar scratchu; port wejściowy MIDI"
 "MIDI Input Port Number:" = "Numer portu wejściowego MIDI:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "Numer portu wejściowego MIDI: przeciągnij w górę / w dół (\"...\" = brak). Kanały MIDI Out na tym porcie grają tryb MIDI i Harmonize Pitchera"
+"Channels and playlist tracks routed to this track" = "Kanały i ścieżki playlisty kierowane do tej ścieżki"
+"Increase number of tracks to..." = "Zwiększ liczbę ścieżek do..."
+"Enter the number of mixer tracks" = "Wpisz liczbę ścieżek miksera"
+"Track count must be between {0} and {1}." = "Liczba ścieżek musi wynosić od {0} do {1}."
+"Set for all tracks" = "Ustaw dla wszystkich ścieżek"

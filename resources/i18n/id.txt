@@ -9814,3 +9814,8 @@ countries: id
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "Opsi: picu slot dengan not MIDI (slot waktu: tuts C5 sampai B7, slot volume: C2 sampai B4), pengurangan klik, kompensasi attack, offset DC, resampling HQ, jam scratch; port input MIDI"
 "MIDI Input Port Number:" = "Nomor port input MIDI:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "Nomor port input MIDI: seret ke atas / bawah (\"...\" = tidak ada). Kanal MIDI Out pada port ini memainkan mode MIDI dan Harmonize Pitcher"
+"Channels and playlist tracks routed to this track" = "Kanal dan trek playlist yang dirutekan ke trek ini"
+"Increase number of tracks to..." = "Tambah jumlah trek menjadi..."
+"Enter the number of mixer tracks" = "Masukkan jumlah trek mixer"
+"Track count must be between {0} and {1}." = "Jumlah trek harus antara {0} dan {1}."
+"Set for all tracks" = "Atur untuk semua trek"

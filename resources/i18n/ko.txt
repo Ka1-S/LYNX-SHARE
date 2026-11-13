@@ -9814,3 +9814,8 @@ countries: kr
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "옵션: MIDI 노트로 슬롯 트리거 (시간 슬롯: 키 C5~B7, 볼륨 슬롯: C2~B4), 클릭 감소, 어택 보정, DC 오프셋, HQ 리샘플링, 스크래치 시계, MIDI 입력 포트"
 "MIDI Input Port Number:" = "MIDI 입력 포트 번호:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "MIDI 입력 포트 번호: 위 / 아래로 드래그 (\"...\" = 없음). 이 포트의 MIDI Out 채널이 Pitcher의 MIDI 모드와 Harmonize를 연주합니다"
+"Channels and playlist tracks routed to this track" = "이 트랙으로 라우팅된 채널과 플레이리스트 트랙"
+"Increase number of tracks to..." = "트랙 수를 다음으로 늘리기..."
+"Enter the number of mixer tracks" = "믹서 트랙 수를 입력하세요"
+"Track count must be between {0} and {1}." = "트랙 수는 {0}에서 {1} 사이여야 합니다."
+"Set for all tracks" = "모든 트랙에 설정"

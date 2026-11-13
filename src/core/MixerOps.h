@@ -180,6 +180,14 @@ std::vector<int> sourcesOf (const Song& song, int track);
 int insertTracks (Song& song, int at, int count);
 // How many more inserts the mixer can take (FL 2026: "You can add a maximum of N tracks", up to 500 inserts).
 int roomForInserts (const Song& song) noexcept;
+// FL's "+" menu › "Increase number of tracks to..." (AddMixerTracksMenu Tag -1, AddOneMixerTrackMenuClick 0x12a8bb0;
+// round 190fl): the box "Enter the number of mixer tracks" starts at the number of inserts; a number below it or above
+// 500 is refused ("Track count must be between <inserts> and 500."), otherwise blank inserts are added at the end
+// until the mixer has that many. `insertCount` = inserts without the Master.
+int insertCount (const Song& song) noexcept;
+bool validInsertCount (const Song& song, int wanted) noexcept;
+// Adds the inserts at the end; returns how many were added (0 when `wanted` is not more than now or not valid).
+int increaseInsertsTo (Song& song, int wanted);
 
 // --- FL's mixer groups and docking (REA round 146a) -----------------------------------------------------
 // The order the strips are shown in: the tracks docked left, then the middle ones, then those docked right (each block
@@ -296,6 +304,16 @@ bool hasDefaultName (const Song& song, int track);
 // --- FL's track latency (REA round 165f-mixer) ------------------------------------------------------------------------
 // "Plugin delay compensation › Reset manual latency on all tracks". Returns how many tracks had one.
 int resetManualLatency (Song& song);
+// "Plugin delay compensation › Set for all tracks" (SetupPDCMenuClick 0x12a3830 → FUN_012a3880(1, 1), round 190fl): the
+// same reset of every track's manual latency, without FL's warning box, then the compensation is worked out again
+// from the plugins (LYNX does that on every change). Returns how many tracks had a manual latency.
+int setPdcForAllTracks (Song& song);
+
+// --- FL's "Select › Channels and playlist tracks routed to this track" (SelectLinkedMenuClick 0x129d110, round 190fl) --
+// FL takes every selected insert (1…500): the Playlist tracks it selects are the audio tracks linked to one of them and
+// the instrument tracks whose channel plays into one of them; the channels are those whose output is one of them.
+std::vector<int> playlistTracksOn (const Song& song, const std::vector<int>& inserts);
+std::vector<int> channelsOn (const Song& song, const std::vector<int>& inserts);
 
 // All effects of the insert on or off (the "effects" switch).
 void setAllEffectsEnabled (Song& song, int track, bool enabled);

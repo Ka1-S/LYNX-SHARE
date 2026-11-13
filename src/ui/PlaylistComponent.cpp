@@ -5912,6 +5912,19 @@ void PlaylistComponent::selectTrackChannel (int track)
         engine.setSelectedChannel (channel);
 }
 
+void PlaylistComponent::selectTracks (const std::vector<int>& tracks)
+{
+    std::vector<int> valid;
+    for (auto t : tracks)
+        if (t >= 0 && t < numTracks() && std::find (valid.begin(), valid.end(), t) == valid.end())
+            valid.push_back (t);
+    if (valid.empty())
+        return;
+    selectTrack (valid.front());
+    selectedTracks = valid;
+    repaint();
+}
+
 void PlaylistComponent::selectTrack (int track)
 {
     if (track < 0)
