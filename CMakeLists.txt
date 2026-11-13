@@ -367,17 +367,19 @@ target_compile_options(vorbis_decoder PRIVATE $<$<NOT:$<C_COMPILER_ID:MSVC>>:-ff
     $<IF:$<C_COMPILER_ID:MSVC>,/FI${CMAKE_CURRENT_SOURCE_DIR}/third_party/vorbis/include/lynx_vorbis_prefix.h,-include${CMAKE_CURRENT_SOURCE_DIR}/third_party/vorbis/include/lynx_vorbis_prefix.h>)
 target_link_libraries(lynx_core PUBLIC vorbis_decoder)
 
-add_executable(lynx_tests tests/tests.cpp)
-target_link_libraries(lynx_tests PRIVATE lynx_core)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+    add_executable(lynx_tests tests/tests.cpp)
+    target_link_libraries(lynx_tests PRIVATE lynx_core)
 
-add_executable(flpdump tools/flpdump.cpp)
-target_link_libraries(flpdump PRIVATE lynx_core)
+    add_executable(flpdump tools/flpdump.cpp)
+    target_link_libraries(flpdump PRIVATE lynx_core)
 
-add_executable(renderwav tools/renderwav.cpp)
-target_link_libraries(renderwav PRIVATE lynx_core)
+    add_executable(renderwav tools/renderwav.cpp)
+    target_link_libraries(renderwav PRIVATE lynx_core)
 
-enable_testing()
-add_test(NAME lynx_tests COMMAND lynx_tests)
+    enable_testing()
+    add_test(NAME lynx_tests COMMAND lynx_tests)
+endif()
 
 # ---------------------------------------------------------------------------
 # App (JUCE)
