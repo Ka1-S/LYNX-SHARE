@@ -288,7 +288,7 @@ bool pasteChannelSteps (Pattern& pattern, const ChannelStepsClipboard& clipboard
 
 // FL's hint bar over a step shows its song position as bar:step:tick ("1:02:00"): bar from 1, step (a 16th) from 1
 // with two digits, the tick inside the step (in FL's 96-per-quarter units: 24 per step) with two digits.
-std::string stepPositionText (std::int64_t tick, int beatsPerBar);
+std::string stepPositionText (std::int64_t tick, Meter meter);
 
 // FL's Tools › Macros › "Change declicking for selected channels to" (FUN_011f7180, REA round 181b): only audio clip
 // channels change. Returns how many did.

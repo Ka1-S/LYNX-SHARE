@@ -64,3 +64,7 @@ plugin's.
 
 Results (`/mnt/e/lynx-work/voices190ej/HANDOFF.md`): issue #158's 25 FL renders 25/25 match (was 18/25); the 25
 comparable generator projects 25/25 in the FIFO / LIFO windows (5/25 before, two of them trivially).
+
+**Round 190fg follow-up:** the VST3 note-off id for nested same-key notes is built (cmake/LynxPatchJuce.cmake fix 26,
+`SentKeys` tags in core/HostNotePitch.h): a note off carries its own note on's id; checked with the VST3 test synth
+(`LYNX --vst3noteidtest`).

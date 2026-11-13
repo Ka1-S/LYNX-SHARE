@@ -25,6 +25,26 @@ namespace lynx
 constexpr int ppq = 960;              // ticks per quarter note
 constexpr int stepsPerBeat = 4;       // step sequencer in sixteenth notes
 constexpr int ticksPerStep = ppq / stepsPerBeat;
+
+// The song's meter (round 190fg): `beats` beats of a 1/`unit` note per bar (a time signature's numerator / denominator:
+// Live's "n / d", FL's playlist time signatures). LYNX's ticks count quarter notes at the tempo (ppq a quarter, the
+// tempo's beat, as in Live), so a bar lasts 4 * beats / unit quarters and a beat 4 / unit quarters: 6/8 is a bar of
+// 3 quarters with 6 eighth-note beats (the metronome clicks six times, the bar counter counts eighths). Unit 4 is the
+// n/4 meter every project had before; unit 1, 2, 4, 8 or 16.
+struct Meter
+{
+    int beats = 4, unit = 4;
+    constexpr Meter() noexcept = default;
+    constexpr Meter (int beatsPerBar, int beatUnit) noexcept : beats (beatsPerBar), unit (beatUnit) {}
+    constexpr std::int64_t beat() const noexcept { return (std::int64_t) ppq * 4 / (unit >= 1 && unit <= 16 ? unit : 4); }
+    constexpr std::int64_t bar() const noexcept { return beat() * (beats > 0 ? beats : 1); }
+    bool operator== (const Meter&) const = default;
+};
+// The denominators a meter may have; anything else becomes the nearest of them (0 or less: 4)
+constexpr int meterUnit (int unit) noexcept
+{
+    return unit <= 0 ? 4 : unit < 2 ? 1 : unit < 3 ? 2 : unit < 6 ? 4 : unit < 12 ? 8 : 16;
+}
 constexpr int maxMixerTracks = 501;   // 0 = Master, 1..500 inserts: FL 2026's dynamic mixer ("You can add a maximum of N tracks" up to 500;
                                       // round 166d, issue #14). Was 128 (FL's old 125 + Master)
 constexpr float unityFader = 0.8f;    // fader position that gives 0 dB, as in FL
@@ -1714,7 +1734,7 @@ struct Pattern
     std::string loopStarterGenre; // FL's Loop Starter genre of this pattern (round 168b); "" = no Loop Starter
 
     void sortNotes();
-    std::int64_t effectiveLength (int beatsPerBar) const noexcept;
+    std::int64_t effectiveLength (Meter meter) const noexcept; // (no length: whole bars of the song's meter)
 
     bool hasStep (int channel, int step) const noexcept;
     // A muted note on the step counts as an empty step. Turning a step off deletes its notes, or with `muteRemoved` (FL's
@@ -2252,8 +2272,8 @@ struct ClipGridScene
     std::uint32_t colour = 0;
     double tempo = 0.0;   // > 0: the song takes this tempo when the scene is launched
     int beatsPerBar = 0;  // > 0: and this bar length
-    // round 190em: the scene time signature's denominator (Live's field is "n / d"; 1, 2, 4, 8 or 16). The song's meter
-    // is n/4 in LYNX: a launch gives it the same bar length in quarter notes (session::sceneBarBeats)
+    // round 190em: the scene time signature's denominator (Live's field is "n / d"; 1, 2, 4, 8 or 16). A launch gives
+    // the song this meter (round 190fg: Song::beatUnit; before, the same bar length in quarter notes)
     int beatUnit = 4;
     bool operator== (const ClipGridScene&) const = default;
 };
@@ -2379,7 +2399,13 @@ struct MasterLookSettings
 struct Song
 {
     double bpm = 130.0;
-    int beatsPerBar = 4;
+    int beatsPerBar = 4; // the meter's numerator
+    // round 190fg: the meter's denominator (a beat is a 1/beatUnit note; Meter). 4 in every project before 0.1.28;
+    // saved only when it is not 4. A launched scene with its own "n / d" sets both.
+    int beatUnit = 4;
+    Meter meter() const noexcept { return { beatsPerBar, beatUnit }; }
+    std::int64_t barTicks() const noexcept { return meter().bar(); }   // a bar of the song's meter, in ticks
+    std::int64_t beatTicks() const noexcept { return meter().beat(); } // one of its beats, in ticks
     float swing = 0.0f; // 0..1: delays off-beat sixteenth notes (like the swing of FL's Channel Rack)
     // the seed of the notes' Chance and Velocity Range draws (round 187c, core/NoteChance.h); saved, "New chance seed"
     std::uint32_t chanceSeed = 0;
@@ -2499,7 +2525,7 @@ struct Song
     void addMarker (Marker marker); // keeps the order
 
     // Bars that play in [from, to), taking the markers' time signature changes into account
-    // (before the first one, beatsPerBar/4 applies).
+    // (before the first one, the song's meter applies: beatsPerBar / beatUnit).
     std::vector<Bar> barsBetween (std::int64_t from, std::int64_t to) const;
     Bar barAt (std::int64_t tick) const;
 

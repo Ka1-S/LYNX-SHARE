@@ -38,12 +38,14 @@ struct Transport
     // (written by the audio thread only)
     std::atomic<double> externalBpm { 0.0 };
     std::atomic<int> beatsPerBar { 4 };
+    std::atomic<int> beatUnit { 4 }; // (round 190fg: the meter's denominator: the metronome clicks its beats)
 
     // Playlist time-signature changes for the metronome (song mode): the bar restarts at each
-    // `signatureTick[i]` with `signatureLength[i]` ticks. The UI writes under a "seqlock": odd version
-    // while writing; readers check the version before and after.
+    // `signatureTick[i]` with `signatureLength[i]` ticks, clicked in beats of `signatureBeat[i]` ticks (round 190fg:
+    // a 6/8 bar clicks six eighths). The UI writes under a "seqlock": odd version while writing; readers check the
+    // version before and after.
     static constexpr int maxSignatures = 64;
-    std::array<std::atomic<std::int64_t>, maxSignatures> signatureTick {}, signatureLength {};
+    std::array<std::atomic<std::int64_t>, maxSignatures> signatureTick {}, signatureLength {}, signatureBeat {};
     std::atomic<int> signatureCount { 0 };
     std::atomic<std::uint32_t> signatureVersion { 0 };
     std::atomic<double> sampleRate { 44100.0 };

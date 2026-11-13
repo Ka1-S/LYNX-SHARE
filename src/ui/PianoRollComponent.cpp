@@ -450,7 +450,7 @@ int PianoRollComponent::keyboardKeyAt (int x, int y) const
 
 std::int64_t PianoRollComponent::gridTicks() const
 {
-    const auto bar = (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+    const auto bar = engine.getSong().barTicks();
     const auto& option = grid::resolve (snapBox);
 
     switch (option.kind)
@@ -505,9 +505,9 @@ std::int64_t PianoRollComponent::newNoteLength() const
 std::int64_t PianoRollComponent::viewLengthTicks() const
 {
     const auto& song = engine.getSong();
-    const auto bar = (std::int64_t) ppq * song.beatsPerBar;
+    const auto bar = song.barTicks();
     // pattern + 4 bars of headroom to grow
-    return currentPattern (song).effectiveLength (song.beatsPerBar) + 4 * bar;
+    return currentPattern (song).effectiveLength (song.meter()) + 4 * bar;
 }
 
 void PianoRollComponent::updateScrollBars()
@@ -603,8 +603,8 @@ void PianoRollComponent::scrollToNotes (bool fitPattern)
     // FL opens the Piano Roll with the whole pattern across the view (at least one bar)
     if (fitPattern && gridArea().getWidth() > 0)
     {
-        const auto bar = (double) ppq * juce::jmax (1, song.beatsPerBar);
-        const auto length = juce::jmax (bar, (double) currentPattern (song).effectiveLength (song.beatsPerBar));
+        const auto bar = (double) song.barTicks();
+        const auto length = juce::jmax (bar, (double) currentPattern (song).effectiveLength (song.meter()));
         pixelsPerTick = juce::jlimit (4.0 / ticksPerStep, 64.0 / ticksPerStep, gridArea().getWidth() / length);
     }
     updateScrollBars();
@@ -805,8 +805,8 @@ void PianoRollComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float
     const auto& pattern = currentPattern (song);
     const auto channel = engine.getSelectedChannel();
     const auto scale = area.getWidth() / juce::jmax (1.0, total);
-    const auto bar = (double) ppq * juce::jmax (1, song.beatsPerBar);
-    const auto end = (float) (pattern.effectiveLength (song.beatsPerBar) * scale);
+    const auto bar = (double) song.barTicks();
+    const auto end = (float) (pattern.effectiveLength (song.meter()) * scale);
 
     g.setColour (bg2);
     g.fillRect (area.withWidth (juce::jmin (area.getWidth(), end)));
@@ -855,8 +855,8 @@ void PianoRollComponent::paint (juce::Graphics& g)
     const auto& pattern = currentPattern (song);
     const auto channel = engine.getSelectedChannel();
     const auto grid = gridArea();
-    const auto patternLength = pattern.effectiveLength (song.beatsPerBar);
-    const auto bar = (std::int64_t) ppq * song.beatsPerBar;
+    const auto patternLength = pattern.effectiveLength (song.meter());
+    const auto bar = song.barTicks();
     const auto snapGrid = gridTicks();
 
     // the overview follows the notes (edits, undo, another channel or pattern) and the view
@@ -3159,7 +3159,7 @@ void PianoRollComponent::runOperation (const std::function<std::vector<int> (Pat
 void PianoRollComponent::showMoreMenu()
 {
     const auto grid = gridTicks();
-    const auto bar = (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+    const auto bar = engine.getSong().barTicks();
     juce::PopupMenu menu;
     menu.addSubMenu (theme::mnemonic (tr ("File"), 'F'), fileMenu());
     menu.addSubMenu (theme::mnemonic (tr ("Edit"), 'E'), editMenu());
@@ -3469,7 +3469,7 @@ void PianoRollComponent::zoomAroundCentre (double factor)
 
 void PianoRollComponent::zoomToBars (int bars)
 {
-    const auto bar = (double) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+    const auto bar = (double) engine.getSong().barTicks();
     const auto from = std::floor (scrollTicks / bar) * bar;
     zoomToTicks (from, from + bars * bar);
 }
@@ -3477,7 +3477,7 @@ void PianoRollComponent::zoomToBars (int bars)
 void PianoRollComponent::zoomAll()
 {
     const auto& song = engine.getSong();
-    zoomToTicks (0.0, (double) currentPattern (song).effectiveLength (song.beatsPerBar));
+    zoomToTicks (0.0, (double) currentPattern (song).effectiveLength (song.meter()));
 }
 
 void PianoRollComponent::zoomToSelection()
@@ -3510,7 +3510,7 @@ void PianoRollComponent::zoomToSelection()
 void PianoRollComponent::centreOnPlayhead()
 {
     const auto& song = engine.getSong();
-    const auto length = (double) juce::jmax<std::int64_t> (1, currentPattern (song).effectiveLength (song.beatsPerBar));
+    const auto length = (double) juce::jmax<std::int64_t> (1, currentPattern (song).effectiveLength (song.meter()));
     auto tick = transportedit::patternPlayhead (song, song.currentPattern, engine.getTransport().positionTicks.load());
     if (tick < 0.0)
         tick = std::fmod (engine.getTransport().positionTicks.load(), length);
@@ -4171,9 +4171,9 @@ void PianoRollComponent::duplicateSelection()
         return;
 
     std::vector<int> added;
-    const auto beatsPerBar = engine.getSong().beatsPerBar;
-    editNotes ([&added, &source, beatsPerBar] (Pattern& p) {
-        added = noteedit::duplicateBars (p, source, beatsPerBar); // FL: whole bars later (round 170h)
+    const auto meter = engine.getSong().meter();
+    editNotes ([&added, &source, meter] (Pattern& p) {
+        added = noteedit::duplicateBars (p, source, meter); // FL: whole bars later (round 170h)
         notetools::regroup (p, added);
     });
     setSelection (added);
@@ -4247,7 +4247,7 @@ bool PianoRollComponent::handleKey (const juce::KeyPress& key)
     const auto code = key.getKeyCode();
     const auto letter = keys::letterOfKeyCode (code); // (0 for F-keys, numpad, arrows: issue #12)
     const auto grid = gridTicks();
-    const auto bar = (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+    const auto bar = engine.getSong().barTicks();
 
     if (code == juce::KeyPress::backspaceKey)
     {
@@ -4652,7 +4652,7 @@ bool PianoRollComponent::playheadFrame (double)
         const auto& followSong = engine.getSong();
         const auto loops = followSong.mode == PlayMode::pattern && engine.patternLinearOrigin() < 0.0 && followSong.currentPattern >= 0
                            && followSong.currentPattern < (int) followSong.patterns.size();
-        const auto loopTicks = loops ? (double) followSong.activePattern().effectiveLength (followSong.beatsPerBar) : 0.0;
+        const auto loopTicks = loops ? (double) followSong.activePattern().effectiveLength (followSong.meter()) : 0.0;
         const auto newStart = transportedit::followViewStartInLoop (scrollTicks, grid.getWidth() / pixelsPerTick, tick, 20.0 / pixelsPerTick,
                                                                     20.0 / pixelsPerTick, loopTicks);
 
@@ -4721,7 +4721,7 @@ void PianoRollComponent::spaceOperation (int kind)
 
     const auto from = timeFrom, to = timeTo;
     const auto& song = engine.getSong();
-    const auto end = currentPattern (song).effectiveLength (song.beatsPerBar);
+    const auto end = currentPattern (song).effectiveLength (song.meter());
     const auto who = allChannels ? -1 : engine.getSelectedChannel();
     std::vector<int> moved;
     setSelection ({});
@@ -5121,7 +5121,7 @@ std::int64_t PianoRollComponent::markerKeyTick() const
     const auto right = xToTick (gridArea().getRight());
     if (playheadTick >= left && playheadTick <= right)
         return (std::int64_t) playheadTick;
-    const auto bar = (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+    const auto bar = engine.getSong().barTicks();
     const auto at = (std::int64_t) left;
     return at % bar > bar / 2 ? (at / bar + 1) * bar : at / bar * bar;
 }
@@ -5159,7 +5159,7 @@ void PianoRollComponent::addPatternSignatureByKey()
     const auto hasTime = timeFrom >= 0 && timeTo > timeFrom;
     const auto from = hasTime ? timeFrom : snap ((double) markerKeyTick(), true);
     const auto to = hasTime ? timeTo : (std::int64_t) -1;
-    const auto current = noteedit::patternSignatureAt (currentPattern (song), from, song.beatsPerBar);
+    const auto current = noteedit::patternSignatureAt (currentPattern (song), from, song.meter());
 
     auto* window = new juce::AlertWindow (tr ("Add time signature change..."), {}, juce::MessageBoxIconType::NoIcon, this);
     juce::StringArray numerators, denominators;
@@ -5180,7 +5180,7 @@ void PianoRollComponent::addPatternSignatureByKey()
                                  const auto n = window->getComboBoxComponent ("numerator")->getText().getIntValue();
                                  const auto d = window->getComboBoxComponent ("denominator")->getText().getIntValue();
                                  safe->engine.editSong ([from, to, n, d] (Song& s) {
-                                     noteedit::addPatternSignatureChange (currentPattern (s), from, to, n, d, s.beatsPerBar);
+                                     noteedit::addPatternSignatureChange (currentPattern (s), from, to, n, d, s.meter());
                                  });
                                  safe->repaint();
                              }),

@@ -200,7 +200,7 @@ TEST (live190em_capture_midi_tempo_from_a_phrase_played_stopped)
     CHECK (session::phraseTempo ({}, 133.0) == 133.0);
     // the notes at that tempo: one beat apart, two bars (as Live's 2-bar clip)
     std::int64_t length = 0;
-    const auto notes = session::phraseNotes (phrase, 10000.0, session::phraseTempo (phrase, 120.0), 4, length);
+    const auto notes = session::phraseNotes (phrase, 10000.0, session::phraseTempo (phrase, 120.0), lynx::Meter (4, 4), length);
     CHECK (notes.size() == 8 && length == 8 * ppq && notes[0].start == 0 && std::abs ((double) notes[4].start - 4.0 * ppq) < ppq / 8.0);
 }
 

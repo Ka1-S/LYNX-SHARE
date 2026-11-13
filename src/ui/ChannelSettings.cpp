@@ -4115,9 +4115,10 @@ private:
         m.addItem (tr ("Autodetect"), sample != nullptr, false, [set, sample, bpm = song.bpm] { set (tempodetect::fitBeatsOf (sample.get(), bpm)); });
         const auto atTempo = sample != nullptr && sample->sampleRate > 0.0 ? (float) ((double) sample->frames() / sample->sampleRate * song.bpm / 60.0) : 0.0f;
         m.addItem (tr ("Project tempo"), atTempo > 0.0f, false, [set, atTempo] { set (atTempo); });
-        for (const auto preset : clipops::timePresetBeats (song.beatsPerBar))
+        const auto barBeats = (float) song.barTicks() / (float) ppq; // (round 190fg: a bar in quarter notes)
+        for (const auto preset : clipops::timePresetBeats (song.meter()))
         {
-            const auto bars = song.beatsPerBar > 0 && preset >= (float) song.beatsPerBar ? preset / (float) song.beatsPerBar : 0.0f;
+            const auto bars = preset >= barBeats - 1.0e-4f ? preset / barBeats : 0.0f;
             const auto label = bars > 0.0f ? (bars == 1.0f ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars, 0) }))
                                            : (preset == 1.0f ? tr ("1 beat") : tr ("{0} beats", { juce::String (preset, 0) }));
             m.addItem (label, true, now == preset, [set, preset] { set (preset); });

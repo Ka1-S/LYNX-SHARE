@@ -116,7 +116,7 @@ inline double tempoAt (const Song& song, double tick) noexcept
         const auto* lane = tempoLane (pattern);
         if (lane == nullptr)
             return base;
-        const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+        const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
         const auto pass = std::floor (std::max (0.0, tick) / length);
         const auto* e = lastEvent (*lane, std::max (0.0, tick) - pass * length);
         if (e == nullptr && pass > 0.0)
@@ -169,7 +169,7 @@ inline double tempoAt (const Song& song, double tick) noexcept
             {
                 const auto& pattern = song.patterns[(std::size_t) c.pattern];
                 if (const auto* lane = tempoLane (pattern))
-                    clipWrite (c, *lane, pattern.effectiveLength (song.beatsPerBar), tick, events);
+                    clipWrite (c, *lane, pattern.effectiveLength (song.meter()), tick, events);
             }
 
     if (events.any() && (! automation.any() || events.tick > automation.tick))

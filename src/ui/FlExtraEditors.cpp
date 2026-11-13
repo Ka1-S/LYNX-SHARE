@@ -296,7 +296,7 @@ private:
             const auto length = (double) juce::jmax<std::int64_t> (1, song.mode == PlayMode::song ? song.songLength() : (std::int64_t) ppq * 4 * 1000);
             ticks = std::fmod (juce::jmax (0.0, target.engine->getTransport().positionTicks.load()), length);
         }
-        const auto text = juce::String (fx::bigclock::clockText (song, ticks, target.engine->getTransport().beatsPerBar.load(), display()));
+        const auto text = juce::String (fx::bigclock::clockText (song, ticks, song.meter(), display()));
         if (text != shown || display() != shownDisplay)
         {
             shown = text;

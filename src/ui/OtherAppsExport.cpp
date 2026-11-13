@@ -39,7 +39,7 @@ bool writeMidi (const Song& song, const std::vector<Note>& notes, const juce::Fi
     midi.setTicksPerQuarterNote (ppq);
     juce::MidiMessageSequence meta;
     meta.addEvent (juce::MidiMessage::tempoMetaEvent (juce::roundToInt (60'000'000.0 / juce::jmax (1.0, song.bpm))), 0.0);
-    meta.addEvent (juce::MidiMessage::timeSignatureMetaEvent (juce::jmax (1, song.beatsPerBar), 4), 0.0);
+    meta.addEvent (juce::MidiMessage::timeSignatureMetaEvent (juce::jmax (1, song.beatsPerBar), meterUnit (song.beatUnit)), 0.0);
     if (const auto key = exportbundle::keySignature (song))
         meta.addEvent (juce::MidiMessage::keySignatureMetaEvent (key->sharps, key->minor), 0.0);
     midi.addTrack (meta);
@@ -506,7 +506,7 @@ public:
         title.setColour (juce::Label::textColourId, theme::colour::textPrimary);
         addAndMakeVisible (title);
         intro.setText (tr ("One folder that Ableton Live, FL Studio and other music apps can open."), juce::dontSendNotification);
-        facts.setText (fromUtf8 (exportbundle::tempoText (song)) + "  ·  " + juce::String (juce::jmax (1, song.beatsPerBar)) + "/4  ·  "
+        facts.setText (fromUtf8 (exportbundle::tempoText (song)) + "  ·  " + juce::String (juce::jmax (1, song.beatsPerBar)) + "/" + juce::String (meterUnit (song.beatUnit)) + "  ·  "
                            + tr ("Key: {0}", { projectkey::get (song) ? fromUtf8 (exportbundle::keyText (song)) : tr ("none") }),
                        juce::dontSendNotification);
         for (auto* l : { &intro, &facts, &contents })

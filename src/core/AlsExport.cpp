@@ -1219,7 +1219,7 @@ struct Exporter
         {
             const auto cur = std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
             patternModeClip.pattern = cur;
-            patternModeClip.length = std::max<std::int64_t> (song.patterns[(std::size_t) cur].lengthTicks, (std::int64_t) song.beatsPerBar * ppq);
+            patternModeClip.length = std::max<std::int64_t> (song.patterns[(std::size_t) cur].lengthTicks, song.barTicks());
             patternClips.push_back (&patternModeClip);
             note ("The song had no Playlist clips: the current pattern is exported at the start");
         }
@@ -1529,7 +1529,7 @@ struct Exporter
         {
             main->value ("DeviceChain/Mixer/Tempo/Manual", num (song.bpm));
             // the signature at the song start: a signature marker there, else the project's n/4 (round 190cg)
-            int startNum = song.beatsPerBar, startDen = 4;
+            int startNum = song.beatsPerBar, startDen = meterUnit (song.beatUnit); // (round 190fg: the song meter's own denominator)
             for (const auto& m : song.markers())
                 if (m.isSignature() && m.tick <= 0)
                 {
@@ -1711,7 +1711,7 @@ struct Exporter
         if (main != nullptr)
             if (const auto* target = main->at ("DeviceChain/Mixer/TimeSignature/AutomationTarget"); target != nullptr && target->has ("Id"))
             {
-                int num = song.beatsPerBar, den = 4;
+                int num = song.beatsPerBar, den = meterUnit (song.beatUnit);
                 std::vector<std::pair<double, double>> changes;
                 for (const auto& m : song.markers())
                 {

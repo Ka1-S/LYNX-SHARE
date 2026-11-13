@@ -61,8 +61,8 @@ std::string paramText (int param, float value);
 // The clock's digits at song position `ticks` (LYNX ticks, ppq per quarter note). Ticks are shown in FL's default
 // resolution (96 per quarter note): Bar:Beat:Tick → "bar:beat:tick" (tick 0–95 of the beat), Bar:Step:Tick →
 // "bar:step:tick" (tick 0–23 of the sixteenth), Min:Sec:Hundredths → "m:ss:cc". Bars follow the song's time signature
-// changes in song mode; `beatsPerBar` applies otherwise.
-std::string clockText (const Song& song, double ticks, int beatsPerBar, Display d);
+// changes in song mode; `meter` applies otherwise.
+std::string clockText (const Song& song, double ticks, Meter meter, Display d);
 } // namespace bigclock
 
 // ------------------------------------------------------------------------------------------------ Tuner

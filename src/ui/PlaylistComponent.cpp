@@ -1310,7 +1310,7 @@ int PlaylistComponent::numTracks() const
 
 std::int64_t PlaylistComponent::gridTicks() const
 {
-    const auto bar = (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+    const auto bar = engine.getSong().barTicks();
     const auto& option = grid::resolve (snapBox);
 
     switch (option.kind)
@@ -1324,7 +1324,7 @@ std::int64_t PlaylistComponent::gridTicks() const
 
     // FL's Line step at this zoom (round 190ax; it was noteedit::screenStep's: a beat where FL steps half a beat, and
     // quarter steps zoomed in where FL stays on steps)
-    return noteedit::flLineStep (pixelsPerTick, engine.getSong().beatsPerBar);
+    return noteedit::flLineStep (pixelsPerTick, engine.getSong().beatsPerBar, meterUnit (engine.getSong().beatUnit));
 }
 
 std::vector<std::int64_t> PlaylistComponent::snapCandidates() const
@@ -1355,7 +1355,7 @@ std::int64_t PlaylistComponent::snap (double tick, bool enabled) const
         return noteedit::snapNearest (tick, snapCandidates(), 10.0 / pixelsPerTick, step);
 
     // whole bars respect time signature changes
-    if (step == (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar))
+    if (step == engine.getSong().barTicks())
         return engine.getSong().barAt ((std::int64_t) std::max (0.0, std::floor (tick))).tick;
 
     return noteedit::snapDown (tick, step);
@@ -1365,7 +1365,7 @@ void PlaylistComponent::updateScrollBars()
 {
     const auto& song = engine.getSong();
     const auto grid = gridArea();
-    const auto bar = (double) ppq * song.beatsPerBar;
+    const auto bar = (double) song.barTicks();
     const auto total = juce::jmax ((double) song.songLength() + 16 * bar, grid.getWidth() / pixelsPerTick);
 
     hBar.setRangeLimits (0.0, total, juce::dontSendNotification);
@@ -1453,7 +1453,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
     const auto& song = engine.getSong();
     const auto grid = gridArea();
-    const auto bar = (std::int64_t) ppq * song.beatsPerBar;
+    const auto bar = song.barTicks();
     const auto tracks = numTracks();
 
     // the overview follows the clips (edits, undo, arrangement switches) and the view
@@ -1689,7 +1689,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
                 // what plays: a clip stretched past its pattern loops it with the LYNX option (issue #25, default on),
                 // else the pattern once and empty after it, as FL plays and shows it (round 168k [EXEC])
-                const auto passes = clipPasses (c, song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar));
+                const auto passes = clipPasses (c, song.patterns[(std::size_t) c.pattern].effectiveLength (song.meter()));
                 for (auto pass = passes.first; pass <= passes.last; ++pass)
                 {
                     const auto origin = c.start - c.offset + pass * passes.length;
@@ -2213,7 +2213,7 @@ void PlaylistComponent::paintOverview (juce::Graphics& g, juce::Rectangle<float>
     using namespace theme;
     const auto& song = engine.getSong();
     const auto scale = area.getWidth() / juce::jmax (1.0, total);
-    const auto bar = (double) ppq * juce::jmax (1, song.beatsPerBar);
+    const auto bar = (double) song.barTicks();
 
     g.setColour (colour::bg2);
     g.fillRect (area.withWidth (juce::jmin (area.getWidth(), (float) (song.songLength() * scale))));
@@ -2417,7 +2417,7 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         const auto noteHeight = juce::jlimit (1.5f, 2.5f, inner.getHeight() / rows);
         auto& marks = batch.contents[clipContentColour (base).getARGB()];
         // what plays: looped along a stretched clip with the LYNX option (issue #25), else once (FL, round 168k)
-        const auto passes = clipPasses (c, song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar));
+        const auto passes = clipPasses (c, song.patterns[(std::size_t) c.pattern].effectiveLength (song.meter()));
         for (auto pass = passes.first; pass <= passes.last; ++pass)
             for (const auto& n : notes)
             {
@@ -3595,7 +3595,7 @@ std::int64_t PlaylistComponent::snapLine (double tick) const
     if (option.kind == grid::Kind::nearest)
         return snap (tick, true);
     const auto step = gridTicks();
-    if (step == (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar)) // (whole bars: time signatures)
+    if (step == engine.getSong().barTicks()) // (whole bars: time signatures)
     {
         const auto b = engine.getSong().barAt ((std::int64_t) std::max (0.0, std::floor (tick)));
         return tick - (double) b.tick >= (double) b.length * 0.5 ? b.tick + b.length : b.tick;
@@ -3712,7 +3712,7 @@ Clip PlaylistComponent::makeBrushClip (int track, std::int64_t start) const
     c.pattern = song.currentPattern;
     c.track = track;
     c.start = juce::jmax<std::int64_t> (0, start);
-    c.length = song.activePattern().effectiveLength (song.beatsPerBar);
+    c.length = song.activePattern().effectiveLength (song.meter());
 
     if (brush.kind == ClipKind::audio && brush.index >= 0 && brush.index < (int) song.channels.size()
         && song.channels[(std::size_t) brush.index].instrument == InstrumentKind::audioClip)
@@ -3731,7 +3731,7 @@ Clip PlaylistComponent::makeBrushClip (int track, std::int64_t start) const
         c.kind = ClipKind::automation;
         c.automation = brush.index;
         c.pattern = 0;
-        c.length = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar) * 4; // 4 bars
+        c.length = song.barTicks() * 4; // 4 bars
     }
 
     return c;
@@ -3750,13 +3750,13 @@ void PlaylistComponent::setTimeSelection (std::int64_t from, std::int64_t to)
 
 void PlaylistComponent::setTimeSelectionForSnapshot (int fromBar, int toBar)
 {
-    const auto bar = (std::int64_t) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+    const auto bar = engine.getSong().barTicks();
     setTimeSelection (fromBar * bar, toBar * bar);
 }
 
 void PlaylistComponent::setViewForSnapshot (double pixelsPerBar, int firstBar, int firstTrack)
 {
-    const auto bar = (double) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+    const auto bar = (double) engine.getSong().barTicks();
     pixelsPerTick = pixelsPerBar / bar;
     scrollTicks = firstBar * bar;
     scrollY = juce::jmax (0, firstTrack) * defaultRowHeight();
@@ -6732,7 +6732,7 @@ ClipSlices clipSlices (AudioEngine& engine, int clipIndex, rack::SlicePer per, b
         }
         default: // a bar or a note division (a whole note = 4 beats), in the clip's time
         {
-            const auto secondsPerSlice = rack::slicePerBeats (per, song.beatsPerBar) * ppq * perTick / sample->sampleRate;
+            const auto secondsPerSlice = rack::slicePerBeats (per, song.meter()) * ppq * perTick / sample->sampleRate;
             out.slices = rack::gridSlices (fileFrames / sample->sampleRate, out.from, out.to, secondsPerSlice);
             break;
         }
@@ -6996,7 +6996,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
         };
         chop.addItem (tr ("Chop to grid"), [chopBy, grid = gridTicks()] { chopBy (grid); });
         chop.addSeparator();
-        const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+        const auto bar = song.barTicks();
         const std::pair<const char*, std::int64_t> sizes[] = { { TR_NOOP ("Chop in bars"), bar },
                                                                { TR_NOOP ("Chop in beats"), (std::int64_t) ppq },
                                                                { TR_NOOP ("Chop in half beats"), (std::int64_t) ppq / 2 },
@@ -7224,7 +7224,7 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
                 sortClips();
             };
             chop.addSectionHeader (tr ("Time based"));
-            const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+            const auto bar = song.barTicks();
             for (const auto& c : flclipmenu::timeBasedChops())
                 chop.addItem (tr (c.text), [chopBy, ticks = c.beatDivisor == 0 ? bar : (std::int64_t) ppq / c.beatDivisor] { chopBy (ticks); });
             chop.addSeparator();
@@ -7429,9 +7429,10 @@ juce::PopupMenu PlaylistComponent::fitToTempoMenu (int index, std::shared_ptr<co
         fit.addSeparator();
     }
     // FL's TIME presets (r168s c_f20): the whole file lasts exactly this long
-    for (const auto preset : clipops::timePresetBeats (song.beatsPerBar))
+    const auto barBeats = (float) song.barTicks() / (float) ppq; // (round 190fg: a bar in quarter notes)
+    for (const auto preset : clipops::timePresetBeats (song.meter()))
     {
-        const auto bars = song.beatsPerBar > 0 && preset >= (float) song.beatsPerBar ? preset / (float) song.beatsPerBar : 0.0f;
+        const auto bars = preset >= barBeats - 1.0e-4f ? preset / barBeats : 0.0f;
         const auto label = bars > 0.0f ? (bars == 1.0f ? tr ("1 bar") : tr ("{0} bars", { juce::String (bars, 0) }))
                                        : (preset == 1.0f ? tr ("1 beat") : tr ("{0} beats", { juce::String (preset, 0) }));
         fit.addItem (label, true, channel.sampler.stretchBeats == preset, [fitTo, preset, kp = channel.sampler.keepPitch] { fitTo (preset, kp); });
@@ -7560,7 +7561,7 @@ void PlaylistComponent::startPreview (int clip, int x)
     if (c.kind == ClipKind::pattern && c.pattern >= 0 && c.pattern < (int) song.patterns.size())
     {
         // a pattern clip plays its pattern alone, from the clicked point
-        const auto length = (double) juce::jmax<std::int64_t> (1, song.patterns[(std::size_t) c.pattern].effectiveLength (song.beatsPerBar));
+        const auto length = (double) juce::jmax<std::int64_t> (1, song.patterns[(std::size_t) c.pattern].effectiveLength (song.meter()));
         previewRestoreSong = song.mode == PlayMode::song;
         previewPatternBefore = song.currentPattern;
         engine.editSong ([p = c.pattern] (Song& s) {
@@ -7745,7 +7746,7 @@ void PlaylistComponent::zoomAroundCentre (double factor)
 
 void PlaylistComponent::zoomToBars (int bars)
 {
-    const auto bar = (double) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+    const auto bar = (double) engine.getSong().barTicks();
     const auto from = std::floor (scrollTicks / bar) * bar;
     zoomToTicks (from, from + bars * bar);
 }
@@ -8578,7 +8579,7 @@ void PlaylistComponent::duplicateSelection()
     if (selection.empty())
         return;
 
-    const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+    const auto bar = song.barTicks();
     std::int64_t from = INT64_MAX, to = 0;
 
     for (auto i : selection)
@@ -9204,7 +9205,7 @@ bool addAudioClip (AudioEngine& engine, const juce::File& file, std::int64_t sta
     const auto path = file.getFullPathName().toStdString();
     const auto name = file.getFileNameWithoutExtension().toStdString();
     // the Simple workflow (round 190p): a loop made for a tempo lasts its beats at the project's tempo, at its own pitch
-    const auto loopBeats = loopsKeepTime ? simpletracks::loopBeats (file.getFileName().toStdString(), seconds, data->acidBeats, engine.getSong().beatsPerBar)
+    const auto loopBeats = loopsKeepTime ? simpletracks::loopBeats (file.getFileName().toStdString(), seconds, data->acidBeats, engine.getSong().meter())
                                          : 0.0f;
     if (loopBeats > 0.0f)
         length = juce::jmax<std::int64_t> (1, (std::int64_t) std::llround ((double) loopBeats * ppq));
@@ -9908,7 +9909,7 @@ void PlaylistComponent::itemDropped (const SourceDetails& details)
             clip.pattern = pattern;
             clip.track = track;
             clip.start = start;
-            clip.length = juce::jmax<std::int64_t> (ppq, s.patterns[(std::size_t) pattern].effectiveLength (s.beatsPerBar));
+            clip.length = juce::jmax<std::int64_t> (ppq, s.patterns[(std::size_t) pattern].effectiveLength (s.meter()));
             s.playlist.push_back (clip);
             s.mode = PlayMode::song;
         });
@@ -10061,7 +10062,7 @@ void PatternPicker::paint (juce::Graphics& g)
                     }
                     const auto body = box.reduced (3.0f, 3.0f);
                     const auto span = (float) juce::jmax (6, high - low + 2);
-                    const auto length = (double) juce::jmax<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+                    const auto length = (double) juce::jmax<std::int64_t> (1, pattern.effectiveLength (song.meter()));
                     g.setColour (clipContentColour (rowColour).withAlpha (0.35f));
                     for (const auto& n : pattern.notes)
                     {

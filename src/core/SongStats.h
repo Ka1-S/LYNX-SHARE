@@ -42,7 +42,7 @@ inline int soundingNotes (const Song& song, double tick)
     {
         const auto current = (std::size_t) std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1);
         const auto& pattern = song.patterns[current];
-        const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+        const auto length = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
         return notesAt (song, pattern, std::fmod (tick, length));
     }
 

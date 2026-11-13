@@ -2,6 +2,7 @@
 
 #include <juce_dsp/juce_dsp.h>
 
+#include "core/MarkerPlan.h"
 #include "core/Timecode.h"
 #include "ui/FrameTicker.h"
 #include "ui/HintBar.h"
@@ -13,25 +14,30 @@ namespace lynx::toolbar
 {
 namespace
 {
-juce::String barBeatStep (const Song& song, double ticks, int beatsPerBar)
+juce::String barBeatStep (const Song& song, double ticks, Meter meter)
 {
-    const auto beats = ticks / ppq;
-    int bar = 0, beat = 0;
+    // (round 190fg: beats of the meter in force, eighths in 6/8; the steps are sixteenths into the beat)
+    int bar = 0;
+    double intoBar = 0.0;
+    auto beatLength = (double) meter.beat();
 
     if (song.mode == PlayMode::song) // the Playlist ruler applies (with time signature changes)
     {
         const auto current = song.barAt ((std::int64_t) ticks);
         bar = current.number;
-        beat = (int) ((ticks - (double) current.tick) / ppq) + 1;
+        intoBar = ticks - (double) current.tick;
+        const auto sig = markers::signatureAt (song, (std::int64_t) ticks);
+        beatLength = (double) ppq * 4.0 / (double) juce::jmax (1, sig.second);
     }
     else
     {
-        const auto perBar = juce::jmax (1, beatsPerBar);
-        bar = (int) (beats / perBar) + 1;
-        beat = (int) std::fmod (beats, (double) perBar) + 1;
+        const auto perBar = (double) meter.bar();
+        bar = (int) (ticks / perBar) + 1;
+        intoBar = std::fmod (ticks, perBar);
     }
 
-    const auto step = (int) (std::fmod (beats, 1.0) * stepsPerBeat) + 1;
+    const auto beat = (int) (intoBar / beatLength) + 1;
+    const auto step = (int) (std::fmod (intoBar, beatLength) / ticksPerStep) + 1;
     return juce::String::formatted ("%d : %d : %d", bar, beat, step);
 }
 
@@ -42,7 +48,7 @@ double loopLength (const Song& song)
 
     const auto length = song.mode == PlayMode::song
                             ? song.songLength()
-                            : song.patterns[(std::size_t) juce::jlimit (0, (int) song.patterns.size() - 1, song.currentPattern)].effectiveLength (song.beatsPerBar);
+                            : song.patterns[(std::size_t) juce::jlimit (0, (int) song.patterns.size() - 1, song.currentPattern)].effectiveLength (song.meter());
     return (double) juce::jmax<std::int64_t> (1, length);
 }
 
@@ -157,7 +163,7 @@ void SongPositionBar::mouseWheelMove (const juce::MouseEvent&, const juce::Mouse
     if (delta == 0.0f)
         return;
 
-    const auto bar = (double) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+    const auto bar = (double) engine.getSong().barTicks();
     const auto current = std::round (position() / bar) * bar;
     engine.seek (juce::jlimit (0.0, juce::jmax (0.0, length() - bar), current + (delta > 0.0f ? -bar : bar) * (wheel.isReversed ? -1.0 : 1.0)));
     update();
@@ -169,8 +175,8 @@ ui::Hint SongPositionBar::hintAt (juce::Point<int>)
     ui::Hint h;
     h.text = (song.mode == PlayMode::song ? tr ("Song position") : tr ("Pattern position"))
              + ": " + tr ("[LMB] click or drag to move the playhead  [Wheel] one bar  [Alt] no snap");
-    const auto bars = juce::jmax (1, juce::roundToInt (length() / ((double) ppq * juce::jmax (1, song.beatsPerBar))));
-    h.value = tr ("Bar {0} of {1}", { barBeatStep (song, position(), song.beatsPerBar).upToFirstOccurrenceOf (" ", false, false), juce::String (bars) });
+    const auto bars = juce::jmax (1, juce::roundToInt (length() / ((double) song.barTicks())));
+    h.value = tr ("Bar {0} of {1}", { barBeatStep (song, position(), song.meter()).upToFirstOccurrenceOf (" ", false, false), juce::String (bars) });
     return h;
 }
 
@@ -182,7 +188,7 @@ juce::String TimeDisplay::text() const
     const auto ticks = playheadTicks (engine);
 
     if (mode == Mode::bars)
-        return barBeatStep (song, ticks, engine.getTransport().beatsPerBar.load());
+        return barBeatStep (song, ticks, song.meter());
 
     const auto seconds = song.secondsForTicks ((std::int64_t) ticks);
     if (mode == Mode::smpte)

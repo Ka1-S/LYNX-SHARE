@@ -54,12 +54,12 @@ void changeMute (Song& song, const std::vector<int>& clips, MuteChange change);
 void changeGain (Song& song, const std::vector<int>& clips, float value, bool relative);
 
 // Positions and lengths as the window shows them, "bar:beat:tick" (ticks at LYNX's PPQ); a position counts from 1 ("1:1:000" is the start), a length from 0 ("2:0:000" = two bars). Time signature
-// changes from markers are not applied (bars of `beatsPerBar` beats).
-std::string formatPosition (std::int64_t ticks, int beatsPerBar);
-std::string formatLength (std::int64_t ticks, int beatsPerBar);
+// changes from markers are not applied (bars and beats of `meter`; round 190fg: 6/8 counts eighths).
+std::string formatPosition (std::int64_t ticks, Meter meter);
+std::string formatLength (std::int64_t ticks, Meter meter);
 // The inverse; also accepts "bar" or "bar:beat". -1 when the text is not a time.
-std::int64_t parsePosition (const std::string& text, int beatsPerBar);
-std::int64_t parseLength (const std::string& text, int beatsPerBar);
+std::int64_t parsePosition (const std::string& text, Meter meter);
+std::int64_t parseLength (const std::string& text, Meter meter);
 
 // Sources a clip of this kind can switch to: their names (patterns / audio channels / automations).
 std::vector<std::pair<int, std::string>> sourcesFor (const Song& song, ClipKind kind);

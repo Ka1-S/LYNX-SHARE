@@ -639,7 +639,7 @@ TEST (simple190ds_simple_tracks_patterns_and_keyed_loops)
     if (! r.ok() || r.pattern < 0)
         return;
     CHECK (s.patterns[(std::size_t) r.pattern].notes.empty());
-    CHECK (s.patterns[(std::size_t) r.pattern].effectiveLength (s.beatsPerBar) == 4 * s.beatsPerBar * ppq);
+    CHECK (s.patterns[(std::size_t) r.pattern].effectiveLength (s.meter()) == 4 * s.beatsPerBar * ppq);
     CHECK (st::patternOf (s, r.track) == r.pattern);
     bool made = true;
     CHECK (st::ensurePattern (s, r.track, 4, &made) == r.pattern && ! made); // (it has one)

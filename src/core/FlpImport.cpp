@@ -954,6 +954,7 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
     song.performanceMode = project.performanceMode; // (round 165m)
     song.autoCrossfades = project.autoCrossfades;   // FL's Playlist "Automatic crossfades" (round 167a)
     song.beatsPerBar = std::clamp (project.beatsPerBar, 1, 32);
+    song.beatUnit = meterUnit (project.beatUnit); // (round 190fg; 4 in every demo project)
     song.swing = std::clamp (project.swing / 128.0f, 0.0f, 1.0f);
     song.playTruncatedNotes = project.playTruncatedNotes; // 0x1E (REA round 167g)
     song.muteRunsEffects = true;                          // FL's muted insert (round 190y)

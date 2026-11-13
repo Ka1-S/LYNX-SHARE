@@ -214,7 +214,7 @@ public:
         originals = song.patterns[(std::size_t) patternIndex].notes;
         channel = engine.getSelectedChannel();
         bpm = song.bpm;
-        beatsPerBar = song.beatsPerBar;
+        meter = song.meter();
         buildControls();
 
         title.setText (tr (noteToolTitle (tool)), juce::dontSendNotification);
@@ -824,7 +824,7 @@ private:
             if (i >= 0 && i < (int) originals.size())
                 start = std::min (start, originals[(std::size_t) i].start);
 
-        const auto bar = (std::int64_t) ppq * juce::jmax (1, beatsPerBar);
+        const auto bar = meter.bar();
         return start == std::numeric_limits<std::int64_t>::max() ? 0 : start / bar * bar;
     }
 
@@ -975,7 +975,7 @@ private:
                 o.seed = (std::uint32_t) intValue (4);
                 o.useLengths = on (5);
                 o.chopChords = on (6);
-                prtools::articulate (p, indices, o, beatsPerBar);
+                prtools::articulate (p, indices, o, meter);
                 break;
             }
             case NoteTool::riffMachine:
@@ -1014,7 +1014,7 @@ private:
                 o.fitScale = intValue (14) + 1;
                 o.fit.lowKey = 36;
                 o.fit.highKey = 84;
-                prtools::riffMachine (p, indices, o, beatsPerBar);
+                prtools::riffMachine (p, indices, o, meter);
                 break;
             }
             case NoteTool::euclidean:
@@ -1026,7 +1026,7 @@ private:
                 o.rotation = intValue (2);
                 o.stepTicks = stepTicks[juce::jlimit (0, 3, intValue (3))];
                 o.start = generatorStart();
-                o.length = (std::int64_t) intValue (4) * ppq * juce::jmax (1, beatsPerBar);
+                o.length = (std::int64_t) intValue (4) * meter.bar();
                 o.key = intValue (5);
                 o.velocity = (float) value (6);
                 o.gate = (float) value (7);
@@ -1078,7 +1078,7 @@ private:
 
                 static const std::int64_t lengths[] = { 1, 2, 4, 8 };
                 prtools::ChordWriteOptions o;
-                o.chordLength = (std::int64_t) ppq * (intValue (6) < 2 ? lengths[intValue (6)] : (std::int64_t) beatsPerBar * (intValue (6) == 2 ? 1 : 2));
+                o.chordLength = intValue (6) < 2 ? (std::int64_t) ppq * lengths[intValue (6)] : meter.bar() * (intValue (6) == 2 ? 1 : 2);
                 o.octave = intValue (7);
                 const auto r = intValue (8) - 1;
                 if (r >= 0 && r < (int) rhythmPresets().size())
@@ -1222,7 +1222,8 @@ private:
     NoteTool tool;
     std::vector<int> indices;
     std::int64_t grid;
-    int patternIndex = 0, channel = 0, beatsPerBar = 4;
+    int patternIndex = 0, channel = 0;
+    Meter meter; // (round 190fg: the song's, for bar lengths)
     double bpm = 130.0;
     std::vector<Note> originals;
     std::uint32_t seed = 1;

@@ -35,20 +35,20 @@ TEST (rack165_loop_lengths_follow_fl_rules)
     p.notes = { stepNote (0, 0), stepNote (0, 4) };
     // FUN_012cfd20: the next step / beat / bar after the last tick the notes cover
     CHECK (loops::lastTick (p, 0) == 5 * step - 1);
-    CHECK (loops::loopLength (p, 0, ChannelLoop::nextStep, 2 * bar, 4) == 5 * step);
-    CHECK (loops::loopLength (p, 0, ChannelLoop::nextBeat, 2 * bar, 4) == 2 * beat);
-    CHECK (loops::loopLength (p, 0, ChannelLoop::nextBar, 2 * bar, 4) == bar);
-    CHECK (loops::loopLength (p, 0, 3, 2 * bar, 4) == 3 * step);           // N steps
-    CHECK (loops::loopLength (p, 0, 99, 2 * bar, 4) == 2 * bar);           // at most the pattern
-    CHECK (loops::loopLength (p, 0, ChannelLoop::dontLoop, 2 * bar, 4) == 0);
-    CHECK (loops::loopLength (p, 0, ChannelLoop::nextBar, 2 * bar, 3) == 3 * beat); // 3/4 bars
+    CHECK (loops::loopLength (p, 0, ChannelLoop::nextStep, 2 * bar, lynx::Meter (4, 4)) == 5 * step);
+    CHECK (loops::loopLength (p, 0, ChannelLoop::nextBeat, 2 * bar, lynx::Meter (4, 4)) == 2 * beat);
+    CHECK (loops::loopLength (p, 0, ChannelLoop::nextBar, 2 * bar, lynx::Meter (4, 4)) == bar);
+    CHECK (loops::loopLength (p, 0, 3, 2 * bar, lynx::Meter (4, 4)) == 3 * step);           // N steps
+    CHECK (loops::loopLength (p, 0, 99, 2 * bar, lynx::Meter (4, 4)) == 2 * bar);           // at most the pattern
+    CHECK (loops::loopLength (p, 0, ChannelLoop::dontLoop, 2 * bar, lynx::Meter (4, 4)) == 0);
+    CHECK (loops::loopLength (p, 0, ChannelLoop::nextBar, 2 * bar, lynx::Meter (3, 4)) == 3 * beat); // 3/4 bars
     // "Set to next beat / bar": a fixed loop point in steps
-    CHECK (loops::nextBoundarySteps (p, 0, ChannelLoop::nextBeat, 4) == 8);
-    CHECK (loops::nextBoundarySteps (p, 0, ChannelLoop::nextBar, 4) == 16);
+    CHECK (loops::nextBoundarySteps (p, 0, ChannelLoop::nextBeat, lynx::Meter (4, 4)) == 8);
+    CHECK (loops::nextBoundarySteps (p, 0, ChannelLoop::nextBar, lynx::Meter (4, 4)) == 16);
     // muted notes don't count
     p.notes.push_back (stepNote (0, 20));
     p.notes.back().muted = true;
-    CHECK (loops::loopLength (p, 0, ChannelLoop::nextBar, 2 * bar, 4) == bar);
+    CHECK (loops::loopLength (p, 0, ChannelLoop::nextBar, 2 * bar, lynx::Meter (4, 4)) == bar);
     CHECK (loops::settingText (ChannelLoop::dontLoop) == "..." && loops::settingText (-3) == "Bar" && loops::settingText (12) == "12");
 }
 
@@ -90,7 +90,7 @@ TEST (rack165_expand_plays_polyrhythms)
     loops::setSetting (p, 0, 3); // every 3 steps: the step at 5 is past the loop point and doesn't play
     loops::setSetting (p, 1, 5);
     auto played = p;
-    loops::expandPattern (played, 4);
+    loops::expandPattern (played, lynx::Meter (4, 4));
     CHECK ((startsOf (played, 0) == std::vector<std::int64_t> { 0, 3 * step, 6 * step, 9 * step, 12 * step, 15 * step }));
     CHECK ((startsOf (played, 1) == std::vector<std::int64_t> { 0, 5 * step, 10 * step, 15 * step }));
     CHECK (played.lengthTicks == bar && ! played.loopOn);
@@ -108,10 +108,10 @@ TEST (rack165_expand_plays_polyrhythms)
     bass.length = 3 * bar - step;
     bass.key = 36;
     q.notes.push_back (bass);
-    CHECK (q.effectiveLength (4) == 3 * bar);
-    loops::expandPattern (q, 4);
+    CHECK (q.effectiveLength (lynx::Meter (4, 4)) == 3 * bar);
+    loops::expandPattern (q, lynx::Meter (4, 4));
     CHECK (startsOf (q, 0).size() == 6 && startsOf (q, 1).size() == 1);
-    CHECK (q.effectiveLength (4) == 3 * bar);
+    CHECK (q.effectiveLength (lynx::Meter (4, 4)) == 3 * bar);
 
     // a repeat that would run past the pattern's end is cut there
     Pattern r;
@@ -122,7 +122,7 @@ TEST (rack165_expand_plays_polyrhythms)
     longNote.length = 3 * step;
     r.notes = { longNote };
     loops::setSetting (r, 0, 6);
-    loops::expandPattern (r, 4);
+    loops::expandPattern (r, lynx::Meter (4, 4));
     CHECK (r.notes.size() == 3 && r.notes.back().start == 12 * step && r.notes.back().length == 3 * step);
     loops::setSetting (r, 0, 7);
 }
@@ -137,18 +137,18 @@ TEST (rack165_burn_to_pattern)
     p.notes = { stepNote (0, 0), stepNote (1, 0), stepNote (2, 0) };
     loops::setSetting (p, 0, 4);
     loops::setSetting (p, 1, 8);
-    CHECK ((loops::loopingChannels (p, 4) == std::vector<int> { 0, 1 }));
-    CHECK (loops::burnChannel (p, 0, 4));
+    CHECK ((loops::loopingChannels (p, lynx::Meter (4, 4)) == std::vector<int> { 0, 1 }));
+    CHECK (loops::burnChannel (p, 0, lynx::Meter (4, 4)));
     CHECK (startsOf (p, 0).size() == 4 && loops::storedSetting (p, 0) == ChannelLoop::dontLoop);
-    CHECK (! loops::burnChannel (p, 2, 4)); // not looping
-    CHECK (loops::burnChannels (p, {}, 4) == 1); // the rest: channel 1
-    CHECK (startsOf (p, 1).size() == 2 && loops::loopingChannels (p, 4).empty());
+    CHECK (! loops::burnChannel (p, 2, lynx::Meter (4, 4))); // not looping
+    CHECK (loops::burnChannels (p, {}, lynx::Meter (4, 4)) == 1); // the rest: channel 1
+    CHECK (startsOf (p, 1).size() == 2 && loops::loopingChannels (p, lynx::Meter (4, 4)).empty());
     // what plays is the same before and after
     auto before = p;
     loops::setSetting (before, 2, 2);
     auto played = before;
-    loops::expandPattern (played, 4);
-    loops::burnChannels (before, {}, 4);
+    loops::expandPattern (played, lynx::Meter (4, 4));
+    loops::burnChannels (before, {}, lynx::Meter (4, 4));
     CHECK (startsOf (played, 2) == startsOf (before, 2));
 }
 

@@ -50,7 +50,7 @@ inline std::vector<Event> playPattern (const lynx::Song& s, int passes, int bloc
 {
     const auto tps = lynx::ticksPerSample (s.bpm, rate);
     const auto& p = s.patterns[0];
-    const auto length = p.effectiveLength (s.beatsPerBar);
+    const auto length = p.effectiveLength (s.meter());
     const auto total = (std::int64_t) std::llround ((double) length * passes / tps);
     std::vector<Event> out;
     lynx::EventBuffer ev;
@@ -69,7 +69,7 @@ inline std::vector<Event> playPattern (const lynx::Song& s, int passes, int bloc
 inline std::vector<std::vector<Event>> onsByPass (const lynx::Song& s, const std::vector<Event>& events, int passes)
 {
     const auto tps = lynx::ticksPerSample (s.bpm, rate);
-    const auto perPass = (double) s.patterns[0].effectiveLength (s.beatsPerBar) / tps;
+    const auto perPass = (double) s.patterns[0].effectiveLength (s.meter()) / tps;
     std::vector<std::vector<Event>> by ((std::size_t) passes);
     for (const auto& e : events)
         if (e.type == (int) lynx::NoteEvent::Type::on)

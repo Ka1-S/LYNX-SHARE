@@ -207,7 +207,7 @@ int ChannelRackComponent::numSteps() const
         return 16;
 
     const auto& p = song.activePattern();
-    const auto steps = (int) (p.effectiveLength (song.beatsPerBar) / ticksPerStep);
+    const auto steps = (int) (p.effectiveLength (song.meter()) / ticksPerStep);
     return juce::jlimit (16, 512, steps);
 }
 
@@ -445,8 +445,8 @@ int ChannelRackComponent::loopStepsOf (int row) const
     const auto& p = song.activePattern();
     if (! p.loopOn)
         return 0;
-    const auto length = p.effectiveLength (song.beatsPerBar);
-    const auto loop = channelloops::loopLength (p, row, channelloops::effectiveSetting (p, row), length, song.beatsPerBar);
+    const auto length = p.effectiveLength (song.meter());
+    const auto loop = channelloops::loopLength (p, row, channelloops::effectiveSetting (p, row), length, song.meter());
     return loop > 0 && loop < length ? (int) (loop / ticksPerStep) : 0;
 }
 
@@ -509,7 +509,7 @@ void ChannelRackComponent::setLoopPoint (int row, int setting)
         auto value = setting;
         // FL's "Set to next beat / bar": a fixed loop point, the steps to the boundary after the channel's last note
         if (setting == 1000 + ChannelLoop::nextBeat || setting == 1000 + ChannelLoop::nextBar)
-            value = channelloops::nextBoundarySteps (p, row, setting - 1000, s.beatsPerBar);
+            value = channelloops::nextBoundarySteps (p, row, setting - 1000, s.meter());
         channelloops::setSetting (p, row, value);
         // (FL switches the looping on, advanced, when a loop point is set from a channel)
         if (! p.loopOn && value != ChannelLoop::dontLoop)
@@ -543,7 +543,7 @@ void ChannelRackComponent::showLoopPointMenu (int row)
         menu.addItem (tr ("Every {0} steps", { juce::String (setting) }), false, true, [] {});
     menu.addSectionHeader (tr ("Tools"));
     menu.addItem (tr ("Burn to pattern"), loopStepsOf (row) > 0, false, [this, row] {
-        engine.editSong ([row] (Song& s) { channelloops::burnChannel (s.activePattern(), row, s.beatsPerBar); });
+        engine.editSong ([row] (Song& s) { channelloops::burnChannel (s.activePattern(), row, s.meter()); });
         repaint();
     });
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (loopBoxBounds (row))));
@@ -575,10 +575,10 @@ void ChannelRackComponent::burnLoops (bool selectedOnly)
         if (selectedOnly)
         {
             for (auto r : rows)
-                channelloops::burnChannel (p, r, s.beatsPerBar);
+                channelloops::burnChannel (p, r, s.meter());
         }
         else
-            channelloops::burnChannels (p, {}, s.beatsPerBar);
+            channelloops::burnChannels (p, {}, s.meter());
     });
     repaint();
 }
@@ -608,7 +608,7 @@ void ChannelRackComponent::showLoopMenu (juce::Component* target)
                 onFilterChanged();
         });
     menu.addSectionHeader (tr ("Burn to pattern"));
-    const auto looping = ! channelloops::loopingChannels (p, song.beatsPerBar).empty();
+    const auto looping = ! channelloops::loopingChannels (p, song.meter()).empty();
     menu.addItem (tr ("Burn selected channels"), looping, false, [this] { burnLoops (true); });
     menu.addItem (tr ("Burn all looping channels"), looping, false, [this] { burnLoops (false); });
     auto options = juce::PopupMenu::Options();
@@ -882,7 +882,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
     textcache::drawText (g, tr ("or drop an audio file here"), gridLeft() + 4, addY + positionStripHeight, 400, rowHeight - positionStripHeight,
                          juce::Justification::centredLeft);
 
-    const auto stepsPerBar = std::max (1, song.beatsPerBar) * (int) (ppq / ticksPerStep);
+    const auto stepsPerBar = (int) std::max<std::int64_t> (1, song.barTicks() / ticksPerStep);
     // FL's "Playing step" strip (PosLEDPanel, REA round 170a §2): a slim LED row under the steps, beat groups
     // alternating, the playing step lit — in Pattern mode and whenever the shown pattern plays in Song mode
     for (int step = 0; step < realSteps; ++step)
@@ -2384,7 +2384,7 @@ ui::Hint ChannelRackComponent::hintAt (juce::Point<int> p)
                                              : tr ("Steps: [LMB] drag draws (starting on a lit step erases)  [RMB] drag erases"));
             // and the step's position as bar:step:tick, like FL's hint bar
             if (hoverStep >= 0)
-                h.value = juce::String (stepPositionText ((std::int64_t) hoverStep * ticksPerStep, song.beatsPerBar));
+                h.value = juce::String (stepPositionText ((std::int64_t) hoverStep * ticksPerStep, song.meter()));
             break;
         case Area::addRow:
             h.text = tr ("Add a channel (or drop audio files on the rack)");
@@ -2442,7 +2442,7 @@ void ChannelRackComponent::applyPaint (const juce::MouseEvent& e)
         // a ghost step of a pattern with a set length: the length grows to the bar holding it (automatic lengths
         // follow the notes by themselves)
         if (on)
-            p.lengthTicks = lengthWithStep (p.lengthTicks, step, ticksPerStep, (std::int64_t) ppq * std::max (1, s.beatsPerBar));
+            p.lengthTicks = lengthWithStep (p.lengthTicks, step, ticksPerStep, s.barTicks());
     });
 }
 
@@ -2757,7 +2757,7 @@ juce::PopupMenu ChannelRackComponent::buildChannelMenu (int channel)
         loop.addItem (tr ("Set to next bar"), [this, channel] { setLoopPoint (channel, 1000 + ChannelLoop::nextBar); });
         loop.addSeparator();
         loop.addItem (tr ("Burn to pattern"), loopStepsOf (channel) > 0, false, [this, channel] {
-            engine.editSong ([channel] (Song& s) { channelloops::burnChannel (s.activePattern(), channel, s.beatsPerBar); });
+            engine.editSong ([channel] (Song& s) { channelloops::burnChannel (s.activePattern(), channel, s.meter()); });
             repaint();
         });
         menu.addSubMenu (setting > 0 && p.loopOn ? tr ("Loop point ({0} steps)", { juce::String (setting) }) : tr ("Loop point"), loop);

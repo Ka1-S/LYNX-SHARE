@@ -72,7 +72,7 @@ void ControllerBridge::command (Command c)
     };
     auto bar = [this] (bool forward) {
         // to the previous / next bar line (from inside a bar, back goes to its start)
-        const auto ticks = (double) ppq * juce::jmax (1, engine.getSong().beatsPerBar);
+        const auto ticks = (double) engine.getSong().barTicks();
         const auto at = engine.getTransport().positionTicks.load() / ticks;
         const auto target = forward ? std::floor (at + 1e-6) + 1.0 : std::ceil (at - 1e-6) - 1.0;
         engine.seek (juce::jmax (0.0, target) * ticks);
@@ -281,7 +281,7 @@ void ControllerBridge::playNote (int key, float velocity, bool on)
                                : juce::MidiMessage::noteOff (1, juce::jlimit (0, 127, key)));
 }
 
-int ControllerBridge::steps() const { return stepsPerBeat * juce::jmax (1, engine.getSong().beatsPerBar); }
+int ControllerBridge::steps() const { return (int) juce::jmax<std::int64_t> (1, engine.getSong().barTicks() / ticksPerStep); }
 
 bool ControllerBridge::step (int index) const
 {

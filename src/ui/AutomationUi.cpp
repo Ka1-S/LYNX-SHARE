@@ -158,7 +158,7 @@ public:
 
         const auto& song = engine.getSong();
         const auto area = plotArea();
-        const auto bar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+        const auto bar = song.barTicks();
 
         g.setColour (colour::bg0);
         g.fillRect (area);

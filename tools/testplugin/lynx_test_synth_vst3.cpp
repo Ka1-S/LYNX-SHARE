@@ -5,11 +5,14 @@
 //   V=<JUCE>/modules/juce_audio_processors/format_types/VST3_SDK
 //   zig c++ -shared -O2 -std=c++17 -target x86_64-windows-gnu -I$V tools/testplugin/lynx_test_synth_vst3.cpp \
 //       $V/pluginterfaces/base/funknown.cpp -lole32 -o "LYNX Test Synth.vst3"
+//   Linux (round 190fg): g++ -shared -fPIC -O2 -std=c++17 -I$V tools/testplugin/lynx_test_synth_vst3.cpp \
+//       $V/pluginterfaces/base/funknown.cpp -o "LYNX Test Synth.vst3/Contents/x86_64-linux/LYNX Test Synth.so"
 //
 // Sound: one sine voice per note on (a second note on of a sounding key adds a second voice, as a polyphonic synth
-// does), a note off ends the oldest voice of its key. With the environment variable LYNX_TEST_SYNTH_LOG = a file path
+// does). The voices are kept by noteId, the VST3 way (round 190fg): a note off with an id ends the voice of that id;
+// without one (-1) it ends the oldest voice of its key. With the environment variable LYNX_TEST_SYNTH_LOG = a file path
 // it appends to <path>.<instance> one line per process call ("P<instance> <ppq> <samples> <playing> <rt|off> <voices>") and per
-// event ("E<instance> on|off <key> <sampleOffset>"): what the host sent and when.
+// event ("E<instance> on|off <key> <sampleOffset> <noteId>"): what the host sent and when.
 #define INIT_CLASS_IID
 #include "pluginterfaces/base/funknown.h"
 #include "pluginterfaces/base/ipluginbase.h"
@@ -260,6 +263,7 @@ private:
     struct Voice
     {
         int key = 0;
+        int32 noteId = -1;
         double phase = 0.0, step = 0.0;
     };
 
@@ -269,29 +273,30 @@ private:
         {
             if (e.noteOn.velocity <= 0.0f)
             {
-                noteOff (e.noteOn.pitch, e.sampleOffset);
+                noteOff (e.noteOn.pitch, e.sampleOffset, -1);
                 return;
             }
             if (log != nullptr)
-                std::fprintf (log, "E%d on %d %d\n", id, (int) e.noteOn.pitch, (int) e.sampleOffset);
+                std::fprintf (log, "E%d on %d %d %d\n", id, (int) e.noteOn.pitch, (int) e.sampleOffset, (int) e.noteOn.noteId);
             if (voiceCount < maxVoices)
             {
                 auto& v = voices[voiceCount++];
                 v.key = e.noteOn.pitch;
+                v.noteId = e.noteOn.noteId;
                 v.phase = 0.0;
                 v.step = 6.283185307179586 * 440.0 * std::pow (2.0, (e.noteOn.pitch - 69) / 12.0) / rate;
             }
         }
         else if (e.type == Event::kNoteOffEvent)
-            noteOff (e.noteOff.pitch, e.sampleOffset);
+            noteOff (e.noteOff.pitch, e.sampleOffset, e.noteOff.noteId);
     }
 
-    void noteOff (int key, int offset)
+    void noteOff (int key, int offset, int32 noteId)
     {
         if (log != nullptr)
-            std::fprintf (log, "E%d off %d %d\n", id, key, offset);
+            std::fprintf (log, "E%d off %d %d %d\n", id, key, offset, (int) noteId);
         for (int i = 0; i < voiceCount; ++i)
-            if (voices[i].key == key)
+            if (noteId >= 0 ? voices[i].noteId == noteId : voices[i].key == key)
             {
                 for (int j = i + 1; j < voiceCount; ++j)
                     voices[j - 1] = voices[j];
@@ -382,7 +387,14 @@ Factory factory;
 
 extern "C"
 {
+#if defined(_WIN32)
 __declspec (dllexport) IPluginFactory* PLUGIN_API GetPluginFactory() { return static_cast<IPluginFactory2*> (&factory); }
 __declspec (dllexport) bool InitDll() { return true; }
 __declspec (dllexport) bool ExitDll() { return true; }
+#else
+// (round 190fg: a Linux build, the bundle's Contents/x86_64-linux/<name>.so)
+__attribute__ ((visibility ("default"))) IPluginFactory* PLUGIN_API GetPluginFactory() { return static_cast<IPluginFactory2*> (&factory); }
+__attribute__ ((visibility ("default"))) bool ModuleEntry (void*) { return true; }
+__attribute__ ((visibility ("default"))) bool ModuleExit() { return true; }
+#endif
 }

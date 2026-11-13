@@ -242,7 +242,7 @@ ChangeLabel describeChange (const Song& before, const Song& after)
         return label (TR_NOOP ("Tempo"));
     if (before.swing != after.swing)
         return label (TR_NOOP ("Swing"));
-    if (before.beatsPerBar != after.beatsPerBar)
+    if (before.beatsPerBar != after.beatsPerBar || before.beatUnit != after.beatUnit)
         return label (TR_NOOP ("Time signature"));
     if (before.info != after.info)
         return label (TR_NOOP ("Project info"));

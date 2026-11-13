@@ -191,10 +191,11 @@ inline float fitBeats (double seconds, double bpm, float embeddedBeats = 0.0f, d
 }
 
 // FL's TIME knob presets (its right-click menu, r168s c_f20): "1 beat, 2 beats, 1 bar, 2 bars, 3 bars, 4 bars" in beats.
-inline std::vector<float> timePresetBeats (int beatsPerBar)
+// (round 190fg: in quarter notes, a beat and a bar of the song's meter)
+inline std::vector<float> timePresetBeats (Meter meter)
 {
-    const auto bar = (float) std::max (1, beatsPerBar);
-    return { 1.0f, 2.0f, bar, 2.0f * bar, 3.0f * bar, 4.0f * bar };
+    const auto beat = (float) meter.beat() / (float) ppq, bar = (float) meter.bar() / (float) ppq;
+    return { beat, 2.0f * beat, bar, 2.0f * bar, 3.0f * bar, 4.0f * bar };
 }
 
 // Clips (indices into song.playlist) that use the same source as `clip`: the same pattern, the same audio

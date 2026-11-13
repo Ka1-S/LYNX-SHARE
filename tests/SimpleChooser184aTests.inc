@@ -298,21 +298,21 @@ TEST (simple190p_a_loop_keeps_time)
     CHECK (simpletracks::tempoInName ("120.wav") == 120.0);
     CHECK (simpletracks::tempoInName ("Take 1200.wav") == 0.0);
     // whole bars at the name's tempo: 4 bars at 102 BPM last 9.412 s
-    CHECK (loopBeats ("DL1_102_Dm_Regulators_Stack_Verse.wav", 16.0 * 60.0 / 102.0, 0.0f, 4) == 16.0f);
-    CHECK (loopBeats ("Funky Guitar 98.wav", 8.0 * 60.0 / 98.0 + 0.05, 0.0f, 4) == 8.0f); // a little padding
-    CHECK (loopBeats ("Waltz 90.wav", 6.0 * 60.0 / 90.0, 0.0f, 3) == 6.0f);
-    CHECK (loopBeats ("Hat 120.wav", 0.5, 0.0f, 4) == 1.0f);  // one beat
-    CHECK (loopBeats ("Hat 120.wav", 1.0, 0.0f, 4) == 2.0f);  // half a bar
+    CHECK (loopBeats ("DL1_102_Dm_Regulators_Stack_Verse.wav", 16.0 * 60.0 / 102.0, 0.0f, lynx::Meter (4, 4)) == 16.0f);
+    CHECK (loopBeats ("Funky Guitar 98.wav", 8.0 * 60.0 / 98.0 + 0.05, 0.0f, lynx::Meter (4, 4)) == 8.0f); // a little padding
+    CHECK (loopBeats ("Waltz 90.wav", 6.0 * 60.0 / 90.0, 0.0f, lynx::Meter (3, 4)) == 6.0f);
+    CHECK (loopBeats ("Hat 120.wav", 0.5, 0.0f, lynx::Meter (4, 4)) == 1.0f);  // one beat
+    CHECK (loopBeats ("Hat 120.wav", 1.0, 0.0f, lynx::Meter (4, 4)) == 2.0f);  // half a bar
     // a number that doesn't make whole bars is not a tempo: a take, a song
-    CHECK (loopBeats ("Take 90.wav", 13.7, 0.0f, 4) == 0.0f);
-    CHECK (loopBeats ("Lead vocal.wav", 8.0, 0.0f, 4) == 0.0f);
-    CHECK (loopBeats ("My song 120.wav", 180.0, 0.0f, 4) == 0.0f);
+    CHECK (loopBeats ("Take 90.wav", 13.7, 0.0f, lynx::Meter (4, 4)) == 0.0f);
+    CHECK (loopBeats ("Lead vocal.wav", 8.0, 0.0f, lynx::Meter (4, 4)) == 0.0f);
+    CHECK (loopBeats ("My song 120.wav", 180.0, 0.0f, lynx::Meter (4, 4)) == 0.0f);
     // "bpm" in the name keeps a loop with a tail; the ACID beat count wins; long files are left alone
-    CHECK (std::abs (loopBeats ("Pad 100 bpm.wav", 10.5, 0.0f, 4) - 17.5f) < 1.0e-4f);
-    CHECK (loopBeats ("Pad 100 bpm.wav", 10.5, 8.0f, 4) == 8.0f);
-    CHECK (loopBeats ("anything.wav", 4.0, 8.0f, 4) == 8.0f);
-    CHECK (loopBeats ("Song 100 bpm.wav", 200.0, 0.0f, 4) == 0.0f);
-    CHECK (loopBeats ("anything.wav", 0.0, 8.0f, 4) == 0.0f);
+    CHECK (std::abs (loopBeats ("Pad 100 bpm.wav", 10.5, 0.0f, lynx::Meter (4, 4)) - 17.5f) < 1.0e-4f);
+    CHECK (loopBeats ("Pad 100 bpm.wav", 10.5, 8.0f, lynx::Meter (4, 4)) == 8.0f);
+    CHECK (loopBeats ("anything.wav", 4.0, 8.0f, lynx::Meter (4, 4)) == 8.0f);
+    CHECK (loopBeats ("Song 100 bpm.wav", 200.0, 0.0f, lynx::Meter (4, 4)) == 0.0f);
+    CHECK (loopBeats ("anything.wav", 0.0, 8.0f, lynx::Meter (4, 4)) == 0.0f);
 
     // the track: the channel is stretched to the beats with its pitch kept, and the clip is that long
     Song s;

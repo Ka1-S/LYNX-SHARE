@@ -191,6 +191,7 @@ private:
         const auto& s = engine.getSong();
         tempo.setValue (s.bpm, juce::dontSendNotification);
         beats.setValue (s.beatsPerBar, juce::dontSendNotification);
+        shownUnit = meterUnit (s.beatUnit);
         swing.setValue (s.swing * 100.0, juce::dontSendNotification);
         pitch.setValue (s.masterPitch, juce::dontSendNotification);
         crossfades.setToggleState (s.autoCrossfades, juce::dontSendNotification);
@@ -203,11 +204,13 @@ private:
     }
 
     // FL's time signature mode (FUN_00eccbd0): the numerator is the beats per bar, the denominator sets the steps per
-    // beat (16 / denominator); LYNX's step grid is 4 per beat, so the denominator is 4
+    // beat (16 / denominator). Round 190fg: the song meter's own denominator (4 unless a scene, an .als, .flp or MIDI
+    // file set another); the step grid stays sixteenths, so a beat of 6/8 is 2 steps
+    int shownUnit = 4;
     void showTimeMode (bool signature)
     {
         beatsLabel.setText (signature ? tr ("Numerator") : tr ("Beats per bar"), juce::dontSendNotification);
-        stepsText.setText (signature ? tr ("Denominator: {0} (the Channel Rack's step grid is {1} steps per beat).", { juce::String (16 / stepsPerBeat), juce::String (stepsPerBeat) })
+        stepsText.setText (signature ? tr ("Denominator: {0} (the Channel Rack's step grid is {1} steps per beat).", { juce::String (shownUnit), juce::String (juce::jmax (1, 16 / shownUnit)) })
                                      : tr ("Steps per beat: {0} (the Channel Rack's step grid).", { juce::String (stepsPerBeat) }),
                            juce::dontSendNotification);
     }

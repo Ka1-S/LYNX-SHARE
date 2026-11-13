@@ -1983,8 +1983,6 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
         {
             sc.beatsPerBar = n;
             sc.beatUnit = session::sceneBeatUnit (d); // (round 190em: the scene keeps its denominator)
-            if (d != 4)
-                ctx.note (&FlpImportReport::approximated, "Scene time signatures other than n/4 (a launch plays the same bar length in quarter notes)");
         }
         if (scenes[s].boolean ("FollowAction/FollowActionEnabled", false))
             ctx.note (&FlpImportReport::unsupported, "Scene follow actions");
@@ -2242,8 +2240,12 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
     }
     int num = 4, den = 4;
     alsTimeSignature ((int) mainMixer.number ("TimeSignature/Manual", 201), num, den);
-    if (den == 4)
+    // the song's meter, any denominator (round 190fg; before, a signature that was not n/4 became a marker at 0)
+    if (meterUnit (den) == den && num >= 1 && num <= 32)
+    {
         song.beatsPerBar = num;
+        song.beatUnit = den;
+    }
     else
     {
         Marker m;
@@ -2446,7 +2448,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         std::int64_t end = 0;
         for (const auto& c : song.playlist)
             end = std::max (end, c.end());
-        const auto bar = den == 4 ? (std::int64_t) song.beatsPerBar * ppq : (std::int64_t) num * ppq * 4 / den;
+        const auto bar = song.barAt (0).length; // (the song's meter, or the signature marker at 0)
         const auto roundUp = [bar] (std::int64_t t) { return bar > 0 ? (t + bar - 1) / bar * bar : t; };
         auto cursor = roundUp (end);
         for (std::size_t s = 0; s < std::max<std::size_t> (scenes.size(), 1); ++s)

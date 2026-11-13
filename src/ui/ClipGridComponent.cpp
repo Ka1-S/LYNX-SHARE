@@ -972,7 +972,7 @@ private:
             theme::fillRoundRect (g, box, 2.0f, c::ledOn);
             g.setColour (c::bg0);
             g.setFont (theme::font (theme::type::small));
-            g.drawText (juce::String (session::lengthCounter (elapsed, song.beatsPerBar)), box, juce::Justification::centred, false);
+            g.drawText (juce::String (session::lengthCounter (elapsed, song.meter())), box, juce::Justification::centred, false);
         }
         if (mixer->armsShown()) // (round 190dr: the arm button is in the mixer's Volume section, as in Live)
             return;
@@ -1060,7 +1060,7 @@ private:
                 return;
             Clip clip;
             clip.pattern = pattern;
-            clip.length = std::max<std::int64_t> (ppq, s.patterns[(std::size_t) pattern].effectiveLength (s.beatsPerBar));
+            clip.length = std::max<std::int64_t> (ppq, s.patterns[(std::size_t) pattern].effectiveLength (s.meter()));
             launcher::setClip (s, track, scene, clip);
         });
         repaint();
@@ -1312,7 +1312,7 @@ private:
             });
         for (const auto bars : { 1, 2, 4, 8 })
         {
-            const auto ticks = (std::int64_t) bars * engine.getSong().beatsPerBar * ppq;
+            const auto ticks = (std::int64_t) bars * engine.getSong().barTicks();
             after.addItem (tr ("{0} bars", { juce::String (bars) }), true, ! f.linked && f.ticks == ticks, [edit, ticks] {
                 edit ([ticks] (ClipFollow& x) {
                     x.linked = false;
@@ -1551,7 +1551,7 @@ private:
         const auto& song = engine.getSong();
         const auto current = field == 1 ? utf8 (session::sceneTempoText (info.tempo > 0.0 ? info.tempo : song.bpm))
                                         : utf8 (info.beatsPerBar > 0 ? session::sceneSignatureText (info.beatsPerBar, info.beatUnit)
-                                                                     : session::sceneSignatureText (song.beatsPerBar, 4));
+                                                                     : session::sceneSignatureText (song.beatsPerBar, song.beatUnit));
         auto* window = new juce::AlertWindow (field == 1 ? tr ("Scene tempo") : tr ("Scene time signature"),
                                               field == 1 ? juce::String ("BPM") : tr ("Beats / beat unit (e.g. 6 / 8)"), juce::MessageBoxIconType::NoIcon, this);
         window->addTextEditor ("value", current);

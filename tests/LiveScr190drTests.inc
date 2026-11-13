@@ -307,15 +307,15 @@ TEST (live190dr2_fields_read_bars_beats_sixteenths_like_the_reference)
 {
     using namespace lynx::clipsample;
     const auto bar = 4 * lynx::ppq;
-    CHECK (positionText (0, 4) == "1. 1. 1");                       // Start 1. 1. 1
-    CHECK (positionText (8 * bar, 4) == "9. 1. 1");                 // End 9. 1. 1
-    CHECK (positionText (8 * bar, 4, true) == "8. 0. 0");           // Length 8. 0. 0
-    CHECK (positionText (bar + 2 * lynx::ppq + lynx::ppq / 4 * 3, 4) == "2. 3. 4");
-    CHECK (positionText (7 * lynx::ppq, 3) == "3. 2. 1");           // 3/4: a bar is three beats
-    CHECK (parsePosition ("9. 1. 1", 4) == 8 * bar && parsePosition ("9.1.1", 4) == 8 * bar && parsePosition ("9", 4) == 8 * bar);
-    CHECK (parsePosition ("2. 3. 4", 4) == bar + 2 * lynx::ppq + lynx::ppq / 4 * 3);
-    CHECK (parsePosition ("8. 0. 0", 4, true) == 8 * bar && parsePosition ("0. 2", 4, true) == 2 * lynx::ppq);
-    CHECK (parsePosition ("0. 1. 1", 4) == -1 && parsePosition ("abc", 4) == -1 && parsePosition ("", 4) == -1 && parsePosition ("-1", 4, true) == -1);
+    CHECK (positionText (0, lynx::Meter (4, 4)) == "1. 1. 1");                       // Start 1. 1. 1
+    CHECK (positionText (8 * bar, lynx::Meter (4, 4)) == "9. 1. 1");                 // End 9. 1. 1
+    CHECK (positionText (8 * bar, lynx::Meter (4, 4), true) == "8. 0. 0");           // Length 8. 0. 0
+    CHECK (positionText (bar + 2 * lynx::ppq + lynx::ppq / 4 * 3, lynx::Meter (4, 4)) == "2. 3. 4");
+    CHECK (positionText (7 * lynx::ppq, lynx::Meter (3, 4)) == "3. 2. 1");           // 3/4: a bar is three beats
+    CHECK (parsePosition ("9. 1. 1", lynx::Meter (4, 4)) == 8 * bar && parsePosition ("9.1.1", lynx::Meter (4, 4)) == 8 * bar && parsePosition ("9", lynx::Meter (4, 4)) == 8 * bar);
+    CHECK (parsePosition ("2. 3. 4", lynx::Meter (4, 4)) == bar + 2 * lynx::ppq + lynx::ppq / 4 * 3);
+    CHECK (parsePosition ("8. 0. 0", lynx::Meter (4, 4), true) == 8 * bar && parsePosition ("0. 2", lynx::Meter (4, 4), true) == 2 * lynx::ppq);
+    CHECK (parsePosition ("0. 1. 1", lynx::Meter (4, 4)) == -1 && parsePosition ("abc", lynx::Meter (4, 4)) == -1 && parsePosition ("", lynx::Meter (4, 4)) == -1 && parsePosition ("-1", lynx::Meter (4, 4), true) == -1);
     // unwarped audio: seconds at the song tempo (120 BPM: one beat = 0.5 s)
     CHECK (secondsText (0, 120.0) == "0:00:000" && secondsText (3 * lynx::ppq, 120.0) == "0:01:500" && secondsText (250 * lynx::ppq, 120.0) == "2:05:000");
     CHECK (parseSeconds ("0:01:500", 120.0) == 3 * lynx::ppq && parseSeconds ("1.5", 120.0) == 3 * lynx::ppq && parseSeconds ("01:500", 120.0) == 3 * lynx::ppq);

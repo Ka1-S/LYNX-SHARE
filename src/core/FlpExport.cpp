@@ -782,6 +782,7 @@ struct Converter
         out.flagsA9 = 15;
         out.tempo = song.bpm;
         out.beatsPerBar = song.beatsPerBar;
+        out.beatUnit = meterUnit (song.beatUnit);
         out.swing = std::clamp (iround (song.swing * 128.0), 0, 128);
         out.mainPitch = iround (song.masterPitch);
         out.currentPattern = std::clamp (song.currentPattern, 0, std::max (0, (int) song.patterns.size() - 1)) + 1;

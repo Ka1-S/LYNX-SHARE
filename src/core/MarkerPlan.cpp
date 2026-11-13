@@ -203,7 +203,7 @@ void placeSongLoop (Song& song, std::int64_t tick)
 
 std::pair<int, int> signatureAt (const Song& song, std::int64_t tick)
 {
-    std::pair<int, int> sig { std::max (1, song.beatsPerBar), 4 };
+    std::pair<int, int> sig { std::max (1, song.beatsPerBar), meterUnit (song.beatUnit) };
     for (const auto& m : song.markers())
         if (m.isSignature() && m.tick <= tick)
             sig = { m.numerator, m.denominator };

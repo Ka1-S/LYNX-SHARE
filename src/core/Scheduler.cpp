@@ -330,7 +330,7 @@ ScheduleIndex makeScheduleIndex (const Song& song)
         for (const auto& n : p.notes)
             longest = std::max (longest, n.length);
         index.maxNoteLength.push_back (longest);
-        index.patternLength.push_back (std::max<std::int64_t> (1, p.effectiveLength (song.beatsPerBar)));
+        index.patternLength.push_back (std::max<std::int64_t> (1, p.effectiveLength (song.meter())));
     }
 
     // FL's pattern clip takeover (issue #158): each pattern's clips chained by start, the list order kept on the same start
@@ -423,7 +423,7 @@ double hostPositionTick (const Song& song, double tick, std::int64_t songLength)
     if (song.patterns.empty())
         return tick;
     const auto& pattern = song.patterns[(std::size_t) std::clamp (song.currentPattern, 0, (int) song.patterns.size() - 1)];
-    return std::fmod (tick, (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar)));
+    return std::fmod (tick, (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter())));
 }
 
 // An audio clip's note (round 190ey: out of scheduleClip, so a Playlist preview plays the clip through its channel the
@@ -529,7 +529,7 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
     // pattern's length. A clip within its pattern, or the option off, is one pass of the notes in [offset, offset + length).
     const auto period = index != nullptr && (std::size_t) clip.pattern < index->patternLength.size()
                             ? index->patternLength[(std::size_t) clip.pattern]
-                            : std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+                            : std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
     const auto repeats = stretchedClipsLoop() && clip.offset + clip.length > period;
     const auto firstPass = repeats ? clip.offset / period : 0, lastPass = repeats ? (clip.offset + clip.length - 1) / period : 0;
     // a clip of the grid may play through a groove of the pool (round 190bv, core/Groove.h): its notes sound moved and

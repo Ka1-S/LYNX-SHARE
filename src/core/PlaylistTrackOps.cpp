@@ -332,7 +332,7 @@ MergeResult mergePatternClips (Song& song, const std::vector<int>& clips, int* n
         if (c.pattern < 0 || c.pattern >= (int) song.patterns.size())
             continue;
         const auto& p = song.patterns[(std::size_t) c.pattern];
-        const auto period = std::max<std::int64_t> (1, p.effectiveLength (song.beatsPerBar));
+        const auto period = std::max<std::int64_t> (1, p.effectiveLength (song.meter()));
         const auto from = c.offset, to = c.offset + c.length;
         const auto shift = c.start - first.start - c.offset;
         for (std::int64_t base = (from / period) * period; base < to; base += period)

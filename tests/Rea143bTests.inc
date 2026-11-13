@@ -35,10 +35,10 @@ TEST (rea143b_step_position_like_fl_hint_bar)
 {
     using namespace lynx;
     // FL's hint bar over the second step of bar 1: "1:02:00" (bar:step:tick, 24 ticks per step)
-    CHECK (stepPositionText (0, 4) == "1:01:00");
-    CHECK (stepPositionText (ticksPerStep, 4) == "1:02:00");
-    CHECK (stepPositionText (ticksPerStep * 16, 4) == "2:01:00");
-    CHECK (stepPositionText (ticksPerStep * 15 + ticksPerStep / 2, 4) == "1:16:12");
-    CHECK (stepPositionText (ticksPerStep * 12, 3) == "2:01:00"); // 3/4: 12 steps per bar
-    CHECK (stepPositionText (-5, 4) == "1:01:00");
+    CHECK (stepPositionText (0, lynx::Meter (4, 4)) == "1:01:00");
+    CHECK (stepPositionText (ticksPerStep, lynx::Meter (4, 4)) == "1:02:00");
+    CHECK (stepPositionText (ticksPerStep * 16, lynx::Meter (4, 4)) == "2:01:00");
+    CHECK (stepPositionText (ticksPerStep * 15 + ticksPerStep / 2, lynx::Meter (4, 4)) == "1:16:12");
+    CHECK (stepPositionText (ticksPerStep * 12, lynx::Meter (3, 4)) == "2:01:00"); // 3/4: 12 steps per bar
+    CHECK (stepPositionText (-5, lynx::Meter (4, 4)) == "1:01:00");
 }

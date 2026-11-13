@@ -273,7 +273,7 @@ int main (int argc, char** argv)
     song.currentPattern = chosen;
     const int loops = argc > 4 ? std::max (1, std::atoi (argv[4])) : 2;
     const auto& pattern = song.patterns[(std::size_t) chosen];
-    const auto lengthTicks = wholeSong ? songTicks : pattern.effectiveLength (song.beatsPerBar) * loops;
+    const auto lengthTicks = wholeSong ? songTicks : pattern.effectiveLength (song.meter()) * loops;
 
     constexpr int sampleRate = 44100;
     const int blockSize = std::getenv ("LYNX_BLOCK") ? std::clamp (std::atoi (std::getenv ("LYNX_BLOCK")), 16, 8192) : 256;

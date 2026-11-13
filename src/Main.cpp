@@ -62,6 +62,7 @@
 #include "engine/FlStudioExport.h"
 #include "engine/MidiFileIo.h"
 #include "engine/PluginHost.h"
+#include "engine/Vst3NoteTuning.h"
 #include "engine/PluginSandbox.h"
 #include "engine/Bridge32Test.h"
 #include "engine/ClapFormat.h"
@@ -1221,6 +1222,13 @@ public:
         {
             const auto i = args.indexOf ("--vst2test");
             runVst2Test (args[i + 1].unquoted(), args[i + 2].unquoted());
+            return;
+        }
+
+        if (args.contains ("--vst3noteidtest"))
+        {
+            const auto i = args.indexOf ("--vst3noteidtest");
+            runVst3NoteIdTest (args[i + 1].unquoted(), args[i + 2].unquoted());
             return;
         }
 
@@ -3833,7 +3841,7 @@ private:
             hitNote.channel = hitChannel;
             hitNote.length = 480;
             host.patterns[0].notes.push_back (hitNote);
-            host.playlist.push_back ({ 0, 0, 0, host.patterns[0].effectiveLength (host.beatsPerBar), 0 });
+            host.playlist.push_back ({ 0, 0, 0, host.patterns[0].effectiveLength (host.meter()), 0 });
             lynx::uids::normalize (host);
             const auto* guest = lynx::parts::invite (host, "Host", "Ana", 0xFF3D9BE9, false);
             juce::String e;
@@ -4703,6 +4711,21 @@ private:
                 livewf190emResult = "ERROR older reader";
             if (livewf190emResult == "OK" && lynx::ProjectFile::toJson (lynx::Song::makeDefault()).contains ("beatUnit"))
                 livewf190emResult = "ERROR beatUnit written by default";
+            // round 190fg: the song meter's denominator round-trips through .lynx; a file without it reads n/4
+            {
+                auto six = lynx::Song::makeDefault();
+                six.beatsPerBar = 6;
+                six.beatUnit = 8;
+                const auto text = lynx::ProjectFile::toJson (six);
+                juce::String why2;
+                const auto back = lynx::ProjectFile::fromJson (text, why2);
+                auto json = juce::JSON::parse (text);
+                if (auto* o = json.getDynamicObject())
+                    o->removeProperty ("beatUnit");
+                const auto old = lynx::ProjectFile::fromJson (juce::JSON::toString (json), why2);
+                if (livewf190emResult == "OK" && (! back || back->beatsPerBar != 6 || back->beatUnit != 8 || ! old || old->beatsPerBar != 6 || old->beatUnit != 4))
+                    livewf190emResult = "ERROR song meter round trip";
+            }
 
             lynx::AudioEngine e (false);
             e.editSong ([] (lynx::Song& s) {
@@ -4714,12 +4737,16 @@ private:
                 lynx::session::setSceneTempo (s, 2, 90.0);
             }, false);
             e.launcherCommand ({ lynx::launcher::Command::Type::launchScene, 0, 2 });
-            if (livewf190emResult == "OK" && (e.getSong().beatsPerBar != 3 || e.getSong().bpm != 90.0))
-                livewf190emResult = "ERROR scene launch " + juce::String (e.getSong().beatsPerBar) + " " + juce::String (e.getSong().bpm);
+            // (round 190fg: the song takes the scene's 6 / 8 as it is: six eighths a bar, 3 quarters long)
+            if (livewf190emResult == "OK" && (e.getSong().beatsPerBar != 6 || e.getSong().beatUnit != 8 || e.getSong().barTicks() != 3 * lynx::ppq
+                                              || e.getSong().bpm != 90.0))
+                livewf190emResult = "ERROR scene launch " + juce::String (e.getSong().beatsPerBar) + "/" + juce::String (e.getSong().beatUnit) + " "
+                                    + juce::String (e.getSong().bpm);
             e.stop();
             e.editSong ([] (lynx::Song& s) {
                 s.bpm = 120.0;
                 s.beatsPerBar = 4;
+                s.beatUnit = 4;
             }, false);
             e.setGridTrackArmed (2, true, true);
             const auto now = juce::Time::getMillisecondCounterHiRes();
@@ -7954,6 +7981,129 @@ private:
             }
         }
 
+        report << "result=" << (ok ? "OK" : "FAILED") << "\n";
+        juce::File (reportPath).replaceWithText (report);
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
+    // LYNX --vst3noteidtest "LYNX Test Synth.vst3" report.txt (round 190fg, cmake/LynxPatchJuce.cmake fix 26): the VST3
+    // test synth (tools/testplugin/lynx_test_synth_vst3.cpp: voices kept by noteId, its log the ids it got) plays two
+    // overlapping pairs of one key on one channel: FIFO (A 0-4, B 2-6 beats, key 60) and LIFO (C 8-14, D 10-12, key 64).
+    // Each note off must carry its own note on's id (FL: each note ends its own voice, round 190ej): the inner note D's
+    // end ends D. A second render with the tag hook off shows fix 14 alone (the oldest id: D's end carries C's id).
+    void runVst3NoteIdTest (const juce::String& pluginPath, const juce::String& reportPath)
+    {
+        juce::String report;
+        bool ok = false;
+        const auto logBase = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-noteid-" + juce::String (juce::Time::currentTimeMillis()));
+        // (read by each new instance)
+       #if JUCE_WINDOWS
+        _putenv_s ("LYNX_TEST_SYNTH_LOG", logBase.getFullPathName().toRawUTF8());
+       #else
+        setenv ("LYNX_TEST_SYNTH_LOG", logBase.getFullPathName().toRawUTF8(), 1);
+       #endif
+        struct E
+        {
+            bool on = false;
+            int key = 0, id = -1;
+        };
+        // (the lines each render added: a running instance keeps its log file open, so the files stay until the end)
+        std::map<juce::String, int> linesRead;
+        const auto readLog = [&logBase, &linesRead] {
+            std::vector<E> events;
+            for (const auto& f : logBase.getParentDirectory().findChildFiles (juce::File::findFiles, false, logBase.getFileName() + ".*"))
+            {
+                juce::StringArray lines;
+                f.readLines (lines);
+                auto& done = linesRead[f.getFullPathName()];
+                for (int i = done; i < lines.size(); ++i)
+                {
+                    const auto p = juce::StringArray::fromTokens (lines[i], " ", {});
+                    if (p.size() >= 5 && p[0].startsWith ("E"))
+                        events.push_back ({ p[1] == "on", p[2].getIntValue(), p[4].getIntValue() });
+                }
+                done = lines.size() - (lines.isEmpty() || lines[lines.size() - 1].isNotEmpty() ? 0 : 1);
+            }
+            return events;
+        };
+        {
+            lynx::AudioEngine offline (false);
+            auto& host = offline.getPluginHost();
+            report << "plugins_in_file=" << host.addPluginFile (juce::File (pluginPath)) << "\n";
+            std::optional<juce::PluginDescription> vst3;
+            for (const auto& type : host.getKnownPlugins().getTypes())
+                if (type.pluginFormatName == "VST3" && type.isInstrument)
+                    vst3 = type;
+            const auto render = [&] (bool tags) {
+                auto song = lynx::Song::makeDefault();
+                song.bpm = 120.0;
+                auto& c = song.channels[0];
+                c.instrument = lynx::InstrumentKind::plugin;
+                c.plugin.id = vst3->createIdentifierString().toStdString();
+                c.plugin.name = vst3->name.toStdString();
+                for (std::size_t k = 1; k < song.channels.size(); ++k)
+                    song.channels[k].muted = true;
+                auto& notes = song.patterns[0].notes;
+                notes.clear();
+                const auto beat = (std::int64_t) lynx::ppq;
+                notes.push_back ({ 0, 4 * beat, 0, 60, 0.8f });      // A
+                notes.push_back ({ 2 * beat, 4 * beat, 0, 60, 0.8f }); // B
+                notes.push_back ({ 8 * beat, 6 * beat, 0, 64, 0.8f }); // C
+                notes.push_back ({ 10 * beat, 2 * beat, 0, 64, 0.8f }); // D (inside C)
+                song.patterns[0].sortNotes();
+                song.patterns[0].lengthTicks = 16 * beat;
+                offline.setSong (song);
+                offline.dispatchPendingMessages();
+                if (! tags)
+                    juce::lynxNoteTagHook = nullptr; // (fix 14 alone: the oldest sounding id; the next instance sets it again)
+                offline.renderOffline (7.9, 48000.0); // (C ends at 7 s; the 8 s pattern does not loop yet)
+                return readLog();
+            };
+            const auto check = [&report] (const char* name, const std::vector<E>& events, bool expectOwn) {
+                // ons and offs of each key in the order the plugin got them
+                std::map<int, std::vector<int>> ons, offs;
+                for (const auto& e : events)
+                    (e.on ? ons : offs)[e.key].push_back (e.id);
+                const auto& a = ons[60]; const auto& o60 = offs[60];
+                const auto& c = ons[64]; const auto& o64 = offs[64];
+                report << name << ": key 60 ons";
+                for (auto id : a) report << " " << id;
+                report << " offs";
+                for (auto id : o60) report << " " << id;
+                report << "; key 64 ons";
+                for (auto id : c) report << " " << id;
+                report << " offs";
+                for (auto id : o64) report << " " << id;
+                report << "\n";
+                if (a.size() != 2 || o60.size() != 2 || c.size() != 2 || o64.size() != 2 || a[0] < 0 || c[0] < 0)
+                    return false;
+                const auto fifo = o60[0] == a[0] && o60[1] == a[1]; // A ends first: A's id either way
+                // LIFO: D (c[1]) ends first; its own id with the tags, C's (the oldest) without
+                const auto lifo = expectOwn ? (o64[0] == c[1] && o64[1] == c[0]) : (o64[0] == c[0] && o64[1] == c[1]);
+                return fifo && lifo;
+            };
+            if (vst3)
+            {
+                report << "plugin=" << vst3->name << "\n";
+                const auto withTags = render (true);
+                const auto okTags = check ("with_tags", withTags, true);
+                const auto withoutTags = render (false);
+                const auto okBefore = check ("fix14_only", withoutTags, false);
+                report << "own_ids=" << (okTags ? "yes" : "NO") << " fix14_only_oldest=" << (okBefore ? "yes" : "NO") << "\n";
+                ok = okTags && okBefore;
+            }
+        }
+        if (ok) // (a failure leaves the logs for a look: their path is in the report)
+            for (const auto& f : logBase.getParentDirectory().findChildFiles (juce::File::findFiles, false, logBase.getFileName() + ".*"))
+                f.deleteFile();
+        else
+            report << "synth_logs=" << logBase.getFullPathName() << ".*\n";
+       #if JUCE_WINDOWS
+        _putenv_s ("LYNX_TEST_SYNTH_LOG", "");
+       #else
+        unsetenv ("LYNX_TEST_SYNTH_LOG");
+       #endif
         report << "result=" << (ok ? "OK" : "FAILED") << "\n";
         juce::File (reportPath).replaceWithText (report);
         setApplicationReturnValue (ok ? 0 : 1);
@@ -13014,7 +13164,7 @@ private:
         // ---- the Export window: as it opens, and with a preset chosen, sections on and a last export to repeat
         {
             auto song = lynx::Song::makeDefault();
-            const auto bar = (std::int64_t) lynx::ppq * song.beatsPerBar;
+            const auto bar = song.barTicks();
             song.mode = lynx::PlayMode::song;
             song.playlist.clear();
             lynx::Clip clip;
@@ -20861,7 +21011,7 @@ private:
                 const auto before = offline.getSong();
                 offline.editSong ([] (lynx::Song& s) {
                     s.loopStart = s.loopEnd = 0; // (no time selection in this one)
-                    const auto bar = (std::int64_t) lynx::ppq * s.beatsPerBar;
+                    const auto bar = s.barTicks();
                     const auto vol = lynx::autolanes::addLane (s, 1, { lynx::AutomationTargetKind::mixerVolume, 1, 0, 0 }, "Insert 1 - Volume", 0.3f);
                     s.automations[(std::size_t) vol].points = { { 0, 0.3f, 0.0f }, { bar * 2, 0.8f, 0.4f }, { bar * 4, 0.6f, 0.0f } };
                     const auto pan = lynx::autolanes::addLane (s, 1, { lynx::AutomationTargetKind::mixerPan, 1, 0, 0 }, "Insert 1 - Pan", 0.5f);
@@ -21806,7 +21956,7 @@ private:
                 {
                     juce::StringArray failed;
                     const auto expect = [&failed] (bool ok, const char* what) { if (! ok) failed.add (what); };
-                    const auto bar = (std::int64_t) lynx::ppq * offline.getSong().beatsPerBar;
+                    const auto bar = offline.getSong().barTicks();
                     offline.editSong ([bar] (lynx::Song& s) {
                         s.blocks.clear();
                         for (std::size_t r = 0; r < 4 && r < s.patterns.size(); ++r)
@@ -22041,7 +22191,7 @@ private:
                     s.channels.push_back (sampler);
                     samplerChannel = (int) s.channels.size() - 1;
 
-                    const auto bar = (std::int64_t) lynx::ppq * std::max (1, s.beatsPerBar);
+                    const auto bar = s.barTicks();
                     const auto whole = (std::int64_t) std::llround (8.0 * s.bpm / 60.0 * lynx::ppq);
                     lynx::Clip clip;
                     clip.kind = lynx::ClipKind::audio;
@@ -22097,7 +22247,7 @@ private:
                                 paths.push_back (f.trim());
 
                         offline.editSong ([&] (lynx::Song& s) {
-                            const auto bar = (std::int64_t) lynx::ppq * std::max (1, s.beatsPerBar);
+                            const auto bar = s.barTicks();
                             const std::uint32_t colours[] = { 0, 0xffd9a441, 0xff6fb36a, 0xffb06fd0, 0xff5fb7c9, 0xffd06f6f };
                             for (std::size_t i = 0; i < paths.size(); ++i)
                             {

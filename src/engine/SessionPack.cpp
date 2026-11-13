@@ -332,6 +332,7 @@ std::string sourceHash (const Song& song, bool insert, int index, int pattern, d
         // a pattern stem: the channel (without what applies live), its notes in that pattern, the tempo and swing
         mini.bpm = song.bpm;
         mini.beatsPerBar = song.beatsPerBar;
+        mini.beatUnit = song.beatUnit;
         mini.swing = song.swing;
         mini.masterPitch = song.masterPitch;
         auto c = song.channels[(std::size_t) index];
@@ -347,7 +348,7 @@ std::string sourceHash (const Song& song, bool insert, int index, int pattern, d
         mini.channels = { c };
         const auto& source = song.patterns[(std::size_t) pattern];
         Pattern p;
-        p.lengthTicks = source.effectiveLength (song.beatsPerBar);
+        p.lengthTicks = source.effectiveLength (song.meter());
         p.loopOn = source.loopOn;
         p.loopMode = source.loopMode;
         for (auto n : source.notes)
@@ -538,6 +539,7 @@ std::string freezeSource (const Song& song, int channel, double sampleRate)
     Song mini;
     mini.bpm = song.bpm;
     mini.beatsPerBar = song.beatsPerBar;
+    mini.beatUnit = song.beatUnit;
     mini.swing = song.swing;
     mini.masterPitch = song.masterPitch;
     auto c = song.channels[(std::size_t) channel];
@@ -567,7 +569,7 @@ std::string freezeSource (const Song& song, int channel, double sampleRate)
         plays[p] = ! q.notes.empty();
         if (plays[p])
         {
-            q.lengthTicks = source.effectiveLength (song.beatsPerBar);
+            q.lengthTicks = source.effectiveLength (song.meter());
             q.loopOn = source.loopOn;
             q.loopMode = source.loopMode;
             for (auto l : source.channelLoops)

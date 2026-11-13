@@ -55,7 +55,7 @@ int insertScene (Song& song, int at);
 bool removeScene (Song& song, int scene); // with its clips (a grid keeps at least one scene)
 
 // Ticks of a launch quantisation (0 = none; `global` is resolved by the caller).
-double quantTicks (LaunchQuant quant, int beatsPerBar) noexcept;
+double quantTicks (LaunchQuant quant, Meter meter) noexcept; // (bars of the meter; note values are absolute, as Live's)
 
 // A row's clips form groups: runs of filled slots in a column, as follow actions see them. Writes the rows of the group
 // holding `scene` on `track` to out[] (capacity rows), in order; returns how many, 0 for an empty slot.

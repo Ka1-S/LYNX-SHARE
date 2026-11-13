@@ -124,7 +124,7 @@ void placeInstrumentNotes (Song& song, int track, int channel, const std::string
     if (request.pattern)
         pattern = *request.pattern;
     else
-        pattern.lengthTicks = (std::int64_t) request.emptyBars * std::max (1, song.beatsPerBar) * ppq;
+        pattern.lengthTicks = (std::int64_t) request.emptyBars * song.barTicks();
     pattern.name = name;
     pattern.colour = colour;
     for (auto& n : pattern.notes)
@@ -137,7 +137,7 @@ void placeInstrumentNotes (Song& song, int track, int channel, const std::string
     clip.pattern = r.pattern;
     clip.track = track;
     clip.start = std::max<std::int64_t> (0, request.start);
-    clip.length = song.patterns[(std::size_t) r.pattern].effectiveLength (song.beatsPerBar);
+    clip.length = song.patterns[(std::size_t) r.pattern].effectiveLength (song.meter());
     song.playlist.push_back (clip);
     song.mode = PlayMode::song;
 }
@@ -230,10 +230,10 @@ Result addDrums (Song& song, int track, const Request& request)
     clip.pattern = r.pattern;
     clip.track = track;
     clip.start = 0;
-    clip.length = song.patterns[(std::size_t) r.pattern].effectiveLength (song.beatsPerBar);
+    clip.length = song.patterns[(std::size_t) r.pattern].effectiveLength (song.meter());
     song.playlist.push_back (clip);
     // the same pattern again and again until `fillBars` bars are covered (whole clips: a 3-bar pattern covers 6)
-    const auto wanted = (std::int64_t) std::clamp (request.fillBars, 0, 64) * song.beatsPerBar * ppq;
+    const auto wanted = (std::int64_t) std::clamp (request.fillBars, 0, 64) * song.barTicks();
     for (auto at = clip.length; clip.length > 0 && at < wanted; at += clip.length)
     {
         clip.start = at;
@@ -347,7 +347,7 @@ double tempoInName (const std::string& name, bool* explicitBpm)
     return 0.0;
 }
 
-float loopBeats (const std::string& name, double seconds, float acidBeats, int beatsPerBar) noexcept
+float loopBeats (const std::string& name, double seconds, float acidBeats, Meter meter) noexcept
 {
     if (! (seconds > 0.0) || seconds > 70.0)
         return 0.0f;
@@ -358,7 +358,7 @@ float loopBeats (const std::string& name, double seconds, float acidBeats, int b
     if (! (bpm > 0.0))
         return 0.0f;
     const auto beats = seconds * bpm / 60.0;
-    const auto bar = (double) std::max (1, beatsPerBar);
+    const auto bar = (double) meter.bar() / ppq; // (in quarter notes)
     if (const auto bars = std::round (beats / bar); bars >= 1.0 && std::abs (beats - bars * bar) <= 0.25)
         return (float) (bars * bar);
     if (const auto whole = std::round (beats); whole >= 1.0 && whole < bar && std::abs (beats - whole) <= 0.08)
@@ -493,14 +493,14 @@ int ensurePattern (Song& song, int track, int bars, bool* made)
     Pattern pattern;
     pattern.name = ! t.name.empty() ? t.name : song.channels[(std::size_t) t.channel].name;
     pattern.colour = song.channels[(std::size_t) t.channel].colour;
-    pattern.lengthTicks = (std::int64_t) std::max (1, bars) * std::max (1, song.beatsPerBar) * ppq;
+    pattern.lengthTicks = (std::int64_t) std::max (1, bars) * song.barTicks();
     song.patterns.push_back (std::move (pattern));
     Clip clip;
     clip.kind = ClipKind::pattern;
     clip.pattern = (int) song.patterns.size() - 1;
     clip.track = track;
     clip.start = 0;
-    clip.length = song.patterns.back().effectiveLength (song.beatsPerBar);
+    clip.length = song.patterns.back().effectiveLength (song.meter());
     song.playlist.push_back (clip);
     song.mode = PlayMode::song;
     if (made != nullptr)

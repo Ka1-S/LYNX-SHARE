@@ -1104,10 +1104,10 @@ TEST (session190cy_recorded_clips_are_named_after_the_track_and_the_counter_read
     const auto plain = session::placeRecordedPattern (s, 2, 0, {}, bar);
     CHECK (plain >= 0 && s.patterns[(std::size_t) plain].name.rfind ("Pattern ", 0) == 0);
 
-    CHECK (session::lengthCounter (0.0, 4) == "0.0.0");
-    CHECK (session::lengthCounter ((double) ppq, 4) == "0.1.0");
-    CHECK (session::lengthCounter (8.0 * ppq + 2.0 * ppq / 4.0, 4) == "2.0.2");
-    CHECK (session::lengthCounter (4.0 * ppq + 3.0 * ppq + 3.0 * ppq / 4.0 + 100.0, 4) == "1.3.3");
-    CHECK (session::lengthCounter (3.0 * ppq, 3) == "1.0.0"); // 3/4
-    CHECK (session::lengthCounter (-5.0, 4) == "0.0.0");
+    CHECK (session::lengthCounter (0.0, lynx::Meter (4, 4)) == "0.0.0");
+    CHECK (session::lengthCounter ((double) ppq, lynx::Meter (4, 4)) == "0.1.0");
+    CHECK (session::lengthCounter (8.0 * ppq + 2.0 * ppq / 4.0, lynx::Meter (4, 4)) == "2.0.2");
+    CHECK (session::lengthCounter (4.0 * ppq + 3.0 * ppq + 3.0 * ppq / 4.0 + 100.0, lynx::Meter (4, 4)) == "1.3.3");
+    CHECK (session::lengthCounter (3.0 * ppq, lynx::Meter (3, 4)) == "1.0.0"); // 3/4
+    CHECK (session::lengthCounter (-5.0, lynx::Meter (4, 4)) == "0.0.0");
 }

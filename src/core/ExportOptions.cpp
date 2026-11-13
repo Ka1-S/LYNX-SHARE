@@ -140,9 +140,9 @@ Options clamped (Options o)
     return o;
 }
 
-double lengthInBars (double seconds, double bpm, int beatsPerBar) noexcept
+double lengthInBars (double seconds, double bpm, Meter meter) noexcept
 {
-    return seconds <= 0.0 || bpm <= 0.0 ? 0.0 : seconds * bpm / 60.0 / (double) std::max (1, beatsPerBar);
+    return seconds <= 0.0 || bpm <= 0.0 ? 0.0 : seconds * bpm / 60.0 / ((double) meter.bar() / ppq);
 }
 
 std::int64_t estimatedBytes (const Options& o, double seconds) noexcept
@@ -225,7 +225,7 @@ std::vector<Note> midiExportNotes (const Song& original)
         {
             // the pattern repeats along a clip longer than it (LYNX extra stretchedClipsLoop, issue #25)
             const auto& pattern = song.patterns[(std::size_t) c.pattern];
-            const auto period = std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+            const auto period = std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
             const auto repeats = stretchedClipsLoop() && c.offset + c.length > period;
             // FL's pattern clip takeover (issue #158): what plays is what is written
             const auto stopsAt = patternClipStopsAt (song, clipIndex);
@@ -410,7 +410,7 @@ Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTi
         Clip tail;
         tail.pattern = (int) base.patterns.size() - 1;
         tail.start = musicTicks;
-        tail.length = tailTicks + (std::int64_t) ppq * std::max (1, base.beatsPerBar);
+        tail.length = tailTicks + base.barTicks();
         base.playlist.push_back (tail);
     }
 
@@ -866,7 +866,7 @@ WavExtras wavExtras (const Song& song, const Options& o, double sampleRate)
     x.acid = o.saveTempo;
     x.tempo = (float) song.bpm;
     x.numerator = std::max (1, song.beatsPerBar);
-    x.denominator = std::max (1, 16 / stepsPerBeat); // FL: 16 / steps per beat
+    x.denominator = meterUnit (song.beatUnit); // FL: 16 / steps per beat (round 190fg: the song meter's denominator)
     if (o.playlistMarkers)
     {
         // the range: the selection starts at the loop region (as makeRenderSong cuts it), one pass

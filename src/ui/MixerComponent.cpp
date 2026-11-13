@@ -5725,7 +5725,8 @@ void EffectsPanel::paint (juce::Graphics& g)
 
         g.setColour (colour::textSecondary);
         g.setFont (font (type::caption));
-        textcache::drawFittedText (g, juce::String::fromUTF8 (info.params[(std::size_t) p].name), r.getX(), r.getY() + knobHeight + 2, r.getWidth(), 14,
+        // (round 190fg: through the translation table, as the generated editor page and the Pocket panels show it)
+        textcache::drawFittedText (g, tr (info.params[(std::size_t) p].name), r.getX(), r.getY() + knobHeight + 2, r.getWidth(), 14,
                           juce::Justification::centred, 1, 0.8f);
         g.setColour (colour::textPrimary);
         textcache::drawText (g, juce::String::fromUTF8 (formatEffectParam (slot.kind, p, value, song.bpm, slot.params).c_str()), r.getX(), r.getY() + knobHeight + 16,
@@ -6017,7 +6018,7 @@ ui::ValueSpec EffectsPanel::specFor (int param, int slot) const
     if (param < 0 || param >= (int) info.params.size())
         return spec;
 
-    spec.name = trackName + " - " + utf8 (info.name) + " - " + utf8 (info.params[(std::size_t) param].name);
+    spec.name = trackName + " - " + utf8 (info.name) + " - " + tr (info.params[(std::size_t) param].name); // (as "Mix" above)
     spec.defaultValue = info.params[(std::size_t) param].defaultValue;
     spec.toText = [kind = fx.kind, param, bpm = song.bpm, context = fx.params] (double v) { return utf8 (formatEffectParam (kind, param, (float) v, bpm, context).c_str()); };
     spec.fromText = ui::inverseOf (spec.toText, 0.0, 1.0);

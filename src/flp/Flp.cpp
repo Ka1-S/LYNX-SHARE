@@ -41,6 +41,7 @@ enum : std::uint32_t
     evSamplePingPong = 0x14,    // u8: Sampler › Ping pong loop
     evSampleLoopRecord = 0xFB,  // the sampler's loop points (round 190dh, see Channel::loopStart)
     evTimeSignatureNumerator = 0x11,
+    evTimeSignatureDenominator = 0x12, // (round 190fg; the project's, after its numerator)
     evChannelSwingMix = 0x61,
     evLayerChild = 0x5E,  // u16: a Layer channel's child (one event per child; REA_rodada164a §1)
     evLayerFlags = 0x90,  // u32: a Layer channel's options (REA_rodada164a §1)
@@ -491,6 +492,7 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
     }
     bool hasFineTempo = false;
     bool hasTimeSignature = false;
+    bool takeDenominator = false; // (round 190fg: the 0x12 that follows the project's 0x11)
     std::string pendingInsertName;
     std::string pendingSlotPlugin;
     std::vector<std::uint8_t> pendingSlotState;
@@ -917,7 +919,14 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                 {
                     project.beatsPerBar = (int) e.value;
                     hasTimeSignature = true; // the following ones belong to patterns
+                    takeDenominator = true;
                 }
+                break;
+
+            case evTimeSignatureDenominator:
+                if (takeDenominator && e.value >= 1 && e.value <= 16)
+                    project.beatUnit = (int) e.value;
+                takeDenominator = false;
                 break;
 
             case evTempoCoarse:

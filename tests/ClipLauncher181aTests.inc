@@ -219,11 +219,11 @@ TEST (grid181a_launch_waits_for_the_quantisation)
     CHECK (r.runtime.anyPlaying.load());
 
     // the table: each value's ticks
-    CHECK (launcher::quantTicks (LaunchQuant::none, 4) == 0.0);
-    CHECK (launcher::quantTicks (LaunchQuant::bars8, 4) == 32.0 * ppq);
-    CHECK (launcher::quantTicks (LaunchQuant::bar, 3) == 3.0 * ppq); // a bar is the song's own
-    CHECK (closeTo (launcher::quantTicks (LaunchQuant::eighthTriplet, 4) * 3.0, ppq, 1.0e-9));
-    CHECK (launcher::quantTicks (LaunchQuant::thirtySecond, 4) == ppq / 8.0);
+    CHECK (launcher::quantTicks (LaunchQuant::none, lynx::Meter (4, 4)) == 0.0);
+    CHECK (launcher::quantTicks (LaunchQuant::bars8, lynx::Meter (4, 4)) == 32.0 * ppq);
+    CHECK (launcher::quantTicks (LaunchQuant::bar, lynx::Meter (3, 4)) == 3.0 * ppq); // a bar is the song's own
+    CHECK (closeTo (launcher::quantTicks (LaunchQuant::eighthTriplet, lynx::Meter (4, 4)) * 3.0, ppq, 1.0e-9));
+    CHECK (launcher::quantTicks (LaunchQuant::thirtySecond, lynx::Meter (4, 4)) == ppq / 8.0);
 }
 
 TEST (grid181a_no_quantisation_and_exact_grid_point)

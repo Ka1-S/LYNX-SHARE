@@ -151,7 +151,7 @@ double mp3SampleRate (double rate) noexcept;
 // What the render window shows before the export (FL: "Length: 144 bars  Total time: 3'57''  Disk space: 38.76 MB"):
 // the music's length in bars and the file size the options give for `seconds` (one file; the tail not counted;
 // FLAC and the lossy formats are estimates).
-double lengthInBars (double seconds, double bpm, int beatsPerBar) noexcept;
+double lengthInBars (double seconds, double bpm, Meter meter) noexcept;
 std::int64_t estimatedBytes (const Options& o, double seconds) noexcept;
 
 // The notes FL's File › Export › "MIDI file..." writes (REA round 139): in song mode, each pattern clip's part of its

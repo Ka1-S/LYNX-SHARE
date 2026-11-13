@@ -68,7 +68,7 @@ inline double patternPlayhead (const Song& song, int pattern, double transportTi
             return -1.0;
         if (linearOrigin >= 0.0 && transportTick >= linearOrigin)
             return transportTick - linearOrigin;
-        const auto length = (double) std::max<std::int64_t> (1, song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar));
+        const auto length = (double) std::max<std::int64_t> (1, song.patterns[(std::size_t) pattern].effectiveLength (song.meter()));
         return std::fmod (transportTick, length);
     }
 
@@ -81,7 +81,7 @@ inline double patternPlayhead (const Song& song, int pattern, double transportTi
                 best = &c;
 
     // a stretched clip loops its pattern (LYNX extra stretchedClipsLoop, issue #25): the playhead wraps with it
-    return best != nullptr ? patternTickInClip (*best, inSong, song.patterns[(std::size_t) pattern].effectiveLength (song.beatsPerBar)) : -1.0;
+    return best != nullptr ? patternTickInClip (*best, inSong, song.patterns[(std::size_t) pattern].effectiveLength (song.meter())) : -1.0;
 }
 
 // Where the transport goes when the Piano Roll's ruler is clicked at `patternTick` (round 163, FL: clicking the

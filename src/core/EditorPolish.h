@@ -106,7 +106,7 @@ inline std::vector<Note> clipGhostNotes (const Song& song, int pattern, int chan
 
         const auto& other = song.patterns[(std::size_t) c.pattern];
         const auto origin = c.start - c.offset;
-        const auto length = std::max<std::int64_t> (1, other.effectiveLength (song.beatsPerBar));
+        const auto length = std::max<std::int64_t> (1, other.effectiveLength (song.meter()));
         // a stretched clip loops its pattern when stretchedClipsLoop() (LYNX extra, issue #25); off = FL: once from
         // the clip's offset (round 168k)
         const auto loops = stretchedClipsLoop() && c.offset + c.length > length;

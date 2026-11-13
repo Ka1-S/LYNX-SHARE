@@ -244,7 +244,7 @@ juce::MemoryBlock writeNotes (const Song& song, const std::vector<Note>& notes, 
     midi.setTicksPerQuarterNote (ppq);
     juce::MidiMessageSequence tempo;
     tempo.addEvent (juce::MidiMessage::tempoMetaEvent (juce::roundToInt (60'000'000.0 / juce::jmax (1.0, song.bpm))), 0.0);
-    tempo.addEvent (juce::MidiMessage::timeSignatureMetaEvent (juce::jmax (1, song.beatsPerBar), 4), 0.0);
+    tempo.addEvent (juce::MidiMessage::timeSignatureMetaEvent (juce::jmax (1, song.beatsPerBar), meterUnit (song.beatUnit)), 0.0);
     midi.addTrack (tempo);
     seq.addEvent (juce::MidiMessage::textMetaEvent (3, juce::String::fromUTF8 (trackName.c_str())), 0.0);
     seq.sort();
@@ -314,7 +314,7 @@ bool savePattern (const Song& song, int patternIndex, const juce::File& file, ju
 
     juce::MidiMessageSequence tempo;
     tempo.addEvent (juce::MidiMessage::tempoMetaEvent (juce::roundToInt (60'000'000.0 / song.bpm)), 0.0);
-    tempo.addEvent (juce::MidiMessage::timeSignatureMetaEvent (song.beatsPerBar, 4), 0.0);
+    tempo.addEvent (juce::MidiMessage::timeSignatureMetaEvent (song.beatsPerBar, meterUnit (song.beatUnit)), 0.0);
     midi.addTrack (tempo);
 
     for (auto& [channel, seq] : byChannel)
@@ -344,6 +344,7 @@ bool saveSong (const Song& song, const juce::File& file, juce::String& error)
     Song flat;
     flat.bpm = song.bpm;
     flat.beatsPerBar = song.beatsPerBar;
+    flat.beatUnit = song.beatUnit;
     flat.channels = song.channels;
     flat.patterns.resize (1);
     flat.patterns[0].notes = exportopts::midiExportNotes (song);

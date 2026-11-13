@@ -127,7 +127,7 @@ bool AudioEngine::recordSlot (int track, int scene)
     }
     launcher::Command c { launcher::Command::Type::record, track, scene };
     if (slotRecordBars > 0)
-        c.at = (double) slotRecordBars * std::max (1, song.beatsPerBar) * ppq;
+        c.at = (double) slotRecordBars * (double) song.barTicks();
     launcherCommand (c);
     updateAudioRecording(); // (the files are open before the first block)
     sendChangeMessage();
