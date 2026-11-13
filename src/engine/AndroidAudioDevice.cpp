@@ -38,13 +38,9 @@ AndroidAudioDevice::~AndroidAudioDevice()
 
 int AndroidAudioDevice::getDefaultBufferSize()
 {
-    if (builder)
-    {
-        int32_t framesPerBurst = AAudioStreamBuilder_getFramesPerBurst(builder);
-        if (framesPerBurst > 0)
-            return framesPerBurst;
-    }
-    return 256;
+    // AAudioStreamBuilder_getFramesPerBurst doesn't exist in NDK
+    // Use a reasonable default that works well on most Android devices
+    return 192;
 }
 
 juce::Array<double> AndroidAudioDevice::getAvailableSampleRates()
