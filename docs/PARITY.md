@@ -3313,3 +3313,68 @@ at Drive 15 / fast tape a hard ceiling (−0.6 / −5.3 / −10.5 dB at −15 / 
 loses 2.7 dB flat at default and stays almost linear at Drive 15: Ember's own Tape curve cannot be fitted to that
 law. A tape style with a level-dependent ceiling (hysteresis core) is the next step there.
 Tools and tables: `/mnt/e/lynx-work/vqe190dp` (`bank.sh`, `gate.py`, `vsx/`, `qfit/`, `qv/`, `ember/`, `golden/`).
+
+## Round 190fj: Ember's Tape on a measured magnetic core (Law: Classic | Measured), tape speed
+
+**Finding (black-box, the tape reference's recorded renders).** At small level the reference is a pure 147-sample
+delay (impulse: one tap of 0.962, response flat to 0.2 dB from 20 Hz to 20 kHz), odd harmonics only (H2 below −150 dB,
+H3 rising 12 dB per 6 dB), its drive compensated (the quiet stair steps read 0.00 dB at every drive). On the 1 kHz
+staircase the fundamental lags the input as the level rises: 0° up to −24 dBFS, −1.9° / −8.7° at −12 / 0 dBFS with
+Drive +10 dB, −26.6° at Drive +15 dB and 1⅞ ips. A static curve fitted per step leaves −16 dB (Drive +10, 0 dBFS) and
+−9 dB (Drive +15) of residual, while any memoryless curve — with any EQ around it — keeps the fundamental's phase
+exactly. At Drive +15 / 1⅞ ips the three loudest steps come out identical (−127 dB apart): the field is clamped ahead
+of the core. Its tails are exactly zero (no remanent offset). Ember's Classic tape curve (round 190dp: "cannot follow
+that level law") lost 2.7 dB flat at the default and stayed almost linear at Drive +15.
+
+**Engine (`core/EmberTape.h`, LYNX's own).** Record EQ (a low and a high first-order shelf) → record level → field
+clamp (`clip · tanh`) → Jiles–Atherton loop (D. C. Jiles, D. L. Atherton, J. Magn. Magn. Mater. 61, 1986; for tape
+J. Chowdhury, DAFx-19 — literature only, no code of any tape model) solved per oversampled sample with midpoint
+Runge–Kutta on the field step, the Langevin function from a 4096-point table, and a 5 ms creep back to the
+anhysteretic curve (without it the loop keeps a remanent offset after loud passages: −12 dB of the peak at Drive +15;
+a DC blocker instead cost the default's sweep 19 dB of ESR) → small-signal make-up (Auto gain on: 0 dB at quiet
+levels, as the reference) → playback EQ (the record EQ's exact inverse) → playback loss (one-pole low-pass per speed)
+→ trim. Ember's half-band oversampler around the core as for every style; a switch onto the measured Tape on a running
+signal starts its filters and loop at the signal's state (no click; FxAudit clean).
+Constants fitted with `fit/tapefit` (Nelder–Mead on mean ESR + level error, the model compiled from the same header):
+the loop, record EQ and drive law at 15 ips on the default and Drive +10 takes (tp172c stairs, sweeps, drums, music);
+1⅞ ips on Drive +15 (tp172c + refcap182 programme); 30 ips on refcap182's X1; 7½ ips on X2 (a take with "Average"
+tape and flutter on: its level law only); 3¾ ips interpolated. Ember's drive 18 dB = the reference's 0 dB (record
+level = gain0 + 1.384 × (drive − 18) dB). The fit keeps the loop narrow: the Langevin saturation, the level law, the
+clamp and the losses carry the match. The reference's lag (which grows as it saturates, where a JA loop's shrinks) is
+not reproduced yet.
+
+**Parameters.** `Law` (appended; Measured for new instances, Classic for projects saved before:
+`upgradeLoadedEffectParams`) and `Tape speed` (30, 15, 7.5, 3.75, 1.875 ips; 15 by default). The measured core runs
+only where the Classic tape curve ran: single band, Style Tape, no voice / band character / Classic voicing / band
+feedback; every other path is untouched. Panel: the speed tabs under the curve while Tape runs measured; the Law tabs
+in the same place while a project's Classic tape is set (both hidden on the Classic voicing's page).
+
+**Gate** (base b0cb90aec objects vs branch, same banks, same harness: `/mnt/e/lynx-work/ember190fj`, `gate.py`):
+
+| Reference row | Bank | Files | Before → after | Up / same / down |
+|---|---|---|---|---|
+| Harrison Tape Saturator → Ember (measured Tape) | tp172c | 12 | 2.67 → **5.75** | 12 / 0 / 0 |
+| Harrison Tape Saturator → Ember (measured Tape) | refcap182 programme | 25 | 2.76 → **5.56** | 23 / 2 / 0 |
+| Saturn 2 | tp172b / refcap182 | 20 / 25 | 5.10 / 6.16 → same | 0 / 45 / 0 |
+| Decapitator | tp172d / trial187b / refcap182 | 24 / 100 / 30 | 5.00 / 3.91 / 4.70 → same | 0 / 154 / 0 |
+| X-Saturator v6, VM Revival, Fusion Vintage Drive, Fusion Transformer | tp172c / refcap182 | 40 / 100 | 5.00, 5.75, 4.58, 5.12 / 5.60, 6.08, 5.04, 6.24 → same | 0 / 140 / 0 |
+| Heatwave (its map keeps the Classic tape: Law Classic) | tp172c / refcap182 | 12 / 25 | 3.08 / 3.04 → same | 0 / 37 / 0 |
+
+Total 35 up / 376 same / 0 down; the 376 unchanged renders are byte-identical to the base's. Per file (tp172c):
+default ESR −5.8 … −14.9 → −19.5 … −41.3 dB (level error up to 5.8 → 0.2 dB); Drive +10 −10.3 … −10.7 → −12.7 …
+−20.0 dB; Drive +15 / 1⅞ ips +2.7 … −2.1 → −12.8 … −20.9 dB (level +3.9 … +6.7 → −0.6 … 0.0 dB). refcap182 X1
+(30 ips) 2 … 5 → 7 … 8; X2 (flutter on, not modelled) 2 … 3 → 3 … 4.
+Classic law / old projects / every non-tape path: bit for bit the base (8 hash goldens, `tests/Ember190fjTests.inc`).
+
+**CPU** (one instance, 30 s stereo at 48 kHz, best of 5, -O2 no-LTO objects at machine load ~20): Tape at 4×
+(Ember's default) Classic 1.8 % of a core → Measured 4.0 % (4.2 % at 1⅞ ips with the clamp); 2× 1.2 → 2.3 %; 8× 3.1 →
+6.9 … 7.7 %. Paid only by the measured Tape (other styles and old projects unchanged). **Latency** unchanged (the
+oversampler's 55 samples, reported to the host as before).
+
+**Not shipped.** Transformer: the same core with a low-frequency record emphasis and an output shelf per Shine was
+fitted on the transformer reference (tp172c D / S1, refcap182 D / S1 / X1 / X2): better on the default's stair /
+drums / music (−24.5 → −36.6, −8.2 → −10.1, −17.1 → −18.5 dB ESR) but worse on Amount 200 %'s stair and sweep
+(−38.4 → −20.1, −7.4 → −6.2 dB) — no clear win; its distortion falls ~50 dB from 400 Hz to 1 kHz (a split low band,
+not a first-order emphasis) and Shine / LF Extend would need their own controls. Heatwave is no tape: its harmonics
+are level-independent (Drive 50: H2 −49, H3 −35 dB at every level from −48 to −12 dBFS) and its default is flat in
+magnitude but dispersive in phase (group delay ~370 samples at 60 Hz → ~96 at 15 kHz); its map keeps the Classic law.
