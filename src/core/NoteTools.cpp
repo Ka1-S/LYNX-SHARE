@@ -481,13 +481,16 @@ void randomise (Pattern& pattern, const std::vector<int>& indices, const Randomi
         // 100 % moved only towards the right / 100 %). The draws stay the same, so Bipolar on is unchanged.
         const auto way = [&o] (float r) { return o.bipolar ? r : std::abs (r); };
 
-        n.velocity = std::clamp (n.velocity + o.velocity * way (rv), 0.0f, 1.0f);
-        n.pan = std::clamp (n.pan + 2.0f * o.pan * way (rp), -1.0f, 1.0f);
+        // FL's law (live FL checks 190cq and 190ew PR-1): at 100 % a level moves at most HALF its lane, ±0.5 of the
+        // 0…1 range (velocity from 78 % reached ~30 %, pan from the centre reached both ends, Mod X / Mod Y / Release
+        // from the centre or 0 piled at the cap); amount × 0.5 × r (round 190ez; LYNX moved twice as far before)
+        n.velocity = std::clamp (n.velocity + 0.5f * o.velocity * way (rv), 0.0f, 1.0f);
+        n.pan = std::clamp (n.pan + o.pan * way (rp), -1.0f, 1.0f); // (pan's lane is −1…1: half of it = ±1)
         n.finePitch = std::clamp (n.finePitch + 120.0f * o.finePitch * way (rf), -120.0f, 120.0f);
-        n.modX = std::clamp (n.modX + o.modX * way (rx), 0.0f, 1.0f);
-        n.modY = std::clamp (n.modY + o.modY * way (ry), 0.0f, 1.0f);
+        n.modX = std::clamp (n.modX + 0.5f * o.modX * way (rx), 0.0f, 1.0f);
+        n.modY = std::clamp (n.modY + 0.5f * o.modY * way (ry), 0.0f, 1.0f);
         if (o.release != 0.0f)
-            setLevelValue (n, Level::release, levelValue (n, Level::release) + o.release * way (rr));
+            setLevelValue (n, Level::release, levelValue (n, Level::release) + 0.5f * o.release * way (rr));
 
         if (o.timing > 0) // off: only later
             n.start = std::max<std::int64_t> (0, n.start + (std::int64_t) std::llround ((double) o.timing * way (rt)));

@@ -990,7 +990,21 @@ bool parseMarkers (const std::uint8_t* data, std::size_t size, Document& out, st
                     q = sb + subLen + (subLen & 1);
                 }
             }
-            else if (pass == 1 && std::memcmp (tag, "lxkn", 4) == 0) // round 190ee: LYNX's region trigger notes
+            else if (pass == 1 && std::memcmp (tag, "tlst", 4) == 0 && len >= 4) // round 190ez: FL Edison's trigger notes
+            {
+                // u32 count, then 24-byte entries: fourcc "cue ", u32 0, u32 cue id, u8 0xFF, u8 note, u8 0x90, u8 0,
+                // u32 0, u32 0 (live FL check 190ew, EDI-2: a WAV Edison saved with a region on D3 = note 38)
+                const auto count = (std::size_t) get32 (data + body);
+                for (std::size_t i = 0; i < count && 4 + (i + 1) * 24 <= len; ++i)
+                {
+                    const auto* t = data + body + 4 + i * 24;
+                    if (std::memcmp (t, "cue ", 4) != 0)
+                        continue;
+                    if (auto* c = findCue (get32 (t + 8)))
+                        c->key = t[13] < 128 ? (int) t[13] : -1;
+                }
+            }
+            else if (pass == 1 && std::memcmp (tag, "lxkn", 4) == 0) // round 190ee: LYNX 0.1.27's own chunk (read only)
             {
                 for (std::size_t q = body; q + 8 <= body + len; q += 8)
                     if (auto* c = findCue (get32 (data + q)))
@@ -1152,17 +1166,25 @@ std::vector<std::uint8_t> encodeWav (const Document& doc, WavFormat format)
         }
         endChunk (o, at);
 
-        // round 190ee: the regions' trigger notes (Edison's Region › Trigger note) in a chunk of LYNX's own — cue id,
-        // key — written only when a region has one, so files without them stay as they were (FL's way of keeping
-        // them in a WAV is not known)
+        // the regions' trigger notes (Edison's Region › Trigger note) in FL Edison's own "tlst" chunk (round 190ez,
+        // layout from a WAV FL wrote: live FL check 190ew EDI-2), written only when a region has one, so files without
+        // them stay as they were. LYNX 0.1.27 wrote them in a chunk of its own ("lxkn"), still read above.
         if (std::any_of (doc.markers.begin(), doc.markers.end(), [] (const Marker& m) { return m.keyNum >= 0; }))
         {
-            at = beginChunk (o, "lxkn");
+            at = beginChunk (o, "tlst");
+            put32 (o, (std::uint32_t) std::count_if (doc.markers.begin(), doc.markers.end(), [] (const Marker& m) { return m.keyNum >= 0; }));
             for (std::size_t i = 0; i < doc.markers.size(); ++i)
                 if (doc.markers[i].keyNum >= 0)
                 {
-                    put32 (o, (std::uint32_t) i + 1);
-                    put32 (o, (std::uint32_t) doc.markers[i].keyNum);
+                    putTag (o, "cue ");
+                    put32 (o, 0);
+                    put32 (o, (std::uint32_t) i + 1); // the cue id
+                    o.push_back (0xff);
+                    o.push_back ((std::uint8_t) std::min (doc.markers[i].keyNum, 127));
+                    o.push_back (0x90);
+                    o.push_back (0);
+                    put32 (o, 0);
+                    put32 (o, 0);
                 }
             endChunk (o, at);
         }

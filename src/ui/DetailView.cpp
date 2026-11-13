@@ -1715,6 +1715,7 @@ public:
         randomize.onClick = [this] {
             notes ([seed = (std::uint32_t) juce::Random::getSystemRandom().nextInt()] (Pattern& p, const std::vector<int>& all, const Song&) {
                 notetools::RandomiseOptions o;
+                o.velocity = 0.5f; // ±0.25 as before round 190ez halved the randomizer's law to FL's
                 o.seed = seed;
                 notetools::randomise (p, all, o);
             });

@@ -373,13 +373,14 @@ TEST (edison190ee_trigger_notes_round_trip)
     CHECK (back.markers.size() == 3);
     if (back.markers.size() == 3)
         CHECK (back.markers[0].keyNum == 36 && back.markers[1].keyNum == -1 && back.markers[2].keyNum == 60 && back.markers[0].name == "Kick");
-    // without trigger notes the file is exactly what it was (no LYNX chunk)
+    // without trigger notes the file is exactly what it was (no trigger chunk); with them, FL's "tlst" (round 190ez:
+    // count + one 24-byte entry per region with a note)
     auto plain = doc;
     for (auto& m : plain.markers)
         m.keyNum = -1;
     const auto plainBytes = encodeWav (plain, WavFormat::int16);
     const std::string text (plainBytes.begin(), plainBytes.end());
-    CHECK (text.find ("lxkn") == std::string::npos && bytes.size() == plainBytes.size() + 8 + 16);
+    CHECK (text.find ("tlst") == std::string::npos && text.find ("lxkn") == std::string::npos && bytes.size() == plainBytes.size() + 8 + 4 + 2 * 24);
 }
 
 // Regions › Assign all to (0x86e370)
