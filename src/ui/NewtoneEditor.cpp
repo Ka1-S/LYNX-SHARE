@@ -1501,7 +1501,7 @@ public:
         setResizeLimits (760, 420, 4000, 2000);
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
-        keepAboveMainWindow (*this);
+        dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
     }
 
     void closeButtonPressed() override;

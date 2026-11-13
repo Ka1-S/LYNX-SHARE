@@ -1309,7 +1309,7 @@ private:
     // takeLock) and the recording thread (drainer list under drainLock).
     struct Take
     {
-        int track = 0;      // insert it plays through (0 = a new free insert)
+        int track = 0;      // the insert that records it (0 = none: Settings' "Record input audio" without armed inserts)
         int first = 0;      // device input channel
         int channels = 0;   // 1 or 2
         // round 168x (issue #41): a take tapped inside its insert (FL's "Record" positions after the input) reads
@@ -1319,7 +1319,7 @@ private:
         int tap = -1;
         int skip = 0;
         int skipped = 0;    // audio thread
-        int playThrough = 0; // the insert the take's clip plays through (0 = a new free insert)
+        int playThrough = -1; // the insert the take's clip plays through (Master = 0; -1 = a new free insert)
         juce::File file;
         std::unique_ptr<takes::TakeStream> stream;
         takes::WavTakeWriter writer;

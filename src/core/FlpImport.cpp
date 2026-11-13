@@ -2369,6 +2369,8 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
         // 0x9A "Audio input source" (REA round 157c): resolved against the open device when the project opens
         // (AudioEngine::setSong). FL plays an insert's input through it whether the insert is armed or not, stopped or
         // playing ([FL] FL Studio 2026, meters of unarmed inserts with an input): monitoring On
+        // (no input and no 0xA6: "Auto", as these files always opened; round 190ev changed only new inserts' default)
+        track.monitor = InputMonitor::automatic;
         if (insert.input >= 0)
         {
             track.flInput = insert.input;

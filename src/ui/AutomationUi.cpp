@@ -854,7 +854,7 @@ public:
         setResizeLimits (400, 200, 4000, 2000);
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
-        keepAboveMainWindow (*this);
+        dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
     }
 
     int getIndex() const { return static_cast<AutomationEditor*> (getContentComponent())->getIndex(); }

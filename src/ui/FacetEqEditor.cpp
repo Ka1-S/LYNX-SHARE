@@ -1902,7 +1902,7 @@ public:
         }
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
-        keepAboveMainWindow (*this);
+        dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
         if (auto* c = getContentComponent()) skin::playOpenAnimation (*c, skin::styleFor (EffectKind::facetEq)); // round 126: fade / scale in
     }
 

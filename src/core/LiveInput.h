@@ -97,6 +97,14 @@ inline bool inputMonitored (InputMonitor mode, bool armed, bool playing, bool re
     return false;
 }
 
+// The .lynx key "monitor" of an insert (round 190ev): written only when the mode is not "Auto", so a project without the
+// key — every insert saved before round 190ev made FL's "When armed" the default of new inserts — opens as it was saved.
+constexpr bool monitorKeyWritten (InputMonitor mode) noexcept { return mode != InputMonitor::automatic; }
+constexpr InputMonitor monitorFromKey (int stored, bool present) noexcept
+{
+    return ! present ? InputMonitor::automatic : (InputMonitor) (stored < 0 ? 0 : stored > 3 ? 3 : stored);
+}
+
 // What a left-click on an insert's arm switch (the Mixer's, or an audio track's record button in the Playlist) does.
 // FL 2026 (measured, round 165 issue11d): it arms at once, with or without an audio input source — no prompt, the file
 // name is automatic; the missing input is reported when recording starts. A second click disarms. The Master has none.

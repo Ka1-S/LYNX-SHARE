@@ -1473,7 +1473,10 @@ struct MixerTrack
     // -1 = none) and, when `inputStereo`, the next one too
     int inputChannel = -1;
     bool inputStereo = true;
-    InputMonitor monitor = InputMonitor::automatic;
+    // FL's default for a new insert is "When armed" (FL's hint "Recording: Post EQ, Monitoring: When armed",
+    // REA_rodada165-issue11c; round 190ev, user decision). Saved projects keep theirs: a .lynx without the key is
+    // "Auto", LYNX's old default (ProjectFile), and so is an .flp without FL's 0xA6 / input events (FlpImport).
+    InputMonitor monitor = InputMonitor::whenArmed;
     // record safe (round 163, as Pro Tools / Nuendo): the insert can't be armed by accident (saved)
     bool recordSafe = false;
     // FL's "Record <insert> to" (the arm button's right-click, round 167a [SHOT s20–s27]): the file this insert records

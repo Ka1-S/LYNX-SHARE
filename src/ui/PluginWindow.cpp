@@ -1601,6 +1601,13 @@ public:
         if (! nativechild::attach (*this, workspace))
             workspace.addAndMakeVisible (*this); // (no native window: a plain child of the desktop)
         nativechild::forwardUnusedKeys (*this);
+        // round 190ev (issue #152): a click in the plugin's own view (its native window, which JUCE never hears of)
+        // brings the frame in front too, as a click on the frame does
+        nativechild::raiseOnAnyClick (*this, [this] {
+            lastUsed() = key();
+            editorlimit::touch (key());
+            focusLinked();
+        });
         getProperties().set ("lynxPluginWindow", true);
         useClassicRendering();
         setVisible (true);

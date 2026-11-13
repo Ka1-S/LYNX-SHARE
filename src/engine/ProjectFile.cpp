@@ -1,4 +1,5 @@
 #include "engine/ProjectFile.h"
+#include "core/LiveInput.h"
 #include "core/FlCurve.h"
 #include "core/Preferences.h"
 
@@ -2526,7 +2527,7 @@ juce::var mixerTrackToVar (const MixerTrack& t)
         if (! t.inputStereo)
             o->setProperty ("inputMono", true);
     }
-    if (t.monitor != InputMonitor::automatic)
+    if (monitorKeyWritten (t.monitor)) // (no key = "Auto": LYNX's default before round 190ev)
         o->setProperty ("monitor", (int) t.monitor);
     if (t.recordSafe)
         o->setProperty ("recordSafe", true);
@@ -2621,7 +2622,7 @@ MixerTrack mixerTrackFromVar (const juce::var& t)
     track.swapChannels = (bool) t.getProperty ("swap", false);
     track.inputChannel = juce::jlimit (-1, 255, (int) t.getProperty ("input", -1));
     track.inputStereo = ! (bool) t.getProperty ("inputMono", false);
-    track.monitor = (InputMonitor) juce::jlimit (0, 3, (int) t.getProperty ("monitor", (int) InputMonitor::automatic));
+    track.monitor = monitorFromKey ((int) t.getProperty ("monitor", 0), t.hasProperty ("monitor"));
     track.recordSafe = (bool) t.getProperty ("recordSafe", false);
     track.recordTo = t.getProperty ("recordTo", "").toString().toStdString();
     track.recordSource = (RecordSource) juce::jlimit (0, 5, (int) t.getProperty ("recordSource", (int) RecordSource::postEq));

@@ -3182,7 +3182,7 @@ public:
         setResizeLimits (kind == EffectKind::waveCandy ? 300 : 900, kind == EffectKind::waveCandy ? 260 : 620, 4000, 3000);
         centreWithSize (getWidth(), getHeight());
         setVisible (true);
-        keepAboveMainWindow (*this);
+        dockOrKeepAbove (*this); // FL's docked plugin window (round 190ev)
         if (target.track >= 0 && target.engine != nullptr)
             gone = std::make_unique<ui::SlotGoneWatcher> (*target.engine, target.track, target.slot, [this] { closeButtonPressed(); });
     }

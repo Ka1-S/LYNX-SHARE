@@ -572,6 +572,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     };
     workspace.onKeyInDetachedWindow = [this] (const juce::KeyPress& key) { return keyPressed (key); };
     PluginWindows::setDockWorkspace (&workspace); // FL's docked plugin windows float there (issue #116, developer switch)
+    setEditorDock (&workspace); // and LYNX's own editor windows (round 190ev)
     workspace.onTitleWheel = [this] (Panel panel, const juce::MouseEvent& ev, const juce::MouseWheelDetails& wheel) {
         if (panel == Panel::channelRack && ev.mods.isShiftDown())
             selectPattern (stepPattern (engine.getSong(), (wheel.deltaY != 0.0f ? wheel.deltaY : -wheel.deltaX) > 0.0f ? -1 : 1));
@@ -952,6 +953,7 @@ MainComponent::~MainComponent()
     engine.nameAutomation = nullptr;
     PluginWindows::closeAll(); // plugin UIs before the engine
     PluginWindows::setDockWorkspace (nullptr); // (issue #116: the docked ones were in the workspace)
+    setEditorDock (nullptr);
     ParametricEqWindows::closeAll();
     closeAutomationEditors();
     closeChannelSettings();
@@ -2516,7 +2518,10 @@ void MainComponent::loadUiSettings()
         else if (key == "limitEditors") // FL's LimitEditors (round 189o; on unless saved off)
             editorlimit::enabled() = on;
         else if (key == "detachNewPlugins") // FL's General › "Detach all new plugins" (issue #116)
+        {
             engine.setDetachNewPlugins (on);
+            setEditorsDetached (on); // (round 190ev: LYNX's own editor windows follow FL's option too)
+        }
         else if (key == "autoSelectLinked")
             ChannelRackComponent::autoSelectLinked = on;
         else if (key == "muteRemovedSteps")
@@ -7368,6 +7373,7 @@ void MainComponent::openSettings (int page)
         ChannelRackComponent::selectFirstChannelWithNotes = o.selectFirstChannelWithNotes;
         PianoRollComponent::monophonicPainting = o.monophonicPainting;
         self.engine.setDetachNewPlugins (o.detachNewPlugins);
+        setEditorsDetached (o.detachNewPlugins); // (round 190ev)
         ChannelRackComponent::autoSelectLinked = o.autoSelectLinked;
         self.alternateUndo = o.alternateUndo;
         EditorGlobals::get().rememberSeek = o.rememberSeek;

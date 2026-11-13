@@ -86,7 +86,15 @@ std::vector<Part> loopPasses (const Placement& p, std::int64_t loopStart, std::i
 int takeTrack (const Song& song, int insert, std::int64_t start, std::int64_t end);
 void linkTakeTrack (Song& song, int track, int insert);
 
-// Puts recorded takes on the Playlist: one audio channel per file (through its insert; 0 = a new free insert) and a
+// FL 2026 (FLEngine's take finish, FUN_012aa880; docs/analise/REA_rodada190ev.md §2): the mixer insert that plays the
+// clip of a take recorded on insert `recordedOn` at the "Record" position `point`. The recording insert itself when it
+// records its external input only, or when a Playlist audio track is linked to it; otherwise the take already holds the
+// insert's own processing (Post EQ, FL's default, and every other position after the input), so the clip goes where the
+// insert goes: the lowest-numbered insert it is routed to (Master, 0, first), Master when it goes nowhere. Never a new
+// insert. -1 (a new free insert) only for a take of no insert (Settings' "Record input audio" without armed inserts).
+int playbackInsert (const Song& song, int recordedOn, RecordSource point);
+
+// Puts recorded takes on the Playlist: one audio channel per file (through its insert; -1 = a new free insert) and a
 // clip per part. Loop passes land as FL 26 leaves them (observed, REA round 177c): one track per pass, each on the next track
 // with no clip in its range. The first keeps what it was, usually the header of a new open group; the others join it and take
 // its name if it has one, else they stay "Track N". With Blend off every pass is muted, with Blend on every pass plays.
@@ -94,7 +102,9 @@ void linkTakeTrack (Song& song, int track, int insert);
 struct TakeFile
 {
     std::string path, name;
-    int insert = 0;
+    int insert = -1;     // the insert the clip plays through (Master = 0; -1 = a new free insert)
+    int recordedOn = -1; // the insert that recorded it (-1 = `insert`): its Playlist audio track holds the clip, and the
+                         // clip's track is linked to it only when the clip plays through it (round 190ev)
 };
 struct TakeOptions
 {
@@ -263,7 +273,8 @@ struct Journal
     std::string wav;
     double firstTick = 0.0, ticksPerSample = 0.0, sampleRate = 0.0;
     int latency = 0;
-    int insert = 0;        // mixer insert it played through (0 = a new one)
+    int insert = -1;       // mixer insert it plays through (Master = 0; -1 = a new one). Saved as "playsThrough"; the
+                           // older key "insert" (0 = a new one) is still written and read
     int playlistTrack = -1;
     std::string project;   // project file (empty: unsaved)
 };
