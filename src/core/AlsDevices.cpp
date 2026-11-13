@@ -708,8 +708,27 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
         t.to = "Filter";
         t.approximate = true;
         ok = autoFilterToFilter (device, t);
-        if (ok)
+        if (ok && t.slot.kind == EffectKind::facetEq)
+        {
+            // (190fm) the notch: the modulation is worked out in the Filter's cutoff units, then moved onto the band's
+            // frequency (Facet's own scale)
+            t.to = "Facet EQ (notch)";
+            Translated f;
+            f.slot = makeEffectSlot (EffectKind::filter);
+            f.slot.params[1] = filterCutoffValue (facet::hz (t.slot.params[(std::size_t) facet::param (0, 1)]));
+            autoFilterModulation (device, context, f);
+            if (f.modulator)
+            {
+                for (auto& v : f.modulator->curve)
+                    v = facetHzOfFilterCutoff (v);
+                f.modulator->param = facet::param (0, 1);
+                t.modulator = std::move (f.modulator);
+            }
+        }
+        else if (ok)
             autoFilterModulation (device, context, t); // (190ed)
+        if (ok)
+            autoFilterDrive (device, t); // (190fm) Drive: an Ember stage in front, in a rack
     }
     else if (tag == "Saturator")
     {
@@ -781,6 +800,28 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
         t.to = "Drum Buss rack (Ember Saturator, Facet EQ, Crest Compressor, Shell Channel)"; // (round 190ek: Crest only with Comp on)
         t.approximate = true;
         ok = drumBussToRack (device, t);
+    }
+    // ---- lot 4 (round 190fm) ----
+    else if (tag == "Hybrid")
+    {
+        t.from = "Hybrid Reverb";
+        t.to = "Hybrid Reverb rack (Atrium / Halo, Convolver, Facet EQ, Utility)";
+        t.approximate = true;
+        ok = hybridToRack (device, context, t);
+    }
+    else if (tag == "Roar")
+    {
+        t.from = "Roar";
+        t.to = "Roar rack (Filter / Facet EQ, Ember Saturator / Lo-fi, Crest Compressor, Utility)";
+        t.approximate = true;
+        ok = roarToRack (device, t);
+    }
+    else if (tag == "GrainDelay")
+    {
+        t.from = "Grain Delay";
+        t.to = "Echoform (Pitch mode)";
+        t.approximate = true;
+        ok = grainDelayToEchoform (device, context, t);
     }
     if (! ok)
         return std::nullopt;

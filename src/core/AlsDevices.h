@@ -36,6 +36,15 @@
 //                                    Shell Channel (+ a dry chain); refit to Live's renders in round 190ek
 //   Auto Filter's LFO / envelope follower / side chain → a Peak Controller linked to the Filter's cutoff
 //   Operator (no FM in use), Drift → the built-in synth
+// Lot 4 (round 190fm, AlsDevicesLot4.cpp):
+//   Hybrid Reverb                  → an Audio Effect Rack "Hybrid Reverb": Atrium (Dark Hall, Quartz, Tides, Prism) or Halo
+//                                    (Shimmer), the Convolver with the set's impulse response when the file is on this
+//                                    machine, Facet EQ, Utility (width), a dry chain
+//   Roar                           → an Audio Effect Rack "Roar": per stage Filter / Facet EQ + Ember Saturator (or Lo-fi),
+//                                    Single / Serial / Parallel / Multi Band / Mid Side as chains, Crest Compressor, Utility
+//   Grain Delay                    → Echoform (Pitch mode)
+//   Auto Filter's other types      → notch (Facet EQ), Morph at its four corners, DJ as a low / high pass; Drive as an Ember
+//                                    stage in a rack in front of the filter
 
 #include <array>
 #include <functional>
@@ -185,6 +194,9 @@ bool reverbToAtrium (const xml::Element& device, EffectSlot& slot, Notes& notes)
 struct Context
 {
     double bpm = 120.0; // the set's tempo: a synced time LYNX can only hold in ms is fixed at this tempo (and reported)
+    // (190fm) a file the device references (Hybrid Reverb's impulse response, a `SampleRef` element): the path where it
+    // is on this machine, "" = not there (empty function = no lookup: the convolution half is listed)
+    std::function<std::string (const xml::Element& sampleRef)> findFile;
 };
 // One Live parameter that drives one LYNX parameter: `live` is the parameter's element path inside the device
 // ("Feedback", "Lfo/Frequency"), `value` turns Live's own unit into LYNX's 0..1. Automation envelopes and rack macro
@@ -465,5 +477,99 @@ struct SimplerResult
 // transpose, volume, pan, filter and its envelope, pitch envelope, LFO, voices, glide, the playback mode (one-shot
 // fades, slices), the region and loop, warp. `fileSeconds` 0 = unknown (the set's own DefaultDuration is used).
 SimplerResult applySimpler (const xml::Element& device, ChannelDef& channel, double bpm, double fileSeconds, Notes& notes);
+
+// ================================================================================================ lot 4 (190fm)
+// Evidence of this lot: [DATA] the shipped sets and Live's own Core Library presets (read-only, nothing copied: preset
+// names against the stored values settle the menu orders), [STR] strings of Live's binary, [ASSUMED] a law no render
+// has checked yet (the round's report lists each one with the Live settings to render).
+
+// ---- Hybrid Reverb → a rack -------------------------------------------------------------------------------------
+// Algorithm_Type [DATA: the algorithm-specific parameters the 256 Core Library devices move, per type: 1 Quartz_*,
+// 2 Shimmer / PitchShift, 3 Tides*, 4 Prism_*; 0 = the default, Dark Hall (its DH Bass controls)]
+enum class HybridAlgorithm { darkHall, quartz, shimmer, tides, prism };
+// Routing [ASSUMED order Serial, Parallel, Algorithm, Convolution: the "Convo Algo Routing" menu; DATA: the presets on 3
+// all leave the blend at 0 and the ones on 2 hold algorithm-sized decays (Cathedral Huge 11 s)]
+enum class HybridRouting { serial, parallel, algorithm, convolution };
+// the rack's macros (each spans its Live control's range)
+enum HybridMacro { hrDryWet, hrDecay, hrSize, hrDiffusion, hrModulation, hrDamping, hrBlend, hrWidth, hrMacros };
+// the pre-delay in ms: synced = sixteenths at the set's tempo, else the time (s) [DATA PreDelay_Time 0 … 4 s,
+// PreDelay_Sixteenth 0 … 16]
+double hybridPredelayMs (bool synced, double seconds, double sixteenths, double bpm) noexcept;
+// the EQ section's cut slope (Eq_LowBandSlope / Eq_HighBandSlope 0 … 9) in dB/oct [ASSUMED 6 per step from 6]
+int hybridEqSlopeDb (int index) noexcept;
+// Halo's Size for a decay (s): Halo's RT is (1.5 + 12.5 · size) × its feedback / diffusion factors (core/LynxVerbs.cpp)
+float haloSizeForDecay (double decaySec, double feedback, double shiftSemis, double diffusion) noexcept;
+// An impulse response read from a file the user has (WAV through the Convolver's reader, AIFF / AIFC here)
+struct ImpulseAudio
+{
+    std::vector<float> l, r;
+    double rate = 44100.0;
+};
+std::optional<ImpulseAudio> decodeImpulse (const std::vector<std::uint8_t>& bytes);
+// Hybrid's IR shaping (Convolution_IrPostProcessingOn): attack fade-in (s), decay (s, ≥ 19.99 = the whole file) and size
+// (stretch, 1 = as recorded) [ASSUMED: a linear fade-in, an exponential fall to −60 dB at the decay time, a resampled
+// stretch]
+void shapeImpulse (ImpulseAudio& ir, double attackSec, double decaySec, double size);
+// The Convolver slot that plays `ir` fully wet (dry off), with the pre-delay (ms, ≤ 500) on its own knob; the IR is
+// embedded in the slot (a project saved with it no longer needs the file)
+EffectSlot convolverSlotOf (const ImpulseAudio& ir, double predelayMs, bool normalise);
+bool hybridToRack (const xml::Element& device, const Context& context, Translated& out);
+
+// ---- Roar → a rack ----------------------------------------------------------------------------------------------
+// Stage*_Shaper_Type 0 … 11 [ASSUMED order Soft Sine, Digital Clip, Bit Crusher, Diode Clipper, Tube Preamp, Half Wave
+// Rectifier, Full Wave Rectifier, Polynomial, Fractal, Tri Fold, Noise Injection, Shards — STR names; DATA: Core Library
+// presets "Drums Moving Crusher" / "Circuit Bent Toy" on 2, "Diode Treatment" on 3, "VHS Mild" / "Drums Noisy Clarity"
+// on 10, "Tape Saturation" stage 2 / "Bass Fuzz" on 3 / 4]
+const char* roarShaperName (int type) noexcept;
+// the LYNX stage for a shaper: Ember style (0 tube, 1 tape, 2 transistor) or character (1 … 28), or Lo-fi (bit crusher);
+// none = no counterpart (the stage's shaper is listed)
+struct RoarShaperFit
+{
+    enum class Kind { ember, lofi, none };
+    Kind kind = Kind::none;
+    int style = 2, character = 0;
+};
+RoarShaperFit roarShaperFit (int type) noexcept;
+// Input_RoutingMode 0 … 5 [DATA: Core Library "Basic Parallel" 2, "Basic Multi Band" 3, "Basic Mid Side" 4, "Basic
+// Feedback" 5; 0 / 1 = Single / Serial by the STR order]
+enum class RoarRouting { single, serial, parallel, multiBand, midSide, feedback };
+// Stage*_Filter_Type 0 … 8 [ASSUMED order Low-pass, Band-pass, High-pass, Notch, Peak, Morph, Comb, Resampling; DATA:
+// "Circuit Bent Toy" / "LoFi Repeater" on 7, "Glitch Rhythmic" on 6, "Drum Kit Enhancer" on 4]
+enum class RoarFilter { lowPass, bandPass, highPass, notch, peak, morph, comb, resampling, other };
+// the rack's macros
+enum RoarMacro { rrDrive1, rrDrive2, rrDrive3, rrInput, rrOutput, rrDryWet, rrMacros };
+// a stage's Amount (0 … 1) as Ember's drive in dB [ASSUMED 0 … 36 dB, linear]
+double roarDriveDb (double amount) noexcept;
+bool roarToRack (const xml::Element& device, Translated& out);
+
+// ---- Grain Delay → Echoform -------------------------------------------------------------------------------------
+bool grainDelayToEchoform (const xml::Element& device, const Context& context, Translated& out);
+
+// ---- Auto Filter's other types ----------------------------------------------------------------------------------
+// What LYNX plays for the filter type: 0 low pass, 1 high pass, 2 band pass (the Filter), 3 notch (Facet EQ); −1 = no
+// counterpart (comb, resampling, notch + low pass, vowel). The new device's Filter_Type [DATA, Core Library preset names:
+// 0 "Cut-O-Move LPF", 1 "Cut-O-Move HPF", 2 "Band-pass Spinner", 3 "Notch Slide Crunch", 5 "DJ Filter Soft Clip",
+// 6 "Comb Envelope", 7 "Resampling Filter S&H", 9 "Vowel Quivver"; 4 Morph and 8 "Notch + LP" by the STR names left]; the
+// older device's FilterType 0 … 4 = low, high, band pass, notch, morph [DOC]. Morph [DATA: the older device stores the
+// classic type its Morph stands for (LegacyFilterType): 0 → low, 0.25 → band, 0.5 → high, 0.75 → notch pass] → the
+// nearest corner (`exact` false between corners). DJ [ASSUMED]: DjControl < 0 a low pass, > 0 a high pass, its cutoff
+// in `djHz`.
+struct AutoFilterPlan
+{
+    int type = -1;
+    bool exact = true;
+    double djHz = 0.0; // > 0: the DJ type's cutoff
+    std::string name;  // Live's type, for the report
+};
+AutoFilterPlan autoFilterPlan (int liveType, bool newer, double morph, double djControl) noexcept;
+// DJ: |c| on a log sweep, 20 kHz → 20 Hz for the low pass, 20 Hz → 20 kHz for the high pass [ASSUMED]
+double autoFilterDjHz (double djControl) noexcept;
+// the notch as Facet EQ band 1 (its Q the Filter's law), Dry/Wet listed when < 1
+void autoFilterNotchToFacet (const xml::Element& device, Translated& out);
+// Drive [DATA: older Drive 0 … 24 dB, newer Filter_Drive 0 … 1 ASSUMED × 24 dB] in front of the filter: the
+// translation is put in a rack after an Ember stage, its links and modulation moved onto the rack's macros
+void autoFilterDrive (const xml::Element& device, Translated& out);
+// Moves a Filter-cutoff modulation curve (Filter units, 20 Hz … 20 kHz) onto Facet's frequency units (10 Hz … 30 kHz)
+float facetHzOfFilterCutoff (float filterValue) noexcept;
 } // namespace alsdev
 } // namespace lynx

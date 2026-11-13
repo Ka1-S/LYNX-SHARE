@@ -468,3 +468,57 @@ envelope; volume, pan, transpose, reverse; one sample part per zone or the sampl
 `AlsExportOptions::sampleFormat`). Live's Slicing defaults (Defaults/Slicing) hold one `DrumBranchPreset` each: "Default"
 is a Classic Simpler with a 50 ms release, one voice, `ChokeGroup` 1; the drum ones are One-Shot, polyphonic, no choke;
 LYNX's Slice to Drum Rack templates follow those facts with its own names.
+
+## 21. Live's own devices → LYNX's own, lot 4 (round 190fm, 2026-11-13)
+`src/core/AlsDevicesLot4.cpp` (laws and evidence tags in `core/AlsDevices.h`). No render of these devices exists yet: what
+is not plain unit maths is [ASSUMED] and listed with the Live settings to render in the round's report
+(`/mnt/e/lynx-work/realive190fm/sub-dev.md`). Menu orders were settled from Live's own Core Library presets on this
+machine, read-only: a preset's name against the value it stores (nothing of them is in LYNX).
+
+- **Hybrid Reverb** (`Hybrid`) → an Audio Effect Rack "Hybrid Reverb". `Algorithm_Type` 0 Dark Hall, 1 Quartz, 2 Shimmer,
+  3 Tides, 4 Prism [DATA: the type-specific parameters the 256 Core Library devices move per type]. `Routing` 0 Serial,
+  1 Parallel, 2 Algorithm, 3 Convolution [ASSUMED order; DATA: the four presets on 3 leave the blend at 0, the ones on 2
+  hold algorithm-sized decays]. Dark Hall / Quartz / Tides / Prism → Atrium (Decay = its RT, Size, Damping → high
+  multiplier, Diffusion, Modulation → late modulation depth, Dark Hall's bass multiplier / crossover, Prism's two
+  multipliers at its crossover); Shimmer → Halo (PitchShift ±12 = Halo's Shift, Shimmer = the shifted feedback, Decay
+  through Halo's Size law). The convolution half: the set's `ImpulseResponseHandler/SampleSlot/Value/SampleRef` (and the
+  `SampleSlotTrueStereo` right file) is looked up on this machine (the set's folder, the library roots, and the
+  `Builtin` folder beside a `Core Library` root: Live's own install, `RelativePathType` 7); found → decoded (WAV / AIFF /
+  AIFC), shaped (`Convolution_IrAttackTime`, `IrDecayTime`, `IrSize`) and embedded in a Fruity Convolver slot (the project
+  keeps it; LYNX ships none); not found → the algorithm alone, the file named in the report (Routing 3 alone: the device
+  stays listed). Serial: Convolver → an inner rack {Convolution | Send → Algorithm}; Parallel: an inner rack {Convolver |
+  Algorithm}; the inner rack's "Blend" crossfades (`ConvoAlgoBlend` 0 = convolution only [DATA: the vocal-IR presets sit
+  at 0]). EQ section → Facet EQ (band type 0 a cut with `Slope` 6 dB per step, 1 a shelf; peaks as bells; `Eq_PreAlgo` in
+  front of the algorithm, else after the wet sum), `StereoWidth` → Utility, Dry/Wet → a dry chain. Macros: Dry/Wet, Decay,
+  Size, Diffusion, Modulation, Damping, Blend, Width (Live's envelopes and macro mappings reach them). Listed: Vintage,
+  Bass Mono, Freeze, Shape, Quartz low damping / distance, Tides, pre-delay feedback, the algorithm's own delay.
+- **Roar** (`Roar`) → an Audio Effect Rack "Roar". `Input_RoutingMode` (a plain value) 0 Single, 1 Serial, 2 Parallel,
+  3 Multi Band, 4 Mid Side, 5 Feedback [DATA: "Basic Parallel" 2 … "Basic Feedback" 5]; stage 3 is used only by Multi
+  Band [DATA]. Per stage: its filter (`Filter_PreOn` before the shaper) — low / band / high pass → Filter, notch / peak →
+  Facet EQ, Morph at its nearest corner, Comb / Resampling listed — and its shaper: `Shaper_Type` 0 … 11 [ASSUMED order,
+  DATA for 2 Bit Crusher, 3 Diode Clipper, 10 Noise Injection] → Ember (Saturator's Soft Sine / Digital Clip fits, the
+  Soft clip, Octave rectifier and Wavefold characters, tube / tape styles) or Lo-fi (bit crusher); Half Wave Rectifier,
+  Noise Injection, Shards listed. Amount → Ember's drive (0 … 36 dB), Trim → its output. Parallel / Multi Band / Mid
+  Side → an inner rack: two chains crossfaded by Blend, three chains behind LYNX's crossover bands (LR 24 dB/oct at
+  `Input_LowMidCrossover` / `MidHighCrossover`), mid / side Utility matrices. Tone → a Facet tilt, compression → Crest
+  Compressor, output gain → Utility, Dry/Wet → a dry chain; macros Drive 1 … 3, Output, Dry/Wet. Listed: modulation (2
+  LFOs, envelope, noise, the matrix), feedback, Color, bias, the compressor's side-chain high pass.
+- **Grain Delay** (`GrainDelay`) → Echoform in Pitch mode (one time for both sides): `MsDelay` 1 … 128 ms or
+  `SyncMode` + `BeatDelayEnum` (the Delay's 1, 2, 3, 4, 5, 6, 8, 16 sixteenths [ASSUMED]) + `BarDelayOffset`; Feedback
+  0 … 0.95 → the loop gain; Pitch −36 … 12 → ±24 st; `NewDryWet` (linear [ASSUMED]) → Echoform's equal-power mix. Listed:
+  Spray, Random Pitch, the grain frequency (Echoform's window is fixed), each repeat shifted once (not again per pass).
+- **Auto Filter** types: `AutoFilter2/Filter_Type` 0 low, 1 high, 2 band pass, 3 notch, 4 Morph, 5 DJ, 6 Comb,
+  7 Resampling, 8 Notch + LP, 9 Vowel [DATA: Core Library names "Cut-O-Move LPF / HPF", "Band-pass Spinner", "Notch Slide
+  Crunch", "DJ Filter Soft Clip", "Comb Envelope", "Resampling Filter S&H", "Vocal Quivver"; 4 and 8 by the STR names
+  left]; the older `AutoFilter/FilterType` 0 … 4 low, high, band, notch, Morph. Morph [DATA: the older device stores the
+  classic type its Morph stands for in `LegacyFilterType`: 0 → low (0), 0.25 → band (2), 0.5 → high (1), 0.75 → notch
+  (3)] → the nearest corner. Notch → a Facet EQ notch band (its Q the low pass's law; LFO / envelope modulation moved onto
+  Facet's frequency scale); DJ (`Filter_DjControl` −1 … 1) → a low pass below 0, a high pass above, cutoff on a log sweep
+  [ASSUMED]. Drive (older `Drive` 0 … 24 dB, newer `Filter_Drive` 0 … 1 × 24 dB [ASSUMED]) → a rack: Ember (transistor
+  curve) in front of the filter, every linked parameter and the Peak Controller's target moved onto a macro; `Circuit`
+  listed. Comb, Resampling, Notch + LP, Vowel stay listed.
+- **Device presets** (gzip XML; `.adg` = `GroupDevicePreset{…, Device, PresetRef, BranchPresets, ReturnBranchPresets}`
+  [SCHEMA, DATA]; `.adv` = the device element right under `<Ableton>` in Live 12.4's Core Library [DATA], the schema's
+  `AbletonDevicePreset{OverwriteProtectionNumber, Device, PresetRef}` wrapper also read): `importLiveDevicePreset`
+  (core/AlsImport.h) opens one the user owns as an insert effect (an audio effect through the translators, an Audio
+  Effect Rack as a LYNX rack, a plugin as a foreign plugin); instrument / MIDI presets are refused with the reason.

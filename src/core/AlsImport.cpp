@@ -168,6 +168,41 @@ struct Ctx
             ++(report->*list)[what];
     }
 
+    // (round 190fm) a file a device references (Hybrid Reverb's impulse response): the path where it is on this PC, ""
+    // when it is not — not reported as a missing sample (the device's own report line says what is left out). Besides
+    // the sample places: the "Builtin" folder next to each library root's "Core Library" (Live's own files on a machine
+    // with Live installed: RelativePathType 7 [DATA], the user's own install, read at import time only)
+    std::string findFile (const Element& sampleRef) const
+    {
+        const auto fileRef = sampleRef.child ("FileRef");
+        const auto& exists = options.common.fileExists;
+        if (! fileRef || ! exists)
+            return {};
+        const auto rel = fileRef.value ("RelativePath");
+        const auto saved = fileRef.value ("Path");
+        std::vector<std::string> candidates;
+        if (const auto it = options.common.relocations.find (saved); it != options.common.relocations.end())
+            candidates.push_back (it->second);
+        if (! rel.empty())
+        {
+            candidates.push_back (joinPath (options.common.projectFolder, rel));
+            for (const auto& root : options.libraryRoots)
+            {
+                candidates.push_back (joinPath (root, rel));
+                if (const auto cut = root.find_last_of ("/\\"); cut != std::string::npos && root.compare (cut + 1, std::string::npos, "Core Library") == 0)
+                    candidates.push_back (joinPath (joinPath (root.substr (0, cut), "Builtin"), rel));
+            }
+        }
+        if (! saved.empty())
+            candidates.push_back (saved);
+        if (const auto name = pathFileName (saved.empty() ? rel : saved); ! name.empty())
+            candidates.push_back (joinPath (options.common.projectFolder, name));
+        for (const auto& c : candidates)
+            if (! c.empty() && exists (c))
+                return c;
+        return {};
+    }
+
     // A sample reference → a path that exists on this PC ("" = missing; the saved path is reported)
     std::string resolveSample (const Element& sampleRef, const std::string& user)
     {
@@ -602,6 +637,7 @@ bool nativeEffectFrom (Ctx& ctx, const Element& d, EffectSlot& slot, std::vector
 {
     alsdev::Context context;
     context.bpm = ctx.song.bpm;
+    context.findFile = [&ctx] (const Element& ref) { return ctx.findFile (ref); }; // (round 190fm)
     auto t = alsdev::effectFromLiveDevice (d, context);
     if (! t)
         return false;
@@ -2191,6 +2227,67 @@ std::optional<Song> importAls (const std::vector<std::uint8_t>& bytes, const Als
     if (! parseSet (bytes, doc, error))
         return std::nullopt;
     return importAlsXml (doc, options, error);
+}
+
+std::optional<LiveDevicePreset> importLiveDevicePreset (const std::vector<std::uint8_t>& bytes, const AlsImportOptions& options, std::string* error)
+{
+    const auto fail = [error] (const std::string& why) -> std::optional<LiveDevicePreset> {
+        if (error != nullptr)
+            *error = why;
+        return std::nullopt;
+    };
+    xml::Document doc;
+    if (! parseSet (bytes, doc, error))
+        return std::nullopt;
+    // [SCHEMA] AbletonDevicePreset {OverwriteProtectionNumber, Device, PresetRef} (.adv); GroupDevicePreset {…, Device,
+    // PresetRef, BranchPresets, ReturnBranchPresets} (.adg): the Device slot holds the device element as a set does
+    // [DATA, Live 12.4's Core Library] an .adv holds the device element right under <Ableton> (no AbletonDevicePreset
+    // wrapper); an .adg holds GroupDevicePreset/Device
+    const auto root = doc.root();
+    auto preset = root.child ("AbletonDevicePreset");
+    if (! preset)
+        preset = root.child ("GroupDevicePreset");
+    if (root.name() != "Ableton" || root.child ("LiveSet"))
+        return fail ("not a Live device preset");
+    const auto devices = preset ? preset.child ("Device").children() : root.children();
+    if (devices.empty())
+        return fail ("the preset holds no device");
+    const auto d = devices.front();
+    const auto tag = std::string (d.name());
+    Ctx ctx (options);
+    LiveDevicePreset out;
+    out.name = d.value ("UserName");
+    if (tag == "AudioEffectGroupDevice")
+    {
+        out.slot = rack::makeRackSlot (RackDoc::Kind::audioEffect);
+        out.slot.enabled = d.boolean ("On/Manual", true);
+        if (! rackFrom (ctx, d, out.slot.patcher, 0))
+            return fail ("the rack could not be read");
+        out.rack = true;
+        return out;
+    }
+    if (tag == "PluginDevice")
+    {
+        const auto p = pluginOf (d);
+        if (! p)
+            return fail ("the plugin could not be read");
+        out.slot.kind = EffectKind::plugin;
+        out.slot.enabled = d.boolean ("On/Manual", true);
+        out.slot.plugin.name = p->name;
+        out.slot.plugin.foreign = *p;
+        ctx.note (&FlpImportReport::converted, "Plugin: " + p->name);
+        return out;
+    }
+    if (isInstrumentDevice (tag) || isMidiEffect (tag) || tag == "InstrumentGroupDevice" || tag == "MidiEffectGroupDevice" || tag == "DrumGroupDevice")
+        return fail ("an instrument or MIDI preset (only audio effects and Audio Effect Racks open as an insert effect)");
+    if (! nativeEffectFrom (ctx, d, out.slot))
+    {
+        ctx.note (&FlpImportReport::droppedEffects, deviceName (d));
+        return fail ("Live's " + deviceName (d) + " has no LYNX counterpart yet");
+    }
+    if (out.name.empty())
+        out.name = deviceName (d);
+    return out;
 }
 
 std::vector<FlpPluginUse> alsForeignPlugins (const std::vector<std::uint8_t>& bytes)
