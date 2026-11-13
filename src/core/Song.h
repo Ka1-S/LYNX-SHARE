@@ -943,6 +943,12 @@ struct ChannelDef
     ArpSettings arp;
     int cutGroup = 0;        // playing this channel cuts channels with an equal cutBy (0 = none)
     int cutBy = 0;
+    // round 190fe: a note of this channel cuts the other channels of its cut group but never this one (FL Studio
+    // Mobile's drum-kit cut groups A / B / C: a hit fades out the *other* pads of the group). Off = FL's rule.
+    bool cutOthersOnly = false;
+    // round 190fe: the end of a note of this channel cuts its group too (FL Studio Mobile's drum sampler runs its cut on a
+    // note-off as on a note-on, 0x1807503a0; set only on pads of a lane that holds its notes). Off = FL's rule.
+    bool cutAtNoteEnd = false;
     std::uint32_t colour = 0; // 0xFFRRGGBB; 0 = theme default
     int group = -1;           // the Channel Rack filter group (index into Song::channelGroups); -1 = none
     PatcherDoc patcher;       // instrument == patcher: its graph (REA_rodada141)

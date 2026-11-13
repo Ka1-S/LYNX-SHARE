@@ -3034,6 +3034,7 @@ private:
         original.playlistTracks[1].collapsed = true;
         original.channelGroups = { "Drums", "Keys" };
         original.channels[1].group = 1;
+        original.channels[1].cutOthersOnly = original.channels[1].cutAtNoteEnd = true; // FL Studio Mobile's cut rule (round 190fe)
         juce::String error;
 
         if (demoProjectPath.isNotEmpty()) // sample project for checking the UI with --snapshot
@@ -3096,6 +3097,8 @@ private:
                                && reloaded->playlistTracks[1].colour == 0
                                && reloaded->playlistTracks[2].grouped && reloaded->playlistTracks[1].collapsed && ! reloaded->playlistTracks[1].grouped
                                && reloaded->channelGroups == original.channelGroups && reloaded->channels[1].group == 1 && reloaded->channels[0].group == -1
+                               && reloaded->channels[1].cutOthersOnly && reloaded->channels[1].cutAtNoteEnd && ! reloaded->channels[0].cutOthersOnly
+                               && ! reloaded->channels[0].cutAtNoteEnd
                                && reloaded->playlist[0].offset == 960 && reloaded->playlist[0].track == 2
                                && reloaded->mixer[3].effects.size() == 1
                                && reloaded->mixer[3].effects[0].kind == lynx::EffectKind::delay

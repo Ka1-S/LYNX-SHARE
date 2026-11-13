@@ -632,7 +632,9 @@ TEST (flm190bs_note_effects_and_key_ranges_on_import)
     CHECK (report.droppedEffects.count ("FL Studio Mobile: Arpeggiator (note effect, not converted)") == 0
            && report.droppedEffects.count ("FL Studio Mobile: Note Echo (note effect, not converted)") == 0
            && report.droppedEffects.count ("FL Studio Mobile: Transpose") == 0 && report.droppedEffects.count ("FL Studio Mobile: Scale") == 0);
-    CHECK (report.partialEffects.count ("FL Studio Mobile: an instrument placed after an effect in its rack (the effect processes it too)") == 1);
+    // (round 190fe: the effect before the instrument sits on an insert of its own that does not reach it)
+    CHECK (report.partialEffects.count ("FL Studio Mobile: an instrument placed after an effect in its rack (the effect processes it too)") == 0
+           && report.converted.count ("FL Studio Mobile: rack whose instruments and effects take turns (one insert per part)") == 1);
 }
 
 TEST (flm190bs_rack_with_several_instruments_is_a_layer)

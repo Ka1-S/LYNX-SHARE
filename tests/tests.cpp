@@ -17402,6 +17402,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "PocketReverb190dwTests.inc" // round 190dw
 #include "FlmEffects190dwTests.inc" // round 190dw: the .flm effect laws against FLM's renders
 #include "FlmImport190dwInstTests.inc" // round 190dw item 4
+#include "FlmImport190feTests.inc" // round 190fe: cut groups, 3x Osc lanes, effect Mix, rack parts
 #include "Bridge176aTests.inc"
 #include "Issues178aTests.inc"
 #include "Mixer177aTests.inc"

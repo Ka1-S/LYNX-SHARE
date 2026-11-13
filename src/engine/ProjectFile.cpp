@@ -1887,6 +1887,10 @@ juce::var channelToVar (const ChannelDef& c)
     }
     if (c.cutGroup != 0 || c.cutBy != 0)
         o->setProperty ("cut", juce::Array<juce::var> { c.cutGroup, c.cutBy });
+    if (c.cutOthersOnly) // round 190fe
+        o->setProperty ("cutOthersOnly", true);
+    if (c.cutAtNoteEnd)
+        o->setProperty ("cutAtNoteEnd", true);
     // FL's key region and Layer channels (round 164)
     if (c.hasKeyRegion())
         o->setProperty ("keyRegion", juce::Array<juce::var> { c.keyLow, c.keyHigh });
@@ -2292,6 +2296,8 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
         def.cutGroup = (int) cut[0];
         def.cutBy = (int) cut[1];
     }
+    def.cutOthersOnly = (bool) c.getProperty ("cutOthersOnly", false); // round 190fe
+    def.cutAtNoteEnd = (bool) c.getProperty ("cutAtNoteEnd", false);
 
     if (const auto& s = c["synthSettings"]; s.isObject())
     {

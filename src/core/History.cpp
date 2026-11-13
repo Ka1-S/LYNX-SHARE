@@ -29,7 +29,7 @@ bool sameChannel (const ChannelDef& a, const ChannelDef& b) noexcept
     return a.name == b.name && a.instrument == b.instrument && sameChannelLevels (a, b) && a.muted == b.muted && a.samplePath == b.samplePath
            && a.zones == b.zones && a.mixerTrack == b.mixerTrack && a.plugin == b.plugin && a.controllerState == b.controllerState
            && a.modelParams == b.modelParams && a.pluginState == b.pluginState && a.sampler == b.sampler && a.synth == b.synth
-           && a.swingMix == b.swingMix && a.arp == b.arp && a.cutGroup == b.cutGroup && a.cutBy == b.cutBy && a.colour == b.colour && a.soloLock == b.soloLock;
+           && a.swingMix == b.swingMix && a.arp == b.arp && a.cutGroup == b.cutGroup && a.cutBy == b.cutBy && a.cutOthersOnly == b.cutOthersOnly && a.cutAtNoteEnd == b.cutAtNoteEnd && a.colour == b.colour && a.soloLock == b.soloLock;
 }
 
 bool sameSlot (const EffectSlot& a, const EffectSlot& b) noexcept
