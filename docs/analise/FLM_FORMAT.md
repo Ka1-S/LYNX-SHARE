@@ -49,7 +49,7 @@ PROVEN-REA (0x18076b9e0); the meanings are INFERRED where marked.
 | 4 | u32 | header word B |
 | 8 | char[256] | song title |
 | 264 | f64 | **tempo, BPM.** PROVEN-FILE: 130.0 in the user file, 128/174/110.02… in the demos |
-| 272 | f64, f64 | handed to one setter together. INFERRED: loop/marker start and end in beats (0,0 or 128,128) |
+| 272 | f64, f64 | **the song's play loop**, start and end in beats (stored as min / max; 0,0 or 128,128 in the demos). Round 190fn, PROVEN-REA on FLM 5.0.3 (`CSequencer::SetPlayLoop`, inlined in the loader; `GetPlaybackLoop`): whether the loop is on is a runtime switch the file does not hold — with it off the whole song plays. LYNX does not import the range (no switch to set) |
 | 288 | 8 bytes | skipped by the reader (a legacy field) |
 | 296 | 4 × f64 | view state. INFERRED: playlist zoom/scroll; not needed for import |
 | 328 | 16 bytes | project GUID |
@@ -73,11 +73,12 @@ the set as the project's Chord pad set (`Song::keyboardChords`).
 
 PROVEN-REA 0x18076b9e0. Offsets:
 - 0: char[256] creation date "YYYY-MM-DD HH-MM-SS";
-- 256: f64 (INFERRED: total edit time);
+- 256: f64 **time spent on the project, seconds** (round 190fn, PROVEN-REA: FLM's own FLP export divides it by 86 400 for FL's
+  working time; the creation date below is parsed with `timegm`, i.e. read as UTC). LYNX: Settings › Info's working time;
 - 264: char[256] author, with a `lastAuthor` JSON fallback;
 - 520: char[256] original song name ("New Song (156)");
 - 776: u8;
-- 777: char[2048] notes/description;
+- 777: char[2048] notes/description (LYNX: Settings › Info's comments; round 190fn);
 - 2825: char[256] last-saved date. When it is empty the UI shows "Never / demo project".
 
 ### TDIV
@@ -156,7 +157,7 @@ PROVEN-REA:
 | 0 | char[1024] | channel display name |
 | 1024 | u32 | (unknown; 1 on an instrument channel) |
 | 1028 | f64 | **display order** (0 = master, 1, 2, …). PROVEN-FILE: a permutation |
-| 1036 | f32 | handed to a setter. INFERRED: colour/hue |
+| 1036 | f32 | **the channel's colour as a hue** 0…1 (clamped). FLM draws HSL(frac(0.83 + 0.73·hue), 0.9, 0.63) — the shipped theme's accent saturation and lightness — and its FLP export colours FL's channels the same way. Round 190fn, PROVEN-REA on FLM 5.0.3 (`CSeqChannel::SetState`, `MakeChannelColor`, `CColor::SetHSL`, `Theme::accentSaturation` / `accentLightness`); LYNX colours the channel's channels, Playlist rows and inserts with it |
 | 1040 | f64, f64 | INFERRED: track height / view (1.137…, NaN) |
 | 1056 | u32, u32 | two booleans. INFERRED: mute and solo (both 0 in the samples) |
 | 1064 | 16 bytes | channel GUID |
@@ -755,11 +756,28 @@ Round 178a found that an FLM→FLP export stores each instrument as that generat
 The state uses the same `RACK 10KR` tree (`SSLF/10LF → RACK → RHED RPRM RSMP RMOD{DESC PRMS CSTM}`). So one LYNX rack
 decoder serves both paths: opening a `.flm` directly, and replacing the inert Mobile Rack in an exported `.flp`.
 
+### 8.1 What FLM's "Save as FLP" writes (round 190fn, PROVEN-REA on FLM 5.0.3's `libFLM.so`, names kept by the build)
+
+- `ConvertFlmToFlp` → `ConvertData` (tempo × 1000 for 0x9C; 0xED from META: the creation date as a Delphi date, the time
+  spent / 86 400) → `ConvertChannels`, `ConvertChannelRacks`, `ConvertInserts`.
+- A note channel → an FL instrument channel with the generator "FL Studio Mobile Rack" (`ConvertNoteRack`), coloured by
+  the channel's hue. Its 0xD5 state (`CreatePluginState`): `SSLF` + size, `10LF`, `HEAD` (8 bytes: the tempo, f64),
+  `RACK` + the channel's rack chunk, `PMAP` + 12-byte records (two ints and a flag: FL's map of the rack's automatable
+  parameters; meaning not traced). FL's own "FL Studio Mobile Rack.fst" has the same layout without `PMAP`.
+- A drum lane → **one FL channel per kit sample** ("Audio", `ConvertAudioRack`), not a Rack generator.
+- Audio lanes → FL audio channels (`ConvertAudioRack`); inserts → the "FL Studio Mobile Rack FX" effect (`ConvertInserts`),
+  whose state has the same `SSLF` layout with effect modules only.
+- LYNX (round 190fn): the Rack generator with one instrument (effects after it allowed) plays on the .flm importer's
+  engines, the rack's level, pan and effects on an insert of their own in front of the channel's FL insert; the Rack FX
+  becomes one container slot (the modules' slots in order at the rack's level, its pan as a balance utility). Kits, several
+  instruments, an effect before the instrument and note effects keep the stand-in and are listed. FLM's FLP mixer section
+  has no 0xEC / 0x62 (round 178a), so LYNX's FLP parser still drops those inserts' effects.
+
 ## 9. Open points (each is INFERRED today; the plan says which slice closes it)
 
 1. (closed, round 190u) EVN2 bytes 14–19: velocity = byte / 255, pan = byte / 255, fine pitch, repeat count, slide flag.
    Pan, drum pitch, repeat and slide notes are imported since round 190ab. Open: the DW sampler's velocity → level law.
-2. CHHD colour and its two flags at 1056; SEND words [1], [3], [4]. (RPRM [2], [3] are Mute and Solo, §3.2; how FLM
+2. ~~CHHD colour~~ (round 190fn: a hue, §4); its two flags at 1056; SEND words [1], [3], [4]. (RPRM [2], [3] are Mute and Solo, §3.2; how FLM
    applies them on load is not traced.)
 3. ~~The automation point shape codes~~: closed in round 187d. The saved points are the sampled curve (§4).
 4. The per-module parameter value → unit maps. Each LYNX engine needs its own mapping (MiniSynth, DirectWave and
@@ -775,7 +793,7 @@ decoder serves both paths: opening a `.flm` directly, and replacing the inert Mo
    (32) maps to Reeverb 2 and Tuned EQ (30) to the Parametric EQ (REA_rodada190by.md). Round 190dw: Equalizer, Graphic
    EQ, Filter, Autoduck (legacy) and the three reverbs on FLM's own engines (§7.10). Parameter counts read in the
    code: 30 = 11, 32 = 16 (14 and 15 are unnamed wet and dry levels), 42 = 8.
-5. HEAD 272/280 (loop range).
+5. ~~HEAD 272/280~~ (round 190fn: the play loop, §2; the loop switch is not in the file).
 6. (round 190bs) The sample slot: the third `MAIN` tail field (f32 0.5) and `LINk`'s second word; where a slot with
    an output link plays; the stretch modes' algorithms (LYNX uses its own stretcher; round 190fe: the stretch is a third-party library's, a
    black box: what a render must measure is in round 190fe's notes) (round 190dw: where a linked slot plays is settled, §7.9); how a kit sample's legacy `STRC`
