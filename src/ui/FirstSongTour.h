@@ -82,6 +82,7 @@ private:
     void showCard();
     void hideCard();
     void update();             // the card's text and the ring's target
+    bool cardShowing() const noexcept; // in its window (as a child component or a native child window, round 190fc)
     void save();
     void clicked (const juce::String& what);
 
@@ -92,5 +93,6 @@ private:
     std::unique_ptr<Card> card;
     std::unique_ptr<Layer> layer;
     std::unique_ptr<Welcome> welcome;
+    juce::Component::SafePointer<juce::Component> shownIn; // the window the card and the ring are in (while shown)
 };
 } // namespace lynx

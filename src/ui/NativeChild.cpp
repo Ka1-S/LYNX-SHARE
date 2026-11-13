@@ -443,6 +443,22 @@ void installClickHook()
 struct KeyForwarder final : juce::KeyListener
 {
     bool keyPressed (const juce::KeyPress& key, juce::Component*) override { return runSecondaryWindowKey (key); }
+
+    // Round 190fc (0.1.27 RC H2): a key-down that nothing in an attached window used is posted on to the parent window by
+    // JUCE (HWNDComponentPeer: WM_KEYDOWN -> doKeyDown false -> forwardMessageToParent). The main window's peer then
+    // finds no WM_CHAR of its own and makes a key press of it for the focused component, which is still the one in this
+    // window: its keys reached the shortcuts twice, so Space played and stopped at once ("Space does nothing" after a
+    // click on a control of the Simple dock or title bar). The key press itself still comes here (the WM_CHAR, or
+    // JUCE's own for keys without a character) and keyPressed forwards it once, so the key-down is taken as used.
+    bool keyStateChanged (bool isKeyDown, juce::Component* origin) override
+    {
+       #if JUCE_WINDOWS
+        return isKeyDown && origin != nullptr && isAttached (*origin);
+       #else
+        juce::ignoreUnused (isKeyDown, origin);
+        return false;
+       #endif
+    }
 };
 
 KeyForwarder& keyForwarder()
@@ -670,6 +686,16 @@ void addFloater (juce::Component& c)
 void removeFloater (juce::Component& c)
 {
     dropDeleted (floaters(), &c);
+}
+
+void passInputThrough (juce::Component& c)
+{
+   #if JUCE_WINDOWS
+    if (auto* hwnd = static_cast<HWND> (c.getWindowHandle()); hwnd != nullptr && isAttached (c))
+        SetWindowLongPtr (hwnd, GWL_EXSTYLE, GetWindowLongPtr (hwnd, GWL_EXSTYLE) | WS_EX_TRANSPARENT);
+   #else
+    juce::ignoreUnused (c);
+   #endif
 }
 
 void keepFloatersInFront()
@@ -926,6 +952,38 @@ void postClickForTest (void* window, juce::Point<int> clientPoint)
     PostMessageW (h, WM_LBUTTONUP, 0, at);
    #else
     juce::ignoreUnused (window, clientPoint);
+   #endif
+}
+
+bool pressSpaceForTest (void* fallback)
+{
+   #if JUCE_WINDOWS
+    auto to = GetFocus();
+    DWORD pid = 0;
+    if (to != nullptr)
+        GetWindowThreadProcessId (to, &pid);
+    if (to == nullptr || pid != GetCurrentProcessId())
+        to = static_cast<HWND> (fallback);
+    if (to == nullptr)
+        return false;
+    const auto scan = MapVirtualKeyW (VK_SPACE, MAPVK_VK_TO_VSC);
+    PostMessageW (to, WM_KEYDOWN, VK_SPACE, (LPARAM) (1u | (scan << 16)));
+    PostMessageW (to, WM_KEYUP, VK_SPACE, (LPARAM) (1u | (scan << 16) | (1u << 30) | (1u << 31)));
+    const auto until = GetTickCount64() + 120;
+    MSG m;
+    while (GetTickCount64() < until)
+    {
+        while (PeekMessageW (&m, nullptr, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage (&m);
+            DispatchMessageW (&m);
+        }
+        Sleep (5);
+    }
+    return true;
+   #else
+    juce::ignoreUnused (fallback);
+    return false;
    #endif
 }
 

@@ -1377,6 +1377,16 @@ public:
             return;
         }
 
+        if (args.contains ("--simplekeytest"))
+        {
+            // LYNX --simplekeytest report.txt (round 190fc, 0.1.27 RC H2): the main window in the Simple layout; after a
+            // demo opened from Welcome › Start from and after clicks in the dock, its tabs, the Lyrics button, a track
+            // header and the grid, Space must start playback (a text field clicked into keeps its typing keys). Shows a
+            // window (takes the foreground on Windows: GUI lock); exit code 0 = OK.
+            runSimpleKeyTest (args[args.indexOf ("--simplekeytest") + 1].unquoted());
+            return;
+        }
+
         if (args.contains ("--pluginstyle")) // round 126: force one style for this run (glow, neon, hardware, vivid; auto = per plugin)
         {
             const auto i = args.indexOf ("--pluginstyle");
@@ -1964,6 +1974,17 @@ public:
             // opened in Simple — and a text report of the checks (incl. resources/demos/*.lynx = the generated songs)
             const auto i = args.indexOf ("--tour190dvshot");
             runTour190dvShot (args[i + 1].unquoted());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--simpleclosetest"))
+        {
+            // LYNX --simpleclosetest <report.txt>: round 190fc off-screen (no window) — the main window in the Simple
+            // layout with Welcome, the tour, Start from, a demo, the dock's tabs, Finish and Lyrics open, then closed as at
+            // shutdown (the 0.1.27 RC crashed on every such close); exit code 0 = OK
+            const auto i = args.indexOf ("--simpleclosetest");
+            setApplicationReturnValue (runSimpleCloseTest (args[i + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -6177,8 +6198,24 @@ private:
                         expect ("editor_above_rack_when_opened", h != nullptr && lynx::nativechild::isAbove (h, rack));
                         workspace->activate (Panel::channelRack); // a click on the rack
                         expect ("rack_above_editor_after_its_click", h != nullptr && lynx::nativechild::isAbove (rack, h));
-                        if (h != nullptr) // a real click (a message to the editor's own window) on its title bar
-                            lynx::nativechild::postClickForTest (h, { 60, 8 });
+                        // a real click (a message to the editor's own window) on its title bar, at a point where the editor
+                        // can be seen. Round 190fc (0.1.27 RC M1): JUCE takes a button-down only where the system says its
+                        // window is the one under the point (HWNDComponentPeer::contains asks WindowFromPoint), so the old
+                        // fixed point (60, 8) was dropped whenever the rack, raised just above, covered it there: the
+                        // check read 0 while real clicks (on what can be seen) raise the editor.
+                        if (h != nullptr && ed != nullptr)
+                        {
+                            juce::Point<int> at (-1, -1);
+                            for (int x = 30; x < ed->getWidth() - 40 && at.x < 0; x += 12)
+                                if (lynx::nativechild::windowAt (*ed, { x, 8 }) == h)
+                                    at = { x, 8 };
+                            step (juce::String ("editor_title_visible_at=") + juce::String (at.x));
+                            if (at.x >= 0)
+                            {
+                                const auto scale = ed->getPeer() != nullptr ? ed->getPeer()->getPlatformScaleFactor() * (double) ed->getDesktopScaleFactor() : 1.0;
+                                lynx::nativechild::postClickForTest (h, (at.toDouble() * scale).roundToInt());
+                            }
+                        }
                     }
                     else if (at == 22)
                     {
@@ -6872,6 +6909,307 @@ private:
 
         auto* test = new FocusTest();
         test->reportPath = reportPath;
+        startFocusTestWindow (*test);
+        test->startTimer (600);
+    }
+
+    // --simplekeytest (round 190fc, 0.1.27 RC H2): in the Simple layout Space often did nothing after a click in the
+    // window (the dock, a track header, the grid, the Lyrics button) or after a demo opened from Welcome › Start from. The
+    // main window in the Simple layout; each step clicks as the system would (through the native window under the point)
+    // and presses Space where the system sends it (the native window of the component with the focus): playback must
+    // start, except while a text field the user clicked into has the keys (it types). Shows a window (Windows: GUI lock).
+    void runSimpleKeyTest (const juce::String& reportPath)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+
+        struct KeyTest final : juce::Timer
+        {
+            juce::String reportPath, report;
+            bool ok = true;
+            int stepIndex = 0, instrumentTrack = 0;
+            std::unique_ptr<lynx::AudioEngine> engine;
+            lynx::MainComponent* ui = nullptr;
+            std::unique_ptr<juce::DocumentWindow> main;
+            std::function<void()> done;
+
+            void line (const juce::String& text)
+            {
+                report << text << "\n";
+                juce::File (reportPath).replaceWithText (report);
+            }
+            void check (const juce::String& what, bool passed)
+            {
+                line ((passed ? "ok   " : "FAIL ") + what);
+                ok = ok && passed;
+            }
+            static juce::String describe (juce::Component* c)
+            {
+                if (c == nullptr)
+                    return "nothing";
+                juce::String path;
+                for (auto* p = c; p != nullptr && path.length() < 160; p = p->getParentComponent())
+                {
+                    auto name = p->getComponentID().isNotEmpty() ? p->getComponentID() : p->getName();
+                    if (name.isEmpty())
+                        name = juce::String (typeid (*p).name()).fromLastOccurrenceOf ("::", false, false).substring (0, 28);
+                    path << (path.isEmpty() ? "" : " < ") << name;
+                }
+                return path;
+            }
+            // the first showing component with this ID in the main window or a native child window of it
+            juce::Component* find (const juce::String& id)
+            {
+                std::function<juce::Component* (juce::Component&)> in = [&] (juce::Component& root) -> juce::Component* {
+                    if (root.getComponentID() == id && root.isShowing())
+                        return &root;
+                    for (auto* c : root.getChildren())
+                        if (auto* f = in (*c))
+                            return f;
+                    return nullptr;
+                };
+                if (auto* f = in (*main))
+                    return f;
+                if (auto* peer = main->getPeer())
+                    for (auto* attached : lynx::nativechild::attachedChildren (peer->getNativeHandle()))
+                        if (auto* f = in (*attached))
+                            return f;
+                return nullptr;
+            }
+            // a click (press and release) at `local` in `c`, through the native window it is in
+            juce::String lastHit;
+            void click (juce::Component& c, juce::Point<int> local)
+            {
+                auto* peer = c.getPeer();
+                if (peer == nullptr)
+                    return;
+                const auto at = peer->getComponent().getLocalPoint (&c, local.toFloat());
+                lastHit = describe (peer->getComponent().getComponentAt (at.roundToInt()));
+                line ("  click at " + local.toString() + " in " + describe (&c).upToFirstOccurrenceOf (" < ", false, false) + " -> " + lastHit);
+                const auto now = juce::Time::currentTimeMillis();
+                peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, at, juce::ModifierKeys (juce::ModifierKeys::leftButtonModifier), 1.0f, 0.0f, now);
+                peer->handleMouseEvent (juce::MouseInputSource::InputSourceType::mouse, at, juce::ModifierKeys(), 1.0f, 0.0f, now + 40);
+            }
+            void click (juce::Component& c) { click (c, c.getLocalBounds().getCentre()); }
+            // Space where the system sends it: the native window of the focused component (else the main one)
+            bool space()
+            {
+                // Windows: posted to the window with the system's focus, as a real key goes (the system's own routing)
+                if (lynx::nativechild::pressSpaceForTest (main->getWindowHandle()))
+                    return true;
+                auto* focused = juce::Component::getCurrentlyFocusedComponent();
+                auto* peer = focused != nullptr && focused->getPeer() != nullptr ? focused->getPeer() : main->getPeer();
+                return peer != nullptr && peer->handleKeyPress (juce::KeyPress (juce::KeyPress::spaceKey, juce::ModifierKeys(), ' '));
+            }
+            void spacePlays (const juce::String& after)
+            {
+                line ("  keys at: " + describe (juce::Component::getCurrentlyFocusedComponent()));
+                auto& transport = engine->getTransport();
+                if (transport.playing.load())
+                    engine->stop();
+                space();
+                check ("Space plays after " + after, transport.playing.load());
+                engine->stop();
+            }
+
+            void timerCallback() override
+            {
+                auto* simple = ui->getSimpleWorkflowForSnapshot();
+                auto& playlist = ui->getPlaylistForSnapshot();
+                switch (stepIndex++)
+                {
+                    case 0:
+                        ui->setLayoutStyle (lynx::layoutstyle::Style::simple);
+                        ui->grabKeyboardFocus();
+                        break;
+                    case 1:
+                        check ("the Simple workflow is up", simple != nullptr);
+                        if (simple == nullptr)
+                            return finish();
+                        spacePlays ("the layout came up");
+                        simple->showWelcome();
+                        break;
+                    case 2:
+                        if (auto* demo = find ("tour.welcome.demo"))
+                            click (*demo); // Welcome › Open a demo song: the Start from list
+                        else
+                            check ("Welcome › Open a demo song found", false);
+                        break;
+                    case 3:
+                    {
+                        check ("Start from is up", simple->isStartFromShowing());
+                        if (auto* start = dynamic_cast<lynx::StartFromPanel*> (simple->startFromForSnapshot()))
+                            check ("a demo song opens from it", start->openForSnapshot (1));
+                        break;
+                    }
+                    case 4:
+                        check ("Start from closed with the demo open", ! simple->isStartFromShowing() && ! engine->getSong().playlist.empty());
+                        spacePlays ("a demo opened from Welcome › Start from");
+                        instrumentTrack = [] (const lynx::Song& song) { // the first Instrument track (the dock's Keyboard and Editor tabs are for it)
+                            for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+                                if (lynx::simpletracks::kindOf (song, t) == lynx::simpletracks::Kind::instrument)
+                                    return t;
+                            return 0;
+                        } (engine->getSong());
+                        line ("instrument track: " + juce::String (instrumentTrack));
+                        playlist.selectTrack (instrumentTrack);
+                        simple->trackSelected (instrumentTrack);
+                        break;
+                    case 5:
+                        if (auto* dock = simple->dockForSnapshot(); dock != nullptr && dock->isShowing())
+                        {
+                            click (*dock, { dock->getWidth() - 6, dock->getHeight() - 6 }); // (its empty corner)
+                            spacePlays ("a click in the dock");
+                        }
+                        else
+                            check ("the dock shows", false);
+                        break;
+                    case 6:
+                        if (auto* tab = find ("simple.dock.keyboard"))
+                        {
+                            click (*tab);
+                            spacePlays ("a click on a dock tab (Keyboard)");
+                        }
+                        if (auto* tab = find ("simple.dock.editor"))
+                        {
+                            click (*tab);
+                            spacePlays ("a click on a dock tab (Editor)");
+                        }
+                        break;
+                    case 7:
+                        if (auto* lyrics = find ("simple.lyrics"))
+                        {
+                            click (*lyrics);
+                            spacePlays ("a click on the Lyrics button");
+                        }
+                        else
+                            check ("the Lyrics button found", false);
+                        break;
+                    case 8:
+                    {
+                        const auto lane = playlist.trackRowForSnapshot (instrumentTrack).withTrimmedLeft (playlist.headerWidth);
+                        click (playlist, { juce::jmax (4, playlist.headerWidth / 2), lane.getCentreY() });
+                        spacePlays ("a click on a track header");
+                        click (playlist, lane.getCentre() + juce::Point<int> (40, 0));
+                        spacePlays ("a click in the Playlist grid");
+                        break;
+                    }
+                    case 9:
+                    {
+                        // a text field the user clicks into keeps its typing keys; a click outside gives Space back
+                        // a dock knob clicked keeps the arrow keys, and Space still plays from it
+                        for (auto tab : { lynx::SimpleDock::Tab::effects, lynx::SimpleDock::Tab::instrument })
+                        {
+                            juce::Component* knob = nullptr;
+                            std::function<void (juce::Component&)> seek = [&] (juce::Component& c) {
+                                if (knob == nullptr && c.isShowing() && (bool) c.getProperties().getWithDefault ("lynxClickKeepsKeys", false))
+                                    knob = &c;
+                                for (auto* child : c.getChildren())
+                                    seek (*child);
+                            };
+                            if (auto* dock = simple->dockForSnapshot())
+                            {
+                                dock->setTab (tab);
+                                seek (*dock);
+                            }
+                            if (knob != nullptr)
+                            {
+                                click (*knob);
+                                spacePlays ("a click on a dock knob");
+                                break;
+                            }
+                        }
+                        if (auto* dock = simple->dockForSnapshot())
+                            dock->setTab (lynx::SimpleDock::Tab::instrument);
+                        juce::TextEditor* field = nullptr;
+                        std::function<void (juce::Component&)> look = [&] (juce::Component& c) {
+                            if (auto* t = dynamic_cast<juce::TextEditor*> (&c); t != nullptr && t->isShowing() && field == nullptr)
+                                field = t;
+                            for (auto* child : c.getChildren())
+                                look (*child);
+                        };
+                        if (auto* dock = simple->dockForSnapshot())
+                            look (*dock);
+                        line ("text field in the dock found=" + juce::String ((int) (field != nullptr)));
+                        if (field != nullptr)
+                        {
+                            click (*field);
+                            const auto before = field->getText();
+                            space();
+                            check ("Space types into the text field the user clicked", field->getText() != before && ! engine->getTransport().playing.load());
+                            engine->stop();
+                            field->clear();
+                            const auto lane = playlist.trackRowForSnapshot (instrumentTrack).withTrimmedLeft (playlist.headerWidth);
+                            click (playlist, lane.getCentre() + juce::Point<int> (60, 0));
+                            spacePlays ("a click in the grid after typing");
+                        }
+                        // H1: the first-song tour's card in front of the native panels, taking no keys (started on the demo
+                        // as it is: Help's question about a new project is a dialog)
+                        if (auto* tour = simple->tourForSnapshot())
+                            tour->start();
+                        break;
+                    }
+                    case 10:
+                    {
+                        auto* tour = simple->tourForSnapshot();
+                        auto* card = tour != nullptr ? tour->cardForSnapshot() : nullptr;
+                        check ("the tour runs", tour != nullptr && tour->isRunning() && card != nullptr && card->isVisible());
+                        if (card == nullptr)
+                            return finish();
+                        auto& frame = ui->workspaceForTest().getFrame (lynx::workspace::Panel::playlist);
+                        const auto native = lynx::nativechild::dockingEnabled() && lynx::nativechild::isAttached (frame);
+                        line ("playlist native child window=" + juce::String ((int) native) + ", tour card native child window="
+                              + juce::String ((int) lynx::nativechild::isAttached (*card)));
+                        if (native)
+                        {
+                            check ("the tour card is a native child window of the main window (not under the panels)", lynx::nativechild::isAttached (*card));
+                           #if JUCE_WINDOWS
+                            check ("the tour card is above the Playlist's native window", lynx::nativechild::isAbove (card->getWindowHandle(), frame.getWindowHandle()));
+                            juce::Component* layer = nullptr;
+                            for (auto* c : lynx::nativechild::attachedChildren (main->getPeer()->getNativeHandle()))
+                                if (c != nullptr && c->getComponentID() == "tour.layer")
+                                    layer = c;
+                            check ("the ring's layer is above the Playlist too", layer != nullptr && lynx::nativechild::isAbove (layer->getWindowHandle(), frame.getWindowHandle()));
+                            check ("the ring's layer lets clicks through to the Playlist",
+                                   layer != nullptr && lynx::nativechild::windowAt (*layer, layer->getLocalBounds().getCentre()) != layer->getWindowHandle());
+                           #endif
+                        }
+                        check ("the tour card took no keys", ! card->hasKeyboardFocus (true));
+                        spacePlays ("the tour came up");
+                        if (auto* next = card->findChildWithID ("tour.next"); next != nullptr && next->isShowing())
+                        {
+                            click (*next);
+                            check ("a click on the card took no keys", ! card->hasKeyboardFocus (true));
+                            spacePlays ("a click on the tour card");
+                        }
+                        finish();
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+
+            void finish()
+            {
+                line (ok ? "result=OK" : "result=FAILED");
+                stopTimer();
+                done();
+            }
+        };
+
+        auto* test = new KeyTest();
+        test->reportPath = reportPath;
+        startFocusTestWindow (*test);
+        // (kept above other apps' windows for its few seconds: JUCE takes a button-down only where the system finds its
+        // window under the point, and the test clicks through LYNX's own peers, not the system's input)
+        test->main->setAlwaysOnTop (true);
+        test->startTimer (700);
+    }
+
+    template <typename Test>
+    void startFocusTestWindow (Test& t)
+    {
+        auto* test = &t;
         test->engine = std::make_unique<lynx::AudioEngine> (false);
         test->main = std::make_unique<juce::DocumentWindow> ("LYNX focus test", lynx::theme::window, juce::DocumentWindow::allButtons);
         test->main->setUsingNativeTitleBar (true);
@@ -6890,7 +7228,6 @@ private:
                 quit();
             });
         };
-        test->startTimer (600);
     }
 
     void runWindowTest (const juce::String& reportPath)
@@ -17129,6 +17466,115 @@ private:
         line ("Simple workflow objects: " + juce::String (madeBefore) + " before, " + juce::String (lynx::SimpleWorkflow::instances.load()) + " after");
         line (report.contains ("ERROR ") ? "RESULT ERROR" : "RESULT OK");
         juce::File (prefix + "-report.txt").replaceWithText (report);
+    }
+
+    // --simpleclosetest (round 190fc, 0.1.27 RC blocker B1): every close in the Simple layout crashed (the Simple workflow
+    // was destroyed after the Workspace and its destructor called into it). Off-screen, no window: the main window in the
+    // Simple layout with everything of it open — Welcome, the first-song tour's card, Start from, a demo song, each dock
+    // tab (the Editor tab docks the Piano roll), Finish, Lyrics, the chooser — then destroyed as the app's shutdown does.
+    // A second main window goes Simple -> Pattern -> Simple and closes too. Checks: no Simple workflow outlives its main
+    // window's destructor body, none is left at all. (Under ASan on Linux the old order is a heap-use-after-free.)
+    bool runSimpleCloseTest (const juce::String& reportPath)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::String report;
+        bool ok = true;
+        const auto line = [&report, &reportPath] (const juce::String& text) {
+            report << text << "\n";
+            juce::File (reportPath).replaceWithText (report); // (written as it goes: a crash still leaves the last step)
+        };
+        const auto check = [&line, &ok] (const juce::String& what, bool good) {
+            line ((good ? "ok   " : "FAIL ") + what);
+            ok = ok && good;
+        };
+        const auto aliveBefore = lynx::SimpleWorkflow::alive.load();
+        {
+            lynx::AudioEngine offline (false);
+            {
+                lynx::MainComponent ui (offline, false);
+                ui.setSize (1600, 900);
+                ui.setVisible (true); // (no window: the docked editor and the tour only need their parents visible)
+                const auto settle = [&] {
+                    for (int k = 0; k < 3; ++k)
+                        offline.dispatchPendingMessages();
+                };
+                ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+                settle();
+                auto* simple = ui.getSimpleWorkflowForSnapshot();
+                check ("the Simple workflow is up", simple != nullptr);
+                if (simple != nullptr)
+                {
+                    const auto empty = lynx::builtInTemplateIndex ("Empty");
+                    offline.setSong (empty >= 0 ? lynx::makeNewProject (empty) : lynx::makeNewProject());
+                    settle();
+                    simple->showWelcome();
+                    settle();
+                    auto* tour = simple->tourForSnapshot();
+                    check ("Welcome screen shown", tour != nullptr && tour->isWelcomeShowing());
+                    simple->startOrContinueTour();
+                    settle();
+                    simple->doTourStep (lynx::tour::beat);
+                    settle();
+                    check ("the tour runs with its card up", simple->tourRunning() && tour != nullptr && tour->cardForSnapshot() != nullptr);
+                    // a demo song from Start from (the panel stays up over the Playlist)
+                    if (auto* start = simple->startFromForSnapshot(); start != nullptr && lynx::demos::count > 1)
+                    {
+                        offline.setSong (lynx::demos::make (1));
+                        settle();
+                        check ("a demo song opened, Start from up", simple->isStartFromShowing() && ! offline.getSong().playlist.empty());
+                    }
+                    // the dock on a track, every tab (the Editor tab docks the Piano roll)
+                    if (auto* dock = simple->dockForSnapshot())
+                    {
+                        simple->trackSelected ([] (const lynx::Song& song) { // the first Instrument track (the dock's Keyboard and Editor tabs are for it)
+                        for (int t = 0; t < (int) song.playlistTracks.size(); ++t)
+                            if (lynx::simpletracks::kindOf (song, t) == lynx::simpletracks::Kind::instrument)
+                                return t;
+                        return 0;
+                    } (offline.getSong()));
+                        for (auto tab : { lynx::SimpleDock::Tab::instrument, lynx::SimpleDock::Tab::keyboard, lynx::SimpleDock::Tab::editor,
+                                          lynx::SimpleDock::Tab::effects, lynx::SimpleDock::Tab::editor })
+                        {
+                            dock->setTab (tab);
+                            settle();
+                        }
+                        check ("the dock shows", simple->isDockShowing());
+                        line ("dock tab at the close: " + juce::String ((int) dock->getTab()) + " (2 = Editor, the docked Piano roll)");
+                    }
+                    ui.toggleLyrics(); // (Lyrics, then Finish: they share the dock on the right)
+                    settle();
+                    simple->showFinish();
+                    settle();
+                    check ("Finish open", simple->isFinishShowing());
+                    simple->showChooser();
+                    settle();
+                    line ("Simple workflow objects alive before the close: " + juce::String (lynx::SimpleWorkflow::alive.load() - aliveBefore));
+                }
+            } // (the main window goes as at shutdown)
+            check ("no Simple workflow outlived its main window's destructor body (it reaches the Workspace)",
+                   lynx::MainComponent::simpleWorkflowAliveAfterTeardown == aliveBefore);
+            check ("none left after the close", lynx::SimpleWorkflow::alive.load() == aliveBefore);
+
+            // Simple, then Pattern, then Simple again, and closed
+            {
+                lynx::MainComponent ui (offline, false);
+                ui.setSize (1600, 900);
+                ui.setVisible (true);
+                ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+                offline.dispatchPendingMessages();
+                ui.setLayoutStyle (lynx::layoutstyle::Style::pattern);
+                offline.dispatchPendingMessages();
+                ui.setLayoutStyle (lynx::layoutstyle::Style::simple);
+                offline.dispatchPendingMessages();
+                if (auto* simple = ui.getSimpleWorkflowForSnapshot())
+                    simple->showWelcome();
+                offline.dispatchPendingMessages();
+            }
+            check ("Simple -> Pattern -> Simple, closed: none outlived the destructor body", lynx::MainComponent::simpleWorkflowAliveAfterTeardown == aliveBefore
+                                                                                              && lynx::SimpleWorkflow::alive.load() == aliveBefore);
+        }
+        line (ok ? "result=OK" : "result=FAILED");
+        return ok;
     }
 
     void runTour190dvShot (const juce::String& prefix)

@@ -161,6 +161,7 @@ private:
 StartFromPanel::StartFromPanel (AudioEngine& e, Hooks h) : engine (e), hooks (std::move (h)), shared (std::make_shared<Shared>())
 {
     setWantsKeyboardFocus (true);
+    getProperties().set ("lynxKeepsKeys", true); // (round 190fc: its list keys while it is up; MainComponent::simpleClickEnded)
     setTitle (tr ("Start from"));
     title.setText (tr ("Start from"), juce::dontSendNotification);
     title.setFont (theme::font (theme::type::display, true));

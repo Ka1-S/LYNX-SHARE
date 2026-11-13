@@ -181,6 +181,7 @@ public:
     void setScrollTickForSnapshot (double tick) { scrollTicks = tick; repaint(); }
     // round 190ef (--drawshot190ef): where a lane's curve is drawn, and the x of a tick
     juce::Rectangle<float> laneBodyForSnapshot (int track, int lane) const { return laneBody (track, lane); }
+    juce::Rectangle<int> trackRowForSnapshot (int track) const { return { 0, trackToY (track), getWidth(), heightOf (track) }; } // (round 190fc)
     double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
     juce::PopupMenu getAutomationPointMenuForSnapshot (int clip, int point); // FL's point menu of an automation clip's point (round 190bw)
@@ -789,6 +790,7 @@ public:
 
     // A component over everything under the toolbar band (round 184a: the Simple workflow's New track chooser); not
     // owned, nullptr = none.
+    juce::Component* getOverlay() const noexcept { return overlay; }
     void setOverlay (juce::Component* c)
     {
         if (overlay != nullptr && overlay != c)

@@ -72,6 +72,10 @@ void raiseOverlays();
 // drawing in the main window's components.
 bool supportsFloaters();
 void addFloater (juce::Component& c);
+// An attached floater that never takes the mouse or a drop (round 190fc: the first-song tour's dimmed layer): the system
+// passes every click, wheel and file drop through it to the window under it (Windows: WS_EX_TRANSPARENT on its layered
+// window; elsewhere nothing more than the windowIgnoresMouseClicks flag it was attached with).
+void passInputThrough (juce::Component& c);
 void removeFloater (juce::Component& c);
 // A floater or an overlay with an attached sibling above it that is neither: raiseOverlays (Windows; a cheap walk of
 // the siblings above each one). Elsewhere: nothing (raiseOverlays already runs on every stacking change).
@@ -130,6 +134,10 @@ bool isLayered (void* window);
 // of its client area, in physical pixels (a message to that window only: nothing goes through the system's input).
 void* innermostChild (void* window);
 void postClickForTest (void* window, juce::Point<int> clientPoint);
+// Tests (Windows; elsewhere false), round 190fc: Space pressed as the system delivers it — key-down and key-up posted to the
+// window that has the system's keyboard focus (when it is one of LYNX's own; else `fallback`), then the thread's
+// messages pumped for a moment (TranslateMessage makes the character, as for a real key). True when it was posted.
+bool pressSpaceForTest (void* fallback);
 // Tests (Windows; elsewhere 0): the system's hit test of the component's own native window at its local point: 1
 // (HTCLIENT) = the window takes the mouse there, -1 (HTTRANSPARENT) = the click goes to the window under it. (Round
 // 190cj: an attached component that is not opaque answers "transparent" wherever its hitTest says no.)

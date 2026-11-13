@@ -213,6 +213,7 @@ public:
           loops (Glyph::loops, kindColour (Kind::audio), tr ("Loops"), tr ("Browse loops and drag them onto the timeline."))
     {
         setWantsKeyboardFocus (true);
+        getProperties().set ("lynxKeepsKeys", true); // (round 190fc: its tiles' keys while it is up)
         title.setText (tr ("New track"), juce::dontSendNotification);
         title.setFont (theme::font (theme::type::display, true));
         title.setJustificationType (juce::Justification::centred);
@@ -507,6 +508,7 @@ private:
 SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std::move (h))
 {
     instances.fetch_add (1, std::memory_order_relaxed);
+    alive.fetch_add (1, std::memory_order_relaxed);
     auto button = std::make_unique<AddTrackButton>();
     button->onClick = [this] { showChooser(); };
     addButton = std::move (button);
@@ -524,6 +526,7 @@ SimpleWorkflow::SimpleWorkflow (AudioEngine& e, Host h) : engine (e), host (std:
     // round 190ch: the project's Lyrics / Notes panel, docked beside the timeline
     auto lyrics = std::make_unique<juce::TextButton> (tr ("Lyrics"));
     lyrics->setTooltip (tr ("Lyrics and notes of this project"));
+    lyrics->setComponentID ("simple.lyrics");
     lyrics->onClick = [this] {
         if (host.toggleLyrics)
             host.toggleLyrics();
@@ -622,6 +625,7 @@ SimpleWorkflow::~SimpleWorkflow()
     if (active)
         left();
     tour.reset(); // (before the chooser and the docks it may point at)
+    alive.fetch_sub (1, std::memory_order_relaxed);
 }
 
 // --- the Welcome screen and the first-song tour (round 190dv) ------------------------------------------------------------

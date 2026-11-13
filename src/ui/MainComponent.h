@@ -120,6 +120,9 @@ public:
     void setLayoutStyle (layoutstyle::Style style, bool swapLayout = true);
     layoutstyle::Style getLayoutStyle() const noexcept { return layoutStyle; }
     SimpleWorkflow* getSimpleWorkflowForSnapshot() noexcept { return simpleWorkflow.get(); } // --simpleshot
+    // round 190fc (B1): how many Simple workflow objects were still alive when the last MainComponent's destructor body
+    // ended (must be 0: what is left is destroyed after the Workspace, which its Host still reaches); -1: none ended yet
+    static inline int simpleWorkflowAliveAfterTeardown = -1;
     // The Clip-launch workflow's detail view (round 183a), made with the grid; nullptr until then.
     DetailView* getDetailViewForSnapshot() const noexcept { return detailView.get(); }
     juce::Component* getClipGridForSnapshot() const noexcept { return clipGridView.get(); } // --gridshot (round 190bv)
@@ -714,6 +717,18 @@ private:
         }
     };
     DockClickWatcher dockClickWatcher; // a global listener only while the Piano roll is docked
+    // round 190fc (H2): after a click in the Simple window the main window keeps the keys (MainComponent.cpp)
+    struct SimpleClickKeys final : juce::MouseListener
+    {
+        std::function<void (juce::Component*)> up;
+        void mouseUp (const juce::MouseEvent& e) override
+        {
+            if (up != nullptr)
+                up (e.eventComponent);
+        }
+    };
+    SimpleClickKeys simpleClickKeys; // (its `up` is set in the constructor)
+    void simpleClickEnded (juce::Component* clicked);
     bool pianoRollDockActive = false;
     bool runDetailAction (const std::string& id);
     void openGridClip (int track, int scene);
