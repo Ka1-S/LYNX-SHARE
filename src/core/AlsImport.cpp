@@ -1631,15 +1631,39 @@ void applyWarpMode (int mode, SamplerSettings& s)
 {
     s.keepPitch = mode != 3;
     s.stretchMethod = mode == 0 ? StretchMethod::beats : mode == 1 ? StretchMethod::tones : mode == 2 ? StretchMethod::texture : StretchMethod::complex;
+    s.warpModes.complexPro = mode == 6; // (round 190fm: kept, so the export writes Complex Pro back)
+}
+
+// A clip's warp-mode settings (round 190fm; ALS_FORMAT §21) [DATA: the members of AudioClip in Live 12.4's schema, the
+// defaults in all 642 clips of the shipped sets]. Out-of-range values are clamped to what LYNX keeps.
+WarpModeSettings warpModesOf (const Element& clip)
+{
+    WarpModeSettings w;
+    w.beatsPreserve = (std::uint8_t) std::clamp ((int) clip.number ("TransientResolution", WarpModeSettings::preserveTransients), 0,
+                                                 WarpModeSettings::preserveTransients);
+    w.beatsLoop = (std::uint8_t) std::clamp ((int) clip.number ("TransientLoopMode", 2), 0, 2);
+    w.beatsEnvelope = (float) std::clamp (clip.number ("TransientEnvelope", 100), 0.0, 100.0);
+    w.tonesGrain = (float) std::clamp (clip.number ("GranularityTones", WarpModeSettings::defaultTonesGrain), WarpModeSettings::tonesGrainMin,
+                                       WarpModeSettings::tonesGrainMax);
+    w.textureGrain = (float) std::clamp (clip.number ("GranularityTexture", WarpModeSettings::defaultTextureGrain), WarpModeSettings::textureGrainMin,
+                                         WarpModeSettings::textureGrainMax);
+    w.textureFlux = (float) std::clamp (clip.number ("FluctuationTexture", 25), 0.0, 100.0);
+    w.proFormants = (float) std::clamp (clip.number ("ComplexProFormants", 100), 0.0, 100.0);
+    w.proEnvelope = (float) std::clamp (clip.number ("ComplexProEnvelope", 128), 8.0, 256.0);
+    return w;
 }
 
 // `stretchBeats` > 0: the channel plays the file stretched offline to that many beats at the song tempo (the warp
 // modes' own engines, core/TimeStretch); 0: the clips stretch it in real time (their `stretch`)
 int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warpMode, bool warped, double stretchBeats = 0.0,
-                     double beatsPitch = 0.0, const std::vector<WarpPoint>& warp = {})
+                     double beatsPitch = 0.0, const std::vector<WarpPoint>& warp = {}, const WarpModeSettings& modes = {})
 {
     auto key = path + "|" + std::to_string (mixerTrack) + "|" + std::to_string (warped ? warpMode : -1) + "|"
                + std::to_string (std::llround (stretchBeats * 1.0e6)) + "|" + std::to_string (std::llround (beatsPitch * 100.0));
+    if (warped && modes != WarpModeSettings {}) // (round 190fm: clips with other warp settings get channels of their own)
+        key += "|wm" + std::to_string (modes.beatsPreserve) + "," + std::to_string (modes.beatsLoop) + "," + std::to_string (modes.beatsEnvelope) + ","
+               + std::to_string (modes.tonesGrain) + "," + std::to_string (modes.textureGrain) + "," + std::to_string (modes.textureFlux) + ","
+               + std::to_string (modes.proFormants) + "," + std::to_string (modes.proEnvelope);
     for (const auto& w : warp) // (clips of one file with different markers need channels of their own)
         key += "|" + std::to_string (std::llround (w.seconds * 1.0e6)) + ":" + std::to_string (std::llround (w.beats * 1.0e6));
     if (const auto it = ctx.audioChannels.find (key); it != ctx.audioChannels.end())
@@ -1653,7 +1677,12 @@ int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warp
     c.volume = 10000.0f / 12800.0f;
     c.mixerTrack = mixerTrack;
     if (warped)
+    {
+        const auto complexPro = warpMode == 6;
+        c.sampler.warpModes = modes;
         applyWarpMode (warpMode, c.sampler);
+        c.sampler.warpModes.complexPro = complexPro;
+    }
     c.sampler.stretchBeats = (float) stretchBeats;
     c.sampler.stretchPitch = (float) beatsPitch;
     c.sampler.warp = warp;
@@ -1737,7 +1766,15 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
         ++ctx.report->partialEffects["Warp markers (one tempo per clip)"]; // stretched in real time: one rate
     // content position (beats, or seconds when not warped) → LYNX playback ticks from the sample's start
     const auto contentTicks = [&] (double v) { return warped ? (v - beatAtZero) * ppq : v * bpm / 60.0 * ppq; };
-    const auto channel = audioChannelFor (ctx, path, mixerTrack, mode, warped, fileBeats, beatsPitch, warp);
+    const auto modes = warpModesOf (clip);
+    if (warped && ctx.report != nullptr) // what LYNX keeps but does not render (round 190fm)
+    {
+        if (mode == 6)
+            ++ctx.report->partialEffects["Warp mode Complex Pro (plays as Complex; Formants and Envelope kept for export)"];
+        if (mode == 2 && modes.textureFlux != WarpModeSettings {}.textureFlux)
+            ++ctx.report->partialEffects["Warp mode Texture: Flux (kept for export, not rendered)"];
+    }
+    const auto channel = audioChannelFor (ctx, path, mixerTrack, mode, warped, fileBeats, beatsPitch, warp, modes);
     const auto loop = loopOverride != nullptr ? *loopOverride : loopOf (clip);
     // not warped: the loop values are seconds [DATA: IsWarped=false clips]; the clip length is in beats either way
     auto unwarpedLoop = loop;

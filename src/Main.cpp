@@ -11,6 +11,8 @@
 #include "core/FlSamplers.h"
 #include "core/ArrangeOps.h"
 #include "core/ClipSample.h"
+#include "core/WarpModes.h"
+#include "ui/ClipAudioPanel.h"
 #include "core/DetailChain.h"
 #include "core/SessionMixer.h"
 #include "core/PlaylistOps.h"
@@ -2225,6 +2227,16 @@ public:
             // automation lane, steps at the grid width and an Alt (no grid) freehand stroke drawn through the Playlist's
             // own mouse handlers, and the Options menu with "Draw Mode". Writes prefix-checks.txt.
             runDrawShot190ef (args[args.indexOf ("--drawshot190ef") + 1].unquoted());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--warpshot190fm"))
+        {
+            // LYNX.exe --warpshot190fm prefix: round 190fm off-screen: the Clip page's Audio panel of a grid audio clip in
+            // Beats (Preserve, Transient Loop Mode, Envelope), Tones and Texture (Grain Size), Complex (none), and the clip
+            // made unique by a mode change while another clip shares its channel (O16). Writes prefix-checks.txt.
+            runWarpShot190fm (args[args.indexOf ("--warpshot190fm") + 1].unquoted());
             quit();
             return;
         }
@@ -19503,6 +19515,91 @@ private:
             check ("Options menu found", index >= 0);
         }
         lynx::drawmode::set (false);
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    void runWarpShot190fm (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        // a one-bar loop of clicks (2 s at 48 kHz) for the audio clips
+        const auto wav = juce::File (prefix + "-loop.wav");
+        wav.deleteFile();
+        {
+            const double rate = 48000.0;
+            juce::AudioBuffer<float> buffer (2, (int) (rate * 2.0));
+            buffer.clear();
+            for (int hit = 0; hit < 8; ++hit)
+                for (int k = 0; k < 3000; ++k)
+                    for (int ch = 0; ch < 2; ++ch)
+                        buffer.setSample (ch, hit * 12000 + k, (float) (std::sin (k * (hit % 4 == 0 ? 0.05 : 0.3)) * std::exp (-k / 500.0) * 0.8));
+            if (auto out = std::unique_ptr<juce::FileOutputStream> (wav.createOutputStream()))
+                if (auto* writer = juce::WavAudioFormat().createWriterFor (out.get(), rate, 2, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> owned (writer);
+                    owned->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+                }
+        }
+        offline.editSong ([&wav] (lynx::Song& s) {
+            lynx::ChannelDef ch;
+            ch.name = "Loop";
+            ch.instrument = lynx::InstrumentKind::audioClip;
+            ch.samplePath = wav.getFullPathName().toStdString();
+            s.channels.push_back (ch);
+            const auto c = (int) s.channels.size() - 1;
+            lynx::clipsample::setWarp (s, c, true, 2.0);
+            s.channels[(std::size_t) c].sampler.stretchMethod = lynx::StretchMethod::beats;
+            lynx::Clip audio;
+            audio.kind = lynx::ClipKind::audio;
+            audio.channel = c;
+            audio.length = 4 * lynx::ppq;
+            lynx::launcher::setClip (s, 0, 0, audio);
+            lynx::launcher::setClip (s, 0, 1, audio); // (a second clip on the same channel: O16)
+            lynx::launcher::ensureGrid (s).scenes.resize (2);
+        }, false);
+        offline.dispatchPendingMessages();
+        const auto shoot = [&] (const char* name) {
+            auto panel = lynx::makeClipAudioPanel (offline, 0, 0);
+            if (panel == nullptr)
+                return false;
+            panel->setSize (900, 250);
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (*panel), out);
+            return true;
+        };
+        const auto channelOf = [&] (int scene) {
+            const auto* c = lynx::warpmodes::gridAudioClip (const_cast<lynx::Song&> (offline.getSong()), 0, scene);
+            return c != nullptr ? c->channel : -1;
+        };
+        check ("01 Beats panel (defaults: Transients, Back-and-Forth, 100)", shoot ("01-beats-defaults"));
+        offline.editSong ([&] (lynx::Song& s) {
+            const auto c = lynx::warpmodes::ownChannelForGridClip (s, 0, 0);
+            lynx::warpmodes::setPreserve (s, c, 3);
+            lynx::warpmodes::setLoopMode (s, c, 0);
+            lynx::warpmodes::setEnvelope (s, c, 40.0);
+        }, false);
+        offline.dispatchPendingMessages();
+        check ("O16: the first clip moved to its own channel, the second kept the old one", channelOf (0) != channelOf (1) && channelOf (0) >= 0 && channelOf (1) >= 0);
+        check ("02 Beats panel (1/8, Loop Off, 40)", shoot ("02-beats-set"));
+        offline.editSong ([&] (lynx::Song& s) { lynx::warpmodes::setMode (s, channelOf (0), (int) lynx::StretchMethod::tones); }, false);
+        offline.dispatchPendingMessages();
+        check ("03 Tones panel (Grain Size 30)", shoot ("03-tones"));
+        offline.editSong ([&] (lynx::Song& s) {
+            lynx::warpmodes::setMode (s, channelOf (0), (int) lynx::StretchMethod::texture);
+            lynx::warpmodes::setGrain (s, channelOf (0), 120.0);
+        }, false);
+        offline.dispatchPendingMessages();
+        check ("04 Texture panel (Grain Size 120)", shoot ("04-texture"));
+        check ("Texture grain kept 120, Tones grain still 30", offline.getSong().channels[(std::size_t) channelOf (0)].sampler.warpModes.textureGrain == 120.0f
+                                                                && offline.getSong().channels[(std::size_t) channelOf (0)].sampler.warpModes.tonesGrain == 30.0f);
+        offline.editSong ([&] (lynx::Song& s) { lynx::warpmodes::setMode (s, channelOf (0), (int) lynx::StretchMethod::complex); }, false);
+        offline.dispatchPendingMessages();
+        check ("05 Complex panel (no settings row)", shoot ("05-complex"));
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 

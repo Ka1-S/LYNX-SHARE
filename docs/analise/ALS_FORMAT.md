@@ -468,3 +468,33 @@ envelope; volume, pan, transpose, reverse; one sample part per zone or the sampl
 `AlsExportOptions::sampleFormat`). Live's Slicing defaults (Defaults/Slicing) hold one `DrumBranchPreset` each: "Default"
 is a Classic Simpler with a 50 ms release, one voice, `ChokeGroup` 1; the drum ones are One-Shot, polyphonic, no choke;
 LYNX's Slice to Drum Rack templates follow those facts with its own names.
+
+## 21. The warp modes' own settings (round 190fm, 2026-11-13)
+
+Evidence (round 190fm, `/mnt/e/lynx-work/realive190fm/LIVE-FACTS.md` §1): Live 12.4's own schema
+(`Resources/Schema/12.0_12402.txt`), the 642 audio clips of the 19 shipped sets, the strings of Live's binaries and REA's
+read of Live's Push "Simpler decoration" script (`ableton/v2/control_surface/simpler_decoration.pyc`, Python 3.11 byte
+code, constants only, evidence `ev_59c086ca…`).
+
+- `AudioClip` (and `SampleWarpProperties` of Simpler / Sampler parts) carry after `WarpMode`: `GranularityTones`,
+  `GranularityTexture`, `FluctuationTexture`, `TransientResolution`, `TransientLoopMode`, `TransientEnvelope`,
+  `ComplexProFormants`, `ComplexProEnvelope` [SCHEMA]. Defaults in every shipped clip: 30, 65, 25, 6, 2, 100, 100, 128 [DATA].
+- `TransientResolution` = Beats › Preserve: 0 … 6 = 1 Bar, 1/2, 1/4, 1/8, 1/16, 1/32, Transients [REA: the decoration's
+  7-item resolution list in that order]. `TransientLoopMode` 0 / 1 / 2 = Loop Off, Loop Forward, Loop Back-and-Forth
+  [STR + 175a's measured default]. `TransientEnvelope` 0 … 100 [REA].
+- Ranges [REA, the decoration's parameter table]: Tones Grain Size 12 … 100, Texture Grain Size 2 … 263, Flux 0 … 100,
+  Formants 0 … 100, Complex Pro Envelope 8 … 256.
+
+LYNX (`SamplerSettings::warpModes`, `core/WarpModes.h`, `core/TimeStretch` `StretchOptions`):
+- Import reads all eight into the audio channel (clips with other settings get channels of their own); export writes them
+  back, and WarpMode 6 (Complex Pro) is kept as a flag so it is written back as 6. .lynx keeps them as `warpModes` (nine
+  numbers, only when not the defaults).
+- Rendered offline: Beats Preserve on a note grid (cuts where the output reaches each multiple of the division; 1 bar is
+  taken as 4 beats), Transient Loop Mode (Off: silence after each piece, reached through a 16 ms fade of the audio that
+  follows; Forward: the piece again; Back-and-Forth: as before), Transient Envelope (LYNX's own curve, `(1 − i/span)^k`,
+  `k = 4 (1 − e) / max (e, 0.02)`: needs a Live render), Tones / Texture Grain Size (the spectral block scaled by size /
+  Live's default, 10 … 250 ms). The defaults run exactly the code before 190fm (tests pin it bit for bit).
+- Kept but not rendered (import report lines): Texture's Flux, Complex Pro's Formants and Envelope (Complex Pro plays as
+  Complex).
+- The Clip View shows the mode's settings under the mode chooser; an edit from a grid clip whose channel other clips play
+  gives that clip its own copy of the channel first (owner decision O16), so only that clip changes, as in Live.

@@ -115,7 +115,7 @@ inline Render renderClip (std::shared_ptr<SampleData> data, float clipPitch, boo
     s.mode = PlayMode::song;
     RackState::Factories f;
     f.samples = [data] (const std::string&) { return std::shared_ptr<const SampleData> (data); };
-    f.stretchedSamples = [data] (const std::string&, double ratio, StretchMethod m, double semis, const StretchMap&) {
+    f.stretchedSamples = [data] (const std::string&, double ratio, StretchMethod m, double semis, const StretchMap&, const lynx::StretchOptions&) {
         return std::shared_ptr<const SampleData> (timeStretch (*data, ratio, m, semis));
     };
     auto state = RackState::build (s, nullptr, rate, f);

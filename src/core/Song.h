@@ -353,6 +353,34 @@ enum LfoTarget { lfoPan, lfoVolume, lfoCutoff, lfoPitch, lfoTargets };
 enum class StretchMethod : int { general = 0, transients = 1, mono = 2, beats = 3, tones = 4, texture = 5, complex = 6 };
 constexpr int stretchMethodCount = 7;
 
+// A warp mode's own settings (round 190fm; Live 12.4's per-clip warp settings, docs/analise/ALS_FORMAT.md §21): what
+// Live keeps beside WarpMode on every audio clip. The defaults are Live's (every clip of its 19 shipped sets) and they
+// render exactly as LYNX did before 190fm, so a channel that never changed them sounds the same.
+//  - Beats: beatsPreserve = where the audio is cut: 0…5 = every 1 bar (4 beats), 1/2, 1/4, 1/8, 1/16, 1/32 note, 6 = at
+//    its transients; beatsLoop = what fills the gap after a piece when the audio is slowed down: 0 nothing (silence),
+//    1 the piece again from its start, 2 back and forth; beatsEnvelope 0…100 = a fade over each piece (100: none).
+//  - Tones / Texture: the grain sizes (Live's numbers; LYNX scales its spectral block by size / default).
+//  - textureFlux, proFormants, proEnvelope, complexPro: kept so a Live set goes back out as it came in; LYNX has no
+//    engine for them (Texture's random grain variation, Complex Pro's formant keeping): they do not change the sound.
+struct WarpModeSettings
+{
+    static constexpr int preserveTransients = 6;
+    static constexpr float defaultTonesGrain = 30.0f, defaultTextureGrain = 65.0f;
+    // Live's ranges [REA: the Push Simpler decoration's parameter table, ALS_FORMAT §21]: Tones 12…100, Texture 2…263,
+    // Transient Envelope and Flux 0…100, Complex Pro Envelope 8…256
+    static constexpr double tonesGrainMin = 12.0, tonesGrainMax = 100.0, textureGrainMin = 2.0, textureGrainMax = 263.0;
+    std::uint8_t beatsPreserve = preserveTransients;
+    std::uint8_t beatsLoop = 2;
+    float beatsEnvelope = 100.0f;
+    float tonesGrain = defaultTonesGrain;
+    float textureGrain = defaultTextureGrain;
+    float textureFlux = 25.0f;
+    float proFormants = 100.0f;
+    float proEnvelope = 128.0f;
+    bool complexPro = false;
+    bool operator== (const WarpModeSettings&) const = default;
+};
+
 // FL's Sampler › "Precomputed effects" (REA_rodada167h §1–§2): computed once on the sample, in FL's order, before it
 // plays (core/SamplePrecompute.h). Raw FL values: fadeIn / fadeOut 0…1024 (256 = a ramp over the whole sample),
 // crossfade 0…2048 (a fraction of the loop), trim 0…32768 (the silence threshold).
@@ -415,6 +443,7 @@ struct SamplerSettings
     // stretchBeats; inside it each stretch of audio between two markers gets its own speed (rendered offline, like the
     // rest of the stretch). Fewer than 2 markers, or markers in a straight line: one speed (round 175a, M1)
     std::vector<WarpPoint> warp;
+    WarpModeSettings warpModes; // round 190fm: the warp mode's own settings (Live's Preserve, loop mode, grain...)
     // outside Beats nothing renders stretchPitch offline: it moves to the Pitch knob (-24..24), so the sample stays at its
     // pitch. True if it moved.
     bool moveBakedPitchToKnob() noexcept

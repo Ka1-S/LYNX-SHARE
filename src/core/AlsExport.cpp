@@ -247,7 +247,7 @@ int warpModeOf (const SamplerSettings& s)
         case StretchMethod::mono:
         case StretchMethod::tones: return 1;      // Tones
         case StretchMethod::texture: return 2;    // Texture
-        default: return 4;                        // Complex
+        default: return s.warpModes.complexPro ? 6 : 4; // Complex (Complex Pro when it came from one, round 190fm)
     }
 }
 
@@ -1012,6 +1012,17 @@ struct Exporter
         const auto mode = warpModeOf (ch.sampler);
         c.value ("IsWarped", "true");
         c.value ("WarpMode", num (mode));
+        { // the warp mode's own settings (round 190fm; ALS_FORMAT §21): the skeleton holds Live's defaults
+            const auto& w = ch.sampler.warpModes;
+            c.value ("GranularityTones", num ((double) w.tonesGrain));
+            c.value ("GranularityTexture", num ((double) w.textureGrain));
+            c.value ("FluctuationTexture", num ((double) w.textureFlux));
+            c.value ("TransientResolution", num ((int) w.beatsPreserve));
+            c.value ("TransientLoopMode", num ((int) w.beatsLoop));
+            c.value ("TransientEnvelope", num ((double) w.beatsEnvelope));
+            c.value ("ComplexProFormants", num ((double) w.proFormants));
+            c.value ("ComplexProEnvelope", num ((double) w.proEnvelope));
+        }
         // a Beats channel's offline transposition (stretchPitch) is the clip's transpose in Live
         const auto baked = mode == 0 && ch.sampler.keepPitch && ch.sampler.stretchBeats > 0.0f ? (double) ch.sampler.stretchPitch : 0.0;
         const auto pitch = mode == 3 ? 0.0 : std::clamp ((double) clip.pitch + baked, -48.0, 48.0);

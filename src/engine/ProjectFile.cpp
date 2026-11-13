@@ -1,4 +1,5 @@
 #include "engine/ProjectFile.h"
+#include "core/WarpModes.h"
 #include "core/LiveInput.h"
 #include "core/FlCurve.h"
 #include "core/Preferences.h"
@@ -2005,6 +2006,13 @@ juce::var channelToVar (const ChannelDef& c)
             sampler->setProperty ("loopKey", juce::Array<juce::var> { c.sampler.loopKeyRoot, c.sampler.loopKeyMinor ? 1 : 0, (int) c.sampler.loopKeySource });
         if (c.sampler.stretchPitch != 0.0f)
             sampler->setProperty ("stretchPitch", c.sampler.stretchPitch);
+        if (c.sampler.warpModes != WarpModeSettings {}) // round 190fm: the warp mode's own settings, only when changed
+        {
+            juce::Array<juce::var> list;
+            for (const auto v : warpmodes::toList (c.sampler.warpModes))
+                list.add (v);
+            sampler->setProperty ("warpModes", list);
+        }
         if (! c.sampler.warp.empty()) // warp markers (round 175a, M1): [seconds, beats] pairs
         {
             juce::Array<juce::var> warp;
@@ -2384,6 +2392,8 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
             def.sampler.loopKeySource = (std::uint8_t) juce::jlimit (0, 3, (int) k[2]);
         }
         def.sampler.stretchPitch = juce::jlimit (-48.0f, 48.0f, (float) (double) s.getProperty ("stretchPitch", 0.0));
+        if (const auto& m = s.getProperty ("warpModes", {}); m.isArray()) // round 190fm
+            def.sampler.warpModes = warpmodes::fromList (*m.getArray(), (std::size_t) m.size());
         const auto warpVar = s.getProperty ("warp", {});
         if (const auto* warp = warpVar.getArray())
             for (const auto& w : *warp)

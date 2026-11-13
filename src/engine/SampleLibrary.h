@@ -30,14 +30,15 @@ public:
     // `map` (round 175a, warp markers): stretched along that warp map instead of at one ratio (its own cache entries).
     std::shared_ptr<const SampleData> loadStretched (const juce::String& path, double ratio, StretchMethod method = StretchMethod::general,
                                                     double semitones = 0.0, // semitones: Beats only (core/TimeStretch)
-                                                    const StretchMap& map = {});
+                                                    const StretchMap& map = {}, const StretchOptions& options = {});
 
     // A channel's precomputed span (its region after its precomputed effects and Trim, core/SamplePrecompute.h) stretched
     // by `ratio` (core/TimeStretch timeStretchSpan), cached in memory by (path, variantKey, ratio, method): FL stretches
     // that span to TIME, not the whole file (round 180d). Dropped with the file's other unused lengths.
     std::shared_ptr<const SampleData> loadStretchedSpan (const juce::String& path, const std::string& variantKey,
                                                         const std::shared_ptr<const SampleData>& span, double ratio,
-                                                        StretchMethod method = StretchMethod::general, double semitones = 0.0);
+                                                        StretchMethod method = StretchMethod::general, double semitones = 0.0,
+                                                        const StretchOptions& options = {});
 
     // Above this, audio goes to a memory-mapped disk cache instead of staying entirely
     // in RAM ("disk streaming"). The cache is reused across sessions.

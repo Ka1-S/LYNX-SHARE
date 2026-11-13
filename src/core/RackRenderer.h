@@ -313,15 +313,16 @@ struct RackState
 
     // Sample stretched without changing pitch (ratio = new / original duration); cached in the app.
     // `map`: the channel's warp map (core/TimeStretch warpStretchMap; empty = one ratio)
+    // `options` (round 190fm): the warp mode's own settings (core/TimeStretch StretchOptions)
     using StretchedSampleProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, double ratio, StretchMethod method,
-                                                                                     double semitones, const StretchMap& map)>;
+                                                                                     double semitones, const StretchMap& map, const StretchOptions& options)>;
 
     // A channel's precomputed span (its region after its precomputed effects and Trim) stretched by `ratio`, cached in the
     // app by (path, variantKey, ratio, method): FL stretches that span, not the whole file (round 180d). Unset: stretched
     // here, uncached (tests).
     using StretchedSpanProvider = std::function<std::shared_ptr<const SampleData> (const std::string& path, const std::string& variantKey,
                                                                                   const std::shared_ptr<const SampleData>& span, double ratio,
-                                                                                  StretchMethod method, double semitones)>;
+                                                                                  StretchMethod method, double semitones, const StretchOptions& options)>;
 
     struct Factories
     {

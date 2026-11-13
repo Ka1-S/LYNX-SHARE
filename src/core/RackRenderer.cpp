@@ -340,9 +340,9 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
                 const auto ratio = target / ((double) span->frames() / span->sampleRate);
                 auto stretched = factories.stretchedSpans
                                      ? factories.stretchedSpans (channel.samplePath, precompute::variantKey (spanSettings, clip), span, ratio,
-                                                                 channel.sampler.stretchMethod, channel.sampler.stretchPitch)
+                                                                 channel.sampler.stretchMethod, channel.sampler.stretchPitch, stretchOptionsOf (channel.sampler))
                                      : std::shared_ptr<const SampleData> (timeStretchSpan (*span, ratio, channel.sampler.stretchMethod,
-                                                                                           channel.sampler.stretchPitch));
+                                                                                           channel.sampler.stretchPitch, stretchOptionsOf (channel.sampler)));
                 sample = stretched != nullptr ? std::move (stretched) : std::move (span);
                 precomputed = true;
             }
@@ -353,7 +353,8 @@ std::shared_ptr<Instrument> buildInstrument (const ChannelDef& channel, double s
             const auto ratio = target / ((double) precompute::stretchedFrames (sample, channel.sampler, clip) / sample->sampleRate);
             const auto map = warpStretchMap (channel.sampler.warp, (double) sample->frames(), sample->sampleRate,
                                              (double) std::llround ((double) sample->frames() * ratio));
-            if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map))
+            if (auto stretched = factories.stretchedSamples (channel.samplePath, ratio, channel.sampler.stretchMethod, channel.sampler.stretchPitch, map,
+                                                         stretchOptionsOf (channel.sampler)))
                 sample = std::move (stretched);
         }
     }
@@ -792,6 +793,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                             && previous->song.channels[p].sampler.stretchMethod == channel.sampler.stretchMethod
                             && previous->song.channels[p].sampler.stretchPitch == channel.sampler.stretchPitch
                             && previous->song.channels[p].sampler.warp == channel.sampler.warp
+                            && previous->song.channels[p].sampler.warpModes == channel.sampler.warpModes
                             && previous->song.bpm == song.bpm))))
             && (kind != InstrumentKind::plugin
                 || (previous->song.channels[p].plugin.id == channel.plugin.id && previous->sampleRate == sampleRate
