@@ -9564,7 +9564,7 @@ countries: cn sg
 "Capture MIDI: {0} notes put in the playing clip" = "捕获 MIDI：已将 {0} 个音符放入正在播放的片段"
 "Track Volume" = "轨道音量"
 "Track Panning" = "轨道声像"
-"Key {0}" = "按键 {0}"
+"@computer key: Key" = "按键"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"

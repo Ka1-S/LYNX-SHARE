@@ -9564,7 +9564,7 @@ countries: de at ch li lu
 "Capture MIDI: {0} notes put in the playing clip" = "MIDI erfassen: {0} Noten in den laufenden Clip gesetzt"
 "Track Volume" = "Spurlautstärke"
 "Track Panning" = "Spurpanorama"
-"Key {0}" = "Taste {0}"
+"@computer key: Key" = "Taste"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] Editor öffnen/schließen  [Alt]+[LMB] andere offen lassen  [Strg]+[LMB] vorhören  [2xLMB] Piano Roll  [LMB] hoch/runter ziehen sortiert um  [RMB] Kanalmenü"

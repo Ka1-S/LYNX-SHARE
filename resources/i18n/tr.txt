@@ -9564,7 +9564,7 @@ countries: tr
 "Capture MIDI: {0} notes put in the playing clip" = "MIDI yakala: {0} nota çalan klibe kondu"
 "Track Volume" = "Parça ses düzeyi"
 "Track Panning" = "Parça pan ayarı"
-"Key {0}" = "Tuş {0}"
+"@computer key: Key" = "Tuş"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
