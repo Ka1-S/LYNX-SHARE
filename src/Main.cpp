@@ -18136,8 +18136,9 @@ private:
         dock->padsSelectForCheck (4);
         shots ("pads-moved");
         saveMenus ({ "Pad menu", "Colour", "Copy a value to every pad" }, [&] {
-            std::vector<juce::PopupMenu> menus { dock->padMenuForSnapshot (4) };
-            for (juce::PopupMenu::MenuItemIterator it (menus[0]); it.next();)
+            const auto top = dock->padMenuForSnapshot (4);
+            std::vector<juce::PopupMenu> menus { top };
+            for (juce::PopupMenu::MenuItemIterator it (top); it.next();)
                 if (it.getItem().subMenu != nullptr)
                     menus.push_back (*it.getItem().subMenu);
             return menus;
@@ -18148,8 +18149,9 @@ private:
         kitFile.deleteFile();
         check ("the pads saved as a kit", dock->saveKitForCheck ("Test kit 190fo") && kitFile.existsAsFile());
         saveMenus ({ "Kit", "My kits" }, [&] {
-            std::vector<juce::PopupMenu> menus { dock->kitMenuForSnapshot() };
-            for (juce::PopupMenu::MenuItemIterator it (menus[0]); it.next();)
+            const auto top = dock->kitMenuForSnapshot();
+            std::vector<juce::PopupMenu> menus { top };
+            for (juce::PopupMenu::MenuItemIterator it (top); it.next();)
                 if (it.getItem().subMenu != nullptr && it.getItem().text == lynx::tr ("My kits"))
                     menus.push_back (*it.getItem().subMenu);
             return menus;

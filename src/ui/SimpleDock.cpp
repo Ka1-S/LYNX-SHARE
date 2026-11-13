@@ -1700,7 +1700,11 @@ public:
     // tests / shots: the same edits the controls make
     void loadFileForCheck (int pad, const juce::File& file) { loadFile (pad, file); }
     void turnForCheck (int knob, float v) { knobs[(std::size_t) knob].turnTo (v); }
-    void setModeForCheck (int mode) { modes[(std::size_t) mode].triggerClick(); }
+    void setModeForCheck (int mode) // (the button's own edit, at once: triggerClick would post it)
+    {
+        modes[(std::size_t) mode].setToggleState (true, juce::dontSendNotification);
+        edit ([mode] (ChannelDef& c) { c.simplePad.mode = (std::uint8_t) mode; });
+    }
     void dragPadForCheck (int from, int to, bool copy) { dropPad (from, to, copy); }
     void setRegionForCheck (float start, float end)
     {
@@ -2363,7 +2367,7 @@ private:
                 {
                     const auto a = n * x / width, b = juce::jmax (a + 1, n * (x + 1) / width);
                     float peak = 0.0f;
-                    for (auto i = a; i < b; i += juce::jmax<std::int64_t> (1, (b - a) / 64))
+                    for (auto i = a; i < b; ++i) // (every sample: a stride aliases a low tone into a moiré; done once per sample)
                         peak = juce::jmax (peak, std::abs (data->leftData()[i]), std::abs (data->rightData()[i]));
                     wave[(std::size_t) x] = peak;
                 }
