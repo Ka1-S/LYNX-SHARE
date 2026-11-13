@@ -182,14 +182,16 @@ TEST (win190ev_soloing_the_recording_insert_keeps_its_input_and_take_audible)
     input.numChannels = 2;
     input.armed[7].store (true);
     input.recording.store (true);
+    // (the peak of the last blocks: a solo change ramps the inserts' levels over the first ones)
     auto peak = [&] {
         auto state = lynx::RackState::build (song, nullptr, 48000.0);
         float p = 0.0f;
-        for (int block = 0; block < 8; ++block)
+        for (int block = 0; block < 40; ++block)
         {
             renderer.process (state.get(), true, 0.0, 256, l.data(), r.data());
-            for (int i = 0; i < 256; ++i)
-                p = std::max ({ p, std::abs (l[(std::size_t) i]), std::abs (r[(std::size_t) i]) });
+            if (block >= 36)
+                for (int i = 0; i < 256; ++i)
+                    p = std::max ({ p, std::abs (l[(std::size_t) i]), std::abs (r[(std::size_t) i]) });
         }
         return p;
     };
