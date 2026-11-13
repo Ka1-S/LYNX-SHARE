@@ -1,12 +1,10 @@
-#pragma once
-
 // Android audio device using AAudio (API 26+) with OpenSL ES fallback
 
 #include <juce_audio_devices/juce_audio_devices.h>
 
 #if JUCE_ANDROID || defined(LYNX_ANDROID)
-#include <jni.h>
 #include <aaudio/AAudio.h>
+#include <jni.h>
 #endif
 
 namespace lynx::engine

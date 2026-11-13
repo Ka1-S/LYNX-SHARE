@@ -630,15 +630,12 @@ if(LYNX_BUILD_APP)
             src/platform/android/jni/AndroidJNI.cpp)
         # Include Android JNI headers
         target_include_directories(LYNX PRIVATE src/platform/android/jni)
-        # Link against JUCE's native_app_glue (provides android_main and android_app)
-        target_link_libraries(LYNX PRIVATE juce::juce_android_native_app_glue)
-        # JUCE Android needs the native app glue
-        # Fix: use juce_android_native_app_glue if defined, or ignore if JUCE 8 handles it automatically
+        # JUCE's native app glue is automatically included by juce_add_gui_app
         # target_link_libraries(LYNX PRIVATE juce::juce_android_native_app_glue)
     else()
         # ALSA (linked) + JACK (loaded at run time; PipeWire serves JACK clients through pipewire-jack)
         target_compile_definitions(LYNX PRIVATE JUCE_ALSA=1 JUCE_JACK=1 JUCE_PLUGINHOST_LV2=1)
-        # LYNX's own PipeWire driver (round 161): vendored MIT headers, libpipewire-0.3.so.0 loaded at run time
+        # LYNX's own PipeWire driver (round 61): vendored MIT headers, libpipewire-0.3.so.0 loaded at run time
         target_include_directories(LYNX SYSTEM PRIVATE third_party/pipewire/include/pipewire-0.3 third_party/pipewire/include/spa-0.2)
         target_link_libraries(LYNX PRIVATE ${CMAKE_DL_LIBS})
     endif()
