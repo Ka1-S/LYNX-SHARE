@@ -2913,6 +2913,38 @@ private:
         }
         unsetenv ("LYNX_TEST_CRASH");
         step ("described_after_crash", 1);
+
+        // round 190fw: past the first limit, a child that still works is waited for (FL Studio's own VST plugin boots
+        // the FL engine), one that sits still is killed as before, and a busy one only up to the cap. Limits are
+        // shortened for the test: 2 s first limit, 2 s without work, 8 s cap (real: 30 s, 30 s, 5 min).
+        setenv ("LYNX_TEST_SCAN_MS", "2000,2000,8000", 1);
+        const auto timed = [&] (const char* fault, const std::function<bool (lynx::PluginHost&)>& progress) {
+            touch();
+            setenv ("LYNX_TEST_CRASH", fault, 1);
+            lynx::PluginHost host (true);
+            const auto started = juce::Time::getMillisecondCounter();
+            host.scan (paths, [&] (float, const juce::String&) { return ! progress || progress (host); });
+            unsetenv ("LYNX_TEST_CRASH");
+            const auto took = (int) (juce::Time::getMillisecondCounter() - started);
+            report << "  " << fault << ": " << took << " ms, children " << host.scanChildrenStarted() << "\n";
+            return std::make_pair (took, host.scanChildrenStarted());
+        };
+        // (after a failed batch, one plugin-by-plugin child and no more: it describes quickly)
+        const auto stopAfterBatch = [] (lynx::PluginHost& host) { return host.scanChildrenStarted() < 2; };
+        {
+            const auto [took, children] = timed ("lv2-batch-busy:5000", {});
+            check ("busy_child_is_waited_for", children == 1 && took >= 4500);
+        }
+        {
+            const auto [took, children] = timed ("lv2-batch-hang", stopAfterBatch);
+            check ("idle_child_ends_near_the_first_limit", children == 2 && took >= 1900 && took < 9000);
+        }
+        {
+            const auto [took, children] = timed ("lv2-batch-busy:60000", stopAfterBatch);
+            check ("busy_child_ends_at_the_cap", children == 2 && took >= 7500 && took < 20000);
+        }
+        unsetenv ("LYNX_TEST_SCAN_MS");
+        step ("described_after_slow_children", 1);
        #endif
         juce::File (reportPath).replaceWithText (report + "result=" + (ok ? "OK" : "FAILED") + "\n");
         setApplicationReturnValue (ok ? 0 : 1);
