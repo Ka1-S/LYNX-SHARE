@@ -1367,9 +1367,9 @@ public:
         {
             // LYNX --focustest report.txt (issue #161): the main window with the Playlist and the Piano roll (native
             // child windows with docking on). For each: LYNX goes to the background (the main window loses the focus),
-            // the user comes back with a click in the panel, then presses Space: playback must start. Also: inside the
-            // active window a click in a panel leaves a text field's focus alone, and that focus comes back with the
-            // window. Shows a window (takes the foreground on Windows: GUI lock); exit code 0 = OK.
+            // the user comes back with a click in the panel, then presses Space: playback must start. Also: a text
+            // field's focus comes back with the window, and inside the active window the click's answer is unchanged.
+            // Shows a window (takes the foreground on Windows: GUI lock); exit code 0 = OK.
             runFocusTest (args[args.indexOf ("--focustest") + 1].unquoted());
             return;
         }
@@ -6830,20 +6830,23 @@ private:
                         break;
                     case 7:
                     {
-                        // inside the active window: a click in a panel leaves a text field's focus where it is
+                        // a text field (the Browser's search box) keeps the keys through a switch to another app and back:
+                        // nothing in LYNX takes them from it (no periodic grab); inside the active window the click's
+                        // activation answer is unchanged, and a click in the Playlist ends the typing as before (issue #9,
+                        // as FL ends typing in its search field)
                         auto* field = firstField (*ui);
                         line ("text field found=" + juce::String ((int) (field != nullptr)));
                         if (field != nullptr)
                         {
-                            field->grabKeyboardFocus();
                             auto& frame = ws.getFrame (Panel::playlist);
+                            field->grabKeyboardFocus();
+                            check ("the text field has the keys", field->hasKeyboardFocus (false));
+                            mainPeer()->handleFocusLoss();
+                            mainPeer()->handleFocusGain(); // (back with Alt+Tab, or a click that activates the window)
+                            check ("the text field gets the keys back with the window", field->hasKeyboardFocus (false));
                             check ("active window: a click in a panel does not activate it again", ! lynx::nativechild::clickActivatesWindow (frame, true));
                             click (frame, false);
-                            check ("active window: the text field keeps the keys after a click in the Playlist", field->hasKeyboardFocus (false));
-                            mainPeer()->handleFocusLoss();
-                            mainPeer()->handleFocusGain();
-                            check ("the text field gets the keys back with the window", field->hasKeyboardFocus (false));
-                            ui->grabKeyboardFocus();
+                            check ("a click in the Playlist ends the typing: the main window has the keys", ui->hasKeyboardFocus (true) && ! field->hasKeyboardFocus (false));
                         }
                         line (ok ? "result=OK" : "result=FAILED");
                         stopTimer();
