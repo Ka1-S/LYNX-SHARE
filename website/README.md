@@ -88,13 +88,13 @@ above its own size. `--artshot` also draws each editor at twice the size: that b
 other modes of the program draw at 100% only, so window and dialog pictures have no @2x file. A plugin without a
 render gets a name plate on its card, never a made-up picture.
 
-**The logo in the pictures.** Since 2026-11-13 the brand's mark is the logo by w3teal
-(`resources/brand/lynx-share-logo.svg`; `python3 tools/make_logo.py site` writes `assets/img/logo.png`, the favicons,
-`assets/img/lynx-share-logo.svg`, the README logo, the social preview and the Store images from it). The pictures in
-`assets/img/` and `docs/img/` are still the 0.1.26 renders, whose program draws the earlier pepper in the logo button
-of a plugin's header: `scripts/site-shots.py R --logo-was <0.1.26 logo>` repainted that button with the new mark
-(a dark disc under it, as the program draws it from 0.1.27). At the next release, whose program draws the new logo
-itself, run `site-shots.py` again WITHOUT `--logo-was` so nothing is painted.
+**The logo in the pictures.** Since 2026-11-13 the brand is the logo by w3teal in its app-icon form (the mark with a
+pepper stem on a dark tile: `resources/brand/lynx-share-logo.svg`; `python3 tools/make_logo.py site` writes
+`assets/img/logo.png`, the favicons, `assets/img/lynx-share-logo.svg`, the README logo, the social preview and the
+Store images from it). The pictures in `assets/img/` and `docs/img/` are still the 0.1.26 renders, whose program draws
+the earlier pepper in the logo button of a plugin's header: `scripts/site-shots.py R --logo-was <0.1.26 logo>`
+repainted that button with the mark (without the tile, on a dark disc, as the program draws it from 0.1.27). At the
+next release, whose program draws the new logo itself, run `site-shots.py` again WITHOUT `--logo-was` so nothing is painted.
 
 ## 0.1.26 release: pictures and catalogue still to do (texts are ready)
 

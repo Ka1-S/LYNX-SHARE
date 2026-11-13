@@ -26,7 +26,10 @@ SRC = Path(__file__).resolve().parent
 OUT = SRC.parent
 SITE = "https://lynx-share.com"
 REPO = "https://github.com/Ka1-S/LYNX-SHARE"
-LOGO_V = "0.1.26-logo"   # cache-buster of the logo pictures (logo by w3teal, 2026-11-13)
+LOGO_V = "0.1.26-logo2"  # cache-buster of the logo pictures (logo by w3teal; its app-icon form since 2026-11-13)
+# the header/footer logo: at 1x the icon's small-size form (32 px, tools/make_logo.py), at 2x the 64 px icon, above that 256 px
+LOGO_SRCSET = (f"/assets/img/favicon-32.png?v={LOGO_V} 1x, /assets/img/favicon.png?v={LOGO_V} 2x, "
+               f"/assets/img/logo.png?v={LOGO_V} 4x")
 LANGS = [["en", "English"], ["zh-Hans", "简体中文"], ["zh-Hant", "繁體中文"], ["nl", "Nederlands"], ["fr", "Français"],
          ["de", "Deutsch"], ["id", "Bahasa Indonesia"], ["it", "Italiano"], ["ja", "日本語"], ["ko", "한국어"],
          ["pl", "Polski"], ["pt-BR", "Português (Brasil)"], ["ru", "Русский"], ["es", "Español"], ["tr", "Türkçe"]]
@@ -265,7 +268,7 @@ def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", ho
 </head>
 <body>
 <header class="top"><div class="wrap">
-  <a href="/" class="brand"><img src="/assets/img/logo.png?v={LOGO_V}" alt="" width="32" height="32">LYNX SHARE</a>
+  <a href="/" class="brand"><img src="/assets/img/logo.png?v={LOGO_V}" srcset="{LOGO_SRCSET}" alt="" width="32" height="32">LYNX SHARE</a>
   <nav class="links" aria-label="Site">{nav}</nav>
   <div class="navbtns">
     <label class="lang">{GLOBE}<span id="langCode" aria-hidden="true">EN</span><select id="lang" aria-label="Language" data-i18n-aria="aria.lang"></select></label>
@@ -276,7 +279,7 @@ def frame(path, cur, title_key, desc_key, body, version, scripts=(), part="", ho
 {body}
 </main>
 <footer><div class="wrap">
-  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v={LOGO_V}" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
+  <a href="/" class="brand" style="font-size:16px"><img src="/assets/img/logo.png?v={LOGO_V}" srcset="{LOGO_SRCSET}" alt="" width="26" height="26" style="width:26px;height:26px">LYNX SHARE</a>
   <span>© 2026 · AGPL-3.0</span>
   <span data-i18n="f.logo">Logo by w3teal</span>
   <div class="links2"><a href="{REPO}">GitHub</a><a href="{REPO}/releases">Releases</a><a href="{REPO}/issues">Issues</a><a href="https://discord.gg/XHKkbtbkY">Discord</a><a href="/#signing" data-i18n="f.sign">Code signing &amp; privacy</a></div>
