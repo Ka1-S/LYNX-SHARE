@@ -23,7 +23,7 @@ import os
 import re
 import sys
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRAND = os.path.join(ROOT, "resources", "brand")
@@ -182,13 +182,9 @@ def site(L):
     art = Image.new("RGBA", (1080, 1080), (17, 17, 20, 255))
     art.alpha_composite(L.icon(800), (140, 140))
     save(art.convert("RGB"), "store", "box-art-1080.png")
-    # GitHub social preview: the icon in the logo's place left of "LYNX" (a flat background there), its left edge on the
-    # text column (x 75), centred on the word's capitals (y 124-182)
-    sp = Image.open(p("docs", "img", "social-preview.png")).convert("RGBA")
-    ImageDraw.Draw(sp).rectangle((60, 70, 176, 206), fill=(14, 15, 19, 255))
-    side = 96
-    sp.alpha_composite(L.icon(side), (75, 153 - side // 2))
-    save(sp.convert("RGB"), "docs", "img", "social-preview.png")
+    # GitHub social preview: drawn whole (text, this icon, the website's hero picture) by scripts/social-preview.py
+    import subprocess
+    subprocess.run([sys.executable, p("scripts", "social-preview.py")], check=True)
 
 
 def app(L):

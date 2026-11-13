@@ -43,7 +43,7 @@ Opens FL Studio, Ableton Live and FL Studio Mobile projects (`.flp`, `.als`, `.f
 
 <p align="center">
   <img src="docs/img/workspace.png" alt="The LYNX SHARE workspace: browser, playlist, piano roll, channel rack and mixer" width="100%">
-  <br><sub>LYNX SHARE's own demo project (<code>LYNX.exe --showcase</code>) in the 0.1.19 workspace: browser, Piano Roll, Channel Rack and Mixer.</sub>
+  <br><sub>LYNX SHARE's own demo project (<code>LYNX.exe --showcase</code>) in the workspace: browser, Playlist, Piano Roll, Channel Rack and Mixer.</sub>
 </p>
 
 ---

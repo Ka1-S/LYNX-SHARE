@@ -13,6 +13,10 @@ Writes (names as website/_src/build.py reads them):
   website/_src/catalog-img.json, website/_src/img-sizes.json the 1x sizes (build.py writes width/height from them;
                                                              a catalog entry [w, h, 2] has an @2x file for srcset)
   docs/img/<name>.png + <name>@2x.png                        the README's pictures (README_PICTURES below)
+  docs/img/social-preview.png                                the GitHub social preview (scripts/social-preview.py: its text
+                                                             lives there) around the hero's render
+  store/screenshots/<name>.png                               the Store screenshots 01-04 (STORE below), 1x
+  website/assets/media/poster.jpg                            the Features video's poster, 1280 x 720 from the 2x hero
 The @2x file is always exactly twice the 1x file's size and is drawn by the program at 2x (never an upscale). A 2x
 render missing for a picture: no @2x file is written (and an old one is removed), the table says so.
 Pictures larger than the page shows are fitted (plugins 960 px wide, wiki 1600 px) with the same factor at both scales.
@@ -35,7 +39,7 @@ from PIL import Image, ImageDraw
 
 # Home / Features pictures: name -> (render, crop box at 1x or None)
 TOP = {
-    "hero": ("snap/s-desktop.png", None),
+    "hero": ("snap/s-desktop-all.png", None),       # Channel Rack, Piano Roll, Playlist and Mixer (the page's alt text)
     "playlist": ("snap/s-playlist.png", None),
     "pianoroll": ("snap/s-pianoroll.png", None),
     "mixer": ("snap/s-mixer.png", None),
@@ -47,7 +51,7 @@ TOP = {
 }
 # the README's pictures (docs/img/<name>.png): the 1600 x 900 window for the wide ones, as the README had them
 README_PICTURES = {
-    "workspace": ("snap1600/s-desktop.png", None),
+    "workspace": ("snap1600/s-desktop-all.png", None),  # the same four windows as the hero (the README's caption)
     "playlist": ("snap/s-playlist.png", (150, 75, 1920, 800)),
     "channel-rack": ("snap/s-rack.png", (0, 0, 1074, 420)),
     "piano-roll": ("snap1600/s-pianoroll.png", None),
@@ -57,6 +61,18 @@ README_PICTURES = {
     "automation": ("snap/s-automation.png", None),
     "clip-launch": ("grid1600/g-both.png", None),
 }
+# the Microsoft Store listing's screenshots (store/screenshots/<name>.png, 1920 x 1080, 1x only); 05-instruments-effects is
+# put together by hand (Channel Rack + a synth + Parametric EQ) and is not written here
+STORE = {
+    "01-workspace": "snap/s-desktop-all.png",
+    "02-playlist": "snap/s-playlist.png",
+    "03-piano-roll": "snap/s-pianoroll-narrow150.png",
+    "04-mixer": "snap/s-mixer.png",
+}
+# the Features page's video poster (website/assets/media/poster.jpg, 1280 x 720) and the GitHub social preview
+# (docs/img/social-preview.png, drawn by scripts/social-preview.py around it): both from the hero's render
+POSTER = "snap/s-desktop-all.png"
+
 # wiki pictures that are a part of a snapshot: name -> (snapshot, box at 1x). The Plugin manager's sample rows name
 # other makers' plugins, so the site shows only the part below them (same as website/_src/import-shots.py).
 CROPS = {"plugin-manager-scan": ("plugin-manager", (0, 330, 980, 600))}
@@ -241,6 +257,7 @@ def main():
     ap.add_argument("renders")
     ap.add_argument("--site", default="website")
     ap.add_argument("--docs", default="docs/img")
+    ap.add_argument("--store", help="the Store screenshots folder (default: store/screenshots beside the site folder)")
     ap.add_argument("--logo-was", help="the logo the renders' build draws (repaint its button with the brand's mark)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
@@ -256,6 +273,40 @@ def main():
 
     for name, (ref, box) in README_PICTURES.items():
         w.pair(root, ref, box, docs / (name + ".png"), docs / (name + "@2x.png"), fmt="png")
+
+    # the Store screenshots (1x), the video poster and the social preview, from the hero's render
+    store = Path(a.store) if a.store else site.resolve().parent / "store" / "screenshots"
+    for name, ref in STORE.items():
+        f1 = render(root, ref, 1)
+        if f1 is None:
+            w.rows.append((str(store / (name + ".png")), "-", 0, "MISSING " + ref))
+            continue
+        one = Image.open(f1)
+        if w.painter:
+            one, _ = w.painter.paint(one, 1)
+        w.put(store / (name + ".png"), png(one), one.size, str(f1))
+    two = render(root, POSTER, 2)
+    big = two or render(root, POSTER, 1)
+    if big is None:
+        w.rows.append((str(site / "assets/media/poster.jpg"), "-", 0, "MISSING " + POSTER))
+    else:
+        im = Image.open(big)
+        if w.painter:
+            im, _ = w.painter.paint(im, 2 if two else 1)
+        out = io.BytesIO()
+        im.convert("RGB").resize((1280, 720), Image.LANCZOS).save(out, "JPEG", quality=88, optimize=True, progressive=True)
+        w.put(site / "assets/media/poster.jpg", out.getvalue(), (1280, 720), str(big))
+        social = docs / "social-preview.png"
+        tool = Path(__file__).resolve().parent / "social-preview.py"
+        tmp = Path(str(social) + ".new.png")
+        import subprocess
+        done = subprocess.run([sys.executable, str(tool), "--window", str(big), "--out", str(tmp)], capture_output=True, text=True)
+        if done.returncode != 0 or not tmp.is_file():
+            w.rows.append((str(social), "-", 0, "MISSING: social-preview.py failed: " + (done.stderr or done.stdout).strip()))
+        else:
+            data = tmp.read_bytes()
+            tmp.unlink()
+            w.put(social, data, Image.open(io.BytesIO(data)).size, "social-preview.py + " + str(big))
 
     catalog = src / "catalog.json"
     if catalog.is_file():

@@ -96,6 +96,15 @@ the earlier pepper in the logo button of a plugin's header: `scripts/site-shots.
 repainted that button with the mark (without the tile, on a dark disc, as the program draws it from 0.1.27). At the
 next release, whose program draws the new logo itself, run `site-shots.py` again WITHOUT `--logo-was` so nothing is painted.
 
+**Hero, social preview, poster, Store.** `site-shots.py` takes the hero (`assets/img/hero.webp`), the README's
+`docs/img/workspace.png`, Store screenshot `01-workspace.png` and `assets/media/poster.jpg` from `snap/s-desktop-all.png`
+(the demo song with the Channel Rack, Piano Roll, Playlist and Mixer open, as the hero's alt text says; `s-desktop.png`
+is the plain start-up layout). It also writes Store screenshots 02-04 and the GitHub social preview
+`docs/img/social-preview.png`, which `scripts/social-preview.py` draws whole: its words are the `TEXT` table at the top
+of that script (name, formats opened and exported, plugin formats, platforms, repository URL). Change them there and
+run it again, never edit the picture; keep them in line with the README. The preview is uploaded by hand in the
+repository's Settings > Social preview.
+
 ## 0.1.27 release: what the texts do not cover yet
 
 Branch wip/rel190eu (round 190eu) has the 0.1.27 Updates entry and the page texts (features, fixes, why, home, FAQ,
