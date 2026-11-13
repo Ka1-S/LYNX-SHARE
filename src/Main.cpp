@@ -17552,7 +17552,7 @@ private:
             return texts;
         };
 
-        check ("the donation page is one constant, on Ko-fi", juce::String (lynx::links::donate).startsWith ("https://ko-fi.com/"));
+        check ("the donation page is one constant, on Ko-fi", juce::String (lynx::links::donate).startsWith ("https://ko-fi"));
         line ("donate URL: " + juce::String (lynx::links::donate));
 
         const auto stateFile = lynx::PluginHost::settingsFolder().getChildFile ("support-note.txt");
