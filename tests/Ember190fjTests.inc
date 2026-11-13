@@ -134,13 +134,16 @@ TEST (ember190fj_classic_tape_and_the_other_paths_render_as_the_base_commit_did)
         { { em::voicing, em::classicDrive, -1, -1 }, { 1.0f, 0.6f }, 48000.0, -1, false, 0x793413613690f0b2ull, 47007.7931, -0.850343585, -0.181251779 }, // classic voicing
         { { em::style, em::drive, em::voice, -1 }, { 1.0f / 3.0f, 0.5f, 0.2f }, 48000.0, -1, false, 0x48cc5eddb7f88ce9ull, 2774.99376, -0.237170994, 0.0424630567 }, // tape voice 1
     };
+    // the Classic voicing's render of the same base commit built with zig c++ 0.13 (clang; the build scripts' compiler)
+    // instead of g++ 15: both builds of the base agree on the other seven, and each build of the branch matches its own
+    constexpr std::uint64_t classicVoicingZig = 0x7bddb56ac889249dull;
     int sameBits = 0, n = 0;
     for (const auto& c : cases)
     {
         const auto r = ember190fj::renderCase (c);
         CHECK (std::abs (r.energy - c.energy) <= 1e-4 * c.energy);
         CHECK (std::abs (r.a - c.a) < 2e-6 && std::abs (r.b - c.b) < 2e-6);
-        sameBits += r.hash == c.hash ? 1 : 0;
+        sameBits += r.hash == c.hash || (n == 6 && r.hash == classicVoicingZig) ? 1 : 0;
         ++n;
     }
     // bit for bit where the maths library is the one the goldens were made with (glibc 2.43 on x86-64: the local builds);
