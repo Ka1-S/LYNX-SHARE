@@ -903,6 +903,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         if (insert >= 0 && insert < (int) song.mixer.size())
             safe->mixer.selectTrack (insert);
     });
+    simpleClickKeys.up = [this] (juce::Component* clicked) { simpleClickEnded (clicked); };
     setSecondaryWindowKeyHandler ([safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
         return safe != nullptr && safe->keyFromSecondaryWindow (key);
     });
@@ -932,6 +933,7 @@ MainComponent::~MainComponent()
     setKeyboardSettingsListener (nullptr);
     setTypingKeyLetters (nullptr);
     juce::Desktop::getInstance().removeGlobalMouseListener (&dockClickWatcher);
+    juce::Desktop::getInstance().removeGlobalMouseListener (&simpleClickKeys);
     workspace.onWillShow = nullptr;
     engine.onSessionUndoSkipped = nullptr;
     PianoRollComponent::onSelectedKeys = nullptr;
@@ -954,6 +956,18 @@ MainComponent::~MainComponent()
     PlaylistComponent::shortcutText = nullptr;
     saveUiSettings();
     workspace.saveState();
+    // Round 190fc (0.1.27 RC blocker B1): the Simple workflow goes while everything its Host reaches still exists. As a
+    // member it was destroyed after `workspace` (declared later, destroyed first), and its destructor leaves the style
+    // (SimpleWorkflow::left): Host::setTitleAccessory then reached the destroyed Workspace's panel frames — an access
+    // violation in PanelFrame::setAccessory on every close (and the setup wizard's "Restart now") in the Simple layout.
+    if (simpleWorkflow != nullptr)
+    {
+        playlist.onTrackEffects = nullptr;
+        playlist.onSimpleTrackSelected = nullptr;
+        playlist.onSimpleFilesDropped = nullptr;
+        simpleWorkflow.reset();
+    }
+    simpleWorkflowAliveAfterTeardown = SimpleWorkflow::alive.load();
     ui::uninstallSliderContract();
     ui::onTweak = nullptr;
     themeui::previewStartupSound = nullptr;
@@ -3292,7 +3306,16 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     if (style == Style::simple && simpleWorkflow == nullptr)
     {
         SimpleWorkflow::Host host;
-        host.setOverlay = [this] (juce::Component* c) { playlistArea.setOverlay (c); };
+        host.setOverlay = [this] (juce::Component* c) {
+            // round 190fc (0.1.27 RC H2): an overlay that had the keys (Welcome, Start from, the chooser) gives them back
+            // to the main window when it goes; JUCE would hand them to the first child that takes keys (the dock's
+            // search box, the Lyrics text...), where Space typed instead of playing
+            auto* old = playlistArea.getOverlay();
+            const auto hadKeys = old != nullptr && old != c && old->hasKeyboardFocus (true);
+            playlistArea.setOverlay (c);
+            if (hadKeys && c == nullptr && isShowing())
+                grabKeyboardFocus();
+        };
         host.showKeys = [this] {
             if (! isTouchKeyboardOpen()) // (round 190p: a new instrument can be played at once, with the mouse too)
                 toggleTouchKeyboard (engine);
@@ -3370,6 +3393,11 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     }
     if (from == Style::simple && style != Style::simple && simpleWorkflow != nullptr)
         simpleWorkflow->left();
+    // round 190fc (H2): every click in the Simple window leaves the keys with the main window (text fields excepted)
+    if (style == Style::simple)
+        juce::Desktop::getInstance().addGlobalMouseListener (&simpleClickKeys);
+    else
+        juce::Desktop::getInstance().removeGlobalMouseListener (&simpleClickKeys);
 
     // the workspace layout is kept per style, so going back restores the Pattern layout exactly
     const auto layoutFile = [] (Style s) { return platform::settingsFile (layoutstyle::workspaceFile (s)); };
@@ -3582,6 +3610,57 @@ void MainComponent::toggleHotSwap (const hotswap::Target& target)
     }
     showPanel (Panel::browser);
     browser.beginHotSwap (target);
+}
+
+// Round 190fc (0.1.27 RC H2, the #161 family inside the app): in the Simple layout Space often did nothing after a click
+// in the window. Its own controls (the dock's tabs and cards, the Lyrics and Finish buttons, the looks) take the keyboard
+// focus on a click, unlike the Pattern layout's panels, and JUCE then hands the keys to whatever child takes them — the
+// dock's sound search box or the Lyrics text, where Space typed a space; the Finish looks and the chooser's tiles also
+// take Space as a click. FL's rule (issue #9): a click anywhere but in a text field leaves the keys with the main window,
+// so Space plays. So after each click in the main window or one of its panels: unless the click was in a text field, or
+// in a part that keeps its own keys (the overlays with their list and tile keys: property "lynxKeepsKeys"; a dock knob
+// just clicked, for its arrow keys: "lynxClickKeepsKeys"), the main window takes the keys back from a text field, from a
+// panel's control, or from nobody.
+// Plugin windows, dialogs and menus are left alone.
+void MainComponent::simpleClickEnded (juce::Component* clicked)
+{
+    if (layoutStyle != layoutstyle::Style::simple || clicked == nullptr || ! isShowing())
+        return;
+    auto inside = clicked == this || isParentOf (clicked);
+    for (int i = 0; ! inside && i < workspace::panelCount; ++i)
+    {
+        auto& frame = workspace.getFrame ((Panel) i);
+        inside = &frame == clicked || frame.isParentOf (clicked);
+    }
+    if (! inside)
+        return;
+    const auto keepsKeys = [] (juce::Component* c) {
+        for (; c != nullptr; c = c->getParentComponent())
+            if ((bool) c->getProperties().getWithDefault ("lynxKeepsKeys", false))
+                return true;
+        return false;
+    };
+    const auto inTextField = [] (juce::Component* c) {
+        for (; c != nullptr; c = c->getParentComponent())
+            if (dynamic_cast<juce::TextEditor*> (c) != nullptr)
+                return true;
+        return false;
+    };
+    if (inTextField (clicked) || keepsKeys (clicked) || (bool) clicked->getProperties().getWithDefault ("lynxClickKeepsKeys", false))
+        return; // (a knob clicked keeps the arrow keys until the next click elsewhere)
+    // now (the clicked control has acted: this listener runs after its own mouseUp, where a button's click and the Lyrics
+    // panel's text focus happen), and once more after what the click posted has run
+    const auto takeKeys = [keepsKeys, inTextField] (MainComponent* self) {
+        if (self == nullptr || self->layoutStyle != layoutstyle::Style::simple || ! self->isShowing()
+            || juce::Component::getCurrentlyModalComponent() != nullptr) // (a menu or a dialog the click opened)
+            return;
+        auto* focused = juce::Component::getCurrentlyFocusedComponent();
+        if (focused != nullptr && ! inTextField (focused) && (focused == self || self->isParentOf (focused) || keepsKeys (focused)))
+            return; // (the main window, or a part with its own keys, has them)
+        self->grabKeyboardFocus();
+    };
+    takeKeys (this);
+    juce::MessageManager::callAsync ([safe = juce::Component::SafePointer<MainComponent> (this), takeKeys] { takeKeys (safe.getComponent()); });
 }
 
 bool MainComponent::pianoRollKeysHere() const

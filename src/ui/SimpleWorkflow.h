@@ -128,6 +128,8 @@ public:
 
     // how many were ever made in this process (the "nothing exists in Pattern workflow" check)
     static inline std::atomic<int> instances { 0 };
+    // how many exist now (round 190fc: none may outlive its MainComponent's destructor body)
+    static inline std::atomic<int> alive { 0 };
 
 private:
     class Chooser;

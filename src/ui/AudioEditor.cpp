@@ -41,6 +41,8 @@
 #include "ui/Icons.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
+#include "ui/NativeChild.h"
+#include "ui/WindowOwner.h"
 
 namespace lynx
 {
@@ -5304,6 +5306,11 @@ AudioEditor* openWindow (AudioEngine& engine, Source source)
     {
         window->setResizable (true, false);
         window->setResizeLimits (720, 380, 4000, 3000);
+        // Edison in a mixer slot is one of the insert's plugin windows: docked in the workspace as FL's are (round 190fc,
+        // 0.1.27 RC M2; the other LYNX editors since round 190ev), so a click on the Playlist or any panel brings that panel
+        // in front of it. FL's "Detach all new plugins" or LYNX_DOCKED_PLUGINS=0 keep it a floating window.
+        if (source.kind == Source::Kind::slot)
+            dockOrKeepAbove (*window);
     }
     return raw;
 }
@@ -5405,7 +5412,9 @@ void openEdisonSlot (AudioEngine& engine, int track, int slot, bool record)
     AudioEditor* editor = nullptr;
     if (auto* open = findToolWindow (windowKey (*source)))
     {
-        open->toFront (true);
+        open->toFront (! nativechild::isAttached (*open)); // (a docked one comes in front without taking the activation)
+        if (nativechild::isAttached (*open))
+            nativechild::raiseOverlays();
         editor = dynamic_cast<AudioEditor*> (open->getContentComponent());
     }
     else

@@ -77,6 +77,7 @@ public:
     DockKnob()
     {
         setWantsKeyboardFocus (true);
+        getProperties().set ("lynxClickKeepsKeys", true); // (round 190fc: clicked, the arrow keys turn it; Space still plays)
         setMouseCursor (juce::MouseCursor::UpDownResizeCursor);
     }
 

@@ -3,6 +3,7 @@
 #include "engine/AudioEngine.h"
 #include "platform/Paths.h"
 #include "ui/I18n.h"
+#include "ui/NativeChild.h"
 #include "ui/Theme.h"
 
 namespace lynx
@@ -13,7 +14,7 @@ constexpr const char* layerId = "tour.layer";
 constexpr const char* cardId = "tour.card";
 
 // The first component with this ID that is on screen inside `root` (the tour's own parts left out)
-juce::Component* findShowing (juce::Component& root, const juce::String& id)
+juce::Component* findShowingIn (juce::Component& root, const juce::String& id)
 {
     for (auto* c : root.getChildren())
     {
@@ -21,10 +22,43 @@ juce::Component* findShowing (juce::Component& root, const juce::String& id)
             continue;
         if (c->getComponentID() == id && ! c->getLocalBounds().isEmpty()) // (its parents up to the window are visible: checked on the way down)
             return c;
-        if (auto* inner = findShowing (*c, id))
+        if (auto* inner = findShowingIn (*c, id))
             return inner;
     }
     return nullptr;
+}
+
+// The same in the window and in the panels that are native child windows of it (issue #116: the Playlist, Channel rack,
+// Piano roll and Mixer frames are not its child components then; round 190fc)
+juce::Component* findShowing (juce::Component& window, const juce::String& id)
+{
+    if (auto* c = findShowingIn (window, id))
+        return c;
+    if (auto* peer = window.getPeer())
+        for (auto* attached : nativechild::attachedChildren (peer->getNativeHandle()))
+            if (attached != nullptr && attached->isVisible() && attached->getComponentID() != layerId && attached->getComponentID() != cardId)
+                if (auto* c = attached->getComponentID() == id ? attached : findShowingIn (*attached, id))
+                    return c;
+    return nullptr;
+}
+
+// `c`'s bounds in `window`'s coordinates, also for a component inside an attached native child window (whose bounds
+// are kept in the main window's client coordinates, ui/NativeChild.h)
+juce::Rectangle<int> areaIn (juce::Component& window, juce::Component& c)
+{
+    auto* top = c.getTopLevelComponent();
+    auto* main = window.getTopLevelComponent();
+    if (top == nullptr || main == nullptr || top == main || ! nativechild::isAttached (*top))
+        return window.getLocalArea (&c, c.getLocalBounds());
+    return window.getLocalArea (main, top->getLocalArea (&c, c.getLocalBounds()) + top->getPosition());
+}
+
+// Issue #116 / round 190fc (0.1.27 RC H1): the panels are native child windows, always drawn above the main window's
+// own components, so the tour's card and ring go in front of them as floaters (ui/NativeChild.h): layered child windows
+// that take no focus. Without a native main window (--snapshot routes, tests) they stay plain children of the window.
+bool tourAsNativeWindows (const juce::Component& window)
+{
+    return nativechild::dockingEnabled() && window.getPeer() != nullptr;
 }
 
 void styleButton (juce::TextButton& b, bool primary)
@@ -110,6 +144,9 @@ public:
             addChildComponent (*b);
         }
         close.setVisible (true);
+        for (auto [b, id] : { std::pair<juce::Component*, const char*> { &close, "tour.close" }, { &skipButton, "tour.skip" }, { &backButton, "tour.back" },
+                              { &doButton, "tour.do" }, { &nextButton, "tour.next" } })
+            b->setComponentID (id); // (round 190fc: --simplekeytest clicks them)
         close.onClick = [this] { owner.clicked ("close"); };
         skipButton.onClick = [this] { owner.clicked ("skip"); };
         backButton.onClick = [this] { owner.clicked ("back"); };
@@ -157,8 +194,12 @@ public:
         return nullptr;
     }
 
+    bool solidBackdrop = false; // an attached child window without per-pixel transparency (Linux): its corners are filled
+
     void paint (juce::Graphics& g) override
     {
+        if (solidBackdrop)
+            g.fillAll (theme::colour::bg1);
         auto r = getLocalBounds().toFloat().reduced (2.0f);
         g.setColour (juce::Colours::black.withAlpha (0.4f));
         g.fillRoundedRectangle (r.translated (0.0f, 3.0f), theme::radius::lg + 1.0f);
@@ -297,6 +338,7 @@ public:
     {
         setComponentID ("tour.welcome");
         setWantsKeyboardFocus (true);
+        getProperties().set ("lynxKeepsKeys", true); // (round 190fc: Esc and its options' keys while it is up)
         title.setText (tr ("Welcome to LYNX"), juce::dontSendNotification);
         title.setFont (theme::font (theme::type::display, true));
         title.setJustificationType (juce::Justification::centred);
@@ -312,6 +354,8 @@ public:
         close.setTooltip (tr ("Close"));
         styleButton (close, false);
         tourOption.setComponentID ("tour.welcome.start");
+        demoOption.setComponentID ("tour.welcome.demo");
+        emptyOption.setComponentID ("tour.welcome.empty");
         tourOption.onClick = [this] { owner.clicked ("welcome.tour"); };
         demoOption.onClick = [this] { owner.clicked ("welcome.demo"); };
         emptyOption.onClick = [this] { owner.clicked ("welcome.empty"); };
@@ -389,6 +433,10 @@ FirstSongTour::~FirstSongTour()
 {
     hideCard();
     hideWelcome();
+    if (card != nullptr)
+        nativechild::removeFloater (*card);
+    if (layer != nullptr)
+        nativechild::removeFloater (*layer);
 }
 
 juce::File FirstSongTour::stateFile() { return platform::settingsFile ("simple-tour.txt"); }
@@ -497,15 +545,70 @@ void FirstSongTour::showCard()
         layer = std::make_unique<Layer>();
         card->follow = [this] { update(); };
     }
-    if (layer->getParentComponent() != window)
-        window->addAndMakeVisible (*layer);
-    if (card->getParentComponent() != window)
-        window->addAndMakeVisible (*card);
-    layer->setBounds (window->getLocalBounds());
+    shownIn = window;
+    if (tourAsNativeWindows (*window))
+    {
+        // in front of the native panels and docked plugin windows (round 190fc): the card always; the dimmed layer with
+        // the ring where child windows blend (Windows, macOS), passing every click and drop through to what is under it
+        const auto attach = [window] (juce::Component& c, juce::Rectangle<int> bounds, bool passThrough) {
+            if (auto* p = c.getParentComponent())
+                p->removeChildComponent (&c);
+            if (! nativechild::isAttached (c))
+            {
+                c.setAlwaysOnTop (false); // (a flag for siblings in one window; it would make a child window "topmost")
+                c.setBounds (bounds);
+                const auto flags = passThrough ? (int) juce::ComponentPeer::windowIgnoresMouseClicks : 0;
+                if (! nativechild::attach (c, *window, flags))
+                    return false;
+                if (passThrough)
+                    nativechild::passInputThrough (c);
+                nativechild::addFloater (c);
+            }
+            else
+                nativechild::reattachIfNeeded (c, *window);
+            c.setVisible (true);
+            return true;
+        };
+        const auto blends = nativechild::supportsFloaters();
+        if (! (blends && attach (*layer, window->getLocalBounds(), true)) && layer->getParentComponent() != window)
+            window->addAndMakeVisible (*layer); // (Linux: dims the window's own parts; the card stays readable above the panels)
+        card->solidBackdrop = ! blends;
+        auto cardBounds = nativechild::boundsIn (*card, *window);
+        if (cardBounds.isEmpty())
+            cardBounds = { 0, 0, Card::width, Card::height }; // (update() puts it in its corner)
+        if (! attach (*card, cardBounds, false) && card->getParentComponent() != window)
+        {
+            card->solidBackdrop = false;
+            window->addAndMakeVisible (*card);
+        }
+        nativechild::raiseOverlays(); // (the layer first, then the card: their order in the floaters list)
+    }
+    else
+    {
+        for (auto* c : { (juce::Component*) card.get(), (juce::Component*) layer.get() })
+            if (nativechild::isAttached (*c)) // (the main window lost its native window meanwhile)
+            {
+                nativechild::removeFloater (*c);
+                nativechild::detach (*c);
+            }
+        card->solidBackdrop = false;
+        if (layer->getParentComponent() != window)
+            window->addAndMakeVisible (*layer);
+        if (card->getParentComponent() != window)
+            window->addAndMakeVisible (*card);
+        layer->setBounds (window->getLocalBounds());
+    }
     layer->toFront (false);
     card->toFront (false);
+    nativechild::keepFloatersInFront();
     card->startFollowing();
     update();
+}
+
+bool FirstSongTour::cardShowing() const noexcept
+{
+    return card != nullptr && shownIn != nullptr
+           && (card->getParentComponent() != nullptr || (nativechild::isAttached (*card) && card->isVisible()));
 }
 
 void FirstSongTour::hideCard()
@@ -519,13 +622,23 @@ void FirstSongTour::hideCard()
     if (layer != nullptr)
         if (auto* p = layer->getParentComponent())
             p->removeChildComponent (layer.get());
+    for (auto* c : { (juce::Component*) card.get(), (juce::Component*) layer.get() })
+        if (c != nullptr && nativechild::isAttached (*c))
+        {
+            nativechild::removeFloater (*c);
+            nativechild::detach (*c);
+            c->setVisible (false);
+        }
+    shownIn = nullptr;
 }
 
 void FirstSongTour::update()
 {
-    if (card == nullptr || card->getParentComponent() == nullptr)
+    if (! cardShowing())
         return;
-    auto* window = card->getParentComponent();
+    auto* window = shownIn.getComponent();
+    for (auto* c : { (juce::Component*) card.get(), (juce::Component*) layer.get() })
+        nativechild::reattachIfNeeded (*c, *window); // (the main window's native window was made again)
     const auto step = machine.step();
     card->show (step, machine.shownDone (engine.getSong()));
 
@@ -534,10 +647,11 @@ void FirstSongTour::update()
     for (const auto& id : tour::targets (step))
         if (auto* c = findShowing (*window, id))
         {
-            ring = window->getLocalArea (c, c->getLocalBounds());
+            ring = areaIn (*window, *c);
             break;
         }
-    layer->setBounds (window->getLocalBounds());
+    if (nativechild::boundsIn (*layer, *window) != window->getLocalBounds())
+        nativechild::place (*layer, *window, window->getLocalBounds());
     layer->setRing (ring);
 
     // the card: in a corner the ring is not in (top right first, under the toolbar)
@@ -551,7 +665,7 @@ void FirstSongTour::update()
     // (and not over the Finish dock while it is open: the end card would hide its looks)
     juce::Rectangle<int> keepClear;
     if (auto* finishDock = findShowing (*window, "simple.finishDock"))
-        keepClear = window->getLocalArea (finishDock, finishDock->getLocalBounds());
+        keepClear = areaIn (*window, *finishDock);
     auto place = spots[0];
     for (const auto& s : spots)
         if ((ring.isEmpty() || ! s.intersects (ring.expanded (24))) && ! s.intersects (keepClear))
@@ -559,8 +673,8 @@ void FirstSongTour::update()
             place = s;
             break;
         }
-    if (card->getBounds() != place)
-        card->setBounds (place);
+    if (nativechild::boundsIn (*card, *window) != place)
+        nativechild::place (*card, *window, place);
 }
 
 void FirstSongTour::clicked (const juce::String& what)
@@ -642,10 +756,10 @@ juce::Rectangle<int> FirstSongTour::ringForSnapshot()
 
 juce::String FirstSongTour::targetIdForSnapshot() const
 {
-    if (card == nullptr || card->getParentComponent() == nullptr)
+    if (! cardShowing())
         return {};
     for (const auto& id : tour::targets (machine.step()))
-        if (findShowing (*card->getParentComponent(), id) != nullptr)
+        if (findShowing (*shownIn.getComponent(), id) != nullptr)
             return id;
     return {};
 }
