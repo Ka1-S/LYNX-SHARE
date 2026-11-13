@@ -5,11 +5,8 @@
 #if JUCE_ANDROID || defined(LYNX_ANDROID)
 #include <android/native_activity.h>
 #include <android/asset_manager.h>
+#include <android/native_app_glue.h>
 #include <jni.h>
-
-// native_app_glue.h is provided by JUCE's juce_android_native_app_glue module
-// Include via the JUCE module path
-#include <juce_audio_devices/native/juce_android_AndroidApp.h>
 
 extern "C" {
     extern JavaVM* android_jvm;

@@ -7,6 +7,8 @@
 namespace lynx::platform
 {
 #if JUCE_ANDROID || defined(LYNX_ANDROID)
+#include <jni.h>
+
 class AndroidLifecycle
 {
 public:
