@@ -14,27 +14,27 @@ public:
     ~AndroidAudioDevice() override;
 
     // AudioIODevice interface (JUCE 8)
-    const juce::String getName() const override { return "AAudio"; }
+    const juce::String getName() const override;
     int getDefaultBufferSize() override;
-    int getCurrentBufferSizeSamples() override { return currentBufferSize; }
-    double getCurrentSampleRate() override { return currentSampleRate; }
+    int getCurrentBufferSizeSamples() const override;
+    double getCurrentSampleRate() const override;
     juce::Array<double> getAvailableSampleRates() override;
     juce::Array<int> getAvailableBufferSizes() override;
 
-    bool open (const juce::String& inputDeviceName,
-               const juce::String& outputDeviceName,
-               int numberOfInputChannelsNeeded,
-               int numberOfOutputChannelsNeeded,
-               int sampleRate,
-               int bufferSizeSamples) override;
+    bool open(const juce::String& inputDeviceName,
+              const juce::String& outputDeviceName,
+              int numberOfInputChannelsNeeded,
+              int numberOfOutputChannelsNeeded,
+              int sampleRate,
+              int bufferSizeSamples) override;
     void close() override;
-    void start (juce::AudioIODeviceCallback* callback) override;
+    void start(juce::AudioIODeviceCallback* callback) override;
     void stop() override;
-    bool isOpen() const override { return isOpened; }
-    bool isPlaying() const override { return isStarted; }
-    int getOutputLatencyInSamples() override;
-    int getInputLatencyInSamples() override;
-    int getXRunCount() const override { return xrunCount; }
+    bool isOpen() const override;
+    bool isPlaying() const override;
+    int getOutputLatencyInSamples() const override;
+    int getInputLatencyInSamples() const override;
+    int getXRunCount() const noexcept override;
 
     // AAudio stream callbacks
     static aaudio_data_callback_result_t onAudioCallback(AAudioStream* stream, void* userData, void* audioData, int32_t numFrames);
@@ -54,12 +54,10 @@ private:
     double currentSampleRate = 44100.0;
     int xrunCount = 0;
 
-    // Audio buffer for mixing
     juce::AudioBuffer<float> mixingBuffer;
     int numInputChannels = 0;
     int numOutputChannels = 0;
 
-    // JNI references for Java side
     jobject audioTrack = nullptr;
     jobject audioRecord = nullptr;
 };

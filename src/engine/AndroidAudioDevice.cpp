@@ -20,7 +20,6 @@ namespace lynx::engine
 
 AndroidAudioDevice::AndroidAudioDevice() : juce::AudioIODevice("AAudio", "AAudio")
 {
-    // Initialize AAudio
     AAudio_createStreamBuilder(&builder);
 }
 
@@ -34,16 +33,30 @@ AndroidAudioDevice::~AndroidAudioDevice()
     }
 }
 
+const juce::String AndroidAudioDevice::getName() const
+{
+    return "AAudio";
+}
+
 int AndroidAudioDevice::getDefaultBufferSize()
 {
-    // Get the optimal buffer size from AAudio
     if (builder)
     {
         int32_t framesPerBurst = AAudioStreamBuilder_getFramesPerBurst(builder);
         if (framesPerBurst > 0)
             return framesPerBurst;
     }
-    return 256; // fallback
+    return 256;
+}
+
+int AndroidAudioDevice::getCurrentBufferSizeSamples() const
+{
+    return currentBufferSize;
+}
+
+double AndroidAudioDevice::getCurrentSampleRate() const
+{
+    return currentSampleRate;
 }
 
 juce::Array<double> AndroidAudioDevice::getAvailableSampleRates()
@@ -51,7 +64,6 @@ juce::Array<double> AndroidAudioDevice::getAvailableSampleRates()
     juce::Array<double> rates;
     rates.add(44100.0);
     rates.add(48000.0);
-    // Android commonly supports these rates
     return rates;
 }
 
@@ -85,7 +97,7 @@ bool AndroidAudioDevice::open(const juce::String& inputDeviceName,
     AAudioStreamBuilder_setSampleRate(builder, sampleRate);
     AAudioStreamBuilder_setChannelCount(builder, numOutputChannels);
     AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_FLOAT);
-    AAudioStreamBuilder_setBufferCapacityInFrames(builder, currentBufferSize * 4); // 4x buffer for safety
+    AAudioStreamBuilder_setBufferCapacityInFrames(builder, currentBufferSize * 4);
     AAudioStreamBuilder_setDataCallback(builder, onAudioCallback, this);
     AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
     AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE);
@@ -97,7 +109,6 @@ bool AndroidAudioDevice::open(const juce::String& inputDeviceName,
         return false;
     }
 
-    // Create input stream if needed
     if (numInputChannels > 0)
     {
         AAudioStreamBuilder_setDirection(builder, AAUDIO_DIRECTION_INPUT);
@@ -112,11 +123,9 @@ bool AndroidAudioDevice::open(const juce::String& inputDeviceName,
         }
     }
 
-    // Verify actual buffer size and sample rate
     currentBufferSize = AAudioStream_getBufferSizeInFrames(outputStream);
     currentSampleRate = AAudioStream_getSampleRate(outputStream);
 
-    // Prepare mixing buffer
     mixingBuffer.setSize(juce::jmax(numInputChannels, numOutputChannels), currentBufferSize);
 
     isOpened = true;
@@ -157,7 +166,6 @@ void AndroidAudioDevice::start(juce::AudioIODeviceCallback* callback)
     currentCallback = callback;
     callback->audioDeviceAboutToStart(this);
 
-    // Start output stream
     aaudio_result_t result = AAudioStream_requestStart(outputStream);
     if (result != AAUDIO_OK)
     {
@@ -167,7 +175,6 @@ void AndroidAudioDevice::start(juce::AudioIODeviceCallback* callback)
         return;
     }
 
-    // Start input stream if available
     if (inputStream)
     {
         result = AAudioStream_requestStart(inputStream);
@@ -205,22 +212,37 @@ void AndroidAudioDevice::stop()
     LOGI("AAudio stopped");
 }
 
-int AndroidAudioDevice::getOutputLatencyInSamples()
+bool AndroidAudioDevice::isOpen() const
+{
+    return isOpened;
+}
+
+bool AndroidAudioDevice::isPlaying() const
+{
+    return isStarted;
+}
+
+int AndroidAudioDevice::getOutputLatencyInSamples() const
 {
     if (outputStream)
     {
-        return AAudioStream_getFramesPerBurst(outputStream) * 2; // estimate
+        return AAudioStream_getFramesPerBurst(outputStream) * 2;
     }
     return currentBufferSize;
 }
 
-int AndroidAudioDevice::getInputLatencyInSamples()
+int AndroidAudioDevice::getInputLatencyInSamples() const
 {
     if (inputStream)
     {
-        return AAudioStream_getFramesPerBurst(inputStream) * 2; // estimate
+        return AAudioStream_getFramesPerBurst(inputStream) * 2;
     }
     return currentBufferSize;
+}
+
+int AndroidAudioDevice::getXRunCount() const noexcept
+{
+    return xrunCount;
 }
 
 aaudio_data_callback_result_t AndroidAudioDevice::onAudioCallback(AAudioStream* stream,
@@ -236,34 +258,29 @@ aaudio_data_callback_result_t AndroidAudioDevice::onAudioCallback(AAudioStream* 
     const int numOutChannels = device->numOutputChannels;
     const int numInChannels = device->numInputChannels;
 
-    // Clear mixing buffer
     device->mixingBuffer.clear();
 
-    // Get input data if available
     if (device->inputStream && numInChannels > 0)
     {
-        // Read from input stream
         aaudio_result_t result = AAudioStream_read(device->inputStream,
                                                    device->mixingBuffer.getArrayOfWritePointers(),
                                                    numFrames,
-                                                   0); // timeout = 0 (non-blocking)
+                                                   0);
         if (result < 0)
         {
             device->xrunCount++;
         }
     }
 
-    // Call the JUCE callback
     device->currentCallback->audioDeviceIOCallbackWithContext(
         device->mixingBuffer.getArrayOfReadPointers(), numInChannels,
         device->mixingBuffer.getArrayOfWritePointers(), numOutChannels,
         numFrames, nullptr);
 
-    // Copy mixed output to AAudio buffer
     for (int ch = 0; ch < numOutChannels; ++ch)
     {
         const float* src = device->mixingBuffer.getReadPointer(ch);
-        float* dst = outputBuffer + ch; // interleaved
+        float* dst = outputBuffer + ch;
         for (int i = 0; i < numFrames; ++i)
         {
             dst[i * numOutChannels] = src[i];
