@@ -622,14 +622,15 @@ if(LYNX_BUILD_APP)
         target_link_libraries(LYNX PRIVATE OpenSLES log android native_app_glue)
         # Android-specific sources
         target_sources(LYNX PRIVATE
-            src/platform/AndroidAudioDevice.cpp
+            src/engine/AndroidAudioDevice.cpp
             src/platform/AndroidPaths.cpp
             src/platform/AndroidLifecycle.cpp
             src/platform/android/jni/AndroidJNI.cpp)
         # Include Android JNI headers
         target_include_directories(LYNX PRIVATE src/platform/android/jni)
         # JUCE Android needs the native app glue
-        target_link_libraries(LYNX PRIVATE juce::juce_android_native_app_glue)
+        # Fix: use juce_android_native_app_glue if defined, or ignore if JUCE 8 handles it automatically
+        # target_link_libraries(LYNX PRIVATE juce::juce_android_native_app_glue)
     else()
         # ALSA (linked) + JACK (loaded at run time; PipeWire serves JACK clients through pipewire-jack)
         target_compile_definitions(LYNX PRIVATE JUCE_ALSA=1 JUCE_JACK=1 JUCE_PLUGINHOST_LV2=1)
