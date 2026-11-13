@@ -64,12 +64,31 @@ jobs:
           cache: 'gradle'
 
       # ---------------------------------------------------------
-      # 3. Setup Android NDK
+      # 3. Setup Android NDK (manual download - more reliable)
       # ---------------------------------------------------------
       - name: Setup Android NDK
-        uses: android-actions/setup-ndk@v2
-        with:
-          ndk-version: ${{ env.ANDROID_NDK_VERSION }}
+        run: |
+          NDK_VERSION="${{ env.ANDROID_NDK_VERSION }}"
+          NDK_URL="https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip"
+          
+          echo "Downloading NDK ${NDK_VERSION}..."
+          wget -q -O /tmp/ndk.zip "$NDK_URL"
+          unzip -q /tmp/ndk.zip -d /tmp/
+          
+          # Find the extracted NDK directory
+          NDK_DIR=$(find /tmp -maxdepth 1 -type d -name "android-ndk-${NDK_VERSION}*" | head -1)
+          
+          if [ -z "$NDK_DIR" ]; then
+            echo "ERROR: NDK directory not found after extraction"
+            ls -la /tmp/
+            exit 1
+          fi
+          
+          echo "ANDROID_NDK_HOME=$NDK_DIR" >> $GITHUB_ENV
+          echo "$NDK_DIR" >> $GITHUB_PATH
+          
+          echo "NDK installed at: $NDK_DIR"
+          ls -la "$NDK_DIR"
 
       # ---------------------------------------------------------
       # 4. Cache CMake/Ninja build
@@ -300,10 +319,29 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
-      - name: Setup NDK
-        uses: android-actions/setup-ndk@v2
-        with:
-          ndk-version: ${{ env.ANDROID_NDK_VERSION }}
+      - name: Setup Android NDK
+            run: |
+              NDK_VERSION="${{ env.ANDROID_NDK_VERSION }}"
+              NDK_URL="https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip"
+              
+              echo "Downloading NDK ${NDK_VERSION}..."
+              wget -q -O /tmp/ndk.zip "$NDK_URL"
+              unzip -q /tmp/ndk.zip -d /tmp/
+              
+              # Find the extracted NDK directory
+              NDK_DIR=$(find /tmp -maxdepth 1 -type d -name "android-ndk-${NDK_VERSION}*" | head -1)
+              
+              if [ -z "$NDK_DIR" ]; then
+                echo "ERROR: NDK directory not found after extraction"
+                ls -la /tmp/
+                exit 1
+              fi
+              
+              echo "ANDROID_NDK_HOME=$NDK_DIR" >> $GITHUB_ENV
+              echo "$NDK_DIR" >> $GITHUB_PATH
+              
+              echo "NDK installed at: $NDK_DIR"
+              ls -la "$NDK_DIR"
       - name: Configure CMake
         run: |
           cmake -B build-android-${{ matrix.abi }} -S . \
