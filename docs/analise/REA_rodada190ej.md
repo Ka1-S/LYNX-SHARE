@@ -25,6 +25,7 @@ Levels: RMS per 0.5 s (`py/tl.py`), FL's wav against LYNX's `renderwav` of the s
 | Generator | FIFO (4–6 s) | LIFO (12–14 s) | FL's rule |
 |---|---|---|---|
 | Sampler (channel sampler, sine sample, volume envelope on) | sounds | sounds | per voice |
+| SoundFont Player (FL's Default.sf2, project from the test writer `voices190ej_write_fl_soundfont_probe`) | sounds | sounds | per voice |
 | 3x Osc, Sytrus, Harmor, Harmless, Fruity DX10, BeepMap, SimSynth, DirectWave | sounds | sounds | per voice |
 | Ogun (Default (tonal)) | sounds (B decays on) | silence: D's note on cut C (Ogun's own same-key cut, REA_rodada37 §1.14), D ends at 12 s | per voice |
 | Kepler, Kepler Exo, MiniSynth, PoiZone, Sawer, Toxic Biohazard, Morphine, GMS, BooBass, Sakura | sounds | silence from 12 s | one voice per key: a second note of a held key takes it over (the overlap is no louder than one note), the earlier note's end does nothing, the end of the note that holds the key ends it |
@@ -54,11 +55,12 @@ plugin's.
 - Per voice (`Instrument::endsVoice`): Sampler (and Fruity Slicer, FPC's layers, audio clips unchanged), LYNX Synth,
   3x Osc, Sytrus, Harmor, Harmless, DX10, BeepMap, SimSynth (a scheduled note no longer releases the key's previous
   voice at its note on: FL's render plays both), Ogun / Autogun, DirectWave, Slicex, Plucked!, FL Keys,
-  Granulizer, Wave Traveller, DrumSynth Live, Fruit Kick.
+  Granulizer, Wave Traveller, DrumSynth Live, Fruit Kick, LYNX Soundfont.
 - One voice per key (`KeyOwners`): Kepler / Kepler Exo, MiniSynth, PoiZone, Sawer, Toxic Biohazard, Morphine, GMS
   (desktop engine), BooBass, Sakura (a scheduled note of a held key also releases the key's voice first: in FL's render
   the overlap is no louder than one note; LYNX played two).
-- Unchanged: hosted plugins (two note ons, two note offs, as FL), LYNX Soundfont, Pocket SuperSaw and FL Studio Mobile's
+- Unchanged: hosted plugins (two note ons, two note offs, as FL), Pocket SuperSaw and FL Studio Mobile's
   modules, Drumaxx, Drumpad, BassDrum (notes never shorten), Transistor Bass, FL Slayer, Patcher graphs, MIDI Out.
 
-Results: see `/mnt/e/lynx-work/voices190ej/HANDOFF.md`.
+Results (`/mnt/e/lynx-work/voices190ej/HANDOFF.md`): issue #158's 25 FL renders 25/25 match (was 18/25); the 25
+comparable generator projects 25/25 in the FIFO / LIFO windows (5/25 before, two of them trivially).

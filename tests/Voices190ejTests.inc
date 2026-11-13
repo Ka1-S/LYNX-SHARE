@@ -360,18 +360,25 @@ TEST (voices190ej_fl_generators_end_voices_as_fl_does)
     struct Case
     {
         InstrumentKind kind;
-        bool perVoice; // false: one note per key, the newest holds it
+        bool lifoOn;         // FL: the outer note sounds on after the inner one's end (per voice)
+        const char* preset;  // the preset FL rendered (under Plugin presets/Generators), "" = the new channel's state
     };
-    const Case cases[] = { { InstrumentKind::threeosc, true }, { InstrumentKind::sytrus, true }, { InstrumentKind::beepmap, true },
-                           { InstrumentKind::dx10, true },     { InstrumentKind::simsynth, true }, { InstrumentKind::sakura, false },
-                           { InstrumentKind::ogun, true },     { InstrumentKind::harmor, true },  { InstrumentKind::harmless, true },
-                           { InstrumentKind::kepler, false },  { InstrumentKind::minisynth, false }, { InstrumentKind::poizone, false },
-                           { InstrumentKind::sawer, false },   { InstrumentKind::toxic, false },  { InstrumentKind::morphine, false },
-                           { InstrumentKind::gms, false },     { InstrumentKind::boobass, false } };
+    // (Ogun is per voice but its own same-key cut ends the outer note at the inner one's start: LIFO silent, as in FL)
+    const Case cases[] = { { InstrumentKind::threeosc, true, "3x Osc/Default.fst" },      { InstrumentKind::sytrus, true, "Sytrus/Default.fst" },
+                           { InstrumentKind::beepmap, true, "BeepMap/Default.fst" },      { InstrumentKind::dx10, true, "Fruity DX10/Chiff Organ.fst" },
+                           { InstrumentKind::simsynth, true, "SimSynth/Default.fst" },    { InstrumentKind::harmor, true, "Harmor/Default.fst" },
+                           { InstrumentKind::harmless, true, "Harmless/Default.fst" },    { InstrumentKind::ogun, false, "Ogun/Default (tonal).fst" },
+                           { InstrumentKind::sakura, false, "Sakura/String/STR Cello FG.fst" }, { InstrumentKind::kepler, false, "Kepler/Default.fst" },
+                           { InstrumentKind::minisynth, false, "MiniSynth/Default.fst" }, { InstrumentKind::poizone, false, "PoiZone/Default.fst" },
+                           { InstrumentKind::sawer, false, "Sawer/Default.fst" },         { InstrumentKind::toxic, false, "" },
+                           { InstrumentKind::morphine, false, "" },                      { InstrumentKind::gms, false, "" },
+                           { InstrumentKind::boobass, false, "" } };
     for (const auto& k : cases)
     {
-        // (the preset FL rendered: the Default preset where there is one, else the new channel's state)
-        auto channel = natives::channelFromPresetFile (k.kind, natives::defaultPresetPath (natives::presetFolderOf (k.kind), true, fl), fl);
+        std::optional<ChannelDef> channel;
+        if (*k.preset != 0)
+            channel = natives::channelFromPresetFile (
+                k.kind, (std::filesystem::path (realFlpDir) / "Patches" / "Plugin presets" / "Generators" / k.preset).string(), fl);
         if (! channel)
             channel = natives::makeChannel (k.kind, fl);
         if (! channel)
@@ -388,7 +395,7 @@ TEST (voices190ej_fl_generators_end_voices_as_fl_does)
         };
         const auto r = voices190ej::measure (make);
         const auto fifoOk = r.fifoRef > 1.0e-4 && r.fifo > 0.5 * r.fifoRef;
-        const auto lifoOk = k.perVoice ? r.lifo > 0.5 * r.lifoRef : r.lifo < 0.5 * r.lifoRef;
+        const auto lifoOk = k.lifoOn ? r.lifo > 0.5 * r.lifoRef : r.lifo < 0.5 * r.lifoRef;
         if (! fifoOk || ! lifoOk)
             std::printf ("  voices190ej: kind %d fifo %.4g (alone %.4g), lifo %.4g (alone %.4g)\n", (int) k.kind, r.fifo,
                          r.fifoRef, r.lifo, r.lifoRef);
@@ -405,7 +412,10 @@ TEST (voices190ej_write_fl_soundfont_probe)
     const auto* dir = std::getenv ("LYNX_190EJ_WRITE_FLP");
     if (dir == nullptr)
         return;
-    const std::string font = "C:\\Program Files\\Image-Line\\FL Studio 2026\\Plugins\\Fruity\\Generators\\Soundfont Player\\Data\\Default.sf2";
+    // (LYNX_190EJ_FONT: the same font by a path this machine's LYNX reads, for LYNX's render of the same project)
+    const auto* local = std::getenv ("LYNX_190EJ_FONT");
+    const std::string font = local != nullptr ? local
+                                              : "C:\\Program Files\\Image-Line\\FL Studio 2026\\Plugins\\Fruity\\Generators\\Soundfont Player\\Data\\Default.sf2";
     flp::Project p;
     p.tempo = 120.0;
     flp::Channel c;
@@ -440,7 +450,51 @@ TEST (voices190ej_write_fl_soundfont_probe)
     a.items.push_back (item);
     p.arrangements.push_back (a);
     const auto bytes = flp::writeProject (p);
-    std::ofstream out (std::string (dir) + "/soundfont.flp", std::ios::binary);
+    const std::string name = local != nullptr ? "soundfont_local.flp" : "soundfont.flp";
+    std::ofstream out (std::string (dir) + "/" + name, std::ios::binary);
     out.write ((const char*) bytes.data(), (std::streamsize) bytes.size());
-    std::printf ("  wrote %s/soundfont.flp\n", dir);
+    std::printf ("  wrote %s/%s\n", dir, name.c_str());
+}
+
+// LYNX Soundfont, FL's SoundFont Player (FL 2026 [EXEC: /R render of the probe above, Default.sf2]: both notes of the
+// key sound on after the first one's end): through the rack, so the ids come from the scheduler
+TEST (voices190ej_soundfont_ends_only_the_note_s_own_voices)
+{
+    using namespace lynx;
+    const auto folder = std::filesystem::temp_directory_path() / ("lynx-190ej-sf-" + processTempTag());
+    std::filesystem::create_directories (folder);
+    const auto path = (folder / "font.sf2").string();
+    {
+        const auto bytes = sf::makeTestFont ({ { "Tone", 0, 0 } }, 1);
+        std::ofstream out (path, std::ios::binary);
+        out.write ((const char*) bytes.data(), (std::streamsize) bytes.size());
+    }
+    const auto keep = sf::FontLibrary::instance().getNow (path);
+    flp::Project project;
+    flp::Channel fc;
+    fc.index = 0;
+    fc.type = flp::ChannelType::instrument;
+    fc.name = "SF";
+    fc.pluginName = "Fruity Soundfont Player";
+    fc.pluginState = i173a::flSoundfontState6 ({ 1, 0, 0, 0, 0, -1, -1, -1, -1, -1, -128, -1, -1 }, path);
+    project.channels = { fc };
+    const auto c = importFlp (project, {}).channels.at (0);
+    I32D_REQUIRE (c.instrument == InstrumentKind::soundfont);
+    const auto note = [] (int startBeat, int beats) {
+        Note n;
+        n.key = 60;
+        n.start = startBeat * ppq;
+        n.length = beats * ppq;
+        n.velocity = 0.8f;
+        return n;
+    };
+    // (120 BPM: a beat is 0.5 s) FIFO A 0-2 s, B 1-4 s; LIFO C 0-4 s, D 1-2 s; levels at 2.5-3.5 s
+    const auto level = [&] (const std::vector<Note>& notes) { return voices190ej::rms (issue14::renderPattern (c, notes, 0.0f, 3.6), 2.5, 3.5); };
+    const auto fifo = level ({ note (0, 4), note (2, 6) }), fifoRef = level ({ note (2, 6) });
+    const auto lifo = level ({ note (0, 8), note (2, 2) }), lifoRef = level ({ note (0, 8) });
+    std::printf ("  soundfont: fifo %.4g (alone %.4g), lifo %.4g (alone %.4g)\n", fifo, fifoRef, lifo, lifoRef);
+    CHECK (fifoRef > 1.0e-4 && lifoRef > 1.0e-4);
+    CHECK (fifo > 0.5 * fifoRef);
+    CHECK (lifo > 0.5 * lifoRef);
+    std::filesystem::remove_all (folder);
 }
