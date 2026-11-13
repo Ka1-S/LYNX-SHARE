@@ -138,11 +138,11 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
 
       # ---------------------------------------------------------
-      # 6. Build native library (limit parallel jobs for memory)
+      # 6. Build native library (use more parallel jobs on GitHub runners)
       # ---------------------------------------------------------
       - name: Build native library
         run: |
-          cmake --build build-android --parallel 2
+          cmake --build build-android --parallel 4
 
       # ---------------------------------------------------------
       # 7. Verify native library was built
@@ -374,7 +374,7 @@ jobs:
             -GNinja
       - name: Build
         run: |
-          cmake --build build-android-${{ matrix.abi }} --parallel 2
+          cmake --build build-android-${{ matrix.abi }} --parallel 4
       - name: Prepare Android project
         run: |
           mkdir -p android/app/src/main/jniLibs/${{ matrix.abi }}

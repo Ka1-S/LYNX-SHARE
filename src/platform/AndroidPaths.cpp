@@ -11,11 +11,9 @@ extern "C" {
     extern JavaVM* android_jvm;
     extern struct android_app* android_app;
 }
-#endif
 
 namespace lynx::platform
 {
-#if JUCE_ANDROID || defined(LYNX_ANDROID)
 
 juce::File androidAppDataFolder()
 {
