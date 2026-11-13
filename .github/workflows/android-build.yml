@@ -103,7 +103,23 @@ jobs:
             ${{ runner.os }}-android-${{ env.ANDROID_ABI }}-${{ env.CMAKE_BUILD_TYPE }}-
 
       # ---------------------------------------------------------
-      # 5. Configure CMake with Android toolchain
+      # 5. Install JUCE Linux dependencies
+      # ---------------------------------------------------------
+      - name: Install JUCE Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2-dev \
+            libfontconfig1-dev \
+            libfreetype6-dev \
+            libx11-dev \
+            libxcomposite-dev \
+            libxcursor-dev \
+            libxinerama-dev \
+            libxrandr-dev
+
+      # ---------------------------------------------------------
+      # 6. Configure CMake with Android toolchain
       # ---------------------------------------------------------
       - name: Configure CMake
         run: |
