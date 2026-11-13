@@ -504,33 +504,35 @@ void brandMark (juce::Graphics& g, juce::Rectangle<float> a)
 {
     const auto d = juce::jmin (a.getWidth(), a.getHeight());
     if (d < 6.0f) return;
-    // The logo by w3teal: its round badge fills the button's circle (d + 3, over the place of the old dark edge and
-    // ring) and its ears rise above it, as far as the area's top; a dark disc under it (1 px wider) so the cut-outs
-    // read the same on every skin. Up to 32 physical pixels across (the 1x header buttons) the small-size form (thin
-    // share line filled, ring thickened) is drawn.
-    const auto disc = logoDisc();
     const auto c = a.getCentre();
-    // (smaller where the ears would rise above the area: a header's top edge)
-    const auto side = juce::jmin ((d + 3.0f) / (2.0f * disc.r), (c.y - a.getY()) / disc.y);
-    const auto circle = side * 2.0f * disc.r;
     const auto scale = pixelScale (g);
-    const bool small = side * scale <= 32.0f;
-    // the logo resampled once per size (×2 for high-DPI)
+    // a picture resampled once per size (x2 for high-DPI), halving step by step: one big jump from 512 px aliases at
+    // the 16-24 px header size
     static std::map<int, juce::Image> cache;
     static const bool registered = lynx::ui::registerImageCache ([] { cache.clear(); }); (void) registered;
-    const auto px = juce::jlimit (8, 160, (int) std::ceil (side * juce::jmax (2.0f, scale)));
-    auto& img = cache[small ? -px : px];
-    if (img.isNull())
+    auto scaled = [] (juce::Image img, int px)
     {
-        const auto logo = small ? logoSmallImage() : logoImage();
-        if (logo.isNull()) return;
-        // halve step by step: one big jump from 512 px aliases at the 16-24 px header size
-        img = logo;
         while (px > 0 && img.getWidth() / 2 >= px)
             img = img.rescaled (img.getWidth() / 2, img.getHeight() / 2, juce::Graphics::highResamplingQuality);
         if (img.getWidth() != px)
             img = img.rescaled (px, px, juce::Graphics::highResamplingQuality);
-    }
+        return img;
+    };
+    // The mark by w3teal (the lynx in the red ring with the pepper stem) without the app icon's tile, which would
+    // shrink the lynx to half the button (round 190eq): its ring fills the button's circle
+    // (d + 3, over the place of the old dark edge and ring) and its ears rise above it, as far as the area's top; a
+    // dark disc under it (1 px wider) so the cut-outs read the same on every skin. Up to 32 physical pixels across
+    // (the 1x header buttons) the mark's small-size form (thicker lines and ring).
+    const auto disc = logoDisc();
+    // (smaller where the ears would rise above the area: a header's top edge)
+    const auto side = juce::jmin ((d + 3.0f) / (2.0f * disc.r), (c.y - a.getY()) / disc.y);
+    const auto circle = side * 2.0f * disc.r;
+    const bool small = side * scale <= 32.0f;
+    const auto px = juce::jlimit (8, 160, (int) std::ceil (side * juce::jmax (2.0f, scale)));
+    auto& img = cache[small ? -px : px];
+    if (img.isNull())
+        img = scaled (small ? logoMarkSmallImage() : logoMarkImage(), px);
+    if (img.isNull()) return;
     bloom (g, c, d * 1.05f, colour::crimson, 0.55f);
     g.setColour (juce::Colours::black.withAlpha (0.5f));
     g.fillEllipse (juce::Rectangle<float> (circle + 2.0f, circle + 2.0f).withCentre (c).translated (0.0f, 0.8f));

@@ -978,7 +978,7 @@ left for later (P2).
 - FL shows a splash with its version while it starts. A General setting turns it off. [DOC][envgen]
 
 **LYNX** (`ui/Splash.*`, `core/StartupSound.*`):
-- A splash of its own: the LYNX SHARE logo (by w3teal) drops onto a dark card and bounces, then "LYNX" and the version slide
+- A splash of its own: the LYNX SHARE app icon (the logo by w3teal on its dark tile) drops onto a dark card and bounces, then "LYNX" and the version slide
   in while the audio engine and the workspace load. It lasts about 2 s.
 - A short start-up sound is synthesised in code: a whoosh, a landing "pop" timed to the first bounce, and a
   plucked chime.

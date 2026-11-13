@@ -3,8 +3,8 @@
 #include "core/StartupSound.h"
 #include "engine/PluginHost.h"
 #include "ui/I18n.h"
-#include "ui/SplashData.h"
 #include "ui/Theme.h"
+#include "ui/WindowOwner.h"
 
 namespace lynx
 {
@@ -86,7 +86,7 @@ std::shared_ptr<const SampleData> makeStartupSample()
 // --- the splash -----------------------------------------------------------------------------------
 
 SplashScreen::SplashScreen()
-    : logoMark (juce::ImageCache::getFromMemory (splashdata::markPng, (int) sizeof (splashdata::markPng)))
+    : logoMark (logoImage())   // the app icon by w3teal (512 px, src/ui/LogoData.h)
 {
     setOpaque (false);
     setSize (width, height);
