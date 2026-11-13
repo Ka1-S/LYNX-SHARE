@@ -23,6 +23,7 @@
 #include "core/Transmitter.h"
 #include "core/TransporterFl.h"
 #include "core/FruityShapers.h"
+#include "core/FlCurve.h"
 #include "core/GrossBeat.h"
 #include "core/LynxTune.h"
 #include "core/MaximusFx.h"
@@ -5438,10 +5439,32 @@ private:
             menu.addSeparator();
         }
         const auto* fx = current();
+        // round 190ee: FL's wrapper "MIDI input port" for the effects that take notes (Gross Beat, Pitcher): the MIDI
+        // Out channels on that port play them
+        if (effectHasMidiPort (kind))
+        {
+            const auto port = fx != nullptr ? effectMidiInPort (*fx) : -1;
+            menu.addSubMenu (port >= 0 ? tr ("MIDI input port ({0})", { juce::String (port) }) : tr ("MIDI input port"), midiPortMenu());
+        }
         menu.addItem (tr ("Bypass"), true, fx != nullptr && ! fx->enabled, [this] {
             editSlot ([] (EffectSlot& target) { target.enabled = ! target.enabled; });
         });
         menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this).withTargetScreenArea (localAreaToGlobal (menuButton().toNearestInt())));
+    }
+
+    // None, Port 0 … 31 (the plugin wrapper menu's list; a port set higher, e.g. by an FL project, is listed too)
+    juce::PopupMenu midiPortMenu()
+    {
+        const auto* fx = current();
+        const auto now = fx != nullptr ? effectMidiInPort (*fx) : -1;
+        juce::PopupMenu ports;
+        auto set = [this] (int port) { editSlot ([port] (EffectSlot& target) { setEffectMidiInPort (target, port); }); };
+        ports.addItem (tr ("None"), true, now < 0, [set] { set (-1); });
+        for (int port = 0; port < 32; ++port)
+            ports.addItem (tr ("Port {0}", { juce::String (port) }), true, now == port, [set, port] { set (port); });
+        if (now >= 32)
+            ports.addItem (tr ("Port {0}", { juce::String (now) }), true, true, [] {});
+        return ports;
     }
 
 private:

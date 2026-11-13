@@ -2021,11 +2021,15 @@ private:
 // Speed, 1 Fine Tune, 2 Bypass All, 3 Note A Freq, 4 range (index/5: min f 220/170/110/80/55/25 Hz), 5…16 note
 // mask C…B (1 = allowed), 17…28 Key Bypass C…B, 29 Formant, 30 Gender, 31 Pitch Reference (0 left, 0.5
 // independent, 1 right), 32 Stereo, 33 Harmonize, 34 MIDI, 35 Octaves, 36 Replace/Mix, 37 Vel, 38…41 Voice 1…4 pan.
-// The DSP is FL's (core/PitcherDsp.h). MIDI mode and Harmonize take held notes, but LYNX effects receive no MIDI:
-// no note is ever held, so MIDI mode corrects nothing (only Fine applies) and Harmonize passes the voice-0 dry
-// signal (Replace) or the dry input alone (Mix) — what FL does with nothing arriving on the Pitcher's MIDI port.
+// The DSP is FL's (core/PitcherDsp.h). Round 190ee: 42 MIDI port (FL's raw parameter 33: port = int(256 v) − 1, −1 =
+// none; REA_rodada16 §1, REA_rodada30 §2.8), 43 Port routing — on (every new and FL-imported Pitcher) the notes come
+// from the MIDI Out channels on that port, as in FL; off (projects saved before round 190ee, through
+// upgradeLoadedEffectParams) the notes held on any Channel Rack channel, as round 173d made it.
 namespace pcorr
 {
+constexpr int midiPortParam = 42, portRoutingParam = 43;
+int midiPort (float v) noexcept { return v > 0.0f ? std::min (255, (int) (v * 256.0f) - 1) : -1; }
+float midiPortValue (int port) noexcept { return port < 0 ? 0.0f : std::min (1.0f, ((float) port + 1.5f) / 256.0f); }
 constexpr double minHz[6] { 220.0, 170.0, 110.0, 80.0, 55.0, 25.0 };
 int range (float v) { return std::clamp ((int) std::lround (v * 5.0f), 0, 5); }
 double noteA (float v) { return 55.0 * std::pow (2.0, (2.0 * v - 1.0) / 12.0); } // ×8 = A 440 at v = 0.5
@@ -2057,12 +2061,26 @@ public:
         heldCount = count;
     }
 
+    // round 190ee: a note from the MIDI Out channels on the Pitcher's port (FL: note in 0x180007a40, velocity / 127)
+    void midiNote (int key, int velocity, int) noexcept override
+    {
+        if (portRouting)
+            dsp.noteOn (key, velocity);
+    }
+
     void process (float* l, float* r, int n, const EffectParams& p, double) noexcept override
     {
+        const auto routed = p[(std::size_t) pcorr::portRoutingParam] > 0.5f;
+        if (routed != portRouting)
+        {
+            dsp.allNotesOff();
+            sounding = {};
+            portRouting = routed;
+        }
         NoteMask now {};
-        for (int c = 0; held != nullptr && c < heldCount; ++c)
+        for (int c = 0; ! portRouting && held != nullptr && c < heldCount; ++c)
             now[0] |= held[c][0], now[1] |= held[c][1];
-        if (now != sounding)
+        if (! portRouting && now != sounding)
         {
             for (int k = 0; k < 128; ++k)
             {
@@ -2112,6 +2130,7 @@ private:
     const NoteMask* held = nullptr;
     int heldCount = 0;
     NoteMask sounding {};
+    bool portRouting = true;
 };
 
 class LoFi final : public Effect
@@ -2934,6 +2953,8 @@ const EffectInfo& effectInfo (EffectKind kind)
                                                  { "Harmonize", 0.0f }, { "MIDI", 0.0f }, { "Octaves", 0.0f }, { "Mix", 0.0f },
                                                  { "Vel", 0.0f }, { "Voice 1 pan", 0.5f }, { "Voice 2 pan", 0.5f },
                                                  { "Voice 3 pan", 0.5f }, { "Voice 4 pan", 0.5f } });
+        // round 190ee: FL's MIDI port (none by default) and how notes arrive (older projects: Port routing off)
+        info.params.insert (info.params.end(), { { "MIDI port", 0.0f }, { "Port routing", 1.0f } });
         return info;
     }();
     static const EffectInfo lofiInfo { "Lo-fi", { { "Rate", 0.0f }, { "Bits", 0.0f }, { "Mix", 1.0f } } };
@@ -4260,8 +4281,34 @@ double savedEffectParamValue (float v) noexcept
     return (double) v;
 }
 
+bool effectHasMidiPort (EffectKind kind) noexcept { return kind == EffectKind::grossBeat || kind == EffectKind::pitchCorrect; }
+
+int effectMidiInPort (const EffectSlot& slot) noexcept
+{
+    if (slot.kind == EffectKind::grossBeat)
+        return std::clamp (slot.plugin.midiInPort, -1, 255);
+    if (slot.kind == EffectKind::pitchCorrect && slot.params[(std::size_t) pcorr::portRoutingParam] > 0.5f)
+        return pcorr::midiPort (slot.params[(std::size_t) pcorr::midiPortParam]);
+    return -1;
+}
+
+void setEffectMidiInPort (EffectSlot& slot, int port) noexcept
+{
+    port = std::clamp (port, -1, 255);
+    if (slot.kind == EffectKind::grossBeat)
+        slot.plugin.midiInPort = port;
+    else if (slot.kind == EffectKind::pitchCorrect)
+    {
+        slot.params[(std::size_t) pcorr::midiPortParam] = pcorr::midiPortValue (port);
+        slot.params[(std::size_t) pcorr::portRoutingParam] = 1.0f; // (an older project's Pitcher moves to FL's routing)
+    }
+}
+
 void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexcept
 {
+    // round 190ee: a Pitcher saved before its MIDI port keeps taking the notes held on the Channel Rack (round 173d)
+    if (slot.kind == EffectKind::pitchCorrect && savedCount <= (std::size_t) pcorr::portRoutingParam)
+        slot.params[(std::size_t) pcorr::portRoutingParam] = 0.0f;
     // round 173d3: a Love Philter saved before its units' L / B / H / shaper / IN / NEXT became parameters takes them from its state
     if (slot.kind == EffectKind::lovePhilter)
         philter::upgradeParams (slot, savedCount);

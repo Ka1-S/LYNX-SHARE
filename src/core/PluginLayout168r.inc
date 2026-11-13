@@ -253,6 +253,8 @@ Layout pitcherLayout()
     v.push_back (toggle (196, 298, 50, 22, "MIDI", TR_NOOP ("MIDI"), boxed));
     v.push_back (toggle (250, 298, 70, 22, "Octaves", TR_NOOP ("Octaves"), boxed));
     v.push_back (toggle (324, 298, 96, 22, "Harmonize", TR_NOOP ("Harmonize"), boxed));
+    // round 190ee: the MIDI port is set from the window menu (MIDI input port); Port routing is saved state
+    l.editedElsewhere = { "MIDI port", "Port routing" };
     return l;
 }
 

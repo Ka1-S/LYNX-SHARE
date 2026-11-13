@@ -467,6 +467,11 @@ inline Output run (const EffectSlot& built, const EffectSlot& played, const Prog
         fx->setSongPosition (tick);
         fx->setPlaying (true);
         fx->setHeldNotes (held.data(), (int) held.size());
+        // round 190ee: Pitcher takes its notes from a MIDI port (a MIDI Out on that port): the same chord arrives there
+        // (a held note's repeated note on changes nothing)
+        if (slot.kind == EffectKind::pitchCorrect)
+            for (const auto key : { 60, 64, 67, 71 })
+                fx->midiNote (key, 100, 0);
         if (o.sidechain)
         {
             fx->setSidechain (prog.scL.data() + at, prog.scR.data() + at);

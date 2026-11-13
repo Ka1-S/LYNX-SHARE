@@ -1172,6 +1172,8 @@ void AudioEngine::markHeldKey (int midiChannel, int key, bool on) noexcept
 {
     if (key < 0 || key > 127 || midiChannel < 0 || midiChannel > 15)
         return;
+    if (on) // round 190ee: Edison's "Last hit" (the region menu's Trigger note)
+        lastHitKey.store (key, std::memory_order_relaxed);
     auto& count = heldKeyCount[midiChannel][(std::size_t) key];
     auto before = count.load();
     std::uint8_t after = 0;

@@ -14630,6 +14630,17 @@ private:
         shot (*editor, "-editor-volume-envelope.png");
         lynx::setAudioEditorEnvelopeModeForSnapshot (*editor, 0);
         juce::File (prefix + "-menu.txt").replaceWithText (lynx::audioEditorMenuForSnapshot (*editor).joinIntoString ("\n") + "\n");
+        // round 190ee: the first marker's menu (Trigger note) and FL's four snap modes on a probe frame
+        if (! d.markers.empty())
+            juce::File (prefix + "-marker-menu.txt").replaceWithText (lynx::audioEditorMarkerMenuForSnapshot (*editor, 0).joinIntoString ("\n") + "\n");
+        {
+            juce::StringArray snaps;
+            const auto probe = (std::int64_t) (d.audio.frames() * 3 / 8) + 777;
+            for (int mode = 0; mode < 4; ++mode)
+                snaps.add (lynx::setAudioEditorSnapForSnapshot (*editor, mode, probe));
+            juce::File (prefix + "-snap.txt").replaceWithText (snaps.joinIntoString ("\n") + "\n");
+            shot (*editor, "-editor-snap-on.png");
+        }
         for (int t = 0; lynx::audioToolNameForSnapshot (t) != nullptr; ++t)
         {
             const auto envelopeTool = t >= 10 && t <= 14; // Scale levels .. Create sequence work on the volume envelope

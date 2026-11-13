@@ -64,6 +64,10 @@ void askRemoveAllEdisonInstances (AudioEngine& engine);
 std::unique_ptr<juce::Component> makeAudioEditorForSnapshot (AudioEngine& engine, audioedit::Document doc, bool spectrum);
 // --snapshot: the items of the editor's main menu, one per line ("Section > Item"), for the menu check.
 juce::StringArray audioEditorMenuForSnapshot (juce::Component& editor);
+// round 190ee: a marker's menu as lines ("Trigger note > C5  [x]"), and FL's snap mode set (snapping on) with where
+// `probeFrame` snaps to (the tooltip first)
+juce::StringArray audioEditorMarkerMenuForSnapshot (juce::Component& editor, int marker);
+juce::String setAudioEditorSnapForSnapshot (juce::Component& editor, int mode, std::int64_t probeFrame);
 // --edisonshot (round 165l): a tool window of `editor` (tool = audiotools::Tool as int; envelopeMode 0 wave,
 // 1 volume, 2 panning, 3 stereo separation: what the envelope tools work on), its English title, and the editor's mode.
 std::unique_ptr<juce::Component> makeAudioToolPanelForSnapshot (juce::Component& editor, int tool, int envelopeMode = 0);

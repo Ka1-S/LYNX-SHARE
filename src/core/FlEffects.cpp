@@ -1505,7 +1505,7 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
             slot.params[(std::size_t) (5 + k)] = mask[k] != 0 ? 1.0f : 0.0f;
             slot.params[(std::size_t) (17 + k)] = p[5 + k] != 0.0f ? 1.0f : 0.0f;
         }
-        // Formant/Gender, Pitch Reference, harmony and MIDI (REA_rodada30 §2; MIDI notes do not reach LYNX effects)
+        // Formant/Gender, Pitch Reference, harmony and MIDI (REA_rodada30 §2; the notes come from its MIDI port, below)
         auto flag = [&p] (int i) { return p[i] != 0.0f ? 1.0f : 0.0f; };
         slot.params[29] = flag (22);
         slot.params[30] = std::clamp (p[2], 0.0f, 1.0f);
@@ -1518,6 +1518,14 @@ std::optional<EffectSlot> effectFromFl (const std::string& pluginName, const std
         slot.params[37] = flag (31);
         for (int j = 0; j < 4; ++j)
             slot.params[(std::size_t) (38 + j)] = std::clamp (p[17 + j], 0.0f, 1.0f);
+        // round 190ee: parameter 33, the MIDI port (the f32 after the note mask; port = int(256 v) − 1, REA_rodada16
+        // §1): the MIDI Out channels on that port play its MIDI mode / Harmonize, as in FL (Port routing stays on)
+        if (state.size() >= 12 + 33 * 4 + 12 + 4)
+        {
+            float port = 0.0f;
+            std::memcpy (&port, state.data() + 12 + 33 * 4 + 12, 4);
+            slot.params[42] = std::isfinite (port) ? std::clamp (port, 0.0f, 1.0f) : 0.0f;
+        }
         return slot;
     }
 

@@ -59,6 +59,8 @@ const std::vector<Allowed>& allowed()
         { "Vintage Phaser", "Keep pitch", "inert", "not-in-programme: acts only while the delay time is being changed (automation)" },
         { "Transporter", "Send to", "inert", "routing: picks the insert its loops' send goes to; the send buffer is pulled by that insert, not this one" },
         { "LYNX Tune", "Receive", "inert", "routing: takes the scale another LYNX Tune instance sends; one instance alone has nothing to receive" },
+        { "Pitch correction", "MIDI port", "inert", "routing (round 190ee): the MIDI Out port whose notes reach MIDI mode / Harmonize (RackRenderer); the audit hands the notes to the effect itself" },
+        { "Pitch correction", "Port routing", "inert", "routing (round 190ee): notes from the port or (older projects) from the Channel Rack; the audit feeds the same chord both ways" },
         { "Newtone", "Slave to host playback", "inert", "no-source: syncs the playback of the loaded source sample; a new instance has none" },
         { "Newtime", "Slave to host playback", "inert", "no-source: syncs the playback of the loaded source sample; a new instance has none" },
         { "Facet EQ", "Target Level", "inert", "no-source: levels the Listen = Source / Target audition of the EQ match; a new instance has no captured target spectrum" },

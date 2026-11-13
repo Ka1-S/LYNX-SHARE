@@ -1506,9 +1506,13 @@ void RackState::buildMidiRoutes()
     std::vector<SlotPorts> slotPorts;
     for (std::size_t t = 0; t < song.mixer.size(); ++t)
         for (std::size_t k = 0; k < song.mixer[t].effects.size(); ++k)
-            if (song.mixer[t].effects[k].kind == EffectKind::patcher)
-                if (auto ports = patcher::midiInputPorts (song.mixer[t].effects[k].patcher); ! ports.empty())
+            if (const auto& fx = song.mixer[t].effects[k]; fx.kind == EffectKind::patcher)
+            {
+                if (auto ports = patcher::midiInputPorts (fx.patcher); ! ports.empty())
                     slotPorts.push_back ({ (int) t, (int) k, std::move (ports) });
+            }
+            else if (const auto port = effectMidiInPort (fx); port >= 0) // round 190ee: Gross Beat, Pitcher
+                slotPorts.push_back ({ (int) t, (int) k, { port } });
 
     // source c sends on `port` with MIDI channel `midiChannel`: the plugins whose input port it is, the Patchers that
     // take that port
@@ -1553,7 +1557,8 @@ void RackState::buildMidiRoutes()
             {
                 effectMidiRoutes[c].push_back ({ s.track, s.slot, port, midiChannel, portOnly });
                 hasEffectMidiRoutes = true;
-                passOn (song.mixer[(std::size_t) s.track].effects[(std::size_t) s.slot].patcher);
+                if (const auto& fx = song.mixer[(std::size_t) s.track].effects[(std::size_t) s.slot]; fx.kind == EffectKind::patcher)
+                    passOn (fx.patcher);
             }
     };
 
@@ -2616,6 +2621,19 @@ void RackRenderer::deliverToEffects (const RackState& state, const NoteEvent& e)
             }
             else
                 graph->queueNoteOffPort (route.port, e.key, route.midiChannel, e.sampleOffset);
+        }
+        else if (e.type != NoteEvent::Type::voiceProp && ! route.portOnly) // round 190ee: Gross Beat, Pitcher
+        {
+            const auto& slot = state.song.mixer[(std::size_t) route.track].effects[(std::size_t) route.slot];
+            if (! state.song.slotActive (slot))
+                continue;
+            const auto midiChannel = e.port >= 0 ? (int) (e.colour & 15) : route.midiChannel;
+            const auto velocity = e.type == NoteEvent::Type::on ? std::clamp ((int) std::lround (e.velocity * 127.0f), 1, 127) : 0;
+            if (auto* fx = state.effects[(std::size_t) route.track][(std::size_t) route.slot].get())
+                fx->midiNote (e.key & 127, velocity, midiChannel);
+            if (e.type == NoteEvent::Type::on)
+                if (const auto key = (std::size_t) route.track * maxEffectSlots + (std::size_t) route.slot; key < smartDisable.size())
+                    smartDisable[key].silentSamples = 0;
         }
     }
 }
