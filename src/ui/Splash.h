@@ -7,7 +7,7 @@
 
 #include "core/Instruments.h"
 
-// The start-up splash screen: the logo (by w3teal) drops in with a bounce on a dark card, "LYNX" and the
+// The start-up splash screen: the app icon (logo by w3teal) drops in with a bounce on a dark card, "LYNX" and the
 // version slide in, a thin accent bar fills while the app initialises, then it fades out. It is shown
 // only by the normal UI start (never in the command-line modes) and can be turned off, as can the
 // start-up sound, in Options (stored in %APPDATA%\LYNX\ui-options.txt).

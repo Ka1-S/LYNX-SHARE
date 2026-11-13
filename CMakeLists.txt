@@ -413,10 +413,11 @@ if(LYNX_BUILD_APP)
         COMPANY_NAME "Ka1-S"
         COMPANY_COPYRIGHT "Copyright (C) 2026 Ka1-S. Licensed under the GNU AGPL-3.0."
         DESCRIPTION "LYNX SHARE digital audio workstation"
-        # macOS bundle (Info.plist, .icns made from the 1024 px badge); ignored elsewhere
+        # macOS bundle (Info.plist, .icns made from the 1024 and 256 px icons on Apple's icon grid, written by
+        # tools/make_logo.py); ignored elsewhere
         BUNDLE_ID "com.ka1-s.lynx"
-        ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/resources/lynx_badge.png"
-        ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/lynx_icon_256.png"
+        ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/lynx-icon-1024.png"
+        ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/lynx-icon-256.png"
         MICROPHONE_PERMISSION_ENABLED TRUE
         MICROPHONE_PERMISSION_TEXT "LYNX SHARE records audio from your microphone or audio interface when you arm a track and press Record."
         DOCUMENT_EXTENSIONS lynx flp mid

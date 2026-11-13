@@ -192,6 +192,21 @@ juce::Image logoSmallImage()
     return juce::ImageCache::getFromMemory (logo::pngSmall, (int) sizeof (logo::pngSmall));
 }
 
+juce::Image logoTinyImage()
+{
+    return juce::ImageCache::getFromMemory (logo::pngTiny, (int) sizeof (logo::pngTiny));
+}
+
+juce::Image logoMarkImage()
+{
+    return juce::ImageCache::getFromMemory (logo::markPng512, (int) sizeof (logo::markPng512));
+}
+
+juce::Image logoMarkSmallImage()
+{
+    return juce::ImageCache::getFromMemory (logo::markSmall, (int) sizeof (logo::markSmall));
+}
+
 LogoDisc logoDisc()
 {
     return { logo::discX, logo::discY, logo::discR };
@@ -205,7 +220,7 @@ juce::Image logoAt (int px)
     auto& img = cache[px];
     if (img.isNull())
     {
-        img = px <= 32 ? logoSmallImage() : logoImage();
+        img = px <= 20 ? logoTinyImage() : px <= 32 ? logoSmallImage() : logoImage();
         while (img.getWidth() / 2 >= px)
             img = img.rescaled (img.getWidth() / 2, img.getHeight() / 2, juce::Graphics::highResamplingQuality);
         if (img.getWidth() != px)

@@ -100,16 +100,21 @@ void removeDialogTextFocus();
 // The dialog's first editable, visible text field (top to bottom, then left to right), or nullptr.
 juce::TextEditor* firstTextField (juce::Component& dialog);
 
-// The LYNX SHARE logo by w3teal (512 px, with transparency), and its form for 24 physical pixels or less (thin
-// share line filled, ring thickened: tools/make_logo.py). Both are square with the same framing.
+// The LYNX SHARE logo by w3teal as the app icon (the mark on its dark tile; 512 px, with transparency), and the icon's
+// small-size form (thicker lines, the mark larger in the tile: tools/make_logo.py) with the pepper stem for 21-32
+// physical pixels and without it for 20 px and less. All three are square with the tile filling them.
 juce::Image logoImage();
 juce::Image logoSmallImage();
-// Where the logo's round badge sits in those pictures (the ears rise above it): centre and radius as fractions of the
-// picture's side.
+juce::Image logoTinyImage();
+// The mark alone (w3teal's lynx in the red ring with the stem, no tile; 512 px) and its small-size form (128 px).
+juce::Image logoMarkImage();
+juce::Image logoMarkSmallImage();
+// Where the mark's ring sits in the mark pictures (the ears and the stem rise above it): centre and radius as
+// fractions of the picture's side.
 struct LogoDisc { float x, y, r; };
 LogoDisc logoDisc();
-// The logo at px x px, scaled down in halving steps (one big jump from 512 px aliases) and cached; up to 32 px the
-// small-size form. For window title bars and other small places.
+// The app icon at px x px, scaled down in halving steps (one big jump from 512 px aliases) and cached; the small-size
+// forms up to 32 px. For window title bars and other small places.
 juce::Image logoAt (int px);
 
 // The CPU time this process has used so far, in seconds (user + kernel; --editorcpu).
