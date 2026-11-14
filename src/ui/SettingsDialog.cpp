@@ -483,6 +483,9 @@ public:
         }
     }
 
+    // the least height that shows the heading, the note, two rows and every button
+    int minimumHeight() const { return 28 + 4 + 20 + 4 + juce::jmax (2 * 24 + 2, extraButton != nullptr ? 26 + 6 + 26 + 6 + 26 : 26 + 6 + 26); }
+
     // A third button under Add / Remove (the plugin folders' "Plugin manager...", as FL's File page has it).
     void addExtraButton (const juce::String& text, std::function<void()> onClick)
     {
@@ -561,7 +564,9 @@ private:
     std::unique_ptr<juce::FileChooser> chooser;
 };
 
-class FilesPage final : public juce::Component
+// (rollup 0.1.28: a ScrollingPage since round 190fn added the fourth list: at a short window every list keeps its
+// Add / Remove buttons and two rows, and the page scrolls)
+class FilesPage final : public ScrollingPage
 {
 public:
     FilesPage (AudioEngine& engine, bool persistent, std::function<void()> browserChanged, std::function<void()> managePlugins = {})
@@ -646,24 +651,30 @@ public:
         if (managePlugins)
             pluginFolders->addExtraButton (tr ("Plugin manager..."), managePlugins);
 
-        addAndMakeVisible (*searchFolders);
-        addAndMakeVisible (*browserFolders);
-        addAndMakeVisible (*pluginFolders);
-        addAndMakeVisible (*flmResources);
+        add (*searchFolders);
+        add (*browserFolders);
+        add (*pluginFolders);
+        add (*flmResources);
     }
 
-    void resized() override
+protected:
+    // The four lists share the window's height; none gets less than its heading, two rows and its buttons (below that
+    // the page scrolls)
+    int layout (int width) override
     {
-        auto area = getLocalBounds().reduced (20, 14);
-        const auto h = (area.getHeight() - 36) / 4;
-        searchFolders->setBounds (area.removeFromTop (h));
-        area.removeFromTop (12);
-        browserFolders->setBounds (area.removeFromTop (h));
-        area.removeFromTop (12);
-        pluginFolders->setBounds (area.removeFromTop (h));
-        area.removeFromTop (12);
-        flmResources->setBounds (area);
+        constexpr int padX = 20, padY = 14, gap = 12;
+        FolderList* lists[] = { searchFolders.get(), browserFolders.get(), pluginFolders.get(), flmResources.get() };
+        const auto share = (getHeight() - 2 * padY - 3 * gap) / 4;
+        auto y = padY;
+        for (auto* list : lists)
+        {
+            const auto h = juce::jmax (list->minimumHeight(), share);
+            list->setBounds (padX, y, juce::jmax (0, width - 2 * padX), h);
+            y += h + gap;
+        }
+        return y - gap + padY;
     }
+    int minimumWidth() const override { return 300; }
 
 private:
     std::unique_ptr<FolderList> searchFolders, browserFolders, pluginFolders, flmResources;
