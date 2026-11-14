@@ -322,6 +322,19 @@ bool callPluginFromUi (juce::AudioPluginInstance& plugin, const char* what, cons
     return false;
 }
 
+namespace
+{
+// The adapter's file and the watched module are the same plugin: equal, or one inside the other (JUCE may describe a
+// VST3 by its bundle folder or by the module file inside it)
+bool sameModule (const std::string& a, const std::string& b)
+{
+    const auto inside = [] (const std::string& outer, const std::string& inner) {
+        return inner.size() > outer.size() && inner.compare (0, outer.size(), outer) == 0 && (inner[outer.size()] == '/' || inner[outer.size()] == '\\');
+    };
+    return ! a.empty() && ! b.empty() && (a == b || inside (a, b) || inside (b, a));
+}
+} // namespace
+
 int switchOffPluginsOfThreadFaults()
 {
     static int seen = 0;
@@ -338,7 +351,7 @@ int switchOffPluginsOfThreadFaults()
         {
             const std::lock_guard<std::mutex> lock (adaptersLock);
             for (auto& [plugin, entry] : adapters())
-                if (entry.file == f->module && ! entry.crashed->exchange (true))
+                if (sameModule (entry.file, f->module) && ! entry.crashed->exchange (true))
                 {
                     names.push_back (entry.name);
                     ++switched;

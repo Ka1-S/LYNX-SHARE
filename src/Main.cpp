@@ -7566,9 +7566,12 @@ private:
                     report << "thread_fault=" << faults.back().where << " (" << lynx::crashguard::describe (faults.back().code) << ")\n";
                 expect ("not_yet_counted_as_a_call_crash", lynx::pluginCrashCount() == crashesBefore);
                 // what the main window's timer does
+                // (every instance of that module: the engine may hold more than the slot's, e.g. the offline render's)
+                if (first != nullptr)
+                    report << "slot_file=" << first->getInstance().getPluginDescription().fileOrIdentifier << "\n";
                 const auto switched = lynx::switchOffPluginsOfThreadFaults();
                 report << "switched_off=" << switched << "\n";
-                expect ("plugin_switched_off", switched == 1 && first != nullptr && first->hasCrashed() && lynx::pluginCrashCount() == crashesBefore + 1);
+                expect ("plugin_switched_off", switched >= 1 && first != nullptr && first->hasCrashed() && lynx::pluginCrashCount() == crashesBefore + switched);
                 expect ("only_once", lynx::switchOffPluginsOfThreadFaults() == 0);
                 const auto down = offline.downHostedPlugins();
                 expect ("slot_down", down.size() == 1 && down[0] == where);
