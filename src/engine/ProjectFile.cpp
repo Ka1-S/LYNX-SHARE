@@ -1186,7 +1186,7 @@ juce::var effectToVar (const EffectSlot& slot)
     if (slot.goal != 0) // a one-knob effect (round 190bu): the goal and where its knob stands
     {
         e->setProperty ("goal", (int) slot.goal);
-        e->setProperty ("goalAmount", juce::roundToInt (slot.goalAmount * 10000.0f) / 10000.0);
+        e->setProperty ("goalAmount", projectNumber (slot.goalAmount, 10000.0f));
     }
     if (slot.sidechain >= 0)
         e->setProperty ("sidechain", slot.sidechain);
@@ -1502,9 +1502,9 @@ juce::var curvePointsToVar (const std::vector<AutomationPoint>& list)
     juce::Array<juce::var> points;
     for (const auto& pt : list)
     {
-        juce::Array<juce::var> p { (juce::int64) pt.tick, juce::roundToInt (pt.value * 10000.0f) / 10000.0 };
+        juce::Array<juce::var> p { (juce::int64) pt.tick, projectNumber (pt.value, 10000.0f) };
         if (pt.mode == AutomationPoint::legacyCurve || (pt.mode == 0 && pt.tension == 0.0f))
-            p.add (juce::roundToInt (pt.tension * 1000.0f) / 1000.0);
+            p.add (projectNumber (pt.tension, 1000.0f));
         else
         {
             p.add ((double) pt.tension);
@@ -2730,7 +2730,7 @@ juce::var mixerTrackToVar (const MixerTrack& t)
     if (! effects.isEmpty())
         o->setProperty ("effects", effects);
     if (t.chainBlend < 1.0f) // the Simple workflow's Blend (round 190bu)
-        o->setProperty ("chainBlend", juce::roundToInt (t.chainBlend * 10000.0f) / 10000.0);
+        o->setProperty ("chainBlend", projectNumber (t.chainBlend, 10000.0f));
     if (! t.chainPreset.empty())
         o->setProperty ("chainPreset", str (t.chainPreset));
     if (! t.standIns.empty())
@@ -2848,8 +2848,9 @@ juce::String toJson (const Song& song, bool stampVersion)
     if (song.masterLook.id != 0) // the Finish dock's Master look (round 189k)
     {
         const auto& l = song.masterLook;
-        root->setProperty ("masterLook", juce::String (l.id) + " " + juce::String (l.intensity, 4) + " " + juce::String (l.tone[0], 2) + " "
-                                             + juce::String (l.tone[1], 2) + " " + juce::String (l.tone[2], 2) + " " + juce::String (l.inputDb, 2));
+        root->setProperty ("masterLook", juce::String (l.id) + " " + projectFloatString (l.intensity, 4) + " " + projectFloatString (l.tone[0], 2) + " "
+                                             + projectFloatString (l.tone[1], 2) + " " + projectFloatString (l.tone[2], 2) + " "
+                                             + projectFloatString (l.inputDb, 2));
     }
     if (song.substitutesBypassed)
         root->setProperty ("substitutesBypassed", true);

@@ -5,6 +5,8 @@
 #include "engine/RemoteNotes.h"
 #include "core/SessionIds.h"
 #include "core/ClipLauncher.h"
+#include "core/Preferences.h"
+#include "core/Rack.h"
 #include "core/PluginSubstitutes.h"
 #include "core/FlExtraFx.h"
 #include "core/VideoPlayer.h"
@@ -632,6 +634,85 @@ void richDocumentAllowlist()
         refusesWith ([&] { remote_document::stage (accepted, addValue (path, "file:///tmp/program")); }, "editable document allowlist");
 }
 
+// Round 190ha: fields LYNX gained after the allowlist was first written. An edit of an object that carries them is
+// accepted; the values a live session shares, racks and the groove pool pass through unchanged and stay read-only.
+void currentFieldsAllowlist()
+{
+    auto base = fixture();
+    ChannelDef hosted;
+    hosted.name = "Hosted";
+    hosted.instrument = InstrumentKind::plugin;
+    hosted.plugin.id = "vst3:existing";
+    hosted.plugin.name = "Existing";
+    hosted.plugin.playedBy = 7;
+    hosted.plugin.values = { { 0, 0.5f } };
+    base.channels.push_back (hosted);
+    ChannelDef racked;
+    racked.name = "Rack";
+    racked.instrument = InstrumentKind::patcher;
+    racked.patcher = rack::makeRack (RackDoc::Kind::instrument);
+    base.channels.push_back (racked);
+    Groove groove;
+    groove.id = 1;
+    groove.name = "Swing";
+    groove.points.push_back ({ 240, 0.25f });
+    base.grooves.grooves.push_back (groove);
+    uids::normalize (base);
+
+    auto rich = base;
+    auto& plugin = rich.channels[1].plugin;
+    plugin.mpe = true;
+    plugin.processInactive = false;
+    plugin.pinned = true;
+    plugin.velocityMode = prefs::pluginVelocityFixed;
+    plugin.fixedVelocity = 90;
+    plugin.inputs = { { 2, 1 } };
+    rich.channels[0].cutOthersOnly = true;
+    rich.channels[0].cutAtNoteEnd = true;
+    rich.channels[0].simplePad = { 3, 1, 0.25f, 0.5f, 1, 2 };
+    rich.mixer[1].sends[0].pre = true;
+    rich.mixer[1].chainBlend = 0.123456791f;
+    rich.mixer[1].chainPreset = "Vocal";
+    EffectSlot knob;
+    knob.kind = EffectKind::utility;
+    knob.look = 1;
+    knob.goal = 2;
+    knob.goalAmount = 0.234567896f;
+    rich.mixer[1].effects.push_back (knob);
+    rich.beatUnit = 8;
+    rich.muteRunsEffects = rich.patternClipTakeover = rich.mutedInsertsSkip = rich.flPluginLevels = rich.loopOff = true;
+    rich.tempoViewLow = 90.0;
+    rich.tempoViewHigh = 150.0;
+    rich.clipGrid.emplace();
+    rich.clipGrid->scenes.emplace_back();
+    rich.clipGrid->scenes[0].beatsPerBar = 6;
+    rich.clipGrid->scenes[0].beatUnit = 8;
+    const auto document = json (ProjectFile::toJsonExact (rich).toRawUTF8());
+    const auto accepted = remote_document::stage (base, addValue ("", document));
+    const auto& p = accepted.channels[1].plugin;
+    check (p.mpe && ! p.processInactive && p.pinned && p.velocityMode == prefs::pluginVelocityFixed && p.fixedVelocity == 90
+           && p.inputs == plugin.inputs && p.playedBy == 7 && p.values == hosted.plugin.values
+           && accepted.channels[0].cutOthersOnly && accepted.channels[0].cutAtNoteEnd && accepted.channels[0].simplePad == rich.channels[0].simplePad
+           && accepted.mixer[1].sends[0].pre && accepted.mixer[1].chainBlend == 0.123456791f && accepted.mixer[1].chainPreset == "Vocal"
+           && accepted.mixer[1].effects[0].goalAmount == 0.234567896f && accepted.mixer[1].effects[0].look == 1
+           && accepted.beatUnit == 8 && accepted.muteRunsEffects && accepted.flPluginLevels && accepted.loopOff
+           && accepted.tempoViewHigh == 150.0 && accepted.clipGrid->scenes[0].beatUnit == 8
+           && accepted.channels[2].patcher.isRack() && accepted.grooves == base.grooves,
+           "Allowlist refused or discarded a field added since it was written");
+    const auto edited = remote_document::stage (accepted, json (R"([
+        {"op":"replace","path":"/channels/1/plugin/fixedVelocity","value":64},
+        {"op":"replace","path":"/channels/2/name","value":"Keys rack"},
+        {"op":"replace","path":"/bpm","value":128}
+    ])"));
+    check (edited.channels[1].plugin.fixedVelocity == 64 && edited.channels[2].name == "Keys rack" && edited.bpm == 128.0,
+           "An edit next to read-only plugin, rack or groove data was refused");
+    for (const auto& [path, value] : { std::pair { "/channels/1/plugin/playedBy", juce::var (8) },
+                                       std::pair { "/channels/1/plugin/values", json ("[0, 0.25]") },
+                                       std::pair { "/channels/2/patcher/rack/name", juce::var ("Changed") },
+                                       std::pair { "/grooves/amount", juce::var (0.5) } })
+        refusesWith ([&] { remote_document::stage (accepted, addValue (path, value)); }, "read-only");
+}
+
 void discoveryCleanup()
 {
     const auto directory = juce::File::getCurrentWorkingDirectory()
@@ -704,6 +785,7 @@ int main()
         run ("hostedStateClearIsRejectedBeforeCommit", hostedStateClearIsRejectedBeforeCommit);
         run ("documentFieldAllowlist", documentFieldAllowlist);
         run ("richDocumentAllowlist", richDocumentAllowlist);
+        run ("currentFieldsAllowlist", currentFieldsAllowlist);
         run ("knownNativeStatePolicy", knownNativeStatePolicy);
         run ("discoveryCleanup", discoveryCleanup);
         std::puts ("Remote JSON Patch, exact project documents, atomic staging and discovery cleanup tests passed");
