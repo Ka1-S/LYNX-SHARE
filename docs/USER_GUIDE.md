@@ -273,3 +273,23 @@ Renders are made in the background a moment after the last change, never while y
 - When the session ends the guest keeps the audio renders of their part (what the host chose under "guests keep");
   the plugin and its settings stay with the host, whose project keeps the plugin as it sounded.
 - Use these sounds for the song you are making together; don't redistribute them as samples.
+
+## Ableton Link: play in time with other apps
+
+Ableton Link shares the tempo, the beat and the bar with other apps and devices on the same network (phone apps,
+other DAWs, hardware with Link). Nothing to set up: switch it on and the apps find each other.
+
+- **Switch it on**: Options › Ableton Link, Settings › Ableton Link, or the **Link** toggle in the toolbar. The
+  toggle is shown in the Clip-launch layout; in the Pattern layout show it with Settings › Ableton Link › Show Link
+  Toggle (or the toolbar's edit mode). Once on, it shows how many other apps are in the session ("1 Link", "2 Links").
+- **Tempo**: the first app in a session sets its tempo. Anyone may change it and everyone follows; the tempo display
+  shows the session's tempo. Changing LYNX's tempo changes it for everyone.
+- **Beat and bar**: the bars line up over the clip grid's launch quantisation (1 Bar by default). With another app
+  in the session, Play waits until the session reaches the beat the song starts on; the position display fills
+  up while it waits. Press Space again to cancel.
+- **Start Stop Sync** (Settings › Ableton Link, off by default): Play and Stop are shared with the apps that have it on.
+- **Tempo automation**: while Link is on, LYNX's tempo automation goes to the other apps as it plays. A tempo change
+  made in another app wins over LYNX's automation until playback starts again.
+- An external MIDI clock LYNX follows (Settings › MIDI) wins: its tempo goes to the session.
+- There is no count-in while Link is on: the start waits for the session instead.
+- When you leave the session after another app changed the tempo, the project keeps that tempo.

@@ -8,7 +8,7 @@ TEST (toolbar_layout_default_roundtrip)
     auto l = Layout::makeDefault();
     CHECK ((int) l.entries.size() == groupCount);
     CHECK (l.isDefault());
-    CHECK (l.orderToString() == "transport,master,record,snap,windows,-multilink,file,-key,chord,meters,output"); // (177b-4: hidden by default)
+    CHECK (l.orderToString() == "-link,transport,master,record,snap,windows,-multilink,file,-key,chord,meters,output"); // (177b-4: hidden by default; 190gl: the Link toggle, hidden in FL's layout)
 
     l.setShown (Group::meters, false);
     l.move (Group::output, -(groupCount - 1)); // to the front
@@ -28,7 +28,7 @@ TEST (toolbar_layout_parse_tolerant)
     // unknown ids ignored, duplicates keep the first, missing groups come back shown at their default place
     l.orderFromString (" snap , -record,bogus,snap,transport\r");
     CHECK ((int) l.entries.size() == groupCount);
-    CHECK (l.entries[0].group == Group::snap);
+    CHECK (l.entries[0].group == Group::link && l.entries[1].group == Group::snap); // (190gl: the hidden Link group first, as by default)
     CHECK (! l.isShown (Group::record) && l.indexOf (Group::record) < l.indexOf (Group::transport));
     CHECK (l.isShown (Group::master) && l.isShown (Group::output));
     CHECK (l.indexOf (Group::master) == l.indexOf (Group::transport) + 1); // after its default predecessor
@@ -47,9 +47,9 @@ TEST (toolbar_layout_move_clamps)
 {
     using namespace lynx::toolbarlayout;
     auto l = Layout::makeDefault();
-    CHECK (! l.move (Group::transport, -1)); // already first
+    CHECK (! l.move (Group::link, -1)); // already first (round 190gl: the Link toggle's group, before the transport)
     CHECK (l.move (Group::transport, 1));
-    CHECK (l.entries[0].group == Group::master && l.entries[1].group == Group::transport);
+    CHECK (l.entries[1].group == Group::master && l.entries[2].group == Group::transport);
     CHECK (! l.move (Group::output, 3));
 }
 

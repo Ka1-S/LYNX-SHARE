@@ -20,6 +20,10 @@ mkdir -p "$OUT/juce" "$OUT/app" "$OUT/shim"
 
 # MinGW headers are lowercase; JUCE includes some with capitals (on Windows it does not matter).
 echo '#include <dbghelp.h>' > "$OUT/shim/Dbghelp.h"
+# Ableton Link (third_party/link, unmodified) includes Windows headers by their SDK capitals (round 190gl)
+echo '#include <ws2tcpip.h>' > "$OUT/shim/WS2tcpip.h"
+echo '#include <winsock2.h>' > "$OUT/shim/WinSock2.h"
+echo '#include <windows.h>' > "$OUT/shim/Windows.h"
 
 MODULES=(juce_core juce_data_structures juce_events juce_graphics juce_gui_basics juce_gui_extra
          juce_audio_basics juce_audio_devices juce_audio_formats juce_audio_processors juce_audio_utils juce_dsp juce_opengl)
@@ -241,6 +245,7 @@ APP_SOURCES+=(src/ui/LyricsPanel.cpp src/ui/ReferenceMatchPanel.cpp src/ui/Start
 APP_SOURCES+=(src/ui/FirstSongTour.cpp) # the Simple workflow's Welcome screen and first-song tour (round 190dv)
 APP_SOURCES+=(src/ui/SupportLynx.cpp) # Help › Support LYNX SHARE..., the About button and the start-up support note (round 190fq)
 APP_SOURCES+=(src/core/Preferences.cpp src/core/MidiSync.cpp src/engine/MidiSyncIo.cpp src/ui/SettingsPages.cpp src/ui/PluginManager.cpp src/ui/ShortcutManager.cpp)
+APP_SOURCES+=(src/engine/AbletonLink.cpp) # Ableton Link (round 190gl; third_party/link, its own include paths below)
 # spectral waveforms: band analysis, background cache and drawing
 APP_SOURCES+=(src/core/WaveAnalysis.cpp src/ui/WaveformView.cpp)
 # FL's Plucked!, Sawer and BeepMap engines (REA round 65)
@@ -350,6 +355,7 @@ printf '%s\n' "${APP_SOURCES[@]}" | xargs -P "$JOBS" -I{} bash -c '
     src={}; obj="$OUT/app/$(echo "$src" | tr / _).o"
     extra=""; [[ "$src" == src/platform/CrashGuard.cpp ]] && extra="-fms-extensions"
     [[ "$src" == src/ui/CrashReporter.cpp ]] && extra="-iquote $OUT"
+    [[ "$src" == src/engine/AbletonLink.cpp ]] && extra="-isystem third_party/link/include -isystem third_party/link/asio/include"
     cached_pp "$obj" -- $ZIG c++ $COMMON_STR $extra -Wall -Wextra -Werror=return-type -c "$src" -o "$obj"'
 
 # 2026-11-04: an object whose source left APP_SOURCES (another branch's build in this folder) must not be linked
@@ -377,7 +383,8 @@ for src in "${APP_SOURCES[@]}"; do APP_OBJECTS+=("$OUT/app/$(echo "$src" | tr / 
 # (one list: the plugins of LYNX_BUILD_PLUGINS=1 below link the same app objects, so they need the same libraries)
 APP_LIBS=(-lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lshlwapi -lversion -lwininet -limm32 -lcomdlg32
           -lgdi32 -luser32 -lcomctl32 -lshell32 -ladvapi32 -lrpcrt4 -ldbghelp -lsetupapi -luxtheme -ldwmapi
-          -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfreadwrite -lmfuuid -lksuser -lavrt -lwinhttp)
+          -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfreadwrite -lmfuuid -lksuser -lavrt -lwinhttp
+          -liphlpapi) # (iphlpapi: Ableton Link's network interfaces, round 190gl)
 "$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/LYNX.exe" "$OUT"/juce/*.o "${APP_OBJECTS[@]}" "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res" \
     -Wl,--subsystem,windows "${APP_LIBS[@]}"
 

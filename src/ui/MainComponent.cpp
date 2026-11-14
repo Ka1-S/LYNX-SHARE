@@ -674,7 +674,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
                                                              &recordButton, &recordMenuButton, &patternModeButton, &songModeButton, &metronomeButton, &typingPianoButton, &countInButton, &waitInputButton,
                                                              &blendButton, &tapTempoButton, &loopRecordButton, &stepEditButton, &punchButton, &tempoDisplay, &patternBox, &newPatternButton, &patternMenuButton, &pluginPickerButton, &timeDisplay,
                                                              &songPosition, &masterVolume, &masterPitch, &perfMeter, &chordPanel, &keyPanel, &output, &hintBar, &tweakReadout, &workspace, &midiLight,
-                                                             &multilinkButton })
+                                                             &multilinkButton, &linkToggle })
     {
         addAndMakeVisible (c);
         c->setMouseClickGrabsKeyboardFocus (false); // the PC keyboard stays with the main window
@@ -820,6 +820,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     addChildComponent (chordNearHint);
     chordPanel.onMenu = [this] { showChordPanelMenu(); };
     keyPanel.onClick = [this] { showKeyMenu(); };
+    linkToggle.setComponentID ("toolbar.link");
+    linkToggle.onConfigure = [this] { openSettings ((int) SettingsPage::link); };
     keyPanel.setComponentID ("toolbar.key"); // (round 190dv: the first-song tour's ring)
     refreshKeyPanel();
     PianoRollComponent::onSelectedKeys = [this] (const std::vector<int>& keys) {
@@ -1178,6 +1180,7 @@ void MainComponent::resized()
     widths[(std::size_t) Group::chord] = 96; // (FL's panel: 96 px)
     widths[(std::size_t) Group::multilink] = h; // one button (FL's MultiLinkBtn)
     widths[(std::size_t) Group::key] = 112; // "Key" over "C# harmonic minor" (round 184a S11; the name shrinks to fit)
+    widths[(std::size_t) Group::link] = toolbar::LinkToggle::idealWidth (h); // "Link" / "2 Links" and its arrow (round 190gl)
 
     const auto room = toolbar.getWidth();
     // room for most hints on two lines; on a very wide window the hint bar takes more (round 170e3)
@@ -1367,6 +1370,7 @@ void MainComponent::resized()
                 case Group::chord: hide ({ &chordPanel }); break;
                 case Group::multilink: hide ({ &multilinkButton }); break;
                 case Group::key: hide ({ &keyPanel }); break;
+                case Group::link: hide ({ &linkToggle }); break;
                 case Group::count_: break;
             }
             continue;
@@ -1469,6 +1473,7 @@ void MainComponent::resized()
             case Group::chord: put (chordPanel, panel.withY (row1).withHeight (2 * h + 2)); break;
             case Group::multilink: put (multilinkButton, panel.withY (row1).withHeight (h)); break;
             case Group::key: put (keyPanel, panel.withY (row1).withHeight (2 * h + 2)); break;
+            case Group::link: put (linkToggle, panel.withY (row1 + h / 2 + 1).withHeight (h).reduced (0, 1)); break; // (centred on the two rows)
             case Group::count_: break;
         }
     }
@@ -1545,6 +1550,8 @@ void MainComponent::setToolbarLayout (const toolbarlayout::Layout& layout, bool 
     const auto scaleChanged = layout.uiScale != toolbarLayout.uiScale;
     if (save && layout.isShown (toolbarlayout::Group::key) != toolbarLayout.isShown (toolbarlayout::Group::key))
         keyPanelFollowsStyle = false; // shown or hidden by hand (round 184a S11): the layout decides from now on
+    if (save && layout.isShown (toolbarlayout::Group::link) != toolbarLayout.isShown (toolbarlayout::Group::link))
+        linkToggleFollowsStyle = false; // (round 190gl, the same for the Link toggle)
     toolbarLayout = layout;
     applyIconSizing (toolbarlayout::effectiveIconSize (toolbarLayout.iconSize, getWidth()));
 
@@ -1562,6 +1569,15 @@ void MainComponent::setToolbarLayout (const toolbarlayout::Layout& layout, bool 
 
     if (save)
         saveUiSettings();
+}
+
+void MainComponent::showLinkToggle (bool on)
+{
+    if (toolbarLayout.isShown (toolbarlayout::Group::link) == on)
+        return;
+    auto layout = toolbarLayout;
+    layout.setShown (toolbarlayout::Group::link, on);
+    setToolbarLayout (layout, true); // (by hand: the layout style stops deciding)
 }
 
 juce::PopupMenu MainComponent::makeToolbarMenu()
@@ -2711,6 +2727,8 @@ void MainComponent::loadUiSettings()
             chordShowNearHint = on;
         else if (key == "keyPanelFollowsStyle")
             keyPanelFollowsStyle = on;
+        else if (key == "linkToggleFollowsStyle")
+            linkToggleFollowsStyle = on;
         else if (key == "stretchedClipsLoop")
             setStretchedClipsLoop (on);
         else if (key == "autoClipsAtPlayback")
@@ -2970,6 +2988,7 @@ void MainComponent::saveUiSettings()
                                       + "\nchordRoman=" + juce::String (chordReadout.getOptions().roman ? 1 : 0)
                                       + "\nchordNearHint=" + juce::String (chordShowNearHint ? 1 : 0)
                                       + "\nkeyPanelFollowsStyle=" + juce::String (keyPanelFollowsStyle ? 1 : 0)
+                                      + "\nlinkToggleFollowsStyle=" + juce::String (linkToggleFollowsStyle ? 1 : 0)
                                       + "\nstretchedClipsLoop=" + juce::String (stretchedClipsLoop() ? 1 : 0)
                                       + "\nautoClipsAtPlayback=" + juce::String (autoclipplace::atPlayback() ? 1 : 0)
                                       + "\ndisableTypingPriority=" + juce::String (pluginkeys::newPluginsHostFirst().load() ? 1 : 0)
@@ -3060,7 +3079,7 @@ void MainComponent::playStop()
 {
     auto& transport = engine.getTransport();
 
-    if (engine.isWaitingForInput() || engine.isCountingIn()) // pressed again: cancel
+    if (engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting()) // pressed again: cancel
     {
         engine.stop();
         return;
@@ -3080,7 +3099,7 @@ void MainComponent::playStop()
 
 void MainComponent::playPause()
 {
-    if (engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn())
+    if (engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting())
         engine.stop();
     else
     {
@@ -3094,7 +3113,7 @@ void MainComponent::playFromStart()
     // FL 2026's Shift+Space (measured in FL, issue #11): playing, recording, waiting or counting in -> stop at the start
     // of the time selection (Song mode) or else of the song / pattern; stopped -> play from the current position, as
     // Space does (a later Space goes back there).
-    const auto wasPlaying = engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn();
+    const auto wasPlaying = engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting();
     if (! wasPlaying)
     {
         playStop();
@@ -3115,7 +3134,7 @@ void MainComponent::stopAndRewind (bool toStart)
 {
     // Stop while nothing plays (the second press, or a double click) goes back to the very start even when
     // "Remember seek time" sends the first Stop to the ruler mark (round 162, issue #9)
-    const auto alreadyStopped = toStart || ! (engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn());
+    const auto alreadyStopped = toStart || ! (engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting());
     engine.stop();
     // FL: the transport's Stop also ends a Browser sample preview (issue #11)
     browser.stopPreview(); // (the engine's one preview voice: the Sample browser window's preview stops too)
@@ -3532,6 +3551,14 @@ void MainComponent::setLayoutStyle (layoutstyle::Style style, bool swapLayout)
     if (keyPanelFollowsStyle && toolbarLayout.isShown (toolbarlayout::Group::key) != (style != Style::pattern))
     {
         toolbarLayout.setShown (toolbarlayout::Group::key, style != Style::pattern);
+        resized();
+        repaint();
+    }
+    // round 190gl: the Link toggle shows in the Clip-launch workflow (the reference DAW's default "Show Link Toggle"),
+    // not in FL's Pattern workflow (FL has no Link) nor the Simple one, until the user shows or hides it
+    if (linkToggleFollowsStyle && toolbarLayout.isShown (toolbarlayout::Group::link) != (style == Style::clipLaunch))
+    {
+        toolbarLayout.setShown (toolbarlayout::Group::link, style == Style::clipLaunch);
         resized();
         repaint();
     }
@@ -5291,6 +5318,7 @@ void MainComponent::TempoDisplay::setBpm (double bpm)
 
     if (std::abs (bpm - engine.getSong().bpm) > 1e-9)
         engine.editSong ([bpm] (Song& s) { clipops::followTempo (s, bpm); });
+    engine.getLink().proposeTempo (bpm); // (round 190gl: the peers follow; also when the project already had this tempo)
 
     repaint();
 }
@@ -5313,7 +5341,9 @@ void MainComponent::TempoDisplay::paint (juce::Graphics& g)
         g.drawRoundedRectangle (area.reduced (0.5f), radius::md, 1.0f);
     }
 
-    const auto bpm = engine.getSong().bpm;
+    // (round 190gl: the Link session's tempo while Link is on; to the thousandth shown, so 96.99995 reads 97.000 — the
+    // whole number and the decimals used to be cut apart and showed 96.000)
+    const auto bpm = linksync::displayTempo (engine.shownTempo());
     const auto whole = juce::String ((int) std::floor (bpm + 1e-9));
     const auto fraction = juce::String (bpm - std::floor (bpm + 1e-9), 3).fromFirstOccurrenceOf (".", false, false).paddedRight ('0', 3).substring (0, 3);
 
@@ -5352,7 +5382,7 @@ void MainComponent::TempoDisplay::mouseDown (const juce::MouseEvent& e)
         return;
     }
 
-    startBpm = engine.getSong().bpm;
+    startBpm = engine.shownTempo();
     dragOnDecimals = isOnDecimals (e.x);
     dragging = true;
     repaint();
@@ -5376,7 +5406,7 @@ void MainComponent::TempoDisplay::mouseUp (const juce::MouseEvent&)
 void MainComponent::TempoDisplay::mouseDoubleClick (const juce::MouseEvent& e)
 {
     if (! e.mods.isPopupMenu())
-        ui::typeValue (*this, spec(), engine.getSong().bpm, [this] (double v) { setBpm (v); });
+        ui::typeValue (*this, spec(), engine.shownTempo(), [this] (double v) { setBpm (v); });
 }
 
 void MainComponent::TempoDisplay::mouseWheelMove (const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel)
@@ -5388,12 +5418,12 @@ void MainComponent::TempoDisplay::mouseWheelMove (const juce::MouseEvent& e, con
 
     const auto step = isOnDecimals (e.x) ? 0.01 : 1.0;
     engine.noteTweaked ({ AutomationTargetKind::tempo, 0 });
-    setBpm (engine.getSong().bpm + (delta > 0.0f ? 1.0 : -1.0) * step * (e.mods.isCtrlDown() ? 0.1 : 1.0));
+    setBpm (engine.shownTempo() + (delta > 0.0f ? 1.0 : -1.0) * step * (e.mods.isCtrlDown() ? 0.1 : 1.0));
 }
 
 ui::Hint MainComponent::TempoDisplay::hintAt (juce::Point<int> p)
 {
-    return ui::valueHint (spec(), engine.getSong().bpm,
+    return ui::valueHint (spec(), engine.shownTempo(),
                           isOnDecimals (p.x) ? tr ("[LMB] drag the decimals for fine changes  [Wheel] 0.01  [2xLMB] type  [RMB] tap tempo, half, double")
                                              : tr ("[LMB] drag the whole number  [Ctrl] fine  [Wheel] 1 BPM  [2xLMB] type  [RMB] tap tempo, half, double"));
 }
@@ -5431,6 +5461,9 @@ juce::String MainComponent::idleHint() const
 
     if (engine.isCountingIn())
         return tr ("Recording: count-in...");
+
+    if (engine.isLinkWaiting()) // (round 190gl)
+        return tr ("Ableton Link: playback starts with the session's next cycle ([Space] cancels)");
 
     // FL's text while "Multilink to controllers" is on (round 177b-4); the controls moved show their own hint
     if (engine.isMultilinkOn())
@@ -6113,7 +6146,7 @@ void MainComponent::timerCallback()
 
         if (engine.isLearningMidi())
             hint.text = tr ("Move a knob/fader on the MIDI controller to link it to the parameter...");
-        else if (engine.isWaitingForInput() || engine.isCountingIn())
+        else if (engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting())
             hint.text = idleHint();
         else if (auto posted = ui::postedHint())
         {
@@ -6149,7 +6182,20 @@ void MainComponent::timerCallback()
         }
     }
 
-    const auto playing = transport.playing.load();
+    // Ableton Link (round 190gl): the toggle's peers, the tempo the session plays, and Start Stop Sync from a peer
+    // (Play / Stop pressed as the user would)
+    linkToggle.update();
+    if (const auto linkTempo = engine.getLink().isEnabled() ? engine.getLink().sessionTempo() : 0.0; linkTempo != shownLinkTempo)
+    {
+        shownLinkTempo = linkTempo;
+        tempoDisplay.repaint();
+    }
+    if (engine.getLink().takeRemoteStart() && ! transport.playing.load() && ! engine.isLinkWaiting() && ! engine.isCountingIn())
+        playStop();
+    if (engine.getLink().takeRemoteStop() && (transport.playing.load() || engine.isLinkWaiting()))
+        playStop();
+
+    const auto playing = transport.playing.load() || engine.isLinkWaiting(); // (lit while the start waits for Link)
     playButton.setToggleState (playing, juce::dontSendNotification);
 
     updateChordPanel();
@@ -7573,11 +7619,16 @@ void MainComponent::openSettings (int page)
             safe->showPluginManager();
     };
     hooks.runAction = [safe] (const std::string& id) { return safe != nullptr && safe->runAction (id); };
+    hooks.linkToggleShown = [safe] { return safe != nullptr && safe->toolbarLayout.isShown (toolbarlayout::Group::link); };
+    hooks.showLinkToggle = [safe] (bool on) {
+        if (safe != nullptr)
+            safe->showLinkToggle (on);
+    };
     hooks.midiChanged = [safe] {
         if (safe != nullptr)
             safe->updateGamepad();
     };
-    showSettings (engine, (SettingsPage) juce::jlimit (0, (int) SettingsPage::extras, page), std::move (hooks)); // (Theme was clamped to MIDI)
+    showSettings (engine, (SettingsPage) juce::jlimit (0, (int) SettingsPage::link, page), std::move (hooks)); // (Theme was clamped to MIDI)
 }
 
 void MainComponent::showPluginManager()
@@ -8489,6 +8540,9 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         // the Settings window's pages (Settings › General gathers the app options that were menu items here)
         menu.addItem (tr ("Audio settings..."), [this] { openSettings ((int) SettingsPage::audio); });
         menu.addItem (tr ("MIDI settings...") + shortcutText ("view.midiSettings"), [this] { openSettings ((int) SettingsPage::midi); });
+        // round 190gl: Ableton Link (LYNX's own in FL's menu: FL has no Link), the switch and its settings page
+        menu.addItem (tr ("Ableton Link"), true, engine.getLink().isEnabled(), [this] { engine.setLinkEnabled (! engine.getLink().isEnabled()); });
+        menu.addItem (tr ("Ableton Link settings..."), [this] { openSettings ((int) SettingsPage::link); });
         menu.addItem (tr ("General settings..."), [this] { openSettings ((int) SettingsPage::general); });
         menu.addItem (tr ("Theme (colors, background)..."), [this] { openSettings ((int) SettingsPage::theme); });
         menu.addItem (tr ("File settings (search folders)..."), [this] { openSettings ((int) SettingsPage::files); });
@@ -8678,7 +8732,9 @@ std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
             : juce::AlertWindow ("LYNX SHARE " JUCE_APPLICATION_VERSION_STRING,
                                  tr ("Lightweight C++/JUCE DAW: FL Studio-style patterns and Ableton Live-style clips.\n"
                                      "Independent implementation: no Image-Line or Ableton code was copied.")
-                                     + "\n\n" + tr ("Logo by {0}", { "w3teal" }), // the community member who made it
+                                     + "\n\n" + tr ("Logo by {0}", { "w3teal" }) // the community member who made it
+                                     // round 190gl: Ableton Link's credit (GPL-2.0-or-later; THIRD_PARTY.md lists every component)
+                                     + "\n" + tr ("Ableton Link by Ableton AG (GPL 2.0 or later). Every open-source component and its licence: THIRD_PARTY.md"),
                                  juce::MessageBoxIconType::NoIcon)
         {
             addCustomComponent (&logo);

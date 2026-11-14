@@ -204,6 +204,15 @@ void TimeDisplay::update()
         shown = t;
         repaint();
     }
+    // (round 190gl) the reference DAW's position display with Link: a progress bar of the session through the quantum
+    // while the transport is stopped or waits to start (another peer connected); Play starts when it is full
+    const auto& link = engine.getLink();
+    const auto progress = link.isEnabled() ? link.startProgress() : -1.0;
+    if (std::abs (progress - linkProgress) > 0.004 || (progress < 0.0) != (linkProgress < 0.0))
+    {
+        linkProgress = progress;
+        repaint();
+    }
 }
 
 void TimeDisplay::paint (juce::Graphics& g)
@@ -212,6 +221,14 @@ void TimeDisplay::paint (juce::Graphics& g)
     const auto area = getLocalBounds();
     g.setColour (colour::bg1);
     g.fillRoundedRectangle (area.toFloat(), radius::md);
+    if (linkProgress >= 0.0) // (round 190gl) the Link session's progress bar, filled from the left
+    {
+        g.saveState();
+        g.reduceClipRegion (area.withWidth (juce::roundToInt (area.getWidth() * juce::jlimit (0.0, 1.0, linkProgress))));
+        g.setColour (colour::accent.withAlpha (0.42f));
+        g.fillRoundedRectangle (area.toFloat(), radius::md);
+        g.restoreState();
+    }
 
     if (isMouseOver())
     {
@@ -608,6 +625,111 @@ void ChordPanel::mouseDown (const juce::MouseEvent& e)
 ui::Hint ChordPanel::hintAt (juce::Point<int>)
 {
     return { tr ("Detected chord"), {}, false, false };
+}
+
+// --- Ableton Link toggle (round 190gl) ---------------------------------------------------------------------------
+
+juce::String LinkToggle::text() const
+{
+    if (! on)
+        return trc ("@Ableton Link: Link");
+    return (peers == 1 ? trc ("@Ableton Link: {0} Link") : trc ("@Ableton Link: {0} Links")).replace ("{0}", juce::String (peers));
+}
+
+int LinkToggle::idealWidth (int height)
+{
+    const auto f = theme::font (theme::type::body);
+    auto widest = 0.0f;
+    for (const auto* t : { "@Ableton Link: Link", "@Ableton Link: {0} Links" })
+        widest = juce::jmax (widest, juce::GlyphArrangement::getStringWidth (f, trc (t).replace ("{0}", "88")));
+    return juce::roundToInt (widest) + 18 + juce::jmax (12, height / 2 + 2);
+}
+
+void LinkToggle::update()
+{
+    const auto& link = engine.getLink();
+    const auto nowOn = link.isEnabled();
+    const auto nowPeers = nowOn ? link.peers() : 0;
+    if (nowOn != on || nowPeers != peers)
+    {
+        on = nowOn;
+        peers = nowPeers;
+        repaint();
+    }
+}
+
+void LinkToggle::paint (juce::Graphics& g)
+{
+    using namespace theme;
+    const auto area = getLocalBounds();
+    const auto arrow = arrowArea();
+    const auto main = area.withTrimmedRight (arrow.getWidth() + 2);
+    const auto over = isMouseOver (true);
+    // the switch: lit while Link is on (the reference DAW's toggle; the Clip-launch layout's MIDI switch uses the same colour)
+    g.setColour (on ? colour::info : (over ? colour::bg2 : colour::bg1));
+    g.fillRoundedRectangle (main.toFloat(), radius::md);
+    g.setColour (on ? colour::bg0 : colour::textPrimary);
+    auto f = font (type::body, on);
+    const auto label = text();
+    for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (f, label) > (float) main.getWidth() - 6.0f; ++i)
+        f = f.withHeight (f.getHeight() * 0.92f);
+    g.setFont (f);
+    g.drawText (label, main, juce::Justification::centred, false);
+    // the drop-down arrow beside it
+    g.setColour (over ? colour::bg2 : colour::bg1);
+    g.fillRoundedRectangle (arrow.toFloat(), radius::md);
+    const auto a = arrow.toFloat().withSizeKeepingCentre (8.0f, 5.0f);
+    juce::Path tri;
+    tri.addTriangle (a.getX(), a.getY(), a.getRight(), a.getY(), a.getCentreX(), a.getBottom());
+    g.setColour (colour::textSecondary);
+    g.fillPath (tri);
+}
+
+void LinkToggle::mouseDown (const juce::MouseEvent& e)
+{
+    if (e.mods.isPopupMenu() || arrowArea().contains (e.getPosition()))
+    {
+        showMenu();
+        return;
+    }
+    if (e.mods.isLeftButtonDown())
+    {
+        engine.setLinkEnabled (! engine.getLink().isEnabled());
+        update();
+    }
+}
+
+void LinkToggle::showMenu()
+{
+    makeMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+}
+
+juce::PopupMenu LinkToggle::makeMenu()
+{
+    // the reference DAW's drop-down: Link on / off and "Configure Link..." (its Link Audio items: LYNX has no Link Audio)
+    juce::PopupMenu menu;
+    const auto linkOn = engine.getLink().isEnabled();
+    menu.addItem (trc ("@Ableton Link: Link"), true, linkOn, [this, linkOn] {
+        engine.setLinkEnabled (! linkOn);
+        update();
+    });
+    menu.addSeparator();
+    menu.addItem (tr ("Configure Link..."), [this] {
+        if (onConfigure)
+            onConfigure();
+    });
+    return menu;
+}
+
+ui::Hint LinkToggle::hintAt (juce::Point<int> position)
+{
+    ui::Hint h;
+    if (arrowArea().contains (position))
+        h.text = tr ("Ableton Link options");
+    else
+        h.text = on ? tr ("Ableton Link is on: the tempo and the beat are shared with the other apps and devices in the session. Click to leave it")
+                    : tr ("Ableton Link: share the tempo and the beat with other apps and devices on the network. Click to join");
+    return h;
 }
 
 void KeyPanel::setText (const juce::String& keyName)

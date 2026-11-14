@@ -2262,7 +2262,115 @@ private:
     std::vector<std::unique_ptr<SectionTitle>> titles;
     std::vector<std::unique_ptr<Row>> rows;
 };
+// ================================================================================================================
+// Link (round 190gl): the reference DAW's Settings › Link, its Link section (manual: "The Link Tab in Live's Settings")
+// ================================================================================================================
+class LinkPage final : public ScrollingPage,
+                       private juce::Timer
+{
+public:
+    LinkPage (AudioEngine& e, SettingsHooks h) : engine (e), hooks (std::move (h))
+    {
+        add (linkTitle);
+        styleNote (intro, tr ("Ableton Link shares the tempo and the beat with other apps and devices on the same network "
+                              "(phones, other DAWs, hardware). Switch it on with the Link toggle in the toolbar or in Options."));
+        intro.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        add (intro);
+        for (auto* l : { &enableLabel, &showLabel, &syncLabel, &statusLabel })
+        {
+            l->setColour (juce::Label::textColourId, theme::colour::textPrimary);
+            add (*l);
+        }
+        enableLabel.setText (tr ("Ableton Link"), juce::dontSendNotification);
+        showLabel.setText (tr ("Show Link Toggle"), juce::dontSendNotification);
+        syncLabel.setText (tr ("Start Stop Sync"), juce::dontSendNotification);
+        statusLabel.setText (tr ("Status"), juce::dontSendNotification);
+        for (auto* b : { &enableButton, &showButton, &syncButton })
+        {
+            b->setClickingTogglesState (true);
+            b->setColour (juce::TextButton::buttonOnColourId, theme::colour::accent);
+            b->setColour (juce::TextButton::textColourOnId, theme::colour::bg0);
+            add (*b);
+        }
+        enableButton.setComponentID ("link.enabled");
+        enableButton.onClick = [this] {
+            engine.setLinkEnabled (enableButton.getToggleState());
+            refresh();
+        };
+        showButton.setComponentID ("link.showToggle");
+        syncButton.setComponentID ("link.startStopSync");
+        showButton.onClick = [this] {
+            if (hooks.showLinkToggle)
+                hooks.showLinkToggle (showButton.getToggleState());
+            refresh();
+        };
+        syncButton.onClick = [this] {
+            engine.setLinkStartStopSync (syncButton.getToggleState());
+            refresh();
+        };
+        styleNote (syncNote, tr ("Play and Stop are shared with the peers that also have Start Stop Sync on."));
+        syncNote.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        add (syncNote);
+        status.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+        add (status);
+        refresh();
+        startTimerHz (4);
+    }
+
+    int layout (int width) override
+    {
+        Rows r (width);
+        r.section (linkTitle, true);
+        intro.setBounds (r.note (intro, 34));
+        enableButton.setBounds (r.row (enableLabel, 110));
+        showButton.setBounds (r.row (showLabel, 110));
+        syncButton.setBounds (r.row (syncLabel, 110));
+        syncNote.setBounds (r.note (syncNote, 18));
+        status.setBounds (r.row (statusLabel, 0));
+        return r.bottom();
+    }
+
+private:
+    void timerCallback() override { refresh(); }
+
+    void refresh()
+    {
+        // (Ableton's Link integration guidelines: the state in the settings list, "Enabled" / "Disabled")
+        const auto linkOn = engine.getLink().isEnabled();
+        enableButton.setToggleState (linkOn, juce::dontSendNotification);
+        enableButton.setButtonText (linkOn ? tr ("Enabled") : tr ("Disabled"));
+        const auto shown = hooks.linkToggleShown ? hooks.linkToggleShown() : false;
+        showButton.setToggleState (shown, juce::dontSendNotification);
+        showButton.setButtonText (shown ? tr ("Show") : tr ("Hide"));
+        const auto sync = engine.getLink().startStopSync();
+        syncButton.setToggleState (sync, juce::dontSendNotification);
+        syncButton.setButtonText (sync ? tr ("On") : tr ("Off"));
+        const auto& link = engine.getLink();
+        juce::String text;
+        if (! link.isEnabled())
+            text = tr ("Link is off");
+        else
+        {
+            const auto peers = link.peers();
+            text = (peers == 1 ? tr ("On: 1 other peer") : tr ("On: {0} other peers").replace ("{0}", juce::String (peers)));
+            if (const auto tempo = link.sessionTempo(); tempo > 0.0)
+                text += ", " + tr ("session tempo {0} BPM").replace ("{0}", juce::String (tempo, 2));
+        }
+        status.setText (text, juce::dontSendNotification);
+    }
+
+    AudioEngine& engine;
+    SettingsHooks hooks;
+    SectionTitle linkTitle { tr ("Ableton Link") };
+    juce::Label intro, enableLabel, showLabel, syncLabel, statusLabel, syncNote, status;
+    juce::TextButton enableButton, showButton, syncButton;
+};
 } // namespace
+
+std::unique_ptr<juce::Component> makeLinkPage (AudioEngine& engine, const SettingsHooks& hooks)
+{
+    return std::make_unique<LinkPage> (engine, hooks);
+}
 
 bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id)
 {

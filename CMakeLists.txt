@@ -483,6 +483,7 @@ if(LYNX_BUILD_APP)
         src/engine/MidiFileIo.cpp
         src/engine/AudioLogger.cpp
         src/engine/MidiSyncIo.cpp
+        src/engine/AbletonLink.cpp
         src/engine/ControllerIo.cpp
         src/engine/PreviewPlayer.cpp
         src/ui/MainComponent.cpp
@@ -618,6 +619,10 @@ if(LYNX_BUILD_APP)
         src/ui/StemExtract.cpp
         src/ui/AudioToMidi.cpp)
     target_sources(LYNX PRIVATE src/Main.cpp ${LYNX_APP_SOURCES})
+    # Ableton Link 4.1.1 (GPL-2.0-or-later, used under the GPLv3; third_party/link, round 190gl) with its bundled Asio
+    # (Boost licence): header-only, used by src/engine/AbletonLink.cpp alone (it sets Link's and Asio's macros itself)
+    set_source_files_properties(src/engine/AbletonLink.cpp PROPERTIES COMPILE_OPTIONS
+        "$<IF:$<CXX_COMPILER_ID:MSVC>,/external:I${CMAKE_CURRENT_SOURCE_DIR}/third_party/link/include;/external:I${CMAKE_CURRENT_SOURCE_DIR}/third_party/link/asio/include;/external:W0,-isystem;${CMAKE_CURRENT_SOURCE_DIR}/third_party/link/include;-isystem;${CMAKE_CURRENT_SOURCE_DIR}/third_party/link/asio/include>")
     target_include_directories(LYNX PRIVATE third_party/onnxruntime) # loaded at run time, never linked
 
     target_include_directories(LYNX PRIVATE third_party/clap/include)
@@ -641,6 +646,7 @@ if(LYNX_BUILD_APP)
         target_include_directories(LYNX PRIVATE third_party/asiosdk/common)
         target_compile_definitions(LYNX PRIVATE JUCE_ASIO=1) # ASIO SDK headers in third_party/asiosdk (GPLv3 option)
         target_link_libraries(LYNX PRIVATE winhttp) # live sessions' WebSocket (engine/LiveLink.cpp)
+        target_link_libraries(LYNX PRIVATE ws2_32 iphlpapi) # Ableton Link's sockets and network interfaces (round 190gl)
         target_link_libraries(LYNX PRIVATE mfplat mfreadwrite mfuuid propsys) # the system's video decoder (round 174d)
     elseif(APPLE)
         target_compile_definitions(LYNX PRIVATE JUCE_PLUGINHOST_AU=1)

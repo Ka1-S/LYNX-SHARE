@@ -112,7 +112,7 @@ TEST (flui115_toolbar_drop_and_place)
     // drop "file" before "master": transport, file, master, ...
     const auto master = Group::master;
     CHECK (l.placeBefore (Group::file, &master));
-    CHECK (l.orderToString() == "transport,file,master,record,snap,windows,-multilink,-key,chord,meters,output");
+    CHECK (l.orderToString() == "-link,transport,file,master,record,snap,windows,-multilink,-key,chord,meters,output");
     CHECK (! l.placeBefore (Group::file, &master)); // already there
     CHECK (l.placeBefore (Group::transport, nullptr)); // to the end
     CHECK (l.entries.back().group == Group::transport);
@@ -137,7 +137,7 @@ TEST (flui115_toolbar_presets_and_flags)
     CHECK (matchingPreset (c) == (int) Preset::compact);
     c.setShown (Group::file, true);
     CHECK (matchingPreset (c) == presetCount); // custom
-    CHECK (applyPreset (l, Preset::minimal).orderToString() == "transport,-master,-record,-snap,windows,-multilink,-file,-key,-chord,-meters,-output");
+    CHECK (applyPreset (l, Preset::minimal).orderToString() == "-link,transport,-master,-record,-snap,windows,-multilink,-file,-key,-chord,-meters,-output");
 
     auto d = Layout::makeDefault();
     CHECK (d.separators && d.visible && d.isDefault());

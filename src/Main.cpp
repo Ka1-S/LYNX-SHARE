@@ -1031,6 +1031,18 @@ public:
             return;
         }
 
+        if (args.contains ("--linktest"))
+        {
+            // LYNX --linktest report.txt [seconds] [peer] (round 190gl): Ableton Link with simulated audio callbacks; with
+            // "peer" a second Link peer in this process, else a peer on the network (Ableton's LinkHut) is expected
+            const auto i = args.indexOf ("--linktest");
+            const auto seconds = args.size() > i + 2 && ! args[i + 2].startsWith ("--") ? args[i + 2].getDoubleValue() : 20.0;
+            const auto ownPeer = args.contains ("peer");
+            juce::File (args[i + 1].unquoted()).replaceWithText (juce::String (lynx::AbletonLink::selfTest (seconds > 0.0 ? seconds : 20.0, ownPeer)));
+            quit();
+            return;
+        }
+
         if (args.contains ("--devices") || args.contains ("--dispositivos")) // --dispositivos: legacy alias
         {
             // diagnostics: driver types and output devices JUCE offers (without opening any)
@@ -2343,6 +2355,17 @@ public:
             // prefix-checks.txt (hit tests: C1 bottom-left, overview scroll, a pad dragged onto another swaps them).
             juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
             lynx::drumshot::run (args[args.indexOf ("--drumshot190ec") + 1].unquoted());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--linkshot190gl"))
+        {
+            // LYNX --linkshot190gl prefix (round 190gl): Ableton Link off-screen with a second Link peer in this process —
+            // the toolbar in FL's Pattern layout (hidden by default, then shown, off and on) and in the Clip-launch layout
+            // ("1 Link", the position display's progress bar, Play waiting), Settings › Ableton Link, the toggle's
+            // drop-down and the Options menu. Writes prefix-checks.txt.
+            runLinkShot190gl (args[args.indexOf ("--linkshot190gl") + 1].unquoted());
             quit();
             return;
         }
@@ -21361,6 +21384,118 @@ private:
         store = {};
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
         lib.deleteRecursively();
+    }
+
+    void runLinkShot190gl (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        ui.setSize (1600, 900);
+        ui.setVisible (true);
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        const auto writeImage = [&prefix] (const juce::Image& image, const char* name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        const auto toolbarShot = [&] (const char* name) {
+            ui.tickLinkForSnapshot();
+            writeImage (lynx::shot::snapshot (ui, ui.getToolbarBoundsForSnapshot()), name);
+        };
+        auto& link = offline.getLink();
+        auto& transport = offline.getTransport();
+        link.deviceStarted (44100.0);
+        // the audio callbacks the offline engine has none of: Link's per-block step, in real time
+        const auto pump = [&] (double seconds, std::function<bool()> until = {}) {
+            const auto end = juce::Time::getMillisecondCounterHiRes() + seconds * 1000.0;
+            while (juce::Time::getMillisecondCounterHiRes() < end)
+            {
+                const auto start = link.beginBlock (transport, 256, 0.0);
+                if (start >= 0)
+                    transport.playing.store (true);
+                if (transport.playing.load())
+                    transport.positionTicks.store (transport.positionTicks.load() + 256 * transport.ticksPerSample());
+                juce::Thread::sleep (6);
+                if (until && until())
+                    return true;
+            }
+            return ! until || until();
+        };
+        auto peer = lynx::AbletonLink::makeTestPeer (97.0); // the other app in the session (it was there first)
+        juce::Thread::sleep (1500); // (a session that started at the same moment as LYNX's could take either tempo)
+        using lynx::toolbarlayout::Group;
+
+        // FL's Pattern layout: no Link toggle on a new install
+        check ("Pattern layout: the Link toggle is hidden by default", ! ui.getToolbarLayoutForSnapshot().isShown (Group::link));
+        toolbarShot ("toolbar-fl-default");
+        // shown by hand (Settings › Ableton Link › Show Link Toggle): "Link", off
+        auto layout = ui.getToolbarLayoutForSnapshot();
+        layout.setShown (Group::link, true);
+        ui.setToolbarLayoutForSnapshot (layout);
+        toolbarShot ("toolbar-fl-link-off");
+        check ("off: the toggle says Link", ui.getLinkToggleForSnapshot().text() == lynx::trc ("@Ableton Link: Link"));
+        // on: the session the other peer runs (its tempo, 97 BPM, wins over the project's)
+        link.setEnabled (true, offline.getSong().bpm);
+        // (a new peer is counted at once; its session's tempo is taken after Link measured it, a moment later)
+        const auto joined = pump (8.0, [&] { return link.peers() > 0 && link.startProgress() >= 0.0 && std::abs (link.sessionTempo() - 97.0) < 1e-3; });
+        check ("Link on: one peer found", joined && link.peers() == 1);
+        check ("Link on: the session's tempo (97 BPM, the first peer's) is the one shown", std::abs (offline.shownTempo() - 97.0) < 1e-3);
+        toolbarShot ("toolbar-fl-link-on");
+        check ("on with one peer: the toggle says 1 Link", ui.getLinkToggleForSnapshot().text() == lynx::trc ("@Ableton Link: {0} Link").replace ("{0}", "1"));
+        check ("stopped with a peer: the position display shows the session's progress", link.startProgress() >= 0.0);
+
+        // the Clip-launch layout: the toggle is shown by default (the reference DAW's "Show Link Toggle": Show)
+        ui.setToolbarLayoutForSnapshot (lynx::toolbarlayout::Layout::makeDefault());
+        ui.setClipLaunchWorkflow (true);
+        check ("Clip-launch layout: the Link toggle is shown by default", ui.getToolbarLayoutForSnapshot().isShown (Group::link));
+        pump (0.4);
+        toolbarShot ("toolbar-cliplaunch-1link");
+        writeImage (lynx::shot::snapshot (ui), "window-cliplaunch");
+        // Play: it waits for the session's phase (the play button lit, the progress bar running), then starts
+        transport.playing.store (true);
+        pump (0.05);
+        const auto waited = offline.isLinkWaiting();
+        check ("Play with a peer waits for the session's phase", waited);
+        toolbarShot ("toolbar-cliplaunch-waiting");
+        const auto started = pump (4.0, [&] { return transport.playing.load() && ! offline.isLinkWaiting(); });
+        check ("then playback starts on the session's phase", started);
+        pump (0.5);
+        toolbarShot ("toolbar-cliplaunch-playing");
+        check ("playing: no progress bar", link.startProgress() < 0.0);
+
+        // the toggle's drop-down and the Options menu
+        saveMenus (juce::StringArray { lynx::trc ("@Ableton Link: Link") }, std::vector<juce::PopupMenu> { ui.getLinkToggleForSnapshot().makeMenu() },
+                   prefix + "-menu-link.png");
+        {
+            const auto names = ui.getMenuNamesForSnapshot();
+            for (int m = 0; m < names.size(); ++m)
+                if (names[m] == lynx::tr ("Options"))
+                    saveMenus (juce::StringArray { names[m] }, std::vector<juce::PopupMenu> { ui.getMenuForSnapshot (m) }, prefix + "-menu-options.png");
+        }
+
+        // Settings › Ableton Link
+        {
+            lynx::SettingsHooks hooks;
+            hooks.linkToggleShown = [] { return true; };
+            auto panel = lynx::makeSettingsPanel (offline, lynx::SettingsPage::link, false, hooks);
+            panel->setSize (680, 620);
+            writeImage (lynx::shot::snapshot (*panel), "settings-link");
+        }
+
+        // off: the project's own tempo comes back on the display
+        transport.playing.store (false);
+        pump (0.1);
+        link.setEnabled (false, offline.getSong().bpm);
+        pump (0.1);
+        toolbarShot ("toolbar-cliplaunch-link-off");
+        check ("off: the tempo display shows the project's tempo again", std::abs (offline.shownTempo() - offline.getSong().bpm) < 1e-9);
+        const auto stats = link.stats();
+        checks << "audio-thread cost of the Link step: mean " << juce::String (stats.meanUs, 2) << " us, max " << juce::String (stats.maxUs, 1)
+               << " us over " << (juce::int64) stats.blocks << " blocks\n";
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
     void runMapShot190ef (const juce::String& prefix)
