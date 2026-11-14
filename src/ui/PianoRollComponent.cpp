@@ -862,13 +862,22 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
     // the overview follows the notes (edits, undo, another channel or pattern) and the view
     {
-        auto signature = (std::size_t) song.currentPattern * 1000003u + (std::size_t) channel * 7919u + pattern.notes.size();
-        for (const auto& n : pattern.notes)
-            signature = signature * 31u + (std::size_t) (n.start * 131 + n.length * 7 + n.key + n.channel * 257 + (n.muted ? 1 : 0));
-        if (signature != overviewSignature)
+        // (round 190gp: hashed again only when the song, the pattern or the channel changed since the last paint;
+        // LYNX_PAINT_SAVINGS=0 hashes on every paint, as before)
+        const auto stamp = engine.getSongStamp();
+        if (! ui::paintSavings() || stamp != overviewStamp || song.currentPattern != overviewPattern || channel != overviewChannel)
         {
-            overviewSignature = signature;
-            overview.repaint();
+            overviewStamp = stamp;
+            overviewPattern = song.currentPattern;
+            overviewChannel = channel;
+            auto signature = (std::size_t) song.currentPattern * 1000003u + (std::size_t) channel * 7919u + pattern.notes.size();
+            for (const auto& n : pattern.notes)
+                signature = signature * 31u + (std::size_t) (n.start * 131 + n.length * 7 + n.key + n.channel * 257 + (n.muted ? 1 : 0));
+            if (signature != overviewSignature)
+            {
+                overviewSignature = signature;
+                overview.repaint();
+            }
         }
         overview.setRange ((double) viewLengthTicks(), scrollTicks, grid.getWidth() / pixelsPerTick);
     }

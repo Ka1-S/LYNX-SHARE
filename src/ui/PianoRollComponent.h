@@ -316,6 +316,10 @@ private:
     OverviewBar overview;
     void paintOverview (juce::Graphics& g, juce::Rectangle<float> area, double total);
     std::size_t overviewSignature = 0; // the notes drawn in the overview (repaints it when they change)
+    // round 190gp: the song stamp, pattern and channel the signature was last worked out for (a paint — each playhead
+    // column too — hashed every note of the pattern; the notes change only with the song, whose stamp moves then)
+    std::uint64_t overviewStamp = 0;
+    int overviewPattern = -1, overviewChannel = -1;
     ToolStrip tools { false };
     int titleInsetLeft = 0, titleInsetRight = 0; // the window's title and buttons share the toolbar row
     ChannelBox channelBox;
