@@ -98,6 +98,8 @@
 #include "ui/PlaylistComponent.h"
 #include "ui/PictureCheck.h"
 #include "ui/PatternBlocksView.h"
+#include "ui/PaintAB.h"
+#include <typeinfo>
 #include "ui/PatcherEditor.h"
 #include "ui/VisualEditors.h"
 #include "ui/FlExtraEditors.h"
@@ -4757,6 +4759,7 @@ private:
         auto& lookBefore = juce::LookAndFeel::getDefaultLookAndFeel();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         const auto fontsResult = lynx::theme::fontSelfTest();
+        const auto paintCachesResult = lynx::theme::paintCacheSelfTest(); // (round 190gr)
         // round 190bm (0.1.25 showed the Mixer and the Playlist black): their cached pictures shown on native and
         // software targets against straight paints (ui/PictureCheck.h; --picturetest runs more sizes and scales)
         juce::String picturesResult = "OK";
@@ -4790,7 +4793,7 @@ private:
         const auto faultResult = faultReportSelfTest();
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
         const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR")
-                        && mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
+                        && mixerBasics == "OK" && fontsResult == "OK" && paintCachesResult.startsWith ("OK") && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
@@ -4822,6 +4825,7 @@ private:
                << "undo=" << (undoOk ? "OK" : "ERROR") << "\n"
                << "mixer_basics=" << mixerBasics << "\n"
                << "fonts=" << fontsResult << "\n"
+               << "paint_caches=" << paintCachesResult << "\n"
                << "cached_pictures=" << picturesResult << "\n"
                << "plugin_editors=" << editorsResult << "\n"
                << "fault_report=" << faultResult << "\n"
@@ -9030,7 +9034,7 @@ private:
         juce::String error;
         auto ok = false;
         const auto loadStart = juce::Time::getMillisecondCounterHiRes();
-        if (project.hasFileExtension ("flp"))
+        if (project.hasFileExtension ("flp;als;flm")) // (round 190gr: a Live set, its Session clips in the grid)
             ok = engine->importFlpFile (project, error);
         else if (auto song = lynx::ProjectFile::load (project, error))
         {
@@ -9314,6 +9318,21 @@ private:
                                    engine->rewind();
                                    engine->play();
                                }, {}, 3000 });
+        // round 190gr: the grid's clips launched (every scene that has clips, one after the other: the playing cells'
+        // progress bars move, the launches blink until their grid point)
+        run->steps.push_back ({ "clip grid, clips launched", [this] {
+                                   engine->getTransport().songMode = true;
+                                   if (const auto& grid = engine->getSong().clipGrid)
+                                       for (int scene = 0; scene < juce::jmin (8, (int) grid->scenes.size()); ++scene)
+                                           engine->launcherCommand ({ lynx::launcher::Command::Type::launchScene, 0, scene });
+                               }, {}, 3000, [this] {
+                                   int playing = 0;
+                                   if (const auto* state = engine->launcherState())
+                                       for (const auto& t : state->tracks)
+                                           playing += t.playing.load() >= 0 ? 1 : 0;
+                                   engine->launcherCommand ({ lynx::launcher::Command::Type::stopAll });
+                                   return "    tracks playing a clip: " + juce::String (playing) + "\n";
+                               } });
         run->steps.push_back ({ "idle: clip grid, stopped", [this] { engine->stop(); }, {}, 3000, [ui] { ui->setClipLaunchWorkflow (false); return juce::String(); } });
         // LYNX_UIPERF_ONLY=text: only the steps whose name has that text
         if (const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_ONLY", {}); only.isNotEmpty())
@@ -17021,6 +17040,11 @@ private:
     // the message thread's CPU per frame.
     void runPaintBench (const juce::File& project, const juce::File& report)
     {
+        // LYNX_PROFILE_MAIN=<file> (round 190gr): the message thread sampled while it paints (Windows; one view at a time
+        // with LYNX_PAINTBENCH_VIEWS)
+        const auto profile = juce::SystemStats::getEnvironmentVariable ("LYNX_PROFILE_MAIN", {});
+        if (profile.isNotEmpty())
+            lynx::crashguard::startMainProfiler (profile.toStdString(), 1000, 2);
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
         lynx::AudioEngine offline (false);
         lynx::MainComponent ui (offline, false);
@@ -17042,6 +17066,17 @@ private:
         offline.getTransport().positionTicks.store ((double) song.songLength() / 3.0);
         const auto frames = juce::jlimit (3, 500, juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_FRAMES", "40").getIntValue());
         juce::Image image (juce::Image::ARGB, ui.getWidth(), ui.getHeight(), true);
+        {
+            // (round 190gr) which renderer draws the frames: the software one (Linux), Direct2D (Windows), Core Graphics
+            juce::Graphics g (image);
+            auto& context = g.getInternalContext();
+            text << "renderer: " << (dynamic_cast<juce::LowLevelGraphicsSoftwareRenderer*> (&context) != nullptr ? "software" : typeid (context).name())
+                 << ", paint caches " << (lynx::ui::paintCache() ? "on" : "off (LYNX_PAINT_CACHE=0)") << ", paint savings "
+                 << (lynx::ui::paintSavings() ? "on" : "off (LYNX_PAINT_SAVINGS=0)") << "\n";
+        }
+        // LYNX_PAINTBENCH_VIEWS="mixer,channel rack" (round 190gr): only those views
+        const auto onlyViews = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_VIEWS", {}), ",", "");
+        const auto wanted = [&onlyViews] (const juce::String& name) { return onlyViews.isEmpty() || onlyViews.contains (name); };
         // the picture's pixels as one number: the same before and after a change = the same drawing
         auto pixelHash = [&image] {
             const juce::Image::BitmapData data (image, juce::Image::BitmapData::readOnly);
@@ -17055,7 +17090,7 @@ private:
         // column of the whole height at 40 places (what a moving playhead repaints each frame)
         auto measure = [&] (const juce::String& name, int mode) {
             offline.dispatchPendingMessages();
-            std::vector<double> ms;
+            std::vector<double> ms, wall;
             juce::String hash;
             for (int f = -3; f < frames; ++f) // (3 frames to warm the caches up)
             {
@@ -17063,6 +17098,7 @@ private:
                     ui.repaint();
                 const auto column = juce::Rectangle<int> ((juce::jmax (0, f) * 97) % juce::jmax (1, ui.getWidth() - 14), 0, 14, ui.getHeight());
                 const auto t0 = lynx::threadCpuSeconds();
+                const auto w0 = juce::Time::getMillisecondCounterHiRes();
                 {
                     juce::Graphics g (image);
                     if (mode == 2)
@@ -17070,17 +17106,34 @@ private:
                     ui.paintEntireComponent (g, true);
                 }
                 if (f >= 0)
+                {
                     ms.push_back (1000.0 * (lynx::threadCpuSeconds() - t0));
+                    wall.push_back (juce::Time::getMillisecondCounterHiRes() - w0); // (round 190gr: Direct2D's work ends with the frame)
+                }
                 if (f == 0 && mode == 0)
+                {
                     hash = pixelHash();
+                    // LYNX_PAINTBENCH_PNG=<prefix> (round 190gr): the whole frame as <prefix>-<view>.png, to compare pixels
+                    if (const auto png = juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_PNG", {}); png.isNotEmpty())
+                    {
+                        const juce::File file (png + "-" + name.replaceCharacter (' ', '-') + ".png");
+                        file.deleteFile();
+                        juce::FileOutputStream out (file);
+                        juce::PNGImageFormat().writeImageToStream (image, out);
+                    }
+                }
             }
             std::sort (ms.begin(), ms.end());
+            std::sort (wall.begin(), wall.end());
             text << name << (mode == 0 ? ", whole frame" : mode == 1 ? ", cached frame" : ", playhead column") << ": median "
-                 << juce::String (ms[ms.size() / 2], 3) << " ms, p90 " << juce::String (ms[(ms.size() * 9) / 10], 3) << " ms"
+                 << juce::String (ms[ms.size() / 2], 3) << " ms, p90 " << juce::String (ms[(ms.size() * 9) / 10], 3) << " ms, wall median "
+                 << juce::String (wall[wall.size() / 2], 3) << " ms"
                  << (hash.isNotEmpty() ? ", pixels " + hash : juce::String()) << "\n";
             report.replaceWithText (text);
         };
         auto measureAll = [&] (const juce::String& name) {
+            if (! wanted (name))
+                return;
             measure (name, 0);
             measure (name, 1);
             measure (name, 2);
@@ -17113,6 +17166,8 @@ private:
         ui.setClipLaunchWorkflow (false);
         text << "result=OK\n";
         report.replaceWithText (text);
+        if (profile.isNotEmpty())
+            lynx::crashguard::stopMainProfiler();
     }
 
     void runGridShot (const juce::String& prefix, const juce::String& projectPath = {})
