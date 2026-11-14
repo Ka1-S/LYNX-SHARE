@@ -16183,7 +16183,7 @@ private:
                 shoot (page, juce::String (name) + "-small", 390, 390);
             }
             shoot (lynx::SettingsPage::audio, "audio-whole", 680, 1500);
-            shoot (lynx::SettingsPage::general, "general-whole", 680, 2300);
+            shoot (lynx::SettingsPage::general, "general-whole", 680, 2400); // (round 190gh: + the Updates section's previous-version row)
         }
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
     }

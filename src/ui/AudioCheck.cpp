@@ -173,13 +173,6 @@ private:
         question.setVisible (stage != Stage::ready);
         heard.setVisible (stage != Stage::ready);
         nothing.setVisible (stage != Stage::ready);
-        if (! open && stage == Stage::ready && advice.getText().isEmpty())
-        {
-            // (no list of devices to try yet: scanning every driver type is left for "I heard nothing" — a JACK client
-            // opened while the wizard is being built can hang or crash a system with a broken JACK)
-            advice.setText (tr ("No audio output device is open. Choose one:"), juce::dontSendNotification);
-            advice.setColour (juce::Label::textColourId, theme::colour::textPrimary);
-        }
     }
 
     void playTone()
