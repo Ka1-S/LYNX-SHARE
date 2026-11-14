@@ -834,6 +834,7 @@ int roarStage (RackBuilder& b, int chain, const Element& device, int k, double i
             if (fit.character > 0)
                 p[(std::size_t) em::characterParam (0)] = (float) fit.character / (float) em::characters;
             p[em::autoGain] = 0.0f;
+            p[(std::size_t) em::law] = 0.0f; // (rollup 0.1.28, 190fm x 190fj: the shaper fits are on the Classic curves, as Saturator's)
             p[em::drive] = linValue (roarDriveDb (amount), 0.0, 36.0);
             p[em::inputGain] = linValue (inputDb, -24.0, 24.0);
             p[em::output] = linValue (trimDb, -18.0, 18.0);

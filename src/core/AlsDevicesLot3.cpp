@@ -207,6 +207,7 @@ bool drumBussToRack (const Element& device, Translated& out)
     const auto stageAt = [type] (double d) { return drumBussDriveStage (type, d); };
     e[em::voice] = (float) stage.voice / (float) em::voices;
     e[em::autoGain] = 0.0f;
+    e[(std::size_t) em::law] = 0.0f; // (rollup 0.1.28, 190fk x 190fj: round 190ek's rack was fitted on the Classic tape)
     e[em::drive] = linValue (stage.driveDb, 0.0, 36.0);
     e[em::output] = linValue (stage.outputDb, -18.0, 18.0);
     const auto trimDb = dbOfGain (manual (device, "InputTrim", 1.0));

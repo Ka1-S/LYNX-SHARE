@@ -200,3 +200,31 @@ TEST (rollup028_midi_generate_stacks_count_bars_of_the_song_meter)
     const auto four = stacks (o, mg190fm::bar (2), bank);
     CHECK (four.size() == 6 && four[0].length == 4 * lynx::ppq);
 }
+
+// Step 2 (ember190fj): Ember's Tape runs a measured magnetic core in new instances (Law = Measured). The Live imports
+// that build Ember stages on fits made on the Classic tape keep it there, as 190fj did for Saturator: realive190fm's
+// Roar (Polynomial = the tape style) and drumbus190fk's round-190ek Drum Buss rack.
+TEST (rollup028_live_imports_keep_embers_classic_tape)
+{
+    using namespace lynx;
+    using namespace lynx::alsdev;
+    using als190fm::par;
+    namespace em = mixsuite::ember;
+    const auto t = als190fm::translate (als190fm::roar (1, par ("Stage1_Shaper_Type", 7) + par ("Stage2_Shaper_Type", 7)));
+    const auto* r = t ? als190fm::rackOf (*t) : nullptr;
+    CHECK (r != nullptr);
+    int embers = 0;
+    if (r != nullptr)
+        for (const auto& node : t->slot.patcher.nodes)
+            if (node.effect.kind == EffectKind::ember)
+            {
+                ++embers;
+                CHECK (em::styleOf (node.effect.params[em::style]) == em::Style::tape);
+                CHECK (node.effect.params[(std::size_t) em::law] == 0.0f && ! em::measuredTape (node.effect.params));
+            }
+    CHECK (embers >= 1);
+    // a new Ember in the Tape style is the measured one (190fj's default), so the pin above is what keeps the import
+    auto fresh = makeEffectSlot (EffectKind::ember);
+    fresh.params[em::style] = 1.0f / (float) (em::styles - 1);
+    CHECK (em::measuredTape (fresh.params));
+}
