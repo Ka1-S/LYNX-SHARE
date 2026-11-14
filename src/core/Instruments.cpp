@@ -1051,7 +1051,10 @@ public:
         renderVoices (left, right, n, gl, gr);
     }
 
-    void renderVoices (float* left, float* right, int n, float gl, float gr) noexcept
+    // (round 190ge: the output buffers never overlap this instrument's state — the scratch ones are written only through
+    // these pointers here — so `__restrict` lets the compiler keep the settings in registers through the sample loop
+    // instead of reading them again after every store; the same arithmetic, the same samples)
+    void renderVoices (float* __restrict left, float* __restrict right, int n, float gl, float gr) noexcept
     {
         for (auto& v : voices)
         {
@@ -1267,7 +1270,7 @@ private:
         return 0.0f;
     }
 
-    float oscillator (Waveform w, double phase, double dt) noexcept
+    [[gnu::always_inline]] inline float oscillator (Waveform w, double phase, double dt) noexcept // (round 190ge: in the sample loop, not a call per oscillator per sample)
     {
         switch (w)
         {

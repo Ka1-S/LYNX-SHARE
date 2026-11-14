@@ -388,6 +388,11 @@ target_link_libraries(flpdump PRIVATE lynx_core)
 add_executable(renderwav tools/renderwav.cpp)
 target_link_libraries(renderwav PRIVATE lynx_core)
 
+# the audio engine's CPU per block, headless (round 190ge): perfbench <scenario> [--block N] [--threads N] ...
+add_executable(perfbench tools/perfbench.cpp)
+target_link_libraries(perfbench PRIVATE lynx_core)
+target_include_directories(perfbench PRIVATE tools)
+
 enable_testing()
 add_test(NAME lynx_tests COMMAND lynx_tests)
 

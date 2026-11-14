@@ -1,8 +1,10 @@
 #include "ui/ClipGridComponent.h"
+#include "ui/PaintAB.h"
 #include "ui/PlaylistComponent.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #include "core/ClipLauncher.h"
 #include "core/DetailChain.h"
@@ -1751,10 +1753,95 @@ private:
         {
             if (const auto want = mixerHeight(); want != mixer->getHeight())
                 resized();
-            mixer->tick();
+            mixer->tick(); // (its meters and arm buttons repaint themselves when they change)
+            if (! ui::paintSavings()) // (LYNX_PAINT_SAVINGS=0: the whole mixer every tick, as before)
+                mixer->repaint();
         }
-        repaint();
+        // round 190ge: the whole grid was repainted 30 times a second, also with nothing playing. Now a change of what
+        // all of it shows (the song, the transport, the layout, the selection) repaints it; otherwise only the columns
+        // whose own state moved (a playing clip's progress, a blink, an arm) are repainted, header to status row
+        const auto columns = juce::jmax (0, juce::jmin (columnCount(), launcher::maxTracks));
+        const auto cells = cellArea();
+        if (! ui::paintSavings()) // (LYNX_PAINT_SAVINGS=0: the whole grid every tick, as before)
+        {
+            repaint();
+            return;
+        }
+        if (const auto now = drawnState(); now != lastDrawnState || columnStates.size() != (std::size_t) columns)
+        {
+            lastDrawnState = now;
+            columnStates.assign ((std::size_t) columns, 0);
+            for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+                columnStates[(std::size_t) t] = columnState (t); // (what this repaint shows)
+            repaint();
+            return;
+        }
+        for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+            if (const auto now = columnState (t); now != columnStates[(std::size_t) t])
+            {
+                columnStates[(std::size_t) t] = now;
+                repaint (juce::Rectangle<int> (columnX (t), 0, columnWidth, cells.getBottom() + statusHeight + 1).getIntersection (
+                    juce::Rectangle<int> (0, 0, cells.getRight(), getHeight())));
+            }
     }
+
+    static std::uint64_t mixBits (std::uint64_t h, std::uint64_t v) noexcept { return (h ^ v) * 1099511628211ull; }
+    template <typename T>
+    static std::uint64_t bitsOf (T value) noexcept
+    {
+        std::uint64_t b = 0;
+        std::memcpy (&b, &value, sizeof (value));
+        return b;
+    }
+
+    // What the whole grid's paint reads that may change without a repaint() of its own: the engine's song (its
+    // stamp), the transport, this view's selection, scroll, size and layout (round 190ge).
+    std::uint64_t drawnState() const
+    {
+        std::uint64_t h = 1469598103934665603ull;
+        h = mixBits (h, engine.getSongStamp());
+        h = mixBits (h, engine.getTransport().playing.load (std::memory_order_relaxed) ? 1u : 0u);
+        h = mixBits (h, gridOf() != nullptr ? 1u : 0u);
+        for (const auto v : { scrollX, scrollY, selectedTrack, selectedScene, pressedTrack, pressedScene, dropTrack, dropScene, deviceDropTrack,
+                              selectedField, getWidth(), getHeight(), sceneWidthNow(), (int) sceneSelected, (int) titleSelected,
+                              (int) layoutstyle::current(), mixer != nullptr && mixer->armsShown() ? 1 : 0, columnCount() })
+            h = mixBits (h, (std::uint64_t) (std::uint32_t) v);
+        return h;
+    }
+
+    // One column's own state: its launcher view (playing, waiting, recording, stopping, taken; a playing clip's
+    // progress; the recording's start and the clock while it records), whether it is armed, and the blink phase while
+    // something in it blinks. Never 0 (0 = not known yet).
+    std::uint64_t columnState (int t) const
+    {
+        std::uint64_t h = 1469598103934665603ull;
+        h = mixBits (h, engine.isGridTrackArmed (t) ? 1u : 0u);
+        if (const auto* state = engine.launcherState())
+        {
+            const auto& v = state->tracks[(std::size_t) t];
+            const auto playing = v.playing.load (std::memory_order_relaxed), pending = v.pending.load (std::memory_order_relaxed);
+            const auto recording = v.recording.load (std::memory_order_relaxed), recordPending = v.recordPending.load (std::memory_order_relaxed);
+            const auto stopping = v.stopping.load (std::memory_order_relaxed);
+            h = mixBits (h, (std::uint64_t) (std::uint32_t) playing);
+            h = mixBits (h, (std::uint64_t) (std::uint32_t) pending);
+            h = mixBits (h, (std::uint64_t) (std::uint32_t) recording);
+            h = mixBits (h, (std::uint64_t) (std::uint32_t) recordPending);
+            h = mixBits (h, (stopping ? 1u : 0u) | (v.taken.load (std::memory_order_relaxed) ? 2u : 0u));
+            if (playing >= 0)
+                h = mixBits (h, bitsOf (v.progress.load (std::memory_order_relaxed)));
+            if (pending >= 0 || recordPending >= 0 || stopping)
+                h = mixBits (h, juce::Time::getMillisecondCounter() / 150);
+            if (recording >= 0) // (the length counter; a MIDI take's name)
+            {
+                h = mixBits (h, bitsOf (v.recordFrom.load (std::memory_order_relaxed)));
+                h = mixBits (h, bitsOf (state->clockNow.load (std::memory_order_relaxed)));
+                h = mixBits (h, juce::Time::getMillisecondCounter() / 33);
+            }
+        }
+        return h != 0 ? h : 1;
+    }
+    std::uint64_t lastDrawnState = 0;
+    std::vector<std::uint64_t> columnStates; // [column] its last columnState, 0 = not known yet
     void componentMovedOrResized (bool, bool) override {}
     void componentPeerChanged() override { updateTimer(); }
     void componentVisibilityChanged() override { updateTimer(); }

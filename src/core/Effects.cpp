@@ -2689,7 +2689,28 @@ std::string paramText (int param, float v)
 }
 } // namespace autopan
 
+namespace
+{
+const EffectInfo& effectInfoOf (EffectKind kind);
+}
+
+// Round 190ge: one table lookup. effectInfoOf below passes the guard of each of its ~120 local statics before its switch
+// on every call, and the renderer asks for a slot's info every block (0.8 % of a big project's render on its own).
 const EffectInfo& effectInfo (EffectKind kind)
+{
+    static const auto table = [] {
+        std::array<const EffectInfo*, 256> t {};
+        for (std::size_t k = 0; k < t.size(); ++k)
+            t[k] = &effectInfoOf ((EffectKind) k); // (a value past the last kind: EQ's, as effectInfoOf answers)
+        return t;
+    }();
+    static_assert (sizeof (EffectKind) == 1);
+    return *table[(std::size_t) kind];
+}
+
+namespace
+{
+const EffectInfo& effectInfoOf (EffectKind kind)
 {
     static const EffectInfo eq { "EQ", { { "Low", 0.5f }, { "Mid", 0.5f }, { "Mid freq.", 0.5f }, { "High", 0.5f }, { "Output", 0.5f } } };
     static const EffectInfo comp { "Compressor", { { "Threshold", 0.7f }, { "Ratio", 3.0f / 19.0f }, { "Attack", 0.67f }, { "Release", 0.54f }, { "Makeup", 0.0f }, { "Auto gain", 0.0f },
@@ -3558,6 +3579,7 @@ const EffectInfo& effectInfo (EffectKind kind)
     }
     return eq;
 }
+} // namespace
 
 std::string formatEffectParam (EffectKind kind, int param, float v, double bpm, const EffectParams& context)
 {

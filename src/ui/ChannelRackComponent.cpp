@@ -13,6 +13,7 @@
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/ChannelRackComponent.h"
+#include "ui/PaintAB.h"
 #include "ui/PluginOffTag.h"
 #include "ui/SpeechDialog.h"
 #include "core/Patcherize.h"
@@ -928,104 +929,109 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             }
 
             const auto hovered = [this, row] (Area a) { return hoverRow == row && hoverArea == a; };
-            const auto led = juce::Rectangle<float> (9.0f, (float) y + rowHeight / 2.0f - 4.5f, 9.0f, 9.0f);
-            g.setColour (theme::muteLed (channel.muted));
-            g.fillEllipse (led);
+            // round 190ge: a playhead step repaints the selector column only (the selectors flash with the hits): the mute
+            // LED, knobs, route box and name, all left of it, are drawn only when the repainted area reaches them
+            if (column.getX() < selectLeft() || ! ui::paintSavings())
+            {
+                const auto led = juce::Rectangle<float> (9.0f, (float) y + rowHeight / 2.0f - 4.5f, 9.0f, 9.0f);
+                g.setColour (theme::muteLed (channel.muted));
+                g.fillEllipse (led);
 
-            if (hovered (Area::mute)) // hover ring
-            {
-                g.setColour (textSecondary.withAlpha (0.8f));
-                g.drawEllipse (led.expanded (2.5f), 1.0f);
-            }
+                if (hovered (Area::mute)) // hover ring
+                {
+                    g.setColour (textSecondary.withAlpha (0.8f));
+                    g.drawEllipse (led.expanded (2.5f), 1.0f);
+                }
 
-            const auto touched = knobDrag != Area::none && knobRow == row;
-            // (while the song plays an automated knob shows its automation's value, issue #12)
-            const auto& automated = engine.getAutomationDisplay();
-            theme::drawKnob (g, controlBounds (Area::pan, row).toFloat().reduced (1.0f, 2.0f),
-                             automated.shown ({ AutomationTargetKind::channelPan, row }, (channel.pan + 1.0f) / 2.0f), true,
-                             touched && knobDrag == Area::pan ? accent : info, hovered (Area::pan) || (touched && knobDrag == Area::pan));
-            theme::drawKnob (g, controlBounds (Area::volume, row).toFloat().reduced (1.0f, 2.0f),
-                             automated.shown ({ AutomationTargetKind::channelVolume, row }, channel.volume), false,
-                             touched && knobDrag == Area::volume ? accent : knobArc, hovered (Area::volume) || (touched && knobDrag == Area::volume));
+                const auto touched = knobDrag != Area::none && knobRow == row;
+                // (while the song plays an automated knob shows its automation's value, issue #12)
+                const auto& automated = engine.getAutomationDisplay();
+                theme::drawKnob (g, controlBounds (Area::pan, row).toFloat().reduced (1.0f, 2.0f),
+                                 automated.shown ({ AutomationTargetKind::channelPan, row }, (channel.pan + 1.0f) / 2.0f), true,
+                                 touched && knobDrag == Area::pan ? accent : info, hovered (Area::pan) || (touched && knobDrag == Area::pan));
+                theme::drawKnob (g, controlBounds (Area::volume, row).toFloat().reduced (1.0f, 2.0f),
+                                 automated.shown ({ AutomationTargetKind::channelVolume, row }, channel.volume), false,
+                                 touched && knobDrag == Area::volume ? accent : knobArc, hovered (Area::volume) || (touched && knobDrag == Area::volume));
 
-            // small box with the mixer insert ("-" = straight to Master)
-            const auto routeArea = controlBounds (Area::route, row).toFloat();
-            g.setColour (theme::drawDigitDisplay (g, routeArea, hovered (Area::route) || (touched && knobDrag == Area::route),
-                                                  channel.mixerTrack <= 0));
-            g.setFont (theme::font (theme::type::caption, true));
-            textcache::drawText (g, channel.mixerTrack > 0 ? juce::String (channel.mixerTrack) : juce::String ("-"), routeArea.toNearestInt(),
-                        juce::Justification::centred);
-            g.setFont (theme::font (theme::type::body));
+                // small box with the mixer insert ("-" = straight to Master)
+                const auto routeArea = controlBounds (Area::route, row).toFloat();
+                g.setColour (theme::drawDigitDisplay (g, routeArea, hovered (Area::route) || (touched && knobDrag == Area::route),
+                                                      channel.mixerTrack <= 0));
+                g.setFont (theme::font (theme::type::caption, true));
+                textcache::drawText (g, channel.mixerTrack > 0 ? juce::String (channel.mixerTrack) : juce::String ("-"), routeArea.toNearestInt(),
+                            juce::Justification::centred);
+                g.setFont (theme::font (theme::type::body));
 
-            // name button: tinted with the channel colour (from the .flp or user-picked), so channels are found by
-            // colour as in FL; kept dark and toned down (LYNX look), with the colour strip at its left
-            {
-                auto plate = row == primary ? bg6 : hovered (Area::name) ? bg5 : bg4;
-                if (channel.colour != 0)
-                    plate = plate.interpolatedWith (theme::tame (juce::Colour (channel.colour)), row == primary ? 0.42f : 0.32f);
-                theme::fillRoundRect (g, nameArea, theme::radius::md, plate);
-            }
+                // name button: tinted with the channel colour (from the .flp or user-picked), so channels are found by
+                // colour as in FL; kept dark and toned down (LYNX look), with the colour strip at its left
+                {
+                    auto plate = row == primary ? bg6 : hovered (Area::name) ? bg5 : bg4;
+                    if (channel.colour != 0)
+                        plate = plate.interpolatedWith (theme::tame (juce::Colour (channel.colour)), row == primary ? 0.42f : 0.32f);
+                    theme::fillRoundRect (g, nameArea, theme::radius::md, plate);
+                }
 
-            if (row == primary)
-            {
-                g.setColour (accent);
-                g.drawRoundedRectangle (nameArea.reduced (0.5f), theme::radius::md, 1.0f);
-            }
+                if (row == primary)
+                {
+                    g.setColour (accent);
+                    g.drawRoundedRectangle (nameArea.reduced (0.5f), theme::radius::md, 1.0f);
+                }
 
-            theme::fillRoundRect (g, nameArea.withWidth (4.0f).reduced (0.0f, 3.0f).translated (3.0f, 0.0f), 1.5f, channel.colour != 0 ? theme::tame (juce::Colour (channel.colour)) : bg6.brighter (0.2f));
+                theme::fillRoundRect (g, nameArea.withWidth (4.0f).reduced (0.0f, 3.0f).translated (3.0f, 0.0f), 1.5f, channel.colour != 0 ? theme::tame (juce::Colour (channel.colour)) : bg6.brighter (0.2f));
 
-            const auto locked = ! channel.receiveFrom.empty();
-            if (locked) // FL's lock icon: the channel receives the notes of one MIDI input ("Receive notes from")
-            {
-                const auto lockBox = juce::Rectangle<float> (nameArea.getRight() - 15.0f, nameArea.getCentreY() - 6.0f, 9.0f, 11.0f);
-                g.setColour (warning);
-                juce::Path shackle;
-                shackle.addCentredArc (lockBox.getCentreX(), lockBox.getY() + 4.0f, 2.8f, 3.2f, 0.0f, -juce::MathConstants<float>::halfPi,
-                                       juce::MathConstants<float>::halfPi, true);
-                g.strokePath (shackle, juce::PathStrokeType (1.4f));
-                g.fillRoundedRectangle (lockBox.withTrimmedTop (4.5f), 1.5f);
+                const auto locked = ! channel.receiveFrom.empty();
+                if (locked) // FL's lock icon: the channel receives the notes of one MIDI input ("Receive notes from")
+                {
+                    const auto lockBox = juce::Rectangle<float> (nameArea.getRight() - 15.0f, nameArea.getCentreY() - 6.0f, 9.0f, 11.0f);
+                    g.setColour (warning);
+                    juce::Path shackle;
+                    shackle.addCentredArc (lockBox.getCentreX(), lockBox.getY() + 4.0f, 2.8f, 3.2f, 0.0f, -juce::MathConstants<float>::halfPi,
+                                           juce::MathConstants<float>::halfPi, true);
+                    g.strokePath (shackle, juce::PathStrokeType (1.4f));
+                    g.fillRoundedRectangle (lockBox.withTrimmedTop (4.5f), 1.5f);
+                }
+                // Online Sessions (round 168a): the plugin is not installed here, its stand-in render plays (an amber tag)
+                auto badgeWidth = 0.0f;
+                if (engine.playsStandIn (row))
+                {
+                    badgeWidth = 16.0f;
+                    juce::Graphics::ScopedSaveState keepFont (g);
+                    const auto tag = juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f), nameArea.getCentreY() - 6.5f, 14.0f, 13.0f);
+                    theme::fillRoundRect (g, tag, 3.0f, warning.withAlpha (0.85f));
+                    g.setColour (bg1);
+                    g.setFont (theme::font (10.0f, true));
+                    g.drawText ("R", tag, juce::Justification::centred, false);
+                }
+                // round 190ap: opened without third-party plugins, this channel's plugin is still off (a grey power tag)
+                else if (engine.channelPluginOff (row))
+                {
+                    badgeWidth = 16.0f;
+                    juce::Graphics::ScopedSaveState keepFont (g);
+                    ui::drawPluginOffTag (g, juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f), nameArea.getCentreY() - 6.5f, 14.0f, 13.0f));
+                }
+                // Freeze (round 190ay): a frozen channel plays its rendered audio, its instrument is unloaded — a snowflake
+                // tag (amber when the audio is out of date or missing) and a dimmed name
+                const auto frozen = channel.freeze.on();
+                if (frozen)
+                {
+                    const auto attention = engine.frozenAudioMissing (row) || engine.freezeOutOfDate (row);
+                    const auto tag = juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f) - badgeWidth, nameArea.getCentreY() - 6.5f, 14.0f, 13.0f);
+                    badgeWidth += 16.0f;
+                    theme::fillRoundRect (g, nameArea, theme::radius::md, bg1.withAlpha (0.35f)); // the plate, dimmed
+                    theme::drawFrozenTag (g, tag, (attention ? warning : info).withAlpha (0.85f), bg1);
+                }
+                // the channel's icon before its name, as FL's channel button shows it (round 168h)
+                auto iconWidth = 0;
+                if (const auto icon = trackicons::iconFor (channel.icon); icon != trackicons::Icon::none)
+                {
+                    iconWidth = 16;
+                    ui::drawTrackIcon (g, icon, juce::Rectangle<float> (nameArea.getX() + 12.0f, nameArea.getCentreY() - 7.0f, 14.0f, 14.0f),
+                                       channel.muted ? textDisabled : textSecondary.brighter (0.3f));
+                }
+                g.setColour (channel.muted ? textDisabled : frozen ? textSecondary : textPrimary);
+                textcache::drawText (g, juce::String::fromUTF8 (channel.name.c_str()),
+                                     nameArea.withTrimmedLeft ((float) (14 + iconWidth)).withTrimmedRight ((locked ? 18 : 6) + badgeWidth).toNearestInt(), juce::Justification::centredLeft, true);
             }
-            // Online Sessions (round 168a): the plugin is not installed here, its stand-in render plays (an amber tag)
-            auto badgeWidth = 0.0f;
-            if (engine.playsStandIn (row))
-            {
-                badgeWidth = 16.0f;
-                juce::Graphics::ScopedSaveState keepFont (g);
-                const auto tag = juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f), nameArea.getCentreY() - 6.5f, 14.0f, 13.0f);
-                theme::fillRoundRect (g, tag, 3.0f, warning.withAlpha (0.85f));
-                g.setColour (bg1);
-                g.setFont (theme::font (10.0f, true));
-                g.drawText ("R", tag, juce::Justification::centred, false);
-            }
-            // round 190ap: opened without third-party plugins, this channel's plugin is still off (a grey power tag)
-            else if (engine.channelPluginOff (row))
-            {
-                badgeWidth = 16.0f;
-                juce::Graphics::ScopedSaveState keepFont (g);
-                ui::drawPluginOffTag (g, juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f), nameArea.getCentreY() - 6.5f, 14.0f, 13.0f));
-            }
-            // Freeze (round 190ay): a frozen channel plays its rendered audio, its instrument is unloaded — a snowflake
-            // tag (amber when the audio is out of date or missing) and a dimmed name
-            const auto frozen = channel.freeze.on();
-            if (frozen)
-            {
-                const auto attention = engine.frozenAudioMissing (row) || engine.freezeOutOfDate (row);
-                const auto tag = juce::Rectangle<float> (nameArea.getRight() - (locked ? 34.0f : 18.0f) - badgeWidth, nameArea.getCentreY() - 6.5f, 14.0f, 13.0f);
-                badgeWidth += 16.0f;
-                theme::fillRoundRect (g, nameArea, theme::radius::md, bg1.withAlpha (0.35f)); // the plate, dimmed
-                theme::drawFrozenTag (g, tag, (attention ? warning : info).withAlpha (0.85f), bg1);
-            }
-            // the channel's icon before its name, as FL's channel button shows it (round 168h)
-            auto iconWidth = 0;
-            if (const auto icon = trackicons::iconFor (channel.icon); icon != trackicons::Icon::none)
-            {
-                iconWidth = 16;
-                ui::drawTrackIcon (g, icon, juce::Rectangle<float> (nameArea.getX() + 12.0f, nameArea.getCentreY() - 7.0f, 14.0f, 14.0f),
-                                   channel.muted ? textDisabled : textSecondary.brighter (0.3f));
-            }
-            g.setColour (channel.muted ? textDisabled : frozen ? textSecondary : textPrimary);
-            textcache::drawText (g, juce::String::fromUTF8 (channel.name.c_str()),
-                                 nameArea.withTrimmedLeft ((float) (14 + iconWidth)).withTrimmedRight ((locked ? 18 : 6) + badgeWidth).toNearestInt(), juce::Justification::centredLeft, true);
 
             // selector: a slim pill, lit when the row is selected
             const auto pill = juce::Rectangle<float> ((float) selectLeft() + 3.0f, (float) y + 7.0f, (float) selectWidth - 6.0f, (float) rowHeight - 14.0f);
@@ -1039,16 +1045,19 @@ void ChannelRackComponent::paint (juce::Graphics& g)
         {
             const auto box = racklayout::addChannelBox (nameLeft(), nameWidth, addY, rowHeight);
             const auto addArea = juce::Rectangle<float> ((float) box.x, (float) box.y, (float) box.width, (float) box.height);
-            const float dash[] = { 3.0f, 3.0f };
-            juce::Path outline, dashed;
-            outline.addRoundedRectangle (addArea.reduced (0.5f), theme::radius::md);
-            juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dash, 2);
-            const auto addHovered = hoverArea == Area::addRow;
-            g.setColour (addHovered ? textSecondary : borderStrong);
-            g.fillPath (dashed);
-            g.setColour (addHovered ? textPrimary : textSecondary);
-            g.setFont (theme::font (theme::type::small));
-            textcache::drawText (g, tr ("+ add channel"), addArea.toNearestInt(), juce::Justification::centred);
+            if (g.clipRegionIntersects (addArea.getSmallestIntegerContainer().expanded (1)) || ! ui::paintSavings()) // (round 190ge: a playhead frame repaints the steps only)
+            {
+                const float dash[] = { 3.0f, 3.0f };
+                juce::Path outline, dashed;
+                outline.addRoundedRectangle (addArea.reduced (0.5f), theme::radius::md);
+                juce::PathStrokeType (1.0f).createDashedStroke (dashed, outline, dash, 2);
+                const auto addHovered = hoverArea == Area::addRow;
+                g.setColour (addHovered ? textSecondary : borderStrong);
+                g.fillPath (dashed);
+                g.setColour (addHovered ? textPrimary : textSecondary);
+                g.setFont (theme::font (theme::type::small));
+                textcache::drawText (g, tr ("+ add channel"), addArea.toNearestInt(), juce::Justification::centred);
+            }
         }
 
         if (stickyX > 0) // steps pass under the column: a hairline marks its edge

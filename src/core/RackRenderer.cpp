@@ -2105,8 +2105,27 @@ void flWrapperGains (float pan, float gain, bool triangular, float& left, float&
 float peakOf (const float* data, int n) noexcept
 {
     float peak = 0.0f;
-
-    for (int i = 0; i < n; ++i)
+    int i = 0;
+#if defined(LYNX_X86)
+    // round 190ge: four lanes at a time. The scalar form below stayed one serial chain of maxss on every compiler (it
+    // runs for each insert and meter, every block). The same peak: a maximum is exact in any order, and a NaN is
+    // skipped in both forms (max (NaN, m) keeps m, as `a > peak` is false for a NaN)
+    if (n >= 8)
+    {
+        const auto mask = _mm_castsi128_ps (_mm_set1_epi32 (0x7fffffff));
+        auto m0 = _mm_setzero_ps(), m1 = _mm_setzero_ps();
+        for (; i + 8 <= n; i += 8)
+        {
+            m0 = _mm_max_ps (_mm_and_ps (_mm_loadu_ps (data + i), mask), m0);
+            m1 = _mm_max_ps (_mm_and_ps (_mm_loadu_ps (data + i + 4), mask), m1);
+        }
+        alignas (16) float lanes[4];
+        _mm_store_ps (lanes, _mm_max_ps (m0, m1));
+        for (const auto a : lanes)
+            peak = a > peak ? a : peak;
+    }
+#endif
+    for (; i < n; ++i)
     {
         const auto a = std::abs (data[i]);
         peak = a > peak ? a : peak; // form the compiler vectorizes
@@ -2115,13 +2134,29 @@ float peakOf (const float* data, int n) noexcept
     return peak;
 }
 
-// No NaN / inf in the block? (x · 0 is 0 for every finite x: one vectorized pass)
+// No NaN / inf in the block? Round 190ge: by the exponent bits (all ones only for an inf or a NaN), four lanes at a
+// time. (The form before, x · 0 summed — 0 for every finite x — was one serial chain of float additions on every
+// compiler: the order of a float sum may not change. It ran after every effect slot, every block.)
 bool finiteBlock (const float* l, const float* r, int n) noexcept
 {
-    float acc = 0.0f;
-    for (int k = 0; k < n; ++k)
-        acc += l[k] * 0.0f + r[k] * 0.0f;
-    return acc == 0.0f;
+    int k = 0;
+    auto bad = false;
+#if defined(LYNX_X86)
+    {
+        const auto exponent = _mm_set1_epi32 (0x7f800000);
+        auto acc = _mm_setzero_si128();
+        for (; k + 4 <= n; k += 4)
+        {
+            const auto a = _mm_and_si128 (_mm_castps_si128 (_mm_loadu_ps (l + k)), exponent);
+            const auto b = _mm_and_si128 (_mm_castps_si128 (_mm_loadu_ps (r + k)), exponent);
+            acc = _mm_or_si128 (acc, _mm_or_si128 (_mm_cmpeq_epi32 (a, exponent), _mm_cmpeq_epi32 (b, exponent)));
+        }
+        bad = _mm_movemask_epi8 (acc) != 0;
+    }
+#endif
+    for (; k < n; ++k)
+        bad = bad || ! std::isfinite (l[k]) || ! std::isfinite (r[k]);
+    return ! bad;
 }
 
 std::atomic<std::uint64_t> nonFiniteBlocks { 0 };
@@ -2132,6 +2167,22 @@ bool anyAbove (const float* l, const float* r, int n, float level) noexcept
     // in blocks of 32: the inner loop vectorizes; silent chunks (the ones that scan everything) stay cheap
     int i = 0;
 
+#if defined(LYNX_X86)
+    // round 190ge: explicitly four lanes at a time (the loop below stayed scalar on every compiler); the same answer:
+    // true as soon as a 32-sample chunk holds a sample above `level` (a NaN is never above it, in both forms)
+    {
+        const auto mask = _mm_castsi128_ps (_mm_set1_epi32 (0x7fffffff));
+        const auto threshold = _mm_set1_ps (level);
+        for (; i + 32 <= n; i += 32)
+        {
+            auto m = _mm_setzero_ps();
+            for (int k = i; k < i + 32; k += 4)
+                m = _mm_max_ps (_mm_max_ps (_mm_and_ps (_mm_loadu_ps (l + k), mask), _mm_and_ps (_mm_loadu_ps (r + k), mask)), m);
+            if (_mm_movemask_ps (_mm_cmpgt_ps (m, threshold)) != 0)
+                return true;
+        }
+    }
+#endif
     for (; i + 32 <= n; i += 32)
     {
         float m = 0.0f;
@@ -3307,12 +3358,23 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         }
         else if (state.hasAutomation && ! isPlugin)
         {
-            auto params = slots[i].params; // copy without allocation
+            // round 190ge: only the automated parameters are worked out, into a copy only when there is one. Most slots of
+            // a song with automation have none, and the copy (768 bytes) and a lookup per parameter, at every block,
+            // were most of this function's own time in a big project (an unautomated parameter keeps its value either way)
             const auto& autos = state.effectParamAuto[(std::size_t) track][i];
-            const auto used = std::min (params.size(), effectInfo (slots[i].kind).params.size());
-
-            for (std::size_t p = 0; p < used; ++p)
-                params[p] = compensatedAutomation (state, autos[p], track, (int) i, automated (autos[p], params[p]));
+            const auto used = std::min (slots[i].params.size(), effectInfo (slots[i].kind).params.size());
+            std::size_t firstAutomated = 0;
+            while (firstAutomated < used && autos[firstAutomated] < 0)
+                ++firstAutomated;
+            EffectParams automatedParams; // (filled only when used)
+            if (firstAutomated < used)
+            {
+                automatedParams = slots[i].params;
+                for (std::size_t p = firstAutomated; p < used; ++p)
+                    if (autos[p] >= 0)
+                        automatedParams[p] = compensatedAutomation (state, autos[p], track, (int) i, automated (autos[p], automatedParams[p]));
+            }
+            const auto& params = firstAutomated < used ? automatedParams : slots[i].params;
 
             effects[i]->setSongPosition (chunkTick);
             effects[i]->setPlaying (chunkPlaying);
@@ -4110,9 +4172,18 @@ void RackRenderer::runVfxChannels (const RackState& state, bool playing, int num
     events.sortByOffset();
 }
 
+namespace
+{
+// Round 190ge: a chunk with almost nothing to do runs on the audio thread alone (see processChunk). The previous chunk's
+// wall time on this thread (one renderer per audio thread; only a heuristic: the samples are the same either way)
+thread_local std::uint64_t lastChunkNs = ~std::uint64_t (0);
+constexpr std::uint64_t lightChunkNs = 60000; // 60 µs (about 1 % of a 256-sample block at 44.1 kHz)
+} // namespace
+
 void RackRenderer::processChunk (const RackState& state, bool playing, double startTick, int numSamples,
                                  float* left, float* right, MeterBank* meters) noexcept
 {
+    const auto chunkStartNs = workers != nullptr ? ProcessTimes::now() : 0;
     chunkTick = startTick;
     chunkPlaying = playing;
     // FL: playback starting puts every control the user moved back under its automation (issue #125)
@@ -4391,6 +4462,14 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         for (int k = 0; k < events.size(); ++k)
             deliverToEffects (state, events[k]);
 
+    // Round 190ge: no note or event in this chunk, no live input, and the last one took under 60 µs (an idle project:
+    // the channels idle, the effects smart-disabled): the workers stay asleep. Waking them per chunk cost an idle
+    // project with 3 workers ~15 % of a core at 64 samples, ten times the work itself. Serial and parallel give the
+    // same samples (the task graph and the layers only change who computes what); the next note runs in parallel.
+    auto* const pool = workers;
+    if (pool != nullptr && events.size() == 0 && lastChunkNs < lightChunkNs && (liveInput == nullptr || liveInput->numChannels == 0))
+        workers = nullptr;
+
     // 1) channels, each with its own notes at the exact sample (in parallel when worth it)
     const auto channels = std::min<int> ({ (int) state.instruments.size(), (int) song.channels.size(), maxChannels });
     auto channel = [this, &state, numSamples] (int c) {
@@ -4495,6 +4574,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         }
     }
 
+    workers = pool;
+
     // 3) Master: inputs, effects, fader. Without a configured mixer, it stays at 0 dB.
     pullInputs (state, 0, numSamples);
     if (meters != nullptr)
@@ -4552,6 +4633,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
 
     if (hwOut != nullptr && ! state.hwRoutes.empty() && hwOut->active.load (std::memory_order_relaxed))
         mixHardwareOutputs (state, numSamples);
+    if (workers != nullptr)
+        lastChunkNs = ProcessTimes::now() - chunkStartNs;
 }
 
 // 4) inserts with a hardware output target: their post-fader output (the same signal the Master gets) into the
@@ -4814,7 +4897,9 @@ void RackRenderer::pullInputs (const RackState& state, int t, int n) noexcept
         // an automated route level (fader curve, like the knob)
         const auto automatedLevel = in.automation >= 0 ? automationValues[(std::size_t) in.automation] : std::numeric_limits<float>::quiet_NaN();
         const auto level = std::isnan (automatedLevel) ? in.level : faderGain (automatedLevel);
-        const auto active = tap >= 0 ? tapActive[(std::size_t) tap] : trackActive[(std::size_t) in.source];
+        // (round 190ge: a source whose block came out all zeros, trackActive 2, adds nothing: its zeros would not change
+        // a sum that starts from +0, and its PDC line drains as if it had been fed them)
+        const auto active = tap >= 0 ? tapActive[(std::size_t) tap] != 0 : trackActive[(std::size_t) in.source] == 1;
         const auto& delays = state.sendDelays[(std::size_t) in.source];
         auto* delay = (std::size_t) in.delay < delays.size() ? delays[(std::size_t) in.delay].get() : nullptr;
         if (pdcBypassNow && (tap < 0 || in.pre) && state.bypassWhenIdle[(std::size_t) in.source] != 0)
@@ -4845,7 +4930,17 @@ namespace
 {
 bool isSilentBlock (const float* l, const float* r, int n) noexcept
 {
-    for (int i = 0; i < n; ++i)
+    int i = 0;
+#if defined(LYNX_X86)
+    // round 190ge: four lanes at a time (each idle insert scans its whole block); != 0 is true for a NaN, as below
+    {
+        const auto zero = _mm_setzero_ps();
+        for (; i + 4 <= n; i += 4)
+            if (_mm_movemask_ps (_mm_or_ps (_mm_cmpneq_ps (_mm_loadu_ps (l + i), zero), _mm_cmpneq_ps (_mm_loadu_ps (r + i), zero))) != 0)
+                return false;
+    }
+#endif
+    for (; i < n; ++i)
         if (l[i] != 0.0f || r[i] != 0.0f)
             return false;
     return true;
@@ -5034,10 +5129,18 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     }
     else
         lastPre = preTarget;
-    last = applyMatrix (l, r, l, r, n, from, target);
+    // round 190ge: an insert whose effects left only zeros (smart-disabled after the stop, a gate closed...): its fader
+    // on silence, with no ramp running and gains that cannot flip a zero's sign, would write the same zeros back, so it
+    // is not run; and the inserts it feeds skip it (trackActive 2). An idle project's mixer used to scale, delay and
+    // sum blocks of zeros on every insert with effects (most of its CPU once the effects were smart-disabled)
+    const auto silentOut = isSilentBlock (l, r, n);
+    if (silentOut && from == target && target.rl == 0.0f && target.lr == 0.0f && ! std::signbit (target.ll) && ! std::signbit (target.rr))
+        last = target;
+    else
+        last = applyMatrix (l, r, l, r, n, from, target);
     tap (RecordSource::postTrack, l, r);
 
-    trackActive[(std::size_t) t] = 1;
+    trackActive[(std::size_t) t] = silentOut ? 2 : 1;
 
     if (meters != nullptr)
     {

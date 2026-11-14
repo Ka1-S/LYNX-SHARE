@@ -46,11 +46,36 @@ public:
     static int latency() noexcept;        // base-rate samples (the same for every factor)
 
     // Runs `f` (float → float) at the oversampled rate on each sample of `x` (in place).
+    // Round 190ge: stage by stage over blocks of samples instead of one base sample through every stage at a time. Each
+    // half-band output still sums its taps one by one in the same order (four outputs side by side), every stage sees
+    // the same samples in the same order, and `f` is called on the same values in the same order: the same output, bit
+    // for bit, at about a third of the cost (the per-sample chain of float additions was most of Ember's CPU).
     template <typename F>
     void process (float* x, int n, F&& f) noexcept
     {
-        for (int i = 0; i < n; ++i)
-            x[i] = padOut (run<0> (x[i], f));
+        std::array<float, blockBase << maxStages> bufA, bufB;
+        for (int start = 0; start < n; start += blockBase)
+        {
+            const int m = std::min (blockBase, n - start);
+            float* cur = bufA.data();
+            float* other = bufB.data();
+            upBlock (st[0], x + start, m, cur);
+            int len = 2 * m;
+            for (int level = 1; level < stages; ++level, len *= 2)
+            {
+                upBlock (st[(std::size_t) level], cur, len, other);
+                std::swap (cur, other);
+            }
+            for (int i = 0; i < len; ++i)
+                cur[i] = f (padIn (cur[i]));
+            for (int level = stages - 1; level >= 0; --level, len /= 2)
+            {
+                downBlock (st[(std::size_t) level], cur, len / 2, other);
+                std::swap (cur, other);
+            }
+            for (int i = 0; i < m; ++i)
+                x[start + i] = padOut (cur[i]);
+        }
     }
 
 private:
@@ -63,25 +88,13 @@ private:
         int upPos = 0, downPos = 0;
     };
 
-    template <int level, typename F>
-    float run (float x, F& f) noexcept
-    {
-        if constexpr (level == maxStages)
-            return f (padIn (x));
-        else
-        {
-            if (level == stages)
-                return f (padIn (x));
-            float a, b;
-            up (st[(std::size_t) level], x, a, b);
-            const auto ya = run<level + 1> (a, f);
-            const auto yb = run<level + 1> (b, f);
-            return down (st[(std::size_t) level], ya, yb);
-        }
-    }
-
-    static void up (Stage& s, float x, float& a, float& b) noexcept;
-    static float down (Stage& s, float a, float b) noexcept;
+    // One stage over a block (round 190ge; before, one sample at a time). up: `m` samples in, 2m out (y[2m] = 2 · the
+    // half-band of the input, y[2m + 1] = the input (c − 1) / 2 samples back). down: m (even, odd) pairs in, m out
+    // (the half-band of the even samples + half the odd one c samples back). The history is left as m single steps
+    // left it, so blocks of any size give the same samples.
+    static constexpr int blockBase = 64; // base-rate samples per block (the highest rate holds blockBase << maxStages)
+    static void upBlock (Stage& s, const float* in, int m, float* out) noexcept;
+    static void downBlock (Stage& s, const float* in, int m, float* out) noexcept;
     float padIn (float x) noexcept;  // a short delay at the highest rate (makes the latency whole)
     float padOut (float x) noexcept; // base-rate delay up to the common latency
 
