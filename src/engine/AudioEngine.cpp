@@ -142,6 +142,37 @@ namespace
 // and 24-25 in others, Live's always at 26): threads raised, how many joined MMCSS at CRITICAL, their thread priority
 std::atomic<int> rtThreadsRaised { 0 }, rtThreadsMmcss { 0 }, rtThreadsCritical { 0 };
 std::atomic<int> rtPriorityMin { 1000 }, rtPriorityMax { -1000 };
+
+// The process priority class (round toolchain190gt, REA 190hb): Windows' WinMM driver (wdmaud2.drv) raises a process
+// that opens a WinMM device to HIGH (and asks REALTIME), FL's and LYNX's alike, so the UI, decoders, prefetch and plugin
+// scans ran above every normal program; FL itself asks ABOVE_NORMAL. LYNX_PRIORITY_CLASS=above asks ABOVE_NORMAL when a
+// device starts (and again 2 s later, after the MIDI ports), relying on MMCSS for the audio threads. Default: left as
+// Windows sets it — measured with --rtstress (Exoplanet, 10 ms buffer, 3 x 3000 callbacks each, loaded PC): HIGH 0
+// callbacks over the deadline, ABOVE_NORMAL 1, the same average load; a 64-sample run was not possible on this PC.
+std::atomic<unsigned long> priorityClassFound { 0 }, priorityClassNow { 0 };
+void choosePriorityClass() noexcept
+{
+    static const auto keep = juce::SystemStats::getEnvironmentVariable ("LYNX_PRIORITY_CLASS", {}) != "above";
+    const auto found = GetPriorityClass (GetCurrentProcess());
+    if (priorityClassFound.load (std::memory_order_relaxed) == 0 || found != ABOVE_NORMAL_PRIORITY_CLASS)
+        priorityClassFound.store (found, std::memory_order_relaxed);
+    if (! keep && found != ABOVE_NORMAL_PRIORITY_CLASS)
+        SetPriorityClass (GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
+    priorityClassNow.store (GetPriorityClass (GetCurrentProcess()), std::memory_order_relaxed);
+}
+juce::String priorityClassName (unsigned long c)
+{
+    switch (c)
+    {
+        case IDLE_PRIORITY_CLASS: return "idle";
+        case BELOW_NORMAL_PRIORITY_CLASS: return "below normal";
+        case NORMAL_PRIORITY_CLASS: return "normal";
+        case ABOVE_NORMAL_PRIORITY_CLASS: return "above normal";
+        case HIGH_PRIORITY_CLASS: return "high";
+        case REALTIME_PRIORITY_CLASS: return "realtime";
+        default: return c == 0 ? juce::String ("not seen") : juce::String::toHexString ((juce::int64) c);
+    }
+}
 #endif
 
 // Audio workers with real-time priority (MMCSS "Pro Audio" on Windows, like the driver; QoS class on macOS; SCHED_FIFO
@@ -5337,6 +5368,8 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
             text << "  audio threads raised " << raised << ": MMCSS Pro Audio " << rtThreadsMmcss.load (std::memory_order_relaxed)
                  << " (critical " << rtThreadsCritical.load (std::memory_order_relaxed) << "), thread priority "
                  << rtPriorityMin.load (std::memory_order_relaxed) << ".." << rtPriorityMax.load (std::memory_order_relaxed) << "\n";
+        text << "  process priority class " << priorityClassName (priorityClassNow.load (std::memory_order_relaxed)) << " (found "
+             << priorityClassName (priorityClassFound.load (std::memory_order_relaxed)) << ")\n";
        #endif
     }
     else
@@ -6106,6 +6139,10 @@ void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
         processFullSpeed = true;
         power::holdProcessFullSpeed (true);
     }
+   #if JUCE_WINDOWS
+    choosePriorityClass();
+    juce::Timer::callAfterDelay (2000, [] { choosePriorityClass(); }); // (after the MIDI ports: WinMM raises it again)
+   #endif
 }
 
 void AudioEngine::audioDeviceStopped()

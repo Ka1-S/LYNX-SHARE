@@ -88,9 +88,10 @@ instructions and cycles per sample, a hash of every output sample), the same sou
 Windows `perfbench.exe` linked from a Windows build's own objects (thread cycles).
 - **Windows** (`scripts/build-windows-zig.sh`): `-O2`, `-ffp-contract=off` (as Linux and macOS; it was missing), and a
   link that drops unreferenced code and folds identical functions (`-OPT:REF -OPT:SAFEICF`, objects with
-  `-ffunction-sections -fdata-sections -faddrsig`; see the script for why zig needs a hand here). __WINGC__
-  - ThinLTO (`LYNX_WIN_LTO=thin`): 0–14 % fewer cycles on Windows (streamed audio most) but the FL Harmless engine ran
-    1.5× slower under it (Harmless.cpp is kept out of LTO when it is on), and the link takes 15–25 minutes. Off.
+  `-ffunction-sections -fdata-sections -faddrsig`; see the script for why zig needs a hand here). LYNX.exe 53.8 →
+  48.2 MB (`.text` −9 %, `.rdata` −13 %), the same output, render cost within the run-to-run noise (±5 %).
+  - ThinLTO (`LYNX_WIN_LTO=thin`): streamed audio −14 %, synth100 −4 %, the rest −1…+5 %, and the FL Harmless engine
+    ran 1.5× slower under it (Harmless.cpp is kept out of LTO when it is on); the link takes 15–25 minutes. Off.
   - `-fno-math-errno`: up to 25 % fewer cycles on Linux, none on Windows (0 to 3 % more); on MinGW it also turns `sin` +
     `cos` of one value into the C runtime's `sincos`. Not used.
   - zig gives `-O3` byte-identical objects to `-O2`; a real `-O3` (`-Xclang -O3`) measured no better than ThinLTO.
