@@ -217,6 +217,11 @@ private:
     // overruns, or probeCpuGain less CPU, without losing on the other. A probe starts when the callback, off, overruns
     // at least probeTriggerOverruns times a second or carries probeTriggerLoad of its block on average.
     static constexpr double probeOverrunGain = 0.8, probeCpuGain = 0.9, probeTriggerOverruns = 1.0, probeTriggerLoad = 0.5;
+    // no probe when the rack's measured serial work (all units, A7's timers) exceeds this share of a block: the ahead
+    // part would need the workers anyway, so render-ahead cannot save their hand-offs (synth100: kept off every time,
+    // and the probe's own windows cost +4 % CPU)
+    static constexpr double probeMaxWork = 0.7;
+    double workShare = 0.0; // (an average of RackRenderer::lastWorkShare while off)
     double recentOverruns = 0.0; // (an average of overruns per second, the last couple of seconds)
     double offHold = decidedSeconds; // a "kept off" verdict holds this long; doubled for each one in a row (max 10 min)
     // a project where render-ahead cuts the overruns 5-20x for a few % more CPU: off by the owner's rule (no project

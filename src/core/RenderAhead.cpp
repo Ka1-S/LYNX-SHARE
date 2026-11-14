@@ -942,12 +942,14 @@ void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playin
     if (! playing)
         return;
     recentOverruns += std::min (1.0, seconds / 2.0) * ((over ? 1.0 / seconds : 0.0) - recentOverruns);
+    if (! engagedNow.load (std::memory_order_relaxed))
+        workShare += std::min (1.0, seconds / 2.0) * (live.lastWorkShare() - workShare);
     const auto engaged = engagedNow.load (std::memory_order_relaxed);
     const auto changed = state != nullptr && state->serial != decidedState;
     switch (probe)
     {
         case Probe::none:
-            if (! engaged && (recentOverruns >= probeTriggerOverruns || loadAverage >= probeTriggerLoad))
+            if (! engaged && (recentOverruns >= probeTriggerOverruns || loadAverage >= probeTriggerLoad) && workShare <= probeMaxWork)
             {
                 probe = Probe::off;
                 probeLeft = probeSeconds;

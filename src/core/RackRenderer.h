@@ -601,6 +601,9 @@ public:
     void forgetState() noexcept { lastState = nullptr; }
     // chunks whose boundary did not line up with the part rendered ahead (the live renderer; diagnostics)
     std::uint64_t splitMismatchCount() const noexcept { return splitMismatches; }
+    // A7's measure of the last chunk: its units' summed work as a share of the chunk's real time (0 when not measured,
+    // e.g. without workers). Render-ahead skips its probe when one thread could not carry the ahead part anyway.
+    double lastWorkShare() const noexcept { return lastWorkShareValue; }
     // Blocks in which an insert effect output NaN / inf and was muted and reset (all renderers, since start; round 111)
     static std::uint64_t nonFiniteEffectBlocks() noexcept;
     void resetUnitTimes() noexcept;
@@ -656,6 +659,7 @@ private:
     std::array<std::uint32_t, maxMixerTracks> trackCostNs {};
     bool measureUnits = false;
     bool parallelChunk = false; // this chunk may go to the workers (the snapshot's guess, or its units' measured work)
+    double lastWorkShareValue = 0.0;
     // the channel pass in clusters of neighbouring channels worth one hand-off each: [k] first channel of cluster k
     std::array<std::int16_t, maxChannels + 1> clusterStart {};
     // the boundary row of the current chunk (−1: the chunks do not line up: the slow path)

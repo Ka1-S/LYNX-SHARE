@@ -4496,6 +4496,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         // measured: Patience at 64 samples, 53 % of a core in small units, cost more CPU and more overruns in parallel)
         const auto chunkNs = sampleRate > 0.0 ? 1.0e9 * numSamples / sampleRate : 0.0;
         parallelChunk = state.parallel || (double) work >= parallelShare * chunkNs;
+        lastWorkShareValue = chunkNs > 0.0 ? (double) work / chunkNs : 0.0;
         if (events.size() == 0 && work < serialWorkNs && (liveInput == nullptr || liveInput->numChannels == 0))
             workers = nullptr;
     }
