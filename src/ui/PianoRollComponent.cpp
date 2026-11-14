@@ -32,6 +32,7 @@
 #include "ui/AutomationUi.h"
 #include "ui/EventEditor.h"
 #include "ui/HintBar.h"
+#include "platform/Paths.h"
 #include "ui/I18n.h"
 #include "ui/Theme.h"
 
@@ -356,13 +357,89 @@ PianoRollComponent::~PianoRollComponent()
 juce::Rectangle<int> PianoRollComponent::gridArea() const
 {
     return getLocalBounds().withTrimmedLeft (keyboardWidth).withTrimmedTop (headerHeight)
-        .withTrimmedRight (scrollBarSize).withTrimmedBottom (velocityHeight);
+        .withTrimmedRight (scrollBarSize).withTrimmedBottom (velocityHeight + eventPaneBarArea().getHeight());
 }
 
 juce::Rectangle<int> PianoRollComponent::velocityArea() const
 {
     const auto grid = gridArea();
-    return { grid.getX(), grid.getBottom(), grid.getWidth(), velocityHeight };
+    return { grid.getX(), grid.getBottom() + eventPaneBarArea().getHeight(), grid.getWidth(), velocityHeight };
+}
+
+// --- the event editor's divider (round 190fz; FL's TQuickSplitter, the facts in core/EventPaneSplit.h) ---------------
+
+namespace
+{
+juce::File eventPaneFile() { return platform::settingsFile ("piano-roll-event-pane.txt"); }
+} // namespace
+
+evpane::State& PianoRollComponent::eventPaneState()
+{
+    static evpane::State state = evpane::fromText (eventPaneFile().loadFileAsString().toStdString());
+    return state;
+}
+
+void PianoRollComponent::saveEventPaneState()
+{
+    eventPaneFile().replaceWithText (juce::String (evpane::toText (eventPaneState())));
+}
+
+juce::Rectangle<int> PianoRollComponent::eventPaneBarArea() const
+{
+    if (fitKeysToNotes) // the Clip-launch dock keeps its short fixed lane (Live's detail view; no divider there)
+        return {};
+    return { 0, eventPaneBarTop, getWidth(), evpane::barThickness };
+}
+
+void PianoRollComponent::layoutEventPane()
+{
+    if (fitKeysToNotes)
+    {
+        eventPaneBarTop = getHeight() - velocityHeight;
+        return;
+    }
+    // the bar's travel: from under the ruler (the grid folded away) to the bottom edge (the event editor folded away);
+    // the remembered place is a fraction of it, so a taller or shorter window keeps the proportion (FL)
+    const auto top = headerHeight, bottom = juce::jmax (headerHeight, getHeight() - evpane::barThickness);
+    eventPaneBarTop = evpane::barTopOf (eventPaneState().aspect, top, bottom);
+    velocityHeight = juce::jmax (0, getHeight() - eventPaneBarTop - evpane::barThickness);
+}
+
+void PianoRollComponent::eventPaneChanged()
+{
+    resized();
+    repaint();
+    ui::Hint hint; // FL's hint bar shows the place as a percentage while it changes ("80%")
+    hint.value = juce::String (evpane::percentOf (eventPaneState().aspect)) + "%";
+    ui::postHint (hint);
+}
+
+void PianoRollComponent::moveEventPaneBar (int y)
+{
+    if (fitKeysToNotes)
+        return;
+    const auto top = headerHeight, bottom = juce::jmax (headerHeight, getHeight() - evpane::barThickness);
+    eventPaneState().aspect = evpane::aspectOf (evpane::clampBar (y, top, bottom), top, bottom);
+    eventPaneChanged();
+}
+
+void PianoRollComponent::toggleEventPaneAlternate()
+{
+    if (fitKeysToNotes)
+        return;
+    const auto top = headerHeight, bottom = juce::jmax (headerHeight, getHeight() - evpane::barThickness);
+    evpane::toggleAlternate (eventPaneState(), evpane::aspectOf (eventPaneBarTop, top, bottom));
+    eventPaneChanged();
+    saveEventPaneState();
+}
+
+void PianoRollComponent::resetEventPane()
+{
+    if (fitKeysToNotes)
+        return;
+    evpane::resetToDefault (eventPaneState());
+    eventPaneChanged();
+    saveEventPaneState();
 }
 
 double PianoRollComponent::tickToX (double tick) const
@@ -536,6 +613,7 @@ void PianoRollComponent::setTitleBarInsets (int left, int right)
 
 void PianoRollComponent::resized()
 {
+    layoutEventPane(); // (round 190fz: the grid / event editor heights from the divider's place)
     const auto h = toolbarHeight - 6;
     auto bar = juce::Rectangle<int> (4 + titleInsetLeft, 3, juce::jmax (0, getWidth() - 8 - titleInsetLeft - titleInsetRight), h);
 
@@ -568,8 +646,9 @@ void PianoRollComponent::resized()
     place (moreButton, h);
     place (chordLabel, 84, true);
     laneBox.setBounds (2, velocityArea().getY() + 4, keyboardWidth - 4, 20);
+    laneBox.setVisible (velocityHeight >= 24); // (the event editor folded away: FL hides its target panel too)
     overview.setBounds (keyboardWidth, toolbarHeight, getWidth() - keyboardWidth - zoomWheelSize, overviewHeight);
-    vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, getHeight() - headerHeight - velocityHeight);
+    vBar.setBounds (getWidth() - scrollBarSize, headerHeight, scrollBarSize, gridArea().getHeight());
     updateScrollBars();
 }
 
@@ -1428,6 +1507,24 @@ void PianoRollComponent::paint (juce::Graphics& g)
         juce::ignoreUnused (lane); // the property combo sits here
     }
 
+    // the event editor's divider (round 190fz): FL's 10 px bar, a dark line at its top and bottom, lighter than the
+    // grid, with a grip of five 2 px dots 4 px apart in its middle (FL's SplitterPaint: darker than the bar at rest,
+    // lighter when a pane is folded away, the highlight colour while it is dragged; FL shot: triage190j/FL-pianoroll.png)
+    if (const auto divider = eventPaneBarArea(); ! divider.isEmpty() && g.clipRegionIntersects (divider))
+    {
+        g.setColour (bg3);
+        g.fillRect (divider);
+        g.setColour (bg0);
+        g.fillRect (divider.getX(), divider.getY(), divider.getWidth(), 1);
+        g.fillRect (divider.getX(), divider.getBottom() - 1, divider.getWidth(), 1);
+        const auto top = headerHeight, bottom = juce::jmax (headerHeight, getHeight() - evpane::barThickness);
+        const auto atEnd = eventPaneBarTop <= top || eventPaneBarTop >= bottom;
+        g.setColour (drag == Drag::eventPaneBar && ! atEnd ? accent : atEnd ? textSecondary : bg1);
+        const auto centre = divider.getCentre();
+        for (int i = -2; i <= 2; ++i)
+            g.fillRect (centre.x + i * 4 - 1, centre.y - 1, 2, 2);
+    }
+
     // the zoom wheel (round 190j): FL's small square with a mark in its middle, at the end of the time scroll bar
     {
         const auto wheel = zoomWheelArea().toFloat().reduced (1.0f);
@@ -1765,6 +1862,31 @@ void PianoRollComponent::mouseDown (const juce::MouseEvent& e)
     {
         if (e.mods.isLeftButtonDown() || e.mods.isMiddleButtonDown())
             beginKeyZoom (e);
+        return;
+    }
+
+    // the event editor's divider (round 190fz, FL's TQuickSplitter): left-drag moves it, a double-click or a right-click
+    // (swapped on release) gives the alternate size, a middle-click the default place
+    if (eventPaneBarArea().contains (e.getPosition()))
+    {
+        if (e.mods.isMiddleButtonDown())
+            resetEventPane();
+        else if (e.mods.isRightButtonDown())
+            drag = Drag::eventPaneAlternate;
+        else if (e.mods.isLeftButtonDown() && e.getNumberOfClicks() >= 2)
+            toggleEventPaneAlternate();
+        else if (e.mods.isLeftButtonDown())
+        {
+            drag = Drag::eventPaneBar;
+            eventPaneGrab = e.y - eventPaneBarTop;
+            repaint (eventPaneBarArea());
+        }
+        return;
+    }
+    // FL (TLEventPanelDblClick): a double-click on the event target panel, left of the event editor, swaps it too
+    if (! fitKeysToNotes && e.mods.isLeftButtonDown() && e.getNumberOfClicks() >= 2 && e.x < keyboardWidth && e.y >= velocityArea().getY())
+    {
+        toggleEventPaneAlternate();
         return;
     }
 
@@ -2169,6 +2291,12 @@ void PianoRollComponent::mouseDrag (const juce::MouseEvent& e)
     switch (drag)
     {
         case Drag::none:
+            return;
+
+        case Drag::eventPaneBar: // round 190fz: the divider follows the mouse (FL's SplitterChanging rule)
+            moveEventPaneBar (e.y - eventPaneGrab);
+            return;
+        case Drag::eventPaneAlternate: // (swapped when the right button is released)
             return;
 
         case Drag::pan:
@@ -2600,6 +2728,8 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
         case Drag::seek: hint.text = tr ("Position  [Alt] no snap"); break;
         case Drag::listen:
         case Drag::zoomRange:
+        case Drag::eventPaneBar:       // (eventPaneChanged posts the percentage)
+        case Drag::eventPaneAlternate:
         case Drag::none: return;
     }
 
@@ -2609,6 +2739,13 @@ void PianoRollComponent::postDragHint (const juce::MouseEvent& e)
 void PianoRollComponent::mouseUp (const juce::MouseEvent& e)
 {
     ui::clearPostedHint();
+    if (drag == Drag::eventPaneBar) // round 190fz: remembered once the drag ends
+        saveEventPaneState();
+    if (drag == Drag::eventPaneAlternate)
+    {
+        drag = Drag::none;
+        toggleEventPaneAlternate();
+    }
     if (drag == Drag::knife)
         cutWithKnife (knifeFrom, knifeTo, ! e.mods.isAltDown());
 
@@ -2772,6 +2909,12 @@ void PianoRollComponent::updateCursor (juce::ModifierKeys mods)
     const auto p = lastMouse;
     auto cursor = gesture::Cursor::normal;
 
+    if (eventPaneBarArea().contains (p)) // the event editor's divider (FL: crVSplit)
+    {
+        setMouseCursor (juce::MouseCursor::UpDownResizeCursor);
+        return;
+    }
+
     if (p.x < keyboardWidth && p.y >= headerHeight && p.y < gridArea().getBottom())
         cursor = flmods::ctrl (mods) ? gesture::Cursor::select : gesture::Cursor::point;
     else if (velocityArea().contains (p))
@@ -2804,6 +2947,12 @@ ui::Hint PianoRollComponent::hintAt (juce::Point<int> p)
     {
         hint.text = tr ("Key height: drag up / down or turn the wheel  [Ctrl] fine");
         hint.value = tr ("Zoom level {0}", { juce::String (gesture::zoomLevel (rowHeight)) });
+        return hint;
+    }
+    if (eventPaneBarArea().contains (p)) // round 190fz: FL's hint is "Right-click / shift+enter for alternate size"
+    {
+        hint.text = tr ("Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size");
+        hint.value = juce::String (evpane::percentOf (eventPaneState().aspect)) + "%";
         return hint;
     }
     const auto h = hoverAt (p);
@@ -3768,6 +3917,7 @@ bool PianoRollComponent::runAction (const std::string& id)
     else if (is ("pianoRoll.zoomSelection")) zoomToSelection();
     else if (is ("pianoRoll.centrePlayhead")) centreOnPlayhead();
     else if (is ("pianoRoll.follow")) EditorGlobals::get().setFollowing (true, ! EditorGlobals::get().isFollowing (true));
+    else if (is ("pianoRoll.eventPaneAlternate")) toggleEventPaneAlternate(); // FL's Shift+Enter (round 190fz)
     else if (is ("pianoRoll.quantizeStarts")) quantizeOperation (0);
     else if (is ("pianoRoll.quickQuantize")) quantizeOperation (1);
     else if (is ("pianoRoll.quantizeHalf")) quantizeOperation (2);

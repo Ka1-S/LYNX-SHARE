@@ -168,6 +168,7 @@
 #include "core/LiveRecordView.h"
 #include "core/Recorder.h"
 #include "core/KeyMap.h"
+#include "core/EventPaneSplit.h" // round 190fz
 #include "core/UndoKeys.h"
 #include "core/SortOnce.h"
 #include "core/RackOps.h"
@@ -17566,3 +17567,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Voices190ejTests.inc"
 #include "Flfix190ezTests.inc"
 #include "Rcfix190fcTests.inc"
+#include "EvPane190fzTests.inc"

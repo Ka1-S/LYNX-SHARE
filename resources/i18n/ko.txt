@@ -9814,3 +9814,5 @@ countries: kr
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "옵션: MIDI 노트로 슬롯 트리거 (시간 슬롯: 키 C5~B7, 볼륨 슬롯: C2~B4), 클릭 감소, 어택 보정, DC 오프셋, HQ 리샘플링, 스크래치 시계, MIDI 입력 포트"
 "MIDI Input Port Number:" = "MIDI 입력 포트 번호:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "MIDI 입력 포트 번호: 위 / 아래로 드래그 (\"...\" = 없음). 이 포트의 MIDI Out 채널이 Pitcher의 MIDI 모드와 Harmonize를 연주합니다"
+"Event editor: alternate size" = "이벤트 에디터: 대체 크기"
+"Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size" = "이벤트 에디터 크기: 드래그  [RMB] 또는 [Shift][Enter] 대체 크기  [MMB] 기본 크기"

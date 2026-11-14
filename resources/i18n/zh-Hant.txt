@@ -9814,3 +9814,5 @@ countries: tw hk mo
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "選項：以 MIDI 音符觸發槽位（時間槽：琴鍵 C5 至 B7，音量槽：C2 至 B4）、喀噠聲抑制、起音補償、直流偏移、HQ 重新取樣、刷碟時鐘；MIDI 輸入埠"
 "MIDI Input Port Number:" = "MIDI 輸入埠號："
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "MIDI 輸入埠號：上下拖曳（\"...\" = 無）。此埠上的 MIDI Out 通道演奏 Pitcher 的 MIDI 模式與 Harmonize"
+"Event editor: alternate size" = "事件編輯器：備用大小"
+"Event editor size: drag  [RMB] or [Shift][Enter] alternate size  [MMB] default size" = "事件編輯器大小：拖曳  [RMB] 或 [Shift][Enter] 備用大小  [MMB] 預設大小"

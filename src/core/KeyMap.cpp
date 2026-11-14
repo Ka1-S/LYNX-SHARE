@@ -216,6 +216,9 @@ std::vector<Action> makeActions()
         { "pianoRoll.quantizeStarts", TR_NOOP ("Quantize starts"), Context::pianoRoll, { chord ('Q', shift) }, true },
         { "pianoRoll.quantizeHalf", TR_NOOP ("Quantize starts 50% (halfway to the grid)"), Context::pianoRoll, {} },
         { "pianoRoll.follow", TR_NOOP ("Follow the playhead (auto scrolling) on/off"), Context::pianoRoll, {} },
+        // FL's piano roll splitter (round 190fz, its hint "Right-click / shift+enter for alternate size"): the event
+        // editor swaps with its alternate size (folded away by default) and back
+        { "pianoRoll.eventPaneAlternate", TR_NOOP ("Event editor: alternate size"), Context::pianoRoll, { chord (enter, shift) } },
         // FL's Piano roll menu (round 168g, REA_rodada168g.md: the ShortcutsModule / EEMenu keys): View, Select, Stamp,
         // Edit and File items
         { "pianoRoll.gridHighlights", TR_NOOP ("Note grid highlights on/off"), Context::pianoRoll, { chord ('B', alt) } },

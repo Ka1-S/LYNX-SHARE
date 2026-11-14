@@ -1880,6 +1880,17 @@ public:
             return;
         }
 
+        if (args.contains ("--evpaneshot"))
+        {
+            // LYNX --evpaneshot prefix [project] (round 190fz): the Piano roll's event editor divider driven with the mouse
+            // handlers (drag, right-click = alternate size and back, middle-click = default, a drag into the snap zone),
+            // a picture of each state and prefix-report.txt with the heights and the remembered settings file
+            const auto i = args.indexOf ("--evpaneshot");
+            setApplicationReturnValue (runEvPaneShot (args[i + 1].unquoted(), i + 2 < args.size() ? args[i + 2].unquoted() : juce::String()) ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--feat166shot"))
         {
             // LYNX.exe --feat166shot prefix [project]: round 166d (issue #14) — the Piano Roll with a scale, folded to
@@ -16376,6 +16387,116 @@ private:
             juce::File (prefix + "-checks.txt").replaceWithText (checks.joinIntoString ("\n") + "\n");
         }
         juce::LookAndFeel::setDefaultLookAndFeel (nullptr);
+    }
+
+    bool runEvPaneShot (const juce::String& prefix, const juce::String& projectPath)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        juce::StringArray report;
+        bool ok = true;
+        {
+            lynx::MainComponent ui (offline, false);
+            const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1600x900"), "x", "");
+            ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+            if (projectPath.isNotEmpty())
+                ui.openFile (juce::File (projectPath));
+            offline.dispatchPendingMessages();
+            ui.selectTabForSnapshot (1); // the Piano Roll
+            offline.dispatchPendingMessages();
+            auto& roll = ui.getPianoRollForSnapshot();
+            roll.scrollToNotes();
+            const auto area = ui.getLocalArea (&roll, roll.getLocalBounds());
+            const auto file = lynx::platform::settingsFile ("piano-roll-event-pane.txt");
+
+            auto source = juce::Desktop::getInstance().getMainMouseSource();
+            const auto now = juce::Time::getCurrentTime();
+            auto event = [&] (juce::Point<int> p, juce::Point<int> down, juce::ModifierKeys mods, int clicks, bool dragged) {
+                return juce::MouseEvent (source, p.toFloat(), mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &roll, &roll, now, down.toFloat(), now, clicks, dragged);
+            };
+            auto barCentre = [&roll] { return roll.eventPaneBarArea().getCentre(); };
+            const juce::ModifierKeys left (juce::ModifierKeys::leftButtonModifier), right (juce::ModifierKeys::rightButtonModifier),
+                middle (juce::ModifierKeys::middleButtonModifier);
+            auto click = [&] (juce::ModifierKeys button, int clicks) {
+                const auto at = barCentre();
+                roll.mouseDown (event (at, at, button, clicks, false));
+                roll.mouseUp (event (at, at, {}, clicks, false));
+                offline.dispatchPendingMessages();
+            };
+            auto dragTo = [&] (int y) {
+                const auto at = barCentre();
+                roll.mouseDown (event (at, at, left, 1, false));
+                for (int step = 1; step <= 8; ++step) // (a few moves, as a hand does)
+                    roll.mouseDrag (event ({ at.x, at.y + (y - at.y) * step / 8 }, at, left, 1, true));
+                roll.mouseUp (event ({ at.x, y }, at, {}, 1, true));
+                offline.dispatchPendingMessages();
+            };
+            auto state = [&] (const juce::String& name) {
+                const auto grid = roll.getHeight() - lynx::PianoRollComponent::headerHeight - roll.velocityHeight - lynx::evpane::barThickness;
+                const auto& st = lynx::PianoRollComponent::eventPaneState();
+                report.add (name + ": roll " + juce::String (roll.getHeight()) + " px, grid " + juce::String (juce::jmax (0, grid)) + " px, bar top "
+                            + juce::String (roll.eventPaneBarTopForTests()) + ", event editor " + juce::String (roll.velocityHeight) + " px, aspect "
+                            + juce::String (st.aspect, 4) + ", spare " + juce::String (st.spare, 4) + ", file \"" + file.loadFileAsString().trim().replace ("\n", " ") + "\"");
+                saveArea (ui, area, prefix + "-" + name + ".png");
+            };
+            auto expect = [&] (bool condition, const juce::String& what) {
+                report.add ((condition ? "PASS " : "FAIL ") + what);
+                ok = ok && condition;
+            };
+
+            state ("1-default");
+            const auto defaultLane = roll.velocityHeight;
+            expect (std::abs (lynx::PianoRollComponent::eventPaneState().aspect - 0.8f) < 1e-6f, "default place is FL's 0.8");
+
+            ui.setHintForSnapshot (roll.hintAt (barCentre()));
+            saveSnapshot (ui, prefix + "-2-hover-hint.png");
+            ui.setHintForSnapshot ({});
+
+            const auto travelTop = lynx::PianoRollComponent::headerHeight, travelBottom = roll.getHeight() - lynx::evpane::barThickness;
+            dragTo (travelTop + (travelBottom - travelTop) * 45 / 100);
+            state ("3-dragged-larger");
+            const auto largeLane = roll.velocityHeight;
+            expect (largeLane > defaultLane * 2, "drag up makes the event editor taller");
+            expect (lynx::evpane::fromText (file.loadFileAsString().toStdString()) == lynx::PianoRollComponent::eventPaneState(),
+                    "the place is written to the settings file on release");
+
+            click (right, 1);
+            state ("4-right-click-alternate");
+            expect (roll.velocityHeight == 0, "right-click: the alternate size (FL's spare 1.0) folds the event editor away");
+            click (right, 1);
+            state ("5-right-click-back");
+            expect (roll.velocityHeight == largeLane, "right-click again: back to the dragged size");
+
+            roll.runAction ("pianoRoll.eventPaneAlternate");
+            offline.dispatchPendingMessages();
+            expect (roll.velocityHeight == 0, "Shift+Enter (pianoRoll.eventPaneAlternate) swaps too");
+            roll.runAction ("pianoRoll.eventPaneAlternate");
+            offline.dispatchPendingMessages();
+
+            dragTo (travelTop + 10);
+            state ("6-grid-folded");
+            expect (roll.eventPaneBarTopForTests() == travelTop, "a drag within 23 px of the top folds the note grid away");
+
+            click (middle, 1);
+            state ("7-middle-click-default");
+            expect (roll.velocityHeight == defaultLane, "middle-click: back to the default place");
+
+            // a taller window keeps the proportion (the place is a fraction of the travel)
+            dragTo (travelTop + (travelBottom - travelTop) * 60 / 100);
+            const auto before = lynx::PianoRollComponent::eventPaneState().aspect;
+            roll.setSize (roll.getWidth(), roll.getHeight() + 200);
+            offline.dispatchPendingMessages();
+            const auto newTravel = roll.getHeight() - lynx::evpane::barThickness - travelTop;
+            expect (std::abs (roll.eventPaneBarTopForTests() - (travelTop + juce::roundToInt (before * (float) newTravel))) <= 1,
+                    "a taller window keeps the proportion");
+            roll.setSize (roll.getWidth(), roll.getHeight() - 200);
+            offline.dispatchPendingMessages();
+
+            click (middle, 1); // leave FL's default behind
+        }
+        report.add (ok ? "RESULT OK" : "RESULT FAIL");
+        juce::File (prefix + "-report.txt").replaceWithText (report.joinIntoString ("\n") + "\n");
+        return ok;
     }
 
     void runFeat166Shot (const juce::String& prefix, const juce::String& projectPath)

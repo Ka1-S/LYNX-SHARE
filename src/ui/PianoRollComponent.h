@@ -2,6 +2,7 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#include "core/EventPaneSplit.h"
 #include "core/NoteTools.h"
 #include "core/PianoKeys.h"
 #include "core/ScaleSnap.h"
@@ -188,6 +189,16 @@ public:
                          laneVelocityRange = 8, laneLast = 8;
     // the bottom lane's property (laneVelocity … laneVelocityRange; round 187c)
     void setLaneForSnapshot (int id) { laneBox.setSelectedId (id, juce::sendNotificationSync); }
+    // The divider between the note grid and the event editor (round 190fz, FL's TQuickSplitter; core/EventPaneSplit.h):
+    // its place is remembered for the Piano roll in the settings folder (FL: per window kind, not per project).
+    static evpane::State& eventPaneState();   // (read from the settings file once)
+    static void saveEventPaneState();          // (written after every change made with the mouse or the key)
+    juce::Rectangle<int> eventPaneBarArea() const; // the bar (empty in the Clip-launch dock, whose lane is fixed)
+    // the same steps as the mouse: move the bar's top to `y` (as a drag), swap with the alternate size, the default place
+    void moveEventPaneBar (int y);
+    void toggleEventPaneAlternate();
+    void resetEventPane();
+    int eventPaneBarTopForTests() const noexcept { return eventPaneBarTop; }
 
     static constexpr int keyboardWidth = 72;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
@@ -195,7 +206,7 @@ public:
     static constexpr int timelineHeight = 22;
     static constexpr int rulerTop = toolbarHeight + overviewHeight;
     static constexpr int headerHeight = rulerTop + timelineHeight;
-    static constexpr int defaultVelocityHeight = 72;
+    static constexpr int defaultVelocityHeight = 72; // (before round 190fz the floating panel's fixed lane; now it follows the divider)
     static constexpr int compactVelocityHeight = 30; // docked in the Clip-launch detail view (round 183a): the reference's lane is ~30 px
     int velocityHeight = defaultVelocityHeight;
     // docked in the Clip-launch detail view (round 183a): a short lane, and the keys fitted to the notes when it scrolls to them;
@@ -220,7 +231,8 @@ public:
 
 private:
     enum class Drag { none, move, resize, resizeLeft, erase, keyboard, select, velocity, velocityLine, velocitySet, paint, muting, knife,
-                      zoomRange, listen, pan, keyZoom, timeZoom, keySelect, rulerSelect, seek, drumPaint, stretch, eventDraw, eventErase };
+                      zoomRange, listen, pan, keyZoom, timeZoom, keySelect, rulerSelect, seek, drumPaint, stretch, eventDraw, eventErase,
+                      eventPaneBar, eventPaneAlternate }; // (round 190fz: dragging the divider; a right-click on it, swapped on release)
 
     // Channel selector: the wheel steps through the channels with notes (Ctrl+wheel: all channels).
     class ChannelBox final : public juce::ComboBox
@@ -496,6 +508,11 @@ private:
     std::vector<std::int64_t> snapCandidates() const;
     juce::Rectangle<int> rubberBand;
     int lastVelocityX = 0;
+    // round 190fz: the divider's top (the grid ends there, the event editor starts barThickness below) and where the
+    // mouse took it
+    int eventPaneBarTop = 0, eventPaneGrab = 0;
+    void layoutEventPane(); // the grid / bar / lane heights from the remembered place and the window's height
+    void eventPaneChanged(); // after a change: lay out, repaint, show the percentage, remember it
     int knownPattern = -1, knownChannel = -1;
     std::size_t knownNoteCount = 0;
 
