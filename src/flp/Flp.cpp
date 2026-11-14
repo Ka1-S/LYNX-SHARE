@@ -273,23 +273,38 @@ bool EventReader::next (Event& out)
         pos += 4;
     }
 
+    // A trial-saved project (REA round 190gy, FLEngine 2026: the saver's event writers FUN_00f40840 / FUN_00f3e190 /
+    // FUN_00f3d620 pass every u8/u16/u32 value through FUN_00a9ece0 once 0x1C = 0 has been written; the reader's
+    // FUN_00a9e430 / 4d0 / 570 undo it when FUN_00f46420 has seen 0x1C = 0 in a file of version 20.99.1 or newer):
+    // value byte j is XORed with (0x79 − the value's file offset + 3·j) mod 256. Event IDs, the 0xAC escape, data
+    // sizes and data payloads are written as they are.
+    auto unscramble = [this] (std::size_t start, std::size_t size, std::uint32_t raw)
+    {
+        if (! scrambled)
+            return raw;
+        auto key = (std::uint8_t) (0x79u - (std::uint32_t) start);
+        for (std::size_t j = 0; j < size; ++j, key = (std::uint8_t) (key + 3))
+            raw ^= (std::uint32_t) key << (8 * j);
+        return raw;
+    };
+
     switch (out.sizeClass())
     {
         case 0:
             need (1);
-            out.value = bytes[pos];
+            out.value = unscramble (pos, 1, bytes[pos]);
             pos += 1;
             break;
 
         case 1:
             need (2);
-            out.value = readLE<std::uint16_t> (bytes, pos);
+            out.value = unscramble (pos, 2, readLE<std::uint16_t> (bytes, pos));
             pos += 2;
             break;
 
         case 2:
             need (4);
-            out.value = readLE<std::uint32_t> (bytes, pos);
+            out.value = unscramble (pos, 4, readLE<std::uint32_t> (bytes, pos));
             pos += 4;
             break;
 
@@ -317,6 +332,20 @@ bool EventReader::next (Event& out)
             break;
         }
     }
+
+    if (out.id == 0xC7) // the version text (ASCII); the scrambling only exists from FL 20.99.1 on
+    {
+        std::string text;
+        for (auto c : out.data)
+        {
+            if (c == 0)
+                break;
+            text += (char) c;
+        }
+        versionNumber = parseVersionNumber (text);
+    }
+    else if (out.id == 0x1C && out.value == 0 && versionNumber >= version (20, 99, 1))
+        scrambled = true; // 0x1C = "saved by a registered FL"; FL writes it before turning the scrambling on
 
     return true;
 }

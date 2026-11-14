@@ -53,10 +53,16 @@ public:
     // Returns false at the end of the data. Throws flp::Error if the file is truncated.
     bool next (Event& out);
 
+    // True once the file has turned out to be saved by an unregistered (trial) FL Studio 21 or newer: from event 0x1C
+    // = 0 on, FL XORs every u8/u16/u32 value with a key that depends on the value's file offset; next() undoes it
+    bool isScrambled() const noexcept { return scrambled; }
+
 private:
     std::span<const std::uint8_t> bytes;
     std::size_t pos = 0;
     Header hdr;
+    std::uint32_t versionNumber = 0; // of the 0xC7 version text, as parseVersionNumber gives it
+    bool scrambled = false;
 };
 
 // ---------------------------------------------------------------------------
