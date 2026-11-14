@@ -329,6 +329,15 @@ void AudioEngine::openAudioDevice()
 
     // 0 inputs, 2 outputs; the device of the last session (Settings › Audio) if it is still there, else the default.
     const auto saved = juce::XmlDocument::parse (audioDeviceFile());
+    // (round 190go) the MIDI ports the saved setup names open with the MIDI devices (openMidiDevices: LYNX's MIDI
+    // settings decide which inputs are open anyway), not on the audio device's way: JUCE opened them here (~0.1-0.2 s)
+    if (saved != nullptr)
+    {
+        savedMidiOutput = { saved->getStringAttribute ("defaultMidiOutput"), saved->getStringAttribute ("defaultMidiOutputDevice") };
+        saved->removeAttribute ("defaultMidiOutput");
+        saved->removeAttribute ("defaultMidiOutputDevice");
+        saved->deleteAllChildElementsWithTagName ("MIDIINPUT");
+    }
     auto fresh = saved == nullptr;
     if (deviceManager.initialise (0, 2, saved.get(), true).isNotEmpty() && saved != nullptr)
     {
@@ -362,6 +371,14 @@ void AudioEngine::openMidiDevices()
     if (! std::exchange (midiPending, false))
         return;
     midiOpen = true;
+    // the default MIDI output of the last session (see openAudioDevice), by its id, else by its name (as JUCE does)
+    if (savedMidiOutput.name.isNotEmpty() || savedMidiOutput.identifier.isNotEmpty())
+        for (const auto& out : juce::MidiOutput::getAvailableDevices())
+            if (out.identifier == savedMidiOutput.identifier || (savedMidiOutput.identifier.isEmpty() && out.name == savedMidiOutput.name))
+            {
+                deviceManager.setDefaultMidiOutputDevice (out.identifier);
+                break;
+            }
     enableAllMidiInputs();
     midiSync.configure (midiPrefs);
     midiSync.sendAllNotesOff(); // FL's "Send all notes off": on init and after a render

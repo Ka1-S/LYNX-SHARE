@@ -319,5 +319,8 @@ void SplashScreen::paint (juce::Graphics& g)
     // hairline border on top of everything
     g.setColour (colour::borderStrong);
     g.strokePath (cardShape, juce::PathStrokeType (1.0f));
+
+    if (auto first = std::exchange (onFirstFrame, nullptr))
+        juce::MessageManager::callAsync (std::move (first)); // (after this frame is on the screen)
 }
 } // namespace lynx

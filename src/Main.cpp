@@ -2485,7 +2485,11 @@ public:
         splash->showOnDesktop();
         startupTrace.mark ("splash on the desktop");
 
-        juce::Timer::callAfterDelay (40, [this] {
+        // the rest once the card's first frame is on the screen (round 190go: before, a fixed 40 ms), at the latest
+        // after 40 ms
+        const auto goOn = [this, started = std::make_shared<bool> (false)] {
+            if (std::exchange (*started, true) || splash == nullptr) // (once; or quit meanwhile)
+                return;
             startEngine();
             if (splash == nullptr) // quit meanwhile
                 return;
@@ -2524,7 +2528,9 @@ public:
                 if (deviceOpen)
                     mainWindow->whenPainted ([this] { startAfterWindow (true); });
             });
-        });
+        };
+        splash->onFirstFrame = goOn;
+        juce::Timer::callAfterDelay (40, goOn);
     }
 
     // what follows the window's first frame (the audio device is open): the notice of an unclean end, the start-up

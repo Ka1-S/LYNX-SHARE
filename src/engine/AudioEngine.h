@@ -1178,6 +1178,7 @@ private:
     bool controllerLearnTick = false; // a MIDI learn was waiting at this tick's applyControllers (round 190aw)
     bool saveGlobalLinks = false; // only the engine with an audio device (the app) writes the settings file
     bool devicePending = false, midiPending = false, midiOpen = false; // (round 190go: see deferDeviceOpen)
+    juce::MidiDeviceInfo savedMidiOutput; // the saved setup's default MIDI output, opened by openMidiDevices
     bool followProjectOnDevice(); // true when the song changed (FL's insert inputs placed on the device)
     void applyControllers();
     std::atomic<int> pendingMarkerNote { -1 }; // MIDI thread -> timer: a "Song marker jump" note

@@ -49,6 +49,9 @@ public:
     double getElapsed() const;
 
     void setStatus (const juce::String& text);
+    // Called once, right after the card's first frame is painted (round 190go: the start-up goes on then, not after a
+    // fixed wait)
+    std::function<void()> onFirstFrame;
     // Fades out, removes itself from the desktop and calls `whenGone`.
     void finish (std::function<void()> whenGone);
 
