@@ -13596,15 +13596,41 @@ private:
             });
             lynx::samplerPageTurn (f, "show", 0.0);
             shoot (f, "sampler-end-loop-red");
-            // round 190gw (live check 190gu B3): the waveform menu's Spectrum view / Multichannel waveform view
-            lynx::samplerpage::waveViews().spectrum = true;
-            lynx::samplerPageTurn (f, "show", 0.0);
-            shoot (f, "sampler-spectrum-view");
-            lynx::samplerpage::waveViews() = { false, true };
-            lynx::samplerPageTurn (f, "show", 0.0);
-            shoot (f, "sampler-multichannel-view");
-            lynx::samplerpage::waveViews() = {};
-            lynx::samplerPageTurn (f, "show", 0.0);
+            // round 190gw (live check 190gu B3): the waveform menu's Spectrum view / Multichannel waveform view, on a stereo
+            // clap-like noise burst (left and right differ) with no loop, as FL's shot
+            {
+                const auto noisy = folder.getChildFile ("Noise Clap.wav");
+                juce::AudioBuffer<float> b (2, 44100);
+                juce::Random random (190);
+                for (int i = 0; i < b.getNumSamples(); ++i)
+                    for (int c = 0; c < 2; ++c)
+                        b.setSample (c, i, (float) ((random.nextFloat() * 2.0f - 1.0f) * 0.9 * std::exp (-i / (44100.0 * (c == 0 ? 0.10 : 0.18)))
+                                                    * (i > 1500 * c ? 1.0 : 0.15)));
+                noisy.deleteFile();
+                juce::WavAudioFormat wav;
+                if (auto out = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (noisy.createOutputStream().release(), 44100.0, 2, 16, {}, 0)))
+                    out->writeFromAudioSampleBuffer (b, 0, b.getNumSamples());
+                const auto before = engine.getSong().channels[0];
+                engine.editSong ([&] (lynx::Song& s) {
+                    s.channels[0].samplePath = noisy.getFullPathName().toStdString();
+                    s.channels[0].sampler.loopStart = s.channels[0].sampler.loopEnd = -1;
+                    s.channels[0].sampler.useLoopPoints = false;
+                });
+                lynx::samplerPageTurn (f, "show", 0.0);
+                frame->createComponentSnapshot (frame->getLocalBounds()); // (starts the new file's waveform)
+                lynx::ui::WaveformCache::getInstance()->waitUntilIdle (8000);
+                lynx::samplerpage::waveViews().spectrum = true;
+                lynx::samplerPageTurn (f, "show", 0.0);
+                shoot (f, "sampler-spectrum-view");
+                lynx::samplerpage::waveViews() = { false, true };
+                lynx::samplerPageTurn (f, "show", 0.0);
+                shoot (f, "sampler-multichannel-view");
+                lynx::samplerpage::waveViews() = {};
+                engine.editSong ([&before] (lynx::Song& s) { s.channels[0] = before; });
+                lynx::samplerPageTurn (f, "show", 0.0);
+                frame->createComponentSnapshot (frame->getLocalBounds());
+                lynx::ui::WaveformCache::getInstance()->waitUntilIdle (8000);
+            }
             // SMP-7: the waveform menu
             const auto waveMenu = lynx::samplerWaveMenu (f);
             juce::StringArray expected { lynx::tr ("Reload"), lynx::tr ("Save as..."), lynx::tr ("Locate file"), lynx::tr ("Copy audio to clipboard"),

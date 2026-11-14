@@ -678,6 +678,7 @@ void WaveformDisplay::paintSpectrum (juce::Graphics& g, juce::Rectangle<float> i
         }
         spectrumKey = key;
     }
+    g.setOpacity (1.0f); // (drawImage takes the current colour's alpha: the centre line's is faint)
     g.drawImage (spectrumImage, inner);
 }
 
@@ -724,7 +725,17 @@ void WaveformDisplay::paint (juce::Graphics& g)
     const auto& views = samplerpage::waveViews();
     const auto data = samplerViews && views.spectrum && source != nullptr ? source() : nullptr;
     if (data != nullptr && data->frames() > 0)
+    {
         paintSpectrum (g, inner, *data);
+        if (watermark.isNotEmpty()) // (FL's faded name shows over the spectrogram too)
+        {
+            g.setColour (colour::textSecondary.withAlpha (0.22f));
+            g.setFont (font (juce::jlimit (14.0f, 34.0f, inner.getHeight() * 0.24f)));
+            g.drawText (watermark, inner.reduced (10.0f, 4.0f).removeFromTop (juce::jlimit (18.0f, 44.0f, inner.getHeight() * 0.32f)),
+                        juce::Justification::centredRight, false);
+            g.setFont (font (type::small));
+        }
+    }
     else
     {
         auto style = currentWaveStyle (colour::audioClip.brighter (0.3f), normalisingGain (*summary));
