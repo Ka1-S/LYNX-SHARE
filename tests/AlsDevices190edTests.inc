@@ -27,6 +27,15 @@ using als190cf::on;
 using als190cf::target;
 
 inline std::optional<lynx::alsdev::Translated> translate (const std::string& text, double bpm = 120.0) { return als190cf::translate (text, bpm); }
+// (round 190fk) a Drum Buss as round 190ek's rack: the importer's default is now Anvil Bus (core/AnvilBus.h)
+inline std::optional<lynx::alsdev::Translated> translateRack (const std::string& text)
+{
+    lynx::xml::Document doc;
+    doc.parse (text);
+    lynx::alsdev::Context context;
+    context.drumBussRack = true;
+    return lynx::alsdev::effectFromLiveDevice (doc.root(), context);
+}
 
 // a set: one MIDI track (Id 10) with `midiDevices` and `midiEnvelopes`, one audio track (Id 20) with `audioDevices` and
 // `audioEnvelopes`, a second audio track (Id 30, "Kick") with no devices
@@ -199,7 +208,7 @@ TEST (als190ed_drum_buss_becomes_a_rack)
     const auto extra = als190ed::flag ("EnableCompression", true) + par ("DriveAmount", 0.5) + par ("DriveType", 1) + par ("CrunchAmount", 0.0) +
                        par ("DampingFrequency", 6000.0) + par ("TransientShaping", 0.4) + par ("BoomFrequency", 60.0) + par ("BoomAmount", 0.3) +
                        par ("BoomDecay", 1.0) + par ("InputTrim", 0.501187) + par ("OutputGain", 0.707946) + par ("DryWet", 1.0);
-    const auto t = als190ed::translate (als190ed::drumBuss (extra));
+    const auto t = als190ed::translateRack (als190ed::drumBuss (extra));
     CHECK (t.has_value() && t->slot.kind == EffectKind::patcher && rack::isRack (t->slot));
     if (! t || ! rack::isRack (t->slot))
         return;
@@ -250,7 +259,7 @@ TEST (als190ed_drum_buss_becomes_a_rack)
         CHECK (finite && energy > 1.0);
     }
     // 41 % wet and a negative transient: a dry chain beside, the chains' volumes 0.59 / 0.41, Invert on, the macro on Dry/Wet
-    const auto wet = als190ed::translate (als190ed::drumBuss (par ("DriveAmount", 0.0) + par ("DriveType", 2) + par ("DampingFrequency", 1200.0) +
+    const auto wet = als190ed::translateRack (als190ed::drumBuss (par ("DriveAmount", 0.0) + par ("DriveType", 2) + par ("DampingFrequency", 1200.0) +
                                                               par ("TransientShaping", -0.45) + par ("BoomAmount", 0.0) + par ("DryWet", 0.41)));
     CHECK (wet.has_value() && wet && rack::isRack (wet->slot));
     if (wet && rack::isRack (wet->slot))

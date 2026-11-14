@@ -1664,7 +1664,7 @@ private:
             case EffectKind::ember: case EffectKind::kilnChannel: case EffectKind::fretChannel:
                 return "Distortion";
             case EffectKind::compressor: case EffectKind::limiter: case EffectKind::apexLimiter: case EffectKind::volumeGate:
-            case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate: case EffectKind::pocketLimiterClassic: case EffectKind::pocketLimiter: case EffectKind::pocketLeveller: case EffectKind::pocketGate: case EffectKind::pocketCompressor: case EffectKind::pocketMultiband: case EffectKind::pocketAutoduck: case EffectKind::shellChannel: case EffectKind::strikeShaper: case EffectKind::fruityLimiter:
+            case EffectKind::crestCompressor: case EffectKind::prismMultiband: case EffectKind::sentryGate: case EffectKind::pocketLimiterClassic: case EffectKind::pocketLimiter: case EffectKind::pocketLeveller: case EffectKind::pocketGate: case EffectKind::pocketCompressor: case EffectKind::pocketMultiband: case EffectKind::pocketAutoduck: case EffectKind::shellChannel: case EffectKind::strikeShaper: case EffectKind::anvilBus: case EffectKind::fruityLimiter:
             case EffectKind::fruityCompressor: case EffectKind::transientProcessor: case EffectKind::fruityMultiband: case EffectKind::maximus:
             case EffectKind::glowLeveler: case EffectKind::hushDeEsser: case EffectKind::emphasizer: case EffectKind::flEmphasis: case EffectKind::squeeze:
                 return "Dynamics";

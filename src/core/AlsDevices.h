@@ -197,6 +197,7 @@ struct Context
     // (190fm) a file the device references (Hybrid Reverb's impulse response, a `SampleRef` element): the path where it
     // is on this machine, "" = not there (empty function = no lookup: the convolution half is listed)
     std::function<std::string (const xml::Element& sampleRef)> findFile;
+    bool drumBussRack = false; // (round 190fk) true: Drum Buss as round 190ek's rack (the A/B harness, its tests); else Anvil Bus
 };
 // One Live parameter that drives one LYNX parameter: `live` is the parameter's element path inside the device
 // ("Feedback", "Lfo/Frequency"), `value` turns Live's own unit into LYNX's 0..1. Automation envelopes and rack macro
@@ -413,6 +414,8 @@ BoomBands drumBussBoom (double amount, double hz, double decay) noexcept;
 // Crunch's lift of its band in dB (the shelves cut the same outside it)
 double drumBussCrunchDb (double crunch) noexcept;
 bool drumBussToRack (const xml::Element& device, Translated& out);
+// (round 190fk) Drum Buss onto Anvil Bus, LYNX's drum-bus engine (core/AnvilBus.h): the import's default
+bool drumBussToEngine (const xml::Element& device, Translated& out);
 // ---- Auto Filter's modulation → a Peak Controller ---------------------------------------------------------------
 // The Peak Controller's controls for an amount (its laws, core/Effects.cpp PeakController): the peak's amount k (−2 … 2,
 // the output per unit of peak) and the LFO's (−1 … 1, the output per unit of wave)

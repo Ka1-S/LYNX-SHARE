@@ -714,6 +714,94 @@ inline const Theme& strikeTheme()
     return t;
 }
 
+// === Anvil Bus (round 190fk, LYNX's drum-bus processor): forged gunmetal hammered by hand, a forge's ember glow
+// along the bottom edge, steel knobs with ember pointers; a small anvil beside each section title. LYNX's own drawing.
+inline void canvasAnvil (juce::Graphics& g, Rectangle<float> a, bool display)
+{
+    valley (g, a, Colour (0xff2b2d32), Colour (0xff17181b), Colour (0xff1d1e22), 0.62f);
+    if (display) return;
+    if (! reduced)
+    {
+        // hammer dimples: soft light-over-dark ovals, deterministic
+        juce::Random rnd (190);
+        const auto count = (int) (a.getWidth() * a.getHeight() / 900.0f);
+        for (int i = 0; i < count; ++i)
+        {
+            const auto r = 3.0f + rnd.nextFloat() * 9.0f;
+            const auto c = Point<float> (a.getX() + rnd.nextFloat() * a.getWidth(), a.getY() + rnd.nextFloat() * a.getHeight());
+            const auto e = Rectangle<float> (r * 2.0f, r * (1.4f + rnd.nextFloat() * 0.5f)).withCentre (c);
+            g.setColour (Colours::black.withAlpha (0.10f + 0.08f * rnd.nextFloat()));
+            g.fillEllipse (e.translated (0.0f, r * 0.18f));
+            g.setColour (Colours::white.withAlpha (0.025f + 0.025f * rnd.nextFloat()));
+            g.fillEllipse (e.reduced (r * 0.25f).translated (-r * 0.12f, -r * 0.15f));
+        }
+        brushedLines (g, a, 1909, 0.035f);
+    }
+    // the forge's glow rising from the bottom edge
+    const auto glow = a.withTop (a.getBottom() - a.getHeight() * 0.22f);
+    g.setGradientFill (ColourGradient (Colour (0xffff5a2e).withAlpha (0.0f), 0.0f, glow.getY(), Colour (0xffff5a2e).withAlpha (0.20f), 0.0f, glow.getBottom(), false));
+    g.fillRect (glow);
+    softLight (g, Point<float> (a.getCentreX(), a.getBottom() + a.getHeight() * 0.05f), a.getWidth() * 0.45f, Colour (0xffffa84a), 0.10f);
+    vignette (g, a, 0.32f);
+}
+
+// a small anvil (horn to the left, flat face, waist, foot)
+inline void anvilEmblem (juce::Graphics& g, Point<float> c, float r)
+{
+    const auto w = r * 2.6f, h = r * 1.7f;
+    const auto x0 = c.x - w * 0.5f, y0 = c.y - h * 0.5f;
+    juce::Path p;
+    p.startNewSubPath (x0, y0 + h * 0.10f);                   // the horn's tip
+    p.quadraticTo (x0 + w * 0.22f, y0 + h * 0.02f, x0 + w * 0.34f, y0);
+    p.lineTo (x0 + w, y0);                                    // the face
+    p.lineTo (x0 + w, y0 + h * 0.32f);
+    p.lineTo (x0 + w * 0.80f, y0 + h * 0.38f);
+    p.lineTo (x0 + w * 0.70f, y0 + h * 0.66f);                // the waist
+    p.lineTo (x0 + w * 0.90f, y0 + h);                        // the foot
+    p.lineTo (x0 + w * 0.24f, y0 + h);
+    p.lineTo (x0 + w * 0.44f, y0 + h * 0.66f);
+    p.lineTo (x0 + w * 0.36f, y0 + h * 0.38f);
+    p.quadraticTo (x0 + w * 0.12f, y0 + h * 0.30f, x0, y0 + h * 0.10f);
+    p.closeSubPath();
+    g.setColour (Colour (0xffc9c6bf));
+    g.fillPath (p);
+    g.setColour (Colour (0xffff7a3a).withAlpha (0.9f));
+    g.fillRect (Rectangle<float> (x0 + w * 0.36f, y0, w * 0.64f, juce::jmax (1.0f, h * 0.10f)));
+}
+
+inline Colour anvilCapTint (const char* param)
+{
+    const juce::String n (param);
+    if (n == "Drive" || n == "Transients" || n == "Boom") return Colour (0xff3b3e44);
+    return Colour (0xff2c2e33);
+}
+
+inline const Theme& anvilTheme()
+{
+    static const Theme t = []
+    {
+        Theme x = ridgeTheme();
+        x.name = "Anvil Bus";
+        x.pal = { Colour (0xff2b2d32), Colour (0xff17181b), Colour (0xffff5a2e), Colour (0xffffa84a),
+                  Colour (0xcc2a2c31), Colour (0xcc1e1f23), Colour (0xff0b0c0e), Colour (0xffd9d4ca),
+                  Colour (0xff09090a), Colour (0xff50535a), Colour (0xff1b1c1f), Colour (0xff121315), Colour (0xffff7a3a),
+                  Colour (0xff26282c) };
+        x.canvas = canvasAnvil;
+        x.headerDeco = nullptr;
+        x.titleEmblem = anvilEmblem;
+        x.flatSections = true;
+        x.rimWidth = 1.2f;
+        x.capTint = anvilCapTint;
+        x.hwKeys = true;
+        x.offLabelCol = Colour (0xffa9a49b);
+        x.captionCol = Colour (0xffe6e1d8);
+        x.valueCol = Colour (0xffbdb7ad);
+        x.headerCol = Colour (0xff141518);
+        return x;
+    }();
+    return t;
+}
+
 inline Colour kilnCapTint (const char* param)
 {
     const juce::String n (param);
@@ -4850,6 +4938,7 @@ const Theme* effectTheme (Art a)
         case Art::fret: return &fretTheme();
         case Art::shell: return &shellTheme();
         case Art::strike: return &strikeTheme();
+        case Art::anvil: return &anvilTheme();
         case Art::crest: return &crestTheme();
         case Art::apex: return &apexTheme();
         case Art::prism: return &prismTheme();
@@ -4982,6 +5071,7 @@ Art artForEffect (EffectKind kind)
         case EffectKind::fretChannel: return Art::fret;
         case EffectKind::shellChannel: return Art::shell;
         case EffectKind::strikeShaper: return Art::strike;
+        case EffectKind::anvilBus: return Art::anvil;
         case EffectKind::aether: return Art::aether;
         case EffectKind::fruityBloodOverdrive: return Art::blood;
         case EffectKind::fruityFastDist: return Art::fastDist;

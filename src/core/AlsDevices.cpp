@@ -797,9 +797,18 @@ std::optional<Translated> effectFromLiveDevice (const Element& device, const Con
     else if (tag == "DrumBuss")
     {
         t.from = "Drum Buss";
-        t.to = "Drum Buss rack (Ember Saturator, Facet EQ, Crest Compressor, Shell Channel)"; // (round 190ek: Crest only with Comp on)
-        t.approximate = true;
-        ok = drumBussToRack (device, t);
+        if (context.drumBussRack) // round 190ek's rack: the A/B harness and its tests
+        {
+            t.to = "Drum Buss rack (Ember Saturator, Facet EQ, Crest Compressor, Shell Channel)"; // (round 190ek: Crest only with Comp on)
+            t.approximate = true;
+            ok = drumBussToRack (device, t);
+        }
+        else // round 190fk: LYNX's own drum-bus engine
+        {
+            t.to = "Anvil Bus";
+            t.approximate = true;
+            ok = drumBussToEngine (device, t);
+        }
     }
     // ---- lot 4 (round 190fm) ----
     else if (tag == "Hybrid")
