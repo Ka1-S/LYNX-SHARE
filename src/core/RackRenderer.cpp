@@ -1015,7 +1015,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
                 reserve[(std::size_t) kind] += std::max (0, need - instrument->pitchShiftersHeld());
             used[(std::size_t) kind] = true;
         }
-        // + a live reserve (one channel's worth) for each kind in use: a keyboard played into a keep-pitch channel
+        // + a live reserve (a chord) for each kind in use: a keyboard played into a keep-pitch channel
         for (int k = 0; k < ShifterStock::kinds; ++k)
             stock.setReserve (k, used[(std::size_t) k] ? ShifterStock::liveReserve + reserve[(std::size_t) k] : 0);
     }

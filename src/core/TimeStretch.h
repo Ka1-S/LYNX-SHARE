@@ -117,8 +117,8 @@ public:
     int maxPrimeLength (int kind) const;
 
     // keep `count` fresh shifters of that kind ready (RackState::build sets it for each rack it builds); topUp() makes
-    // what is missing. liveReserve: one channel's worth, for what a keyboard plays beyond the song
-    static constexpr int liveReserve = 8;
+    // what is missing. liveReserve: a chord a keyboard plays beyond the song (refilled 30 times a second)
+    static constexpr int liveReserve = 4;
     void setReserve (int kind, int count);
     void topUp();
     std::unique_ptr<VoicePitchShifter> take (int kind) noexcept;

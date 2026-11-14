@@ -60,7 +60,7 @@ run () { # app args...
 rec () { echo "{\"app\":\"$1\",\"case\":\"$2\",\"rep\":$3,\"load1\":$4,\"r\":${5:-null}}" >> "$out"; echo "$1 $2 #$3 load=$4 :: ${5:0:400}"; }
 # keep LYNX's own logs of a run (the next run in the same profile overwrites them): keep <app> <case> <rep> <profile>
 keep () { local d="$WL/prof/$4/LYNX" k="$H/logs/$1-$2-$3" log; mkdir -p "$H/logs"; for log in startup.log load.log; do [ -f "$d/$log" ] && cp "$d/$log" "$k-$log"; done; }
-newprof () { rm -rf "/mnt/c/Users/kauan/lynx-test/perfwin190gd/prof/${1:?}"; mkdir -p "$WL/prof/$1"; cp -r "$WL/seed/LYNX" "$WL/prof/$1/"; }
+newprof () { rm -rf "${WL:?}/prof/${1:?}"; mkdir -p "$WL/prof/$1"; cp -r "$WL/seed/LYNX" "$WL/prof/$1/"; }
 lxenv () { echo "LYNX_PROFILE_DIR=$W\\prof\\$1;LYNX_TEST_MODE=1;LYNX_TEST_MAXIMIZE=1;LYNX_TRACE_STARTUP=1"; }
 lxexe () { [ "$1" = lx2 ] && echo "$LX2" || echo "$LX"; }
 proj () { [ "$1" = patience ] && echo "$LIVESONG" || echo "$W\\proj\\$1.flp"; }

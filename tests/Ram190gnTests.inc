@@ -282,18 +282,20 @@ TEST (ram190gn_renderer_buffers_follow_the_song)
         CHECK (r.bufferChannels() == 160 && r.bufferTracks() == 320);
     }
     {
-        // without reserveFor: the same audio, the buffers grown at the first block of the big song
+        // without reserveFor: the same audio, the buffers grown at the first block of the big song (two builds: a
+        // state's instruments play in one renderer only)
+        const auto bigA = make (150, 300), bigB = make (150, 300);
         RackRenderer a, b;
         a.prepare (44100.0, 512);
         b.prepare (44100.0, 512);
-        b.reserveFor (*big);
+        b.reserveFor (*bigB);
         std::vector<float> la (512), ra (512), lb (512), rb (512);
         auto same = true;
         for (int k = 0; k < 20; ++k)
         {
             const auto tick = k * 512.0 * ticksPerSample (big->song.bpm, 44100.0);
-            a.process (big.get(), true, tick, 512, la.data(), ra.data());
-            b.process (big.get(), true, tick, 512, lb.data(), rb.data());
+            a.process (bigA.get(), true, tick, 512, la.data(), ra.data());
+            b.process (bigB.get(), true, tick, 512, lb.data(), rb.data());
             same = same && std::memcmp (la.data(), lb.data(), sizeof (float) * 512) == 0 && std::memcmp (ra.data(), rb.data(), sizeof (float) * 512) == 0;
         }
         CHECK (same);

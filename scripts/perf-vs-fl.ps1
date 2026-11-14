@@ -136,6 +136,8 @@ if ($readyAt -ge 0 -and $mode -eq "play") {
   $mods = @{}; foreach ($mo in (Get-Process -Id $p.Id).Modules) { $mods[$mo.ModuleName] = @($mo.BaseAddress.ToInt64(), ($mo.BaseAddress.ToInt64() + $mo.ModuleMemorySize)) }
   $p.Refresh(); $th0 = @{}; foreach ($t in $p.Threads) { try { $th0[$t.Id] = $t.TotalProcessorTime.TotalSeconds } catch {} }
   $c0 = $p.TotalProcessorTime.TotalSeconds; $t0 = $sw.Elapsed.TotalSeconds
+  # round 190gn: the process's page faults (soft + hard) while it plays, from the raw counter (a running total)
+  $pf0 = (Get-CimInstance Win32_PerfRawData_PerfProc_Process -Filter "IDProcess=$($p.Id)" -ea 0).PageFaultsPersec
   if ($watch -ne "" -and $m -ne $null) {
     # screen updates inside the window (primary monitor part) during 10 s of playback
     $x = [math]::Max(0, $m.x + 8); $y = [math]::Max(0, $m.y + 8); $w = [math]::Min(1920 - $x, $m.w - 16); $h = [math]::Min(1080 - $y, $m.ht - 16)
@@ -146,6 +148,8 @@ if ($readyAt -ge 0 -and $mode -eq "play") {
   $el = $sw.Elapsed.TotalSeconds - $t0; if ($el -lt $sampleS) { Start-Sleep -Milliseconds ([int](1000 * ($sampleS - $el))) }
   $p.Refresh(); $c1 = $p.TotalProcessorTime.TotalSeconds; $t1 = $sw.Elapsed.TotalSeconds
   $r.play_cpu_pct = [math]::Round(100 * ($c1 - $c0) / ($t1 - $t0), 1)
+  $pf1 = (Get-CimInstance Win32_PerfRawData_PerfProc_Process -Filter "IDProcess=$($p.Id)" -ea 0).PageFaultsPersec
+  if ($pf0 -ne $null -and $pf1 -ne $null) { $r.play_faults = [int64]$pf1 - [int64]$pf0; $r.play_faults_s = [math]::Round(($t1 - $t0), 1) }
   $rows = @()
   foreach ($t in $p.Threads) { try { if ($th0.ContainsKey($t.Id)) { $d = 100 * ($t.TotalProcessorTime.TotalSeconds - $th0[$t.Id]) / ($t1 - $t0)
         if ($d -ge 0.5) { $a = [W]::StartAddr([uint32]$t.Id); $mn = "{0:x}" -f $a; foreach ($k in $mods.Keys) { if ($a -ge $mods[$k][0] -and $a -lt $mods[$k][1]) { $mn = "$k+0x{0:x}" -f ($a - $mods[$k][0]) } }
