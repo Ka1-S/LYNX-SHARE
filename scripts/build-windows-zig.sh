@@ -20,6 +20,10 @@ mkdir -p "$OUT/juce" "$OUT/app" "$OUT/shim"
 
 # MinGW headers are lowercase; JUCE includes some with capitals (on Windows it does not matter).
 echo '#include <dbghelp.h>' > "$OUT/shim/Dbghelp.h"
+# Ableton Link (third_party/link, unmodified) includes Windows headers by their SDK capitals (round 190gl)
+echo '#include <ws2tcpip.h>' > "$OUT/shim/WS2tcpip.h"
+echo '#include <winsock2.h>' > "$OUT/shim/WinSock2.h"
+echo '#include <windows.h>' > "$OUT/shim/Windows.h"
 
 MODULES=(juce_core juce_data_structures juce_events juce_graphics juce_gui_basics juce_gui_extra
          juce_audio_basics juce_audio_devices juce_audio_formats juce_audio_processors juce_audio_utils juce_dsp juce_opengl)
