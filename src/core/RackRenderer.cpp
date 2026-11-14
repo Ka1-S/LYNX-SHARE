@@ -1293,11 +1293,13 @@ void RackState::buildTaskGraph (const std::vector<int>& depth)
     for (int i = 0; i < tasks; ++i)
         if (graphIndegree[(std::size_t) i] == 0)
             graphRoots.push_back (i);
-    // serial chains (round 190gq): a task whose only successor is fed by nothing else runs that successor itself
+    // serial chains (round 190gq): an insert whose only successor is an insert fed by nothing else runs that insert
+    // itself. Only insert → insert links: a channel fused with its insert made the graph run depth-first, so the other
+    // channels (the roots, most of the work) started later (measured: Exoplanet's overruns doubled)
     graphFused.assign ((std::size_t) tasks, -1);
     graphFusedCount = 0;
     if (std::getenv ("LYNX_CHAINS") == nullptr || std::atoi (std::getenv ("LYNX_CHAINS")) != 0)
-        for (int i = 0; i < tasks; ++i)
+        for (int i = graphChannels; i < tasks; ++i)
             if (graphNextStart[(std::size_t) i + 1] - graphNextStart[(std::size_t) i] == 1)
                 if (const auto j = graphNext[(std::size_t) graphNextStart[(std::size_t) i]]; graphIndegree[(std::size_t) j] == 1)
                 {
