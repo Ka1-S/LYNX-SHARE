@@ -55,7 +55,7 @@ inline bool optOutOfPowerThrottling() noexcept
     return set != nullptr && set (GetCurrentThread(), detail::threadPowerThrottling, &state, sizeof (state)) != 0;
 }
 
-// The calling thread joins MMCSS "Pro Audio" at high priority (the class of LYNX's own render workers, AudioEngine.cpp)
+// The calling thread joins MMCSS "Pro Audio" at critical priority (the class of LYNX's own render workers, AudioEngine.cpp)
 // and opts out of power throttling. For audio threads outside the engine (the plugin sandbox, the 32-bit bridge).
 inline void becomeProAudioThread() noexcept
 {
@@ -67,7 +67,7 @@ inline void becomeProAudioThread() noexcept
     DWORD task = 0;
     if (auto* handle = avSet != nullptr ? avSet (L"Pro Audio", &task) : nullptr)
     {
-        if (avPriority != nullptr)
+        if (avPriority != nullptr && avPriority (handle, 2 /* AVRT_PRIORITY_CRITICAL, as LYNX's own audio threads */) == 0)
             avPriority (handle, 1 /* AVRT_PRIORITY_HIGH */);
     }
     else

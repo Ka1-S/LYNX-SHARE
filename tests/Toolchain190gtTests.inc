@@ -107,6 +107,10 @@ TEST (toolchain190gt_audio_threads_opt_out_of_ecoqos_and_join_the_device_workgro
     CHECK (raise != std::string::npos && engine.find ("power::optOutOfPowerThrottling();", raise) < raiseEnd);
     const auto callback = engine.find ("void AudioEngine::audioDeviceIOCallbackWithContext");
     CHECK (callback != std::string::npos && engine.find ("power::optOutOfPowerThrottling();", callback) != std::string::npos);
+    // MMCSS "Pro Audio" at CRITICAL, as Live (REA 190hc), and the reached priority in the real-time report
+    CHECK (engine.find ("avPriority (handle, 2 /* AVRT_PRIORITY_CRITICAL */)", raise) < raiseEnd);
+    CHECK (engine.find ("audio threads raised ") != std::string::npos);
+    CHECK (readFile ("src/platform/PowerThrottling.h").find ("avPriority (handle, 2 /* AVRT_PRIORITY_CRITICAL") != std::string::npos);
     // the stream prefetcher's thread
     CHECK (readFile ("src/engine/StreamPrefetcher.cpp").find ("power::optOutOfPowerThrottling();") != std::string::npos);
     // the plugin sandbox's / 32-bit bridge's audio thread: MMCSS + no EcoQoS

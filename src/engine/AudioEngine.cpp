@@ -137,6 +137,13 @@ const natives::FlAccess& flStudioAccess()
 
 namespace
 {
+#if JUCE_WINDOWS
+// what the audio threads reached (round toolchain190gt, REA 190hc: LYNX's were seen at dynamic priority 15 in some runs
+// and 24-25 in others, Live's always at 26): threads raised, how many joined MMCSS at CRITICAL, their thread priority
+std::atomic<int> rtThreadsRaised { 0 }, rtThreadsMmcss { 0 }, rtThreadsCritical { 0 };
+std::atomic<int> rtPriorityMin { 1000 }, rtPriorityMax { -1000 };
+#endif
+
 // Audio workers with real-time priority (MMCSS "Pro Audio" on Windows, like the driver; QoS class on macOS; SCHED_FIFO
 // on Linux when allowed).
 void raiseAudioThreadPriority()
@@ -148,7 +155,9 @@ void raiseAudioThreadPriority()
             return reinterpret_cast<AvSet> (reinterpret_cast<void*> (GetProcAddress (avrt, "AvSetMmThreadCharacteristicsW")));
         return nullptr;
     }();
-    // FL's audio worker threads also raise their MMCSS priority to "high" (FLEngine_x64.dll, REA round 87)
+    // FL's audio worker threads raise their MMCSS priority to "high" (FLEngine_x64.dll, REA round 87); Live's to "critical"
+    // (REA round 190hc: its 22 audio threads sat at dynamic priority 26 in every snapshot), which LYNX uses since round
+    // toolchain190gt
     using AvPriority = int (__stdcall*) (void*, int);
     static const auto avPriority = [] () -> AvPriority {
         if (auto* avrt = LoadLibraryW (L"avrt.dll"))
@@ -159,13 +168,20 @@ void raiseAudioThreadPriority()
 
     if (auto* handle = avSet != nullptr ? avSet (L"Pro Audio", &task) : nullptr)
     {
-        if (avPriority != nullptr)
+        rtThreadsMmcss.fetch_add (1, std::memory_order_relaxed);
+        if (avPriority != nullptr && avPriority (handle, 2 /* AVRT_PRIORITY_CRITICAL */) != 0)
+            rtThreadsCritical.fetch_add (1, std::memory_order_relaxed);
+        else if (avPriority != nullptr)
             avPriority (handle, 1 /* AVRT_PRIORITY_HIGH */);
     }
     else
         SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
     // and full speed while LYNX is in the background (no EcoQoS: platform/PowerThrottling.h, round toolchain190gt)
     power::optOutOfPowerThrottling();
+    const auto reached = GetThreadPriority (GetCurrentThread());
+    rtThreadsRaised.fetch_add (1, std::memory_order_relaxed);
+    for (auto low = rtPriorityMin.load(); reached < low && ! rtPriorityMin.compare_exchange_weak (low, reached);) {}
+    for (auto high = rtPriorityMax.load(); reached > high && ! rtPriorityMax.compare_exchange_weak (high, reached);) {}
    #elif JUCE_MAC
     // the highest quality-of-service class: scheduled like the UI's own interactive work, on the performance cores
     pthread_set_qos_class_self_np (QOS_CLASS_USER_INTERACTIVE, 0);
@@ -5317,6 +5333,10 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
             text << "  device thread priority " << before << (deviceThreadPriorityAfter.load (std::memory_order_relaxed) != before
                                                                 ? " -> " + juce::String (deviceThreadPriorityAfter.load (std::memory_order_relaxed)) + " (raised to MMCSS Pro Audio)"
                                                                 : juce::String (boostDeviceThread ? " (kept)" : " (kept: LYNX_DEVICE_BOOST=0)")) << "\n";
+        if (const auto raised = rtThreadsRaised.load (std::memory_order_relaxed); raised > 0)
+            text << "  audio threads raised " << raised << ": MMCSS Pro Audio " << rtThreadsMmcss.load (std::memory_order_relaxed)
+                 << " (critical " << rtThreadsCritical.load (std::memory_order_relaxed) << "), thread priority "
+                 << rtPriorityMin.load (std::memory_order_relaxed) << ".." << rtPriorityMax.load (std::memory_order_relaxed) << "\n";
        #endif
     }
     else
