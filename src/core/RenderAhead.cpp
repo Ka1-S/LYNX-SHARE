@@ -1006,7 +1006,10 @@ void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playin
                 counters.probeOverOn.store ((float) (60.0 * overRateOn), std::memory_order_relaxed);
                 const auto fewerOverruns = overRateOn <= overRateOff * probeOverrunGain && overRateOff > 0.0;
                 const auto lessCpu = cpuShareOn <= cpuShareOff * probeCpuGain;
-                const auto keep = (fewerOverruns && cpuShareOn <= cpuShareOff * probeCpuMargin) || (lessCpu && overRateOn <= overRateOff);
+                // (the owner's rule, no project worse: kept only for a CPU win beyond the probe's measuring error — about
+                // ten points in render-ahead's favour against whole runs — with no more overruns. Fewer overruns for a
+                // little more CPU (synth100, Exoplanet: 5-20x fewer for +5-9 %) would be `favourFewerOverruns`.)
+                const auto keep = (lessCpu && overRateOn <= overRateOff) || (favourFewerOverruns && fewerOverruns && cpuShareOn <= cpuShareOff * probeCpuMargin);
                 probe = keep ? Probe::decidedOn : Probe::decidedOff;
                 decidedLeft = decidedSeconds;
                 decidedState = state != nullptr ? state->serial : 0;

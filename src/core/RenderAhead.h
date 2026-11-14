@@ -162,10 +162,9 @@ public:
     void setTargets (const renderahead::Targets* t) noexcept { targets = t; }
     // the window in samples (default about 23 ms; tests use other values)
     void setWindowSamples (int samples) noexcept { windowSamples = samples; }
-    // With the option on, render-ahead runs when the project needs it: the callback's average load at or above
-    // `engageLoad` of its block, or one block at or above `engageSpike` (a light project has no deadline to ease and
-    // would only pay the second thread); it stops after `idleSeconds` with the whole rack under `idleLoad`.
-    // always = true (tests, null runs): whenever it can.
+    // With the option on, render-ahead runs only where the engine has measured it to be a clear win for this project
+    // (the probe below: fewer overruns at no more CPU, or less CPU at no more overruns); it also stops after
+    // `idleSeconds` with the whole rack under `idleLoad`. always = true (tests, null runs): whenever it can.
     void setAlwaysEngage (bool always) noexcept { alwaysEngage = always; }
     static constexpr double engageLoad = 0.20, engageSpike = 0.60, idleLoad = 0.08, idleSeconds = 10.0;
 
@@ -219,6 +218,9 @@ private:
     // at least probeTriggerOverruns times a second or carries probeTriggerLoad of its block on average.
     static constexpr double probeOverrunGain = 0.8, probeCpuGain = 0.9, probeTriggerOverruns = 1.0, probeTriggerLoad = 0.5;
     double recentOverruns = 0.0; // (an average of overruns per second, the last couple of seconds)
+    // a project where render-ahead cuts the overruns 5-20x for a few % more CPU: off by the owner's rule (no project
+    // worse in any measure); true would keep it there (an owner decision, not taken)
+    static constexpr bool favourFewerOverruns = false;
     static constexpr int probeRounds = 2;
     double probeLeft = 0.0, decidedLeft = 0.0, warmupLeft = 0.0;
     int probeRound = 0;
