@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+#include <chrono>
 #include <functional>
 #include <memory>
 
@@ -24,7 +26,61 @@ struct StartupOptions
 // LYNX's start-up sound (core/StartupSound.h) as a sample the preview player can play.
 std::shared_ptr<const SampleData> makeStartupSample();
 
+// What Main drives during the start-up (round 190hd): the card on the message thread (SplashScreen, a JUCE window: Linux,
+// macOS, LYNX_SPLASH_THREAD=0) or, on Windows, a layered window of its own drawn by a thread of its own with the same
+// drawing code (makeStartupSplash): the message thread can then start the engine, open the audio device and build the
+// main window while the card is up and while the logo drops, without stopping a single frame of the drop.
+class StartupSplash
+{
+public:
+    virtual ~StartupSplash() = default;
+
+    // Shows the card centred on the main display, above other windows (the clock has not started yet).
+    virtual void showOnDesktop() = 0;
+    // t = 0 of the animation (start the start-up sound at the same moment).
+    virtual void startClock() = 0;
+    virtual double getElapsed() const = 0;
+    virtual void setStatus (const juce::String& text) = 0;
+    // the progress bar fills over this (default SplashScreen::minimumDuration)
+    virtual void setBarDuration (double seconds) = 0;
+    // above every other window again, without taking the focus
+    virtual void raise() = 0;
+    // Fades out, removes itself from the desktop and calls `whenGone` (on the message thread).
+    virtual void finish (std::function<void()> whenGone) = 0;
+
+    // The frames painted during the drop (the clock's first `landing` seconds) and the longest time between two of
+    // them, in ms (round 190go: the start-up trace shows that the window built behind the card leaves the drop alone)
+    virtual int getDropFrames() const = 0;
+    virtual double getLongestDropGapMs() const = 0;
+    // When the first frame was on the screen (steady clock; the epoch: not yet)
+    virtual std::chrono::steady_clock::time_point getFirstFrameTime() const = 0;
+    // true: the card draws on a thread of its own, the message thread may work during the drop
+    virtual bool drawsOnItsOwnThread() const { return false; }
+
+    // Called once on the message thread, after the card's first frame is on the screen (round 190go: the start-up goes
+    // on then, not after a fixed wait)
+    std::function<void()> onFirstFrame;
+};
+
+// The card for this start: Windows draws it on a thread of its own (round 190hd), unless LYNX_SPLASH_THREAD=0.
+std::unique_ptr<StartupSplash> makeStartupSplash();
+
+// One frame of the card (SplashScreen::width x height, the logical size): the same drawing for both kinds of card
+// and for --snapshot. `fonts` resolved on the message thread (a card drawn by its own thread uses them there).
+struct SplashFrame
+{
+    double t = 0.0;              // seconds of the clock (0: the still card before the drop)
+    double barDuration = 2.1;    // the progress bar fills over this
+    juce::String status, subtitle, version;
+    const juce::Image* logo = nullptr;
+    const juce::Font* fonts = nullptr; // [4]: "LYNX", "SHARE", the subtitle, the small text (nullptr: made here)
+};
+void drawSplashFrame (juce::Graphics& g, const SplashFrame& frame);
+// The fonts drawSplashFrame uses, resolved (their typefaces looked up) on the calling thread.
+std::array<juce::Font, 4> makeSplashFonts();
+
 class SplashScreen final : public juce::Component,
+                           public StartupSplash,
                            private juce::Timer
 {
 public:
@@ -38,30 +94,22 @@ public:
     // How long the card stays given that the process started `sinceProcessStart` seconds before its clock: the rest of
     // minimumDuration, but at least `landing` (the logo's drop, after which the main window is built).
     static double remainingDuration (double sinceProcessStart, double landing = 1.05);
-    // the progress bar fills over this (default minimumDuration)
-    void setBarDuration (double seconds) { barDuration = seconds; }
     static constexpr double fadeOutTime = 0.25;
 
-    // Shows the card centred on the main display, above other windows (the clock has not started yet).
-    void showOnDesktop();
-    // t = 0 of the animation (start the start-up sound at the same moment).
-    void startClock();
-    double getElapsed() const;
-
-    void setStatus (const juce::String& text);
-    // Called once, right after the card's first frame is painted (round 190go: the start-up goes on then, not after a
-    // fixed wait)
-    std::function<void()> onFirstFrame;
-    // Fades out, removes itself from the desktop and calls `whenGone`.
-    void finish (std::function<void()> whenGone);
+    void showOnDesktop() override;
+    void startClock() override;
+    double getElapsed() const override;
+    void setStatus (const juce::String& text) override;
+    void setBarDuration (double seconds) override { barDuration = seconds; }
+    void raise() override { toFront (false); }
+    void finish (std::function<void()> whenGone) override;
 
     // --snapshot: draws the frame at `seconds` (no desktop, no timer).
     void setTimeForSnapshot (double seconds);
 
-    // The frames painted during the drop (the clock's first `landing` seconds) and the longest time between two of
-    // them, in ms (round 190go: the start-up trace shows that the window built behind the card leaves the drop alone)
-    int getDropFrames() const noexcept { return dropFrames; }
-    double getLongestDropGapMs() const noexcept { return longestDropGapMs; }
+    int getDropFrames() const override { return dropFrames; }
+    double getLongestDropGapMs() const override { return longestDropGapMs; }
+    std::chrono::steady_clock::time_point getFirstFrameTime() const override { return firstFrameTime; }
 
     void paint (juce::Graphics& g) override;
 
@@ -75,6 +123,7 @@ private:
     double barDuration = minimumDuration;
     int dropFrames = 0;
     double longestDropGapMs = 0.0, lastDropPaintMs = -1.0;
+    std::chrono::steady_clock::time_point firstFrameTime;
     std::function<void()> onGone;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SplashScreen)

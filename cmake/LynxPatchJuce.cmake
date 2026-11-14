@@ -157,6 +157,11 @@
 #    to its windows (all messages while the driver's control panel is open). LYNX can then make and open its device
 #    on a worker while the main window is built (engine/DllAsioDevice.h, prewarmAsioDevice). The audio callbacks still
 #    come from the driver's own thread. LYNX_ASIO_THREAD=0: as before (the caller's thread; no prewarm either).
+# 28. Windows only, juce_graphics/native/juce_Direct2DImage_windows.cpp (round 190hd, start-up): a thread can ask for
+#    software images (`juce::lynxSoftwareImagesOnThisThread (true)`): every image it makes after that, a decoded PNG
+#    included, is a plain software image instead of a Direct2D one. The splash card draws on a thread of its own with the
+#    CPU (ui/Splash.cpp); before, its logo was the process's first Direct2D image, so the Direct3D 11 + Direct2D device
+#    (~0.35-0.4 s) was made before the card could show. Other threads: as before.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -256,6 +261,9 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("image readback put off (one image)" "LYNX patch (round 190bm): for one image"
             "        const bool skipReadback = lynxSkipImageReadback; // LYNX patch (round 174e2): the flag when made|NL|"
             "        // LYNX patch (round 174e2): the flag when made|NL|        // LYNX patch (round 190bm): for one image only (a Graphics made on another image meanwhile reads back as ever)|NL|        const bool skipReadback = lynxSkipImageReadback && lynxNoReadbackImage == self.get();|NL|")
+        lynx_juce_fix("software images on a thread that asks for them" "LYNX patch (round 190hd): software images"
+            "ImagePixelData::Ptr NativeImageType::create (Image::PixelFormat format, int width, int height, bool clearImage) const|NL|{|NL|    SharedResourcePointer<DirectX> directX;|NL|"
+            "// LYNX patch (round 190hd): software images on a thread that asks for them (cmake/LynxPatchJuce.cmake, fix 28)|NL|static thread_local bool lynxSoftwareImages = false;|NL|void lynxSoftwareImagesOnThisThread (bool on) { lynxSoftwareImages = on; }|NL||NL|ImagePixelData::Ptr NativeImageType::create (Image::PixelFormat format, int width, int height, bool clearImage) const|NL|{|NL|    if (lynxSoftwareImages) // LYNX patch (round 190hd): this thread draws with the CPU (no Direct2D device made for it)|NL|        return new SoftwarePixelData { format, width, height, clearImage };|NL||NL|    SharedResourcePointer<DirectX> directX;|NL|")
     elseif(file MATCHES "juce_Windowing_linux.cpp$")
         lynx_juce_fix("no X focus for menu windows" "LYNX patch (issue #45): never takes the X focus"
             "    void grabFocus() override|NL|    {|NL|"
