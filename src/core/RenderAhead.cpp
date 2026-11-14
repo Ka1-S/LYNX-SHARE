@@ -941,12 +941,13 @@ void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playin
     lastAheadCpu = aheadNs;
     if (! playing)
         return;
+    recentOverruns += std::min (1.0, seconds / 2.0) * ((over ? 1.0 / seconds : 0.0) - recentOverruns);
     const auto engaged = engagedNow.load (std::memory_order_relaxed);
     const auto changed = state != nullptr && state->serial != decidedState;
     switch (probe)
     {
         case Probe::none:
-            if (loadAverage >= engageLoad || spiked)
+            if (! engaged && (recentOverruns >= probeTriggerOverruns || loadAverage >= probeTriggerLoad))
             {
                 probe = Probe::off;
                 probeLeft = probeSeconds;
@@ -1003,7 +1004,9 @@ void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playin
                 counters.probeCpuOn.store ((float) (100.0 * cpuShareOn), std::memory_order_relaxed);
                 counters.probeOverOff.store ((float) (60.0 * overRateOff), std::memory_order_relaxed);
                 counters.probeOverOn.store ((float) (60.0 * overRateOn), std::memory_order_relaxed);
-                const auto keep = overRateOn <= overRateOff && cpuShareOn <= cpuShareOff * probeCpuMargin;
+                const auto fewerOverruns = overRateOn <= overRateOff * probeOverrunGain && overRateOff > 0.0;
+                const auto lessCpu = cpuShareOn <= cpuShareOff * probeCpuGain;
+                const auto keep = (fewerOverruns && cpuShareOn <= cpuShareOff * probeCpuMargin) || (lessCpu && overRateOn <= overRateOff);
                 probe = keep ? Probe::decidedOn : Probe::decidedOff;
                 decidedLeft = decidedSeconds;
                 decidedState = state != nullptr ? state->serial : 0;

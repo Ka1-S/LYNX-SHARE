@@ -213,7 +213,12 @@ private:
     bool renderAheadAllowed() const noexcept;
     enum class Probe { none, off, on, decidedOn, decidedOff };
     Probe probe = Probe::none;
-    static constexpr double probeSeconds = 2.0, probeWarmup = 0.25, probeCpuMargin = 1.02, decidedSeconds = 60.0;
+    static constexpr double probeSeconds = 3.0, probeWarmup = 0.25, probeCpuMargin = 1.02, decidedSeconds = 60.0;
+    // render-ahead is kept only with a clear win (off is the baseline: a tie is off): at least probeOverrunGain fewer
+    // overruns, or probeCpuGain less CPU, without losing on the other. A probe starts when the callback, off, overruns
+    // at least probeTriggerOverruns times a second or carries probeTriggerLoad of its block on average.
+    static constexpr double probeOverrunGain = 0.8, probeCpuGain = 0.9, probeTriggerOverruns = 1.0, probeTriggerLoad = 0.5;
+    double recentOverruns = 0.0; // (an average of overruns per second, the last couple of seconds)
     static constexpr int probeRounds = 2;
     double probeLeft = 0.0, decidedLeft = 0.0, warmupLeft = 0.0;
     int probeRound = 0;
