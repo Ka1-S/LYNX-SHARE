@@ -8,12 +8,16 @@
 //  - otherwise the spectral stretcher runs, and the attacks it detects are
 //    spliced back unstretched (no smeared or doubled hits, no pre-echo).
 
+#include <array>
+#include <atomic>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "core/Denormals.h"
 #include "core/Instruments.h"
 
 namespace lynx
@@ -43,6 +47,9 @@ std::shared_ptr<SampleData> timeStretch (const SampleData& input, double ratio, 
 // map its knobs (cropped, cropFrom, cropTo) and scales the span's loop.
 std::shared_ptr<SampleData> timeStretchSpan (const SampleData& span, double ratio, StretchMethod method = StretchMethod::general,
                                              double semitones = 0.0, const StretchOptions& options = {});
+// What timeStretchSpan carries over from the span to its stretched copy `out` (round 190gn: a copy read back from the
+// disk cache gets it the same way)
+void copySpanInfo (const SampleData& span, SampleData& out);
 
 // A warp map (round 175a, warp markers M1): source frame → output frame, piecewise linear between its points. Both
 // coordinates increase; the first point is (0, 0) and the last (the source's frames, the output's frames). Each segment
@@ -92,6 +99,74 @@ private:
     struct Impl;
     std::unique_ptr<Impl> impl;
 };
+
+// Round 190gn (A1, memory): the rack's stock of fresh voice pitch shifters. A sampler that keeps its pitch used to make
+// all of its 8 shifters when it was built (~0.75 MB each: FL's Thief, 29 such channels, 174 MB); now it makes only the
+// ones the song can use at once (RackState's song analysis) and takes any further one from this stock the first time
+// its voices need it, keeping it from then on. A shifter from the stock is in exactly the state of one made at build
+// time (VoicePitchShifter::allocate is deterministic: a fixed seed and a silent run), so a voice sounds the same
+// whichever way its shifter came. Two kinds, by the method's analysis block (100 / 80 ms).
+//  - make(): any thread but the audio thread (several at once: it touches no shared state);
+//  - take(): the audio thread, lock-free and allocation-free (nullptr when the stock is empty — the voice then plays
+//    resampled, as one past the 8th always did, and the miss is counted); an offline stock (export) makes one instead;
+//  - topUp(): any thread but the audio thread; refills the stock to its live reserve (shifterstock::topUpAll() for
+//    every rack's stock: the engine calls it from its message-thread timer).
+class ShifterStock
+{
+public:
+    static constexpr int kinds = 2, capacity = 128;
+    static int kindOf (StretchMethod method) noexcept
+    {
+        return method == StretchMethod::transients || method == StretchMethod::beats ? 1 : 0;
+    }
+
+    explicit ShifterStock (double sampleRate, bool offline = false);
+    ~ShifterStock();
+    ShifterStock (const ShifterStock&) = delete;
+    ShifterStock& operator= (const ShifterStock&) = delete;
+
+    double sampleRate() const noexcept { return rate; }
+    bool offline() const noexcept { return makesOnDemand; }
+    // a fresh shifter of that kind (not from the stock)
+    std::unique_ptr<VoicePitchShifter> make (int kind) const;
+    // the longest priming a shifter of that kind takes (VoicePitchShifter::maxPrimeLength)
+    int maxPrimeLength (int kind) const;
+
+    // keep `count` fresh shifters of that kind ready (RackState::build sets it for each rack it builds); topUp() makes
+    // what is missing. liveReserve: a chord a keyboard plays beyond the song (refilled 30 times a second)
+    static constexpr int liveReserve = 4;
+    void setReserve (int kind, int count);
+    void topUp();
+    std::unique_ptr<VoicePitchShifter> take (int kind) noexcept;
+
+    int ready (int kind) const noexcept;  // fresh ones in the stock now
+    int missed() const noexcept { return misses.load (std::memory_order_relaxed); }
+    int handedOut() const noexcept { return taken.load (std::memory_order_relaxed); }
+
+private:
+    double rate;
+    bool makesOnDemand;
+    FloatMode mode = FloatMode::current(); // the building thread's: every shifter is made in it, wherever make() runs
+    std::array<std::array<std::atomic<VoicePitchShifter*>, capacity>, kinds> slots {};
+    std::array<int, kinds> wanted {};
+    std::mutex fill; // topUp() / reserve() (never the audio thread)
+    std::atomic<int> misses { 0 }, taken { 0 };
+};
+
+namespace shifterstock
+{
+// every live rack's stock refilled to its reserve (message thread; cheap when nothing was taken)
+void topUpAll();
+// the stocks register themselves (weakly) for topUpAll
+void enlist (const std::shared_ptr<ShifterStock>& stock);
+// LYNX_SHIFTER_STRICT=1 (the null tests): even an offline stock never makes one on the audio thread's demand, so a
+// render proves the song analysis gave every voice its shifter (ShifterStock::missed() stays 0)
+bool strict() noexcept;
+// Whether RackState::build plans the shifters by the song (default; LYNX_SHIFTER_STOCK=0 or setPlanned (false): every
+// keep-pitch sampler makes its 8 up front, as before round 190gn — the A/B of the null tests)
+bool planned() noexcept;
+void setPlanned (bool on) noexcept;
+} // namespace shifterstock
 
 namespace stretchdetail
 {

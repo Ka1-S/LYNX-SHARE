@@ -11,6 +11,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <limits>
 #include <vector>
 
 #include "core/Song.h"
@@ -27,6 +28,7 @@ namespace vfx
 {
 class Processor;
 }
+class ShifterStock; // core/TimeStretch.h
 
 // Gains a sampler's voices take from outside, per sample (round 190z: FPC's pad envelopes, layer pan and FPC's choke,
 // which FL steps on the voice's own tick grid). `voice` is the sampler's voice slot (0…15). Audio thread, no
@@ -97,6 +99,15 @@ public:
     // UI thread, before the instrument reaches the audio thread: a sampler whose sample is stretched keeping its pitch
     // allocates its per-voice pitch shifters (keys transpose it without changing its length, like FL's Stretch modes).
     virtual void prepareKeyShift (double /*sampleRate*/) {}
+    // Round 190gn (A1): before prepareKeyShift, the rack's shifter stock and how many shifters to make now (the voices the
+    // song can shift at once, at most 8); the others come from the stock the first time a voice needs one. Without a
+    // stock, prepareKeyShift makes all 8 as before.
+    virtual void useShifterStock (std::shared_ptr<ShifterStock> /*stock*/, int /*makeNow*/) {}
+    // The most seconds one note's voice can sound on this instrument (a sampler playing its sample once to the end; +inf
+    // when a loop, zones or a held pad can keep it longer). The song analysis of the shifters.
+    virtual double longestVoiceSeconds() const noexcept { return std::numeric_limits<double>::infinity(); }
+    // How many pitch shifters the instrument holds now (memory diagnostics, tests)
+    virtual int pitchShiftersHeld() const noexcept { return 0; }
 
     // The channel's pan (−1..1) and linear volume behind the gains of the next render() calls. Audio thread, before
     // every chunk. For an instrument that pans its parts around the channel's pan (FPC's pads, round 190q).

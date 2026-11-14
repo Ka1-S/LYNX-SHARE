@@ -4,6 +4,7 @@
 #include "core/CacheBudget.h"
 #include "platform/Paths.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
@@ -21,6 +22,16 @@
 #include "engine/Mp3Format.h"
 #include "engine/WavPackFormat.h"
 #include "core/Speech.h"
+
+#if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #include <windows.h>
+#else
+ #include <sys/mman.h>
+ #include <unistd.h>
+#endif
 
 namespace lynx
 {
@@ -296,8 +307,210 @@ juce::File stretchCacheFile (const juce::String& path, double ratio, StretchMeth
     return SampleLibrary::cacheFolder().getChildFile (juce::String::toHexString (key.hashCode64()) + ".str");
 }
 
+// A precomputed span's stretched copy on disk (round 190gn): keyed by the span's audio (rate, frames and a hash of its
+// floats), the ratio, the method, the stretcher's fingerprint and the warp mode's own settings
+juce::File spanCacheFile (const SampleData& span, double ratio, StretchMethod method, double semitones, const StretchOptions& options)
+{
+    if (span.frames() == 0)
+        return {};
+    auto h = fnv (span.leftData(), span.frames() * sizeof (float));
+    if (span.isStereo())
+        h = fnv (span.rightData(), span.frames() * sizeof (float), h);
+    const auto key = "span|" + juce::String::toHexString ((juce::int64) h) + "|" + juce::String (span.sampleRate, 3) + "|" + juce::String ((juce::int64) span.frames())
+                     + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method) + "|" + juce::String::toHexString ((juce::int64) stretchFingerprint (method))
+                     + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String())
+                     + juce::String (stretchOptionsKey (options, method)); // (rollup 0.1.28: round 190fm's warp settings)
+    return SampleLibrary::cacheFolder().getChildFile (juce::String::toHexString (key.hashCode64()) + ".str");
+}
+
+// Round 190gn (A2, memory): a stretched copy read back from the disk cache is mapped from its file instead of copied
+// into the process's own memory (FL's Thief: 24 copies, 229 MB of private memory), and every page of the mapping is
+// locked in RAM (VirtualLock / mlock) before the sampler can see it: the audio thread never waits for the disk and
+// never takes a page fault on it (locked pages are always mapped and resident). The pages are the cache file's, not
+// the process's (no commit, shared with another LYNX that maps the same copy). When the pages can't be locked (the
+// system's limit for locked memory) the copy is read into RAM as before. The floats are the file's: the same sound.
+namespace lockedpages
+{
+std::mutex& budgetLock()
+{
+    static std::mutex m;
+    return m;
+}
+#if JUCE_WINDOWS
+std::size_t& lockedTotal()
+{
+    static std::size_t total = 0;
+    return total;
+}
+#endif
+
+bool lock (const void* at, std::size_t bytes)
+{
+    if (at == nullptr || bytes == 0)
+        return false;
+    static const bool off = [] { const auto* e = std::getenv ("LYNX_STRETCH_MAP"); return e != nullptr && e[0] == '0'; }();
+    if (off)
+        return false;
+#if JUCE_WINDOWS
+    // a process may lock about its minimum working set: raise it (and the maximum) by what is locked
+    const std::scoped_lock l (budgetLock());
+    const auto process = GetCurrentProcess();
+    SIZE_T least = 0, most = 0;
+    if (! GetProcessWorkingSetSize (process, &least, &most))
+        return false;
+    const SIZE_T slack = 4u << 20;
+    if (! SetProcessWorkingSetSize (process, least + bytes + slack, std::max (most, least + bytes + slack) + bytes))
+        return false;
+    if (! VirtualLock (const_cast<void*> (at), bytes))
+    {
+        SetProcessWorkingSetSize (process, least, most);
+        return false;
+    }
+    lockedTotal() += bytes;
+    return true;
+#else
+    return mlock (at, bytes) == 0;
+#endif
+}
+
+void unlock (const void* at, std::size_t bytes)
+{
+    if (at == nullptr || bytes == 0)
+        return;
+#if JUCE_WINDOWS
+    const std::scoped_lock l (budgetLock());
+    VirtualUnlock (const_cast<void*> (at), bytes);
+    const auto process = GetCurrentProcess();
+    SIZE_T least = 0, most = 0;
+    if (GetProcessWorkingSetSize (process, &least, &most) && least > bytes)
+        SetProcessWorkingSetSize (process, least - bytes, most > bytes ? most - bytes : most);
+    lockedTotal() -= std::min (lockedTotal(), bytes);
+#else
+    munlock (at, bytes);
+#endif
+}
+
+// the bytes of [at, at + bytes) that are resident and locked now (Windows: the working set's Valid + Locked bits;
+// elsewhere resident pages, the lock itself is mlock's promise) — the load log's proof
+std::int64_t lockedBytes (const void* at, std::size_t bytes)
+{
+    if (at == nullptr || bytes == 0)
+        return 0;
+#if JUCE_WINDOWS
+    struct Block { void* va; ULONG_PTR flags; }; // PSAPI_WORKING_SET_EX_INFORMATION (flags bit 0 Valid, bit 22 Locked)
+    using Query = BOOL (WINAPI*) (HANDLE, PVOID, DWORD);
+    static const auto query = (Query) (void*) GetProcAddress (GetModuleHandleW (L"kernel32.dll"), "K32QueryWorkingSetEx");
+    if (query == nullptr)
+        return -1;
+    SYSTEM_INFO info {};
+    GetSystemInfo (&info);
+    const auto page = (std::size_t) info.dwPageSize;
+    const auto first = reinterpret_cast<std::uintptr_t> (at) / page * page;
+    const auto pages = (reinterpret_cast<std::uintptr_t> (at) + bytes - first + page - 1) / page;
+    std::vector<Block> blocks (pages);
+    for (std::size_t i = 0; i < pages; ++i)
+        blocks[i].va = reinterpret_cast<void*> (first + i * page);
+    if (! query (GetCurrentProcess(), blocks.data(), (DWORD) (blocks.size() * sizeof (Block))))
+        return -1;
+    std::int64_t locked = 0;
+    for (const auto& b : blocks)
+        if ((b.flags & 1u) != 0 && (b.flags & (1u << 22)) != 0)
+            locked += (std::int64_t) page;
+    return std::min<std::int64_t> (locked, (std::int64_t) bytes);
+#else
+    const auto page = (std::size_t) sysconf (_SC_PAGESIZE);
+    const auto first = reinterpret_cast<std::uintptr_t> (at) / page * page;
+    const auto pages = (reinterpret_cast<std::uintptr_t> (at) + bytes - first + page - 1) / page;
+    std::vector<unsigned char> resident (pages);
+   #if defined(__APPLE__)
+    if (mincore (reinterpret_cast<void*> (first), pages * page, reinterpret_cast<char*> (resident.data())) != 0)
+   #else
+    if (mincore (reinterpret_cast<void*> (first), pages * page, resident.data()) != 0)
+   #endif
+        return -1;
+    std::int64_t in = 0;
+    for (const auto r : resident)
+        in += (r & 1) != 0 ? (std::int64_t) page : 0;
+    return std::min<std::int64_t> (in, (std::int64_t) bytes);
+#endif
+}
+} // namespace lockedpages
+
+// the owner of a mapped, locked stretched copy (SampleData::mapping)
+struct LockedCopy
+{
+    std::unique_ptr<juce::MemoryMappedFile> file;
+    const void* at = nullptr;
+    std::size_t bytes = 0;
+    ~LockedCopy() { lockedpages::unlock (at, bytes); }
+};
+
+// What every mapped stretched copy holds locked now (memoryUse)
+std::mutex& lockedCopiesLock()
+{
+    static std::mutex m;
+    return m;
+}
+std::vector<std::weak_ptr<const LockedCopy>>& lockedCopies()
+{
+    static std::vector<std::weak_ptr<const LockedCopy>> list;
+    return list;
+}
+
+// The copy mapped and locked (nullptr: not possible, read it instead)
+std::shared_ptr<SampleData> mapStretched (const juce::File& file, double rate, juce::int64 frames, std::int32_t channels)
+{
+    auto copy = std::make_shared<LockedCopy>();
+    copy->file = std::make_unique<juce::MemoryMappedFile> (file, juce::MemoryMappedFile::readOnly);
+    const auto* d = static_cast<const char*> (copy->file->getData());
+    const auto bytes = (std::size_t) (frames * channels) * sizeof (float);
+    if (d == nullptr || copy->file->getSize() != (std::size_t) stretchHeader + bytes || std::memcmp (d, stretchMagic, 8) != 0)
+        return nullptr;
+    const auto* samples = d + stretchHeader;
+    if (! lockedpages::lock (samples, bytes))
+        return nullptr;
+    copy->at = samples;
+    copy->bytes = bytes;
+    auto out = std::make_shared<SampleData>();
+    out->sampleRate = rate;
+    out->mappedFrames = (std::size_t) frames;
+    out->mappedLeft = reinterpret_cast<const float*> (samples);
+    out->mappedRight = channels == 2 ? reinterpret_cast<const float*> (samples) + frames : nullptr;
+    {
+        const std::scoped_lock l (lockedCopiesLock());
+        auto& list = lockedCopies();
+        list.erase (std::remove_if (list.begin(), list.end(), [] (const std::weak_ptr<const LockedCopy>& w) { return w.expired(); }), list.end());
+        list.push_back (copy);
+    }
+    out->mapping = std::move (copy);
+    return out;
+}
+
 std::shared_ptr<SampleData> readStretched (const juce::File& file)
 {
+    // round 190gn: mapped and locked when it can be (the header read alone first)
+    if (file != juce::File() && file.existsAsFile())
+        if (juce::FileInputStream in (file); in.openedOk())
+        {
+            char header[stretchHeader] {};
+            if (in.read (header, stretchHeader) == stretchHeader && std::memcmp (header, stretchMagic, 8) == 0)
+            {
+                double rate = 0.0;
+                juce::int64 frames = 0;
+                std::int32_t channels = 0;
+                std::memcpy (&rate, header + 8, 8);
+                std::memcpy (&frames, header + 16, 8);
+                std::memcpy (&channels, header + 24, 4);
+                if (frames > 0 && (channels == 1 || channels == 2) && rate > 0.0
+                    && file.getSize() == stretchHeader + frames * channels * (juce::int64) sizeof (float))
+                    if (auto mapped = mapStretched (file, rate, frames, channels))
+                    {
+                        file.setLastModificationTime (juce::Time::getCurrentTime()); // (recently used: pruned last)
+                        return mapped;
+                    }
+            }
+        }
+
     juce::MemoryBlock block;
     if (file == juce::File() || ! file.existsAsFile() || ! file.loadFileAsData (block) || block.getSize() < (std::size_t) stretchHeader)
         return nullptr;
@@ -459,10 +672,25 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStretchedSpan (const juce::
         if (auto it = shared.stretched.find (key); it != shared.stretched.end())
             return it->second;
     }
+    // round 190gn (A2): on disk too (the stretch is the costly part of an open: Thief's 10 spans, 1.8 s), keyed by the span's
+    // own audio (what is stretched), so any change to the file or to its precomputed effects makes another copy
+    static const bool useDisk = [] { const auto* e = std::getenv ("LYNX_STRETCH_DISK"); return e == nullptr || e[0] != '0'; }();
+    const auto onDisk = useDisk ? spanCacheFile (*span, ratio, method, semitones, options) : juce::File();
     std::shared_ptr<const SampleData> stretched;
+    {
+        const loadtrace::Scope timing ("stretch_disk_read");
+        if (auto read = readStretched (onDisk))
+        {
+            copySpanInfo (*span, *read);
+            stretched = std::move (read);
+        }
+    }
+    if (stretched == nullptr)
     {
         const loadtrace::Scope timing ("stretch_compute");
         stretched = timeStretchSpan (*span, ratio, method, semitones, options);
+        if (stretched != nullptr && onDisk != juce::File())
+            writeStretchedLater (onDisk, stretched);
     }
     if (stretched == nullptr)
         return nullptr;
@@ -762,6 +990,26 @@ std::int64_t mappedBytesOf (const SampleData& d)
 }
 } // namespace
 
+std::int64_t SampleLibrary::lockedStretchedBytes()
+{
+    std::vector<std::shared_ptr<const LockedCopy>> live;
+    {
+        const std::scoped_lock l (lockedCopiesLock());
+        for (const auto& w : lockedCopies())
+            if (auto c = w.lock())
+                live.push_back (std::move (c));
+    }
+    std::int64_t locked = 0;
+    for (const auto& c : live)
+    {
+        const auto n = lockedpages::lockedBytes (c->at, c->bytes);
+        if (n < 0)
+            return -1;
+        locked += n;
+    }
+    return locked;
+}
+
 SampleLibrary::MemoryUse SampleLibrary::memoryUse()
 {
     MemoryUse use;
@@ -780,7 +1028,11 @@ SampleLibrary::MemoryUse SampleLibrary::memoryUse()
     const std::scoped_lock l (shared.stretchLock);
     for (const auto& [key, data] : shared.stretched)
         if (data != nullptr)
+        {
             ++use.stretched, use.stretchedBytes += heldBytes (*data) + mappedBytesOf (*data);
+            if (data->isMapped())
+                ++use.stretchedMapped, use.stretchedMappedBytes += mappedBytesOf (*data);
+        }
     return use;
 }
 

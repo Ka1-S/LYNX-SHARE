@@ -1,5 +1,6 @@
 #include "core/TimeStretch.h"
 
+#include <cstdlib>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -692,6 +693,167 @@ void VoicePitchShifter::process (const float* inL, const float* inR, int inFrame
     impl->stretch.process (in, inFrames, out, outFrames);
 }
 
+ShifterStock::ShifterStock (double sampleRate, bool offline) : rate (sampleRate), makesOnDemand (offline && ! shifterstock::strict()) {}
+
+ShifterStock::~ShifterStock()
+{
+    for (auto& kind : slots)
+        for (auto& slot : kind)
+            delete slot.exchange (nullptr);
+}
+
+std::unique_ptr<VoicePitchShifter> ShifterStock::make (int kind) const
+{
+    const KeepFloatMode keep;
+    mode.applyHere();
+    auto shifter = std::make_unique<VoicePitchShifter>();
+    shifter->allocate (rate, kind == 1 ? StretchMethod::transients : StretchMethod::general);
+    return shifter;
+}
+
+int ShifterStock::maxPrimeLength (int kind) const
+{
+    // (a function of the rate and the block only: measured once per stock and kind)
+    static std::mutex lock;
+    static std::vector<std::pair<std::pair<double, int>, int>> known;
+    const std::scoped_lock l (lock);
+    for (const auto& [key, length] : known)
+        if (key.first == rate && key.second == kind)
+            return length;
+    const auto length = make (kind)->maxPrimeLength();
+    known.push_back ({ { rate, kind }, length });
+    return length;
+}
+
+void ShifterStock::setReserve (int kind, int count)
+{
+    const std::scoped_lock l (fill);
+    wanted[(std::size_t) std::clamp (kind, 0, kinds - 1)] = std::clamp (count, 0, capacity);
+}
+
+void ShifterStock::topUp()
+{
+    const std::scoped_lock l (fill);
+    for (int kind = 0; kind < kinds; ++kind)
+    {
+        auto missing = wanted[(std::size_t) kind] - ready (kind);
+        for (auto& slot : slots[(std::size_t) kind])
+        {
+            if (missing <= 0)
+                break;
+            if (slot.load (std::memory_order_acquire) != nullptr)
+                continue;
+            auto fresh = make (kind);
+            VoicePitchShifter* expected = nullptr;
+            if (slot.compare_exchange_strong (expected, fresh.get(), std::memory_order_release))
+            {
+                fresh.release();
+                --missing;
+            }
+        }
+    }
+}
+
+std::unique_ptr<VoicePitchShifter> ShifterStock::take (int kind) noexcept
+{
+    kind = std::clamp (kind, 0, kinds - 1);
+    for (auto& slot : slots[(std::size_t) kind])
+        if (slot.load (std::memory_order_relaxed) != nullptr)
+            if (auto* s = slot.exchange (nullptr, std::memory_order_acq_rel))
+            {
+                taken.fetch_add (1, std::memory_order_relaxed);
+                return std::unique_ptr<VoicePitchShifter> (s);
+            }
+    if (makesOnDemand) // an export's own rack: not a real-time thread
+    {
+        try
+        {
+            taken.fetch_add (1, std::memory_order_relaxed);
+            return make (kind);
+        }
+        catch (...)
+        {
+        }
+    }
+    misses.fetch_add (1, std::memory_order_relaxed);
+    return nullptr;
+}
+
+int ShifterStock::ready (int kind) const noexcept
+{
+    int n = 0;
+    for (const auto& slot : slots[(std::size_t) std::clamp (kind, 0, kinds - 1)])
+        n += slot.load (std::memory_order_relaxed) != nullptr;
+    return n;
+}
+
+namespace shifterstock
+{
+namespace
+{
+std::mutex& registryLock()
+{
+    static std::mutex m;
+    return m;
+}
+std::vector<std::weak_ptr<ShifterStock>>& registry()
+{
+    static std::vector<std::weak_ptr<ShifterStock>> r;
+    return r;
+}
+} // namespace
+
+void enlist (const std::shared_ptr<ShifterStock>& stock)
+{
+    if (stock == nullptr)
+        return;
+    const std::scoped_lock l (registryLock());
+    auto& r = registry();
+    r.erase (std::remove_if (r.begin(), r.end(), [] (const std::weak_ptr<ShifterStock>& w) { return w.expired(); }), r.end());
+    for (const auto& w : r)
+        if (w.lock() == stock)
+            return;
+    r.push_back (stock);
+}
+
+void topUpAll()
+{
+    std::vector<std::shared_ptr<ShifterStock>> live;
+    {
+        const std::scoped_lock l (registryLock());
+        for (const auto& w : registry())
+            if (auto s = w.lock())
+                live.push_back (std::move (s));
+    }
+    for (const auto& s : live)
+        s->topUp();
+}
+
+namespace
+{
+std::atomic<bool>& plannedFlag() noexcept
+{
+    static std::atomic<bool> on { [] {
+        const char* e = std::getenv ("LYNX_SHIFTER_STOCK");
+        return e == nullptr || e[0] != '0';
+    }() };
+    return on;
+}
+} // namespace
+
+bool planned() noexcept { return plannedFlag().load (std::memory_order_relaxed); }
+void setPlanned (bool on) noexcept { plannedFlag().store (on, std::memory_order_relaxed); }
+
+bool strict() noexcept
+{
+    static const bool on = [] {
+        const char* e = std::getenv ("LYNX_SHIFTER_STRICT");
+        return e != nullptr && e[0] == '1';
+    }();
+    return on;
+}
+} // namespace shifterstock
+
 StretchMethod stretchMethodForFlMode (int flMode) noexcept
 {
     switch (flMode)
@@ -727,17 +889,22 @@ std::shared_ptr<SampleData> timeStretchSpan (const SampleData& span, double rati
         if (! out->right.empty())
             out->right[at] *= g;
     }
-    out->cropped = span.cropped;
-    out->cropFrom = span.cropFrom;
-    out->cropTo = span.cropTo;
-    out->acidBeats = span.acidBeats;
+    copySpanInfo (span, *out);
+    return out;
+}
+
+void copySpanInfo (const SampleData& span, SampleData& out)
+{
+    out.cropped = span.cropped;
+    out.cropFrom = span.cropFrom;
+    out.cropTo = span.cropTo;
+    out.acidBeats = span.acidBeats;
     if (span.loopStart >= 0 && span.loopEnd > span.loopStart)
     {
-        const auto scale = (double) out->frames() / (double) std::max<std::size_t> (1, span.frames());
-        out->loopStart = (std::int64_t) std::llround ((double) span.loopStart * scale);
-        out->loopEnd = std::max<std::int64_t> (out->loopStart + 1, (std::int64_t) std::llround ((double) span.loopEnd * scale));
+        const auto scale = (double) out.frames() / (double) std::max<std::size_t> (1, span.frames());
+        out.loopStart = (std::int64_t) std::llround ((double) span.loopStart * scale);
+        out.loopEnd = std::max<std::int64_t> (out.loopStart + 1, (std::int64_t) std::llround ((double) span.loopEnd * scale));
     }
-    return out;
 }
 
 std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, StretchMethod method, double semitones,

@@ -2125,6 +2125,11 @@ public:
         // a free shifter: none, or its voice ended or plays unshifted
         for (std::size_t k = 0; k < shifterPool.size() && ks.shifter == nullptr; ++k)
         {
+            // (round 190gn: a slot the build left empty takes a fresh shifter from the rack's stock the first time it is
+            // reached, and keeps it: the same shifter state as one made at build time, so the same sound)
+            if (shifterPool[k] == nullptr && shifterStock != nullptr)
+                if ((shifterPool[k] = shifterStock->take (shifterKind)) != nullptr)
+                    heldShifters.fetch_add (1, std::memory_order_relaxed);
             if (shifterPool[k] == nullptr || ! shifterPool[k]->ready() || primeL.size() < (std::size_t) shifterPool[k]->maxPrimeLength())
                 continue;
             const auto user = shifterUser[k];
@@ -2237,20 +2242,56 @@ public:
     void setNextClipPitch (float semitones) noexcept override { nextClipPitch = std::isfinite (semitones) ? semitones : 0.0f; }
     void setNextClipStretch (float stretch) noexcept override { nextClipStretch = std::isfinite (stretch) && stretch > 0.0f ? stretch : 1.0f; }
 
+    void useShifterStock (std::shared_ptr<ShifterStock> stock, int makeNow) override
+    {
+        shifterStock = std::move (stock);
+        shiftersNow = std::clamp (makeNow, 0, keyShiftVoices);
+    }
+
     void prepareKeyShift (double sr) override
     {
         if (! keyShift.load() && ! clipShift)
             return;
         const auto method = (StretchMethod) keyShiftMethod.load();
-        for (auto& shifter : shifterPool)
+        // round 190gn (A1): with the rack's stock (and its rate), only the shifters the song can use at once are made
+        // now; the other slots fill from the stock on the audio thread when a voice first reaches them
+        if (shifterStock != nullptr && shifterStock->sampleRate() != sr)
+            shifterStock = nullptr;
+        shifterKind = ShifterStock::kindOf (method);
+        const auto now = shifterStock != nullptr ? shiftersNow : keyShiftVoices;
+        for (int k = 0; k < keyShiftVoices; ++k)
         {
-            shifter = std::make_unique<VoicePitchShifter>();
-            shifter->allocate (sr, method);
+            auto& shifter = shifterPool[(std::size_t) k];
+            shifter = nullptr;
+            if (k < now)
+            {
+                shifter = std::make_unique<VoicePitchShifter>();
+                shifter->allocate (sr, method);
+            }
         }
+        heldShifters.store (now, std::memory_order_relaxed);
         shifterUser.fill (-1);
-        const auto prime = (std::size_t) shifterPool[0]->maxPrimeLength();
+        const auto prime = (std::size_t) (shifterPool[0] != nullptr ? shifterPool[0]->maxPrimeLength() : shifterStock->maxPrimeLength (shifterKind));
         primeL.assign (prime, 0.0f);
         primeR.assign (prime, 0.0f);
+    }
+
+    int pitchShiftersHeld() const noexcept override { return heldShifters.load (std::memory_order_relaxed); }
+
+    double longestVoiceSeconds() const noexcept override
+    {
+        // a note plays its sample once to the end at most (a released note only ends sooner); a loop, zones or an FL
+        // Mobile pad (its own envelope and start delay) can hold a voice longer
+        const auto* data = sample.get();
+        if (data == nullptr || ! zones.empty() || padOn.load() || data->frames() < 2 || sampleRate <= 0.0)
+            return std::numeric_limits<double>::infinity();
+        if (useLoops.load() && data->loopStart >= 0 && data->loopEnd > data->loopStart)
+            return std::numeric_limits<double>::infinity();
+        const auto base = baseRate (*data);
+        if (! (base > 0.0))
+            return std::numeric_limits<double>::infinity();
+        // (+ the end fade or the slowest declicking release, 200 ms)
+        return (double) data->frames() / (base * sampleRate) + 0.25;
     }
 
     void pitchBend (float semitones) noexcept override
@@ -3259,6 +3300,10 @@ private:
     std::array<KeyShift, 16> shifts {};
     std::array<std::unique_ptr<VoicePitchShifter>, keyShiftVoices> shifterPool;
     std::array<int, keyShiftVoices> shifterUser {}; // the voice using each shifter (-1 = none)
+    std::shared_ptr<ShifterStock> shifterStock; // round 190gn: the rack's (null: all 8 made up front)
+    int shifterKind = 0;                         // ShifterStock::kindOf the method the shifters were made for
+    int shiftersNow = keyShiftVoices;            // made by prepareKeyShift (useShifterStock)
+    std::atomic<int> heldShifters { 0 };         // shifterPool's filled slots (any thread may read it)
     std::vector<float> primeL, primeR;
     std::atomic<bool> keyShift { false };
     std::atomic<int> keyShiftMethod { 0 };

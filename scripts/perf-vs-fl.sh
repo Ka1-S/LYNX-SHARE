@@ -60,7 +60,7 @@ run () { # app args...
 rec () { echo "{\"app\":\"$1\",\"case\":\"$2\",\"rep\":$3,\"load1\":$4,\"r\":${5:-null}}" >> "$out"; echo "$1 $2 #$3 load=$4 :: ${5:0:400}"; }
 # keep LYNX's own logs of a run (the next run in the same profile overwrites them): keep <app> <case> <rep> <profile>
 keep () { local d="$WL/prof/$4/LYNX" k="$H/logs/$1-$2-$3" log; mkdir -p "$H/logs"; for log in startup.log load.log; do [ -f "$d/$log" ] && cp "$d/$log" "$k-$log"; done; }
-newprof () { rm -rf "/mnt/c/Users/kauan/lynx-test/perfwin190gd/prof/${1:?}"; mkdir -p "$WL/prof/$1"; cp -r "$WL/seed/LYNX" "$WL/prof/$1/"; }
+newprof () { rm -rf "${WL:?}/prof/${1:?}"; mkdir -p "$WL/prof/$1"; cp -r "$WL/seed/LYNX" "$WL/prof/$1/"; }
 lxenv () { echo "LYNX_PROFILE_DIR=$W\\prof\\$1;LYNX_TEST_MODE=1;LYNX_TEST_MAXIMIZE=1;LYNX_TRACE_STARTUP=1"; }
 lxexe () { [ "$1" = lx2 ] && echo "$LX2" || echo "$LX"; }
 proj () { [ "$1" = patience ] && echo "$LIVESONG" || echo "$W\\proj\\$1.flp"; }
@@ -100,6 +100,14 @@ play)
     lx|lx2) newprof "pl-$a-$p-$r"; l=$(gate); j=$(run lx -mode play -space 1 -exe "$(lxexe $a)" -envs "$(lxenv pl-$a-$p-$r)" -argline "\"$f\"" -title "$([ $p = patience ] && echo Patience || echo $p)" -timeoutS 240 -watch "$W\\shots\\$a-watch-$p-$r.txt"); rec $a "$p@play" $r $l "$j" ;;
     fl) [ $p = patience ] && continue; l=$(gate); j=$(run fl -mode play -space 1 -exe "$FL" -argline "\"$f\"" -title " - FL Studio" -timeoutS 240 -closeTitles "$CLOSE" -watch "$W\\shots\\fl-watch-$p-$r.txt"); rec fl "$p@play" $r $l "$j" ;;
     live) [ $p = patience ] || continue; l=$(gate); j=$(run live -mode play -space 1 -exe "$LIVE" -argline "\"$f\"" -title "Patience" -timeoutS 240 -keep 1 -watch "$W\\shots\\live-watch-$p-$r.txt"); rec live "$p@play" $r $l "$j" ;;
+    esac
+  done ;;
+playwarm) # round 190gn: play with a warm profile (its disk cache filled by a first open: mapped stretched copies)
+  for p in $PROJS; do f=$(proj $p)
+    case $a in
+    lx|lx2) newprof "pw-$a-$p-$r"
+      l=$(gate); j=$(run lx -exe "$(lxexe $a)" -envs "$(lxenv pw-$a-$p-$r)" -argline "\"$f\"" -title "$([ $p = patience ] && echo Patience || echo $p)" -timeoutS 240); rec $a "$p-fill" $r $l "$j"
+      l=$(gate); j=$(run lx -mode play -space 1 -exe "$(lxexe $a)" -envs "$(lxenv pw-$a-$p-$r)" -argline "\"$f\"" -title "$([ $p = patience ] && echo Patience || echo $p)" -timeoutS 240 -watch "$W\\shots\\$a-watchw-$p-$r.txt"); rec $a "$p@playwarm" $r $l "$j"; keep $a "$p-playwarm" $r "pw-$a-$p-$r" ;;
     esac
   done ;;
 deep) # one run per app and project ("empty" = no project): per-thread CPU at idle (play mode without Space), then a
