@@ -105,6 +105,21 @@ WorkerPool::~WorkerPool()
         t.join();
 }
 
+void WorkerPool::setThreadRefresh (std::function<void()> fn)
+{
+    threadRefresh = std::move (fn); // (the workers read it only after a request: its release publishes it)
+}
+
+void WorkerPool::refreshIfAsked (std::uint32_t& seen) const
+{
+    if (const auto now = refreshGeneration.load (std::memory_order_acquire); now != seen)
+    {
+        seen = now;
+        if (threadRefresh)
+            threadRefresh();
+    }
+}
+
 bool WorkerPool::hasWork() const noexcept
 {
     constexpr auto mask = (std::uint64_t (1) << indexBits) - 1;
@@ -125,9 +140,12 @@ void WorkerPool::workerLoop (std::function<void()> onStart)
         onStart();
 
     using clock = std::chrono::steady_clock;
+    auto refreshSeen = refreshGeneration.load (std::memory_order_acquire);
 
     while (! quit.load (std::memory_order_relaxed))
     {
+        refreshIfAsked (refreshSeen);
+
         // spin a little: within a block the next parallelFor (next mixer layer or chunk) follows right away
         auto spinStart = clock::now();
         auto found = false;
@@ -177,6 +195,7 @@ void WorkerPool::workerLoop (std::function<void()> onStart)
         if (quit.load())
             return;
 
+        refreshIfAsked (refreshSeen); // (before the block's work: a new workgroup is joined before working for it)
         work (true);
     }
 }

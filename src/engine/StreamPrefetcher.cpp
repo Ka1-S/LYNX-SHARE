@@ -1,5 +1,7 @@
 #include "engine/StreamPrefetcher.h"
 
+#include "platform/PowerThrottling.h"
+
 namespace lynx
 {
 StreamPrefetcher::StreamPrefetcher (const Transport& t)
@@ -40,6 +42,7 @@ void StreamPrefetcher::update (const Song& song, SampleLibrary& samples)
 
 void StreamPrefetcher::run()
 {
+    power::optOutOfPowerThrottling(); // (it feeds the audio thread: no EcoQoS in the background, round toolchain190gt)
     while (! threadShouldExit())
     {
         {

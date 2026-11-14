@@ -44,6 +44,7 @@
 #include "engine/DllAsioDevice.h"
 #include "engine/PipeWireDevice.h"
 #include "platform/LinuxRealtime.h"
+#include "platform/PowerThrottling.h"
 #include "engine/Metronome.h"
 #include "core/NoteTools.h"
 #include "core/VfxScript.h"
@@ -56,6 +57,9 @@
 #if JUCE_WINDOWS
  #include <windows.h>
 #elif JUCE_MAC
+ #include <mach/mach.h>
+ #include <mach/mach_time.h>
+ #include <mach/thread_policy.h>
  #include <pthread.h>
  #include <sys/qos.h>
 #elif JUCE_LINUX || JUCE_BSD
@@ -160,6 +164,8 @@ void raiseAudioThreadPriority()
     }
     else
         SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+    // and full speed while LYNX is in the background (no EcoQoS: platform/PowerThrottling.h, round toolchain190gt)
+    power::optOutOfPowerThrottling();
    #elif JUCE_MAC
     // the highest quality-of-service class: scheduled like the UI's own interactive work, on the performance cores
     pthread_set_qos_class_self_np (QOS_CLASS_USER_INTERACTIVE, 0);
@@ -172,6 +178,23 @@ void raiseAudioThreadPriority()
         rt::noteAudioThread (false); // RealtimeKit / the portal may grant it (round 161)
    #endif
 }
+
+#if JUCE_MAC
+// The calling thread becomes a time-constraint (real-time) thread with the device's buffer as its period: about half of
+// it to compute, the whole of it as the deadline. Apple's audio workgroups take only such threads (os_workgroup_join
+// fails with EINVAL before; research round 190gs B1).
+void becomeTimeConstraintThread (double blockMs) noexcept
+{
+    mach_timebase_info_data_t timebase {};
+    if (mach_timebase_info (&timebase) != KERN_SUCCESS || timebase.numer == 0)
+        return;
+    const auto ticks = [&] (double ms) { return (uint32_t) (ms * 1.0e6 * (double) timebase.denom / (double) timebase.numer); };
+    const auto period = juce::jlimit (0.5, 50.0, blockMs); // (above 50 ms the kernel refuses the policy)
+    thread_time_constraint_policy_data_t policy { ticks (period), ticks (0.5 * period), ticks (period), 1 };
+    thread_policy_set (pthread_mach_thread_np (pthread_self()), THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t) &policy,
+                       THREAD_TIME_CONSTRAINT_POLICY_COUNT);
+}
+#endif
 
 int workerCount()
 {
@@ -5699,6 +5722,8 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         deviceThreadPriorityBefore.store (before, std::memory_order_relaxed);
         if (boostDeviceThread && before < THREAD_PRIORITY_TIME_CRITICAL)
             raiseAudioThreadPriority();
+        else
+            power::optOutOfPowerThrottling(); // (a driver's own time-critical thread too: no EcoQoS, round toolchain190gt)
         deviceThreadPriorityAfter.store (GetThreadPriority (GetCurrentThread()), std::memory_order_relaxed);
     }
    #endif
@@ -6055,12 +6080,83 @@ void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     hwOutput.clear();
     hwOutput.active.store (true);
     player.audioDeviceAboutToStart (device);
+    joinDeviceWorkgroup (device);
+    if (! processFullSpeed) // (Windows: the process stays out of EcoQoS while a device is open, round toolchain190gt)
+    {
+        processFullSpeed = true;
+        power::holdProcessFullSpeed (true);
+    }
 }
 
 void AudioEngine::audioDeviceStopped()
 {
     hwOutput.active.store (false);
     player.audioDeviceStopped();
+    joinDeviceWorkgroup (nullptr);
+    if (processFullSpeed)
+    {
+        processFullSpeed = false;
+        power::holdProcessFullSpeed (false);
+    }
+}
+
+// macOS (round toolchain190gt): the render workers join the device's audio workgroup (os_workgroup, macOS 11+), so the
+// scheduler runs them with the device's I/O thread as one real-time job with the buffer's deadline: on Apple silicon,
+// on the performance cores. Each worker joins on its own thread (WorkerPool::setThreadRefresh) the next time it wakes,
+// first becoming a time-constraint thread. A stopped device: the workers leave. LYNX_WORKGROUP=0 turns it off.
+// Elsewhere this does nothing (Windows: MMCSS "Pro Audio" and no EcoQoS; Linux: SCHED_FIFO / RealtimeKit, round 161).
+struct AudioEngine::DeviceWorkgroup
+{
+    juce::SpinLock lock;
+    juce::AudioWorkgroup workgroup; // (empty: no device, or one without a workgroup)
+    double blockMs = 0.0;
+};
+
+void AudioEngine::joinDeviceWorkgroup ([[maybe_unused]] juce::AudioIODevice* device)
+{
+   #if JUCE_MAC
+    static const auto off = juce::SystemStats::getEnvironmentVariable ("LYNX_WORKGROUP", {}) == "0";
+    if (off || workers == nullptr || workers->workers() == 0)
+        return;
+    auto wanted = device != nullptr ? device->getWorkgroup() : juce::AudioWorkgroup {};
+    if (deviceWorkgroup == nullptr)
+    {
+        if (! wanted)
+            return;
+        deviceWorkgroup = std::make_shared<DeviceWorkgroup>();
+        // (the pool keeps the holder alive as long as its workers can run the refresh)
+        workers->setThreadRefresh ([holder = deviceWorkgroup] {
+            struct Joined
+            {
+                juce::AudioWorkgroup workgroup; // (retained while joined: the token leaves it before it is released)
+                juce::WorkgroupToken token;
+            };
+            thread_local Joined joined;
+            juce::AudioWorkgroup next;
+            double blockMs = 0.0;
+            {
+                const juce::SpinLock::ScopedLockType sl (holder->lock);
+                next = holder->workgroup;
+                blockMs = holder->blockMs;
+            }
+            if (next == joined.workgroup && (! next || static_cast<bool> (joined.token)))
+                return;
+            joined.token.reset();
+            joined.workgroup = next;
+            if (! next)
+                return;
+            becomeTimeConstraintThread (blockMs);
+            next.join (joined.token);
+        });
+    }
+    {
+        const juce::SpinLock::ScopedLockType sl (deviceWorkgroup->lock);
+        deviceWorkgroup->workgroup = std::move (wanted);
+        deviceWorkgroup->blockMs = device != nullptr ? 1000.0 * device->getCurrentBufferSizeSamples() / juce::jmax (1.0, device->getCurrentSampleRate())
+                                                     : 0.0;
+    }
+    workers->requestThreadRefresh();
+   #endif
 }
 
 // The Master's own target (its default: the graph's output as it is, on the first open pair) and the inserts'

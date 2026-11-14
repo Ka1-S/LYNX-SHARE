@@ -38,6 +38,13 @@ public:
 
     int workers() const noexcept { return (int) threads.size(); }
 
+    // Per-thread set-up that can change while the pool lives (round toolchain190gt: on macOS the workers join the audio
+    // device's workgroup, which changes with the device). `fn` runs on every worker thread, on that thread, the next time
+    // it looks for work after requestThreadRefresh(). Set it once, before the first request; it runs outside the work,
+    // so it may take a short lock. requestThreadRefresh() may be called from any thread and is wait-free.
+    void setThreadRefresh (std::function<void()> fn);
+    void requestThreadRefresh() noexcept { refreshGeneration.fetch_add (1, std::memory_order_acq_rel); }
+
     // a spin-wait pause (x86 PAUSE / ARM YIELD), for callers waiting on each other inside a parallelFor
     static void relax() noexcept;
 
@@ -71,6 +78,7 @@ private:
     bool hasWork() const noexcept;
     bool isParked() const noexcept;
     void workerLoop (std::function<void()> onStart);
+    void refreshIfAsked (std::uint32_t& seen) const;
 
     struct Semaphore; // OS semaphore (WorkerPool.cpp)
     std::unique_ptr<Semaphore> wake;
@@ -91,5 +99,7 @@ private:
     std::uint64_t generation = 0; // caller thread only
     std::atomic<int> done { 0 };
     std::atomic<std::uint64_t> byWorkers { 0 }, wokenUp { 0 };
+    std::function<void()> threadRefresh;          // (published by refreshGeneration)
+    std::atomic<std::uint32_t> refreshGeneration { 0 };
 };
 } // namespace lynx

@@ -1257,6 +1257,11 @@ private:
     std::atomic<unsigned long> deviceThreadId { 0 };
     std::atomic<int> deviceThreadPriorityBefore { -100 }, deviceThreadPriorityAfter { -100 };
     bool boostDeviceThread = true;
+    // macOS: the device's audio workgroup the render workers join (AudioEngine.cpp, round toolchain190gt)
+    struct DeviceWorkgroup;
+    std::shared_ptr<DeviceWorkgroup> deviceWorkgroup;
+    void joinDeviceWorkgroup (juce::AudioIODevice* device); // message thread (device start / stop)
+    bool processFullSpeed = false; // Windows: this engine holds the process out of EcoQoS (platform/PowerThrottling.h)
     // the live clock (round 170d): the musical position of the next block (count-in included), its tempo, and whether
     // it runs; the output latency the played notes are moved back by
     std::atomic<double> clockTick { 0.0 }, clockTicksPerMs { 0.0 }, outputCompensationMs { 0.0 };
