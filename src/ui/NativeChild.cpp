@@ -1,6 +1,7 @@
 #include "ui/NativeChild.h"
 #include "ui/WindowOwner.h"
 #include "core/DockStack.h"
+#include "core/DockingPolicy.h"
 
 #include <algorithm>
 #include <cmath>
@@ -473,14 +474,15 @@ bool dockingEnabled()
     // Issue #165 (Linux, Wayland desktop through XWayland, and LYNX's own private X server): an X11 child window in the
     // main window takes no keyboard focus for its text fields (the SoundFont's preset search box typed nothing), a
     // closed or moved one leaves its picture behind until something else repaints there, and it has no frame of its
-    // own. The docking glue (click raise, placement, stacking checks) is written for Win32 only, so on Linux plugin and
-    // channel windows are the system's own windows ("Detached", as before issue #116) unless LYNX_DOCKED_PLUGINS=1.
+    // own. The docking glue (click raise, placement, stacking checks) is written for Win32 only, so on Linux and macOS
+    // plugin and channel windows are the system's own windows ("Detached", as before issue #116) unless
+    // LYNX_DOCKED_PLUGINS=1 (core/DockingPolicy.h).
     static const bool on = [] {
-        const auto value = juce::SystemStats::getEnvironmentVariable ("LYNX_DOCKED_PLUGINS", {}).trim();
-       #if JUCE_LINUX || JUCE_BSD
-        return value == "1";
+        const auto value = juce::SystemStats::getEnvironmentVariable ("LYNX_DOCKED_PLUGINS", {}).trim().toStdString();
+       #if JUCE_WINDOWS
+        return dockpolicy::dockingOn (value, true);
        #else
-        return value != "0";
+        return dockpolicy::dockingOn (value, false);
        #endif
     }();
     return on;

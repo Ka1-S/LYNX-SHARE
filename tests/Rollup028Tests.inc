@@ -258,3 +258,26 @@ TEST (rollup028_consolidated_audio_clips_keep_their_envelopes_in_the_render)
     if (std::abs (flat[24000]) > 1.0e-3f)
         CHECK (std::abs (shaped[24000] / flat[24000] - (std::pow (11.0f, 0.85f) - 1.0f) / 10.0f) < 0.003f);
 }
+
+// Step 4 (round 190gm, issue #165, extended to macOS by the coordinator): plugin and channel windows dock inside the main
+// window by default on Windows only (the docking glue is Win32 code); on Linux and macOS they are the system's own
+// windows unless LYNX_DOCKED_PLUGINS=1.
+#include "core/DockingPolicy.h"
+
+TEST (rollup028_plugin_windows_dock_by_default_on_windows_only)
+{
+    using lynx::dockpolicy::dockingOn;
+    CHECK (dockingOn ("", true) && dockingOn ("1", true) && ! dockingOn ("0", true));
+    CHECK (! dockingOn ("", false) && dockingOn ("1", false) && ! dockingOn ("0", false));
+    static_assert (dockingOn ("", true) && ! dockingOn ("", false));
+    // the app takes the Windows rule only on Windows (NativeChild.cpp)
+    const auto source = i18ntest::readFile ("src/ui/NativeChild.cpp");
+    const auto at = source.find ("bool dockingEnabled()");
+    CHECK (at != std::string::npos);
+    if (at != std::string::npos)
+    {
+        const auto body = source.substr (at, source.find ("\n}\n", at) - at);
+        CHECK (body.find ("#if JUCE_WINDOWS") != std::string::npos && body.find ("dockingOn (value, true)") != std::string::npos
+               && body.find ("dockingOn (value, false)") != std::string::npos);
+    }
+}
