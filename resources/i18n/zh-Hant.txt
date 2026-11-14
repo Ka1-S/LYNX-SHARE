@@ -9955,6 +9955,17 @@ countries: tw hk mo
 "Arc Down" = "下弧"
 "Bounce Up" = "上彈跳"
 "Bounce Down" = "下彈跳"
+"Clip envelope" = "片段包絡"
+"Envelope device: the clip itself, or the track's mixer" = "包絡裝置：片段本身，或軌道的混音台"
+"Envelope control" = "包絡控制"
+"The clip's envelopes: its gain and its panning while it plays" = "片段的包絡：播放時的增益和聲像"
+"Show volume envelope" = "顯示音量包絡"
+"Show pan envelope" = "顯示聲像包絡"
+"Hide envelope" = "隱藏包絡"
+"Reset volume envelope" = "重設音量包絡"
+"Reset pan envelope" = "重設聲像包絡"
+"Auto-warp: {0} markers" = "自動變速：{0} 個標記"
+"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "變速旗標：拖曳以移動，在此按兩下可新增  [Alt]+拖曳可在片段任意位置移動標記線"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"

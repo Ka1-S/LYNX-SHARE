@@ -52,6 +52,10 @@ struct NoteEvent
     float clipPitch = 0.0f;
     // audio clips: FL 2026's clip stretch (the audio plays that many times longer; round 167l)
     float clipStretch = 1.0f;
+    // audio clips, round 190gi (core/ClipEnvelope.h): the clip's envelope (an index into Song::clipEnvelopes; −1 = none
+    // or flat) and the clip time (ticks) where the note starts in it
+    std::int32_t clipEnvelope = -1;
+    double clipEnvTick = 0.0;
     // the note's Mod X / Y (0..1, 0.5 = none) and, on its "off", its release velocity (0..1) — REA round 151
     float modX = 0.5f, modY = 0.5f, release = 0.5f;
     // the note's level factor (a Layer's VOL and crossfade, round 164): the instrument scales the voice when it can,

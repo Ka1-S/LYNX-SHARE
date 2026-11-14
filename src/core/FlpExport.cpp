@@ -1,3 +1,4 @@
+#include "core/ClipEnvelope.h"
 #include "core/FlCurve.h"
 #include "core/PlaylistOps.h"
 #include "core/FlpExport.h"
@@ -1845,6 +1846,10 @@ flp::Project toProject (const Song& input, const Options& options, Report& repor
         if (n > 0)
             report.notes.push_back ("Pattern Blocks: " + std::to_string (n) + " block(s) written as pattern clips (FL 2026 has no blocks)");
     }
+    // audio clip envelopes (round 190gi): FL has none on a clip; FL's own way is the clip menu's Automate › Volume /
+    // Panning, an automation clip of the clip channel's Levels adjustment over the clip — written that way, same curve
+    if (const auto n = clipenv::bakeToAutomation (song); n > 0)
+        report.notes.push_back ("Clip envelopes: " + std::to_string (n) + " envelope(s) written as automation clips of the clip's channel Levels adjustment (FL's Automate > Volume / Panning)");
     // automation lanes (round 177b): FL has none; each becomes an automation clip on a free track
     if (const auto n = autolanes::lanesToClips (song); n > 0)
         report.notes.push_back ("Automation lanes: " + std::to_string (n) + " lane(s) written as automation clips (FL has no lanes)");

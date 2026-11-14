@@ -9955,6 +9955,17 @@ countries: tr
 "Arc Down" = "Aşağı yay"
 "Bounce Up" = "Yukarı sekme"
 "Bounce Down" = "Aşağı sekme"
+"Clip envelope" = "Klip zarfı"
+"Envelope device: the clip itself, or the track's mixer" = "Zarf aygıtı: klibin kendisi veya parçanın mikseri"
+"Envelope control" = "Zarf denetimi"
+"The clip's envelopes: its gain and its panning while it plays" = "Klibin zarfları: çalarken kazancı ve panı"
+"Show volume envelope" = "Ses düzeyi zarfını göster"
+"Show pan envelope" = "Pan zarfını göster"
+"Hide envelope" = "Zarfı gizle"
+"Reset volume envelope" = "Ses düzeyi zarfını sıfırla"
+"Reset pan envelope" = "Pan zarfını sıfırla"
+"Auto-warp: {0} markers" = "Otomatik warp: {0} işaret"
+"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "Warp bayrakları: taşımak için sürükleyin, buraya çift tıklamak bir tane ekler  [Alt]+sürükleme bir işaretin çizgisini klibin her yerinde taşır"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"

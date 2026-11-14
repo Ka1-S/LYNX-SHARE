@@ -9955,6 +9955,17 @@ countries: de at ch li lu
 "Arc Down" = "Bogen nach unten"
 "Bounce Up" = "Springen nach oben"
 "Bounce Down" = "Springen nach unten"
+"Clip envelope" = "Clip-Hüllkurve"
+"Envelope device: the clip itself, or the track's mixer" = "Hüllkurven-Gerät: der Clip selbst oder der Mixer der Spur"
+"Envelope control" = "Hüllkurven-Parameter"
+"The clip's envelopes: its gain and its panning while it plays" = "Die Hüllkurven des Clips: Gain und Panorama während der Wiedergabe"
+"Show volume envelope" = "Lautstärke-Hüllkurve zeigen"
+"Show pan envelope" = "Panorama-Hüllkurve zeigen"
+"Hide envelope" = "Hüllkurve ausblenden"
+"Reset volume envelope" = "Lautstärke-Hüllkurve zurücksetzen"
+"Reset pan envelope" = "Panorama-Hüllkurve zurücksetzen"
+"Auto-warp: {0} markers" = "Auto-Warp: {0} Marker"
+"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "Warp-Fahnen: zum Verschieben ziehen, Doppelklick hier fügt eine hinzu  [Alt]+Ziehen verschiebt die Linie eines Markers überall auf dem Clip"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] Editor öffnen/schließen  [Alt]+[LMB] andere offen lassen  [Strg]+[LMB] vorhören  [2xLMB] Piano Roll  [LMB] hoch/runter ziehen sortiert um  [RMB] Kanalmenü"

@@ -2714,6 +2714,10 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
     auto& instrument = *state.instruments[(std::size_t) i];
     instrument.beginChunk (n); // (extra outputs: a generator Patcher's, REA_rodada141)
     instrument.setChannelLevels (pan, volume); // (FPC's pads pan around the channel's pan, round 190q)
+    // audio clip envelopes (round 190gi): this snapshot's table, every block while the song has one (and once more when it
+    // has none left, so no instrument keeps a table that is going away); a song without any skips the call
+    if (! state.song.clipEnvelopes.empty() || clipEnvTableShown)
+        instrument.setClipEnvelopes (state.song.clipEnvelopes.empty() ? nullptr : &state.song.clipEnvelopes, chunkTps);
     // issue #14: the channel's pitch as it is now (a hosted plugin bends to it; native engines took it at note on)
     // (round 167a: the native generators move their sounding notes with it, as FL's do)
     // (round 173d: + the controller's pitch wheel, which FL's generators follow through the channel's pitch)
@@ -2907,6 +2911,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
                     instrument.setNextClipStretch (e.clipStretch);
                 if (e.fadeIn > 0.0f || e.fadeOut > 0.0f || e.fadeShape != 0)
                     instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape, e.fadeInTension, e.fadeOutTension);
+                if (e.clipEnvelope >= 0) // (round 190gi)
+                    instrument.setNextClipEnvelope (e.clipEnvelope, e.clipEnvTick);
 
                 // an echo's volume: the instrument scales the voice, else (engines without it) the velocity
                 auto velocity = e.velocity;
@@ -3618,6 +3624,8 @@ void RackRenderer::process (const RackState* state,
                     instrument.setNextClipStretch (e.clipStretch);
                 if (e.fadeIn > 0.0f || e.fadeOut > 0.0f || e.fadeShape != 0)
                     instrument.setNextClipFades (e.clipElapsed, e.clipRemaining, e.fadeIn, e.fadeOut, e.fadeShape, e.fadeInTension, e.fadeOutTension);
+                if (e.clipEnvelope >= 0) // (round 190gi)
+                    instrument.setNextClipEnvelope (e.clipEnvelope, e.clipEnvTick);
                 auto velocity = e.velocity;
                 if (e.gain != 1.0f && ! instrument.setNextNoteGain (e.gain))
                     velocity *= e.gain;
@@ -4116,6 +4124,9 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         updateAutomation (state, startTick + 1.0e-6);
 
     chunkTps = ticksPerSample (bpm, sampleRate);
+    // (round 190gi: renderChannel hands the clip envelope table on while the song has one, and once after it is gone)
+    clipEnvTableShown = clipEnvTableWas;
+    clipEnvTableWas = ! song.clipEnvelopes.empty();
     chunkStartTick = playing ? startTick : liveTick; // stopped: live notes' arpeggios run on their own clock
     if (! playing)
         liveTick += numSamples * chunkTps;

@@ -1955,6 +1955,18 @@ struct KeyboardChord
     bool operator== (const KeyboardChord&) const = default;
 };
 
+// An audio clip's own volume and pan envelopes (round 190gi, the owner's #24 / roadmap "CE"; LYNX's own in the FL
+// workflow, Live's clip envelopes Clip Gain / Pan in Clip-launch; logic in core/ClipEnvelope.h). Points as an automation
+// clip's (FL's curve modes and tension per segment) in CLIP time: the clip's content ticks, `Clip::offset`'s units, so
+// trimming the clip's start or splitting it keeps every point on its audio. Values 0..1: volume 1 = unity (FL's Levels
+// adjustment law below it), pan 0.5 = centre. An empty lane changes nothing.
+struct ClipEnvelope
+{
+    std::vector<AutomationPoint> volume, pan;
+    std::uint8_t shown = 0; // the lane drawn and edited on the clip: 0 none, 1 volume, 2 pan (Live: the chooser's pick)
+    bool operator== (const ClipEnvelope&) const = default;
+};
+
 // A block in the Playlist: a section of a pattern, or a section of an audioClip channel's audio.
 struct Clip
 {
@@ -1983,6 +1995,10 @@ struct Clip
     // A slot of the clip grid (Clip-launch workflow, core/ClipLauncher.h): this clip's entry in ClipGrid::slots, −1 for
     // every clip of the Playlist. It fits the padding after `reversed`: Clip stays the same size.
     std::int16_t gridSlot = -1;
+    // audio clips, round 190gi: the clip's envelopes, an index into Song::clipEnvelopes (−1 = none, as every clip saved
+    // before). Clips may share one (a split, a copy); an edit gives the edited clip its own (clipenv::own). In the
+    // padding after gridSlot: Clip stays the same size.
+    std::int32_t envelope = -1;
     // audio clips: FL 2026's per-clip stretch (the playlist item's +0x40 double, REA_rodada167l §2): the clip plays its
     // audio `stretch` times longer (2 = half speed). Its channel's time-stretch mode decides how: Resample changes the
     // speed and the pitch together, the other modes keep the pitch. `length` is already the stretched length.
@@ -2672,6 +2688,10 @@ struct Song
     // whether an effect slot processes: switched on, and not a substitute while the substitutes are bypassed
     bool slotActive (const EffectSlot& slot) const noexcept { return slot.enabled && ! (substitutesBypassed && slot.isSubstitute()); }
     std::vector<Automation> automations;
+    // audio clip envelopes (round 190gi, core/ClipEnvelope.h): Clip::envelope indexes it, from every arrangement and the
+    // clip grid. Entries are only appended while a project is open (a voice that plays one keeps its index); the save
+    // writes the used ones only. Empty: no cost.
+    std::vector<ClipEnvelope> clipEnvelopes;
     std::vector<Modulator> modulators; // round 177b: LYNX's modulators (empty: no cost)
     std::vector<PlaylistTrack> playlistTracks; // index = track; tracks past the end use the default
     // Video tracks and the project's video settings (round 174d, core/VideoTrack.h): LYNX's own, above the clip tracks

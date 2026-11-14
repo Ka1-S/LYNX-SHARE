@@ -9955,6 +9955,17 @@ countries: it ch sm
 "Arc Down" = "Arco in giù"
 "Bounce Up" = "Rimbalzo in su"
 "Bounce Down" = "Rimbalzo in giù"
+"Clip envelope" = "Inviluppo della clip"
+"Envelope device: the clip itself, or the track's mixer" = "Dispositivo dell'inviluppo: la clip stessa o il mixer della traccia"
+"Envelope control" = "Controllo dell'inviluppo"
+"The clip's envelopes: its gain and its panning while it plays" = "Gli inviluppi della clip: il guadagno e il pan durante la riproduzione"
+"Show volume envelope" = "Mostra inviluppo del volume"
+"Show pan envelope" = "Mostra inviluppo del pan"
+"Hide envelope" = "Nascondi inviluppo"
+"Reset volume envelope" = "Reimposta inviluppo del volume"
+"Reset pan envelope" = "Reimposta inviluppo del pan"
+"Auto-warp: {0} markers" = "Auto-warp: {0} marker"
+"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "Bandierine di warp: trascinane una per spostarla, doppio clic qui ne aggiunge una  [Alt]+trascina sposta la linea di un marker ovunque sulla clip"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] apri/chiudi l'editor  [Alt]+[LMB] lascia aperti gli altri  [Ctrl]+[LMB] ascolta  [2xLMB] Piano Roll  [LMB] trascina su/giù riordina  [RMB] menu del canale"

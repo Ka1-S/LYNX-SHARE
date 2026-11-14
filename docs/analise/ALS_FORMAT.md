@@ -607,3 +607,9 @@ constant against Live's renders with the round-190ek metrics, never letting a ca
 - **Boom / Crunch / colour:** §19's fits, unchanged (Boom's high pass stays at 10 Hz with Boom at 0).
 Before → after per case (the rack against the engine, same stimuli, same metrics) and what still needs a live render:
 `/mnt/e/lynx-work/drumbus190fk/HANDOFF.md`.
+
+## 25. Audio clip envelopes (round 190gi)
+
+- An audio clip's clip envelopes: `AudioClip/Envelopes/Envelopes/ClipEnvelope{EnvelopeTarget/PointeeId, Automation/Events/FloatEvent{Time, Value}, LoopSlot, ScrollerTimePreserver}` **[SCHEMA, DATA]**, times in clip beats (the clip's `LoopStart` coordinates), the first event "before the song" (−63072000).
+- Clip Gain → the track's `DeviceChain/MainSequencer/VolumeModulationTarget`; Track Panning modulation → `DeviceChain/Mixer/Pan/ModulationTarget` **[SCHEMA, DATA: the 12 Suite demo set's vocal clips]**. Values −1…1 (−1 where those clips are silent) **[DATA]**.
+- LYNX: the clip's own `ClipEnvelope` volume / pan lanes (core/ClipEnvelope.h), 0…1 ↔ −1…1 linear (the ends are certain; the law between them needs a live check). Export: the PointeeId is a placeholder until the ids are renumbered, then the track's own target ids; a curved LYNX segment is written as 8 straight ones. Import: other clip envelopes (devices, track volume modulation, transposition, sample offset) are listed; Live 11+ curve controls become straight segments (listed).

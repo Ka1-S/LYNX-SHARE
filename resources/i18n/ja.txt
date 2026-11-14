@@ -9955,6 +9955,17 @@ countries: jp
 "Arc Down" = "アーチ下"
 "Bounce Up" = "バウンス上"
 "Bounce Down" = "バウンス下"
+"Clip envelope" = "クリップエンベロープ"
+"Envelope device: the clip itself, or the track's mixer" = "エンベロープのデバイス: クリップ自体、またはトラックのミキサー"
+"Envelope control" = "エンベロープのコントロール"
+"The clip's envelopes: its gain and its panning while it plays" = "クリップのエンベロープ: 再生中のゲインとパン"
+"Show volume envelope" = "ボリュームエンベロープを表示"
+"Show pan envelope" = "パンエンベロープを表示"
+"Hide envelope" = "エンベロープを隠す"
+"Reset volume envelope" = "ボリュームエンベロープをリセット"
+"Reset pan envelope" = "パンエンベロープをリセット"
+"Auto-warp: {0} markers" = "オートワープ: {0} 個のマーカー"
+"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "ワープフラグ: ドラッグで移動、ここをダブルクリックで追加  [Alt]+ドラッグでクリップ上のどこでもマーカーの線を移動"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"

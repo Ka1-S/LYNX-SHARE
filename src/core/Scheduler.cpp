@@ -1,4 +1,5 @@
 #include "core/Scheduler.h"
+#include "core/ClipEnvelope.h"
 
 #include "core/ClipOps.h"
 #include "core/Groove.h"
@@ -448,6 +449,9 @@ NoteEvent audioClipNote (const Song& song, const Clip& clip, std::size_t clipInd
     e.fadeOutTension = clip.crossfadeOut > 0 || (clip.fadeCurve & 2) != 0 ? 0.0f : clip.fadeOutTension;
     e.clipPitch = clip.pitch; // FL 2026's clip pitch (round 167k): shifted, the clip's length stays
     e.clipStretch = (float) clip.stretch; // FL 2026's clip stretch (round 167l)
+    // the clip's own envelopes (round 190gi): only an active one reaches the voice (a flat or missing one costs nothing)
+    e.clipEnvelope = clipenv::activeOf (song, clip) != nullptr ? clip.envelope : -1;
+    e.clipEnvTick = (double) clip.offset + (double) clip.offsetFraction;
 
     // FL's per-clip edge declicker (round 189i, clipops::declickChoice): a Disabled side plays without the channel's
     // declicker, a manual side neither. FL /R renders (round 189l): a side FL marks as joined seamlessly (choice 1)
@@ -497,6 +501,7 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
             e.startSeconds = ((double) clip.offset + (double) clip.offsetFraction + loopStart - (double) clip.start) * secondsPerTick;
             e.clipElapsed = (float) ((loopStart - (double) clip.start) / tps);
             e.clipRemaining = (float) (((double) clip.end() - loopStart) / tps);
+            e.clipEnvTick = clipenv::clipTick (clip, loopStart);
             out.add (e);
         }
 
@@ -507,6 +512,7 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         e.startSeconds = std::max (0.0, ((double) clip.offset + (double) clip.offsetFraction) * secondsPerTick);
         e.clipElapsed = 0.0f;
         e.clipRemaining = (float) ((double) clip.length / tps);
+        e.clipEnvTick = (double) clip.offset + (double) clip.offsetFraction;
         emitOccurrences ((double) clip.start, loop, startTick, endTick, tps, numSamples, e, out);
 
         e.type = NoteEvent::Type::off;
