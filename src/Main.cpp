@@ -67,6 +67,7 @@
 #include "engine/DllAsioDevice.h"
 #include "engine/PipeWireDevice.h"
 #include "platform/LinuxRealtime.h"
+#include "engine/PowerHints.h"
 #include "engine/Exporter.h"
 #include "engine/FlStudioExport.h"
 #include "engine/MidiFileIo.h"
@@ -584,6 +585,9 @@ public:
 
         // a crash in any mode (UI, command line) writes its backtrace to %APPDATA%\LYNX\autosave
         juce::SystemStats::setApplicationCrashHandler (onCrash);
+        // rollup 0.1.28 (REA 190hb action 4, FL's "Init DWM"): the compositor on MMCSS, steadier frames under CPU load
+        // (Windows; LYNX_DWM_MMCSS=0 leaves it off)
+        lynx::powerhints::enableCompositorMmcss();
         // round 190ci: also for a fault on a stack Windows cannot walk, which never reaches that handler (Windows)
         lynx::crashguard::setUnwalkableFaultHandler (onCrash);
         if (const auto args = juce::StringArray::fromTokens (commandLine, true); args.contains ("--faulttest"))
