@@ -89,7 +89,7 @@ inline int addMarker (Song& song, int clip, double seconds, double fileSeconds)
         return -1;
     auto& sampler = song.channels[(std::size_t) channel].sampler;
     // (the markers as the clip plays them, as the flag drag edits them)
-    if (auto played = warpedit::playedMarkers (sampler, fileSeconds); played.size() >= 2)
+    if (auto played = warpedit::editableMarkers (sampler, fileSeconds); played.size() >= 2)
         sampler.warp = std::move (played);
     warpedit::ensureMarkers (sampler, fileSeconds, song.bpm);
     const auto added = warpedit::addMarker (sampler, seconds);

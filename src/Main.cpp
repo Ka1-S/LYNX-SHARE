@@ -12745,6 +12745,7 @@ private:
                               : e.kind == lynx::flclipmenu::Entry::Kind::header  ? "[" + lynx::tr (e.text.c_str()) + "]"
                                                                                  : lynx::tr (e.text.c_str()));
             want.add ("-");
+            want.add ("[" + lynx::tr ("LYNX extras") + "]"); // (round 190gi)
             for (const auto& x : lynx::flclipmenu::lynxExtras())
                 want.add (lynx::tr (x.c_str()));
             check ("clip_menu_fl_order", got == want, got.joinIntoString ("|"));
@@ -19917,6 +19918,10 @@ private:
                                                          now, strip, now, 2, false));
             offline.dispatchPendingMessages();
             check ("a double-click on the flag strip adds a warp marker", markers().size() == before + 1);
+            if (markers().size() != before + 1)
+                checks << "     (strip seconds " << playlist.warpStripSecondsForSnapshot (2, strip.toInt()) << ", played markers "
+                       << (int) playlist.warpMarkerCountForSnapshot (2) << ", file seconds " << playlist.clipFileSecondsForSnapshot (2)
+                       << ", channel markers " << (int) before << ", clip at " << bounds.toString() << ", strip " << strip.toString() << ")\n";
             int added = -1;
             for (int k = 0; k < (int) markers().size(); ++k)
                 if (std::abs (markers()[(std::size_t) k].beats - 1.5) < 0.05)

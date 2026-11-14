@@ -7,6 +7,7 @@
 
 #include "core/ClipEnvelope.h"
 #include "core/ClipLauncher.h"
+#include "core/ClipOps.h"
 #include "core/ClipSample.h"
 #include "core/WarpModes.h"
 #include "ui/AudioEditor.h"
@@ -91,6 +92,27 @@ public:
                 g.drawText (juce::String (t / perBar + 1), juce::Rectangle<float> (x + 3.0f, area.getY(), 40.0f, 12.0f), juce::Justification::topLeft, false);
             }
         }
+        // the clip's audio under the envelope, faint (Live draws the sample there): min / max per 2 px of its content
+        if (c->channel >= 0 && c->channel < (int) song.channels.size())
+            if (const auto data = engine.getSampleLibrary().findLoaded (juce::String::fromUTF8 (song.channels[(std::size_t) c->channel].samplePath.c_str()));
+                data != nullptr && ! data->left.empty())
+            {
+                const auto& ch = song.channels[(std::size_t) c->channel];
+                const auto perTick = clipops::framesPerTick (ch, (double) data->left.size(), data->sampleRate, song.bpm) / juce::jmax (0.01, c->stretch);
+                g.setColour (colour::textSecondary.withAlpha (0.22f));
+                for (float x = area.getX(); x < area.getRight(); x += 2.0f)
+                {
+                    const auto f0 = (std::int64_t) (xToTick (*c, x) * perTick), f1 = (std::int64_t) (xToTick (*c, x + 2.0f) * perTick);
+                    float lo = 0.0f, hi = 0.0f;
+                    for (auto f = juce::jmax<std::int64_t> (0, f0); f < f1 && f < (std::int64_t) data->left.size(); f += juce::jmax<std::int64_t> (1, (f1 - f0) / 64))
+                    {
+                        lo = juce::jmin (lo, data->left[(std::size_t) f]);
+                        hi = juce::jmax (hi, data->left[(std::size_t) f]);
+                    }
+                    if (hi > lo)
+                        g.fillRect (x, area.getCentreY() - hi * area.getHeight() * 0.5f, 2.0f, juce::jmax (1.0f, (hi - lo) * area.getHeight() * 0.5f));
+                }
+            }
         if (lane == clipenv::panLane)
         {
             g.setColour (colour::border);

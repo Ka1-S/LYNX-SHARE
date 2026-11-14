@@ -315,6 +315,11 @@ TEST (clipenv190gi_playlist_warp_commands)
     CHECK (song.channels[1].sampler.warp.size() >= 2 && song.channels[1].sampler.keepPitch && song.channels[0].sampler.warp.empty());
     const auto quantized = clipwarp::quantize (song, 1, clicks);
     CHECK (quantized > 0);
+    // one-tempo markers: none "played" (they bend nothing), but the Playlist shows and edits them (editableMarkers)
+    SamplerSettings straight;
+    warpedit::ensureMarkers (straight, 4.0, 120.0);
+    CHECK (warpedit::playedMarkers (straight, 4.0).empty() && warpedit::editableMarkers (straight, 4.0).size() == 2);
+    CHECK (warpedit::editableMarkers (SamplerSettings {}, 4.0).empty());
     const auto before = song.channels[1].sampler.warp.size();
     const auto added = clipwarp::addMarker (song, 1, 0.73, 4.0);
     CHECK (added > 0 && song.channels[1].sampler.warp.size() == before + 1);

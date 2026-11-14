@@ -2746,7 +2746,7 @@ void PlaylistComponent::paintClipEnvelope (juce::Graphics& g, const Clip& c, con
     }
     // the lane's name at the body's top left: "Volume" / "Pan"
     g.setColour (theme::colour::automation.brighter (0.4f));
-    g.setFont (font (type::caption));
+    g.setFont (theme::font (theme::type::caption));
     g.drawText (lane == clipenv::panLane ? tr ("Pan") : tr ("Volume"), body.reduced (4.0f, 1.0f).withHeight (12.0f).toNearestInt(),
                 juce::Justification::topRight, false);
 }
@@ -3490,7 +3490,7 @@ std::vector<WarpPoint> PlaylistComponent::clipWarpMarkers (int index) const
     if (c.kind != ClipKind::audio || c.channel < 0 || c.channel >= (int) song.channels.size()
         || clipops::playsBackwards (song.channels[(std::size_t) c.channel], c))
         return {};
-    return warpedit::playedMarkers (song.channels[(std::size_t) c.channel].sampler, clipFileSeconds (index));
+    return warpedit::editableMarkers (song.channels[(std::size_t) c.channel].sampler, clipFileSeconds (index)); // (190gi: one-tempo markers too)
 }
 
 // round 190gi: Alt + drag — the marker whose line is within 5 px of `p`, anywhere on the clip's body (the start one never moves)
@@ -5420,7 +5420,7 @@ void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
                 if (channel < 0)
                     return;
                 auto& sampler = s.channels[(std::size_t) channel].sampler;
-                sampler.warp = warpedit::playedMarkers (sampler, seconds);
+                sampler.warp = warpedit::editableMarkers (sampler, seconds);
                 warpedit::moveMarker (sampler, index, beats, seconds);
             });
         drag = Drag::none;
@@ -7551,6 +7551,7 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
 
     // --- LYNX's own items (no FL counterpart), core flclipmenu::lynxExtras --------------------------------------------
     menu.addSeparator();
+    menu.addSectionHeader (tr ("LYNX extras")); // (round 190gi: as the Clip View's menu, DetailView; FL's sections stay FL's)
     // round 190ds, Simple workflow only (LYNX's own): the clip follows the project key, and its loop's key
     if (simpleHeaders)
         addKeyFollowItems (menu, index, targets);
