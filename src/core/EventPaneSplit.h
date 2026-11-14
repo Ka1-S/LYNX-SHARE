@@ -19,6 +19,7 @@
 // Pure logic, no JUCE: the Piano roll (ui/PianoRollComponent) lays out and draws it, the tests check the rules here.
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <locale>
 #include <sstream>
@@ -94,10 +95,13 @@ inline int percentOf (float aspect) noexcept { return (int) std::lround (clampAs
 // The settings file's text: "aspect=0.8\nspare=1\n"; unknown lines are ignored, missing values keep FL's defaults.
 inline std::string toText (const State& s)
 {
-    std::ostringstream out;
-    out.imbue (std::locale::classic()); // (a "." decimal point whatever the user's locale)
-    out << "aspect=" << clampAspect (s.aspect) << "\nspare=" << (s.spare < 0.0f ? -1.0f : clampAspect (s.spare)) << "\n";
-    return out.str();
+    // the shortest text that reads back as the same float, with a "." whatever the user's locale
+    auto number = [] (float v) {
+        char text[32];
+        const auto end = std::to_chars (text, text + sizeof (text), v).ptr;
+        return std::string (text, end);
+    };
+    return "aspect=" + number (clampAspect (s.aspect)) + "\nspare=" + number (s.spare < 0.0f ? -1.0f : clampAspect (s.spare)) + "\n";
 }
 
 inline State fromText (const std::string& text)

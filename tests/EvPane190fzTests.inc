@@ -80,6 +80,11 @@ TEST (evpane190fz_settings_text_round_trip)
     using namespace lynx::evpane;
     const State s { 0.4375f, 1.0f };
     CHECK (fromText (toText (s)) == s);
+    for (int y = 0; y <= 620; ++y) // every place a drag gives reads back exactly (the --evpaneshot check after a release)
+    {
+        const State dragged { aspectOf (70 + y, 70, 690), 1.0f };
+        CHECK (fromText (toText (dragged)) == dragged);
+    }
     CHECK (toText (State {}) == "aspect=0.8\nspare=1\n");
     CHECK (fromText ("") == State {});                              // no file: FL's defaults
     CHECK (fromText ("aspect=abc\nspare=\n") == State {});           // unreadable values keep the defaults
