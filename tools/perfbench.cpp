@@ -15,6 +15,8 @@
 //   inserts50       one synth into 50 inserts in a chain of sends, 4 effects each: the mixer and effects alone
 //   stream          24 audio-clip channels playing 60 s takes (long audio streaming)
 //   idle            the synth100 project with the transport stopped and nothing playing (the cost of an idle project)
+//   afterstop       the synth100 project played for --warmup seconds (not measured), then stopped (round 190gp: the
+//                   seconds after Stop, while the effects' tails die away and smart disable takes them out)
 //   flp:<path>      an FL Studio project, whole song (FL's own data from FL_ROOT, as renderwav)
 // --threads N: N worker threads besides the calling one (the app's WorkerPool); the CPU time is then the process'
 // (every thread, spinning included) and the instructions are the calling thread's only.
@@ -54,9 +56,27 @@
 #include "core/SynthPresets.h"
 #include "core/WorkerPool.h"
 
+// round 190gp: A/B switches of this round's changes, looked up weakly (the same tool links with the objects from before
+// them, which do not have them): LYNX_DECLARED_TAILS=0 (smart disable's fixed hold), LYNX_SYNTH_LANES=0 (the synth's
+// voices one by one)
+namespace lynx
+{
+void setDeclaredTails (bool on) noexcept __attribute__ ((weak));
+void setSynthVoiceLanes (bool on) noexcept __attribute__ ((weak));
+}
+
 namespace
 {
 using namespace lynx;
+
+void applySwitches()
+{
+    auto off = [] (const char* name) { const char* v = std::getenv (name); return v != nullptr && std::atoi (v) == 0; };
+    if (setDeclaredTails != nullptr)
+        setDeclaredTails (! off ("LYNX_DECLARED_TAILS"));
+    if (setSynthVoiceLanes != nullptr)
+        setSynthVoiceLanes (! off ("LYNX_SYNTH_LANES"));
+}
 
 #if defined(_WIN32) // (no thread CPU clock here: the process' CPU time)
 using clockid_t = int;
@@ -323,10 +343,12 @@ int main (int argc, char** argv)
                               "[--seconds S] [--reps R] [--offline] [--nometers] [--raw path] [--stopped]\n");
         return 2;
     }
+    applySwitches();
     const std::string scenario = argv[1];
     int blockSize = 256, threads = 0, reps = 5;
     double seconds = 0.0, warmup = 0.0;
-    bool offline = false, meters = true, stopped = scenario == "idle", units = false;
+    bool offline = false, meters = true, stopped = scenario == "idle" || scenario == "afterstop", units = false;
+    const bool playWarmup = scenario == "afterstop"; // (the warmup plays, the measured part is stopped)
     const char* raw = nullptr;
     for (int i = 2; i < argc; ++i)
     {
@@ -363,7 +385,7 @@ int main (int argc, char** argv)
         song = demos::make (1);
     else if (scenario == "pop")
         song = demos::make (2);
-    else if (scenario == "synth100" || scenario == "idle")
+    else if (scenario == "synth100" || scenario == "idle" || scenario == "afterstop")
         song = makeSynth100 (16);
     else if (scenario == "inserts50")
         song = makeInserts50 (16);
@@ -437,7 +459,8 @@ int main (int argc, char** argv)
             std::vector<float> wl ((std::size_t) blockSize), wr ((std::size_t) blockSize);
             for (int done = 0, total = (int) (warmup * sampleRate); done < total; done += blockSize)
             {
-                renderer->process (state.get(), ! stopped, stopped ? 0.0 : done * tps, blockSize, wl.data(), wr.data(), live.get(),
+                const auto play = ! stopped || playWarmup;
+                renderer->process (state.get(), play, play ? done * tps : 0.0, blockSize, wl.data(), wr.data(), live.get(),
                                    meters ? bank.get() : nullptr, midiLive.get());
                 if (pool != nullptr)
                     pool->park();

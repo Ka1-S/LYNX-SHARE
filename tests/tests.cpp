@@ -17566,3 +17566,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Voices190ejTests.inc"
 #include "Flfix190ezTests.inc"
 #include "Rcfix190fcTests.inc"
+#include "SynthLanes190gpTests.inc"
+#include "SchedIndex190gpTests.inc"
+#include "SmartTails190gpTests.inc"
+#include "ApexMeter190gpTests.inc"
