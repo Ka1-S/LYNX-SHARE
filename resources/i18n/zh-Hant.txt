@@ -10050,17 +10050,6 @@ countries: tw hk mo
 "Open in new Fruity Slicer channel" = "在新的 Fruity Slicer 通道中開啟"
 "Open in new Slicex channel" = "在新的 Slicex 通道中開啟"
 "Get properties" = "檢視內容"
-"Clip envelope" = "片段包絡"
-"Envelope device: the clip itself, or the track's mixer" = "包絡裝置：片段本身，或軌道的混音台"
-"Envelope control" = "包絡控制"
-"The clip's envelopes: its gain and its panning while it plays" = "片段的包絡：播放時的增益和聲像"
-"Show volume envelope" = "顯示音量包絡"
-"Show pan envelope" = "顯示聲像包絡"
-"Hide envelope" = "隱藏包絡"
-"Reset volume envelope" = "重設音量包絡"
-"Reset pan envelope" = "重設聲像包絡"
-"Auto-warp: {0} markers" = "自動變速：{0} 個標記"
-"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "變速旗標：拖曳以移動，在此按兩下可新增  [Alt]+拖曳可在片段任意位置移動標記線"
 "In a separate process a crash of the plugin cannot take LYNX SHARE down. Its window then opens on its own (it cannot be docked)." = "在獨立處理程序中，外掛當機不會使 LYNX SHARE 結束。它的視窗隨後會單獨開啟（無法停駐）。"
 "Separate process" = "獨立處理程序"
 "Every plugin runs in a separate process (Options > General settings)." = "所有外掛都在獨立處理程序中執行（選項 > 一般設定）。"
@@ -10112,5 +10101,3 @@ countries: tw hk mo
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats 規律：Classic 按 0.1.28 之前的 LYNX 播放（此專案當時儲存）；實測遵循 Live 12.4 的渲染"
 
 # --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 開啟/關閉編輯器  [Alt]+[LMB] 保持其他編輯器開啟  [Ctrl]+[LMB] 試聽  [2xLMB] 鋼琴捲軸  [LMB] 上下拖曳重新排序  [RMB] 通道選單"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "峰值電平表（左/右）帶峰值保持  [LMB] 清除削波指示燈"

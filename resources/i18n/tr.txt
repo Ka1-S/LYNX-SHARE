@@ -10050,17 +10050,6 @@ countries: tr
 "Open in new Fruity Slicer channel" = "Yeni Fruity Slicer kanalında aç"
 "Open in new Slicex channel" = "Yeni Slicex kanalında aç"
 "Get properties" = "Özellikleri göster"
-"Clip envelope" = "Klip zarfı"
-"Envelope device: the clip itself, or the track's mixer" = "Zarf aygıtı: klibin kendisi veya parçanın mikseri"
-"Envelope control" = "Zarf denetimi"
-"The clip's envelopes: its gain and its panning while it plays" = "Klibin zarfları: çalarken kazancı ve panı"
-"Show volume envelope" = "Ses düzeyi zarfını göster"
-"Show pan envelope" = "Pan zarfını göster"
-"Hide envelope" = "Zarfı gizle"
-"Reset volume envelope" = "Ses düzeyi zarfını sıfırla"
-"Reset pan envelope" = "Pan zarfını sıfırla"
-"Auto-warp: {0} markers" = "Otomatik warp: {0} işaret"
-"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "Warp bayrakları: taşımak için sürükleyin, buraya çift tıklamak bir tane ekler  [Alt]+sürükleme bir işaretin çizgisini klibin her yerinde taşır"
 "In a separate process a crash of the plugin cannot take LYNX SHARE down. Its window then opens on its own (it cannot be docked)." = "Ayrı bir süreçte eklentinin çökmesi LYNX SHARE'i kapatamaz. Penceresi o zaman ayrı açılır (yerleştirilemez)."
 "Separate process" = "Ayrı süreç"
 "Every plugin runs in a separate process (Options > General settings)." = "Tüm eklentiler ayrı bir süreçte çalışır (Seçenekler > Genel ayarlar)."
@@ -10112,5 +10101,3 @@ countries: tr
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats yasası: Classic, 0.1.28 öncesi LYNX gibi çalar (bu proje o zaman kaydedildi); Ölçülmüş, Live 12.4 renderlarını izler"
 
 # --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak hold'lu tepe ölçer (sol/sağ)  [LMB] clip ışığını temizler"

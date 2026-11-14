@@ -10050,17 +10050,6 @@ countries: it ch sm
 "Open in new Fruity Slicer channel" = "Apri in un nuovo canale Fruity Slicer"
 "Open in new Slicex channel" = "Apri in un nuovo canale Slicex"
 "Get properties" = "Mostra proprietà"
-"Clip envelope" = "Inviluppo della clip"
-"Envelope device: the clip itself, or the track's mixer" = "Dispositivo dell'inviluppo: la clip stessa o il mixer della traccia"
-"Envelope control" = "Controllo dell'inviluppo"
-"The clip's envelopes: its gain and its panning while it plays" = "Gli inviluppi della clip: il guadagno e il pan durante la riproduzione"
-"Show volume envelope" = "Mostra inviluppo del volume"
-"Show pan envelope" = "Mostra inviluppo del pan"
-"Hide envelope" = "Nascondi inviluppo"
-"Reset volume envelope" = "Reimposta inviluppo del volume"
-"Reset pan envelope" = "Reimposta inviluppo del pan"
-"Auto-warp: {0} markers" = "Auto-warp: {0} marker"
-"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "Bandierine di warp: trascinane una per spostarla, doppio clic qui ne aggiunge una  [Alt]+trascina sposta la linea di un marker ovunque sulla clip"
 "In a separate process a crash of the plugin cannot take LYNX SHARE down. Its window then opens on its own (it cannot be docked)." = "In un processo separato, un crash del plugin non può far cadere LYNX SHARE. La sua finestra si apre allora da sola (non può essere agganciata)."
 "Separate process" = "Processo separato"
 "Every plugin runs in a separate process (Options > General settings)." = "Tutti i plugin vengono eseguiti in un processo separato (Opzioni > Impostazioni generali)."
@@ -10112,5 +10101,3 @@ countries: it ch sm
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Legge di Beats: Classic suona come LYNX prima della 0.1.28 (questo progetto è stato salvato allora); Misurato segue i render di Live 12.4"
 
 # --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] apri/chiudi l'editor  [Alt]+[LMB] lascia aperti gli altri  [Ctrl]+[LMB] ascolta  [2xLMB] Piano Roll  [LMB] trascina su/giù riordina  [RMB] menu del canale"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Meter di picco (sinistra/destra) con peak hold  [LMB] spegne la spia di clip"

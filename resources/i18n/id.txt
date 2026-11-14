@@ -10050,17 +10050,6 @@ countries: id
 "Open in new Fruity Slicer channel" = "Buka di channel Fruity Slicer baru"
 "Open in new Slicex channel" = "Buka di channel Slicex baru"
 "Get properties" = "Lihat properti"
-"Clip envelope" = "Envelope klip"
-"Envelope device: the clip itself, or the track's mixer" = "Perangkat envelope: klip itu sendiri, atau mixer trek"
-"Envelope control" = "Kontrol envelope"
-"The clip's envelopes: its gain and its panning while it plays" = "Envelope klip: gain dan pan-nya selama diputar"
-"Show volume envelope" = "Tampilkan envelope volume"
-"Show pan envelope" = "Tampilkan envelope pan"
-"Hide envelope" = "Sembunyikan envelope"
-"Reset volume envelope" = "Atur ulang envelope volume"
-"Reset pan envelope" = "Atur ulang envelope pan"
-"Auto-warp: {0} markers" = "Auto-warp: {0} penanda"
-"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "Bendera warp: seret untuk memindahkan, klik ganda di sini menambah satu  [Alt]+seret memindahkan garis penanda di mana saja pada klip"
 "In a separate process a crash of the plugin cannot take LYNX SHARE down. Its window then opens on its own (it cannot be docked)." = "Di proses terpisah, crash plugin tidak bisa menjatuhkan LYNX SHARE. Jendelanya lalu terbuka sendiri (tidak bisa di-dock)."
 "Separate process" = "Proses terpisah"
 "Every plugin runs in a separate process (Options > General settings)." = "Semua plugin berjalan di proses terpisah (Opsi > Pengaturan umum)."
@@ -10112,5 +10101,3 @@ countries: id
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Hukum Beats: Classic diputar seperti LYNX sebelum 0.1.28 (proyek ini disimpan saat itu); Terukur mengikuti render Live 12.4"
 
 # --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] buka/tutup editor  [Alt]+[LMB] biarkan yang lain terbuka  [Ctrl]+[LMB] dengarkan  [2xLMB] Piano Roll  [LMB] seret naik/turun mengubah urutan  [RMB] menu channel"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Peak meter (kiri/kanan) dengan peak hold  [LMB] mematikan lampu clip"

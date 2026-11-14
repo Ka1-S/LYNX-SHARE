@@ -10050,17 +10050,6 @@ countries: fr be ch ca lu
 "Open in new Fruity Slicer channel" = "Ouvrir dans un nouveau canal Fruity Slicer"
 "Open in new Slicex channel" = "Ouvrir dans un nouveau canal Slicex"
 "Get properties" = "Afficher les propriétés"
-"Clip envelope" = "Enveloppe du clip"
-"Envelope device: the clip itself, or the track's mixer" = "Appareil de l'enveloppe : le clip lui-même ou la console de la piste"
-"Envelope control" = "Contrôle de l'enveloppe"
-"The clip's envelopes: its gain and its panning while it plays" = "Les enveloppes du clip : son gain et son panoramique pendant la lecture"
-"Show volume envelope" = "Afficher l'enveloppe de volume"
-"Show pan envelope" = "Afficher l'enveloppe de panoramique"
-"Hide envelope" = "Masquer l'enveloppe"
-"Reset volume envelope" = "Réinitialiser l'enveloppe de volume"
-"Reset pan envelope" = "Réinitialiser l'enveloppe de panoramique"
-"Auto-warp: {0} markers" = "Auto-warp : {0} marqueurs"
-"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "Drapeaux de warp : faire glisser un drapeau le déplace, un double-clic ici en ajoute un  [Alt]+glisser déplace la ligne d'un marqueur n'importe où sur le clip"
 "In a separate process a crash of the plugin cannot take LYNX SHARE down. Its window then opens on its own (it cannot be docked)." = "Dans un processus séparé, un plantage du plugin ne peut pas faire tomber LYNX SHARE. Sa fenêtre s'ouvre alors à part (elle ne peut pas être ancrée)."
 "Separate process" = "Processus séparé"
 "Every plugin runs in a separate process (Options > General settings)." = "Tous les plugins s'exécutent dans un processus séparé (Options > Réglages généraux)."
@@ -10112,5 +10101,3 @@ countries: fr be ch ca lu
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Loi de Beats : Classic joue comme LYNX avant la 0.1.28 (ce projet a été enregistré alors) ; Mesuré suit les rendus de Live 12.4"
 
 # --- Not in pt-BR.txt (yet)
-"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] ouvrir/fermer l'éditeur  [Alt]+[LMB] garder les autres ouverts  [Ctrl]+[LMB] écouter  [2xLMB] Piano Roll  [LMB] glisser haut/bas réordonne  [RMB] menu du canal"
-"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Crêtemètre (gauche/droite) avec maintien de crête  [LMB] efface le voyant d'écrêtage"
