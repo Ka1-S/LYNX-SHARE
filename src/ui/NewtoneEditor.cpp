@@ -7,6 +7,7 @@
 #include <map>
 #include <set>
 
+#include "core/MixerOps.h"
 #include "core/NewtoneFx.h"
 #include "core/VocalPitch.h"
 #include "engine/MidiFileIo.h"
@@ -1558,6 +1559,20 @@ void closeAll()
     newtoneWindows().clear();
 }
 } // namespace NewtoneWindows
+
+void openSampleInMasterEditor (AudioEngine& engine, EffectKind kind, const std::string& path)
+{
+    int slot = -1;
+    engine.editSong ([&] (Song& song) { slot = mixerops::openSampleInMasterEditor (song, kind, path); });
+    if (slot < 0)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, utf8 (effectInfo (kind).name),
+                                                tr ("The Master track has no free effect slot."));
+        return;
+    }
+    newtoneWindows().erase ({ 0, slot }); // (an open window shows the old sample: it opens again with the new one)
+    NewtoneWindows::open (engine, 0, slot);
+}
 
 std::unique_ptr<juce::Component> makeNewtoneEditor (AudioEngine& engine, int track, int slot)
 {

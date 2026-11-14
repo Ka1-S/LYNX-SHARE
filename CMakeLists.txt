@@ -299,7 +299,8 @@ target_sources(lynx_core PRIVATE
 
 # spectral waveforms: band analysis and multi-resolution peak cache
 target_sources(lynx_core PRIVATE
-    src/core/WaveAnalysis.cpp)
+    src/core/WaveAnalysis.cpp
+    src/core/Spectrogram.cpp)
 
 # export options + MP3, plugin performance monitor, clip properties / arrangements (round 84)
 target_sources(lynx_core PRIVATE

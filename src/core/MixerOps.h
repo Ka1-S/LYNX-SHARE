@@ -154,6 +154,12 @@ int moveEffectBy (Song& song, int track, int index, int delta);
 // Adds `fx` into the empty `row` (FL: a plugin picked on an empty slot lands in that slot). Returns its index, or -1
 // (row taken, insert full).
 int insertEffectAtRow (Song& song, int track, EffectSlot fx, int row);
+// The audio clip menu's "Pitch-correct sample" / "Time-warp sample" and the Sampler waveform menu's "Edit in pitch
+// corrector" / "Edit in time warper" (round 190gw; live check 190gu B3: FL opens Newtone / Newtime on the Master, its
+// window "Newtone (Master)", with the clip's sample loaded): LYNX's Newtone / Newtime (`kind`) on the Master, the first
+// one there or a new one in the first empty slot, with `path` loaded (its earlier edits go, as with any new sample).
+// Returns the slot's index on the Master, -1 when the Master has no empty slot left or `kind` is neither.
+int openSampleInMasterEditor (Song& song, EffectKind kind, const std::string& path);
 // Removes effect `index`; the others keep their rows (FL leaves the slot empty).
 void removeEffectKeepRows (Song& song, int track, int index);
 // Removes every effect of `kind` from every mixer track, each slot left empty (FL's Tools › Macros › "Remove all Edison
@@ -180,6 +186,12 @@ std::vector<int> sourcesOf (const Song& song, int track);
 int insertTracks (Song& song, int at, int count);
 // How many more inserts the mixer can take (FL 2026: "You can add a maximum of N tracks", up to 500 inserts).
 int roomForInserts (const Song& song) noexcept;
+// FL 2026's checks of the two "how many" boxes (round 190gw; InsertMixerTrackMenuItemClick 0x129c990 / AddOneMixerTrackMenuClick
+// 0x12a8bb0 Tag -2, both against 502 tracks = Master + 500 inserts + Current): "Insert multiple..." wants 1 to the room
+// left, else "Please enter a number between 1 and <room>." (outOfRange); "Add multiple..." (`adding`) only refuses more
+// than the room, "You can add a maximum of <room> tracks." (tooMany), and adds nothing for 0.
+enum class InsertCheck { ok, outOfRange, tooMany };
+InsertCheck checkInsertMultiple (const Song& song, int count, bool adding) noexcept;
 // FL's "+" menu › "Increase number of tracks to..." (AddMixerTracksMenu Tag -1, AddOneMixerTrackMenuClick 0x12a8bb0;
 // round 190fl): the box "Enter the number of mixer tracks" starts at the number of inserts; a number below it or above
 // 500 is refused ("Track count must be between <inserts> and 500."), otherwise blank inserts are added at the end

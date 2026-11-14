@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "core/Arpeggiator.h"
+#include "core/LinkFormula.h"
 #include "core/ChannelMiscFx.h"
 #include "core/ChannelPoly.h"
 #include "core/VoiceLimit.h"
@@ -119,6 +120,14 @@ struct RackState
         int pattern = 0, lane = 0, slot = 0;
     };
     std::vector<EventLane> eventLanes;
+    // round 190gw: automation clips with several target links (FL's "Target links", Automation::links): each link takes
+    // a slot after the event lanes whose value is the clip's own through the link's mapping formula
+    struct LinkSlot
+    {
+        int automation = 0, slot = 0;
+        linkformula::Formula formula;
+    };
+    std::vector<LinkSlot> linkSlots;
     std::vector<std::vector<int>> patternClips; // per pattern: its clips in the Playlist, by start
 
     struct PluginParamBinding

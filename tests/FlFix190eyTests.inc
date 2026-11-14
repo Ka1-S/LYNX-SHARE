@@ -157,8 +157,9 @@ TEST (flfix190ey_waveform_menu_is_fls)
         if (e.text != nullptr && e.have)
             have.push_back (e.text);
     const std::vector<std::string> expected { "Reload", "Save as...", "Locate file", "Copy audio to clipboard", "Paste audio from clipboard",
-                                              "Edit in audio editor", "Open in new sampler channel", "Open in new Fruity Granulizer channel",
-                                              "Open in new Fruity Slicer channel", "Open in new Slicex channel", "Detect tempo", "Get properties" }; // (round 190gk: Slicer, Slicex, Get properties)
+                                              "Edit in audio editor", "Edit in pitch corrector", "Edit in time warper", "Open in new sampler channel",
+                                              "Open in new Fruity Granulizer channel", "Open in new Fruity Slicer channel", "Open in new Slicex channel",
+                                              "Detect tempo", "Get properties", "Spectrum view", "Multichannel waveform view" }; // (round 190gk: Slicer, Slicex, Get properties; 190gw: Newtone / Newtime, the views)
     CHECK (have == expected);
     for (const auto& e : samplerpage::waveMenu())
         if (e.text != nullptr && (std::string (e.text) == "Copy audio to clipboard" || std::string (e.text) == "Edit in audio editor"))

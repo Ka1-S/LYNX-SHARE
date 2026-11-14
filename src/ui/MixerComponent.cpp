@@ -1807,8 +1807,11 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
             updateSize();
             selectTrack (juce::jmax (1, count));
         });
-        menu.addItem (tr ("Add multiple..."), room, false, [this, count] { askInsertMultiple (juce::jmax (1, count)); });
-        // FL's third item (Tag -1, round 190fl): the number of inserts to have, the new ones at the end
+        menu.addItem (tr ("Add multiple..."), room, false, [this, count] { askInsertMultiple (juce::jmax (1, count), true); });
+        // FL's third item (Tag -1, round 190fl): the number of inserts to have, the new ones at the end. Round 190gw: FL 2026
+        // shows it only on THIS "+" (the one after the last strip): AddMixerTracksMenuBeforePopup 0x12a87d0 sets the
+        // item's Visible (TQuickMenuItem.Visible's setter 0x840720) to "the menu was not opened from the toolbar's
+        // AddTrackAfterSelectedBtn" — LYNX has no such toolbar button, and FL's track / options menus never had the item
         menu.addItem (tr ("Increase number of tracks to..."), room, false, [this] { askInsertCount(); });
         // FL's "Add from state" (REA round 167q: AddMixerTracksMenu, FUN_012a87d0 / FUN_012a83b0)
         juce::PopupMenu fromState;
@@ -3075,36 +3078,57 @@ static void placeRenderedFiles (AudioEngine& engine, const std::vector<juce::Fil
         engine.editSong ([list] (Song& s) { mixerops::placeRenderedFiles (s, list); });
 }
 
-void MixerStrips::askInsertMultiple (int at)
+std::unique_ptr<juce::AlertWindow> MixerStrips::makeInsertMultipleBox (bool adding)
 {
-    auto* window = new juce::AlertWindow (tr ("Insert multiple"), tr ("How many blank inserts?"), juce::MessageBoxIconType::NoIcon);
-    // FL 2026's box starts at 10, already selected; Ctrl+A selects it again (round 167a [SHOT s13–s15])
-    window->addTextEditor ("count", "10");
+    auto window = std::make_unique<juce::AlertWindow> (adding ? tr ("Add multiple") : tr ("Insert multiple"),
+                                                      adding ? tr ("Enter the number of mixer tracks to add") : tr ("Number of tracks to add"),
+                                                      juce::MessageBoxIconType::NoIcon);
+    window->addTextEditor ("count", adding ? "10" : "1");
     if (auto* field = window->getTextEditor ("count"))
         field->setInputRestrictions (4, "0123456789");
     window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
     window->addButton (tr ("Cancel"), 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    return window;
+}
+
+void MixerStrips::askInsertMultiple (int at, bool adding)
+{
+    // FL 2026 (round 190gw; live check 190gu B4, shots reafl/fl-mixer-insert-multiple-*.png; FLEngine
+    // InsertMixerTrackMenuItemClick 0x129c990 and AddOneMixerTrackMenuClick 0x12a8bb0 Tag -2): the track menu's
+    // "Insert multiple..." asks "Number of tracks to add" (1, selected) and refuses anything outside 1 to the room left
+    // ("Please enter a number between 1 and N.", N = 500 - inserts: 377 on a 123-insert project); the new tracks go before
+    // the track and are all selected. The "+" menu's "Add multiple..." asks "Enter the number of mixer tracks to add" (10)
+    // and refuses more than the room ("You can add a maximum of N tracks."). Nothing is added after an error.
+    auto* window = makeInsertMultipleBox (adding).release();
     juce::Component::SafePointer<MixerStrips> safe (this);
-    window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, at, window] (int result) {
+    window->enterModalState (true, juce::ModalCallbackFunction::create ([safe, at, adding, window] (int result) {
                                  if (safe == nullptr || result != 1)
                                      return;
                                  const auto n = window->getTextEditorContents ("count").getIntValue();
-                                 const auto room = mixerops::roomForInserts (safe->engine.getSong());
-                                 if (n > room) // FL 2026 shows "You can add a maximum of 375 tracks." (round 166d [SHOT]); nothing is added then
+                                 const auto& song = safe->engine.getSong();
+                                 const auto room = mixerops::roomForInserts (song);
+                                 if (const auto check = mixerops::checkInsertMultiple (song, n, adding); check != mixerops::InsertCheck::ok)
                                  {
-                                     juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Insert multiple"),
-                                                                             tr ("You can add a maximum of {0} inserts.", { juce::String (room) }));
+                                     juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Error"),
+                                                                             check == mixerops::InsertCheck::outOfRange
+                                                                                 ? tr ("Please enter a number between 1 and {0}.", { juce::String (room) })
+                                                                                 : tr ("You can add a maximum of {0} tracks.", { juce::String (room) }));
                                      return;
                                  }
-                                 if (n > 0)
+                                 if (n <= 0)
+                                     return;
+                                 const auto first = juce::jlimit (1, (int) song.mixer.size(), at);
+                                 int added = 0;
+                                 safe->engine.editSong ([first, n, &added] (Song& s) { added = mixerops::insertTracks (s, first, n); });
+                                 std::vector<int> made;
+                                 for (int i = 0; i < added; ++i)
                                  {
-                                     const auto first = juce::jlimit (1, (int) safe->engine.getSong().mixer.size(), at);
-                                     safe->engine.editSong ([first, n] (Song& s) { mixerops::insertTracks (s, first, n); });
-                                     for (int i = 0; i < n; ++i)
-                                         safe->revealed.insert (first + i); // shown even while unused
-                                     safe->updateSize();
-                                     safe->selectTrack (first);
+                                     safe->revealed.insert (first + i); // shown even while unused
+                                     made.push_back (first + i);
                                  }
+                                 safe->updateSize();
+                                 if (! made.empty())
+                                     safe->setSelection (made, first); // (FL: the new tracks, all selected)
                              }),
                              true);
     if (auto* field = window->getTextEditor ("count"))

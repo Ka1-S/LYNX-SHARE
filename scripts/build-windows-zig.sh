@@ -247,7 +247,7 @@ APP_SOURCES+=(src/ui/SupportLynx.cpp) # Help › Support LYNX SHARE..., the Abou
 APP_SOURCES+=(src/core/Preferences.cpp src/core/MidiSync.cpp src/engine/MidiSyncIo.cpp src/ui/SettingsPages.cpp src/ui/PluginManager.cpp src/ui/ShortcutManager.cpp)
 APP_SOURCES+=(src/engine/AbletonLink.cpp) # Ableton Link (round 190gl; third_party/link, its own include paths below)
 # spectral waveforms: band analysis, background cache and drawing
-APP_SOURCES+=(src/core/WaveAnalysis.cpp src/ui/WaveformView.cpp)
+APP_SOURCES+=(src/core/WaveAnalysis.cpp src/core/Spectrogram.cpp src/ui/WaveformView.cpp)
 # FL's Plucked!, Sawer and BeepMap engines (REA round 65)
 APP_SOURCES+=(src/core/Plucked.cpp src/core/BeepMap.cpp src/core/Sawer.cpp)
 # LYNX Soundfont: SF2 / SF3 player with a preset search (round 158, issue #6)

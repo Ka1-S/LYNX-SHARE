@@ -974,4 +974,59 @@ inline int automateAudioClip (Song& song, int clip, AutomateWhat what, const std
     return made.automation;
 }
 
+// ---- "Crossfade with ›" (round 190gw; live check 190gu B3, FL 2026 shots fltails/fl-crossfade-*.png) ----------------
+// The audio clips of OTHER channels that overlap `clip` in time (on any track), in Playlist order: the submenu's list.
+inline std::vector<int> crossfadeCandidates (const Song& song, int clip)
+{
+    std::vector<int> out;
+    if (clip < 0 || clip >= (int) song.playlist.size())
+        return out;
+    const auto& a = song.playlist[(std::size_t) clip];
+    if (a.kind != ClipKind::audio)
+        return out;
+    for (int i = 0; i < (int) song.playlist.size(); ++i)
+    {
+        const auto& b = song.playlist[(std::size_t) i];
+        if (i != clip && b.kind == ClipKind::audio && b.gridSlot < 0 && b.channel != a.channel && b.start < a.end() && a.start < b.end())
+            out.push_back (i);
+    }
+    return out;
+}
+
+// FL's two target links: A's Levels adjustment Volume multiplier through 0.5*Tension(Input,10), B's through
+// 0.5-0.5*Tension(Input,-10) (0.5 = 100 % of the multiplier's 0 to 200 % travel): at the ramp's 1 A plays at 100 % and B is
+// silent, at its 0 the other way round, each with FL's log-shaped fade.
+constexpr const char* crossfadeOutFormula = "0.5*Tension(Input,10)";
+constexpr const char* crossfadeInFormula = "0.5-0.5*Tension(Input,-10)";
+
+// The clip FL makes: "<A> to <B> crossfade" (the two channels' names) on A's track over the time both play, a straight
+// ramp from 1 down to 0, with the two links above. Returns the new automation's index, -1 when they don't overlap or
+// either is not an audio clip of a channel.
+inline int crossfadeWith (Song& song, int clip, int other)
+{
+    const auto candidates = crossfadeCandidates (song, clip);
+    if (std::find (candidates.begin(), candidates.end(), other) == candidates.end())
+        return -1;
+    const auto a = song.playlist[(std::size_t) clip], b = song.playlist[(std::size_t) other];
+    if (a.channel < 0 || a.channel >= (int) song.channels.size() || b.channel < 0 || b.channel >= (int) song.channels.size())
+        return -1;
+    const auto from = std::max (a.start, b.start), to = std::min (a.end(), b.end());
+    Automation automation;
+    automation.name = song.channels[(std::size_t) a.channel].name + " to " + song.channels[(std::size_t) b.channel].name + " crossfade";
+    automation.links = { { { AutomationTargetKind::channelAdjust, a.channel, 0, leveladjust::volume }, crossfadeOutFormula },
+                         { { AutomationTargetKind::channelAdjust, b.channel, 0, leveladjust::volume }, crossfadeInFormula } };
+    automation.target = automation.links.front().target;
+    automation.points = { { 0, 1.0f, 0.0f }, { to - from, 0.0f, 0.0f } };
+    song.automations.push_back (std::move (automation));
+
+    Clip made;
+    made.kind = ClipKind::automation;
+    made.automation = (int) song.automations.size() - 1;
+    made.track = a.track;
+    made.start = from;
+    made.length = std::max<std::int64_t> (1, to - from);
+    song.playlist.push_back (made);
+    return made.automation;
+}
+
 } // namespace lynx::clipops

@@ -23,6 +23,7 @@
 #include "core/PlaylistOps.h"
 #include "core/LastTweaked.h"
 #include "core/ClipOps.h"
+#include "core/SamplerPage.h"
 #include "core/FlTrackMenus.h"
 #include "core/FlClipMenu.h"
 #include "core/OneClickRec.h"
@@ -12908,17 +12909,17 @@ private:
         {
             const auto start = bandPoint (4);
             press (pl, start, {}, start + juce::Point<int> (0, 41));
-            check ("drag_resizes", tracks()[4].height == 78 && heightOf (4) == 78, juce::String (tracks()[4].height) + " / " + juce::String (heightOf (4)));
+            check ("drag_resizes", tracks()[4].height == 88 && heightOf (4) == 88, juce::String (tracks()[4].height) + " / " + juce::String (heightOf (4))); // (190gw: from FL's 48 px row)
             headerShot ("-resized.png", 6);
             const auto again = bandPoint (4);
             press (pl, again, {}, again + juce::Point<int> (0, -100)); // (above the row's top, but less than 32 px)
             check ("drag_stops_at_16", heightOf (4) == 16, juce::String (heightOf (4)));
             press (pl, bandPoint (4), alt);
-            check ("alt_click_resets", tracks()[4].height == 0 && tracks()[4].lockedHeight == -1 && heightOf (4) == 38, juce::String (heightOf (4)));
+            check ("alt_click_resets", tracks()[4].height == 0 && tracks()[4].lockedHeight == -1 && heightOf (4) == 48, juce::String (heightOf (4)));
             press (pl, bandPoint (4), {}, {}, 2); // the second press of a double click
             check ("double_click_locks_small", tracks()[4].lockedHeight == 1 && heightOf (4) == 16, juce::String (tracks()[4].lockedHeight));
             press (pl, bandPoint (4), {});
-            check ("click_on_locked_band_unlocks", tracks()[4].lockedHeight == -1 && heightOf (4) == 38, juce::String (tracks()[4].lockedHeight));
+            check ("click_on_locked_band_unlocks", tracks()[4].lockedHeight == -1 && heightOf (4) == 48, juce::String (tracks()[4].lockedHeight));
             const auto top = pl.trackRowForSnapshot (4).getY();
             const auto b = bandPoint (4);
             press (pl, b, {}, juce::Point<int> (b.x, top - 40));
@@ -12958,7 +12959,7 @@ private:
                     if (t.index == 5) size5 = t.heightScale;
                     if (t.index == 1) size1 = t.heightScale;
                 }
-            check ("flp_size_factor", std::abs (size5 - lynx::polish::flSizeForHeight (300)) < 1.0e-4f && std::abs (size1 - lynx::polish::flSizeForHeight (50)) < 1.0e-4f,
+            check ("flp_size_factor", std::abs (size5 - lynx::polish::flSizeForHeight (300, 48)) < 1.0e-4f && std::abs (size1 - lynx::polish::flSizeForHeight (50, 48)) < 1.0e-4f,
                    juce::String (size5) + " " + juce::String (size1));
         }
 
@@ -12987,6 +12988,124 @@ private:
             // FL: Ctrl+drag across the strips = the range from the press, alone
             press (strips, at (3), ctrl, at (4));
             check ("mixer_ctrl_drag_range", strips.getSelection() == std::vector<int> { 3, 4 }, list (strips.getSelection()));
+        }
+
+        // ---- 5. round 190gw (live check 190gu B1): FL's default row, the left lock strip, the right selection strip
+        {
+            ui.selectTabForSnapshot (2);
+            auto song = lynx::Song::makeDefault();
+            song.playlist.clear();
+            song.playlistTracks.assign (6, {});
+            for (int t = 0; t < 6; ++t)
+                song.playlistTracks[(std::size_t) t].name = juce::String ("Track " + juce::String (t + 1)).toStdString();
+            engine.setSong (std::move (song));
+            engine.dispatchPendingMessages();
+            pl.setSize (juce::jmax (pl.getWidth(), 900), juce::jmax (pl.getHeight(), 600));
+            check ("gw_default_row_48", heightOf (0) == 48 && heightOf (5) == 48, juce::String (heightOf (0)));
+            const auto rowMid = [&] (int t) { const auto r = pl.trackRowForSnapshot (t); return r.getY() + r.getHeight() / 2 - 4; };
+            const auto stripX = lynx::PlaylistComponent::flHeaderWidth - 4;
+            // the left strip (x < 10): the row flips to the smallest size and back; nothing selects
+            press (pl, { 2, rowMid (2) }, {});
+            check ("gw_left_strip_smallest", heightOf (2) == 16 && tracks()[2].lockedHeight == 1, juce::String (heightOf (2)));
+            press (pl, { 2, rowMid (2) }, {});
+            check ("gw_left_strip_back", heightOf (2) == 48 && tracks()[2].lockedHeight == -1, juce::String (heightOf (2)));
+            // the right strip: click = alone, Shift+click toggles, right-click toggles with no menu
+            press (pl, { stripX, rowMid (0) }, {});
+            check ("gw_strip_click_alone", pl.selectedTracksForSnapshot() == std::vector<int> { 0 }, list (pl.selectedTracksForSnapshot()));
+            press (pl, { stripX, rowMid (1) }, shift);
+            check ("gw_strip_shift_click_adds", pl.selectedTracksForSnapshot() == std::vector<int> { 0, 1 }, list (pl.selectedTracksForSnapshot()));
+            headerShot ("-gw-strip-two-selected.png", 6);
+            press (pl, { stripX, rowMid (0) }, shift);
+            check ("gw_strip_shift_click_removes", pl.selectedTracksForSnapshot() == std::vector<int> { 1 }, list (pl.selectedTracksForSnapshot()));
+            {
+                const juce::Point<int> p { stripX, rowMid (4) };
+                const juce::ModifierKeys right (juce::ModifierKeys::rightButtonModifier);
+                pl.mouseDown (event (pl, p, right, p, 1, false));
+                pl.mouseUp (event (pl, p, {}, p, 1, false));
+            }
+            check ("gw_strip_right_click_adds", pl.selectedTracksForSnapshot() == std::vector<int> { 1, 4 }, list (pl.selectedTracksForSnapshot()));
+            // a drag down the strip: the tracks crossed join (FUN_012e8740)
+            press (pl, { stripX, rowMid (0) }, {}, juce::Point<int> (stripX, rowMid (4)));
+            check ("gw_strip_drag_range", pl.selectedTracksForSnapshot() == std::vector<int> { 0, 1, 2, 3, 4 }, list (pl.selectedTracksForSnapshot()));
+            headerShot ("-gw-strip-range.png", 6);
+            // a double click: the track alone <-> every track
+            press (pl, { stripX, rowMid (2) }, {});
+            press (pl, { stripX, rowMid (2) }, {}, {}, 2);
+            check ("gw_strip_double_click_all", (int) pl.selectedTracksForSnapshot().size() == pl.numTracksForSnapshot(), list (pl.selectedTracksForSnapshot()));
+            press (pl, { stripX, rowMid (1) }, {});
+
+            // .lynx: the new default row is saved; a project from before (no key) keeps LYNX's old 38 px row
+            juce::String error;
+            const auto json = lynx::ProjectFile::toJson (engine.getSong());
+            const auto back = lynx::ProjectFile::fromJson (json, error);
+            check ("gw_lynx_row_saved", back && back->playlistRowHeight == 48, error);
+            auto parsed = juce::JSON::parse (json);
+            if (auto* o = parsed.getDynamicObject())
+                o->removeProperty ("playlistRowHeight");
+            const auto old = lynx::ProjectFile::fromJson (juce::JSON::toString (parsed), error);
+            check ("gw_old_lynx_keeps_38", old && old->playlistRowHeight == 38, error);
+            engine.setSong (*old);
+            engine.dispatchPendingMessages();
+            check ("gw_old_lynx_rows_38", heightOf (0) == 38, juce::String (heightOf (0)));
+
+            // an automation clip with two target links (Crossfade with) comes back with its links and formulas
+            auto linked = lynx::Song::makeDefault();
+            linked.channels.resize (2);
+            lynx::Automation a;
+            a.links = { { { lynx::AutomationTargetKind::channelAdjust, 0, 0, lynx::leveladjust::volume }, lynx::clipops::crossfadeOutFormula },
+                        { { lynx::AutomationTargetKind::channelAdjust, 1, 0, lynx::leveladjust::volume }, lynx::clipops::crossfadeInFormula } };
+            a.target = a.links[0].target;
+            a.points = { { 0, 1.0f, 0.0f }, { 384, 0.0f, 0.0f } };
+            linked.automations.push_back (a);
+            const auto linkedBack = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (linked), error);
+            check ("gw_lynx_links_round_trip", linkedBack && linkedBack->automations.size() == linked.automations.size()
+                                                   && linkedBack->automations.back().links == a.links && linkedBack->automations.back().target == a.target, error);
+
+            // Sampler › Open in new Fruity Slicer / Slicex channel: named after the sample, " #n" when taken
+            const auto wav = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-190gw").getChildFile ("Basic 808 Clap.wav");
+            wav.getParentDirectory().createDirectory();
+            {
+                juce::AudioBuffer<float> b (1, 4410);
+                for (int i = 0; i < b.getNumSamples(); ++i)
+                    b.setSample (0, i, 0.5f * std::sin ((float) i * 0.2f) * (1.0f - (float) i / (float) b.getNumSamples()));
+                wav.deleteFile();
+                juce::WavAudioFormat format;
+                std::unique_ptr<juce::OutputStream> out (wav.createOutputStream());
+                if (auto* w = format.createWriterFor (out.get(), 44100.0, 1, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> writer (w);
+                    writer->writeFromAudioSampleBuffer (b, 0, b.getNumSamples());
+                }
+            }
+            engine.editSong ([] (lynx::Song& s) {
+                s.channels.resize (1);
+                s.channels[0] = {};
+                s.channels[0].name = "Basic 808 Clap";
+            });
+            engine.dispatchPendingMessages();
+            if (lynx::openInNewChannelHandler())
+            {
+                lynx::openInNewChannelHandler() (wav, lynx::InstrumentKind::fruityslicer);
+                lynx::openInNewChannelHandler() (wav, lynx::InstrumentKind::slicex);
+            }
+            engine.dispatchPendingMessages();
+            const auto& ch = engine.getSong().channels;
+            check ("gw_open_in_new_named_after_sample", ch.size() >= 3 && ch[1].name == "Basic 808 Clap #2" && ch[2].name == "Basic 808 Clap #3"
+                                                              && ch[1].instrument == lynx::InstrumentKind::fruityslicer && ch[2].instrument == lynx::InstrumentKind::slicex,
+                   ch.size() >= 3 ? juce::String::fromUTF8 (ch[1].name.c_str()) + " | " + juce::String::fromUTF8 (ch[2].name.c_str()) : juce::String ((int) ch.size()));
+            wav.getParentDirectory().deleteRecursively();
+
+            // the mixer's two boxes (live check 190gu B4): "Insert multiple..." asks "Number of tracks to add" (1),
+            // "Add multiple..." "Enter the number of mixer tracks to add" (10)
+            for (const auto adding : { false, true })
+            {
+                auto box = lynx::MixerStrips::makeInsertMultipleBox (adding);
+                const auto text = box->getTextEditorContents ("count");
+                check (adding ? "gw_add_multiple_box" : "gw_insert_multiple_box", text == (adding ? "10" : "1"), text);
+                if (box->getWidth() > 0 && box->getHeight() > 0)
+                    savePng (box->createComponentSnapshot (box->getLocalBounds()), prefix + (adding ? "-gw-add-multiple-box.png" : "-gw-insert-multiple-box.png"));
+            }
         }
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
@@ -13543,15 +13662,52 @@ private:
             });
             lynx::samplerPageTurn (f, "show", 0.0);
             shoot (f, "sampler-end-loop-red");
+            // round 190gw (live check 190gu B3): the waveform menu's Spectrum view / Multichannel waveform view, on a stereo
+            // clap-like noise burst (left and right differ) with no loop, as FL's shot
+            {
+                const auto noisy = folder.getChildFile ("Noise Clap.wav");
+                juce::AudioBuffer<float> b (2, 44100);
+                juce::Random random (190);
+                for (int i = 0; i < b.getNumSamples(); ++i)
+                    for (int c = 0; c < 2; ++c)
+                        b.setSample (c, i, (float) ((random.nextFloat() * 2.0f - 1.0f) * 0.9 * std::exp (-i / (44100.0 * (c == 0 ? 0.10 : 0.18)))
+                                                    * (i > 1500 * c ? 1.0 : 0.15)));
+                noisy.deleteFile();
+                juce::WavAudioFormat wav;
+                if (auto out = std::unique_ptr<juce::AudioFormatWriter> (wav.createWriterFor (noisy.createOutputStream().release(), 44100.0, 2, 16, {}, 0)))
+                    out->writeFromAudioSampleBuffer (b, 0, b.getNumSamples());
+                const auto before = engine.getSong().channels[0];
+                engine.editSong ([&] (lynx::Song& s) {
+                    s.channels[0].samplePath = noisy.getFullPathName().toStdString();
+                    s.channels[0].sampler.loopStart = s.channels[0].sampler.loopEnd = -1;
+                    s.channels[0].sampler.useLoopPoints = false;
+                });
+                lynx::samplerPageTurn (f, "show", 0.0);
+                frame->createComponentSnapshot (frame->getLocalBounds()); // (starts the new file's waveform)
+                lynx::ui::WaveformCache::getInstance()->waitUntilIdle (8000);
+                lynx::samplerpage::waveViews().spectrum = true;
+                lynx::samplerPageTurn (f, "show", 0.0);
+                shoot (f, "sampler-spectrum-view");
+                lynx::samplerpage::waveViews() = { false, true };
+                lynx::samplerPageTurn (f, "show", 0.0);
+                shoot (f, "sampler-multichannel-view");
+                lynx::samplerpage::waveViews() = {};
+                engine.editSong ([&before] (lynx::Song& s) { s.channels[0] = before; });
+                lynx::samplerPageTurn (f, "show", 0.0);
+                frame->createComponentSnapshot (frame->getLocalBounds());
+                lynx::ui::WaveformCache::getInstance()->waitUntilIdle (8000);
+            }
             // SMP-7: the waveform menu
             const auto waveMenu = lynx::samplerWaveMenu (f);
             juce::StringArray expected { lynx::tr ("Reload"), lynx::tr ("Save as..."), lynx::tr ("Locate file"), lynx::tr ("Copy audio to clipboard"),
-                                               lynx::tr ("Paste audio from clipboard"), "-", lynx::tr ("Edit in audio editor"), "-",
+                                               lynx::tr ("Paste audio from clipboard"), "-", lynx::tr ("Edit in audio editor"),
+                                               lynx::tr ("Edit in pitch corrector"), lynx::tr ("Edit in time warper"), "-", // (round 190gw)
                                                lynx::tr ("Open in new sampler channel"), lynx::tr ("Open in new Fruity Granulizer channel"),
                                                lynx::tr ("Open in new Fruity Slicer channel"), lynx::tr ("Open in new Slicex channel"), "-", // (round 190gk)
                                                lynx::tr ("Detect tempo") };
             if (lynx::fileProperties) // (round 190gk: Windows only)
                 expected.add (lynx::tr ("Get properties"));
+            expected.addArray (juce::StringArray { "-", lynx::tr ("Spectrum view"), lynx::tr ("Multichannel waveform view") }); // (round 190gw)
             check ("wave_menu_items", waveMenu.has_value() && texts (*waveMenu) == expected, waveMenu.has_value() ? texts (*waveMenu).joinIntoString ("|") : juce::String ("none"));
             if (waveMenu.has_value())
                 saveMenus (juce::StringArray { "Sampler waveform" }, std::vector<juce::PopupMenu> { *waveMenu }, prefix + "-wave-menu.png");
@@ -14019,7 +14175,7 @@ private:
         }
 
         std::fprintf (stderr, "flclipshot: overlap\n");
-        // ---- 2. a second channel's clip overlapping: Crossfade with leaves (FL would enable it; LYNX lacks it)
+        // ---- 2. a second channel's clip overlapping: Crossfade with lists it and makes FL's crossfade clip (round 190gw)
         {
             engine.editSong ([vox] (lynx::Song& s) {
                 auto copy = s.playlist[0]; // (another audio clip channel's clip, at the same time)
@@ -14031,7 +14187,16 @@ private:
             });
             engine.dispatchPendingMessages();
             const auto overlapped = playlist.getClipMenuForSnapshot (0);
-            check ("crossfade_with_left_out_when_fl_enables", find (overlapped, lynx::tr ("Crossfade with")) == nullptr);
+            const auto* with = find (overlapped, lynx::tr ("Crossfade with"));
+            check ("crossfade_with_lists_the_overlap", with != nullptr && with->isEnabled && with->subMenu != nullptr && find (*with->subMenu, "Vox 2") != nullptr);
+            const auto made = with != nullptr && with->subMenu != nullptr && click (*with->subMenu, "Vox 2");
+            engine.dispatchPendingMessages();
+            const auto& xsong = engine.getSong();
+            const auto xok = made && ! xsong.automations.empty() && xsong.automations.back().links.size() == 2
+                             && juce::String::fromUTF8 (xsong.automations.back().name.c_str()).endsWith (" to Vox 2 crossfade");
+            check ("crossfade_with_makes_the_clip", xok, xok ? juce::String::fromUTF8 (xsong.automations.back().name.c_str()) : juce::String());
+            if (made)
+                engine.undo();
             engine.undo();
             engine.dispatchPendingMessages();
         }

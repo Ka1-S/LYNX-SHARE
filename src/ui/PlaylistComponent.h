@@ -12,6 +12,7 @@
 #include "core/ArrangeOps.h"
 #include "core/MagicLasso.h"
 #include "core/MeterBallistics.h"
+#include "core/TrackHeaderGestures.h"
 #include "core/PickerSelection.h"
 #include "core/PlaylistOps.h"
 #include "engine/AudioEngine.h"
@@ -183,6 +184,7 @@ public:
     juce::Rectangle<float> laneBodyForSnapshot (int track, int lane) const { return laneBody (track, lane); }
     juce::Rectangle<int> trackRowForSnapshot (int track) const { return { 0, trackToY (track), getWidth(), heightOf (track) }; } // (round 190fc)
     std::vector<int> selectedTracksForSnapshot() const { return sortedTrackSelection(); } // (round 190ft)
+    int numTracksForSnapshot() const { return numTracks(); } // (round 190gw)
     int headerWidthForSnapshot() const noexcept { return headerWidth; }
     double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
     juce::Rectangle<int> clipBoundsForSnapshot (int clip) const { return clipBounds (clip); } // (round 190gi)
@@ -205,7 +207,10 @@ public:
     static constexpr int timelineHeight = 24;
     static constexpr int rulerTop = toolbarHeight + overviewHeight;
     static constexpr int headerHeight = rulerTop + timelineHeight;
-    static constexpr int trackHeight = 38; // the default row height (each track can be resized: P18)
+    // the default row (each track can be resized: P18): the song's (FL's 48 px since round 190gw; 38 in older projects);
+    // the Clip-launch layout keeps LYNX's 38, the Simple layout its own
+    static constexpr int liveTrackHeight = 38;
+    int baseRowHeight() const;
     static constexpr int foldedHeight = 7; // a member of a collapsed group: a thin row of clip bars (as FL)
     static constexpr int groupIndent = 8;  // grouped tracks' headers are indented under their group header
     static constexpr int scrollBarSize = 12;
@@ -357,7 +362,7 @@ private:
     // vertical scroll bar (up = taller), double-click it: back to 100%
     double trackZoom = 1.0;
     int scaledHeight (int storedHeight) const { return juce::jlimit (8, 640, (int) std::lround (storedHeight * trackZoom)); }
-    int defaultRowHeight() const { return scaledHeight (trackHeight); }
+    int defaultRowHeight() const { return scaledHeight (baseRowHeight()); }
     juce::Rectangle<int> trackZoomHandle() const;
     void setTrackZoom (double zoom, int anchorY);
     double trackZoomStart = 1.0;
@@ -687,6 +692,9 @@ private:
     bool updateMeterColumn();        // true when the column appeared or went away
     bool stepHeaderMeters (double nowMs);
     int meterColumn = 0;             // px at the right of the headers for the meters (0 = no track shows one)
+    // the column at the headers' right edge: FL's selection strip (9 px, live check 190gu B1; the meters sit in it), or
+    // in the Simple headers the meters' column alone
+    int rightColumn() const noexcept { return simpleHeaders ? meterColumn : trackhdr::selectionStripWidth; }
     std::map<int, std::array<meters::PeakHold, 2>> headerLevels; // per mixer track shown
     double headerMeterMs = -1.0;
 

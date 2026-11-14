@@ -938,6 +938,9 @@ bool threeOscState (Ctx& ctx, const flm::Module& m, ChannelDef& c)
         {
             const auto e = j - 1;
             const auto tempo = v (66 + e) > 0.5;
+            // (round 190gw: FL's FLM rack draws this switch ON for a stored 0.5, live check 190gu B6, but the sound is
+            // the envelope's OFF: with it on, the 50 % delay would hold every note of FL's all-0.5 test silent for about
+            // four beats, and FL's render starts each note at once. So the switch plays from above 0.5, as REA 190n read)
             r[1] = v (62 + e) > 0.5 ? 1 : 0;
             if (tempo)
                 r[0] |= 1;

@@ -137,6 +137,11 @@ public:
     double getViewEnd() const noexcept { return viewEnd; }
     std::function<void()> onViewChanged;
 
+    // Round 190gw (FL's Sampler waveform menu, live check 190gu B3): this display follows the Sampler's two view switches
+    // (core samplerpage::waveViews): Spectrum view draws a spectrogram (core/Spectrogram) instead of the waveform,
+    // Multichannel waveform view draws each channel in its own lane.
+    void setFollowsSamplerViews (bool follows);
+
     void paint (juce::Graphics& g) override;
     void mouseDown (const juce::MouseEvent& e) override
     {
@@ -159,6 +164,10 @@ private:
     bool captionShown = true, zoomEnabled = false;
     float loopStart = -1.0f, loopEnd = -1.0f;
     double viewStart = 0.0, viewEnd = 1.0;
+    bool samplerViews = false;
+    juce::Image spectrumImage; // the last spectrogram drawn, and what it shows
+    juce::String spectrumKey;
+    void paintSpectrum (juce::Graphics& g, juce::Rectangle<float> inner, const SampleData& data);
     float displayX (double displayFraction) const; // the x of a display-order fraction of the file, through the view
     static constexpr int locatorTrail = 20; // px of the fading trail behind the locator (FL's)
     float regionX (float fraction) const; // the x of a play-order fraction of the region
