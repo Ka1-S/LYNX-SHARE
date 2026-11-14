@@ -1011,7 +1011,9 @@ void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playin
                 // little more CPU (synth100, Exoplanet: 5-20x fewer for +5-9 %) would be `favourFewerOverruns`.)
                 const auto keep = (lessCpu && overRateOn <= overRateOff) || (favourFewerOverruns && fewerOverruns && cpuShareOn <= cpuShareOff * probeCpuMargin);
                 probe = keep ? Probe::decidedOn : Probe::decidedOff;
-                decidedLeft = decidedSeconds;
+                // (a project that keeps losing is probed less and less often: the probe's own "on" windows cost)
+                decidedLeft = keep ? decidedSeconds : offHold;
+                offHold = keep ? decidedSeconds : std::min (600.0, offHold * 2.0);
                 decidedState = state != nullptr ? state->serial : 0;
                 (keep ? counters.keptOn : counters.keptOff).fetch_add (1, std::memory_order_relaxed);
                 if (! keep)

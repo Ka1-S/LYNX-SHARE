@@ -218,6 +218,7 @@ private:
     // at least probeTriggerOverruns times a second or carries probeTriggerLoad of its block on average.
     static constexpr double probeOverrunGain = 0.8, probeCpuGain = 0.9, probeTriggerOverruns = 1.0, probeTriggerLoad = 0.5;
     double recentOverruns = 0.0; // (an average of overruns per second, the last couple of seconds)
+    double offHold = decidedSeconds; // a "kept off" verdict holds this long; doubled for each one in a row (max 10 min)
     // a project where render-ahead cuts the overruns 5-20x for a few % more CPU: off by the owner's rule (no project
     // worse in any measure); true would keep it there (an owner decision, not taken)
     static constexpr bool favourFewerOverruns = false;
