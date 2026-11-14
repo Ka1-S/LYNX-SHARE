@@ -431,8 +431,10 @@ private:
 void lowerIndexerPriority()
 {
 #if JUCE_WINDOWS
-    SetPriorityClass (GetCurrentProcess(), IDLE_PRIORITY_CLASS);
+    // background mode first (low disk and memory priority), then the idle class (the order: setting background mode
+    // left the class at Normal, measured)
     SetPriorityClass (GetCurrentProcess(), PROCESS_MODE_BACKGROUND_BEGIN);
+    SetPriorityClass (GetCurrentProcess(), IDLE_PRIORITY_CLASS);
 #else
     setpriority (PRIO_PROCESS, 0, 19);
  #if JUCE_LINUX
