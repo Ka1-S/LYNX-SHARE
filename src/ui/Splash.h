@@ -56,6 +56,16 @@ public:
     virtual std::chrono::steady_clock::time_point getFirstFrameTime() const = 0;
     // true: the card draws on a thread of its own, the message thread may work during the drop
     virtual bool drawsOnItsOwnThread() const { return false; }
+    // Runs `then` on the message thread once the clock has reached `seconds` (the logo has landed). The JUCE card: a
+    // JUCE timer, as before. The card on its own thread: its own clock (round 190hd: a JUCE timer started while the
+    // message thread is busy can fire up to ~0.3 s early: JUCE's timer thread takes the time it waited for a busy
+    // message thread off a timer added meanwhile, which showed the window and faded the card in the middle of the drop)
+    virtual void whenLanded (double seconds, std::function<void()> then)
+    {
+        juce::Timer::callAfterDelay (juce::roundToInt (seconds * 1000.0), std::move (then));
+    }
+    // (the card on its own thread) the clock time of the longest gap between two frames of the drop, seconds
+    virtual double getLongestDropGapAt() const { return -1.0; }
 
     // Called once on the message thread, after the card's first frame is on the screen (round 190go: the start-up goes
     // on then, not after a fixed wait)

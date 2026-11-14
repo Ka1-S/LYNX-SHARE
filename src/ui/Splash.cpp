@@ -407,6 +407,7 @@ public:
         : fonts (makeSplashFonts()),
           subtitle (tr ("Digital audio workstation")),
           version (tr ("Version {0}", { JUCE_APPLICATION_VERSION_STRING })),
+          dropStatus (tr ("Loading the workspace...")),
           status (tr ("Starting the audio engine..."))
     {
         wake = CreateEventW (nullptr, FALSE, FALSE, nullptr);
@@ -470,6 +471,17 @@ public:
     }
 
     bool drawsOnItsOwnThread() const override { return true; }
+
+    void whenLanded (double seconds, std::function<void()> then) override
+    {
+        {
+            const std::scoped_lock hold (lock);
+            onLanded = std::move (then);
+        }
+        landingAt.store (seconds);
+    }
+
+    double getLongestDropGapAt() const override { return longestDropGapAt.load(); }
 
 private:
     // runs `f` on the message thread unless this card is gone by then (it is deleted there)
@@ -551,6 +563,20 @@ private:
         }
 
         juce::Image frame (juce::Image::ARGB, w, h, true, juce::SoftwareImageType());
+        // every glyph the card will draw, once, before its first frame (an outline looked up mid-drop waited for the
+        // font system while the message thread loaded the window's fonts: a frame of ~0.1 s)
+        {
+            SplashFrame warm;
+            warm.t = 1.6;
+            warm.status = dropStatus + " " + status;
+            warm.subtitle = subtitle;
+            warm.version = version;
+            warm.logo = &logo;
+            warm.fonts = fonts.data();
+            juce::Graphics g (frame);
+            g.addTransform (juce::AffineTransform::scale ((float) scale));
+            drawSplashFrame (g, warm);
+        }
         constexpr double period = 1.0 / 60.0;
         auto next = steadySeconds();
         auto shown = false, faded = false;
@@ -574,10 +600,26 @@ private:
             }
             if (start >= 0.0 && fade < 0.0 && t <= 1.05) // (the drop's frames, as the JUCE card counts them)
             {
-                if (lastDropPaint >= 0.0)
-                    longestDropGapMs.store (juce::jmax (longestDropGapMs.load(), (now - lastDropPaint) * 1000.0));
+                if (lastDropPaint >= 0.0 && (now - lastDropPaint) * 1000.0 > longestDropGapMs.load())
+                {
+                    longestDropGapMs.store ((now - lastDropPaint) * 1000.0);
+                    longestDropGapAt.store (t);
+                }
                 ++dropFrames;
                 lastDropPaint = now;
+            }
+            if (const auto landing = landingAt.load(); start >= 0.0 && landing >= 0.0 && t >= landing)
+            {
+                landingAt.store (-1.0);
+                post ([] (ThreadedSplash& s) {
+                    std::function<void()> then;
+                    {
+                        const std::scoped_lock hold (s.lock);
+                        then = std::move (s.onLanded);
+                    }
+                    if (then)
+                        then(); // (may delete this card)
+                });
             }
 
             SplashFrame look;
@@ -673,10 +715,11 @@ private:
     }
 
     const std::array<juce::Font, 4> fonts;
-    const juce::String subtitle, version;
-    std::mutex lock; // guards status and onGone
+    const juce::String subtitle, version, dropStatus;
+    std::mutex lock; // guards status, onGone and onLanded
     juce::String status;
-    std::function<void()> onGone;
+    std::function<void()> onGone, onLanded;
+    std::atomic<double> landingAt { -1.0 }, longestDropGapAt { -1.0 };
     std::atomic<double> clockStart { -1.0 }, fadeStart { -1.0 }, barDuration { SplashScreen::minimumDuration };
     std::atomic<bool> quit { false }, raiseAsked { false };
     std::atomic<int> dropFrames { 0 };

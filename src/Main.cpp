@@ -2594,13 +2594,15 @@ public:
         splashDuration = ownThread ? landingSeconds : lynx::SplashScreen::remainingDuration (startupTrace.seconds());
         splash->setBarDuration (splashDuration);
 
-        juce::Timer::callAfterDelay (juce::roundToInt (splashDuration * 1000.0), [this] {
+        splash->whenLanded (splashDuration, [this] {
             if (splash == nullptr || mainWindow == nullptr)
                 return;
 
             if (startupTrace.on)
                 startupTrace.mark (("splash: the drop in " + juce::String (splash->getDropFrames()) + " frames, longest gap "
-                                    + juce::String (splash->getLongestDropGapMs(), 1) + " ms").toRawUTF8());
+                                    + juce::String (splash->getLongestDropGapMs(), 1) + " ms"
+                                    + (splash->getLongestDropGapAt() >= 0.0 ? " (at " + juce::String (splash->getLongestDropGapAt(), 3) + " s of its clock)" : juce::String()))
+                                       .toRawUTF8());
             mainWindow->reveal();
             startupTrace.mark ("window revealed (after the splash)");
             splash->raise();

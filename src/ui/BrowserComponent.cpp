@@ -3182,8 +3182,17 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
     details = std::make_unique<DetailsBox>();
     addChildComponent (*details);
 
+    browserStartupMark ("  browser: search index, widgets");
     rebuildRoots();
+    browserStartupMark ("  browser: roots and tree");
     engine.addChangeListener (this);
+    constructing = false;
+}
+
+void BrowserComponent::browserStartupMark (const char* step) const
+{
+    if (constructing && role == Role::main && startupMark != nullptr)
+        startupMark (step);
 }
 
 juce::File BrowserComponent::userFoldersFile()
@@ -4380,7 +4389,11 @@ void BrowserComponent::rebuildTree()
     // FL's Plugin database, under the project (round 142); always while hot-swap is on (round 190ce: it is what the
     // linked device is replaced from, also when the user's view leaves it out)
     if (tab == allTab && (view.shows (browserview::pluginsRootId) || swapSession.active()))
+    {
+        browserStartupMark ("  browser: roots (FL folders, user folders, view, collections)");
         top.push_back (FileTree::makePluginDatabase (*this, openPluginFolders));
+        browserStartupMark ("  browser: the Plugin database tree");
+    }
 
     if (tab == allTab)
         for (int i = 0; i < allRoots.size(); ++i)

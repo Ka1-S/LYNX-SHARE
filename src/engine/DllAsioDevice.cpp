@@ -482,6 +482,41 @@ private:
     juce::String deviceName;
     bool scanned = true;
 };
+// Round 190hd: a device type whose device list was read while the start-up waited for the prewarmed ASIO device (the
+// Windows Audio and DirectSound lists, ~0.1 s, came after that wait, on the start-up's critical path): its first scan
+// is that one; later scans as ever
+class ScannedAheadType final : public juce::AudioIODeviceType,
+                               private juce::AudioIODeviceType::Listener
+{
+public:
+    explicit ScannedAheadType (std::unique_ptr<juce::AudioIODeviceType> inner)
+        : juce::AudioIODeviceType (inner->getTypeName()), type (std::move (inner))
+    {
+        type->scanForDevices();
+        type->addListener (this);
+    }
+    ~ScannedAheadType() override { type->removeListener (this); }
+
+    void scanForDevices() override
+    {
+        if (! std::exchange (scanned, false))
+            type->scanForDevices();
+    }
+    juce::StringArray getDeviceNames (bool wantInputNames) const override { return type->getDeviceNames (wantInputNames); }
+    int getDefaultDeviceIndex (bool forInput) const override { return type->getDefaultDeviceIndex (forInput); }
+    int getIndexOfDevice (juce::AudioIODevice* d, bool asInput) const override { return type->getIndexOfDevice (d, asInput); }
+    bool hasSeparateInputsAndOutputs() const override { return type->hasSeparateInputsAndOutputs(); }
+    juce::AudioIODevice* createDevice (const juce::String& outputDeviceName, const juce::String& inputDeviceName) override
+    {
+        return type->createDevice (outputDeviceName, inputDeviceName);
+    }
+
+private:
+    void audioDeviceListChanged() override { callDeviceChangeListeners(); }
+
+    std::unique_ptr<juce::AudioIODeviceType> type;
+    bool scanned = true;
+};
 } // namespace
 
 void prewarmAsioDevice (const juce::File& savedSetup)
@@ -536,6 +571,18 @@ void LynxDeviceManager::createAudioDeviceTypes (juce::OwnedArray<juce::AudioIODe
     std::unique_lock<std::mutex> l (p.lock);
     if (! p.started || std::exchange (p.taken, true))
         return;
+    // (round 190hd) the other types' device lists while the ASIO device is still being made (else after it, below)
+    if (! p.done && juce::SystemStats::getEnvironmentVariable ("LYNX_SCAN_AHEAD", {}) != "0")
+    {
+        l.unlock();
+        for (int i = 0; i < types.size(); ++i)
+            if (types[i]->getTypeName() != "ASIO")
+            {
+                std::unique_ptr<juce::AudioIODeviceType> inner (types.removeAndReturn (i)); // (not deleted: handed over)
+                types.insert (i, new ScannedAheadType (std::move (inner)));
+            }
+        l.lock();
+    }
     const auto waitFrom = juce::Time::getMillisecondCounterHiRes();
     // (normally long done: the window was built meanwhile). Messages sent to this thread's windows are answered
     // while it waits: a driver being made on the ASIO thread may send one to JUCE's message window (its init gets it)
