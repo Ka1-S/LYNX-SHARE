@@ -15,7 +15,6 @@
  #include <utility>
  #include <thread>
  #include <mutex>
- #include <condition_variable>
  #include <vector>
 
 namespace lynx
@@ -429,7 +428,6 @@ namespace
 struct Prewarm
 {
     std::mutex lock;
-    std::condition_variable doneSignal;
     bool started = false, done = false, taken = false;
     juce::String name, report;
     double startMs = 0.0, doneMs = 0.0;
@@ -521,7 +519,6 @@ void prewarmAsioDevice (const juce::File& savedSetup)
         w.device = std::move (device);
         w.doneMs = juce::Time::getMillisecondCounterHiRes();
         w.done = true;
-        w.doneSignal.notify_all();
     }).detach();
 }
 
@@ -540,7 +537,16 @@ void LynxDeviceManager::createAudioDeviceTypes (juce::OwnedArray<juce::AudioIODe
     if (! p.started || std::exchange (p.taken, true))
         return;
     const auto waitFrom = juce::Time::getMillisecondCounterHiRes();
-    p.doneSignal.wait (l, [&p] { return p.done; }); // (normally long done: the window was built meanwhile)
+    // (normally long done: the window was built meanwhile). Messages sent to this thread's windows are answered
+    // while it waits: a driver being made on the ASIO thread may send one to JUCE's message window (its init gets it)
+    while (! p.done)
+    {
+        l.unlock();
+        MsgWaitForMultipleObjectsEx (0, nullptr, 5, QS_SENDMESSAGE, 0);
+        MSG m;
+        PeekMessageW (&m, nullptr, 0, 0, PM_NOREMOVE | PM_QS_SENDMESSAGE);
+        l.lock();
+    }
     p.report = "ASIO prewarm: " + p.name + (p.device != nullptr ? " made and opened in " : " not made, ") + juce::String (p.doneMs - p.startMs, 0)
                + " ms, waited " + juce::String (juce::jmax (0.0, juce::Time::getMillisecondCounterHiRes() - waitFrom), 0) + " ms";
     if (p.type == nullptr)
