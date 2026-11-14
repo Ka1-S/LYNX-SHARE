@@ -3,7 +3,9 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "core/LiveEventQueue.h"
+#include "core/MarkerPlan.h"
 #include "core/RackRenderer.h"
+#include "core/RenderAhead.h"
 #include "core/SnapshotExchange.h"
 #include "engine/Metronome.h"
 #include "engine/Transport.h"
@@ -15,8 +17,9 @@ namespace lynx
 class ChannelRackProcessor final : public juce::AudioProcessor
 {
 public:
+    // `threadStart` runs on the render-ahead thread first (the workers' priority)
     ChannelRackProcessor (Transport& transport, SnapshotExchange<RackState>& exchange, LiveEventQueue& live,
-                          LiveEventQueue& midiLive, MeterBank& meters, WorkerPool* workers = nullptr);
+                          LiveEventQueue& midiLive, MeterBank& meters, WorkerPool* workers = nullptr, std::function<void()> threadStart = {});
 
     const juce::String getName() const override { return "Channel Rack"; }
 
@@ -44,7 +47,12 @@ public:
     void setMetering (bool on) noexcept { metering.store (on); }
 
     // External audio input of the inserts (set before the device starts).
-    void setLiveInput (LiveInput* input) noexcept { renderer.setLiveInput (input); }
+    void setLiveInput (LiveInput* input) noexcept
+    {
+        liveInput = input;
+        renderer.setLiveInput (input);
+        ahead->setLiveInput (input);
+    }
     // Hardware output buses of the inserts (REA round 156).
     void setHardwareOutput (HardwareOutput* out) noexcept { renderer.setHardwareOutput (out); }
     void setPerformance (perf::Live* live) noexcept { renderer.setPerformance (live); }
@@ -59,6 +67,17 @@ public:
     // Per instrument / effect processing time (Plugin performance monitor).
     ProcessTimes& processTimes() noexcept { return renderer.processTimes(); }
 
+    // Render-ahead (round 190gq, core/RenderAhead.h): the live targets the engine publishes, the keys sounding on a
+    // channel (whichever renderer renders it), the controls both renderers follow, the workers' parking
+    void setRenderAheadTargets (const renderahead::Targets* targets) noexcept { ahead->setTargets (targets); }
+    NoteMask soundingKeys (int channel) const noexcept { return ahead->rendererOf (channel).soundingKeys (channel); }
+    void setOverriddenSlots (const std::vector<int>& slots) noexcept { ahead->setOverriddenSlots (slots); }
+    void setReleasedSlots (const std::vector<int>& slots) noexcept { ahead->setReleasedSlots (slots); }
+    void setProfiling (bool on) noexcept { ahead->setProfiling (on); }
+    bool renderAheadOwnsWorkers() const noexcept { return ahead->ownsWorkers(); }
+    void haltRenderAhead() noexcept { ahead->halt(); }
+    const renderahead::Stats& renderAheadStats() const noexcept { return ahead->stats(); }
+
 private:
     std::atomic<bool> metering { true };
     Transport& transport;
@@ -67,6 +86,11 @@ private:
     LiveEventQueue& midiLive;
     MeterBank& meters;
     RackRenderer renderer;
+    std::unique_ptr<RenderAhead> ahead;
+    LiveInput* liveInput = nullptr;
+    renderahead::TransportModel model;
+    MarkerPlan markers;
+    std::uint32_t markerVersion = 0;
     juce::AudioBuffer<float> scratch; // for mono output
     std::unique_ptr<Metronome> metronome;
     std::atomic<bool> metronomeAllowed { true };

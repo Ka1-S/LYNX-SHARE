@@ -301,7 +301,7 @@ AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPlug
         mark ("  engine: device opened");
         deviceManager.addAudioCallback (this);
         if (rackProcessor != nullptr)
-            rackProcessor->getRenderer().setProfiling (true); // per-unit CPU for the CPU meter and the glitch log
+            rackProcessor->setProfiling (true); // per-unit CPU for the CPU meter and the glitch log
         deviceStateSaver = std::make_unique<DeviceStateSaver> (*this);
         midiPrefs = midiPrefsShared = prefs::MidiPrefs::fromText (midiSettingsFile().loadFileAsString().toStdString());
         performanceMidiChannel.store (midiPrefs.performanceChannel);
@@ -332,6 +332,8 @@ AudioLogger& AudioEngine::getAudioLogger()
 
 AudioEngine::~AudioEngine()
 {
+    if (rackProcessor != nullptr) // (round 190gq: the render-ahead thread stops before the snapshots are freed)
+        rackProcessor->haltRenderAhead();
     if (pluginHoldOwner.load() == this) // (round 190ap: the hold goes with its project's engine)
     {
         pluginHoldOwner.store (nullptr);
@@ -383,10 +385,12 @@ void AudioEngine::buildInitialGraph()
     graph.setPlayConfigDetails (0, 2, transport.sampleRate.load(), 512);
 
     auto output = graph.addNode (std::make_unique<IONode> (IONode::audioOutputNode));
-    auto rack = graph.addNode (std::make_unique<ChannelRackProcessor> (transport, rackExchange, liveEvents, midiEvents, meters, workers.get()));
+    auto rack = graph.addNode (std::make_unique<ChannelRackProcessor> (transport, rackExchange, liveEvents, midiEvents, meters, workers.get(),
+                                                                       raiseAudioThreadPriority));
     rackProcessor = dynamic_cast<ChannelRackProcessor*> (rack->getProcessor());
     if (rackProcessor != nullptr)
     {
+        rackProcessor->setRenderAheadTargets (&renderAheadTargets); // (round 190gq)
         rackProcessor->setLiveInput (&liveInput);
         rackProcessor->setHardwareOutput (&hwOutput);
         rackProcessor->setPerformance (performanceLive.get());
@@ -1289,7 +1293,7 @@ void AudioEngine::clearScoreLog()
 
 NoteMask AudioEngine::soundingKeys (int channel) const noexcept
 {
-    return rackProcessor != nullptr ? rackProcessor->getRenderer().soundingKeys (channel) : NoteMask {};
+    return rackProcessor != nullptr ? rackProcessor->soundingKeys (channel) : NoteMask {};
 }
 
 std::vector<int> AudioEngine::heldInputKeys() const
@@ -2755,6 +2759,7 @@ void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
         const juce::SpinLock::ScopedLockType lock (midiPrefsLock);
         midiPrefsShared = p;
     }
+    publishRenderAheadTargets(); // (round 190gq: a MIDI input's own target channel is played live)
     performanceMidiChannel.store (p.performanceChannel);
     footPedalNoteOff.store (p.footPedalNoteOff);
     if (! p.pickup)
@@ -3182,6 +3187,7 @@ void AudioEngine::editLevels (const std::function<void (Song&)>& edit, bool undo
     // snapshot rebuild per move. While the song played that stalled the message thread and the fader (and the sound)
     // moved in steps of ~0.2 s. Here the edit changes only levels, so the snapshot in use takes the new values through
     // its live levels; the full publish follows once the mouse is released (timerCallback).
+    renderAheadTargets.tweaked(); // (round 190gq: the part rendered ahead hears a drag within about a block)
     if (publishedLevels == nullptr || ! publishedLevels->matches (song))
     {
         editSong (edit, undoable);
@@ -3404,6 +3410,31 @@ void AudioEngine::publishSelection()
             extraLiveChannels[(std::size_t) extra++].store (c);
 
     extraLiveCount.store (extra);
+    publishRenderAheadTargets();
+}
+
+// Render-ahead (round 190gq, core/RenderAhead.h): the channels notes are played into live stay real-time — the selected
+// channels (the typing keyboard, a MIDI input on "the selected channels"), each MIDI input's own target channel, the
+// channels locked to a MIDI input ("Receive notes from")
+void AudioEngine::publishRenderAheadTargets()
+{
+    std::array<int, renderahead::Targets::maxChannels> channels {};
+    int count = 0;
+    auto add = [&] (int c) {
+        if (c < 0 || count >= (int) channels.size() || std::find (channels.begin(), channels.begin() + count, c) != channels.begin() + count)
+            return;
+        channels[(std::size_t) count++] = c;
+    };
+    add (selectedChannel);
+    for (const auto c : selectedChannels)
+        add (c);
+    for (const auto& input : midiPrefs.inputs)
+        if (input.enabled)
+            add (input.target);
+    for (std::size_t c = 0; c < song.channels.size(); ++c)
+        if (! song.channels[c].receiveFrom.empty())
+            add ((int) c);
+    renderAheadTargets.publish (channels.data(), count, nullptr, 0);
 }
 
 namespace
@@ -4350,7 +4381,7 @@ void AudioEngine::publishReleasedTargets()
             if (a >= (int) song.automations.size() || ! song.automations[(std::size_t) a].isLive())
                 slots.push_back (a);
     }
-    rackProcessor->getRenderer().setReleasedSlots (slots);
+    rackProcessor->setReleasedSlots (slots);
 }
 
 void AudioEngine::tweakReleased (const AutomationTarget& target)
@@ -4494,7 +4525,7 @@ void AudioEngine::updateAutomationRecording (bool active)
         }
         if (slots.empty() && ! automationOverrideActive)
             return;
-        rackProcessor->getRenderer().setOverriddenSlots (slots);
+        rackProcessor->setOverriddenSlots (slots);
         automationOverrideActive = ! slots.empty();
     };
 
@@ -5276,6 +5307,11 @@ void AudioEngine::updateRealtimeStats()
     }
 }
 
+const renderahead::Stats* AudioEngine::renderAheadStats() const noexcept
+{
+    return rackProcessor != nullptr ? &rackProcessor->renderAheadStats() : nullptr;
+}
+
 juce::String AudioEngine::describeRealtime (bool withUnits) const
 {
     juce::String text;
@@ -5304,6 +5340,17 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
          << juce::String (s.maxLoad * 100.0, 0) << "%, workers " << (workers != nullptr ? workers->workers() : 0) << "\n";
     if (latencyRepublishes > 0)
         text << "  latency changes re-planned PDC " << latencyRepublishes << " times (last: unit " << lastLatencyChange << ")\n";
+    if (rackProcessor != nullptr) // (round 190gq: Options › Audio settings › "Render ahead")
+    {
+        const auto& r = rackProcessor->renderAheadStats();
+        auto n = [] (const std::atomic<std::uint64_t>& v) { return juce::String ((juce::int64) v.load (std::memory_order_relaxed)); };
+        text << "  render ahead: " << (renderAheadOption().load() ? "on" : "off") << ", " << (r.engaged.load() ? "running" : "not running")
+             << ", window " << r.window.load() << " samples; blocks " << n (r.blocks) << ": from the ring " << n (r.fromRing) << ", waited "
+             << n (r.waited) << ", rendered in the callback " << n (r.inline_) << "; dropped " << n (r.flushes) << ", drained " << n (r.drains)
+             << ", started " << n (r.engagements) << ", states taken at once " << n (r.statesSwapped) << ", channels joined live " << n (r.promoted)
+             << ", partition changes " << n (r.partitionChanges) << ", boundary mismatches " << n (r.splitMismatches) << "; ahead "
+             << r.aheadChannels.load() << " channels / " << r.aheadTracks.load() << " inserts, boundary " << r.boundary.load() << "\n";
+    }
     if (withUnits && heaviestUnits.empty())
         text << "  heaviest: not measured yet\n";
     if (withUnits && ! heaviestUnits.empty())
@@ -5890,7 +5937,12 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         // master sync out (round 165f): this part's clock / MTC messages, time-stamped for the sender thread
         midiSync.subBlock (transport.positionTicks.load (std::memory_order_relaxed), tps, n, done, playing);
 
+        // (round 190gq: render-ahead follows the device callback's blocks while the rack runs inside it)
+        transport.callbackSamples.store (numSamples, std::memory_order_relaxed);
+        transport.callbackOffset.store (done, std::memory_order_relaxed);
+        transport.inDeviceCallback.store (true, std::memory_order_relaxed);
         player.audioDeviceIOCallbackWithContext (inputs.data(), numInputChannels, outputs.data(), numOutputChannels, n, context);
+        transport.inDeviceCallback.store (false, std::memory_order_relaxed);
         routeOutputs (outputs.data(), numOutputChannels, n);
 
         if (takesLocked) // the tapped takes' part of this block, now rendered (round 168x)
@@ -6007,8 +6059,9 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         ping.process (in, clickOut.data(), 2, numSamples);
     }
 
-    // the block is done: the workers sleep until the next one instead of spinning (REA round 116)
-    if (workers != nullptr)
+    // the block is done: the workers sleep until the next one instead of spinning (REA round 116) — unless render-ahead
+    // runs: its thread hands them blocks between the callbacks and parks them itself (round 190gq)
+    if (workers != nullptr && (rackProcessor == nullptr || ! rackProcessor->renderAheadOwnsWorkers()))
         workers->park();
 
     // the live clock (round 170d): the next block's musical position — during the count-in the metronome's count before

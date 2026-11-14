@@ -37,10 +37,10 @@ inline void cpuRelax() noexcept
 } // namespace
 
 #if defined(_WIN32)
-struct WorkerPool::Semaphore
+struct OsSemaphore::Impl
 {
-    Semaphore() : handle (CreateSemaphoreW (nullptr, 0, 0x7fffffff, nullptr)) {}
-    ~Semaphore()
+    Impl() : handle (CreateSemaphoreW (nullptr, 0, 0x7fffffff, nullptr)) {}
+    ~Impl()
     {
         if (handle != nullptr)
             CloseHandle (handle);
@@ -51,10 +51,10 @@ struct WorkerPool::Semaphore
 };
 #elif defined(__APPLE__)
 // libdispatch semaphore: a Mach semaphore underneath, woken by the kernel at once
-struct WorkerPool::Semaphore
+struct OsSemaphore::Impl
 {
-    Semaphore() : handle (dispatch_semaphore_create (0)) {}
-    ~Semaphore() { dispatch_release (handle); }
+    Impl() : handle (dispatch_semaphore_create (0)) {}
+    ~Impl() { dispatch_release (handle); }
     void release (int n) noexcept
     {
         for (int i = 0; i < n; ++i)
@@ -66,10 +66,10 @@ struct WorkerPool::Semaphore
 #else
 // POSIX semaphore: glibc implements it on a futex (uncontended post/wait stay in user space, a sleeper is woken
 // by the kernel at once)
-struct WorkerPool::Semaphore
+struct OsSemaphore::Impl
 {
-    Semaphore() { sem_init (&handle, 0, 0); }
-    ~Semaphore() { sem_destroy (&handle); }
+    Impl() { sem_init (&handle, 0, 0); }
+    ~Impl() { sem_destroy (&handle); }
     void release (int n) noexcept
     {
         for (int i = 0; i < n; ++i)
@@ -83,12 +83,21 @@ struct WorkerPool::Semaphore
 };
 #endif
 
+OsSemaphore::OsSemaphore() : impl (std::make_unique<Impl>()) {}
+OsSemaphore::~OsSemaphore() = default;
+void OsSemaphore::release (int n) noexcept
+{
+    if (n > 0)
+        impl->release (n);
+}
+void OsSemaphore::acquire() noexcept { impl->acquire(); }
+
 void WorkerPool::relax() noexcept
 {
     cpuRelax();
 }
 
-WorkerPool::WorkerPool (int n, std::function<void()> onThreadStart) : wake (std::make_unique<Semaphore>())
+WorkerPool::WorkerPool (int n, std::function<void()> onThreadStart) : wake (std::make_unique<OsSemaphore>())
 {
     // ticket 0: count 0, nothing to take until the first parallelFor
 

@@ -9814,3 +9814,5 @@ countries: tw hk mo
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "選項：以 MIDI 音符觸發槽位（時間槽：琴鍵 C5 至 B7，音量槽：C2 至 B4）、喀噠聲抑制、起音補償、直流偏移、HQ 重新取樣、刷碟時鐘；MIDI 輸入埠"
 "MIDI Input Port Number:" = "MIDI 輸入埠號："
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "MIDI 輸入埠號：上下拖曳（\"...\" = 無）。此埠上的 MIDI Out 通道演奏 Pitcher 的 MIDI 模式與 Harmonize"
+"Render ahead (lower CPU at small buffers)" = "提前算繪（小緩衝區下更省 CPU）"
+"Tracks nobody plays live are rendered a little ahead on another thread, so heavy projects hold small buffers. Inputs, the channels being played and everything they feed stay real-time; edits on the other tracks can be heard up to about 25 ms late." = "無人即時演奏的音軌會在另一個執行緒上稍微提前算繪，讓大型專案也能用小緩衝區播放。輸入、正在演奏的通道及其送往的一切都保持即時；對其他音軌的編輯最多可能延遲約 25 毫秒才聽到。"

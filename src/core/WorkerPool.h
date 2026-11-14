@@ -25,6 +25,23 @@
 
 namespace lynx
 {
+// An OS semaphore (a Win32 semaphore on Windows, a libdispatch one on macOS, a futex-backed POSIX one on Linux): the
+// workers sleep on one, so does the render-ahead thread (round 190gq, core/RenderAhead.h). release() never blocks.
+class OsSemaphore
+{
+public:
+    OsSemaphore();
+    ~OsSemaphore();
+    OsSemaphore (const OsSemaphore&) = delete;
+    OsSemaphore& operator= (const OsSemaphore&) = delete;
+    void release (int n = 1) noexcept;
+    void acquire() noexcept;
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl;
+};
+
 class WorkerPool
 {
 public:
@@ -72,8 +89,7 @@ private:
     bool isParked() const noexcept;
     void workerLoop (std::function<void()> onStart);
 
-    struct Semaphore; // OS semaphore (WorkerPool.cpp)
-    std::unique_ptr<Semaphore> wake;
+    std::unique_ptr<OsSemaphore> wake;
     std::vector<std::thread> threads;
     std::atomic<bool> quit { false };
     std::atomic<int> sleeping { 0 }; // workers blocked (or about to block) on `wake`

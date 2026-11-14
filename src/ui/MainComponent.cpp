@@ -6,6 +6,7 @@
 #include "ui/GamepadInput.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
+#include "core/RenderAhead.h"
 #include "core/DrawMode.h"
 #include "core/SessionKeys.h"
 #include "core/EditorLimit.h"
@@ -2742,6 +2743,8 @@ void MainComponent::loadUiSettings()
         else if (flsettings::parse (key.toStdString(), line.fromFirstOccurrenceOf ("=", false, false).trim().toStdString()))
         {
         }
+        else if (key == "renderAhead") // (round 190gq: Options › Audio settings › "Render ahead", on by default)
+            renderAheadOption().store (line.fromFirstOccurrenceOf ("=", false, false).trim() != "0");
         else if (key == "metronomeTrack")
             engine.getTransport().metronomeTrack.store (juce::jlimit (0, maxMixerTracks - 1, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
         else if (key == "playTruncatedOnTransport")
@@ -2959,6 +2962,7 @@ void MainComponent::saveUiSettings()
                                       + "\nplayTruncatedOnTransport=" + juce::String (engine.getTransport().playTruncatedOnTransport.load() ? 1 : 0)
                                       + "\nresetPluginsOnTransport=" + juce::String (engine.getTransport().resetPluginsOnTransport.load() ? 1 : 0)
                                       + juce::String (flsettings::serialise())
+                                      + "\nrenderAhead=" + juce::String (renderAheadOption().load() ? 1 : 0)
                                       + "\npreviewVolume=" + juce::String (engine.getPreviewVolume(), 2)
                                       + "\npreviewInTime=" + juce::String (engine.isPreviewInTime() ? 1 : 0)
                                       + "\nbrowserAutoPreview=" + juce::String (BrowserComponent::autoPreview ? 1 : 0)

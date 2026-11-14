@@ -46,6 +46,7 @@ add_library(lynx_core STATIC
     src/core/Patcherize.cpp
     src/core/Instruments.cpp
     src/core/RackRenderer.cpp
+    src/core/RenderAhead.cpp
     src/core/RollingAudioLog.cpp
     src/core/ChordReadout.cpp
     src/core/LoadTrace.cpp

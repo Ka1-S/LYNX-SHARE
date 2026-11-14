@@ -534,6 +534,68 @@ public:
     void setProfiling (bool on) noexcept { profiling.store (on, std::memory_order_relaxed); }
     bool isProfiling() const noexcept { return profiling.load (std::memory_order_relaxed); }
     const UnitTimes& unitTimes() const noexcept { return *units; }
+
+    // ---- Render-ahead (round 190gq, core/RenderAhead.h) ----------------------------------------------------------
+    // Two renderers can share one rack, each channel and insert rendered by exactly one of them: the live one at the
+    // device block, the other a few blocks ahead on its own thread. A Split names the other renderer's units and the
+    // boundary: the units of the part rendered ahead that a live insert takes (a channel or an insert routed into it,
+    // a send tap, a side-chain or Connections source). The renderer that renders ahead writes them into a SplitBlock
+    // chunk by chunk; the live one reads them where the unit would have run. The same samples either way.
+    struct Split
+    {
+        static constexpr int maxSlots = 256;
+        enum class Kind : std::uint8_t { channel, track, tap };
+        std::array<char, maxChannels> foreignChannel {};       // 1 = the other renderer renders this channel
+        std::array<char, maxMixerTracks> foreignTrack {};      // ... this insert (0 = the Master)
+        std::array<std::int16_t, maxChannels> channelSlot {};  // its boundary slot, −1 = none
+        std::array<std::int16_t, maxMixerTracks> trackSlot {};
+        std::array<std::int16_t, RackState::maxSendTaps> tapSlot {};
+        std::array<Kind, maxSlots> slotKind {};
+        std::array<std::int16_t, maxSlots> slotUnit {};
+        int slots = 0;
+        bool exports = false; // true: this renderer writes the boundary (it renders ahead); false: it reads it
+        void clear() noexcept
+        {
+            foreignChannel.fill (0);
+            foreignTrack.fill (0);
+            channelSlot.fill (-1);
+            trackSlot.fill (-1);
+            tapSlot.fill (-1);
+            slots = 0;
+            exports = false;
+        }
+    };
+    struct SplitBlock
+    {
+        static constexpr int maxChunks = 64;
+        float* audio = nullptr;        // slot s, side d: audio + (s * 2 + d) * stride, each chunk at its offset in the block
+        int stride = 0;
+        std::uint8_t* flags = nullptr; // [chunk * Split::maxSlots + slot]: the channel's channelSilent, the insert's or tap's activity
+        int chunks = 0;
+        std::array<int, maxChunks> chunkOffset {};
+    };
+    // Same thread as process(); nullptr = this renderer renders everything (the default)
+    void setSplit (const Split* s) noexcept { split = s; }
+    void setSplitBlock (SplitBlock* block) noexcept { splitBlock = block; }
+    // the play head this renderer's hosted plugins see (core/Instruments.h), nullptr = the shared one (the song position)
+    void setHostTimeline (HostTimeline* timeline) noexcept { ownTimeline = timeline; }
+    // the Plugin performance monitor's and the profiler's counters are `other`'s: both renderers of one rack add their
+    // units into them, and only `other` counts the audio's duration
+    void shareTimesWith (RackRenderer& other) noexcept;
+    // Moving units between the two renderers (at a block boundary, both idle): the global state — transport, the
+    // started notes, automation values, the live clocks — and each flagged unit's own state (fader ramps, the built-in
+    // EQ, smart disable, one-knob glides, held keys, voice order, Mono layers, Layer picks). Any per-unit state added to
+    // the renderer must be copied in adoptUnits too.
+    void adoptGlobals (const RackRenderer& from) noexcept;
+    void adoptUnits (const RackRenderer& from, const char* channels, const char* tracks) noexcept;
+    // these automations' values (controllers: their value comes from a unit's output), or all of them (nullptr)
+    void adoptAutomationValues (const RackRenderer& from, const int* automations, int count) noexcept;
+    // the flagged channels' voices end now and their note state is cleared (what render-ahead played for them was dropped)
+    void silenceChannels (const RackState& state, const char* channels) noexcept;
+    // the snapshot it last rendered is gone: not looked at again (prepare)
+    void forgetState() noexcept { lastState = nullptr; }
+    // chunks whose boundary did not line up with the part rendered ahead (the live renderer; diagnostics)
+    std::uint64_t splitMismatchCount() const noexcept { return splitMismatches; }
     // Blocks in which an insert effect output NaN / inf and was muted and reset (all renderers, since start; round 111)
     static std::uint64_t nonFiniteEffectBlocks() noexcept;
     void resetUnitTimes() noexcept;
@@ -571,6 +633,28 @@ public:
 private:
     void processChunk (const RackState& state, bool playing, double startTick, int numSamples,
                        float* left, float* right, MeterBank* meters) noexcept;
+    // render-ahead (round 190gq): this renderer's part of the rack, the boundary in and out
+    const Split* split = nullptr;
+    SplitBlock* splitBlock = nullptr;
+    int splitChunk = 0; // the chunk of the current process() call
+    std::uint64_t splitMismatches = 0;
+    HostTimeline* ownTimeline = nullptr;
+    bool countsAudio = true; // (false: a renderer that shares another's times)
+    bool foreignChannel (int c) const noexcept { return split != nullptr && c >= 0 && c < maxChannels && split->foreignChannel[(std::size_t) c] != 0; }
+    bool foreignTrack (int t) const noexcept { return split != nullptr && t >= 0 && t < maxMixerTracks && split->foreignTrack[(std::size_t) t] != 0; }
+    void importChannel (int channel, int n) noexcept;
+    void importTrack (const RackState& state, int track, int n) noexcept;
+    void exportSplit (int n) noexcept;
+    // A7 (round 190gq): each unit's time in the last chunk it ran in, measured while workers are available (the
+    // channel and insert tasks; nanoseconds, saturated), and what the chunk's work comes to from them
+    std::array<std::uint32_t, maxChannels> channelCostNs {};
+    std::array<std::uint32_t, maxMixerTracks> trackCostNs {};
+    bool measureUnits = false;
+    // the channel pass in clusters of neighbouring channels worth one hand-off each: [k] first channel of cluster k
+    std::array<std::int16_t, maxChannels + 1> clusterStart {};
+    // the boundary row of the current chunk (−1: the chunks do not line up: the slow path)
+    int splitRow() noexcept;
+    void resetNoteTools (const RackState& state) noexcept;
     void renderChannel (const RackState& state, int channel, int n) noexcept;
     void processTrack (const RackState& state, int track, int n, MeterBank* meters) noexcept;
     void runSilencedTrack (const RackState& state, int track, int n, const MixerMatrix& level, MeterBank* meters, bool cutEffectSends) noexcept;
@@ -715,8 +799,10 @@ private:
     bool runTaskGraph (const RackState& state, bool playing, int channels, int numSamples, MeterBank* meters) noexcept;
     void sumChannelsInto (const RackState& state, int track, int channels, int n) noexcept;
     std::atomic<bool> profiling { false };
-    std::unique_ptr<UnitTimes> units = std::make_unique<UnitTimes>();
-    std::unique_ptr<ProcessTimes> times = std::make_unique<ProcessTimes>();
+    std::unique_ptr<UnitTimes> ownUnits = std::make_unique<UnitTimes>();
+    std::unique_ptr<ProcessTimes> ownTimes = std::make_unique<ProcessTimes>();
+    UnitTimes* units = ownUnits.get();
+    ProcessTimes* times = ownTimes.get();
 
     struct SmartDisableState
     {

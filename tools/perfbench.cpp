@@ -6,7 +6,7 @@
 // a bit-identical null test).
 //
 // usage: perfbench <scenario> [--block N] [--threads N] [--seconds S] [--reps R] [--offline] [--nometers] [--raw path]
-//                              [--stopped]
+//                              [--stopped] [--ahead] [--live C] [--paced] [--apptransport]
 // scenarios:
 //   demo            the showcase song (Demo.lynx), whole song
 //   hiphop | pop    the two LYNX demo songs
@@ -18,6 +18,15 @@
 //   flp:<path>      an FL Studio project, whole song (FL's own data from FL_ROOT, as renderwav)
 // --threads N: N worker threads besides the calling one (the app's WorkerPool); the CPU time is then the process'
 // (every thread, spinning included) and the instructions are the calling thread's only.
+// Round 190gq (render-ahead, core/RenderAhead.h):
+//   --apptransport  the position moves as the app's audio callback moves it (the tempo the renderer used, Transport's
+//                   arithmetic); implied by --ahead, so a real-time and a render-ahead run of one scenario can be nulled
+//   --ahead         render through RenderAhead as ChannelRackProcessor does (the device callback's model, the thread)
+//   --live C        channel C is played live (the selected channel): it and what it feeds stay real-time (repeatable)
+//   --loop B        (with --apptransport) a loop region over the song's first B bars: the blocks are split at its end
+//                   and the position wraps, as the app's callback does it (core/RenderAhead.h planSubBlock)
+//   --paced         the blocks come at real time, as a device's callbacks: reports the callbacks that ran past their
+//                   block's duration (dropouts), the worst callback, and the process CPU (every thread)
 
 #include <algorithm>
 #include <cctype>
@@ -33,6 +42,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <time.h>
@@ -50,6 +60,7 @@
 #include "core/LiveEventQueue.h"
 #include "core/Meters.h"
 #include "core/RackRenderer.h"
+#include "core/RenderAhead.h"
 #include "core/ShowcaseSong.h"
 #include "core/SynthPresets.h"
 #include "core/WorkerPool.h"
@@ -326,7 +337,9 @@ int main (int argc, char** argv)
     const std::string scenario = argv[1];
     int blockSize = 256, threads = 0, reps = 5;
     double seconds = 0.0, warmup = 0.0;
-    bool offline = false, meters = true, stopped = scenario == "idle", units = false;
+    bool offline = false, meters = true, stopped = scenario == "idle", units = false, aheadMode = false, paced = false, appTransport = false;
+    std::vector<int> liveChannels;
+    int loopBars = 0;
     const char* raw = nullptr;
     for (int i = 2; i < argc; ++i)
     {
@@ -352,6 +365,16 @@ int main (int argc, char** argv)
             warmup = std::max (0.0, std::atof (next()));
         else if (a == "--units") // the renderer's own per-channel / per-slot CPU (as renderwav's LYNX_PROFILE)
             units = true;
+        else if (a == "--ahead")
+            aheadMode = appTransport = true;
+        else if (a == "--live")
+            liveChannels.push_back (std::atoi (next()));
+        else if (a == "--paced")
+            paced = true;
+        else if (a == "--apptransport")
+            appTransport = true;
+        else if (a == "--loop")
+            loopBars = std::max (0, std::atoi (next()));
     }
 
     constexpr int sampleRate = 44100;
@@ -396,6 +419,8 @@ int main (int argc, char** argv)
     if (stopped && seconds > 0.0)
         totalSamples = (std::size_t) (seconds * sampleRate);
     totalSamples = std::max<std::size_t> (totalSamples, (std::size_t) blockSize);
+    if (appTransport) // (whole device blocks: a device keeps its block size; render-ahead drops its window when it changes)
+        totalSamples = totalSamples / (std::size_t) blockSize * (std::size_t) blockSize;
 
     setOfflineRendering (offline);
     auto provider = [&] (const std::string& p) {
@@ -420,6 +445,7 @@ int main (int argc, char** argv)
     for (int rep = 0; rep < reps; ++rep)
     {
         auto state = RackState::build (song, nullptr, sampleRate, provider);
+        const auto* statePtr = state.get();
         auto renderer = std::make_unique<RackRenderer>();
         if (pool != nullptr)
             renderer->setWorkerPool (pool.get());
@@ -428,41 +454,127 @@ int main (int argc, char** argv)
         auto bank = std::make_unique<MeterBank>();
         auto live = std::make_unique<LiveEventQueue>();
         auto midiLive = std::make_unique<LiveEventQueue>();
+        // render-ahead (round 190gq): the controller as ChannelRackProcessor drives it, the snapshot from an exchange
+        SnapshotExchange<RackState> exchange;
+        std::unique_ptr<RenderAhead> ahead;
+        renderahead::Targets targets;
+        renderahead::TransportModel model;
+        MarkerPlan markers;
+        if (aheadMode)
+        {
+            ahead = std::make_unique<RenderAhead> (*renderer);
+            ahead->setWorkerPool (pool.get());
+            ahead->prepare (sampleRate, std::max (2048, blockSize));
+            ahead->setTargets (&targets);
+            targets.publish (liveChannels.data(), (int) liveChannels.size(), nullptr, 0);
+            exchange.publish (std::move (state));
+        }
+        // the device callback's transport: linear through the export song, or round the loop region (--loop)
+        model.sampleRate = sampleRate;
+        model.deviceBlock = blockSize;
+        model.songMode = loopBars > 0;
+        model.loopEnd = loopBars > 0 ? (double) loopBars * song.beatsPerBar * ppq : 0.0;
+        model.markers = &markers;
 
         std::vector<float> left (totalSamples), right (totalSamples);
         std::vector<double> blockCpu;
         blockCpu.reserve (totalSamples / (std::size_t) blockSize + 1);
+        // the app's transport (--apptransport): the next block's position moves with the tempo this one used
+        auto bpmNow = song.bpm;
+        auto renderBlock = [&] (double tick, int n, float* l, float* r) {
+            if (ahead != nullptr)
+            {
+                renderahead::Block b;
+                b.playing = ! stopped;
+                b.startTick = tick;
+                b.samples = n;
+                b.tps = renderahead::transportTps (bpmNow, sampleRate);
+                b.metronomeTrack = 0;
+                b.model = &model;
+                b.metering = meters;
+                ahead->process (exchange, b, l, r, live.get(), meters ? bank.get() : nullptr, midiLive.get());
+                if (pool != nullptr && ! ahead->ownsWorkers())
+                    pool->park();
+                const auto* used = ahead->currentState();
+                bpmNow = used != nullptr && used->tempoMap ? renderer->currentBpm() : song.bpm;
+                return;
+            }
+            renderer->process (statePtr, ! stopped, tick, n, l, r, live.get(), meters ? bank.get() : nullptr, midiLive.get());
+            if (pool != nullptr) // (as the app's audio callback ends: the workers sleep until the next block, REA round 116)
+                pool->park();
+            if (appTransport)
+                bpmNow = statePtr->tempoMap ? renderer->currentBpm() : song.bpm;
+        };
+        auto stepTicks = [&] (int n) { return appTransport ? n * renderahead::transportTps (bpmNow, sampleRate) : n * tps; };
+        double warmTick = 0.0;
         if (warmup > 0.0) // (stopped: the same position; playing: the song advances and the measured part starts later)
         {
             std::vector<float> wl ((std::size_t) blockSize), wr ((std::size_t) blockSize);
             for (int done = 0, total = (int) (warmup * sampleRate); done < total; done += blockSize)
             {
-                renderer->process (state.get(), ! stopped, stopped ? 0.0 : done * tps, blockSize, wl.data(), wr.data(), live.get(),
-                                   meters ? bank.get() : nullptr, midiLive.get());
-                if (pool != nullptr)
-                    pool->park();
+                const auto step = stepTicks (blockSize);
+                renderBlock (stopped ? 0.0 : (appTransport ? warmTick : done * tps), blockSize, wl.data(), wr.data());
+                warmTick += step;
             }
             if (units)
                 renderer->resetUnitTimes();
         }
         InstructionCounter counter;
-        const auto clock = pool != nullptr ? CLOCK_PROCESS_CPUTIME_ID : CLOCK_THREAD_CPUTIME_ID;
+        const auto clock = pool != nullptr || ahead != nullptr || paced ? CLOCK_PROCESS_CPUTIME_ID : CLOCK_THREAD_CPUTIME_ID;
         const auto warmupBlocks = (int) std::ceil (warmup * sampleRate / blockSize);
-        double tick = stopped ? 0.0 : (double) warmupBlocks * blockSize * tps, used = 0.0;
+        double tick = stopped ? 0.0 : (appTransport ? warmTick : (double) warmupBlocks * blockSize * tps), used = 0.0;
         const auto wall0 = std::chrono::steady_clock::now();
+        const auto period = std::chrono::duration<double> ((double) blockSize / sampleRate);
+        auto due = wall0;
+        int dropouts = 0;
+        double worstMs = 0.0;
+        std::vector<double> callbackMs;
+        const auto processCpu0 = cpuMs (CLOCK_PROCESS_CPUTIME_ID);
         counter.start();
         for (std::size_t pos = 0; pos < totalSamples; pos += (std::size_t) blockSize)
         {
             const auto n = (int) std::min<std::size_t> ((std::size_t) blockSize, totalSamples - pos);
+            if (paced) // the device asks for the next block at its time
+            {
+                std::this_thread::sleep_until (due);
+                due += std::chrono::duration_cast<std::chrono::steady_clock::duration> (period);
+            }
             const auto c0 = cpuMs (clock);
-            renderer->process (state.get(), ! stopped, stopped ? 0.0 : tick, n, left.data() + pos, right.data() + pos, live.get(),
-                               meters ? bank.get() : nullptr, midiLive.get());
-            if (pool != nullptr) // (as the app's audio callback ends: the workers sleep until the next block, REA round 116)
-                pool->park();
+            const auto w0 = std::chrono::steady_clock::now();
+            if (appTransport && ! stopped)
+            {
+                // the callback's loop: sub-blocks up to the loop's end, the position as Transport moves it
+                model.deviceBlock = n;
+                for (int done = 0; done < n;)
+                {
+                    const auto tpsNow = renderahead::transportTps (bpmNow, sampleRate);
+                    const auto sb = renderahead::planSubBlock (model, tick, done, tpsNow);
+                    model.offset = done;
+                    renderBlock (sb.start, sb.samples, left.data() + pos + (std::size_t) done, right.data() + pos + (std::size_t) done);
+                    tick = sb.next;
+                    done += sb.samples;
+                }
+            }
+            else
+            {
+                const auto step = stepTicks (n);
+                renderBlock (stopped ? 0.0 : tick, n, left.data() + pos, right.data() + pos);
+                tick += stopped ? 0.0 : step;
+            }
             const auto spent = cpuMs (clock) - c0;
+            const auto wallSpent = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - w0).count();
+            if (paced)
+            {
+                callbackMs.push_back (wallSpent);
+                worstMs = std::max (worstMs, wallSpent);
+                if (std::chrono::steady_clock::now() > due) // finished after the next block was due: a dropout
+                {
+                    ++dropouts;
+                    due = std::chrono::steady_clock::now(); // (the device goes on from now)
+                }
+            }
             used += spent;
-            blockCpu.push_back (spent);
-            tick += n * tps;
+            blockCpu.push_back (paced ? wallSpent : spent);
             if (meters) // the UI's meter reads (Mixer + Playlist headers), as often as a 60 Hz timer would
                 if ((pos / (std::size_t) blockSize) % std::max<std::size_t> (1, (std::size_t) (sampleRate / 60 / blockSize)) == 0)
                 {
@@ -472,6 +584,26 @@ int main (int argc, char** argv)
                             (void) bank->takePeak (t, s), (void) bank->takeViewPeak (t, s);
                     counter.resume();
                 }
+        }
+        if (paced) // every thread's CPU, the render-ahead thread and the workers included
+            used = cpuMs (CLOCK_PROCESS_CPUTIME_ID) - processCpu0;
+        if (paced)
+        {
+            std::sort (callbackMs.begin(), callbackMs.end());
+            const auto audioSeconds = (double) totalSamples / sampleRate;
+            std::printf ("paced: %d dropouts (%.2f per minute), worst callback %.3f ms, p99 %.3f ms, median %.3f ms (budget %.3f ms)\n", dropouts,
+                         dropouts * 60.0 / audioSeconds, worstMs, callbackMs[std::min (callbackMs.size() - 1, (std::size_t) (0.99 * (double) callbackMs.size()))],
+                         callbackMs[callbackMs.size() / 2], 1000.0 * blockSize / sampleRate);
+        }
+        if (ahead != nullptr)
+        {
+            const auto& st = ahead->stats();
+            std::printf ("ahead: blocks %llu, from ring %llu, waited %llu, inline %llu, flushes %llu, drains %llu, engagements %llu, ahead channels %d, "
+                         "ahead inserts %d, boundary %d, window %d samples, split mismatches %llu\n",
+                         (unsigned long long) st.blocks.load(), (unsigned long long) st.fromRing.load(), (unsigned long long) st.waited.load(),
+                         (unsigned long long) st.inline_.load(), (unsigned long long) st.flushes.load(), (unsigned long long) st.drains.load(),
+                         (unsigned long long) st.engagements.load(), st.aheadChannels.load(), st.aheadTracks.load(), st.boundary.load(), st.window.load(),
+                         (unsigned long long) st.splitMismatches.load());
         }
         counter.pause();
         const auto wallMs = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - wall0).count();

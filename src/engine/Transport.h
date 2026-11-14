@@ -111,10 +111,19 @@ struct Transport
     // makes it when the position reaches `pendingJumpAt` (FL's "Quantize song jumps"; < 0 = none).
     std::atomic<double> pendingJumpAt { -1.0 }, pendingJumpTo { -1.0 };
 
+    // Render-ahead (round 190gq, core/RenderAhead.h): while part of the rack renders ahead, the tempo the position moves
+    // with is the one both parts render with (> 0); a tempo edit takes over when it reaches both. Audio thread only.
+    std::atomic<double> pinnedBpm { 0.0 };
+    // The device callback's block (samples) and where its current sub-block starts, while the callback runs the rack
+    // (inDeviceCallback); an offline render through the graph leaves them unset. Audio thread only.
+    std::atomic<int> callbackSamples { 0 }, callbackOffset { 0 };
+    std::atomic<bool> inDeviceCallback { false };
+
     double ticksPerSample() const noexcept
     {
         const auto external = externalBpm.load (std::memory_order_relaxed);
-        return (external > 0.0 ? external : bpm.load (std::memory_order_relaxed)) * ppq / (60.0 * sampleRate.load (std::memory_order_relaxed));
+        const auto pinned = pinnedBpm.load (std::memory_order_relaxed);
+        return (external > 0.0 ? external : pinned > 0.0 ? pinned : bpm.load (std::memory_order_relaxed)) * ppq / (60.0 * sampleRate.load (std::memory_order_relaxed));
     }
 
     double positionInBeats() const noexcept

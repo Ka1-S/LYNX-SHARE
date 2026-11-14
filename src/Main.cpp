@@ -49,6 +49,7 @@
 #include "core/DemoSongs.h"
 #include "core/FirstSongTour.h"
 #include "core/ShowcaseSong.h"
+#include "core/RenderAhead.h"
 #include "core/SynthPresets.h"
 #include "core/FlWrapper.h"
 #include "engine/AudioEngine.h"
@@ -665,6 +666,23 @@ public:
             const auto option = [&args] (const char* name) { return args.contains (name) ? args[args.indexOf (name) + 1].unquoted() : juce::String(); };
             runRealtimeStress (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()), seconds > 0.0 ? seconds : 30.0, buffer,
                                option ("--type"), option ("--device"), option ("--record"));
+            return;
+        }
+
+        if (args.contains ("--renderaheadtest"))
+        {
+            // LYNX --renderaheadtest report.txt [project.flp|.lynx ...] [--buffer N] [--seconds S] (round 190gq): the engine's
+            // own device callback (a stand-in device driven block by block, as --cliplooptest) plays the showcase song (from
+            // the start, round a loop region that wraps mid-block, in Pattern mode) and each project with Options › Audio
+            // settings › "Render ahead" off, then on. The two outputs must be the same to the bit, nothing rendered ahead
+            // may be dropped, and most blocks must come from the ring. No window, no audio device.
+            const auto i = args.indexOf ("--renderaheadtest");
+            juce::StringArray projects;
+            for (int k = i + 2; k < args.size() && ! args[k].startsWith ("--"); ++k)
+                projects.add (args[k].unquoted());
+            const auto buffer = args.contains ("--buffer") ? args[args.indexOf ("--buffer") + 1].getIntValue() : 128;
+            const auto seconds = args.contains ("--seconds") ? args[args.indexOf ("--seconds") + 1].getDoubleValue() : 12.0;
+            runRenderAheadTest (juce::File (args[i + 1].unquoted()), projects, juce::jlimit (16, 2048, buffer), seconds > 0.0 ? seconds : 12.0);
             return;
         }
 
@@ -10116,6 +10134,162 @@ private:
             setApplicationReturnValue (ok ? 0 : 1);
             quit();
         });
+    }
+
+    // --renderaheadtest (round 190gq): see the command line above
+    void runRenderAheadTest (const juce::File& report, const juce::StringArray& projects, int block, double seconds)
+    {
+        struct StandIn final : juce::AudioIODevice
+        {
+            explicit StandIn (int b) : juce::AudioIODevice ("renderahead", "test"), block (b) {}
+            const int block;
+            juce::StringArray getOutputChannelNames() override { return { "L", "R" }; }
+            juce::StringArray getInputChannelNames() override { return {}; }
+            juce::Array<double> getAvailableSampleRates() override { return { 48000.0 }; }
+            juce::Array<int> getAvailableBufferSizes() override { return { block }; }
+            int getDefaultBufferSize() override { return block; }
+            juce::String open (const juce::BigInteger&, const juce::BigInteger&, double, int) override { return {}; }
+            void close() override {}
+            bool isOpen() override { return true; }
+            void start (juce::AudioIODeviceCallback*) override {}
+            void stop() override {}
+            bool isPlaying() override { return true; }
+            juce::String getLastError() override { return {}; }
+            int getCurrentBufferSizeSamples() override { return block; }
+            double getCurrentSampleRate() override { return 48000.0; }
+            int getCurrentBitDepth() override { return 32; }
+            juce::BigInteger getActiveOutputChannels() const override
+            {
+                juce::BigInteger b;
+                b.setRange (0, 2, true);
+                return b;
+            }
+            juce::BigInteger getActiveInputChannels() const override { return {}; }
+            int getOutputLatencyInSamples() override { return 0; }
+            int getInputLatencyInSamples() override { return 0; }
+        };
+        struct Scenario
+        {
+            juce::String name;
+            juce::File file;   // a project, or none: the showcase song
+            int mode = 0;      // 0 Song mode from the start, 1 a loop region, 2 Pattern mode
+        };
+        auto scenarios = std::make_shared<std::vector<Scenario>>();
+        scenarios->push_back ({ "showcase, Song mode", {}, 0 });
+        scenarios->push_back ({ "showcase, a loop region wrapping mid-block", {}, 1 });
+        scenarios->push_back ({ "showcase, Pattern mode", {}, 2 });
+        for (const auto& p : projects)
+            scenarios->push_back ({ juce::File (p).getFileName(), juce::File (p), 0 });
+        auto text = std::make_shared<juce::String>();
+        auto step = [report, text] (const juce::String& line) { *text << line << "\n"; report.replaceWithText (*text); };
+        step ("render-ahead test: blocks of " + juce::String (block) + " at 48 kHz, " + juce::String (seconds, 1) + " s per run");
+        auto outputs = std::make_shared<std::vector<std::vector<float>>>();
+        auto ok = std::make_shared<bool> (true);
+        auto run = std::make_shared<std::function<void (std::size_t, int)>>();
+        *run = [this, scenarios, step, outputs, ok, run, block, seconds, report] (std::size_t index, int pass) {
+            if (index >= scenarios->size())
+            {
+                lynx::renderAheadOption().store (true);
+                step (juce::String ("result=") + (*ok ? "OK" : "FAIL"));
+                setApplicationReturnValue (*ok ? 0 : 1);
+                engine.reset();
+                quit();
+                return;
+            }
+            const auto& sc = (*scenarios)[index];
+            lynx::renderAheadOption().store (pass == 1);
+            engine = std::make_unique<lynx::AudioEngine>();
+            engine->getDeviceManager().closeAudioDevice(); // the engine's callback is driven by hand below
+            juce::String error;
+            auto loaded = true;
+            if (sc.file == juce::File())
+            {
+                auto song = lynx::makeShowcaseSong (0);
+                if (sc.mode == 1)
+                {
+                    song.loopStart = 4 * lynx::ppq * song.beatsPerBar + 37; // (not on a block boundary)
+                    song.loopEnd = 6 * lynx::ppq * song.beatsPerBar + 211;
+                    song.loopOff = false;
+                }
+                if (sc.mode == 2)
+                    song.mode = lynx::PlayMode::pattern;
+                engine->setSong (std::move (song));
+            }
+            else if (sc.file.hasFileExtension ("flp"))
+                loaded = engine->importFlpFile (sc.file, error);
+            else if (auto song = lynx::ProjectFile::load (sc.file, error))
+                engine->setSong (std::move (*song));
+            else
+                loaded = false;
+            if (! loaded)
+            {
+                step ("FAIL " + sc.name + ": " + error);
+                *ok = false;
+                (*run) (index + 1, 0);
+                return;
+            }
+            auto device = std::make_shared<StandIn> (block);
+            engine->deviceCallback().audioDeviceAboutToStart (device.get());
+            // the graph is (re)built on the message thread: the run starts once it has settled
+            juce::Timer::callAfterDelay (1500, [this, scenarios, step, outputs, ok, run, block, seconds, index, pass, device] {
+                if (engine == nullptr)
+                    return;
+                const auto& sc = (*scenarios)[index];
+                auto& cb = engine->deviceCallback();
+                std::vector<float> l ((std::size_t) block), r ((std::size_t) block), out;
+                float* outs[] = { l.data(), r.data() };
+                juce::AudioIODeviceCallbackContext context;
+                engine->stop();
+                engine->seek (0.0);
+                cb.audioDeviceIOCallbackWithContext (nullptr, 0, outs, 2, block, context); // (the seek, stopped)
+                engine->play();
+                const auto blocks = (int) (seconds * 48000.0 / block);
+                const auto t0 = juce::Time::getMillisecondCounterHiRes();
+                for (int k = 0; k < blocks; ++k)
+                {
+                    cb.audioDeviceIOCallbackWithContext (nullptr, 0, outs, 2, block, context);
+                    out.insert (out.end(), l.begin(), l.end());
+                    out.insert (out.end(), r.begin(), r.end());
+                    // (about the device's pace at the start of each second, so the render-ahead thread gets ahead)
+                    if (k % (48000 / block) < 48000 / block / 2)
+                        std::this_thread::sleep_for (std::chrono::microseconds ((int) (block * 1.0e6 / 48000.0 * 0.6)));
+                }
+                const auto ms = juce::Time::getMillisecondCounterHiRes() - t0;
+                engine->stop();
+                cb.audioDeviceIOCallbackWithContext (nullptr, 0, outs, 2, block, context);
+                const auto* st = engine->renderAheadStats();
+                auto n = [] (const std::atomic<std::uint64_t>& v) { return (juce::int64) v.load(); };
+                juce::String line = sc.name + (pass == 1 ? ", render ahead on: " : ", render ahead off: ") + juce::String (ms / 1000.0, 1) + " s";
+                if (st != nullptr && pass == 1)
+                    line << "; blocks " << n (st->blocks) << ", from the ring " << n (st->fromRing) << ", waited " << n (st->waited) << ", in the callback "
+                         << n (st->inline_) << ", dropped " << n (st->flushes) << ", drained " << n (st->drains) << ", started " << n (st->engagements)
+                         << ", boundary mismatches " << n (st->splitMismatches) << "; ahead " << st->aheadChannels.load() << " channels / "
+                         << st->aheadTracks.load() << " inserts, boundary " << st->boundary.load() << ", window " << st->window.load();
+                step ("     " + line);
+                if (pass == 0)
+                {
+                    outputs->assign (1, std::move (out));
+                    (*run) (index, 1);
+                    return;
+                }
+                const auto& off = outputs->front();
+                std::size_t first = off.size() == out.size() ? off.size() : 0;
+                for (std::size_t s = 0; s < std::min (off.size(), out.size()); ++s)
+                    if (std::memcmp (&off[s], &out[s], sizeof (float)) != 0)
+                    {
+                        first = s;
+                        break;
+                    }
+                const auto same = off.size() == out.size() && first == off.size();
+                const auto clean = st != nullptr && st->flushes.load() == 0 && st->splitMismatches.load() == 0 && st->engagements.load() >= 1
+                                   && st->fromRing.load() > st->blocks.load() / 4;
+                *ok = *ok && same && clean;
+                step (juce::String (same && clean ? "ok   " : "FAIL ") + sc.name + ": " + (same ? "bit-identical" : "differs from sample " + juce::String ((juce::int64) first / 2 % block) + " of block " + juce::String ((juce::int64) first / 2 / block))
+                      + (clean ? "" : ", render-ahead counters off (see above)"));
+                (*run) (index + 1, 0);
+            });
+        };
+        (*run) (0, 0);
     }
 
     void runClipLoopTest (const juce::File& report, const juce::File& wavFile)

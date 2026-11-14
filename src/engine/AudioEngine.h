@@ -33,6 +33,7 @@
 #include "engine/MidiSyncIo.h"
 #include "engine/ControllerIo.h"
 #include "core/RackRenderer.h"
+#include "core/RenderAhead.h"
 #include "core/RtStats.h"
 #include "core/ScoreLog.h"
 #include "core/FlpImport.h"
@@ -976,6 +977,8 @@ public:
     void restoreAudioDeviceState (const juce::XmlElement* state);
     // Device, buffer, deadline and the callback statistics in a few lines (CPU meter hint, glitch log, --rtstress).
     juce::String describeRealtime (bool withUnits = true) const;
+    // render-ahead's counters (round 190gq, core/RenderAhead.h; nullptr before the graph exists)
+    const renderahead::Stats* renderAheadStats() const noexcept;
 
     // Settings › Audio "Driver settings…": shows the device's own panel (ASIO) and, when the driver says its settings
     // changed, reopens it with them. The device object is replaced (its driver re-read), so the old pointer is never
@@ -1249,6 +1252,8 @@ private:
     std::array<std::atomic<int>, maxLiveChannels> extraLiveChannels {};
     std::atomic<int> extraLiveCount { 0 };
     void publishSelection();
+    void publishRenderAheadTargets();
+    renderahead::Targets renderAheadTargets; // (round 190gq) the channels played live, for the render-ahead's partition
     std::atomic<double> blockTimeMs { 0.0 };         // when positionTicks was last updated
     std::atomic<double> blockDurationMs { 0.0 };     // the last block's length (round 174e: playheadAdvanceTicks)
     // round 174e: the device's callback thread (Windows): its priority when first seen and after LYNX raised it to the

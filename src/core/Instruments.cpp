@@ -1,6 +1,7 @@
 #include "core/FruityDance.h"
 #include "core/FruitySlicer.h"
 #include "core/Instruments.h"
+#include "core/HostTimelineScope.h"
 #include "core/FpcInstrument.h"
 #include "core/ControlSurface.h"
 #include "core/VoltageController.h"
@@ -3563,10 +3564,20 @@ std::atomic<bool> hqAllFlag { false };
 void setHqForAllPlugins (bool on) noexcept { hqAllFlag.store (on); }
 bool hqForAllPlugins() noexcept { return hqAllFlag.load (std::memory_order_relaxed); }
 
+namespace
+{
+thread_local HostTimeline* threadTimeline = nullptr; // (round 190gq)
+}
+
 HostTimeline& hostTimeline() noexcept
 {
     static HostTimeline timeline;
-    return timeline;
+    return threadTimeline != nullptr ? *threadTimeline : timeline;
+}
+
+HostTimeline* swapThreadHostTimeline (HostTimeline* timeline) noexcept
+{
+    return std::exchange (threadTimeline, timeline);
 }
 
 namespace

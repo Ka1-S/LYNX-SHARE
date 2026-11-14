@@ -192,6 +192,8 @@
 #include "ui/I18nData.h"
 #include "ui/I18nLocale.h"
 #include "core/CrashReport.h"
+#include "core/RenderAhead.h"
+#include "core/WorkerPool.h"
 
 namespace
 {
@@ -17566,3 +17568,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Voices190ejTests.inc"
 #include "Flfix190ezTests.inc"
 #include "Rcfix190fcTests.inc"
+#include "RenderAhead190gqTests.inc"
