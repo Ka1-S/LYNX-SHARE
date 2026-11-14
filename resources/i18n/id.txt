@@ -9989,3 +9989,9 @@ countries: id
 "LYNX SHARE is free and open source. If it helps your music, you can support it on Ko-fi." = "LYNX SHARE gratis dan open source. Jika membantu musik Anda, Anda bisa mendukungnya di Ko-fi."
 "Show the support note" = "Tampilkan catatan dukungan"
 "Now and then at start-up, a small note in a corner about supporting LYNX SHARE on Ko-fi. Donating is optional and never unlocks anything." = "Sesekali saat mulai, sebuah catatan kecil di sudut tentang cara mendukung LYNX SHARE di Ko-fi. Donasi bersifat opsional dan tidak pernah membuka apa pun."
+
+# --- Round 190fs: user presets of the built-in generators
+"Generator preset: [2xLMB] new channel with it" = "Preset generator: [2xLMB] channel baru dengan preset ini"
+"This preset is for {0}." = "Preset ini untuk {0}."
+"The settings of this preset can't be carried over to this version of the plugin (VST2 / VST3)." = "Pengaturan preset ini tidak bisa dipindahkan ke versi plugin ini (VST2 / VST3)."
+"This preset is for {0}. Add {0} to a channel or a mixer track first (scan for plugins if it is not in the list), open its window and load the preset from its Presets menu." = "Preset ini untuk {0}. Tambahkan {0} ke channel atau track Mixer terlebih dahulu (pindai plugin jika tidak ada di daftar), buka jendelanya, lalu muat preset dari menu Presets-nya."

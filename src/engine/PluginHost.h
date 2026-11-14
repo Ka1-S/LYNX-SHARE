@@ -464,6 +464,10 @@ public:
     // pluginSubstitutesEnabled(); `substituted` gets one "name -> LYNX effect" line each (they are not in `missing`).
     int adoptFlPlugins (Song& song, juce::StringArray* missing = nullptr, juce::StringArray* matched = nullptr,
                         juce::StringArray* withoutState = nullptr, juce::StringArray* substituted = nullptr);
+    // The state in JUCE's format that `plugin` (FL's wrapper record of a project or an .fst preset) gives the plugin
+    // `d` (VST3: component + controller; VST2: FL's layout; CLAP: the plugin's bytes); empty when it can't be carried
+    // over (VST2 <-> VST3). Base64, as PluginRef::state.
+    static std::string stateFromFlWrapper (const ForeignPlugin& plugin, const juce::PluginDescription& d);
 
     // Export to FL Studio (round 171e): a plugin of this PC as FL's Fruity Wrapper keeps it — the format, its identifier
     // (VST2 id, VST3 class TUID from FL's plugin database or the module's factory, CLAP id), name, path and the state

@@ -9989,3 +9989,9 @@ countries: pl
 "LYNX SHARE is free and open source. If it helps your music, you can support it on Ko-fi." = "LYNX SHARE jest darmowy i otwartoźródłowy. Jeśli pomaga Ci w muzyce, możesz go wesprzeć na Ko-fi."
 "Show the support note" = "Pokazuj notkę o wsparciu"
 "Now and then at start-up, a small note in a corner about supporting LYNX SHARE on Ko-fi. Donating is optional and never unlocks anything." = "Od czasu do czasu, przy starcie, mała notka w rogu o wspieraniu LYNX SHARE na Ko-fi. Darowizna jest dobrowolna i nigdy niczego nie odblokowuje."
+
+# --- Round 190fs: user presets of the built-in generators
+"Generator preset: [2xLMB] new channel with it" = "Preset generatora: [2xLMB] nowy kanał z nim"
+"This preset is for {0}." = "Ten preset jest dla {0}."
+"The settings of this preset can't be carried over to this version of the plugin (VST2 / VST3)." = "Ustawień tego presetu nie da się przenieść do tej wersji wtyczki (VST2 / VST3)."
+"This preset is for {0}. Add {0} to a channel or a mixer track first (scan for plugins if it is not in the list), open its window and load the preset from its Presets menu." = "Ten preset jest dla {0}. Najpierw dodaj {0} do kanału lub ścieżki miksera (wyszukaj wtyczki, jeśli nie ma go na liście), otwórz jego okno i wczytaj preset z jego menu Presets."

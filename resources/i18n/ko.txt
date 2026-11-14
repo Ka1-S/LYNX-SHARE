@@ -9989,3 +9989,9 @@ countries: kr
 "LYNX SHARE is free and open source. If it helps your music, you can support it on Ko-fi." = "LYNX SHARE는 무료 오픈 소스입니다. 음악 작업에 도움이 된다면 Ko-fi에서 후원할 수 있습니다."
 "Show the support note" = "후원 안내 보기"
 "Now and then at start-up, a small note in a corner about supporting LYNX SHARE on Ko-fi. Donating is optional and never unlocks anything." = "가끔 시작할 때 Ko-fi에서 LYNX SHARE를 후원하는 방법에 대한 작은 안내가 구석에 표시됩니다. 후원은 선택 사항이며 아무것도 잠금 해제하지 않습니다."
+
+# --- Round 190fs: user presets of the built-in generators
+"Generator preset: [2xLMB] new channel with it" = "제너레이터 프리셋: [2xLMB] 이 프리셋으로 새 채널"
+"This preset is for {0}." = "이 프리셋은 {0}용입니다."
+"The settings of this preset can't be carried over to this version of the plugin (VST2 / VST3)." = "이 프리셋의 설정은 이 버전의 플러그인으로 옮길 수 없습니다 (VST2 / VST3)."
+"This preset is for {0}. Add {0} to a channel or a mixer track first (scan for plugins if it is not in the list), open its window and load the preset from its Presets menu." = "이 프리셋은 {0}용입니다. 먼저 {0}을(를) 채널이나 믹서 트랙에 추가하고 (목록에 없으면 플러그인을 스캔하세요), 창을 연 뒤 Presets 메뉴에서 프리셋을 불러오세요."

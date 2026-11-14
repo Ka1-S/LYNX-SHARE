@@ -109,6 +109,8 @@
 #include "ui/VisualGl.h"
 #include "ui/DanceView.h"
 #include "ui/PluginPresetMenu.h"
+#include "ui/GeneratorPresetMenu.h"
+#include "core/GeneratorPresets.h"
 #include "ui/PluginWindow.h"
 #include "ui/Motion.h"
 #include "ui/NativeChild.h"
@@ -2134,6 +2136,16 @@ public:
         if (args.contains ("--flplshot"))
         {
             setApplicationReturnValue (runFlPlShot (args[args.indexOf ("--flplshot") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        // --genpresetshot <prefix> (round 190fs): the channel window's preset box with the user's own presets (Save
+        // preset..., Your presets, Delete preset, Show the presets folder) for Fruity DX10, 3x Osc and LYNX's synth, the
+        // name box, a load (one undo step) and the Browser's new channel, offscreen; prefix-checks.txt holds the checks
+        if (args.contains ("--genpresetshot"))
+        {
+            setApplicationReturnValue (runGenPresetShot (args[args.indexOf ("--genpresetshot") + 1].unquoted()) ? 0 : 1);
             quit();
             return;
         }
@@ -12422,6 +12434,166 @@ private:
             }
         }
         return image;
+    }
+
+    // --genpresetshot (round 190fs): see the dispatch above
+    bool runGenPresetShot (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        const auto shoot = [&prefix] (juce::Component& c, const char* name) {
+            savePng (c.createComponentSnapshot (c.getLocalBounds()), prefix + "-" + name + ".png");
+        };
+        const auto plain = [] (juce::String t) { return t.upToFirstOccurrenceOf ("\t", false, false).removeCharacters ("&"); };
+        const auto texts = [&plain] (const juce::PopupMenu& menu) {
+            juce::StringArray out;
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                out.add (it.getItem().isSeparator ? juce::String ("-") : it.getItem().isSectionHeader ? "[" + plain (it.getItem().text) + "]" : plain (it.getItem().text));
+            return out;
+        };
+        const auto click = [&plain] (const juce::PopupMenu& menu, const juce::String& text) {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (plain (it.getItem().text) == plain (text) && it.getItem().isEnabled && it.getItem().action != nullptr)
+                {
+                    it.getItem().action();
+                    return true;
+                }
+            return false;
+        };
+        const auto sameSound = [] (const lynx::ChannelDef& a, const lynx::ChannelDef& b) { return lynx::genpresets::sameSound (a, b); };
+
+        lynx::AudioEngine engine (false);
+        const auto& fl = lynx::flStudioAccess();
+        auto dx = lynx::natives::makeChannel (lynx::InstrumentKind::dx10, fl);
+        auto osc = lynx::natives::makeChannel (lynx::InstrumentKind::threeosc, fl);
+        check ("channels_made", dx.has_value() && osc.has_value());
+        if (! dx || ! osc)
+        {
+            juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\n");
+            return false;
+        }
+        engine.editSong ([&] (lynx::Song& s) {
+            s.channels.clear();
+            s.channels.push_back (*dx);
+            s.channels.back().mixerTrack = 1;
+            s.channels.push_back (*osc);
+            s.channels.back().mixerTrack = 2;
+            lynx::ChannelDef synth;
+            synth.instrument = lynx::InstrumentKind::synth;
+            synth.name = "Synth";
+            synth.mixerTrack = 3;
+            s.channels.push_back (synth);
+        });
+        const auto channel = [&engine] (int i) { return engine.getSong().channels[(std::size_t) i]; };
+
+        // ---- 1. Fruity DX10: the preset box before and after "Save preset..."
+        {
+            auto frame = lynx::makeChannelFrame (engine, 0, 0);
+            frame->setSize (juce::jmax (500, frame->getWidth()), juce::jmax (300, frame->getHeight()));
+            auto menu = lynx::channelPresetMenu (*frame);
+            check ("dx10_menu", menu.has_value());
+            const auto before = menu ? texts (*menu) : juce::StringArray();
+            check ("dx10_menu_has_save", before.contains (lynx::tr ("Save preset...")) && before.contains (lynx::tr ("Show the presets folder"))
+                                             && ! before.contains ("[" + lynx::tr ("Your presets") + "]"), before.joinIntoString ("|"));
+            if (menu)
+                saveMenus (juce::StringArray { "Fruity DX10 presets" }, std::vector<juce::PopupMenu> { *menu }, prefix + "-dx10-menu-before.png");
+            // a sound of its own: the bank's 4th preset, then a knob moved (a sound no factory preset has)
+            const auto mine = [&] {
+                auto c = channel (0);
+                if (auto b = lynx::banks::withPreset (c, 3))
+                    c = *b;
+                if (! c.pluginState.empty())
+                    c.pluginState[c.pluginState.size() / 2] ^= 0x5a;
+                return c;
+            }();
+            engine.editSong ([&] (lynx::Song& s) { s.channels[0] = mine; });
+            check ("dx10_saved", lynx::channelPresetSave (*frame, "My FM Bell"));
+            const auto file = lynx::genpresetui::folderFor (lynx::InstrumentKind::dx10).getChildFile ("My FM Bell.lynxpreset");
+            check ("dx10_file", file.existsAsFile() && lynx::genpresetui::isPresetFile (file), file.getFullPathName());
+            check ("dx10_box_shows_it", lynx::channelPresetName (*frame) == "My FM Bell", lynx::channelPresetName (*frame));
+            menu = lynx::channelPresetMenu (*frame);
+            const auto after = menu ? texts (*menu) : juce::StringArray();
+            check ("dx10_menu_your_presets", after.contains ("[" + lynx::tr ("Your presets") + "]") && after.contains ("My FM Bell")
+                                                 && after.contains (lynx::tr ("Delete preset \"{0}\"", { "My FM Bell" })), after.joinIntoString ("|"));
+            if (menu)
+                saveMenus (juce::StringArray { "Fruity DX10 presets" }, std::vector<juce::PopupMenu> { *menu }, prefix + "-dx10-menu.png");
+            shoot (*frame, "dx10-window");
+            // another sound, then the user's preset from the menu: the saved sound back, one undo step, project changed
+            if (auto other = lynx::banks::withPreset (channel (0), 0))
+                engine.editSong ([&] (lynx::Song& s) { s.channels[0] = *other; });
+            check ("dx10_other_sound", ! sameSound (channel (0), mine));
+            engine.markSaved();
+            menu = lynx::channelPresetMenu (*frame);
+            check ("dx10_load_click", menu.has_value() && click (*menu, "My FM Bell"));
+            check ("dx10_loaded_identical", sameSound (channel (0), mine) && channel (0).pluginState == mine.pluginState);
+            check ("dx10_loaded_name_and_insert", channel (0).name == "My FM Bell" && channel (0).mixerTrack == 1,
+                   juce::String::fromUTF8 (channel (0).name.c_str()));
+            check ("dx10_project_changed", engine.isModified());
+            engine.undo();
+            check ("dx10_one_undo_step", ! sameSound (channel (0), mine));
+            engine.redo();
+            check ("dx10_redo", sameSound (channel (0), mine));
+            // the Browser: a new channel with the preset's generator, sound and name
+            juce::String error;
+            const auto count = engine.getSong().channels.size();
+            check ("browser_new_channel", lynx::genpresetui::addChannel (engine, file, error) && engine.getSong().channels.size() == count + 1, error);
+            const auto added = engine.getSong().channels.back();
+            check ("browser_channel_sound", added.instrument == lynx::InstrumentKind::dx10 && sameSound (added, mine) && added.name == "My FM Bell");
+            engine.undo();
+            check ("browser_channel_undo", engine.getSong().channels.size() == count);
+        }
+
+        // ---- 2. 3x Osc: save, the menu, delete
+        {
+            auto frame = lynx::makeChannelFrame (engine, 1, 0);
+            frame->setSize (juce::jmax (500, frame->getWidth()), juce::jmax (300, frame->getHeight()));
+            check ("3xosc_saved", lynx::channelPresetSave (*frame, "Wide Saw Lead") && lynx::channelPresetSave (*frame, "Sub Bass"));
+            auto menu = lynx::channelPresetMenu (*frame);
+            const auto items = menu ? texts (*menu) : juce::StringArray();
+            check ("3xosc_menu", items.contains ("Wide Saw Lead") && items.contains ("Sub Bass") && items.contains (lynx::tr ("Save preset...")),
+                   items.joinIntoString ("|"));
+            if (menu)
+                saveMenus (juce::StringArray { "3x Osc presets" }, std::vector<juce::PopupMenu> { *menu }, prefix + "-3xosc-menu.png");
+            shoot (*frame, "3xosc-window");
+            check ("3xosc_delete", menu.has_value() && click (*menu, lynx::tr ("Delete preset \"{0}\"", { "Sub Bass" })));
+            check ("3xosc_deleted", lynx::genpresetui::userPresets (lynx::InstrumentKind::threeosc).size() == 1
+                                        && ! lynx::genpresetui::folderFor (lynx::InstrumentKind::threeosc).getChildFile ("Sub Bass.lynxpreset").exists());
+            menu = lynx::channelPresetMenu (*frame);
+            const auto left = menu ? texts (*menu) : juce::StringArray();
+            check ("3xosc_menu_after_delete", left.contains ("Wide Saw Lead") && ! left.contains ("Sub Bass"), left.joinIntoString ("|"));
+        }
+
+        // ---- 3. LYNX's synth: its "Presets..." box
+        {
+            engine.editSong ([] (lynx::Song& s) { s.channels[2].synth.cutoff = 777.0f; });
+            auto frame = lynx::makeChannelFrame (engine, 2, 0);
+            frame->setSize (juce::jmax (500, frame->getWidth()), juce::jmax (300, frame->getHeight()));
+            check ("synth_saved", lynx::channelPresetSave (*frame, "Dark Pad"));
+            const auto menu = lynx::channelPresetMenu (*frame);
+            const auto items = menu ? texts (*menu) : juce::StringArray();
+            check ("synth_menu", items.contains ("Dark Pad") && items.contains (lynx::tr ("Save preset...")) && items.contains (lynx::tr ("Show the presets folder")),
+                   items.joinIntoString ("|"));
+            if (menu)
+                saveMenus (juce::StringArray { "Synth presets" }, std::vector<juce::PopupMenu> { *menu }, prefix + "-synth-menu.png");
+            const auto saved = lynx::genpresetui::read (lynx::genpresetui::folderFor (lynx::InstrumentKind::synth).getChildFile ("Dark Pad.lynxpreset"));
+            check ("synth_file", saved.has_value() && saved->sound.synth.cutoff == 777.0f);
+        }
+
+        // ---- 4. the name box (the hosted plugins' and the effects' "Save preset" box)
+        {
+            auto box = lynx::genpresetui::makeNameBox ("My FM Bell");
+            box->setSize (juce::jmax (360, box->getWidth()), juce::jmax (150, box->getHeight()));
+            shoot (*box, "save-name-box");
+            check ("name_box", box->getTextEditorContents ("name") == "My FM Bell");
+        }
+
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\n");
+        return allOk;
     }
 
     // --flfixshot (round 190ey): see the dispatch above

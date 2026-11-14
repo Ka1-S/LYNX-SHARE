@@ -293,6 +293,7 @@ target_sources(lynx_core PRIVATE
     src/core/History.cpp
     src/core/EffectPresets.cpp
     src/core/PluginPresets.cpp
+    src/core/GeneratorPresets.cpp
     src/core/ParamHelp.cpp
     src/core/SearchQuery.cpp src/core/SearchIndex.cpp src/core/SearchService.cpp src/core/BrowserView.cpp)
 
@@ -483,6 +484,7 @@ if(LYNX_BUILD_APP)
         src/ui/QuickPick.cpp
         src/ui/PluginWindow.cpp
         src/ui/PluginPresetMenu.cpp
+        src/ui/GeneratorPresetMenu.cpp
         src/ui/ProjectLoading.cpp
         src/ui/WindowOwner.cpp
         src/ui/PluginKeysTest.cpp

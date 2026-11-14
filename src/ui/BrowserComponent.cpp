@@ -1,4 +1,5 @@
 #include "ui/PluginPresetMenu.h"
+#include "ui/GeneratorPresetMenu.h"
 #include "ui/FileChoosers.h"
 #include "ui/QuickPick.h"
 #include "engine/FlStudio.h"
@@ -151,6 +152,8 @@ juce::String rowHint (const juce::File& f, bool folder, bool expanded)
         return tr ("Mixer preset: [2xLMB] load it onto the selected mixer tracks  drag onto a mixer track (onto the empty mixer space: a new track)");
     if (f.hasFileExtension ("fst"))
         return tr ("Preset: [2xLMB] new channel with it (FL synth presets)  drag onto a mixer insert: effect preset");
+    if (f.hasFileExtension ("lynxpreset") && f.isAChildOf (genpresetui::root()))
+        return tr ("Generator preset: [2xLMB] new channel with it");
     if (f.hasFileExtension ("lynxpreset;fxp;fxb;vstpreset"))
         return tr ("Plugin preset: [2xLMB] load it into its plugin (an open plugin window, or the selected channel's plugin)");
     if (f.hasFileExtension ("sfz"))
@@ -4424,7 +4427,7 @@ void BrowserComponent::showFileMenu (const juce::File& file)
         menu.addItem (tr ("Open project"), onOpenProject != nullptr, false, [this, file] { onOpenProject (file); });
     else if (file.hasFileExtension ("mid;midi"))
         menu.addItem (tr ("Open MIDI file"), onOpenProject != nullptr, false, [this, file] { onOpenProject (file); });
-    else if (file.hasFileExtension ("fst;gmsynth"))
+    else if (file.hasFileExtension ("fst;gmsynth") || genpresetui::isPresetFile (file))
         menu.addItem (tr ("Open in a new channel"), [this, file] { openFile (file); });
     else if (file.hasFileExtension ("sf2;sf3;sfz"))
     {
@@ -5270,6 +5273,14 @@ void BrowserComponent::newSampleChannel (const juce::File& file)
 
 void BrowserComponent::openFile (const juce::File& file)
 {
+    // a user preset of one of LYNX's generators (round 190fs): a new channel with that generator and sound
+    if (genpresetui::isPresetFile (file))
+    {
+        juce::String error;
+        if (! genpresetui::addChannel (engine, file, error) && error.isNotEmpty())
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Preset"), error);
+        return;
+    }
     // a hosted plugin's preset (round 162d, issue #8): into the plugin it belongs to
     if (pluginpresetui::isPresetFile (file) && (! file.hasFileExtension ("lynxpreset") || pluginpresetui::readLynxPreset (file).has_value()))
     {
@@ -5309,6 +5320,14 @@ void BrowserComponent::openFile (const juce::File& file)
     // preset of an FL synth that LYNX converts (3x Osc, Sytrus, GMS...): new channel with the built-in synth
     if (file.hasFileExtension ("fst;gmsynth"))
     {
+        // FL's preset of a third-party plugin (round 190fs): into that plugin (an open window, or a new channel)
+        if (pluginpresetui::isFlPresetOfPlugin (file))
+        {
+            juce::String message;
+            if (! pluginpresetui::applyFlPresetFromBrowser (engine, file, message) && message.isNotEmpty())
+                juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Preset"), message);
+            return;
+        }
         juce::MemoryBlock data;
 
         if (! file.loadFileAsData (data))

@@ -9989,3 +9989,9 @@ countries: jp
 "LYNX SHARE is free and open source. If it helps your music, you can support it on Ko-fi." = "LYNX SHARE は無料のオープンソースです。音楽づくりに役立っているなら、Ko-fi で支援できます。"
 "Show the support note" = "支援のお知らせを表示"
 "Now and then at start-up, a small note in a corner about supporting LYNX SHARE on Ko-fi. Donating is optional and never unlocks anything." = "起動時にときどき、LYNX SHARE を Ko-fi で支援することについての小さなお知らせを隅に表示します。寄付は任意で、何かが解除されることはありません。"
+
+# --- Round 190fs: user presets of the built-in generators
+"Generator preset: [2xLMB] new channel with it" = "ジェネレーターのプリセット: [2xLMB] このプリセットで新しいチャンネル"
+"This preset is for {0}." = "このプリセットは {0} 用です。"
+"The settings of this preset can't be carried over to this version of the plugin (VST2 / VST3)." = "このプリセットの設定は、このバージョンのプラグインに引き継げません (VST2 / VST3)。"
+"This preset is for {0}. Add {0} to a channel or a mixer track first (scan for plugins if it is not in the list), open its window and load the preset from its Presets menu." = "このプリセットは {0} 用です。まず {0} をチャンネルかミキサートラックに追加し (一覧にない場合はプラグインをスキャン)、そのウィンドウを開いて Presets メニューからプリセットを読み込んでください。"
