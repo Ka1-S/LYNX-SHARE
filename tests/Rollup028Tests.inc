@@ -210,18 +210,21 @@ TEST (rollup028_live_imports_keep_embers_classic_tape)
     using namespace lynx::alsdev;
     using als190fm::par;
     namespace em = mixsuite::ember;
-    const auto t = als190fm::translate (als190fm::roar (1, par ("Stage1_Shaper_Type", 7) + par ("Stage2_Shaper_Type", 7)));
-    const auto* r = t ? als190fm::rackOf (*t) : nullptr;
-    CHECK (r != nullptr);
+    const auto t = als190fm::translate (als190fm::roar (1, par ("Stage1_Shaper_Type", 7) + par ("Stage2_Shaper_Type", 7) + par ("Output_DryWet", 1.0)));
+    CHECK (t.has_value());
     int embers = 0;
-    if (r != nullptr)
-        for (const auto& node : t->slot.patcher.nodes)
-            if (node.effect.kind == EffectKind::ember)
-            {
-                ++embers;
-                CHECK (em::styleOf (node.effect.params[em::style]) == em::Style::tape);
-                CHECK (node.effect.params[(std::size_t) em::law] == 0.0f && ! em::measuredTape (node.effect.params));
-            }
+    std::function<void (const EffectSlot&)> visit = [&] (const EffectSlot& slot) {
+        if (slot.kind == EffectKind::ember)
+        {
+            ++embers;
+            CHECK (em::styleOf (slot.params[em::style]) == em::Style::tape);
+            CHECK (slot.params[(std::size_t) em::law] == 0.0f && ! em::measuredTape (slot.params));
+        }
+        for (const auto& node : slot.patcher.nodes) // (racks, racks in racks)
+            visit (node.effect);
+    };
+    if (t.has_value())
+        visit (t->slot);
     CHECK (embers >= 1);
     // a new Ember in the Tape style is the measured one (190fj's default), so the pin above is what keeps the import
     auto fresh = makeEffectSlot (EffectKind::ember);
