@@ -19837,6 +19837,9 @@ private:
         playlist.setViewForSnapshot (360.0, 0, 0);
         ui.resized();
         offline.dispatchPendingMessages();
+        (void) lynx::shot::snapshot (ui); // (a paint starts the waveform analyses; the shot waits for them)
+        lynx::ui::WaveformCache::getInstance()->waitUntilIdle (8000);
+        offline.dispatchPendingMessages();
         write (ui, "01-playlist-envelopes");
 
         // the clip menu: LYNX's extras with Clip envelope ›, Auto-warp, Quantize audio (Auto-warp run from it on the loop)
