@@ -255,6 +255,11 @@ struct RackState
     std::vector<int> graphIndegree;                   // [task] tasks that must finish first
     std::vector<int> graphNextStart, graphNext;       // [task] → successors (CSR)
     std::vector<int> graphRoots;                      // tasks with nothing before them, heaviest kind first
+    // Round 190gq (REA 190hb, FL's mixer threading runs each serial chain of tracks as one unit): [task] the task run
+    // right after it on the same thread (its only successor, which nothing else feeds), −1 none; those tasks are not
+    // handed out on their own (graphFusedCount of them), so a chain costs no hand-off per link
+    std::vector<int> graphFused;
+    int graphFusedCount = 0;
     std::vector<std::vector<int>> trackChannels;      // [track] the channels playing into it, in channel order
     void buildMixerGraph();
     void applyVcas(); // VCA mutes into mixerAudible, the VCA chains (round 177a)

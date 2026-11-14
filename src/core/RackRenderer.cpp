@@ -1293,6 +1293,17 @@ void RackState::buildTaskGraph (const std::vector<int>& depth)
     for (int i = 0; i < tasks; ++i)
         if (graphIndegree[(std::size_t) i] == 0)
             graphRoots.push_back (i);
+    // serial chains (round 190gq): a task whose only successor is fed by nothing else runs that successor itself
+    graphFused.assign ((std::size_t) tasks, -1);
+    graphFusedCount = 0;
+    if (std::getenv ("LYNX_CHAINS") == nullptr || std::atoi (std::getenv ("LYNX_CHAINS")) != 0)
+        for (int i = 0; i < tasks; ++i)
+            if (graphNextStart[(std::size_t) i + 1] - graphNextStart[(std::size_t) i] == 1)
+                if (const auto j = graphNext[(std::size_t) graphNextStart[(std::size_t) i]]; graphIndegree[(std::size_t) j] == 1)
+                {
+                    graphFused[(std::size_t) i] = j;
+                    ++graphFusedCount;
+                }
     graphOk = true;
 }
 
@@ -4169,6 +4180,7 @@ constexpr std::uint64_t lightChunkNs = 60000; // 60 µs (about 1 % of a 256-samp
 // workers at 64 samples at ~110 µs of CPU per block in a light project), a mixer layer below layerSerialNs too, and the
 // channel pass hands out clusters of about clusterWorkNs
 constexpr std::uint64_t serialWorkNs = 150000, layerSerialNs = 30000, clusterWorkNs = 20000;
+constexpr double parallelShare = 0.6; // (round 190gq, REA 190hc: a snapshot that guessed "serial" goes parallel past this)
 // LYNX_A7=0: the round 190ge dispatch (A/B measurements with one build, as LYNX_TASKGRAPH)
 bool adaptiveThreads() noexcept
 {
@@ -4465,8 +4477,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     // or not, so the next chunk decides on fresh numbers.
     // Round 190gq (REA 190hc action 1): whether the work goes to the workers at all is measured too. The snapshot's
     // guess (2+ hosted plugins or 24+ channels) left a set of LYNX's own devices (Live's "Patience", 15 tracks) on one
-    // thread at 104-110 % of its deadline with every worker idle: a chunk whose units did at least a hand-off's worth
-    // of work last time runs in parallel whatever its plugin and channel counts.
+    // thread at 104-110 % of its deadline with every worker idle: a chunk whose units' work last time would fill most of
+    // its real time runs in parallel whatever its plugin and channel counts.
     measureUnits = pool != nullptr && adaptiveThreads();
     parallelChunk = state.parallel;
     if (adaptiveThreads() && workers != nullptr)
@@ -4477,7 +4489,11 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
             work += channelCostNs[(std::size_t) c];
         for (int t = 1; t < tracks && t < maxMixerTracks; ++t)
             work += trackCostNs[(std::size_t) t];
-        parallelChunk = state.parallel || work >= serialWorkNs;
+        // (the snapshot's guess, with A7's serial rule below; or, whatever the counts, when the chunk's measured work
+        // would take more than parallelShare of its real time on one thread: parallelism pays only near the deadline —
+        // measured: Patience at 64 samples, 53 % of a core in small units, cost more CPU and more overruns in parallel)
+        const auto chunkNs = sampleRate > 0.0 ? 1.0e9 * numSamples / sampleRate : 0.0;
+        parallelChunk = state.parallel || (double) work >= parallelShare * chunkNs;
         if (events.size() == 0 && work < serialWorkNs && (liveInput == nullptr || liveInput->numChannels == 0))
             workers = nullptr;
     }
@@ -4881,6 +4897,8 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
                 std::this_thread::yield();
         }
         --id;
+        for (;;) // (a serial chain runs here link after link: round 190gq)
+        {
         const auto before = timing || measureUnits ? ProcessTimes::now() : 0; // (A7: every task's time, for the next chunk's choice)
         if (id < channels)
         {
@@ -4903,6 +4921,11 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
             if (measureUnits && t < maxMixerTracks)
                 trackCostNs[(std::size_t) t] = (std::uint32_t) std::min<std::uint64_t> (ProcessTimes::now() - before, 0xffffffffu);
         }
+        const auto fused = (std::size_t) id < state.graphFused.size() ? state.graphFused[(std::size_t) id] : -1;
+        if (fused < 0)
+            break;
+        id = fused;
+        }
         for (auto k = state.graphNextStart[(std::size_t) id]; k < state.graphNextStart[(std::size_t) id + 1]; ++k)
         {
             const auto j = state.graphNext[(std::size_t) k];
@@ -4910,7 +4933,7 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
                 graphSlots[(std::size_t) graphPushed.fetch_add (1, std::memory_order_acq_rel)].store (j + 1, std::memory_order_release);
         }
     };
-    workers->parallelFor (tasks, task);
+    workers->parallelFor (tasks - state.graphFusedCount, task);
 
     // the Master's own channels and input (its effects run after, as before)
     sumChannelsInto (state, 0, channels, n);

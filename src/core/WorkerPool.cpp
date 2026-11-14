@@ -1,6 +1,7 @@
 #include "core/WorkerPool.h"
 
 #include <chrono>
+#include <cstdlib>
 #include <ctime>
 
 #include "core/Denormals.h"
@@ -231,7 +232,8 @@ bool WorkerPool::work (bool isWorker) noexcept
             return;
         if (isWorker)
             byWorkers.fetch_add ((std::uint64_t) ran, std::memory_order_relaxed);
-        done.fetch_add (ran, std::memory_order_acq_rel);
+        if (done.fetch_add (ran, std::memory_order_acq_rel) + ran == target && callerWaiting.exchange (false, std::memory_order_acq_rel))
+            finished->release(); // (the last of the round: the caller sleeps)
         ran = 0;
     };
 
@@ -269,6 +271,7 @@ void WorkerPool::run (int n, void* ctx, Call fn) noexcept
 
     context = ctx;
     call = fn;
+    target = n;
     done.store (0, std::memory_order_relaxed);
     ++generation;
     const auto base = generation << (2 * indexBits);
@@ -280,11 +283,36 @@ void WorkerPool::run (int n, void* ctx, Call fn) noexcept
 
     work (false);
 
-    for (int spins = 0; done.load (std::memory_order_acquire) < n; ++spins)
+    // (round 190gq) a short spin for the last indices, then sleep until the worker finishing the round wakes us
+    // (LYNX_CALLER_SLEEP=0: the old spin-and-yield wait, for A/B runs)
+    static const bool callerSleeps = [] { const char* e = std::getenv ("LYNX_CALLER_SLEEP"); return e == nullptr || std::atoi (e) != 0; }();
+    if (! callerSleeps)
+        for (int spins = 0; done.load (std::memory_order_acquire) < n; ++spins)
+        {
+            cpuRelax();
+            if ((spins & 1023) == 1023)
+                std::this_thread::yield();
+        }
+    if (done.load (std::memory_order_acquire) < n)
     {
-        cpuRelax();
-        if ((spins & 1023) == 1023)
-            std::this_thread::yield();
+        const auto spinUntil = std::chrono::steady_clock::now() + std::chrono::microseconds (callerSpinMicros);
+        for (int spins = 0; done.load (std::memory_order_acquire) < n; ++spins)
+        {
+            cpuRelax();
+            if ((spins & 63) == 63 && std::chrono::steady_clock::now() > spinUntil)
+            {
+                callerWaiting.store (true, std::memory_order_seq_cst);
+                if (done.load (std::memory_order_seq_cst) >= n)
+                {
+                    // finished meanwhile: take back the flag, or the wake already sent for it
+                    if (! callerWaiting.exchange (false, std::memory_order_acq_rel))
+                        finished->acquire();
+                    break;
+                }
+                finished->acquire();
+                break;
+            }
+        }
     }
 
     ticket.store (base, std::memory_order_release); // count 0: late workers take nothing

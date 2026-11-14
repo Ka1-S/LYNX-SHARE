@@ -112,6 +112,12 @@ private:
     static constexpr int indexBits = 20;
     alignas (64) std::atomic<std::uint64_t> ticket { 0 };
     alignas (64) std::atomic<int> done { 0 };
+    // Round 190gq (REA 190hb: FL's caller never spins): the caller spins callerSpinMicros for the last index, then sleeps
+    // on `finished`; the index that completes the round wakes it (callerWaiting: one wake per wait, never a stale one)
+    std::atomic<bool> callerWaiting { false };
+    int target = 0; // the round's count (written before the ticket)
+    std::unique_ptr<OsSemaphore> finished = std::make_unique<OsSemaphore>();
+    static constexpr int callerSpinMicros = 20;
     alignas (64) std::uint64_t generation = 0; // caller thread only
     std::atomic<std::uint64_t> byWorkers { 0 }, wokenUp { 0 };
     alignas (64) std::atomic<std::uint64_t> workersCpu { 0 };
