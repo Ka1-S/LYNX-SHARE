@@ -1,5 +1,9 @@
 #include "engine/AudioEngine.h"
 #include "core/VideoPlayer.h"
+#include "engine/ProjectFile.h"
+#include "engine/RemoteError.h"
+#include "engine/RemoteHistory.h"
+#include "core/Sha256.h"
 
 #include "core/Comping.h"
 #include "core/CountIn.h"
@@ -66,6 +70,32 @@
 
 namespace lynx
 {
+namespace
+{
+std::unordered_set<std::uint64_t> remoteFreshTargets (const Song& before, const Song& after)
+{
+    std::unordered_set<std::uint64_t> existing, fresh;
+    for (const auto& channel : before.channels) existing.insert (channel.instance.id);
+    for (const auto& track : before.mixer)
+        for (const auto& effect : track.effects) existing.insert (effect.instance.id);
+    for (const auto& channel : after.channels)
+        if (! existing.contains (channel.instance.id)) fresh.insert (channel.instance.id);
+    for (const auto& track : after.mixer)
+        for (const auto& effect : track.effects)
+            if (! existing.contains (effect.instance.id)) fresh.insert (effect.instance.id);
+    return fresh;
+}
+
+void adoptCapturedRemoteDevices (Song& model, RackState& published, Song&& captured)
+{
+    // Capturing changes only saved hosted-state bytes. Keep the model and reuse baseline equal to the verified
+    // running devices without publishing, changing history or capturing a vendor a second time.
+    remote_history::mirrorCapturedHostedStates (captured, published.song);
+    model.channels = std::move (captured.channels);
+    model.mixer = std::move (captured.mixer);
+}
+}
+
 using IONode = juce::AudioProcessorGraph::AudioGraphIOProcessor;
 
 // The FL Studio installation (registry, else the usual folders) to resolve %FLStudio...%.
@@ -3222,6 +3252,8 @@ void AudioEngine::setSong (Song newSong)
 
 void AudioEngine::saveUndoStep()
 {
+    const auto remote = nextRemoteHistoryStep;
+    nextRemoteHistoryStep = false;
     // Dozens of edits arrive during a drag; only the first one of the click saves the state.
     bool samePress = false;
 
@@ -3238,7 +3270,7 @@ void AudioEngine::saveUndoStep()
 
     if (! samePress)
     {
-        undoStack.push_back (song);
+        undoStack.push_back ({ song, remote });
         redoStack.clear();
 
         if (undoStack.size() > maxUndoSteps)
@@ -3250,7 +3282,7 @@ void AudioEngine::saveUndoStep()
         if (sessionHistory)
         {
             closeSessionStep();
-            sessionUndo.push_back ({ song, song });
+            sessionUndo.push_back ({ song, song, remote });
             sessionRedo.clear();
             if (sessionUndo.size() > maxUndoSteps)
                 sessionUndo.pop_front();
@@ -3349,24 +3381,69 @@ void AudioEngine::sessionStep (bool redo)
     closeSessionStep();
     auto& from = redo ? sessionRedo : sessionUndo;
     auto& to = redo ? sessionUndo : sessionRedo;
-    if (from.empty())
-        return;
-    auto step = std::move (from.back());
-    from.pop_back();
-    std::vector<live::Key> skipped;
-    // undo: the step's entities back to "before" (where they still are as "after" left them); redo the other way
-    auto next = redo ? live::selectiveRevert (song, step.second, step.first, &skipped) : live::selectiveRevert (song, step.first, step.second, &skipped);
-    juce::StringArray names;
-    for (const auto& k : skipped)
-        names.addIfNotAlreadyThere (juce::String::fromUTF8 (live::describe (k, song, [] (const char* s) { return tr (s).toStdString(); }).c_str()));
-    to.push_back (std::move (step));
-    song = std::move (next);
-    modified = true;
-    lastUndoPress = {};
-    clipops::updateCrossfades (song);
-    publishSong();
-    if (! names.isEmpty() && onSessionUndoSkipped)
-        onSessionUndoSkipped (names);
+    if (from.empty()) return;
+    const auto remote = from.back().remote;
+    bool movementMayHaveBegun = false;
+    try
+    {
+        std::optional<Song> before;
+        if (remote)
+        {
+            before = song;
+            capturePluginStatesInto (*before, false);
+            if (remoteHistoryApiStep && ! checkRemoteHistory (from.back().deviceHash, *before)) return;
+        }
+        // Prepare the pending after-state, selective result and all conflict labels before touching either stack.
+        auto step = from.back();
+        if (remote)
+        {
+            // API calls passed the device fence; native history intentionally restores without that refusal.
+            // Capture this endpoint while keeping metadata for selective conflicts in the remaining entities.
+            auto& outgoing = redo ? step.first : step.second;
+            outgoing.channels = before->channels;
+            outgoing.mixer = before->mixer;
+        }
+        const auto& current = before ? *before : song;
+        std::vector<live::Key> skipped;
+        auto next = redo ? live::selectiveRevert (current, step.second, step.first, &skipped)
+                         : live::selectiveRevert (current, step.first, step.second, &skipped);
+        const auto savedTargetHash = remote ? remoteDeviceStateHashOf (next) : juce::String();
+        juce::StringArray names;
+        for (const auto& key : skipped)
+            names.addIfNotAlreadyThere (juce::String::fromUTF8 (live::describe (key, song, [] (const char* s) { return tr (s).toStdString(); }).c_str()));
+        const auto fresh = remote ? remoteFreshTargets (*before, next) : std::unordered_set<std::uint64_t>();
+        const juce::ScopedValueSetter<std::unordered_set<std::uint64_t>> freshPolicy (remoteFreshInstances, fresh);
+        if (remoteHistoryApiStep && remoteHistoryCancelled && remoteHistoryCancelled())
+        {
+            failRemoteHistory (false);
+            remoteHistoryError = tr ("Remote history operation cancelled before changing history.");
+            return;
+        }
+        movementMayHaveBegun = true;
+        to.push_back (std::move (step));
+        from.pop_back();
+        sessionAfterOpen = false;
+        song = std::move (next);
+        modified = true;
+        lastUndoPress = {};
+        clipops::updateCrossfades (song);
+        levelsPending = false;
+        publishSong();
+        const auto fence = finishRemoteHistory (before);
+        if (remote && ! remoteHistoryFailed)
+        {
+            auto& incoming = redo ? to.back().second : to.back().first;
+            incoming.channels = song.channels;
+            incoming.mixer = song.mixer;
+            remote_history::acceptRestoredState (to.back(), from.empty() ? nullptr : &from.back(), savedTargetHash, fence);
+        }
+        if (! names.isEmpty() && onSessionUndoSkipped) onSessionUndoSkipped (names);
+    }
+    catch (...)
+    {
+        if (! remote) throw;
+        failRemoteHistory (movementMayHaveBegun);
+    }
 }
 
 void AudioEngine::setSessionHistory (bool on)
@@ -3386,47 +3463,86 @@ void AudioEngine::applyRemote (Song remote)
     publishSong();
 }
 
+void AudioEngine::historyStep (bool redo)
+{
+    auto& from = redo ? redoStack : undoStack;
+    auto& to = redo ? undoStack : redoStack;
+    if (from.empty()) return;
+    const auto remote = from.back().remote;
+    bool movementMayHaveBegun = false;
+    try
+    {
+        std::optional<Song> before;
+        if (remote)
+        {
+            before = song;
+            capturePluginStatesInto (*before, false);
+            if (remoteHistoryApiStep && ! checkRemoteHistory (from.back().deviceHash, *before)) return;
+        }
+        const auto savedTargetHash = remote ? remoteDeviceStateHashOf (from.back().song) : juce::String();
+        // The model's saved blob can differ from the running vendor's normalized blob. Redo must restore the
+        // actual state we are leaving, captured before any history movement, rather than the stale model bytes.
+        std::optional<HistoryEntry> inverse;
+        if (remote) inverse.emplace (HistoryEntry { *before, true });
+        const auto fresh = remote ? remoteFreshTargets (*before, from.back().song) : std::unordered_set<std::uint64_t>();
+        const juce::ScopedValueSetter<std::unordered_set<std::uint64_t>> freshPolicy (remoteFreshInstances, fresh);
+        if (remoteHistoryApiStep && remoteHistoryCancelled && remoteHistoryCancelled())
+        {
+            failRemoteHistory (false);
+            remoteHistoryError = tr ("Remote history operation cancelled before changing history.");
+            return;
+        }
+        // Moving song into a temporary may already change the live model even if push_back throws.
+        movementMayHaveBegun = true;
+        if (remote) to.push_back (std::move (*inverse));
+        else to.push_back ({ std::move (song), false });
+        song = std::move (from.back().song);
+        from.pop_back();
+        comp::setAudition (song, -1); // an old history state must not resume a comp audition
+        modified = true;
+        levelsPending = false;
+        lastUndoPress = {};
+        publishSong();
+        const auto fence = finishRemoteHistory (before);
+        if (remote && ! remoteHistoryFailed)
+            remote_history::acceptRestoredState (to.back(), from.empty() ? nullptr : &from.back(),
+                                                 savedTargetHash, fence);
+    }
+    catch (...)
+    {
+        if (! remote) throw;
+        failRemoteHistory (movementMayHaveBegun);
+    }
+}
+
 void AudioEngine::undo()
 {
-    if (sessionHistory)
-        return sessionStep (false);
-    if (undoStack.empty())
-        return;
-
-    redoStack.push_back (std::move (song));
-    song = std::move (undoStack.back());
-    undoStack.pop_back();
-    comp::setAudition (song, -1); // (not an edit: whatever an old state had auditioned stays out of it)
-    modified = true;
-    lastUndoPress = {};
-    publishSong();
+    remoteHistoryFailed = false;
+    remoteHistoryUncertain = false;
+    remoteHistoryError.clear();
+    remoteHistoryCode = "changed";
+    if (sessionHistory) sessionStep (false); else historyStep (false);
 }
 
 void AudioEngine::redo()
 {
-    if (sessionHistory)
-        return sessionStep (true);
-    if (redoStack.empty())
-        return;
-
-    undoStack.push_back (std::move (song));
-    song = std::move (redoStack.back());
-    redoStack.pop_back();
-    comp::setAudition (song, -1);
-    modified = true;
-    lastUndoPress = {};
-    publishSong();
+    remoteHistoryFailed = false;
+    remoteHistoryUncertain = false;
+    remoteHistoryError.clear();
+    remoteHistoryCode = "changed";
+    if (sessionHistory) sessionStep (true); else historyStep (true);
 }
 
 namespace
 {
-const Song& historyState (const std::deque<Song>& undo, const Song& current, const std::deque<Song>& redo, int index)
+template <typename Entries>
+const Song& historyState (const Entries& undo, const Song& current, const Entries& redo, int index)
 {
     if (index < (int) undo.size())
-        return undo[(std::size_t) index];
+        return undo[(std::size_t) index].song;
     if (index == (int) undo.size())
         return current;
-    return redo[redo.size() - 1 - (std::size_t) (index - (int) undo.size() - 1)];
+    return redo[redo.size() - 1 - (std::size_t) (index - (int) undo.size() - 1)].song;
 }
 } // namespace
 
@@ -3452,30 +3568,55 @@ void AudioEngine::jumpToHistory (int index)
         return;
     if (sessionHistory)
     {
-        while (getHistoryPosition() > index && ! sessionUndo.empty())
-            sessionStep (false);
-        while (getHistoryPosition() < index && ! sessionRedo.empty())
-            sessionStep (true);
+        while (getHistoryPosition() != index)
+        {
+            const auto previous = getHistoryPosition();
+            if (previous > index) undo(); else redo();
+            if (remoteHistoryFailed || getHistoryPosition() == previous) return;
+        }
         return;
     }
 
+    bool remote = false;
+    const auto position = getHistoryPosition();
+    if (index < position)
+        for (int i = index; i < position; ++i) remote = remote || undoStack[(std::size_t) i].remote;
+    else
+        for (int i = 0; i < index - position; ++i) remote = remote || redoStack[redoStack.size() - 1 - (std::size_t) i].remote;
+    if (remote)
+    {
+        while (getHistoryPosition() > index)
+        {
+            const auto previous = getHistoryPosition();
+            undo();
+            if (remoteHistoryFailed || getHistoryPosition() == previous) return;
+        }
+        while (getHistoryPosition() < index)
+        {
+            const auto previous = getHistoryPosition();
+            redo();
+            if (remoteHistoryFailed || getHistoryPosition() == previous) return;
+        }
+        return;
+    }
     // move through the stacks, then publish once
     while (getHistoryPosition() > index && ! undoStack.empty())
     {
-        redoStack.push_back (std::move (song));
-        song = std::move (undoStack.back());
+        redoStack.push_back ({ std::move (song), undoStack.back().remote });
+        song = std::move (undoStack.back().song);
         undoStack.pop_back();
     }
 
     while (getHistoryPosition() < index && ! redoStack.empty())
     {
-        undoStack.push_back (std::move (song));
-        song = std::move (redoStack.back());
+        undoStack.push_back ({ std::move (song), redoStack.back().remote });
+        song = std::move (redoStack.back().song);
         redoStack.pop_back();
     }
 
     modified = true;
     lastUndoPress = {};
+    levelsPending = false;
     publishSong();
 }
 
@@ -4231,6 +4372,7 @@ void AudioEngine::publishSong()
             duringPluginCreation();
         return plugins.makeEffect (ref, sr);
     };
+    factories.freshInstances = std::exchange (remoteFreshInstances, {});
     if (rebuildPlugins) // round 190ap: a plugin switched back on (switchPluginOn)
         factories.rebuildPlugin = [this] (const PluginRef& ref) { return rebuildPluginId.empty() || ref.id == rebuildPluginId; };
 
@@ -5761,23 +5903,26 @@ void AudioEngine::flushEdisonAudio()
         editSong (apply, false);
 }
 
-void AudioEngine::capturePluginStates()
+void AudioEngine::capturePluginStatesInto (Song& target, bool requireAll)
 {
-    stampWorkTime();
-    flushEdisonAudio(); // (round 190cd: an Edison slot's audio is a file of the project)
+    const auto capture = [requireAll] (auto* plugin) {
+        auto state = plugin->captureState();
+        if (! state && requireAll) throw RemoteError ("failed", "Cannot capture a live device; no project changes were made");
+        return state;
+    };
     // Changes only the saved state (recreates nothing and doesn't enter the undo history).
-    for (std::size_t i = 0; i < song.channels.size(); ++i)
+    for (std::size_t i = 0; i < target.channels.size(); ++i)
         if (auto* p = dynamic_cast<PluginInstrument*> (getChannelInstrument ((int) i).get()))
-            if (song.channels[i].plugin.playedBy == 0) // (P5-A1: a plugin shared in a live session keeps no state, only values)
-                if (auto state = p->captureState()) // (a plugin that crashed keeps the state saved before)
-                    song.channels[i].plugin.state = std::move (*state);
+            if (target.channels[i].plugin.playedBy == 0) // (P5-A1: a plugin shared in a live session keeps no state, only values)
+                if (auto state = capture (p)) // (a plugin that crashed keeps the state saved before)
+                    target.channels[i].plugin.state = std::move (*state);
 
-    for (std::size_t t = 0; t < song.mixer.size(); ++t)
-        for (std::size_t s = 0; s < song.mixer[t].effects.size(); ++s)
+    for (std::size_t t = 0; t < target.mixer.size(); ++t)
+        for (std::size_t s = 0; s < target.mixer[t].effects.size(); ++s)
             if (auto* p = dynamic_cast<PluginEffect*> (getEffect ((int) t, (int) s).get()))
-                if (song.mixer[t].effects[s].plugin.playedBy == 0)
-                    if (auto state = p->captureState())
-                        song.mixer[t].effects[s].plugin.state = std::move (*state);
+                if (target.mixer[t].effects[s].plugin.playedBy == 0)
+                    if (auto state = capture (p))
+                        target.mixer[t].effects[s].plugin.state = std::move (*state);
 
     // the plugins inside Patchers (REA_rodada141), nested ones too
     std::function<void (PatcherDoc&, patcher::Graph*)> captureGraph = [&] (PatcherDoc& doc, patcher::Graph* graph) {
@@ -5790,7 +5935,7 @@ void AudioEngine::capturePluginStates()
             {
                 auto instrument = graph->instrumentAt (n);
                 if (auto* p = dynamic_cast<PluginInstrument*> (instrument.get()))
-                    if (auto state = p->captureState())
+                    if (auto state = capture (p))
                         node.channel.plugin.state = std::move (*state);
                 if (node.channel.instrument == InstrumentKind::patcher)
                     captureGraph (node.channel.patcher, patcher::graphOf (instrument.get()));
@@ -5799,23 +5944,55 @@ void AudioEngine::capturePluginStates()
             {
                 auto effect = graph->effectAt (n);
                 if (auto* p = dynamic_cast<PluginEffect*> (effect.get()))
-                    if (auto state = p->captureState())
+                    if (auto state = capture (p))
                         node.effect.plugin.state = std::move (*state);
                 if (node.effect.kind == EffectKind::patcher)
                     captureGraph (node.effect.patcher, patcher::graphOf (effect.get()));
             }
         }
     };
-    for (std::size_t i = 0; i < song.channels.size(); ++i)
-        if (song.channels[i].instrument == InstrumentKind::patcher)
-            captureGraph (song.channels[i].patcher, patcher::graphOf (getChannelInstrument ((int) i).get()));
-    for (std::size_t t = 0; t < song.mixer.size(); ++t)
-        for (std::size_t s = 0; s < song.mixer[t].effects.size(); ++s)
-            if (song.mixer[t].effects[s].kind == EffectKind::patcher)
-                captureGraph (song.mixer[t].effects[s].patcher, patcher::graphOf (getEffect ((int) t, (int) s).get()));
+    for (std::size_t i = 0; i < target.channels.size(); ++i)
+        if (target.channels[i].instrument == InstrumentKind::patcher)
+            captureGraph (target.channels[i].patcher, patcher::graphOf (getChannelInstrument ((int) i).get()));
+    for (std::size_t t = 0; t < target.mixer.size(); ++t)
+        for (std::size_t s = 0; s < target.mixer[t].effects.size(); ++s)
+            if (target.mixer[t].effects[s].kind == EffectKind::patcher)
+                captureGraph (target.mixer[t].effects[s].patcher, patcher::graphOf (getEffect ((int) t, (int) s).get()));
 
+}
+
+void AudioEngine::capturePluginStates()
+{
+    stampWorkTime();
+    flushEdisonAudio(); // (round 190cd: an Edison slot's audio is a file of the project)
+    capturePluginStatesInto (song, false);
     lastPublishedShape.song.channels = song.channels;
     lastPublishedShape.song.mixer = song.mixer;
+}
+
+Song AudioEngine::snapshotForRemoteControl()
+{
+    if (getTransport().playing.load() || isRecording())
+        throw RemoteError ("busy", "Stop playback and recording before capturing opaque device state");
+    // The model belongs to the message thread; live state capture locks each hosted plugin only.
+    // Do not stop the audio callback while copying the project or reading unrelated devices.
+    auto snapshot = song;
+    capturePluginStatesInto (snapshot, false);
+    return snapshot;
+}
+
+juce::String AudioEngine::remoteDeviceStateHash()
+{
+    return remoteDeviceStateHashOf (snapshotForRemoteControl());
+}
+
+juce::String AudioEngine::remoteDeviceStateHashOf (const Song& snapshot)
+{
+    Song devices;
+    devices.channels = snapshot.channels;
+    devices.mixer = snapshot.mixer;
+    const auto json = ProjectFile::toJsonExact (devices).toStdString();
+    return juce::String (sha256Hex (reinterpret_cast<const std::uint8_t*> (json.data()), json.size()));
 }
 
 bool AudioEngine::auditionPreset (const juce::AudioPluginInstance& plugin)
@@ -5867,6 +6044,283 @@ void AudioEngine::updateAudition()
     sendLiveNote (auditionChannel, pluginpresets::auditionKey, pluginpresets::auditionVelocity, true);
     auditionSounding = true;
     auditionAtMs = juce::Time::getMillisecondCounterHiRes() + pluginpresets::auditionLengthMs;
+}
+
+namespace
+{
+void preserveRemoteTags (const Song& before, Song& after)
+{
+    std::function<void (const PatcherDoc&, PatcherDoc&)> graph;
+    graph = [&] (const PatcherDoc& old, PatcherDoc& next) {
+        for (std::size_t i = 0; i < std::min (old.nodes.size(), next.nodes.size()); ++i)
+        {
+            const auto& prior = old.nodes[i];
+            auto& node = next.nodes[i];
+            if (node.generator != prior.generator) continue;
+            if (node.generator)
+            {
+                node.channel.instance = prior.channel.instance;
+                graph (prior.channel.patcher, node.channel.patcher);
+            }
+            else
+            {
+                node.effect.instance = prior.effect.instance;
+                graph (prior.effect.patcher, node.effect.patcher);
+            }
+        }
+    };
+    for (auto& channel : after.channels)
+        if (channel.uid != 0)
+            for (const auto& prior : before.channels)
+                if (channel.uid == prior.uid && channel.instrument == prior.instrument && channel.plugin.id == prior.plugin.id
+                    && ! (channel.plugin.state.empty() && ! prior.plugin.state.empty()))
+                {
+                    channel.instance = prior.instance;
+                    graph (prior.patcher, channel.patcher);
+                    break;
+                }
+    for (std::size_t t = 0; t < std::min (before.mixer.size(), after.mixer.size()); ++t)
+    {
+        const auto& old = before.mixer[t].effects;
+        auto& next = after.mixer[t].effects;
+        std::vector<bool> used (old.size(), false);
+        std::vector<int> match (next.size(), -1);
+        // Keep tags already carried through an edit; parsed project documents need value matching.
+        for (std::size_t i = 0; i < next.size(); ++i)
+            for (std::size_t j = 0; j < old.size(); ++j)
+                if (! used[j] && next[i].instance.id == old[j].instance.id)
+                { match[i] = (int) j; used[j] = true; break; }
+        for (std::size_t i = 0; i < next.size(); ++i)
+            if (match[i] < 0)
+                for (std::size_t j = 0; j < old.size(); ++j)
+                    if (! used[j] && next[i] == old[j])
+                    { match[i] = (int) j; used[j] = true; break; }
+        for (std::size_t i = 0; i < next.size(); ++i)
+            if (match[i] < 0 && i < old.size() && ! used[i] && next[i].kind == old[i].kind && next[i].plugin.id == old[i].plugin.id
+                && ! (next[i].plugin.state.empty() && ! old[i].plugin.state.empty()))
+            { match[i] = (int) i; used[i] = true; }
+        for (std::size_t i = 0; i < next.size(); ++i)
+            if (match[i] >= 0)
+            {
+                const auto& prior = old[(std::size_t) match[i]];
+                next[i].instance = prior.instance;
+                graph (prior.patcher, next[i].patcher);
+            }
+    }
+}
+
+void validateRemoteStates (const Song& song)
+{
+    const auto check = [] (const PluginRef& ref) {
+        if (ref.state.empty()) return;
+        juce::MemoryBlock bytes;
+        if (! bytes.fromBase64Encoding (juce::String::fromUTF8 (ref.state.c_str())))
+            throw RemoteError ("invalid", "Hosted device state must use the native base64 encoding");
+    };
+    std::function<void (const PatcherDoc&)> graph;
+    graph = [&] (const PatcherDoc& doc) {
+        for (const auto& node : doc.nodes)
+            if (node.generator)
+            {
+                if (node.channel.instrument == InstrumentKind::plugin) check (node.channel.plugin);
+                graph (node.channel.patcher);
+            }
+            else
+            {
+                if (node.effect.kind == EffectKind::plugin) check (node.effect.plugin);
+                graph (node.effect.patcher);
+            }
+    };
+    for (const auto& channel : song.channels)
+    {
+        if (channel.instrument == InstrumentKind::plugin) check (channel.plugin);
+        graph (channel.patcher);
+    }
+    for (const auto& track : song.mixer)
+        for (const auto& effect : track.effects)
+        {
+            if (effect.kind == EffectKind::plugin) check (effect.plugin);
+            graph (effect.patcher);
+        }
+}
+}
+
+void AudioEngine::syncRemotePluginStates (const Song& before)
+{
+    std::map<std::uint64_t, std::string> previous;
+    std::function<void (const PatcherDoc&)> collectGraph;
+    collectGraph = [&] (const PatcherDoc& doc) {
+        for (const auto& node : doc.nodes)
+            if (node.generator)
+            {
+                previous[node.channel.instance.id] = node.channel.plugin.state;
+                collectGraph (node.channel.patcher);
+            }
+            else
+            {
+                previous[node.effect.instance.id] = node.effect.plugin.state;
+                collectGraph (node.effect.patcher);
+            }
+    };
+    for (const auto& channel : before.channels)
+    {
+        previous[channel.instance.id] = channel.plugin.state;
+        collectGraph (channel.patcher);
+    }
+    for (const auto& track : before.mixer)
+        for (const auto& effect : track.effects)
+        {
+            previous[effect.instance.id] = effect.plugin.state;
+            collectGraph (effect.patcher);
+        }
+    const auto apply = [&] (auto* plugin, std::uint64_t identity, const std::string& desired) {
+        const auto old = previous.find (identity);
+        // A new instance was loaded with its target state by the normal factory. An unchanged
+        // instance needs no state call: saving bytes must never reset unrelated GUI state.
+        if (old == previous.end() || old->second == desired) return;
+        const auto current = plugin->captureState();
+        if (! current || (*current != desired && ! plugin->restoreState (desired)))
+            throw RemoteError ("uncertain", "The project changed but a running device could not restore its state; inspect it before further history actions", true);
+    };
+    std::function<void (const PatcherDoc&, patcher::Graph*)> graph;
+    graph = [&] (const PatcherDoc& doc, patcher::Graph* live) {
+        if (live == nullptr) return;
+        for (int i = 0; i < (int) doc.nodes.size() && i < live->nodeCount(); ++i)
+        {
+            const auto& node = doc.nodes[(std::size_t) i];
+            if (node.generator)
+            {
+                auto instance = live->instrumentAt (i);
+                if (auto* p = dynamic_cast<PluginInstrument*> (instance.get())) apply (p, node.channel.instance.id, node.channel.plugin.state);
+                if (node.channel.instrument == InstrumentKind::patcher) graph (node.channel.patcher, patcher::graphOf (instance.get()));
+            }
+            else
+            {
+                auto instance = live->effectAt (i);
+                if (auto* p = dynamic_cast<PluginEffect*> (instance.get())) apply (p, node.effect.instance.id, node.effect.plugin.state);
+                if (node.effect.kind == EffectKind::patcher) graph (node.effect.patcher, patcher::graphOf (instance.get()));
+            }
+        }
+    };
+    for (std::size_t i = 0; i < song.channels.size(); ++i)
+    {
+        auto instance = getChannelInstrument ((int) i);
+        if (auto* p = dynamic_cast<PluginInstrument*> (instance.get())) apply (p, song.channels[i].instance.id, song.channels[i].plugin.state);
+        if (song.channels[i].instrument == InstrumentKind::patcher) graph (song.channels[i].patcher, patcher::graphOf (instance.get()));
+    }
+    for (std::size_t t = 0; t < song.mixer.size(); ++t)
+        for (std::size_t i = 0; i < song.mixer[t].effects.size(); ++i)
+        {
+            auto instance = getEffect ((int) t, (int) i);
+            if (auto* p = dynamic_cast<PluginEffect*> (instance.get())) apply (p, song.mixer[t].effects[i].instance.id, song.mixer[t].effects[i].plugin.state);
+            if (song.mixer[t].effects[i].kind == EffectKind::patcher) graph (song.mixer[t].effects[i].patcher, patcher::graphOf (instance.get()));
+        }
+}
+
+void AudioEngine::failRemoteHistory (bool uncertain)
+{
+    remoteHistoryFailed = true;
+    remoteHistoryUncertain = uncertain;
+    remoteHistoryCode = uncertain ? "uncertain" : "failed";
+    remoteHistoryError = uncertain
+        ? tr ("The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo.")
+        : tr ("The history operation could not be prepared. No history step was moved; inspect the device before retrying.");
+    try { juce::Logger::writeToLog (remoteHistoryError); } catch (...) {}
+}
+
+bool AudioEngine::checkRemoteHistory (const juce::String& expected, const Song& current)
+{
+    if (expected.isNotEmpty() && expected == remoteDeviceStateHashOf (current)) return true;
+    remoteHistoryFailed = true;
+    remoteHistoryUncertain = false;
+    remoteHistoryCode = "changed";
+    remoteHistoryError = tr ("A device changed after this remote edit. Undo/redo was refused to preserve those changes.");
+    juce::Logger::writeToLog (remoteHistoryError);
+    return false;
+}
+
+juce::String AudioEngine::finishRemoteHistory (const std::optional<Song>& before)
+{
+    if (! before) return {};
+    try
+    {
+        syncRemotePluginStates (*before);
+        auto current = song;
+        capturePluginStatesInto (current, false);
+        const auto fence = remoteDeviceStateHashOf (current);
+        adoptCapturedRemoteDevices (song, lastPublishedShape, std::move (current));
+        return fence;
+    }
+    catch (...)
+    {
+        failRemoteHistory (true);
+        return {};
+    }
+}
+
+bool AudioEngine::editSongRemoteTransaction (const std::function<void (Song&)>& stage, const std::function<bool()>& cancelled, bool preserveRuntimeIdentity)
+{
+    if (getTransport().playing.load() || isRecording() || juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+        throw RemoteError ("busy", "Stop playback/recording and finish the current gesture before remote edits");
+    // Staging, serialization and publication stay off the audio-device lock. Hosted state access
+    // synchronizes with processing through the same per-instance locks used by native history.
+    auto before = snapshotForRemoteControl();
+    auto next = before;
+    if (cancelled && cancelled()) throw RemoteError ("failed", "Remote operation cancelled before committing changes");
+    stage (next); // all parsing, validation and allocations happen before history is changed
+    if (cancelled && cancelled()) throw RemoteError ("failed", "Remote operation cancelled before committing changes");
+    if (ProjectFile::toJsonExact (before) == ProjectFile::toJsonExact (next)) return false;
+    validateRemoteStates (next);
+    if (preserveRuntimeIdentity) preserveRemoteTags (before, next);
+    const auto capturedBefore = before;
+    const auto fresh = remoteFreshTargets (capturedBefore, next);
+    try
+    {
+        song = std::move (before); // capture live state in the owned undo step, without adding a separate step
+        remote_history::mirrorCapturedHostedStates (song, lastPublishedShape.song);
+        lastUndoPress = {};
+        levelsPending = false;
+        const juce::ScopedValueSetter<bool> remoteStep (nextRemoteHistoryStep, true);
+        const juce::ScopedValueSetter<std::unordered_set<std::uint64_t>> freshPolicy (remoteFreshInstances, fresh);
+        editSong ([&] (Song& current) { current = std::move (next); });
+        syncRemotePluginStates (capturedBefore);
+        auto committed = song;
+        capturePluginStatesInto (committed, false);
+        const auto fence = remoteDeviceStateHashOf (committed);
+        adoptCapturedRemoteDevices (song, lastPublishedShape, std::move (committed));
+        if (! undoStack.empty()) undoStack.back().deviceHash = fence;
+        if (sessionHistory && ! sessionUndo.empty()) sessionUndo.back().deviceHash = fence;
+        remoteHistoryError.clear();
+    }
+    catch (...)
+    {
+        throw RemoteError ("uncertain", "The project edit ran but its device state could not be verified; inspect before retrying", true);
+    }
+    return true;
+}
+
+void AudioEngine::undoRemoteControl (const std::function<bool()>& cancelled)
+{
+    if (getTransport().playing.load() || isRecording() || juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+        throw RemoteError ("busy", "Stop playback/recording and finish the current gesture before remote undo");
+    if (cancelled && cancelled()) throw RemoteError ("failed", "Remote undo cancelled before changing history");
+    const juce::ScopedValueSetter<bool> apiStep (remoteHistoryApiStep, true);
+    const juce::ScopedValueSetter<std::function<bool()>> cancellation (remoteHistoryCancelled, cancelled);
+    try { undo(); }
+    catch (...) { throw RemoteError ("uncertain", "Native undo did not finish; its history or project may have changed. Inspect before retrying", true); }
+    if (remoteHistoryFailed) throw RemoteError (remoteHistoryCode, remoteHistoryError.toStdString(), remoteHistoryUncertain);
+}
+
+void AudioEngine::redoRemoteControl (const std::function<bool()>& cancelled)
+{
+    if (getTransport().playing.load() || isRecording() || juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
+        throw RemoteError ("busy", "Stop playback/recording and finish the current gesture before remote redo");
+    if (cancelled && cancelled()) throw RemoteError ("failed", "Remote redo cancelled before changing history");
+    const juce::ScopedValueSetter<bool> apiStep (remoteHistoryApiStep, true);
+    const juce::ScopedValueSetter<std::function<bool()>> cancellation (remoteHistoryCancelled, cancelled);
+    try { redo(); }
+    catch (...) { throw RemoteError ("uncertain", "Native redo did not finish; its history or project may have changed. Inspect before retrying", true); }
+    if (remoteHistoryFailed) throw RemoteError (remoteHistoryCode, remoteHistoryError.toStdString(), remoteHistoryUncertain);
 }
 
 namespace

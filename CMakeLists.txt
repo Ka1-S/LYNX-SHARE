@@ -384,6 +384,10 @@ target_link_libraries(lynx_core PUBLIC vorbis_decoder)
 
 add_executable(lynx_tests tests/tests.cpp)
 target_link_libraries(lynx_tests PRIVATE lynx_core)
+add_executable(lynx_remote_playlist_tests tests/RemotePlaylistEditsTests.cpp)
+target_link_libraries(lynx_remote_playlist_tests PRIVATE lynx_core)
+add_executable(lynx_remote_instrument_tests tests/RemoteInstrumentEditsTests.cpp)
+target_link_libraries(lynx_remote_instrument_tests PRIVATE lynx_core)
 
 add_executable(flpdump tools/flpdump.cpp)
 target_link_libraries(flpdump PRIVATE lynx_core)
@@ -398,6 +402,8 @@ target_include_directories(perfbench PRIVATE tools)
 
 enable_testing()
 add_test(NAME lynx_tests COMMAND lynx_tests)
+add_test(NAME lynx_remote_playlist_tests COMMAND lynx_remote_playlist_tests)
+add_test(NAME lynx_remote_instrument_tests COMMAND lynx_remote_instrument_tests)
 
 # ---------------------------------------------------------------------------
 # App (JUCE)
@@ -444,6 +450,14 @@ if(LYNX_BUILD_APP)
         src/platform/Package.cpp
         src/platform/NativeEmbed.cpp
         src/engine/AudioEngine.cpp
+        src/engine/RemoteControl.cpp
+        src/engine/RemoteProjectControl.cpp
+        src/engine/RemoteProjectDocument.cpp
+        src/ui/RemoteControlSettings.cpp
+        src/engine/RemotePluginControl.cpp
+        src/engine/RemoteInstrumentControl.cpp
+        src/engine/GeneratorCatalog.cpp
+        src/engine/RemotePlaylistControl.cpp
         src/engine/AudioEngineSession.cpp
         src/engine/ChannelRackProcessor.cpp
         src/engine/Metronome.cpp
@@ -645,7 +659,7 @@ if(LYNX_BUILD_APP)
     if(WIN32)
         target_include_directories(LYNX PRIVATE third_party/asiosdk/common)
         target_compile_definitions(LYNX PRIVATE JUCE_ASIO=1) # ASIO SDK headers in third_party/asiosdk (GPLv3 option)
-        target_link_libraries(LYNX PRIVATE winhttp) # live sessions' WebSocket (engine/LiveLink.cpp)
+        target_link_libraries(LYNX PRIVATE winhttp bcrypt advapi32) # live sessions' WebSocket (engine/LiveLink.cpp)
         target_link_libraries(LYNX PRIVATE ws2_32 iphlpapi) # Ableton Link's sockets and network interfaces (round 190gl)
         target_link_libraries(LYNX PRIVATE mfplat mfreadwrite mfuuid propsys) # the system's video decoder (round 174d)
     elseif(APPLE)
@@ -688,6 +702,18 @@ if(LYNX_BUILD_APP)
     if(LYNX_LTO)
         target_link_libraries(LYNX PUBLIC juce::juce_recommended_lto_flags)
     endif()
+    add_executable(lynx_remote_project_tests
+        tests/RemoteProjectControlTests.cpp
+        src/engine/RemoteProjectDocument.cpp
+        src/engine/ProjectFile.cpp)
+    target_include_directories(lynx_remote_project_tests PRIVATE src)
+    target_compile_definitions(lynx_remote_project_tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0
+        JUCE_APPLICATION_VERSION_STRING="${PROJECT_VERSION}")
+    target_link_libraries(lynx_remote_project_tests PRIVATE lynx_core juce::juce_core)
+    if(WIN32)
+        target_link_libraries(lynx_remote_project_tests PRIVATE bcrypt advapi32)
+    endif()
+    add_test(NAME lynx_remote_project_tests COMMAND lynx_remote_project_tests)
 endif()
 
 # LYNX's own effects and instruments as VST3 / CLAP plugins for other hosts (round 180b, docs/PLUGIN_EXPORT.md). Off by

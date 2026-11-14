@@ -4151,6 +4151,12 @@ countries: id
 "Let the plugin know when rendering to an audio file" = "Beri tahu plugin saat me-render ke file audio"
 "Compatibility" = "Kompatibilitas"
 "Remote control" = "Kendali jarak jauh"
+"Allows authenticated local applications to read and edit this project." = "Mengizinkan aplikasi lokal yang terautentikasi untuk membaca dan mengedit proyek ini."
+"Enable local remote control" = "Aktifkan kendali jarak jauh lokal"
+"Remote control active — local clients can read and edit this project." = "Kendali jarak jauh aktif — klien lokal dapat membaca dan mengedit proyek ini."
+"Remote control could not start. Disable and re-enable to retry." = "Kendali jarak jauh tidak dapat dimulai. Nonaktifkan lalu aktifkan kembali untuk mencoba lagi."
+"Remote control is off." = "Kendali jarak jauh dinonaktifkan."
+"The remote control setting could not be saved." = "Pengaturan kendali jarak jauh tidak dapat disimpan."
 "Channel type" = "Jenis channel"
 "Deselect MIDI channels to filter out (right-click: only this one)" = "Hapus pilihan channel MIDI untuk menyaringnya (klik kanan: hanya ini)"
 "LYNX SHARE synth" = "Synth LYNX SHARE"
@@ -8440,6 +8446,13 @@ countries: id
 "Show levels on instrument tracks" = "Tampilkan level pada trek instrumen"
 "Start offset" = "Offset awal"
 "Sample start offset" = "Offset awal sampel"
+
+# Remote-control history status
+"Remote history operation cancelled before changing history." = "Operasi riwayat jarak jauh dibatalkan sebelum mengubah riwayat."
+"The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo." = "Operasi riwayat tidak selesai; proyek atau riwayatnya mungkin telah berubah. Periksa keadaannya sebelum menjalankan Urungkan/Ulangi lagi."
+"The history operation could not be prepared. No history step was moved; inspect the device before retrying." = "Operasi riwayat tidak dapat disiapkan. Posisi dalam riwayat tidak berubah; periksa perangkat sebelum mencoba lagi."
+"A device changed after this remote edit. Undo/redo was refused to preserve those changes." = "Sebuah perangkat berubah setelah penyuntingan jarak jauh ini. Urungkan/Ulangi ditolak untuk mempertahankan perubahan tersebut."
+
 "Keyboard style" = "Gaya keyboard"
 "Flat keys" = "Tuts datar"
 "Piano keys (lines between the white keys)" = "Tuts piano (garis di antara tuts putih)"

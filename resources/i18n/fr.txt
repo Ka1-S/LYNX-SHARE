@@ -4151,6 +4151,12 @@ countries: fr be ch ca lu
 "Let the plugin know when rendering to an audio file" = "Informer le plugin lors d'un rendu vers un fichier audio"
 "Compatibility" = "Compatibilité"
 "Remote control" = "Contrôle à distance"
+"Allows authenticated local applications to read and edit this project." = "Autorise les applications locales authentifiées à lire et modifier ce projet."
+"Enable local remote control" = "Activer le contrôle à distance local"
+"Remote control active — local clients can read and edit this project." = "Contrôle à distance actif — les clients locaux peuvent lire et modifier ce projet."
+"Remote control could not start. Disable and re-enable to retry." = "Le contrôle à distance n'a pas pu démarrer. Désactivez-le puis réactivez-le pour réessayer."
+"Remote control is off." = "Le contrôle à distance est désactivé."
+"The remote control setting could not be saved." = "Le paramètre de contrôle à distance n'a pas pu être enregistré."
 "Channel type" = "Type de canal"
 "Deselect MIDI channels to filter out (right-click: only this one)" = "Désélectionnez les canaux MIDI à exclure (clic droit : uniquement celui-ci)"
 "LYNX SHARE synth" = "Synthé LYNX SHARE"
@@ -8440,6 +8446,13 @@ countries: fr be ch ca lu
 "Show levels on instrument tracks" = "Afficher les niveaux sur les pistes d'instrument"
 "Start offset" = "Décalage de départ"
 "Sample start offset" = "Décalage de départ de l'échantillon"
+
+# Remote-control history status
+"Remote history operation cancelled before changing history." = "L'opération d'historique à distance a été annulée avant toute modification de l'historique."
+"The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo." = "L'opération d'historique ne s'est pas terminée ; le projet ou son historique peuvent avoir changé. Vérifiez leur état avant toute nouvelle annulation ou tout nouveau rétablissement."
+"The history operation could not be prepared. No history step was moved; inspect the device before retrying." = "Impossible de préparer l'opération d'historique. Aucun déplacement dans l'historique n'a eu lieu ; vérifiez le périphérique avant de réessayer."
+"A device changed after this remote edit. Undo/redo was refused to preserve those changes." = "Un périphérique a changé après cette modification à distance. L'annulation/le rétablissement a été refusé pour préserver ces changements."
+
 "Keyboard style" = "Style du clavier"
 "Flat keys" = "Touches plates"
 "Piano keys (lines between the white keys)" = "Touches de piano (lignes entre les touches blanches)"

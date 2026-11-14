@@ -367,6 +367,14 @@ LYNX.AppImage --menu-entry on|off              Linux AppImage: add to / remove f
 
 </details>
 
+## LYNX Remote Control (experimental)
+
+Enable **Settings > General > Remote control** to let authenticated local clients read and edit the open project. It is off by default. An active indicator appears under the toolbar; switching the setting off closes the listener and removes its discovery file. Automatic update checks keep their normal behavior.
+
+The vendor-neutral `lynx-control/1` API provides bounded project and device reads, complete paged native-project snapshots, atomic document edits, transport, revision/change tracking and guarded native undo. It uses an owner-private discovery file and mutual authentication on loopback. Windows, macOS and Linux use the same protocol. This API is not in a released build yet.
+
+See the [protocol and operation reference](docs/REMOTE_CONTROL.md) and [standalone Python client](examples/remote_control.py). For unattended launches, `LYNX_CONTROL_ENABLED=1` enables the API for that run; `LYNX_CONTROL_DISCOVERY` optionally selects an absolute private discovery path. The path alone does not enable remote control. Keep discovery credentials out of chat, version control and shared folders.
+
 ## Status: alpha
 
 LYNX SHARE already opens, plays and exports whole projects, and new releases come out often. It is not yet a

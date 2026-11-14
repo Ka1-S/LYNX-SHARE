@@ -146,6 +146,7 @@
 #include "core/PinOnTop.h"
 #include "core/MetronomeVoice.h"
 #include "engine/Transport.h"
+#include "engine/RemoteHistory.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
 #include "core/Scheduler.h"
@@ -4815,12 +4816,36 @@ TEST (plugin_factories_create_reuse_and_fallback)
     CHECK (instrumentsMade == 1 && effectsMade == 1);
     CHECK (a->instruments.size() == 2 && a->instruments[1] != nullptr); // missing: muted, but it exists
 
-    // changing the saved state doesn't recreate; swapping the plugin does
+    // Default startup keeps the established reuse contract: saving/capturing
+    // different serialized bytes by itself must not recreate hosted instances.
+    auto storedOnly = s;
+    storedOnly.channels[0].plugin.state = "captured instrument without opt-in";
+    storedOnly.mixer[1].effects[0].plugin.state = "captured effect without opt-in";
+    auto ordinary = lynx::RackState::build (storedOnly, a.get(), 48000.0, f);
+    CHECK (instrumentsMade == 1 && effectsMade == 1);
+    CHECK (ordinary->instruments[0] == a->instruments[0] && ordinary->effects[1][0] == a->effects[1][0]);
+
+    // Serialized state changes and undo preserve running instances. Remote control
+    // applies deliberate state edits in place through the engine, outside this factory.
     s.channels[0].plugin.state = "abc";
     auto b = lynx::RackState::build (s, a.get(), 48000.0, f);
     CHECK (instrumentsMade == 1 && b->instruments[0] == a->instruments[0] && b->effects[1][0] == a->effects[1][0]);
+    s.mixer[1].effects[0].plugin.state = "new effect state";
+    auto changed = lynx::RackState::build (s, b.get(), 48000.0, f);
+    CHECK (instrumentsMade == 1 && effectsMade == 1 && changed->effects[1][0] == b->effects[1][0]);
+    s.channels[0].plugin.state.clear();
+    s.mixer[1].effects[0].plugin.state.clear();
+    auto undone = lynx::RackState::build (s, changed.get(), 48000.0, f);
+    CHECK (instrumentsMade == 1 && effectsMade == 1);
+    CHECK (undone->instruments[0] == changed->instruments[0] && undone->effects[1][0] == changed->effects[1][0]);
+    auto capturedShape = *undone;
+    capturedShape.song.channels[0].plugin.state = s.channels[0].plugin.state = "captured instrument";
+    capturedShape.song.mixer[1].effects[0].plugin.state = s.mixer[1].effects[0].plugin.state = "captured effect";
+    auto captured = lynx::RackState::build (s, &capturedShape, 48000.0, f);
+    CHECK (instrumentsMade == 1 && effectsMade == 1);
+    CHECK (captured->instruments[0] == undone->instruments[0] && captured->effects[1][0] == undone->effects[1][0]);
     s.mixer[1].effects[0].plugin.id = "VST3-Outro-1";
-    auto c2 = lynx::RackState::build (s, b.get(), 48000.0, f);
+    auto c2 = lynx::RackState::build (s, captured.get(), 48000.0, f);
     CHECK (effectsMade == 2);
 
     // rendering with a missing plugin and a plugin slot breaks nothing
@@ -4842,6 +4867,153 @@ TEST (plugin_factories_create_reuse_and_fallback)
         peak = std::max (peak, std::abs (v));
     }
     CHECK (peak > 0.0f);
+}
+
+TEST (remote_reset_replaces_only_requested_instances_and_default_reuse_stays_unchanged)
+{
+    lynx::Song source;
+    source.mixer = lynx::Song::defaultMixer (2);
+    for (const auto* id : { "Synth A", "Synth B" })
+    {
+        lynx::ChannelDef channel;
+        channel.instrument = lynx::InstrumentKind::plugin;
+        channel.plugin.id = id;
+        channel.plugin.state = std::string ("saved ") + id;
+        source.channels.push_back (std::move (channel));
+    }
+    for (const auto* id : { "Effect A", "Effect B" })
+    {
+        lynx::EffectSlot effect;
+        effect.kind = lynx::EffectKind::plugin;
+        effect.plugin.id = id;
+        effect.plugin.state = std::string ("saved ") + id;
+        source.mixer[1].effects.push_back (std::move (effect));
+    }
+    int instrumentsMade = 0, effectsMade = 0;
+    std::string lastInstrumentState, lastEffectState;
+    lynx::RackState::Factories normal;
+    normal.pluginInstruments = [&] (const lynx::PluginRef& ref, double) -> std::shared_ptr<lynx::Instrument> {
+        ++instrumentsMade;
+        lastInstrumentState = ref.state;
+        return lynx::makeInstrument (lynx::InstrumentKind::synth);
+    };
+    normal.pluginEffects = [&] (const lynx::PluginRef& ref, double) -> std::shared_ptr<lynx::Effect> {
+        ++effectsMade;
+        lastEffectState = ref.state;
+        return lynx::makeEffect (lynx::EffectKind::eq);
+    };
+    const auto before = lynx::RackState::build (source, nullptr, 48000.0, normal);
+    CHECK (instrumentsMade == 2 && effectsMade == 2);
+    auto reset = source;
+    reset.channels[0].instance.renew();
+    reset.channels[0].plugin.state.clear();
+    reset.mixer[1].effects[0].instance.renew();
+    reset.mixer[1].effects[0].plugin.state.clear();
+
+    // Ordinary project/UI edits retain the established positional fallback, even for fresh model tags.
+    const auto ordinary = lynx::RackState::build (reset, before.get(), 48000.0, normal);
+    CHECK (instrumentsMade == 2 && effectsMade == 2);
+    CHECK (ordinary->instruments[0] == before->instruments[0] && ordinary->effects[1][0] == before->effects[1][0]);
+
+    auto requested = normal;
+    requested.freshInstances = { reset.channels[0].instance.id, reset.mixer[1].effects[0].instance.id };
+    const auto replaced = lynx::RackState::build (reset, before.get(), 48000.0, requested);
+    CHECK (instrumentsMade == 3 && effectsMade == 3);
+    CHECK (lastInstrumentState.empty() && lastEffectState.empty()); // factories received actual default-state requests
+    CHECK (replaced->instruments[0] != before->instruments[0] && replaced->effects[1][0] != before->effects[1][0]);
+    CHECK (replaced->instruments[1] == before->instruments[1] && replaced->effects[1][1] == before->effects[1][1]);
+
+    // The policy belongs to that build only: later ordinary edits reuse the newly created instances.
+    const auto later = lynx::RackState::build (reset, replaced.get(), 48000.0, normal);
+    CHECK (instrumentsMade == 3 && effectsMade == 3);
+    CHECK (later->instruments[0] == replaced->instruments[0] && later->effects[1][0] == replaced->effects[1][0]);
+}
+
+TEST (remote_history_normalized_restores_preserve_lineage_without_crossing_producer_edits)
+{
+    struct Entry { std::string song; bool remote = false; std::string deviceHash; };
+    std::vector<Entry> undo { { "A", true, "B" }, { "B", true, "C" } }, redo;
+    std::string live = "C";
+    const auto restore = [&] (auto& from, auto& to, const std::string& normalized) {
+        CHECK (! from.empty() && from.back().deviceHash == live);
+        const auto savedTarget = from.back().song;
+        // A real engine inverse stores captured live bytes, even when its raw model blob was older.
+        to.push_back ({ live, true, {} });
+        from.pop_back();
+        live = normalized;
+        lynx::remote_history::acceptRestoredState (to.back(), from.empty() ? nullptr : &from.back(), savedTarget, live);
+    };
+
+    restore (undo, redo, "B-normalized");
+    CHECK (undo.back().deviceHash == live && redo.back().deviceHash == live);
+    CHECK (redo.back().song == "C");
+    restore (undo, redo, "A-normalized");
+    CHECK (undo.empty() && redo.back().song == "B-normalized");
+    restore (redo, undo, "B-normalized-again");
+    CHECK (redo.back().deviceHash == live); // the next redo adopts normalization through the same proven lineage
+    restore (redo, undo, "C-normalized");
+    CHECK (redo.empty() && undo.size() == 2);
+
+    // A producer changed B to D before the following remote edit. Undoing that edit may normalize D, but cannot
+    // promote the older B fence: doing so would silently authorize undo across the producer's opaque edit.
+    undo = { { "A", true, "B" }, { "D", true, "E" } };
+    redo.clear();
+    live = "E";
+    restore (undo, redo, "D-normalized");
+    CHECK (redo.back().deviceHash == live && undo.back().deviceHash == "B");
+    CHECK (undo.back().deviceHash != live); // the next remote-owned undo remains refused
+
+    // An ordinary producer entry never acquires a remote fence even if its bytes happen to match the target.
+    Entry ordinary { "A", false, "B" }, inverse { "C", true, {} };
+    lynx::remote_history::acceptRestoredState (inverse, &ordinary, std::string ("B"), std::string ("B-normalized"));
+    CHECK (ordinary.deviceHash == "B" && inverse.deviceHash == "B-normalized");
+}
+
+TEST (remote_capture_mirror_preserves_projected_shape_and_updates_only_matching_hosted_bytes)
+{
+    lynx::Song captured;
+    lynx::ChannelDef hosted;
+    hosted.instrument = lynx::InstrumentKind::plugin;
+    hosted.plugin.id = "Synth";
+    hosted.plugin.state = "saved";
+    captured.channels = { hosted, hosted };
+    captured.channels[1].instance.renew();
+    lynx::ChannelDef patcher;
+    patcher.instrument = lynx::InstrumentKind::patcher;
+    lynx::PatchNode nested;
+    nested.generator = true;
+    nested.channel = hosted;
+    patcher.patcher.nodes.push_back (nested);
+    captured.channels.push_back (patcher);
+    captured.mixer = lynx::Song::defaultMixer (2);
+    lynx::EffectSlot effect;
+    effect.kind = lynx::EffectKind::plugin;
+    effect.plugin.id = "Effect";
+    effect.plugin.state = "saved";
+    captured.mixer[1].effects.push_back (effect);
+    auto published = captured;
+    published.channels[0].muted = true; // an insert stand-in changes routing/muting in the published projection
+    published.channels[1].instrument = lynx::InstrumentKind::sampler;
+    published.channels[1].samplePath = "stem.wav";
+    published.channels.push_back (lynx::ChannelDef()); // generated stem helper channels must survive
+    published.mixer[1].effects[0].enabled = false;
+
+    captured.channels[0].plugin.state = "captured synth";
+    captured.channels[1].plugin.state = "unavailable synth";
+    captured.channels[2].patcher.nodes[0].channel.plugin.state = "captured nested synth";
+    captured.mixer[1].effects[0].plugin.state = "captured effect";
+    lynx::remote_history::mirrorCapturedHostedStates (captured, published);
+    CHECK (published.channels.size() == 4 && published.channels[0].muted);
+    CHECK (published.channels[0].plugin.state == "captured synth");
+    CHECK (published.channels[1].instrument == lynx::InstrumentKind::sampler && published.channels[1].samplePath == "stem.wav");
+    CHECK (published.channels[1].plugin.state == "saved"); // a projected replacement is not the captured hosted device
+    CHECK (published.channels[2].patcher.nodes[0].channel.plugin.state == "captured nested synth");
+    CHECK (! published.mixer[1].effects[0].enabled && published.mixer[1].effects[0].plugin.state == "captured effect");
+
+    published.channels[0].instance.renew();
+    captured.channels[0].plugin.state = "different device";
+    lynx::remote_history::mirrorCapturedHostedStates (captured, published);
+    CHECK (published.channels[0].plugin.state == "captured synth");
 }
 
 TEST (export_song_adds_silent_tail_and_never_restarts)

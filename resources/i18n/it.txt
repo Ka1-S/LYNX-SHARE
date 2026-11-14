@@ -4151,6 +4151,12 @@ countries: it ch sm
 "Let the plugin know when rendering to an audio file" = "Fa sapere al plugin quando si renderizza in un file audio"
 "Compatibility" = "Compatibilità"
 "Remote control" = "Controllo remoto"
+"Allows authenticated local applications to read and edit this project." = "Consente alle applicazioni locali autenticate di leggere e modificare questo progetto."
+"Enable local remote control" = "Abilita il controllo remoto locale"
+"Remote control active — local clients can read and edit this project." = "Controllo remoto attivo — i client locali possono leggere e modificare questo progetto."
+"Remote control could not start. Disable and re-enable to retry." = "Impossibile avviare il controllo remoto. Disattivalo e riattivalo per riprovare."
+"Remote control is off." = "Il controllo remoto è disattivato."
+"The remote control setting could not be saved." = "Impossibile salvare l'impostazione del controllo remoto."
 "Channel type" = "Tipo di canale"
 "Deselect MIDI channels to filter out (right-click: only this one)" = "Deseleziona i canali MIDI da escludere (clic destro: solo questo)"
 "LYNX SHARE synth" = "Synth di LYNX SHARE"
@@ -8440,6 +8446,13 @@ countries: it ch sm
 "Show levels on instrument tracks" = "Mostra i livelli sulle tracce strumento"
 "Start offset" = "Offset di inizio"
 "Sample start offset" = "Offset di inizio del campione"
+
+# Remote-control history status
+"Remote history operation cancelled before changing history." = "L'operazione remota sulla cronologia è stata annullata prima di modificare la cronologia."
+"The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo." = "L'operazione sulla cronologia non è stata completata; il progetto o la sua cronologia potrebbero essere cambiati. Controllane lo stato prima di annullare/ripetere altre operazioni."
+"The history operation could not be prepared. No history step was moved; inspect the device before retrying." = "Impossibile preparare l'operazione sulla cronologia. La posizione nella cronologia non è stata spostata; controlla il dispositivo prima di riprovare."
+"A device changed after this remote edit. Undo/redo was refused to preserve those changes." = "Un dispositivo è cambiato dopo questa modifica remota. L'annullamento/ripetizione è stato rifiutato per preservare queste modifiche."
+
 "Keyboard style" = "Stile della tastiera"
 "Flat keys" = "Tasti piatti"
 "Piano keys (lines between the white keys)" = "Tasti di pianoforte (linee tra i tasti bianchi)"

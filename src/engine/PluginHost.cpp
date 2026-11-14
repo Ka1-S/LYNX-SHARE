@@ -2,12 +2,14 @@
 #include "platform/Paths.h"
 
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <cmath>
 #include <map>
 #include <cstdlib>
 #include <cstring>
 #include <thread>
+#include <type_traits>
 
 #include "core/Preferences.h"
 #include "core/PluginScanPolicy.h"
@@ -232,6 +234,15 @@ void recordCrash (const std::string& name, std::uint32_t code, bool onLoad = fal
     crashCount.store (index + 1, std::memory_order_release); // (two plugins crashing in the same instant may share a slot)
 }
 
+void recordCrashOnce (std::atomic<bool>& crashed, const std::string& name, std::uint32_t code) noexcept
+{
+    if (! crashed.exchange (true, std::memory_order_acq_rel))
+        recordCrash (name, code);
+}
+
+// A waiting caller takes its normal silence/bypass branch, without recording the earlier fault again.
+constexpr std::uint32_t alreadyCrashed = 1;
+
 // The calls of one audio block, as a guarded unit
 struct BlockCall
 {
@@ -242,10 +253,24 @@ struct BlockCall
 };
 
 // a block call under the crash guard, with this thread's floating-point mode put back after it (core/Denormals.h)
-std::uint32_t runBlock (BlockCall call) noexcept
+std::uint32_t runBlock (BlockCall call, std::atomic<bool>& crashed, const std::string& name) noexcept
 {
     const KeepFloatMode keep;
-    return crashguard::run (call);
+    // The adapter holds the instance's callback try-lock for its whole render.
+    // Keep the lock outside the crash guard so a guarded vendor fault unwinds it.
+    if (crashed.load (std::memory_order_relaxed)) return alreadyCrashed;
+    const auto code = crashguard::run (call);
+    if (code != 0) recordCrashOnce (crashed, name, code);
+    return code;
+}
+
+std::uint32_t runReset (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name) noexcept
+{
+    // Called with the instance's callback lock already held (try-lock on the audio thread).
+    if (crashed.load (std::memory_order_relaxed)) return alreadyCrashed;
+    const auto code = crashguard::run ([&] { plugin.reset(); });
+    if (code != 0) recordCrashOnce (crashed, name, code);
+    return code;
 }
 } // namespace
 
@@ -387,35 +412,145 @@ std::vector<PluginCrash> pluginCrashes()
     return list;
 }
 
+HostedParameterChanges::HostedParameterChanges (int n)
+    : count (std::max (0, n)), values (std::make_unique<Value[]> ((std::size_t) count))
+{
+    static_assert (std::atomic<float>::is_always_lock_free && std::atomic<std::uint64_t>::is_always_lock_free);
+}
+
+void HostedParameterChanges::defer (int index, float value) noexcept
+{
+    if (! contains (index)) return;
+    const auto epoch = restoreEpoch.load (std::memory_order_acquire);
+    values[index].deferred.store (((std::uint64_t) epoch << 32) | std::bit_cast<std::uint32_t> (value), std::memory_order_release);
+    pending.store (true, std::memory_order_release);
+}
+
+void HostedParameterChanges::clear (int index) noexcept
+{
+    if (contains (index)) values[index].deferred.exchange (0, std::memory_order_acq_rel);
+}
+
+float HostedParameterChanges::latest (int index) const noexcept
+{
+    if (! contains (index)) return -1.0f;
+    const auto deferred = values[index].deferred.load (std::memory_order_acquire);
+    return deferred != 0 && (std::uint32_t) (deferred >> 32) == restoreEpoch.load (std::memory_order_acquire)
+               ? std::bit_cast<float> ((std::uint32_t) deferred) : values[index].cached.load (std::memory_order_relaxed);
+}
+
+void HostedParameterChanges::observed (int index, float value) noexcept
+{
+    if (contains (index)) values[index].cached.store (value, std::memory_order_relaxed);
+}
+
+bool HostedParameterChanges::take (int index, float& value) noexcept
+{
+    if (! contains (index)) return false;
+    const auto deferred = values[index].deferred.exchange (0, std::memory_order_acq_rel);
+    if (deferred == 0 || (std::uint32_t) (deferred >> 32) != restoreEpoch.load (std::memory_order_acquire)) return false;
+    value = std::bit_cast<float> ((std::uint32_t) deferred);
+    return true;
+}
+
 namespace
 {
+// All vendor calls here run under the instance lock. Only the audio-side attempt is nonblocking; UI state access
+// may wait for a block already in flight, but the next audio block never waits for it in return.
+void applyParameter (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes, int index, float value)
+{
+    setPluginParameter (plugin, index, value);
+    const auto& params = plugin.getParameters();
+    if (index >= 0 && index < params.size()) changes.observed (index, params[index]->getValue());
+}
+
+std::uint32_t flushParameters (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes,
+                               std::atomic<bool>& crashed, const std::string& name) noexcept
+{
+    if (! changes.takePending()) return 0;
+    const auto code = crashguard::run ([&] {
+        for (int index = 0; index < changes.size(); ++index)
+        {
+            float value;
+            if (changes.take (index, value)) applyParameter (plugin, changes, index, value);
+        }
+    });
+    if (code != 0) recordCrashOnce (crashed, name, code);
+    return code;
+}
+
+void audioParameter (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes,
+                     std::atomic<bool>& crashed, const std::string& name, int index, float value) noexcept
+{
+    if (! changes.contains (index)) return;
+    const juce::CriticalSection::ScopedTryLockType lock (plugin.getCallbackLock());
+    if (! lock.isLocked())
+    {
+        changes.defer (index, value);
+        return;
+    }
+    if (crashed.load (std::memory_order_relaxed)) return;
+    changes.clear (index); // a later successful automation value supersedes the queued one
+    if (const auto code = crashguard::run ([&] { applyParameter (plugin, changes, index, value); }); code != 0)
+        recordCrashOnce (crashed, name, code);
+}
+
 std::optional<std::string> guardedState (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name)
 {
     if (crashed.load())
         return std::nullopt;
+    const juce::ScopedLock lock (plugin.getCallbackLock());
+    if (crashed.load (std::memory_order_relaxed)) return std::nullopt;
     juce::MemoryBlock state;
     if (const auto code = crashguard::run ([&] { plugin.getStateInformation (state); }); code != 0)
     {
-        crashed.store (true);
-        recordCrash (name, code);
+        recordCrashOnce (crashed, name, code);
         return std::nullopt;
     }
     return state.toBase64Encoding().toStdString();
 }
 
-void guardedUiParameter (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name, int index, float value)
+bool guardedRestore (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes, std::atomic<bool>& crashed, const std::string& name,
+                     const std::string& encoded)
 {
+    if (crashed.load()) return false;
+    juce::MemoryBlock state;
+    if (encoded.empty() || ! state.fromBase64Encoding (juce::String::fromUTF8 (encoded.c_str()))) return false;
+    const juce::ScopedLock lock (plugin.getCallbackLock());
+    if (crashed.load (std::memory_order_relaxed)) return false;
+    // This acquisition is the restore boundary. Requests made before it cannot overwrite the restored state;
+    // requests arriving while the vendor restores see the new epoch and remain pending for the next block.
+    changes.beginRestore();
+    if (const auto code = crashguard::run ([&] {
+            plugin.setStateInformation (state.getData(), (int) state.getSize());
+            const auto& params = plugin.getParameters();
+            for (int i = 0; i < params.size(); ++i) changes.observed (i, params[i]->getValue());
+        }); code != 0)
+    {
+        recordCrashOnce (crashed, name, code);
+        return false;
+    }
+    return true;
+}
+
+void guardedUiParameter (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes,
+                         std::atomic<bool>& crashed, const std::string& name, int index, float value)
+{
+    const juce::ScopedLock lock (plugin.getCallbackLock());
     if (crashed.load())
         return;
     if (const auto code = crashguard::run ([&] {
             const auto& params = plugin.getParameters();
             if (index >= 0 && index < params.size())
+            {
+                changes.clear (index);
                 params[index]->setValueNotifyingHost (value);
+                changes.observed (index, params[index]->getValue());
+            }
         });
         code != 0)
     {
-        crashed.store (true);
-        recordCrash (name, code);
+        recordCrashOnce (crashed, name, code);
     }
 }
 } // namespace
@@ -423,11 +558,12 @@ void guardedUiParameter (juce::AudioPluginInstance& plugin, std::atomic<bool>& c
 PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> instance, int maxBlockSize, int fixedBlock, HostedOptions o)
     : options (o),
       plugin (std::move (instance)),
+      parameterChanges (plugin->getParameters().size()),
       blockSize (maxBlockSize),
       name (plugin->getName().toStdString())
 {
     buffer.setSize (bufferChannels (*plugin), blockSize);
-    midi.ensureSize (8192); // the audio thread only adds events within this capacity
+    midi.ensureSize (32768); // 8 KiB normal queue, with room for all 16x128 recovery note-offs without allocation
     if (options.mpe)
     {
         // issue #108: the MPE zone (15 member channels, per-note bend range 48) goes out with the first block, before
@@ -458,7 +594,7 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
         // (every output channel goes through the fixed blocks: the other outputs keep their place too)
         const auto channels = juce::jlimit (2, 64, plugin->getTotalNumOutputChannels()); // (64: render()'s pointer array)
         fixed = std::make_unique<FixedBlock> (juce::jmin (fixedBlock, blockSize), channels);
-        pending.ensureSize (8192);
+        pending.ensureSize (32768);
         scratch.assign ((std::size_t) blockSize * (std::size_t) channels, 0.0f);
     }
     plugin->setPlayHead (&timelinePlayHead (options.sendLoopPosition));
@@ -483,8 +619,8 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
 void PluginInstrument::releaseHeldKeys() noexcept
 {
     heldKeys.releaseAll ([this] (int ch, int key) {
-        midi.addEvent (juce::MidiMessage::noteOff (ch + 1, key), 0);
-        tagSent (false, ch, key, 0); // (round 190fg: no note of its own)
+        if (queueMidi (juce::MidiMessage::noteOff (ch + 1, key)))
+            tagSent (false, ch, key, 0); // (round 190fg: no note of its own)
     });
     mpeNotes.reset(); // (issue #108: their member channels are free again)
     sentKeys.played = {}; // (their note offs went out with these)
@@ -526,8 +662,9 @@ void PluginInstrument::resetForExport()
 {
     // FL's "Reset plugin when FL Studio resets" (on by default): an export starts without what the plugin still holds
     // (tails, notes)
+    const juce::ScopedLock lock (plugin->getCallbackLock()); // offline/UI path, never the live audio callback
     if (! hasCrashed() && options.resetOnFlush)
-        if (const auto code = crashguard::run ([this] { plugin->reset(); }); code != 0)
+        if (const auto code = runReset (*plugin, crashed, name); code != 0)
             failed (code);
 }
 
@@ -563,8 +700,7 @@ PluginInstrument::~PluginInstrument()
 
 void PluginInstrument::failed (std::uint32_t code) noexcept
 {
-    crashed.store (true, std::memory_order_relaxed);
-    recordCrash (name, code);
+    recordCrashOnce (crashed, name, code);
 }
 
 std::optional<std::string> PluginInstrument::captureState()
@@ -572,11 +708,16 @@ std::optional<std::string> PluginInstrument::captureState()
     return guardedState (*plugin, crashed, name);
 }
 
+bool PluginInstrument::restoreState (const std::string& state)
+{
+    return guardedRestore (*plugin, parameterChanges, crashed, name, state);
+}
+
 void PluginInstrument::setParameterFromUi (int index, float value)
 {
     if (midiControls.set (index, value)) // a MIDI CC / aftertouch / bend "parameter": sent with the next block
         return;
-    guardedUiParameter (*plugin, crashed, name, index, value);
+    guardedUiParameter (*plugin, parameterChanges, crashed, name, index, value);
 }
 
 // The MIDI velocity of a note on: LYNX's own law is JUCE's (127 v, rounded); a project with FL's levels sends it as
@@ -591,21 +732,21 @@ juce::uint8 PluginInstrument::midiVelocity (float velocity) const noexcept
 void PluginInstrument::noteOnMidi (int key, float velocity, int midiChannel) noexcept
 {
     const auto byte = midiVelocity (velocity);
-    midi.addEvent (juce::MidiMessage::noteOn (juce::jlimit (0, 15, midiChannel) + 1, juce::jlimit (0, 127, key), byte), 0);
-    tagSent (byte > 0, juce::jlimit (0, 15, midiChannel), juce::jlimit (0, 127, key), 0);
+    if (queueMidi (juce::MidiMessage::noteOn (juce::jlimit (0, 15, midiChannel) + 1, juce::jlimit (0, 127, key), byte)))
+        tagSent (byte > 0, juce::jlimit (0, 15, midiChannel), juce::jlimit (0, 127, key), 0);
     hold (juce::jlimit (0, 15, midiChannel), key, true);
 }
 
 void PluginInstrument::noteOffMidi (int key, int midiChannel) noexcept
 {
-    midi.addEvent (juce::MidiMessage::noteOff (juce::jlimit (0, 15, midiChannel) + 1, juce::jlimit (0, 127, key)), 0);
-    tagSent (false, juce::jlimit (0, 15, midiChannel), juce::jlimit (0, 127, key), 0);
+    if (queueMidi (juce::MidiMessage::noteOff (juce::jlimit (0, 15, midiChannel) + 1, juce::jlimit (0, 127, key))))
+        tagSent (false, juce::jlimit (0, 15, midiChannel), juce::jlimit (0, 127, key), 0);
     hold (juce::jlimit (0, 15, midiChannel), key, false);
 }
 
 void PluginInstrument::flushMidiControls() noexcept
 {
-    midiControls.flush (0, [this] (const std::uint8_t* bytes, int size) { midi.addEvent (bytes, size, 0); });
+    midiControls.flush (0, [this] (const std::uint8_t* bytes, int size) { queueMidi (bytes, size); });
 }
 
 void PluginInstrument::addBend (int offset) noexcept
@@ -616,7 +757,10 @@ void PluginInstrument::addBend (int offset) noexcept
     if (value == sentBend)
         return;
     sentBend = value;
-    (bendInto != nullptr ? *bendInto : midi).addEvent (juce::MidiMessage::pitchWheel (1, value), offset);
+    if (bendInto == nullptr || bendInto == &midi)
+        queueMidi (juce::MidiMessage::pitchWheel (1, value), offset);
+    else
+        bendInto->addEvent (juce::MidiMessage::pitchWheel (1, value), offset);
 }
 
 void PluginInstrument::bendBlock (juce::MidiBuffer& into, int base, int count) noexcept
@@ -652,11 +796,11 @@ void PluginInstrument::sendExpression (int channel, mpe::Expr expr, float value)
 {
     const auto ch = juce::jlimit (1, 15, channel) + 1;
     if (expr == mpe::Expr::pitch)
-        midi.addEvent (juce::MidiMessage::pitchWheel (ch, mpe::bendValue (value, mpe::defaultBendRange)), 0);
+        queueMidi (juce::MidiMessage::pitchWheel (ch, mpe::bendValue (value, mpe::defaultBendRange)));
     else if (expr == mpe::Expr::timbre)
-        midi.addEvent (juce::MidiMessage::controllerEvent (ch, 74, mpe::timbreOfModX (value)), 0);
+        queueMidi (juce::MidiMessage::controllerEvent (ch, 74, mpe::timbreOfModX (value)));
     else
-        midi.addEvent (juce::MidiMessage::channelPressureChange (ch, juce::jlimit (0, 127, juce::roundToInt (juce::jlimit (0.0f, 1.0f, value) * 127.0f))), 0);
+        queueMidi (juce::MidiMessage::channelPressureChange (ch, juce::jlimit (0, 127, juce::roundToInt (juce::jlimit (0.0f, 1.0f, value) * 127.0f))));
 }
 
 void PluginInstrument::noteExpression (int key, int prop, float value, float) noexcept
@@ -704,8 +848,8 @@ void PluginInstrument::noteOn (int key, float velocity) noexcept
         sendExpression (ch, mpe::Expr::pitch, (std::isfinite (fine) ? fine : 0.0f) - (float) (k - played) * 100.0f);
         sendExpression (ch, mpe::Expr::timbre, nextModX);
         sendExpression (ch, mpe::Expr::pressure, mpe::pressureOfModY (nextModY));
-        midi.addEvent (juce::MidiMessage::noteOn (ch + 1, k, juce::jlimit (0.0f, 1.0f, velocity)), 0);
-        tagSent (true, ch, k, startingNoteId()); // (member channels are not 1: nothing is queued)
+        if (queueMidi (juce::MidiMessage::noteOn (ch + 1, k, juce::jlimit (0.0f, 1.0f, velocity))))
+            tagSent (true, ch, k, startingNoteId()); // (member channels are not 1: nothing is queued)
         hold (ch, k, true);
         nextModX = nextModY = 0.5f;
         return;
@@ -727,13 +871,13 @@ void PluginInstrument::noteOn (int key, float velocity) noexcept
     }
     addBend (0);
     const auto byte = midiVelocity (velocity);
-    midi.addEvent (juce::MidiMessage::noteOn (1, k, byte), 0);
     // (round 190fg: the note this note on starts; a velocity of 0 goes out as a note off, so it queues as one)
-    tagSent (byte > 0, 0, k, byte > 0 ? startingNoteId() : 0);
+    if (queueMidi (juce::MidiMessage::noteOn (1, k, byte)))
+        tagSent (byte > 0, 0, k, byte > 0 ? startingNoteId() : 0);
     hold (0, k, true);
     // FL's "Send MOD X as polyphonic aftertouch": the note's Mod X right after its note on
     if (options.modXAftertouch)
-        midi.addEvent (juce::MidiMessage::aftertouchChange (1, k, juce::jlimit (0, 127, juce::roundToInt (nextModX * 127.0f))), 0);
+        queueMidi (juce::MidiMessage::aftertouchChange (1, k, juce::jlimit (0, 127, juce::roundToInt (nextModX * 127.0f))));
     nextModX = nextModY = 0.5f;
 }
 
@@ -743,11 +887,13 @@ void PluginInstrument::noteOff (int key) noexcept
     // (issue #108: on the member channel its note on took)
     const auto ch = options.mpe ? juce::jmax (0, mpeNotes.noteOff (k)) : 0;
     // FL's "Send note release velocity" (on by default): the note's release velocity, else 0
+    bool queued = true;
     if (options.releaseVelocity)
-        midi.addEvent (juce::MidiMessage::noteOff (ch + 1, k, juce::jlimit (0.0f, 1.0f, nextRelease)), 0);
+        queued = queueMidi (juce::MidiMessage::noteOff (ch + 1, k, juce::jlimit (0.0f, 1.0f, nextRelease)));
     else
-        midi.addEvent (juce::MidiMessage::noteOff (ch + 1, k), 0);
-    tagSent (false, ch, k, endingNoteId()); // (round 190fg: the note this note off ends)
+        queued = queueMidi (juce::MidiMessage::noteOff (ch + 1, k));
+    if (queued)
+        tagSent (false, ch, k, endingNoteId()); // (round 190fg: the note this note off ends)
     nextRelease = 0.5f;
     hold (ch, k, false);
 }
@@ -758,35 +904,91 @@ void PluginInstrument::allNotesOff() noexcept
     // host passes a controller only as the parameter the plugin maps it to, and drops it otherwise), so a jump while
     // playing left SynthMaster's notes sounding under the chased ones: doubled notes, a sequence out of time
     releaseHeldKeys();
-    midi.addEvent (juce::MidiMessage::allNotesOff (1), 0);
-    midi.addEvent (juce::MidiMessage::allSoundOff (1), 0);
+    queueMidi (juce::MidiMessage::allNotesOff (1));
+    queueMidi (juce::MidiMessage::allSoundOff (1));
 }
 
-// A Patcher parameter output (round 171b): the parameter's value as the plugin reports it, guarded like the audio calls
-static float hostedParameterValue (juce::AudioPluginInstance& plugin, const std::atomic<bool>& crashed, int index) noexcept
+bool PluginInstrument::queueMidi (const void* bytes, int size, int offset) noexcept
+{
+    // Bound retained work even if a vendor's state call lasts indefinitely. JUCE's event header is smaller than
+    // this conservative allowance; an accepted event therefore fits the constructor's preallocated storage.
+    const auto budget = recoveryMidi ? 32768 : 8192;
+    constexpr int headerAllowance = 16;
+    if (midiOverflow || size <= 0) return false;
+    if (size > budget - headerAllowance || midi.data.size() > budget - size - headerAllowance)
+    {
+        if (recoveryMidi) return false; // mandatory recovery note-offs take priority over optional controls in this block
+        midiOverflow = true;
+        midi.clear();
+        sentKeys.clearTags(); // (round 190fg's note tags belonged to the events just dropped)
+        return false;
+    }
+    midi.addEvent (bytes, size, offset);
+    return true;
+}
+
+void PluginInstrument::rememberMidi (const juce::MidiBuffer& messages) noexcept
+{
+    for (const auto event : messages)
+    {
+        if (event.numBytes < 3) continue;
+        const auto status = event.data[0] & 0xf0, channel = event.data[0] & 0x0f;
+        if (status == 0x90 || status == 0x80)
+            deliveredKeys.set (channel, event.data[1], status == 0x90 && event.data[2] != 0);
+    }
+}
+
+void PluginInstrument::recoverMidi() noexcept
+{
+    if (! midiOverflow) return;
+    // Missed note-ons are not replayed as a burst. Release only notes actually delivered before the gap. Even the
+    // worst case (all 16x128 keys) fits the separate 32 KiB preallocation, without trusting CC123 in VST3 hosts.
+    midi.clear();
+    pending.clear();
+    if (fixed != nullptr) fixed->clear();
+    sentKeys.clearTags(); // the recovery note-offs below carry no note of their own (round 190fg)
+    // Keep the delivered mask until the offs reach the vendor. A partial fixed block may overflow again before
+    // it processes, in which case its replacement recovery still has to release the same sounding keys.
+    for (int ch = 0; ch < 16; ++ch)
+        for (int key = 0; key < 128; ++key)
+            if (deliveredKeys.held (ch, key)) midi.addEvent (juce::MidiMessage::noteOff (ch + 1, key), 0);
+    midiOverflow = false;
+    recoveryMidi = true;
+    sentBend = -1; // dropped controls are resent from the current pitch rather than treated as delivered
+    bendRangeSent = false;
+    midiControls.resend();
+    flushMidiControls();
+}
+
+// Patcher control cables also run on the audio thread: during state access use the queued/last observed value.
+static float hostedParameterValue (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes,
+                                  const std::atomic<bool>& crashed, int index) noexcept
 {
     if (crashed.load (std::memory_order_relaxed) || index < 0)
         return -1.0f;
+    const juce::CriticalSection::ScopedTryLockType lock (plugin.getCallbackLock());
+    if (! lock.isLocked()) return changes.latest (index);
+    if (crashed.load (std::memory_order_relaxed)) return -1.0f;
     float value = -1.0f;
     crashguard::run ([&] {
         const auto& params = plugin.getParameters();
         if (index < params.size())
             value = params[index]->getValue();
     });
+    changes.observed (index, value);
     return value;
 }
 
 float PluginInstrument::parameterValue (int index) const noexcept
 {
-    return hostedParameterValue (*plugin, crashed, index);
+    return hostedParameterValue (*plugin, parameterChanges, crashed, index);
 }
 
 void PluginInstrument::setParameter (int index, float value) noexcept
 {
     if (crashed.load (std::memory_order_relaxed) || midiControls.set (index, value))
         return;
-    if (const auto code = crashguard::run ([&] { setPluginParameter (*plugin, index, value); }); code != 0)
-        failed (code);
+    audioParameter (*plugin, parameterChanges, crashed, name, index, value);
 }
 
 void PluginInstrument::render (float* left, float* right, int n, float gl, float gr) noexcept
@@ -799,13 +1001,28 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         midi.clear();
         return; // silent
     }
+    const juce::CriticalSection::ScopedTryLockType lock (plugin->getCallbackLock());
+    if (! lock.isLocked())
+    {
+        if (fixed != nullptr) fixed->clear(); // elapsed time must not replay a buffered pre-gap block on resumption
+        blockClock.start (hostTimeline().chunk.load (std::memory_order_relaxed));
+        blockClock.advance (n);
+        return; // state access owns this instance: silence, with MIDI, reset and parameter changes still pending
+    }
+    if (crashed.load (std::memory_order_relaxed)) { midi.clear(); return; }
+    recoverMidi();
     if (resetPending.exchange (false, std::memory_order_relaxed))
-        if (const auto code = crashguard::run ([this] { plugin->reset(); }); code != 0)
+    {
+        if (const auto code = runReset (*plugin, crashed, name); code != 0)
         {
             failed (code);
             midi.clear();
             return;
         }
+        else
+            deliveredKeys.bits = {};
+    }
+    if (flushParameters (*plugin, parameterChanges, crashed, name) != 0) { midi.clear(); return; }
     // FL's "Send pitch bend range": the pitch-bend-sensitivity RPN (0, 0) once, before the first notes
     if (options.sendBendRange && ! bendRangeSent)
     {
@@ -814,7 +1031,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         for (const auto& m : { juce::MidiMessage::controllerEvent (1, 101, 0), juce::MidiMessage::controllerEvent (1, 100, 0),
                                juce::MidiMessage::controllerEvent (1, 6, range), juce::MidiMessage::controllerEvent (1, 38, 0),
                                juce::MidiMessage::controllerEvent (1, 101, 127), juce::MidiMessage::controllerEvent (1, 100, 127) })
-            midi.addEvent (m, 0); // (the first render comes before any note: the plugin is new)
+            queueMidi (m); // (the first render comes before any note: the plugin is new)
     }
     flushMidiControls();
     // issue #63: the VST3 host picks up each note on's tuning while this thread runs the plugin's blocks
@@ -829,23 +1046,32 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
     if (fixed != nullptr)
     {
         bendBlock (midi, 0, n);
+        if (pending.data.size() > 32768 - midi.data.size())
+        {
+            midiOverflow = true;
+            recoverMidi(); // a series of tiny renders cannot grow the fixed block's pending MIDI either
+        }
         // events of this chunk start where the block being collected stands now
         const auto at = fixed->position();
         for (const auto event : midi)
             pending.addEvent (event.data, event.numBytes, at);
         midi.clear();
+        recoveryMidi = false;
 
         auto process = [this] (float* const* ch, int count) {
             juce::AudioBuffer<float> view (buffer.getArrayOfWritePointers(), buffer.getNumChannels(), count);
             view.clear();
             if (! crashed.load (std::memory_order_relaxed))
-                if (const auto code = runBlock (BlockCall { plugin.get(), &view, &pending }); code != 0)
+            {
+                rememberMidi (pending);
+                if (const auto code = runBlock (BlockCall { plugin.get(), &view, &pending }, crashed, name); code != 0)
                 {
                     failed (code);
                     view.clear(); // silent from here on
                 }
                 else
                     collectMidiOutput (pending);
+            }
             pending.clear();
             const auto channels = (int) (scratch.size() / (std::size_t) blockSize);
             for (int c = 0; c < channels; ++c)
@@ -875,7 +1101,8 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         view.clear();
         bendBlock (midi, 0, count);
         setHostBlockOffset (chunkOffset + done);
-        if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
+        rememberMidi (midi);
+        if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
             midi.clear();
             failed (code);
@@ -883,6 +1110,7 @@ void PluginInstrument::render (float* left, float* right, int n, float gl, float
         }
         collectMidiOutput (midi);
         midi.clear();
+        recoveryMidi = false;
 
         mixOutputs (view.getArrayOfReadPointers(), view.getNumChannels(), done, count, gl, gr, left, right);
         done += count;
@@ -978,6 +1206,7 @@ const float* PluginInstrument::auxOutputData (int k, int side) const noexcept
 
 PluginEffect::PluginEffect (std::unique_ptr<juce::AudioPluginInstance> instance, int maxBlockSize, int fixedBlock, HostedOptions o)
     : plugin (std::move (instance)),
+      parameterChanges (plugin->getParameters().size()),
       blockSize (maxBlockSize),
       name (plugin->getName().toStdString())
 {
@@ -1012,8 +1241,9 @@ void PluginEffect::resetForExport()
 {
     // FL's "Reset plugin when FL Studio resets" (on by default): an export starts without what the plugin still holds
     // (tails, notes)
+    const juce::ScopedLock lock (plugin->getCallbackLock()); // offline/UI path, never the live audio callback
     if (! hasCrashed() && options.resetOnFlush)
-        if (const auto code = crashguard::run ([this] { plugin->reset(); }); code != 0)
+        if (const auto code = runReset (*plugin, crashed, name); code != 0)
             failed (code);
 }
 
@@ -1028,13 +1258,17 @@ PluginEffect::~PluginEffect()
 
 void PluginEffect::failed (std::uint32_t code) noexcept
 {
-    crashed.store (true, std::memory_order_relaxed);
-    recordCrash (name, code);
+    recordCrashOnce (crashed, name, code);
 }
 
 std::optional<std::string> PluginEffect::captureState()
 {
     return guardedState (*plugin, crashed, name);
+}
+
+bool PluginEffect::restoreState (const std::string& state)
+{
+    return guardedRestore (*plugin, parameterChanges, crashed, name, state);
 }
 
 void PluginEffect::flushMidiControls() noexcept
@@ -1046,20 +1280,19 @@ void PluginEffect::setParameterFromUi (int index, float value)
 {
     if (midiControls.set (index, value))
         return;
-    guardedUiParameter (*plugin, crashed, name, index, value);
+    guardedUiParameter (*plugin, parameterChanges, crashed, name, index, value);
 }
 
 float PluginEffect::parameterValue (int index) const noexcept
 {
-    return hostedParameterValue (*plugin, crashed, index);
+    return hostedParameterValue (*plugin, parameterChanges, crashed, index);
 }
 
 void PluginEffect::setParameter (int index, float value) noexcept
 {
     if (crashed.load (std::memory_order_relaxed) || midiControls.set (index, value))
         return;
-    if (const auto code = crashguard::run ([&] { setPluginParameter (*plugin, index, value); }); code != 0)
-        failed (code);
+    audioParameter (*plugin, parameterChanges, crashed, name, index, value);
 }
 
 void PluginEffect::findSideChannel() noexcept
@@ -1263,6 +1496,258 @@ juce::String pluginSidechainSelfTest()
     return "OK";
 }
 
+juce::String pluginStateContentionSelfTest()
+{
+    struct Probe final : juce::AudioPluginInstance
+    {
+        struct Parameter final : juce::HostedAudioProcessorParameter
+        {
+            explicit Parameter (Probe& p) : owner (p) {}
+            float getValue() const override { owner.checkAccess(); return value.load(); }
+            void setValue (float v) override { owner.checkAccess(); value.store (v); ++owner.writes; }
+            float getDefaultValue() const override { return 0.0f; }
+            juce::String getName (int) const override { return "Value"; }
+            juce::String getLabel() const override { return {}; }
+            juce::String getParameterID() const override { return "value"; }
+            float getValueForText (const juce::String& text) const override { return text.getFloatValue(); }
+            Probe& owner;
+            std::atomic<float> value { 0.0f };
+        };
+        Probe() : AudioPluginInstance (BusesProperties().withInput ("Input", juce::AudioChannelSet::stereo(), true)
+                                                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
+        {
+            for (int i = 0; i < 2; ++i) addHostedParameter (std::make_unique<Parameter> (*this));
+        }
+        const juce::String getName() const override { return "State contention probe"; }
+        void fillInPluginDescription (juce::PluginDescription& d) const override { d.name = getName(); }
+        void prepareToPlay (double, int) override {}
+        void releaseResources() override {}
+        void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer& messages) override
+        {
+            checkAccess();
+            ++blocks;
+            for (const auto event : messages)
+            {
+                if (event.numBytes < 3) continue;
+                const auto status = event.data[0] & 0xf0, ch = event.data[0] & 0x0f;
+                if (status == 0x90 && event.data[2] != 0)
+                {
+                    ++noteOns;
+                    if (event.data[1] >= 64 && event.data[1] < 96) ++missedNoteOns;
+                    sounding.set (ch, event.data[1], true);
+                }
+                else if (status == 0x80 || status == 0x90) { ++noteOffs; sounding.set (ch, event.data[1], false); }
+                else if (status == 0xb0 && event.data[1] == 64) sustain.store (event.data[2]);
+            }
+            for (int ch = 0; ch < audio.getNumChannels(); ++ch)
+                std::fill_n (audio.getWritePointer (ch), audio.getNumSamples(), output.load());
+        }
+        void reset() override
+        {
+            checkAccess();
+            ++resets;
+            for (auto* p : getParameters()) static_cast<Parameter*> (p)->value.store (0.0f);
+            sounding.bits = {};
+        }
+        double getTailLengthSeconds() const override { return 0.0; }
+        bool acceptsMidi() const override { return true; }
+        bool producesMidi() const override { return false; }
+        bool hasEditor() const override { return false; }
+        juce::AudioProcessorEditor* createEditor() override { return nullptr; }
+        int getNumPrograms() override { return 1; }
+        int getCurrentProgram() override { return 0; }
+        void setCurrentProgram (int) override {}
+        const juce::String getProgramName (int) override { return {}; }
+        void changeProgramName (int, const juce::String&) override {}
+        void getStateInformation (juce::MemoryBlock& state) override { stateAccess (1); state.replaceAll ("state", 5); }
+        void setStateInformation (const void*, int) override
+        {
+            stateAccess (2);
+            static_cast<Parameter*> (getParameters()[0])->value.store (0.35f);
+            static_cast<Parameter*> (getParameters()[1])->value.store (0.45f);
+        }
+        void checkAccess() const { if (stateActive.load()) overlap.store (true); }
+        void stateAccess (int mode)
+        {
+            if (holdMode.load() != mode) return;
+            stateActive.store (true);
+            entered.signal();
+            if (! release.wait (5000)) timedOut.store (true);
+            stateActive.store (false);
+        }
+        std::atomic<int> blocks { 0 }, resets { 0 }, writes { 0 }, holdMode { 0 };
+        std::atomic<int> noteOns { 0 }, noteOffs { 0 }, missedNoteOns { 0 };
+        std::atomic<int> sustain { 0 };
+        HostedKeys sounding;
+        std::atomic<float> output { 0.5f };
+        std::atomic<bool> stateActive { false }, timedOut { false };
+        mutable std::atomic<bool> overlap { false };
+        juce::WaitableEvent entered { true }, release { true };
+    };
+    int checks = 0;
+    const auto require = [&] (bool condition, const char* message) {
+        ++checks;
+        if (! condition) throw std::runtime_error (message);
+    };
+    const auto exercise = [&] (auto& adapter, Probe& probe, const auto& render, const auto& reset,
+                              const auto& outputUnchanged, const auto& outputResumed, const auto& noOldOutput) {
+        adapter.setParameterFromUi (0, 0.2f);
+        adapter.setParameterFromUi (1, 0.3f);
+        const auto saved = adapter.captureState();
+        require (saved.has_value(), "could not capture contention fixture");
+        const auto whileHeld = [&] (int mode, const auto& audioCall) {
+            probe.entered.reset();
+            probe.release.reset();
+            probe.holdMode.store (mode);
+            bool stateOk = false;
+            std::thread state ([&] { stateOk = mode == 1 ? adapter.captureState().has_value() : adapter.restoreState (*saved); });
+            const juce::ScopeGuard joinState { [&] { probe.release.signal(); if (state.joinable()) state.join(); probe.holdMode.store (0); } };
+            require (probe.entered.wait (2000), "state fixture did not acquire the instance lock");
+            juce::WaitableEvent finished { true };
+            std::thread audio ([&] { audioCall(); finished.signal(); });
+            const juce::ScopeGuard joinAudio { [&] { probe.release.signal(); if (audio.joinable()) audio.join(); } };
+            // The state gate stays closed until after this observation. A blocking callback cannot pass, regardless
+            // of scheduling; the timeout only bounds a failed test, not a timing/performance assertion.
+            const auto completedWhileHeld = finished.wait (1000);
+            probe.release.signal();
+            audio.join();
+            state.join();
+            probe.holdMode.store (0);
+            require (completedWhileHeld, "audio waited for hosted state access");
+            require (stateOk && ! probe.timedOut.load(), "state fixture failed or its gate timed out");
+            require (! probe.overlap.load(), "audio entered the plugin during hosted state access");
+        };
+
+        float read = -1.0f;
+        whileHeld (1, [&] { read = adapter.parameterValue (0); render(); });
+        require (read == 0.2f, "contended parameter read lost the last observed value");
+        require (probe.blocks.load() == 0 && outputUnchanged(), "contended render changed the dry/silent output");
+        const auto writesBefore = probe.writes.load();
+        whileHeld (2, [&] {
+            adapter.setParameter (0, 0.4f);
+            adapter.setParameter (0, 0.8f);
+            adapter.setParameter (1, 0.6f);
+            read = adapter.parameterValue (0);
+            reset();
+            render();
+        });
+        require (read == 0.8f && probe.writes.load() == writesBefore && probe.resets.load() == 0,
+                 "contended automation/reset entered the vendor or lost the latest request");
+        render();
+        render(); // fixed buffers have one block of latency
+        require (adapter.parameterValue (0) == 0.8f && adapter.parameterValue (1) == 0.6f,
+                 "deferred parameter values were not applied after the pending reset");
+        require (probe.resets.load() == 1 && probe.writes.load() == writesBefore + 2,
+                 "deferred reset or coalesced automation was lost or applied twice");
+        require (probe.blocks.load() > 0 && outputResumed(), "processing failed to resume after state access");
+        whileHeld (1, [&] { adapter.setParameter (0, 0.1f); });
+        adapter.setParameterFromUi (0, 0.9f);
+        render();
+        require (adapter.parameterValue (0) == 0.9f, "queued automation overwrote a later UI change");
+        whileHeld (1, [&] { adapter.setParameter (0, 0.2f); });
+        adapter.setParameter (0, 0.7f);
+        render();
+        require (adapter.parameterValue (0) == 0.7f, "queued automation overwrote a later audio change");
+        whileHeld (1, [&] { adapter.setParameter (0, 0.1f); });
+        require (adapter.restoreState (*saved), "restore ordering fixture failed");
+        render();
+        require (adapter.parameterValue (0) == 0.35f, "automation queued before restore overwrote restored state");
+        whileHeld (1, [&] { read = adapter.parameterValue (0); });
+        require (read == 0.35f, "restored parameter cache was not refreshed");
+        if constexpr (std::is_same_v<std::remove_cvref_t<decltype (adapter)>, PluginInstrument>)
+        {
+            adapter.noteOnMidi (60, 0.7f, 0);
+            render(); render();
+            whileHeld (1, [&] { adapter.noteOffMidi (60, 0); render(); });
+            render(); render();
+            require (! probe.sounding.any(), "a short contention gap lost a note-off");
+            adapter.noteOnMidi (60, 0.7f, 0);
+            render(); render();
+            const auto onsBefore = probe.noteOns.load(), offsBefore = probe.noteOffs.load();
+            const auto* storage = adapter.midi.data.begin();
+            whileHeld (1, [&] {
+                for (int block = 0; block < 1024; ++block)
+                {
+                    for (int key = 0; key < 32; ++key)
+                    {
+                        adapter.noteOnMidi (key + 64, 0.7f, 0);
+                        adapter.noteOffMidi (key + 64, 0);
+                    }
+                    render();
+                }
+            });
+            require (adapter.midiOverflow && adapter.midi.data.size() <= 8192 && adapter.midi.data.begin() == storage,
+                     "sustained state contention grew or reallocated the MIDI queue");
+            if (adapter.fixed != nullptr)
+            {
+                const auto* pendingStorage = adapter.pending.data.begin();
+                float oneLeft = 0.0f, oneRight = 0.0f;
+                // Queue recovery into a partial fixed block, then overflow it twice before any vendor call.
+                adapter.render (&oneLeft, &oneRight, 1, 1.0f, 1.0f);
+                for (int piece = 0; piece < 64; ++piece)
+                {
+                    for (int pair = 0; pair < 64; ++pair)
+                    {
+                        adapter.noteOnMidi (pair % 32, 0.7f, 0);
+                        adapter.noteOffMidi (pair % 32, 0);
+                    }
+                    adapter.render (&oneLeft, &oneRight, 1, 1.0f, 1.0f);
+                }
+                require (adapter.pending.data.size() <= 32768 && adapter.pending.data.begin() == pendingStorage,
+                         "tiny fixed renders reallocated their pending MIDI queue");
+                render(); render(); // overflow restarted the fixed clock; now deliver the retained recovery offs
+            }
+            else
+            {
+                render(); render();
+                require (probe.noteOns.load() == onsBefore, "overflow replayed missed note-ons");
+            }
+            require (probe.missedNoteOns.load() == 0 && probe.noteOffs.load() > offsBefore && ! probe.sounding.any(),
+                     "overflow replayed missed note-ons or left a delivered key sounding");
+            adapter.setParameter (midictl::ccBase + 64, 1.0f);
+            render(); render();
+            require (probe.sustain.load() == 127, "pedal recovery fixture did not enable sustain");
+            const std::uint8_t filler[] { 0xb0, 99, 0 };
+            for (int i = 0; i < 909; ++i) adapter.midiMessage (filler, 3);
+            require (! adapter.midiOverflow, "pedal recovery fixture overflowed before the control flush");
+            adapter.setParameter (midictl::ccBase + 64, 0.0f);
+            render(); render();
+            require (probe.sustain.load() == 0, "queue overflow permanently lost a sustain-off control");
+        }
+        probe.output.store (0.0f);
+        whileHeld (1, [&] { render(); });
+        render();
+        require (noOldOutput(), "a pre-gap fixed audio block replayed after contention");
+        require (! adapter.hasCrashed(), "lock contention was reported as a plugin crash");
+    };
+    try
+    {
+        for (const auto fixed : { 0, 64 })
+        {
+            std::array<float, 128> left {}, right {};
+            const auto unchanged = [&] { return left.back() == 0.25f && right.back() == 0.25f; };
+            auto instrument = std::make_unique<Probe>();
+            auto* voiceProbe = instrument.get();
+            PluginInstrument voice (std::move (instrument), 128, fixed);
+            exercise (voice, *voiceProbe, [&] {
+                left.fill (0.25f); right.fill (0.25f);
+                voice.render (left.data(), right.data(), (int) left.size(), 1.0f, 1.0f);
+            }, [&] { voice.panic(); }, unchanged, [&] { return left.back() == 0.75f && right.back() == 0.75f; },
+            [&] { return left.front() == 0.25f && right.front() == 0.25f; });
+            auto effect = std::make_unique<Probe>();
+            auto* effectProbe = effect.get();
+            PluginEffect fx (std::move (effect), 128, fixed);
+            exercise (fx, *effectProbe, [&] {
+                left.fill (0.25f); right.fill (0.25f);
+                fx.process (left.data(), right.data(), (int) left.size(), {}, 120.0);
+            }, [&] { fx.transportReset(); }, unchanged, [&] { return left.back() == 0.5f && right.back() == 0.5f; },
+            [&] { return left.front() == 0.0f && right.front() == 0.0f; });
+        }
+        return "OK (" + juce::String (checks) + " checks)";
+    }
+    catch (const std::exception& e) { return "ERROR " + juce::String::fromUTF8 (e.what()); }
+}
+
 void PluginEffect::setConnections (const SlotConnections& c)
 {
     for (int o = 0; o < maxPluginConnections; ++o)
@@ -1328,12 +1813,20 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
     const std::unique_lock<std::mutex> layout (layoutLock, std::try_to_lock);
     if (! layout.owns_lock())
         return;
+    const juce::CriticalSection::ScopedTryLockType lock (plugin->getCallbackLock());
+    if (! lock.isLocked())
+    {
+        if (fixed != nullptr) fixed->clear();
+        return; // state access owns this instance: dry bypass; keep reset and parameter changes for the next block
+    }
+    if (crashed.load (std::memory_order_relaxed)) return;
     if (resetPending.exchange (false, std::memory_order_relaxed))
-        if (const auto code = crashguard::run ([this] { plugin->reset(); }); code != 0)
+        if (const auto code = runReset (*plugin, crashed, name); code != 0)
         {
             failed (code);
             return;
         }
+    if (flushParameters (*plugin, parameterChanges, crashed, name) != 0) return;
     flushMidiControls();
 
     if (fixed != nullptr)
@@ -1379,7 +1872,7 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
                 if (sideCount > 1)
                     view.copyFrom (sideChannel + 1, 0, ch[3], count);
             }
-            if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
+            if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
             {
                 midi.clear();
                 failed (code); // this block keeps its dry input
@@ -1436,7 +1929,7 @@ void PluginEffect::process (float* left, float* right, int n, const EffectParams
             view.copyFrom (1, 0, inR + done, count);
         }
         feedSide (view, done, count);
-        if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }); code != 0)
+        if (const auto code = runBlock (BlockCall { plugin.get(), &view, &midi }, crashed, name); code != 0)
         {
             midi.clear();
             failed (code); // this block keeps its dry input
@@ -3081,6 +3574,39 @@ void PluginHost::preload (const PluginRef& ref, int wanted)
     p.instance = createInstance (ref, preloadRate, &p.error);
     const std::scoped_lock lock (preloadLock);
     preloaded[preloadKey (ref, preloadRate)].push_back (std::move (p));
+}
+
+bool PluginHost::preloadChecked (const PluginRef& ref, double sampleRate, juce::String& error,
+                                const std::function<bool (juce::AudioPluginInstance&, juce::String&)>& validate)
+{
+    if (ref.id.empty() || ! std::isfinite (sampleRate) || sampleRate <= 0)
+    {
+        error = "Invalid plugin identity or sample rate";
+        return false;
+    }
+    Preloaded ready;
+    ready.instance = createInstance (ref, sampleRate, &error);
+    if (ready.instance == nullptr)
+        return false;
+    if (validate && ! validate (*ready.instance, error))
+        return false;
+    const std::scoped_lock lock (preloadLock);
+    preloaded[preloadKey (ref, sampleRate)].push_back (std::move (ready));
+    return true;
+}
+
+void PluginHost::discardPreloaded (const PluginRef& ref, double sampleRate)
+{
+    std::vector<Preloaded> discarded;
+    {
+        const std::scoped_lock lock (preloadLock);
+        if (auto found = preloaded.find (preloadKey (ref, sampleRate)); found != preloaded.end())
+        {
+            discarded = std::move (found->second);
+            preloaded.erase (found);
+        }
+    }
+    // Plugin teardown stays outside the cache mutex, just as clearPreloaded().
 }
 
 void PluginHost::clearPreloaded()

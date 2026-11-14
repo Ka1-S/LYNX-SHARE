@@ -129,8 +129,11 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DFETCHCONTENT_SOURCE_DIR_JUCE="$RUNNER_TEMP/juce" \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_OBJC_COMPILER_LAUNCHER=ccache -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache \
             -DLYNX_LTO=OFF
-          cmake --build build --target LYNX -- -k 0
+          cmake --build build --target LYNX lynx_remote_project_tests -- -k 0
           ccache --show-stats || true
+
+      - name: Remote project document regressions
+        run: ctest --test-dir build --output-on-failure -R '^lynx_remote_project_tests$'
 
       - uses: actions/cache/save@v4
         if: always() && github.ref == 'refs/heads/main'

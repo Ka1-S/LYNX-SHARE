@@ -12,6 +12,7 @@
 #include <mutex>
 #include <string>
 #include <utility>
+#include <unordered_set>
 #include <vector>
 
 #include "core/Arpeggiator.h"
@@ -340,6 +341,9 @@ struct RackState
         // when it was off). A Patcher that holds such a plugin is built anew as a whole. Unset: nothing is forced.
         std::function<bool (const PluginRef&)> rebuildPlugin;
         launcher::Runtime* clipLauncher = nullptr; // (round 181a) only the engine's own state, and only with a grid
+        // One publish may deliberately replace selected runtime identities (remote reset/replacement).
+        // An empty set preserves the established positional fallback for ordinary project/UI edits.
+        std::unordered_set<std::uint64_t> freshInstances;
         // round 190aq: the inserts whose latency-adding slots are bypassed (lowlatency::bypassTracks); empty = none
         std::vector<char> lowLatencyTracks;
     };

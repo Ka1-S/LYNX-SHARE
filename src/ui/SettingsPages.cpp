@@ -1,6 +1,7 @@
 #include "ui/RemoteControl.h"
 #include "ui/NumBox.h"
 #include "ui/SettingsPages.h"
+#include "ui/RemoteControlSettings.h"
 #include "platform/Paths.h"
 #include "platform/FileTypes.h"
 #include "platform/Package.h"
@@ -119,7 +120,7 @@ struct Rows
 // ================================================================================================================
 // General
 // ================================================================================================================
-class GeneralPage final : public ScrollingPage
+class GeneralPage final : public ScrollingPage, private juce::Timer
 {
 public:
     GeneralPage (AudioEngine& e, SettingsHooks h, bool keep) : engine (e), hooks (std::move (h)), persistent (keep)
@@ -163,6 +164,16 @@ public:
             if (hooks.setGeneral)
                 hooks.setGeneral (options);
         };
+        add (remoteTitle);
+        add (remoteControl);
+        add (remoteStatus);
+        toggle (remoteControl, tr ("Enable local remote control"), options.remoteControl,
+                [this] (bool on) { options.remoteControl = on; });
+        remoteControl.setEnabled (hooks.setGeneral != nullptr);
+        remoteControl.setTooltip (tr ("Allows authenticated local applications to read and edit this project."));
+        styleNote (remoteStatus, tr (remoteui::status()));
+        startTimerHz (2);
+
         styleLabel (languageLabel, tr ("Language"));
         styleNote (languageNote, tr ("A new language is applied when LYNX SHARE restarts."));
         int id = 1;
@@ -569,6 +580,9 @@ private:
         r.section (reportsTitle);
         crashBox.setBounds (r.row (crashLabel, 260));
         crashNote.setBounds (r.full (46).translated (0, -3));
+        r.section (remoteTitle);
+        remoteControl.setBounds (r.full (24));
+        remoteStatus.setBounds (r.full (36));
         if (updatesTitle.isVisible())
         {
             r.section (updatesTitle);
@@ -582,6 +596,14 @@ private:
         }
         displayTitle.setVisible (false);
         return r.bottom();
+    }
+
+    void timerCallback() override
+    {
+        remoteControl.setToggleState (remoteui::enabled(), juce::dontSendNotification);
+        const auto historyError = engine.getRemoteHistoryError();
+        remoteStatus.setText (historyError.isNotEmpty() ? historyError : tr (remoteui::status()), juce::dontSendNotification);
+        remoteStatus.setColour (juce::Label::textColourId, remoteui::active() ? theme::colour::accent : theme::colour::textSecondary);
     }
 
     void toggle (juce::ToggleButton& t, const juce::String& text, bool value, std::function<void (bool)> set)
@@ -683,7 +705,7 @@ private:
     juce::Label alsSessionLabel;
     juce::ComboBox alsSessionBox;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
-        backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
+        backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") }, remoteTitle { tr ("Remote control") };
     juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
     juce::Label fontLabel, fontPreview, fontNote;
     juce::ComboBox fontBox;
@@ -692,6 +714,8 @@ private:
     std::vector<TemplateChoice> templateChoices; // templateBox's item id - 1
     juce::TextButton fontReset { tr ("Reset to default") };
     juce::StringArray fontNames;
+    juce::ToggleButton remoteControl;
+    juce::Label remoteStatus;
     juce::HyperlinkButton translationLink;
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
     juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, supportNoteBox, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, sandbox, substitutes, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;

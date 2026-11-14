@@ -132,6 +132,14 @@ public:
         return isPitchBend (param) ? (float) q / 16383.0f : (float) q / 127.0f;
     }
 
+    // Audio thread: a host queue dropped a block; replay requested controls on the next flush (not defaults for
+    // controls that were never touched). This also preserves a sustain-off lost in that discarded block.
+    void resend() noexcept
+    {
+        sent.fill (-1);
+        dirty.store (true, std::memory_order_release);
+    }
+
     // Audio thread: calls emit(bytes, size) for each controller whose value changed since the last call.
     template <typename Emit>
     void flush (int midiChannel, Emit&& emit) noexcept

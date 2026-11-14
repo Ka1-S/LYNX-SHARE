@@ -4151,6 +4151,12 @@ countries: es mx ar co cl pe ve
 "Let the plugin know when rendering to an audio file" = "Avisar al plugin cuando se renderiza a un archivo de audio"
 "Compatibility" = "Compatibilidad"
 "Remote control" = "Control remoto"
+"Allows authenticated local applications to read and edit this project." = "Permite que las aplicaciones locales autenticadas lean y editen este proyecto."
+"Enable local remote control" = "Activar el control remoto local"
+"Remote control active — local clients can read and edit this project." = "Control remoto activo — los clientes locales pueden leer y editar este proyecto."
+"Remote control could not start. Disable and re-enable to retry." = "No se pudo iniciar el control remoto. Desactívalo y vuelve a activarlo para reintentar."
+"Remote control is off." = "El control remoto está desactivado."
+"The remote control setting could not be saved." = "No se pudo guardar la configuración del control remoto."
 "Channel type" = "Tipo de canal"
 "Deselect MIDI channels to filter out (right-click: only this one)" = "Desmarca los canales MIDI que quieras filtrar (clic derecho: solo este)"
 "LYNX SHARE synth" = "Sintetizador de LYNX SHARE"
@@ -8440,6 +8446,13 @@ countries: es mx ar co cl pe ve
 "Show levels on instrument tracks" = "Mostrar niveles en las pistas de instrumento"
 "Start offset" = "Desplazamiento de inicio"
 "Sample start offset" = "Desplazamiento de inicio de la muestra"
+
+# Remote-control history status
+"Remote history operation cancelled before changing history." = "La operación remota del historial se canceló antes de modificar el historial."
+"The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo." = "La operación del historial no terminó; es posible que el proyecto o su historial hayan cambiado. Revísalos antes de volver a deshacer o rehacer."
+"The history operation could not be prepared. No history step was moved; inspect the device before retrying." = "No se pudo preparar la operación del historial. La posición en el historial no cambió; revisa el dispositivo antes de volver a intentarlo."
+"A device changed after this remote edit. Undo/redo was refused to preserve those changes." = "Un dispositivo cambió después de esta edición remota. Se rechazó deshacer/rehacer para conservar esos cambios."
+
 "Keyboard style" = "Estilo del teclado"
 "Flat keys" = "Teclas planas"
 "Piano keys (lines between the white keys)" = "Teclas de piano (líneas entre las teclas blancas)"

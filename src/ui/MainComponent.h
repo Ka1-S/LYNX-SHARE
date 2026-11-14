@@ -84,6 +84,8 @@ public:
     // A file the operating system asks LYNX to open while it runs (macOS Finder): as File › Open, unsaved changes are
     // asked about first; waits for a project still loading.
     void openFileRequest (const juce::File& file);
+    // The document currently saved/opened, empty for an unsaved or imported song.
+    juce::File getCurrentProjectFile() const { return currentFile; }
     void showSetupWizard(); // first run, or Options > Setup wizard (an overlay over this component)
     void closeSetupWizardForSnapshot() { setupOverlay.reset(); }
     void refreshTweakReadoutForSnapshot() { refreshTweakReadout(); resized(); }
@@ -759,6 +761,7 @@ private:
     BrowserComponent browser;
     Workspace workspace; // after the panels' contents: it is destroyed first
     updater::UpdateBar updateBar; // "LYNX SHARE x.y.z is available" under the toolbar (round 166b)
+    juce::Label remoteControlBar;
     std::unique_ptr<juce::Component> danceStage; // the dance channels' dancers over the workspace (ui/DanceView.h, round 165e)
 
     std::unique_ptr<juce::FileChooser> fileChooser;

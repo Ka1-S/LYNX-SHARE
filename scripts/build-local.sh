@@ -239,6 +239,9 @@ fi
 # all of it (7 times per cold build), and each one ran its own single-threaded LTO link, one after the other. With zig
 # the lines below only queue the tools (build-local/.bin/cxx): each is linked as build-local/.bin/<tool>/lynx_tests
 # (the tests' name, so the cached core objects are reused) and they are built in parallel before the tests run.
+# These JUCE-free regression suites also run through the upstream core CI path.
+$CXX $FLAGS $CORE $WAVPACK tests/RemotePlaylistEditsTests.cpp -o build-local/lynx_remote_playlist_tests
+$CXX $FLAGS $CORE $WAVPACK tests/RemoteInstrumentEditsTests.cpp -o build-local/lynx_remote_instrument_tests
 TOOLS_QUEUE=
 case "$CXX" in
     *zig*)
@@ -315,4 +318,6 @@ if [[ -n "${tools_pid:-}" ]]; then
         exit 1
     fi
 fi
+./build-local/lynx_remote_playlist_tests || tests_rc=$?
+./build-local/lynx_remote_instrument_tests || tests_rc=$?
 exit $tests_rc

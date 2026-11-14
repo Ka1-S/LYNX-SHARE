@@ -4151,6 +4151,12 @@ countries: cn sg
 "Let the plugin know when rendering to an audio file" = "渲染到音频文件时通知插件"
 "Compatibility" = "兼容性"
 "Remote control" = "远程控制"
+"Allows authenticated local applications to read and edit this project." = "允许经过身份验证的本地应用程序读取和编辑此项目。"
+"Enable local remote control" = "启用本地远程控制"
+"Remote control active — local clients can read and edit this project." = "远程控制已启用 — 本地客户端可以读取和编辑此项目。"
+"Remote control could not start. Disable and re-enable to retry." = "无法启动远程控制。请先禁用再重新启用以重试。"
+"Remote control is off." = "远程控制已关闭。"
+"The remote control setting could not be saved." = "无法保存远程控制设置。"
 "Channel type" = "通道类型"
 "Deselect MIDI channels to filter out (right-click: only this one)" = "取消选择要过滤掉的MIDI通道（右键：仅此通道）"
 "LYNX SHARE synth" = "LYNX SHARE合成器"
@@ -8440,6 +8446,13 @@ countries: cn sg
 "Show levels on instrument tracks" = "在乐器轨道上显示电平"
 "Start offset" = "起始偏移"
 "Sample start offset" = "采样起始偏移"
+
+# Remote-control history status
+"Remote history operation cancelled before changing history." = "远程历史操作已在修改历史记录前取消。"
+"The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo." = "历史操作未完成；项目或其历史记录可能已更改。继续撤销/重做前，请先检查状态。"
+"The history operation could not be prepared. No history step was moved; inspect the device before retrying." = "无法准备历史操作。历史记录位置未改变；重试前请检查设备。"
+"A device changed after this remote edit. Undo/redo was refused to preserve those changes." = "某个设备在此次远程编辑后发生了更改。为保留这些更改，已拒绝撤销/重做。"
+
 "Keyboard style" = "键盘样式"
 "Flat keys" = "平面琴键"
 "Piano keys (lines between the white keys)" = "钢琴琴键（白键之间有分隔线）"
