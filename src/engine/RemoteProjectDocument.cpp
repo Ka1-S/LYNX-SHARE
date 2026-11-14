@@ -58,6 +58,11 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         // folded tracks, the loop switch and the tempo lane's range
         add (S::root, "beatUnit masterLook muteRunsEffects patternClipTakeover mutedInsertsSkip pluginLevels keyboardChords midiGenerate "
              "playlistTracksFolded loopOff tempoView");
+        // rollup 0.1.28: the fields merged after round 190ha's base — 190gw's default row height, 190gz's link switch
+        // (editable), 190gx's Beats-law mark (what the file was saved by) and 190gw's automation target links (read-only:
+        // formulas and targets, as remoteMappings)
+        add (S::root, "playlistRowHeight linkTracksToMixer");
+        add (S::root, "beatsLaw190gx", S::readOnly);
         add (S::root, "format version savedBy projectId nextUid session clipFadesPerClip", S::readOnly);
         // Not reviewed for document edits (yet): the groove pool (its ids are clip references), controller mappings
         // (formulas, ports, targets). They pass through unchanged; edit them in LYNX.
@@ -139,6 +144,7 @@ const DocumentFields& editableDocumentFields (DocumentShape shape)
         add (S::pattern, "events", S::events, true);
         add (S::events, "target events");
         add (S::automation, "name uid target points source curve lfo lfoFl recordLive");
+        add (S::automation, "links", S::readOnly);
         add (S::modulator, "name shape sync beats hz phase unipolar seed routes");
         add (S::vca, "name colour level muted members parent");
         add (S::video, "rate startTimecode rateFromVideo timecodeRuler burnIn");
