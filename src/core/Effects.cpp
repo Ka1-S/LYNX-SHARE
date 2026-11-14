@@ -4252,6 +4252,8 @@ EffectSlot makeEffectSlot (EffectKind kind)
         slot.state = visualfx::scene::toState (visualfx::scene::defaultScene());
     if (kind == EffectKind::grossBeat) // round 168m: a new Gross Beat starts with LYNX's factory slots (FL loads its default bank)
         slot.state = grossbeat::factoryContainer();
+    if (kind == EffectKind::spiralEcho) // round 190fy: a new Spiral Echo runs the measured loop's revision 1 (hidden parameter)
+        slot.params[(std::size_t) echosuite::spiral::revision] = 1.0f;
 
     return slot;
 }
@@ -4405,6 +4407,9 @@ void upgradeLoadedEffectParams (EffectSlot& slot, std::size_t savedCount) noexce
     // round 190do: a Spiral Echo saved before the measured loop keeps the classic one
     if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::law)
         slot.params[(std::size_t) echosuite::spiral::law] = 0.0f;
+    // round 190fy: … and one saved before the loop timing's revision (0.1.27: Law, no hidden revision) keeps round 190do's loop
+    if (slot.kind == EffectKind::spiralEcho && savedCount <= (std::size_t) echosuite::spiral::revision)
+        slot.params[(std::size_t) echosuite::spiral::revision] = 0.0f;
     // round 190ca: a Nebula saved before the cloud law keeps the classic engine in every mode
     if (slot.kind == EffectKind::nebula && savedCount <= (std::size_t) verbs::nebula::law)
         slot.params[(std::size_t) verbs::nebula::law] = 0.0f;

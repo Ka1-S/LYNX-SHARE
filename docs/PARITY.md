@@ -80,7 +80,7 @@ there.
 | Apex Limiter | Pro-L 2 | 9 | 9 | 7 | 6 | tp172b | tp172b: sound 2 → 7 (first programme comparison: 5.7 → 6.9; two-stage release); trial187b: 16 more settings measured (6.8), no change |
 | Epoch Verb | ValhallaVintageVerb | 9 | 9 | 5 | 8 | 135 |  |
 | Nebula | Valhalla Supermassive | 9 | 9 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.20 → 3.33, verb 6.05 → 7.19 on the matched settings; bank 3.11 → 3.33 / 6.16 → 7.30; stereo part 1.8 → 9.3): the tail is stereo as the reference's, the modulation law of its level |
-| Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 129 |  |
+| Spiral Echo | ValhallaFreqEcho | 9 | 9 | 7 | 8 | 190fy | 190do: measured loop (fxparity 3.38 → 3.88); 190fy: the loop's read and all-pass refitted, revision 1 (fxparity 3.88 → 4.50, 7 up / 9 same / 0 down, tail 6.79 → 6.98; refcap0124 36 captures 3.69 → 3.75) |
 | Lattice Mod | ValhallaUberMod | 9 | 9 | 4 | 8 | 144 |  |
 | Quell Denoiser | NS1 (Waves) | 9 | 9 | 4 (ref expired) | 6 | 137 |  |
 | Hush De-esser | Pro-DS | 10 | 9 | 6 | 6 | tp172b | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
@@ -3428,3 +3428,62 @@ drums / music (−24.5 → −36.6, −8.2 → −10.1, −17.1 → −18.5 dB E
 not a first-order emphasis) and Shine / LF Extend would need their own controls. Heatwave is no tape: its harmonics
 are level-independent (Drive 50: H2 −49, H3 −35 dB at every level from −48 to −12 dBFS) and its default is flat in
 magnitude but dispersive in phase (group delay ~370 samples at 60 Hz → ~96 at 15 kHz); its map keeps the Classic law.
+
+## Round 190fy: Spiral Echo's measured loop, revision 1 (non-dynamics parity round, 0.1.28)
+
+Scope: the lowest non-dynamics rows where the recorded reference renders allow a real gain (Ember, LYNX Tune and the
+dynamics plugins belong to other rounds). Black-box only: the tp172d bank renders and refcap0124's one-parameter
+captures of the reference; no plugin was run again, nothing of its binary was opened, no third-party code.
+
+**What changed.** Spiral Echo's measured loop (round 190do, the default of new instances since 0.1.27) gets a
+revision. Echo by echo (echo 2 over echo 1 of the bank's 0.5 impulse, S1 = 10 ms, S3 = 18 ms on the dial), revision 0
+was late against the reference above 1 kHz and early under 200 Hz: its 2875 Hz (Q 0.34) all-pass delayed the mids more
+than the reference's loop does. Revision 1 reads the line 1.8 samples sooner (at 48 kHz; at least one sample, a linear
+read under two samples: the 0.01 ms floor answers two samples after the input, the reference one, revision 0 three) and replaces that all-pass with a broad one at 7080 Hz (Q 0.101): 3.7 samples more delay under 300 Hz
+against the top, 2.4 fewer at 2 kHz. The constants were fitted on the error of the 16 bank renders (Nelder-Mead over
+read offset, all-pass frequency and Q and a time scale; mean ESR −6.8 → −10.2 dB; the scale came back at 1.000) and
+checked on the 36 refcap0124 renders, which the fit never saw.
+
+**Old projects.** The revision is a hidden parameter (index 9, not in the info: no control, no string): a new instance
+starts at 1 (`makeEffectSlot`), a project or preset saved by 0.1.27 (nine values, Law = Measured) loads at 0 and renders
+bit for bit as before (4 of 4 fingerprints from the base commit's objects in `tests/Parity190fyTests.inc`; 16 of 16 bank
+renders byte-identical), one saved before 0.1.27 keeps the classic loop (Law = 0). Law = Classic ignores the revision.
+
+| Bank | Files | Before → after | Up / same / down | Mean ESR |
+|---|---|---|---|---|
+| tp172d ValhallaFreqEcho (the scoreboard row) | 16 | **3.88 → 4.50** | 7 / 9 / 0 | −6.8 → −10.2 dB |
+| refcap0124 ValhallaFreqEcho (default + every one-parameter render) | 36 | 3.69 → 3.75 | 2 / 33 / 1 | |
+
+Per setting (tp172d): D 3.00 → 3.00, S1 4.00 → 5.00, S2 4.00 → 5.50, S3 4.50 → 4.50. Tail score (`scripts/taillab.py`,
+delay kind): 6.79 → 6.98, every setting up (D 6.26 → 6.67, S1 6.98 → 7.15, S2 6.49 → 6.53, S3 7.43 → 7.56). The one refcap file down is the −1000 Hz shift
+(`p001_0.000`, 6 → 4): its spectrum error crosses the 0.6 dB step (0.56 → 0.62 dB) while its ESR improves (−10.5 → −11.2
+dB) and its level stays (+0.1 dB); its mirror, +1000 Hz (`p001_1.000`), goes 4 → 6. Every candidate of the fit that
+moved the bank moved that file across the same step; the coordinator decides whether a 0.06 dB spectrum step counts.
+
+**CPU** (thread time, 20 s of noise bursts at 48 kHz, blocks of 512, best of 5; base, revision 0 and revision 1
+binaries interleaved four times, machine load ~30): % of one core, default 0.564 / 0.596 / 0.590, S1 0.580 / 0.590 /
+0.608, S3 0.564 / 0.581 / 0.587, +100 Hz shift 0.590 / 0.588 / 0.558 — the same within noise (two constants and one
+branch, no new filter). Latency 0, memory unchanged.
+
+**Looked at, nothing shipped (the gate or the evidence said no):**
+- *Voice Shift ← Little AlterBoy* (3.17 / 3.27 / 3.80): the shifted files' spectrum error comes from the reference's
+  own low-level output under 130 Hz — a DC offset that changes per note (−32 dB at 0 Hz in a held note) and a floor
+  45 … 55 dB down — where LYNX is clean. LYNX also thumps at each voiced onset under 130 Hz (Formant −6: −26 … −29 dB
+  with Law Measured, −35 … −37 dB with Classic, the reference −41 … −45 dB): round 190dp's shifted unvoiced grains
+  meeting the first voiced grain (Voice Shift does not normalise the window sum as LYNX Tune does). Removing the thump
+  is a quality fix the score cannot see (one file 3 → 2), copying the DC is not one; left open for the owner.
+- *Halo ← ValhallaShimmer*: the top two bands are 3.5 / 8 dB under the reference on every wet file (the output high
+  cut is first order at 8 kHz at the bank's setting); opening it moved one file down and none up (the tone corrector of
+  round 190bz is fitted with that cut). The level error has opposite signs on the impulse and programme files of one
+  setting, so a level law cannot fix it either.
+- *Orbit ← ValhallaSpaceModulator* S1: the music file sits 1.0 dB low, all of it under 110 Hz; a stronger feedback
+  (0.45 instead of 0.377) did not lift it (another mechanism), so nothing shipped.
+- *Ridge Strip ← SSL 4K G, Pink EQ*: the translator plays Pink as Black. The 206 Pink impulse renders of tp172c's
+  K4G_ir grid show a different EQ (larger gain range, other centre frequencies, a high shelf that tilts the lows down
+  by up to 11 dB, LF Bell = LF Shelf): a new curve family to fit, a round of its own; data and tools listed in the
+  handoff. Lattice Mod: every file is at step 4 with an ESR near 0 (random modulation) and envelope correlation
+  0.49 … 0.97, under step 6's 0.98: no statistic within reach.
+
+Tools: `/mnt/e/lynx-work/parityfx190fy` (`lab/spiral.py`, `lab/refcap_sp.py`, `lab/sp_search.py`, `lab/cands.sh`,
+`lab/echoes.py`, `lab/loopid.py`, `lab/bands.py`, `lab/lf.py`, `gold/`, `cpu/`).
+
