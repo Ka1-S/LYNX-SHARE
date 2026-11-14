@@ -102,6 +102,14 @@ play)
     live) [ $p = patience ] || continue; l=$(gate); j=$(run live -mode play -space 1 -exe "$LIVE" -argline "\"$f\"" -title "Patience" -timeoutS 240 -keep 1 -watch "$W\\shots\\live-watch-$p-$r.txt"); rec live "$p@play" $r $l "$j" ;;
     esac
   done ;;
+playwarm) # round 190gn: play with a warm profile (its disk cache filled by a first open: mapped stretched copies)
+  for p in $PROJS; do f=$(proj $p)
+    case $a in
+    lx|lx2) newprof "pw-$a-$p-$r"
+      l=$(gate); j=$(run lx -exe "$(lxexe $a)" -envs "$(lxenv pw-$a-$p-$r)" -argline "\"$f\"" -title "$([ $p = patience ] && echo Patience || echo $p)" -timeoutS 240); rec $a "$p-fill" $r $l "$j"
+      l=$(gate); j=$(run lx -mode play -space 1 -exe "$(lxexe $a)" -envs "$(lxenv pw-$a-$p-$r)" -argline "\"$f\"" -title "$([ $p = patience ] && echo Patience || echo $p)" -timeoutS 240 -watch "$W\\shots\\$a-watchw-$p-$r.txt"); rec $a "$p@playwarm" $r $l "$j"; keep $a "$p-playwarm" $r "pw-$a-$p-$r" ;;
+    esac
+  done ;;
 deep) # one run per app and project ("empty" = no project): per-thread CPU at idle (play mode without Space), then a
       # VMMap snapshot and, for LYNX, a third run with the message thread sampled (LYNX_PROFILE_MAIN; its sampler thread
       # costs most of a core and its own memory, so that run's CPU / memory numbers are not used)
