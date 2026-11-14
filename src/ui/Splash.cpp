@@ -237,7 +237,7 @@ void drawSplashFrame (juce::Graphics& g, const SplashFrame& frame)
     if (frame.fonts == nullptr)
         made = makeSplashFonts();
     const auto* fonts = frame.fonts != nullptr ? frame.fonts : made->data();
-    static const juce::Image noLogo;
+    const juce::Image noLogo; // (an empty image: nothing to free)
     const auto& logoMark = frame.logo != nullptr ? *frame.logo : noLogo;
     const auto card = juce::Rectangle<float> (0.0f, 0.0f, (float) SplashScreen::width, (float) SplashScreen::height).reduced (0.5f);
     juce::Path cardShape;

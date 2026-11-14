@@ -22843,12 +22843,14 @@ private:
     {
     public:
         MainWindow (const juce::String& name, lynx::AudioEngine& engine)
-            : DocumentWindow (name, lynx::theme::window, DocumentWindow::allButtons)
+            : DocumentWindow (name, lynx::theme::window, DocumentWindow::allButtons, false)
         {
-            startupTrace.mark ("  window: its desktop window");
+            // (round 190hd) one desktop window, made with the native title bar: before, JUCE made one with its own title
+            // bar and setUsingNativeTitleBar made it again (~20-35 ms each, the Direct2D context included)
             setUsingNativeTitleBar (true);
+            addToDesktop();
             setIcon (lynx::logoImage());
-            startupTrace.mark ("  window: native title bar, icon");
+            startupTrace.mark ("  window: its desktop window (native title bar), icon");
             content = new lynx::MainComponent (engine);
             setContentOwned (content, true);
             startupTrace.mark ("  window: content set");
