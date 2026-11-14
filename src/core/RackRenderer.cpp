@@ -605,7 +605,7 @@ int voicesAtOnce (const Song& song, const VoicePlan& plan, std::size_t c, double
         if (clip.kind != ClipKind::pattern || clip.pattern < 0 || clip.pattern >= (int) played.patterns.size() || clip.length <= 0)
             continue;
         const auto& pattern = played.patterns[(std::size_t) clip.pattern];
-        const auto period = std::max<std::int64_t> (1, pattern.effectiveLength (played.beatsPerBar));
+        const auto period = std::max<std::int64_t> (1, pattern.effectiveLength (played.meter()));
         const auto lastPass = (clip.offset + clip.length - 1) / period;
         for (const auto& n : pattern.notes)
         {
@@ -626,7 +626,7 @@ int voicesAtOnce (const Song& song, const VoicePlan& plan, std::size_t c, double
     // pattern mode: each pattern on its own, looping
     for (const auto& pattern : song.patterns)
     {
-        const auto period = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+        const auto period = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.meter()));
         const auto loops = std::max (2.0, std::ceil ((voiceTicks + 2.0 * slack) / period) + 1.0);
         auto any = false;
         for (const auto& n : pattern.notes)
