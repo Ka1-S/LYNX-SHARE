@@ -375,7 +375,13 @@ void writeLoadLog()
     text << "memory: private " << mb (toolbar::PerformanceMeter::processPrivateBytes()) << " MB, working set "
          << mb (toolbar::PerformanceMeter::processMemoryBytes()) << " MB; samples in RAM " << use.samples << " (" << mb (use.sampleBytes)
          << " MB), mapped " << use.mappedSamples << " (" << mb (use.mappedBytes) << " MB), stretched copies " << use.stretched << " ("
-         << mb (use.stretchedBytes) << " MB)\n\n";
+         << mb (use.stretchedBytes) << " MB";
+    // round 190gn (A2): of them mapped from the disk cache, and how much of that is resident and locked (equal: none of
+    // their pages can fault on the audio thread)
+    if (use.stretchedMapped > 0)
+        text << ", of them mapped " << use.stretchedMapped << " (" << mb (use.stretchedMappedBytes) << " MB, locked "
+             << mb (SampleLibrary::lockedStretchedBytes()) << " MB)";
+    text << ")\n\n";
     log.replaceWithText (text);
 }
 } // namespace lynx

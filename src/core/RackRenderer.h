@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -23,6 +24,7 @@
 #include "core/Instruments.h"
 #include "core/TimeStretch.h"
 #include "core/LiveEventQueue.h"
+#include "core/SnapshotExchange.h"
 #include "core/LiveInput.h"
 #include "core/LowLatency.h"
 #include "core/Meters.h"
@@ -60,6 +62,8 @@ struct RackState
     std::vector<std::shared_ptr<Instrument>> instruments; // one per channel
     std::vector<std::vector<std::shared_ptr<Effect>>> effects; // [mixer track][slot]
     double sampleRate = 44100.0; // rate the new instruments were prepared with
+    // Round 190gn (A1): the keep-pitch samplers' stock of fresh pitch shifters (shared with the racks built from this one)
+    std::shared_ptr<ShifterStock> shifterStock;
     // Round 168s (issue #32): this snapshot's number, the one it was built from, and for each channel the channel of
     // that snapshot it is (−1 = new): the renderer moves its per-channel note state along when channels moved
     std::uint64_t serial = 0, builtFrom = 0;
@@ -499,6 +503,17 @@ public:
     // Blocks larger than maxBlockSize are processed in pieces.
     void prepare (double sampleRate, int maxBlockSize = 2048);
 
+    // Round 190gn (A6, memory): the channel and mixer buffers are sized by the songs played, not for 1 024 channels and
+    // 501 inserts (~8 MB, all touched). Off the audio thread, before `state` reaches process(): grows them (in steps of
+    // 32) when the state has more channels or inserts than they hold; the audio thread swaps to the new ones at its
+    // next block (never smaller than the state it plays). A renderer nobody calls this on (tools, tests, offline
+    // renders) grows them on the rendering thread instead.
+    void reserveFor (const RackState& state);
+    // the channels / inserts the buffers hold now (as last reserved or prepared)
+    int bufferChannels() const noexcept { return reservedChannels.load (std::memory_order_relaxed); }
+    int bufferTracks() const noexcept { return reservedTracks.load (std::memory_order_relaxed); }
+    static constexpr int minBufferChannels = 64, minBufferTracks = 128;
+
     // Audio thread. left/right are overwritten. `live` (optional) carries notes
     // played live, applied at the start of the block.
     void process (const RackState* state,
@@ -611,7 +626,22 @@ private:
     std::vector<VoiceOrder> voiceOrderScratch;   // (round 168s: moving the note state with moved channels)
     std::vector<NoteMask> heldScratch;
     EventBuffer events;
-    std::vector<float> mixBuffers; // maxMixerTracks * 2 * blockCapacity
+    // round 190gn (A6): the per-chunk channel and insert buffers, sized by the songs (reserveFor) and handed to the
+    // audio thread like the snapshots; `buffers` is the one process() uses (audio thread)
+    struct Buffers
+    {
+        int channels = 0, tracks = 0, frames = 0;  // frames: of each mixer buffer, min (blockCapacity, chunkCapacity)
+        mutable std::vector<float> channel;      // channels * 2 * chunkCapacity
+        mutable std::vector<float> scratch;      // tracks * 2 * chunkCapacity
+        mutable std::vector<float> mix;          // tracks * 2 * frames
+    };
+    static std::unique_ptr<const Buffers> makeBuffers (int channels, int tracks, int frames);
+    bool buffersFor (const RackState& state) noexcept; // (audio thread) false: no buffers for it (the block is silent)
+    SnapshotExchange<Buffers> bufferExchange;
+    const Buffers* buffers = nullptr;
+    std::mutex bufferLock; // the producers of bufferExchange: reserveFor (message thread) and prepare
+    std::atomic<int> reservedChannels { 0 }, reservedTracks { 0 }, preparedFrames { 0 };
+    std::atomic<bool> reserving { false }; // reserveFor is used: the audio thread never grows them itself
     std::array<float, RackState::maxAutomations> automationValues {}; // NaN = not evaluated yet
     // the pitch bend an automation / event lane last gave each LYNX instrument (0..1; NaN = none yet; issue #12)
     std::array<float, maxChannels> automatedBend {};
@@ -661,8 +691,6 @@ private:
     channelpoly::Mode polyMode (const ChannelDef& c, const Instrument& instrument) const noexcept;
     void clearPolyLayers() noexcept;
     static constexpr int chunkCapacity = 512;               // chunks processed at once
-    std::vector<float> channelBuffers;                      // maxChannels * 2 * chunkCapacity
-    std::vector<float> trackScratchBuffers;                 // maxMixerTracks * 2 * chunkCapacity
     double chunkStartTick = 0.0, chunkTps = 1.0;            // of the chunk being rendered (for the arpeggiator)
     // live-played notes of channels with an arpeggiator, echo delay or key / velocity tracking go through the
     // channel's note path like the scheduled ones (FL, round 149); while stopped the arpeggiator runs on its own clock

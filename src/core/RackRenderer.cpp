@@ -501,6 +501,148 @@ bool clipShiftWanted (const Song& song, std::size_t channel)
     return false;
 }
 
+// Round 190gn (A1, memory): how many voices of channel `c` can sound at once — a bound for the pitch shifters it can
+// use (at most 8, ShifterStock). Every note of the channel the song can play (each pattern clip's notes along the clip,
+// repeated or not; muted clips, tracks and notes too, as they can be switched on while playing; each pattern looped on
+// its own, as in pattern mode; the notes of a Layer that has the channel as a child; the channel's echo repeats; with a
+// VFX note processor in the song, all 8) lasts
+// at most `voiceSeconds` (the instrument's longestVoiceSeconds: its sample played once to the end), an audio clip of
+// the channel at most its length and the end declick; counted with a quarter beat of slack each side (time shift,
+// swing; plus the channel's Time › Shift) at the fastest tempo of the song. The most of these intervals that overlap is the bound; a channel whose notes
+// can come from elsewhere (an arpeggiator) or whose voices have no end (loops, zones: +inf) keeps all 8. What a live
+// keyboard adds comes from the stock's live reserve.
+// The song as the analysis reads it (once per build): Pattern Blocks expanded to their clips, and the fastest tempo
+struct VoicePlan
+{
+    std::optional<Song> expanded; // (empty: the song itself)
+    double ticksPerSecond = 0.0; // at the fastest tempo; 0 = unknown (a pattern's own tempo lane)
+};
+
+VoicePlan voicePlan (const Song& song)
+{
+    VoicePlan plan;
+    if (patternblocks::active (song))
+        patternblocks::expandSong (plan.expanded.emplace (song));
+    auto bpm = std::max (1.0, song.bpm);
+    if (tempomap::active (song))
+    {
+        if (song.mode != PlayMode::song)
+            return plan;
+        const auto length = (double) std::max<std::int64_t> (ppq, song.songLength());
+        for (double t = 0.0; t <= length; t += ppq / 16.0)
+            bpm = std::max (bpm, tempomap::tempoAt (song, t));
+        bpm *= 1.01;
+    }
+    plan.ticksPerSecond = bpm * ppq / 60.0;
+    return plan;
+}
+
+int voicesAtOnce (const Song& song, const VoicePlan& plan, std::size_t c, double voiceSeconds)
+{
+    constexpr int all = 8;
+    if (c >= song.channels.size() || ! std::isfinite (voiceSeconds) || song.channels[c].arp.enabled() || plan.ticksPerSecond <= 0.0)
+        return all;
+    const auto& channel = song.channels[c];
+    const auto ticksPerSecond = plan.ticksPerSecond;
+    // (+ the channel's Time › Shift, which moves every note later)
+    const auto slack = (double) ppq / 4.0 + std::max (0.0, (double) song.channels[c].misc.shiftBeats * ppq);
+    const auto voiceTicks = voiceSeconds * ticksPerSecond;
+
+    // VFX note processors send notes to other channels by port (core/Vfx.h): not followed here, 8
+    for (const auto& other : song.channels)
+        if (other.instrument == InstrumentKind::vfx)
+            return all;
+
+    // the channels whose notes play this one: itself, and every Layer (in turn) that has it as a child
+    std::vector<char> plays (song.channels.size(), 0);
+    plays[c] = 1;
+    for (bool grew = true; grew;)
+    {
+        grew = false;
+        for (std::size_t l = 0; l < song.channels.size(); ++l)
+            if (! plays[l] && song.channels[l].instrument == InstrumentKind::layer)
+                for (const auto child : song.channels[l].layer.children)
+                    if (child >= 0 && (std::size_t) child < plays.size() && plays[(std::size_t) child])
+                    {
+                        if (song.channels[l].arp.enabled())
+                            return all;
+                        plays[l] = 1, grew = true;
+                        break;
+                    }
+    }
+    const auto ofChannel = [&plays] (const Note& n) { return n.channel >= 0 && (std::size_t) n.channel < plays.size() && plays[(std::size_t) n.channel] && ! n.slide; };
+    const auto echo = channel.misc.echo.enabled() ? std::clamp (channel.misc.echo.echoes, 0, 64) * (channel.misc.echo.fat ? 2 : 1) : 0;
+    const auto echoTicks = (double) channel.misc.echo.timeBeats * ppq;
+
+    std::vector<std::pair<double, int>> edges; // (tick, +1 start / −1 end) of one timeline
+    auto best = 0;
+    const auto addVoice = [&] (double start, double ticks) {
+        edges.push_back ({ start - slack, +1 });
+        edges.push_back ({ start + ticks + slack, -1 });
+    };
+    const auto addNote = [&] (double start) {
+        addVoice (start, voiceTicks);
+        for (int k = 1; k <= echo; ++k)
+            addVoice (start + (double) (channel.misc.echo.fat ? (k + 1) / 2 : k) * echoTicks, voiceTicks);
+    };
+    const auto count = [&] {
+        std::sort (edges.begin(), edges.end()); // (an end at the same tick as a start comes first)
+        auto now = 0;
+        for (const auto& e : edges)
+            best = std::max (best, now += e.second);
+        edges.clear();
+    };
+
+    // the song: pattern clips (with their repeats), audio clips of the channel
+    const Song& played = plan.expanded ? *plan.expanded : song;
+    for (const auto& clip : played.playlist)
+    {
+        if (clip.kind == ClipKind::audio && clip.channel >= 0 && (std::size_t) clip.channel < plays.size() && plays[(std::size_t) clip.channel])
+            addVoice ((double) clip.start, (double) clip.length + 0.3 * ticksPerSecond);
+        if (clip.kind != ClipKind::pattern || clip.pattern < 0 || clip.pattern >= (int) played.patterns.size() || clip.length <= 0)
+            continue;
+        const auto& pattern = played.patterns[(std::size_t) clip.pattern];
+        const auto period = std::max<std::int64_t> (1, pattern.effectiveLength (played.beatsPerBar));
+        const auto lastPass = (clip.offset + clip.length - 1) / period;
+        for (const auto& n : pattern.notes)
+        {
+            if (! ofChannel (n))
+                continue;
+            for (std::int64_t pass = 0; pass <= lastPass; ++pass)
+            {
+                const auto at = n.start + pass * period;
+                if (pass > 0 && n.start >= period)
+                    break;
+                if (at >= clip.offset && at < clip.offset + clip.length)
+                    addNote ((double) (clip.start + at - clip.offset));
+            }
+        }
+    }
+    count();
+
+    // pattern mode: each pattern on its own, looping
+    for (const auto& pattern : song.patterns)
+    {
+        const auto period = (double) std::max<std::int64_t> (1, pattern.effectiveLength (song.beatsPerBar));
+        const auto loops = std::max (2.0, std::ceil ((voiceTicks + 2.0 * slack) / period) + 1.0);
+        auto any = false;
+        for (const auto& n : pattern.notes)
+            if (ofChannel (n))
+            {
+                any = true;
+                for (double k = 0.0; k < loops; ++k)
+                    addNote ((double) n.start + k * period);
+            }
+        if (any)
+            count();
+        if (best >= all)
+            break;
+    }
+
+    // (not capped by the channel's Max polyphony: a note past it releases the oldest one, which still sounds)
+    return std::clamp (best, 0, all);
+}
+
 // The keep-pitch samplers' shifters, in parallel: each instrument only touches its own pool, and each shifter's
 // set-up is deterministic (a fixed seed and a silent priming run), so the result is the same as one by one
 void prepareKeyShifts (const std::vector<Instrument*>& list, double sampleRate)
@@ -841,7 +983,45 @@ std::unique_ptr<const RackState> RackState::build (Song song,
             instrument->setPanTriangular (song.panTriangular);
             instrument->setFlWrapperVelocity (song.flPluginLevels);
         }
+    // round 190gn (A1): the shifters each keep-pitch channel's voices can use at once are made now; any further one (a
+    // live keyboard, an edit) comes from the rack's stock, refilled off the audio thread
+    {
+        const loadtrace::Scope timing ("rack_shifter_plan");
+        const auto offline = offlineRendering() || renderInProgress();
+        state->shifterStock = previous != nullptr && previous->shifterStock != nullptr && previous->sampleRate == sampleRate
+                                      && previous->shifterStock->offline() == (offline && ! shifterstock::strict())
+                                  ? previous->shifterStock
+                                  : std::make_shared<ShifterStock> (sampleRate, offline);
+        auto& stock = *state->shifterStock;
+        std::array<int, ShifterStock::kinds> reserve {};
+        std::array<bool, ShifterStock::kinds> used {};
+        std::optional<VoicePlan> plan; // (made for the first keep-pitch channel)
+        for (std::size_t i = 0; i < song.channels.size() && i < state->instruments.size(); ++i)
+        {
+            auto* instrument = state->instruments[i].get();
+            const auto& channel = song.channels[i];
+            const auto fresh = std::find (keyShiftLater.begin(), keyShiftLater.end(), instrument) != keyShiftLater.end();
+            const auto shifts = (channel.instrument == InstrumentKind::sampler || channel.instrument == InstrumentKind::audioClip)
+                                && (channel.sampler.keepPitch || clipShiftWanted (song, i));
+            if (instrument == nullptr || ! shifts || ! shifterstock::planned())
+                continue;
+            const auto kind = ShifterStock::kindOf (channel.sampler.stretchMethod);
+            if (! plan)
+                plan = voicePlan (song);
+            const auto need = voicesAtOnce (song, *plan, i, instrument->longestVoiceSeconds());
+            if (fresh)
+                instrument->useShifterStock (state->shifterStock, need);
+            else // (a running instrument: what the song now wants beyond what it holds waits in the stock)
+                reserve[(std::size_t) kind] += std::max (0, need - instrument->pitchShiftersHeld());
+            used[(std::size_t) kind] = true;
+        }
+        // + a live reserve (one channel's worth) for each kind in use: a keyboard played into a keep-pitch channel
+        for (int k = 0; k < ShifterStock::kinds; ++k)
+            stock.setReserve (k, used[(std::size_t) k] ? ShifterStock::liveReserve + reserve[(std::size_t) k] : 0);
+    }
     prepareKeyShifts (keyShiftLater, sampleRate);
+    state->shifterStock->topUp();
+    shifterstock::enlist (state->shifterStock);
 
     state->effects.resize (song.mixer.size());
 
@@ -2254,14 +2434,29 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
     lastTrackGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastTapGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
     lastMeterGain.fill ({ std::numeric_limits<float>::quiet_NaN(), 0.0f, 0.0f, 0.0f });
-    channelBuffers.assign ((std::size_t) maxChannels * 2 * chunkCapacity, 0.0f);
     smartDisable.assign ((std::size_t) maxMixerTracks * maxEffectSlots, {});
     trackEqs.assign ((std::size_t) maxMixerTracks, {});
-    trackScratchBuffers.assign ((std::size_t) maxMixerTracks * 2 * chunkCapacity, 0.0f);
     tapBuffers.assign ((std::size_t) RackState::maxSendTaps * 2 * chunkCapacity, 0.0f);
     sampleRate = sr;
     blockCapacity = std::max (64, maxBlockSize);
-    mixBuffers.assign ((std::size_t) maxMixerTracks * 2 * (std::size_t) blockCapacity, 0.0f);
+    {
+        // (round 190gn: as many channels / inserts as reserved, the state last played or the minimum; a mixer buffer
+        // holds one chunk, the most process() mixes at once)
+        const std::scoped_lock l (bufferLock);
+        auto channels = std::max (reservedChannels.load(), minBufferChannels);
+        auto tracks = std::max (reservedTracks.load(), minBufferTracks);
+        if (lastState != nullptr)
+        {
+            channels = std::max (channels, (int) std::min<std::size_t> (lastState->instruments.size(), (std::size_t) maxChannels));
+            tracks = std::max (tracks, (int) std::min<std::size_t> (lastState->song.mixer.size(), (std::size_t) maxMixerTracks));
+        }
+        const auto frames = std::min (blockCapacity, chunkCapacity);
+        reservedChannels.store (channels);
+        reservedTracks.store (tracks);
+        preparedFrames.store (frames);
+        bufferExchange.collectGarbage();
+        bufferExchange.publish (makeBuffers (channels, tracks, frames));
+    }
     hwScratch.assign (2 * (std::size_t) blockCapacity, 0.0f);
     layerPick.assign ((std::size_t) maxChannels * 128, (std::int16_t) -1);
     voiceOrderScratch.assign ((std::size_t) maxChannels, {});
@@ -2282,7 +2477,72 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
 
 float* RackRenderer::trackBuffer (int track, int channel) noexcept
 {
-    return mixBuffers.data() + ((std::size_t) track * 2 + (std::size_t) channel) * (std::size_t) blockCapacity;
+    return buffers->mix.data() + ((std::size_t) track * 2 + (std::size_t) channel) * (std::size_t) buffers->frames;
+}
+
+std::unique_ptr<const RackRenderer::Buffers> RackRenderer::makeBuffers (int channels, int tracks, int frames)
+{
+    auto b = std::make_unique<Buffers>();
+    b->channels = std::clamp (channels, 1, maxChannels);
+    b->tracks = std::clamp (tracks, 1, maxMixerTracks);
+    b->frames = std::clamp (frames, 1, chunkCapacity);
+    b->channel.assign ((std::size_t) b->channels * 2 * chunkCapacity, 0.0f);
+    b->scratch.assign ((std::size_t) b->tracks * 2 * chunkCapacity, 0.0f);
+    b->mix.assign ((std::size_t) b->tracks * 2 * (std::size_t) b->frames, 0.0f);
+    return b;
+}
+
+namespace
+{
+// what a state's blocks index the buffers by (process: channels < min (instruments, channels, maxChannels); inserts
+// < max (1, mixer size), at most maxMixerTracks)
+std::pair<int, int> bufferNeeds (const RackState& state) noexcept
+{
+    const auto channels = (int) std::min ({ state.instruments.size(), state.song.channels.size(), (std::size_t) RackRenderer::maxChannels });
+    const auto tracks = std::clamp ((int) state.song.mixer.size(), 1, maxMixerTracks);
+    return { std::max (1, channels), tracks };
+}
+} // namespace
+
+void RackRenderer::reserveFor (const RackState& state)
+{
+    const auto [channels, tracks] = bufferNeeds (state);
+    const std::scoped_lock l (bufferLock);
+    reserving.store (true);
+    bufferExchange.collectGarbage();
+    if (channels <= reservedChannels.load() && tracks <= reservedTracks.load())
+        return;
+    const auto up = [] (int n, int limit) { return std::min (limit, (n + 31) / 32 * 32); };
+    reservedChannels.store (std::max (reservedChannels.load(), up (channels, maxChannels)));
+    reservedTracks.store (std::max (reservedTracks.load(), up (tracks, maxMixerTracks)));
+    if (preparedFrames.load() > 0) // (not prepared yet: prepare() makes them at this size)
+        bufferExchange.publish (makeBuffers (reservedChannels.load(), reservedTracks.load(), preparedFrames.load()));
+}
+
+bool RackRenderer::buffersFor (const RackState& state) noexcept
+{
+    const auto [channels, tracks] = bufferNeeds (state);
+    buffers = bufferExchange.acquire();
+    const auto fits = [&] { return buffers != nullptr && buffers->channels >= channels && buffers->tracks >= tracks; };
+    if (fits())
+        return true;
+    if (reserving.load (std::memory_order_relaxed)) // (never: reserveFor ran before the state was published)
+        return false;
+    // a renderer without reserveFor (offline, tools, tests): grown here, on the rendering thread
+    try
+    {
+        const std::scoped_lock l (bufferLock);
+        reservedChannels.store (std::max (reservedChannels.load(), channels));
+        reservedTracks.store (std::max (reservedTracks.load(), tracks));
+        bufferExchange.collectGarbage();
+        bufferExchange.publish (makeBuffers (reservedChannels.load(), reservedTracks.load(), std::max (1, preparedFrames.load())));
+    }
+    catch (...)
+    {
+        return false;
+    }
+    buffers = bufferExchange.acquire();
+    return fits();
 }
 
 float* RackRenderer::tapBuffer (int tap, int side) noexcept
@@ -2640,12 +2900,12 @@ void RackRenderer::deliverToEffects (const RackState& state, const NoteEvent& e)
 
 float* RackRenderer::channelBuffer (int channel, int side) noexcept
 {
-    return channelBuffers.data() + ((std::size_t) channel * 2 + (std::size_t) side) * chunkCapacity;
+    return buffers->channel.data() + ((std::size_t) channel * 2 + (std::size_t) side) * chunkCapacity;
 }
 
 float* RackRenderer::trackScratch (int track, int side) noexcept
 {
-    return trackScratchBuffers.data() + ((std::size_t) track * 2 + (std::size_t) side) * chunkCapacity;
+    return buffers->scratch.data() + ((std::size_t) track * 2 + (std::size_t) side) * chunkCapacity;
 }
 
 // A whole channel over the chunk: notes at the exact sample (only its own events), volume/pan and the
@@ -3421,7 +3681,7 @@ void RackRenderer::process (const RackState* state,
     std::memset (right, 0, sizeof (float) * (std::size_t) numSamples);
     events.clear();
 
-    if (state == nullptr || blockCapacity == 0)
+    if (state == nullptr || blockCapacity == 0 || ! buffersFor (*state))
         return;
 
     const auto timing = times->enabled.load (std::memory_order_relaxed);

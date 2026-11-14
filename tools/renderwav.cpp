@@ -48,6 +48,7 @@
 #include "core/PluginSubstitutes.h"
 #include "core/RackRenderer.h"
 #include "core/WorkerPool.h"
+#include "core/TimeStretch.h"
 
 // LYNX_ALLOCS: every operator new while `counting` is set (inside RackRenderer::process) is counted
 namespace allocs
@@ -297,14 +298,26 @@ int main (int argc, char** argv)
     lynx::setOfflineRendering (std::getenv ("LYNX_LIVE") == nullptr);
     std::map<std::string, std::shared_ptr<const lynx::SampleData>> cache;
     const auto buildStart = std::chrono::steady_clock::now();
-    auto state = lynx::RackState::build (song, nullptr, sampleRate, [&] (const std::string& p) {
+    lynx::RackState::Factories factories;
+    factories.samples = [&] (const std::string& p) {
         auto& entry = cache[p];
         if (entry == nullptr)
             entry = lynx::tools::readWav (toLocal (p));
         if (entry == nullptr)
             std::printf ("  (could not read %s)\n", p.c_str());
         return entry;
-    });
+    };
+    // LYNX_STRETCH=1 (round 190gn): keep-pitch samples are time-stretched to the tempo as in the app (its sample library
+    // does the same stretch, cached); without it they play unstretched
+    if (const char* e = std::getenv ("LYNX_STRETCH"); e != nullptr && e[0] == '1')
+        factories.stretchedSamples = [&] (const std::string& p, double ratio, lynx::StretchMethod method, double semitones,
+                                          const lynx::StretchMap& map) -> std::shared_ptr<const lynx::SampleData> {
+            const auto original = factories.samples (p);
+            if (original == nullptr)
+                return nullptr;
+            return map.empty() ? lynx::timeStretch (*original, ratio, method, semitones) : lynx::timeStretchMapped (*original, map, method, semitones);
+        };
+    auto state = lynx::RackState::build (song, nullptr, sampleRate, factories);
     std::printf ("rack build: %.0f ms\n", std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - buildStart).count());
     {
         std::size_t edges = 0, delayed = 0, tracksWithFx = 0;
@@ -485,6 +498,22 @@ int main (int argc, char** argv)
         std::printf ("longest single calls:\n");
         for (std::size_t i = 0; i < rows.size() && i < 10; ++i)
             std::printf ("  %7.2f ms  %s\n", rows[i].maxNs * 1e-6, rows[i].name.c_str());
+    }
+
+    // round 190gn (A1): the keep-pitch samplers' pitch shifters after the render (made at build + taken from the stock)
+    {
+        int held = 0, channels = 0;
+        for (const auto& i : state->instruments)
+            if (i != nullptr && i->pitchShiftersHeld() > 0)
+                held += i->pitchShiftersHeld(), ++channels;
+        const auto* stock = state->shifterStock.get();
+        std::printf ("pitch shifters: %d held by %d channels (%d from the stock, %d left in it, %d voices missed one)\n", held, channels,
+                     stock != nullptr ? stock->handedOut() : 0, stock != nullptr ? stock->ready (0) + stock->ready (1) : 0,
+                     stock != nullptr ? stock->missed() : 0);
+        if (std::getenv ("LYNX_SHIFTER_LIST") != nullptr)
+            for (std::size_t c = 0; c < state->instruments.size(); ++c)
+                if (const auto& i = state->instruments[c]; i != nullptr && i->pitchShiftersHeld() > 0)
+                    std::printf ("  shifters %2zu %-28s %d\n", c, song.channels[c].name.c_str(), i->pitchShiftersHeld());
     }
 
     // LYNX_RAW=path: also write the un-normalized float samples (L block then R block), for bit-exact comparisons

@@ -53,8 +53,14 @@ public:
     {
         int samples = 0, mappedSamples = 0, stretched = 0;
         std::int64_t sampleBytes = 0, mappedBytes = 0, stretchedBytes = 0;
+        // round 190gn (A2): the stretched copies mapped from the disk cache (locked in RAM: not the process's memory)
+        int stretchedMapped = 0;
+        std::int64_t stretchedMappedBytes = 0;
     };
     static MemoryUse memoryUse();
+    // the bytes of the mapped stretched copies that are resident and locked right now (-1: can't tell); the load log
+    // shows it next to stretchedMappedBytes: equal = no page of them can fault on the audio thread
+    static std::int64_t lockedStretchedBytes();
 
     // Filter for FileChooser ("*.wav;*.flac;...")
     juce::String wildcard() const;

@@ -408,6 +408,7 @@ void AudioEngine::buildInitialGraph()
         rackProcessor->setLiveInput (&liveInput);
         rackProcessor->setHardwareOutput (&hwOutput);
         rackProcessor->setPerformance (performanceLive.get());
+        rackProcessor->getRenderer().reserveFor (lastPublishedShape); // (round 190gn: a song published before the graph)
         // FL's own metronome sounds from its install (Data\System), LYNX's stand-ins without it (round 165z-a2)
         const auto& flData = flStudioAccess().roots.data;
         rackProcessor->setMetronome (std::make_unique<Metronome> (transport, flData.empty() ? juce::File() : platform::localFile (flData)));
@@ -4171,6 +4172,7 @@ void AudioEngine::publishSong()
     lastPublishedShape.pdc = state->pdc;
     lastPublishedShape.channelDelays = state->channelDelays;
     lastPublishedShape.sendDelays = state->sendDelays;
+    lastPublishedShape.shifterStock = state->shifterStock; // (round 190gn: the next build keeps the rack's shifter stock)
 
     const auto mark = [&] (const char* what) {
         if (traceEdits)
@@ -4179,6 +4181,9 @@ void AudioEngine::publishSong()
     mark ("built");
     levelsPending = false;
     publishedLevels = projectedSong ? nullptr : state->live; // (stand-ins: their projection, edits rebuild)
+    // round 190gn (A6): the renderer's channel / insert buffers hold this song before it can play it
+    if (rackProcessor != nullptr)
+        rackProcessor->getRenderer().reserveFor (*state);
     rackExchange.publish (std::move (state));
     mark ("exchanged");
 
@@ -4885,6 +4890,9 @@ void AudioEngine::timerCallback()
     }
 
     updateRealtimeStats();
+    // round 190gn (A1): the racks' pitch-shifter stocks back to their reserve (a voice took one: a live keyboard on a
+    // keep-pitch channel); nothing to do, and no allocation, when none was taken
+    shifterstock::topUpAll();
     if (++hwTicks >= 5) // (6 times a second)
     {
         hwTicks = 0;
