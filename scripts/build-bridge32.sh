@@ -75,7 +75,8 @@ for m in "${MODULES[@]}" juce_core_CompilationTime juce_graphics_Harfbuzz juce_g
     esac
     cached "$obj" "$key" -- $ZIG c++ $COMMON_STR -w -c "$src" -o "$obj"'
 
-SOURCES=(src/bridge/Bridge32Main.cpp src/engine/SandboxWorker.cpp src/engine/Vst2Format.cpp src/core/FlWrapper.cpp src/platform/NativeEmbed.cpp src/platform/MingwFixes.cpp)
+# (rollup 0.1.28: FlWrapper.cpp reads FL .fst presets with the FLP parser since round 190fs, so the parser is linked too)
+SOURCES=(src/bridge/Bridge32Main.cpp src/engine/SandboxWorker.cpp src/engine/Vst2Format.cpp src/core/FlWrapper.cpp src/flp/Flp.cpp src/platform/NativeEmbed.cpp src/platform/MingwFixes.cpp)
 echo "Bridge32: sources..."
 printf '%s\n' "${SOURCES[@]}" | xargs -P "$JOBS" -I{} bash -c '
     src={}; obj="$B/app/$(echo "$src" | tr / _).o"
