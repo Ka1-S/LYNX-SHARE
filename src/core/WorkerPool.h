@@ -57,6 +57,10 @@ public:
 
     // a spin-wait pause (x86 PAUSE / ARM YIELD), for callers waiting on each other inside a parallelFor
     static void relax() noexcept;
+    // the calling thread's CPU time (nanoseconds; Windows: the scheduler's per-thread times, coarse but fine over seconds)
+    static std::uint64_t threadCpuNs() noexcept;
+    // round 190gq: the CPU time the workers have spent (working and spinning), for render-ahead's on / off comparison
+    std::uint64_t cpuNs() const noexcept { return workersCpu.load (std::memory_order_relaxed); }
 
     // Calls fn(i) for i in [0, count), in parallel. Returns when all have finished.
     template <typename Fn>
@@ -110,5 +114,6 @@ private:
     alignas (64) std::atomic<int> done { 0 };
     alignas (64) std::uint64_t generation = 0; // caller thread only
     std::atomic<std::uint64_t> byWorkers { 0 }, wokenUp { 0 };
+    alignas (64) std::atomic<std::uint64_t> workersCpu { 0 };
 };
 } // namespace lynx

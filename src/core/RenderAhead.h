@@ -135,7 +135,10 @@ struct Block
 struct Stats
 {
     std::atomic<std::uint64_t> blocks { 0 }, fromRing { 0 }, waited { 0 }, inline_ { 0 }, flushes { 0 }, drains { 0 },
-        engagements { 0 }, partitionChanges { 0 }, promoted { 0 }, splitMismatches { 0 }, statesSwapped { 0 };
+        engagements { 0 }, partitionChanges { 0 }, promoted { 0 }, splitMismatches { 0 }, statesSwapped { 0 }, backoffs { 0 },
+        probes { 0 }, keptOn { 0 }, keptOff { 0 };
+    // the last probe: the rack's CPU (% of a core) and overruns per minute, render-ahead off and on
+    std::atomic<float> probeCpuOff { 0.0f }, probeCpuOn { 0.0f }, probeOverOff { 0.0f }, probeOverOn { 0.0f };
     std::atomic<int> aheadChannels { 0 }, aheadTracks { 0 }, boundary { 0 }, window { 0 };
     std::atomic<bool> engaged { false };
 };
@@ -198,6 +201,27 @@ public:
 
 private:
     struct Entry;
+    void processBlock (SnapshotExchange<RackState>& exchange, const renderahead::Block& block, float* left, float* right, LiveEventQueue* live,
+                       MeterBank* meters, LiveEventQueue* moreLive) noexcept;
+    // Round 190gq, the owner's rule "no project gets worse": when render-ahead might help, the engine measures it — a
+    // probe of probeRounds × (probeSeconds off, probeSeconds on), the rack's own CPU time (the callback's, the workers',
+    // the render-ahead thread's: per-thread CPU clocks) and its overruns (a callback longer than its block) — and keeps
+    // render-ahead only with no more overruns and at most probeCpuMargin more CPU. The choice holds for decidedSeconds
+    // of playback or until the project changes; the back-off rules still apply while it is on. Each switch is a clean
+    // sync (the output stays bit-identical).
+    void account (double wallNs, double cpuNs, int samples, bool playing, const RackState* state) noexcept;
+    bool renderAheadAllowed() const noexcept;
+    enum class Probe { none, off, on, decidedOn, decidedOff };
+    Probe probe = Probe::none;
+    static constexpr double probeSeconds = 2.0, probeWarmup = 0.25, probeCpuMargin = 1.02, decidedSeconds = 60.0;
+    static constexpr int probeRounds = 2;
+    double probeLeft = 0.0, decidedLeft = 0.0, warmupLeft = 0.0;
+    int probeRound = 0;
+    double cpuOff = 0.0, cpuOn = 0.0, secondsOff = 0.0, secondsOn = 0.0;
+    int overOff = 0, overOn = 0;
+    std::uint64_t decidedState = 0;
+    std::atomic<std::uint64_t> aheadCpuNs { 0 }; // the render-ahead thread's CPU time (the thread adds per block)
+    std::uint64_t lastWorkersCpu = 0, lastAheadCpu = 0;
     void threadLoop (std::function<void()> onStart);
     bool producing() const noexcept;
     void wakeThread() noexcept;
@@ -297,6 +321,17 @@ private:
     // (the thread) the ahead part's load rendered serially (job time / block time): above serialLimit one thread can't
     // keep the window, the workers take part; a serial job now and then measures it again
     double serialLoad = 0.0;
+    std::atomic<float> serialLoadSeen { 0.0f }; // (the callback reads it)
+    // Back-off (the owner's rule: no project may get worse): render-ahead stops by itself, cleanly, when it cannot help —
+    // its part needs the workers anyway (serial load at or above serialLimit for backoffHeavySeconds: it would only add a
+    // thread and a second renderer's per-block work to a pool that is busy already), or the callback had to wait for
+    // the thread or render in its place in more than backoffWaitShare of the blocks of the last backoffWindowSeconds
+    // (the window is not absorbing anything). It stays off for backoffSeconds of playback, or until the project changes.
+    static constexpr double backoffHeavySeconds = 1.0, backoffWaitShare = 0.05, backoffWindowSeconds = 2.0, backoffSeconds = 0.0;
+    double heavyFor = 0.0, windowSeconds = 0.0, backoffLeft = 0.0;
+    int windowBlocks = 0, windowWaits = 0;
+    std::uint64_t backoffState = 0;
+    bool backoffPending = false;
     int jobsSinceSerial = 0;
     static constexpr double serialLimit = 0.7;
     renderahead::TransportModel lastModel;

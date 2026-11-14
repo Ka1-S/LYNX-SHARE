@@ -610,11 +610,13 @@ int main (int argc, char** argv)
         {
             const auto& st = ahead->stats();
             std::printf ("ahead: blocks %llu, from ring %llu, waited %llu, inline %llu, flushes %llu, drains %llu, engagements %llu, ahead channels %d, "
-                         "ahead inserts %d, boundary %d, window %d samples, split mismatches %llu\n",
+                         "ahead inserts %d, boundary %d, window %d samples, split mismatches %llu, backoffs %llu, probes %llu, kept on %llu, kept off %llu (probe cpu %.1f%% off / %.1f%% on, overruns %.0f / %.0f per minute)\n",
                          (unsigned long long) st.blocks.load(), (unsigned long long) st.fromRing.load(), (unsigned long long) st.waited.load(),
                          (unsigned long long) st.inline_.load(), (unsigned long long) st.flushes.load(), (unsigned long long) st.drains.load(),
                          (unsigned long long) st.engagements.load(), st.aheadChannels.load(), st.aheadTracks.load(), st.boundary.load(), st.window.load(),
-                         (unsigned long long) st.splitMismatches.load());
+                         (unsigned long long) st.splitMismatches.load(), (unsigned long long) st.backoffs.load(),
+                         (unsigned long long) st.probes.load(), (unsigned long long) st.keptOn.load(), (unsigned long long) st.keptOff.load(),
+                         (double) st.probeCpuOff.load(), (double) st.probeCpuOn.load(), (double) st.probeOverOff.load(), (double) st.probeOverOn.load());
         }
         counter.pause();
         const auto wallMs = std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - wall0).count();

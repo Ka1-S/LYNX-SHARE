@@ -1,6 +1,7 @@
 #include "core/WorkerPool.h"
 
 #include <chrono>
+#include <ctime>
 
 #include "core/Denormals.h"
 
@@ -97,6 +98,23 @@ void WorkerPool::relax() noexcept
     cpuRelax();
 }
 
+std::uint64_t WorkerPool::threadCpuNs() noexcept
+{
+#if defined(_WIN32)
+    FILETIME created, exited, kernel, user;
+    if (! GetThreadTimes (GetCurrentThread(), &created, &exited, &kernel, &user))
+        return 0;
+    const auto k = ((std::uint64_t) kernel.dwHighDateTime << 32) | kernel.dwLowDateTime;
+    const auto u = ((std::uint64_t) user.dwHighDateTime << 32) | user.dwLowDateTime;
+    return (k + u) * 100;
+#else
+    timespec ts {};
+    if (clock_gettime (CLOCK_THREAD_CPUTIME_ID, &ts) != 0)
+        return 0;
+    return (std::uint64_t) ts.tv_sec * 1000000000ull + (std::uint64_t) ts.tv_nsec;
+#endif
+}
+
 WorkerPool::WorkerPool (int n, std::function<void()> onThreadStart) : wake (std::make_unique<OsSemaphore>())
 {
     // ticket 0: count 0, nothing to take until the first parallelFor
@@ -134,6 +152,7 @@ void WorkerPool::workerLoop (std::function<void()> onStart)
         onStart();
 
     using clock = std::chrono::steady_clock;
+    auto cpuMark = threadCpuNs();
 
     while (! quit.load (std::memory_order_relaxed))
     {
@@ -165,6 +184,9 @@ void WorkerPool::workerLoop (std::function<void()> onStart)
         if (found)
         {
             work (true);
+            const auto now = threadCpuNs(); // (round 190gq: the workers' CPU, spinning included)
+            workersCpu.fetch_add (now - cpuMark, std::memory_order_relaxed);
+            cpuMark = now;
             continue;
         }
 
@@ -179,7 +201,12 @@ void WorkerPool::workerLoop (std::function<void()> onStart)
             continue;
         }
 
-        wake->acquire();
+        {
+            const auto now = threadCpuNs();
+            workersCpu.fetch_add (now - cpuMark, std::memory_order_relaxed);
+            wake->acquire();
+            cpuMark = threadCpuNs();
+        }
         sleeping.fetch_sub (1, std::memory_order_seq_cst);
         wokenUp.fetch_add (1, std::memory_order_relaxed);
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <utility>
 
 #include "core/Denormals.h"
 #include "core/Patcher.h"
@@ -607,6 +608,12 @@ bool RenderAhead::engage (const RackState& state, const Block& b) noexcept
     readIndex.store (0, std::memory_order_relaxed);
     writeIndex.store (0, std::memory_order_relaxed);
     std::swap (current, next);
+    // (the back-off rules start counting afresh; the thread is idle)
+    serialLoad = 0.0;
+    serialLoadSeen.store (0.0f, std::memory_order_relaxed);
+    jobsSinceSerial = 0;
+    heavyFor = windowSeconds = 0.0;
+    windowBlocks = windowWaits = 0;
 
     // the part rendered ahead starts where the live renderer is: its transport, its started notes, the units' state
     ahead->adoptGlobals (live);
@@ -766,8 +773,10 @@ void RenderAhead::threadLoop (std::function<void()> onStart)
         const auto useWorkers = pool != nullptr && (fill < std::max (1, targetFill / 3) || heavy);
        #endif
         const auto jobStart = ProcessTimes::now();
+        const auto jobCpu = WorkerPool::threadCpuNs();
         renderJob (entry, *aheadState, sb.start, sb.samples, true, useWorkers);
         const auto jobNs = ProcessTimes::now() - jobStart;
+        aheadCpuNs.fetch_add (WorkerPool::threadCpuNs() - jobCpu, std::memory_order_relaxed);
         aheadBusyNs.fetch_add (jobNs, std::memory_order_relaxed);
         if (useWorkers)
             ++jobsSinceSerial;
@@ -775,6 +784,7 @@ void RenderAhead::threadLoop (std::function<void()> onStart)
         {
             const auto load = (double) jobNs * 1.0e-9 * model.sampleRate / sb.samples;
             serialLoad += 0.1 * (load - serialLoad);
+            serialLoadSeen.store ((float) serialLoad, std::memory_order_relaxed);
             jobsSinceSerial = 0;
         }
         nextPosition = sb.next;
@@ -906,6 +916,118 @@ void RenderAhead::renderLive (const RackState& state, const Block& b, Entry& ent
 void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b, float* left, float* right, LiveEventQueue* liveQueue,
                            MeterBank* meters, LiveEventQueue* moreLive) noexcept
 {
+    const auto wall0 = ProcessTimes::now();
+    const auto cpu0 = WorkerPool::threadCpuNs();
+    processBlock (exchange, b, left, right, liveQueue, meters, moreLive);
+    const auto cpu = (double) (WorkerPool::threadCpuNs() - cpu0);
+    account ((double) (ProcessTimes::now() - wall0), cpu, b.samples, b.playing, liveState);
+}
+
+bool RenderAhead::renderAheadAllowed() const noexcept
+{
+    return alwaysEngage || probe == Probe::on || probe == Probe::decidedOn;
+}
+
+void RenderAhead::account (double wallNs, double cpuNs, int samples, bool playing, const RackState* state) noexcept
+{
+    if (alwaysEngage || samples <= 0 || sampleRate <= 0.0)
+        return;
+    const auto seconds = samples / sampleRate;
+    const auto over = wallNs * 1.0e-9 > seconds;
+    // the rack's CPU in this block: the callback's here, the workers' and the thread's since the last block
+    const auto workers = pool != nullptr ? pool->cpuNs() : 0, aheadNs = aheadCpuNs.load (std::memory_order_relaxed);
+    const auto rackNs = cpuNs + (double) (workers - lastWorkersCpu) + (double) (aheadNs - lastAheadCpu);
+    lastWorkersCpu = workers;
+    lastAheadCpu = aheadNs;
+    if (! playing)
+        return;
+    const auto engaged = engagedNow.load (std::memory_order_relaxed);
+    const auto changed = state != nullptr && state->serial != decidedState;
+    switch (probe)
+    {
+        case Probe::none:
+            if (loadAverage >= engageLoad || spiked)
+            {
+                probe = Probe::off;
+                probeLeft = probeSeconds;
+                probeRound = 0;
+                cpuOff = cpuOn = secondsOff = secondsOn = 0.0;
+                overOff = overOn = 0;
+                counters.probes.fetch_add (1, std::memory_order_relaxed);
+            }
+            break;
+        case Probe::off:
+            if (engaged) // (still draining from the last "on" window)
+                break;
+            cpuOff += rackNs;
+            secondsOff += seconds;
+            overOff += over ? 1 : 0;
+            if ((probeLeft -= seconds) <= 0.0)
+            {
+                probe = Probe::on;
+                probeLeft = probeSeconds;
+                warmupLeft = probeWarmup;
+            }
+            break;
+        case Probe::on:
+            if (! engaged)
+            {
+                // it could not start (nothing to render ahead, backed off): off it is
+                if ((warmupLeft -= seconds) < -1.0)
+                {
+                    probe = Probe::decidedOff;
+                    decidedLeft = decidedSeconds;
+                    decidedState = state != nullptr ? state->serial : 0;
+                    counters.keptOff.fetch_add (1, std::memory_order_relaxed);
+                }
+                break;
+            }
+            if ((warmupLeft -= seconds) > 0.0) // (its first blocks fill the window)
+                break;
+            cpuOn += rackNs;
+            secondsOn += seconds;
+            overOn += over ? 1 : 0;
+            if ((probeLeft -= seconds) <= 0.0)
+            {
+                if (++probeRound < probeRounds)
+                {
+                    probe = Probe::off;
+                    probeLeft = probeSeconds;
+                    drain.store (true, std::memory_order_release); // (off again, cleanly)
+                    break;
+                }
+                const auto cpuShareOff = secondsOff > 0.0 ? cpuOff * 1.0e-9 / secondsOff : 0.0;
+                const auto cpuShareOn = secondsOn > 0.0 ? cpuOn * 1.0e-9 / secondsOn : 0.0;
+                const auto overRateOff = secondsOff > 0.0 ? overOff / secondsOff : 0.0, overRateOn = secondsOn > 0.0 ? overOn / secondsOn : 0.0;
+                counters.probeCpuOff.store ((float) (100.0 * cpuShareOff), std::memory_order_relaxed);
+                counters.probeCpuOn.store ((float) (100.0 * cpuShareOn), std::memory_order_relaxed);
+                counters.probeOverOff.store ((float) (60.0 * overRateOff), std::memory_order_relaxed);
+                counters.probeOverOn.store ((float) (60.0 * overRateOn), std::memory_order_relaxed);
+                const auto keep = overRateOn <= overRateOff && cpuShareOn <= cpuShareOff * probeCpuMargin;
+                probe = keep ? Probe::decidedOn : Probe::decidedOff;
+                decidedLeft = decidedSeconds;
+                decidedState = state != nullptr ? state->serial : 0;
+                (keep ? counters.keptOn : counters.keptOff).fetch_add (1, std::memory_order_relaxed);
+                if (! keep)
+                    drain.store (true, std::memory_order_release);
+            }
+            break;
+        case Probe::decidedOn:
+        case Probe::decidedOff:
+            if ((decidedLeft -= seconds) <= 0.0 || changed)
+            {
+                probe = Probe::none; // (measured again when the load asks)
+                if (engaged)
+                    drain.store (true, std::memory_order_release);
+            }
+            break;
+    }
+}
+
+void RenderAhead::processBlock (SnapshotExchange<RackState>& exchange, const Block& b, float* left, float* right, LiveEventQueue* liveQueue,
+                                MeterBank* meters, LiveEventQueue* moreLive) noexcept
+{
+
     counters.blocks.fetch_add (1, std::memory_order_relaxed);
     if (targets != nullptr)
         targets->read (targetChannels, targetChannelCount, targetTracks, targetTrackCount, targetVersion);
@@ -942,7 +1064,11 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
         }
         auto engaged = false;
         // (light projects: no deadline to ease, render-ahead would only add its thread)
-        const auto needed = alwaysEngage || loadAverage >= engageLoad || spiked || stickyOn;
+        // (backed off: not again until the time is up or the project changes)
+        if (backoffLeft > 0.0 && b.playing)
+            backoffLeft = state != nullptr && state->serial != backoffState ? 0.0 : std::max (0.0, backoffLeft - b.samples / sampleRate);
+        // (the probe's "on" window or its verdict; tests: whenever it can)
+        const auto needed = renderAheadAllowed() && (alwaysEngage || backoffLeft <= 0.0);
         if (want && steady && needed && state != nullptr && ! state->launchers && held == nullptr)
         {
             // (a state with nothing to render ahead is not looked at again until it, or the live targets, change)
@@ -1000,7 +1126,7 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
         liveState = state;
         return;
     }
-    if (! want) // the option switched off while playing: drained, then off
+    if (! want || ! renderAheadAllowed()) // the option switched off while playing, the probe's "off": drained, then off
         drain.store (true, std::memory_order_release);
 
     // a new snapshot: the live part takes it now when the part rendered ahead can go on as it is (same units, same
@@ -1105,6 +1231,8 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
         {
             // the thread is rendering it: wait for it (the renderer can't do two blocks at once)
             counters.waited.fetch_add (1, std::memory_order_relaxed);
+            if (tweakHoldSamples.load (std::memory_order_relaxed) == 0) // (a drag holds the window at one block: waits are expected)
+                ++windowWaits;
             for (int spins = 0; owner.load (std::memory_order_acquire) == 1; ++spins)
             {
                 WorkerPool::relax();
@@ -1138,6 +1266,11 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
             engageBlocked = false;
             const auto* state = exchange.acquire();
             retireHeld (exchange);
+            if (std::exchange (backoffPending, false) && state != nullptr)
+            {
+                backoffLeft = backoffSeconds; // (backed off: off for a while, or until the project changes)
+                backoffState = state->serial;
+            }
             localPending = false;
             live.process (state, b.playing, b.startTick, b.samples, left, right, localEvents.get(), meters, nullptr);
             liveState = state;
@@ -1154,6 +1287,8 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
         renderJob (slot, *aheadState, b.startTick, b.samples, b.playing, pool != nullptr);
         entry = &slot;
         counters.inline_.fetch_add (1, std::memory_order_relaxed);
+        if (tweakHoldSamples.load (std::memory_order_relaxed) == 0)
+            ++windowWaits;
         // the thread goes on after this block: where the callback will put the position
         const auto sb = planSubBlock (*m, b.startTick, m->offset, b.tps);
         if (sb.start == b.startTick && sb.samples == b.samples)
@@ -1180,6 +1315,31 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
         stickyOn = false;
         drain.store (true, std::memory_order_release); // (disengaged cleanly at the next sync)
         engageBlocked = false;
+    }
+    // the back-off rules
+    {
+        const auto seconds = b.samples / sampleRate;
+        heavyFor = serialLoadSeen.load (std::memory_order_relaxed) >= serialLimit ? heavyFor + seconds : 0.0;
+        ++windowBlocks;
+        windowSeconds += seconds;
+        // (only once the probe has kept it on: the probe itself measures the "on" window)
+        auto backOff = false;
+        if (windowSeconds >= backoffWindowSeconds)
+        {
+            backOff = windowWaits > backoffWaitShare * windowBlocks;
+            windowBlocks = windowWaits = 0;
+            windowSeconds = 0.0;
+        }
+        if (backOff && probe == Probe::decidedOn && ! alwaysEngage && ! drain.load (std::memory_order_relaxed))
+        {
+            heavyFor = 0.0;
+            stickyOn = false;
+            backoffPending = true;
+            drain.store (true, std::memory_order_release);
+            engageBlocked = false;
+            counters.backoffs.fetch_add (1, std::memory_order_relaxed);
+            probe = Probe::none; // (the window stopped absorbing anything: measured again)
+        }
     }
 
     if (fromRing)
