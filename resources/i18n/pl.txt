@@ -10023,3 +10023,15 @@ countries: pl
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Przyczyna: przetwarzanie zbliżyło się do granicy bufora ({0}%). Spróbuj większego bufora albo zamroź najcięższe kanały."
 # Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
 "Tape speed" = "Prędkość taśmy"
+
+# --- round 190gw: FL 2026 facts (mixer boxes, Sampler views, Newtone / Newtime on the Master)
+"Edit in pitch corrector" = "Edytuj w korektorze wysokości"
+"Edit in time warper" = "Edytuj w edytorze czasu"
+"Spectrum view" = "Widok widma"
+"Multichannel waveform view" = "Wielokanałowy widok przebiegu"
+"Add multiple" = "Dodaj kilka"
+"Enter the number of mixer tracks to add" = "Podaj liczbę ścieżek miksera do dodania"
+"Number of tracks to add" = "Liczba ścieżek do dodania"
+"Please enter a number between 1 and {0}." = "Podaj liczbę od 1 do {0}."
+"You can add a maximum of {0} tracks." = "Można dodać najwyżej {0} ścieżek."
+"The Master track has no free effect slot." = "Ścieżka Master nie ma wolnego slotu efektu."

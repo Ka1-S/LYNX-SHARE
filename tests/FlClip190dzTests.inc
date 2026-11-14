@@ -116,18 +116,18 @@ TEST (flclip190dz_menu_model_is_fl_order_and_sections)
             CHECK (e.mnemonic == 'f');
     }
 
-    // what LYNX shows: FL's list without what it cannot do yet (Pitch-correct, Time-warp, Deverb, the fade curves),
-    // Crossfade with only greyed (no other channel's clip overlapping), Crossfade selected only when FL shows it
+    // what LYNX shows: FL's list without what it cannot do (Deverb: FL 2026 only offers a download there), Crossfade
+    // selected only when FL shows it (round 190gw: Pitch-correct / Time-warp = LYNX's Newtone / Newtime, Crossfade with
+    // works and is greyed only while no other channel's clip overlaps)
     const std::vector<std::string> usual {
         "[Audio clip]", "Preview", "-", "(v) Muted", "-", "Rename and color...", "Change color...", "Random color", "Change icon...", "-",
         "Select source channel >", "Channel settings", "Make unique", "Select all similar clips", "Delete", "-", "Properties...",
         "[Region]", "Select region >", "Chop >", "||",
-        "[Sample]", "Make unique as sample", "Edit sample", "Extract stems from sample", "Detect tempo", "Fit to tempo",
-        "[Automation]", "Automate >", "Crossfade with >", "[Fades]", "Reset fades", "Fade in curve >", "Fade out curve >"
+        "[Sample]", "Make unique as sample", "Edit sample", "Pitch-correct sample", "Time-warp sample", "Extract stems from sample",
+        "Detect tempo", "Fit to tempo", "[Automation]", "Automate >", "Crossfade with >", "[Fades]", "Reset fades", "Fade in curve >", "Fade out curve >"
     };
     CHECK (flclip190dz::texts (flclipmenu::shown (true, false)) == usual);
     auto overlapped = usual;
-    overlapped.erase (std::find (overlapped.begin(), overlapped.end(), "Crossfade with >"));
     overlapped.insert (std::find (overlapped.begin(), overlapped.end(), "Fade in curve >"), "Crossfade selected"); // (round 190ey: the curves shown)
     CHECK (flclip190dz::texts (flclipmenu::shown (false, true)) == overlapped);
     for (const auto& e : flclipmenu::shown (true, true))

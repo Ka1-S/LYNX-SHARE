@@ -3043,6 +3043,13 @@ juce::String toJson (const Song& song, bool stampVersion)
         }
 
         o->setProperty ("points", points);
+        if (! a.links.empty()) // round 190gw: FL's target links, each with its mapping formula
+        {
+            juce::Array<juce::var> links;
+            for (const auto& l : a.links)
+                links.add (juce::Array<juce::var> { targetKindName (l.target.kind), l.target.index, l.target.slot, l.target.param, str (l.formula) });
+            o->setProperty ("links", links);
+        }
         if (a.isLive())
         {
             o->setProperty ("source", juce::Array<juce::var> { a.source.track, a.source.slot, a.source.output, a.source.channel });
@@ -3365,6 +3372,8 @@ juce::String toJson (const Song& song, bool stampVersion)
 
         if (! heights.isEmpty())
             root->setProperty ("playlistTrackHeights", heights);
+        // round 190gw: the default row (FL's 48; projects saved before have none and keep 38)
+        root->setProperty ("playlistRowHeight", song.playlistRowHeight);
 
         juce::Array<juce::var> colours; // [index, 0xRRGGBB]
 
@@ -3772,6 +3781,12 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
             if (const auto& source = a["source"]; source.isArray() && source.size() >= 3)
                 automation.source = { (int) source[0], (int) source[1], (int) source[2], source.size() >= 4 ? (int) source[3] : -1 };
             automation.recordLive = (bool) a["recordLive"];
+            if (auto* links = a["links"].getArray()) // round 190gw
+                for (const auto& l : *links)
+                    if (l.isArray() && l.size() >= 5)
+                        automation.links.push_back ({ { targetKindFromName (l[0].toString()), (int) l[1], (int) l[2], (int) l[3] }, l[4].toString().toStdString() });
+            if (! automation.links.empty())
+                automation.target = automation.links.front().target;
             if (auto* curve = a["curve"].getArray())
                 for (const auto& v : *curve)
                     automation.curve.push_back (juce::jlimit (0.0f, 1.0f, (float) (double) v));
@@ -4063,6 +4078,9 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 song.playlistTracks[index] = { t[1].toString().toStdString(), (bool) t[2] };
             }
 
+    // round 190gw: FL's 48 px default row for new projects; a project saved before has no key and keeps LYNX's old 38
+    song.playlistRowHeight = juce::jlimit (polish::minTrackHeight, polish::maxTrackHeight,
+                                           (int) root.getProperty ("playlistRowHeight", Song::legacyRowHeight));
     if (auto* heights = root["playlistTrackHeights"].getArray())
         for (const auto& t : *heights)
             if (t.isArray() && t.size() == 2 && (int) t[0] >= 0 && (int) t[0] < 500)

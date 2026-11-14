@@ -5,6 +5,8 @@
 #include "core/FlControlMenus.h"
 #include "core/FlmDwSampler.h"
 #include "core/SamplerPage.h"
+#include "ui/NewtoneEditor.h"
+#include "ui/EditorTools.h"
 #include "ui/FileChoosers.h"
 #include "ui/Icons.h"
 #include "ui/LayerEditor.h"
@@ -3132,6 +3134,7 @@ public:
         wave.setWatermark (tr ("Sampler"));
         wave.setCaptionVisible (false);
         wave.setZoomable (true);
+        wave.setFollowsSamplerViews (true); // (round 190gw: the waveform menu's Spectrum / Multichannel views)
         wave.onViewChanged = [this] { waveScroll.setCurrentRange (wave.getViewStart(), wave.getViewEnd() - wave.getViewStart(), juce::dontSendNotification); };
         // round 190w: FL 2026 previews the sample when its display is clicked (from the start offset, to its end) and shows
         // the playback locator over it (What's New 21138; [SHOT] flgap190w burst n2 / o3)
@@ -3693,6 +3696,24 @@ private:
                 menu.addItem (text, file.existsAsFile() && openInNewChannelHandler() != nullptr, false, [file, kind] {
                     if (openInNewChannelHandler())
                         openInNewChannelHandler() (file, kind);
+                });
+            }
+            else if (key == "Edit in pitch corrector" || key == "Edit in time warper") // (round 190gw)
+                menu.addItem (text, has && file.existsAsFile(), false, [safe, file, kind = key == "Edit in pitch corrector" ? EffectKind::newtone : EffectKind::newtime] {
+                    if (safe != nullptr)
+                        openSampleInMasterEditor (safe->engine, kind, file.getFullPathName().toStdString());
+                });
+            else if (key == "Spectrum view" || key == "Multichannel waveform view") // (round 190gw: FL's global view switches)
+            {
+                const auto spectrum = key == "Spectrum view";
+                auto& views = samplerpage::waveViews();
+                menu.addItem (text, true, spectrum ? views.spectrum : views.multichannel, [safe, spectrum] {
+                    auto& v = samplerpage::waveViews();
+                    (spectrum ? v.spectrum : v.multichannel) = ! (spectrum ? v.spectrum : v.multichannel);
+                    if (safe != nullptr)
+                        safe->wave.repaint();
+                    if (EditorGlobals::get().onOptionsChanged) // (kept in the UI settings)
+                        EditorGlobals::get().onOptionsChanged();
                 });
             }
             else if (key == "Get properties")

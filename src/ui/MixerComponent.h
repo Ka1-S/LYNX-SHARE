@@ -379,7 +379,12 @@ private:
     float groupGrab = 0.0f;
     void showMenu (int track);
     void askInsertCount(); // the "+" menu's "Increase number of tracks to..." (round 190fl)
-    void askInsertMultiple (int at); // "Insert multiple..." / the "+" menu's "Add multiple..." (at most the room left)
+    // the track menu's "Insert multiple..." (before track `at`) / the "+" menu's "Add multiple..." (`adding`: at the end);
+    // FL 2026's boxes, defaults and range rules (round 190gw)
+    void askInsertMultiple (int at, bool adding = false);
+public:
+    static std::unique_ptr<juce::AlertWindow> makeInsertMultipleBox (bool adding); // (its box; --hdrshot190ft draws it)
+private:
     void showTrackEq (int track);
     ui::ValueSpec specFor (Part part, int track) const;
     void setValue (Part part, int track, double value);

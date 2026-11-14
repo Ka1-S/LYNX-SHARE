@@ -1,4 +1,5 @@
 #include "core/MixerOps.h"
+#include "core/Effects.h"
 #include "core/ClipOps.h"
 #include "core/FlpExport.h"
 #include "core/RackOps.h"
@@ -1166,6 +1167,36 @@ int insertTracks (Song& song, int at, int count)
 int roomForInserts (const Song& song) noexcept
 {
     return std::max (0, maxMixerTracks - std::max (1, (int) song.mixer.size()));
+}
+
+int openSampleInMasterEditor (Song& song, EffectKind kind, const std::string& path)
+{
+    if ((kind != EffectKind::newtone && kind != EffectKind::newtime) || path.empty())
+        return -1;
+    if (song.mixer.empty())
+        song.mixer.resize (1);
+    auto& effects = song.mixer[0].effects;
+    auto slot = -1;
+    for (int i = 0; i < (int) effects.size() && slot < 0; ++i)
+        if (effects[(std::size_t) i].kind == kind)
+            slot = i;
+    for (int row = 0; slot < 0 && row < maxEffectSlots; ++row)
+        if (effectAtRow (effects, row) < 0)
+            slot = insertEffectAtRow (song, 0, makeEffectSlot (kind), row);
+    if (slot < 0)
+        return -1;
+    auto& fx = song.mixer[0].effects[(std::size_t) slot];
+    fx.samplePath = path;
+    fx.state.clear(); // (a new sample: its own notes / no markers, as the editor's own Load does)
+    return slot;
+}
+
+InsertCheck checkInsertMultiple (const Song& song, int count, bool adding) noexcept
+{
+    const auto room = roomForInserts (song);
+    if (adding)
+        return count > room ? InsertCheck::tooMany : InsertCheck::ok;
+    return count < 1 || count > room ? InsertCheck::outOfRange : InsertCheck::ok;
 }
 
 std::vector<int> displayOrder (const Song& song)

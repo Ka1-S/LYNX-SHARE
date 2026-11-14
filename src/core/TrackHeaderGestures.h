@@ -172,6 +172,56 @@ inline bool groupGesture (int newHeight, int mouseY, int rowTop)
 {
     return newHeight <= polish::minTrackHeight && mouseY - rowTop <= -groupGestureDistance;
 }
+// --- the header's two side strips (live check 190gu B1, round 190gw; FUN_00ea93a0's codes 0xd2 / 0xd0) ---------------
+
+// The left lock strip: the header's first 10 px. A click flips the row between its size and the smallest row (FL's
+// quick "Lock to this size" flip, the same as a double click on the resize band); FL draws nothing there.
+constexpr int lockStripWidth = 10;
+// The selection strip: a 9 px column at the header's right edge, between the header and the grid. A selected track
+// shows an outlined box in it (FL's lime, the LED's colour); FL 2026's track level meter, when shown, sits in it too.
+constexpr int selectionStripWidth = 9;
+
+enum class HeaderZone { lockStrip, plate, selectionStrip };
+
+inline HeaderZone zoneAt (int x, int headerWidth) noexcept
+{
+    if (x >= headerWidth - selectionStripWidth)
+        return HeaderZone::selectionStrip;
+    return x < lockStripWidth ? HeaderZone::lockStrip : HeaderZone::plate;
+}
+
+// A press on the selection strip (FL: click = this track alone, Shift+click and right-click toggle it with no menu, a
+// double click switches between this track alone and every track — FUN_012e83e0 mode 5; Ctrl = the header's Ctrl
+// press; a drag goes on as a range from the pressed track).
+enum class StripAction { only, toggle, ctrlPress, onlyOrAll };
+
+inline StripAction stripPress (bool ctrl, bool shift, bool rightButton, bool doubleClick) noexcept
+{
+    if (rightButton)
+        return StripAction::toggle;
+    if (doubleClick && ! ctrl && ! shift)
+        return StripAction::onlyOrAll;
+    if (ctrl)
+        return StripAction::ctrlPress;
+    return shift ? StripAction::toggle : StripAction::only;
+}
+
+// FL's mode 5 (only <-> all): when the track is the only one selected (the double click's first click made it so), every
+// track; otherwise the track alone.
+inline void applyOnlyOrAll (std::vector<int>& selected, int track, int count)
+{
+    if (track < 0)
+        return;
+    if (selected.size() == 1 && selected.front() == track && count > 1)
+    {
+        selected.resize ((std::size_t) count);
+        for (int t = 0; t < count; ++t)
+            selected[(std::size_t) t] = t;
+    }
+    else
+        selected = { track };
+}
+
 // LYNX's Ctrl+click toggle (issue #163): the clip selection follows the track — its clips join when it becomes
 // selected and leave when it is deselected. `clipTracks[i]` is the track of clip i.
 inline void toggleTrackClips (std::vector<int>& clipSelection, const std::vector<int>& clipTracks, int track, bool nowSelected)

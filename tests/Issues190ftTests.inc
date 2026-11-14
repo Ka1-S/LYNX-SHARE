@@ -104,10 +104,11 @@ TEST (issues190ft_fl_size_factor_law_and_flp)
     for (int h = 16; h <= 528; h += 2)
         CHECK (polish::heightForFlSize (polish::flSizeForHeight (h)) == h);
 
-    // .flp: the f32 size at byte 13 of the 0xEE track event is written and read back with the same law
+    // .flp: the f32 size at byte 13 of the 0xEE track event is written and read back with the same law (round 190gw: on the
+    // song's default row, FL's 48 px: 200 % = 80 px)
     auto song = Song::makeDefault();
     song.playlistTracks.resize (4);
-    song.playlistTracks[1].height = 60;  // FL 200 %
+    song.playlistTracks[1].height = 80;  // FL 200 %
     song.playlistTracks[2].height = 300;
     song.playlistTracks[3].lockedHeight = 80;
     flpexport::Options options;
@@ -124,10 +125,10 @@ TEST (issues190ft_fl_size_factor_law_and_flp)
                     locked3 = t.lockedHeight;
             }
     CHECK (std::abs (sizes[0] - 1.0f) < 1.0e-6f && std::abs (sizes[1] - 2.0f) < 1.0e-6f
-           && std::abs (sizes[2] - polish::flSizeForHeight (300)) < 1.0e-6f && locked3 == 80);
+           && std::abs (sizes[2] - polish::flSizeForHeight (300, Song::flDefaultRowHeight)) < 1.0e-6f && locked3 == 80);
     const auto back = importFlp (project);
     CHECK (back.playlistTracks.size() >= 4);
     if (back.playlistTracks.size() >= 4)
-        CHECK (back.playlistTracks[0].height == 0 && back.playlistTracks[1].height == 60 && back.playlistTracks[2].height == 300
+        CHECK (back.playlistTracks[0].height == 0 && back.playlistTracks[1].height == 80 && back.playlistTracks[2].height == 300
                && back.playlistTracks[3].lockedHeight == 80);
 }

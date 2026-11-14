@@ -74,7 +74,7 @@ CORE="$CORE src/core/PluginLayout.cpp src/core/StateParams.cpp"
 # the drum / physical-model generators' controls and LYNX bank states (round 168p)
 CORE="$CORE src/core/DrumControls.cpp src/core/BankStates.cpp src/core/DrumBanks.cpp"
 # spectral waveforms (band analysis, multi-resolution peak cache)
-CORE="$CORE src/core/WaveAnalysis.cpp"
+CORE="$CORE src/core/WaveAnalysis.cpp src/core/Spectrogram.cpp"
 # FL's Plucked!, Sawer and BeepMap engines (REA round 65)
 CORE="$CORE src/core/Plucked.cpp src/core/BeepMap.cpp src/core/Sawer.cpp"
 # FL's sampler interpolation and FL Keys (REA round 69)

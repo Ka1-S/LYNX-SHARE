@@ -1469,7 +1469,7 @@ struct Converter
                     a.items.push_back (*item);
             std::stable_sort (a.items.begin(), a.items.end(), [] (const flp::PlaylistItem& x, const flp::PlaylistItem& y) { return x.position < y.position; });
             for (int t = 0; t < (int) song.playlistTracks.size() && t < 500; ++t)
-                a.tracks.push_back (trackInfo (song.playlistTracks[(std::size_t) t], t));
+                a.tracks.push_back (trackInfo (song.playlistTracks[(std::size_t) t], t, song.playlistRowHeight));
             out.arrangements.push_back (std::move (a));
         }
         report.exact.push_back ("Playlist: " + std::to_string (song.arrangements.size()) + " arrangement(s), tracks, markers");
@@ -1558,7 +1558,7 @@ struct Converter
         return std::nullopt;
     }
 
-    static flp::PlaylistTrackInfo trackInfo (const PlaylistTrack& t, int index)
+    static flp::PlaylistTrackInfo trackInfo (const PlaylistTrack& t, int index, int rowHeight)
     {
         flp::PlaylistTrackInfo info;
         info.index = index;
@@ -1569,7 +1569,7 @@ struct Converter
         info.expanded = ! t.collapsed;
         info.lockedToContent = t.lockedToContent;
         info.lockedHeight = t.lockedHeight;
-        info.heightScale = t.height > 0 ? polish::flSizeForHeight (t.height) : 1.0f; // (round 190ft: FL's size factor)
+        info.heightScale = t.height > 0 ? polish::flSizeForHeight (t.height, rowHeight) : 1.0f; // (round 190ft: FL's size factor; 190gw: on the song's default row)
         info.mode = t.mode == PlaylistTrackMode::audio ? 1 : t.mode == PlaylistTrackMode::instrument ? 3 : 0;
         info.mixerTrack = t.mixerTrack;
         info.channel = t.channel;

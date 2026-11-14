@@ -24,6 +24,7 @@
 #include "core/ProjectKey.h"
 #include "core/ScaleKeys.h"
 #include "core/SimplePads.h"
+#include "core/SamplerPage.h"
 #include "core/SessionOps.h"
 #include "ui/FileChoosers.h"
 #include "ui/ProjectLoading.h"
@@ -491,6 +492,8 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             auto made = natives::makeChannel (kind, flStudioAccess());
             if (! made)
                 return;
+            // round 190gw (live check 190gu B3): the channel takes the sample's name, " #n" when taken
+            made->name = samplerpage::openInNewChannelName (engine.getSong(), file.getFileNameWithoutExtension().toStdString());
             const auto added = rack.addChannel (*made, false);
             if (kind == InstrumentKind::slicex)
                 loadSlicexSampleWhenOpened (added, file.getFullPathName());
@@ -506,6 +509,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         c.instrument = kind;
         audioclips::loadSampleInto (c, file.getFullPathName().toStdString(), file.getFileNameWithoutExtension().toStdString());
         c.instrument = kind; // (loadSampleInto keeps the Granulizer; a sampler stays one)
+        c.name = samplerpage::openInNewChannelName (engine.getSong(), file.getFileNameWithoutExtension().toStdString()); // (round 190gw)
         const auto added = rack.addChannel (c, false);
         showPanel (Panel::channelRack);
         rack.toggleEditor (added, false);
@@ -2632,6 +2636,10 @@ void MainComponent::loadUiSettings()
             skin::setArtMotion (on);
         else if (key == "waveStereo")
             ui::WaveformCache::stereo = on;
+        else if (key == "samplerSpectrumView") // round 190gw: the Sampler waveform menu's view switches
+            samplerpage::waveViews().spectrum = on;
+        else if (key == "samplerMultichannelView")
+            samplerpage::waveViews().multichannel = on;
         else if (key == "noteNames")
             notenames::currentStyle.store (juce::jlimit (0, 2, line.fromFirstOccurrenceOf ("=", false, false).trim().getIntValue()));
         else if (key == "noteFlats")
@@ -2924,6 +2932,8 @@ void MainComponent::saveUiSettings()
                                       + "\nstartupSound=" + juce::String (startup.sound ? 1 : 0)
                                       + "\nwaveSpectral=" + juce::String (ui::WaveformCache::spectral ? 1 : 0)
                                       + "\nwaveStereo=" + juce::String (ui::WaveformCache::stereo ? 1 : 0)
+                                      + "\nsamplerSpectrumView=" + juce::String (samplerpage::waveViews().spectrum ? 1 : 0)
+                                      + "\nsamplerMultichannelView=" + juce::String (samplerpage::waveViews().multichannel ? 1 : 0)
                                       + "\nnoteNames=" + juce::String (notenames::currentStyle.load())
                                       + "\nnoteFlats=" + juce::String (notenames::currentFlats.load() ? 1 : 0)
                                       + "\nnoteNamesEveryKey=" + juce::String (notenames::everyKey.load() ? 1 : 0)

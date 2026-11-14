@@ -10023,3 +10023,15 @@ countries: tr
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Neden: işleme arabelleğin sınırına yaklaştı (%{0}). Daha büyük bir arabellek deneyin veya en ağır kanalları dondurun."
 # Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
 "Tape speed" = "Bant hızı"
+
+# --- round 190gw: FL 2026 facts (mixer boxes, Sampler views, Newtone / Newtime on the Master)
+"Edit in pitch corrector" = "Perde düzelticide düzenle"
+"Edit in time warper" = "Zaman bükücüde düzenle"
+"Spectrum view" = "Spektrum görünümü"
+"Multichannel waveform view" = "Çok kanallı dalga formu görünümü"
+"Add multiple" = "Birden çok ekle"
+"Enter the number of mixer tracks to add" = "Eklenecek mikser kanalı sayısını girin"
+"Number of tracks to add" = "Eklenecek kanal sayısı"
+"Please enter a number between 1 and {0}." = "Lütfen 1 ile {0} arasında bir sayı girin."
+"You can add a maximum of {0} tracks." = "En fazla {0} kanal ekleyebilirsiniz."
+"The Master track has no free effect slot." = "Master kanalında boş efekt yuvası yok."

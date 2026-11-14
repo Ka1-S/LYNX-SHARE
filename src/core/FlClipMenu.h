@@ -68,15 +68,21 @@ inline std::vector<Entry> fl()
         { K::header, TR_NOOP ("Sample") },
         { K::item, TR_NOOP ("Make unique as sample"), H::yes, 'u' },
         { K::item, TR_NOOP ("Edit sample"), H::yes, 'E' },
-        { K::item, TR_NOOP ("Pitch-correct sample"), H::missing, 'P' }, // (FL: the clip's sample into Newtone)
-        { K::item, TR_NOOP ("Time-warp sample"), H::missing, 'T' },     // (FL: the clip's sample into Newtime)
+        // round 190gw (live check 190gu B3): FL opens Newtone / Newtime on the Master with the clip's sample; LYNX's own
+        // Newtone / Newtime (mixerops::openSampleInMasterEditor)
+        { K::item, TR_NOOP ("Pitch-correct sample"), H::yes, 'P' },
+        { K::item, TR_NOOP ("Time-warp sample"), H::yes, 'T' },
         { K::item, TR_NOOP ("Extract stems from sample") },
-        { K::item, TR_NOOP ("Deverb"), H::missing }, // (FL: its Deverb dialog on the clip's part, the result saved as <name>_Deverb.wav)
+        // (FL 2026 only offers to download the module here, live check 190gu B3: "This feature needs to be downloaded before it
+        // can be used"; LYNX's Deverb is the audio editor's tool, so the item stays out)
+        { K::item, TR_NOOP ("Deverb"), H::missing },
         { K::item, TR_NOOP ("Detect tempo"), H::yes, 'D' },
         { K::item, TR_NOOP ("Fit to tempo"), H::yes, 'F' },
         { K::header, TR_NOOP ("Automation") },
         { K::submenu, TR_NOOP ("Automate"), H::yes, 'A' },
-        { K::submenu, TR_NOOP ("Crossfade with"), H::greyedOnly, 'f' }, // (greyed while no other channel's audio clip overlaps it)
+        // the other channels' audio clips overlapping it in time; one picked makes "<A> to <B> crossfade" (round 190gw,
+        // crossfadeWith below); greyed while there is none
+        { K::submenu, TR_NOOP ("Crossfade with"), H::yes, 'f' },
         { K::header, TR_NOOP ("Fades") },
         { K::item, TR_NOOP ("Reset fades") },
         { K::item, TR_NOOP ("Crossfade selected"), H::yes, 0, true },

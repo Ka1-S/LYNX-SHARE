@@ -309,8 +309,9 @@ inline std::vector<WaveMenuEntry> waveMenu()
              { TR_NOOP ("Paste audio from clipboard"), true, "Ctrl+V" },
              { nullptr },
              { TR_NOOP ("Edit in audio editor"), true, "Ctrl+E" },
-             { "Edit in pitch corrector", false },  // (FL: Newtone; LYNX has no pitch corrector editor)
-             { "Edit in time warper", false },      // (FL: Newtime)
+             // round 190gw: FL's Newtone / Newtime with the sample (live check 190gu B3: on the Master); LYNX's own
+             { TR_NOOP ("Edit in pitch corrector") },
+             { TR_NOOP ("Edit in time warper") },
              { nullptr },
              { TR_NOOP ("Open in new sampler channel") },
              { TR_NOOP ("Open in new Fruity Granulizer channel") },
@@ -323,8 +324,37 @@ inline std::vector<WaveMenuEntry> waveMenu()
              { TR_NOOP ("Detect tempo") },
              { TR_NOOP ("Get properties") }, // (round 190gk: the system's file properties, Windows only; REA 0x11f22a0)
              { nullptr },
-             { "Spectrum view", false },              // (FL's faded ticks: display modes LYNX's page doesn't have)
-             { "Multichannel waveform view", false } };
+             // round 190gw (live check 190gu B3): FL's two global view switches (AutoCheck items; a faded tick = off).
+             // Spectrum view draws a spectrogram instead of the waveform (it wins when both are on); Multichannel
+             // waveform view draws each channel in its own lane. The overview under the display stays a waveform.
+             { TR_NOOP ("Spectrum view") },
+             { TR_NOOP ("Multichannel waveform view") } };
+}
+
+// The two view switches (global, kept in LYNX's UI settings as FL keeps them in its own).
+struct WaveViews
+{
+    bool spectrum = false, multichannel = false;
+};
+inline WaveViews& waveViews() noexcept
+{
+    static WaveViews views;
+    return views;
+}
+
+// "Open in new ... channel" names the new channel after the sample (live check 190gu B3: FL's "Basic 808 Clap #2",
+// "#3" next to the Sampler channel "Basic 808 Clap"), not after the plugin: the sample's name, or with " #n" (n = 2, 3...)
+// the first one no channel has yet.
+inline std::string openInNewChannelName (const Song& song, const std::string& sampleName)
+{
+    const auto taken = [&song] (const std::string& name) {
+        return std::any_of (song.channels.begin(), song.channels.end(), [&name] (const ChannelDef& c) { return c.name == name; });
+    };
+    if (! taken (sampleName))
+        return sampleName;
+    for (int n = 2;; ++n)
+        if (auto name = sampleName + " #" + std::to_string (n); ! taken (name))
+            return name;
 }
 
 // Remove sample (live check 190ew CTL-4): FL clears the sample and renames the channel "Sampler" without asking

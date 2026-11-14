@@ -10023,3 +10023,15 @@ countries: nl be
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Oorzaak: de verwerking kwam dicht bij de grens van de buffer ({0}%). Probeer een grotere buffer, of bevries de zwaarste kanalen."
 # Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
 "Tape speed" = "Bandsnelheid"
+
+# --- round 190gw: FL 2026 facts (mixer boxes, Sampler views, Newtone / Newtime on the Master)
+"Edit in pitch corrector" = "Bewerken in toonhoogtecorrector"
+"Edit in time warper" = "Bewerken in time-warper"
+"Spectrum view" = "Spectrumweergave"
+"Multichannel waveform view" = "Meerkanaals golfvormweergave"
+"Add multiple" = "Meerdere toevoegen"
+"Enter the number of mixer tracks to add" = "Voer het aantal toe te voegen mixertracks in"
+"Number of tracks to add" = "Aantal toe te voegen tracks"
+"Please enter a number between 1 and {0}." = "Voer een getal tussen 1 en {0} in."
+"You can add a maximum of {0} tracks." = "Je kunt maximaal {0} tracks toevoegen."
+"The Master track has no free effect slot." = "De Master-track heeft geen vrij effectslot."

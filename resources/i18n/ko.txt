@@ -10023,3 +10023,15 @@ countries: kr
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "원인: 처리가 버퍼 한계({0}%)에 가까워졌습니다. 더 큰 버퍼를 사용하거나 가장 무거운 채널을 프리즈하세요."
 # Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
 "Tape speed" = "테이프 속도"
+
+# --- round 190gw: FL 2026 facts (mixer boxes, Sampler views, Newtone / Newtime on the Master)
+"Edit in pitch corrector" = "피치 보정기에서 편집"
+"Edit in time warper" = "타임 워퍼에서 편집"
+"Spectrum view" = "스펙트럼 보기"
+"Multichannel waveform view" = "멀티채널 파형 보기"
+"Add multiple" = "여러 개 추가"
+"Enter the number of mixer tracks to add" = "추가할 믹서 트랙 수를 입력하세요"
+"Number of tracks to add" = "추가할 트랙 수"
+"Please enter a number between 1 and {0}." = "1에서 {0} 사이의 숫자를 입력하세요."
+"You can add a maximum of {0} tracks." = "최대 {0}개의 트랙을 추가할 수 있습니다."
+"The Master track has no free effect slot." = "Master 트랙에 빈 이펙트 슬롯이 없습니다."

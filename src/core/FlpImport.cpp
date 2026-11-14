@@ -2264,6 +2264,11 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
                 if (r.synth.porta)
                     def.synth.portaBeats = r.synth.portaBeats;
                 def.misc.pitchRange = r.misc.pitchRange;
+                // round 190gw (live check 190gu B6): the module's own Gate (3x Osc MISC › Poly › Gate, a .flm import's
+                // Time › Gate) shortens the notes it plays inside FL as well: the shorter of it and FL's channel gate.
+                // (FL's render of 190fe's all-0.5 rack: notes ~70 ms long; without this LYNX held the whole beat, ~10 dB louder)
+                if (r.misc.gateBeats > 0.0f)
+                    def.misc.gateBeats = def.misc.gateBeats > 0.0f ? std::min (def.misc.gateBeats, r.misc.gateBeats) : r.misc.gateBeats;
                 if (r.maxPolyphony > 0 && (def.maxPolyphony == 0 || r.maxPolyphony < def.maxPolyphony))
                     def.maxPolyphony = r.maxPolyphony;
                 // the module's key range inside FL's key region
@@ -4096,10 +4101,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
                     auto& track = song.playlistTracks[(std::size_t) t.index];
                     track = { t.name, ! t.enabled, 0, coloured ? 0xFF000000u | t.colour : 0u };
-                    // FL's size factor: a row is 16 px + size × (default − 16) (FUN_00ea0b30, round 190ft); LYNX
-                    // applies the same law to its own default row
+                    // FL's size factor: a row is 16 px + size × (default − 16) (FUN_00ea0b30, round 190ft) on FL's
+                    // 48 px default row (live check 190gu B1, round 190gw)
                     if (sized)
-                        track.height = polish::heightForFlSize (t.heightScale);
+                        track.height = polish::heightForFlSize (t.heightScale, song.playlistRowHeight);
                     track.grouped = t.index > 0 && t.grouped;
                     track.performance = performance; // Performance mode's track settings (round 165m)
                     track.collapsed = ! t.expanded;

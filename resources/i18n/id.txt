@@ -10023,3 +10023,15 @@ countries: id
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Penyebab: pemrosesan mendekati batas buffer ({0}%). Coba buffer yang lebih besar, atau bekukan channel terberat."
 # Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
 "Tape speed" = "Kecepatan pita"
+
+# --- round 190gw: FL 2026 facts (mixer boxes, Sampler views, Newtone / Newtime on the Master)
+"Edit in pitch corrector" = "Edit di pengoreksi nada"
+"Edit in time warper" = "Edit di time warper"
+"Spectrum view" = "Tampilan spektrum"
+"Multichannel waveform view" = "Tampilan bentuk gelombang multikanal"
+"Add multiple" = "Tambah beberapa"
+"Enter the number of mixer tracks to add" = "Masukkan jumlah trek mixer yang akan ditambahkan"
+"Number of tracks to add" = "Jumlah trek yang ditambahkan"
+"Please enter a number between 1 and {0}." = "Masukkan angka antara 1 dan {0}."
+"You can add a maximum of {0} tracks." = "Anda dapat menambahkan paling banyak {0} trek."
+"The Master track has no free effect slot." = "Trek Master tidak memiliki slot efek kosong."

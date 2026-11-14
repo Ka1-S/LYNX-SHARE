@@ -1809,7 +1809,7 @@ void RackState::buildAutomationTables()
     const auto playsClips = [&] (int a) {
         const auto& automation = automations[(std::size_t) a];
         return ! automationClips[(std::size_t) a].empty() && ! automation.isLive() && zoneAutomations[(std::size_t) a] == 0
-               && automation.target.kind != AutomationTargetKind::none;
+               && automation.target.kind != AutomationTargetKind::none && automation.links.empty(); // (190gw: links bind below)
     };
     for (int a = count - 1; a > 0; --a)
     {
@@ -1841,7 +1841,8 @@ void RackState::buildAutomationTables()
     for (int a = 0; a < count; ++a)
     {
         if (automationFollowers[(std::size_t) a] != 0
-            || (automationClips[(std::size_t) a].empty() && ! automations[(std::size_t) a].isLive() && zoneAutomations[(std::size_t) a] == 0))
+            || (automationClips[(std::size_t) a].empty() && ! automations[(std::size_t) a].isLive() && zoneAutomations[(std::size_t) a] == 0)
+            || ! automations[(std::size_t) a].links.empty()) // (round 190gw: through its link slots, below)
             continue;
 
         bind (a, automations[(std::size_t) a].target);
@@ -1880,6 +1881,18 @@ void RackState::buildAutomationTables()
             eventLanes.push_back ({ p, l, slot });
             bind (slot++, lane.target);
         }
+
+    // round 190gw: the target links of an automation clip with several (FL's "Crossfade with" clip): one slot each
+    linkSlots.clear();
+    for (int a = 0; a < count; ++a)
+        if (const auto& automation = automations[(std::size_t) a]; ! automation.links.empty() && ! automation.isLive())
+            for (const auto& link : automation.links)
+            {
+                if (slot >= maxAutomations)
+                    break;
+                linkSlots.push_back ({ a, slot, linkformula::Formula::compile (link.formula) });
+                bind (slot++, link.target);
+            }
 
     // round 177b: modulators, after everything else (a modulated target follows its automation or its own value)
     modRoutes.clear();
@@ -2528,6 +2541,12 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     for (std::size_t a = 0; a < state.automationClips.size(); ++a)
         if (! state.automationClips[a].empty() && state.automationFollowers[a] == 0)
             automationValues[a] = automationValueAt (state, (int) a, tick);
+    // round 190gw: an automation's target links take its value through their formulas (NaN: the targets' own values)
+    for (const auto& link : state.linkSlots)
+    {
+        const auto v = automationValues[(std::size_t) link.automation];
+        automationValues[(std::size_t) link.slot] = std::isnan (v) ? v : link.formula.map (v);
+    }
 
     // automation lanes (round 177b): the lane's curve in song time, except where a clip of the same target plays
     for (const auto& lane : state.laneAutomations)

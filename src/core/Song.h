@@ -1900,6 +1900,17 @@ struct Automation
     // FL's "Record automation" of an internal-controller link (CanAutomateBox "Allow recording of automation", off by
     // default; round 190cs): while automation is recorded, the controller's moves are written into the target's clip
     bool recordLive = false;
+    // FL's automation clip with several "Target links", each through its own mapping formula (round 190gw: the audio
+    // clip menu's "Crossfade with" makes one with two Volume multiplier links, live check 190gu B3). Empty = the plain
+    // 1:1 clip on `target`. When set, `target` is the first link's target (names, older readers) and the engine drives
+    // every link's target with linkformula(formula) of the clip's value instead.
+    struct Link
+    {
+        AutomationTarget target;
+        std::string formula; // over `Input` (core/LinkFormula.h); "" = 1:1
+        bool operator== (const Link&) const = default;
+    };
+    std::vector<Link> links;
     bool isLive() const noexcept { return source.track >= 0 || source.channel >= 0; }
     std::uint64_t uid = 0; // stable id (Online Sessions, round 168a)
     float mapLive (float v) const noexcept; // applies the curve
@@ -2521,7 +2532,11 @@ struct Song
     void forEachTarget (Fn&& fn)
     {
         for (auto& a : automations)
+        {
             fn (a.target);
+            for (auto& link : a.links) // (round 190gw)
+                fn (link.target);
+        }
         for (auto& l : midiLinks)
             fn (l.target);
         for (auto& m : remoteMappings) // round 190ef
@@ -2694,6 +2709,11 @@ struct Song
     std::vector<ClipEnvelope> clipEnvelopes;
     std::vector<Modulator> modulators; // round 177b: LYNX's modulators (empty: no cost)
     std::vector<PlaylistTrack> playlistTracks; // index = track; tracks past the end use the default
+    // The Playlist's default row in px at 100 % (FL's base row): FL 2026's 48 (live check 190gu B1, the Default template
+    // at FL's default zoom); a .lynx saved before round 190gw has no such key and keeps LYNX's old 38. A row's FL size
+    // factor is (height − 16) / (this − 16).
+    static constexpr int flDefaultRowHeight = 48, legacyRowHeight = 38;
+    int playlistRowHeight = flDefaultRowHeight;
     // Video tracks and the project's video settings (round 174d, core/VideoTrack.h): LYNX's own, above the clip tracks
     std::vector<VideoTrack> videoTracks;
     VideoSettings video;

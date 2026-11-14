@@ -10023,3 +10023,15 @@ countries: cn sg
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "原因：处理接近缓冲区的极限（{0}%）。请尝试更大的缓冲区，或冻结最重的通道。"
 # Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
 "Tape speed" = "磁带速度"
+
+# --- round 190gw: FL 2026 facts (mixer boxes, Sampler views, Newtone / Newtime on the Master)
+"Edit in pitch corrector" = "在音高校正器中编辑"
+"Edit in time warper" = "在时间扭曲器中编辑"
+"Spectrum view" = "频谱视图"
+"Multichannel waveform view" = "多声道波形视图"
+"Add multiple" = "添加多个"
+"Enter the number of mixer tracks to add" = "输入要添加的混音器轨道数"
+"Number of tracks to add" = "要添加的轨道数"
+"Please enter a number between 1 and {0}." = "请输入 1 到 {0} 之间的数字。"
+"You can add a maximum of {0} tracks." = "最多可以添加 {0} 个轨道。"
+"The Master track has no free effect slot." = "Master 轨道没有空闲的效果器插槽。"
