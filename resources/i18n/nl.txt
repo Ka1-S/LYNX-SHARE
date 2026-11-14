@@ -1186,7 +1186,7 @@ countries: nl be
 "Huge" = "Enorm"
 "Height of every track" = "Hoogte van elke track"
 "Previewing the clip: release the mouse to stop" = "Clip voorbeluisteren: laat de muis los om te stoppen"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "Trackscheiding: [LMB] slepen wijzigt de hoogte van deze track  [Shift][LMB] slepen: alle tracks  [2xLMB] standaardhoogte"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "Trackgrootte: [LMB] slepen wijzigt de hoogte van deze track (geselecteerd: alle geselecteerde tracks)  [Shift][LMB] slepen: alle tracks  [Alt][LMB] of [MMB] standaardgrootte  [2xLMB] grootte vergrendelen / ontgrendelen"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + slepen: een unieke kopie  [Alt][RMB] ingedrukt houden: beluisteren"
 "Long view (level over time)" = "Lange weergave (niveau in de tijd)"
 "Spectrum (low frequencies on the left)" = "Spectrum (lage frequenties links)"
@@ -5787,7 +5787,7 @@ countries: nl be
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Voegt lege kolommen in vóór de song voor de clips die gestart worden, met op elke kolom een marker, en een Start-marker waar de song begint; de performance-modus wordt aangezet."
 "Marker count" = "Aantal markers"
 "2 steps" = "2 steps"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Track: [LMB] selecteren  [Ctrl][LMB] toevoegen / weghalen  [Shift][LMB] bereik  [RMB] menu  [2xLMB] bron van de clip openen  [Shift][Wheel] omhoog / omlaag verplaatsen"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Track: [LMB] selecteren  [Ctrl][LMB] toevoegen / weghalen  [Ctrl] slepen: tracks met hun clips  [Shift][LMB] bereik  [RMB] menu  [2xLMB] bron van de clip openen  [Shift][Wheel] omhoog / omlaag verplaatsen"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Tracklatentie: {0}"
@@ -7172,8 +7172,8 @@ countries: nl be
 "No pattern blocks to turn into clips" = "Geen patternblokken om in clips om te zetten"
 "{0} selected tracks" = "{0} geselecteerde tracks"
 "Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "Routeert de geselecteerde inserts naar deze (sleep na inschakelen: niveau). Ctrl+klik: alleen deze track, Shift: sidechain, Ctrl+Shift: alleen sidechain, rechtsklik: menu"
-"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] selecteert  [Ctrl]+[LMB] of eroverheen slepen: bereik  [Ctrl]+[Shift]+[LMB] voegt toe of verwijdert  [LMB] zijwaarts slepen herschikt  [RMB] insertmenu"
-"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Klik selecteert het insert (Ctrl+klik of eroverheen slepen: bereik, Ctrl+Shift: toevoegen of verwijderen), rechtsklik opent het menu; Alt+Links/Rechts verplaatst de selectie"
+"[LMB] selects  [Ctrl]+[LMB] or [Ctrl]+[Shift]+[LMB] adds or removes  [Ctrl] drag across: range  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] selecteert  [Ctrl]+[LMB] of [Ctrl]+[Shift]+[LMB] voegt toe of verwijdert  [Ctrl] eroverheen slepen: bereik  [LMB] zijwaarts slepen herschikt  [RMB] insertmenu"
+"Click selects the insert (Ctrl+click or Ctrl+Shift+click: add or remove, Ctrl+drag across: range), right-click opens its menu; Alt+Left/Right moves the selection" = "Klik selecteert het insert (Ctrl+klik of Ctrl+Shift+klik: toevoegen of verwijderen, Ctrl+eroverheen slepen: bereik), rechtsklik opent het menu; Alt+Links/Rechts verplaatst de selectie"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Effectslot: klik toont of verbergt het venster (en de knoppen eronder), de LED omzeilt het, het wiel of slepen verplaatst het omhoog of omlaag, rechtsklik: opties"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Opent het venster van het effect (alle regelaars, zoals in FL); klikken op de slotnaam doet hetzelfde"
 "Themed" = "Thematisch"

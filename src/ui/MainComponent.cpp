@@ -464,6 +464,10 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
         showPanel (Panel::mixer);
         mixer.selectTrack (insert);
     };
+    playlist.onLinkedMixerTrack = [this] (int insert) { // round 190ft (FL FUN_012e3aa0): only while the mixer shows
+        if (mixer.isShowing())
+            mixer.selectTrack (insert);
+    };
     openMixerInsertHandler() = rack.onOpenMixerInsert; // and on the channel window's TRACK box (round 168s)
     locateInBrowserHandler() = [this] (const juce::File& file) { // (the sampler's File row, round 190df)
         showPanel (Panel::browser);

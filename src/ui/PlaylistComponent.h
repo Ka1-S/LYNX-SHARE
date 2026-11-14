@@ -182,6 +182,8 @@ public:
     // round 190ef (--drawshot190ef): where a lane's curve is drawn, and the x of a tick
     juce::Rectangle<float> laneBodyForSnapshot (int track, int lane) const { return laneBody (track, lane); }
     juce::Rectangle<int> trackRowForSnapshot (int track) const { return { 0, trackToY (track), getWidth(), heightOf (track) }; } // (round 190fc)
+    std::vector<int> selectedTracksForSnapshot() const { return sortedTrackSelection(); } // (round 190ft)
+    int headerWidthForSnapshot() const noexcept { return headerWidth; }
     double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
     juce::PopupMenu getAutomationPointMenuForSnapshot (int clip, int point); // FL's point menu of an automation clip's point (round 190bw)
@@ -224,6 +226,9 @@ public:
     bool hasSimpleHeaders() const noexcept { return simpleHeaders; }
     std::function<void (int insert)> onTrackEffects; // "+FX" on a Simple header: the insert's effects
     std::function<void (int track)> onSimpleTrackSelected; // the Simple workflow: a track was selected (its dock follows)
+    // round 190ft (FL FUN_012e3aa0): a header click made an audio / instrument track the only selected one: its mixer
+    // track (the main window makes it the mixer's current track when the mixer is showing)
+    std::function<void (int insert)> onLinkedMixerTrack;
     // Files dropped below the tracks (or MIDI files anywhere) while the Simple headers are on: new tracks from `tick`
     std::function<void (const juce::StringArray& files, std::int64_t tick)> onSimpleFilesDropped;
     // round 190fo: the Simple workflow's track menu "Export this track" › As audio / As MIDI (nullptr: not offered)
@@ -261,7 +266,7 @@ public:
 
 private:
     enum class Drag { none, move, resize, trimLeft, slip, erase, seek, loop, select, fadeIn, fadeOut, paint, muting, knife, zoomRange, listen, pan, timeMove, timeShift, autoPoint, autoTension,
-                      lanePoint, laneTension, laneDraw, trackResize, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };
+                      lanePoint, laneTension, laneDraw, trackResize, headerSelect, preview, trackZoom, heightZoom, timeZoom, perfLaunch, clipGain, swipe, warpMarker };
     void swipeTimeSelectionToComp (int lane);
     // a swipe on a take lane (round 177c): the lane and the range so far
     int swipeLane = -1;
@@ -362,6 +367,17 @@ private:
     void setTrackHeights (std::vector<int> tracks, int height);
     int resizeTrack = -1, resizeStartHeight = 0;
     bool resizeAll = false;
+    // round 190ft (FL AUTracksPanelMouseDown / MouseMove): the band press, a drag across the headers after a Ctrl /
+    // Ctrl+Shift press (adds or removes the tracks crossed; with Ctrl the clips of the tracks crossed are selected)
+    std::vector<int> bandTargets (int track) const; // the track, and the other selected tracks when it is one of them
+    void bandToggleLock (int track);
+    void bandReset (int track);
+    std::vector<int> sortedTrackSelection() const;
+    void selectClipsOnTracks (int fromTrack, int toTrack, bool add);
+    void followLinkedTrack (int track); // FL's select-only side effects (instrument channel, mixer track)
+    int headerDragAnchor = -1;
+    bool headerDragAdding = true, headerDragClips = false, headerCtrlPending = false;
+    std::vector<int> headerClipBase;
     // Alt+right-click on a clip: hear it while the button is held (pattern clips play their pattern)
     void startPreview (int clip, int x);
     // FL's audio clip menu › Preview (EEAUPreviewMenuClick, round 190dx): the clip's own audio, alone, once

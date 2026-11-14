@@ -1970,7 +1970,11 @@ void MixerStrips::mouseDown (const juce::MouseEvent& e)
         selectBase.clear();
         if (e.mods.isShiftDown())
             selectBase = selection;
-        dragSelectTo (t);
+        // LYNX extra (issue #163, owner 2026-11-14; FL has no Ctrl+click toggle): with Ctrl alone the press waits; a drag
+        // onto another strip does FL's range from here, a release on this strip adds / removes it
+        ctrlClickPending = ! e.mods.isShiftDown();
+        if (! ctrlClickPending)
+            dragSelectTo (t);
         return;
     }
 
@@ -2172,8 +2176,11 @@ void MixerStrips::mouseDrag (const juce::MouseEvent& e)
 
     if (selectAnchor > 0)
     {
-        if (const auto t = trackAt (juce::jlimit (0, getWidth() - 1, e.x)); t >= 0)
+        if (const auto t = trackAt (juce::jlimit (0, getWidth() - 1, e.x)); t >= 0 && ! (ctrlClickPending && t == selectAnchor))
+        {
+            ctrlClickPending = false;
             dragSelectTo (t);
+        }
         return;
     }
 
@@ -2613,7 +2620,7 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
             h.text = tr ("Folded group: {0} ({1} inserts)  [LMB] unfold", { name, juce::String ((int) mixerops::groupOf (song, t).size()) });
             break;
         case Part::header:
-            h.text = name + " - " + tr ("[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu") + feeds() + latency();
+            h.text = name + " - " + tr ("[LMB] selects  [Ctrl]+[LMB] or [Ctrl]+[Shift]+[LMB] adds or removes  [Ctrl] drag across: range  [LMB] drag sideways reorders  [RMB] insert menu") + feeds() + latency();
             h.hasMenu = true;
             if (engine.insertPlaysStandIn (t))
                 h.text = name + " - " + tr ("Stand-in: a plugin of this insert is not installed on this PC, a render of its sound plays (the plugins' settings are kept)");
@@ -2622,7 +2629,7 @@ ui::Hint MixerStrips::hintAt (juce::Point<int> p)
             break;
         case Part::body:
         case Part::none:
-            h.text = name + " - " + tr ("Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection") + feeds() + latency();
+            h.text = name + " - " + tr ("Click selects the insert (Ctrl+click or Ctrl+Shift+click: add or remove, Ctrl+drag across: range), right-click opens its menu; Alt+Left/Right moves the selection") + feeds() + latency();
             h.hasMenu = true;
             break;
     }
@@ -2642,6 +2649,22 @@ void MixerStrips::mouseUp (const juce::MouseEvent&)
         repaint();
     dragVca = -1;
 
+    if (ctrlClickPending && selectAnchor > 0)
+    {
+        // the LYNX Ctrl+click toggle (the last selected track stays: the mixer always has one)
+        auto s = selection;
+        const auto t = selectAnchor;
+        if (const auto it = std::lower_bound (s.begin(), s.end(), t); it != s.end() && *it == t)
+        {
+            if (s.size() > 1)
+                s.erase (it);
+        }
+        else
+            s.insert (std::lower_bound (s.begin(), s.end(), t), t);
+        const auto primary = std::binary_search (s.begin(), s.end(), t) ? t : (std::binary_search (s.begin(), s.end(), selected) ? selected : s.back());
+        setSelection (s, primary);
+    }
+    ctrlClickPending = false;
     headerDragTrack = -1;
     headerDragged = false;
     selectAnchor = -1;

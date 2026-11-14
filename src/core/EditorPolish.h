@@ -138,11 +138,34 @@ inline std::vector<Note> clipGhostNotes (const Song& song, int pattern, int chan
 
 // --- Playlist: track heights (P18) -------------------------------------------------------------------
 
-constexpr int minTrackHeight = 20, maxTrackHeight = 160, defaultTrackHeight = 38;
+// FL's row limits (FUN_00ea0b30, round 190ft): the smallest row is 16 px, the tallest 512 px more; a row is
+// minTrackHeight + size × (default − minTrackHeight), `size` being the factor FL keeps per track and in the .flp.
+constexpr int minTrackHeight = 16, maxTrackHeight = minTrackHeight + 512, defaultTrackHeight = 38;
 
 inline int clampTrackHeight (int h)
 {
     return std::clamp (h, minTrackHeight, maxTrackHeight);
+}
+
+// FL keeps rows at an even height (the layout clears bit 0).
+inline int evenTrackHeight (int h)
+{
+    return clampTrackHeight (h) & ~1;
+}
+
+// FL's size factor (Size menu 0.333 … 2, a resize drag any value ≥ 0, the .flp's f32) ↔ LYNX's px at 100 % zoom.
+inline int heightForFlSize (double size, int base = defaultTrackHeight)
+{
+    if (! (size >= 0.0))
+        size = 1.0;
+    return evenTrackHeight (minTrackHeight + (int) std::lround ((base - minTrackHeight) * size));
+}
+
+inline float flSizeForHeight (int height, int base = defaultTrackHeight)
+{
+    if (height <= 0)
+        return 1.0f;
+    return (float) std::max (0, clampTrackHeight (height) - minTrackHeight) / (float) (base - minTrackHeight);
 }
 
 // Heights of tracks 0..n-1 laid out top to bottom: `heights[i]` (0 or missing = `fallback`).

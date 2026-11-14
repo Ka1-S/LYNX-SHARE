@@ -1291,7 +1291,7 @@ Project parseEvents (std::span<const std::uint8_t> file, FileKind kind)
                     if (e.data.size() >= 17)
                     {
                         const auto h = readLE<float> (e.data, 13);
-                        if (std::isfinite (h) && h > 0.05f && h < 10.0f)
+                        if (std::isfinite (h) && h >= 0.0f && h < 1000.0f) // (0 = FL's smallest row, a drag has no upper limit: round 190ft)
                             t.heightScale = h;
                     }
                     if (e.data.size() >= 22)

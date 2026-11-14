@@ -1186,7 +1186,7 @@ countries: tr
 "Huge" = "Dev"
 "Height of every track" = "Tüm izlerin yüksekliği"
 "Previewing the clip: release the mouse to stop" = "Klip önizleniyor: durdurmak için fareyi bırakın"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "İz ayırıcı: [LMB] sürükle bu izi boyutlandırır  [Shift][LMB] sürükle: tüm izler  [2xLMB] varsayılan yükseklik"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "İz boyutu: [LMB] sürükle bu izi boyutlandırır (seçiliyse: tüm seçili izler)  [Shift][LMB] sürükle: tüm izler  [Alt][LMB] veya [MMB] varsayılan boyut  [2xLMB] boyutu kilitle / kilidi aç"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + sürükle: benzersiz kopya  [Alt][RMB] basılı tut: dinle"
 "Long view (level over time)" = "Uzun görünüm (zamana göre seviye)"
 "Spectrum (low frequencies on the left)" = "Spektrum (düşük frekanslar solda)"
@@ -5787,7 +5787,7 @@ countries: tr
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Başlatılacak klipler için şarkının önüne boş sütunlar, her birine bir işaretçi ve şarkının başladığı yere bir Start işaretçisi ekler; performans modu açılır."
 "Marker count" = "İşaretçi sayısı"
 "2 steps" = "2 step"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "İz: [LMB] seç  [Ctrl][LMB] ekle / çıkar  [Shift][LMB] aralık  [RMB] menü  [2xLMB] klibin kaynağını aç  [Shift][Wheel] yukarı / aşağı taşı"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "İz: [LMB] seç  [Ctrl][LMB] ekle / çıkar  [Ctrl] sürükle: klipleriyle birlikte izler  [Shift][LMB] aralık  [RMB] menü  [2xLMB] klibin kaynağını aç  [Shift][Wheel] yukarı / aşağı taşı"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Kanal gecikmesi: {0}"
@@ -7172,8 +7172,8 @@ countries: tr
 "No pattern blocks to turn into clips" = "Klibe dönüştürülecek pattern bloğu yok"
 "{0} selected tracks" = "{0} seçili kanal"
 "Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "Seçili insert'leri buraya yönlendirir (açtıktan sonra sürükle: seviye). Ctrl+tık: yalnız bu kanal, Shift: sidechain, Ctrl+Shift: yalnız sidechain, sağ tık: menü"
-"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] seçer  [Ctrl]+[LMB] veya üzerinden sürükle: aralık  [Ctrl]+[Shift]+[LMB] ekler veya çıkarır  [LMB] yana sürüklemek sıralar  [RMB] insert menüsü"
-"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Tık insert'i seçer (Ctrl+tık veya üzerinden sürükle: aralık, Ctrl+Shift: ekle veya çıkar), sağ tık menüsünü açar; Alt+Sol/Sağ seçimi taşır"
+"[LMB] selects  [Ctrl]+[LMB] or [Ctrl]+[Shift]+[LMB] adds or removes  [Ctrl] drag across: range  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] seçer  [Ctrl]+[LMB] veya [Ctrl]+[Shift]+[LMB] ekler veya çıkarır  [Ctrl] üzerinden sürükle: aralık  [LMB] yana sürüklemek sıralar  [RMB] insert menüsü"
+"Click selects the insert (Ctrl+click or Ctrl+Shift+click: add or remove, Ctrl+drag across: range), right-click opens its menu; Alt+Left/Right moves the selection" = "Tık insert'i seçer (Ctrl+tık veya Ctrl+Shift+tık: ekle veya çıkar, Ctrl+üzerinden sürükle: aralık), sağ tık menüsünü açar; Alt+Sol/Sağ seçimi taşır"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Efekt slotu: tık penceresini (ve alttaki düğmelerini) gösterir veya gizler, LED baypas eder, tekerlek veya sürükleme yukarı ya da aşağı taşır, sağ tık: seçenekler"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Efektin penceresini açar (FL'deki gibi tüm kontroller); slot adına tıklamak da aynısını yapar"
 "Themed" = "Temalı"

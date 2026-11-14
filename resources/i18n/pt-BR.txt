@@ -1187,7 +1187,7 @@ countries: br
 "Huge" = "Enorme"
 "Height of every track" = "Altura de todas as faixas"
 "Previewing the clip: release the mouse to stop" = "Ouvindo o clipe: solte o mouse para parar"
-"Track divider: [LMB] drag resizes this track  [Shift][LMB] drag: all tracks  [2xLMB] default height" = "Divisória da faixa: [LMB] arraste para redimensionar esta faixa  [Shift][LMB] arraste: todas as faixas  [2xLMB] altura padrão"
+"Track size: [LMB] drag resizes this track (selected: every selected track)  [Shift][LMB] drag: all tracks  [Alt][LMB] or [MMB] default size  [2xLMB] lock / unlock the size" = "Tamanho da faixa: [LMB] arraste para redimensionar esta faixa (selecionada: todas as selecionadas)  [Shift][LMB] arraste: todas as faixas  [Alt][LMB] ou [MMB] tamanho padrão  [2xLMB] trava / destrava o tamanho"
 "[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it" = "[Shift][V] + arrastar: uma cópia única  [Alt][RMB] segure: ouvir"
 "Long view (level over time)" = "Visão longa (nível ao longo do tempo)"
 "Spectrum (low frequencies on the left)" = "Espectro (graves à esquerda)"
@@ -5869,7 +5869,7 @@ countries: br
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Insere colunas vazias antes da música para os clipes a disparar, um marcador em cada uma e um marcador Start onde a música começa; o modo performance é ligado."
 "Marker count" = "Número de marcadores"
 "2 steps" = "2 passos"
-"Track: [LMB] select  [Ctrl][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Faixa: [LMB] seleciona  [Ctrl][LMB] inclui / tira  [Shift][LMB] intervalo  [RMB] menu  [2xLMB] abre a fonte do clipe  [Shift][Wheel] move para cima / baixo"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Faixa: [LMB] seleciona  [Ctrl][LMB] inclui / tira  [Ctrl] arraste: faixas com os clipes delas  [Shift][LMB] intervalo  [RMB] menu  [2xLMB] abre a fonte do clipe  [Shift][Wheel] move para cima / baixo"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Latência da faixa: {0}"
@@ -7270,8 +7270,8 @@ countries: br
 "No pattern blocks to turn into clips" = "Nenhum bloco de pattern para transformar em clipes"
 "{0} selected tracks" = "{0} faixas selecionadas"
 "Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "Roteia os inserts selecionados para este (arraste depois de ativar: nível). Ctrl+clique: só esta faixa, Shift: sidechain, Ctrl+Shift: só sidechain, clique direito: menu"
-"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] seleciona  [Ctrl]+[LMB] ou arrastar por cima: intervalo  [Ctrl]+[Shift]+[LMB] adiciona ou remove  [LMB] arrastar para o lado reordena  [RMB] menu do insert"
-"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Clique seleciona o insert (Ctrl+clique ou arrastar por cima: intervalo, Ctrl+Shift: adiciona ou remove), clique direito abre o menu; Alt+Esquerda/Direita move a seleção"
+"[LMB] selects  [Ctrl]+[LMB] or [Ctrl]+[Shift]+[LMB] adds or removes  [Ctrl] drag across: range  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] seleciona  [Ctrl]+[LMB] ou [Ctrl]+[Shift]+[LMB] adiciona ou remove  [Ctrl] arrastar por cima: intervalo  [LMB] arrastar para o lado reordena  [RMB] menu do insert"
+"Click selects the insert (Ctrl+click or Ctrl+Shift+click: add or remove, Ctrl+drag across: range), right-click opens its menu; Alt+Left/Right moves the selection" = "Clique seleciona o insert (Ctrl+clique ou Ctrl+Shift+clique: adiciona ou remove, Ctrl+arrastar por cima: intervalo), clique direito abre o menu; Alt+Esquerda/Direita move a seleção"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Slot de efeito: clique mostra ou esconde a janela (e os knobs abaixo), o LED faz bypass, a roda ou arrastar move para cima ou para baixo, clique direito: opções"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Abre a janela do efeito (todos os controles, como no FL); clicar no nome do slot faz o mesmo"
 "Themed" = "Temático"

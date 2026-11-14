@@ -16,6 +16,7 @@
 #include <tuple>
 #include <cmath>
 
+#include "core/EditorPolish.h"
 #include "core/Effects.h"
 #include "core/Rack.h"
 #include "core/FruityBasicFx.h"
@@ -3984,7 +3985,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 if (song.playlistTracks.size() <= index)
                     song.playlistTracks.resize (index + 1);
 
-                song.playlistTracks[index].height = juce::jlimit (0, 400, (int) t[1]);
+                song.playlistTracks[index].height = juce::jlimit (0, polish::maxTrackHeight, (int) t[1]); // (FL's tallest row, round 190ft)
             }
 
     if (auto* colours = root["playlistTrackColours"].getArray())

@@ -4096,9 +4096,10 @@ Song importFlp (const flp::Project& input, const FlpImportOptions& options)
 
                     auto& track = song.playlistTracks[(std::size_t) t.index];
                     track = { t.name, ! t.enabled, 0, coloured ? 0xFF000000u | t.colour : 0u };
-                    // FL's size is relative to its default row; LYNX keeps the same proportion of its own default
+                    // FL's size factor: a row is 16 px + size × (default − 16) (FUN_00ea0b30, round 190ft); LYNX
+                    // applies the same law to its own default row
                     if (sized)
-                        track.height = polish::clampTrackHeight ((int) std::lround (polish::defaultTrackHeight * t.heightScale));
+                        track.height = polish::heightForFlSize (t.heightScale);
                     track.grouped = t.index > 0 && t.grouped;
                     track.performance = performance; // Performance mode's track settings (round 165m)
                     track.collapsed = ! t.expanded;
