@@ -220,6 +220,7 @@ struct StartupTrace
 {
     using clock = std::chrono::steady_clock;
     const clock::time_point t0 = clock::now(); // static initialisation: no JUCE yet, standard library only
+    const std::chrono::system_clock::time_point t0System = std::chrono::system_clock::now(); // (round 190hd: vs the process's creation)
     // (round 190go: always kept, as a field-readable start-up timeline; written to startup.log 5 s and 15 s after the
     // window — with LYNX_TRACE_STARTUP set, at every step as before, so a start that hangs still leaves its last step)
     const bool on = true;
@@ -2431,6 +2432,16 @@ public:
             lynx::crashguard::startMainProfiler (profile.toStdString());
 
         startupTrace.mark ("initialise (normal start)");
+        // (round 190hd, Windows) how long before the trace's 0 the process was made: the loader (the exe, its DLLs,
+        // relocations) and the static initialisers that ran before this file's
+        if (const auto created = lynx::crashguard::processStartTime(); created != 0)
+        {
+            const auto t0 = (std::uint64_t) std::chrono::duration_cast<std::chrono::microseconds> (startupTrace.t0System.time_since_epoch()).count() * 10u
+                            + 116444736000000000ull; // (FILETIME: 100 ns since 1601)
+            if (t0 > created)
+                startupTrace.mark (("  (the process was made " + juce::String ((double) (t0 - created) / 10000.0, 1)
+                                    + " ms before this trace's 0: the loader, the DLLs, the first static initialisers)").toRawUTF8());
+        }
         prepareGraphicsDevice();
         if (startupTrace.on)
             lynx::startupMark = startupMarkHook;
