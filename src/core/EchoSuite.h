@@ -239,7 +239,11 @@ namespace spiral
 {
 enum Param { mix, shift, delay, sync, feedback, lowCut, highCut, stereo,
              law, // round 190do (appended): 0 = the classic loop (projects saved before), 1 = the measured loop
-             paramCount };
+             paramCount,
+             // round 190fy, hidden (not in the info; saved while non-zero): the measured loop's revision. 1 = the loop
+             // timing measured in round 190fy (new instances, makeEffectSlot), 0 = round 190do's measured loop (a project or
+             // preset saved by 0.1.27 loads without it, so it keeps that loop bit for bit). Only read with Law = Measured
+             revision = paramCount };
 double shiftHz (float v) noexcept;   // ±1000 Hz, |x|^5
 double delayMs (float v) noexcept;   // 0.01 .. 1000 ms (centre 100 ms)
 float delayValue (double ms) noexcept;
