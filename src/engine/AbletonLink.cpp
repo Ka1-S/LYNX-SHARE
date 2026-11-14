@@ -331,7 +331,7 @@ int AbletonLink::beginBlock (Transport& transport, int numSamples, double output
         rt.steady += (numSamples - std::max (0, startSample)) * bpm / (60.0 * sr);
 
     // what the UI shows
-    shownTempo.store (state.tempo(), std::memory_order_relaxed);
+    shownTempo.store (linksync::displayTempo (state.tempo()), std::memory_order_relaxed);
     if (! rt.running && peers > 0)
     {
         const auto from = rt.pending ? rt.startBeat : positionBeats;

@@ -5273,7 +5273,9 @@ void MainComponent::TempoDisplay::paint (juce::Graphics& g)
         g.drawRoundedRectangle (area.reduced (0.5f), radius::md, 1.0f);
     }
 
-    const auto bpm = engine.shownTempo(); // (round 190gl: the Link session's tempo while Link is on)
+    // (round 190gl: the Link session's tempo while Link is on; to the thousandth shown, so 96.99995 reads 97.000 — the
+    // whole number and the decimals used to be cut apart and showed 96.000)
+    const auto bpm = linksync::displayTempo (engine.shownTempo());
     const auto whole = juce::String ((int) std::floor (bpm + 1e-9));
     const auto fraction = juce::String (bpm - std::floor (bpm + 1e-9), 3).fromFirstOccurrenceOf (".", false, false).paddedRight ('0', 3).substring (0, 3);
 

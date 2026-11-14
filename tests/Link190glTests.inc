@@ -152,6 +152,27 @@ TEST (link190gl_tempo_rules)
     CHECK (out.propose == 128.0);
 }
 
+TEST (link190gl_tempo_from_the_network_is_the_same_tempo)
+{
+    using namespace lynx::linksync;
+    // a peer's 110 BPM arrives as whole microseconds per beat: the same tempo, not another peer's change
+    const auto fromNetwork = 60.0e6 / 545455.0;
+    CHECK (sameTempo (110.0, fromNetwork) && ! sameTempo (110.0, 110.01));
+    CHECK (std::abs (displayTempo (fromNetwork) - 110.0) < 1e-12 && displayTempo (96.99995) == 97.0);
+    TempoArbiter a;
+    TempoArbiter::Input in;
+    in.sessionBpm = 120.0;
+    in.projectBpm = 120.0;
+    in.songBpm = 120.0;
+    a.reset (in);
+    in.projectBpm = 110.0;
+    auto out = a.step (in);
+    CHECK (out.propose == 110.0);
+    in.sessionBpm = fromNetwork; // what the session says afterwards
+    out = a.step (in);
+    CHECK (out.propose == 0.0 && ! a.changedByPeer());
+}
+
 TEST (link190gl_toggle_text_as_the_reference)
 {
     using lynx::linksync::toggleText;

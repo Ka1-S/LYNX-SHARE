@@ -126,6 +126,21 @@ inline Follow follow (double sessionBpm, double error, const FollowLaw& law = {}
     return f;
 }
 
+// Two tempos Link treats as one: peers exchange a tempo as whole microseconds per beat, so 110 BPM comes back from
+// the network as 60e6 / 545455 = 109.99991 BPM. Within a microsecond per beat = the same tempo.
+inline bool sameTempo (double a, double b) noexcept
+{
+    if (a <= 0.0 || b <= 0.0)
+        return a == b;
+    return std::abs (60.0e6 / a - 60.0e6 / b) <= 1.0;
+}
+
+// The tempo as shown and kept by LYNX: to a thousandth of a BPM (109.99991 from the network shows as 110.000).
+inline double displayTempo (double bpm) noexcept
+{
+    return std::round (bpm * 1000.0) / 1000.0;
+}
+
 // Tempo arbitration between LYNX's own tempo and the session's (rules 1-4 above). Audio thread, once per block.
 class TempoArbiter
 {
@@ -161,7 +176,7 @@ public:
         Output out;
         out.play = in.sessionBpm;
         // another peer's change: whatever the session says now that we did not propose (rule 3)
-        if (std::abs (in.sessionBpm - lastSession) > eps)
+        if (! sameTempo (in.sessionBpm, lastSession))
         {
             remoteChanged = true;
             if (in.playing && in.tempoMap)
@@ -180,7 +195,7 @@ public:
 
         lastProject = in.projectBpm;
         lastSong = in.songBpm;
-        if (propose > 0.0 && std::abs (propose - in.sessionBpm) > eps)
+        if (propose > 0.0 && ! sameTempo (propose, in.sessionBpm))
         {
             out.propose = propose;
             out.play = propose;
