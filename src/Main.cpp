@@ -19003,7 +19003,8 @@ private:
         check ("off: the toggle says Link", ui.getLinkToggleForSnapshot().text() == lynx::trc ("@Ableton Link: Link"));
         // on: the session the other peer runs (its tempo, 97 BPM, wins over the project's)
         link.setEnabled (true, offline.getSong().bpm);
-        const auto joined = pump (6.0, [&] { return link.peers() > 0 && link.startProgress() >= 0.0; });
+        // (a new peer is counted at once; its session's tempo is taken after Link measured it, a moment later)
+        const auto joined = pump (8.0, [&] { return link.peers() > 0 && link.startProgress() >= 0.0 && std::abs (link.sessionTempo() - 97.0) < 1e-6; });
         check ("Link on: one peer found", joined && link.peers() == 1);
         check ("Link on: the session's tempo (97 BPM, the first peer's) is the one shown", std::abs (offline.shownTempo() - 97.0) < 1e-6);
         toolbarShot ("toolbar-fl-link-on");
