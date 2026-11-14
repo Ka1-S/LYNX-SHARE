@@ -188,15 +188,24 @@ public:
         {
             juce::Graphics::ScopedSaveState save (g);
             g.reduceClipRegion (juce::Rectangle<int> (0, 0, cells.getRight(), getHeight()));
+            // round 190gr (A11): a repaint of a few cells (a playing clip's progress, a blink) draws only what it reaches;
+            // each part draws inside its own box, so the pixels are the same
+            const auto cull = ui::paintCache();
+            const auto reaches = [&g, cull] (juce::Rectangle<int> box) { return ! cull || g.clipRegionIntersects (box); };
             for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
             {
                 const auto x = columnX (t);
-                paintHeader (g, song, state, t, { x, 0, columnWidth, headerHeight });
-                paintStatus (g, song, state, t, { x, cells.getBottom(), columnWidth, statusHeight });
+                if (! reaches ({ x, 0, columnWidth, cells.getBottom() + statusHeight }))
+                    continue;
+                if (reaches ({ x, 0, columnWidth, headerHeight }))
+                    paintHeader (g, song, state, t, { x, 0, columnWidth, headerHeight });
+                if (reaches ({ x, cells.getBottom(), columnWidth, statusHeight }))
+                    paintStatus (g, song, state, t, { x, cells.getBottom(), columnWidth, statusHeight });
                 juce::Graphics::ScopedSaveState rows (g);
                 g.reduceClipRegion (juce::Rectangle<int> (x, headerHeight, columnWidth, cells.getHeight()));
                 for (int r = firstRow(); r < scenes && rowY (r) < cells.getBottom(); ++r)
-                    paintSlot (g, song, *grid, state, t, r, { x, rowY (r), columnWidth, rowHeight });
+                    if (reaches ({ x, rowY (r), columnWidth, rowHeight }))
+                        paintSlot (g, song, *grid, state, t, r, { x, rowY (r), columnWidth, rowHeight });
             }
         }
 
@@ -209,6 +218,7 @@ public:
         g.setColour (c::textSecondary);
         g.setFont (theme::font (theme::type::small, true));
         g.drawText (tr ("Scenes"), sceneColumn.withHeight (headerHeight).withTrimmedLeft (8), juce::Justification::centredLeft);
+        if (! ui::paintCache() || g.clipRegionIntersects (sceneColumn.withTrimmedTop (headerHeight)))
         {
             juce::Graphics::ScopedSaveState rows (g);
             g.reduceClipRegion (sceneColumn.withTrimmedTop (headerHeight));
@@ -877,11 +887,7 @@ private:
             g.setColour (fill);
             g.fillRect (cell);
             const auto ink = fill.getPerceivedBrightness() > 0.62f ? c::bg1 : juce::Colours::white;
-            juce::Path triangle;
-            const auto a = zone.withSizeKeepingCentre (9.0f, 11.0f);
-            triangle.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
-            g.setColour (c::record);
-            g.fillPath (triangle);
+            theme::fillLaunchTriangle (g, zone.withSizeKeepingCentre (9.0f, 11.0f), c::record);
             g.setColour (ink);
             g.setFont (theme::font (theme::type::small));
             // (an audio take is named after its file, known only when it closes)
@@ -898,11 +904,7 @@ private:
             {
                 // a slot that waits for its recording to start: its launch button blinks in the record colour
                 const auto blinkOn = (juce::Time::getMillisecondCounter() / 150) % 2 == 0;
-                juce::Path triangle;
-                const auto a = zone.withSizeKeepingCentre (9.0f, 11.0f);
-                triangle.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
-                g.setColour (blinkOn ? c::record : c::record.withAlpha (0.3f));
-                g.fillPath (triangle);
+                theme::fillLaunchTriangle (g, zone.withSizeKeepingCentre (9.0f, 11.0f), blinkOn ? c::record : c::record.withAlpha (0.3f));
             }
             else if (engine.isGridTrackArmed (t))
             {
@@ -936,15 +938,14 @@ private:
             const auto blink = pending && blinkOn;
             // (a clip asked to stop blinks until its grid point: with a long quantisation it would seem to ignore the press)
             const auto stopping = playing && state->tracks[(std::size_t) t].stopping.load (std::memory_order_relaxed);
-            juce::Path triangle;
             const auto a = zone.withSizeKeepingCentre (9.0f, 11.0f);
-            triangle.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
             // (a light pattern colour takes dark marks)
             const auto ink = (playing ? fill.brighter (0.25f) : fill.withMultipliedBrightness (0.85f)).getPerceivedBrightness() > 0.62f ? c::bg1 : juce::Colours::white;
-            g.setColour (stopping && ! blinkOn ? ink.withAlpha (0.3f) : playing ? c::ledOn : pending ? (blink ? c::ledOn : ink.withAlpha (0.3f)) : ink.withAlpha (0.85f));
-            g.fillPath (triangle);
+            theme::fillLaunchTriangle (g, a, stopping && ! blinkOn ? ink.withAlpha (0.3f) : playing ? c::ledOn : pending ? (blink ? c::ledOn : ink.withAlpha (0.3f)) : ink.withAlpha (0.85f));
             if (playing && ink != juce::Colours::white)
             {
+                juce::Path triangle;
+                triangle.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
                 g.setColour (ink);
                 g.strokePath (triangle, juce::PathStrokeType (1.0f));
             }
@@ -1003,14 +1004,11 @@ private:
         const auto cell = r.reduced (1);
         g.setColour (scene.colour != 0 ? juce::Colour (scene.colour) : c::bg3);
         g.fillRect (cell);
-        juce::Path triangle;
         const auto a = cell.withWidth (launchZone).toFloat().withSizeKeepingCentre (9.0f, 11.0f);
-        triangle.addTriangle (a.getX(), a.getY(), a.getRight(), a.getCentreY(), a.getX(), a.getBottom());
         // (round 190em: a scene with its own tempo or time signature has a coloured launch triangle, as Live's cyan one)
         // (a plain scene's triangle: Live's dark grey, measured in the 190ei shot live-scenes-tempo-sig-on.png)
-        g.setColour (scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info
-                     : layoutstyle::current() == layoutstyle::Style::clipLaunch ? liveSceneTriangle : c::textPrimary);
-        g.fillPath (triangle);
+        theme::fillLaunchTriangle (g, a, scene.tempo > 0.0 || scene.beatsPerBar > 0 ? c::info
+                                         : layoutstyle::current() == layoutstyle::Style::clipLaunch ? liveSceneTriangle : c::textPrimary);
         g.setFont (theme::font (theme::type::small));
         auto nameArea = cell.withTrimmedLeft (launchZone);
         // round 190ef: the scene's tempo and time signature fields (greyed: off, showing the song's value)
@@ -1771,19 +1769,125 @@ private:
         {
             lastDrawnState = now;
             columnStates.assign ((std::size_t) columns, 0);
+            columnViews.assign ((std::size_t) columns, {});
             for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+            {
                 columnStates[(std::size_t) t] = columnState (t); // (what this repaint shows)
+                columnViews[(std::size_t) t] = columnView (t);
+            }
             repaint();
             return;
         }
+        const auto visible = juce::Rectangle<int> (0, 0, cells.getRight(), getHeight());
+        if (! ui::paintCache()) // (LYNX_PAINT_CACHE=0: a changed column is repainted whole, as round 190ge did)
+        {
+            for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
+                if (const auto now = columnState (t); now != columnStates[(std::size_t) t])
+                {
+                    columnStates[(std::size_t) t] = now;
+                    repaint (juce::Rectangle<int> (columnX (t), 0, columnWidth, cells.getBottom() + statusHeight + 1).getIntersection (visible));
+                }
+            return;
+        }
+        // round 190gr (A11): only the parts of a column that changed — the cells whose launcher state moved, a playing
+        // clip's progress bar (the stretch between its last and its new length), the header for the "taken" mark, the
+        // status cell for the recording counter; an arm repaints the whole column (its empty slots show it)
+        if (columnViews.size() != (std::size_t) columns)
+            columnViews.assign ((std::size_t) columns, {});
         for (int t = firstColumn(); t < columns && columnX (t) < cells.getRight(); ++t)
-            if (const auto now = columnState (t); now != columnStates[(std::size_t) t])
+        {
+            const auto now = columnView (t);
+            auto& was = columnViews[(std::size_t) t];
+            const auto x = columnX (t);
+            const auto whole = juce::Rectangle<int> (x, 0, columnWidth, cells.getBottom() + statusHeight + 1);
+            if (! was.known || was.armed != now.armed)
             {
-                columnStates[(std::size_t) t] = now;
-                repaint (juce::Rectangle<int> (columnX (t), 0, columnWidth, cells.getBottom() + statusHeight + 1).getIntersection (
-                    juce::Rectangle<int> (0, 0, cells.getRight(), getHeight())));
+                repaint (whole.getIntersection (visible));
+                was = now;
+                continue;
             }
+            const auto cellOf = [&] (int row) {
+                return juce::Rectangle<int> (x, rowY (row), columnWidth, rowHeight).getIntersection (cells).getIntersection (visible);
+            };
+            const auto rowDirty = [&] (int row) {
+                if (row >= 0)
+                    repaint (cellOf (row));
+            };
+            if (was.taken != now.taken)
+                repaint (juce::Rectangle<int> (x, 0, columnWidth, headerHeight).getIntersection (visible));
+            for (const auto pair : { std::pair (was.playing, now.playing), std::pair (was.pending, now.pending), std::pair (was.recording, now.recording),
+                                     std::pair (was.recordPending, now.recordPending) })
+                if (pair.first != pair.second)
+                {
+                    rowDirty (pair.first);
+                    rowDirty (pair.second);
+                }
+            if (was.stopping != now.stopping)
+            {
+                rowDirty (was.playing);
+                rowDirty (now.playing);
+            }
+            if (was.blink != now.blink) // (what blinks: a waiting launch or record, a stop asked for)
+            {
+                rowDirty (now.pending);
+                rowDirty (now.recordPending);
+                if (now.stopping)
+                    rowDirty (now.playing);
+            }
+            if (now.recording >= 0 && was.recordTick != now.recordTick) // (the take's name; the length counter)
+                rowDirty (now.recording);
+            if (was.recording != now.recording || (now.recording >= 0 && was.recordTick != now.recordTick))
+                repaint (juce::Rectangle<int> (x, cells.getBottom(), columnWidth, statusHeight + 1).getIntersection (visible));
+            if (now.playing >= 0 && now.playing == was.playing && now.progress != was.progress)
+            {
+                // the bar under the playing cell (paintSlot: 3 px high, cell width × progress, antialiased at its end)
+                const auto cell = juce::Rectangle<int> (x, rowY (now.playing), columnWidth, rowHeight).reduced (1);
+                const auto a = (float) cell.getWidth() * juce::jlimit (0.0f, 1.0f, was.progress);
+                const auto b = (float) cell.getWidth() * juce::jlimit (0.0f, 1.0f, now.progress);
+                const auto from = cell.getX() + (int) std::floor (juce::jmin (a, b)) - 1, to = cell.getX() + (int) std::ceil (juce::jmax (a, b)) + 1;
+                repaint (juce::Rectangle<int> (from, cell.getBottom() - 3, to - from, 3).getIntersection (cell).getIntersection (cells).getIntersection (visible));
+            }
+            was = now;
+        }
     }
+
+    // What one column's paint reads of the launcher and the engine (round 190gr, A11): compared field by field with the
+    // last tick, so a repaint covers only the parts that changed.
+    struct ColumnView
+    {
+        bool known = false, armed = false, taken = false, stopping = false;
+        int playing = -1, pending = -1, recording = -1, recordPending = -1;
+        float progress = 0.0f;
+        std::uint32_t blink = 0;      // the blink phase, while something in the column blinks
+        std::uint64_t recordTick = 0; // while it records: the recording's start, the clock, a 33 ms tick
+    };
+
+    ColumnView columnView (int t) const
+    {
+        ColumnView c;
+        c.known = true;
+        c.armed = engine.isGridTrackArmed (t);
+        if (const auto* state = engine.launcherState())
+        {
+            const auto& v = state->tracks[(std::size_t) t];
+            c.playing = v.playing.load (std::memory_order_relaxed);
+            c.pending = v.pending.load (std::memory_order_relaxed);
+            c.recording = v.recording.load (std::memory_order_relaxed);
+            c.recordPending = v.recordPending.load (std::memory_order_relaxed);
+            c.stopping = v.stopping.load (std::memory_order_relaxed);
+            c.taken = v.taken.load (std::memory_order_relaxed);
+            if (c.playing >= 0)
+                c.progress = v.progress.load (std::memory_order_relaxed);
+            if (c.pending >= 0 || c.recordPending >= 0 || c.stopping)
+                c.blink = juce::Time::getMillisecondCounter() / 150;
+            if (c.recording >= 0)
+                c.recordTick = mixBits (mixBits (mixBits (1469598103934665603ull, bitsOf (v.recordFrom.load (std::memory_order_relaxed))),
+                                                 bitsOf (state->clockNow.load (std::memory_order_relaxed))),
+                                        juce::Time::getMillisecondCounter() / 33);
+        }
+        return c;
+    }
+    std::vector<ColumnView> columnViews; // [column] what the last tick saw
 
     static std::uint64_t mixBits (std::uint64_t h, std::uint64_t v) noexcept { return (h ^ v) * 1099511628211ull; }
     template <typename T>

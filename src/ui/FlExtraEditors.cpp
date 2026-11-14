@@ -248,7 +248,7 @@ public:
         // the biggest monospaced size that fits the box (the digits never jump while they change)
         const auto chars = (float) juce::jmax (8, shown.length());
         const auto size = juce::jmin (digits.getHeight() * 0.92f, digits.getWidth() / (chars * 0.62f));
-        g.setFont (theme::monoFont (size).withStyle ("Bold"));
+        g.setFont (theme::monoFont (size).boldened());
         g.setColour (theme::colour::textPrimary);
         g.drawText (shown, digits, juce::Justification::centred, false);
 

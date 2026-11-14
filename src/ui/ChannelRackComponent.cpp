@@ -759,6 +759,23 @@ void ChannelRackComponent::paint (juce::Graphics& g)
     const auto palette = theme::currentPalette();
     const auto column = playheadColumn.load (std::memory_order_relaxed) && playheadStep >= 0 && playheadStep < steps;
     g.setFont (theme::font (theme::type::body));
+    // round 190gr: which (channel, step) cells hold a Piano Roll note, from one pass over the pattern's notes (cellHasNote
+    // walks every note of the pattern for each cell: rows x steps x notes per frame)
+    const auto channelCount = (int) song.channels.size();
+    const auto noteCells = ui::paintCache();
+    if (noteCells)
+    {
+        noteCellBits.assign ((std::size_t) channelCount * (std::size_t) juce::jmax (0, steps), 0);
+        for (const auto& n : pattern.notes)
+            if (! n.muted && n.channel >= 0 && n.channel < channelCount && n.start >= 0)
+                if (const auto step = n.start / ticksPerStep; step < steps)
+                    noteCellBits[(std::size_t) n.channel * (std::size_t) steps + (std::size_t) step] = 1;
+    }
+    const auto hasNote = [&] (int channel, int step) {
+        if (! noteCells)
+            return cellHasNote (channel, step);
+        return step >= 0 && step < steps && noteCellBits[(std::size_t) channel * (std::size_t) steps + (std::size_t) step] != 0;
+    };
 
     for (int row = 0; row < (int) song.channels.size(); ++row)
     {
@@ -823,14 +840,14 @@ void ChannelRackComponent::paint (juce::Graphics& g)
                 continue;
 
             auto onGrid = pattern.hasStep (row, step);
-            auto any = onGrid || cellHasNote (row, step);
+            auto any = onGrid || hasNote (row, step);
 
             const auto hoverStepHere = hoverArea == Area::grid && hoverRow == row && hoverStep == step && paintMode == PaintMode::none;
             if (loopSteps > 0 && step >= loopSteps && step < realSteps)
             {
                 // FL's loop ghosts: what the loop repeats here, faint; a step of its own past the loop point doesn't play
                 const auto source = step % loopSteps;
-                const auto repeated = pattern.hasStep (row, source) || cellHasNote (row, source);
+                const auto repeated = pattern.hasStep (row, source) || hasNote (row, source);
                 auto fill = repeated ? stepOn : theme::stepOff (step);
                 theme::fillRoundRect (g, r.toFloat(), theme::radius::sm, fill.withMultipliedAlpha (hoverStepHere ? 0.75f : repeated ? 0.45f : 0.3f));
                 if (repeated && step == playheadStep) // the repeat plays: lit as a hit (below)

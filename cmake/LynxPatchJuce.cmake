@@ -150,6 +150,11 @@
 #    engine/Vst3NoteTuning.h, while fix 18's context is set) for that tag of each note on and note off it converts, keeps
 #    it beside the id it gave the note on, and gives a tagged note off the id of the note on with the same tag. A note off
 #    without a tag (a live key, all notes off) or with an unknown tag keeps fix 14's oldest-note rule.
+# 27. Every platform, juce_graphics/fonts/juce_SimpleShapedText.cpp (round 190gr; 26 in its branch): every ShapedTextOptions (one per text
+#    JUCE shapes: each drawText, drawFittedText, GlyphArrangement line) asked the OS for the display language. On Linux
+#    that is setlocale () with a walk over the LC_* / LANG variables (getenv, ~1 % of a whole-frame paint); on Windows
+#    a DLL load and GetUserPreferredUILanguages. The display language is now read once per run (the same text shaped
+#    with the same language: the same glyphs).
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -285,6 +290,9 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("no walk back over no glyphs" "LYNX patch (issue #142): no glyphs"
             "                        auto it = glyphs.cend();|NL||NL|                        while (--it != glyphs.begin())"
             "                        auto it = glyphs.cend();|NL||NL|                        // LYNX patch (issue #142): no glyphs (a font without a typeface), nothing to walk back over|NL|                        if (glyphs.empty())|NL|                            return it;|NL||NL|                        while (--it != glyphs.begin())")
+        lynx_juce_fix("display language read once" "LYNX patch (round 190gr): the display language"
+            "    String language = SystemStats::getDisplayLanguage();"
+            "    // LYNX patch (round 190gr): the display language, read once (it was the OS call at every shaped text)|NL|    String language = [] { static const String once = SystemStats::getDisplayLanguage(); return once; }();")
     elseif(file MATCHES "juce_Messaging_windows.cpp$")
         lynx_juce_fix("dispatch hook" "LYNX patch (issue #32): the message dispatch hook"
             "CheckEventBlockedByModalComps isEventBlockedByModalComps = nullptr;"

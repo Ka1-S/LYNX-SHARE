@@ -15,6 +15,7 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <unordered_map>
 #include <vector>
@@ -24,12 +25,78 @@
 #include "platform/Paths.h"
 #include "ui/Icons.h"
 #include "ui/ImageCaches.h"
+#include "ui/PaintAB.h"
 #include "ui/PluginSkin.h"
 #include "ui/WindowOwner.h"
 
 namespace lynx::theme
 {
 using namespace colour;
+
+// --- the font cache (round 190gr, U1) -----------------------------------------------------------------
+namespace
+{
+struct FontCache
+{
+    juce::SpinLock lock;
+    std::unordered_map<std::uint64_t, juce::Font> fonts;
+};
+
+FontCache& fontCache()
+{
+    // (never destroyed: its fonts hold typefaces JUCE frees itself at shutdown; a plugin empties it through the image caches)
+    static auto* cache = [] {
+        auto* c = new FontCache();
+        lynx::ui::registerImageCache ([c] {
+            const juce::SpinLock::ScopedLockType lock (c->lock);
+            c->fonts.clear();
+        });
+        return c;
+    }();
+    return *cache;
+}
+
+juce::FontOptions fontOptions (float size, int kind)
+{
+    if (kind == 2)
+        return juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain);
+    return juce::FontOptions (size, kind == 1 ? juce::Font::bold : juce::Font::plain);
+}
+
+// kind 0 plain, 1 bold, 2 monospaced
+juce::Font cachedFont (float size, int kind)
+{
+    if (! lynx::ui::paintCache())
+        return juce::Font (fontOptions (size, kind));
+    std::uint32_t bits = 0;
+    std::memcpy (&bits, &size, sizeof (bits));
+    const auto key = ((std::uint64_t) bits << 2) | (std::uint64_t) kind;
+    auto& cache = fontCache();
+    const juce::SpinLock::ScopedLockType lock (cache.lock);
+    if (const auto it = cache.fonts.find (key); it != cache.fonts.end())
+        return it->second;
+    if (cache.fonts.size() >= 512) // (the sizes a session uses stay far below this)
+        cache.fonts.clear();
+    return cache.fonts.emplace (key, juce::Font (fontOptions (size, kind))).first->second;
+}
+} // namespace
+
+juce::Font font (float size, bool bold)
+{
+    return cachedFont (size, bold ? 1 : 0);
+}
+
+juce::Font monoFont (float size)
+{
+    return cachedFont (size, 2);
+}
+
+void clearFontCache()
+{
+    auto& cache = fontCache();
+    const juce::SpinLock::ScopedLockType lock (cache.lock);
+    cache.fonts.clear();
+}
 
 namespace
 {
@@ -164,24 +231,114 @@ struct SpritePlace
     }
 };
 
-void blit (juce::Graphics& g, const juce::Image& sprite, const SpritePlace& at, int scale, bool mask)
+// (round 190gr: JUCE draws an image with the current colour's alpha as its opacity; a tile already holds its colour's
+// alpha, so it is drawn with an opaque fill and `after` is the colour set afterwards — the one the shape's own drawing
+// leaves. Before, a translucent shape drawn from a tile got its alpha twice: fainter, its big plates' corners fainter
+// than their middle.)
+void blit (juce::Graphics& g, const juce::Image& sprite, const SpritePlace& at, int scale, bool mask, juce::Colour after)
 {
+    g.setColour (juce::Colours::black);
     if (scale == 1)
         g.drawImageAt (sprite, at.x, at.y, mask);
     else
         g.drawImage (sprite, juce::Rectangle<float> ((float) at.x / (float) scale, (float) at.y / (float) scale, (float) sprite.getWidth() / (float) scale,
                                                      (float) sprite.getHeight() / (float) scale), juce::RectanglePlacement::stretchToFit, mask);
+    g.setColour (after);
 }
 
 void drawKnobDirect (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, bool bipolar, juce::Colour arcColour, bool hover);
+
+// Round 190gr (U2): a small shape drawn from a cached tile. `draw` paints the shape into a tile at (pad, pad) with the
+// size of `bounds` (quantised to eighths of a physical pixel, as the tile's key holds it); the tile is blitted at
+// bounds' place, its sub-pixel offset (eighths) part of the key, so the shape keeps its anti-aliasing. One colour, one
+// filled primitive: the pixels of drawing it straight within one level per channel (--selftest paint_caches).
+// `native`: the tile is an image of the context's own kind (Windows: a Direct2D bitmap, which Direct2D blits on the GPU;
+// a software image there would be uploaded at every blit). Returns false when the context's scale is not a whole
+// number (or the shape is too big): the caller then draws it directly.
+template <typename Draw>
+bool drawTile (juce::Graphics& g, SpriteCache& cache, juce::Rectangle<float> bounds, float pad, std::uint64_t shapeKey, bool native, juce::Colour after, Draw&& draw)
+{
+    const auto scale = spriteScale (g);
+    if (scale == 0 || bounds.getWidth() * (float) scale > 256.0f || bounds.getHeight() * (float) scale > 256.0f || bounds.isEmpty())
+        return false;
+    const auto s = (float) scale;
+    const auto outer = bounds.expanded (pad);
+    const SpritePlace at (outer, scale);
+    const auto qw = eighth (bounds.getWidth() * s), qh = eighth (bounds.getHeight() * s), qp = eighth (pad * s);
+    auto key = mix (mix (mix (shapeKey, (std::uint64_t) qw), (std::uint64_t) qh), (std::uint64_t) qp);
+    key = mix (key, (std::uint64_t) ((at.fx * 16 + at.fy) * 8 + scale));
+    auto* sprite = cache.find (key);
+    if (sprite == nullptr)
+    {
+        const auto w = (float) at.fx * 0.125f + (float) (qw + 2 * qp) * 0.125f, h = (float) at.fy * 0.125f + (float) (qh + 2 * qp) * 0.125f;
+        juce::Image image (juce::Image::ARGB, (int) std::ceil (w) + 1, (int) std::ceil (h) + 1, true,
+                           native ? (const juce::ImageType&) juce::NativeImageType() : (const juce::ImageType&) juce::SoftwareImageType());
+        {
+            juce::Graphics ig (image);
+            ig.addTransform (juce::AffineTransform::scale (s).translated ((float) at.fx * 0.125f, (float) at.fy * 0.125f));
+            const auto p = (float) qp * 0.125f / s;
+            draw (ig, juce::Rectangle<float> (p, p, (float) qw * 0.125f / s, (float) qh * 0.125f / s));
+        }
+        sprite = &cache.add (key, std::move (image));
+    }
+    blit (g, *sprite, at, scale, false, after);
+    return true;
+}
+
+// Which shapes come from tiles. Linux (software renderer): round 161's rounded rectangles and knobs, and since round
+// 190gr the launch triangles (within one level of drawing them straight; ellipses and outlines were tried and left out:
+// a curve's tile made at another place came out up to 14 levels apart, see paintCacheSelfTest). Windows (Direct2D): the
+// shapes drawn as paths — a knob's arcs, a triangle — for which Direct2D makes a new path geometry at every call (it
+// draws rounded rectangles and ellipses as GPU primitives). LYNX_PAINT_CACHE=0: no tiles at all, every shape drawn
+// straight; LYNX_PAINT_TILES=0: only round 161's tiles (Linux).
+bool tilesForPrimitives() noexcept // (round 161's rounded rectangles: LYNX_PAINT_CACHE=0 only)
+{
+    return useSprites && lynx::ui::paintCache();
+}
+
+bool tilesForPaths() noexcept
+{
+   #if JUCE_WINDOWS
+    return lynx::ui::paintTiles(); // (new on Windows: LYNX_PAINT_TILES=0 draws them straight)
+   #else
+    return useSprites && lynx::ui::paintCache(); // (round 161's knobs; the triangles follow LYNX_PAINT_TILES below)
+   #endif
+}
+
+constexpr bool nativeTiles =
+   #if JUCE_WINDOWS
+    true;
+   #else
+    false;
+   #endif
+std::uint64_t paletteStamp = 0; // (setPalette: +1; part of the knob tiles' keys)
+// (the largest channel difference a tile may show against its shape drawn straight, --selftest; see paintCacheSelfTest)
+constexpr int nativeTolerance = 1, nativeKnobTolerance = 3;
 } // namespace
+
+void fillLaunchTriangle (juce::Graphics& g, juce::Rectangle<float> a, juce::Colour colour)
+{
+    g.setColour (colour);
+    if (a.isEmpty() || ! g.clipRegionIntersects (a.getSmallestIntegerContainer().expanded (1)))
+        return;
+    static SpriteCache cache;
+    static const bool registered = lynx::ui::registerImageCache ([] { cache.images.clear(); }); (void) registered;
+    const auto direct = [colour] (juce::Graphics& ig, juce::Rectangle<float> b) {
+        juce::Path triangle;
+        triangle.addTriangle (b.getX(), b.getY(), b.getRight(), b.getCentreY(), b.getX(), b.getBottom());
+        ig.setColour (colour);
+        ig.fillPath (triangle);
+    };
+    if (! (tilesForPaths() && lynx::ui::paintTiles()) || ! drawTile (g, cache, a, 0.0f, mix (0x3c6ef372fe94f82bull, (std::uint64_t) colour.getARGB()), nativeTiles, colour, direct))
+        direct (g, a);
+}
 
 void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, juce::Colour colour)
 {
     g.setColour (colour);
     if (r.isEmpty() || ! g.clipRegionIntersects (r.getSmallestIntegerContainer()))
         return;
-    if (! useSprites || corner <= 0.0f)
+    if (! tilesForPrimitives() || corner <= 0.0f)
     {
         g.fillRoundedRectangle (r, corner);
         return;
@@ -237,7 +394,7 @@ void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, j
             }
             sprite = &cache.add (key, std::move (mask));
         }
-        blit (g, *sprite, at, scale, false);
+        blit (g, *sprite, at, scale, false, colour);
         return;
     }
 
@@ -273,10 +430,12 @@ void fillRoundRect (juce::Graphics& g, juce::Rectangle<float> r, float corner, j
             g.fillRect (juce::Rectangle<float> (x1 / s, y1 / s, (x2 - x1) / s, (y2 - y1) / s));
     };
     const auto pl = eighth (xl - (float) x0), pr = eighth (xr - (float) xb), pt = eighth (yt - (float) y0), pbot = eighth (yb - (float) yc);
+    g.setColour (juce::Colours::black); // (the corners with an opaque fill: each mask holds the colour's alpha already; see blit)
     put (cornerMask (0, pl, pt), x0, y0);
     put (cornerMask (1, pr, pt), xb, y0);
     put (cornerMask (2, pl, pbot), x0, yc);
     put (cornerMask (3, pr, pbot), xb, yc);
+    g.setColour (colour);
     rect ((float) xa, yt, (float) xb, (float) ya);  // top band
     rect ((float) xa, (float) yc, (float) xb, yb);  // bottom band
     rect (xl, (float) ya, xr, (float) yc);          // middle, full width
@@ -337,7 +496,7 @@ void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, 
 {
     if (! g.clipRegionIntersects (bounds.getSmallestIntegerContainer().expanded (1)))
         return;
-    const auto scale = useSprites ? spriteScale (g) : 0;
+    const auto scale = tilesForPaths() ? spriteScale (g) : 0;
     if (scale == 0 || bounds.getWidth() * (float) scale > 256.0f || bounds.getHeight() * (float) scale > 256.0f)
     {
         drawKnobDirect (g, bounds, value01, bipolar, arcColour, hover);
@@ -350,11 +509,14 @@ void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, 
     const auto value = juce::roundToInt (juce::jlimit (0.0f, 1.0f, value01) * 1440.0f); // (a sixteenth of a degree of the ring)
     auto key = mix (mix (0x84222325cbf29ce4ull, (std::uint64_t) eighth (bounds.getWidth() * (float) scale)), (std::uint64_t) eighth (bounds.getHeight() * (float) scale));
     key = mix (mix (mix (key, (std::uint64_t) value), (std::uint64_t) arcColour.getARGB()), (std::uint64_t) ((at.fx * 16 + at.fy) * 64 + scale * 4 + (bipolar ? 2 : 0) + (hover ? 1 : 0)));
+    key = mix (key, paletteStamp); // (a knob is drawn in the theme's colours too: a new palette, new tiles)
     auto* sprite = cache.find (key);
     if (sprite == nullptr)
     {
         const auto w = (float) at.fx * 0.125f + bounds.getWidth() * (float) scale, h = (float) at.fy * 0.125f + bounds.getHeight() * (float) scale;
-        juce::Image image (juce::Image::ARGB, (int) std::ceil (w) + 1, (int) std::ceil (h) + 1, true, juce::SoftwareImageType());
+        // (Windows, round 190gr: a Direct2D bitmap; drawn straight, each of the knob's arcs is a new path geometry)
+        juce::Image image (juce::Image::ARGB, (int) std::ceil (w) + 1, (int) std::ceil (h) + 1, true,
+                           nativeTiles ? (const juce::ImageType&) juce::NativeImageType() : (const juce::ImageType&) juce::SoftwareImageType());
         {
             juce::Graphics ig (image);
             ig.addTransform (juce::AffineTransform::scale ((float) scale).translated ((float) at.fx * 0.125f, (float) at.fy * 0.125f));
@@ -363,7 +525,7 @@ void drawKnob (juce::Graphics& g, juce::Rectangle<float> bounds, float value01, 
         }
         sprite = &cache.add (key, std::move (image));
     }
-    blit (g, *sprite, at, scale, false);
+    blit (g, *sprite, at, scale, false, textPrimary); // (the colour drawKnobDirect leaves set: its pointer's)
 }
 
 namespace
@@ -426,8 +588,136 @@ void drawKnobDirect (juce::Graphics& g, juce::Rectangle<float> bounds, float val
 }
 } // namespace
 
+// --selftest "paint_caches=" (round 190gr): the font cache gives one font object per size and weight, and a shape drawn
+// from a tile has the pixels of the shape drawn straight: on the software renderer at most 1 level per channel (a fill
+// at a fractional position; outlines are not drawn from tiles: JUCE works a stroke's outline out from the shape's own
+// coordinates, so the same outline made elsewhere came out up to 11 levels apart at its corners), on the native renderer
+// (Direct2D) at most nativeTolerance / nativeKnobTolerance.
+juce::String paintCacheSelfTest()
+{
+    {
+        const auto a = font (type::body), b = font (type::body), bold = font (type::body, true);
+        if (lynx::ui::paintCache() && (! (a == b) || a.getTypefacePtr() != b.getTypefacePtr()))
+            return "ERROR the font cache made two fonts for one size";
+        if (! bold.isBold() || a.isBold() || std::abs (a.getHeight() - type::body) > 1.0e-4f)
+            return "ERROR a cached font has the wrong size or weight";
+        if (monoFont (type::small).getTypefaceName() != juce::Font::getDefaultMonospacedFontName())
+            return "ERROR the monospaced font";
+        clearFontCache();
+        if (font (type::body).getTypefacePtr() == nullptr)
+            return "ERROR no typeface after the cache was emptied";
+    }
+    struct Shape
+    {
+        const char* name;
+        float pad;
+        bool single; // one primitive in one colour
+        std::function<void (juce::Graphics&, juce::Rectangle<float>)> draw;
+    };
+    const auto red = juce::Colour (0xffe5383b), grey = juce::Colour (0xb0a1a6b0);
+    const Shape shapes[] = {
+        { "ellipse", 0.0f, true, [red] (juce::Graphics& g, juce::Rectangle<float> r) { g.setColour (red); g.fillEllipse (r); } },
+        { "translucent ellipse", 0.0f, true, [grey] (juce::Graphics& g, juce::Rectangle<float> r) { g.setColour (grey); g.fillEllipse (r); } },
+        { "triangle", 0.0f, true, [red] (juce::Graphics& g, juce::Rectangle<float> r) {
+              juce::Path t;
+              t.addTriangle (r.getX(), r.getY(), r.getRight(), r.getCentreY(), r.getX(), r.getBottom());
+              g.setColour (red);
+              g.fillPath (t);
+          } },
+        { "knob", 0.0f, false, [] (juce::Graphics& g, juce::Rectangle<float> r) { drawKnobDirect (g, r, 0.37f, false, knobArc, false); } },
+    };
+    const juce::Rectangle<float> places[] = { { 10.0f, 6.0f, 9.0f, 11.0f }, { 30.5f, 6.25f, 22.0f, 22.0f }, { 61.125f, 5.75f, 26.0f, 18.0f } };
+    juce::String detail;
+    for (const auto native : { false, true })
+    {
+        int worstSingle = 0, worstKnob = 0;
+        for (const auto& shape : shapes)
+            for (const auto& place : places)
+            {
+                SpriteCache cache;
+                juce::Image direct (juce::Image::ARGB, 100, 36, true, native ? (const juce::ImageType&) juce::NativeImageType() : (const juce::ImageType&) juce::SoftwareImageType());
+                auto tiled = direct.createCopy();
+                for (auto* image : { &direct, &tiled })
+                {
+                    juce::Graphics g (*image);
+                    g.fillAll (bg2);
+                    if (image == &direct || ! drawTile (g, cache, place, shape.pad, 0x1234567ull, native, juce::Colours::white, shape.draw))
+                        shape.draw (g, place);
+                }
+                const juce::Image::BitmapData a (direct, juce::Image::BitmapData::readOnly), b (tiled, juce::Image::BitmapData::readOnly);
+                int worst = 0;
+                juce::String where;
+                for (int y = 0; y < a.height; ++y)
+                    for (int x = 0; x < a.width; ++x)
+                    {
+                        const auto p = a.getPixelColour (x, y), q = b.getPixelColour (x, y);
+                        const auto d = juce::jmax (std::abs ((int) p.getRed() - (int) q.getRed()), std::abs ((int) p.getGreen() - (int) q.getGreen()),
+                                                   juce::jmax (std::abs ((int) p.getBlue() - (int) q.getBlue()), std::abs ((int) p.getAlpha() - (int) q.getAlpha())));
+                        if (d > worst)
+                            where = juce::String (x) + "," + juce::String (y) + " " + p.toDisplayString (true) + "/" + q.toDisplayString (true);
+                        worst = juce::jmax (worst, d);
+                    }
+                if (worst > 0 && std::getenv ("LYNX_TILE_DEBUG") != nullptr)
+                    std::fprintf (stderr, "tile %s %s at %.3f,%.3f: %d (%s)\n", native ? "native" : "software", shape.name, place.getX(), place.getY(), worst,
+                                  where.toRawUTF8());
+                (shape.single ? worstSingle : worstKnob) = juce::jmax (shape.single ? worstSingle : worstKnob, worst);
+            }
+        detail << (native ? ", native" : "software") << " shapes " << worstSingle << " / knob " << worstKnob;
+        if (! native && (worstSingle > 1 || worstKnob > 1))
+            return "ERROR a tile differs from its shape on the software renderer by more than 1 level (" + detail + ")";
+        if (worstSingle > nativeTolerance || worstKnob > nativeKnobTolerance)
+            return "ERROR a tile differs from its shape (" + detail + ")";
+    }
+    // round 161's rounded rectangles (theme::fillRoundRect: a small one from one tile, a big one from four corner tiles
+    // and plain rectangles), translucent: the alpha once (round 190gr), as fillRoundedRectangle draws it
+    {
+        int worst = 0;
+        for (const auto& r : { juce::Rectangle<float> (4.0f, 3.0f, 20.0f, 14.0f), juce::Rectangle<float> (30.5f, 2.0f, 140.0f, 90.0f) })
+        {
+            juce::Image direct (juce::Image::ARGB, 180, 100, true, juce::SoftwareImageType());
+            auto tiled = direct.createCopy();
+            const auto colour = juce::Colour (0x8ce5383b);
+            {
+                juce::Graphics g (direct);
+                g.fillAll (bg2);
+                g.setColour (colour);
+                g.fillRoundedRectangle (r, radius::md);
+            }
+            {
+                juce::Graphics g (tiled);
+                g.fillAll (bg2);
+                fillRoundRect (g, r, radius::md, colour);
+            }
+            const juce::Image::BitmapData a (direct, juce::Image::BitmapData::readOnly), b (tiled, juce::Image::BitmapData::readOnly);
+            int here = 0;
+            juce::String where;
+            for (int y = 0; y < a.height; ++y)
+                for (int x = 0; x < a.width; ++x)
+                {
+                    const auto p = a.getPixelColour (x, y), q = b.getPixelColour (x, y);
+                    const auto d = juce::jmax (std::abs ((int) p.getRed() - (int) q.getRed()), std::abs ((int) p.getGreen() - (int) q.getGreen()),
+                                               std::abs ((int) p.getBlue() - (int) q.getBlue()));
+                    if (d > here)
+                        where = juce::String (x) + "," + juce::String (y) + " " + p.toDisplayString (false) + "/" + q.toDisplayString (false);
+                    here = juce::jmax (here, d);
+                }
+            if (here > 0 && std::getenv ("LYNX_TILE_DEBUG") != nullptr)
+                std::fprintf (stderr, "plate %.1fx%.1f: %d (%s)\n", r.getWidth(), r.getHeight(), here, where.toRawUTF8());
+            worst = juce::jmax (worst, here);
+            const auto mid = r.getCentre().toInt();
+            if (a.getPixelColour (mid.x, mid.y) != b.getPixelColour (mid.x, mid.y))
+                return "ERROR a translucent rounded rectangle from tiles is not the colour fillRoundedRectangle gives it (" + detail + ")";
+        }
+        // (their corners: up to 8 levels apart since round 161 — the corner curve flattened at the tile's place, not the
+        // plate's; reported, not a failure. The alpha must be applied once: the plates' middles are the same.)
+        detail << ", translucent plates " << worst << " at a corner";
+    }
+    return "OK (" + detail + ")";
+}
+
 void setPalette (const themes::Palette& p)
 {
+    ++paletteStamp;
     auto c = [] (std::uint32_t argb) { return juce::Colour (argb); };
     bg0 = c (p.bg0); bg1 = c (p.bg1); bg2 = c (p.bg2); bg3 = c (p.bg3); bg4 = c (p.bg4); bg5 = c (p.bg5); bg6 = c (p.bg6);
     border = c (p.border); borderStrong = c (p.borderStrong);
@@ -569,6 +859,7 @@ LookAndFeel::LookAndFeel()
    #else
     useFontconfigFontFolders();
    #endif
+    clearFontCache(); // (the cached fonts may hold the typeface of the family before)
     refreshColours();
 }
 
@@ -597,12 +888,12 @@ juce::String fontSelfTest()
     // every font gets a typeface and glyphs: the default, the monospaced one, a family nobody has (issue #142). The
     // text has places where a line may break: those took JUCE's crashing path
     const juce::String text ("0 : 00 : 00 one-two three/four");
-    const std::pair<const char*, juce::FontOptions> fonts[] = {
+    const std::pair<const char*, juce::Font> fonts[] = {
         { "default", font (type::body) },
         { "bold", font (type::body, true) },
         { "monospaced", monoFont (type::body) },
-        { "serif", juce::FontOptions (juce::Font::getDefaultSerifFontName(), type::body, juce::Font::plain) },
-        { "unknown family", juce::FontOptions ("LYNX no such family 142", type::body, juce::Font::bold) },
+        { "serif", juce::Font (juce::FontOptions (juce::Font::getDefaultSerifFontName(), type::body, juce::Font::plain)) },
+        { "unknown family", juce::Font (juce::FontOptions ("LYNX no such family 142", type::body, juce::Font::bold)) },
     };
     for (const auto& [name, options] : fonts)
     {
@@ -696,6 +987,7 @@ juce::String LookAndFeel::applyLanguageFont (const juce::String& languageId)
     const auto family = uiFontForLanguage (languageId);
     if (family.isNotEmpty())
         setDefaultSansSerifTypefaceName (family);
+    clearFontCache(); // (the cached fonts hold the typeface of the family before)
     return family; // empty: JUCE's per-glyph font fallback still finds whatever CJK font the OS has
 }
 
@@ -744,6 +1036,7 @@ juce::String LookAndFeel::applyInterfaceFont (const juce::String& languageId, co
         {
             // the user's font also in Chinese, Japanese and Korean: what it lacks comes from JUCE's per-glyph fallback
             setDefaultSansSerifTypefaceName (juce::String::fromUTF8 (family.c_str()));
+            clearFontCache();
             return juce::String::fromUTF8 (family.c_str());
         }
     }
