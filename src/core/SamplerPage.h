@@ -314,13 +314,14 @@ inline std::vector<WaveMenuEntry> waveMenu()
              { nullptr },
              { TR_NOOP ("Open in new sampler channel") },
              { TR_NOOP ("Open in new Fruity Granulizer channel") },
-             // (Fruity Slicer / Slicex slice the file as their editors load it: not reachable from here yet; no Slicer 2)
-             { "Open in new Fruity Slicer channel", false },
+             // round 190gk: Fruity Slicer / Slicex load it as their editors' Load does (REA 190fl: SBONewMenuClick
+             // 0x11f8330, Tag 1 Fruity Slicer, 3 Slicex); LYNX has no Slicer 2
+             { TR_NOOP ("Open in new Fruity Slicer channel") },
              { "Open in new Fruity Slicer 2 channel", false },
-             { "Open in new Slicex channel", false },
+             { TR_NOOP ("Open in new Slicex channel") },
              { nullptr },
              { TR_NOOP ("Detect tempo") },
-             { "Get properties", false }, // (FL's properties dialog: not built)
+             { TR_NOOP ("Get properties") }, // (round 190gk: the system's file properties, Windows only; REA 0x11f22a0)
              { nullptr },
              { "Spectrum view", false },              // (FL's faded ticks: display modes LYNX's page doesn't have)
              { "Multichannel waveform view", false } };

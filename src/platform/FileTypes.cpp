@@ -7,6 +7,7 @@
 #if JUCE_WINDOWS
  #include <windows.h>
  #include <shlobj.h>
+ #include <shellapi.h>
 #endif
 
 namespace lynx
@@ -167,6 +168,28 @@ void registerFileTypes()
     WindowsRegistry::setValue (classes + progId + "\\shell\\open\\command\\", command);
     // Explorer caches icons per type: tell it the association changed
     SHChangeNotify (SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+   #endif
+}
+
+bool showFileProperties (const juce::File& file)
+{
+   #if JUCE_WINDOWS
+    if (! file.exists())
+        return false;
+    const auto path = file.getFullPathName();
+    SHELLEXECUTEINFOW info {};
+    info.cbSize = sizeof (info);
+    info.fMask = SEE_MASK_INVOKEIDLIST | SEE_MASK_NOCLOSEPROCESS; // (FL's mask 0xc)
+    info.lpVerb = L"properties";
+    info.lpFile = path.toWideCharPointer();
+    info.nShow = SW_SHOW;
+    const auto ok = ShellExecuteExW (&info) != FALSE;
+    if (info.hProcess != nullptr)
+        CloseHandle (info.hProcess);
+    return ok;
+   #else
+    juce::ignoreUnused (file);
+    return false;
    #endif
 }
 } // namespace lynx

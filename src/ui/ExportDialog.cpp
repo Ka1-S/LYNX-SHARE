@@ -594,7 +594,11 @@ public:
             for (auto& t : alsoToggles)
                 t.setEnabled (false);
             realtimeToggle.setVisible (false);
+            // FL's render window: "Start" (hint "Start rendering", Enter; TRENDERFORM StartBtn / TWAVRENDERFORM OkBtn,
+            // round 190gk)
             exportButton.setButtonText (clip->button);
+            exportButton.setTooltip (tr ("Start rendering"));
+            exportButton.addShortcut (juce::KeyPress (juce::KeyPress::returnKey));
             exportButton.onClick = [this] { renderClip(); };
         }
 
@@ -1645,7 +1649,7 @@ void consolidate (AudioEngine& engine, const quickrender::Plan& plan, const juce
     const auto render = quickrender::makePlanRenderSong (engine.getSong(), plan);
     auto mode = std::make_shared<ClipRenderMode>();
     mode->song = render;
-    mode->button = tr ("Render");
+    mode->button = trc ("@render button: Start");
     auto* engineRef = &engine;
     mode->onRender = [engineRef, plan, render, folder] (const exportopts::Options& o) {
         const auto file = uniqueWav (folder, plan.name);
@@ -1790,7 +1794,7 @@ void renderPatternAsAudioClip (AudioEngine& engine, int pattern, int how)
     auto mode = std::make_shared<ClipRenderMode>();
     mode->pattern = true;
     mode->song = render;
-    mode->button = tr ("Render");
+    mode->button = trc ("@render button: Start");
     mode->onRender = go;
     showClipRenderWindow (engine, replace ? tr ("Render and replace") : tr ("Render as audio clip"), std::move (mode));
 }
@@ -1881,7 +1885,7 @@ void renderPatternsAsAudioClips (AudioEngine& engine, const std::vector<int>& pa
     auto mode = std::make_shared<ClipRenderMode>();
     mode->pattern = true;
     mode->song = batch->renders.front();
-    mode->button = tr ("Render");
+    mode->button = trc ("@render button: Start");
     mode->onRender = [batch] (const exportopts::Options& o) {
         batch->options = o;
         runPatternBatch (batch, 0);
@@ -1930,7 +1934,7 @@ void exportAllPlaylistTracks (AudioEngine& engine, const juce::String& projectNa
         }
         auto mode = std::make_shared<ClipRenderMode>();
         mode->song = items.front().song;
-        mode->button = tr ("Render");
+        mode->button = trc ("@render button: Start");
         mode->onRender = [items, skipped, folder] (const exportopts::Options& o) mutable {
             (new TrackExportThread (std::move (items), o, skipped, folder))->launchThread();
         };

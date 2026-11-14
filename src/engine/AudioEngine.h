@@ -163,6 +163,9 @@ public:
     // Recordings into Edison slots go on while their windows are closed (as FL's plugin does): this moves what the
     // audio thread recorded into the takes (the engine's timer calls it) and flushes a take that ended by itself.
     void pumpEdisonRecordings();
+    // Round 190gk: slots a Gross Beat picked from MIDI notes become its Time slot / Volume slot parameters, as FL's
+    // click does (not an undo step); the engine's timer calls it.
+    void pumpGrossBeatPicks();
     // Round 190ao (Bitwig's "Reload plug-in"): a hosted plugin of a channel (track < 0) or a mixer slot that is down:
     // it crashed inside a call and was switched off, or its separate process died or stopped responding.
     struct HostedSlot

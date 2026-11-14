@@ -77,6 +77,7 @@
 #include "ui/FlVoicePanel.h"
 #include "core/FruitySlicer.h"
 #include "ui/SlicexEditor.h"
+#include "platform/FileTypes.h"
 #include "ui/BrowserComponent.h"
 #include "engine/SampleLibrary.h"
 #include "core/SampleFiles.h"
@@ -3680,13 +3681,22 @@ private:
                     if (safe != nullptr)
                         openAudioEditorForChannel (safe->engine, safe->ref.index);
                 });
-            else if (key == "Open in new sampler channel" || key == "Open in new Fruity Granulizer channel")
+            else if (key == "Open in new sampler channel" || key == "Open in new Fruity Granulizer channel" || key == "Open in new Fruity Slicer channel"
+                     || key == "Open in new Slicex channel")
             {
-                const auto kind = key == "Open in new sampler channel" ? InstrumentKind::sampler : InstrumentKind::granulizer;
+                const auto kind = key == "Open in new sampler channel"            ? InstrumentKind::sampler
+                                  : key == "Open in new Fruity Granulizer channel" ? InstrumentKind::granulizer
+                                  : key == "Open in new Fruity Slicer channel"     ? InstrumentKind::fruityslicer
+                                                                                   : InstrumentKind::slicex;
                 menu.addItem (text, file.existsAsFile() && openInNewChannelHandler() != nullptr, false, [file, kind] {
                     if (openInNewChannelHandler())
                         openInNewChannelHandler() (file, kind);
                 });
+            }
+            else if (key == "Get properties")
+            {
+                if (fileProperties) // (FL: Explorer's Properties of the sample's file; no such window on the other systems)
+                    menu.addItem (text, file.existsAsFile(), false, [file] { showFileProperties (file); });
             }
             else if (key == "Detect tempo")
                 menu.addItem (text, has, false, [safe, sample] {

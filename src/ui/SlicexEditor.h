@@ -18,6 +18,9 @@ struct Song;
 
 // `channel`: the Channel Rack channel (−1 in a Patcher: `locate` finds the node)
 std::unique_ptr<juce::Component> makeSlicexEditor (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate, int channel);
+// Round 190gk ("Open in new Slicex channel" of the Sampler's waveform menu): the next editor made for Channel Rack
+// channel `channel` loads `path` on deck A as the deck's Load sample does; `channel` −1 forgets it.
+void loadSlicexSampleWhenOpened (int channel, const juce::String& path);
 
 // The editor test (LYNX --slicexedittest, round 190aj): one command for the Slicex editor inside `root` (the channel's
 // settings panel), on its current deck; the result as text. The commands are listed at SlicexEditor::test.

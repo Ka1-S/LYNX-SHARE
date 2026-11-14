@@ -9814,3 +9814,10 @@ countries: es mx ar co cl pe ve
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "Opciones: disparar slots con notas MIDI (slots de tiempo: teclas C5 a B7, slots de volumen: C2 a B4), reducción de clics, compensación de ataque, offset DC, remuestreo HQ, reloj de scratch; puerto de entrada MIDI"
 "MIDI Input Port Number:" = "Número de puerto de entrada MIDI:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "Número de puerto de entrada MIDI: arrastra arriba / abajo (\"...\" = ninguno). Los canales MIDI Out de ese puerto tocan el modo MIDI y Harmonize de Pitcher"
+
+# --- Round 190gk: FL's render window Start, the Sampler waveform menu's Slicer / Slicex items
+"@render button: Start" = "Iniciar"
+"Start rendering" = "Iniciar el renderizado"
+"Open in new Fruity Slicer channel" = "Abrir en un canal Fruity Slicer nuevo"
+"Open in new Slicex channel" = "Abrir en un canal Slicex nuevo"
+"Get properties" = "Ver propiedades"
