@@ -10021,3 +10021,5 @@ countries: tr
 "Cause: driver or system latency (the load was only {0}%). Try a larger buffer or another driver." = "Neden: sürücü veya sistem gecikmesi (yük yalnızca %{0} idi). Daha büyük bir arabellek veya başka bir sürücü deneyin."
 "Cause: the processing took longer than the buffer ({0} ms). Slowest in that block: {1} ({2} ms)." = "Neden: işleme arabellekten uzun sürdü ({0} ms). O bloktaki en yavaş: {1} ({2} ms)."
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Neden: işleme arabelleğin sınırına yaklaştı (%{0}). Daha büyük bir arabellek deneyin veya en ağır kanalları dondurun."
+# Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
+"Tape speed" = "Bant hızı"

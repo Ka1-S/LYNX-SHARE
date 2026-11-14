@@ -10021,3 +10021,5 @@ countries: jp
 "Cause: driver or system latency (the load was only {0}%). Try a larger buffer or another driver." = "原因: ドライバーまたはシステムの遅延(負荷はわずか{0}%でした)。より大きなバッファーか別のドライバーを試してください。"
 "Cause: the processing took longer than the buffer ({0} ms). Slowest in that block: {1} ({2} ms)." = "原因: 処理がバッファーの長さ({0} ms)を超えました。そのブロックで最も遅いもの: {1}({2} ms)。"
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "原因: 処理がバッファーの限界近く({0}%)に達しました。より大きなバッファーを試すか、最も重いチャンネルをフリーズしてください。"
+# Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
+"Tape speed" = "テープ速度"

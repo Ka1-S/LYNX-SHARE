@@ -10021,3 +10021,5 @@ countries: id
 "Cause: driver or system latency (the load was only {0}%). Try a larger buffer or another driver." = "Penyebab: latensi driver atau sistem (bebannya hanya {0}%). Coba buffer yang lebih besar atau driver lain."
 "Cause: the processing took longer than the buffer ({0} ms). Slowest in that block: {1} ({2} ms)." = "Penyebab: pemrosesan lebih lama daripada buffer ({0} ms). Paling lambat di blok itu: {1} ({2} ms)."
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Penyebab: pemrosesan mendekati batas buffer ({0}%). Coba buffer yang lebih besar, atau bekukan channel terberat."
+# Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
+"Tape speed" = "Kecepatan pita"

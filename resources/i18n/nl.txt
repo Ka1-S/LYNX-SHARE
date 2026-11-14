@@ -10021,3 +10021,5 @@ countries: nl be
 "Cause: driver or system latency (the load was only {0}%). Try a larger buffer or another driver." = "Oorzaak: latentie van het stuurprogramma of het systeem (de belasting was maar {0}%). Probeer een grotere buffer of een ander stuurprogramma."
 "Cause: the processing took longer than the buffer ({0} ms). Slowest in that block: {1} ({2} ms)." = "Oorzaak: de verwerking duurde langer dan de buffer ({0} ms). Het traagst in dat blok: {1} ({2} ms)."
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Oorzaak: de verwerking kwam dicht bij de grens van de buffer ({0}%). Probeer een grotere buffer, of bevries de zwaarste kanalen."
+# Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
+"Tape speed" = "Bandsnelheid"

@@ -109,7 +109,9 @@ protected:
                                     // KNEE / RANGE bars), 2 = a chunky grey face with a white pointer (round tp172b6: the
                                     // multiband reference's), 3 = the same, small, inside a ring (`outer`), 4 = that ring;
                                     // menus: 1 = a plain pill button showing the choice (no arrow);
-                                    // tabs: 1 = a raised pill with a marker at the chosen end
+                                    // tabs: 1 = a raised pill with a marker at the chosen end, 2 = small hardware keys,
+                                    // muted until hovered, the chosen one lit, the caption small above them (the generic
+                                    // pages' compactKeys, as Glow Leveler's Old | Measured; rollup 0.1.28)
         float rowTrim = 0.0f;         // sliders: room kept at the scale row's right end (round tp172b6: the stereo link's MID key)
         bool keepCase = false;        // tabs look 1 (round tp172b6): the options as written (the reference's Band / Free, In / Ext)
         bool bare = false;            // buttons (round tp172b6): no face of their own (the editor paints them in its overlay)
@@ -848,6 +850,31 @@ protected:
                     const auto mx = sel <= 0 ? pill.getX() : pill.getRight() - marker;
                     g.setColour (on ? juce::Colour (0xffdca103) : colour::textDisabled);
                     g.fillRect (juce::Rectangle<float> (mx, pill.getY(), marker, pill.getHeight()));
+                    break;
+                }
+                if (c.look == 2) // (the generic pages' compactKeys: PluginEditors.cpp, Item::tabs)
+                {
+                    if (c.caption.isNotEmpty())
+                    {
+                        g.setColour (skin::captionColour().withAlpha (0.8f));
+                        g.setFont (font (type::small));
+                        g.drawText (caps (c.caption), c.r.withY (c.r.getY() - 12.0f).withHeight (11.0f), juce::Justification::centredLeft, false);
+                    }
+                    const auto w = c.r.getWidth() / (float) n;
+                    for (int i = 0; i < n; ++i)
+                    {
+                        const auto cell = juce::Rectangle<float> (c.r.getX() + w * (float) i, c.r.getY(), w, c.r.getHeight()).reduced (2.0f, 0.0f);
+                        const auto hot = cell.contains (mouse);
+                        skin::hwKey (g, cell, i == sel && on, hot);
+                        if (i != sel && ! hot)
+                        {
+                            g.setColour (juce::Colour (0xffc8cbce).withAlpha (0.55f));
+                            g.fillRoundedRectangle (cell, 2.0f);
+                        }
+                        g.setColour (i == sel && on ? juce::Colours::white : juce::Colours::white.withAlpha (hot ? 0.95f : 0.75f));
+                        g.setFont (font (juce::jmax (7.0f, juce::jmin (c.r.getHeight() * 0.58f, 8.5f)), true));
+                        g.drawFittedText (caps (tr (c.options[i])), cell.toNearestInt(), juce::Justification::centred, 1, 0.7f);
+                    }
                     break;
                 }
                 skin::valuePlate (g, c.r, radius::md);

@@ -10021,3 +10021,5 @@ countries: kr
 "Cause: driver or system latency (the load was only {0}%). Try a larger buffer or another driver." = "원인: 드라이버 또는 시스템 지연(부하는 {0}%에 불과했습니다). 더 큰 버퍼나 다른 드라이버를 사용해 보세요."
 "Cause: the processing took longer than the buffer ({0} ms). Slowest in that block: {1} ({2} ms)." = "원인: 처리가 버퍼({0} ms)보다 오래 걸렸습니다. 그 블록에서 가장 느린 것: {1}({2} ms)."
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "원인: 처리가 버퍼 한계({0}%)에 가까워졌습니다. 더 큰 버퍼를 사용하거나 가장 무거운 채널을 프리즈하세요."
+# Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
+"Tape speed" = "테이프 속도"

@@ -2961,6 +2961,29 @@ private:
         // they end left of the IN / OUT meter
         out.push_back (barValue ({ s.getX() + 698.0f, s.getY(), 86.0f, s.getHeight() }, inputPan, tr ("In pan")));
         out.push_back (barValue ({ s.getX() + 788.0f, s.getY(), 86.0f, s.getHeight() }, outputPan, tr ("Out pan")));
+        // rollup 0.1.28 (round 190fj's Law and Tape speed): the measured magnetic core runs where the Classic tape curve
+        // ran (one band, Style Tape, no voice / character / feedback); there its law and, on the measured core, the tape
+        // speed are two rows of keys under the strip, in Glow Leveler's Old | Measured look (owner decision)
+        if (const auto* fx = current())
+        {
+            auto withCore = fx->params;
+            withCore[(std::size_t) law] = 1.0f;
+            if (count() == 1 && measuredTape (withCore))
+            {
+                auto lawKeys = tabs ({ s.getX() + 2.0f, s.getY() + s.getHeight() + 18.0f, 132.0f, 16.0f }, law, tr ("Classic|Measured"), { 0.0f, 1.0f });
+                lawKeys.look = 2;
+                lawKeys.caption = tr ("Law");
+                out.push_back (lawKeys);
+                if (v (law) >= 0.5f)
+                {
+                    auto speedKeys = tabs ({ s.getX() + 146.0f, s.getY() + s.getHeight() + 18.0f, 230.0f, 16.0f }, tapeSpeed,
+                                           tr ("30 ips|15|7.5|3.75|1.875"), { 0.0f, 0.25f, 0.5f, 0.75f, 1.0f });
+                    speedKeys.look = 2;
+                    speedKeys.caption = tr ("Tape speed");
+                    out.push_back (speedKeys);
+                }
+            }
+        }
         // round tp172d: back to the Classic panel (the Voicing on; Ember's Classic window replaces this one)
         out.push_back (button ({ s.getX() + 880.0f, s.getY(), 64.0f, s.getHeight() }, idClassic, tr ("Classic"), false,
                                    tr ("The Classic panel: one-screen hardware saturator (Drive, Punish, five styles)")));

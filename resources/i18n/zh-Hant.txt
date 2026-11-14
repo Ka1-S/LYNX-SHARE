@@ -10021,3 +10021,5 @@ countries: tw hk mo
 "Cause: driver or system latency (the load was only {0}%). Try a larger buffer or another driver." = "原因：驅動程式或系統延遲（當時負載僅為{0}%）。請嘗試更大的緩衝區或其他驅動程式。"
 "Cause: the processing took longer than the buffer ({0} ms). Slowest in that block: {1} ({2} ms)." = "原因：處理耗時超過緩衝區（{0} ms）。該區塊中最慢的是：{1}（{2} ms）。"
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "原因：處理接近緩衝區的極限（{0}%）。請嘗試更大的緩衝區，或凍結最重的通道。"
+# Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
+"Tape speed" = "磁帶速度"

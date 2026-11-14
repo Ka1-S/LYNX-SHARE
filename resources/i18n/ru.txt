@@ -10021,3 +10021,5 @@ countries: ru by kz
 "Cause: driver or system latency (the load was only {0}%). Try a larger buffer or another driver." = "Причина: задержка драйвера или системы (нагрузка была всего {0}%). Попробуйте буфер побольше или другой драйвер."
 "Cause: the processing took longer than the buffer ({0} ms). Slowest in that block: {1} ({2} ms)." = "Причина: обработка заняла больше времени, чем длится буфер ({0} мс). Самое медленное в этом блоке: {1} ({2} мс)."
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Причина: обработка подошла к пределу буфера ({0}%). Попробуйте буфер побольше или заморозьте самые тяжёлые каналы."
+# Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
+"Tape speed" = "Скорость ленты"

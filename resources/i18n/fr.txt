@@ -10021,3 +10021,5 @@ countries: fr be ch ca lu
 "Cause: driver or system latency (the load was only {0}%). Try a larger buffer or another driver." = "Cause : latence du pilote ou du système (la charge n'était que de {0} %). Essayez un tampon plus grand ou un autre pilote."
 "Cause: the processing took longer than the buffer ({0} ms). Slowest in that block: {1} ({2} ms)." = "Cause : le traitement a pris plus de temps que le tampon ({0} ms). Le plus lent dans ce bloc : {1} ({2} ms)."
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Cause : le traitement a frôlé la limite du tampon ({0} %). Essayez un tampon plus grand, ou figez les canaux les plus lourds."
+# Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
+"Tape speed" = "Vitesse de bande"
