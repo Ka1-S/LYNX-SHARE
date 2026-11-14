@@ -311,11 +311,12 @@ int main (int argc, char** argv)
     // does the same stretch, cached); without it they play unstretched
     if (const char* e = std::getenv ("LYNX_STRETCH"); e != nullptr && e[0] == '1')
         factories.stretchedSamples = [&] (const std::string& p, double ratio, lynx::StretchMethod method, double semitones,
-                                          const lynx::StretchMap& map) -> std::shared_ptr<const lynx::SampleData> {
+                                          const lynx::StretchMap& map, const lynx::StretchOptions& options) -> std::shared_ptr<const lynx::SampleData> {
             const auto original = factories.samples (p);
             if (original == nullptr)
                 return nullptr;
-            return map.empty() ? lynx::timeStretch (*original, ratio, method, semitones) : lynx::timeStretchMapped (*original, map, method, semitones);
+            return map.empty() ? lynx::timeStretch (*original, ratio, method, semitones, options)
+                               : lynx::timeStretchMapped (*original, map, method, semitones, options);
         };
     auto state = lynx::RackState::build (song, nullptr, sampleRate, factories);
     std::printf ("rack build: %.0f ms\n", std::chrono::duration<double, std::milli> (std::chrono::steady_clock::now() - buildStart).count());
