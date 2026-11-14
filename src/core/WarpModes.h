@@ -159,4 +159,38 @@ inline bool setGrain (Song& song, int channel, double value)
         return false;
     return true;
 }
+// Texture's Flux and Complex Pro's Formants / Envelope (round 190gx): the Clip View shows them under their mode, as Live
+// does [LIVE 190gu warp/live-audio-box-{texture,complex-pro}.png], only when LYNX's engine plays them (no dead controls);
+// the values are kept for the .als either way.
+inline constexpr bool textureFluxPlays = false;
+inline constexpr bool complexProPlays = false;
+inline bool setFlux (Song& song, int channel, double value)
+{
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return false;
+    song.channels[(std::size_t) channel].sampler.warpModes.textureFlux = (float) std::clamp (value, 0.0, 100.0);
+    return true;
+}
+inline bool setProFormants (Song& song, int channel, double value)
+{
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return false;
+    song.channels[(std::size_t) channel].sampler.warpModes.proFormants = (float) std::clamp (value, 0.0, 100.0);
+    return true;
+}
+inline bool setProEnvelope (Song& song, int channel, double value)
+{
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return false;
+    song.channels[(std::size_t) channel].sampler.warpModes.proEnvelope = (float) std::clamp (value, 8.0, 256.0);
+    return true;
+}
+// Live's Complex Pro: LYNX's Complex with the clip's formants kept (complexPro)
+inline bool setComplexPro (Song& song, int channel)
+{
+    if (! setMode (song, channel, (int) StretchMethod::complex))
+        return false;
+    song.channels[(std::size_t) channel].sampler.warpModes.complexPro = true;
+    return true;
+}
 } // namespace lynx::warpmodes

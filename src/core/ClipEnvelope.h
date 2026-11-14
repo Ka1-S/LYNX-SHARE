@@ -12,8 +12,11 @@
 // - Ableton Live has clip envelopes: an audio clip's "Clip Gain" envelope (the track's MainSequencer
 //   VolumeModulationTarget) and the Mixer's "Track Panning" modulation, in clip beats, values −1…1 [SCHEMA
 //   realive190fm/schema-12402.txt AudioSequencer, ClipEnvelope{EnvelopeTarget/PointeeId, Automation/Events}; DATA: the
-//   12 Suite demo set's vocal clips: −1 where the clip is silent, 1 elsewhere]. toLive / fromLive map 0…1 ↔ −1…1
-//   linearly (the ends are certain; Live's law between them needs a live check).
+//   12 Suite demo set's vocal clips: −1 where the clip is silent, 1 elsewhere]. Live's laws were measured in round
+//   190gu (1 kHz sine, /mnt/e/lynx-work/live190gu/s/ana/clipenv-g2.txt, the same in Re-Pitch and Complex) and are
+//   applied by toLive / fromLive (round 190gx): Clip Gain = liveGainDb below (gain never above unity), Track Panning
+//   = the constant-power law with +3 dB at the sides that LYNX's voicePan already is. Live ignores the clip envelopes
+//   of an UNWARPED clip (it renders at unity; its Clip View has no Envelopes tab): the .als import leaves them out.
 //
 // Cost: a clip without an envelope (index −1, or every lane flat) adds nothing to its voice; the renderer hands the
 // table to the instruments only when the song has envelopes at all.
@@ -23,6 +26,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -208,8 +212,89 @@ inline bool anyActive (const Song& song) noexcept
 }
 
 // ---- Live (.als) ----------------------------------------------------------------------------------------------------
-inline double toLive (float v) noexcept { return (double) std::clamp (v, 0.0f, 1.0f) * 2.0 - 1.0; }
-inline float fromLive (double v) noexcept { return (float) std::clamp ((v + 1.0) * 0.5, 0.0, 1.0); }
+// Live's Clip Gain law (round 190gu renders, fitted in round 190gx; 31 measured values, every one within 0.01 dB):
+// value L (−1…1) → dB = 20·(L − 1) from 1 down to −0.2 (gain 10^(L−1)); below, the larger of −50·L² + L − 21.8 (a
+// quadratic that joins at −0.2: −24 dB, and holds to −0.94: −66.92 dB) and the line through Live's two lowest steps
+// (−0.98: −69.4 dB, −0.96: −68.37 dB), which takes over at about −0.95; −1 is silence.
+namespace livelaw
+{
+inline constexpr double quadA = -50.0, quadB = 1.0, quadC = -21.8; // dB = quadA·L² + quadB·L + quadC (−0.95 … −0.2)
+inline constexpr double lineAt = -0.98, lineDb = -69.4, lineSlope = 51.35;   // the floor line through (−0.98, −69.4), (−0.96, −68.373)
+inline constexpr double kneeHigh = -0.2;
+}
+inline double liveGainDb (double L) noexcept
+{
+    using namespace livelaw;
+    if (! (L > -1.0))
+        return -std::numeric_limits<double>::infinity();
+    L = std::min (L, 1.0);
+    if (L >= kneeHigh)
+        return 20.0 * (L - 1.0);
+    return std::max (quadA * L * L + quadB * L + quadC, lineDb + lineSlope * (L - lineAt));
+}
+inline double liveGain (double L) noexcept { return L > -1.0 ? std::pow (10.0, liveGainDb (L) / 20.0) : 0.0; }
+// The inverse: the Live value of a gain (0 … 1; above unity → 1, at or below the floor line's end, about −70.4 dB → −1).
+// dB is the max of two rising curves below −0.2, so L is the smaller of their two inverses.
+inline double liveValueOfGain (double gain) noexcept
+{
+    using namespace livelaw;
+    if (! (gain > 0.0))
+        return -1.0;
+    const auto db = 20.0 * std::log10 (gain);
+    if (db >= -24.0)
+        return std::min (1.0, 1.0 + db / 20.0);
+    const auto disc = quadB * quadB - 4.0 * quadA * (quadC - db); // (quadA < 0: the root below the vertex)
+    const auto onQuad = disc >= 0.0 ? (-quadB + std::sqrt (disc)) / (2.0 * quadA) : -1.0;
+    const auto onLine = lineAt + (db - lineDb) / lineSlope;
+    return std::clamp (std::min (onQuad, onLine), -1.0, kneeHigh);
+}
+// LYNX's volume lane value (0…1 on the Levels-adjustment law, gainOf) ↔ Live's Clip Gain value: the same gain
+inline double volumeToLive (float v) noexcept { return v >= 1.0f ? 1.0 : liveValueOfGain ((double) gainOf (v)); }
+inline float volumeFromLive (double L) noexcept
+{
+    if (L >= 1.0)
+        return 1.0f;
+    const auto g = liveGain (L);
+    return (float) std::clamp (std::log (10.0 * g + 1.0) / std::log (11.0), 0.0, 1.0);
+}
+// The pan lane: LYNX's offset (2v − 1) is Live's Track Panning value, and both use the same constant-power law with
+// +3 dB at the sides (voicePan: L = √2·cos((p+1)·π/4), R = √2·sin((p+1)·π/4); Live 190gu: ±1 → +3.01 dB / −100 dB)
+inline double panToLive (float v) noexcept { return (double) std::clamp (v, 0.0f, 1.0f) * 2.0 - 1.0; }
+inline float panFromLive (double L) noexcept { return (float) std::clamp ((L + 1.0) * 0.5, 0.0, 1.0); }
+inline double toLive (std::uint8_t lane, float v) noexcept { return lane == panLane ? panToLive (v) : volumeToLive (v); }
+inline float fromLive (std::uint8_t lane, double L) noexcept { return lane == panLane ? panFromLive (L) : volumeFromLive (L); }
+
+// The two programs interpolate a lane in different units (Live: straight in its value; LYNX: straight in the lane's
+// 0…1 value), so a volume ramp is cut into pieces until the two agree within `tolDb` at every piece's middle (gains
+// under −60 dB are not compared). `inner (t0, t1, f)` is the source value at fraction f of the segment in the source's
+// units, `mapped` turns it into the target's, `dbOfTarget` / `dbOfSource` give the gain of each. The pieces' ends after
+// t0 are handed to `add (t, targetValue)` in order (t1 included).
+template <typename SourceAt, typename Map, typename DbT, typename DbS, typename Add>
+void subdivide (double t0, double t1, const SourceAt& sourceAt, const Map& mapped, const DbT& dbOfTarget, const DbS& dbOfSource, const Add& add,
+                double tolDb = 0.05, int depth = 0)
+{
+    const auto a = mapped (sourceAt (t0)), b = mapped (sourceAt (t1));
+    const auto tm = 0.5 * (t0 + t1);
+    double off = 0.0;
+    for (const auto f : { 0.25, 0.5, 0.75 })
+    {
+        const auto truth = dbOfSource (sourceAt (t0 + (t1 - t0) * f)), straight = dbOfTarget (a + (b - a) * f);
+        off = std::max (off, std::abs (std::max (truth, -66.0) - std::max (straight, -66.0)));
+    }
+    if (depth < 12 && t1 > t0 && off > tolDb)
+    {
+        subdivide (t0, tm, sourceAt, mapped, dbOfTarget, dbOfSource, add, tolDb, depth + 1);
+        subdivide (tm, t1, sourceAt, mapped, dbOfTarget, dbOfSource, add, tolDb, depth + 1);
+        return;
+    }
+    add (t1, b);
+}
+inline double laneDb (float v) noexcept
+{
+    const auto g = gainOf (v);
+    return g > 0.0f ? 20.0 * std::log10 ((double) g) : -200.0;
+}
+inline double liveDb (double L) noexcept { return L > -1.0 ? liveGainDb (L) : -200.0; }
 
 // ---- FL (.flp): FL's Automate › Volume / Panning over the clip ------------------------------------------------------
 // A lane's points between the clip's start and end, moved to the clip's own start (0 = the clip's first tick), with a

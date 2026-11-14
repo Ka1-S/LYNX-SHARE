@@ -613,3 +613,13 @@ Before → after per case (the rack against the engine, same stimuli, same metri
 - An audio clip's clip envelopes: `AudioClip/Envelopes/Envelopes/ClipEnvelope{EnvelopeTarget/PointeeId, Automation/Events/FloatEvent{Time, Value}, LoopSlot, ScrollerTimePreserver}` **[SCHEMA, DATA]**, times in clip beats (the clip's `LoopStart` coordinates), the first event "before the song" (−63072000).
 - Clip Gain → the track's `DeviceChain/MainSequencer/VolumeModulationTarget`; Track Panning modulation → `DeviceChain/Mixer/Pan/ModulationTarget` **[SCHEMA, DATA: the 12 Suite demo set's vocal clips]**. Values −1…1 (−1 where those clips are silent) **[DATA]**.
 - LYNX: the clip's own `ClipEnvelope` volume / pan lanes (core/ClipEnvelope.h), 0…1 ↔ −1…1 linear (the ends are certain; the law between them needs a live check). Export: the PointeeId is a placeholder until the ids are renumbered, then the track's own target ids; a curved LYNX segment is written as 8 straight ones. Import: other clip envelopes (devices, track volume modulation, transposition, sample offset) are listed; Live 11+ curve controls become straight segments (listed).
+- **Round 190gx (Live 12.4 renders of round 190gu, 1 kHz sine, the same in Re-Pitch and Complex):** Live plays clip
+  envelopes **only on warped clips** (an unwarped clip renders at unity and its Clip View has no Envelopes tab) — the
+  import leaves an unwarped clip's envelopes out (listed); the export always writes warped clips. **Clip Gain law**
+  (value L → dB): 20·(L − 1) from 1 down to −0.2; below it the larger of −50·L² + L − 21.8 and the line through
+  (−0.98, −69.4 dB) and (−0.96, −68.37 dB) (it takes over near −0.95); −1 silent; never above 0 dB. All 28 measured
+  values within 0.01 dB (`clipenv::liveGainDb`). LYNX's volume lane keeps its own gain law (FL's Levels adjustment), so
+  the values are converted through the gain both ways (`clipenv::toLive / fromLive`), and because the two programs'
+  ramps are straight in different units a volume ramp is cut into pieces both ways until the gain agrees within 0.05 dB
+  (above −60 dB). **Track Panning law:** constant power with +3 dB at the sides, L = √2·cos((p+1)·π/4),
+  R = √2·sin((p+1)·π/4) — the same as LYNX's voice pan, so the pan lane maps one to one.

@@ -40,6 +40,10 @@ const ModeItem flModes[] = { { TR_NOOP ("General"), (int) StretchMethod::general
 // keeps two of Live's audio clip envelopes: Clip › Gain and Mixer › Track Panning (core/ClipEnvelope.h; the .als maps
 // them both ways). Live's editing [MANUAL]: a click on the line adds a breakpoint, a click on a breakpoint deletes it, a
 // drag moves it, Alt + drag on a segment bends it. Clip time across the clip's content (its start to its end).
+// Round 190gx [LIVE 190gu clipenv/live-clipview-envelopes-*.png]: the Device and Control choosers sit at the bottom left
+// under the envelope, and the Gain axis is straight in Live's own Clip Gain value (its −1…1 staircase draws as even
+// steps), so a lane's height reads as in Live; the value under the line is filled. Live's "Linked" loop switch is left
+// out (LYNX's envelopes always follow the clip's loop).
 class ClipEnvelopeView final : public juce::Component, private juce::ChangeListener
 {
 public:
@@ -59,7 +63,7 @@ public:
 
     void resized() override
     {
-        auto bar = getLocalBounds().removeFromTop (barHeight).reduced (4, 3);
+        auto bar = getLocalBounds().removeFromBottom (barHeight).reduced (4, 3);
         device.setBounds (bar.removeFromLeft (110));
         bar.removeFromLeft (4);
         control.setBounds (bar.removeFromLeft (130));
@@ -69,7 +73,7 @@ public:
         using namespace theme;
         g.fillAll (colour::bg0);
         g.setColour (colour::bg1);
-        g.fillRect (getLocalBounds().removeFromTop (barHeight));
+        g.fillRect (getLocalBounds().removeFromBottom (barHeight));
         const auto* c = clip();
         if (c == nullptr)
             return;
@@ -133,6 +137,14 @@ public:
                 automationLineTo (curve, (float) x - 2.0f, lastY, (float) x, y, [&] { return yAt (x - 1); });
             lastY = y;
         }
+        {
+            auto fill = curve; // (the area under the line, faint, as Live fills it)
+            fill.lineTo (area.getRight(), area.getBottom());
+            fill.lineTo (area.getX(), area.getBottom());
+            fill.closeSubPath();
+            g.setColour (colour::accent.withAlpha (0.16f));
+            g.fillPath (fill);
+        }
         g.setColour (colour::accent);
         g.strokePath (curve, juce::PathStrokeType (1.5f));
         for (std::size_t k = 0; k < points.size(); ++k)
@@ -148,7 +160,7 @@ public:
         {
             g.setColour (colour::textPrimary);
             g.setFont (font (type::small));
-            g.drawText (readout, getLocalBounds().removeFromTop (barHeight).reduced (8, 0), juce::Justification::centredRight, false);
+            g.drawText (readout, getLocalBounds().removeFromBottom (barHeight).reduced (8, 0), juce::Justification::centredRight, false);
         }
     }
 
@@ -283,7 +295,7 @@ private:
         });
         repaint();
     }
-    juce::Rectangle<float> body() const { return getLocalBounds().withTrimmedTop (barHeight).toFloat().reduced (8.0f, 10.0f); }
+    juce::Rectangle<float> body() const { return getLocalBounds().withTrimmedBottom (barHeight).toFloat().reduced (8.0f, 10.0f); }
     double tickToX (const Clip& c, double tick) const
     {
         const auto a = body();
@@ -294,8 +306,19 @@ private:
         const auto a = body();
         return (double) c.offset + (double) (x - a.getX()) / juce::jmax (1.0f, a.getWidth()) * (double) juce::jmax<std::int64_t> (1, c.length);
     }
-    float valueToY (float v) const { const auto a = body(); return a.getBottom() - juce::jlimit (0.0f, 1.0f, v) * a.getHeight(); }
-    float yToValue (float y) const { const auto a = body(); return juce::jlimit (0.0f, 1.0f, (a.getBottom() - y) / juce::jmax (1.0f, a.getHeight())); }
+    // the height of a lane value: the pan straight, the gain straight in Live's Clip Gain value (clipenv::toLive)
+    float valueToY (float v) const
+    {
+        const auto a = body();
+        const auto h = (float) (clipenv::toLive (lane, juce::jlimit (0.0f, 1.0f, v)) + 1.0) * 0.5f;
+        return a.getBottom() - juce::jlimit (0.0f, 1.0f, h) * a.getHeight();
+    }
+    float yToValue (float y) const
+    {
+        const auto a = body();
+        const auto h = juce::jlimit (0.0f, 1.0f, (a.getBottom() - y) / juce::jmax (1.0f, a.getHeight()));
+        return clipenv::fromLive (lane, (double) h * 2.0 - 1.0);
+    }
     float valueNow (const Clip&, double tick) const
     {
         const auto& list = points();
@@ -344,6 +367,101 @@ private:
     juce::String readout;
 };
 
+// Beats' Transient Loop Mode chooser as Live draws it [LIVE 190gu warp/live-beats-loop-mode-menu.png]: a small box with
+// the mode's icon only (Off: an arrow to a bar, Forward: two arrows, Back-and-Forth: an arrow each way) and a down
+// arrow; its list shows the three icons (LYNX adds each name beside its icon, and the box's tooltip names the mode).
+class LoopModeChooser final : public juce::Component, public juce::SettableTooltipClient
+{
+public:
+    std::function<void (int)> onChoose;
+    void setMode (int m)
+    {
+        if (m != mode)
+        {
+            mode = m;
+            setTooltip (tr ("Transient Loop Mode: what fills the gap after each piece when the audio is slowed down") + " ("
+                        + tr (warpmodes::loopNames()[(std::size_t) juce::jlimit (0, 2, mode)]) + ")");
+            repaint();
+        }
+    }
+    int getMode() const noexcept { return mode; }
+
+    static void drawIcon (juce::Graphics& g, juce::Rectangle<float> r, int which, juce::Colour c)
+    {
+        g.setColour (c);
+        const auto stroke = juce::PathStrokeType (1.3f);
+        const auto arrow = [&] (float y, bool right, float x0, float x1) {
+            juce::Path p;
+            p.startNewSubPath (x0, y);
+            p.lineTo (x1, y);
+            const auto tip = right ? x1 : x0, back = right ? -3.0f : 3.0f;
+            p.startNewSubPath (tip + back, y - 3.0f);
+            p.lineTo (tip, y);
+            p.lineTo (tip + back, y + 3.0f);
+            g.strokePath (p, stroke);
+        };
+        const auto cy = r.getCentreY(), x0 = r.getX() + 1.0f, x1 = r.getRight() - 1.0f;
+        if (which == 0)
+        {
+            arrow (cy, true, x0, x1 - 3.0f);
+            g.drawLine (x1, cy - 4.0f, x1, cy + 4.0f, 1.3f);
+        }
+        else if (which == 1)
+        {
+            arrow (cy - 2.5f, true, x0, x1);
+            arrow (cy + 2.5f, true, x0, x1);
+        }
+        else
+        {
+            arrow (cy - 2.5f, true, x0, x1);
+            arrow (cy + 2.5f, false, x0, x1);
+        }
+    }
+    void paint (juce::Graphics& g) override
+    {
+        using namespace theme;
+        const auto r = getLocalBounds().toFloat().reduced (0.5f);
+        g.setColour (colour::bg2);
+        g.fillRoundedRectangle (r, 3.0f);
+        g.setColour (colour::border);
+        g.drawRoundedRectangle (r, 3.0f, 1.0f);
+        const auto icon = r.withWidth (juce::jmin (22.0f, r.getWidth() - 14.0f)).withSizeKeepingCentre (juce::jmin (18.0f, r.getWidth() - 16.0f), 10.0f).translated (4.0f, 0.0f);
+        drawIcon (g, icon, mode, isEnabled() ? colour::textPrimary : colour::textSecondary);
+        juce::Path tri;
+        const auto tx = r.getRight() - 9.0f, ty = r.getCentreY();
+        tri.addTriangle (tx - 3.5f, ty - 2.0f, tx + 3.5f, ty - 2.0f, tx, ty + 2.5f);
+        g.setColour (colour::textSecondary);
+        g.fillPath (tri);
+    }
+    void mouseDown (const juce::MouseEvent&) override
+    {
+        juce::PopupMenu menu;
+        for (int k = 0; k < 3; ++k)
+        {
+            auto image = std::make_unique<juce::DrawableImage>();
+            juce::Image img (juce::Image::ARGB, 22, 12, true);
+            {
+                juce::Graphics ig (img);
+                drawIcon (ig, juce::Rectangle<float> (2.0f, 1.0f, 18.0f, 10.0f), k, theme::colour::textPrimary);
+            }
+            image->setImage (img);
+            juce::PopupMenu::Item item (tr (warpmodes::loopNames()[(std::size_t) k]));
+            item.itemID = k + 1;
+            item.isTicked = k == mode;
+            item.image = std::move (image);
+            menu.addItem (std::move (item));
+        }
+        juce::Component::SafePointer<LoopModeChooser> safe (this);
+        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this), [safe] (int id) {
+            if (safe != nullptr && id > 0 && safe->onChoose)
+                safe->onChoose (id - 1);
+        });
+    }
+
+private:
+    int mode = -1;
+};
+
 class ClipAudioPanel final : public juce::Component, private juce::ChangeListener
 {
 public:
@@ -365,6 +483,8 @@ public:
         // the warp mode: Live's names first
         for (const auto& m : liveModes)
             mode.addItem (tr (m.name), m.method + 2);
+        if constexpr (warpmodes::complexProPlays) // (Live's last mode; its chooser then reads "Pro")
+            mode.addItem (tr ("Complex Pro"), complexProId);
         mode.addSeparator();
         for (const auto& m : flModes)
             mode.addItem (tr (m.name), m.method + 2);
@@ -372,6 +492,11 @@ public:
         mode.onChange = [this] {
             if (refreshing)
                 return;
+            if (mode.getSelectedId() == complexProId)
+            {
+                editMode ([] (Song& s, int c) { warpmodes::setComplexPro (s, c); });
+                return;
+            }
             const auto id = mode.getSelectedId() - 2;
             editMode ([id] (Song& s, int c) { warpmodes::setMode (s, c, id); });
         };
@@ -385,12 +510,9 @@ public:
             if (! refreshing)
                 editMode ([v = preserve.getSelectedId() - 1] (Song& s, int c) { warpmodes::setPreserve (s, c, v); });
         };
-        for (int k = 0; k < (int) warpmodes::loopNames().size(); ++k)
-            loopMode.addItem (tr (warpmodes::loopNames()[(std::size_t) k]), k + 1);
-        loopMode.setTooltip (tr ("Transient Loop Mode: what fills the gap after each piece when the audio is slowed down"));
-        loopMode.onChange = [this] {
+        loopMode.onChoose = [this] (int v) {
             if (! refreshing)
-                editMode ([v = loopMode.getSelectedId() - 1] (Song& s, int c) { warpmodes::setLoopMode (s, c, v); });
+                editMode ([v] (Song& s, int c) { warpmodes::setLoopMode (s, c, v); });
         };
         {
             ui::ValueSpec spec;
@@ -405,6 +527,27 @@ public:
                 editMode ([v] (Song& s, int c) { warpmodes::setEnvelope (s, c, v); });
             });
         }
+        // Texture › Flux, Complex Pro › Formants and Envelope (round 190gx; shown only when the engine plays them)
+        {
+            const auto box = [this] (const juce::String& name, double lo, double hi, double def, int decimals, auto get, auto set) {
+                ui::ValueSpec spec;
+                spec.name = name;
+                spec.minimum = lo;
+                spec.maximum = hi;
+                spec.interval = decimals > 0 ? 0.01 : 1.0;
+                spec.pixelsForRange = 200.0;
+                spec.defaultValue = def;
+                spec.toText = [decimals] (double v) { return juce::String (v, decimals); };
+                return std::make_unique<ui::NumBox> (spec, [this, get] { return (double) get (sampler().warpModes); },
+                                                     [this, set] (double v) { editMode ([v, set] (Song& s, int c) { set (s, c, v); }); });
+            };
+            flux = box (tr ("Flux: how much the grains' timing varies at random"), 0.0, 100.0, 25.0, 2,
+                        [] (const WarpModeSettings& w) { return w.textureFlux; }, &warpmodes::setFlux);
+            proFormants = box (tr ("Formants: how much of the sound's formants are kept when it is transposed"), 0.0, 100.0, 100.0, 2,
+                              [] (const WarpModeSettings& w) { return w.proFormants; }, &warpmodes::setProFormants);
+            proEnvelope = box (tr ("Envelope: the size of the spectral envelope Complex Pro keeps"), 8.0, 256.0, 128.0, 0,
+                               [] (const WarpModeSettings& w) { return w.proEnvelope; }, &warpmodes::setProEnvelope);
+        }
         // Grain Size: one box per mode, each in Live's range with Live's default (Tones 12…100, 30; Texture 2…263, 65)
         for (auto texture : { false, true })
         {
@@ -412,10 +555,10 @@ public:
             spec.name = tr ("Grain Size: the length of the pieces the audio is stretched in");
             spec.minimum = texture ? WarpModeSettings::textureGrainMin : WarpModeSettings::tonesGrainMin;
             spec.maximum = texture ? WarpModeSettings::textureGrainMax : WarpModeSettings::tonesGrainMax;
-            spec.interval = 1.0;
+            spec.interval = 0.01;
             spec.pixelsForRange = texture ? 400.0 : 200.0;
             spec.defaultValue = texture ? WarpModeSettings::defaultTextureGrain : WarpModeSettings::defaultTonesGrain;
-            spec.toText = [] (double v) { return juce::String (juce::roundToInt (v)); };
+            spec.toText = [] (double v) { return juce::String (v, 2); }; // (Live: "30.00")
             (texture ? grainTexture : grainTones) = std::make_unique<ui::NumBox> (spec, [this, texture] {
                 const auto& w = sampler().warpModes;
                 return (double) (texture ? w.textureGrain : w.tonesGrain);
@@ -500,7 +643,8 @@ public:
         }
         for (auto* c : std::initializer_list<juce::Component*> { &warp, &mode, bpm.get(), &halve, &twice, &gain, &pitchKnob, &semitones, &cents, &reverse, &edit, &fade })
             addAndMakeVisible (*c);
-        for (auto* c : std::initializer_list<juce::Component*> { &preserve, &loopMode, envelope.get(), grainTones.get(), grainTexture.get() })
+        for (auto* c : std::initializer_list<juce::Component*> { &preserve, &loopMode, envelope.get(), grainTones.get(), grainTexture.get(), flux.get(),
+                                                                 proFormants.get(), proEnvelope.get() })
             addChildComponent (*c);
 
         editor = makeAudioEditorPanel (engine, channel, -1, true);
@@ -529,10 +673,18 @@ public:
         engine.addChangeListener (this);
         refresh();
     }
-    // the tab shown (kept for the next clip, as the pattern clips' Notes | Envelopes)
+    // the tab shown (kept for the next clip, as the pattern clips' Notes | Envelopes). Round 190gx: Live shows the
+    // Envelopes tab only while the clip is warped [LIVE 190gu: an unwarped clip's Clip View has the Sample tab alone, and
+    // Live does not play its envelopes], so an unwarped clip shows its sample.
     void showEnvelopes (bool on)
     {
         envelopesShown = on;
+        applyTab();
+    }
+    void applyTab()
+    {
+        const auto on = envelopesShown && envelopesAllowed;
+        envelopesTab.setVisible (envelopesAllowed);
         sampleTab.setToggleState (! on, juce::dontSendNotification);
         envelopesTab.setToggleState (on, juce::dontSendNotification);
         envelopes->setVisible (on);
@@ -555,10 +707,18 @@ public:
         g.drawText (tr ("Audio"), column.withHeight (18).reduced (8, 0), juce::Justification::centredLeft);
         g.setFont (font (type::caption));
         g.drawText (tr ("BPM"), bpmLabel, juce::Justification::centredLeft);
+        // the mode's labels over their boxes, as Live writes them (Beats: Preserve; Tones / Texture: Grain Size, Flux;
+        // Complex Pro: Formants, Envelope)
+        if (preserve.isVisible())
+            g.drawText (tr ("Preserve"), modeLabel1, juce::Justification::bottomLeft);
         if (grainTones->isVisible() || grainTexture->isVisible())
-            g.drawText (tr ("Grain Size"), grainLabel, juce::Justification::centredLeft);
-        if (envelope->isVisible())
-            g.drawText (tr ("Envelope"), envelopeLabel, juce::Justification::centredLeft);
+            g.drawText (tr ("Grain Size"), modeLabel1, juce::Justification::bottomLeft);
+        if (proFormants->isVisible())
+            g.drawText (tr ("Formants"), modeLabel1, juce::Justification::bottomLeft);
+        if (flux->isVisible())
+            g.drawText (tr ("Flux"), modeLabel2, juce::Justification::bottomLeft);
+        if (proEnvelope->isVisible())
+            g.drawText (tr ("Envelope"), modeLabel2, juce::Justification::bottomLeft);
         g.drawText (tr ("Gain"), gainLabel, juce::Justification::centred);
         g.drawText (tr ("Pitch"), pitchLabel, juce::Justification::centred);
         g.drawText ("st", stLabel, juce::Justification::centred);
@@ -598,20 +758,24 @@ public:
         warp.setBounds (left.removeFromTop (20).withWidth (left.getWidth() / 2));
         left.removeFromTop (4);
         mode.setBounds (left.removeFromTop (22));
-        // the mode's own settings under it (Beats: Preserve, then the loop mode and the envelope; Tones / Texture: Grain Size)
+        // the mode's own settings under it, placed as Live's Audio box [LIVE 190gu warp/live-audio-box-4-modes.png]: a label
+        // row, then its box, full width (Beats: Preserve › its chooser, then the loop-mode icon chooser and the Transient
+        // Envelope box side by side; Tones: Grain Size; Texture: Grain Size, Flux; Complex Pro: Formants, Envelope)
         {
-            left.removeFromTop (4);
+            modeLabel1 = left.removeFromTop (16);
             auto row1 = left.removeFromTop (20);
             preserve.setBounds (row1);
-            grainLabel = row1.removeFromLeft (row1.getWidth() / 2);
             grainTones->setBounds (row1);
             grainTexture->setBounds (row1);
-            left.removeFromTop (4);
-            loopMode.setBounds (left.removeFromTop (20));
-            left.removeFromTop (4);
-            auto row3 = left.removeFromTop (20); // (Envelope on its own row, like Grain Size: its label fits)
-            envelopeLabel = row3.removeFromLeft (row3.getWidth() / 2);
-            envelope->setBounds (row3);
+            proFormants->setBounds (row1);
+            left.removeFromTop (3);
+            auto row2 = left.removeFromTop (20);
+            loopMode.setBounds (row2.withWidth (row2.getWidth() / 2 - 4));
+            envelope->setBounds (row2.withTrimmedLeft (row2.getWidth() / 2 + 2));
+            modeLabel2 = row2;
+            auto row3 = left.removeFromTop (20);
+            flux->setBounds (row3);
+            proEnvelope->setBounds (row3);
         }
         fade.setBounds (left.removeFromBottom (18).withWidth (left.getWidth() / 2 - 2));
         left.removeFromBottom (4);
@@ -702,7 +866,7 @@ private:
             {
                 setAudioEditorGridClip (*editor, track, scene);
                 addChildComponent (*editor);
-                editor->setVisible (! envelopesShown);
+                editor->setVisible (! (envelopesShown && envelopesAllowed));
             }
             resized();
             refresh();
@@ -724,6 +888,11 @@ private:
         mode.setSelectedId (s.keepPitch ? (int) s.stretchMethod + 2 : 1, n);
         const auto warped = clipsample::isWarped (s);
         warp.setToggleState (warped, n);
+        if (warped != envelopesAllowed)
+        {
+            envelopesAllowed = warped;
+            applyTab();
+        }
         warp.setEnabled (fileSeconds > 0.0);
         for (auto* w : std::initializer_list<juce::Component*> { bpm.get(), &halve, &twice })
             w->setEnabled (warped && fileSeconds > 0.0);
@@ -738,13 +907,22 @@ private:
         const auto beats = warped && s.keepPitch && s.stretchMethod == StretchMethod::beats;
         const auto tones = warped && s.keepPitch && s.stretchMethod == StretchMethod::tones;
         const auto texture = warped && s.keepPitch && s.stretchMethod == StretchMethod::texture;
+        const auto pro = warpmodes::complexProPlays && warped && s.keepPitch && s.stretchMethod == StretchMethod::complex && s.warpModes.complexPro;
+        if (pro)
+            mode.setSelectedId (complexProId, n);
+        flux->setVisible (texture && warpmodes::textureFluxPlays);
+        proFormants->setVisible (pro);
+        proEnvelope->setVisible (pro);
+        flux->repaint();
+        proFormants->repaint();
+        proEnvelope->repaint();
         preserve.setVisible (beats);
         loopMode.setVisible (beats);
         envelope->setVisible (beats);
         grainTones->setVisible (tones);
         grainTexture->setVisible (texture);
         preserve.setSelectedId ((int) s.warpModes.beatsPreserve + 1, n);
-        loopMode.setSelectedId ((int) s.warpModes.beatsLoop + 1, n);
+        loopMode.setMode ((int) s.warpModes.beatsLoop);
         envelope->repaint();
         grainTones->repaint();
         grainTexture->repaint();
@@ -784,16 +962,19 @@ private:
     AudioEngine& engine;
     int track, scene, channel;
     juce::TextButton warp, halve, twice, reverse, edit, fade;
-    juce::ComboBox mode, preserve, loopMode;
-    std::unique_ptr<ui::NumBox> bpm, envelope, grainTones, grainTexture;
+    juce::ComboBox mode, preserve;
+    LoopModeChooser loopMode;                      // round 190gx: Live's icon chooser
+    std::unique_ptr<ui::NumBox> bpm, envelope, grainTones, grainTexture, flux, proFormants, proEnvelope;
+    static constexpr int complexProId = 100;       // (the mode chooser's Complex Pro item)
     juce::Slider gain, pitchKnob, semitones, cents;
-    juce::Rectangle<int> grainLabel, envelopeLabel, bpmLabel, gainLabel, pitchLabel, stLabel, ctLabel, titleBar;
+    juce::Rectangle<int> modeLabel1, modeLabel2, bpmLabel, gainLabel, pitchLabel, stLabel, ctLabel, titleBar;
     juce::String titleText;
     double fileSeconds = 0.0;
     std::unique_ptr<juce::Component> editor;
     juce::TextButton sampleTab, envelopesTab;      // round 190gi
     std::unique_ptr<ClipEnvelopeView> envelopes;
     static inline bool envelopesShown = false;     // (not saved)
+    bool envelopesAllowed = true;                  // round 190gx: the clip is warped (Live's Envelopes tab exists)
     bool refreshing = false;
 };
 } // namespace

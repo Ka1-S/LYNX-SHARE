@@ -10139,3 +10139,9 @@ countries: br
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Causa: o processamento chegou perto do limite do buffer ({0}%). Tente um buffer maior ou congele os canais mais pesados."
 # Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
 "Tape speed" = "Velocidade da fita"
+"Flux" = "Flux"
+"Formants" = "Formantes"
+"Complex Pro" = "Complex Pro"
+"Flux: how much the grains' timing varies at random" = "Flux: quanto o tempo dos grãos varia ao acaso"
+"Formants: how much of the sound's formants are kept when it is transposed" = "Formantes: quanto dos formantes do som é mantido ao transpô-lo"
+"Envelope: the size of the spectral envelope Complex Pro keeps" = "Envelope: o tamanho do envelope espectral que o Complex Pro mantém"
