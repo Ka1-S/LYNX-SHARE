@@ -1,4 +1,5 @@
 #include "core/RackRenderer.h"
+#include "core/Dropouts.h"
 #include "core/Rack.h"
 #include "core/MixerOps.h"
 #include "core/FlSettings.h"
@@ -2208,8 +2209,10 @@ std::uint64_t nowNs() noexcept
 // Adds the time since `start` to `slot` when profiling (start = 0: profiling was off when the unit began)
 struct UnitTimer
 {
-    UnitTimer (bool on, std::atomic<std::uint64_t>& s, std::atomic<std::uint64_t>* m = nullptr) noexcept
-        : slot (s), longest (m), start (on ? nowNs() : 0) {}
+    // `blockSlowest` / `unit` (round 190gg): the block's slowest call, for the dropout log (core/Dropouts.h)
+    UnitTimer (bool on, std::atomic<std::uint64_t>& s, std::atomic<std::uint64_t>* m = nullptr, std::atomic<std::uint64_t>* blockSlowest = nullptr,
+               std::uint32_t unitId = 0) noexcept
+        : slot (s), longest (m), slowest (blockSlowest), unit (unitId), start (on ? nowNs() : 0) {}
     ~UnitTimer()
     {
         if (start == 0)
@@ -2223,9 +2226,13 @@ struct UnitTimer
             {
             }
         }
+        if (slowest != nullptr)
+            dropouts::raiseSlowest (*slowest, used, unit);
     }
     std::atomic<std::uint64_t>& slot;
     std::atomic<std::uint64_t>* longest;
+    std::atomic<std::uint64_t>* slowest;
+    std::uint32_t unit;
     std::uint64_t start;
 };
 } // namespace
@@ -2729,7 +2736,8 @@ void RackRenderer::renderChannel (const RackState& state, int i, int n) noexcept
         return;
     }
     channelSilent[(std::size_t) i] = 0;
-    const UnitTimer timer (profiling.load (std::memory_order_relaxed), units->channelNs[(std::size_t) i], &units->channelMaxNs[(std::size_t) i]);
+    const UnitTimer timer (profiling.load (std::memory_order_relaxed), units->channelNs[(std::size_t) i], &units->channelMaxNs[(std::size_t) i],
+                           &units->blockSlowest, dropouts::channelUnit (i));
     std::memset (l, 0, sizeof (float) * (std::size_t) n);
     std::memset (r, 0, sizeof (float) * (std::size_t) n);
     int position = 0;
@@ -3232,7 +3240,8 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         }
 
         const UnitTimer timer (profiling.load (std::memory_order_relaxed), units->effectNs[std::min (key, units->effectNs.size() - 1)],
-                               &units->effectMaxNs[std::min (key, units->effectNs.size() - 1)]);
+                               &units->effectMaxNs[std::min (key, units->effectNs.size() - 1)], &units->blockSlowest,
+                               dropouts::effectUnit (std::min (key, units->effectNs.size() - 1)));
 
         // the hardware insert (round 164d): this piece's device input and output buses (none during an export)
         if (slots[i].kind == EffectKind::hardwareInsert || slots[i].kind == EffectKind::patcher) // (a Patcher hands them to its nodes, round 165c)

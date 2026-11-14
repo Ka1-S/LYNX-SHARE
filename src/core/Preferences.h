@@ -291,6 +291,7 @@ struct PluginRow
     PluginStatus status = PluginStatus::ok;
     bool favourite = false;
     std::string bits = {}; // FL's Bits column (Windows, round 176a): "64", "32" or "32+64"
+    bool separate = false; // round 190gg (LYNX-own): on the "always run in a separate process" list
 };
 
 enum class PluginFilter { all, instruments, effects, favourites, failed };

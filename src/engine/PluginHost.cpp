@@ -243,6 +243,117 @@ std::uint32_t runBlock (BlockCall call) noexcept
 }
 } // namespace
 
+// Round 190gg (B4): the adapters by the plugin they hold, for crashes in calls the UI makes (callPluginFromUi) and on the
+// plugin's own threads. Adapters register as they are made and leave as they go (never on the audio thread).
+namespace
+{
+struct AdapterEntry
+{
+    std::atomic<bool>* crashed = nullptr;
+    std::string name, file;
+};
+std::mutex adaptersLock;
+std::map<const juce::AudioProcessor*, AdapterEntry>& adapters()
+{
+    static std::map<const juce::AudioProcessor*, AdapterEntry> map;
+    return map;
+}
+std::set<const juce::AudioProcessor*>& bareCrashed() // plugins without an adapter whose UI call crashed
+{
+    static std::set<const juce::AudioProcessor*> set;
+    return set;
+}
+
+std::string moduleFileOf (const juce::AudioPluginInstance& plugin)
+{
+    auto file = plugin.getPluginDescription().fileOrIdentifier.toStdString();
+    while (file.size() > 1 && (file.back() == '/' || file.back() == '\\'))
+        file.pop_back();
+    return file;
+}
+
+void registerAdapter (juce::AudioPluginInstance& plugin, std::atomic<bool>& crashed, const std::string& name)
+{
+    const auto file = moduleFileOf (plugin);
+    const std::lock_guard<std::mutex> lock (adaptersLock);
+    adapters()[&plugin] = { &crashed, name, file };
+}
+
+void forgetAdapter (const juce::AudioPluginInstance* plugin)
+{
+    const std::lock_guard<std::mutex> lock (adaptersLock);
+    adapters().erase (plugin);
+}
+} // namespace
+
+bool pluginInstanceDown (const juce::AudioPluginInstance& plugin)
+{
+    if (isSandboxedPluginDead (plugin))
+        return true;
+    const std::lock_guard<std::mutex> lock (adaptersLock);
+    if (bareCrashed().count (&plugin) > 0)
+        return true;
+    const auto it = adapters().find (&plugin);
+    return it != adapters().end() && it->second.crashed->load();
+}
+
+bool callPluginFromUi (juce::AudioPluginInstance& plugin, const char* what, const std::function<void()>& call)
+{
+    if (pluginInstanceDown (plugin))
+        return false;
+    const auto code = crashguard::run ([&call] { call(); });
+    if (code == 0)
+        return true;
+    std::string name;
+    {
+        const std::lock_guard<std::mutex> lock (adaptersLock);
+        if (const auto it = adapters().find (&plugin); it != adapters().end())
+        {
+            it->second.crashed->store (true);
+            name = it->second.name;
+        }
+        else
+            bareCrashed().insert (&plugin);
+    }
+    if (name.empty())
+        name = plugin.getPluginDescription().name.toStdString(); // (JUCE's copy of the scan's description)
+    recordCrash (name, code);
+    crashguard::note ("plugin " + name + " crashed while " + what + " (" + crashguard::describe (code) + "): switched off");
+    return false;
+}
+
+int switchOffPluginsOfThreadFaults()
+{
+    static int seen = 0;
+    const auto total = crashguard::pluginThreadFaultCount();
+    if (total == seen)
+        return 0;
+    const auto faults = crashguard::pluginThreadFaults();
+    const auto fresh = std::min<int> (total - seen, (int) faults.size());
+    seen = total;
+    int switched = 0;
+    for (auto f = faults.end() - fresh; f != faults.end(); ++f)
+    {
+        std::vector<std::string> names;
+        {
+            const std::lock_guard<std::mutex> lock (adaptersLock);
+            for (auto& [plugin, entry] : adapters())
+                if (entry.file == f->module && ! entry.crashed->exchange (true))
+                {
+                    names.push_back (entry.name);
+                    ++switched;
+                }
+        }
+        crashguard::note ("a thread of " + f->module + " crashed (" + crashguard::describe (f->code) + " at " + f->where + "): "
+                          + std::to_string (names.size()) + " instance(s) switched off");
+        for (const auto& n : names)
+            recordCrash (n, f->code);
+        if (names.empty()) // (no instance left: still said, under the module's name)
+            recordCrash (juce::File (juce::String::fromUTF8 (f->module.c_str())).getFileNameWithoutExtension().toStdString(), f->code);
+    }
+    return switched;
+}
+
 int pluginCrashCount() noexcept
 {
     return crashCount.load (std::memory_order_acquire);
@@ -332,6 +443,7 @@ PluginInstrument::PluginInstrument (std::unique_ptr<juce::AudioPluginInstance> i
         scratch.assign ((std::size_t) blockSize * (std::size_t) channels, 0.0f);
     }
     plugin->setPlayHead (&timelinePlayHead (options.sendLoopPosition));
+    registerAdapter (*plugin, crashed, name); // (round 190gg: crashes in UI calls and on the plugin's own threads)
     producesMidi = plugin->producesMidi(); // only then is what the buffer holds after processing the plugin's output
     // issue #63: a VST3's note ons carry the note's tuning (FL's wrapper); the patched JUCE host asks for it
     const auto format = plugin->getPluginDescription().pluginFormatName;
@@ -405,6 +517,7 @@ int PluginInstrument::takeMidiOutput (MidiOutNote* out, int max) noexcept
 
 PluginInstrument::~PluginInstrument()
 {
+    forgetAdapter (plugin.get());
     // a plugin that crashed is not called again, not even to release it (its memory is left as it is)
     if (crashed.load())
         (void) plugin.release();
@@ -842,6 +955,7 @@ PluginEffect::PluginEffect (std::unique_ptr<juce::AudioPluginInstance> instance,
     }
     options = o;
     plugin->setPlayHead (&timelinePlayHead (options.sendLoopPosition));
+    registerAdapter (*plugin, crashed, name); // (round 190gg: crashes in UI calls and on the plugin's own threads)
 }
 
 void PluginEffect::setRenderMode (bool offline)
@@ -861,6 +975,7 @@ void PluginEffect::resetForExport()
 
 PluginEffect::~PluginEffect()
 {
+    forgetAdapter (plugin.get());
     if (crashed.load())
         (void) plugin.release();
     else
@@ -3003,6 +3118,8 @@ std::unique_ptr<juce::AudioPluginInstance> PluginHost::createInstance (const Plu
             *error = message;
         return nullptr;
     }
+    // round 190gg (B4): a fault on one of this plugin's own threads switches it off instead of ending LYNX (Linux / macOS)
+    crashguard::watchPluginModule (description->fileOrIdentifier.toStdString());
 
     preparePlugin (*instance, sampleRate, preparedBlock);
 

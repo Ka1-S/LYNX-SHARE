@@ -25,9 +25,9 @@
 //   - finding out whose fault it is runs in the signal handler (dladdr, the unwinder): not async-signal-safe by the
 //     letter of POSIX; a fault there is passed on to the crash handler (SA_NODEFER), never caught;
 //   - not caught: aborts (SIGABRT: the C library's heap checks, assertions, Rust's panic=abort), stack overflows
-//     (no alternate stack on the audio thread), faults on the plugin's own threads, faults inside its editor's event
-//     handling (see the window guard below). "Run in a separate process" (engine/PluginSandbox.h) is the complete
-//     protection: there the plugin dies alone.
+//     (no alternate stack on the audio thread), faults inside its editor's event handling (see the window guard
+//     below). Faults on the plugin's own threads: see watchPluginModule (round 190gg). "Run in a separate process"
+//     (engine/PluginSandbox.h) is the complete protection: there the plugin dies alone.
 //
 // A caught crash leaves the plugin in an unknown state: the caller must never call that instance again (PluginEffect /
 // PluginInstrument switch to bypass / silence and report it, engine/PluginHost.h).
@@ -35,6 +35,7 @@
 #include <cstdint>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 namespace lynx::crashguard
 {
@@ -49,6 +50,32 @@ std::uint32_t run (Fn&& fn) noexcept
 }
 // This build catches a plugin's faults in call() (Windows SEH; Linux / macOS on x86-64 / ARM64 signals)
 bool pluginFaultsCaught() noexcept;
+
+// Round 190gg (B4): faults on a hosted plugin's OWN threads (Linux / macOS on x86-64 / ARM64; the app only, not the
+// exported plugins' runtime; nothing on Windows). A thread the plugin started (its GUI renderer, a disk streamer, a
+// licence check) runs no LYNX call, so call() cannot catch its fault. The handler of call() now also looks at a fault
+// outside every guarded call: when, from the faulting instruction to the thread's first frame (which the walk must
+// reach: the C library's thread start), no frame is LYNX's executable, and the first frame that is not the system's
+// runtime belongs to a module given to watchPluginModule (the plugin's file, or a file in its bundle folder), the
+// fault is noted (pluginThreadFaults) and that thread is parked for good (it waits with every signal blocked; whatever
+// it held stays held). The app then switches every instance of that plugin off (engine/PluginHost.h,
+// switchOffPluginsOfThreadFaults), as after a crash inside a call. Anything else goes to the crash handler as before:
+// a fault on a LYNX thread (even inside a plugin's code it called), on a thread whose frames cannot be walked to its
+// start, in a module nobody watches, or while another fault is being looked at.
+// watchPluginModule: message thread, after the module was loaded in this process (an absolute path; at most 128).
+void watchPluginModule (const std::string& fileUtf8) noexcept;
+bool pluginThreadFaultsCaught() noexcept;
+struct PluginThreadFault
+{
+    std::string module; // the watched path
+    std::uint32_t code = 0;
+    std::string where;  // "file+0xoffset" of the plugin's faulting frame
+};
+int pluginThreadFaultCount() noexcept;            // only grows
+std::vector<PluginThreadFault> pluginThreadFaults(); // the last 16, oldest first
+// --faulttest thread / thread-libc: a fault on a thread of LYNX's own with LYNX's executable watched as if it were a
+// plugin's module: it must still end the process through the crash handler (a return = the thread was parked)
+void faultOnOwnThreadForTest (bool inCLibrary) noexcept;
 
 // Plugin editor windows (issue #32, round 174a; Windows x64 only, elsewhere these do nothing). A hosted plugin's own
 // window procedure runs outside every LYNX call (DispatchMessageW calls it from the message loop), so a fault in it

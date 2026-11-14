@@ -5949,6 +5949,10 @@ void MainComponent::timerCallback()
                       6000);
     }
 
+    // round 190gg (B4, Linux / macOS): a hosted plugin's own thread faulted; that thread was parked, and every instance
+    // of the plugin is switched off now (counted as crashes: the prompt below)
+    switchOffPluginsOfThreadFaults();
+
     // a hosted plugin crashed inside a call: it was switched off (bypassed / silent) and LYNX kept running
     if (const auto crashes = pluginCrashCount(); crashes != pluginCrashesSeen)
     {
@@ -5969,19 +5973,20 @@ void MainComponent::timerCallback()
         // crash it again, so no Reload; the project keeps them for the save
         const auto all = pluginCrashes();
         const auto onLoad = ! all.empty() && all.back().onLoad;
-        auto message = tr ("{0} crashed and was switched off.", { crashedName }) + "\n\n"
-                       + tr ("LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project.");
-        auto options = juce::MessageBoxOptions().withIconType (juce::MessageBoxIconType::WarningIcon).withTitle (tr ("Plugin crashed"));
-        if (! onLoad)
-            options = options.withMessage (message + " " + tr ("Reload starts it again with the settings from the last save or backup."))
-                          .withButton (tr ("Reload"));
-        else
-            options = options.withMessage (message);
-        juce::AlertWindow::showAsync (options.withButton (tr ("Close")),
-                                      [safe = juce::Component::SafePointer<MainComponent> (this), crashedName, onLoad] (int result) {
-                                          if (safe != nullptr && result == 1 && ! onLoad)
-                                              safe->reloadCrashedPlugins (crashedName);
-                                      });
+        // round 190gg (B1): Reload, or from now on in a process of its own, where its next crash cannot reach LYNX
+        const auto prompt = PluginWindows::crashPrompt (crashedName, onLoad);
+        auto options = juce::MessageBoxOptions().withIconType (juce::MessageBoxIconType::WarningIcon).withTitle (prompt.title).withMessage (prompt.message);
+        for (const auto& button : prompt.buttons)
+            options = options.withButton (button);
+        juce::AlertWindow::showAsync (options, [safe = juce::Component::SafePointer<MainComponent> (this), crashedName, prompt] (int result) {
+            // (JUCE: the first button is 1, the last one 0)
+            if (safe == nullptr || result == 0)
+                return;
+            if (result == 1 && prompt.reload)
+                safe->reloadCrashedPlugins (crashedName);
+            else if (prompt.separate && result == (prompt.reload ? 2 : 1))
+                PluginWindows::alwaysRunSeparately (safe->engine, crashedName);
+        });
     }
 
     // round 176a: a plugin in a separate process (Make bridged, or a 32-bit plugin in the 32-bit bridge) crashed or hung:
@@ -6098,6 +6103,7 @@ void MainComponent::timerCallback()
         auto* device = engine.getDeviceManager().getCurrentAudioDevice();
         perfMeter.setRealtime (rt.overBudget, rt.lateCalls, engine.getRtStats().takeWindowMaxLoad(), heaviest,
                                device != nullptr ? device->getXRunCount() : -1);
+        perfMeter.setDropouts (describeDropouts (engine)); // (round 190gg: how many, when, why)
         // dropouts on Windows shared mode: suggest the interface's ASIO driver (round 160), worked out once per device type
         if (device != nullptr && (rt.overBudget > 0 || rt.lateCalls > 0) && device->getTypeName() != driverTipType)
         {
@@ -7028,20 +7034,7 @@ void MainComponent::announceEditorCrash (const juce::String& plugin)
         if (result == 1)
             safe->save (true);
         else if (result == 2 && offerSeparate)
-        {
-            safe->engine.capturePluginStates(); // the new instances start from the current settings
-            setPluginAlwaysSeparate (plugin, true);
-            const auto name = plugin.toStdString();
-            safe->engine.editSong ([name] (Song& song) {
-                for (auto& c : song.channels)
-                    if (c.instrument == InstrumentKind::plugin && c.plugin.name == name)
-                        c.plugin.separateProcess = true;
-                for (auto& track : song.mixer)
-                    for (auto& fx : track.effects)
-                        if (fx.kind == EffectKind::plugin && fx.plugin.name == name)
-                            fx.plugin.separateProcess = true;
-            });
-        }
+            PluginWindows::alwaysRunSeparately (safe->engine, plugin); // (round 190gg: the same as the crash prompt's)
     });
 }
 

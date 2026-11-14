@@ -187,7 +187,9 @@ std::optional<pp::Preset> readLynxPreset (const juce::File& file)
     return pp::fromText (file.loadFileAsString().toStdString());
 }
 
-bool load (juce::AudioPluginInstance& plugin, const juce::File& file, juce::String& error)
+namespace
+{
+bool loadUnguarded (juce::AudioPluginInstance& plugin, const juce::File& file, juce::String& error)
 {
     if (file.hasFileExtension ("lynxpreset"))
     {
@@ -230,6 +232,17 @@ bool load (juce::AudioPluginInstance& plugin, const juce::File& file, juce::Stri
         return ok;
     }
     error = tr ("Unknown preset format.");
+    return false;
+}
+} // namespace
+
+bool load (juce::AudioPluginInstance& plugin, const juce::File& file, juce::String& error)
+{
+    // round 190gg (B4): a plugin that crashes on a preset is switched off (as when it crashes while playing), not LYNX
+    auto ok = false;
+    if (callPluginFromUi (plugin, "loading a preset", [&] { ok = loadUnguarded (plugin, file, error); }))
+        return ok;
+    error = tr ("{0} crashed and was switched off.", { plugin.getName() });
     return false;
 }
 
@@ -462,7 +475,8 @@ void PresetBar::apply (const Entry& entry)
 {
     if (entry.program >= 0)
     {
-        plugin.setCurrentProgram (entry.program);
+        if (! callPluginFromUi (plugin, "loading a program", [this, &entry] { plugin.setCurrentProgram (entry.program); }))
+            return; // (round 190gg: it crashed and was switched off; the "Plugin crashed" prompt says so)
         currentProgram = entry.program;
         currentFile = juce::File();
         setName (entry.name);

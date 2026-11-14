@@ -71,11 +71,32 @@ A thread de áudio deve rodar com prioridade de tempo real.
 
 Os detalhes estão em [LINUX.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md).
 
+### O som estala ou falha
+
+O LYNX SHARE conta cada falha (buffer underrun) e diz por que ela aconteceu. Aponte para o medidor `CPU` na barra de ferramentas, ou abra `Ferramentas › Monitor de desempenho dos plugins...`. Um número vermelho ao lado da porcentagem de CPU é a contagem.
+
+A dica diz a causa da última falha:
+
+| Causa | O que significa | O que tentar |
+|---|---|---|
+| O processamento levou mais tempo que o buffer | Um bloco de áudio levou mais tempo para ser calculado do que o tempo que ele dura. A dica diz o canal ou efeito mais lento daquele bloco | Aumente o tamanho do buffer em `Opções › Configurações de áudio...`, congele esse canal ou baixe a qualidade do plugin |
+| O processamento chegou perto do limite do buffer | A carga estava perto de 100 % na hora da falha | Aumente o tamanho do buffer ou congele os canais mais pesados |
+| Latência do driver ou do sistema | O driver ou o sistema atrasou enquanto a carga estava baixa. Nenhum plugin causou a falha | Aumente o tamanho do buffer, tente outro driver (no Windows, o driver ASIO da interface) e, no Linux, verifique a prioridade de tempo real (acima) |
+
+Cada falha também é registrada em `audio-glitches.log` na pasta de configurações, com o dispositivo, o buffer e os canais mais pesados.
+
 ## Plugins
 
 ### Um plugin trava
 
-Rode-o no próprio processo, para que só o plugin pare.
+A maioria dos travamentos de plugin desliga só aquele plugin: um efeito fica em bypass, um instrumento fica mudo, e o LYNX SHARE e o projeto continuam rodando. A mensagem `O plugin travou` então oferece:
+
+- `Recarregar`, que inicia o plugin de novo com as configurações do último salvamento ou backup.
+- `Sempre rodar <plugin> em um processo separado`, que o inicia de novo em um processo próprio, agora e em todo projeto. Um travamento lá não derruba o LYNX SHARE. Um plugin em processo separado abre a janela dele sozinha (ela não pode ser encaixada).
+
+A janela do plugin mostra os mesmos dois botões no lugar do editor. `Opções › Gerenciador de plugins...` lista na coluna `Processo separado` os plugins que sempre rodam em processo separado; clique na caixa para ligar ou desligar um deles.
+
+Para rodar todos os plugins no próprio processo:
 
 1. Abra `Opções › Configurações gerais...`.
 2. Ative `Rodar plugins em processo separado (protege o LYNX SHARE de travamentos)`.

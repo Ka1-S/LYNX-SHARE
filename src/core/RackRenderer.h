@@ -522,6 +522,8 @@ public:
         std::array<std::atomic<std::uint64_t>, maxChannels> channelMaxNs {}; // longest single call (spikes)
         std::array<std::atomic<std::uint64_t>, (std::size_t) maxMixerTracks * maxEffectSlots> effectMaxNs {};
         std::atomic<std::uint64_t> processNs { 0 }, processedSamples { 0 };
+        // round 190gg: the slowest channel / effect call since the audio callback last took it (core/Dropouts.h pack())
+        std::atomic<std::uint64_t> blockSlowest { 0 };
     };
     // The keys sounding on a channel (played by the song / pattern, the keyboard, MIDI inputs), for the Piano roll's
     // keyboard (issue #14: FL lights them); published after each block, safe to read from any thread.
@@ -534,6 +536,9 @@ public:
     void setProfiling (bool on) noexcept { profiling.store (on, std::memory_order_relaxed); }
     bool isProfiling() const noexcept { return profiling.load (std::memory_order_relaxed); }
     const UnitTimes& unitTimes() const noexcept { return *units; }
+    // Round 190gg: the slowest channel / effect call since the last take (core/Dropouts.h pack(); 0 = none). Audio thread,
+    // once per device callback.
+    std::uint64_t takeBlockSlowest() noexcept { return units->blockSlowest.exchange (0, std::memory_order_relaxed); }
     // Blocks in which an insert effect output NaN / inf and was muted and reset (all renderers, since start; round 111)
     static std::uint64_t nonFiniteEffectBlocks() noexcept;
     void resetUnitTimes() noexcept;

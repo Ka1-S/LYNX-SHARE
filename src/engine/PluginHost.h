@@ -55,6 +55,19 @@ struct PluginCrash
 int pluginCrashCount() noexcept;
 std::vector<PluginCrash> pluginCrashes();
 
+// Round 190gg (B4): a call LYNX's UI makes into a hosted plugin (making its editor, loading a preset, a program or the
+// spare state), under the crash guard like the audio calls. When it crashes, the plugin is switched off as after a crash
+// inside an audio call (its PluginInstrument / PluginEffect never calls it again, the "Plugin crashed" prompt follows;
+// a plugin no adapter holds is only reported) and the result is false. A plugin already switched off is not called
+// (false as well). UI thread. `what` names the call in the session's steps ("loading a preset").
+bool callPluginFromUi (juce::AudioPluginInstance& plugin, const char* what, const std::function<void()>& call);
+// The plugin's adapter crashed (or a UI call crashed it): it must not be called any more. UI thread.
+bool pluginInstanceDown (const juce::AudioPluginInstance& plugin);
+// Round 190gg (B4; Linux / macOS): faults on hosted plugins' own threads (platform/CrashGuard.h, watchPluginModule) that
+// are new since the last call: every instance of that plugin's file is switched off (as above). Returns how many
+// instances were switched off. UI thread (MainComponent's timer; the tests).
+int switchOffPluginsOfThreadFaults();
+
 // A hosted plugin's audio outputs as FL's wrapper lists them in Processing › Connections (round 188d, issue #114):
 // one per output bus (bus 0 = the main output); a plugin with one bus of more than two channels (a bridged plugin)
 // in stereo pairs. `channel` = its first channel in the plugin's buffer.

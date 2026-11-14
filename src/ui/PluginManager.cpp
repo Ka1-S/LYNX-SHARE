@@ -8,6 +8,7 @@
 #include "platform/Paths.h"
 #include "ui/FileChoosers.h"
 #include "ui/I18n.h"
+#include "ui/PluginWindow.h"
 #include "ui/Theme.h"
 #include "ui/ToolWindow.h"
 
@@ -26,7 +27,8 @@ enum Column
     formatColumn,
     statusColumn,
     fileColumn,
-    bitsColumn // (FL's Bits column, round 176a; Windows x64 only)
+    bitsColumn, // (FL's Bits column, round 176a; Windows x64 only)
+    separateColumn // (round 190gg, LYNX-own: "always run in a separate process")
 };
 
 juce::String statusText (prefs::PluginStatus s)
@@ -49,7 +51,7 @@ std::vector<prefs::PluginRow> sampleRows()
         { "Surge XT", "Surge Synth Team", "CLAP", "Synth", "C:\\Program Files\\Common Files\\CLAP\\Surge XT.clap", "CLAP-Surge", true, PluginStatus::ok, true },
         { "Dexed", "Digital Suburban", "VST3", "Synth", "C:\\Program Files\\Common Files\\VST3\\Dexed.vst3", "VST3-Dexed", true, PluginStatus::ok, false },
         { "TDR Nova", "Tokyo Dawn Labs", "VST3", "EQ", "C:\\Program Files\\Common Files\\VST3\\TDR Nova.vst3", "VST3-Nova", false, PluginStatus::ok, true },
-        { "Valhalla Supermassive", "Valhalla DSP", "VST3", "Reverb", "C:\\Program Files\\Common Files\\VST3\\ValhallaSupermassive.vst3", "VST3-VS", false, PluginStatus::ok, false },
+        { "Valhalla Supermassive", "Valhalla DSP", "VST3", "Reverb", "C:\\Program Files\\Common Files\\VST3\\ValhallaSupermassive.vst3", "VST3-VS", false, PluginStatus::ok, false, {}, true },
         { "OTT", "Xfer Records", "VST3", "Dynamics", "C:\\Program Files\\Common Files\\VST3\\OTT.vst3", "VST3-OTT", false, PluginStatus::ok, false },
         { "Surge XT Effects", "Surge Synth Team", "CLAP", "Fx", "C:\\Program Files\\Common Files\\CLAP\\Surge XT Effects.clap", "CLAP-SurgeFx", false, PluginStatus::ok, false },
         { "Spectral Gate", "", "VST3", "", "D:\\Old plugins\\SpectralGate.vst3", "", false, PluginStatus::failed, false },
@@ -63,7 +65,7 @@ class PluginManagerPanel final : public juce::Component,
 {
 public:
     PluginManagerPanel (AudioEngine& e, bool keep, std::function<void()> folders)
-        : host (e.getPluginHost()), persistent (keep), onFolders (std::move (folders))
+        : engine (e), host (e.getPluginHost()), persistent (keep), onFolders (std::move (folders))
     {
         search.setTextToShowWhenEmpty (tr ("Search name, vendor, format or file"), theme::colour::textDisabled);
         search.setFont (theme::font (theme::type::body));
@@ -105,6 +107,7 @@ public:
         if (bridge32Supported())
             header.addColumn (tr ("Bits"), bitsColumn, 52, 40, 80, flags & ~juce::TableHeaderComponent::sortable);
         header.addColumn (tr ("Status"), statusColumn, 110, 70, 200, flags);
+        header.addColumn (tr ("Separate process"), separateColumn, 116, 60, 180, flags & ~juce::TableHeaderComponent::sortable);
         header.addColumn (tr ("File"), fileColumn, 300, 80, 2000, flags);
         header.setSortColumnId (nameColumn, true);
         header.setStretchToFitActive (true);
@@ -200,6 +203,7 @@ private:
     // --- data --------------------------------------------------------------------------------------------------
     void reload()
     {
+        allSeparate = persistent && pluginSandboxEnabled(); // (read once: the column draws it on every row)
         if (! persistent)
         {
             rows = sampleRows();
@@ -209,6 +213,7 @@ private:
 
         rows.clear();
         const auto& favourites = host.favourites();
+        const auto separate = pluginsAlwaysSeparate();
         const auto types = host.getKnownPlugins().getTypes();
         // FL's Bits column and "Combine 32 and 64 bit versions of a plugin" (round 176a): one row for both builds
         std::vector<std::string> bits ((std::size_t) types.size());
@@ -234,6 +239,7 @@ private:
             r.id = t.createIdentifierString().toStdString();
             r.instrument = t.isInstrument;
             r.favourite = favourites.count (r.id) > 0;
+            r.separate = separate.contains (t.name.trim(), true);
             if (juce::File::isAbsolutePath (t.fileOrIdentifier) && ! juce::File (t.fileOrIdentifier).exists())
                 r.status = prefs::PluginStatus::missingFile;
             rows.push_back (r);
@@ -317,6 +323,29 @@ private:
                 break;
             case formatColumn: text (u8 (r->format), theme::colour::textSecondary); break;
             case bitsColumn: text (u8 (r->bits), theme::colour::textSecondary); break;
+            case separateColumn:
+            {
+                if (r->id.empty() || r->status == prefs::PluginStatus::failed)
+                    break;
+                if (r->bits == "32") // (always in the 32-bit bridge)
+                {
+                    text (juce::String ("-"), theme::colour::textDisabled);
+                    break;
+                }
+                const auto all = allSeparate;
+                const auto box = juce::Rectangle<float> (10.0f, height * 0.5f - 7.0f, 14.0f, 14.0f);
+                g.setColour (theme::colour::bg0);
+                g.fillRoundedRectangle (box, 3.0f);
+                g.setColour (all ? theme::colour::border : theme::colour::borderStrong);
+                g.drawRoundedRectangle (box, 3.0f, 1.0f);
+                if (r->separate || all)
+                {
+                    g.setColour (all ? theme::colour::textDisabled : theme::colour::accent);
+                    g.setFont (theme::font (theme::type::body, true));
+                    g.drawText (juce::String::fromUTF8 ("\xe2\x9c\x93"), box.toNearestInt(), juce::Justification::centred);
+                }
+                break;
+            }
             case statusColumn:
             {
                 const auto colour = ok ? theme::colour::ledOn : r->status == prefs::PluginStatus::failed ? theme::colour::accent : theme::colour::warning;
@@ -346,11 +375,13 @@ private:
         }
         if (column == favouriteColumn)
             toggleFavourite (row);
+        if (column == separateColumn)
+            toggleSeparate (row);
     }
 
     void cellDoubleClicked (int row, int column, const juce::MouseEvent&) override
     {
-        if (column != favouriteColumn)
+        if (column != favouriteColumn && column != separateColumn)
             toggleFavourite (row);
     }
 
@@ -363,6 +394,9 @@ private:
             return {};
         if (column == favouriteColumn)
             return tr ("Favourite: listed first when adding a plugin");
+        if (column == separateColumn)
+            return allSeparate ? tr ("Every plugin runs in a separate process (Options > General settings).")
+                                          : tr ("Always run this plugin in a separate process (click to switch).") + " " + PluginWindows::alwaysSeparateHint();
         if (column == statusColumn && r->status == prefs::PluginStatus::failed)
             return tr ("The scan couldn't load this file (it crashed, hung or isn't a plugin). Right-click > Try again.");
         return u8 (r->file);
@@ -382,6 +416,27 @@ private:
             refilter();
         else
             table.repaintRow (row);
+    }
+
+    // Round 190gg (B1): the plugin on / off the "always in a separate process" list. On: its instances in the open
+    // project move to their own processes now (as the crash prompt's choice); off: new instances and other projects run
+    // it inside LYNX again (an instance keeps its own Processing › "Run in a separate process").
+    void toggleSeparate (int row)
+    {
+        const auto* r = rowAt (row);
+        if (r == nullptr || r->id.empty() || r->status == prefs::PluginStatus::failed || r->bits == "32" || allSeparate)
+            return;
+        const auto on = ! r->separate;
+        const auto name = u8 (r->name);
+        if (persistent)
+        {
+            if (on)
+                PluginWindows::alwaysRunSeparately (engine, name);
+            else
+                setPluginAlwaysSeparate (name, false);
+        }
+        rows[(std::size_t) visible[(std::size_t) row]].separate = on;
+        table.repaintRow (row);
     }
 
     void showRowMenu (int row)
@@ -485,8 +540,9 @@ private:
             reload(); // show what was found so far
     }
 
+    AudioEngine& engine;
     PluginHost& host;
-    bool persistent;
+    bool persistent, allSeparate = false;
     std::function<void()> onFolders;
     std::vector<prefs::PluginRow> rows;
     std::vector<int> visible;
