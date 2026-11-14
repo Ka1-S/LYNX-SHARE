@@ -55,6 +55,11 @@ public:
     // --snapshot: draws the frame at `seconds` (no desktop, no timer).
     void setTimeForSnapshot (double seconds);
 
+    // The frames painted during the drop (the clock's first `landing` seconds) and the longest time between two of
+    // them, in ms (round 190go: the start-up trace shows that the window built behind the card leaves the drop alone)
+    int getDropFrames() const noexcept { return dropFrames; }
+    double getLongestDropGapMs() const noexcept { return longestDropGapMs; }
+
     void paint (juce::Graphics& g) override;
 
 private:
@@ -65,6 +70,8 @@ private:
     double time = 0.0;
     double clockStartMs = -1.0, fadeStartMs = -1.0;
     double barDuration = minimumDuration;
+    int dropFrames = 0;
+    double longestDropGapMs = 0.0, lastDropPaintMs = -1.0;
     std::function<void()> onGone;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SplashScreen)

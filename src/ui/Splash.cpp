@@ -175,6 +175,17 @@ void SplashScreen::paint (juce::Graphics& g)
 {
     using namespace theme;
     const auto t = time;
+    if (clockStartMs >= 0.0 && fadeStartMs < 0.0) // (the drop's frames: see getDropFrames)
+    {
+        const auto now = juce::Time::getMillisecondCounterHiRes();
+        if (getElapsed() <= 1.05)
+        {
+            if (lastDropPaintMs >= 0.0)
+                longestDropGapMs = juce::jmax (longestDropGapMs, now - lastDropPaintMs);
+            ++dropFrames;
+        }
+        lastDropPaintMs = now;
+    }
     const auto card = getLocalBounds().toFloat().reduced (0.5f);
     juce::Path cardShape;
     cardShape.addRoundedRectangle (card, 14.0f);
