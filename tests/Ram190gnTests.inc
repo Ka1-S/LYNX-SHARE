@@ -67,8 +67,9 @@ lynx::RackState::Factories factories (std::shared_ptr<lynx::SampleData> sample)
 {
     lynx::RackState::Factories f;
     f.samples = [sample] (const std::string&) { return std::shared_ptr<const lynx::SampleData> (sample); };
-    f.stretchedSamples = [sample] (const std::string&, double ratio, lynx::StretchMethod m, double, const lynx::StretchMap&) {
-        return std::shared_ptr<const lynx::SampleData> (lynx::timeStretch (*sample, ratio, m));
+    f.stretchedSamples = [sample] (const std::string&, double ratio, lynx::StretchMethod m, double, const lynx::StretchMap&,
+                                   const lynx::StretchOptions& options) { // (rollup 0.1.28: round 190fm's warp settings)
+        return std::shared_ptr<const lynx::SampleData> (lynx::timeStretch (*sample, ratio, m, 0.0, options));
     };
     return f;
 }
