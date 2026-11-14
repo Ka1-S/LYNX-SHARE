@@ -117,6 +117,36 @@ replacing them so an edit retains expression it does not intend to change.
 `chanceGroup` is a nonnegative integer, and `chanceOne` is a boolean. A true
 `chanceOne` flag is retained even when its chance group is currently zero.
 
+## Typed pattern operations
+
+The `patterns` capability advertises `pattern.create`, `pattern.clone` and
+`pattern.set`. Each requires the normal project/process/revision guards and
+stopped playback/recording, and commits one remote-owned native undo step.
+
+- `pattern.create`: optional `index` is an insertion position from zero through
+  the pattern count; omit it to append. Optional `name` defaults to the next
+  unused `Pattern N`. Optional `lengthTicks` defaults to zero (automatic).
+- `pattern.clone`: required `index` names an existing source. The complete copy
+  is inserted immediately after it; optional `name` replaces the copy's default
+  name. Notes and all expression fields, events, markers, loops and colour are
+  retained; the new pattern gets a fresh identity.
+- `pattern.set`: required `index` plus `name`, `lengthTicks` or both. Omitted
+  metadata is preserved. A no-op does not advance revision or add history.
+
+Names contain 1–256 characters, include non-whitespace text and have no control
+characters. `lengthTicks` is an integer
+from zero through 1,000,000,000 at PPQ 960; zero follows the notes automatically.
+A positive length cannot end before an existing note. Creation/cloning select
+the new pattern. Playlist clips, Pattern Blocks across arrangements and channel
+Loop Starter references keep their source targets as indices shift. Length
+changes resize untrimmed full-pattern clips as in LYNX's UI; trimmed clips keep
+their lengths. Results include `index`, `patternId`, `name`, `lengthTicks`,
+`effectiveLengthTicks`, `patternCount` and `changed`, plus the common identity
+metadata. Session pattern rows expose explicit/effective length and colour.
+Refresh after each committed indexed edit. Pattern deletion is not a typed
+operation; a valid document transaction can edit the full native model subject
+to its reference and identity rules.
+
 ## Read a complete project document
 
 `project.read` exposes every field of LYNX's native versioned project format,
@@ -197,7 +227,8 @@ limited to depth 64, four million JSON nodes, one million items per array, 100,0
 channels/patterns/automations, 501 mixer tracks and 500 Playlist rows.
 
 Typed operations include tempo and channel/mixer level changes, catalog-based
-instrument insertion/replacement, note replacement, device parameter batches,
+instrument insertion/replacement, pattern creation/cloning/name/length changes,
+note replacement, device parameter batches,
 effect loading/removal and Playlist editing. `api.describe` is authoritative for
 the running build; additional typed operations can be added without replacing
 the document API. Separate typed requests are separate undo steps. Document

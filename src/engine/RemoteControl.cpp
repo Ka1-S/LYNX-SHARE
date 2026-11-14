@@ -10,6 +10,7 @@
 #include "engine/RemotePluginControl.h"
 #include "engine/RemotePlaylistControl.h"
 #include "engine/RemoteInstrumentControl.h"
+#include "engine/RemotePatternControl.h"
 #include "engine/RemoteJsonLimits.h"
 #include "engine/RemoteAuthentication.h"
 #include "core/SessionIds.h"
@@ -144,7 +145,7 @@ struct RemoteControl::Impl final : juce::Thread
                 { "patternCount", (int) s.patterns.size() }, { "canUndo", engine.canUndo() }, { "canRedo", engine.canRedo() },
                 { "historyError", engine.getRemoteHistoryError() },
                 { "capabilities", object ({ { "pluginParameters", true }, { "effects", true }, { "playlist", true },
-                    { "instruments", true }, { "projectDocument", true }, { "projectTransactions", true },
+                    { "instruments", true }, { "patterns", true }, { "projectDocument", true }, { "projectTransactions", true },
                     { "deviceStateHash", true }, { "changePolling", true } }) } });
         }
 
@@ -173,6 +174,9 @@ struct RemoteControl::Impl final : juce::Thread
             }
             for (std::size_t i = 0; i < s.patterns.size(); ++i)
                 patterns.add (object ({ { "index", (int) i }, { "patternId", text (uids::toHex (s.patterns[i].uid)) }, { "name", text (s.patterns[i].name) },
+                                       { "lengthTicks", (juce::int64) s.patterns[i].lengthTicks },
+                                       { "effectiveLengthTicks", (juce::int64) s.patterns[i].effectiveLength (s.beatsPerBar) },
+                                       { "colour", (juce::int64) s.patterns[i].colour },
                                        { "noteCount", (int) s.patterns[i].notes.size() } }));
             for (std::size_t i = 0; i < s.playlist.size(); ++i)
             {
@@ -217,7 +221,7 @@ struct RemoteControl::Impl final : juce::Thread
                 return object ({ { "protocol", protocol }, { "apiVersion", 1 }, { "projectFormat", "lynx-json/1" },
                     { "maxRequestBytes", (int) maxMessage }, { "maxResponseBytes", (int) maxMessage },
                     { "authentication", "hmac-sha256-mutual" }, { "capabilities", status()["capabilities"] },
-                    { "operations", juce::var (juce::StringArray { "api.describe", "status", "changes", "session.inspect", "device.state", "project.read", "project.edit", "pattern.notes", "plugin.inspect", "effect.catalog", "instrument.catalog", "playlist.inspect", "tempo.set", "mixer.set", "channel.set", "channel.create", "instrument.replace", "pattern.replace_notes", "plugin.parameters_set", "effect.load", "effect.remove", "playlist.edit", "transport.play", "transport.stop", "history.undo", "history.redo" }) } });
+                    { "operations", juce::var (juce::StringArray { "api.describe", "status", "changes", "session.inspect", "device.state", "project.read", "project.edit", "pattern.create", "pattern.clone", "pattern.set", "pattern.notes", "plugin.inspect", "effect.catalog", "instrument.catalog", "playlist.inspect", "tempo.set", "mixer.set", "channel.set", "channel.create", "instrument.replace", "pattern.replace_notes", "plugin.parameters_set", "effect.load", "effect.remove", "playlist.edit", "transport.play", "transport.stop", "history.undo", "history.redo" }) } });
             if (op == "project.read") return projectControl.dispatch (op, args, cancelled);
             if (op == "session.inspect")
                 return inspect();
@@ -254,7 +258,7 @@ struct RemoteControl::Impl final : juce::Thread
             if (op != "transport.play" && op != "transport.stop" && op != "tempo.set" && op != "mixer.set"
                 && op != "channel.set" && op != "pattern.replace_notes" && op != "history.undo" && op != "history.redo"
                 && ! isRemotePluginOperation (op) && ! isRemotePlaylistOperation (op) && ! isRemoteInstrumentOperation (op)
-                && ! isRemoteProjectOperation (op))
+                && ! isRemoteProjectOperation (op) && ! isRemotePatternOperation (op))
                 invalid ("Unsupported operation: " + op);
 
             // Every mutation is bound to the project and revision Remote actually observed. This also protects shared
@@ -280,6 +284,8 @@ struct RemoteControl::Impl final : juce::Thread
                 return dispatchRemotePlugin (engine, op, args, cancelled);
             if (isRemoteInstrumentOperation (op))
                 return dispatchRemoteInstrument (engine, op, args, cancelled);
+            if (isRemotePatternOperation (op))
+                return dispatchRemotePattern (engine, op, args, cancelled);
             if (isRemotePlaylistOperation (op))
                 return dispatchRemotePlaylist (engine, op, args, cancelled);
 
@@ -467,7 +473,8 @@ struct RemoteControl::Impl final : juce::Thread
                                 || work->op == "history.undo" || work->op == "history.redo"
                                 || work->op == "channel.create" || work->op == "instrument.replace"
                                 || work->op == "project.read" || work->op == "project.edit" || work->op == "device.state"
-                                || work->op == "playlist.edit";
+                                || work->op == "playlist.edit"
+                                || isRemotePatternOperation (work->op);
         const auto deadline = juce::Time::getMillisecondCounterHiRes() + (longOperation ? 60000.0 : 5000.0);
         while (state->active && ! threadShouldExit() && juce::Time::getMillisecondCounterHiRes() < deadline)
             if (work->finished.wait (50))

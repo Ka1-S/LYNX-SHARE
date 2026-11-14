@@ -177,7 +177,7 @@ for m in "${MODULES[@]}" juce_core_CompilationTime juce_graphics_Harfbuzz juce_g
     fi'
 
 APP_SOURCES=(src/Main.cpp
-             src/engine/RemoteControl.cpp src/engine/RemoteProjectControl.cpp src/engine/RemoteProjectDocument.cpp
+             src/engine/RemotePatternControl.cpp src/engine/RemoteControl.cpp src/engine/RemoteProjectControl.cpp src/engine/RemoteProjectDocument.cpp
              src/engine/RemotePluginControl.cpp src/engine/RemoteInstrumentControl.cpp src/engine/RemotePlaylistControl.cpp
              src/engine/GeneratorCatalog.cpp src/ui/RemoteControlSettings.cpp
              src/engine/AudioEngine.cpp src/engine/AudioEngineSession.cpp src/engine/ChannelRackProcessor.cpp src/engine/Metronome.cpp
