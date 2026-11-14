@@ -325,8 +325,8 @@ int main (int argc, char** argv)
     }
     const std::string scenario = argv[1];
     int blockSize = 256, threads = 0, reps = 5;
-    double seconds = 0.0;
-    bool offline = false, meters = true, stopped = scenario == "idle";
+    double seconds = 0.0, warmup = 0.0;
+    bool offline = false, meters = true, stopped = scenario == "idle", units = false;
     const char* raw = nullptr;
     for (int i = 2; i < argc; ++i)
     {
@@ -348,6 +348,10 @@ int main (int argc, char** argv)
             raw = next();
         else if (a == "--stopped")
             stopped = true;
+        else if (a == "--warmup") // seconds rendered first and not measured (an idle project: past the effects' smart disable hold)
+            warmup = std::max (0.0, std::atof (next()));
+        else if (a == "--units") // the renderer's own per-channel / per-slot CPU (as renderwav's LYNX_PROFILE)
+            units = true;
     }
 
     constexpr int sampleRate = 44100;
@@ -420,6 +424,7 @@ int main (int argc, char** argv)
         if (pool != nullptr)
             renderer->setWorkerPool (pool.get());
         renderer->prepare (sampleRate, std::max (2048, blockSize));
+        renderer->setProfiling (units);
         auto bank = std::make_unique<MeterBank>();
         auto live = std::make_unique<LiveEventQueue>();
         auto midiLive = std::make_unique<LiveEventQueue>();
@@ -427,9 +432,23 @@ int main (int argc, char** argv)
         std::vector<float> left (totalSamples), right (totalSamples);
         std::vector<double> blockCpu;
         blockCpu.reserve (totalSamples / (std::size_t) blockSize + 1);
+        if (warmup > 0.0) // (stopped: the same position; playing: the song advances and the measured part starts later)
+        {
+            std::vector<float> wl ((std::size_t) blockSize), wr ((std::size_t) blockSize);
+            for (int done = 0, total = (int) (warmup * sampleRate); done < total; done += blockSize)
+            {
+                renderer->process (state.get(), ! stopped, stopped ? 0.0 : done * tps, blockSize, wl.data(), wr.data(), live.get(),
+                                   meters ? bank.get() : nullptr, midiLive.get());
+                if (pool != nullptr)
+                    pool->park();
+            }
+            if (units)
+                renderer->resetUnitTimes();
+        }
         InstructionCounter counter;
         const auto clock = pool != nullptr ? CLOCK_PROCESS_CPUTIME_ID : CLOCK_THREAD_CPUTIME_ID;
-        double tick = 0.0, used = 0.0;
+        const auto warmupBlocks = (int) std::ceil (warmup * sampleRate / blockSize);
+        double tick = stopped ? 0.0 : (double) warmupBlocks * blockSize * tps, used = 0.0;
         const auto wall0 = std::chrono::steady_clock::now();
         counter.start();
         for (std::size_t pos = 0; pos < totalSamples; pos += (std::size_t) blockSize)
@@ -438,6 +457,8 @@ int main (int argc, char** argv)
             const auto c0 = cpuMs (clock);
             renderer->process (state.get(), ! stopped, stopped ? 0.0 : tick, n, left.data() + pos, right.data() + pos, live.get(),
                                meters ? bank.get() : nullptr, midiLive.get());
+            if (pool != nullptr) // (as the app's audio callback ends: the workers sleep until the next block, REA round 116)
+                pool->park();
             const auto spent = cpuMs (clock) - c0;
             used += spent;
             blockCpu.push_back (spent);
@@ -470,6 +491,26 @@ int main (int argc, char** argv)
                      "block p99 %.1f%% of budget, hash %016llx\n",
                      rep, used, 100.0 * used / audioMs, wallMs, used * 1e6 / (double) totalSamples, (double) instructions * 1e-9,
                      (double) instructions / (double) totalSamples, 100.0 * p99 / budget, (unsigned long long) h);
+        if (units && rep == 0)
+        {
+            const auto& u = renderer->unitTimes();
+            std::vector<std::pair<double, std::string>> rows;
+            for (std::size_t c = 0; c < song.channels.size() && c < (std::size_t) RackRenderer::maxChannels; ++c)
+                if (const auto ns = (double) u.channelNs[c].load(); ns > 0.0)
+                    rows.push_back ({ ns, "channel " + std::to_string (c) + " " + song.channels[c].name });
+            for (std::size_t t = 0; t < song.mixer.size(); ++t)
+                for (std::size_t k = 0; k < song.mixer[t].effects.size() && k < (std::size_t) maxEffectSlots; ++k)
+                    if (const auto ns = (double) u.effectNs[t * maxEffectSlots + k].load(); ns > 0.0)
+                        rows.push_back ({ ns, "insert " + std::to_string (t) + " slot " + std::to_string (k + 1) + " "
+                                                  + effectInfo (song.mixer[t].effects[k].kind).name });
+            std::sort (rows.begin(), rows.end(), [] (const auto& a, const auto& b) { return a.first > b.first; });
+            double total = 0.0;
+            for (const auto& r : rows)
+                total += r.first;
+            std::printf ("units: %.1f ms in channels and slots (%.1f%% of this rep's CPU)\n", total * 1e-6, 100.0 * total * 1e-6 / used);
+            for (std::size_t i = 0; i < rows.size() && i < 20; ++i)
+                std::printf ("  %6.2f%% of a core  %s\n", 100.0 * rows[i].first * 1e-6 / audioMs, rows[i].second.c_str());
+        }
         if (raw != nullptr && rep == 0)
         {
             std::ofstream r (raw, std::ios::binary);

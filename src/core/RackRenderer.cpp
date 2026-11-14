@@ -4147,9 +4147,18 @@ void RackRenderer::runVfxChannels (const RackState& state, bool playing, int num
     events.sortByOffset();
 }
 
+namespace
+{
+// Round 190ge: a chunk with almost nothing to do runs on the audio thread alone (see processChunk). The previous chunk's
+// wall time on this thread (one renderer per audio thread; only a heuristic: the samples are the same either way)
+thread_local std::uint64_t lastChunkNs = ~std::uint64_t (0);
+constexpr std::uint64_t lightChunkNs = 60000; // 60 µs (about 1 % of a 256-sample block at 44.1 kHz)
+} // namespace
+
 void RackRenderer::processChunk (const RackState& state, bool playing, double startTick, int numSamples,
                                  float* left, float* right, MeterBank* meters) noexcept
 {
+    const auto chunkStartNs = workers != nullptr ? ProcessTimes::now() : 0;
     chunkTick = startTick;
     chunkPlaying = playing;
     // FL: playback starting puts every control the user moved back under its automation (issue #125)
@@ -4420,6 +4429,14 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         for (int k = 0; k < events.size(); ++k)
             deliverToEffects (state, events[k]);
 
+    // Round 190ge: no note or event in this chunk, no live input, and the last one took under 60 µs (an idle project:
+    // the channels idle, the effects smart-disabled): the workers stay asleep. Waking them per chunk cost an idle
+    // project with 3 workers ~15 % of a core at 64 samples, ten times the work itself. Serial and parallel give the
+    // same samples (the task graph and the layers only change who computes what); the next note runs in parallel.
+    auto* const pool = workers;
+    if (pool != nullptr && events.size() == 0 && lastChunkNs < lightChunkNs && (liveInput == nullptr || liveInput->numChannels == 0))
+        workers = nullptr;
+
     // 1) channels, each with its own notes at the exact sample (in parallel when worth it)
     const auto channels = std::min<int> ({ (int) state.instruments.size(), (int) song.channels.size(), maxChannels });
     auto channel = [this, &state, numSamples] (int c) {
@@ -4524,6 +4541,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         }
     }
 
+    workers = pool;
+
     // 3) Master: inputs, effects, fader. Without a configured mixer, it stays at 0 dB.
     pullInputs (state, 0, numSamples);
     if (meters != nullptr)
@@ -4581,6 +4600,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
 
     if (hwOut != nullptr && ! state.hwRoutes.empty() && hwOut->active.load (std::memory_order_relaxed))
         mixHardwareOutputs (state, numSamples);
+    if (workers != nullptr)
+        lastChunkNs = ProcessTimes::now() - chunkStartNs;
 }
 
 // 4) inserts with a hardware output target: their post-fader output (the same signal the Master gets) into the
