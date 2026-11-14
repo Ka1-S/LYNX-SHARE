@@ -108,10 +108,17 @@ private:
         {
             float a, b, c, d;
             up (st[0], x, a, b);
+            // the curve runs on c, then on d (it may keep state): one order on every compiler — Clang's, which builds the
+            // shipped Windows and macOS apps; as call arguments, g++ evaluated them the other way round (rollup 0.1.28,
+            // owner decision after round 190gp)
             up (st[1], a, c, d);
-            const float y0 = down (st[1], f (c), f (d));
+            const float c0 = f (c);
+            const float d0 = f (d);
+            const float y0 = down (st[1], c0, d0);
             up (st[1], b, c, d);
-            const float y1 = down (st[1], f (c), f (d));
+            const float c1 = f (c);
+            const float d1 = f (d);
+            const float y1 = down (st[1], c1, d1);
             return down (st[0], y0, y1);
         }
 

@@ -131,19 +131,20 @@ TEST (ember190fj_classic_tape_and_the_other_paths_render_as_the_base_commit_did)
         { { em::style, em::drive, -1, -1 }, { 1.0f / 3.0f, 0.6f }, 48000.0, em::classicHot + 1, false, 0x5801b2634b49a540ull, 2111.39431, -0.20686233, 0.0464245565 }, // tape d0.6 old project
         { { em::style, em::drive, em::bands, -1 }, { 1.0f / 3.0f, 0.5f, 0.34f }, 48000.0, -1, false, 0xbc8195172a35b9b4ull, 5312.00704, -0.0836353153, -0.033575356 }, // tape 2 bands
         { { em::style, em::drive, -1, -1 }, { 2.0f / 3.0f, 0.6f }, 48000.0, -1, false, 0xad1eaddbf40aca7eull, 2822.06092, -0.194525942, -0.00734378165 }, // transistor d0.6
-        { { em::voicing, em::classicDrive, -1, -1 }, { 1.0f, 0.6f }, 48000.0, -1, false, 0x793413613690f0b2ull, 47007.7931, -0.850343585, -0.181251779 }, // classic voicing
+        { { em::voicing, em::classicDrive, -1, -1 }, { 1.0f, 0.6f }, 48000.0, -1, false, 0x7bddb56ac889249dull, 47007.7931, -0.850343585, -0.181251779 }, // classic voicing (Clang's order, see below)
         { { em::style, em::drive, em::voice, -1 }, { 1.0f / 3.0f, 0.5f, 0.2f }, 48000.0, -1, false, 0x48cc5eddb7f88ce9ull, 2774.99376, -0.237170994, 0.0424630567 }, // tape voice 1
     };
-    // the Classic voicing's render of the same base commit built with zig c++ 0.13 (clang; the build scripts' compiler)
-    // instead of g++ 15: both builds of the base agree on the other seven, and each build of the branch matches its own
-    constexpr std::uint64_t classicVoicingZig = 0x7bddb56ac889249dull;
+    // the Classic voicing: until rollup 0.1.28 its x4 oversampler called the curve as two call arguments, which g++
+    // evaluated right to left and Clang left to right, so g++ 15 builds rendered it as 0x793413613690f0b2 and Clang /
+    // zig builds (the shipped apps) as 0x7bddb56ac889249d. The order is now Clang's on every compiler (EmberClassic.h
+    // Os4::run): one hash, the Clang one, for every build
     int sameBits = 0, n = 0;
     for (const auto& c : cases)
     {
         const auto r = ember190fj::renderCase (c);
         CHECK (std::abs (r.energy - c.energy) <= 1e-4 * c.energy);
         CHECK (std::abs (r.a - c.a) < 2e-6 && std::abs (r.b - c.b) < 2e-6);
-        sameBits += r.hash == c.hash || (n == 6 && r.hash == classicVoicingZig) ? 1 : 0;
+        sameBits += r.hash == c.hash ? 1 : 0;
         ++n;
     }
     // bit for bit where the maths library is the one the goldens were made with (glibc 2.43 on x86-64: the local builds);
