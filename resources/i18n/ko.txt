@@ -9854,6 +9854,17 @@ countries: kr
 "Arc Down" = "아래로 아치"
 "Bounce Up" = "위로 바운스"
 "Bounce Down" = "아래로 바운스"
+"Clip envelope" = "클립 엔벨로프"
+"Envelope device: the clip itself, or the track's mixer" = "엔벨로프 장치: 클립 자체 또는 트랙의 믹서"
+"Envelope control" = "엔벨로프 컨트롤"
+"The clip's envelopes: its gain and its panning while it plays" = "클립의 엔벨로프: 재생 중 게인과 팬"
+"Show volume envelope" = "볼륨 엔벨로프 표시"
+"Show pan envelope" = "팬 엔벨로프 표시"
+"Hide envelope" = "엔벨로프 숨기기"
+"Reset volume envelope" = "볼륨 엔벨로프 초기화"
+"Reset pan envelope" = "팬 엔벨로프 초기화"
+"Auto-warp: {0} markers" = "자동 워프: 마커 {0}개"
+"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "워프 플래그: 드래그하여 이동, 여기를 더블클릭하면 추가  [Alt]+드래그로 클립 어디서나 마커 선 이동"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 에디터 열기/닫기  [Alt]+[LMB] 다른 에디터 유지  [Ctrl]+[LMB] 미리 듣기  [2xLMB] 피아노 롤  [LMB] 위/아래 드래그로 순서 변경  [RMB] 채널 메뉴"

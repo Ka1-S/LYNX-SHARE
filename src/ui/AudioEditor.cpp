@@ -13,6 +13,7 @@
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
+#include "core/ClipEnvelope.h"
 #include "core/AudioCapture.h"
 #include "core/AudioEditTools.h"
 #include "core/AutoWarp.h"
@@ -816,10 +817,16 @@ public:
             if (clipFactor > 0.0)
             {
                 if (juce::isPositiveAndBelow (clip, (int) s.playlist.size()) && s.playlist[(std::size_t) clip].kind == ClipKind::audio)
+                {
                     warptools::scaleClip (s.playlist[(std::size_t) clip], clipFactor);
+                    clipenv::scale (s, s.playlist[(std::size_t) clip], clipFactor); // (round 190gi)
+                }
                 if (s.clipGrid)
                     if (auto* c = const_cast<Clip*> (launcher::clipAt (*s.clipGrid, gridTrack, gridScene)); c != nullptr && c->kind == ClipKind::audio && c->channel == channel)
+                    {
                         warptools::scaleClip (*c, clipFactor);
+                        clipenv::scale (s, *c, clipFactor);
+                    }
             }
         });
         source.index = channel;

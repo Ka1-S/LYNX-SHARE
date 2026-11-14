@@ -584,3 +584,9 @@ machine, read-only: a preset's name against the value it stores (nothing of them
   `AbletonDevicePreset{OverwriteProtectionNumber, Device, PresetRef}` wrapper also read): `importLiveDevicePreset`
   (core/AlsImport.h) opens one the user owns as an insert effect (an audio effect through the translators, an Audio
   Effect Rack as a LYNX rack, a plugin as a foreign plugin); instrument / MIDI presets are refused with the reason.
+
+## 24. Audio clip envelopes (round 190gi)
+
+- An audio clip's clip envelopes: `AudioClip/Envelopes/Envelopes/ClipEnvelope{EnvelopeTarget/PointeeId, Automation/Events/FloatEvent{Time, Value}, LoopSlot, ScrollerTimePreserver}` **[SCHEMA, DATA]**, times in clip beats (the clip's `LoopStart` coordinates), the first event "before the song" (−63072000).
+- Clip Gain → the track's `DeviceChain/MainSequencer/VolumeModulationTarget`; Track Panning modulation → `DeviceChain/Mixer/Pan/ModulationTarget` **[SCHEMA, DATA: the 12 Suite demo set's vocal clips]**. Values −1…1 (−1 where those clips are silent) **[DATA]**.
+- LYNX: the clip's own `ClipEnvelope` volume / pan lanes (core/ClipEnvelope.h), 0…1 ↔ −1…1 linear (the ends are certain; the law between them needs a live check). Export: the PointeeId is a placeholder until the ids are renumbered, then the track's own target ids; a curved LYNX segment is written as 8 straight ones. Import: other clip envelopes (devices, track volume modulation, transposition, sample offset) are listed; Live 11+ curve controls become straight segments (listed).

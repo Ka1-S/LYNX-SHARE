@@ -1,4 +1,5 @@
 #include "core/AlsImport.h"
+#include "core/ClipEnvelope.h"
 #include "core/AlsDevices.h"
 #include "core/Effects.h"
 #include "core/Rack.h"
@@ -162,6 +163,9 @@ struct Ctx
     bool clipKeySeen = false;
     // round 190fm: the set's GroovePool, a Groove's Id attribute → its id in LYNX's pool
     std::map<int, std::uint32_t> grooveIds;
+    // round 190gi: the track being read's Clip Gain (MainSequencer/VolumeModulationTarget) and Track Panning modulation
+    // (Mixer/Pan/ModulationTarget) ids, the targets of its audio clips' clip envelopes
+    std::string clipVolumeTarget, clipPanTarget;
 
     explicit Ctx (const AlsImportOptions& o) : options (o), report (o.common.report) {}
 
@@ -1732,6 +1736,66 @@ int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warp
 }
 
 // `out`: the clips go there instead of the Playlist; `loopOverride`: the content played instead of the clip's own Loop
+// A track's clip envelope targets (round 190gi), before its audio clips are read
+void clipEnvelopeTargets (Ctx& ctx, const Element& track)
+{
+    ctx.clipVolumeTarget = track.path ("DeviceChain/MainSequencer/VolumeModulationTarget").attr ("Id");
+    ctx.clipPanTarget = track.path ("DeviceChain/Mixer/Pan/ModulationTarget").attr ("Id");
+}
+
+// An audio clip's clip envelopes (round 190gi): the Clip Gain and Track Panning ones as a new entry of the song's
+// table (its index; −1 = none). `contentTicks` maps clip time to LYNX's content ticks. Others are listed.
+template <typename ToTicks>
+int clipEnvelopeOf (Ctx& ctx, const Element& clip, const ToTicks& contentTicks)
+{
+    ClipEnvelope e;
+    for (const auto& env : clip.path ("Envelopes/Envelopes").children ("ClipEnvelope"))
+    {
+        const auto pointee = env.path ("EnvelopeTarget/PointeeId").attr ("Value");
+        const auto lane = ! pointee.empty() && pointee == ctx.clipVolumeTarget ? clipenv::volumeLane
+                          : ! pointee.empty() && pointee == ctx.clipPanTarget  ? clipenv::panLane
+                                                                               : (std::uint8_t) 0;
+        if (lane == 0)
+        {
+            ctx.note (&FlpImportReport::unsupported, "Clip envelopes of devices and of other mixer controls (left out; Clip Gain and Track Panning are kept)");
+            continue;
+        }
+        std::vector<AutomationPoint> points;
+        float before = clipenv::neutralOf (lane);
+        bool curves = false;
+        for (const auto& ev : env.path ("Automation/Events").children())
+        {
+            const auto t = numberAttr (ev, "Time");
+            const auto v = clipenv::fromLive (numberAttr (ev, "Value"));
+            curves = curves || ev.hasAttr ("CurveControl1X");
+            if (t < -1.0e6) // the "before the song" event [DATA]
+            {
+                before = v;
+                continue;
+            }
+            AutomationPoint p;
+            p.tick = (std::int64_t) std::llround (contentTicks (t));
+            p.value = v;
+            points.push_back (p);
+        }
+        if (points.empty())
+        {
+            AutomationPoint p;
+            p.value = before;
+            points.push_back (p);
+        }
+        std::stable_sort (points.begin(), points.end(), [] (const AutomationPoint& a, const AutomationPoint& b) { return a.tick < b.tick; });
+        if (curves)
+            ctx.note (&FlpImportReport::approximated, "Curved clip envelope segments (straight in LYNX)");
+        clipenv::laneOf (e, lane) = std::move (points);
+    }
+    if (! clipenv::active (e))
+        return -1;
+    ctx.note (&FlpImportReport::approximated, "Clip envelopes (Clip Gain and Track Panning: kept; Live's gain law between the ends needs a live check)");
+    ctx.song.clipEnvelopes.push_back (std::move (e));
+    return (int) ctx.song.clipEnvelopes.size() - 1;
+}
+
 void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, double at, double length, const std::string& user,
                    std::vector<Clip>* out = nullptr, const ClipLoop* loopOverride = nullptr)
 {
@@ -1845,6 +1909,14 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
         if (&pass == &passes.back())
             c.fadeOut = std::clamp (ticksOf (clip.number ("Fades/FadeOutLength", 0)), (std::int64_t) 0, c.length);
         (out != nullptr ? *out : ctx.song.playlist).push_back (c);
+    }
+    // round 190gi: Live's clip envelopes on Clip Gain and Track Panning → the clips' own envelopes (clip beats → the same
+    // content ticks as the clips' offsets; −1…1 → 0…1)
+    if (const auto envelope = clipEnvelopeOf (ctx, clip, contentTicks); envelope >= 0)
+    {
+        auto& list = out != nullptr ? *out : ctx.song.playlist;
+        for (std::size_t k = list.size() - std::min (list.size(), passes.size()); k < list.size(); ++k)
+            list[k].envelope = envelope;
     }
 }
 
@@ -2067,7 +2139,10 @@ void sessionToGrid (Ctx& ctx, const Element& set, const std::vector<Element>& tr
                 if (clip.name() == "MidiClip" && channelOf[i] >= 0)
                     addMidiClip (ctx, clip, rowOf[i], channelOf[i], 0.0, length, &made, &body);
                 else if (clip.name() == "AudioClip")
+                {
+                    clipEnvelopeTargets (ctx, tracks[i]);
                     addAudioClip (ctx, clip, rowOf[i], insertOf[i], 0.0, length, song.mixer[(std::size_t) insertOf[i]].name, &made, &body);
+                }
                 if (made.empty())
                     continue;
                 const auto id = launcher::setClip (song, rowOf[i], (int) s, made.front());
@@ -2618,6 +2693,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
         else
         {
             effectsFrom (ctx, devices, insert);
+            clipEnvelopeTargets (ctx, t);
             if (kind == "AudioTrack")
                 for (const auto& clip : t.path ("DeviceChain/MainSequencer/Sample/ArrangerAutomation/Events").children ("AudioClip"))
                 {
@@ -2673,7 +2749,10 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
                 if (clip.name() == "MidiClip" && channelOf[i] >= 0)
                     addMidiClip (ctx, clip, rowOf[i], channelOf[i], at, length);
                 else if (clip.name() == "AudioClip" && rowOf[i] >= 0)
+                {
+                    clipEnvelopeTargets (ctx, tracks[i]);
                     addAudioClip (ctx, clip, rowOf[i], insertOf[i], at, length, song.mixer[(std::size_t) insertOf[i]].name);
+                }
             }
             Marker m;
             m.tick = cursor;

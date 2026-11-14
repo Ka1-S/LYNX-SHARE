@@ -9,6 +9,7 @@
 #include "core/MidiOut.h"
 #include "core/Scheduler.h"
 #include "core/ClipOps.h"
+#include "core/ClipEnvelope.h"
 #include "core/ChannelPoly.h"
 
 #include "core/DirectWave.h"
@@ -1554,6 +1555,13 @@ struct SamplerVoice
     double regionFirst = 0.0, regionLast = 0.0; // the whole region, before the start offset and slicing (round 190w: the locator)
     float clipElapsed = 0.0f, clipRemaining = 0.0f, fadeIn = 0.0f, fadeOut = 0.0f; // clip fades
     std::uint8_t fadeShape = 0; // bit 0 / 1: the fade-in / fade-out is on the S curve (else straight)
+    // the clip's envelope (round 190gi): its index in the block's table (−1 = none), the clip tick of the next sample,
+    // and the gain / pan gains ramping over 16-sample steps
+    std::int32_t envIndex = -1;
+    double envTick = 0.0;
+    float envGain = 1.0f, envGainStep = 0.0f, envL = 1.0f, envR = 1.0f, envLStep = 0.0f, envRStep = 0.0f;
+    int envLeft = 0;
+    bool envStarted = false;
     float fadeInTension = 0.0f, fadeOutTension = 0.0f; // FL's raw fade tensions
     float panL = 1.0f, panR = 1.0f;
     double glideRatio = 1.0;
@@ -1803,6 +1811,7 @@ public:
         // this note's clip fades and flags, taken now so a note that does not sound leaves none to the next one
         const auto clipFades = std::exchange (nextClip, {});
         const auto clipShape = std::exchange (nextClipShape, (std::uint16_t) 0);
+        const auto clipEnvelope = std::exchange (nextClipEnvelope, -1);
         const auto clipPitch = clipMode ? (double) std::clamp (std::exchange (nextClipPitch, 0.0f), -12.0f, 12.0f) : 0.0;
         // FL 2026's clip stretch (round 167l, FL render of a 2 s 440 Hz ramp: ×2 lasts 4 s at 220 Hz in Resample, at
         // 440 Hz in the stretch modes; ×0.5 lasts 1 s): the clip reads its file `stretch` times slower
@@ -1942,6 +1951,11 @@ public:
         startClipEdges (*target, clipShape, clipFades);
         target->fadeInTension = std::exchange (nextClipTension[0], 0.0f);
         target->fadeOutTension = std::exchange (nextClipTension[1], 0.0f);
+        target->envIndex = clipMode ? clipEnvelope : -1;
+        target->envTick = nextClipEnvTick;
+        target->envLeft = 0;
+        target->envStarted = false;
+        target->envGain = target->envL = target->envR = 1.0f;
         // FL's read speed: the rate ratio at the original pitch, else exp(cents·ln2/1200)·ratio
         target->rate = flrs::speedFor ((float) (semitones * 100.0), base);
         target->reversed = backwards;
@@ -2315,6 +2329,52 @@ public:
         nextClip = { elapsed, remaining, in, out };
         nextClipShape = shape;
         nextClipTension = { inTension, outTension };
+    }
+
+    void setNextClipEnvelope (int index, double tick) noexcept override
+    {
+        nextClipEnvelope = index;
+        nextClipEnvTick = tick;
+    }
+    void setClipEnvelopes (const std::vector<ClipEnvelope>* table, double ticksPerSample) noexcept override
+    {
+        clipEnvelopes = table;
+        clipEnvTps = std::isfinite (ticksPerSample) ? std::max (0.0, ticksPerSample) : 0.0;
+    }
+    // One sample of a voice's clip envelope: every 16 samples the gain and the pan gains are read at the step's end and
+    // ramp there (no steps in the sound, and a cost only on voices with an envelope)
+    void clipEnvelopeSample (SamplerVoice& v, float& sl, float& sr, float& gain) noexcept
+    {
+        constexpr int step = 16;
+        if (v.envLeft <= 0)
+        {
+            const ClipEnvelope* e = clipEnvelopes != nullptr && v.envIndex < (int) clipEnvelopes->size() ? &(*clipEnvelopes)[(std::size_t) v.envIndex] : nullptr;
+            const auto read = [e] (double tick, float& g, float& l, float& r) {
+                g = e != nullptr ? clipenv::gainAt (*e, tick) : 1.0f;
+                l = r = 1.0f;
+                if (e != nullptr && ! e->pan.empty())
+                    voicePan (clipenv::panAt (*e, tick), l, r);
+            };
+            if (! v.envStarted)
+            {
+                read (v.envTick, v.envGain, v.envL, v.envR);
+                v.envStarted = true;
+            }
+            float g, l, r;
+            read (v.envTick + step * clipEnvTps, g, l, r);
+            v.envGainStep = (g - v.envGain) / (float) step;
+            v.envLStep = (l - v.envL) / (float) step;
+            v.envRStep = (r - v.envR) / (float) step;
+            v.envLeft = step;
+        }
+        gain *= std::max (0.0f, v.envGain);
+        sl *= v.envL;
+        sr *= v.envR;
+        v.envGain += v.envGainStep;
+        v.envL += v.envLStep;
+        v.envR += v.envRStep;
+        v.envTick += clipEnvTps;
+        --v.envLeft;
     }
 
     bool setNextNoteGain (float gain) noexcept override
@@ -2790,6 +2850,8 @@ public:
                     v.clipElapsed += 1.0f;
                     v.clipRemaining -= 1.0f;
                 }
+                if (v.envIndex >= 0)
+                    clipEnvelopeSample (v, sl, sr, gain);
 
                 if (shaper != nullptr)
                 {
@@ -3047,6 +3109,8 @@ public:
                     v.clipElapsed += 1.0f;
                     v.clipRemaining -= 1.0f;
                 }
+                if (v.envIndex >= 0)
+                    clipEnvelopeSample (v, sl, sr, gain);
                 flX[(std::size_t) (2 * m)] = sl;
                 flX[(std::size_t) (2 * m + 1)] = sr;
                 if (v.offFade >= 0)
@@ -3302,6 +3366,10 @@ private:
     bool clipShift = false;           // pitch shifters for the clips' own pitch (set before prepareKeyShift)
     std::uint16_t nextClipShape = 0;
     std::array<float, 2> nextClipTension {};
+    std::int32_t nextClipEnvelope = -1; // round 190gi: the next clip's envelope (audio thread)
+    double nextClipEnvTick = 0.0;
+    const std::vector<ClipEnvelope>* clipEnvelopes = nullptr; // the block's table (null: the song has none)
+    double clipEnvTps = 0.0;
 
     struct SliceTable
     {

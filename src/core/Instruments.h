@@ -132,6 +132,11 @@ public:
     virtual void setClipShift (bool) {}
     virtual void setNextClipFades (float /*elapsed*/, float /*remaining*/, float /*fadeIn*/, float /*fadeOut*/, std::uint16_t /*shape*/ = 0,
                                   float /*inTension*/ = 0.0f, float /*outTension*/ = 0.0f) noexcept {}
+    // Audio clip envelopes (round 190gi, core/ClipEnvelope.h): the next clip note plays envelope `index` of the song's
+    // table from clip tick `tick` (before noteOn); and, every block, the table of the snapshot that plays (null: none)
+    // with the ticks per sample. The voice keeps only the index: the table is the one handed in for the block it renders.
+    virtual void setNextClipEnvelope (int /*index*/, double /*tick*/) noexcept {}
+    virtual void setClipEnvelopes (const std::vector<ClipEnvelope>* /*table*/, double /*ticksPerSample*/) noexcept {}
     // Pan, fine tuning and "porta" (inverts the channel's porta) of the next note (called right before
     // noteOn). Ignored if unsupported.
     virtual void setNextNoteExpression (float /*pan*/, float /*cents*/, bool /*porta*/ = false) noexcept {}

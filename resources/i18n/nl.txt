@@ -9854,6 +9854,17 @@ countries: nl be
 "Arc Down" = "Boog omlaag"
 "Bounce Up" = "Stuiter omhoog"
 "Bounce Down" = "Stuiter omlaag"
+"Clip envelope" = "Clip-envelop"
+"Envelope device: the clip itself, or the track's mixer" = "Envelop-apparaat: de clip zelf of de mixer van het spoor"
+"Envelope control" = "Envelop-regelaar"
+"The clip's envelopes: its gain and its panning while it plays" = "De envelops van de clip: gain en panning tijdens het afspelen"
+"Show volume envelope" = "Volume-envelop tonen"
+"Show pan envelope" = "Pan-envelop tonen"
+"Hide envelope" = "Envelop verbergen"
+"Reset volume envelope" = "Volume-envelop herstellen"
+"Reset pan envelope" = "Pan-envelop herstellen"
+"Auto-warp: {0} markers" = "Auto-warp: {0} markers"
+"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "Warpvlaggen: sleep er een om te verplaatsen, dubbelklik hier voegt er een toe  [Alt]+slepen verplaatst de lijn van een marker overal op de clip"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"

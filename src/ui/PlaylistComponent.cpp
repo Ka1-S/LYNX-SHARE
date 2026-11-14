@@ -12,6 +12,8 @@
 #include "ui/TrackIcons.h"
 #include "core/TrackIcons.h"
 #include "core/WarpEdit.h"
+#include "core/ClipEnvelope.h"
+#include "core/ClipWarp.h"
 #include "ui/ClipProperties.h"
 #include "ui/UiTrace.h"
 #include "ui/ImageReadback.h"
@@ -2534,6 +2536,11 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
         }
     }
 
+    // the clip's own envelope (round 190gi): the lane shown is edited here like an automation clip's curve; a clip whose
+    // envelope is hidden still shows its volume line faintly
+    if (const auto* envelope = clipenv::of (song, c); envelope != nullptr && (envelope->shown != 0 || clipenv::active (*envelope)))
+        paintClipEnvelope (g, c, *envelope);
+
     // fades: a shaded ramp over the body and a handle at the header's corner; an automatic crossfade (round 166e)
     // replaces that side's fade with FL's two crossing S-curves over the overlap
     const auto fadeIn = c.effectiveFadeIn(), fadeOut = c.effectiveFadeOut();
@@ -2666,6 +2673,82 @@ void PlaylistComponent::paintAutomationClip (juce::Graphics& g, const Clip& c, j
             g.setColour (theme::colour::automation.brighter (0.5f));
             g.fillEllipse (x - 2.5f, y - 2.5f, 5.0f, 5.0f);
         }
+}
+
+void PlaylistComponent::paintClipEnvelope (juce::Graphics& g, const Clip& c, const ClipEnvelope& envelope)
+{
+    const auto lane = envelope.shown != 0 ? envelope.shown : clipenv::volumeLane;
+    const auto& points = clipenv::laneOf (envelope, lane);
+    if (envelope.shown == 0 && clipenv::flat (points, clipenv::neutralOf (lane)))
+        return;
+    const auto body = automationBody (c);
+    const auto shown = envelope.shown != 0;
+    const auto clip = g.getClipBounds().toFloat();
+    const auto valueAt = [&] (double tick) { return points.empty() ? clipenv::neutralOf (lane) : automationCurveAt (points, tick); };
+    const auto yAt = [&] (int sx) { return body.getBottom() - valueAt (clipenv::clipTick (c, xToTick (sx))) * body.getHeight(); };
+
+    // the pan lane's centre line, so left and right read at a glance
+    if (shown && lane == clipenv::panLane)
+    {
+        g.setColour (theme::colour::bg0.withAlpha (0.35f));
+        g.drawHorizontalLine ((int) std::round (body.getCentreY()), body.getX(), body.getRight());
+    }
+    juce::Path curve;
+    bool started = false;
+    auto lastY = 0.0f;
+    // (sampled every 2 px on the body's grid from a little before the repainted area, as the automation clips are)
+    const auto lastX = std::min (body.getRight(), clip.getRight() + 4.0f);
+    for (auto k = (int) std::floor (juce::jmax (0.0f, clip.getX() - 4.0f - body.getX()) / 2.0f);; ++k)
+    {
+        const auto x = body.getX() + 2.0f * (float) k;
+        if (x > lastX)
+            break;
+        const auto y = yAt ((int) x);
+        if (! started)
+            curve.startNewSubPath (x, y);
+        else
+            automationLineTo (curve, x - 2.0f, lastY, x, y, [&] { return yAt ((int) x - 1); });
+        lastY = y;
+        started = true;
+    }
+    // dark under-stroke: readable over any waveform colour
+    g.setColour (theme::colour::bg0.withAlpha (shown ? 0.7f : 0.35f));
+    g.strokePath (curve, juce::PathStrokeType (shown ? 3.0f : 2.0f));
+    g.setColour (theme::colour::automation.brighter (0.3f).withAlpha (shown ? 1.0f : 0.55f));
+    g.strokePath (curve, juce::PathStrokeType (shown ? 1.5f : 1.0f));
+    if (! shown || body.getWidth() <= 24.0f)
+        return;
+
+    // the tension handles between points and the points, as on an automation clip (round 165)
+    for (int i = 0; i + 1 < (int) points.size(); ++i)
+    {
+        const auto& a = points[(std::size_t) i];
+        const auto& b = points[(std::size_t) i + 1];
+        const auto x0 = tickToX ((double) (c.start + a.tick - c.offset)), x1 = tickToX ((double) (c.start + b.tick - c.offset));
+        const auto midX = (float) (0.5 * (x0 + x1));
+        if (x1 - x0 < 16.0 || midX < body.getX() || midX > body.getRight() || body.getHeight() < 10.0f)
+            continue;
+        const auto y = body.getBottom() - valueAt (0.5 * (double) (a.tick + b.tick)) * body.getHeight();
+        g.setColour (theme::colour::automation.brighter (0.2f).withAlpha (0.9f));
+        g.drawEllipse (midX - 3.0f, y - 3.0f, 6.0f, 6.0f, 1.2f);
+    }
+    for (const auto& p : points)
+    {
+        const auto songTick = (double) (c.start + p.tick - c.offset);
+        if (songTick < (double) c.start || songTick > (double) c.end())
+            continue;
+        const auto x = (float) tickToX (songTick);
+        const auto y = body.getBottom() - p.value * body.getHeight();
+        g.setColour (theme::colour::bg0);
+        g.fillEllipse (x - 3.5f, y - 3.5f, 7.0f, 7.0f);
+        g.setColour (theme::colour::automation.brighter (0.5f));
+        g.fillEllipse (x - 2.5f, y - 2.5f, 5.0f, 5.0f);
+    }
+    // the lane's name at the body's top left: "Volume" / "Pan"
+    g.setColour (theme::colour::automation.brighter (0.4f));
+    g.setFont (font (type::caption));
+    g.drawText (lane == clipenv::panLane ? tr ("Pan") : tr ("Volume"), body.reduced (4.0f, 1.0f).withHeight (12.0f).toNearestInt(),
+                juce::Justification::topRight, false);
 }
 
 juce::Rectangle<float> PlaylistComponent::automationBody (const Clip& c) const
@@ -3171,19 +3254,74 @@ void PlaylistComponent::toggleAutomationLanes()
         onViewOptionChanged();
 }
 
+juce::Rectangle<float> PlaylistComponent::curveBodyForSnapshot (int clip) const
+{
+    const auto& song = engine.getSong();
+    return clip >= 0 && clip < (int) song.playlist.size() ? automationBody (song.playlist[(std::size_t) clip]) : juce::Rectangle<float>();
+}
+
+PlaylistComponent::CurveRef PlaylistComponent::curveOf (int clip) const
+{
+    const auto& song = engine.getSong();
+    if (clip < 0 || clip >= (int) song.playlist.size())
+        return {};
+    const auto& c = song.playlist[(std::size_t) clip];
+    if (c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) song.automations.size())
+        return { &song.automations[(std::size_t) c.automation].points, c.automation, 0 };
+    if (const auto* e = clipenv::of (song, c); e != nullptr && e->shown != 0)
+        return { &clipenv::laneOf (*e, e->shown), -1, e->shown };
+    return {};
+}
+
+void PlaylistComponent::editCurve (int clip, const std::function<void (std::vector<AutomationPoint>&)>& fn)
+{
+    engine.editSong ([clip, &fn] (Song& s) {
+        if (clip < 0 || clip >= (int) s.playlist.size())
+            return;
+        auto& c = s.playlist[(std::size_t) clip];
+        if (c.kind == ClipKind::automation && c.automation >= 0 && c.automation < (int) s.automations.size())
+            fn (s.automations[(std::size_t) c.automation].points);
+        else if (const auto* e = clipenv::of (s, c); e != nullptr && e->shown != 0)
+        {
+            auto& own = clipenv::own (s, c);
+            fn (clipenv::laneOf (own, own.shown));
+        }
+    });
+}
+
+float PlaylistComponent::curveValueAt (int clip, double clipTick) const
+{
+    const auto curve = curveOf (clip);
+    if (curve.automation >= 0)
+        return engine.getSong().automations[(std::size_t) curve.automation].valueAt (clipTick);
+    return curve.points != nullptr && ! curve.points->empty() ? automationCurveAt (*curve.points, clipTick) : clipenv::neutralOf (curve.lane);
+}
+
+// a point's value as the hint shows it: the automation target's, or the envelope's dB / pan
+juce::String PlaylistComponent::curveValueText (int clip, float value) const
+{
+    const auto curve = curveOf (clip);
+    if (curve.automation >= 0)
+        return automationPointValueText (engine.getSong().automations[(std::size_t) curve.automation].target, value);
+    if (curve.lane == clipenv::panLane)
+    {
+        const auto pan = juce::roundToInt (clipenv::panOf (value) * 100.0f);
+        return pan == 0 ? tr ("Centered") : juce::String (std::abs (pan)) + (pan < 0 ? "% L" : "% R");
+    }
+    const auto gain = clipenv::gainOf (value);
+    return gain <= 0.0f ? juce::String ("-inf dB") : juce::String (juce::Decibels::gainToDecibels (gain), 1) + " dB";
+}
+
 int PlaylistComponent::automationPointAt (int clip, juce::Point<int> pos) const
 {
     const auto& song = engine.getSong();
-
-    if (clip < 0 || clip >= (int) song.playlist.size() || song.playlist[(std::size_t) clip].kind != ClipKind::automation)
+    const auto curve = curveOf (clip);
+    if (curve.points == nullptr)
         return -1;
 
     const auto& c = song.playlist[(std::size_t) clip];
-    if (c.automation < 0 || c.automation >= (int) song.automations.size())
-        return -1;
-
     const auto body = automationBody (c);
-    const auto& points = song.automations[(std::size_t) c.automation].points;
+    const auto& points = *curve.points;
 
     for (int i = (int) points.size() - 1; i >= 0; --i)
     {
@@ -3201,19 +3339,15 @@ int PlaylistComponent::automationPointAt (int clip, juce::Point<int> pos) const
 bool PlaylistComponent::isOnAutomationCurve (int clip, juce::Point<int> pos) const
 {
     const auto& song = engine.getSong();
-
-    if (clip < 0 || clip >= (int) song.playlist.size() || song.playlist[(std::size_t) clip].kind != ClipKind::automation)
+    if (curveOf (clip).points == nullptr)
         return false;
 
     const auto& c = song.playlist[(std::size_t) clip];
-    if (c.automation < 0 || c.automation >= (int) song.automations.size())
-        return false;
-
     const auto body = automationBody (c);
     if (! body.expanded (0.0f, 4.0f).contains (pos.toFloat()))
         return false;
 
-    const auto value = song.automations[(std::size_t) c.automation].valueAt ((double) c.offset + xToTick (pos.x) - (double) c.start);
+    const auto value = curveValueAt (clip, (double) c.offset + xToTick (pos.x) - (double) c.start);
     return std::abs (body.getBottom() - value * body.getHeight() - (float) pos.y) <= 5.0f;
 }
 
@@ -3222,10 +3356,9 @@ bool PlaylistComponent::automationEditable (int clip) const
     const auto& song = engine.getSong();
     if (clip < 0 || clip >= (int) song.playlist.size())
         return false;
-    const auto& c = song.playlist[(std::size_t) clip];
-    if (c.kind != ClipKind::automation || c.automation < 0 || c.automation >= (int) song.automations.size())
+    if (curveOf (clip).points == nullptr)
         return false;
-    const auto body = automationBody (c);
+    const auto body = automationBody (song.playlist[(std::size_t) clip]);
     return body.getWidth() > 24.0f && body.getHeight() >= 10.0f;
 }
 
@@ -3235,25 +3368,24 @@ juce::Point<float> PlaylistComponent::automationHandlePos (int clip, int point) 
         return { -1.0f, -1.0f };
     const auto& song = engine.getSong();
     const auto& c = song.playlist[(std::size_t) clip];
-    const auto& automation = song.automations[(std::size_t) c.automation];
-    if (point < 0 || point + 1 >= (int) automation.points.size())
+    const auto& points = *curveOf (clip).points;
+    if (point < 0 || point + 1 >= (int) points.size())
         return { -1.0f, -1.0f };
-    const auto& a = automation.points[(std::size_t) point];
-    const auto& b = automation.points[(std::size_t) point + 1];
+    const auto& a = points[(std::size_t) point];
+    const auto& b = points[(std::size_t) point + 1];
     const auto x0 = tickToX ((double) (c.start + a.tick - c.offset)), x1 = tickToX ((double) (c.start + b.tick - c.offset));
     const auto body = automationBody (c);
     const auto midX = (float) (0.5 * (x0 + x1));
     if (x1 - x0 < 16.0 || midX < body.getX() || midX > body.getRight())
         return { -1.0f, -1.0f };
-    return { midX, body.getBottom() - automation.valueAt (0.5 * (double) (a.tick + b.tick)) * body.getHeight() };
+    return { midX, body.getBottom() - curveValueAt (clip, 0.5 * (double) (a.tick + b.tick)) * body.getHeight() };
 }
 
 int PlaylistComponent::automationHandleAt (int clip, juce::Point<int> p) const
 {
     if (! automationEditable (clip))
         return -1;
-    const auto& song = engine.getSong();
-    const auto n = (int) song.automations[(std::size_t) song.playlist[(std::size_t) clip].automation].points.size();
+    const auto n = (int) curveOf (clip).points->size();
     for (int i = 0; i + 1 < n; ++i)
         if (const auto h = automationHandlePos (clip, i); h.x >= 0.0f && h.getDistanceFrom (p.toFloat()) <= 5.0f)
             return i;
@@ -3274,6 +3406,29 @@ juce::PopupMenu PlaylistComponent::getAutomationPointMenuForSnapshot (int clip, 
     const auto& song = engine.getSong();
     if (clip < 0 || clip >= (int) song.playlist.size())
         return {};
+    // an audio clip's envelope (round 190gi): the same point menu without the value clipboard and the automation editor
+    if (const auto curve = curveOf (clip); curve.lane != 0)
+    {
+        const auto& points = *curve.points;
+        if (point < 0 || point >= (int) points.size())
+            return {};
+        juce::PopupMenu menu;
+        menu.addSectionHeader (automationPointMenuHeader (point, (int) points.size()));
+        menu.addItem (tr ("Delete"), points.size() > 1, false, [this, clip, point] {
+            editCurve (clip, [point] (std::vector<AutomationPoint>& list) {
+                if (list.size() > 1)
+                    eraseAutomationPoint (list, point);
+            });
+        });
+        addAutomationModeItems (menu, automationPointMode (points, point), point > 0, [this, clip, point] (int mode) {
+            editCurve (clip, [point, mode] (std::vector<AutomationPoint>& list) { setAutomationPointMode (list, point, mode); });
+        });
+        menu.addSeparator();
+        menu.addItem (tr ("Straight segment (reset the curve)"), point + 1 < (int) points.size(), false, [this, clip, point] {
+            editCurve (clip, [point] (std::vector<AutomationPoint>& list) { setAutomationSegmentTension (list, point, 0.0f); });
+        });
+        return menu;
+    }
     const auto a = song.playlist[(std::size_t) clip].automation;
     if (a < 0 || a >= (int) song.automations.size() || point < 0 || point >= (int) song.automations[(std::size_t) a].points.size())
         return {};
@@ -3336,6 +3491,45 @@ std::vector<WarpPoint> PlaylistComponent::clipWarpMarkers (int index) const
         || clipops::playsBackwards (song.channels[(std::size_t) c.channel], c))
         return {};
     return warpedit::playedMarkers (song.channels[(std::size_t) c.channel].sampler, clipFileSeconds (index));
+}
+
+// round 190gi: Alt + drag — the marker whose line is within 5 px of `p`, anywhere on the clip's body (the start one never moves)
+int PlaylistComponent::warpMarkerNear (int index, juce::Point<int> p) const
+{
+    const auto markers = clipWarpMarkers (index);
+    if (markers.size() < 2)
+        return -1;
+    const auto& c = engine.getSong().playlist[(std::size_t) index];
+    const auto bounds = clipBounds (index);
+    if (p.y < bounds.getY() + (int) clipTitleHeight || p.y > bounds.getBottom())
+        return -1;
+    int best = -1;
+    double bestDx = 5.0;
+    for (std::size_t k = 1; k < markers.size(); ++k)
+        if (const auto dx = std::abs (tickToX (warpedit::clipTickOfBeat (c, markers[k].beats)) - p.x); dx <= bestDx)
+        {
+            bestDx = dx;
+            best = (int) k;
+        }
+    return best;
+}
+
+// round 190gi: a double-click on the flag strip of a clip that has warp markers adds one there (file seconds; −1 = none)
+double PlaylistComponent::warpStripSeconds (int index, juce::Point<int> p) const
+{
+    const auto markers = clipWarpMarkers (index);
+    const auto& song = engine.getSong();
+    if (markers.size() < 2 || index < 0 || index >= (int) song.playlist.size())
+        return -1.0;
+    const auto& c = song.playlist[(std::size_t) index];
+    if (c.channel < 0 || c.channel >= (int) song.channels.size() || song.channels[(std::size_t) c.channel].sampler.warp.size() < 2)
+        return -1.0;
+    const auto top = (float) clipBounds (index).getY() + (float) clipTitleHeight;
+    if (p.y < top - 1.0f || p.y > top + 8.0f)
+        return -1.0;
+    const auto beats = (xToTick (p.x) - warpedit::clipTickOfBeat (c, 0.0)) / (ppq * std::clamp (c.stretch, 0.01, 100.0));
+    const auto seconds = warpedit::secondsAt (markers, beats);
+    return seconds > 0.0 && seconds < clipFileSeconds (index) ? seconds : -1.0;
 }
 
 int PlaylistComponent::warpMarkerAt (int index, juce::Point<int> p) const
@@ -4175,24 +4369,22 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
         if (const auto handle = automationHandleAt (hit, e.getPosition()); handle >= 0)
         {
-            const auto automation = engine.getSong().playlist[(std::size_t) hit].automation;
             automationPointMemory().tension = 0.0f; // FL's "default tension" also clears the editor's memory
-            engine.editSong ([automation, handle] (Song& s) { setAutomationSegmentTension (s.automations[(std::size_t) automation].points, handle, 0.0f); });
+            editCurve (hit, [handle] (std::vector<AutomationPoint>& points) { setAutomationSegmentTension (points, handle, 0.0f); });
             return;
         }
         if (automationEditable (hit) && automationBody (engine.getSong().playlist[(std::size_t) hit]).contains (e.position))
         {
             const auto& c = engine.getSong().playlist[(std::size_t) hit];
-            const auto& automation = engine.getSong().automations[(std::size_t) c.automation];
             AutomationPoint p;
             p.tick = juce::jlimit<std::int64_t> (c.offset, c.offset + c.length, snap (xToTick (e.x), ! e.mods.isAltDown()) - c.start + c.offset);
             const auto body = automationBody (c);
-            p.value = e.mods.isShiftDown() ? automation.valueAt ((double) p.tick)
+            p.value = e.mods.isShiftDown() ? curveValueAt (hit, (double) p.tick)
                                            : juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight()));
             int added = -1;
             // FL: the new point takes the mode and tension last used (round 190bw)
-            engine.editSong ([a = c.automation, p, &added, m = automationPointMemory()] (Song& s) {
-                added = insertAutomationPoint (s.automations[(std::size_t) a].points, p, m.mode, m.tension);
+            editCurve (hit, [p, &added, m = automationPointMemory()] (std::vector<AutomationPoint>& points) {
+                added = insertAutomationPoint (points, p, m.mode, m.tension);
             });
             setSelection ({});
             drag = Drag::autoPoint;
@@ -4348,8 +4540,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
 
         if (const auto handle = point < 0 ? automationHandleAt (hit, e.getPosition()) : -1; handle >= 0)
         {
-            const auto& song = engine.getSong();
-            const auto& points = song.automations[(std::size_t) song.playlist[(std::size_t) hit].automation].points;
+            const auto& points = *curveOf (hit).points;
             setSelection ({});
             drag = Drag::autoTension;
             autoClip = hit;
@@ -4369,9 +4560,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             p.tick = juce::jmax<std::int64_t> (0, snap (xToTick (e.x), snapOn) - c.start + c.offset);
             const auto body = automationBody (c);
             p.value = juce::jlimit (0.0f, 1.0f, (body.getBottom() - (float) e.y) / juce::jmax (1.0f, body.getHeight()));
-            engine.editSong ([a = c.automation, p, m = automationPointMemory()] (Song& s) {
-                insertAutomationPoint (s.automations[(std::size_t) a].points, p, m.mode, m.tension);
-            });
+            editCurve (hit, [p, m = automationPointMemory()] (std::vector<AutomationPoint>& points) { insertAutomationPoint (points, p, m.mode, m.tension); });
             point = automationPointAt (hit, e.getPosition());
         }
 
@@ -4385,9 +4574,10 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
     }
 
-    // warp marker flags (round 175a): drag a marker sideways; the change is applied on release
+    // warp marker flags (round 175a): drag a marker sideways; the change is applied on release. Round 190gi: Alt + drag
+    // near a marker's line anywhere on the clip's body does the same (FL's plain clip drag is unchanged)
     if (hit >= 0)
-        if (const auto marker = warpMarkerAt (hit, e.getPosition()); marker > 0)
+        if (const auto marker = e.mods.isAltDown() && e.mods.isLeftButtonDown() ? warpMarkerNear (hit, e.getPosition()) : warpMarkerAt (hit, e.getPosition()); marker > 0)
         {
             setSelection ({});
             warpClip = hit;
@@ -4710,9 +4900,10 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             if (autoClip < 0 || autoClip >= (int) song.playlist.size())
                 return;
             const auto& c = song.playlist[(std::size_t) autoClip];
-            if (c.automation < 0 || c.automation >= (int) song.automations.size())
+            const auto curve = curveOf (autoClip);
+            if (curve.points == nullptr)
                 return;
-            const auto& points = song.automations[(std::size_t) c.automation].points;
+            const auto& points = *curve.points;
             if (autoPoint < 0 || autoPoint >= (int) points.size())
                 return;
 
@@ -4729,10 +4920,12 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             if (flmods::ctrl (e.mods) && ! flmods::ctrl (downMods))
                 value = points[(std::size_t) autoPoint].value;
 
-            engine.editSong ([a = c.automation, i = autoPoint, tick, value] (Song& s) {
-                auto& p = s.automations[(std::size_t) a].points[(std::size_t) i];
-                p.tick = tick;
-                p.value = value;
+            editCurve (autoClip, [i = autoPoint, tick, value] (std::vector<AutomationPoint>& list) {
+                if (i < (int) list.size())
+                {
+                    list[(std::size_t) i].tick = tick;
+                    list[(std::size_t) i].value = value;
+                }
             });
             return;
         }
@@ -4742,15 +4935,15 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
             const auto& song = engine.getSong();
             if (autoClip < 0 || autoClip >= (int) song.playlist.size())
                 return;
-            const auto a = song.playlist[(std::size_t) autoClip].automation;
-            if (a < 0 || a >= (int) song.automations.size() || autoPoint < 0 || autoPoint + 1 >= (int) song.automations[(std::size_t) a].points.size())
+            const auto curve = curveOf (autoClip);
+            if (curve.points == nullptr || autoPoint < 0 || autoPoint + 1 >= (int) curve.points->size())
                 return;
             // the handle follows the mouse: a drag over the curve's height bends the segment fully (Ctrl: 4× finer)
             const auto range = juce::jmax (30.0f, automationBody (song.playlist[(std::size_t) autoClip]).getHeight()) * (flmods::ctrl (e.mods) ? 4.0f : 1.0f);
             const auto up = -(float) e.getDistanceFromDragStartY() / range;
             const auto tension = juce::jlimit (-1.0f, 1.0f, tensionStart + tensionSign * up);
             automationPointMemory().tension = tension; // (FL's editor memory: the next new point takes it)
-            engine.editSong ([a, i = autoPoint, tension] (Song& s) { setAutomationSegmentTension (s.automations[(std::size_t) a].points, i, tension); });
+            editCurve (autoClip, [i = autoPoint, tension] (std::vector<AutomationPoint>& list) { setAutomationSegmentTension (list, i, tension); });
             return;
         }
 
@@ -5125,7 +5318,11 @@ void PlaylistComponent::postDragHint()
         case Drag::fadeIn:
         case Drag::fadeOut: hint.text = EditorGlobals::get().snapFadeHandles ? tr ("Setting the fade  [Alt] no snap") : tr ("Setting the fade"); break;
         case Drag::warpMarker: hint.text = tr ("Moving the warp marker: the audio around it stretches  [Alt] no snap"); break;
-        case Drag::autoPoint: hint.text = tr ("Moving the point: then [Shift] keeps time  [Ctrl] keeps value"); break;
+        case Drag::autoPoint:
+            hint.text = tr ("Moving the point: then [Shift] keeps time  [Ctrl] keeps value");
+            if (const auto curve = curveOf (autoClip); curve.lane != 0 && autoPoint >= 0 && autoPoint < (int) curve.points->size())
+                hint.value = curveValueText (autoClip, (*curve.points)[(std::size_t) autoPoint].value); // (an envelope's dB / pan)
+            break;
         case Drag::autoTension: hint.text = tr ("Bending the segment: drag up / down  [Ctrl] fine"); break;
         case Drag::laneDraw:
             hint.text = drawFreehand ? tr ("Draw Mode: drawing freehand") : tr ("Draw Mode: drawing steps at the grid width  [Alt] freehand");
@@ -7421,6 +7618,53 @@ juce::PopupMenu PlaylistComponent::buildAudioClipMenu (int index, int mouseX)
         }
         menu.addSubMenu (tr ("Clip volume"), gains);
     }
+    // the clip's own envelopes (round 190gi, core/ClipEnvelope.h): the lane shown on the clip is edited there like an
+    // automation clip's curve ([RMB] adds a point, drag a point, the hollow handles bend a segment)
+    {
+        const auto* envelope = clipenv::of (song, clip);
+        const auto shown = envelope != nullptr ? envelope->shown : (std::uint8_t) 0;
+        juce::PopupMenu env;
+        auto showLane = [this, index] (std::uint8_t lane) {
+            engine.editSong ([index, lane] (Song& s) {
+                if (index < (int) s.playlist.size())
+                    clipenv::show (s, s.playlist[(std::size_t) index], lane);
+            });
+        };
+        env.addItem (tr ("Show volume envelope"), true, shown == clipenv::volumeLane, [showLane, shown] { showLane (shown == clipenv::volumeLane ? 0 : clipenv::volumeLane); });
+        env.addItem (tr ("Show pan envelope"), true, shown == clipenv::panLane, [showLane, shown] { showLane (shown == clipenv::panLane ? 0 : clipenv::panLane); });
+        env.addItem (tr ("Hide envelope"), shown != 0, false, [showLane] { showLane (0); });
+        env.addSeparator();
+        for (const auto lane : { clipenv::volumeLane, clipenv::panLane })
+        {
+            const auto has = envelope != nullptr && ! clipenv::flat (clipenv::laneOf (*envelope, lane), clipenv::neutralOf (lane));
+            env.addItem (lane == clipenv::volumeLane ? tr ("Reset volume envelope") : tr ("Reset pan envelope"), has, false, [this, targets, lane] {
+                engine.editSong ([targets, lane] (Song& s) {
+                    for (auto i : targets)
+                        if (i < (int) s.playlist.size())
+                            clipenv::reset (s, s.playlist[(std::size_t) i], lane);
+                });
+            });
+        }
+        menu.addSubMenu (tr ("Clip envelope"), env);
+    }
+    // warp from the Playlist (round 190gi, core/ClipWarp.h): the audio editor's Auto-warp and Quantize audio on this clip
+    const auto warpable = sample != nullptr && ! clipops::playsBackwards (channel, clip);
+    menu.addItem (tr ("Auto-warp"), warpable, false, [this, index, sample, file = juce::File (path).getFileNameWithoutExtension().toStdString()] {
+        int placed = 0;
+        engine.editSong ([&] (Song& s) { placed = clipwarp::autoWarp (s, index, *sample, file); });
+        ui::Hint done;
+        done.text = placed > 0 ? tr ("Auto-warp: {0} markers", { juce::String (placed) }) : tr ("Auto-warp found no beat to lock to");
+        ui::postHint (done, 2500);
+        repaint();
+    });
+    menu.addItem (tr ("Quantize audio"), warpable, false, [this, index, sample] {
+        int placed = 0;
+        engine.editSong ([&] (Song& s) { placed = clipwarp::quantize (s, index, *sample); });
+        ui::Hint done;
+        done.text = placed > 0 ? tr ("{0} warp markers placed", { juce::String (placed) }) : tr ("No attack to quantize here");
+        ui::postHint (done, 2500);
+        repaint();
+    });
     menu.addItem (tr ("Open in a new Sampler channel"), sample != nullptr, false, [this, ch] {
         if (onOpenInSampler)
             onOpenInSampler (ch);
@@ -8317,6 +8561,7 @@ void PlaylistComponent::makeSelectionUniqueAsSample()
             copy.samplePath = p.path;
             copy.name = quickrender::uniqueChannelName (s, p.name);
             s.channels.push_back (std::move (copy));
+            clipenv::shift (s, clip, -((double) clip.offset + (double) clip.offsetFraction)); // (round 190gi: its envelopes stay on their audio)
             clipops::resetRenderedClip (clip, (int) s.channels.size() - 1);
         }
     });
@@ -8906,11 +9151,11 @@ PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
         h.target = gesture::Target::fadeHandle;
     else if (gainHandle (h.clip).expanded (2.0f).contains (p.toFloat()))
         h.target = gesture::Target::gainHandle;
-    else if (c.kind == ClipKind::automation && automationPointAt (h.clip, p) >= 0)
+    else if ((c.kind == ClipKind::automation || c.kind == ClipKind::audio) && automationPointAt (h.clip, p) >= 0) // (190gi: envelopes)
         h.target = gesture::Target::autoPoint;
-    else if (c.kind == ClipKind::automation && automationHandleAt (h.clip, p) >= 0)
+    else if ((c.kind == ClipKind::automation || c.kind == ClipKind::audio) && automationHandleAt (h.clip, p) >= 0)
         h.target = gesture::Target::autoTension;
-    else if (c.kind == ClipKind::automation && isOnAutomationCurve (h.clip, p))
+    else if ((c.kind == ClipKind::automation || c.kind == ClipKind::audio) && isOnAutomationCurve (h.clip, p))
         h.target = gesture::Target::autoCurve;
 
     return h;
@@ -9113,6 +9358,8 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
         else if (h.target == gesture::Target::item && ! m.ctrl && automationEditable (h.clip)
                  && automationBody (song.playlist[(std::size_t) h.clip]).contains (p.toFloat())) // round 165
             hint.text << "  " << tr ("[RMB] adds a point here (hold and drag to place it)  [Shift][RMB] on the curve");
+        else if (h.target == gesture::Target::item && ! m.ctrl && warpStripSeconds (h.clip, p) > 0.0) // round 190gi
+            hint.text << "  " << tr ("Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip");
         else if (h.target == gesture::Target::item && ! m.ctrl)
             hint.text << "  " << tr ("[Shift][V] + drag: a unique copy  [Alt][RMB] hold: hear it");
         const auto& c = song.playlist[(std::size_t) h.clip];
@@ -9188,6 +9435,17 @@ void PlaylistComponent::mouseDoubleClick (const juce::MouseEvent& e)
 
     if (hit < 0)
         return;
+
+    // round 190gi: on the warp flag strip of a warped clip a double-click adds a warp marker (nothing moves until it is
+    // dragged); everywhere else FL's double-click (the channel settings; Alt: the clip properties)
+    if (! e.mods.isAltDown())
+        if (const auto seconds = warpStripSeconds (hit, e.getPosition()); seconds > 0.0)
+        {
+            const auto file = clipFileSeconds (hit);
+            engine.editSong ([hit, seconds, file] (Song& s) { clipwarp::addMarker (s, hit, seconds, file); });
+            repaint();
+            return;
+        }
 
     openClipSource (hit, e.mods.isAltDown());
 }

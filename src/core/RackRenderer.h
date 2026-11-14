@@ -665,6 +665,7 @@ private:
     std::vector<float> channelBuffers;                      // maxChannels * 2 * chunkCapacity
     std::vector<float> trackScratchBuffers;                 // maxMixerTracks * 2 * chunkCapacity
     double chunkStartTick = 0.0, chunkTps = 1.0;            // of the chunk being rendered (for the arpeggiator)
+    bool clipEnvTableShown = false, clipEnvTableWas = false; // round 190gi: the last chunk's song had clip envelopes
     // live-played notes of channels with an arpeggiator, echo delay or key / velocity tracking go through the
     // channel's note path like the scheduled ones (FL, round 149); while stopped the arpeggiator runs on its own clock
     std::array<NoteEvent, 256> liveRouted {};

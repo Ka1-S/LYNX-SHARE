@@ -183,6 +183,8 @@ public:
     juce::Rectangle<float> laneBodyForSnapshot (int track, int lane) const { return laneBody (track, lane); }
     juce::Rectangle<int> trackRowForSnapshot (int track) const { return { 0, trackToY (track), getWidth(), heightOf (track) }; } // (round 190fc)
     double xOfTickForSnapshot (double tick) const { return tickToX (tick); }
+    juce::Rectangle<int> clipBoundsForSnapshot (int clip) const { return clipBounds (clip); } // (round 190gi)
+    juce::Rectangle<float> curveBodyForSnapshot (int clip) const; // (round 190gi: where an envelope / automation curve is drawn)
     juce::PopupMenu getClipMenuForSnapshot (int index); // --snapshot: the clip menu of that clip
     juce::PopupMenu getAutomationPointMenuForSnapshot (int clip, int point); // FL's point menu of an automation clip's point (round 190bw)
     juce::PopupMenu getTrackMenuForSnapshot (int track) { return buildTrackMenu (track); }
@@ -397,6 +399,8 @@ private:
     std::vector<WarpPoint> clipWarpMarkers (int clip) const; // as played (warpedit::playedMarkers); empty: none
     double clipFileSeconds (int clip) const;
     int warpMarkerAt (int clip, juce::Point<int> p) const; // the marker's index, or -1
+    int warpMarkerNear (int clip, juce::Point<int> p) const;      // round 190gi: Alt + drag, anywhere on the body
+    double warpStripSeconds (int clip, juce::Point<int> p) const; // round 190gi: a double-click on the flag strip
     int warpClip = -1, warpIndex = -1;
     double warpBeat = 0.0; // the dragged marker's beat (shown while dragging, applied on release)
     void updateScrollBars();
@@ -563,6 +567,20 @@ private:
     bool rulerDoubleDrag = false;
     bool rulerMenuOnClick = false; // a right press on the ruler: the ruler menu if released in place (round 168t)
     juce::Rectangle<float> automationBody (const Clip& clip) const;
+    // round 190gi: the curve a clip edits in place — an automation clip's points, or an audio clip's envelope lane shown
+    // on it (core/ClipEnvelope.h); the point and handle helpers below work on either. editCurve: one undoable edit (the
+    // audio clip gets its own envelope first).
+    struct CurveRef
+    {
+        const std::vector<AutomationPoint>* points = nullptr;
+        int automation = -1;   // an automation clip's automation
+        std::uint8_t lane = 0; // an audio clip's envelope lane (clipenv::volumeLane / panLane)
+    };
+    CurveRef curveOf (int clip) const;
+    void editCurve (int clip, const std::function<void (std::vector<AutomationPoint>&)>& fn);
+    float curveValueAt (int clip, double clipTick) const;
+    juce::String curveValueText (int clip, float value) const;
+    void paintClipEnvelope (juce::Graphics& g, const Clip& c, const ClipEnvelope& envelope);
     int automationPointAt (int clip, juce::Point<int> p) const;
     bool isOnAutomationCurve (int clip, juce::Point<int> p) const;
     // round 165: FL's in-Playlist automation editing — clips tall and wide enough to edit, the tension handles between

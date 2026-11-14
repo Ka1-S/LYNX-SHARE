@@ -1,4 +1,5 @@
 #include "engine/ProjectFile.h"
+#include "core/ClipEnvelope.h"
 #include "core/WarpModes.h"
 #include "core/LiveInput.h"
 #include "core/FlCurve.h"
@@ -1471,7 +1472,80 @@ std::vector<PatternBlock> blocksFromVar (const juce::var& v, const Song& song)
     return out;
 }
 
-juce::var clipsToVar (const std::vector<Clip>& list)
+// Round 190gi: audio clip envelopes. Song-level "clipEnvelopes" (only the used ones, renumbered by clipenv::usedOrder);
+// a clip refers to its entry at index 25 of its array. Points as the automation clips' ([tick, value, tension] or
+// [tick, value, tension, mode]).
+juce::var curvePointsToVar (const std::vector<AutomationPoint>& list)
+{
+    juce::Array<juce::var> points;
+    for (const auto& pt : list)
+    {
+        juce::Array<juce::var> p { (juce::int64) pt.tick, juce::roundToInt (pt.value * 10000.0f) / 10000.0 };
+        if (pt.mode == AutomationPoint::legacyCurve || (pt.mode == 0 && pt.tension == 0.0f))
+            p.add (juce::roundToInt (pt.tension * 1000.0f) / 1000.0);
+        else
+        {
+            p.add ((double) pt.tension);
+            p.add ((int) pt.mode);
+        }
+        points.add (p);
+    }
+    return points;
+}
+
+std::vector<AutomationPoint> curvePointsFromVar (const juce::var& v)
+{
+    std::vector<AutomationPoint> out;
+    if (auto* points = v.getArray())
+        for (const auto& pt : *points)
+            if (pt.isArray() && pt.size() >= 2)
+                out.push_back ({ (std::int64_t) (juce::int64) pt[0], juce::jlimit (0.0f, 1.0f, (float) (double) pt[1]),
+                                 pt.size() >= 3 ? juce::jlimit (-1.0f, 1.0f, (float) (double) pt[2]) : 0.0f, savedPointMode (pt) });
+    std::stable_sort (out.begin(), out.end(), [] (const AutomationPoint& x, const AutomationPoint& y) { return x.tick < y.tick; });
+    return out;
+}
+
+juce::var clipEnvelopesToVar (const Song& song, const std::vector<int>& remap, int count)
+{
+    std::vector<const ClipEnvelope*> used ((std::size_t) count, nullptr);
+    for (std::size_t i = 0; i < remap.size(); ++i)
+        if (remap[i] >= 0 && remap[i] < count)
+            used[(std::size_t) remap[i]] = &song.clipEnvelopes[i];
+    juce::Array<juce::var> out;
+    for (const auto* e : used)
+    {
+        auto o = std::make_unique<juce::DynamicObject>();
+        if (e != nullptr)
+        {
+            if (! e->volume.empty())
+                o->setProperty ("volume", curvePointsToVar (e->volume));
+            if (! e->pan.empty())
+                o->setProperty ("pan", curvePointsToVar (e->pan));
+            if (e->shown != 0)
+                o->setProperty ("shown", (int) e->shown);
+        }
+        out.add (juce::var (o.release()));
+    }
+    return out;
+}
+
+std::vector<ClipEnvelope> clipEnvelopesFromVar (const juce::var& v)
+{
+    std::vector<ClipEnvelope> out;
+    if (auto* list = v.getArray())
+        for (const auto& o : *list)
+        {
+            ClipEnvelope e;
+            e.volume = curvePointsFromVar (o["volume"]);
+            e.pan = curvePointsFromVar (o["pan"]);
+            e.shown = (std::uint8_t) juce::jlimit (0, 2, (int) o["shown"]);
+            out.push_back (std::move (e));
+        }
+    return out;
+}
+
+// `envelopes` (the save's clipenv::usedOrder): a clip's envelope index as saved; null = no envelopes written
+juce::var clipsToVar (const std::vector<Clip>& list, const std::vector<int>* envelopes = nullptr)
 {
     juce::Array<juce::var> clips;
 
@@ -1488,7 +1562,9 @@ juce::var clipsToVar (const std::vector<Clip>& list)
         const auto pan = juce::roundToInt (c.pan * 1000.0f) / 1000.0;
         const auto pitch = juce::roundToInt (c.pitch * 1000.0f) / 1000.0;
         const auto stretch = std::round (c.stretch * 1.0e6) / 1.0e6;
-        const int used = c.groove != 0 ? 15 : c.followKey || c.keyShift != 0 ? 14 : c.fadeCurve != 0 ? 13 : c.linearFades != 0 || c.flFadeFlags != 0 ? 12 : c.fadeInTension != 0.0f || c.fadeOutTension != 0.0f ? 11 : c.uid != 0 ? 10 : stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
+        const auto envelope = envelopes != nullptr && c.kind == ClipKind::audio && c.envelope >= 0 && c.envelope < (int) envelopes->size()
+                                  ? (*envelopes)[(std::size_t) c.envelope] : -1;
+        const int used = envelope >= 0 ? 16 : c.groove != 0 ? 15 : c.followKey || c.keyShift != 0 ? 14 : c.fadeCurve != 0 ? 13 : c.linearFades != 0 || c.flFadeFlags != 0 ? 12 : c.fadeInTension != 0.0f || c.fadeOutTension != 0.0f ? 11 : c.uid != 0 ? 10 : stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
                        : (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f) ? 3 : 0;
         if (used > 0)
         {
@@ -1534,6 +1610,8 @@ juce::var clipsToVar (const std::vector<Clip>& list)
             }
             if (used >= 15)
                 clip.add ((juce::int64) c.groove); // a Playlist pattern clip's groove (round 190fm): index 24
+            if (used >= 16)
+                clip.add (envelope); // an audio clip's envelopes (round 190gi): index 25, into "clipEnvelopes"
         }
 
         clips.add (clip);
@@ -1580,6 +1658,8 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
                 clip.followKey = c.size() >= 24 && (bool) c[22];
                 clip.keyShift = c.size() >= 24 ? (std::int8_t) juce::jlimit (-12, 12, (int) c[23]) : (std::int8_t) 0;
                 clip.groove = c.size() >= 25 ? (std::uint32_t) juce::jmax<juce::int64> (0, (juce::int64) c[24]) : 0u; // (round 190fm)
+                if (const auto e = c.size() >= 26 ? (int) c[25] : -1; e >= 0 && e < (int) song.clipEnvelopes.size()) // (round 190gi)
+                    clip.envelope = e;
             }
 
             if (c.size() >= 7 && (int) c[5] == 2)
@@ -1606,7 +1686,7 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
 }
 
 // The clip grid (round 181a). One object per clip: its settings, and the Clip in the form the Playlist's clips are saved in.
-juce::var clipGridToVar (const ClipGrid& grid)
+juce::var clipGridToVar (const ClipGrid& grid, const std::vector<int>* envelopes = nullptr)
 {
     auto root = std::make_unique<juce::DynamicObject>();
     root->setProperty ("quant", (int) grid.globalQuant);
@@ -1670,7 +1750,7 @@ juce::var clipGridToVar (const ClipGrid& grid)
             juce::Array<juce::var> follow { f.enabled, (int) f.a, (int) f.b, f.chanceA, f.chanceB, f.jumpA, f.jumpB, f.linked, f.iterations, (juce::int64) f.ticks };
             o->setProperty ("follow", follow);
         }
-        o->setProperty ("clip", clipsToVar ({ clip }));
+        o->setProperty ("clip", clipsToVar ({ clip }, envelopes));
         clips.add (juce::var (o.release()));
     }
     root->setProperty ("clips", clips);
@@ -3221,10 +3301,16 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("adr", juce::var (o));
     }
 
-    root->setProperty ("playlist", clipsToVar (song.playlist));
+    // audio clip envelopes (round 190gi): only in a project whose clips use one (others are byte-identical)
+    int envelopeCount = 0;
+    const auto envelopeRemap = clipenv::usedOrder (song, &envelopeCount);
+    const auto* envelopes = envelopeCount > 0 ? &envelopeRemap : nullptr;
+    if (envelopes != nullptr)
+        root->setProperty ("clipEnvelopes", clipEnvelopesToVar (song, envelopeRemap, envelopeCount));
+    root->setProperty ("playlist", clipsToVar (song.playlist, envelopes));
     root->setProperty ("clipFadesPerClip", true); // round 180d: a project without it has linear clip fades
     if (song.clipGrid) // the Clip-launch workflow's grid (round 181a): only in a project that has one
-        root->setProperty ("clipGrid", clipGridToVar (*song.clipGrid));
+        root->setProperty ("clipGrid", clipGridToVar (*song.clipGrid, envelopes));
     if (song.grooves != GroovePool {}) // the groove pool (round 190bv)
         root->setProperty ("grooves", groovePoolToVar (song.grooves));
     if (song.patternBlocksOn)
@@ -3352,7 +3438,7 @@ juce::String toJson (const Song& song, bool stampVersion)
 
             if ((int) i != song.currentArrangement) // the current one is in "playlist"
             {
-                o->setProperty ("clips", clipsToVar (a.clips));
+                o->setProperty ("clips", clipsToVar (a.clips, envelopes));
                 if (! a.blocks.empty())
                     o->setProperty ("blocks", blocksToVar (a.blocks));
 
@@ -3706,6 +3792,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
             song.automations.push_back (std::move (automation));
         }
 
+    song.clipEnvelopes = clipEnvelopesFromVar (root["clipEnvelopes"]); // (round 190gi; before every clip list)
     song.playlist = clipsFromVar (root["playlist"], song);
     // saved before FL's S curve for clip fades (round 180d): those clips keep the straight fades the mix was made with
     const bool oldClipFades = ! root.hasProperty ("clipFadesPerClip");

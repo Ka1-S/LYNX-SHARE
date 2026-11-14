@@ -1,13 +1,16 @@
 #include "ui/ClipAudioPanel.h"
 
 #include <cmath>
+#include <limits>
 
 #include <juce_audio_formats/juce_audio_formats.h>
 
+#include "core/ClipEnvelope.h"
 #include "core/ClipLauncher.h"
 #include "core/ClipSample.h"
 #include "core/WarpModes.h"
 #include "ui/AudioEditor.h"
+#include "ui/AutomationUi.h"
 #include "ui/I18n.h"
 #include "ui/NumBox.h"
 #include "ui/Theme.h"
@@ -30,6 +33,294 @@ const ModeItem liveModes[] = { { TR_NOOP ("Beats"), (int) StretchMethod::beats }
                                { TR_NOOP ("Complex"), (int) StretchMethod::complex } };
 const ModeItem flModes[] = { { TR_NOOP ("General"), (int) StretchMethod::general }, { TR_NOOP ("Drums / transients"), (int) StretchMethod::transients },
                              { TR_NOOP ("Vocal / mono"), (int) StretchMethod::mono } };
+
+// The Clip View's Envelopes tab of an audio clip (round 190gi; Live 12's audio Clip View has the tabs Sample | Envelopes
+// [SHOT ableton175a/live/m3-live-clipview2.png] and the envelope choosers Device / Control [MANUAL clip envelopes]). LYNX
+// keeps two of Live's audio clip envelopes: Clip › Gain and Mixer › Track Panning (core/ClipEnvelope.h; the .als maps
+// them both ways). Live's editing [MANUAL]: a click on the line adds a breakpoint, a click on a breakpoint deletes it, a
+// drag moves it, Alt + drag on a segment bends it. Clip time across the clip's content (its start to its end).
+class ClipEnvelopeView final : public juce::Component, private juce::ChangeListener
+{
+public:
+    ClipEnvelopeView (AudioEngine& e, int trackIn, int sceneIn) : engine (e), track (trackIn), scene (sceneIn)
+    {
+        device.addItem (tr ("Clip"), 1);
+        device.addItem (tr ("Mixer"), 2);
+        device.setTooltip (tr ("Envelope device: the clip itself, or the track's mixer"));
+        device.onChange = [this] { choose (device.getSelectedId() == 2 ? clipenv::panLane : clipenv::volumeLane); };
+        control.setTooltip (tr ("Envelope control"));
+        addAndMakeVisible (device);
+        addAndMakeVisible (control);
+        engine.addChangeListener (this);
+        refresh();
+    }
+    ~ClipEnvelopeView() override { engine.removeChangeListener (this); }
+
+    void resized() override
+    {
+        auto bar = getLocalBounds().removeFromTop (barHeight).reduced (4, 3);
+        device.setBounds (bar.removeFromLeft (110));
+        bar.removeFromLeft (4);
+        control.setBounds (bar.removeFromLeft (130));
+    }
+    void paint (juce::Graphics& g) override
+    {
+        using namespace theme;
+        g.fillAll (colour::bg0);
+        g.setColour (colour::bg1);
+        g.fillRect (getLocalBounds().removeFromTop (barHeight));
+        const auto* c = clip();
+        if (c == nullptr)
+            return;
+        const auto area = body();
+        // the beat grid of the clip's content (bars brighter), as Live's sample editor counts them
+        const auto& song = engine.getSong();
+        const auto perBar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+        for (auto t = ((std::int64_t) c->offset / ppq) * ppq; t <= c->offset + c->length; t += ppq)
+        {
+            if (t < c->offset)
+                continue;
+            const auto x = (float) tickToX (*c, (double) t);
+            const auto bar = t % perBar == 0;
+            g.setColour (colour::border.withAlpha (bar ? 0.9f : 0.4f));
+            g.drawVerticalLine ((int) x, area.getY(), area.getBottom());
+            if (bar)
+            {
+                g.setColour (colour::textSecondary);
+                g.setFont (font (type::caption));
+                g.drawText (juce::String (t / perBar + 1), juce::Rectangle<float> (x + 3.0f, area.getY(), 40.0f, 12.0f), juce::Justification::topLeft, false);
+            }
+        }
+        if (lane == clipenv::panLane)
+        {
+            g.setColour (colour::border);
+            g.drawHorizontalLine ((int) area.getCentreY(), area.getX(), area.getRight());
+        }
+        const auto* e = clipenv::of (song, *c);
+        const auto& points = e != nullptr ? clipenv::laneOf (*e, lane) : none;
+        const auto valueAt = [&] (double tick) { return points.empty() ? clipenv::neutralOf (lane) : automationCurveAt (points, tick); };
+        const auto yAt = [&] (int x) { return valueToY (valueAt (xToTick (*c, (float) x))); };
+        juce::Path curve;
+        auto lastY = 0.0f;
+        for (int x = (int) area.getX(); x <= (int) area.getRight(); x += 2)
+        {
+            const auto y = yAt (x);
+            if (x == (int) area.getX())
+                curve.startNewSubPath ((float) x, y);
+            else
+                automationLineTo (curve, (float) x - 2.0f, lastY, (float) x, y, [&] { return yAt (x - 1); });
+            lastY = y;
+        }
+        g.setColour (colour::accent);
+        g.strokePath (curve, juce::PathStrokeType (1.5f));
+        for (std::size_t k = 0; k < points.size(); ++k)
+        {
+            const auto x = (float) tickToX (*c, (double) points[k].tick), y = valueToY (points[k].value);
+            g.setColour (colour::bg0);
+            g.fillEllipse (x - 4.0f, y - 4.0f, 8.0f, 8.0f);
+            g.setColour ((int) k == dragPoint ? colour::accent.brighter (0.4f) : colour::accent);
+            g.fillEllipse (x - 3.0f, y - 3.0f, 6.0f, 6.0f);
+        }
+        // the value under the mouse or of the point being dragged: dB for the gain, L / R for the panning
+        if (! readout.isEmpty())
+        {
+            g.setColour (colour::textPrimary);
+            g.setFont (font (type::small));
+            g.drawText (readout, getLocalBounds().removeFromTop (barHeight).reduced (8, 0), juce::Justification::centredRight, false);
+        }
+    }
+
+    void mouseDown (const juce::MouseEvent& e) override
+    {
+        const auto* c = clip();
+        if (c == nullptr || ! body().contains (e.position))
+            return;
+        moved = false;
+        dragPoint = pointAt (e.position);
+        if (dragPoint < 0 && e.mods.isAltDown()) // Alt + drag on a segment: bend it
+        {
+            bendSegment = segmentAt (*c, e.position);
+            if (bendSegment >= 0)
+            {
+                bendStart = points()[(std::size_t) bendSegment].tension;
+                return;
+            }
+        }
+        if (dragPoint < 0 && std::abs (valueToY (valueNow (*c, xToTick (*c, e.position.x))) - e.position.y) <= 6.0f)
+        {
+            // a click on the line: a breakpoint there, dragged while the button is held
+            AutomationPoint p;
+            p.tick = (std::int64_t) std::llround (xToTick (*c, e.position.x));
+            p.value = yToValue (e.position.y);
+            int added = -1;
+            edit ([&] (std::vector<AutomationPoint>& list) { added = insertAutomationPoint (list, p); });
+            dragPoint = added;
+            moved = true; // (a new point is not deleted on release)
+        }
+        repaint();
+    }
+    void mouseDrag (const juce::MouseEvent& e) override
+    {
+        const auto* c = clip();
+        if (c == nullptr)
+            return;
+        if (bendSegment >= 0)
+        {
+            const auto up = -(float) e.getDistanceFromDragStartY() / juce::jmax (30.0f, body().getHeight());
+            const auto rising = bendSegment + 1 < (int) points().size() && points()[(std::size_t) bendSegment + 1].value >= points()[(std::size_t) bendSegment].value;
+            const auto tension = juce::jlimit (-1.0f, 1.0f, bendStart + (rising ? -up : up));
+            edit ([seg = bendSegment, tension] (std::vector<AutomationPoint>& list) { setAutomationSegmentTension (list, seg, tension); });
+            return;
+        }
+        if (dragPoint < 0 || dragPoint >= (int) points().size())
+            return;
+        if (e.getDistanceFromDragStart() > 2)
+            moved = true;
+        const auto& list = points();
+        const auto lo = dragPoint > 0 ? list[(std::size_t) dragPoint - 1].tick : std::numeric_limits<std::int64_t>::min() / 2;
+        const auto hi = dragPoint + 1 < (int) list.size() ? list[(std::size_t) dragPoint + 1].tick : std::numeric_limits<std::int64_t>::max() / 2;
+        const auto tick = juce::jlimit (lo, hi, (std::int64_t) std::llround (xToTick (*c, e.position.x)));
+        const auto value = yToValue (e.position.y);
+        edit ([i = dragPoint, tick, value] (std::vector<AutomationPoint>& l) {
+            if (i < (int) l.size())
+            {
+                l[(std::size_t) i].tick = tick;
+                l[(std::size_t) i].value = value;
+            }
+        });
+        readout = valueText (value);
+    }
+    void mouseUp (const juce::MouseEvent&) override
+    {
+        // a click on a breakpoint (no drag): it goes (Live), the last one stays
+        if (! moved && dragPoint >= 0 && bendSegment < 0 && points().size() > 1)
+            edit ([i = dragPoint] (std::vector<AutomationPoint>& l) { eraseAutomationPoint (l, i); });
+        dragPoint = bendSegment = -1;
+        repaint();
+    }
+    void mouseMove (const juce::MouseEvent& e) override
+    {
+        const auto* c = clip();
+        readout = c != nullptr && body().contains (e.position) ? valueText (valueNow (*c, xToTick (*c, e.position.x))) : juce::String();
+        repaint();
+    }
+
+    std::uint8_t laneShown() const noexcept { return lane; }
+
+private:
+    void changeListenerCallback (juce::ChangeBroadcaster*) override { refresh(); }
+    void refresh()
+    {
+        const auto* c = clip();
+        const auto* e = c != nullptr ? clipenv::of (engine.getSong(), *c) : nullptr;
+        if (e != nullptr && e->shown != 0)
+            lane = e->shown;
+        device.setSelectedId (lane == clipenv::panLane ? 2 : 1, juce::dontSendNotification);
+        control.clear (juce::dontSendNotification);
+        control.addItem (lane == clipenv::panLane ? tr ("Track Panning") : tr ("Gain"), 1);
+        control.setSelectedId (1, juce::dontSendNotification);
+        repaint();
+    }
+    void choose (std::uint8_t which)
+    {
+        lane = which;
+        engine.editSong ([this, which] (Song& s) {
+            if (s.clipGrid)
+                if (auto* c = const_cast<Clip*> (launcher::clipAt (*s.clipGrid, track, scene)); c != nullptr && c->kind == ClipKind::audio)
+                    clipenv::show (s, *c, which);
+        });
+        refresh();
+    }
+    const Clip* clip() const
+    {
+        const auto& song = engine.getSong();
+        const auto* c = song.clipGrid ? launcher::clipAt (*song.clipGrid, track, scene) : nullptr;
+        return c != nullptr && c->kind == ClipKind::audio ? c : nullptr;
+    }
+    const std::vector<AutomationPoint>& points() const
+    {
+        const auto* c = clip();
+        const auto* e = c != nullptr ? clipenv::of (engine.getSong(), *c) : nullptr;
+        return e != nullptr ? clipenv::laneOf (*e, lane) : none;
+    }
+    // one undoable edit of the lane shown (the clip gets its own envelope, the lane starts flat over the clip)
+    void edit (const std::function<void (std::vector<AutomationPoint>&)>& fn)
+    {
+        engine.editSong ([this, &fn] (Song& s) {
+            if (! s.clipGrid)
+                return;
+            auto* c = const_cast<Clip*> (launcher::clipAt (*s.clipGrid, track, scene));
+            if (c == nullptr || c->kind != ClipKind::audio)
+                return;
+            auto& own = clipenv::own (s, *c);
+            own.shown = lane;
+            auto& list = clipenv::laneOf (own, lane);
+            if (list.empty())
+                list = clipenv::defaultLane (*c, lane);
+            fn (list);
+        });
+        repaint();
+    }
+    juce::Rectangle<float> body() const { return getLocalBounds().withTrimmedTop (barHeight).toFloat().reduced (8.0f, 10.0f); }
+    double tickToX (const Clip& c, double tick) const
+    {
+        const auto a = body();
+        return a.getX() + (tick - (double) c.offset) / (double) juce::jmax<std::int64_t> (1, c.length) * a.getWidth();
+    }
+    double xToTick (const Clip& c, float x) const
+    {
+        const auto a = body();
+        return (double) c.offset + (double) (x - a.getX()) / juce::jmax (1.0f, a.getWidth()) * (double) juce::jmax<std::int64_t> (1, c.length);
+    }
+    float valueToY (float v) const { const auto a = body(); return a.getBottom() - juce::jlimit (0.0f, 1.0f, v) * a.getHeight(); }
+    float yToValue (float y) const { const auto a = body(); return juce::jlimit (0.0f, 1.0f, (a.getBottom() - y) / juce::jmax (1.0f, a.getHeight())); }
+    float valueNow (const Clip&, double tick) const
+    {
+        const auto& list = points();
+        return list.empty() ? clipenv::neutralOf (lane) : automationCurveAt (list, tick);
+    }
+    int pointAt (juce::Point<float> p) const
+    {
+        const auto* c = clip();
+        if (c == nullptr)
+            return -1;
+        const auto& list = points();
+        for (int k = (int) list.size() - 1; k >= 0; --k)
+            if (juce::Point<float> ((float) tickToX (*c, (double) list[(std::size_t) k].tick), valueToY (list[(std::size_t) k].value)).getDistanceFrom (p) <= 6.0f)
+                return k;
+        return -1;
+    }
+    int segmentAt (const Clip& c, juce::Point<float> p) const
+    {
+        const auto& list = points();
+        const auto tick = xToTick (c, p.x);
+        for (int k = 0; k + 1 < (int) list.size(); ++k)
+            if (tick >= (double) list[(std::size_t) k].tick && tick < (double) list[(std::size_t) k + 1].tick)
+                return k;
+        return -1;
+    }
+    juce::String valueText (float v) const
+    {
+        if (lane == clipenv::panLane)
+        {
+            const auto pan = juce::roundToInt (clipenv::panOf (v) * 100.0f);
+            return pan == 0 ? tr ("Centered") : juce::String (std::abs (pan)) + (pan < 0 ? "% L" : "% R");
+        }
+        const auto gain = clipenv::gainOf (v);
+        return gain <= 0.0f ? juce::String ("-inf dB") : juce::String (juce::Decibels::gainToDecibels (gain), 1) + " dB";
+    }
+
+    static constexpr int barHeight = 26;
+    static inline const std::vector<AutomationPoint> none {};
+    AudioEngine& engine;
+    int track, scene;
+    std::uint8_t lane = clipenv::volumeLane;
+    juce::ComboBox device, control;
+    int dragPoint = -1, bendSegment = -1;
+    float bendStart = 0.0f;
+    bool moved = false;
+    juce::String readout;
+};
 
 class ClipAudioPanel final : public juce::Component, private juce::ChangeListener
 {
@@ -196,8 +487,36 @@ public:
             setAudioEditorGridClip (*editor, track, scene); // (round 190cy: ÷2 / ×2 halve / double this clip too)
             addAndMakeVisible (*editor);
         }
+        // round 190gi: Live's Sample | Envelopes tabs at the right of the editor's title bar
+        for (auto* b : { &sampleTab, &envelopesTab })
+        {
+            addAndMakeVisible (*b);
+            b->setConnectedEdges (0);
+            b->setClickingTogglesState (false);
+            b->setColour (juce::TextButton::buttonOnColourId, colour::accent);
+            b->setColour (juce::TextButton::textColourOnId, colour::onAccent);
+        }
+        sampleTab.setButtonText (tr ("Sample"));
+        envelopesTab.setButtonText (tr ("Envelopes"));
+        envelopesTab.setTooltip (tr ("The clip's envelopes: its gain and its panning while it plays"));
+        sampleTab.onClick = [this] { showEnvelopes (false); };
+        envelopesTab.onClick = [this] { showEnvelopes (true); };
+        envelopes = std::make_unique<ClipEnvelopeView> (engine, track, scene);
+        addChildComponent (*envelopes);
+        showEnvelopes (envelopesShown);
         engine.addChangeListener (this);
         refresh();
+    }
+    // the tab shown (kept for the next clip, as the pattern clips' Notes | Envelopes)
+    void showEnvelopes (bool on)
+    {
+        envelopesShown = on;
+        sampleTab.setToggleState (! on, juce::dontSendNotification);
+        envelopesTab.setToggleState (on, juce::dontSendNotification);
+        envelopes->setVisible (on);
+        if (editor != nullptr)
+            editor->setVisible (! on);
+        resized();
     }
     ~ClipAudioPanel() override { engine.removeChangeListener (this); }
 
@@ -304,9 +623,17 @@ public:
         boxes.removeFromLeft (4);
         cents.setBounds (boxes);
 
-        titleBar = area.removeFromTop (titleText.isEmpty() ? 0 : 20);
+        titleBar = area.removeFromTop (20);
+        {
+            auto tabs = titleBar.reduced (2, 2);
+            envelopesTab.setBounds (tabs.removeFromRight (80));
+            tabs.removeFromRight (2);
+            sampleTab.setBounds (tabs.removeFromRight (64));
+        }
         if (editor != nullptr)
             editor->setBounds (area);
+        if (envelopes != nullptr)
+            envelopes->setBounds (area);
     }
 
 private:
@@ -352,7 +679,8 @@ private:
             if (editor != nullptr)
             {
                 setAudioEditorGridClip (*editor, track, scene);
-                addAndMakeVisible (*editor);
+                addChildComponent (*editor);
+                editor->setVisible (! envelopesShown);
             }
             resized();
             refresh();
@@ -441,6 +769,9 @@ private:
     juce::String titleText;
     double fileSeconds = 0.0;
     std::unique_ptr<juce::Component> editor;
+    juce::TextButton sampleTab, envelopesTab;      // round 190gi
+    std::unique_ptr<ClipEnvelopeView> envelopes;
+    static inline bool envelopesShown = false;     // (not saved)
     bool refreshing = false;
 };
 } // namespace

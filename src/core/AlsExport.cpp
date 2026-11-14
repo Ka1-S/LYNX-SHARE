@@ -1,4 +1,5 @@
 #include "core/AlsExport.h"
+#include "core/ClipEnvelope.h"
 
 #include <algorithm>
 #include <charconv>
@@ -1194,7 +1195,133 @@ struct Exporter
         }
         if (clip.reversed)
             note ("Reversed audio clips are exported forwards");
+        clipEnvelopes (c, clip);
         return c;
+    }
+
+    // Round 190gi: the clip's own envelopes → Live's clip envelopes, in clip beats: volume → the track's Clip Gain
+    // (MainSequencer/VolumeModulationTarget), pan → the Mixer's Track Panning modulation (Mixer/Pan/ModulationTarget),
+    // values 0…1 → −1…1 (clipenv::toLive). The targets' ids exist only after the renumbering: the PointeeId holds a
+    // placeholder that run() replaces per track (clipEnvelopeTargets).
+    void clipEnvelopes (Node& c, const Clip& clip)
+    {
+        const auto* e = clipenv::activeOf (song, clip);
+        auto* list = c.at ("Envelopes/Envelopes");
+        if (e == nullptr)
+            return;
+        if (list == nullptr)
+        {
+            auto* envelopes = c.child ("Envelopes");
+            if (envelopes == nullptr)
+                return;
+            Node inner;
+            inner.name = "Envelopes";
+            envelopes->add (std::move (inner));
+            list = envelopes->child ("Envelopes");
+        }
+        int id = (int) list->kids.size();
+        bool curved = false;
+        for (const auto lane : { clipenv::volumeLane, clipenv::panLane })
+        {
+            const auto& points = clipenv::laneOf (*e, lane);
+            if (clipenv::flat (points, clipenv::neutralOf (lane)))
+                continue;
+            // the events: each point, and a curved segment (FL's curve modes, a tension) sampled at 8 steps
+            std::vector<std::pair<double, double>> events;
+            for (std::size_t k = 0; k < points.size(); ++k)
+            {
+                events.push_back ({ beats (points[k].tick), clipenv::toLive (points[k].value) });
+                if (k + 1 < points.size() && (points[k].mode != 0 || points[k].tension != 0.0f) && points[k + 1].tick > points[k].tick)
+                {
+                    curved = true;
+                    for (int j = 1; j < 8; ++j)
+                    {
+                        const auto t = (double) points[k].tick + (double) (points[k + 1].tick - points[k].tick) * j / 8.0;
+                        events.push_back ({ t / (double) ppq, clipenv::toLive (automationCurveAt (points, t)) });
+                    }
+                }
+            }
+            Node env;
+            env.name = "ClipEnvelope";
+            env.set ("Id", num (id++));
+            Node target;
+            target.name = "EnvelopeTarget";
+            Node pointee;
+            pointee.name = "PointeeId";
+            pointee.set ("Value", lane == clipenv::volumeLane ? clipVolumePlaceholder : clipPanPlaceholder);
+            target.add (std::move (pointee));
+            env.add (std::move (target));
+            Node automation;
+            automation.name = "Automation";
+            Node list2;
+            list2.name = "Events";
+            int eventId = 0;
+            auto add = [&] (double t, double v) {
+                Node ev;
+                ev.name = "FloatEvent";
+                ev.set ("Id", num (eventId++));
+                ev.set ("Time", num (t));
+                ev.set ("Value", num (v));
+                list2.add (std::move (ev));
+            };
+            add (beforeSong, events.front().second); // (Live's envelopes open with the "before the song" event [DATA])
+            for (const auto& [t, v] : events)
+                add (t, v);
+            automation.add (std::move (list2));
+            Node view;
+            view.name = "AutomationTransformViewState";
+            Node pending;
+            pending.name = "IsTransformPending";
+            pending.set ("Value", "false");
+            view.add (std::move (pending));
+            Node transforms;
+            transforms.name = "TimeAndValueTransforms";
+            view.add (std::move (transforms));
+            automation.add (std::move (view));
+            env.add (std::move (automation));
+            Node loopSlot;
+            loopSlot.name = "LoopSlot";
+            Node value;
+            value.name = "Value";
+            loopSlot.add (std::move (value));
+            env.add (std::move (loopSlot));
+            Node scroller;
+            scroller.name = "ScrollerTimePreserver";
+            for (const auto* edge : { "LeftTime", "RightTime" })
+            {
+                Node t;
+                t.name = edge;
+                t.set ("Value", "0");
+                scroller.add (std::move (t));
+            }
+            env.add (std::move (scroller));
+            list->add (std::move (env));
+        }
+        if (curved)
+            note ("Clip envelope curves are written as straight segments (8 per curved segment)");
+    }
+    static constexpr const char* clipVolumePlaceholder = "@lynx-clip-volume";
+    static constexpr const char* clipPanPlaceholder = "@lynx-clip-pan";
+
+    // after the renumbering: each track's clip envelope placeholders → its own targets' ids
+    void clipEnvelopeTargets (Node& track)
+    {
+        const auto* vol = track.at ("DeviceChain/MainSequencer/VolumeModulationTarget");
+        const auto* pan = track.at ("DeviceChain/Mixer/Pan/ModulationTarget");
+        const auto volId = vol != nullptr ? vol->get ("Id") : std::string(), panId = pan != nullptr ? pan->get ("Id") : std::string();
+        std::function<void (Node&)> walk = [&] (Node& n) {
+            if (n.name == "PointeeId")
+            {
+                const auto v = n.get ("Value");
+                if (v == clipVolumePlaceholder)
+                    n.set ("Value", volId);
+                else if (v == clipPanPlaceholder)
+                    n.set ("Value", panId);
+            }
+            for (auto& k : n.kids)
+                walk (k);
+        };
+        walk (track);
     }
 
     // ---- the clip grid → Session view (round 181c). Launch numbers as read in Live 12's Clip View [LIVE: REA_rodada181a.md]
@@ -1757,6 +1884,9 @@ struct Exporter
                 renumber (k);
         };
         renumber (set);
+        if (auto* tracks = set.child ("Tracks")) // (round 190gi)
+            for (auto& t : tracks->kids)
+                clipEnvelopeTargets (t);
 
         // automation: mixer volume / pan of a track's insert, the Master, tempo
         int envelopeId = 0;
