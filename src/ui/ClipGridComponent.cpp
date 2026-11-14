@@ -1729,8 +1729,8 @@ private:
         {
             if (const auto want = mixerHeight(); want != mixer->getHeight())
                 resized();
-            // (its meters: repainted when they move, and while the song plays, as the whole grid was)
-            if (mixer->tick() || engine.getTransport().playing.load (std::memory_order_relaxed) || ! ui::paintSavings())
+            mixer->tick(); // (its meters and arm buttons repaint themselves when they change)
+            if (! ui::paintSavings()) // (LYNX_PAINT_SAVINGS=0: the whole mixer every tick, as before)
                 mixer->repaint();
         }
         // round 190ge: the whole grid was repainted 30 times a second, also with nothing playing. Now a change of what
