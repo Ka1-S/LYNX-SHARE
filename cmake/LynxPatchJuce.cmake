@@ -162,6 +162,12 @@
 #    included, is a plain software image instead of a Direct2D one. The splash card draws on a thread of its own with the
 #    CPU (ui/Splash.cpp); before, its logo was the process's first Direct2D image, so the Direct3D 11 + Direct2D device
 #    (~0.35-0.4 s) was made before the card could show. Other threads: as before.
+# 29. Windows only, juce_audio_devices/native/juce_ASIO_windows.cpp (round 190hd, start-up): JUCE starts an ASIO driver,
+#    sleeps 80 ms and stops it while it initialises the device ("because Cubase does it"); for "FL Studio ASIO" that is
+#    ~0.27 s of the start-up's critical path (its stop ends a Windows Audio stream). The ASIO protocol does not ask for
+#    it (init, channels, buffer sizes, createBuffers, start). `juce::lynxAsioQuickInit` (set by LYNX's prewarm for the
+#    one device it makes ahead, engine/DllAsioDevice.cpp) skips it for that device only; a device that then fails to
+#    open is made again the usual way (AudioEngine::openAudioDevice). Every other open: as JUCE does.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -329,6 +335,12 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("ASIO channel names after a reset on the ASIO thread" "LYNX patch (round 190go): the channel names"
             "                  currentSampleRate, currentBlockSizeSamples);|NL||NL|            reloadChannelNames();|NL|"
             "                  currentSampleRate, currentBlockSizeSamples);|NL||NL|            // LYNX patch (round 190go): the channel names from the ASIO thread|NL|            lynxAsioCall ([this] { reloadChannelNames(); });|NL|")
+        lynx_juce_fix("ASIO quick init for the start-up's device" "LYNX patch (round 190hd): no start / stop at init"
+            "                        // start and stop because cubase does it..|NL|                        err = asioObject->start();|NL|                        // ignore an error here, as it might start later after setting other stuff up|NL|                        JUCE_ASIO_LOG_ERROR (\"start\", err);|NL||NL|                        Thread::sleep (80);|NL|                        asioObject->stop();|NL|"
+            "                        // LYNX patch (round 190hd): no start / stop at init for the device the start-up makes ahead|NL|                        // (fix 29: lynxAsioQuickInit, set by LYNX's prewarm for its one device); every other open as JUCE does|NL|                        if (! lynxAsioQuickInit.exchange (false))|NL|                        {|NL|                        // start and stop because cubase does it..|NL|                        err = asioObject->start();|NL|                        // ignore an error here, as it might start later after setting other stuff up|NL|                        JUCE_ASIO_LOG_ERROR (\"start\", err);|NL||NL|                        Thread::sleep (80);|NL|                        asioObject->stop();|NL|                        }|NL|")
+        lynx_juce_fix("ASIO quick init flag" "LYNX patch (round 190hd): the quick init flag"
+            "static void sendASIODeviceChangeToListeners (ASIOAudioIODeviceType*);|NL|"
+            "static void sendASIODeviceChangeToListeners (ASIOAudioIODeviceType*);|NL||NL|// LYNX patch (round 190hd): the quick init flag (cmake/LynxPatchJuce.cmake, fix 29)|NL|std::atomic<bool> lynxAsioQuickInit { false };|NL|")
     elseif(file MATCHES "juce_WASAPI_windows.cpp$")
         lynx_juce_fix("shared mode keeps the mix format's channels" "LYNX patch (issue #134): shared mode"
             "        if (fallbackNumChannels >= maxNumChannelsToQuery)|NL|            return fallbackNumChannels;|NL|"

@@ -32,6 +32,9 @@ void prewarmAsioDevice (const juce::File& savedSetup);
 
 // For the start-up trace: what the prewarm gave ("" when there was none)
 juce::String asioPrewarmReport();
+// Round 190hd: the prewarmed device was made without JUCE's start / stop at init (JUCE patch 29; LYNX_ASIO_QUICK_INIT=0:
+// with it). Should it then fail to open, the engine makes it again the usual way.
+bool asioPrewarmQuickInit();
 
 // The device manager of the engine: JUCE's, whose ASIO type hands over the device prewarmAsioDevice made (its first
 // scan is the prewarm's too) and otherwise does what JUCE's does.

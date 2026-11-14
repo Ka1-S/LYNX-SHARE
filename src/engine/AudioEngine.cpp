@@ -338,7 +338,11 @@ void AudioEngine::openAudioDevice()
         saved->deleteAllChildElementsWithTagName ("MIDIINPUT");
     }
     auto fresh = saved == nullptr;
-    if (deviceManager.initialise (0, 2, saved.get(), true).isNotEmpty() && saved != nullptr)
+    auto failed = deviceManager.initialise (0, 2, saved.get(), true).isNotEmpty();
+    // (round 190hd) a device made ahead without JUCE's start / stop at init that then failed: once more the usual way
+    if (failed && saved != nullptr && asioPrewarmQuickInit())
+        failed = deviceManager.initialise (0, 2, saved.get(), true).isNotEmpty();
+    if (failed && saved != nullptr)
     {
         deviceManager.initialise (0, 2, nullptr, true);
         fresh = true;
