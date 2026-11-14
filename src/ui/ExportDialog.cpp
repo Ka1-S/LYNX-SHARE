@@ -2044,6 +2044,16 @@ std::unique_ptr<juce::Component> makeExportPanelForTracks (AudioEngine& engine, 
     return std::make_unique<ExportPanel> (engine, juce::File(), "LYNX SHARE", false, 0, tracks);
 }
 
+std::unique_ptr<juce::Component> makeClipRenderPanel (AudioEngine& engine)
+{
+    auto mode = std::make_shared<ClipRenderMode>();
+    mode->pattern = true;
+    mode->song = engine.getSong();
+    mode->button = trc ("@render button: Start");
+    mode->onRender = [] (const exportopts::Options&) {};
+    return std::make_unique<ExportPanel> (engine, juce::File(), "LYNX SHARE", false, -1, std::vector<int> {}, std::move (mode));
+}
+
 void showExportDialogForTracks (AudioEngine& engine, const juce::File& suggestedFolder, const juce::String& suggestedName,
                                 const std::vector<int>& tracks, std::function<void (const std::vector<juce::File>&)> afterRender)
 {

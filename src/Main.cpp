@@ -120,6 +120,8 @@
 #include "ui/AudioClipboard.h"
 #include "ui/FlVoicePanel.h"
 #include "ui/SlicexEditor.h"
+#include "ui/FruitySlicerEditor.h"
+#include "core/GrossBeat.h"
 #include "core/LynxBanks.h"
 #include "core/NativeEngines.h"
 #include "ui/ControllerEditors.h"
@@ -12261,10 +12263,13 @@ private:
             shoot (f, "sampler-end-loop-red");
             // SMP-7: the waveform menu
             const auto waveMenu = lynx::samplerWaveMenu (f);
-            const juce::StringArray expected { lynx::tr ("Reload"), lynx::tr ("Save as..."), lynx::tr ("Locate file"), lynx::tr ("Copy audio to clipboard"),
+            juce::StringArray expected { lynx::tr ("Reload"), lynx::tr ("Save as..."), lynx::tr ("Locate file"), lynx::tr ("Copy audio to clipboard"),
                                                lynx::tr ("Paste audio from clipboard"), "-", lynx::tr ("Edit in audio editor"), "-",
-                                               lynx::tr ("Open in new sampler channel"), lynx::tr ("Open in new Fruity Granulizer channel"), "-",
+                                               lynx::tr ("Open in new sampler channel"), lynx::tr ("Open in new Fruity Granulizer channel"),
+                                               lynx::tr ("Open in new Fruity Slicer channel"), lynx::tr ("Open in new Slicex channel"), "-", // (round 190gk)
                                                lynx::tr ("Detect tempo") };
+            if (lynx::fileProperties) // (round 190gk: Windows only)
+                expected.add (lynx::tr ("Get properties"));
             check ("wave_menu_items", waveMenu.has_value() && texts (*waveMenu) == expected, waveMenu.has_value() ? texts (*waveMenu).joinIntoString ("|") : juce::String ("none"));
             if (waveMenu.has_value())
                 saveMenus (juce::StringArray { "Sampler waveform" }, std::vector<juce::PopupMenu> { *waveMenu }, prefix + "-wave-menu.png");
@@ -12423,6 +12428,67 @@ private:
             for (const auto& m : lynx::messages::all())
                 listed = listed || juce::String (m.id) == "RecAutoSwitchExternalInput";
             check ("external_input_in_manage_messages", listed);
+        }
+
+        // ---- 5. round 190gk: FL's Start in the render window; the Sampler's "Open in new Fruity Slicer / Slicex channel";
+        // a Gross Beat slot picked by MIDI becomes its parameter
+        {
+            lynx::AudioEngine engine (false);
+            auto panel = lynx::makeClipRenderPanel (engine);
+            panel->setSize (panel->getWidth() > 0 ? panel->getWidth() : 640, panel->getHeight() > 0 ? panel->getHeight() : 480);
+            juce::String button;
+            for (auto* c : panel->getChildren())
+                if (auto* b = dynamic_cast<juce::TextButton*> (c); b != nullptr && b->isVisible() && b->getTooltip() == lynx::tr ("Start rendering"))
+                    button = b->getButtonText();
+            check ("render_button_start", button == lynx::trc ("@render button: Start") && button == "Start", button);
+            shoot (*panel, "fltails190gk-render-start");
+
+            const auto clap = writeWav (folder.getChildFile ("Slice me.wav"), 44100.0, 44100, 140.0);
+            engine.editSong ([] (lynx::Song& s) {
+                s.channels.resize (2);
+                s.channels[0] = {};
+                s.channels[0].instrument = lynx::InstrumentKind::fruityslicer;
+                s.channels[0].name = "Fruity Slicer";
+                s.channels[1] = {};
+                s.channels[1].instrument = lynx::InstrumentKind::slicex;
+                s.channels[1].name = "Slicex";
+            });
+            const auto locate = [] (int index) {
+                return [index] (lynx::Song& s) -> lynx::ChannelDef* { return index < (int) s.channels.size() ? &s.channels[(std::size_t) index] : nullptr; };
+            };
+            lynx::loadSampleWhenOpened (0, clap.getFullPathName());
+            auto slicer = lynx::makeFruitySlicerEditor (engine, locate (0), 0);
+            const auto& fs = engine.getSong().channels[0];
+            check ("open_in_new_fruity_slicer", fs.samplePath == clap.getFullPathName().toStdString() && ! fs.pluginState.empty(), juce::String (fs.samplePath));
+            lynx::loadSlicexSampleWhenOpened (1, clap.getFullPathName());
+            auto slicex = lynx::makeSlicexEditor (engine, locate (1), 1);
+            const auto& sx = engine.getSong().channels[1];
+            check ("open_in_new_slicex", sx.samplePath == clap.getFullPathName().toStdString() && ! sx.pluginState.empty(), juce::String (sx.samplePath));
+            auto again = lynx::makeSlicexEditor (engine, locate (1), 1); // (the request is used once)
+            check ("open_in_new_used_once", engine.getSong().channels[1].samplePath == sx.samplePath);
+
+            // Gross Beat on insert 1: two notes on its MIDI input, one block, the engine's timer step
+            engine.editSong ([] (lynx::Song& s) {
+                if (s.mixer.size() < 2)
+                    s.mixer.resize (2);
+                s.mixer[1].effects = { lynx::makeEffectSlot (lynx::EffectKind::grossBeat) };
+            });
+            engine.dispatchPendingMessages();
+            auto fx = engine.getEffect (1, 0);
+            check ("gb_running", fx != nullptr);
+            if (fx != nullptr)
+            {
+                std::vector<float> l (512, 0.1f), r (512, 0.1f);
+                fx->prepare (44100.0);
+                fx->setSongPosition (0.0);
+                fx->midiNote (60 + 9, 100, 0);
+                fx->midiNote (24 + 3, 100, 0);
+                fx->process (l.data(), r.data(), 512, engine.getSong().mixer[1].effects[0].params, 120.0);
+                engine.pumpGrossBeatPicks();
+                const auto& p = engine.getSong().mixer[1].effects[0].params;
+                check ("gb_midi_pick_sets_parameters", lynx::grossbeat::rawFromParam (0, p[0]) == 9 && lynx::grossbeat::rawFromParam (1, p[1]) == 3,
+                       juce::String (lynx::grossbeat::rawFromParam (0, p[0])) + " " + juce::String (lynx::grossbeat::rawFromParam (1, p[1])));
+            }
         }
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
