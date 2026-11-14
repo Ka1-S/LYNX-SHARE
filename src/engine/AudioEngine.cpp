@@ -5974,8 +5974,8 @@ Song AudioEngine::snapshotForRemoteControl()
 {
     if (getTransport().playing.load() || isRecording())
         throw RemoteError ("busy", "Stop playback and recording before capturing opaque device state");
-    // The model belongs to the message thread; live state capture locks each hosted plugin only.
-    // Do not stop the audio callback while copying the project or reading unrelated devices.
+    // The model belongs to the message thread. Live state capture runs beside processing (no lock, as on JUCE's own
+    // hosts); only a restore holds a hosted plugin's callback lock. Do not stop the audio callback while copying.
     auto snapshot = song;
     capturePluginStatesInto (snapshot, false);
     return snapshot;
@@ -6262,8 +6262,8 @@ bool AudioEngine::editSongRemoteTransaction (const std::function<void (Song&)>& 
 {
     if (getTransport().playing.load() || isRecording() || juce::ModifierKeys::getCurrentModifiersRealtime().isAnyMouseButtonDown())
         throw RemoteError ("busy", "Stop playback/recording and finish the current gesture before remote edits");
-    // Staging, serialization and publication stay off the audio-device lock. Hosted state access
-    // synchronizes with processing through the same per-instance locks used by native history.
+    // Staging, serialization and publication stay off the audio-device lock. A hosted state restore holds only that
+    // plugin's callback lock (the audio side skips the block meanwhile); capture takes no lock.
     auto before = snapshotForRemoteControl();
     auto next = before;
     if (cancelled && cancelled()) throw RemoteError ("failed", "Remote operation cancelled before committing changes");
