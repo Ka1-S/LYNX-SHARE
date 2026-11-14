@@ -2742,7 +2742,9 @@ void followPatternLengths (const std::vector<std::int64_t>& before, Song& song);
 Song makeExportSong (const Song& song, bool wholeSong, std::int64_t tailTicks, std::int64_t& musicLength);
 
 // Copy of the song in which only the (post-fader) output of insert `track` is heard, straight to Master
-// without effects or fader: this is what gets rendered to "turn the insert into audio".
+// without effects or fader: this is what gets rendered to "turn the insert into audio". Round 190gj: the inserts its
+// effects listen to (side-chain keys, Connections) play as in the mix but unheard, so the insert sounds as in the mix
+// (a side-chained bass stays ducked; until 0.1.27 those keys were silenced).
 Song makeBounceSong (const Song& song, int track);
 
 // After rendering the insert to `samplePath` (`length` ticks from the start): creates an

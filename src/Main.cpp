@@ -2977,7 +2977,7 @@ private:
     // LYNX's own faults on to the crash handler instead of swallowing them ("swallowed.txt" = it did).
     // Round 190gj (P9): the inserts' stems from one render are the files each stem's own render writes, byte for byte
     // (a short song with a bus, a send return, delay compensation, a channel on the Master, an automated insert and a
-    // side-chain that needs its own render), streamed (24-bit WAV with the full mix) and buffered (normalised float).
+    // side-chained insert), streamed (24-bit WAV with the full mix) and buffered (normalised float).
     static juce::String stemsSinglePassSelfTest()
     {
         auto s = lynx::Song::makeDefault();
@@ -3037,9 +3037,8 @@ private:
             const auto b = lynx::runStemExport (planShared, now, {}, {}, {}, {}, false, true, &stats);
             if (a != (int) planAlone.items.size() || b != a)
                 problems << name << ": " << a << " / " << b << " files; ";
-            // (insert 5's side-chain needs its own render; a file whose render ends at its longest tail inside another's
-            // block too)
-            if (stats.passes != 1 || stats.inPass < 4 || stats.alone < 1)
+            // (every insert from the one render, insert 5 with its side-chain too: it stays ducked as in the mix)
+            if (stats.passes != 1 || stats.inPass < 6)
                 problems << name << ": renders " << stats.passes << " shared, " << stats.inPass << " in it, " << stats.alone << " alone; ";
             for (std::size_t k = 0; k < planShared.items.size() && k < planAlone.items.size(); ++k)
             {

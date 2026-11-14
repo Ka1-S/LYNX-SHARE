@@ -1953,6 +1953,100 @@ Song makeBounceSong (const Song& song, int track)
     insert.muted = false;
     insert.solo = true; // it and whatever feeds it are audible
 
+    // Round 190gj (owner decision 2026-11-14, FL's split render): what the insert's effects listen to (a side-chain key,
+    // a hosted effect's Connections) plays as it does in the mix, unheard — so a ducked bass stays ducked in its stem and
+    // the stems add up to the mix. Those inserts (with their own sources and keys) are soloed too, and their routes out
+    // of that set are cut, so nothing of them reaches the Master. (Until 0.1.27 they were silenced: no ducking.)
+    {
+        const auto n = (int) out.mixer.size();
+        auto feedersOf = [&out, n] (int u) {
+            std::vector<int> f;
+            for (int src = 1; src < n; ++src)
+            {
+                if (src == u)
+                    continue;
+                auto feeds = out.routes (src, u);
+                for (const auto& fx : out.mixer[(std::size_t) src].effects)
+                    for (int o = 0; o < maxSlotSends && ! feeds; ++o)
+                        feeds = slotSendTarget (fx, o) == u;
+                for (const auto& tap : fruitySendsOf (out, src))
+                    feeds = feeds || tap.target == u;
+                if (feeds)
+                    f.push_back (src);
+            }
+            return f;
+        };
+        auto keysOf = [&out, n] (int u) {
+            std::vector<int> k;
+            for (const auto& fx : out.mixer[(std::size_t) u].effects)
+            {
+                const auto c = slotConnections (out, u, fx);
+                for (const auto source : { fx.sidechain, fx.sidechain2, c.routed ? c.mainSource : -1, c.routed ? c.sideSource : -1 })
+                    if (source > 0 && source < n && source != u)
+                        k.push_back (source);
+            }
+            return k;
+        };
+        const auto heard = out.soloAudible();
+        // the keys of whatever the stem hears that feeds the insert, then everything that reaches those keys
+        std::vector<char> inSet ((std::size_t) n, 0);
+        std::vector<int> stack;
+        for (int u = 1; u < n; ++u)
+            if (heard[(std::size_t) u])
+                for (const auto k : keysOf (u))
+                    if (! heard[(std::size_t) k] && ! inSet[(std::size_t) k])
+                    {
+                        inSet[(std::size_t) k] = 1;
+                        stack.push_back (k);
+                    }
+        while (! stack.empty())
+        {
+            const auto u = stack.back();
+            stack.pop_back();
+            auto more = feedersOf (u);
+            const auto k = keysOf (u);
+            more.insert (more.end(), k.begin(), k.end());
+            for (const auto src : more)
+                if (! inSet[(std::size_t) src] && ! heard[(std::size_t) src])
+                {
+                    inSet[(std::size_t) src] = 1;
+                    stack.push_back (src);
+                }
+        }
+        if (std::any_of (inSet.begin(), inSet.end(), [] (char c) { return c != 0; }))
+        {
+            for (int u = 1; u < n; ++u)
+                if (inSet[(std::size_t) u])
+                {
+                    auto& m = out.mixer[(std::size_t) u];
+                    m.solo = true;
+                    m.soloSources = true;
+                }
+            // the newly heard inserts send nowhere outside the keys' set (not to the Master, not into the stem's own
+            // path: the insert and its sources stay as they were)
+            for (int pass = 0; pass < 4; ++pass)
+            {
+                const auto now = out.soloAudible();
+                auto changed = false;
+                for (int u = 1; u < n; ++u)
+                {
+                    if (! now[(std::size_t) u] || heard[(std::size_t) u])
+                        continue;
+                    auto& m = out.mixer[(std::size_t) u];
+                    changed = changed || m.toMaster;
+                    m.toMaster = false;
+                    const auto before = m.sends.size();
+                    m.sends.erase (std::remove_if (m.sends.begin(), m.sends.end(),
+                                                   [&inSet, n] (const MixerSend& s) { return s.target <= 0 || s.target >= n || ! inSet[(std::size_t) s.target]; }),
+                                   m.sends.end());
+                    changed = changed || m.sends.size() != before;
+                }
+                if (! changed)
+                    break;
+            }
+        }
+    }
+
     // the Master neutral: the render plays through the song's Master again (Render to audio), so nothing of it may be in
     // the file — effects, fader, pan, separation, phase / swap, EQ and its automation (round 186b, as StandIns' stems)
     auto& master = out.mixer[0];

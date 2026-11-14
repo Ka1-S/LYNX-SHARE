@@ -107,10 +107,14 @@ TEST (stems190gj_plan_says_which_stems_one_render_makes)
         slots[t].assign (s.mixer[t].effects.size(), 0);
     auto plan = [&] (const lynx::Song& song, int t) { return lynx::exportopts::planStemTap (song, t, channels, slots, s190gj::rate); };
 
-    for (int t : { 1, 2, 3, 4, 6, 7 })
+    for (int t = 1; t <= 7; ++t)
         CHECK (plan (s, t).ok);
-    // the synth's compressor listens to the kick, which its own render silences
-    CHECK (! plan (s, 5).ok && plan (s, 5).why.find ("insert 1 ") != std::string::npos);
+    // the synth's compressor listens to the kick: its stem render plays the kick unheard (owner decision 2026-11-14,
+    // FL's split render: the stem stays ducked), so the one render makes it too, from the synth's insert alone
+    CHECK (plan (s, 5).inputs.size() == 1 && plan (s, 5).inputs[0].track == 5);
+    const auto keyed = lynx::makeBounceSong (s, 5);
+    CHECK (keyed.mixer[1].solo && ! keyed.mixer[1].toMaster && keyed.mixer[1].sends.empty());
+    CHECK (lynx::makeBounceSong (s, 2).mixer[1].solo == false); // (no key: as before)
     CHECK (! plan (s, 0).ok && ! plan (s, 8).ok);
     // insert 1's stem: itself, at 0 dB, delayed to the Master's alignment (5 ms of insert 4's latency, at 48 kHz)
     const auto one = plan (s, 1);
@@ -183,7 +187,7 @@ TEST (stems190gj_taps_of_one_render_equal_each_stems_own_render)
             for (const auto& in : p.inputs)
                 taps.wanted[(std::size_t) in.track] = 1;
         }
-    CHECK (stems.size() == 6);
+    CHECK (stems.size() == 7);
 
     std::vector<lynx::exportopts::StemMixer> mixers;
     for (const auto& p : plans)
@@ -216,6 +220,16 @@ TEST (stems190gj_taps_of_one_render_equal_each_stems_own_render)
         }
         CHECK (differ == 0);
         CHECK (sounding > 1000);
+        if (stems[k] == 5) // the stem is ducked by the kick, as in the mix: not what it is with the kick silenced
+        {
+            auto unkeyed = lynx::makeBounceSong (s, 5);
+            unkeyed.mixer[5].effects[0].sidechain = -1; // (the compressor hears no key)
+            const auto plain = s190gj::render (unkeyed, blocks);
+            std::size_t other = 0;
+            for (std::size_t i = 0; i < own.size(); ++i)
+                other += own[i] != plain[i] ? 1 : 0;
+            CHECK (other > 1000);
+        }
         if (differ != 0)
             std::printf ("  stem of insert %d: %zu samples differ\n", stems[k], differ);
     }
