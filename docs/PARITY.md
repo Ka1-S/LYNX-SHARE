@@ -3220,8 +3220,8 @@ search on the three references' stair and pink-stair step levels at all their pr
 1.89 → 1.16). The measured Limit law and Glow's own engine ignore the switch. The editor shows `Side chain` `Old | Measured`
 under the cell-memory keys (existing strings, 14 languages; the four key groups are 12 px high now so the column ends above
 the COMPRESS caption). CPU: one biquad per sample and channel more than the emphasis (35 s stereo programme, user time, best of
-five on a loaded machine: Glow 0.47 / 0.48 s base / branch with the switch off, 0.41 … 0.50 s with it on — inside the timing
-noise, `logs/cpu.txt`); no latency.
+five, `logs/cpu2.txt`): Glow 0.356 → 0.352 s with the switch off, 0.356 s (base, emphasis) → 0.360 s with it on, with the cell
+memory 0.408 → 0.398 s — inside the timing noise; the Compressor 0.127 → 0.128 s (same code); no latency.
 
 **Setting maps refitted with the pink stairs in the loss** (round 190ar's fitter, `fit/fitfx.py`, specs `fit/specs190fx*.py`):
 - FET references → Compressor (FET law, no code change): stairs, tone bursts and pink stairs; pass 1 restarts the ratio at
