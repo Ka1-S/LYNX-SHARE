@@ -106,6 +106,22 @@ const natives::FlAccess& flStudioAccess()
             return std::vector<std::uint8_t> (bytes, bytes + data.getSize());
         };
         access.listPresets = [] (const std::string& folder) {
+            // round 190gd: a folder's listing is kept for a few seconds. Listing the generators' engines walked FL's whole
+            // Plugin database\Generators tree once per engine (~40 walks, ~0.5 s of every start and of every Browser /
+            // Add menu refresh); FL's own preset folders change when FL or the user saves a preset, seconds apart at most
+            struct Listing
+            {
+                std::vector<std::string> files;
+                juce::uint32 madeMs = 0;
+            };
+            static std::mutex lock;
+            static std::map<std::string, Listing> listings;
+            const auto now = juce::Time::getMillisecondCounter();
+            {
+                const std::scoped_lock l (lock);
+                if (const auto it = listings.find (folder); it != listings.end() && now - it->second.madeMs < 5000)
+                    return it->second.files;
+            }
             std::vector<std::string> out;
             auto files = platform::localFile (folder).findChildFiles (juce::File::findFiles, true, "*.fst;*.tbio;*.gmsynth;*.mrp");
             std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b) {
@@ -113,6 +129,8 @@ const natives::FlAccess& flStudioAccess()
             });
             for (const auto& f : files)
                 out.push_back (f.getFullPathName().toStdString());
+            const std::scoped_lock l (lock);
+            listings[folder] = { out, juce::Time::getMillisecondCounter() };
             return out;
         };
         // (FL Keys' raw wavetables become WAV files of LYNX's settings folder, like an .flp's embedded samples)

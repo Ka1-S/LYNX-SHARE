@@ -2361,6 +2361,48 @@ void PlaylistComponent::paintOverChildren (juce::Graphics& g)
     textcache::drawText (g, tr ("Ripple"), tag.toNearestInt(), juce::Justification::centred);
 }
 
+namespace
+{
+// The played span of an audio clip's file, for drawing it (round 190gd). The Playlist loaded the file on every paint to
+// read its span; a channel that plays a time-stretched copy holds only that copy, so every paint of its clips decoded
+// the whole file again and applied its precomputed effects (FL's Thief: ~15 s of the message thread at 85-95 % after
+// the project opened, and the files coming and going in memory). A file nothing holds is now decoded once: its span is
+// kept per path, channel settings (what precompute::playedSpan depends on) and waveform summary (a file read again
+// gets a new one). Message thread.
+precompute::PlayedSpan drawnSpan (SampleLibrary& samples, const ChannelDef& channel, const juce::String& path,
+                                  const std::shared_ptr<const wave::Summary>& summary)
+{
+    if (const auto held = samples.findLoaded (path)) // (held by the rack: playedSpan keeps its own span for it)
+        return clipops::clipSpan (channel, held);
+    const auto whole = channel.instrument == InstrumentKind::audioClip;
+    const auto& s = channel.sampler;
+    struct Entry
+    {
+        juce::String path;
+        std::weak_ptr<const wave::Summary> summary;
+        float regionStart, regionEnd;
+        bool reverse, loops, whole;
+        std::int64_t loopStart, loopEnd;
+        std::vector<std::int32_t> flChannel;
+        SamplePrecompute precompute;
+        precompute::PlayedSpan span;
+    };
+    static std::vector<Entry> cache;
+    for (const auto& e : cache)
+        if (e.path == path && e.whole == whole && e.regionStart == s.regionStart && e.regionEnd == s.regionEnd && e.reverse == s.reverse
+            && e.loops == s.useLoopPoints && e.loopStart == s.loopStart && e.loopEnd == s.loopEnd && e.flChannel == s.flChannel
+            && e.precompute == s.precompute && ! e.summary.expired() && e.summary.lock() == summary)
+            return e.span;
+    const auto data = samples.load (path);
+    const auto span = data != nullptr ? clipops::clipSpan (channel, data) : precompute::PlayedSpan { 0, (std::int64_t) summary->frames };
+    std::erase_if (cache, [] (const Entry& e) { return e.summary.expired(); });
+    if (cache.size() >= 256)
+        cache.erase (cache.begin());
+    cache.push_back ({ path, summary, s.regionStart, s.regionEnd, s.reverse, s.useLoopPoints, whole, s.loopStart, s.loopEnd, s.flChannel, s.precompute, span });
+    return span;
+}
+} // namespace
+
 void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, const Clip& c, juce::Rectangle<float> r, bool current)
 {
     const auto& song = engine.getSong();
@@ -2392,8 +2434,7 @@ void PlaylistComponent::addSmallClip (SmallClips& batch, float physicalScale, co
         // the same mapping as paintAudioClip
         const auto wave = body.reduced (0.0f, body.getHeight() >= 14.0f ? 2.0f : 1.0f);
         // what the clip plays of the file (its Trim; round 180d): the same frames as the playback
-        const auto data = engine.getSampleLibrary().load (path);
-        const auto span = data != nullptr ? clipops::clipSpan (channel, data) : precompute::PlayedSpan { 0, (std::int64_t) summary->frames };
+        const auto span = drawnSpan (engine.getSampleLibrary(), channel, path, summary);
         const auto total = (double) span.frames;
         const auto perTick = clipops::framesPerTick (channel, c, total, summary->sampleRate, song.bpm);
         const auto startTick = (double) c.offset + (double) (wave.getX() - r.getX()) / pixelsPerTick;
@@ -2479,8 +2520,7 @@ void PlaylistComponent::paintAudioClip (juce::Graphics& g, const Clip& c, juce::
     {
         const auto wave = body.reduced (0.0f, body.getHeight() >= 14.0f ? 2.0f : 1.0f);
         // what the clip plays of the file (its Trim; round 180d): the same frames as the playback
-        const auto data = engine.getSampleLibrary().load (path);
-        const auto span = data != nullptr ? clipops::clipSpan (channel, data) : precompute::PlayedSpan { 0, (std::int64_t) summary->frames };
+        const auto span = drawnSpan (engine.getSampleLibrary(), channel, path, summary);
         const auto total = (double) span.frames;
         const auto perTick = clipops::framesPerTick (channel, c, total, summary->sampleRate, song.bpm);
         // r's left edge is the clip start, i.e. tick `offset` of the audio (counted from the played span's end when

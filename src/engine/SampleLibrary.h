@@ -48,6 +48,15 @@ public:
     // done once per session in the background). Returns the bytes left.
     static juce::int64 prunePcmCache (juce::int64 limitBytes);
 
+    // What the decoded samples of the process hold now (round 190gd: the load log says where a project's megabytes go):
+    // samples in RAM (float, both channels) and mapped from the disk cache, and the time-stretched copies kept
+    struct MemoryUse
+    {
+        int samples = 0, mappedSamples = 0, stretched = 0;
+        std::int64_t sampleBytes = 0, mappedBytes = 0, stretchedBytes = 0;
+    };
+    static MemoryUse memoryUse();
+
     // Filter for FileChooser ("*.wav;*.flac;...")
     juce::String wildcard() const;
 

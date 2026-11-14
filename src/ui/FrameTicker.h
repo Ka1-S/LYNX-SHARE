@@ -7,7 +7,8 @@
 //  - attached: one step per vertical blank (at most `maxHz`, 170 by default: a 240 Hz display gets every other one;
 //    capped tickers all run on the same frames; Settings › General › Animation rate caps them all at 60 or 30);
 //  - after ~0.3 s of steps that changed nothing (transport stopped, meters fallen) it detaches; a light idle poll
-//    (20 Hz, the same step) brings it back as soon as something moves, so an idle view costs no repaint at all;
+//    (20 Hz, the same step; one timer for every ticker since round 190gd) brings it back as soon as something moves,
+//    so an idle view costs no repaint at all;
 //  - the poll also covers a window that gets no vertical blank (no peer yet, a platform without them).
 // The step returns true while something moved. It repaints only what changed (each view does its own dirty rects).
 //
@@ -18,25 +19,27 @@
 
 #include "core/FramePacing.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdlib>
 #include <functional>
 #include <map>
+#include <vector>
 
 namespace lynx::ui
 {
-class FrameTicker final : private juce::Timer
+class FrameTicker final
 {
 public:
     // owner: the view (its window's refresh drives the ticker). step (nowMs): one animation step, true while it moved.
     FrameTicker (juce::Component& ownerIn, std::function<bool (double)> stepIn, double maxHzIn = 170.0)
         : owner (ownerIn), step (std::move (stepIn)), maxHz (maxHzIn)
     {
-        startTimerHz (fixedHz() > 0 ? fixedHz() : idleHz);
+        Poll::add (this);
     }
 
-    ~FrameTicker() override { stopTimer(); }
+    ~FrameTicker() { Poll::remove (this); }
 
     // something started to move (Play, a new meter level): run at the display rate from the next refresh
     void wake()
@@ -144,7 +147,57 @@ private:
         return ms;
     }
 
-    void timerCallback() override
+    // The idle poll of every ticker (round 190gd): one timer for all of them. Each ticker had its own 20 Hz timer, on
+    // its own phase: five views woke JUCE's timer thread and the message thread ~100 times a second with nothing
+    // moving; now 20. Message thread; made by the first ticker, deleted after the last one.
+    struct Poll final : private juce::Timer
+    {
+        std::vector<FrameTicker*> tickers;
+        bool polling = false, orphaned = false;
+
+        static Poll*& instance()
+        {
+            static Poll* p = nullptr;
+            return p;
+        }
+        static void add (FrameTicker* t)
+        {
+            auto*& p = instance();
+            if (p == nullptr)
+                p = new Poll();
+            p->tickers.push_back (t);
+            if (! p->isTimerRunning())
+                p->startTimerHz (fixedHz() > 0 ? fixedHz() : idleHz);
+        }
+        static void remove (FrameTicker* t)
+        {
+            auto*& p = instance();
+            if (p == nullptr)
+                return;
+            p->tickers.erase (std::remove (p->tickers.begin(), p->tickers.end(), t), p->tickers.end());
+            if (! p->tickers.empty())
+                return;
+            p->stopTimer();
+            if (p->polling)
+                p->orphaned = true; // (deleted when its own callback returns)
+            else
+                delete p;
+            p = nullptr;
+        }
+        void timerCallback() override
+        {
+            polling = true;
+            const auto list = tickers; // (a step may delete views, and their tickers with them)
+            for (auto* t : list)
+                if (! orphaned && std::find (tickers.begin(), tickers.end(), t) != tickers.end())
+                    t->poll();
+            polling = false;
+            if (orphaned)
+                delete this;
+        }
+    };
+
+    void poll()
     {
         const auto nowMs = juce::Time::getMillisecondCounterHiRes();
         if (fixedHz() > 0) // diagnostics: a plain timer

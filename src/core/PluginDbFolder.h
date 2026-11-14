@@ -13,6 +13,8 @@
 //   Installed/Effects|Generators/<format>/   every plugin LYNX has (built-in and scanned), written again by LYNX: the
 //                                            place to copy an entry from after deleting it above
 //   database.index                           LYNX's own notes (which plugins were given an entry once)
+//   installed.index                          LYNX's own notes (the plugin list Installed was last written for: a start
+//                                            whose list and Installed file names match reads none of its files)
 //   Read me.txt
 // An entry is a small text file (UTF-8):
 //   LYNX plugin 1
@@ -90,6 +92,10 @@ std::string folderOnDisk (const std::string& root, bool instruments, const std::
 // folders, places and names LYNX kept in its settings until now) and the built-in plugins' default folders. After
 // that `state` is replaced by what the tree says; new plugins get their entries, Installed is brought up to date.
 Report refresh (const std::string& root, const std::vector<Plugin>& plugins, State& state);
+
+// Tests (round 190gd): forget what this process remembers of `root` (the folders read and the Installed list written),
+// as a new start of LYNX would
+void forgetSession (const std::string& root);
 
 // Model → disk, after a change made in LYNX (a move, a new / renamed / deleted folder, a rename): entries are moved,
 // renamed, made or removed and folders made; a folder LYNX read at the last refresh that the model no longer has is
