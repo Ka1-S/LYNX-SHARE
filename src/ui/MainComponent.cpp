@@ -3126,6 +3126,15 @@ void MainComponent::notePlayStart (bool resume)
     seekClicksSeen = EditorGlobals::get().seekMarkSerial; // (the click that put the position here is this start)
 }
 
+void MainComponent::forgetSeekMark()
+{
+    auto& globals = EditorGlobals::get();
+    globals.seekMark = -1;
+    seekClicksSeen = globals.seekMarkSerial;
+    returnTicks = -1.0;
+    transportPaused = false;
+}
+
 std::int64_t MainComponent::stopReturn (bool alreadyStopped, bool spaceKey)
 {
     auto& globals = EditorGlobals::get();
@@ -3175,7 +3184,8 @@ void MainComponent::stopAndRewind (bool toStart)
 {
     // Stop while nothing plays (the second press, or a double click) goes back to the very start even when
     // "Remember seek time" sends the first Stop to the ruler mark (round 162, issue #9)
-    const auto alreadyStopped = toStart || ! (engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting());
+    // (paused is not stopped: FL's Stop after a pause (transport state 2) still goes back to the seek mark, issue #169)
+    const auto alreadyStopped = toStart || ! (transportPaused || engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting());
     const auto back = stopReturn (alreadyStopped, false); // (issue #169: FL's seek mark, Pattern mode too)
     engine.stop();
     transportPaused = false;
@@ -7142,6 +7152,7 @@ void MainComponent::openStartupProject()
 
 void MainComponent::startNewProject (Song song, const juce::File& file)
 {
+    forgetSeekMark();
     engine.stop();
     engine.rewind();
     engine.setSong (std::move (song));
@@ -7282,6 +7293,7 @@ void MainComponent::openFileRequest (const juce::File& file)
 
 void MainComponent::openFile (const juce::File& file)
 {
+    forgetSeekMark(); // (another project: FL's mark and a pause don't carry over)
     juce::String error;
     crashguard::note (("opening project " + file.getFileName()).toStdString()); // session breadcrumb (round 111)
 

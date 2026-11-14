@@ -259,6 +259,7 @@ private:
     double positionToStartFrom() const; // the position playback starts from (a seek still on its way counts)
     void notePlayStart (bool resume);
     std::int64_t stopReturn (bool alreadyStopped, bool spaceKey);
+    void forgetSeekMark();
 
     // key map and actions
     bool runAction (const std::string& id);
