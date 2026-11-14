@@ -81,6 +81,25 @@ round 117 notes (`docs/analise/REA_rodada117.md`) list the measured differences.
   app on Linux and macOS; `release.yml` builds all three platforms on a tag and attaches the packages and
   `SHA256SUMS.txt` to the draft release.
 
+## Release optimisation
+
+Measured in round toolchain190gt with `perfbench` (round 190ge: the engine's render as the audio callback does it,
+instructions and cycles per sample, a hash of every output sample), the same source built several ways, interleaved.
+- **Windows** (`scripts/build-windows-zig.sh`): `-O2 -fno-math-errno`, ThinLTO for LYNX's own objects (JUCE's modules
+  stay out of it), and a link that drops unreferenced code and folds identical functions (`-OPT:REF -OPT:SAFEICF`,
+  see the script). Against the old `-O2` build, on the Linux build of the same compiler (zig 0.14.1 = LLVM 19): 2–25 %
+  fewer instructions and 0–22 % fewer cycles per sample over six scenarios, every output bit-identical. `LYNX_WIN_LTO=0
+  LYNX_WIN_GC=0` builds without the LTO link for development.
+  - zig gives `-O3` the same code as `-O2`; a real `-O3` (`-Xclang -O3`) measured no better than ThinLTO.
+  - `-mcpu=x86_64_v2` (SSE4.2) measured no gain on Linux and changes some outputs; it would also need a CPU check
+    before any static constructor. Not used.
+- **Linux** (GCC 13, `-O3`, LTO of the app's own objects): unchanged. Link-time optimising the core too, and
+  `-fno-math-errno`, measured no gain with GCC. Against Clang, GCC's core needed 12–38 % more cycles on the two FL demo
+  projects and 9–22 % fewer on the LYNX-native scenarios (an open question for a later round).
+- **macOS**: unchanged (Apple's clang `-O3`, LTO of the app's own objects; Darwin has no maths `errno`).
+- The Clang job of the Tests workflow compiles the core with the Windows flags (`LYNX_OPT_FLAGS`, `scripts/build-local.sh`),
+  so the bit-exact goldens check that codegen.
+
 ## Windows plugins on Linux (yabridge)
 
 [yabridge](https://github.com/robbert-vdh/yabridge) turns Windows VST2/VST3 plugins into Linux ones running in Wine.

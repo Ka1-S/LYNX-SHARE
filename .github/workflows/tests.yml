@@ -34,10 +34,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # opt (round toolchain190gt): the Clang job compiles with the Windows release's flags (zig = the same LLVM; its
+        # ThinLTO is covered by build-local's own zig build), so the bit-exact goldens check that codegen
         include:
-          - { os: ubuntu-24.04, compiler: g++ }
-          - { os: ubuntu-24.04, compiler: clang++ }
-          - { os: macos-15, compiler: clang++ }
+          - { os: ubuntu-24.04, compiler: g++, opt: '-O2' }
+          - { os: ubuntu-24.04, compiler: clang++, opt: '-O2 -fno-math-errno' }
+          - { os: macos-15, compiler: clang++, opt: '-O2' }
     env:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1500M
@@ -57,6 +59,7 @@ jobs:
       - name: Build and test the core (no JUCE)
         env:
           CXX: ccache ${{ matrix.compiler }}
+          LYNX_OPT_FLAGS: ${{ matrix.opt }}
           LYNX_TEST_JOBS: auto
         run: |
           ccache --zero-stats > /dev/null # (after the restore: the statistics live in the cache folder)
