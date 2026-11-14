@@ -10101,3 +10101,10 @@ countries: it ch sm
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Legge di Beats: Classic suona come LYNX prima della 0.1.28 (questo progetto è stato salvato allora); Misurato segue i render di Live 12.4"
 
 # --- Not in pt-BR.txt (yet)
+# round 190gz: Link Playlist tracks to mixer tracks (issue #170)
+"Link Playlist tracks to mixer tracks (current project) on/off" = "Collega le tracce della Playlist alle tracce del mixer (progetto attuale) attiva/disattiva"
+"Link Playlist tracks to mixer tracks (current project)" = "Collega le tracce della Playlist alle tracce del mixer (progetto attuale)"
+"Link Playlist tracks to mixer tracks in new projects" = "Collega le tracce della Playlist alle tracce del mixer nei nuovi progetti"
+"Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Collega le tracce della Playlist alle tracce del mixer (traccia N con l'insert N; muto, solo, volume e pan nelle intestazioni delle tracce collegate)"
+"New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "I nuovi progetti iniziano con ogni traccia della Playlist che contiene clip collegata a una traccia del mixer (traccia N all'insert N quando questo non cambia il suono); le intestazioni delle tracce collegate mostrano muto, solo, volume e pan. Anche nella pagina Impostazioni › Progetto, con l'opzione per il progetto aperto."
+"Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Traccia collegata: [LMB] silenzia / riattiva la sua traccia del mixer  [Ctrl][LMB] o [RMB] solo della traccia della Playlist"

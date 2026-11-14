@@ -2341,6 +2341,7 @@ compressor role (no captured state) still load the stand-in at its defaults.
 | Sidechain from an effect | route arrow › "Sidechain to this track" (/ only), then the plugin's own input selector | the same route menu, plus a "SC: … ▾" picker in every side-input effect's window header, the plugin wrapper header, the mixer's selected-effect panel and the slot menu (makes FL's level-0 link) | LYNX extra |
 | Automation lanes under Playlist tracks | — (automation clips only) | Playlist ruler menu › "Automation lanes", off by default | LYNX extra (Ableton-style, optional) |
 | Modulators (LFO / random moving a knob around its value) | — | Tools › "Modulators…" and every control's "Modulate" submenu; no cost until the first one exists | LYNX extra |
+| Playlist tracks linked to mixer tracks (round 190gz, issue #170) | tracks and inserts apart; Track mode links one track at a time | Playlist › Edit, Track mode and Settings › Project › "Link Playlist tracks to mixer tracks", off by default (Settings also has the new-projects default). Each track with clips becomes FL's audio / instrument track of an insert (Track N with insert N when the sound stays the same; content already routed keeps its insert; mixed tracks stay unassigned), new content follows, insert N's recording lands on Track N; linked headers get M, S, volume and pan (152 px headers). The links are FL track modes, so .flp keeps them | LYNX extra (optional) |
 
 ## Host workflow: LYNX extras over FL (round 177d)
 

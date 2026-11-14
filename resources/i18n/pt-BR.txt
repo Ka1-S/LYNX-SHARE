@@ -10220,3 +10220,10 @@ countries: br
 "Envelope: the size of the spectral envelope Complex Pro keeps" = "Envelope: o tamanho do envelope espectral que o Complex Pro mantém"
 "Measured" = "Medido"
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Lei do Beats: Classic toca como o LYNX tocava antes da 0.1.28 (este projeto foi salvo então); Medido segue as renderizações do Live 12.4"
+# round 190gz: Link Playlist tracks to mixer tracks (issue #170)
+"Link Playlist tracks to mixer tracks (current project) on/off" = "Vincular faixas da Playlist às trilhas do mixer (projeto atual) liga/desliga"
+"Link Playlist tracks to mixer tracks (current project)" = "Vincular faixas da Playlist às trilhas do mixer (projeto atual)"
+"Link Playlist tracks to mixer tracks in new projects" = "Vincular faixas da Playlist às trilhas do mixer em projetos novos"
+"Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Vincular faixas da Playlist às trilhas do mixer (Faixa N com o insert N; mudo, solo, volume e pan nos cabeçalhos das faixas vinculadas)"
+"New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Projetos novos começam com cada faixa da Playlist que tem clipes vinculada a uma trilha do mixer (Faixa N ao insert N quando isso não muda o som); os cabeçalhos das faixas vinculadas mostram mudo, solo, volume e pan. Também na página Configurações › Projeto, com a opção para o projeto aberto."
+"Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Faixa vinculada: [LMB] silenciar / reativar a trilha do mixer dela  [Ctrl][LMB] ou [RMB] solo da faixa da Playlist"

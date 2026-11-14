@@ -10101,3 +10101,10 @@ countries: nl be
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats-wet: Classic speelt zoals LYNX vóór 0.1.28 (dit project is toen opgeslagen); Gemeten volgt de renders van Live 12.4"
 
 # --- Not in pt-BR.txt (yet)
+# round 190gz: Link Playlist tracks to mixer tracks (issue #170)
+"Link Playlist tracks to mixer tracks (current project) on/off" = "Playlist-sporen koppelen aan mixersporen (huidig project) aan/uit"
+"Link Playlist tracks to mixer tracks (current project)" = "Playlist-sporen koppelen aan mixersporen (huidig project)"
+"Link Playlist tracks to mixer tracks in new projects" = "Playlist-sporen koppelen aan mixersporen in nieuwe projecten"
+"Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Playlist-sporen koppelen aan mixersporen (spoor N met insert N; dempen, solo, volume en pan in de koppen van gekoppelde sporen)"
+"New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Nieuwe projecten beginnen met elk Playlist-spoor met clips gekoppeld aan een mixerspoor (spoor N aan insert N als dat het geluid niet verandert); de koppen van gekoppelde sporen tonen dempen, solo, volume en pan. Ook op de pagina Instellingen › Project, met de schakelaar voor het open project."
+"Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Gekoppeld spoor: [LMB] het mixerspoor dempen / weer aan  [Ctrl][LMB] of [RMB] solo van het Playlist-spoor"

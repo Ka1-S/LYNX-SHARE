@@ -2381,6 +2381,7 @@ bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_v
     if (id == "playlist.automationLanes") return autolanes::shown();
     if (id == "pianoRoll.songBarsRuler") return PianoRollComponent::songBarsRuler;
     if (id == "general.hoverValues") return hooks.getGeneral && hooks.getGeneral().hoverValues;
+    if (id == "project.linkTracks") return hooks.getGeneral && hooks.getGeneral().linkTracksInNewProjects;
     if (id == "record.lastLoopPassPlays") return engine.getRecordOptions().lastLoopPassPlays;
     if (id == "detail.windowKey") return DetailView::extraWindowKey;
     if (id == "detail.selectInMixer") return DetailView::extraSelectInMixer;
@@ -2449,6 +2450,15 @@ void setLynxExtra (AudioEngine& engine, const SettingsHooks& hooks, std::string_
         {
             auto options = hooks.getGeneral();
             options.hoverValues = on;
+            hooks.setGeneral (options);
+        }
+    }
+    else if (id == "project.linkTracks") // round 190gz: the new projects' default (the open project: Settings › Project)
+    {
+        if (hooks.getGeneral && hooks.setGeneral)
+        {
+            auto options = hooks.getGeneral();
+            options.linkTracksInNewProjects = on;
             hooks.setGeneral (options);
         }
     }

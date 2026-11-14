@@ -7509,6 +7509,7 @@ void MainComponent::openSettings (int page)
         o.backupLongestWaitMinutes = safe->backupLongestWaitMinutes;
         o.hoverValues = safe->hoverValues;
         o.crossfadesInNewProjects = newProjectDefaults().autoCrossfades;
+        o.linkTracksInNewProjects = newProjectDefaults().linkTracks;
         o.pluginSandbox = pluginSandboxEnabled();
         o.menuEntry = appImageMenuEntryInstalled();
         o.pluginSubstitutes = pluginSubstitutesEnabled();
@@ -7613,6 +7614,7 @@ void MainComponent::openSettings (int page)
         self.hoverValues = o.hoverValues;
         self.hoverTipShown = false;
         newProjectDefaults().autoCrossfades = o.crossfadesInNewProjects;
+        newProjectDefaults().linkTracks = o.linkTracksInNewProjects;
         self.autosaveTicks = 0;
         self.saveUiSettings();
         if (o.uiFont != theme::savedUiFont())

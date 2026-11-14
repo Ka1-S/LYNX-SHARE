@@ -2839,6 +2839,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         root->setProperty ("performanceMode", true);
     if (song.autoCrossfades)
         root->setProperty ("autoCrossfades", true);
+    if (song.linkTracksToMixer) // round 190gz (issue #170): LYNX's "Link Playlist tracks to mixer tracks"
+        root->setProperty ("linkTracksToMixer", true);
     if (song.compCrossfadeMs != Song::defaultCompCrossfadeMs)
         root->setProperty ("compCrossfadeMs", (double) song.compCrossfadeMs);
     if (song.playTruncatedNotes)
@@ -3612,6 +3614,7 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
     song.cleanMixer = (bool) root.getProperty ("cleanMixer", false);
     song.performanceMode = (bool) root.getProperty ("performanceMode", false);
     song.autoCrossfades = (bool) root.getProperty ("autoCrossfades", false);
+    song.linkTracksToMixer = (bool) root.getProperty ("linkTracksToMixer", false); // (round 190gz; older projects: off)
     song.compCrossfadeMs = juce::jlimit (0.0f, 100.0f, (float) (double) root.getProperty ("compCrossfadeMs", (double) Song::defaultCompCrossfadeMs));
     song.playTruncatedNotes = (bool) root.getProperty ("playTruncatedNotes", false);
     song.muteRunsEffects = (bool) root.getProperty ("muteRunsEffects", false); // (round 190y; older projects: off)

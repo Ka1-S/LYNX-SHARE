@@ -10101,3 +10101,10 @@ countries: pl
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Prawo Beats: Classic gra jak LYNX przed 0.1.28 (ten projekt zapisano wtedy); Zmierzony podąża za renderami Live 12.4"
 
 # --- Not in pt-BR.txt (yet)
+# round 190gz: Link Playlist tracks to mixer tracks (issue #170)
+"Link Playlist tracks to mixer tracks (current project) on/off" = "Połącz ścieżki Playlisty ze ścieżkami miksera (bieżący projekt) wł./wył."
+"Link Playlist tracks to mixer tracks (current project)" = "Połącz ścieżki Playlisty ze ścieżkami miksera (bieżący projekt)"
+"Link Playlist tracks to mixer tracks in new projects" = "Połącz ścieżki Playlisty ze ścieżkami miksera w nowych projektach"
+"Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Połącz ścieżki Playlisty ze ścieżkami miksera (ścieżka N z insertem N; wyciszenie, solo, głośność i panorama w nagłówkach połączonych ścieżek)"
+"New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Nowe projekty zaczynają się z każdą ścieżką Playlisty zawierającą klipy połączoną ze ścieżką miksera (ścieżka N z insertem N, gdy nie zmienia to brzmienia); nagłówki połączonych ścieżek pokazują wyciszenie, solo, głośność i panoramę. Także na stronie Ustawienia › Projekt, z przełącznikiem dla otwartego projektu."
+"Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Połączona ścieżka: [LMB] wycisz / włącz jej ścieżkę miksera  [Ctrl][LMB] lub [RMB] solo ścieżki Playlisty"

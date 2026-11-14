@@ -198,9 +198,9 @@ public:
     // hovers the right edge of the first clip in view (grip, outline, menu button); returns its hint
     ui::Hint hoverForSnapshot();
 
-    // The track headers' width: FL's 96 px, or the Simple workflow's wider headers (round 184a). setSimpleHeaders sets
-    // it; everything else only reads it.
-    static constexpr int flHeaderWidth = 96, simpleHeaderWidth = 232;
+    // The track headers' width: FL's 96 px, the Simple workflow's wider headers (round 184a), or the linked headers
+    // (round 190gz). updateHeaderWidth sets it; everything else only reads it.
+    static constexpr int flHeaderWidth = 96, simpleHeaderWidth = 232, linkedHeaderWidth = 152;
     int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
@@ -506,12 +506,19 @@ private:
     juce::Rectangle<int> trackVolume (int track) const;
     juce::Rectangle<int> trackPan (int track) const;
     juce::Rectangle<int> trackFx (int track) const;
-    int simpleInsert (int track) const; // the insert a Simple header's controls act on, -1 none
+    int simpleInsert (int track) const; // the insert a Simple (or linked) header's controls act on, -1 none
+    // LYNX's "Link Playlist tracks to mixer tracks" (round 190gz, issue #170): with FL's headers, the project's switch is
+    // on. The headers are then wider and a linked track's header carries its mixer track's M, S, volume and pan (the
+    // Simple headers' controls, laid out for FL's row heights: one row of buttons, the volume bar and pan from 34 px).
+    bool linkedHeaders() const;
+    void updateHeaderWidth(); // FL's, the Simple or the linked width, as the layout and the project ask
+    static constexpr int linkedTwoRows = 34;
     void selectTrackChannel (int track); // the Simple workflow: a header click selects the track's channel
     int dropLaneTrack() const;          // the row the "drop files here" lane is drawn on, -1 none
     // a level drag on a Simple header: 1 volume, 2 pan (0 none)
     int levelDrag = 0, levelInsert = -1;
     float levelStart = 0.0f;
+    int levelWidth = 1; // the volume bar's width at the press
     juce::Rectangle<int> trackArrow (int track) const; // a group header's fold arrow (empty for other tracks)
     // An audio track's buttons (FL 2026, issue #11), acting on its linked mixer track: "Arm/disarm recording" (left of
     // the LED / arrow) and, on rows tall enough, "Audio input source" (with the monitoring choices). Empty for others.

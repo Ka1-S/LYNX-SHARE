@@ -1,6 +1,7 @@
 #include "core/TakeRecording.h"
 
 #include "core/Comping.h"
+#include "core/PlaylistOps.h"
 
 #include <algorithm>
 #include <cmath>
@@ -135,6 +136,10 @@ int playbackInsert (const Song& song, int recordedOn, RecordSource point)
     if (std::any_of (song.playlistTracks.begin(), song.playlistTracks.end(),
                      [recordedOn] (const PlaylistTrack& pt) { return pt.mode == PlaylistTrackMode::audio && pt.mixerTrack == recordedOn; }))
         return recordedOn;
+    // LYNX's "Link Playlist tracks to mixer tracks" (round 190gz): the insert's own track takes the take and becomes its
+    // audio track, so the clip plays through the insert as on any linked audio track
+    if (autolink::pairedTakeTrack (song, recordedOn) >= 0)
+        return recordedOn;
     const auto& mt = song.mixer[(std::size_t) recordedOn];
     if (mt.toMaster)
         return 0;
@@ -157,6 +162,9 @@ int takeTrack (const Song& song, int insert, std::int64_t start, std::int64_t en
             if (pt.mode == PlaylistTrackMode::audio && pt.mixerTrack == insert && freeAt (t))
                 return t;
         }
+    // LYNX's "Link Playlist tracks to mixer tracks" (round 190gz): insert N's take goes to Track N when it is still empty
+    if (const auto paired = insert > 0 ? autolink::pairedTakeTrack (song, insert) : -1; paired >= 0)
+        return paired;
     int next = 0;
     for (const auto& c : song.playlist)
         next = std::max (next, c.track + 1);

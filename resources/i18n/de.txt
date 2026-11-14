@@ -10101,3 +10101,10 @@ countries: de at ch li lu
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats-Gesetz: Classic spielt wie LYNX vor 0.1.28 (dieses Projekt wurde damals gespeichert); Gemessen folgt den Renderings von Live 12.4"
 
 # --- Not in pt-BR.txt (yet)
+# round 190gz: Link Playlist tracks to mixer tracks (issue #170)
+"Link Playlist tracks to mixer tracks (current project) on/off" = "Playlist-Spuren mit Mixer-Spuren verknüpfen (aktuelles Projekt) an/aus"
+"Link Playlist tracks to mixer tracks (current project)" = "Playlist-Spuren mit Mixer-Spuren verknüpfen (aktuelles Projekt)"
+"Link Playlist tracks to mixer tracks in new projects" = "Playlist-Spuren in neuen Projekten mit Mixer-Spuren verknüpfen"
+"Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Playlist-Spuren mit Mixer-Spuren verknüpfen (Spur N mit Insert N; Stumm, Solo, Lautstärke und Panorama in den Köpfen verknüpfter Spuren)"
+"New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Neue Projekte beginnen mit jeder Playlist-Spur, die Clips enthält, verknüpft mit einer Mixer-Spur (Spur N mit Insert N, wenn das den Klang nicht ändert); die Köpfe verknüpfter Spuren zeigen Stumm, Solo, Lautstärke und Panorama. Auch auf der Seite Einstellungen › Projekt, mit dem Schalter für das offene Projekt."
+"Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Verknüpfte Spur: [LMB] ihre Mixer-Spur stumm / laut schalten  [Ctrl][LMB] oder [RMB] Solo der Playlist-Spur"

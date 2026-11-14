@@ -10101,3 +10101,10 @@ countries: fr be ch ca lu
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Loi de Beats : Classic joue comme LYNX avant la 0.1.28 (ce projet a été enregistré alors) ; Mesuré suit les rendus de Live 12.4"
 
 # --- Not in pt-BR.txt (yet)
+# round 190gz: Link Playlist tracks to mixer tracks (issue #170)
+"Link Playlist tracks to mixer tracks (current project) on/off" = "Lier les pistes de la Playlist aux pistes de mixage (projet actuel) activer/désactiver"
+"Link Playlist tracks to mixer tracks (current project)" = "Lier les pistes de la Playlist aux pistes de mixage (projet actuel)"
+"Link Playlist tracks to mixer tracks in new projects" = "Lier les pistes de la Playlist aux pistes de mixage dans les nouveaux projets"
+"Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Lier les pistes de la Playlist aux pistes de mixage (piste N avec l'insert N ; muet, solo, volume et panoramique dans les en-têtes des pistes liées)"
+"New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Les nouveaux projets commencent avec chaque piste de la Playlist qui contient des clips liée à une piste de mixage (piste N à l'insert N quand cela ne change pas le son) ; les en-têtes des pistes liées affichent muet, solo, volume et panoramique. Aussi dans la page Réglages › Projet, avec l'option pour le projet ouvert."
+"Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Piste liée : [LMB] couper / rétablir sa piste de mixage  [Ctrl][LMB] ou [RMB] solo de la piste de la Playlist"

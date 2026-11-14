@@ -10101,3 +10101,10 @@ countries: kr
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats 법칙: Classic은 0.1.28 이전의 LYNX처럼 재생(이 프로젝트는 그때 저장됨), 측정은 Live 12.4 렌더를 따름"
 
 # --- Not in pt-BR.txt (yet)
+# round 190gz: Link Playlist tracks to mixer tracks (issue #170)
+"Link Playlist tracks to mixer tracks (current project) on/off" = "플레이리스트 트랙을 믹서 트랙에 연결 (현재 프로젝트) 켜기/끄기"
+"Link Playlist tracks to mixer tracks (current project)" = "플레이리스트 트랙을 믹서 트랙에 연결 (현재 프로젝트)"
+"Link Playlist tracks to mixer tracks in new projects" = "새 프로젝트에서 플레이리스트 트랙을 믹서 트랙에 연결"
+"Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "플레이리스트 트랙을 믹서 트랙에 연결 (트랙 N과 인서트 N; 연결된 트랙 헤더에 음소거, 솔로, 볼륨, 팬)"
+"New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "새 프로젝트는 클립이 있는 플레이리스트의 모든 트랙이 믹서 트랙에 연결된 상태로 시작합니다 (소리가 바뀌지 않으면 트랙 N을 인서트 N에). 연결된 트랙 헤더에 음소거, 솔로, 볼륨, 팬이 표시됩니다. 설정 › 프로젝트 페이지에도 있으며, 열린 프로젝트용 스위치도 함께 있습니다."
+"Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "연결된 트랙: [LMB] 믹서 트랙 음소거 / 해제  [Ctrl][LMB] 또는 [RMB] 플레이리스트 트랙 솔로"

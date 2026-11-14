@@ -10101,3 +10101,10 @@ countries: cn sg
 "Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats 规律：Classic 按 0.1.28 之前的 LYNX 播放（此项目当时保存）；实测遵循 Live 12.4 的渲染"
 
 # --- Not in pt-BR.txt (yet)
+# round 190gz: Link Playlist tracks to mixer tracks (issue #170)
+"Link Playlist tracks to mixer tracks (current project) on/off" = "将播放列表音轨链接到混音器轨道（当前工程）开/关"
+"Link Playlist tracks to mixer tracks (current project)" = "将播放列表音轨链接到混音器轨道（当前工程）"
+"Link Playlist tracks to mixer tracks in new projects" = "在新工程中将播放列表音轨链接到混音器轨道"
+"Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "将播放列表音轨链接到混音器轨道（音轨 N 对应插入轨 N；已链接音轨的轨头显示静音、独奏、音量和声像）"
+"New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "新工程开始时，每条含有片段的播放列表音轨都链接到一条混音器轨道（在不改变声音时，音轨 N 对应插入轨 N）；已链接音轨的轨头显示静音、独奏、音量和声像。也在 设置 › 工程 页面中，并附有当前打开工程的开关。"
+"Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "已链接音轨：[LMB] 将其混音器轨道静音 / 取消静音  [Ctrl][LMB] 或 [RMB] 独奏该播放列表音轨"

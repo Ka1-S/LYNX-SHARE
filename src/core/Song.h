@@ -2639,6 +2639,13 @@ struct Song
     // without it loads with it off (FL: "old projects now load with automatic crossfades turned off"); new projects
     // take Settings' "Enable automatic crossfades in new projects".
     bool autoCrossfades = false;
+    // LYNX extra (round 190gz, issue #170; core/PlaylistOps.h autolink): "Link Playlist tracks to mixer tracks". Every
+    // Playlist track that holds clips becomes FL's audio or instrument track of a mixer track (Track N with insert N
+    // where that changes nothing in the sound), and the linked tracks' headers carry the mixer track's mute, solo,
+    // volume and pan. Off = FL (tracks and inserts apart). Saved with the project only when on; new projects take
+    // Settings' "Link Playlist tracks to mixer tracks in new projects" (off). The links themselves are FL track modes,
+    // so an .flp export keeps them; the switch is LYNX's and stays in .lynx.
+    bool linkTracksToMixer = false;
     // LYNX comping (round 177c, core/Comping.h): the length of the equal-power crossfade where a comp switches takes (ms,
     // 0 = a hard cut). Saved with the project when it is not the default.
     static constexpr float defaultCompCrossfadeMs = 5.0f;
