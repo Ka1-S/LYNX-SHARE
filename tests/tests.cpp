@@ -17583,3 +17583,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Donate190fqTests.inc"
 #include "GenPreset190fsTests.inc"
 #include "Issues190ftTests.inc"
+#include "Flvsti190fwTests.inc"

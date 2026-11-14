@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <map>
 #include <cstdlib>
 #include <cstring>
@@ -27,6 +28,9 @@
 
 #if JUCE_WINDOWS
  #include <windows.h>
+ #include <psapi.h>
+#else
+ #include <sys/resource.h>
 #endif
 
 namespace lynx
@@ -1442,15 +1446,16 @@ PluginHost::PluginHost (bool keep)
         // since a large bundle (Waves shell) was marked "hung" only for taking longer than 30 s
         const auto retried = settingsFolder().getChildFile ("scan-retry.txt");
         // round 113: once more, as the scan now keeps a description whose plugin only hung while closing (or, round
-        // 111, crashed in its teardown at exit after writing it)
-        if (retried.loadFileAsString().getIntValue() < 2)
+        // 111, crashed in its teardown at exit after writing it); round 190fw: and once more, as a child that is still
+        // working when the old 30 s pass is no longer killed (FL Studio's own VST plugins were blacklisted that way)
+        if (retried.loadFileAsString().getIntValue() < 3)
         {
             if (! known.getBlacklistedFiles().isEmpty())
             {
                 known.clearBlacklistedFiles();
                 save();
             }
-            retried.replaceWithText ("2\n");
+            retried.replaceWithText ("3\n");
         }
     }
     if (persistent)
@@ -1595,6 +1600,110 @@ juce::File classCountFile (const juce::File& result)
     return result.withFileExtension ("classes");
 }
 
+// round 190fw: what the scan child is doing (core/PluginScanPolicy.h), written by the child, read by the parent
+juce::File activityFile (const juce::File& result)
+{
+    return result.withFileExtension ("alive");
+}
+
+scanpolicy::ChildActivity ownActivity()
+{
+    scanpolicy::ChildActivity a;
+   #if JUCE_WINDOWS
+    FILETIME created, ended, kernel, user;
+    if (GetProcessTimes (GetCurrentProcess(), &created, &ended, &kernel, &user))
+    {
+        const auto ticks = [] (const FILETIME& t) { return ((long long) t.dwHighDateTime << 32) | t.dwLowDateTime; };
+        a.cpuMs = (ticks (kernel) + ticks (user)) / 10000;
+    }
+    IO_COUNTERS io {};
+    if (GetProcessIoCounters (GetCurrentProcess(), &io))
+        a.readBytes = (long long) io.ReadTransferCount;
+    PROCESS_MEMORY_COUNTERS memory {};
+    if (K32GetProcessMemoryInfo (GetCurrentProcess(), &memory, sizeof (memory)))
+        a.faults = (long long) memory.PageFaultCount;
+    struct Count
+    {
+        DWORD pid;
+        int visible = 0;
+    } count { GetCurrentProcessId() };
+    EnumWindows ([] (HWND window, LPARAM data) -> BOOL {
+        auto& c = *reinterpret_cast<Count*> (data);
+        DWORD pid = 0;
+        GetWindowThreadProcessId (window, &pid);
+        if (pid == c.pid && IsWindowVisible (window))
+            ++c.visible;
+        return TRUE;
+    }, (LPARAM) &count);
+    a.windows = count.visible;
+   #else
+    rusage usage {};
+    if (getrusage (RUSAGE_SELF, &usage) == 0)
+    {
+        a.cpuMs = (long long) (usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) * 1000 + (usage.ru_utime.tv_usec + usage.ru_stime.tv_usec) / 1000;
+        a.readBytes = (long long) usage.ru_inblock * 512;
+        a.faults = (long long) (usage.ru_minflt + usage.ru_majflt);
+    }
+   #endif
+    return a;
+}
+
+scanpolicy::ChildActivity readActivity (const juce::File& file)
+{
+    juce::StringArray parts;
+    parts.addTokens (file.loadFileAsString(), " ", {});
+    scanpolicy::ChildActivity a;
+    if (parts.size() >= 4)
+    {
+        a.cpuMs = parts[0].getLargeIntValue();
+        a.readBytes = parts[1].getLargeIntValue();
+        a.faults = parts[2].getLargeIntValue();
+        a.windows = parts[3].getIntValue();
+    }
+    return a;
+}
+
+// the child's side: a thread that writes ownActivity() twice a second while the plugin is being described
+class ActivityReporter
+{
+public:
+    explicit ActivityReporter (juce::File target)
+        : file (std::move (target)),
+          thread ([this] {
+              while (! done)
+              {
+                  const auto a = ownActivity();
+                  file.replaceWithText (juce::String (a.cpuMs) + " " + juce::String (a.readBytes) + " " + juce::String (a.faults) + " "
+                                        + juce::String (a.windows));
+                  for (int i = 0; i < 5 && ! done; ++i)
+                      std::this_thread::sleep_for (std::chrono::milliseconds (100));
+              }
+          })
+    {
+    }
+
+    ~ActivityReporter()
+    {
+        done = true;
+        thread.join();
+    }
+
+private:
+    juce::File file;
+    std::atomic<bool> done { false };
+    std::thread thread;
+};
+
+// LYNX_TEST_SCAN_MS=<base>,<stall>,<cap> (--lv2scantest): shorter limits, so the test's children need seconds, not minutes
+scanpolicy::ChildWatch makeChildWatch()
+{
+    juce::StringArray limits;
+    limits.addTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_TEST_SCAN_MS", {}), ",", {});
+    if (limits.size() == 3)
+        return scanpolicy::ChildWatch (limits[0].getIntValue(), limits[1].getIntValue(), limits[2].getIntValue());
+    return scanpolicy::ChildWatch();
+}
+
 // the child wrote its whole answer (the file closes with the root element): a hang after it is the plugin's shutdown
 bool scanResultComplete (const juce::File& result)
 {
@@ -1629,13 +1738,21 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
     juce::ChildProcess child;
     auto ok = child.start (juce::StringArray { exe.getFullPathName(), "--scan-one", format.getName(), file, result.getFullPathName() }, 0);
     const auto started = juce::Time::getMillisecondCounter();
+    auto cleanUp = [&result] {
+        result.deleteFile();
+        classCountFile (result).deleteFile();
+        activityFile (result).deleteFile();
+    };
     if (ok)
     {
         // wait in short steps so a cancelled scan (or LYNX closing) doesn't wait for a slow plugin; a file holding
-        // many plugins (Waves shell) gets more time once the child has said how many (core/PluginScanPolicy.h)
-        auto timeout = (juce::uint32) scanpolicy::baseTimeoutMs;
+        // many plugins (Waves shell) gets more time once the child has said how many, and a child that is still
+        // working (FL Studio's own plugin boots the FL engine) or shows a window gets more time (core/PluginScanPolicy.h)
+        auto watch = makeChildWatch();
         auto classesKnown = false;
-        while (child.isRunning() && ! stopScan && juce::Time::getMillisecondCounter() - started < timeout)
+        auto lastReport = 0u;
+        const auto elapsed = [started] { return (int) (juce::Time::getMillisecondCounter() - started); };
+        while (child.isRunning() && ! stopScan && ! watch.expired (elapsed()))
         {
             child.waitForProcessToFinish (100);
             if (keepGoing && ! keepGoing())
@@ -1643,7 +1760,12 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
             if (! classesKnown && classCountFile (result).existsAsFile())
             {
                 classesKnown = true;
-                timeout = (juce::uint32) scanpolicy::timeoutMs (classCountFile (result).loadFileAsString().getIntValue());
+                watch.setClasses (classCountFile (result).loadFileAsString().getIntValue());
+            }
+            if ((juce::uint32) elapsed() - lastReport >= 500 && activityFile (result).existsAsFile())
+            {
+                lastReport = (juce::uint32) elapsed();
+                watch.report (elapsed(), readActivity (activityFile (result)));
             }
         }
         if (child.isRunning())
@@ -1651,13 +1773,14 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
             child.kill();
             if (stopScan) // not the plugin's fault: try it again next time
             {
-                result.deleteFile();
-                classCountFile (result).deleteFile();
+                cleanUp();
                 return false;
             }
             // the description may be complete and only the plugin's shutdown hung (round 113): keep it then
             ok = scanResultComplete (result);
-            logScanFailure (file, ok ? "result kept, child killed after it" : (classesKnown ? "timeout while describing" : "timeout before the class count"),
+            logScanFailure (file, ok ? juce::String ("result kept, child killed after it")
+                                     : juce::String (classesKnown ? "timeout while describing" : "timeout before the class count") + " ("
+                                           + watch.why (elapsed()) + ")",
                             juce::Time::getMillisecondCounter() - started);
         }
         else if (child.getExitCode() != 0)
@@ -1683,8 +1806,7 @@ bool PluginHost::scanOne (juce::AudioPluginFormat& format, const juce::String& f
             logScanFailure (file, "ended without an answer", juce::Time::getMillisecondCounter() - started);
         known.addToBlacklist (file);
     }
-    result.deleteFile();
-    classCountFile (result).deleteFile();
+    cleanUp();
     return xml != nullptr; // a child can also end "well" without an answer
 }
 
@@ -2042,6 +2164,8 @@ void PluginHost::cancelBackgroundScan()
 
 int PluginHost::scanOneFile (const juce::String& formatName, const juce::String& file, const juce::File& output)
 {
+    // what this child is doing, for the parent's limit (round 190fw): a plugin that boots slowly is not a hung one
+    const ActivityReporter activity (activityFile (output));
     // first tell the parent how many plugins this file holds, so it waits long enough for a large bundle
     if (formatName == "VST3")
         if (const auto classes = countVst3Classes (file); classes > 1)
@@ -2059,6 +2183,14 @@ int PluginHost::scanOneFile (const juce::String& formatName, const juce::String&
                 std::abort();
             if (fault == "lv2-batch-hang")
                 juce::Thread::sleep (60000);
+            if (fault.startsWith ("lv2-batch-busy")) // (round 190fw: works this long, in ms, before it answers)
+                for (const auto until = juce::Time::getMillisecondCounter() + (juce::uint32) fault.fromLastOccurrenceOf (":", false, false).getIntValue();
+                     juce::Time::getMillisecondCounter() < until;)
+                {
+                    volatile double x = 0.0;
+                    for (int k = 0; k < 100000; ++k)
+                        x = x + std::sqrt ((double) k);
+                }
             auto ids = format->searchPathsForPlugins (juce::FileSearchPath (file.fromFirstOccurrenceOf (lv2BatchPrefix, false, false)), true, false);
             ids.removeDuplicates (false); // newer JUCE lists a bundle once per plugin, and describes all of them each time
             classCountFile (output).replaceWithText (juce::String (ids.size())); // (a large collection gets the time it needs)

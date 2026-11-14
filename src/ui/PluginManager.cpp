@@ -1,6 +1,7 @@
 #include "ui/PluginManager.h"
 
 #include "core/PluginCatalog.h"
+#include "core/PluginScanPolicy.h"
 #include "core/Preferences.h"
 #include "engine/AudioEngine.h"
 #include "engine/PluginHost.h"
@@ -242,7 +243,7 @@ private:
         {
             prefs::PluginRow r;
             r.name = juce::File::createFileWithoutCheckingPath (f).getFileNameWithoutExtension().toStdString();
-            r.format = juce::File::createFileWithoutCheckingPath (f).hasFileExtension ("clap") ? "CLAP" : "VST3";
+            r.format = scanpolicy::formatOfFile (f.toStdString());
             r.file = f.toStdString();
             r.status = prefs::PluginStatus::failed;
             rows.push_back (r);
@@ -436,8 +437,16 @@ private:
 
     void chooseFile()
     {
+        // (round 190fw: and VST2 modules, e.g. Image-Line's "FL Studio VSTi.dll")
+       #if JUCE_WINDOWS
+        const juce::String patterns ("*.vst3;*.clap;*.dll");
+       #elif JUCE_LINUX || JUCE_BSD
+        const juce::String patterns ("*.vst3;*.clap;*.so");
+       #else
+        const juce::String patterns ("*.vst3;*.clap");
+       #endif
         chooser = lynx::ui::makeFileChooser (tr ("Add a plugin file"), juce::File::getSpecialLocation (juce::File::userHomeDirectory),
-                                                       "*.vst3;*.clap");
+                                                       patterns);
         lynx::ui::launchChooser (chooser, juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                                   | juce::FileBrowserComponent::canSelectDirectories,
                               [safe = juce::Component::SafePointer<PluginManagerPanel> (this)] (const juce::FileChooser& c) {

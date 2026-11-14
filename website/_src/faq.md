@@ -66,3 +66,7 @@ Yes. `View › Layout style › Simple workflow` shows one window with the track
 ## Will an update change how my projects sound?
 
 No, not on purpose. When one of LYNX SHARE's effects is refitted to sound closer to the plugin it is modelled on, the new behaviour is a switch (`Law: Classic | Measured`): new instances use it, and projects and presets saved earlier keep the old one. Only real fixes, such as a limiter that went over its ceiling, change a saved project, and the release notes list them.
+
+## Can I use FL Studio's own plugins in LYNX SHARE?
+
+Yes, through the FL Studio plugin that comes with FL Studio. FL Studio installs itself as a plugin too: `FL Studio VSTi` and `FL Studio VSTi (Multi)` (VST2) on Windows, and an Audio Unit on macOS. Put it on a channel in LYNX SHARE and FL Studio runs inside it, with its Channel rack, Patcher, Sytrus, Harmor and the other plugins your FL Studio licence covers. It needs FL Studio installed and your own licence. LYNX SHARE does not load FL Studio's plugin files directly, because they are made to run only inside FL Studio. If an older version of LYNX SHARE listed the FL Studio plugin as `Failed to load`, right-click it in `Options › Plugin manager...` and choose `Try again (scan this file now)`.

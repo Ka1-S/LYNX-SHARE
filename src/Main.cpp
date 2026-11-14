@@ -1227,6 +1227,17 @@ public:
             return;
         }
 
+        if (args.contains ("--vstitest"))
+        {
+            // LYNX --vstitest plugin folder [project.lynx] (round 190fw, issue #162): an instrument plugin (Image-Line's
+            // "FL Studio VSTi") on a channel: notes in, audio out, its state through a saved project, its outputs and
+            // the host tempo it follows. See runVstiTest.
+            const auto i = args.indexOf ("--vstitest");
+            const auto project = i + 3 < args.size() && ! args[i + 3].startsWith ("--") ? args[i + 3].unquoted() : juce::String();
+            runVstiTest (args[i + 1].unquoted(), args[i + 2].unquoted(), project);
+            return;
+        }
+
         if (args.contains ("--vst2test"))
         {
             const auto i = args.indexOf ("--vst2test");
@@ -3029,6 +3040,38 @@ private:
         }
         unsetenv ("LYNX_TEST_CRASH");
         step ("described_after_crash", 1);
+
+        // round 190fw: past the first limit, a child that still works is waited for (FL Studio's own VST plugin boots
+        // the FL engine), one that sits still is killed as before, and a busy one only up to the cap. Limits are
+        // shortened for the test: 2 s first limit, 2 s without work, 8 s cap (real: 30 s, 30 s, 5 min).
+        setenv ("LYNX_TEST_SCAN_MS", "2000,2000,8000", 1);
+        const auto timed = [&] (const char* fault, const std::function<bool (lynx::PluginHost&)>& progress) {
+            touch();
+            setenv ("LYNX_TEST_CRASH", fault, 1);
+            lynx::PluginHost host (true);
+            const auto started = juce::Time::getMillisecondCounter();
+            host.scan (paths, [&] (float, const juce::String&) { return ! progress || progress (host); });
+            unsetenv ("LYNX_TEST_CRASH");
+            const auto took = (int) (juce::Time::getMillisecondCounter() - started);
+            report << "  " << fault << ": " << took << " ms, children " << host.scanChildrenStarted() << "\n";
+            return std::make_pair (took, host.scanChildrenStarted());
+        };
+        // (after a failed batch, one plugin-by-plugin child and no more: it describes quickly)
+        const auto stopAfterBatch = [] (lynx::PluginHost& host) { return host.scanChildrenStarted() < 2; };
+        {
+            const auto [took, children] = timed ("lv2-batch-busy:5000", {});
+            check ("busy_child_is_waited_for", children == 1 && took >= 4500);
+        }
+        {
+            const auto [took, children] = timed ("lv2-batch-hang", stopAfterBatch);
+            check ("idle_child_ends_near_the_first_limit", children == 2 && took >= 1900 && took < 9000);
+        }
+        {
+            const auto [took, children] = timed ("lv2-batch-busy:60000", stopAfterBatch);
+            check ("busy_child_ends_at_the_cap", children == 2 && took >= 7500 && took < 20000);
+        }
+        unsetenv ("LYNX_TEST_SCAN_MS");
+        step ("described_after_slow_children", 1);
        #endif
         juce::File (reportPath).replaceWithText (report + "result=" + (ok ? "OK" : "FAILED") + "\n");
         setApplicationReturnValue (ok ? 0 : 1);
@@ -7551,6 +7594,231 @@ private:
 
     // LYNX.exe --plugintest plugin.vst3 report.txt ["name"]: loads the plugin (or the one named in a shell), plays notes if it is an
     // instrument (and runs audio through it if it is an effect) and measures the audio.
+    // Round 190fw: an instrument plugin file on channel 5 of an offline engine (Image-Line's "FL Studio VSTi", which
+    // runs FL Studio inside it). Without a project: four chords at 137 BPM, rendered (notes.wav), the plugin's state
+    // saved in <folder>/vstitest.lynx. With a project (one saved by LYNX with the plugin on a channel, e.g. after its
+    // window was used): that project. Then: the project loaded back from the file renders the same (reload.wav) and
+    // gives the same state back; the project's own notes removed, rendered at 100 and 150 BPM (tempo-100/150.wav), the
+    // onsets of what the plugin plays by itself must follow the host tempo; and the outputs the plugin offers.
+    void runVstiTest (const juce::String& pluginPath, const juce::String& folderPath, const juce::String& projectPath)
+    {
+        juce::String report;
+        auto ok = true;
+        const juce::File folder (folderPath);
+        folder.createDirectory();
+        const auto check = [&] (const juce::String& name, bool passed) {
+            report << name << "=" << (passed ? "OK" : "FAILED") << "\n";
+            ok = ok && passed;
+        };
+        struct Take
+        {
+            float peak = 0.0f;
+            std::vector<float> left;
+        };
+        // renders `song` with the plugin file known to the engine's host; `wav` (in the folder) gets the audio
+        const auto render = [&] (const lynx::Song& song, double seconds, const juce::String& wav, std::function<void (lynx::AudioEngine&)> after = {}) {
+            Take take;
+            lynx::AudioEngine engine (false);
+            engine.getPluginHost().addPluginFile (juce::File (pluginPath));
+            engine.setSong (song);
+            const auto file = folder.getChildFile (wav);
+            file.deleteFile();
+            std::unique_ptr<juce::AudioFormatWriter> writer;
+            if (auto stream = file.createOutputStream())
+            {
+                juce::WavAudioFormat format;
+                writer.reset (format.createWriterFor (stream.get(), 48000.0, 2, 24, {}, 0));
+                if (writer != nullptr)
+                    stream.release();
+            }
+            lynx::AudioEngine::RenderOptions o;
+            o.seconds = seconds;
+            o.sampleRate = 48000.0;
+            o.output = writer.get();
+            o.capture = [&take] (const float* l, const float*, int n) { take.left.insert (take.left.end(), l, l + n); };
+            take.peak = engine.renderOffline (o);
+            writer.reset();
+            if (after)
+                after (engine);
+            return take;
+        };
+        // the channel that holds the plugin
+        const auto pluginChannel = [&] (const lynx::Song& song) {
+            for (std::size_t c = 0; c < song.channels.size(); ++c)
+                if (song.channels[c].instrument == lynx::InstrumentKind::plugin
+                    && juce::String (song.channels[c].plugin.name).containsIgnoreCase (juce::File (pluginPath).getFileNameWithoutExtension().upToFirstOccurrenceOf (" (", false, false)))
+                    return (int) c;
+            return -1;
+        };
+
+        lynx::Song song;
+        const auto saved = folder.getChildFile ("vstitest.lynx");
+        if (projectPath.isEmpty())
+        {
+            lynx::AudioEngine scanner (false);
+            report << "plugins_in_file=" << scanner.getPluginHost().addPluginFile (juce::File (pluginPath)) << "\n";
+            std::optional<juce::PluginDescription> type;
+            for (const auto& t : scanner.getPluginHost().getKnownPlugins().getTypes())
+                if (t.isInstrument && juce::File (t.fileOrIdentifier) == juce::File (pluginPath))
+                    type = t;
+            check ("instrument_found", type.has_value());
+            if (! type)
+            {
+                juce::File (folder.getChildFile ("report.txt")).replaceWithText (report + "result=FAILED\n");
+                setApplicationReturnValue (1);
+                quit();
+                return;
+            }
+            report << "plugin=" << type->name << " (" << type->manufacturerName << ") outputs=" << type->numOutputChannels << "\n";
+            song = lynx::Song::makeDefault();
+            song.bpm = 137.0;
+            auto& c = song.channels[4];
+            c.instrument = lynx::InstrumentKind::plugin;
+            c.plugin = {};
+            c.plugin.id = type->createIdentifierString().toStdString();
+            c.plugin.name = type->name.toStdString();
+            c.name = type->name.toStdString();
+            c.volume = 1.0f;
+            for (std::size_t k = 0; k < song.channels.size(); ++k)
+                song.channels[k].muted = k != 4;
+            song.patterns[0].notes.clear();
+            for (int beat = 0; beat < 8; ++beat) // a chord per beat, two bars
+                for (int key : { 60, 64, 67 })
+                    song.patterns[0].notes.push_back ({ (std::int64_t) beat * lynx::ppq, lynx::ppq / 2, 4, key + (beat / 4) * 5, 0.9f });
+            song.patterns[0].sortNotes();
+            const auto notes = render (song, 4.0, "notes.wav", [&song] (lynx::AudioEngine& engine) {
+                engine.capturePluginStates();
+                song = engine.getSong();
+            });
+            report << "notes_peak=" << notes.peak << "\n";
+            check ("notes_play", notes.peak > 0.001f && notes.peak < 10.0f);
+            juce::String error;
+            check ("project_saved", lynx::ProjectFile::save (song, saved, error));
+        }
+        else
+        {
+            juce::String error;
+            const auto loaded = lynx::ProjectFile::load (juce::File (projectPath), error);
+            check ("project_loaded", loaded.has_value());
+            if (loaded)
+                song = *loaded;
+            juce::File (projectPath).copyFileTo (saved);
+        }
+
+        const auto channel = pluginChannel (song);
+        check ("plugin_channel", channel >= 0);
+        if (channel >= 0)
+        {
+            const auto& plugin = song.channels[(std::size_t) channel].plugin;
+            juce::MemoryBlock state;
+            state.fromBase64Encoding (juce::String (plugin.state));
+            report << "channel=" << channel + 1 << " state_bytes=" << (int) state.getSize() << "\n";
+            check ("state_saved", state.getSize() > 0);
+
+            // the project read back from the file: the same sound, and the same state handed back
+            juce::String error;
+            const auto again = lynx::ProjectFile::load (saved, error);
+            check ("project_reloaded", again.has_value());
+            if (again)
+            {
+                std::string stateBack;
+                const auto first = render (*again, 4.0, "reload-a.wav");
+                const auto second = render (*again, 4.0, "reload-b.wav", [&] (lynx::AudioEngine& engine) {
+                    engine.capturePluginStates();
+                    stateBack = engine.getSong().channels[(std::size_t) channel].plugin.state;
+                });
+                // two loads of the same project: the same audio (sample for sample, or within -60 dB for a plugin
+                // with free-running modulation)
+                double energy = 0.0, difference = 0.0;
+                const auto n = std::min (first.left.size(), second.left.size());
+                for (std::size_t k = 0; k < n; ++k)
+                {
+                    energy += (double) first.left[k] * first.left[k];
+                    difference += ((double) first.left[k] - second.left[k]) * ((double) first.left[k] - second.left[k]);
+                }
+                const auto ratioDb = energy > 0.0 ? 10.0 * std::log10 (std::max (difference, 1e-30) / energy) : 0.0;
+                report << "reload_peak=" << first.peak << " reload_difference_db=" << juce::String (ratioDb, 1) << "\n";
+                check ("reload_plays", first.peak > 0.001f);
+                check ("reload_same_sound", energy > 0.0 && ratioDb < -60.0);
+                juce::MemoryBlock back;
+                back.fromBase64Encoding (juce::String (stateBack));
+                report << "state_back_bytes=" << (int) back.getSize() << " identical=" << (int) (back == state) << "\n";
+                check ("state_handed_back", back.getSize() > 0);
+            }
+
+            // the host tempo: what the plugin plays by itself (FL Studio's own patterns inside FL Studio VSTi) at two
+            // tempos, without the project's notes
+            auto self = song;
+            for (std::size_t k = 0; k < self.channels.size(); ++k)
+                self.channels[k].muted = (int) k != channel;
+            for (auto& pattern : self.patterns)
+                pattern.notes.erase (std::remove_if (pattern.notes.begin(), pattern.notes.end(), [channel] (const lynx::Note& n) { return n.channel == channel; }),
+                                     pattern.notes.end());
+            const auto onsets = [] (const std::vector<float>& x) {
+                // envelope rises over a threshold (10 ms hold-off of 60 ms): the times in seconds
+                std::vector<double> at;
+                float peak = 0.0f;
+                for (const auto v : x)
+                    peak = std::max (peak, std::abs (v));
+                const auto threshold = peak * 0.3f;
+                auto quietFor = 1 << 30;
+                for (std::size_t k = 0; k < x.size(); ++k)
+                {
+                    const auto loud = std::abs (x[k]) >= threshold;
+                    if (loud && quietFor >= 48000 * 60 / 1000)
+                        at.push_back ((double) k / 48000.0);
+                    quietFor = loud ? 0 : quietFor + 1;
+                }
+                return at;
+            };
+            const auto medianGap = [] (const std::vector<double>& at) {
+                std::vector<double> gaps;
+                for (std::size_t k = 1; k < at.size(); ++k)
+                    gaps.push_back (at[k] - at[k - 1]);
+                if (gaps.empty())
+                    return 0.0;
+                std::sort (gaps.begin(), gaps.end());
+                return gaps[gaps.size() / 2];
+            };
+            self.bpm = 100.0;
+            const auto slow = render (self, 6.0, "tempo-100.wav");
+            self.bpm = 150.0;
+            const auto fast = render (self, 6.0, "tempo-150.wav");
+            const auto gapSlow = medianGap (onsets (slow.left)), gapFast = medianGap (onsets (fast.left));
+            report << "self_peak_100=" << slow.peak << " self_peak_150=" << fast.peak << " onsets_100=" << (int) onsets (slow.left).size()
+                   << " onsets_150=" << (int) onsets (fast.left).size() << " gap_100=" << juce::String (gapSlow, 4) << " gap_150="
+                   << juce::String (gapFast, 4) << "\n";
+            if (slow.peak > 0.001f && gapFast > 0.0)
+            {
+                report << "tempo_ratio=" << juce::String (gapSlow / gapFast, 3) << " (expected 1.5)\n";
+                check ("follows_host_tempo", std::abs (gapSlow / gapFast - 1.5) < 0.05);
+            }
+            else
+                report << "tempo: the plugin plays nothing by itself in this project\n";
+
+            // the outputs it offers (FL Studio VSTi (Multi): FL's mixer tracks as separate outputs)
+            lynx::AudioEngine engine (false);
+            engine.getPluginHost().addPluginFile (juce::File (pluginPath));
+            engine.setSong (song);
+            engine.renderOffline (0.2, 48000.0);
+            if (auto instrument = std::dynamic_pointer_cast<lynx::PluginInstrument> (engine.getChannelInstrument (channel)))
+            {
+                report << "outputs=" << (int) instrument->outputs().size() << ":";
+                for (const auto& o : instrument->outputs())
+                    report << " [" << o.name << "]";
+                report << "\n";
+                check ("outputs_listed", ! instrument->outputs().empty());
+            }
+            else
+                check ("instrument_loaded", false);
+        }
+        report << "plugin_crashes=" << lynx::pluginCrashCount() << "\n";
+        report << "result=" << (ok ? "OK" : "FAILED") << "\n";
+        folder.getChildFile ("report.txt").replaceWithText (report);
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
     void runPluginTest (const juce::String& pluginPath, const juce::String& reportPath, const juce::String& only = {})
     {
         juce::String report;
