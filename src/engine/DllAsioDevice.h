@@ -22,10 +22,22 @@ std::unique_ptr<juce::AudioIODeviceType> makeDllAsioDeviceType (const juce::Stri
 // The built-in LYNX ASIO type when lynx-asio.dll sits next to LYNX.exe and LYNX ASIO is not registered; else nullptr.
 std::unique_ptr<juce::AudioIODeviceType> makeBuiltInLynxAsioType();
 
-// Round 190go: when `savedSetup` (audio-device.xml) names a device of JUCE's "ASIO" type, that driver's DLL (its
-// registered InprocServer32) is loaded on a thread of its own and kept loaded. Opening the device on the message
-// thread then finds the module loaded: its load (DllMain, the driver's own signature check: ~0.35 s for FL Studio
-// ASIO) is off the start-up's path. Only LoadLibrary: no driver object is made and no COM call is made on that
-// thread. Returns at once; does nothing elsewhere, for another type or when the driver is not registered.
-void preloadAsioDriver (const juce::File& savedSetup);
+// Round 190go (start-up): when `savedSetup` (audio-device.xml) names a device of JUCE's "ASIO" type, that device is
+// made and opened on a worker thread at once, while the main window is built (making and opening "FL Studio ASIO" took
+// ~0.8 s of the start-up's critical path). The driver itself is called on JUCE's ASIO thread only (JUCE patch 27 in
+// cmake/LynxPatchJuce.cmake: one thread makes, uses and releases it, as COM wants). The engine's device manager takes
+// the device when it opens its audio device (LynxDeviceManager). Returns at once; nothing elsewhere, for another
+// type, or with LYNX_ASIO_THREAD=0.
+void prewarmAsioDevice (const juce::File& savedSetup);
+
+// For the start-up trace: what the prewarm gave ("" when there was none)
+juce::String asioPrewarmReport();
+
+// The device manager of the engine: JUCE's, whose ASIO type hands over the device prewarmAsioDevice made (its first
+// scan is the prewarm's too) and otherwise does what JUCE's does.
+class LynxDeviceManager final : public juce::AudioDeviceManager
+{
+public:
+    void createAudioDeviceTypes (juce::OwnedArray<juce::AudioIODeviceType>& types) override;
+};
 } // namespace lynx

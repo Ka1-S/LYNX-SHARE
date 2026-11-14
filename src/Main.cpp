@@ -2450,18 +2450,19 @@ public:
                 openTimeIdleSeconds = juce::jlimit (1, 120, args[i + 3].getIntValue());
         }
 
+        // round 190go: the ASIO device of the last session is made and opened from now on, while the splash and the
+        // window come up (see below)
+        lynx::AudioEngine::prewarmAudioDevice();
         // round 190go: the built-in start-up sound is made while the splash and the window come up (pure maths)
         if (startupOptions.sound && lynx::themeui::current().startupSound.empty())
             startupSampleJob = std::async (std::launch::async, [] { return lynx::makeStartupSample(); });
 
         // Round 190go (start-up faster than FL Studio): the main window is built first, with the engine ready but no
-        // audio device open; the device opens on the message thread after it (JUCE's ASIO type wants one thread for a
-        // driver's whole life, and a COM driver must stay on the thread that made it), while the driver's DLL was
-        // loaded on a thread of its own meanwhile (AudioEngine::preloadDeviceDriver). Play pressed before the device is
-        // open starts with it.
+        // audio device open; the device opens after it. An ASIO device of the last session was made and opened ahead,
+        // on a worker, while the window was built (AudioEngine::prewarmAudioDevice; the driver itself only ever runs on
+        // JUCE's ASIO thread, as COM wants). Play pressed before the device is open starts with it.
         if (! startupOptions.splash)
         {
-            lynx::AudioEngine::preloadDeviceDriver();
             startEngine();
             createMainWindow();
             mainWindow->reveal();
@@ -2483,7 +2484,6 @@ public:
         startupTrace.mark ("splash made");
         splash->showOnDesktop();
         startupTrace.mark ("splash on the desktop");
-        lynx::AudioEngine::preloadDeviceDriver();
 
         juce::Timer::callAfterDelay (40, [this] {
             startEngine();
@@ -2588,6 +2588,8 @@ public:
         if (engine == nullptr || ! engine->isAudioDeviceOpenPending())
             return;
         engine->openAudioDevice();
+        if (const auto prewarmed = lynx::asioPrewarmReport(); prewarmed.isNotEmpty() && startupTrace.on)
+            startupTrace.mark (("  " + prewarmed).toRawUTF8());
         startupTrace.mark ("audio device opened");
         addDriverFileDeviceType();
 

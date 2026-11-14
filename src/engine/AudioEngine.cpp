@@ -352,10 +352,9 @@ void AudioEngine::openAudioDevice()
     mark ("  engine: callback + settings");
 }
 
-void AudioEngine::preloadDeviceDriver()
+void AudioEngine::prewarmAudioDevice()
 {
-    if (juce::SystemStats::getEnvironmentVariable ("LYNX_ASIO_PRELOAD", {}) != "0") // (0: off, for an A/B)
-        preloadAsioDriver (audioDeviceFile());
+    prewarmAsioDevice (audioDeviceFile());
 }
 
 void AudioEngine::openMidiDevices()

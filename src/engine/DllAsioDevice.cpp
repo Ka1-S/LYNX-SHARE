@@ -14,6 +14,8 @@
  #include <cmath>
  #include <utility>
  #include <thread>
+ #include <mutex>
+ #include <condition_variable>
  #include <vector>
 
 namespace lynx
@@ -423,73 +425,132 @@ std::unique_ptr<juce::AudioIODeviceType> makeBuiltInLynxAsioType()
 
 namespace
 {
-// a REG_SZ / REG_EXPAND_SZ value of an open key ({} when missing)
-std::wstring registryText (HKEY key, const wchar_t* value)
+// The device prewarmAsioDevice makes on its worker, and the JUCE ASIO type that made it (already scanned)
+struct Prewarm
 {
-    wchar_t buffer[1024] = {};
-    DWORD type = 0, size = sizeof (buffer) - sizeof (wchar_t);
-    if (RegQueryValueExW (key, value, nullptr, &type, reinterpret_cast<LPBYTE> (buffer), &size) != ERROR_SUCCESS
-        || (type != REG_SZ && type != REG_EXPAND_SZ))
-        return {};
-    std::wstring text (buffer);
-    if (type == REG_EXPAND_SZ)
-    {
-        wchar_t expanded[1024] = {};
-        if (const auto n = ExpandEnvironmentStringsW (text.c_str(), expanded, 1024); n > 0 && n <= 1024)
-            text = expanded;
-    }
-    return text;
+    std::mutex lock;
+    std::condition_variable doneSignal;
+    bool started = false, done = false, taken = false;
+    juce::String name, report;
+    double startMs = 0.0, doneMs = 0.0;
+    std::unique_ptr<juce::AudioIODeviceType> type;
+    std::unique_ptr<juce::AudioIODevice> device;
+};
+Prewarm& prewarm()
+{
+    static Prewarm p;
+    return p;
 }
 
-// The DLL of the ASIO driver JUCE lists as `deviceName` (its key under HKLM\SOFTWARE\ASIO, named by its
-// "description" or else by the key's name, as JUCE's ASIO type does), from its class's InprocServer32.
-std::wstring asioDriverDll (const std::wstring& deviceName)
+// JUCE's ASIO type with the prewarmed device handed over to its first createDevice for that name
+class PrewarmedAsioType final : public juce::AudioIODeviceType,
+                                private juce::AudioIODeviceType::Listener
 {
-    HKEY asio = nullptr;
-    if (RegOpenKeyExW (HKEY_LOCAL_MACHINE, L"SOFTWARE\\ASIO", 0, KEY_READ, &asio) != ERROR_SUCCESS)
-        return {};
-    std::wstring clsid;
-    wchar_t name[256] = {};
-    for (DWORD i = 0; clsid.empty() && RegEnumKeyW (asio, i, name, 256) == ERROR_SUCCESS; ++i)
+public:
+    PrewarmedAsioType (std::unique_ptr<juce::AudioIODeviceType> inner, std::unique_ptr<juce::AudioIODevice> ready, juce::String readyName)
+        : juce::AudioIODeviceType (inner->getTypeName()), type (std::move (inner)), device (std::move (ready)), deviceName (std::move (readyName))
     {
-        HKEY driver = nullptr;
-        if (RegOpenKeyExW (asio, name, 0, KEY_READ, &driver) != ERROR_SUCCESS)
-            continue;
-        auto shown = registryText (driver, L"description");
-        if (shown.empty())
-            shown = name;
-        if (shown == deviceName)
-            clsid = registryText (driver, L"clsid");
-        RegCloseKey (driver);
+        type->addListener (this);
     }
-    RegCloseKey (asio);
-    if (clsid.empty())
-        return {};
-    HKEY server = nullptr;
-    if (RegOpenKeyExW (HKEY_CLASSES_ROOT, (L"CLSID\\" + clsid + L"\\InprocServer32").c_str(), 0, KEY_READ, &server) != ERROR_SUCCESS)
-        return {};
-    auto dll = registryText (server, nullptr);
-    RegCloseKey (server);
-    return dll;
-}
+    ~PrewarmedAsioType() override
+    {
+        device.reset(); // (before its type)
+        type->removeListener (this);
+    }
+
+    void scanForDevices() override
+    {
+        if (! std::exchange (scanned, false)) // (the first scan: the prewarm's, a moment ago)
+            type->scanForDevices();
+    }
+    juce::StringArray getDeviceNames (bool wantInputNames) const override { return type->getDeviceNames (wantInputNames); }
+    int getDefaultDeviceIndex (bool forInput) const override { return type->getDefaultDeviceIndex (forInput); }
+    int getIndexOfDevice (juce::AudioIODevice* d, bool asInput) const override { return type->getIndexOfDevice (d, asInput); }
+    bool hasSeparateInputsAndOutputs() const override { return type->hasSeparateInputsAndOutputs(); }
+    juce::AudioIODevice* createDevice (const juce::String& outputDeviceName, const juce::String& inputDeviceName) override
+    {
+        const auto wanted = outputDeviceName.isNotEmpty() ? outputDeviceName : inputDeviceName;
+        if (device != nullptr && wanted == deviceName)
+            return device.release();
+        device.reset(); // (another device: the prewarmed one is closed first, an ASIO driver may allow one instance)
+        return type->createDevice (outputDeviceName, inputDeviceName);
+    }
+
+private:
+    void audioDeviceListChanged() override { callDeviceChangeListeners(); }
+
+    std::unique_ptr<juce::AudioIODeviceType> type;
+    std::unique_ptr<juce::AudioIODevice> device;
+    juce::String deviceName;
+    bool scanned = true;
+};
 } // namespace
 
-void preloadAsioDriver (const juce::File& savedSetup)
+void prewarmAsioDevice (const juce::File& savedSetup)
 {
-    std::thread ([savedSetup] {
-        const auto xml = juce::XmlDocument::parse (savedSetup);
-        if (xml == nullptr || xml->getStringAttribute ("deviceType") != "ASIO")
+    if (juce::SystemStats::getEnvironmentVariable ("LYNX_ASIO_THREAD", {}) == "0") // (no ASIO thread: nothing ahead)
+        return;
+    const auto xml = juce::XmlDocument::parse (savedSetup);
+    if (xml == nullptr || xml->getStringAttribute ("deviceType") != "ASIO")
+        return;
+    auto name = xml->getStringAttribute ("audioOutputDeviceName");
+    if (name.isEmpty())
+        name = xml->getStringAttribute ("audioInputDeviceName");
+    if (name.isEmpty())
+        return;
+    auto& p = prewarm();
+    {
+        const std::lock_guard<std::mutex> l (p.lock);
+        if (std::exchange (p.started, true))
             return;
-        const auto device = xml->getStringAttribute ("audioOutputDeviceName").isNotEmpty() ? xml->getStringAttribute ("audioOutputDeviceName")
-                                                                                         : xml->getStringAttribute ("audioInputDeviceName");
-        if (device.isEmpty())
-            return;
-        const auto dll = asioDriverDll (device.toWideCharPointer());
-        if (dll.empty())
-            return;
-        // kept loaded for the session (COM loads the same module when the driver is created; never unloaded here)
-        LoadLibraryExW (dll.c_str(), nullptr, 0);
+        p.name = name;
+        p.startMs = juce::Time::getMillisecondCounterHiRes();
+    }
+    std::thread ([name] {
+        auto& w = prewarm();
+        std::unique_ptr<juce::AudioIODeviceType> type (juce::AudioIODeviceType::createAudioIODeviceType_ASIO());
+        std::unique_ptr<juce::AudioIODevice> device;
+        if (type != nullptr)
+        {
+            type->scanForDevices();
+            if (type->getDeviceNames().contains (name))
+                device.reset (type->createDevice (name, name)); // (the driver is made and opened on the ASIO thread)
+        }
+        const std::lock_guard<std::mutex> l (w.lock);
+        w.type = std::move (type);
+        w.device = std::move (device);
+        w.doneMs = juce::Time::getMillisecondCounterHiRes();
+        w.done = true;
+        w.doneSignal.notify_all();
     }).detach();
+}
+
+juce::String asioPrewarmReport()
+{
+    auto& p = prewarm();
+    const std::lock_guard<std::mutex> l (p.lock);
+    return p.report;
+}
+
+void LynxDeviceManager::createAudioDeviceTypes (juce::OwnedArray<juce::AudioIODeviceType>& types)
+{
+    juce::AudioDeviceManager::createAudioDeviceTypes (types);
+    auto& p = prewarm();
+    std::unique_lock<std::mutex> l (p.lock);
+    if (! p.started || std::exchange (p.taken, true))
+        return;
+    const auto waitFrom = juce::Time::getMillisecondCounterHiRes();
+    p.doneSignal.wait (l, [&p] { return p.done; }); // (normally long done: the window was built meanwhile)
+    p.report = "ASIO prewarm: " + p.name + (p.device != nullptr ? " made and opened in " : " not made, ") + juce::String (p.doneMs - p.startMs, 0)
+               + " ms, waited " + juce::String (juce::jmax (0.0, juce::Time::getMillisecondCounterHiRes() - waitFrom), 0) + " ms";
+    if (p.type == nullptr)
+        return;
+    for (int i = 0; i < types.size(); ++i)
+        if (types[i]->getTypeName() == p.type->getTypeName())
+        {
+            types.set (i, new PrewarmedAsioType (std::move (p.type), std::move (p.device), p.name), true);
+            return;
+        }
 }
 } // namespace lynx
 
@@ -499,7 +560,9 @@ namespace lynx
 {
 std::unique_ptr<juce::AudioIODeviceType> makeDllAsioDeviceType (const juce::String&, const juce::String&, const juce::String&) { return nullptr; }
 std::unique_ptr<juce::AudioIODeviceType> makeBuiltInLynxAsioType() { return nullptr; }
-void preloadAsioDriver (const juce::File&) {}
+void prewarmAsioDevice (const juce::File&) {}
+juce::String asioPrewarmReport() { return {}; }
+void LynxDeviceManager::createAudioDeviceTypes (juce::OwnedArray<juce::AudioIODeviceType>& types) { juce::AudioDeviceManager::createAudioDeviceTypes (types); }
 } // namespace lynx
 
 #endif

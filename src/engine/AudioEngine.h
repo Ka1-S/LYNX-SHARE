@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/DllAsioDevice.h"
 #include <array>
 #include <optional>
 #include <deque>
@@ -86,11 +87,10 @@ public:
     // The MIDI inputs and the MIDI sync outputs (FL's MIDI settings). Message thread; once.
     void openMidiDevices();
     bool isAudioDeviceOpenPending() const noexcept { return devicePending; }
-    // Windows (round 190go): loads the DLL of the ASIO driver of the last session on a thread of its own, so the
-    // device open on the message thread finds it loaded (its load and signature check took ~0.35 s of the start).
-    // Only the module is loaded (no driver object, no COM call): the driver itself is still created, used and released
-    // on the message thread. Elsewhere, or for another device type: nothing.
-    static void preloadDeviceDriver();
+    // Windows (round 190go): the ASIO device of the last session is made and opened on a worker thread now (the
+    // driver itself on JUCE's ASIO thread, cmake/LynxPatchJuce.cmake fix 27); openAudioDevice() then takes it. Making
+    // and opening it took ~0.8 s of the start's critical path. Elsewhere, or for another device type: nothing.
+    static void prewarmAudioDevice();
     // Round 180b (LYNX's plugins in another host): this engine plays nothing, it serves an editor whose audio runs in the
     // plugin's own renderer. The editor's displays read that renderer's times and tap, and its running effect.
     void setExternalRuntime (ProcessTimes* times, std::function<std::shared_ptr<Effect>()> effect)
@@ -1110,7 +1110,7 @@ private:
     void adoptPrepared (PreparedFlp& prepared); // the plugins of a prepared import found / substituted (message thread)
 
     std::unique_ptr<WorkerPool> workers; // extra renderer threads (before the graph, which uses them)
-    juce::AudioDeviceManager deviceManager;
+    LynxDeviceManager deviceManager; // (JUCE's, taking the prewarmed ASIO device: round 190go)
     juce::AudioProcessorGraph graph;
     juce::AudioProcessorPlayer player;
     Transport transport;
