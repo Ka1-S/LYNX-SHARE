@@ -3993,6 +3993,16 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
                 for (int t = juce::jmin (currentTrack, track); t <= juce::jmax (currentTrack, track); ++t)
                     selectedTracks.push_back (t);
             }
+            else if (plan.ctrlClickToggles)
+            {
+                // Ctrl alone: decided by what follows (mouseDrag: FL's Ctrl press + range; mouseUp: LYNX's toggle)
+                drag = Drag::headerSelect;
+                headerDragAnchor = track;
+                headerDragAdding = true;
+                headerDragClips = true;
+                headerCtrlPending = true;
+                return;
+            }
             else
             {
                 auto sel = sortedTrackSelection();
@@ -4728,6 +4738,18 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
     {
         // FL FUN_012e8740 on every move: the tracks from the press to the mouse are added (or removed); the range only grows
         const auto track = yToTrack (e.y);
+        if (headerCtrlPending)
+        {
+            if (track == headerDragAnchor)
+                return; // (still a click: LYNX's toggle on release)
+            // the drag left the track: FL's Ctrl press now (the track alone with its clips), then FL's range
+            headerCtrlPending = false;
+            selectedTracks = { headerDragAnchor };
+            currentTrack = headerDragAnchor;
+            headerClipBase.clear();
+            selectClipsOnTracks (headerDragAnchor, headerDragAnchor, false);
+            followLinkedTrack (headerDragAnchor);
+        }
         auto sel = sortedTrackSelection();
         trackhdr::applyRange (sel, headerDragAnchor, track, headerDragAdding);
         selectedTracks = sel;
@@ -5288,6 +5310,27 @@ void PlaylistComponent::postDragHint()
 
 void PlaylistComponent::mouseUp (const juce::MouseEvent& e)
 {
+    if (drag == Drag::headerSelect && headerCtrlPending)
+    {
+        // LYNX extra (issue #163; FL has no Ctrl+click toggle): Ctrl+click adds / removes the track, its clips follow
+        headerCtrlPending = false;
+        drag = Drag::none;
+        const auto track = headerDragAnchor;
+        auto sel = sortedTrackSelection();
+        trackhdr::applySelection (sel, track, trackhdr::SelMode::toggle);
+        selectedTracks = sel;
+        const auto nowSelected = std::binary_search (sel.begin(), sel.end(), track);
+        currentTrack = sel.empty() ? -1 : (nowSelected ? track : sel.back());
+        std::vector<int> clipTracks;
+        for (const auto& c : engine.getSong().playlist)
+            clipTracks.push_back (c.gridSlot >= 0 ? -1 : c.track);
+        auto clips = selection;
+        trackhdr::toggleTrackClips (clips, clipTracks, track, nowSelected);
+        setSelection (clips);
+        repaint (0, tracksTop(), headerWidth, getHeight() - tracksTop());
+        return;
+    }
+    headerCtrlPending = false;
     if (drag == Drag::swipe)
     {
         drag = Drag::none;
@@ -9218,7 +9261,7 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
                     : h.input ? tr ("Audio track: [LMB] audio input source and monitoring (its mixer track)")
                     : h.led   ? tr ("Track: [LMB] mute / unmute  [Ctrl][LMB] or [RMB] solo")
                     : h.arrow ? tr ("Track group: [LMB] collapse / expand the grouped tracks")
-                              : tr ("Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down");
+                              : tr ("Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down");
         hint.value = trackName (h.track);
         if (const auto mode = trackmodes::describe (song, h.track); ! mode.empty()) // FL's "(Instrument track)" / "(Audio track, ...)"
             hint.value += " " + (mode.rfind ("(Audio", 0) == 0 ? tr ("(Audio track, linked to mixer track {0})", { juce::String (song.playlistTracks[(std::size_t) h.track].mixerTrack) })

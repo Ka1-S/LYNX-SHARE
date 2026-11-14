@@ -28,8 +28,20 @@ TEST (issues190ft_header_selection_follows_fl)
     // follows the result); Alt or Ctrl+Alt = alone; Shift = LYNX's range
     const auto plain = planPress (false, false, false);
     CHECK (plain.mode == SelMode::only && plain.clips == ClipPick::none && dragAfter (plain, true) == RangeDrag::none && ! plain.lynxShiftRange);
+    // Ctrl alone: FL's press (alone + clips, range) once a drag leaves the track; a click toggles (LYNX extra, #163)
     const auto c = planPress (true, false, false);
-    CHECK (c.mode == SelMode::only && c.clips == ClipPick::replace && dragAfter (c, true) == RangeDrag::select);
+    CHECK (c.mode == SelMode::only && c.clips == ClipPick::replace && dragAfter (c, true) == RangeDrag::select && c.ctrlClickToggles);
+    CHECK (! planPress (true, true, false).ctrlClickToggles && ! planPress (false, false, false).ctrlClickToggles
+           && ! planPress (true, false, true).ctrlClickToggles);
+    // the toggle's clips follow the track
+    const std::vector<int> clipTracks { 0, 2, 2, 1, -1, 2 };
+    std::vector<int> clips { 3 };
+    toggleTrackClips (clips, clipTracks, 2, true);
+    CHECK ((clips == std::vector<int> { 3, 1, 2, 5 }));
+    toggleTrackClips (clips, clipTracks, 2, true);
+    CHECK ((clips == std::vector<int> { 3, 1, 2, 5 }));
+    toggleTrackClips (clips, clipTracks, 2, false);
+    CHECK ((clips == std::vector<int> { 3 }));
     const auto cs = planPress (true, true, false);
     CHECK (cs.mode == SelMode::toggle && cs.clips == ClipPick::add);
     CHECK (dragAfter (cs, true) == RangeDrag::select && dragAfter (cs, false) == RangeDrag::deselect);

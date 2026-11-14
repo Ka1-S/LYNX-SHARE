@@ -5787,7 +5787,7 @@ countries: id
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Menyisipkan kolom kosong sebelum song untuk clip yang akan diluncurkan, satu marker di tiap kolom, dan marker Start tempat song dimulai; mode performance dinyalakan."
 "Marker count" = "Jumlah marker"
 "2 steps" = "2 step"
-"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Track: [LMB] pilih  [Ctrl][LMB] beserta clip-nya (seret: track lain)  [Ctrl][Shift][LMB] tambah / buang  [Shift][LMB] rentang  [RMB] menu  [2xLMB] buka sumber clip  [Shift][Wheel] pindah ke atas / bawah"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Track: [LMB] pilih  [Ctrl][LMB] tambah / buang  [Ctrl] seret: track beserta clip-nya  [Shift][LMB] rentang  [RMB] menu  [2xLMB] buka sumber clip  [Shift][Wheel] pindah ke atas / bawah"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Latensi track: {0}"
@@ -7172,8 +7172,8 @@ countries: id
 "No pattern blocks to turn into clips" = "Tidak ada blok pattern untuk diubah menjadi klip"
 "{0} selected tracks" = "{0} trek dipilih"
 "Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "Merutekan insert terpilih ke sini (seret setelah diaktifkan: level). Ctrl+klik: hanya trek ini, Shift: sidechain, Ctrl+Shift: hanya sidechain, klik kanan: menu"
-"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] memilih  [Ctrl]+[LMB] atau seret melintasi: rentang  [Ctrl]+[Shift]+[LMB] menambah atau menghapus  [LMB] seret ke samping mengurutkan  [RMB] menu insert"
-"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Klik memilih insert (Ctrl+klik atau seret melintasi: rentang, Ctrl+Shift: tambah atau hapus), klik kanan membuka menunya; Alt+Kiri/Kanan memindahkan pilihan"
+"[LMB] selects  [Ctrl]+[LMB] or [Ctrl]+[Shift]+[LMB] adds or removes  [Ctrl] drag across: range  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] memilih  [Ctrl]+[LMB] atau [Ctrl]+[Shift]+[LMB] menambah atau menghapus  [Ctrl] seret melintasi: rentang  [LMB] seret ke samping mengurutkan  [RMB] menu insert"
+"Click selects the insert (Ctrl+click or Ctrl+Shift+click: add or remove, Ctrl+drag across: range), right-click opens its menu; Alt+Left/Right moves the selection" = "Klik memilih insert (Ctrl+klik atau Ctrl+Shift+klik: tambah atau hapus, Ctrl+seret melintasi: rentang), klik kanan membuka menunya; Alt+Kiri/Kanan memindahkan pilihan"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Slot efek: klik menampilkan atau menyembunyikan jendelanya (dan kenopnya di bawah), LED mem-bypass, roda atau seret memindahkannya ke atas atau ke bawah, klik kanan: opsi"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Membuka jendela efek (semua kontrolnya, seperti di FL); mengklik nama slot melakukan hal yang sama"
 "Themed" = "Bertema"

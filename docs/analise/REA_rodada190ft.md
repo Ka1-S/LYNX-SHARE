@@ -47,18 +47,21 @@ selection does **not** multi-select inserts.
 (no range); Ctrl (or a double press) + click clears the selection and selects from the anchor to the mouse (alone on a
 click); Ctrl+Shift adds the range, or removes it when the press started on a selected track (a click = toggle one);
 Ctrl+double = the group. Shift+click without Ctrl opens the rename dialog (FUN_012be9b0). LYNX already did all of this
-(round 170b) except the rename; nothing changed in the mixer.
+(round 170b) except the rename. FL has **no Ctrl+click toggle** in either place (the reporter of #163 confirmed that
+and asked LYNX to do better): see the LYNX extra below.
 
 **LYNX before → now**
 
 | | before | now |
 |---|---|---|
-| Playlist Ctrl+click | toggled the track | FL: the track alone + its clips; Ctrl+drag adds tracks and clips |
+| Playlist Ctrl+click | toggled the track | **LYNX extra**: adds / removes the track, its clips join / leave the clip selection |
+| Playlist Ctrl+drag | — | FL: once the drag leaves the pressed track, FL's Ctrl press (the track alone + its clips) and FL's range (tracks crossed and their clips) |
 | Playlist Ctrl+Shift+click | (= Ctrl+click) | FL: adds / removes the track, adds its clips; drag adds / removes the tracks crossed |
 | Playlist right-click on an unselected track | menu only | FL: selects it alone first |
 | Playlist click on an audio / instrument track | nothing else | FL: instrument channel selected, linked insert current when the mixer shows |
 | Playlist / Mixer Shift+click | range | kept (LYNX extra; FL opens Rename — **owner decision**, see below) |
-| Mixer Ctrl / Ctrl+Shift | FL (170b) | unchanged |
+| Mixer Ctrl+click | FL: the insert alone (range start) | **LYNX extra**: adds / removes the insert (the last one stays) |
+| Mixer Ctrl+drag, Ctrl+Shift | FL (170b) | unchanged: Ctrl+drag across = FL's range from the press, alone; Ctrl+Shift adds / removes |
 
 ## #164 — track height
 
@@ -91,11 +94,19 @@ selection (rounds 165m / 170b), and #163's reporter relies on it. Recommended an
 (LYNX extra); rename stays on F2 / the menu / double-click on the mixer name. Switching to FL's rename is a one-line
 change in `trackhdr::planPress` and the mixer's Shift branch.
 
+## The LYNX extra (owner 2026-11-14, #163)
+
+FL decides on the press (Ctrl = the track / insert alone). LYNX waits: a Ctrl press changes nothing until the mouse
+either leaves the pressed track (then FL's press and FL's range run, exactly as in FL) or is released on it (then the
+track / insert is toggled). So every FL gesture keeps its result except the plain Ctrl+click, which toggles.
+Code: `trackhdr::PressPlan::ctrlClickToggles`, `trackhdr::toggleTrackClips`, `PlaylistComponent` (headerCtrlPending),
+`MixerStrips` (ctrlClickPending).
+
 ## Best way?
 
 FL's Ctrl+Shift+click toggle is the same in the Playlist and the Mixer; Ableton (and most DAWs) toggle with
-Ctrl/Cmd+click and range with Shift+click. LYNX now has both FL's gestures and Shift = range; an option "Ctrl+click
-toggles (Ableton style)" could follow if users ask (#163's reporter expected it).
+Ctrl/Cmd+click and range with Shift+click. LYNX now has FL's gestures plus Ableton's Ctrl+click toggle and Shift range,
+which is what #163's reporter asked for.
 
 ## Tests
 

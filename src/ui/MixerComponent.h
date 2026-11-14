@@ -363,6 +363,7 @@ private:
     int selectAnchor = -1;
     bool selectAdding = true;
     std::vector<int> selectBase; // the selection kept under the range (Ctrl+Shift)
+    bool ctrlClickPending = false; // Ctrl alone: a release on the same strip toggles it (LYNX extra, issue #163)
     void dragSelectTo (int track);
     bool headerDragged = false;
     void showSendMenu (int track);

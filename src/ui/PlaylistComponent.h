@@ -370,7 +370,7 @@ private:
     void selectClipsOnTracks (int fromTrack, int toTrack, bool add);
     void followLinkedTrack (int track); // FL's select-only side effects (instrument channel, mixer track)
     int headerDragAnchor = -1;
-    bool headerDragAdding = true, headerDragClips = false;
+    bool headerDragAdding = true, headerDragClips = false, headerCtrlPending = false;
     std::vector<int> headerClipBase;
     // Alt+right-click on a clip: hear it while the button is held (pattern clips play their pattern)
     void startPreview (int clip, int x);

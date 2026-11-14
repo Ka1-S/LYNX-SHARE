@@ -5787,7 +5787,7 @@ countries: cn sg
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "在歌曲之前插入空白列用于放置要触发的片段，每列放一个标记，并在歌曲开始处放置Start标记；同时开启表演模式。"
 "Marker count" = "标记数量"
 "2 steps" = "2步"
-"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "轨道：[LMB] 选择  [Ctrl][LMB] 连同其片段（拖动：更多轨道）  [Ctrl][Shift][LMB] 添加 / 移除  [Shift][LMB] 范围  [RMB] 菜单  [2xLMB] 打开片段来源  [Shift][Wheel] 向上 / 向下移动"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "轨道：[LMB] 选择  [Ctrl][LMB] 添加 / 移除  [Ctrl] 拖动：连同片段选择轨道  [Shift][LMB] 范围  [RMB] 菜单  [2xLMB] 打开片段来源  [Shift][Wheel] 向上 / 向下移动"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "轨道延迟：{0}"
@@ -7172,8 +7172,8 @@ countries: cn sg
 "No pattern blocks to turn into clips" = "没有可转为片段的 Pattern 块"
 "{0} selected tracks" = "已选择 {0} 个轨道"
 "Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "将选中的插入轨道路由到此处 (启用后拖动: 电平)。Ctrl+单击: 仅此轨道, Shift: 侧链, Ctrl+Shift: 仅侧链, 右键: 菜单"
-"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] 选择  [Ctrl]+[LMB] 或横向拖过: 范围  [Ctrl]+[Shift]+[LMB] 添加或移除  [LMB] 横向拖动重新排序  [RMB] 插入轨道菜单"
-"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "单击选择插入轨道 (Ctrl+单击或横向拖过: 范围, Ctrl+Shift: 添加或移除), 右键打开菜单; Alt+左/右移动选择"
+"[LMB] selects  [Ctrl]+[LMB] or [Ctrl]+[Shift]+[LMB] adds or removes  [Ctrl] drag across: range  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] 选择  [Ctrl]+[LMB] 或 [Ctrl]+[Shift]+[LMB] 添加或移除  [Ctrl] 横向拖过: 范围  [LMB] 横向拖动重新排序  [RMB] 插入轨道菜单"
+"Click selects the insert (Ctrl+click or Ctrl+Shift+click: add or remove, Ctrl+drag across: range), right-click opens its menu; Alt+Left/Right moves the selection" = "单击选择插入轨道 (Ctrl+单击或 Ctrl+Shift+单击: 添加或移除, Ctrl+横向拖过: 范围), 右键打开菜单; Alt+左/右移动选择"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "效果槽: 单击显示或隐藏其窗口 (及下方旋钮), LED 旁通, 滚轮或拖动将其上移或下移, 右键: 选项"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "打开效果器窗口 (完整控件, 与 FL 相同); 单击槽名称效果相同"
 "Themed" = "主题"

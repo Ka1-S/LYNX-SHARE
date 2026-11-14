@@ -5787,7 +5787,7 @@ countries: jp
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "ソングの前に起動するクリップ用の空の列を挿入し、各列にマーカーを、ソングの開始位置にStartマーカーを置きます。パフォーマンスモードがオンになります。"
 "Marker count" = "マーカー数"
 "2 steps" = "2ステップ"
-"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "トラック: [LMB] 選択  [Ctrl][LMB] クリップごと選択 (ドラッグ: 他のトラックも)  [Ctrl][Shift][LMB] 追加 / 解除  [Shift][LMB] 範囲  [RMB] メニュー  [2xLMB] クリップのソースを開く  [Shift][Wheel] 上 / 下に移動"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "トラック: [LMB] 選択  [Ctrl][LMB] 追加 / 解除  [Ctrl] ドラッグ: トラックをクリップごと  [Shift][LMB] 範囲  [RMB] メニュー  [2xLMB] クリップのソースを開く  [Shift][Wheel] 上 / 下に移動"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "トラックのレイテンシー: {0}"
@@ -7172,8 +7172,8 @@ countries: jp
 "No pattern blocks to turn into clips" = "クリップに変換するパターンブロックがありません"
 "{0} selected tracks" = "{0} 個のトラックを選択"
 "Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "選択したインサートをここにルーティング (有効化後にドラッグ: レベル)。Ctrl+クリック: このトラックのみ、Shift: サイドチェイン、Ctrl+Shift: サイドチェインのみ、右クリック: メニュー"
-"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] 選択  [Ctrl]+[LMB] またはなぞるようにドラッグ: 範囲  [Ctrl]+[Shift]+[LMB] 追加または解除  [LMB] 横ドラッグで並べ替え  [RMB] インサートメニュー"
-"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "クリックでインサートを選択 (Ctrl+クリックまたはなぞるようにドラッグ: 範囲、Ctrl+Shift: 追加または解除)、右クリックでメニュー、Alt+左/右で選択を移動"
+"[LMB] selects  [Ctrl]+[LMB] or [Ctrl]+[Shift]+[LMB] adds or removes  [Ctrl] drag across: range  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] 選択  [Ctrl]+[LMB] または [Ctrl]+[Shift]+[LMB] 追加または解除  [Ctrl] なぞるようにドラッグ: 範囲  [LMB] 横ドラッグで並べ替え  [RMB] インサートメニュー"
+"Click selects the insert (Ctrl+click or Ctrl+Shift+click: add or remove, Ctrl+drag across: range), right-click opens its menu; Alt+Left/Right moves the selection" = "クリックでインサートを選択 (Ctrl+クリックまたは Ctrl+Shift+クリック: 追加または解除、Ctrl+なぞるようにドラッグ: 範囲)、右クリックでメニュー、Alt+左/右で選択を移動"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "エフェクトスロット: クリックでウィンドウ (と下のノブ) を表示/非表示、LED でバイパス、ホイールまたはドラッグで上下に移動、右クリック: オプション"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "エフェクトのウィンドウを開く (FL と同じく全コントロール)。スロット名のクリックでも同じ"
 "Themed" = "テーマ"

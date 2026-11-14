@@ -5787,7 +5787,7 @@ countries: pl
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Wstawia puste kolumny przed utworem na klipy do uruchamiania, znacznik na każdej z nich i znacznik Start tam, gdzie zaczyna się utwór; tryb performance zostaje włączony."
 "Marker count" = "Liczba znaczników"
 "2 steps" = "2 kroki"
-"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Ścieżka: [LMB] zaznacz  [Ctrl][LMB] razem z jej klipami (przeciągnij: więcej ścieżek)  [Ctrl][Shift][LMB] dodaj / usuń  [Shift][LMB] zakres  [RMB] menu  [2xLMB] otwórz źródło klipu  [Shift][Wheel] przesuń w górę / w dół"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Ścieżka: [LMB] zaznacz  [Ctrl][LMB] dodaj / usuń  [Ctrl] przeciągnij: ścieżki z ich klipami  [Shift][LMB] zakres  [RMB] menu  [2xLMB] otwórz źródło klipu  [Shift][Wheel] przesuń w górę / w dół"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Latencja ścieżki: {0}"
@@ -7172,8 +7172,8 @@ countries: pl
 "No pattern blocks to turn into clips" = "Brak bloków patternów do zamiany na klipy"
 "{0} selected tracks" = "Wybrane ścieżki: {0}"
 "Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "Kieruje wybrane inserty do tego (przeciągnij po włączeniu: poziom). Ctrl+klik: tylko ta ścieżka, Shift: sidechain, Ctrl+Shift: tylko sidechain, prawy klik: menu"
-"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] zaznacza  [Ctrl]+[LMB] lub przeciągnij przez: zakres  [Ctrl]+[Shift]+[LMB] dodaje lub usuwa  [LMB] przeciągnij w bok zmienia kolejność  [RMB] menu insertu"
-"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Klik zaznacza insert (Ctrl+klik lub przeciągnij przez: zakres, Ctrl+Shift: dodaj lub usuń), prawy klik otwiera menu; Alt+Lewo/Prawo przesuwa zaznaczenie"
+"[LMB] selects  [Ctrl]+[LMB] or [Ctrl]+[Shift]+[LMB] adds or removes  [Ctrl] drag across: range  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] zaznacza  [Ctrl]+[LMB] lub [Ctrl]+[Shift]+[LMB] dodaje lub usuwa  [Ctrl] przeciągnij przez: zakres  [LMB] przeciągnij w bok zmienia kolejność  [RMB] menu insertu"
+"Click selects the insert (Ctrl+click or Ctrl+Shift+click: add or remove, Ctrl+drag across: range), right-click opens its menu; Alt+Left/Right moves the selection" = "Klik zaznacza insert (Ctrl+klik lub Ctrl+Shift+klik: dodaj lub usuń, Ctrl+przeciągnij przez: zakres), prawy klik otwiera menu; Alt+Lewo/Prawo przesuwa zaznaczenie"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Slot efektu: klik pokazuje lub ukrywa jego okno (i pokrętła poniżej), dioda go omija, kółko lub przeciągnięcie przesuwa go w górę lub w dół, prawy klik: opcje"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Otwiera okno efektu (wszystkie kontrolki, jak w FL); kliknięcie nazwy slotu robi to samo"
 "Themed" = "Tematyczny"

@@ -57,6 +57,10 @@ struct PressPlan
     bool rangeFollowsResult = false; // Ctrl+Shift: the drag selects when the press left the track selected, else deselects
     RangeDrag drag = RangeDrag::none;
     bool lynxShiftRange = false;     // LYNX's own Shift+click: the tracks from the last clicked one (kept, see REA doc)
+    // LYNX extra (issue #163, owner 2026-11-14): with Ctrl alone nothing changes on the press; a drag that leaves the
+    // track does FL's Ctrl press (this track alone with its clips) and FL's range; a click without that toggles the
+    // track (its clips join or leave the clip selection) — FL has no Ctrl+click toggle
+    bool ctrlClickToggles = false;
 };
 
 // A left press on the header's plain area (not the LED, a button, the group arrow or the resize band). `ctrl` is FL's
@@ -75,10 +79,12 @@ inline PressPlan planPress (bool ctrl, bool shift, bool alt)
         }
         else
         {
-            // FL: Ctrl+click = this track alone and every clip on it; Ctrl+drag adds the tracks crossed (and their clips)
+            // FL: Ctrl+press = this track alone and every clip on it; Ctrl+drag adds the tracks crossed (and their
+            // clips). LYNX: deferred to the drag, a plain Ctrl+click toggles (ctrlClickToggles)
             p.mode = SelMode::only;
             p.clips = ClipPick::replace;
             p.drag = RangeDrag::select;
+            p.ctrlClickToggles = true;
         }
         return p;
     }
@@ -165,5 +171,20 @@ constexpr int groupGestureDistance = 32;
 inline bool groupGesture (int newHeight, int mouseY, int rowTop)
 {
     return newHeight <= polish::minTrackHeight && mouseY - rowTop <= -groupGestureDistance;
+}
+// LYNX's Ctrl+click toggle (issue #163): the clip selection follows the track — its clips join when it becomes
+// selected and leave when it is deselected. `clipTracks[i]` is the track of clip i.
+inline void toggleTrackClips (std::vector<int>& clipSelection, const std::vector<int>& clipTracks, int track, bool nowSelected)
+{
+    for (int i = 0; i < (int) clipTracks.size(); ++i)
+    {
+        if (clipTracks[(std::size_t) i] != track)
+            continue;
+        const auto it = std::find (clipSelection.begin(), clipSelection.end(), i);
+        if (nowSelected && it == clipSelection.end())
+            clipSelection.push_back (i);
+        else if (! nowSelected && it != clipSelection.end())
+            clipSelection.erase (it);
+    }
 }
 } // namespace lynx::trackhdr

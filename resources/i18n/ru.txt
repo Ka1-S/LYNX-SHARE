@@ -5787,7 +5787,7 @@ countries: ru by kz
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "Вставляет пустые столбцы перед песней для запускаемых клипов, по маркеру на каждом и маркер Start там, где начинается песня; режим выступления включается."
 "Marker count" = "Число маркеров"
 "2 steps" = "2 шага"
-"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Дорожка: [LMB] выбрать  [Ctrl][LMB] вместе с её клипами (перетаскивание: ещё дорожки)  [Ctrl][Shift][LMB] добавить / убрать  [Shift][LMB] диапазон  [RMB] меню  [2xLMB] открыть источник клипа  [Shift][Wheel] вверх / вниз"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "Дорожка: [LMB] выбрать  [Ctrl][LMB] добавить / убрать  [Ctrl] перетаскивание: дорожки с их клипами  [Shift][LMB] диапазон  [RMB] меню  [2xLMB] открыть источник клипа  [Shift][Wheel] вверх / вниз"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "Задержка канала: {0}"
@@ -7172,8 +7172,8 @@ countries: ru by kz
 "No pattern blocks to turn into clips" = "Нет блоков паттернов для превращения в клипы"
 "{0} selected tracks" = "Выбрано дорожек: {0}"
 "Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "Направляет выбранные инсерты сюда (перетащите после включения: уровень). Ctrl+клик: только эта дорожка, Shift: сайдчейн, Ctrl+Shift: только сайдчейн, правый клик: меню"
-"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] выбирает  [Ctrl]+[LMB] или протянуть: диапазон  [Ctrl]+[Shift]+[LMB] добавляет или убирает  [LMB] перетаскивание вбок меняет порядок  [RMB] меню инсерта"
-"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "Клик выбирает инсерт (Ctrl+клик или протянуть: диапазон, Ctrl+Shift: добавить или убрать), правый клик открывает меню; Alt+Влево/Вправо сдвигает выбор"
+"[LMB] selects  [Ctrl]+[LMB] or [Ctrl]+[Shift]+[LMB] adds or removes  [Ctrl] drag across: range  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] выбирает  [Ctrl]+[LMB] или [Ctrl]+[Shift]+[LMB] добавляет или убирает  [Ctrl] протянуть: диапазон  [LMB] перетаскивание вбок меняет порядок  [RMB] меню инсерта"
+"Click selects the insert (Ctrl+click or Ctrl+Shift+click: add or remove, Ctrl+drag across: range), right-click opens its menu; Alt+Left/Right moves the selection" = "Клик выбирает инсерт (Ctrl+клик или Ctrl+Shift+клик: добавить или убрать, Ctrl+протянуть: диапазон), правый клик открывает меню; Alt+Влево/Вправо сдвигает выбор"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "Слот эффекта: клик показывает или скрывает его окно (и ручки под ним), светодиод обходит его, колесо или перетаскивание двигает вверх или вниз, правый клик: опции"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "Открывает окно эффекта (все его регуляторы, как в FL); клик по имени слота делает то же"
 "Themed" = "Тематический"

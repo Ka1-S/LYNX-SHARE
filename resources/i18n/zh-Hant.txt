@@ -5787,7 +5787,7 @@ countries: tw hk mo
 "Inserts empty columns before the song for the clips to launch, a marker on each, and a Start marker where the song begins; Performance mode is turned on." = "在歌曲之前插入空白欄位以放置要觸發的片段，每欄放一個標記，並在歌曲開始處放置Start標記；同時開啟表演模式。"
 "Marker count" = "標記數量"
 "2 steps" = "2步"
-"Track: [LMB] select  [Ctrl][LMB] with its clips (drag: more tracks)  [Ctrl][Shift][LMB] add / remove  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "軌道：[LMB] 選取  [Ctrl][LMB] 連同其片段（拖曳：更多軌道）  [Ctrl][Shift][LMB] 加入 / 移除  [Shift][LMB] 範圍  [RMB] 選單  [2xLMB] 開啟片段來源  [Shift][Wheel] 向上 / 向下移動"
+"Track: [LMB] select  [Ctrl][LMB] add / remove  [Ctrl] drag: tracks with their clips  [Shift][LMB] range  [RMB] menu  [2xLMB] open the clip source  [Shift][Wheel] move up / down" = "軌道：[LMB] 選取  [Ctrl][LMB] 加入 / 移除  [Ctrl] 拖曳：連同片段選取軌道  [Shift][LMB] 範圍  [RMB] 選單  [2xLMB] 開啟片段來源  [Shift][Wheel] 向上 / 向下移動"
 
 # --- Mixer: track latency, routing selected ⇄ this track, submix, render tracks (REA round 165f-mixer)
 "Track latency: {0}" = "軌道延遲：{0}"
@@ -7172,8 +7172,8 @@ countries: tw hk mo
 "No pattern blocks to turn into clips" = "沒有可轉為片段的 Pattern 區塊"
 "{0} selected tracks" = "已選擇 {0} 個軌道"
 "Route the selected inserts to this one (drag after enabling: level). Ctrl+click: this track only, Shift: sidechain, Ctrl+Shift: sidechain only, right-click: menu" = "將選取的插入軌道路由到此處 (啟用後拖曳: 電平)。Ctrl+按一下: 僅此軌道, Shift: 側鏈, Ctrl+Shift: 僅側鏈, 右鍵: 選單"
-"[LMB] selects  [Ctrl]+[LMB] or drag across: range  [Ctrl]+[Shift]+[LMB] adds or removes  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] 選取  [Ctrl]+[LMB] 或橫向拖過: 範圍  [Ctrl]+[Shift]+[LMB] 新增或移除  [LMB] 橫向拖曳重新排序  [RMB] 插入軌道選單"
-"Click selects the insert (Ctrl+click or drag across: range, Ctrl+Shift: add or remove), right-click opens its menu; Alt+Left/Right moves the selection" = "按一下選取插入軌道 (Ctrl+按一下或橫向拖過: 範圍, Ctrl+Shift: 新增或移除), 右鍵開啟選單; Alt+左/右移動選取"
+"[LMB] selects  [Ctrl]+[LMB] or [Ctrl]+[Shift]+[LMB] adds or removes  [Ctrl] drag across: range  [LMB] drag sideways reorders  [RMB] insert menu" = "[LMB] 選取  [Ctrl]+[LMB] 或 [Ctrl]+[Shift]+[LMB] 新增或移除  [Ctrl] 橫向拖過: 範圍  [LMB] 橫向拖曳重新排序  [RMB] 插入軌道選單"
+"Click selects the insert (Ctrl+click or Ctrl+Shift+click: add or remove, Ctrl+drag across: range), right-click opens its menu; Alt+Left/Right moves the selection" = "按一下選取插入軌道 (Ctrl+按一下或 Ctrl+Shift+按一下: 新增或移除, Ctrl+橫向拖過: 範圍), 右鍵開啟選單; Alt+左/右移動選取"
 "Effect slot: click shows or hides its window (and its knobs below), the LED bypasses, the wheel or a drag moves it up or down, right-click: options" = "效果槽: 按一下顯示或隱藏其視窗 (及下方旋鈕), LED 旁通, 滾輪或拖曳將其上移或下移, 右鍵: 選項"
 "Open the effect's window (its full controls, as in FL); clicking the slot's name does the same" = "開啟效果器視窗 (完整控制項, 與 FL 相同); 按一下槽名稱效果相同"
 "Themed" = "主題"

@@ -11968,11 +11968,17 @@ private:
         // ---- 1. selection (AUTracksPanelMouseDown / FUN_012e83e0)
         press (pl, headerPoint (1), {});
         check ("click_selects_alone", pl.selectedTracksForSnapshot() == std::vector<int> { 1 }, list (pl.selectedTracksForSnapshot()));
+        pl.selectClipsForSnapshot ({});
+        // LYNX extra (issue #163): Ctrl+click adds / removes one track, its clips follow
         press (pl, headerPoint (3), ctrl);
-        check ("ctrl_click_alone_with_clips", pl.selectedTracksForSnapshot() == std::vector<int> { 3 } && sortedClips() == clipsOn ({ 3 }),
+        check ("ctrl_click_adds_lynx", pl.selectedTracksForSnapshot() == std::vector<int> { 1, 3 } && sortedClips() == clipsOn ({ 3 }),
                list (pl.selectedTracksForSnapshot()) + " clips " + list (sortedClips()));
+        press (pl, headerPoint (5), ctrl);
+        press (pl, headerPoint (1), ctrl);
+        check ("ctrl_click_removes_lynx", pl.selectedTracksForSnapshot() == std::vector<int> { 3, 5 } && sortedClips() == clipsOn ({ 3, 5 }),
+               list (pl.selectedTracksForSnapshot()) + " clips " + list (sortedClips()));
+        // FL's own toggle: Ctrl+Shift+click (its clips are added)
         press (pl, headerPoint (1), ctrl | shift);
-        press (pl, headerPoint (5), ctrl | shift);
         check ("ctrl_shift_click_adds", pl.selectedTracksForSnapshot() == std::vector<int> { 1, 3, 5 }, list (pl.selectedTracksForSnapshot()));
         check ("ctrl_shift_click_adds_clips", sortedClips() == clipsOn ({ 1, 3, 5 }), list (sortedClips()));
         press (pl, headerPoint (3), ctrl | shift);
@@ -12066,16 +12072,21 @@ private:
             auto& strips = mixer.getStripsForSnapshot();
             strips.setSize (juce::jmax (strips.getWidth(), 1300), juce::jmax (strips.getHeight(), 560));
             const auto at = [&] (int t) { return juce::Point<int> (strips.stripLeft (t) + 8, strips.getHeight() / 2 + 40); };
-            press (strips, at (2), ctrl);
-            check ("mixer_ctrl_click_alone", strips.getSelection() == std::vector<int> { 2 }, list (strips.getSelection()));
-            press (strips, at (4), ctrl | shift);
-            press (strips, at (6), ctrl | shift);
-            check ("mixer_ctrl_shift_click_adds", strips.getSelection() == std::vector<int> { 2, 4, 6 }, list (strips.getSelection()));
-            press (strips, at (4), ctrl | shift);
-            check ("mixer_ctrl_shift_click_removes", strips.getSelection() == std::vector<int> { 2, 6 }, list (strips.getSelection()));
+            press (strips, at (2), {});
+            check ("mixer_click_alone", strips.getSelection() == std::vector<int> { 2 }, list (strips.getSelection()));
+            // LYNX extra (issue #163): Ctrl+click adds / removes one insert
+            press (strips, at (4), ctrl);
+            press (strips, at (6), ctrl);
+            check ("mixer_ctrl_click_adds_lynx", strips.getSelection() == std::vector<int> { 2, 4, 6 }, list (strips.getSelection()));
+            press (strips, at (4), ctrl);
+            check ("mixer_ctrl_click_removes_lynx", strips.getSelection() == std::vector<int> { 2, 6 }, list (strips.getSelection()));
+            // FL: Ctrl+Shift+click adds / removes too
             press (strips, at (5), ctrl | shift);
-            check ("mixer_ctrl_shift_click_adds_again", strips.getSelection() == std::vector<int> { 2, 5, 6 }, list (strips.getSelection()));
+            check ("mixer_ctrl_shift_click_adds", strips.getSelection() == std::vector<int> { 2, 5, 6 }, list (strips.getSelection()));
             savePng (mixer.createComponentSnapshot ({ 0, 0, juce::jmin (mixer.getWidth(), 900), mixer.getHeight() }), prefix + "-mixer-ctrl-multiselect.png");
+            // FL: Ctrl+drag across the strips = the range from the press, alone
+            press (strips, at (3), ctrl, at (4));
+            check ("mixer_ctrl_drag_range", strips.getSelection() == std::vector<int> { 3, 4 }, list (strips.getSelection()));
         }
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
