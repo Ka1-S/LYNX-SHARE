@@ -66,6 +66,8 @@ public:
     }
     // (the card on its own thread) the clock time of the longest gap between two frames of the drop, seconds
     virtual double getLongestDropGapAt() const { return -1.0; }
+    // (the card on its own thread) where the frame before that gap spent its time
+    virtual juce::String getLongestDropGapDetail() const { return {}; }
 
     // Called once on the message thread, after the card's first frame is on the screen (round 190go: the start-up goes
     // on then, not after a fixed wait)

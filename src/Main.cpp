@@ -2601,7 +2601,9 @@ public:
             if (startupTrace.on)
                 startupTrace.mark (("splash: the drop in " + juce::String (splash->getDropFrames()) + " frames, longest gap "
                                     + juce::String (splash->getLongestDropGapMs(), 1) + " ms"
-                                    + (splash->getLongestDropGapAt() >= 0.0 ? " (at " + juce::String (splash->getLongestDropGapAt(), 3) + " s of its clock)" : juce::String()))
+                                    + (splash->getLongestDropGapAt() >= 0.0 ? " (at " + juce::String (splash->getLongestDropGapAt(), 3) + " s of its clock; the frame before: "
+                                                                                  + splash->getLongestDropGapDetail() + ")"
+                                                                            : juce::String()))
                                        .toRawUTF8());
             mainWindow->reveal();
             startupTrace.mark ("window revealed (after the splash)");

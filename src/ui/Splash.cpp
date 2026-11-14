@@ -483,6 +483,12 @@ public:
 
     double getLongestDropGapAt() const override { return longestDropGapAt.load(); }
 
+    juce::String getLongestDropGapDetail() const override
+    {
+        const std::scoped_lock hold (lock);
+        return longestGapDetail;
+    }
+
 private:
     // runs `f` on the message thread unless this card is gone by then (it is deleted there)
     void post (std::function<void (ThreadedSplash&)> f)
@@ -604,6 +610,9 @@ private:
                 {
                     longestDropGapMs.store ((now - lastDropPaint) * 1000.0);
                     longestDropGapAt.store (t);
+                    const std::scoped_lock hold (lock); // (what the frame before it spent its time on)
+                    longestGapDetail = "draw " + juce::String (spent[0], 1) + " ms, show " + juce::String (spent[1], 1) + " ms, messages "
+                                       + juce::String (spent[2], 1) + " ms, wait " + juce::String (spent[3], 1) + " ms";
                 }
                 ++dropFrames;
                 lastDropPaint = now;
@@ -622,6 +631,8 @@ private:
                 });
             }
 
+            auto mark = steadySeconds();
+            const auto lap = [&mark] (double& into) { const auto n = steadySeconds(); into = (n - mark) * 1000.0; mark = n; };
             SplashFrame look;
             look.t = t;
             look.barDuration = barDuration.load();
@@ -644,6 +655,7 @@ private:
                 for (int row = 0; row < h; ++row) // (premultiplied BGRA, as UpdateLayeredWindow wants)
                     std::memcpy (static_cast<std::uint8_t*> (bits) + (std::size_t) row * (std::size_t) w * 4, pixels.getLinePointer (row), (std::size_t) w * 4);
             }
+            lap (spent[0]);
             POINT source { 0, 0 }, place { x, y };
             SIZE size { w, h };
             BLENDFUNCTION blend { AC_SRC_OVER, 0, (BYTE) juce::roundToInt (alpha * 255.0), AC_SRC_ALPHA };
@@ -656,6 +668,7 @@ private:
                 firstFrameTicks.store (std::chrono::steady_clock::now().time_since_epoch().count());
                 post ([] (ThreadedSplash& s) { if (auto first = std::exchange (s.onFirstFrame, nullptr)) first(); });
             }
+            lap (spent[1]);
 
             MSG message;
             while (PeekMessageW (&message, nullptr, 0, 0, PM_REMOVE))
@@ -663,6 +676,7 @@ private:
                 TranslateMessage (&message);
                 DispatchMessageW (&message);
             }
+            lap (spent[2]);
 
             // the next tick of a 60 Hz clock (a tick missed is skipped, as JUCE's timer does)
             next += period;
@@ -671,15 +685,18 @@ private:
                 next += period;
             LARGE_INTEGER due;
             due.QuadPart = -juce::jmax ((LONGLONG) 1, (LONGLONG) ((next - later) * 1.0e7)); // (relative, 100 ns units)
+            // (the timeout: the tick plus a little, in case the timer never signals; never a long wait)
+            const auto timeoutMs = (DWORD) juce::jmax (1, (int) std::ceil ((next - later) * 1000.0) + 2);
             if (timer != nullptr && SetWaitableTimer (timer, &due, 0, nullptr, nullptr, FALSE))
             {
                 const HANDLE waitFor[] = { timer, wake };
-                MsgWaitForMultipleObjects (2, waitFor, FALSE, 100, QS_ALLINPUT);
+                MsgWaitForMultipleObjects (2, waitFor, FALSE, timeoutMs, QS_ALLINPUT);
             }
             else
             {
-                MsgWaitForMultipleObjects (1, &wake, FALSE, (DWORD) juce::jmax (1, juce::roundToInt ((next - later) * 1000.0)), QS_ALLINPUT);
+                MsgWaitForMultipleObjects (1, &wake, FALSE, timeoutMs, QS_ALLINPUT);
             }
+            lap (spent[3]);
         }
 
         ShowWindow (window, SW_HIDE);
@@ -716,10 +733,12 @@ private:
 
     const std::array<juce::Font, 4> fonts;
     const juce::String subtitle, version, dropStatus;
-    std::mutex lock; // guards status, onGone and onLanded
+    mutable std::mutex lock; // guards status, onGone, onLanded and longestGapDetail
     juce::String status;
     std::function<void()> onGone, onLanded;
     std::atomic<double> landingAt { -1.0 }, longestDropGapAt { -1.0 };
+    double spent[4] {}; // (the splash thread) the last frame's draw, show, messages, wait, ms
+    juce::String longestGapDetail; // (guarded by lock)
     std::atomic<double> clockStart { -1.0 }, fadeStart { -1.0 }, barDuration { SplashScreen::minimumDuration };
     std::atomic<bool> quit { false }, raiseAsked { false };
     std::atomic<int> dropFrames { 0 };

@@ -314,11 +314,10 @@ void AudioEngine::openAudioDevice()
     const auto mark = [] (const char* step) { if (startupMark != nullptr) startupMark (step); };
 
     // LYNX ASIO without installation: lynx-asio.dll next to LYNX.exe, when it is not registered (REA round 106)
+    deviceManager.getAvailableDeviceTypes(); // the standard types first (round 190hd: its own trace line)
+    mark ("  engine: standard device types (the prewarmed ASIO device handed over)");
     if (auto lynxAsio = makeBuiltInLynxAsioType())
-    {
-        deviceManager.getAvailableDeviceTypes(); // the standard types first
         deviceManager.addAudioDeviceType (std::move (lynxAsio));
-    }
     // LYNX's own PipeWire client on Linux (round 161), listed when a PipeWire daemon answers
     if (auto pipeWire = makePipeWireDeviceType())
     {
