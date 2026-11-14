@@ -6,7 +6,7 @@
 // the delay compensation works; below its ceiling it only delays), insert 4 with an EQ and an automated fader. No
 // Master effects: the parts add up to the mix. The checks:
 //  1. the export (offline, blocks of 512) against playback: the live engine on a stand-in audio device whose callbacks
-//     come in blocks of 441 (a real-time bounce records its Master): the same samples, below −90 dBFS;
+//     come in blocks of 441, its Master recorded by the real-time bounce's tap: the same samples, below −90 dBFS;
 //  2. "One per mixer insert" and "One per channel" stems as the Export window makes them: every file as long as the
 //     mix, the inserts on the Master (and the channels) adding up to the mix (so each starts at 0, the PDC trimmed as
 //     in the mix), the bus's stem with its delay (group FX), and an insert fed only by a Fruity Send (an extra output)
@@ -292,17 +292,32 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
             live.timerCallback();
             juce::Thread::sleep (10);
         }
-        const auto file = folder.getChildFile ("played.wav");
-        ExportJob job (live, options, file);
-        juce::String error;
-        const auto ok = job.run ({}, error);
+        // playback: what the real-time bounce records (as Export › "Render through the hardware in real time"), with
+        // the message thread doing its part (the engine's timer) as in the app
+        if (const auto error = live.startRealtimeBounce (0.0); error.isNotEmpty())
+            return "ERROR playback (real-time bounce): " + error;
+        const auto latency = (std::int64_t) live.bounceLatency();
+        const auto wanted = latency + (std::int64_t) mix.l.size();
+        const auto started = juce::Time::getMillisecondCounter();
+        while ((std::int64_t) played.l.size() < wanted && juce::Time::getMillisecondCounter() - started < 60000 && live.bounceStillPlaying())
+        {
+            live.timerCallback();
+            juce::Thread::sleep (20);
+            live.pullRealtimeBounce (played.l, played.r);
+        }
+        const auto dropouts = live.bounceDropouts();
+        live.finishRealtimeBounce();
         live.deviceManager.removeAudioCallback (&live);
         live.deviceManager.closeAudioDevice();
-        if (! ok)
-            return "ERROR playback (real-time bounce): " + error;
-        if (job.getNotice().isNotEmpty())
-            notes.add (job.getNotice());
-        played = readWav (file);
+        if (dropouts > 0)
+            notes.add (juce::String (dropouts) + " dropout(s) during playback");
+        if ((std::int64_t) played.l.size() < wanted)
+            return "ERROR playback: " + juce::String ((int) played.l.size()) + " frames recorded of " + juce::String ((int) wanted);
+        played.l.erase (played.l.begin(), played.l.begin() + latency); // (the delay compensation's start, as the export trims it)
+        played.r.erase (played.r.begin(), played.r.begin() + latency);
+        played.l.resize (mix.l.size());
+        played.r.resize (mix.r.size());
+        say ("playback: " + juce::String ((int) latency) + " samples of delay compensation trimmed");
     }
     {
         const auto n = juce::jmin (mix.l.size(), played.l.size());
@@ -330,8 +345,6 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
             errors.add ("playback differs from the export by " + db (d) + " (best lag " + juce::String (bestLag) + ": " + db (best) + ", worst at frame "
                         + juce::String ((int) worst) + ")");
         }
-        if (std::abs ((int) mix.l.size() - (int) played.l.size()) > 24000)
-            errors.add ("playback length " + juce::String ((int) played.l.size()) + " vs the export's " + juce::String ((int) mix.l.size()));
     }
 
     // --- 2. stems ---------------------------------------------------------------------------------------------------
