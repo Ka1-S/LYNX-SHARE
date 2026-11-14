@@ -11,6 +11,10 @@ Free and open source, for Windows, macOS and Linux. Opens your FL Studio, Ableto
   <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/badge/Download-0.1.27%20alpha-d9534f?style=for-the-badge" alt="Download LYNX SHARE"></a>
   <a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N"><img src="https://get.microsoft.com/images/en-us%20dark.svg" height="28" alt="Get it from Microsoft"></a>
   <a href="https://discord.gg/XHKkbtbkY"><img src="https://img.shields.io/badge/Discord-join%20the%20community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the LYNX SHARE Discord"></a>
+  <br>
+  <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/github/downloads/Ka1-S/LYNX-SHARE/total?style=for-the-badge&label=downloads&color=24292f" alt="Total downloads"></a>
+  <a href="https://github.com/Ka1-S/LYNX-SHARE/stargazers"><img src="https://img.shields.io/github/stars/Ka1-S/LYNX-SHARE?style=for-the-badge&color=24292f" alt="GitHub stars"></a>
+  <a href="https://ko-fi.com/lynxshare"><img src="https://img.shields.io/badge/Ko--fi-support%20LYNX%20SHARE-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white" alt="Support LYNX SHARE on Ko-fi"></a>
 </p>
 
 <p align="center">
@@ -30,7 +34,6 @@ Free and open source, for Windows, macOS and Linux. Opens your FL Studio, Ableto
   <img src="https://img.shields.io/badge/VST3%20%C2%B7%20CLAP-supported-d9534f" alt="VST3 and CLAP">
   <img src="https://img.shields.io/badge/status-alpha-f0ad4e" alt="Alpha">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-5cb85c" alt="AGPL-3.0 license"></a>
-  <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/github/downloads/Ka1-S/LYNX-SHARE/total?label=downloads&color=24292f" alt="Total downloads"></a>
 </p>
 
 <p align="center">
