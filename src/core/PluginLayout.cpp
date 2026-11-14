@@ -2044,6 +2044,9 @@ Layout glowLeveler()
     // round 190dm: the cell's memory (release slower after long exposure; Compress)
     v.push_back (when (label (14, 82, 112, 9, TR_NOOP ("Cell memory"), dim), "Voicing", 0.5f, 1.0f));
     v.push_back (when (tabs (14, 92, 112, 14, "Opto memory", TR_NOOP ("Off|On"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    // round 190fx: the side chain's weighting (Old = the voicing's treble emphasis; Measured = the even weighting)
+    v.push_back (when (label (14, 110, 112, 9, TR_NOOP ("Side chain"), dim), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (tabs (14, 120, 112, 14, "SC weighting", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
     // COMPRESS / LIMIT: a bat toggle (up = compress), its two words above and under it
     v.push_back (tabs (40, 136, 52, 84, "Limit", TR_NOOP ("Compress|Limit"), {}, batToggle));
     // the two big knobs, their printed 0 … 100 round them; no value text (the drag tip shows it)

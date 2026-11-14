@@ -17547,6 +17547,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "DanceFix190cjTests.inc"
 #include "Reverb190bzTests.inc"
 #include "Dyn190dmTests.inc"
+#include "ParityDyn190fxTests.inc"
 #include "Echo190dlTests.inc"
 #include "Vqe190dpTests.inc"
 #include "ApexFix190coTests.inc"
