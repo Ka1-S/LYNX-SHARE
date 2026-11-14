@@ -325,9 +325,8 @@ void spliceAttacks (Planar& out, const Planar& in, const std::function<double (d
 // With a warp map (`toOut`, round 175a M1) each piece starts where the map puts its attack.
 // Round 190fm adds Live's Beats settings (`modes`; the defaults run exactly the code above): Preserve on a note grid
 // (cuts where the output reaches each multiple of the division, `sourceBeats` = the beats the source spans, `toSource`
-// = the inverse of `toOut`), Transient Loop Mode (0: silence after a piece's end, reached through a `fade`-long fade
-// of the audio that follows; 1: the piece again from its start; 2: back and forth) and Transient Envelope (a fade over
-// each piece's span, stretchdetail::beatsEnvelopeGain).
+// = the inverse of `toOut`), Transient Loop Mode and Transient Envelope — their laws re-measured in round 190gx (see
+// the fill below).
 Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double semitones, const std::function<double (double)>& toOut,
                      const WarpModeSettings& modes = {}, double sourceBeats = 0.0, const std::function<double (double)>& toSource = {})
 {
@@ -342,10 +341,15 @@ Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double
     cuts.push_back (n);
     const auto fade = std::max (16L, (long) std::lround (sampleRate * 0.016));
     const auto speed = semitones == 0.0 ? 1.0 : std::pow (2.0, semitones / 12.0);
+    // round 190gx: a piece cut at a transient starts almost at once (Live: full level within 1 ms of the cut on the drum
+    // loop; 2 ms matched the renders best of 1 / 2 / 4 / 16); a grid piece, cut anywhere in the sound, keeps the 16 ms
+    // crossfade (measured: shorter ones click on the voice). The previous piece still fades out over 16 ms.
+    const auto onGrid = division > 0.0 && sourceBeats > 0.0 && toSource;
+    const auto fadeInLen = onGrid ? fade : std::max (1L, (long) std::lround (sampleRate * 0.002));
     const auto weight = [&] (std::size_t k, long i, long own) {
         float w = 1.0f;
-        if (k > 0 && i < fade)
-            w = (float) i / (float) fade;
+        if (k > 0 && i < fadeInLen)
+            w = (float) i / (float) fadeInLen;
         if (i >= own)
             w *= 1.0f - (float) (i - own) / (float) fade;
         return w;
@@ -357,9 +361,65 @@ Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double
         const auto c1 = 0.5f * (y2 - y0), c2 = y0 - 2.5f * y1 + 2.0f * y2 - 0.5f * y3, c3 = 0.5f * (y3 - y0) + 1.5f * (y1 - y2);
         return ((c3 * f + c2) * f + c1) * f + y1;
     };
+    // Round 190gx (Live 12.4's W1 renders, /mnt/e/lynx-work/livefacts190gx/warp/REPORT.md): what fills the gap after a
+    // piece's own end. `own` = the output frames the piece lasts at its own speed. Loop Off: the piece fades out over its
+    // last 10 ms and ends there (Live: a linear 10 ms ramp ending exactly at the next transient; nothing after).
+    // Back-and-forth and Forward turn `beatsTurnSeconds` before the piece's end (Live: 21–30 ms, the reversed reading
+    // mirrors there), Back-and-forth bounces inside the piece's second half, Forward loops that second half (a short
+    // crossfade at each jump). Transient Envelope: unity up to the piece's own end, then an exponential decay
+    // (stretchdetail::beatsEnvelopeGain).
+    struct Read
+    {
+        double pos = 0.0, pos2 = -1.0; // where in the piece (own-speed frames); pos2 ≥ 0: crossfaded with it by mix
+        float mix = 0.0f, gain = 1.0f;
+        bool stop = false;
+    };
+    // (the turn is a transient cut's: on a Preserve grid Live fills from the piece's very end — measured: every grid case
+    // matches best with no turn)
+    const auto turnFrames = onGrid ? 0L : (long) std::lround (sampleRate * stretchdetail::beatsTurnSeconds);
+    const auto loopXfade = std::max (8L, (long) std::lround (sampleRate * 0.005));
+    const auto offFade = std::max (8L, (long) std::lround (sampleRate * 0.010));
+    const auto readOf = [&] (long i, long own, bool fills) {
+        Read r;
+        if (! fills) // (the piece's slot is no longer than the piece: it plays straight on, cut by the next one)
+            r.pos = (double) i;
+        else if (i < own && (loopMode == 0 || i < own - turnFrames || own < 4 * turnFrames))
+        {
+            r.pos = (double) i;
+            if (loopMode == 0 && i >= own - std::min (own, offFade))
+                r.gain = (float) (own - i) / (float) std::min (own, offFade);
+        }
+        else if (loopMode == 0)
+            r.stop = true;
+        else
+        {
+            const auto turn = own < 4 * turnFrames ? own : own - turnFrames; // (short pieces: at their end)
+            const auto mid = turn / 2, seg = std::max (1L, turn - mid);
+            const auto u = i - turn;
+            if (loopMode == 2)
+            {
+                const auto m = u % (2 * seg);
+                r.pos = (double) (m < seg ? turn - 1 - m : mid + (m - seg));
+            }
+            else
+            {
+                const auto m = u % seg;
+                r.pos = (double) (mid + m);
+                if (m < loopXfade) // (from the run that just ended, carried on past the turn)
+                {
+                    r.pos2 = (double) (turn + m);
+                    r.mix = (float) m / (float) loopXfade;
+                }
+            }
+        }
+        if (envelope < 100.0f && i >= own)
+            r.gain *= stretchdetail::beatsEnvelopeGain (envelope, i - own, sampleRate);
+        return r;
+    };
 
     Planar out;
     out.ch.assign (in.ch.size(), std::vector<float> ((std::size_t) outFrames, 0.0f));
+    bool previousCut = false; // (Loop Off: a piece that follows one ended by its own fade starts at once)
     for (std::size_t k = 0; k + 1 < cuts.size(); ++k)
     {
         const auto a = cuts[k], length = cuts[k + 1] - a;
@@ -369,61 +429,32 @@ Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double
         const auto span = std::min (outFrames - o0, (o1 - o0) + (last ? 0L : fade));
         if (length <= 0 || span <= 0)
             continue;
-        if (speed == 1.0)
-        {
-            const auto period = 2 * length;
-            for (long i = 0; i < span; ++i)
-            {
-                long src;
-                auto w = weight (k, i, o1 - o0);
-                if (loopMode == 2)
-                {
-                    const auto m = i % period;
-                    src = a + (m < length ? m : period - 1 - m);
-                }
-                else if (loopMode == 1)
-                    src = a + i % length;
-                else
-                {
-                    if (i >= length + fade || a + i >= n)
-                        break;
-                    if (i >= length)
-                        w *= 1.0f - (float) (i - length) / (float) fade;
-                    src = a + i;
-                }
-                if (envelope < 100.0f)
-                    w *= stretchdetail::beatsEnvelopeGain (envelope, i, o1 - o0);
-                for (std::size_t c = 0; c < in.ch.size(); ++c)
-                    out.ch[c][(std::size_t) (o0 + i)] += w * in.ch[c][(std::size_t) src];
-            }
-            continue;
-        }
-        // the piece resampled: `played` output frames read it from a to its end, `speed` source frames per output frame
-        const auto played = std::max (1L, (long) std::floor ((double) (length - 1) / speed) + 1);
-        const auto period = 2 * played;
+        // the piece at its own speed lasts `own` output frames (resampled: read from a to its end, `speed` source frames
+        // per output frame)
+        const auto own = speed == 1.0 ? length : std::max (1L, (long) std::floor ((double) (length - 1) / speed) + 1);
+        const auto fills = o1 - o0 > own;
+        const auto fadeIn = loopMode != 0 || previousCut;
+        previousCut = ! fills;
         for (long i = 0; i < span; ++i)
         {
-            const auto m = i % period;
-            auto w = weight (k, i, o1 - o0);
-            double t;
-            if (loopMode == 2)
-                t = (double) (m < played ? m : period - 1 - m) * speed;
-            else if (loopMode == 1)
-                t = (double) (i % played) * speed;
-            else
-            {
-                if (i >= played)
-                    break; // (Loop Off: the piece read once; its last frames are held at the piece's edge, so a short fade)
-                t = (double) i * speed;
-                if (i >= played - std::min (played, fade))
-                    w *= (float) (played - i) / (float) std::min (played, fade);
-            }
-            if (envelope < 100.0f)
-                w *= stretchdetail::beatsEnvelopeGain (envelope, i, o1 - o0);
-            const auto at = (long) t;
-            const auto f = (float) (t - (double) at);
+            const auto r = readOf (i, own, fills);
+            if (r.stop)
+                break;
+            auto w = (fadeIn ? weight (k, i, o1 - o0) : (i >= o1 - o0 ? 1.0f - (float) (i - o1 + o0) / (float) fade : 1.0f)) * r.gain;
             for (std::size_t c = 0; c < in.ch.size(); ++c)
-                out.ch[c][(std::size_t) (o0 + i)] += w * cubicAt (in.ch[c], a, length, at, f);
+            {
+                const auto sample = [&] (double pos) {
+                    if (speed == 1.0)
+                        return in.ch[c][(std::size_t) std::min (n - 1, a + (long) pos)];
+                    const auto t = pos * speed;
+                    const auto at = (long) t;
+                    return cubicAt (in.ch[c], a, length, at, (float) (t - (double) at));
+                };
+                auto v = sample (r.pos);
+                if (r.pos2 >= 0.0)
+                    v = r.mix * v + (1.0f - r.mix) * sample (r.pos2);
+                out.ch[c][(std::size_t) (o0 + i)] += w * v;
+            }
         }
     }
     return out;
@@ -454,7 +485,8 @@ std::vector<long> beatsCuts (const float* mono, long n, double sampleRate)
                 if (const auto rise = rms (k + w) - rms (k); rise > steepest)
                 {
                     steepest = rise;
-                    c = k;
+                    c = k + w; // (round 190gx: the start of the steepest window, i.e. the attack itself — Live cuts the drum
+                               // loop's hits on their onsets; the window before it put LYNX's cuts 10 ms early)
                 }
         }
         std::sort (cuts.begin(), cuts.end());
@@ -619,14 +651,22 @@ std::vector<long> gridCuts (long frames, long outFrames, double sourceBeats, dou
     return cuts;
 }
 
-float beatsEnvelopeGain (float envelope, long i, long span) noexcept
+float beatsEnvelopeGain (float envelope, long sinceEnd, double sampleRate) noexcept
 {
-    const auto e = std::clamp ((double) envelope / 100.0, 0.0, 1.0);
-    if (e >= 1.0 || span <= 0)
+    const auto e = std::clamp ((double) envelope, 0.0, 100.0);
+    if (e >= 100.0 || sinceEnd <= 0 || ! (sampleRate > 0.0))
         return 1.0f;
-    const auto k = 4.0 * (1.0 - e) / std::max (e, 0.02);
-    const auto x = std::clamp (1.0 - (double) i / (double) span, 0.0, 1.0);
-    return (float) std::pow (x, k);
+    const auto tau = beatsEnvelopeSeconds (envelope);
+    return (float) std::exp (-(double) sinceEnd / (tau * sampleRate));
+}
+
+double beatsEnvelopeSeconds (float envelope) noexcept
+{
+    // Live 12.4 (W1 renders, 190gx): 0 → 15.5 ms (0.560 dB/ms), 50 → 98.0 ms (0.0886 dB/ms), the same on every piece of
+    // the drum loop and the voice whatever the gap's length; between them and up to 100 a geometric law (the knob's
+    // time mapping is an assumption: only 0 and 50 were rendered), 100 = no decay
+    const auto e = std::clamp ((double) envelope, 0.0, 100.0);
+    return 0.0155 * std::pow (0.0980 / 0.0155, e / 50.0);
 }
 
 std::shared_ptr<SampleData> stretchWith (const SampleData& in, double ratio, const Preset& preset)

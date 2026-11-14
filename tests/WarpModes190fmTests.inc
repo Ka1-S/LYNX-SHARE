@@ -122,16 +122,17 @@ TEST (warp190fm_beats_loop_modes_and_envelope)
     // Loop Off: nothing after the piece's end (its fade into the following audio aside)
     CHECK (gapEnergy (*backForth) > 1.0);
     CHECK (gapEnergy (*silent) < 1e-9);
-    // Loop Forward: the gap plays the piece again from its start
+    // Loop Forward: the gap plays the piece's second half again (round 190gx: Live loops from the middle of the piece up
+    // to 20 ms before its end; WarpLive190gxTests)
+    const auto turn = length - (long) std::lround (in.sampleRate * lynx::stretchdetail::beatsTurnSeconds);
+    const auto xf = (long) std::lround (in.sampleRate * 0.005);
     double err = 0.0;
-    for (long j = 0; j < length / 4; ++j)
-        err = std::max (err, (double) std::abs (forward->left[(std::size_t) (o0 + length + j)] - in.left[(std::size_t) (a + j)]));
+    for (long j = xf; j < length / 4; ++j)
+        err = std::max (err, (double) std::abs (forward->left[(std::size_t) (o0 + turn + j)] - in.left[(std::size_t) (a + turn / 2 + j)]));
     CHECK (err < 1e-6);
-    // Transient Envelope 0: each piece dies away quickly; the law at a few points
+    // Transient Envelope 0: each piece's fill dies away quickly (the law: WarpLive190gxTests)
     CHECK (gapEnergy (*faded) < 0.05 * gapEnergy (*backForth));
-    CHECK (lynx::stretchdetail::beatsEnvelopeGain (100.0f, 500, 1000) == 1.0f);
-    CHECK (std::abs (lynx::stretchdetail::beatsEnvelopeGain (50.0f, 500, 1000) - 0.0625f) < 1e-6f);
-    CHECK (lynx::stretchdetail::beatsEnvelopeGain (0.0f, 1000, 1000) == 0.0f);
+    CHECK (lynx::stretchdetail::beatsEnvelopeGain (100.0f, 500, 44100.0) == 1.0f);
     CHECK (lynx::stretchOptionsKey (off, lynx::StretchMethod::beats) == "|bl0");
     CHECK (lynx::stretchOptionsKey (env, lynx::StretchMethod::beats) == "|be0");
     // transposed Beats honours them too (each piece read faster, then silence)
