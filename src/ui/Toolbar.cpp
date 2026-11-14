@@ -3,10 +3,12 @@
 #include <juce_dsp/juce_dsp.h>
 
 #include "core/Timecode.h"
+#include "core/TempoMap.h"
 #include "ui/FrameTicker.h"
 #include "ui/HintBar.h"
 #include "ui/I18n.h"
 #include "ui/Icons.h"
+#include "ui/PaintAB.h"
 #include "ui/Theme.h"
 
 namespace lynx::toolbar
@@ -176,6 +178,37 @@ ui::Hint SongPositionBar::hintAt (juce::Point<int>)
 
 // --- time display --------------------------------------------------------------------------------
 
+namespace
+{
+// Round 190gr: Song::secondsForTicks sums the song's tempo from tick 0 at every call (with a tempo automation: one tempo
+// lookup, a walk over the clips, per 16th), and the time display asks for it at every timer tick and paint while the song
+// plays. The sum of the whole 16ths is kept and continued from where it stopped: the same additions in the same order,
+// so the same seconds to the last bit. Message thread.
+double secondsForTicksCached (const Song& song, std::uint64_t stamp, std::int64_t ticks)
+{
+    if (! tempomap::active (song) || ! ui::paintCache())
+        return song.secondsForTicks (ticks);
+    struct Sum
+    {
+        std::uint64_t stamp = 0;
+        double bpm = 0.0;
+        int mode = -1, pattern = -1;
+        std::int64_t whole = 0; // ticks summed (whole 16ths)
+        double seconds = 0.0;
+    };
+    static Sum sum;
+    if (sum.stamp != stamp || sum.bpm != song.bpm || sum.mode != (int) song.mode || sum.pattern != song.currentPattern || ticks < sum.whole)
+        sum = { stamp, song.bpm, (int) song.mode, song.currentPattern, 0, 0.0 };
+    constexpr std::int64_t step = ticksPerStep;
+    for (; sum.whole + step <= ticks; sum.whole += step)
+        sum.seconds += (double) step * 60.0 / (std::max (1.0, song.tempoAt ((double) sum.whole)) * ppq);
+    auto seconds = sum.seconds;
+    if (const auto rest = ticks - sum.whole; rest > 0)
+        seconds += (double) rest * 60.0 / (std::max (1.0, song.tempoAt ((double) sum.whole)) * ppq);
+    return seconds;
+}
+} // namespace
+
 juce::String TimeDisplay::text() const
 {
     const auto& song = engine.getSong();
@@ -184,7 +217,7 @@ juce::String TimeDisplay::text() const
     if (mode == Mode::bars)
         return barBeatStep (song, ticks, engine.getTransport().beatsPerBar.load());
 
-    const auto seconds = song.secondsForTicks ((std::int64_t) ticks);
+    const auto seconds = secondsForTicksCached (song, engine.getSongStamp(), (std::int64_t) ticks);
     if (mode == Mode::smpte)
         return juce::String (timecode::format (seconds, smpteRate));
     const auto whole = (int) seconds;
