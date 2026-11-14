@@ -251,7 +251,16 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
     for (int k = 0; k < 3; ++k)
         if (! writeSample (folder.getChildFile ("parity-" + juce::String (k) + ".wav"), k))
             return "ERROR can't write the test samples in " + folder.getFullPathName();
-    const auto song = paritySong (folder);
+    auto song = paritySong (folder);
+    // (diagnosis: LYNX_EXPORTPARITY_CHANNELS="0,2" plays only those channels; LYNX_EXPORTPARITY_NOAUTO=1 drops the automation)
+    if (const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_EXPORTPARITY_CHANNELS", {}); only.isNotEmpty())
+        for (int c = 0; c < (int) song.channels.size(); ++c)
+            song.channels[(std::size_t) c].muted = ! juce::StringArray::fromTokens (only, ",", {}).contains (juce::String (c));
+    if (juce::SystemStats::getEnvironmentVariable ("LYNX_EXPORTPARITY_NOAUTO", {}) == "1")
+    {
+        song.automations.clear();
+        song.playlist.pop_back();
+    }
     const auto options = parityOptions();
     juce::StringArray errors, notes;
 

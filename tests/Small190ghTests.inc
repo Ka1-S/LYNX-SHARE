@@ -3,6 +3,7 @@
 
 #include "core/AudioCheck.h"
 #include "core/ExportOptions.h"
+#include "core/LiveInput.h"
 #include "core/UpdateCheck.h"
 
 namespace gh190
@@ -411,4 +412,51 @@ TEST (small190gh_inserts_fed_only_by_extra_outputs_get_a_stem)
     // "Process inactive inputs and outputs" on: the inactive output plays on insert 7 too
     s.channels[s.channels.size() - 2].plugin.processInactive = true;
     CHECK ((exportopts::stemTracks (s) == std::vector<int> { 1, 5, 6, 7, 8, 9, 10 }));
+}
+
+TEST (small190gh_a_song_played_on_past_its_end_keeps_its_automation_as_an_export_tail)
+{
+    // a real-time bounce (or a linear recording) plays on past the song's end: the automation holds its last values, as
+    // the export's tail does (an empty clip after the music), instead of starting over from the song's start
+    using namespace lynx;
+    const auto s = gh190::song();
+    auto withTail = s;
+    withTail.patterns.emplace_back().name = "(tail)";
+    Clip tail;
+    tail.pattern = (int) withTail.patterns.size() - 1;
+    tail.start = 8 * ppq;
+    tail.length = 8 * ppq;
+    withTail.playlist.push_back (tail);
+    const auto end = (int) std::llround (s.secondsForTicks (8 * ppq) * 48000.0);
+    const auto total = end + 48000;
+    auto render = [total] (const Song& song, bool linear) {
+        const double rate = 48000.0;
+        RackRenderer r;
+        r.prepare (rate, 2048);
+        r.setTransportOptions (true, false, 0);
+        LiveInput li;
+        li.linearSong.store (linear);
+        r.setLiveInput (&li);
+        auto st = RackState::build (song, nullptr, rate, gh190::sample);
+        std::vector<float> l ((std::size_t) total), rr ((std::size_t) total);
+        const auto tps = ticksPerSample (song.bpm, rate);
+        double tick = 0.0;
+        for (int done = 0; done < total; done += 441)
+        {
+            const auto n = std::min (441, total - done);
+            r.process (st.get(), true, tick, n, l.data() + done, rr.data() + done);
+            tick += n * tps;
+        }
+        r.setLiveInput (nullptr);
+        return l;
+    };
+    const auto exported = render (withTail, false);
+    const auto linear = render (s, true);
+    const auto wrapped = render (s, false);
+    CHECK (gh190::maxDifference (exported, linear) < 3.16e-5f);
+    // (without the linear flag the automation starts over at the end: the tail differs)
+    float after = 0.0f;
+    for (int i = end; i < total; ++i)
+        after = std::max (after, std::abs (exported[(std::size_t) i] - wrapped[(std::size_t) i]));
+    CHECK (after > 1.0e-3f);
 }

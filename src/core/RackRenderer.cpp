@@ -2377,6 +2377,19 @@ void RackRenderer::clearOverriddenValues() noexcept
                     automationValues[w * 32 + b] = std::numeric_limits<float>::quiet_NaN(); // the control's own value
 }
 
+// Round 190gh (B7): where the song is for its automation and tempo: within the song (the transport wraps at its end),
+// except while it plays on past its end (a real-time bounce, a linear recording: liveInput's linearSong), where the
+// values hold as the song ended them — as an export's tail does — instead of starting over from the song's start.
+namespace
+{
+double linearSongTick (const LiveInput* liveInput, double startTick, double length) noexcept
+{
+    if (liveInput != nullptr && liveInput->linearSong.load (std::memory_order_relaxed))
+        return std::max (0.0, startTick);
+    return std::fmod (std::max (0.0, startTick), length);
+}
+} // namespace
+
 void RackRenderer::updateAutomation (const RackState& state, double startTick) noexcept
 {
     const auto& song = state.song;
@@ -2418,7 +2431,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
         else
         {
             const auto length = (double) std::max<std::int64_t> (1, state.schedule.songLength);
-            const auto tick = std::fmod (std::max (0.0, startTick), length);
+            const auto tick = linearSongTick (liveInput, startTick, length);
 
             // inside a clip of the pattern: its events; after one: the value it ended with; before the first:
             // no value (the target's own). Depends only on the position, like automation clips.
@@ -2457,7 +2470,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     }
 
     const auto length = (double) std::max<std::int64_t> (1, state.schedule.songLength);
-    const auto tick = std::fmod (std::max (0.0, startTick), length);
+    const auto tick = linearSongTick (liveInput, startTick, length);
 
     for (std::size_t a = 0; a < state.automationClips.size(); ++a)
         if (! state.automationClips[a].empty() && state.automationFollowers[a] == 0)
@@ -3539,7 +3552,7 @@ void RackRenderer::process (const RackState* state,
     {
         const auto songMode = state->song.mode == PlayMode::song;
         const auto length = (double) std::max<std::int64_t> (1, state->schedule.songLength);
-        bpm = tempomap::tempoAt (state->song, songMode ? std::fmod (std::max (0.0, startTick), length) : std::max (0.0, startTick));
+        bpm = tempomap::tempoAt (state->song, songMode ? linearSongTick (liveInput, startTick, length) : std::max (0.0, startTick));
     }
 
     const auto tps = ticksPerSample (bpm, sampleRate);
