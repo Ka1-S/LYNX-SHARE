@@ -1974,11 +1974,13 @@ void PlaylistComponent::paint (juce::Graphics& g)
 
                 const auto led = trackLed (t).toFloat();
                 auto textRight = led.getX() - 2.0f;
-                if (simpleHeaders)
+                if (simpleHeaders || simpleInsert (t) > 0)
                 {
                     // the Simple headers (round 184a): M and S buttons on the track's insert, a colour bar, and on tall
-                    // rows the insert's volume, pan and effects
-                    if (trackColour != 0)
+                    // rows the insert's volume, pan and effects. Round 190gz: a linked track's header (FL's layout, the
+                    // project's "Link Playlist tracks to mixer tracks") has the same M, S, volume and pan, no colour bar
+                    // (FL tints the plate) and no "+FX"; its M is lit by the Playlist track's own mute too
+                    if (simpleHeaders && trackColour != 0)
                     {
                         g.setColour (juce::Colour (trackColour));
                         g.fillRoundedRectangle (plateArea.withWidth (4.0f).reduced (0.0f, 2.0f).translated (isTrackSelected (t) ? 4.0f : 0.0f, 0.0f), 1.5f);
@@ -1992,7 +1994,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                         g.setFont (font (type::caption, true));
                         g.drawText (text, r, juce::Justification::centred, false);
                     };
-                    button (led, "M", m != nullptr ? m->muted : muted, colour::warning, hovered && hover.led);
+                    button (led, "M", m != nullptr ? (m->muted || (! simpleHeaders && muted)) : muted, colour::warning, hovered && hover.led);
                     if (const auto solo = trackSolo (t).toFloat(); ! solo.isEmpty() && m != nullptr)
                     {
                         button (solo, "S", m->solo, colour::info, hovered && hover.solo);
@@ -2009,23 +2011,27 @@ void PlaylistComponent::paint (juce::Graphics& g)
                         g.fillRect (bar.getX() + bar.getWidth() * unityFader - 0.5f, bar.getY(), 1.0f, bar.getHeight());
                         // pan: a small knob, its arc from the top
                         const auto pan = trackPan (t).toFloat();
+                        const auto knob = pan.getWidth() * 0.5f - 1.0f; // (7 px on the Simple headers, 6 on the linked ones)
                         g.setColour (colour::bg4);
                         g.fillEllipse (pan.reduced (1.0f));
                         juce::Path arc;
                         const auto angle = m->pan * 2.356f;
-                        arc.addCentredArc (pan.getCentreX(), pan.getCentreY(), 7.0f, 7.0f, 0.0f, juce::jmin (0.0f, angle), juce::jmax (0.0f, angle), true);
+                        arc.addCentredArc (pan.getCentreX(), pan.getCentreY(), knob, knob, 0.0f, juce::jmin (0.0f, angle), juce::jmax (0.0f, angle), true);
                         g.setColour ((hovered && hover.pan) || (levelDrag == 2 && levelInsert == insert) ? colour::accentHover : colour::info);
                         g.strokePath (arc, juce::PathStrokeType (2.0f));
                         g.setColour (colour::textPrimary);
-                        g.drawLine (pan.getCentreX(), pan.getCentreY(), pan.getCentreX() + 6.0f * std::sin (angle), pan.getCentreY() - 6.0f * std::cos (angle), 1.4f);
+                        g.drawLine (pan.getCentreX(), pan.getCentreY(), pan.getCentreX() + (knob - 1.0f) * std::sin (angle),
+                                    pan.getCentreY() - (knob - 1.0f) * std::cos (angle), 1.4f);
                         // "+FX", with the insert's effect count
-                        const auto fx = trackFx (t).toFloat();
-                        const auto count = (int) m->effects.size();
-                        g.setColour (hovered && hover.fx ? colour::bg6 : colour::bg4);
-                        g.fillRoundedRectangle (fx, radius::sm);
-                        g.setColour (count > 0 ? colour::accent : colour::textSecondary);
-                        g.setFont (font (type::caption, true));
-                        g.drawText (count > 0 ? "FX " + juce::String (count) : juce::String ("+ FX"), fx, juce::Justification::centred, false);
+                        if (const auto fx = trackFx (t).toFloat(); ! fx.isEmpty())
+                        {
+                            const auto count = (int) m->effects.size();
+                            g.setColour (hovered && hover.fx ? colour::bg6 : colour::bg4);
+                            g.fillRoundedRectangle (fx, radius::sm);
+                            g.setColour (count > 0 ? colour::accent : colour::textSecondary);
+                            g.setFont (font (type::caption, true));
+                            g.drawText (count > 0 ? "FX " + juce::String (count) : juce::String ("+ FX"), fx, juce::Justification::centred, false);
+                        }
                     }
                 }
                 else
@@ -2119,7 +2125,7 @@ void PlaylistComponent::paint (juce::Graphics& g)
                 // the track's icon before its name, as FL's track header shows it (round 168h)
                 auto textLeft = (int) left + (simpleHeaders ? 12 : 6);
                 // the Simple headers: the name in the first row, beside the buttons
-                const auto nameHeight = simpleHeaders && ! trackVolume (t).isEmpty() ? juce::jmin (trackHeight, (int) led.getBottom() - y + 4) : trackHeight;
+                const auto nameHeight = ! trackVolume (t).isEmpty() ? juce::jmin (trackHeight, (int) led.getBottom() - y + 4) : trackHeight;
 
                 // round 177b: the lanes' fold arrow (points down while they show) and, on hover, "+A" (add a lane)
                 if (const auto laneArrow = trackLaneArrow (t); ! laneArrow.isEmpty())
@@ -2903,7 +2909,7 @@ juce::Rectangle<int> PlaylistComponent::trackLaneArrow (int track) const
     const auto member = noteedit::groupHeaderOf (song, track) >= 0 && ! noteedit::isGroupHeader (song, track);
     const auto left = member ? groupIndent : 2;
     // (the Simple headers: in the first row, beside the M and S buttons, clear of the volume row)
-    const auto centreY = simpleHeaders ? trackLed (track).getCentreY() : trackToY (track) + heightOf (track) / 2;
+    const auto centreY = simpleHeaders || ! trackVolume (track).isEmpty() ? trackLed (track).getCentreY() : trackToY (track) + heightOf (track) / 2;
     return { left + 4, centreY - 6, 12, 12 };
 }
 
@@ -4138,10 +4144,17 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             repaint (0, headerHeight, headerWidth, getHeight() - headerHeight);
             return;
         }
-        // the Simple headers (round 184a): M, S, volume, pan and "+FX" act on the track's mixer insert
-        if (const auto insert = simpleInsert (track); insert > 0 && ! flmods::popup (e.mods))
+        // the Simple headers (round 184a), and the linked ones (round 190gz): M, S, volume, pan and "+FX" act on the
+        // track's mixer insert
+        if (const auto insert = simpleInsert (track); insert > 0 && ! flmods::popup (e.mods) && ! (! simpleHeaders && onLed && flmods::ctrl (e.mods)))
         {
             const auto p = e.getPosition();
+            if (onLed && ! simpleHeaders && engine.getSong().isTrackMuted (track))
+            {
+                // a linked header's M is lit by a muted Playlist track too (FL's LED): the first click unmutes the track
+                editTrack (track, [] (PlaylistTrack& t) { t.muted = false; });
+                return;
+            }
             if (onLed || trackSolo (track).contains (p))
             {
                 const auto solo = ! onLed;
@@ -4158,6 +4171,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
             {
                 levelDrag = trackPan (track).expanded (2).contains (p) ? 2 : 1;
                 levelInsert = insert;
+                levelWidth = trackVolume (track).getWidth();
                 const auto& m = engine.getSong().mixer[(std::size_t) insert];
                 levelStart = levelDrag == 2 ? m.pan : m.volume;
                 if (levelDrag == 1) // a click on the bar sets the level there
@@ -4848,7 +4862,7 @@ void PlaylistComponent::mouseDrag (const juce::MouseEvent& e)
         const auto insert = levelInsert;
         if (levelDrag == 1)
         {
-            const auto v = juce::jlimit (0.0f, 1.0f, levelStart + fine * (float) e.getDistanceFromDragStartX() / (float) juce::jmax (40, headerWidth - 122));
+            const auto v = juce::jlimit (0.0f, 1.0f, levelStart + fine * (float) e.getDistanceFromDragStartX() / (float) juce::jmax (40, levelWidth));
             engine.editLevels ([insert, v] (Song& s) { s.mixer[(std::size_t) insert].volume = v; });
         }
         else
@@ -6194,6 +6208,8 @@ juce::PopupMenu PlaylistComponent::editMenu()
     m.addItem (tr ("Reverse selected audio clips") + key ("playlist.reverseClips"), [this] { runAction ("playlist.reverseClips"); });
     m.addSeparator();
     m.addItem (tr ("Automatic crossfades (current project)"), true, song.autoCrossfades, [this] { runAction ("playlist.autoCrossfades"); });
+    m.addItem (tr ("Link Playlist tracks to mixer tracks (current project)") + key ("playlist.linkTracks"), true, song.linkTracksToMixer,
+               [this] { runAction ("playlist.linkTracks"); }); // round 190gz (issue #170), LYNX extra
     m.addItem (tr ("Create new clips with manual fades") + key ("playlist.manualFades"), true, EditorGlobals::get().manualFades,
                [this] { runAction ("playlist.manualFades"); });
     m.addItem (tr ("Snap fade handles") + key ("playlist.snapFadeHandles"), true, EditorGlobals::get().snapFadeHandles,
@@ -6238,39 +6254,67 @@ juce::Rectangle<int> PlaylistComponent::trackLed (int track) const
     const auto h = heightOf (track);
     if (simpleHeaders) // the M button, in the first row (round 184a)
         return { headerWidth - 28 - meterColumn, trackToY (track) + juce::jmin (5, juce::jmax (0, h / 2 - 8)), 22, juce::jmin (15, h - 2) };
+    if (simpleInsert (track) > 0) // a linked header's M button (round 190gz): the first row, or centred on a short row
+        return { headerWidth - 22 - meterColumn, trackToY (track) + (h >= linkedTwoRows ? 4 : juce::jmax (1, (h - 14) / 2)), 18, juce::jmin (14, h - 2) };
     return { headerWidth - 17 - meterColumn, trackToY (track) + h / 2 - 6, 12, 12 };
 }
 
 int PlaylistComponent::simpleInsert (int track) const
 {
-    return simpleHeaders ? simpletracks::insertOf (engine.getSong(), track) : -1;
+    if (simpleHeaders)
+        return simpletracks::insertOf (engine.getSong(), track);
+    // round 190gz: a linked track's header acts on the same insert (an audio track's, an instrument track's channel's)
+    return linkedHeaders() ? simpletracks::insertOf (engine.getSong(), track) : -1;
+}
+
+bool PlaylistComponent::linkedHeaders() const
+{
+    return ! simpleHeaders && engine.getSong().linkTracksToMixer;
+}
+
+void PlaylistComponent::updateHeaderWidth()
+{
+    const auto width = simpleHeaders ? simpleHeaderWidth : linkedHeaders() ? linkedHeaderWidth : flHeaderWidth;
+    if (width == headerWidth)
+        return;
+    headerWidth = width;
+    hover = {};
+    resized();
+    repaint();
 }
 
 juce::Rectangle<int> PlaylistComponent::trackSolo (int track) const
 {
     if (simpleInsert (track) < 0 || noteedit::isFoldedAway (engine.getSong(), track))
         return {};
-    return trackLed (track).translated (-25, 0);
+    return trackLed (track).translated (simpleHeaders ? -25 : -20, 0);
 }
 
 juce::Rectangle<int> PlaylistComponent::trackVolume (int track) const
 {
     const auto h = heightOf (track);
-    if (simpleInsert (track) < 0 || h < simpleTwoRows || noteedit::isFoldedAway (engine.getSong(), track))
+    if (simpleInsert (track) < 0 || h < (simpleHeaders ? simpleTwoRows : linkedTwoRows) || noteedit::isFoldedAway (engine.getSong(), track))
         return {};
-    return { 12, trackToY (track) + h - 20, headerWidth - 122, 12 };
+    if (simpleHeaders)
+        return { 12, trackToY (track) + h - 20, headerWidth - 122, 12 };
+    // a linked header (round 190gz): the bar under the first row, the pan knob at its right (Logic / Bitwig's compact row)
+    const auto& song = engine.getSong();
+    const auto left = noteedit::groupHeaderOf (song, track) >= 0 && ! noteedit::isGroupHeader (song, track) ? groupIndent : 2;
+    return { left + 6, trackToY (track) + 20, headerWidth - meterColumn - left - 32, 12 };
 }
 
 juce::Rectangle<int> PlaylistComponent::trackPan (int track) const
 {
     const auto v = trackVolume (track);
-    return v.isEmpty() ? juce::Rectangle<int>() : juce::Rectangle<int> (v.getRight() + 10, v.getCentreY() - 8, 16, 16);
+    if (v.isEmpty())
+        return {};
+    return simpleHeaders ? juce::Rectangle<int> (v.getRight() + 10, v.getCentreY() - 8, 16, 16) : juce::Rectangle<int> (v.getRight() + 6, v.getCentreY() - 7, 14, 14);
 }
 
 juce::Rectangle<int> PlaylistComponent::trackFx (int track) const
 {
     const auto v = trackVolume (track);
-    return v.isEmpty() ? juce::Rectangle<int>() : juce::Rectangle<int> (v.getRight() + 34, v.getCentreY() - 8, 44, 16);
+    return v.isEmpty() || ! simpleHeaders ? juce::Rectangle<int>() : juce::Rectangle<int> (v.getRight() + 34, v.getCentreY() - 8, 44, 16);
 }
 
 void PlaylistComponent::setSimpleHeaders (bool on)
@@ -6278,10 +6322,9 @@ void PlaylistComponent::setSimpleHeaders (bool on)
     if (on == simpleHeaders)
         return;
     simpleHeaders = on;
-    headerWidth = on ? simpleHeaderWidth : flHeaderWidth;
     hover = {};
-    resized();
-    repaint();
+    headerWidth = -1; // (always laid out again)
+    updateHeaderWidth();
 }
 
 void PlaylistComponent::selectTrackChannel (int track)
@@ -6365,7 +6408,7 @@ juce::Rectangle<int> PlaylistComponent::trackArm (int track) const
     const auto arrow = trackArrow (track);
     const auto solo = trackSolo (track);
     const auto led = solo.isEmpty() ? trackLed (track) : solo;
-    if (simpleHeaders)
+    if (simpleHeaders || simpleInsert (track) > 0) // (the Simple and the linked headers: beside the S button)
         return { (arrow.isEmpty() ? led.getX() : arrow.getX()) - 17, led.getY() + (led.getHeight() - 12) / 2, 12, 12 };
     return { (arrow.isEmpty() ? led.getX() : arrow.getX()) - 15, led.getY(), 12, 12 };
 }
@@ -6620,6 +6663,10 @@ juce::PopupMenu PlaylistComponent::buildTrackMenu (int track)
         quickpick::addGeneratorMenu (instruments, engine, [this, track] (ChannelDef c) { instrumentForTrack (track, std::move (c)); }, nullptr, nullptr, this);
         quickpick::addFolderViewItems (instruments, engine);
         modes.addSubMenu (theme::mnemonic (tr ("Instrument track"), 'I'), instruments, true, nullptr, info.mode == PlaylistTrackMode::instrument);
+        // LYNX extra (round 190gz, issue #170): the project's switch, where track modes are picked
+        modes.addSeparator();
+        modes.addItem (tr ("Link Playlist tracks to mixer tracks (current project)"), true, song.linkTracksToMixer,
+                       [this] { runAction ("playlist.linkTracks"); });
         menu.addSubMenu (theme::mnemonic (tr ("Track mode"), 'T'), modes);
     }
     {
@@ -7143,6 +7190,9 @@ void PlaylistComponent::showRulerMenu (int x)
         menu.addItem (tr ("Reverse selected audio clips") + "\t9", anyAudio, false, [this] { runAction ("playlist.reverseClips"); });
     }
     menu.addItem (tr ("Automatic crossfades (current project)"), true, engine.getSong().autoCrossfades, [this] { runAction ("playlist.autoCrossfades"); });
+    // LYNX extra (round 190gz, issue #170)
+    menu.addItem (tr ("Link Playlist tracks to mixer tracks (current project)"), true, engine.getSong().linkTracksToMixer,
+                  [this] { runAction ("playlist.linkTracks"); });
     // FL's legacy Pattern Blocks (round 170f)
     menu.addItem (tr ("Pattern blocks (current project)"), true, engine.getSong().patternBlocksOn, [this] { runAction ("playlist.patternBlocks"); });
     menu.addItem (tr ("Turn pattern blocks into clips"), ! engine.getSong().blocks.empty(), false, [this] { runAction ("playlist.blocksToClips"); });
@@ -8534,6 +8584,7 @@ bool PlaylistComponent::runAction (const std::string& id)
     else if (is ("playlist.rippleDelete")) rippleDeleteSelection();
     else if (is ("playlist.ripple")) setRipple (! ripple);
     else if (is ("playlist.autoCrossfades")) engine.editSong ([] (Song& s) { s.autoCrossfades = ! s.autoCrossfades; });
+    else if (is ("playlist.linkTracks")) engine.editSong ([] (Song& s) { autolink::setOn (s, ! s.linkTracksToMixer); }); // round 190gz
     else if (is ("playlist.patternBlocks")) togglePatternBlocks();
     else if (is ("playlist.automationLanes")) toggleAutomationLanes();
     else if (is ("playlist.blocksToClips")) turnBlocksIntoClips();
@@ -9549,7 +9600,7 @@ PlaylistComponent::Hover PlaylistComponent::hoverAt (juce::Point<int> p) const
         h.arrow = ! folded && h.divider < 0 && trackArrow (h.track).contains (p);
         h.arm = ! folded && h.divider < 0 && trackArm (h.track).expanded (2).contains (p);
         h.input = ! folded && h.divider < 0 && trackInput (h.track).expanded (2).contains (p);
-        if (simpleHeaders && ! folded && h.divider < 0)
+        if ((simpleHeaders || simpleInsert (h.track) > 0) && ! folded && h.divider < 0) // (round 190gz: linked headers too)
         {
             h.solo = trackSolo (h.track).contains (p);
             h.volume = trackVolume (h.track).expanded (0, 4).contains (p);
@@ -9716,7 +9767,8 @@ ui::Hint PlaylistComponent::hintAt (juce::Point<int> p)
     {
         // the Simple headers (round 184a): their controls are the track's mixer track's
         const auto& m = song.mixer[(std::size_t) simpleInsert (h.track)];
-        hint.text = h.led      ? tr ("Track: [LMB] mute / unmute its mixer track")
+        hint.text = h.led      ? (simpleHeaders ? tr ("Track: [LMB] mute / unmute its mixer track")
+                                            : tr ("Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track"))
                     : h.solo   ? tr ("Track: [LMB] solo its mixer track")
                     : h.volume ? tr ("Track volume: [LMB] click or drag  [Shift] fine  [2xLMB] 0 dB")
                     : h.pan    ? tr ("Track pan: [LMB] drag up / down  [Shift] fine  [2xLMB] centre")
@@ -9831,15 +9883,26 @@ void PlaylistComponent::mouseDoubleClick (const juce::MouseEvent& e)
             return;
         if (const auto insert = simpleInsert (track); insert > 0)
         {
-            // the Simple headers: a double-click resets the volume (to 0 dB) or the pan (centre); on the name it renames
+            // the Simple headers: a double-click resets the volume (to 0 dB) or the pan (centre); on the name it renames.
+            // The linked headers (round 190gz): the same on volume / pan; elsewhere FL's double-click
             const auto p = e.getPosition();
             if (trackVolume (track).expanded (0, 4).contains (p))
+            {
                 engine.editSong ([insert] (Song& s) { s.mixer[(std::size_t) insert].volume = unityFader; });
-            else if (trackPan (track).expanded (2).contains (p))
+                return;
+            }
+            if (trackPan (track).expanded (2).contains (p))
+            {
                 engine.editSong ([insert] (Song& s) { s.mixer[(std::size_t) insert].pan = 0.0f; });
-            else if (! trackSolo (track).contains (p) && ! trackFx (track).contains (p))
+                return;
+            }
+            if (trackSolo (track).contains (p) || trackFx (track).contains (p))
+                return;
+            if (simpleHeaders)
+            {
                 renameTrack (track);
-            return;
+                return;
+            }
         }
 
         const auto& playlist = engine.getSong().playlist;
@@ -10253,6 +10316,7 @@ void PlaylistComponent::changeListenerCallback (juce::ChangeBroadcaster* source)
     followButton.setToggleState (EditorGlobals::get().isFollowing (false), juce::dontSendNotification);
     refreshArrangementBox();
     refreshTrackLayout();
+    updateHeaderWidth(); // round 190gz: the project's "Link Playlist tracks to mixer tracks" (menu, undo, another project)
     if (engine.getSong().patternBlocksOn != blocksShown) // Pattern Blocks turned on / off (menu, undo, another project)
         resized();
     if (videoSectionHeight() != videoLanes->getHeight()) // video tracks added / removed / resized (round 174d)

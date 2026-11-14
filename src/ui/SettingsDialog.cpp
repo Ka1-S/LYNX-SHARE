@@ -5,6 +5,7 @@
 
 #include "core/ClipOps.h"
 #include "core/MissingFiles.h"
+#include "core/PlaylistOps.h"
 #include "engine/PluginHost.h"
 #include "ui/I18n.h"
 #include "ui/MissingFilesDialog.h"
@@ -98,6 +99,21 @@ public:
         crossfadesNew.setEnabled (hooks.getGeneral != nullptr);
         crossfadesNew.setToggleState (hooks.getGeneral != nullptr ? hooks.getGeneral().crossfadesInNewProjects : true, juce::dontSendNotification);
         add (crossfadesNew);
+        // LYNX extra (round 190gz, issue #170): Playlist tracks linked to mixer tracks, for this project and new ones
+        linkTracks.setButtonText (tr ("Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)"));
+        linkTracks.onClick = [this] { edit ([on = linkTracks.getToggleState()] (Song& s) { autolink::setOn (s, on); }); };
+        add (linkTracks);
+        linkTracksNew.setButtonText (tr ("Link Playlist tracks to mixer tracks in new projects"));
+        linkTracksNew.onClick = [this] {
+            if (hooks.getGeneral == nullptr || hooks.setGeneral == nullptr)
+                return;
+            auto o = hooks.getGeneral();
+            o.linkTracksInNewProjects = linkTracksNew.getToggleState();
+            hooks.setGeneral (o);
+        };
+        linkTracksNew.setEnabled (hooks.getGeneral != nullptr);
+        linkTracksNew.setToggleState (hooks.getGeneral != nullptr && hooks.getGeneral().linkTracksInNewProjects, juce::dontSendNotification);
+        add (linkTracksNew);
         // Comping (round 177c): the crossfade at a comp's switches, re-applied to every comp when it changes
         styleLabel (compFadeLabel, tr ("Comp crossfade"));
         add (compFadeLabel);
@@ -166,6 +182,8 @@ private:
         area.removeFromTop (6);
         crossfades.setBounds (area.removeFromTop (26));
         crossfadesNew.setBounds (area.removeFromTop (26));
+        linkTracks.setBounds (area.removeFromTop (26));
+        linkTracksNew.setBounds (area.removeFromTop (26));
         auto compRow = area.removeFromTop (26);
         compFadeLabel.setBounds (compRow.removeFromLeft (150));
         compFade.setBounds (compRow.removeFromLeft (180));
@@ -195,6 +213,7 @@ private:
         swing.setValue (s.swing * 100.0, juce::dontSendNotification);
         pitch.setValue (s.masterPitch, juce::dontSendNotification);
         crossfades.setToggleState (s.autoCrossfades, juce::dontSendNotification);
+        linkTracks.setToggleState (s.linkTracksToMixer, juce::dontSendNotification);
         compFade.setValue (s.compCrossfadeMs, juce::dontSendNotification);
         truncated.setToggleState (s.playTruncatedNotes, juce::dontSendNotification);
         fastDeclick.setToggleState (s.fastDeclick, juce::dontSendNotification);
@@ -228,7 +247,7 @@ private:
         playlistTitle { tr ("Playlist") };
     juce::Label tempoLabel, beatsLabel, swingLabel, pitchLabel, ppqText, stepsText, signatureText, panLawLabel, timeModeLabel;
     juce::Slider tempo, beats, swing, pitch;
-    juce::ToggleButton crossfades, crossfadesNew, truncated, fastDeclick;
+    juce::ToggleButton crossfades, crossfadesNew, linkTracks, linkTracksNew, truncated, fastDeclick;
     juce::Label compFadeLabel;
     juce::Slider compFade;
     juce::ComboBox panLaw, timeMode;

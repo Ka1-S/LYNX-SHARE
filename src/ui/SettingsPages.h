@@ -58,6 +58,7 @@ struct GeneralOptions
     bool backupWaitsForQuiet = true; // round 177d: a backup waits while playing and right after MIDI input too
     int backupLongestWaitMinutes = prefs::defaultBackupLongestWaitMinutes; // ...and is written anyway after this long
     bool crossfadesInNewProjects = true; // FL's "Enable automatic crossfades in new projects" (Settings › Project; round 166e)
+    bool linkTracksInNewProjects = false; // LYNX: "Link Playlist tracks to mixer tracks in new projects" (round 190gz, issue #170)
     bool pluginSandbox = false;
     bool pluginSubstitutes = true; // missing plugins play a LYNX equivalent (core/PluginSubstitutes.h)
     bool limitEditors = true; // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h; on as FL)

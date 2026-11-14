@@ -1,6 +1,7 @@
 #include "core/Templates.h"
 
 #include "core/Effects.h"
+#include "core/PlaylistOps.h"
 #include "core/SynthPresets.h"
 
 #include <algorithm>
@@ -230,7 +231,8 @@ std::string NewProjectDefaults::toText() const
 {
     const char* chain = master == MasterChain::empty ? "empty" : master == MasterChain::clipper ? "clipper" : "default";
     return "newInserts=" + std::to_string (inserts) + "\nnewMasterChain=" + chain + "\nnewCleanMixer=" + (cleanMixer ? "1" : "0")
-           + "\nplaylistTracks=" + std::to_string (playlistTracks) + "\nnewAutoCrossfades=" + (autoCrossfades ? "1" : "0") + "\n";
+           + "\nplaylistTracks=" + std::to_string (playlistTracks) + "\nnewAutoCrossfades=" + (autoCrossfades ? "1" : "0")
+           + "\nnewLinkTracks=" + (linkTracks ? "1" : "0") + "\n";
 }
 
 void NewProjectDefaults::readKey (const std::string& key, const std::string& value)
@@ -256,6 +258,8 @@ void NewProjectDefaults::readKey (const std::string& key, const std::string& val
         playlistTracks = std::clamp (number (16), 1, 500);
     else if (key == "newAutoCrossfades")
         autoCrossfades = value != "0";
+    else if (key == "newLinkTracks")
+        linkTracks = value == "1";
 }
 
 void applyNewProjectDefaults (Song& song, const NewProjectDefaults& defaults)
@@ -296,6 +300,9 @@ void applyNewProjectDefaults (Song& song, const NewProjectDefaults& defaults)
 
     song.cleanMixer = defaults.cleanMixer;
     song.autoCrossfades = defaults.autoCrossfades;
+    song.linkTracksToMixer = defaults.linkTracks; // (round 190gz: a template's tracks with clips are linked too)
+    if (defaults.linkTracks)
+        autolink::setOn (song, true);
     song.playTruncatedNotes = true; // (on in FL's Empty template and new projects)
     song.muteRunsEffects = true;    // (FL's muted insert, round 190y)
     song.patternClipTakeover = true; // (FL's pattern clip takeover, issue #158)

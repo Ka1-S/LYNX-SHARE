@@ -10201,3 +10201,10 @@ countries: br
 "On: {0} other peers" = "Ligado: {0} outros participantes"
 "session tempo {0} BPM" = "andamento da sessão {0} BPM"
 "Ableton Link by Ableton AG (GPL 2.0 or later). Every open-source component and its licence: THIRD_PARTY.md" = "Ableton Link da Ableton AG (GPL 2.0 ou posterior). Cada componente de código aberto e sua licença: THIRD_PARTY.md"
+# round 190gz: Link Playlist tracks to mixer tracks (issue #170)
+"Link Playlist tracks to mixer tracks (current project) on/off" = "Vincular faixas da Playlist às trilhas do mixer (projeto atual) liga/desliga"
+"Link Playlist tracks to mixer tracks (current project)" = "Vincular faixas da Playlist às trilhas do mixer (projeto atual)"
+"Link Playlist tracks to mixer tracks in new projects" = "Vincular faixas da Playlist às trilhas do mixer em projetos novos"
+"Link Playlist tracks to mixer tracks (Track N with insert N; mute, solo, volume and pan on linked track headers)" = "Vincular faixas da Playlist às trilhas do mixer (Faixa N com o insert N; mudo, solo, volume e pan nos cabeçalhos das faixas vinculadas)"
+"New projects start with every Playlist track that holds clips linked to a mixer track (Track N to insert N when that leaves the sound unchanged); linked track headers show mute, solo, volume and pan. Also on the Settings › Project page, with the switch for the open project." = "Projetos novos começam com cada faixa da Playlist que tem clipes vinculada a uma trilha do mixer (Faixa N ao insert N quando isso não muda o som); os cabeçalhos das faixas vinculadas mostram mudo, solo, volume e pan. Também na página Configurações › Projeto, com a opção para o projeto aberto."
+"Linked track: [LMB] mute / unmute its mixer track  [Ctrl][LMB] or [RMB] solo the Playlist track" = "Faixa vinculada: [LMB] silenciar / reativar a trilha do mixer dela  [Ctrl][LMB] ou [RMB] solo da faixa da Playlist"

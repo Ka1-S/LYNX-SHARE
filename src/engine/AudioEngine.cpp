@@ -12,6 +12,7 @@
 #include "engine/SessionPack.h"
 
 #include "core/ClipOps.h"
+#include "core/PlaylistOps.h"
 #include "core/DetailChain.h"
 #include "core/SessionOps.h"
 #include "core/MarkerPlan.h"
@@ -3271,8 +3272,12 @@ void AudioEngine::editSong (const std::function<void (Song&)>& edit, bool undoab
     const auto lengthsBefore = patternLengths (song);
     const auto auditioned = comp::auditionedTrack (song);
     const auto pluginsBefore = detachNewPluginsOn ? freshPluginCounts (song) : std::map<std::string, int>();
+    // LYNX's "Link Playlist tracks to mixer tracks" (round 190gz): what each track's clips called for before the edit
+    const auto contentBefore = song.linkTracksToMixer ? autolink::contentKinds (song) : std::vector<autolink::Plan::Kind>();
     edit (song);
     song.keepOnePattern(); // (round 190ea: what follows, and every listener, may read the current pattern)
+    if (song.linkTracksToMixer && ! contentBefore.empty()) // a track that just got its first clip (or notes) is linked
+        autolink::followNewContent (song, contentBefore);
     if (detachNewPluginsOn)
         detachNewPlugins (pluginsBefore, song);
     comp::checkAudition (song, auditioned);

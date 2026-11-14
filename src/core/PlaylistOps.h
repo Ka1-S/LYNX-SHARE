@@ -257,6 +257,54 @@ bool dropOnHeader (Song& song, int track, const std::string& path, const std::st
 // "Consolidate track(s)" moved to core/QuickRender.h (round 168e: FL's new track above, the old one grouped and muted).
 } // namespace lynx::trackmodes
 
+// LYNX extra (round 190gz, issue #170): "Link Playlist tracks to mixer tracks" (Song::linkTracksToMixer). FL keeps
+// Playlist tracks and mixer inserts apart; every other DAW pairs them. With the switch on, a Playlist track that holds
+// clips is made FL's own audio or instrument track (trackmodes), so nothing new is stored per track and an .flp export
+// stays an ordinary FL project. The rules never change how the song sounds:
+// - audio clips (with or without automation clips) whose channels all play through one insert M that no other track is
+//   linked to: an audio track linked to M; all on the Master: an audio track linked to insert N (the track's own
+//   number) when N is unused and neutral, else to the first such insert (a new one when the mixer has room), and their
+//   channels are routed there;
+// - pattern clips (with or without automation clips) of one generator channel that has no instrument track yet: its
+//   instrument track, on the channel's insert, or (channel on the Master) on insert N / the first unused neutral one;
+// - anything else (no clips, automation only, several channels' patterns, audio and patterns mixed, a route to an insert
+//   another track is linked to) stays unassigned, as in FL.
+// Tracks already linked are never changed.
+namespace lynx::autolink
+{
+// An insert that can take a track's content without changing the sound: no channel, track, send or effect uses it,
+// not reserved in an online session, and its level, pan, mute, solo, EQ, phase, routing and latency are the defaults.
+bool isNeutralFree (const Song& song, int mixer);
+// The insert content on the Master goes to for track `track`: insert track + 1 when isNeutralFree, else the first one
+// that is, else a new insert (-1 when the mixer is full; the new insert is appended to `song`).
+int insertForTrack (Song& song, int track);
+// What linking `track` would do (nothing is changed)
+struct Plan
+{
+    enum class Kind { none, audio, instrument } kind = Kind::none;
+    int mixer = -1;   // the insert it would link to (0 = the Master: a new / neutral insert is picked when it links)
+    int channel = -1; // instrument tracks: the channel
+    bool operator== (const Plan&) const = default;
+};
+Plan planFor (const Song& song, int track);
+// Links one unassigned track by its plan. True when it was linked.
+bool linkTrack (Song& song, int track);
+// What each track's clips call for, whatever its mode (tracks 0..499, all arrangements and the clip grid, one pass):
+// audio, instrument (one generator's patterns) or none.
+std::vector<Plan::Kind> contentKinds (const Song& song);
+// Turns the switch on and links every unassigned track that holds clips (lowest first). Returns how many were linked.
+// Off: only the switch (the links stay: they are FL track modes; Track mode › Unassigned undoes one, Undo the whole step).
+int setOn (Song& song, bool on);
+// After an edit while the switch is on (AudioEngine::editSong): an unassigned track whose content called for no link
+// before the edit (`before`, from contentKinds) and calls for one now is linked — a first clip, the first notes in an
+// empty pattern. A track whose content was already linkable is left alone, so Track mode › Unassigned stays unassigned.
+// Returns how many were linked.
+int followNewContent (Song& song, const std::vector<Plan::Kind>& before);
+// Recording (core/TakeRecording.h) while the switch is on: the Playlist track a take of insert `insert` goes to when no
+// audio track is linked to it yet — track insert − 1 when it is unassigned, ungrouped and holds no clip; -1 otherwise.
+int pairedTakeTrack (const Song& song, int insert);
+} // namespace lynx::autolink
+
 // Audio clips and the channels they play (round 190ax).
 namespace lynx::audioclips
 {
