@@ -31,6 +31,7 @@
 #include "core/SerialJobs.h"
 #include "core/PreviewTempo.h"
 #include "engine/MidiSyncIo.h"
+#include "engine/AbletonLink.h"
 #include "engine/ControllerIo.h"
 #include "core/RackRenderer.h"
 #include "core/RtStats.h"
@@ -354,6 +355,8 @@ public:
     void resetToInitialValues() noexcept;
     bool isWaitingForInput() const noexcept { return waitingForInput.load(); }
     bool isCountingIn() const noexcept { return transport.countIn.load() > 0.0; }
+    // Ableton Link (round 190gl): Play was pressed and waits for the session's phase (a Stop cancels it)
+    bool isLinkWaiting() const noexcept { return transport.linkWaiting.load(); }
     // The audio clock the last callback left (core/Recorder.h LiveClock) and where an event played at `eventMs`
     // (juce::Time::getMillisecondCounterHiRes) is recorded: sample-accurate against the block, minus the output
     // latency when compensateOutput is on (round 170d). Any thread.
@@ -723,6 +726,13 @@ public:
     void setMidiPrefs (const prefs::MidiPrefs& prefs, bool save = true);
     // master sync out / external clock in / all notes off (round 165f)
     MidiSyncIo& getMidiSync() noexcept { return midiSync; }
+    // Ableton Link (round 190gl, engine/AbletonLink.h): the session, and its switches (saved with the MIDI settings)
+    AbletonLink& getLink() noexcept { return abletonLink; }
+    const AbletonLink& getLink() const noexcept { return abletonLink; }
+    void setLinkEnabled (bool on);
+    void setLinkStartStopSync (bool on);
+    // The tempo the toolbar shows: the Link session's while Link is on, else the project's.
+    double shownTempo() const noexcept;
     // MIDI controller profiles (round 190aw, core/ControllerSession.h): the devices that run one, and LYNX as they see
     // it (the main window's bridge; null when it closes).
     ControllerIo& getControllers() noexcept { return controllerIo; }
@@ -1090,6 +1100,7 @@ private:
     void takePreviewResults();
     double editorVolume = 1.0;
     void publishSong();
+    void applyLinkPrefs(); // (round 190gl) Link on / off and its options as midiPrefs say
     RackState::Factories rackFactories();
     void adoptPrepared (PreparedFlp& prepared); // the plugins of a prepared import found / substituted (message thread)
 
@@ -1099,6 +1110,7 @@ private:
     juce::AudioProcessorPlayer player;
     Transport transport;
     MidiSyncIo midiSync; // (before the MIDI callbacks and the audio callback use it)
+    AbletonLink abletonLink; // (round 190gl; before the audio callback uses it)
     ControllerIo controllerIo; // (before the MIDI callbacks use it)
     SampleLibrary samples;
     LiveEventQueue liveEvents;   // UI -> audio

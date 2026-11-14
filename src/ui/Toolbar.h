@@ -71,6 +71,7 @@ private:
     void showMenu();
     AudioEngine& engine;
     juce::String shown;
+    double linkProgress = -1.0; // (round 190gl) the Link session's progress bar while the transport waits / is stopped
     Mode mode = Mode::bars;
     int smpteRate = 5; // timecode::rates index (30 fps)
 };
@@ -204,6 +205,34 @@ public:
 
 private:
     juce::String text;
+};
+
+// Ableton Link's switch (round 190gl), as the reference DAW's control bar has it (its manual's "The Link Toggle in the
+// Control Bar"): "Link" while off; on, the number of other peers ("0 Links", "1 Link", "2 Links"), lit; the arrow beside
+// it opens the drop-down (Link on / off, Configure Link...). In FL's Pattern layout it is LYNX's own small switch,
+// hidden until the user shows it (Settings › Link › Show Link Toggle, or the toolbar's edit mode).
+class LinkToggle final : public juce::Component,
+                         public ui::HintSource
+{
+public:
+    explicit LinkToggle (AudioEngine& e) : engine (e) { setMouseCursor (juce::MouseCursor::PointingHandCursor); }
+    std::function<void()> onConfigure; // "Configure Link...": Settings › Link
+    void update();                     // the main window's timer: peers, on / off
+    void paint (juce::Graphics& g) override;
+    void mouseDown (const juce::MouseEvent& e) override;
+    void mouseEnter (const juce::MouseEvent&) override { repaint(); }
+    void mouseExit (const juce::MouseEvent&) override { repaint(); }
+    ui::Hint hintAt (juce::Point<int> position) override;
+    static int idealWidth (int height);
+    juce::String text() const;         // what the switch shows now (tests)
+    juce::PopupMenu makeMenu();        // the drop-down (shots)
+
+private:
+    juce::Rectangle<int> arrowArea() const { return getLocalBounds().removeFromRight (juce::jmax (12, getHeight() / 2 + 2)); }
+    void showMenu();
+    AudioEngine& engine;
+    bool on = false;
+    int peers = 0;
 };
 
 // The chord near the hint bar (View › Toolbars): outlined text with no box, over whatever is below the bar, as in FL.

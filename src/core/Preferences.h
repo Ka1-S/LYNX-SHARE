@@ -224,6 +224,11 @@ struct MidiPrefs
     // "Use a game controller" (round 184a, S16): the first XInput pad plays the transport and is linkable like a
     // MIDI controller (core/GamepadMap.h); off by default
     bool gamepad = false;
+    // Ableton Link (round 190gl, engine/AbletonLink.h): LYNX in the Link session (its control-bar toggle) and the
+    // reference DAW's Settings › Link "Start Stop Sync" (off by default, as there). Kept with the MIDI sync settings:
+    // like the reference DAW's, they belong to the app, not to a project.
+    bool link = false;
+    bool linkStartStopSync = false;
 
     // The settings of a device (the defaults when it was never changed).
     MidiInputPrefs input (const std::string& name) const;

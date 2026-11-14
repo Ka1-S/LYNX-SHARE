@@ -655,7 +655,10 @@ public:
         tabs.setTabBarDepth (34);
         tabs.setOutline (0);
         // FL's order: device pages first, then the app, then the project
+        // (round 190gl: Link after MIDI, as the reference DAW's Settings put Link beside Tempo & MIDI; named in full, as
+        // Ableton's Link integration guidelines ask of other apps)
         const std::pair<SettingsPage, juce::String> order[] = { { SettingsPage::audio, tr ("Audio") },     { SettingsPage::midi, tr ("MIDI") },
+                                                                { SettingsPage::link, tr ("Ableton Link") },
                                                                 { SettingsPage::general, tr ("General") }, { SettingsPage::theme, tr ("Theme") },
                                                                 { SettingsPage::files, tr ("Files") },     { SettingsPage::extras, tr ("LYNX extras") },
                                                                 { SettingsPage::project, tr ("Project") }, { SettingsPage::info, tr ("Info") } };
@@ -672,6 +675,7 @@ public:
                 case SettingsPage::project: content = new ProjectPage (engine, hooks); break;
                 case SettingsPage::info: content = new InfoPage (engine); break;
                 case SettingsPage::extras: content = makeExtrasPage (engine, hooks, persistent).release(); break;
+                case SettingsPage::link: content = makeLinkPage (engine, hooks).release(); break;
             }
             tabs.addTab (name, theme::colour::bg2, content, true);
             pages.push_back (p);

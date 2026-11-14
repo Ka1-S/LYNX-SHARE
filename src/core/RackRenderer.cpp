@@ -3531,16 +3531,18 @@ void RackRenderer::process (const RackState* state,
     }
     wasPlaying = playing;
     // tempo automation: the tempo holds for the whole block (evaluated at its start)
-    bpm = tempoOverride > 0.0 ? tempoOverride : state->song.bpm;
+    ownBpm = state->song.bpm;
 
     // and FL's pattern Tempo events (issue #86, core/TempoMap.h): in song mode with the tempo clips, in pattern mode the
     // current pattern's. A tempo the user is dragging over its automation holds (as before).
-    if (tempoOverride <= 0.0 && state->tempoMap && ! (state->tempoAutomation >= 0 && isSlotOverridden (state->tempoAutomation)))
+    // (round 190gl: evaluated under an override too: the Link session proposes the song's own tempo to its peers)
+    if (state->tempoMap && ! (state->tempoAutomation >= 0 && isSlotOverridden (state->tempoAutomation)))
     {
         const auto songMode = state->song.mode == PlayMode::song;
         const auto length = (double) std::max<std::int64_t> (1, state->schedule.songLength);
-        bpm = tempomap::tempoAt (state->song, songMode ? std::fmod (std::max (0.0, startTick), length) : std::max (0.0, startTick));
+        ownBpm = tempomap::tempoAt (state->song, songMode ? std::fmod (std::max (0.0, startTick), length) : std::max (0.0, startTick));
     }
+    bpm = tempoOverride > 0.0 ? tempoOverride : ownBpm;
 
     const auto tps = ticksPerSample (bpm, sampleRate);
     expectedTick = startTick + numSamples * tps;

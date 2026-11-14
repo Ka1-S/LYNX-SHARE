@@ -315,6 +315,8 @@ AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPlug
         enableAllMidiInputs();
         midiSync.configure (midiPrefs);
         midiSync.sendAllNotesOff(); // FL's "Send all notes off": on init and after a render
+        if (! platform::testMode()) // (round 190gl: Link on as it was left; never in a test run, which must not join a session)
+            applyLinkPrefs();
         deviceManager.addMidiInputDeviceCallback ({}, this); // {} = all inputs enabled
         midiDevicesChanged = juce::MidiDeviceListConnection::make ([this] { enableAllMidiInputs(); });
         mark ("  engine: MIDI inputs");
@@ -792,6 +794,7 @@ void AudioEngine::stop() noexcept
     stopClipPreview(); // (live check 190ew PL-3: and transport stop)
     waitingForInput.store (false);
     transport.countIn.store (0.0);
+    transport.linkWaiting.store (false); // (round 190gl: a start waiting for the Link session's phase is cancelled)
     transport.playing.store (false);
 }
 
@@ -884,7 +887,8 @@ void AudioEngine::startPlayback()
         return;
     }
 
-    if (recordOptions.countInBars > 0)
+    // (round 190gl: as the reference DAW, no count-in while Link is on: the start waits for the session's phase instead)
+    if (recordOptions.countInBars > 0 && ! abletonLink.isEnabled())
     {
         // the notes played during the count-in belong to this take (round 170d)
         const auto length = countInLength (song, recordOptions.countInBars, startAt);
@@ -1033,7 +1037,7 @@ void AudioEngine::previewFile (const juce::File& file)
     // here), else from LYNX's tempo detection (on the worker); a file that can have none plays as it always did
     const auto path = file.getFullPathName();
     const auto name = file.getFileName().toStdString();
-    const auto external = transport.externalBpm.load (std::memory_order_relaxed);
+    const auto external = transport.overrideBpm(); // (an external clock's or the Link session's tempo)
     const auto projectBpm = external > 0.0 ? external : transport.bpm.load (std::memory_order_relaxed);
     auto found = previewtempo::quick (*sample, name);
     auto known = found.bpm > 0.0;
@@ -2763,10 +2767,53 @@ void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
     {
         enableAllMidiInputs();
         midiSync.configure (p);
+        applyLinkPrefs();
     }
     if (save)
         midiSettingsFile().replaceWithText (juce::String (p.toText()));
     sendChangeMessage();
+}
+
+// --- Ableton Link (round 190gl) -----------------------------------------------------------------------------------
+
+void AudioEngine::applyLinkPrefs()
+{
+    abletonLink.setStartStopSync (midiPrefs.linkStartStopSync);
+    if (midiPrefs.link == abletonLink.isEnabled())
+        return;
+    if (! midiPrefs.link && abletonLink.tempoChangedByPeer())
+    {
+        // the reference DAW has one tempo: leaving the session, the project keeps the tempo a peer set last (not over
+        // tempo automation, which sets it anyway)
+        const auto session = abletonLink.sessionTempo();
+        if (session > 0.0 && std::abs (session - song.bpm) > 1.0e-6 && ! transport.songTempoMap.load())
+            editSong ([session] (Song& s) { s.bpm = session; });
+    }
+    abletonLink.setEnabled (midiPrefs.link, song.bpm);
+}
+
+void AudioEngine::setLinkEnabled (bool on)
+{
+    if (midiPrefs.link == on && abletonLink.isEnabled() == on)
+        return;
+    auto p = midiPrefs;
+    p.link = on;
+    setMidiPrefs (p);
+}
+
+void AudioEngine::setLinkStartStopSync (bool on)
+{
+    if (midiPrefs.linkStartStopSync == on)
+        return;
+    auto p = midiPrefs;
+    p.linkStartStopSync = on;
+    setMidiPrefs (p);
+}
+
+double AudioEngine::shownTempo() const noexcept
+{
+    const auto session = abletonLink.isEnabled() ? abletonLink.sessionTempo() : 0.0;
+    return session > 0.0 ? session : song.bpm;
 }
 
 void AudioEngine::setUndoLevels (int levels)
@@ -3003,7 +3050,7 @@ void AudioEngine::launcherCommand (const launcher::Command& command)
     if (starts && ! transport.playing.load() && ! isCountingIn())
     {
         // a recording into a slot counts in first, as the record options say (round 190bv)
-        if (command.type == T::record && recordOptions.countInBars > 0)
+        if (command.type == T::record && recordOptions.countInBars > 0 && ! abletonLink.isEnabled())
             transport.countIn.store ((double) countInLength (song, recordOptions.countInBars, (std::int64_t) transport.positionTicks.load()));
         else
             play();
@@ -4041,6 +4088,8 @@ void AudioEngine::publishSong()
     }
     transport.bpm.store (song.bpm);
     transport.beatsPerBar.store (song.beatsPerBar);
+    transport.projectBpm.store (song.bpm); // (round 190gl: what the Link session sees as the project's own tempo)
+    transport.linkQuantum.store (linksync::quantumBeats (song.clipGrid.has_value() ? song.clipGrid->globalQuant : LaunchQuant::bar, song.beatsPerBar));
 
     {
         // time-signature table for the metronome: the start (beatsPerBar/4) and each signature change
@@ -5747,6 +5796,9 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
     transport.readMarkers (rtMarkers, rtMarkerVersion); // FL's marker actions (a new table when the song changed)
     // an external MIDI clock moves the transport (round 165f)
     midiSync.beginBlock (transport, callbackStart, numSamples);
+    // Ableton Link (round 190gl): the session's tempo and phase move the transport; a Play waiting for the session's
+    // phase starts at `linkStart` (a sample of this block; -1 = none), to the sample like the count-in's end
+    const auto linkStart = abletonLink.beginBlock (transport, numSamples, outputCompensationMs.load (std::memory_order_relaxed));
 
     // With the loop region on, the block is split at the loop end and the position jumps back to
     // its start (the nodes see a jump and release their notes, as in FL).
@@ -5775,6 +5827,10 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         auto n = numSamples - done;
         if (countInSamples > done)
             n = juce::jmin (n, countInSamples - done);
+        if (linkStart > done) // (the part before the Link start plays stopped)
+            n = juce::jmin (n, linkStart - done);
+        else if (linkStart >= 0 && done == linkStart)
+            transport.playing.store (true, std::memory_order_relaxed);
         const auto playing = transport.playing.load (std::memory_order_relaxed);
         const auto tps = transport.ticksPerSample();
         // Song mode: the loop region, or else the whole song (back to the start at its end, like FL)
@@ -6035,6 +6091,7 @@ void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     transport.sampleRate.store (device->getCurrentSampleRate());
     meters.rollingLog.setSampleRate (device->getCurrentSampleRate()); // (the audio thread isn't running yet: it may allocate)
     midiSync.deviceStarted (device->getCurrentSampleRate(), device->getCurrentBufferSizeSamples(), device->getOutputLatencyInSamples());
+    abletonLink.deviceStarted (device->getCurrentSampleRate()); // (round 190gl: the Link session's sample clock starts over)
     // what is heard comes out one output buffer + the driver's output latency after it was rendered (round 170d, as
     // the MIDI clock output counts it)
     outputCompensationMs.store (1000.0 * (device->getCurrentBufferSizeSamples() + juce::jmax (0, device->getOutputLatencyInSamples()))

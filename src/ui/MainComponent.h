@@ -170,6 +170,16 @@ public:
     std::vector<std::pair<juce::Rectangle<int>, juce::String>> getQuickTipsForSnapshot();
     // --snapshot: a toolbar layout (icon size, hidden/reordered groups) without saving it
     void setToolbarLayoutForSnapshot (const toolbarlayout::Layout& layout) { setToolbarLayout (layout, false); }
+    const toolbarlayout::Layout& getToolbarLayoutForSnapshot() const noexcept { return toolbarLayout; }
+    // --linkshot190gl (round 190gl): the Link toggle, and what the timer refreshes for Link (toggle, position bar, tempo)
+    toolbar::LinkToggle& getLinkToggleForSnapshot() noexcept { return linkToggle; }
+    void tickLinkForSnapshot()
+    {
+        linkToggle.update();
+        timeDisplay.update();
+        tempoDisplay.repaint();
+        playButton.setToggleState (engine.getTransport().playing.load() || engine.isLinkWaiting(), juce::dontSendNotification);
+    }
     juce::PopupMenu getToolbarMenuForSnapshot() { return makeToolbarMenu(); }
     void setToolbarEditingForSnapshot (bool editing) { setToolbarEditing (editing); }
     int getToolbarAndTrayHeightForSnapshot() const { return toolbarHeight + (toolbarEditor != nullptr ? toolbar::EditOverlay::trayHeight : 0); }
@@ -335,6 +345,9 @@ private:
     juce::Rectangle<int> modeArea; // the Pattern / Song switch (painted as one control) // a narrow window: four recording switches per row (round 170e3)
     void applyIconSizing (toolbarlayout::IconSize size);
     void setToolbarLayout (const toolbarlayout::Layout& layout, bool save = true);
+    // Settings › Link › Show Link Toggle (round 190gl): shows / hides the toolbar's Link toggle (from then on by hand)
+    void showLinkToggle (bool on);
+    double shownLinkTempo = 0.0; // (round 190gl) the Link tempo the tempo display last drew
     juce::PopupMenu makeToolbarMenu();
     void showToolbarMenu();
     void showCustomizeToolbar();
@@ -642,6 +655,10 @@ private:
     // panel until the user shows or hides it by hand (then the toolbar layout decides, in every workflow).
     toolbar::KeyPanel keyPanel;
     bool keyPanelFollowsStyle = true;
+    // Ableton Link's toggle (round 190gl): hidden in FL's Pattern layout, shown in the Clip-launch one (the reference
+    // DAW's "Show Link Toggle"), until the user shows or hides it
+    toolbar::LinkToggle linkToggle { engine };
+    bool linkToggleFollowsStyle = true;
     void showKeyMenu();
     juce::PopupMenu makeKeyMenu();
     void refreshKeyPanel();

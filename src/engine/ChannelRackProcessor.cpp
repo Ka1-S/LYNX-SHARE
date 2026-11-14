@@ -28,7 +28,7 @@ void ChannelRackProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     const auto* state = exchange.acquire();
     const auto playing = transport.playing.load (std::memory_order_relaxed);
     const auto startTick = transport.positionTicks.load (std::memory_order_relaxed);
-    renderer.setTempoOverride (transport.externalBpm.load (std::memory_order_relaxed));
+    renderer.setTempoOverride (transport.overrideBpm()); // an external clock's or the Link session's tempo
 
     // the metronome's click for this block, into its mixer track (FL: never in an export, so neither in an offline
     // render nor in a real-time bounce)
@@ -67,7 +67,13 @@ void ChannelRackProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     }
 
     // tempo automation: the transport advances at the tempo the renderer used
-    if (state != nullptr && state->tempoMap && transport.externalBpm.load (std::memory_order_relaxed) <= 0.0)
+    if (state != nullptr && state->tempoMap && transport.overrideBpm() <= 0.0)
         transport.bpm.store (renderer.currentBpm(), std::memory_order_relaxed);
+    // (round 190gl) the song's own tempo now, for the Link session: it proposes the song's tempo automation to the peers
+    if (state != nullptr)
+    {
+        transport.songTempoNow.store (renderer.songBpm(), std::memory_order_relaxed);
+        transport.songTempoMap.store (state->tempoMap, std::memory_order_relaxed);
+    }
 }
 } // namespace lynx

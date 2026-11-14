@@ -37,6 +37,20 @@ struct Transport
     // External clock sync (round 165f): > 0 = the tempo LYNX follows from an incoming MIDI clock, over the song's
     // (written by the audio thread only)
     std::atomic<double> externalBpm { 0.0 };
+    // Ableton Link (round 190gl, engine/AbletonLink.h): > 0 = the tempo LYNX plays at in a Link session (the session's,
+    // nudged onto its phase), over the song's; an external clock still wins (written by the audio thread only)
+    std::atomic<double> linkBpm { 0.0 };
+    // Play was pressed in a Link session with other peers: playback waits for the session's phase (core/LinkSync.h); the
+    // audio thread starts it, a Stop cancels it
+    std::atomic<bool> linkWaiting { false };
+    // the tempo the song plays at without an override (its automation and tempo events) and whether it has any:
+    // written by the rack's processor each block, read by the Link session (which proposes it to the peers)
+    std::atomic<double> songTempoNow { 0.0 };
+    std::atomic<bool> songTempoMap { false };
+    // the project's tempo (Song::bpm) and the Link quantum in beats (the clip grid's global launch quantisation,
+    // core/LinkSync.h), published with the song
+    std::atomic<double> projectBpm { 130.0 };
+    std::atomic<double> linkQuantum { 4.0 };
     std::atomic<int> beatsPerBar { 4 };
 
     // Playlist time-signature changes for the metronome (song mode): the bar restarts at each
@@ -111,10 +125,17 @@ struct Transport
     // makes it when the position reaches `pendingJumpAt` (FL's "Quantize song jumps"; < 0 = none).
     std::atomic<double> pendingJumpAt { -1.0 }, pendingJumpTo { -1.0 };
 
-    double ticksPerSample() const noexcept
+    // The tempo that replaces the song's now: an external MIDI clock's, else the Link session's (0 = none).
+    double overrideBpm() const noexcept
     {
         const auto external = externalBpm.load (std::memory_order_relaxed);
-        return (external > 0.0 ? external : bpm.load (std::memory_order_relaxed)) * ppq / (60.0 * sampleRate.load (std::memory_order_relaxed));
+        return external > 0.0 ? external : linkBpm.load (std::memory_order_relaxed);
+    }
+
+    double ticksPerSample() const noexcept
+    {
+        const auto over = overrideBpm();
+        return (over > 0.0 ? over : bpm.load (std::memory_order_relaxed)) * ppq / (60.0 * sampleRate.load (std::memory_order_relaxed));
     }
 
     double positionInBeats() const noexcept

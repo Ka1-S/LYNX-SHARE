@@ -83,6 +83,9 @@ struct SettingsHooks
     // runs one of the main window's actions by id ("playlist.automationLanes"): the LYNX extras page switches a view
     // option exactly as its menu item does (round 190am)
     std::function<bool (const std::string&)> runAction;
+    // Settings › Link's "Show Link Toggle" (round 190gl): the main toolbar's Link toggle shown, and showing / hiding it
+    std::function<bool()> linkToggleShown;
+    std::function<void (bool)> showLinkToggle;
 };
 
 // Settings pages (Settings window, ui/SettingsDialog.cpp)
@@ -93,6 +96,10 @@ std::unique_ptr<juce::Component> makeMidiPage (AudioEngine& engine, const Settin
 // switch and one line of explanation (core/LynxExtras.h). The switches mirror the preferences the features already
 // have: nothing is stored by the page itself.
 std::unique_ptr<juce::Component> makeExtrasPage (AudioEngine& engine, const SettingsHooks& hooks, bool persistent);
+// Settings › Ableton Link (round 190gl): Ableton Link Enabled / Disabled (Ableton's integration guidelines), then the
+// reference DAW's Link page — "Show Link Toggle" (Show / Hide) and "Start Stop Sync" (On / Off). Its Link Audio section
+// is left out: LYNX has no Link Audio.
+std::unique_ptr<juce::Component> makeLinkPage (AudioEngine& engine, const SettingsHooks& hooks);
 // Whether the extra `id` (core/LynxExtras.h) is on now, and switching it: the same variables and the same code paths
 // as each feature's own menu item or check box.
 bool lynxExtraOn (AudioEngine& engine, const SettingsHooks& hooks, std::string_view id);

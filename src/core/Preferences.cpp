@@ -422,6 +422,10 @@ std::string MidiPrefs::toText() const
         out += "performanceChannel=" + std::to_string (performanceChannel) + "\n";
     if (gamepad)
         out += "gamepad=1\n";
+    if (link)
+        out += "link=1\n";
+    if (linkStartStopSync)
+        out += "linkStartStopSync=1\n";
     // input=<enabled>|<midi channel>|<target>|<device name>
     for (const auto& i : inputs)
     {
@@ -501,6 +505,10 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             p.performanceChannel = std::clamp (std::atoi (trim (value).c_str()), 0, 16);
         else if (key == "gamepad")
             p.gamepad = trim (value) == "1";
+        else if (key == "link")
+            p.link = trim (value) == "1";
+        else if (key == "linkStartStopSync")
+            p.linkStartStopSync = trim (value) == "1";
         else if (key == "input")
         {
             const auto parts = split (value, '|', 4);
