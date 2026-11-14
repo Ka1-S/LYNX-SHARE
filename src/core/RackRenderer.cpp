@@ -883,8 +883,10 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     // which previous channel each channel was (round 168s, issue #32): by its instance tag, so inserting, removing or
     // moving channels keeps every other channel's running instrument (voices, loops, a plugin's live state); by position
     // only when the channel there is gone from the song (another project loaded over it, the old behaviour)
-    const auto channelOrigin = matchByInstance (song.channels, previous != nullptr ? &previous->song.channels : nullptr,
-                                                previous != nullptr ? previous->instruments.size() : 0);
+    auto channelOrigin = matchByInstance (song.channels, previous != nullptr ? &previous->song.channels : nullptr,
+                                         previous != nullptr ? previous->instruments.size() : 0);
+    for (std::size_t i = 0; i < channelOrigin.size(); ++i)
+        if (factories.freshInstances.contains (song.channels[i].instance.id)) channelOrigin[i] = -1;
     {
         static std::atomic<std::uint64_t> serials { 1 };
         state->serial = serials.fetch_add (1, std::memory_order_relaxed);
@@ -1075,6 +1077,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
 
         for (std::size_t i = 0; i < slots.size() && i < (std::size_t) maxEffectSlots; ++i)
         {
+            if (factories.freshInstances.contains (slots[i].instance.id)) slotOrigin[t][i] = { -1, -1 };
             const auto kind = slots[i].kind;
             const auto none = std::numeric_limits<std::size_t>::max();
             const auto pt = slotOrigin[t][i].first >= 0 ? (std::size_t) slotOrigin[t][i].first : none;

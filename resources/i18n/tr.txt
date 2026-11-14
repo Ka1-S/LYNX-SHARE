@@ -4151,6 +4151,12 @@ countries: tr
 "Let the plugin know when rendering to an audio file" = "Ses dosyasına render alınırken plugin'e bildir"
 "Compatibility" = "Uyumluluk"
 "Remote control" = "Uzaktan kontrol"
+"Allows authenticated local applications to read and edit this project." = "Kimliği doğrulanmış yerel uygulamaların bu projeyi okumasına ve düzenlemesine izin verir."
+"Enable local remote control" = "Yerel uzaktan kontrolü etkinleştir"
+"Remote control active — local clients can read and edit this project." = "Uzaktan kontrol etkin — yerel istemciler bu projeyi okuyabilir ve düzenleyebilir."
+"Remote control could not start. Disable and re-enable to retry." = "Uzaktan kontrol başlatılamadı. Yeniden denemek için devre dışı bırakıp tekrar etkinleştirin."
+"Remote control is off." = "Uzaktan kontrol kapalı."
+"The remote control setting could not be saved." = "Uzaktan kontrol ayarı kaydedilemedi."
 "Channel type" = "Kanal türü"
 "Deselect MIDI channels to filter out (right-click: only this one)" = "Filtrelemek için MIDI kanallarının seçimini kaldırın (sağ tık: yalnızca bu)"
 "LYNX SHARE synth" = "LYNX SHARE synth"
@@ -8440,6 +8446,13 @@ countries: tr
 "Show levels on instrument tracks" = "Enstrüman parçalarında seviyeleri göster"
 "Start offset" = "Başlangıç kayması"
 "Sample start offset" = "Örnek başlangıç kayması"
+
+# Remote-control history status
+"Remote history operation cancelled before changing history." = "Uzaktan geçmiş işlemi, geçmiş değiştirilmeden iptal edildi."
+"The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo." = "Geçmiş işlemi tamamlanmadı; proje veya geçmişi değişmiş olabilir. Başka bir geri alma/yineleme işleminden önce durumu kontrol edin."
+"The history operation could not be prepared. No history step was moved; inspect the device before retrying." = "Geçmiş işlemi hazırlanamadı. Geçmişteki konum değiştirilmedi; yeniden denemeden önce aygıtı kontrol edin."
+"A device changed after this remote edit. Undo/redo was refused to preserve those changes." = "Bu uzaktan düzenlemeden sonra bir aygıt değişti. Bu değişiklikleri korumak için geri alma/yineleme reddedildi."
+
 "Keyboard style" = "Klavye stili"
 "Flat keys" = "Düz tuşlar"
 "Piano keys (lines between the white keys)" = "Piyano tuşları (beyaz tuşlar arasında çizgiler)"

@@ -256,6 +256,11 @@ EOF
         chmod +x build-local/.bin/cxx
         CXX=build-local/.bin/cxx ;;
 esac
+# The JUCE-free Remote Control suites (they also run through the upstream core CI path). After the zig queue above,
+# so with zig they link the cached core objects instead of compiling the whole core once more each (round 190ha).
+$CXX $FLAGS $CORE $WAVPACK tests/RemotePlaylistEditsTests.cpp -o build-local/lynx_remote_playlist_tests
+$CXX $FLAGS $CORE $WAVPACK tests/RemoteInstrumentEditsTests.cpp -o build-local/lynx_remote_instrument_tests
+$CXX $FLAGS $CORE $WAVPACK tests/RemotePatternEditsTests.cpp -o build-local/lynx_remote_pattern_tests
 $CXX $FLAGS src/flp/Flp.cpp tools/flpdump.cpp -o build-local/flpdump 2> >(grep -v 'glibc version' >&2)
 
 $CXX $FLAGS $CORE $WAVPACK tools/renderwav.cpp -o build-local/renderwav 2> >(grep -v 'glibc version' >&2)
@@ -315,4 +320,7 @@ if [[ -n "${tools_pid:-}" ]]; then
         exit 1
     fi
 fi
+./build-local/lynx_remote_playlist_tests || tests_rc=$?
+./build-local/lynx_remote_instrument_tests || tests_rc=$?
+./build-local/lynx_remote_pattern_tests || tests_rc=$?
 exit $tests_rc

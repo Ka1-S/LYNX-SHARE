@@ -4151,6 +4151,12 @@ countries: de at ch li lu
 "Let the plugin know when rendering to an audio file" = "Dem Plugin mitteilen, wenn in eine Audiodatei gerendert wird"
 "Compatibility" = "Kompatibilität"
 "Remote control" = "Fernsteuerung"
+"Allows authenticated local applications to read and edit this project." = "Erlaubt authentifizierten lokalen Anwendungen, dieses Projekt zu lesen und zu bearbeiten."
+"Enable local remote control" = "Lokale Fernsteuerung aktivieren"
+"Remote control active — local clients can read and edit this project." = "Fernsteuerung aktiv — lokale Clients können dieses Projekt lesen und bearbeiten."
+"Remote control could not start. Disable and re-enable to retry." = "Die Fernsteuerung konnte nicht gestartet werden. Zum erneuten Versuch deaktivieren und wieder aktivieren."
+"Remote control is off." = "Die Fernsteuerung ist ausgeschaltet."
+"The remote control setting could not be saved." = "Die Einstellung für die Fernsteuerung konnte nicht gespeichert werden."
 "Channel type" = "Kanaltyp"
 "Deselect MIDI channels to filter out (right-click: only this one)" = "MIDI-Kanäle abwählen, um sie herauszufiltern (Rechtsklick: nur dieser)"
 "LYNX SHARE synth" = "LYNX-SHARE-Synth"
@@ -8440,6 +8446,13 @@ countries: de at ch li lu
 "Show levels on instrument tracks" = "Pegel auf Instrumentenspuren anzeigen"
 "Start offset" = "Startversatz"
 "Sample start offset" = "Startversatz des Samples"
+
+# Remote-control history status
+"Remote history operation cancelled before changing history." = "Die ferngesteuerte Verlaufsaktion wurde abgebrochen, bevor der Verlauf geändert wurde."
+"The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo." = "Die Verlaufsaktion wurde nicht abgeschlossen; das Projekt oder sein Verlauf könnte sich geändert haben. Prüfen Sie den Zustand vor weiteren Rückgängig-/Wiederholen-Aktionen."
+"The history operation could not be prepared. No history step was moved; inspect the device before retrying." = "Die Verlaufsaktion konnte nicht vorbereitet werden. Die Position im Verlauf wurde nicht verändert; prüfen Sie das Gerät, bevor Sie es erneut versuchen."
+"A device changed after this remote edit. Undo/redo was refused to preserve those changes." = "Ein Gerät wurde nach dieser ferngesteuerten Bearbeitung geändert. Rückgängig/Wiederholen wurde abgelehnt, um diese Änderungen zu erhalten."
+
 "Keyboard style" = "Klaviatur-Stil"
 "Flat keys" = "Flache Tasten"
 "Piano keys (lines between the white keys)" = "Klaviertasten (Linien zwischen den weißen Tasten)"

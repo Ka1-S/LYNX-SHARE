@@ -4151,6 +4151,12 @@ countries: jp
 "Let the plugin know when rendering to an audio file" = "オーディオファイルへのレンダリング時にプラグインに通知"
 "Compatibility" = "互換性"
 "Remote control" = "リモートコントロール"
+"Allows authenticated local applications to read and edit this project." = "認証済みのローカルアプリケーションがこのプロジェクトを読み取り、編集できるようにします。"
+"Enable local remote control" = "ローカルのリモートコントロールを有効化"
+"Remote control active — local clients can read and edit this project." = "リモートコントロールが有効です — ローカルクライアントがこのプロジェクトを読み取り、編集できます。"
+"Remote control could not start. Disable and re-enable to retry." = "リモートコントロールを開始できませんでした。無効にしてから再度有効にし、もう一度お試しください。"
+"Remote control is off." = "リモートコントロールは無効です。"
+"The remote control setting could not be saved." = "リモートコントロールの設定を保存できませんでした。"
 "Channel type" = "チャンネルタイプ"
 "Deselect MIDI channels to filter out (right-click: only this one)" = "除外するMIDIチャンネルの選択を解除 (右クリック: これだけ)"
 "LYNX SHARE synth" = "LYNX SHAREシンセ"
@@ -8440,6 +8446,13 @@ countries: jp
 "Show levels on instrument tracks" = "インストゥルメントトラックにレベルを表示"
 "Start offset" = "開始オフセット"
 "Sample start offset" = "サンプルの開始オフセット"
+
+# Remote-control history status
+"Remote history operation cancelled before changing history." = "履歴を変更する前に、リモート履歴操作がキャンセルされました。"
+"The history operation did not finish; the project or its history may have changed. Inspect before further undo/redo." = "履歴操作が完了しませんでした。プロジェクトまたはその履歴が変更された可能性があります。続けて元に戻す／やり直す操作を行う前に、状態を確認してください。"
+"The history operation could not be prepared. No history step was moved; inspect the device before retrying." = "履歴操作を準備できませんでした。履歴の位置は変更されていません。再試行する前にデバイスを確認してください。"
+"A device changed after this remote edit. Undo/redo was refused to preserve those changes." = "このリモート編集の後にデバイスが変更されました。その変更を保持するため、元に戻す／やり直す操作を拒否しました。"
+
 "Keyboard style" = "鍵盤のスタイル"
 "Flat keys" = "フラットな鍵盤"
 "Piano keys (lines between the white keys)" = "ピアノ鍵盤（白鍵の間に線）"
