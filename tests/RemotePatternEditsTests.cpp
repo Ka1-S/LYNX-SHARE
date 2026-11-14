@@ -240,8 +240,10 @@ void metadataAndValidation()
     check (remote_patterns::set (original, 0, {}, 0).song.patterns[0].lengthTicks == 0, "automatic length was refused");
     // Round 190ha: only what LYNX's pattern length box can set, 0 (automatic) or 1..999 whole bars of the song's meter
     check (remote_patterns::set (original, 0, {}, 999 * 3840).song.patterns[0].lengthTicks == 999 * 3840, "999 bars were refused");
-    for (const auto ticks : { std::int64_t (960), std::int64_t (1920), std::int64_t (3841), std::int64_t (1000) * 3840 })
+    for (const auto ticks : { std::int64_t (960), std::int64_t (5760), std::int64_t (3841), std::int64_t (1000) * 3840 })
         refuses ([&] { remote_patterns::set (original, 0, {}, ticks); });
+    // (the fixture's own 1920, half a bar, is its current length: restating it is the no-op checked above)
+    check (! remote_patterns::metadataChanged (original, 0, {}, 1920), "restating a non-bar current length was refused");
     refuses ([&] { remote_patterns::create (original, {}, {}, 1920); });
     auto compound = original; // 6/8: a bar is six eighths, 2880 ticks
     compound.beatsPerBar = 6;
