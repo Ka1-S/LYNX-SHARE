@@ -13,8 +13,10 @@
 
 // Global JavaVM pointer
 JavaVM* android_jvm = nullptr;
-// Global android_app pointer (for native_app_glue)
-struct android_app* g_android_app = nullptr;
+// Store the current ANativeActivity instance for lifecycle callbacks.
+// We intentionally avoid touching android_app here because the Android headers
+// only forward-declare that type in native_activity.h.
+ANativeActivity* g_native_activity = nullptr;
 
 extern "C" {
 
@@ -31,28 +33,26 @@ void JNI_OnUnload(JavaVM* vm, void* reserved)
 {
     LOGI("JNI_OnUnload");
     android_jvm = nullptr;
+    g_native_activity = nullptr;
 }
 
 // Native activity callbacks (for native_app_glue compatibility)
 void ANativeActivity_onCreate(ANativeActivity* activity, void* savedState, size_t savedStateSize)
 {
     LOGI("ANativeActivity_onCreate");
-    // Store the activity pointer for later use
-    g_android_app = reinterpret_cast<struct android_app*>(activity->instance);
-    if (g_android_app)
-    {
-        g_android_app->activity = activity;
-    }
+    g_native_activity = activity;
 }
 
 void ANativeActivity_onStart(ANativeActivity* activity)
 {
     LOGI("ANativeActivity_onStart");
+    g_native_activity = activity;
 }
 
 void ANativeActivity_onResume(ANativeActivity* activity)
 {
     LOGI("ANativeActivity_onResume");
+    g_native_activity = activity;
 }
 
 void ANativeActivity_onPause(ANativeActivity* activity)
@@ -68,6 +68,8 @@ void ANativeActivity_onStop(ANativeActivity* activity)
 void ANativeActivity_onDestroy(ANativeActivity* activity)
 {
     LOGI("ANativeActivity_onDestroy");
+    if (g_native_activity == activity)
+        g_native_activity = nullptr;
 }
 
 void ANativeActivity_onWindowFocusChanged(ANativeActivity* activity, int focused)
