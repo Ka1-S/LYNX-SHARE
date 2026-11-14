@@ -4463,8 +4463,13 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     // or events start can start voices the last one did not have (measured: Exoplanet's bursts after a quiet chunk ran
     // past their block when this rule took them too). The units' times are measured whenever workers are there, serial
     // or not, so the next chunk decides on fresh numbers.
+    // Round 190gq (REA 190hc action 1): whether the work goes to the workers at all is measured too. The snapshot's
+    // guess (2+ hosted plugins or 24+ channels) left a set of LYNX's own devices (Live's "Patience", 15 tracks) on one
+    // thread at 104-110 % of its deadline with every worker idle: a chunk whose units did at least a hand-off's worth
+    // of work last time runs in parallel whatever its plugin and channel counts.
     measureUnits = pool != nullptr && adaptiveThreads();
-    if (adaptiveThreads() && workers != nullptr && (liveInput == nullptr || liveInput->numChannels == 0))
+    parallelChunk = state.parallel;
+    if (adaptiveThreads() && workers != nullptr)
     {
         std::uint64_t work = 0;
         const auto channelCount = std::min<int> ({ (int) state.instruments.size(), (int) song.channels.size(), maxChannels });
@@ -4472,7 +4477,8 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
             work += channelCostNs[(std::size_t) c];
         for (int t = 1; t < tracks && t < maxMixerTracks; ++t)
             work += trackCostNs[(std::size_t) t];
-        if (events.size() == 0 && work < serialWorkNs)
+        parallelChunk = state.parallel || work >= serialWorkNs;
+        if (events.size() == 0 && work < serialWorkNs && (liveInput == nullptr || liveInput->numChannels == 0))
             workers = nullptr;
     }
 
@@ -4502,7 +4508,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     const auto threadMixer = flsettings::options().multithreadMixer.load (std::memory_order_relaxed);
     if (! (threadGenerators && threadMixer) || ! runTaskGraph (state, playing, channels, numSamples, meters))
     {
-        if (workers != nullptr && state.parallel && threadGenerators && state.audioThreadChannels.empty())
+        if (workers != nullptr && parallelChunk && threadGenerators && state.audioThreadChannels.empty())
         {
             // A7: neighbouring light channels go out together, a cluster about worth one hand-off
             auto clusters = 0;
@@ -4524,7 +4530,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
             };
             workers->parallelFor (clusters, cluster);
         }
-        else if (workers != nullptr && state.parallel && threadGenerators)
+        else if (workers != nullptr && parallelChunk && threadGenerators)
         {
             // "Allow threaded processing" off: those channels on this thread, the rest in parallel
             auto threaded = [&state, &channel, channels] (int i) {
@@ -4612,7 +4618,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
                 if (t >= 0 && t < maxMixerTracks)
                     layerWork += trackCostNs[(std::size_t) t];
 
-            if (workers != nullptr && state.parallel && threadMixer && layer.size() > 1 && (layerWork >= layerSerialNs || ! adaptiveThreads()))
+            if (workers != nullptr && parallelChunk && threadMixer && layer.size() > 1 && (layerWork >= layerSerialNs || ! adaptiveThreads()))
                 workers->parallelFor ((int) layer.size(), track);
             else
                 for (int i = 0; i < (int) layer.size(); ++i)
@@ -4838,7 +4844,7 @@ bool RackRenderer::runTaskGraph (const RackState& state, bool playing, int chann
 {
     // LYNX_TASKGRAPH=0: the layers only (A/B measurements)
     static const bool enabled = [] { const char* e = std::getenv ("LYNX_TASKGRAPH"); return e == nullptr || std::atoi (e) != 0; }();
-    if (! enabled || ! state.graphOk || workers == nullptr || ! state.parallel || state.graphChannels != channels)
+    if (! enabled || ! state.graphOk || workers == nullptr || ! parallelChunk || state.graphChannels != channels)
         return false;
     const auto tracks = std::max<int> (1, (int) state.song.mixer.size());
     const auto tasks = channels + tracks - 1;

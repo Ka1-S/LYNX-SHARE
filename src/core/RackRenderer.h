@@ -650,6 +650,7 @@ private:
     std::array<std::uint32_t, maxChannels> channelCostNs {};
     std::array<std::uint32_t, maxMixerTracks> trackCostNs {};
     bool measureUnits = false;
+    bool parallelChunk = false; // this chunk may go to the workers (the snapshot's guess, or its units' measured work)
     // the channel pass in clusters of neighbouring channels worth one hand-off each: [k] first channel of cluster k
     std::array<std::int16_t, maxChannels + 1> clusterStart {};
     // the boundary row of the current chunk (−1: the chunks do not line up: the slow path)

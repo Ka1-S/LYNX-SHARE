@@ -57,6 +57,7 @@
 #include "WavReader.h"
 #include "core/DemoSongs.h"
 #include "core/Effects.h"
+#include "core/AlsImport.h"
 #include "core/FlpImport.h"
 #include "core/LiveEventQueue.h"
 #include "core/Meters.h"
@@ -396,6 +397,29 @@ int main (int argc, char** argv)
         song = makeInserts50 (16);
     else if (scenario == "stream")
         song = makeStream (60, cache);
+    else if (scenario.rfind ("als:", 0) == 0) // (round 190gq: a Live set, its arrangement on the Playlist)
+    {
+        const auto path = scenario.substr (4);
+        std::ifstream in (path, std::ios::binary);
+        std::vector<std::uint8_t> bytes ((std::istreambuf_iterator<char> (in)), std::istreambuf_iterator<char>());
+        AlsImportOptions options;
+        options.sessionOnPlaylist = true;
+        options.common.projectFolder = std::filesystem::path (path).parent_path().string();
+        options.common.fileExists = [] (const std::string& p) { return std::filesystem::exists (toLocal (p)); };
+        options.common.readFile = [] (const std::string& p) {
+            std::ifstream f (toLocal (p), std::ios::binary);
+            return std::vector<std::uint8_t> ((std::istreambuf_iterator<char> (f)), std::istreambuf_iterator<char>());
+        };
+        options.libraryRoots = { "/mnt/c/ProgramData/Ableton/Live 12 Trial/Resources/Core Library" };
+        std::string error;
+        auto imported = importAls (bytes, options, &error);
+        if (! imported)
+        {
+            std::fprintf (stderr, "error: %s\n", error.c_str());
+            return 1;
+        }
+        song = std::move (*imported);
+    }
     else if (scenario.rfind ("flp:", 0) == 0)
     {
         try
