@@ -11,6 +11,7 @@
 #include <set>
 #include <sstream>
 
+#include "core/Fpc.h"
 #include "core/PatternBlocks.h"
 #include "core/Preferences.h"
 
@@ -439,11 +440,33 @@ Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTi
 
 std::vector<int> stemTracks (const Song& song)
 {
-    std::vector<int> out;
-    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    const auto n = (int) song.mixer.size();
+    // round 190gh (B7): the inserts extra outputs feed (a multi-output instrument's, a Patcher's, an effect's sends)
+    std::set<int> fed;
+    for (const auto& c : song.channels)
     {
-        auto used = std::any_of (song.channels.begin(), song.channels.end(), [t] (const ChannelDef& c) { return c.mixerTrack == t; });
-        for (int src = 1; src < (int) song.mixer.size() && ! used; ++src)
+        if (c.instrument == InstrumentKind::plugin)
+            for (const auto& route : c.plugin.outputs)
+                if (route.offset != 0 && (route.active != 0 || c.plugin.processInactive))
+                    fed.insert (c.mixerTrack + route.offset);
+        if (c.instrument == InstrumentKind::fpc)
+            if (const auto kit = fpc::read (c.pluginState))
+                for (const auto& pad : kit->pads)
+                    if (pad.output != 0)
+                        fed.insert (c.mixerTrack + pad.output);
+        if (c.instrument == InstrumentKind::patcher)
+            for (std::size_t k = 0; k < c.patcher.outputTracks.size(); ++k)
+                fed.insert (c.patcher.outputTracks[k] >= 0 ? c.patcher.outputTracks[k] : c.mixerTrack + (int) k + 1);
+    }
+    for (int src = 1; src < n; ++src)
+        for (const auto& tap : fruitySendsOf (song, src))
+            fed.insert (tap.target);
+
+    std::vector<int> out;
+    for (int t = 1; t < n; ++t)
+    {
+        auto used = fed.count (t) > 0 || std::any_of (song.channels.begin(), song.channels.end(), [t] (const ChannelDef& c) { return c.mixerTrack == t; });
+        for (int src = 1; src < n && ! used; ++src)
             used = src != t && song.routes (src, t);
         if (used)
             out.push_back (t);

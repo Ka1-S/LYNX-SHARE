@@ -186,8 +186,12 @@ public:
             return base.getSiblingFile (juce::String::fromUTF8 (exportopts::stemFileName (baseName, number, name, ext).c_str()));
         };
 
+        const auto set = (int) sets.size();
+        if (o.tail == exportopts::TailMode::leave) // (cut / wrap: every file is the music's length already)
+            sets.push_back ({ from, o });
+        const auto first = items.size();
         if (o.stemsIncludeMaster)
-            items.push_back ({ prefix + juce::String ("Master"), base, from, o });
+            items.push_back ({ prefix + juce::String ("Master"), base, from, o, -1, true });
 
         if (o.stems == exportopts::Stems::channels || o.stems == exportopts::Stems::channelsDry)
             for (auto c : exportopts::stemChannels (from, o.range))
@@ -199,6 +203,9 @@ public:
                                    ! onlyTracks.empty() && recordToFile (from, t) != juce::File() ? recordToFile (from, t).withFileExtension (ext)
                                                                                                   : file (t, from.mixer[(std::size_t) t].name),
                                    makeBounceSong (from, t), o });
+        if (o.tail == exportopts::TailMode::leave)
+            for (auto i = first; i < items.size(); ++i)
+                items[i].set = set;
     }
 
     // FL's "Record <insert> to" file of an insert (round 167a): a track render writes there; none = File()
@@ -217,10 +224,21 @@ public:
             auto& item = items[i];
             setStatusMessage (item.name);
 
+            // round 190gh (B7): the set's length, from its mix (exported first when asked, else rendered once to find it)
+            std::int64_t exact = 0;
+            if (item.set >= 0 && ! item.mix)
+            {
+                auto& set = sets[(std::size_t) item.set];
+                if (set.frames < 0)
+                    set.frames = probeLength (item.set);
+                exact = juce::jmax<std::int64_t> (0, set.frames);
+            }
+
             JobOnMessageThread slot (*this);
-            auto* job = slot.create ([&item] {
+            auto* job = slot.create ([&item, exact] {
                 auto j = std::make_unique<ExportJob> (item.song, item.options, item.file);
                 j->setExtraData (true);
+                j->setExactFrames (exact);
                 return j;
             });
             if (job == nullptr)
@@ -237,10 +255,33 @@ public:
             {
                 ++written;
                 files.push_back (item.file);
+                if (item.mix && item.set >= 0)
+                    sets[(std::size_t) item.set].frames = job->getWrittenFrames();
             }
 
             slot.release();
         }
+    }
+
+    // the length of a set's mix (no file kept): a render to a temporary file
+    std::int64_t probeLength (int index)
+    {
+        const auto& set = sets[(std::size_t) index];
+        setStatusMessage (tr ("Measuring the length of the mix..."));
+        auto o = set.options;
+        o.format = exportopts::Format::wav;
+        o.moreFormats = 0;
+        o.wavBits = 16;
+        const juce::TemporaryFile temp (".wav");
+        JobOnMessageThread slot (*this);
+        const auto& mix = set.mix;
+        auto* job = slot.create ([&mix, &o, &temp] { return std::make_unique<ExportJob> (mix, o, temp.getFile()); });
+        if (job == nullptr)
+            return 0;
+        juce::String error;
+        const auto frames = job->run ([this] (double) { return ! threadShouldExit(); }, error) ? job->getWrittenFrames() : 0;
+        slot.release();
+        return frames;
     }
 
     void threadComplete (bool cancelled) override
@@ -268,7 +309,18 @@ private:
         juce::File file;
         Song song;
         exportopts::Options options; // (a section is rendered as a selection of the song, round 190ap)
+        int set = -1;                // round 190gh (B7): the render set (a stems export, or one section's) it belongs to
+        bool mix = false;            // the set's full mix ("Master")
     };
+    // round 190gh (B7): every file of one stems export has the mix's length, as FL's split render (the tail ends where
+    // the mix's tail ends): the set's mix and its options, to find that length when the mix itself is not exported
+    struct RenderSet
+    {
+        Song mix;
+        exportopts::Options options;
+        std::int64_t frames = -1; // found: the mix's length after the trim
+    };
+    std::vector<RenderSet> sets;
     bool sectioned = false;
     std::function<void (const std::vector<juce::File>&)> afterRender;
     exportopts::Options options;

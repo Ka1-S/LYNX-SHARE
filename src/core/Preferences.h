@@ -253,10 +253,25 @@ struct MidiInputPlan
     std::vector<std::string> open;   // wanted and not open (it appeared, or opening failed before): open it
     std::vector<std::string> reopen; // open, but it disappeared since the last check and came back: close and open again
     std::vector<std::string> close;  // open but turned off in the settings
+    // Round 190gh (B8, hot-plug): open but no longer listed (unplugged while open): its handle is closed at once, so
+    // nothing waits on a device that is gone; it opens again (`open`) when it is plugged back in
+    std::vector<std::string> gone;
     bool operator== (const MidiInputPlan&) const = default;
 };
 
-// `available` = the devices now; `previous` = the identifiers available at the last check; `openIds` = the ones open.
+// Round 190gh (B8, hot-plug): what changed between two device lists (inputs and outputs together). `added` / `removed`
+// are names (a device with an input and an output is named once); a device that came back under another identifier
+// (plugged into another USB port) is in neither, but `changed` is set, so its ports are opened again.
+struct MidiDeviceChange
+{
+    std::vector<std::string> added, removed;
+    bool changed = false; // any identifier or name differs
+    bool operator== (const MidiDeviceChange&) const = default;
+};
+MidiDeviceChange diffMidiDevices (const std::vector<MidiPort>& before, const std::vector<MidiPort>& after);
+
+// `available` = the devices now; `previous` = the identifiers available at the last check; `openIds` = the ones open
+// (including ones that are no longer available: they go to `gone`).
 MidiInputPlan planMidiInputs (const MidiPrefs& prefs, const std::vector<MidiPort>& available,
                               const std::vector<std::string>& previous, const std::vector<std::string>& openIds);
 

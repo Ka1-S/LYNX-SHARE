@@ -223,6 +223,7 @@ APP_SOURCES+=(src/core/LiveSession.cpp src/core/LiveCrypto.cpp src/engine/LiveLi
 APP_SOURCES+=(src/core/RemotePlugins.cpp src/engine/LiveRemotePlugins.cpp src/ui/LiveRemoteUi.cpp)
 # round 190c: the device-change and short-export self-tests (issues #134, #138)
 APP_SOURCES+=(src/engine/DeviceChangeTest.cpp src/engine/ShortExportTest.cpp)
+APP_SOURCES+=(src/engine/ExportParityTest.cpp src/engine/MidiHotplugTest.cpp)
 # round 190az: a CLAP plugin deleted on another thread while the message thread is blocked
 APP_SOURCES+=(src/engine/ClapTeardownTest.cpp)
 # LYNX substitutes for missing third-party plugins (round 98)
@@ -284,6 +285,7 @@ APP_SOURCES+=(src/core/PluginLayout.cpp src/core/StateParams.cpp src/ui/PluginEd
 APP_SOURCES+=(src/core/CrashReport.cpp src/ui/CrashReporter.cpp)
 # in-app update check + Update button (round 166b)
 APP_SOURCES+=(src/core/UpdateCheck.cpp src/ui/Updater.cpp)
+APP_SOURCES+=(src/core/AudioCheck.cpp src/ui/AudioCheck.cpp)
 # visual plugins: Wave Candy, Visualizer, video export (round 164c)
 APP_SOURCES+=(src/core/VisualFx.cpp src/ui/VisualEditors.cpp)
 # FL plugins LYNX lacked: Mute 2, Big Clock, Tuner, HTML NoteBook (round 165g)

@@ -17589,5 +17589,6 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "GenPreset190fsTests.inc"
 #include "Issues190ftTests.inc"
 #include "Flvsti190fwTests.inc"
-#include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup
 #include "Stability190ggTests.inc"
+#include "Small190ghTests.inc"
+#include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup

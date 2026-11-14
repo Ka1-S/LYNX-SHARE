@@ -2443,6 +2443,19 @@ void RackRenderer::clearOverriddenValues() noexcept
                     automationValues[w * 32 + b] = std::numeric_limits<float>::quiet_NaN(); // the control's own value
 }
 
+// Round 190gh (B7): where the song is for its automation and tempo: within the song (the transport wraps at its end),
+// except while it plays on past its end (a real-time bounce, a linear recording: liveInput's linearSong), where the
+// values hold as the song ended them — as an export's tail does — instead of starting over from the song's start.
+namespace
+{
+double linearSongTick (const LiveInput* liveInput, double startTick, double length) noexcept
+{
+    if (liveInput != nullptr && liveInput->linearSong.load (std::memory_order_relaxed))
+        return std::max (0.0, startTick);
+    return std::fmod (std::max (0.0, startTick), length);
+}
+} // namespace
+
 void RackRenderer::updateAutomation (const RackState& state, double startTick) noexcept
 {
     const auto& song = state.song;
@@ -2484,7 +2497,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
         else
         {
             const auto length = (double) std::max<std::int64_t> (1, state.schedule.songLength);
-            const auto tick = std::fmod (std::max (0.0, startTick), length);
+            const auto tick = linearSongTick (liveInput, startTick, length);
 
             // inside a clip of the pattern: its events; after one: the value it ended with; before the first:
             // no value (the target's own). Depends only on the position, like automation clips.
@@ -2523,7 +2536,7 @@ void RackRenderer::updateAutomation (const RackState& state, double startTick) n
     }
 
     const auto length = (double) std::max<std::int64_t> (1, state.schedule.songLength);
-    const auto tick = std::fmod (std::max (0.0, startTick), length);
+    const auto tick = linearSongTick (liveInput, startTick, length);
 
     for (std::size_t a = 0; a < state.automationClips.size(); ++a)
         if (! state.automationClips[a].empty() && state.automationFollowers[a] == 0)
@@ -3624,7 +3637,7 @@ void RackRenderer::process (const RackState* state,
     {
         const auto songMode = state->song.mode == PlayMode::song;
         const auto length = (double) std::max<std::int64_t> (1, state->schedule.songLength);
-        bpm = tempomap::tempoAt (state->song, songMode ? std::fmod (std::max (0.0, startTick), length) : std::max (0.0, startTick));
+        bpm = tempomap::tempoAt (state->song, songMode ? linearSongTick (liveInput, startTick, length) : std::max (0.0, startTick));
     }
 
     const auto tps = ticksPerSample (bpm, sampleRate);
@@ -3825,23 +3838,57 @@ void RackRenderer::process (const RackState* state,
     // Blocks larger than the mixer buffers are done in pieces. With automation, small
     // pieces so values move smoothly.
     const auto chunk = std::min (blockCapacity, state->hasAutomation ? 128 : chunkCapacity);
+    // (round 190gh, B7: while playing with automation, the pieces are those an export makes — blocks of 512 from the
+    // start, cut in pieces of 128 and where a pattern event falls — whatever the audio device's block size; a piece the
+    // block's end cuts goes on in the next block with the automation values it began with)
+    constexpr int piece = 128, exportBlock = 512;
+    const auto grid = playing && tps > 0.0 && state->hasAutomation && chunk >= std::min (piece, blockCapacity);
+    if (! playing || tps <= 0.0)
+        gridNextTick = -1.0;
+    else if (gridNextTick < 0.0 || std::abs (startTick - gridNextTick) > 1.0e-3)
+        gridSample = pieceStart = 0; // started, or jumped (a seek, the loop)
 
     for (int done = 0; done < numSamples;)
     {
         auto n = std::min (chunk, numSamples - done);
+        auto continuing = false;
+        const auto pos = gridSample + done;
+        if (grid)
+        {
+            const auto blockEnd = (pos / exportBlock + 1) * exportBlock;
+            auto pieceEnd = std::min<std::int64_t> (pieceStart + piece, blockEnd);
+            if (pos >= pieceEnd)
+            {
+                pieceStart = pos;
+                pieceEnd = std::min<std::int64_t> (pos + piece, blockEnd);
+            }
+            continuing = pos > pieceStart;
+            n = (int) std::min<std::int64_t> (std::min (blockCapacity, numSamples - done), pieceEnd - pos);
+        }
 
         // pattern events take effect at their own sample, as in FL (REA_rodada85 §3): a chunk ends where one falls
+        auto atEvent = false;
         if (playing && ! state->eventLanes.empty() && tps > 0.0)
         {
             const auto ahead = ticksToNextEvent (*state, startTick + done * tps);
             if (ahead < (double) n * tps)
+            {
                 n = std::max (1, (int) std::ceil (ahead / tps - 1.0e-9));
+                atEvent = true;
+            }
         }
         liveInputOffset = done;
-        processChunk (*state, playing, startTick + done * tps, n, left + done, right + done, meters);
+        processChunk (*state, playing, startTick + done * tps, n, left + done, right + done, meters, continuing);
         resumeAudio = false;
         chaseNotes = false;
         done += n;
+        if (grid && atEvent)
+            pieceStart = pos + n; // (the next piece starts at the event, as in an export)
+    }
+    if (playing && tps > 0.0)
+    {
+        gridSample += numSamples;
+        gridNextTick = startTick + numSamples * tps;
     }
     publishSoundingKeys ((int) state->song.channels.size());
 
@@ -4181,7 +4228,7 @@ constexpr std::uint64_t lightChunkNs = 60000; // 60 µs (about 1 % of a 256-samp
 } // namespace
 
 void RackRenderer::processChunk (const RackState& state, bool playing, double startTick, int numSamples,
-                                 float* left, float* right, MeterBank* meters) noexcept
+                                 float* left, float* right, MeterBank* meters, bool continuing) noexcept
 {
     const auto chunkStartNs = workers != nullptr ? ProcessTimes::now() : 0;
     chunkTick = startTick;
@@ -4200,7 +4247,9 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
 
     if (! state.modRoutes.empty()) // round 177b (before the automation applies the plugin-side parameters)
         updateModulators (state, playing ? startTick : liveTick, numSamples);
-    if (state.hasAutomation) // (a hair later: a chunk that starts on a pattern event's sample takes its value)
+    // (a hair later: a chunk that starts on a pattern event's sample takes its value; round 190gh: a piece that goes on
+    // from the previous block keeps the values it began with, as in an export)
+    if (state.hasAutomation && ! continuing)
         updateAutomation (state, startTick + 1.0e-6);
 
     chunkTps = ticksPerSample (bpm, sampleRate);

@@ -722,6 +722,17 @@ public:
     std::uint32_t getMidiPlayed() const noexcept { return midiPlayed.load (std::memory_order_relaxed); }
     // Closes and opens again every enabled MIDI input (the MIDI light's click; Settings › MIDI › Refresh).
     void reconnectMidiInputs();
+    // Round 190gh (B8): MIDI device hot-plug. The device lists are compared on the system's notification and every 2 s
+    // (FL: "MIDI devices have changed... refreshing..."): enabled inputs that appear are opened by name, an input that
+    // was unplugged while open is closed at once, the sync outputs and the controllers' feedback ports are opened
+    // again by name, the version below counts up (Settings › MIDI rebuilds its lists) and onMidiDevicesChanged gets
+    // the names plugged in and out (the hint bar). UI thread.
+    int getMidiDeviceListVersion() const noexcept { return midiDeviceListVersion; }
+    std::function<void (const juce::StringArray& added, const juce::StringArray& removed)> onMidiDevicesChanged;
+    // --selftest "midi_hotplug" / --midihotplugtest: stand-in device lists in place of the system's (empty = the
+    // system's), then "OK (...)" or "ERROR ..." (engine/MidiHotplugTest.cpp)
+    static std::function<juce::Array<juce::MidiDeviceInfo> (bool inputs)>& midiDeviceListOverride();
+    static juce::String midiHotplugSelfTest();
     const prefs::MidiPrefs& getMidiPrefs() const noexcept { return midiPrefs; }
     // Applies them (and saves them in %APPDATA%\LYNX\midi-settings.txt when `save`).
     void setMidiPrefs (const prefs::MidiPrefs& prefs, bool save = true);
@@ -918,6 +929,9 @@ public:
         // FL never puts the metronome in an export (round 165z-a2, measured): off, the click is left out even with
         // the metronome on. (The selftest turns it on to measure the click.)
         bool includeMetronome = false;
+        // Round 190gh (B7): > 0 renders exactly this many samples after the PDC trim (music, then the tail, without
+        // stopping at the tail's silence): the stems of one export all get the mix's length, as FL's split render
+        std::int64_t exactSamples = 0;
     };
 
     float renderOffline (const RenderOptions& options);
@@ -1010,6 +1024,11 @@ public:
     // `pluginFiles`: hosted plugins to add; `log` receives a line per change.
     static juce::String deviceChangeSelfTest (int switches, bool everyUnit, const juce::StringArray& pluginFiles = {},
                                               const std::function<void (const juce::String&)>& log = {});
+    // --selftest "export_parity" / --exportparitytest (round 190gh, B7; engine/ExportParityTest.cpp): the export against
+    // playback through a stand-in audio device (null below −90 dBFS), stems of every mode starting together with one
+    // length and adding up to the mix, group effects and multi-output inserts in "one per mixer insert", the delay
+    // compensation's trim on and off. "OK (...)" or "ERROR ...". `log` receives a line per check.
+    static juce::String exportParitySelfTest (const std::function<void (const juce::String&)>& log = {});
     // %APPDATA%\LYNX\audio-glitches.log: a line each time callbacks run over their deadline (at most every 2 s).
     static juce::File glitchLogFile();
 
@@ -1287,6 +1306,9 @@ private:
     std::atomic<int> scopeWrite { 0 };
     juce::MidiDeviceListConnection midiDevicesChanged;
     std::vector<std::string> lastMidiInputIds;       // the MIDI inputs available at the last check (UI thread)
+    std::vector<prefs::MidiPort> lastMidiPorts;       // inputs and outputs at the last check (ids "in:" / "out:"; UI thread)
+    bool midiPortsKnown = false;                     // lastMidiPorts was filled once (no hint for the start-up list)
+    int midiDeviceListVersion = 0;
     int midiCheckTicks = 0;
     std::atomic<std::uint32_t> midiActivity { 0 }, midiPlayed { 0 };
     prefs::MidiPrefs midiPrefs;                      // UI thread

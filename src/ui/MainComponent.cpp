@@ -102,6 +102,7 @@
 #include "ui/AudioEditor.h"
 #include "ui/TempoTapper.h"
 #include "ui/ExportDialog.h"
+#include "ui/AudioCheck.h"
 #include "ui/AlsExportDialog.h"
 #include "ui/OtherAppsExport.h"
 #include "ui/FlStudioExportDialog.h"
@@ -915,6 +916,15 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     engine.onSessionUndoSkipped = [] (const juce::StringArray& skipped) {
         ui::postHint ({ tr ("Undo left alone what someone else changed since: {0}", { skipped.joinIntoString (", ") }), {} }, 4000);
     };
+    // round 190gh (B8): a MIDI device plugged in or out while LYNX SHARE runs (FL: "New MIDI device detected")
+    engine.onMidiDevicesChanged = [] (const juce::StringArray& added, const juce::StringArray& removed) {
+        juce::StringArray lines;
+        if (! added.isEmpty())
+            lines.add (tr ("MIDI device connected: {0}", { added.joinIntoString (", ") }));
+        if (! removed.isEmpty())
+            lines.add (tr ("MIDI device disconnected: {0}", { removed.joinIntoString (", ") }));
+        ui::postNotice ({ lines.joinIntoString ("  ·  "), {} }, 5000);
+    };
     if (startStyle.style != layoutstyle::Style::pattern)
         setLayoutStyle (startStyle.style, false); // (the saved workspace layout is already this style's)
     updateGamepad(); // (round 184a, S16: only when the option is on)
@@ -973,6 +983,7 @@ MainComponent::~MainComponent()
     juce::Desktop::getInstance().removeGlobalMouseListener (&simpleClickKeys);
     workspace.onWillShow = nullptr;
     engine.onSessionUndoSkipped = nullptr;
+    engine.onMidiDevicesChanged = nullptr;
     PianoRollComponent::onSelectedKeys = nullptr;
     liveui::closeChat();
     liveui::setRemoteSession (nullptr, nullptr);
@@ -8600,9 +8611,16 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Built-in plugins (online list)..."), [] {
             juce::URL ("https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/PLUGINS.md").launchInDefaultBrowser();
         });
+        menu.addItem (tr ("Test audio output..."), [this] { showAudioCheck (engine); }); // (round 190gh, B23)
         menu.addItem (tr ("Report a problem..."), [this] { crashreporter::showManualReport (&engine.getDeviceManager()); });
         if (updater::offered()) // (not in the Store build: the Store updates it)
+        {
             menu.addItem (tr ("Check for updates..."), [] { updater::checkNow(); });
+            // round 190gh (B2): back to the version before the last update
+            const auto previous = updater::previousVersion();
+            menu.addItem (previous.isNotEmpty() ? tr ("Go back to {0}...", { previous }) : tr ("Go back to the previous version..."),
+                          [] { updater::goBack(); });
+        }
         // round 190fq (LYNX's own): an optional way to donate, next to About in every layout; it never unlocks anything
         menu.addItem (tr ("Support LYNX SHARE..."), [] { support::showSupportWindow(); });
         menu.addItem (tr ("About LYNX SHARE"), [] {

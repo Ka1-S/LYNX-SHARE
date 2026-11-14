@@ -73,6 +73,11 @@ public:
     // auto-sampler), whose files become samples again and must not carry a loop
     void setExtraData (bool on) noexcept { extraData = on; }
     AudioEngine& getEngine() noexcept { return *engine; }
+    // Round 190gh (B7): the file gets exactly `frames` samples (music, then the tail, padded with silence when it
+    // ends sooner): every stem of one export as long as the mix. 0 = the tail ends at its silence (as before).
+    void setExactFrames (std::int64_t frames) noexcept { exactFrames = frames; }
+    // the frames the last run() wrote (after the PDC trim and the tail)
+    std::int64_t getWrittenFrames() const noexcept { return writtenFrames; }
 
 private:
     bool writeBuffered (std::vector<float>& left, std::vector<float>& right, juce::String& error);
@@ -92,6 +97,7 @@ private:
     exportopts::WavExtras extras; // FL's extra data for WAV files
     bool extraData = false;
     float peak = 0.0f;
+    std::int64_t exactFrames = 0, writtenFrames = 0;
 };
 
 // Seconds the export of `song` with these options lasts (the music, all loops; no tail).
