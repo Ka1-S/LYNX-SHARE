@@ -198,7 +198,7 @@ public:
 
     // The track headers' width: FL's 96 px, the Simple workflow's wider headers (round 184a), or the linked headers
     // (round 190gz). updateHeaderWidth sets it; everything else only reads it.
-    static constexpr int flHeaderWidth = 96, simpleHeaderWidth = 232;
+    static constexpr int flHeaderWidth = 96, simpleHeaderWidth = 232, linkedHeaderWidth = 152;
     int headerWidth = flHeaderWidth;
     static constexpr int toolbarHeight = 32; // the panel title row (Workspace::titleHeight)
     static constexpr int overviewHeight = 16; // the overview strip under the toolbar (round 90)
@@ -507,7 +507,7 @@ private:
     // Simple headers' controls, laid out for FL's row heights: one row of buttons, the volume bar and pan from 34 px).
     bool linkedHeaders() const;
     void updateHeaderWidth(); // FL's, the Simple or the linked width, as the layout and the project ask
-    static constexpr int linkedHeaderWidth = 152, linkedTwoRows = 34;
+    static constexpr int linkedTwoRows = 34;
     void selectTrackChannel (int track); // the Simple workflow: a header click selects the track's channel
     int dropLaneTrack() const;          // the row the "drop files here" lane is drawn on, -1 none
     // a level drag on a Simple header: 1 volume, 2 pan (0 none)
