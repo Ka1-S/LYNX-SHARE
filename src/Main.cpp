@@ -205,6 +205,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdio>
+#include <ctime>
 #include <cstdlib>
 #include <mutex>
 #include <thread>
@@ -2293,10 +2294,16 @@ public:
             return;
         }
 
-        if (args.contains ("--stems"))
+        if (args.contains ("--stems") || args.contains ("--stemexport"))
         {
-            // LYNX.exe --stems project.(flp|als|lynx) base.wav: one WAV per insert that has sound (like "Export stems")
-            const auto i = args.indexOf ("--stems");
+            // LYNX.exe --stems project.(flp|als|lynx) base.wav [--separate]: one WAV per insert that has sound (like
+            // "Export stems"), in one render of the song (round 190gj; --separate: one render per insert, as before).
+            // LYNX.exe --stemexport project base.ext options.txt [--separate]: what the Export window writes with these
+            // options (exportopts::toText lines: stems, sections, the full mix, formats...), the same code.
+            // Both write <base>.txt: the files with their peaks, the renders, the wall and CPU time.
+            const auto full = args.contains ("--stemexport");
+            const auto i = args.indexOf (full ? "--stemexport" : "--stems");
+            const auto separate = args.contains ("--separate");
             juce::String error, report;
             int written = 0;
             {
@@ -2313,22 +2320,44 @@ public:
                     }
 
                 const auto& song = loader.getSong();
-
-                for (int t = 1; ok && t < (int) song.mixer.size(); ++t)
+                lynx::StemPlan plan;
+                if (full && ok)
+                    plan = lynx::planStemExport (song, lynx::exportopts::fromText (juce::File (args[i + 3].unquoted()).loadFileAsString().toStdString()), base);
+                else if (ok)
                 {
-                    if (std::none_of (song.channels.begin(), song.channels.end(), [t] (const lynx::ChannelDef& c) { return c.mixerTrack == t; }))
-                        continue;
-
-                    const auto file = base.getSiblingFile (base.getFileNameWithoutExtension() + " - " + juce::String (t) + ".wav");
+                    // every insert a channel goes to, as "<base> - <insert>.wav", 24-bit, 6 s of tail at most
                     lynx::ExportSettings settings;
-                    lynx::ExportJob job (lynx::makeBounceSong (song, t), settings, file);
-
-                    if (job.run ({}, error))
-                    {
-                        ++written;
-                        report << file.getFileName() << " peak=" << job.getPeak() << "\n";
-                    }
+                    plan.sets.push_back ({ song, settings.toOptions() });
+                    for (int t = 1; t < (int) song.mixer.size(); ++t)
+                        if (std::any_of (song.channels.begin(), song.channels.end(), [t] (const lynx::ChannelDef& c) { return c.mixerTrack == t; }))
+                            plan.items.push_back ({ juce::String (t), base.getSiblingFile (base.getFileNameWithoutExtension() + " - " + juce::String (t) + ".wav"), 0, t,
+                                                    lynx::makeBounceSong (song, t), settings.toOptions() });
                 }
+
+                const auto wallStart = juce::Time::getMillisecondCounterHiRes();
+                const auto cpuStart = std::clock();
+                lynx::StemRunStats stats;
+                std::vector<juce::String> lines (plan.items.size());
+                auto previous = wallStart; // (one render per file: the time since the file before is its render's)
+                written = lynx::runStemExport (
+                    plan, [] (std::function<void()> f) { f(); }, {}, {}, {},
+                    [&] (std::size_t k, bool done, float peak) {
+                        const auto now = juce::Time::getMillisecondCounterHiRes();
+                        if (done)
+                            lines[k] = plan.items[k].file.getFileName() + " peak=" + juce::String (peak) + " ms=" + juce::String (now - previous, 0) + "\n";
+                        previous = now;
+                    },
+                    separate, full, &stats);
+                const auto wallMs = juce::Time::getMillisecondCounterHiRes() - wallStart;
+                const auto cpuMs = 1000.0 * (double) (std::clock() - cpuStart) / (double) CLOCKS_PER_SEC;
+                for (const auto& line : lines)
+                    report << line;
+                report << "renders=" << (stats.passes + stats.alone) << " shared=" << stats.passes << " inshared=" << stats.inPass
+                       << " alone=" << stats.alone << "\n";
+                for (const auto& why : stats.why)
+                    report << "alone: " << why << "\n";
+                report << "wall_ms=" << juce::String (wallMs, 0) << " cpu_ms=" << juce::String (cpuMs, 0) << " make_ms=" << juce::String (stats.makeMs, 0)
+                       << " render_ms=" << juce::String (stats.renderMs, 0) << "\n";
             }
 
             report << "stems=" << written << "\n";
@@ -2927,6 +2956,93 @@ private:
     // Round 190dt (Linux / macOS): a plain fault, and LYNX's own fault inside a guarded plugin call (in its code, and in
     // the C library called from its code), must each leave the crash file with the signal: the plugin guard passes
     // LYNX's own faults on to the crash handler instead of swallowing them ("swallowed.txt" = it did).
+    // Round 190gj (P9): the inserts' stems from one render are the files each stem's own render writes, byte for byte
+    // (a short song with a bus, a send return, delay compensation, a channel on the Master, an automated insert and a
+    // side-chain that needs its own render), streamed (24-bit WAV with the full mix) and buffered (normalised float).
+    static juce::String stemsSinglePassSelfTest()
+    {
+        auto s = lynx::Song::makeDefault();
+        s.mixer = lynx::Song::defaultMixer (7);
+        for (std::size_t c = 0; c < s.channels.size(); ++c)
+            s.channels[c].mixerTrack = (int) c + 1;
+        auto onMaster = s.channels[2];
+        onMaster.mixerTrack = 0;
+        onMaster.pan = -0.4f;
+        s.channels.push_back (onMaster);
+        for (int step : { 1, 5, 9, 13 })
+            s.patterns[0].toggleStep ((int) s.channels.size() - 1, step);
+        s.mixer[0].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::limiter));
+        s.mixer[1].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::compressor));
+        s.mixer[2].toMaster = false;
+        s.mixer[2].sends = { lynx::MixerSend { 6, 1.0f } };
+        s.mixer[3].sends = { lynx::MixerSend { 7, 0.5f } };
+        s.mixer[3].latencyMs = 3.0f;
+        s.mixer[4].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::delay));
+        s.mixer[4].latencyMs = 5.0f;
+        s.mixer[4].sends = { lynx::MixerSend { 6, 0.7f } };
+        s.mixer[4].masterLevel = 0.8f;
+        auto keyed = lynx::makeEffectSlot (lynx::EffectKind::compressor);
+        keyed.sidechain = 1;
+        s.mixer[5].effects.push_back (keyed);
+        s.mixer[6].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::distortion));
+        s.mixer[7].effects.push_back (lynx::makeEffectSlot (lynx::EffectKind::reverb));
+        lynx::Automation a;
+        a.target = { lynx::AutomationTargetKind::mixerPan, 3 };
+        a.points = { { 0, 0.2f, 0.0f }, { 8 * lynx::ppq, 0.9f, 0.0f } };
+        s.automations.push_back (a);
+        s.playlist.clear();
+        for (int bar = 0; bar < 2; ++bar)
+            s.playlist.push_back ({ 0, 0, bar * 4 * lynx::ppq, 4 * lynx::ppq, 0 });
+        lynx::Clip automationClip;
+        automationClip.kind = lynx::ClipKind::automation;
+        automationClip.automation = 0;
+        automationClip.length = 8 * lynx::ppq;
+        automationClip.track = 1;
+        s.playlist.push_back (automationClip);
+        s.mode = lynx::PlayMode::song;
+
+        const auto dir = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile ("lynx-stems190gj-" + juce::String (juce::Time::currentTimeMillis()));
+        juce::String problems;
+        auto run = [&] (lynx::exportopts::Options o, const juce::String& name) {
+            o.stems = lynx::exportopts::Stems::mixerTracks;
+            o.maxTailSeconds = 3.0;
+            const auto alone = dir.getChildFile ("alone"), shared = dir.getChildFile ("shared");
+            alone.createDirectory();
+            shared.createDirectory();
+            const auto ext = juce::String (lynx::exportopts::extension (o.format));
+            const auto planAlone = lynx::planStemExport (s, o, alone.getChildFile (name + ext));
+            const auto planShared = lynx::planStemExport (s, o, shared.getChildFile (name + ext));
+            auto now = [] (std::function<void()> f) { f(); };
+            lynx::StemRunStats stats;
+            const auto a = lynx::runStemExport (planAlone, now, {}, {}, {}, {}, true);
+            const auto b = lynx::runStemExport (planShared, now, {}, {}, {}, {}, false, true, &stats);
+            if (a != (int) planAlone.items.size() || b != a)
+                problems << name << ": " << a << " / " << b << " files; ";
+            // (insert 5's side-chain needs its own render; a file whose render ends at its longest tail inside another's
+            // block too)
+            if (stats.passes != 1 || stats.inPass < 4 || stats.alone < 1)
+                problems << name << ": renders " << stats.passes << " shared, " << stats.inPass << " in it, " << stats.alone << " alone; ";
+            for (std::size_t k = 0; k < planShared.items.size() && k < planAlone.items.size(); ++k)
+            {
+                juce::MemoryBlock x, y;
+                planAlone.items[k].file.loadFileAsData (x);
+                planShared.items[k].file.loadFileAsData (y);
+                if (x.getSize() == 0 || x != y)
+                    problems << name << ": " << planShared.items[k].file.getFileName() << " differs; ";
+            }
+        };
+        lynx::exportopts::Options streamed;
+        streamed.wavBits = 24;
+        streamed.stemsIncludeMaster = true;
+        run (streamed, "streamed");
+        lynx::exportopts::Options buffered;
+        buffered.wavBits = 32;
+        buffered.normalize = true;
+        run (buffered, "buffered");
+        dir.deleteRecursively();
+        return problems.isEmpty() ? juce::String ("OK") : "ERROR " + problems;
+    }
+
     static juce::String faultReportSelfTest()
     {
        #if (JUCE_WINDOWS && (defined (_M_X64) || defined (__x86_64__))) \
@@ -4778,8 +4894,9 @@ private:
         });
         // round 190ci: a fault leaves a crash file, also on a stack Windows cannot walk (that FPC fault left none)
         const auto faultResult = faultReportSelfTest();
+        const auto stemsResult = stemsSinglePassSelfTest(); // round 190gj
         juce::LookAndFeel::setDefaultLookAndFeel (&lookBefore);
-        const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR")
+        const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR") && stemsResult == "OK"
                         && mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
@@ -4789,6 +4906,7 @@ private:
         juce::String report;
         report << "connections=" << offline.getNumGraphConnections() << "\n"
                << "peak=" << peak << "\n"
+               << "stems_single_pass=" << stemsResult << "\n"
                << "project=" << (projectOk ? "OK" : "ERROR " + error) << "\n"
                << "playlist_track_modes_roundtrip=" << (trackModes122Ok ? "OK" : "ERROR") << "\n"
                << "project_features=" << (richOk ? "OK" : "ERROR") << "\n"

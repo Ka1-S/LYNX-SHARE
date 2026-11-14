@@ -495,6 +495,21 @@ public:
         sideTrack = track;
     }
 
+    // Round 190gj (P9, FL's "Split mixer tracks" in one render): while set, every process() block copies the post-fader
+    // output of each `wanted` insert, and the Master's own input before its routes arrive (its channels: index 0), into
+    // `taps` at its place in the block. A part where an insert stays inactive (silent, idle) is left as it was: the
+    // export clears the taps before each block. Same thread as process(); set off playback (an offline render).
+    struct RenderTaps
+    {
+        int capacity = 0;                     // samples per block
+        std::vector<char> wanted;             // [track]
+        std::vector<std::vector<float>> data; // [track]: left (capacity samples) then right
+        bool wants (int t) const noexcept { return t >= 0 && (std::size_t) t < wanted.size() && wanted[(std::size_t) t] != 0; }
+        float* left (int t) noexcept { return data[(std::size_t) t].data(); }
+        float* right (int t) noexcept { return data[(std::size_t) t].data() + capacity; }
+    };
+    void setRenderTaps (RenderTaps* taps) noexcept { renderTaps = taps; }
+
     // Allocates the mixer buffers: call off the audio thread.
     // Blocks larger than maxBlockSize are processed in pieces.
     void prepare (double sampleRate, int maxBlockSize = 2048);
@@ -683,6 +698,8 @@ private:
     WorkerPool* workers = nullptr;
     LiveInput* liveInput = nullptr;
     HardwareOutput* hwOut = nullptr;
+    RenderTaps* renderTaps = nullptr; // round 190gj (single-pass stems)
+    void copyToRenderTap (int t, const float* l, const float* r, int n) noexcept;
     perf::Live* perfLive = nullptr;
     perf::Player perfPlayer;
     double perfClock = 0.0;      // the Player's steady clock (ticks): the transport's position, never wrapping

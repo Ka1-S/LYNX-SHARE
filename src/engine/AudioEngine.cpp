@@ -49,6 +49,7 @@
 #include "core/VfxScript.h"
 #include "core/SamplePrecompute.h"
 #include "engine/PreviewPlayer.h"
+#include "engine/RenderStream.h"
 #include "engine/PluginSandbox.h"
 #include "core/PluginPresets.h"
 #include "flp/Flp.h"
@@ -416,23 +417,30 @@ std::atomic<int>& AudioEngine::offlineRendersRunning() noexcept
     return count;
 }
 
+RenderStream::Setup AudioEngine::streamSetup (const RenderOptions& options, int latency)
+{
+    RenderStream::Setup setup;
+    setup.trim = (std::int64_t) juce::jmax (0, options.trimSamples + (options.trimPdc ? latency : 0));
+    setup.musicSamples = (std::int64_t) (options.seconds * options.sampleRate) + setup.trim;
+    setup.totalSamples = setup.musicSamples + (std::int64_t) (juce::jmax (0.0, options.tailSeconds) * options.sampleRate);
+    setup.sampleRate = options.sampleRate;
+    setup.keepOvers = options.keepOvers;
+    setup.ditherBits = options.ditherBits;
+    setup.ditherShaping = options.ditherShaping;
+    setup.output = options.output;
+    setup.capture = options.capture;
+    return setup;
+}
+
 float AudioEngine::renderOffline (const RenderOptions& options)
 {
     offlineRendersRunning().fetch_add (1, std::memory_order_acq_rel);
     const juce::ScopeGuard rendered { [] { offlineRendersRunning().fetch_sub (1, std::memory_order_acq_rel); } };
-    const auto seconds = options.seconds;
     const auto sampleRate = options.sampleRate;
-    auto* output = options.output;
     const auto& progress = options.progress;
-    const auto tailSeconds = options.tailSeconds;
-    const auto trimSamples = options.trimSamples;
-    std::optional<Dither> dither;
+    auto* shared = options.shared;
 
-    if (options.ditherBits > 0)
-        dither.emplace (options.ditherBits, options.ditherShaping);
-
-    constexpr int blockSize = 512;
-    constexpr float silence = 3.0e-5f; // ~ -90 dB
+    constexpr int blockSize = renderBlockSize;
     // "HQ for all plugins" (REA round 134): engines with FL render-quality settings use them (Sytrus) and HQ switches
     // are forced on; without it the export keeps the playback quality
     setOfflineRendering (options.hqAllPlugins);
@@ -490,19 +498,28 @@ float AudioEngine::renderOffline (const RenderOptions& options)
 
     juce::AudioBuffer<float> buffer (2, blockSize);
     juce::MidiBuffer midi;
-    float peak = 0.0f;
-    // PDC trim with the latency the plugins report once they have settled
-    const auto trim = (std::int64_t) juce::jmax (0, trimSamples + (options.trimPdc ? latency : 0));
-    lastRenderStats.trimmedSamples = (int) trim;
-    const auto musicSamples = (std::int64_t) (seconds * sampleRate) + trim;
-    const auto totalSamples = musicSamples + (std::int64_t) (juce::jmax (0.0, tailSeconds) * sampleRate);
-    std::int64_t quietSamples = 0;
+    // what is done after the graph (round 190gj: RenderStream, the same code as the single-pass stems' files), with the
+    // PDC trim of the latency the plugins report once they have settled
+    auto setup = streamSetup (options, latency);
+    lastRenderStats.trimmedSamples = (int) setup.trim;
+    const auto musicSamples = setup.musicSamples;
+    const auto totalSamples = setup.totalSamples;
+    if (shared != nullptr)
+    {
+        setup.output = nullptr;
+        setup.capture = nullptr;
+    }
+    RenderStream stream (std::move (setup));
     bool cancelled = lastRenderStats.warmUp.cancelled;
+    if (shared != nullptr && ! cancelled)
+        shared->start (latency);
 
     vfx::script::setSongEnded (false);
-    for (std::int64_t done = 0; done < totalSamples && ! cancelled; done += blockSize)
+    for (std::int64_t done = 0; ! cancelled;)
     {
-        const auto n = (int) juce::jmin<std::int64_t> (blockSize, totalSamples - done);
+        const auto n = shared != nullptr ? juce::jmin (blockSize, shared->nextBlock (done)) : stream.blockAt (done, blockSize);
+        if (n <= 0)
+            break;
         // the tail: the song has ended (VFX Script sees the transport stopped, like FL's render; round 167e)
         if (done >= musicSamples)
             vfx::script::setSongEnded (true);
@@ -513,46 +530,30 @@ float AudioEngine::renderOffline (const RenderOptions& options)
         const auto afterGraph = juce::Time::getMillisecondCounterHiRes();
         lastRenderStats.graphMs += afterGraph - before;
 
-        if (! options.keepOvers) // float WAV and the buffered export (normalize) keep what goes above 0 dBFS, like FL
-            for (int ch = 0; ch < view.getNumChannels(); ++ch)
-                clipOvers (view.getWritePointer (ch), n);
-
-        const auto blockPeak = view.getMagnitude (0, n);
-        peak = juce::jmax (peak, blockPeak);
-
-        if (dither)
-            for (int ch = 0; ch < view.getNumChannels(); ++ch)
-                dither->process (view.getWritePointer (ch), n, ch);
-
-        // PDC: the start is the latency's silence; the song's end arrives `trim` samples later
-        if ((output != nullptr || options.capture) && done + n > trim)
-        {
-            const auto skip = (int) juce::jmax<std::int64_t> (0, trim - done);
-            const auto beforeWrite = juce::Time::getMillisecondCounterHiRes();
-            if (output != nullptr)
-                output->writeFromAudioSampleBuffer (view, skip, n - skip);
-            if (options.capture)
-                options.capture (view.getReadPointer (0, skip), view.getReadPointer (1, skip), n - skip);
-            lastRenderStats.writeMs += juce::Time::getMillisecondCounterHiRes() - beforeWrite;
-        }
+        if (shared != nullptr)
+            shared->block (view, done, n);
+        else
+            stream.block (view, done, n);
 
         transport.positionTicks.store (transport.positionTicks.load() + n * transport.ticksPerSample());
 
         // in the tail: half a second of silence ends it
-        if (done + n > musicSamples)
-        {
-            quietSamples = blockPeak < silence ? quietSamples + n : 0;
+        if (stream.endedBySilence())
+            break;
 
-            if (quietSamples > (std::int64_t) (sampleRate * 0.5))
-                break;
-        }
-
-        if (progress && (done / blockSize) % 32 == 0 && ! progress ((double) done / (double) juce::jmax<std::int64_t> (1, totalSamples)))
+        // (a shared render reports its own progress, and is cancelled by ending its blocks)
+        if (shared == nullptr && progress && (done / blockSize) % 32 == 0
+            && ! progress ((double) done / (double) juce::jmax<std::int64_t> (1, totalSamples)))
         {
             cancelled = true;
             break;
         }
+        done += n;
+        if (stream.hasEnded())
+            break;
     }
+    lastRenderStats.writeMs = stream.getWriteMs();
+    const auto peak = stream.getPeak();
 
     stop();
     vfx::script::setSongEnded (false);
@@ -687,6 +688,26 @@ void AudioEngine::forEachHostedPlugin (const std::function<void (juce::AudioPlug
     for (std::size_t t = 0; t < song.mixer.size(); ++t)
         for (std::size_t s = 0; s < song.mixer[t].effects.size(); ++s)
             inGraph (patcher::graphOf (getEffect ((int) t, (int) s).get()));
+}
+
+void AudioEngine::getPublishedLatencies (std::vector<int>& channels, std::vector<std::vector<int>>& slots) const
+{
+    // RackState::latencies: the instruments, then the slots of every insert in order (buildPdc's layout)
+    const auto& shape = lastPublishedShape;
+    channels.clear();
+    slots.assign (shape.effects.size(), {});
+    auto next = shape.latencies.begin();
+    for (std::size_t c = 0; c < shape.instruments.size() && next != shape.latencies.end(); ++c)
+        channels.push_back (*next++);
+    for (std::size_t t = 0; t < shape.effects.size(); ++t)
+        for (std::size_t s = 0; s < shape.effects[t].size() && next != shape.latencies.end(); ++s)
+            slots[t].push_back (*next++);
+}
+
+void AudioEngine::setRenderTaps (RackRenderer::RenderTaps* taps) noexcept
+{
+    if (rackProcessor != nullptr)
+        rackProcessor->getRenderer().setRenderTaps (taps);
 }
 
 ProcessTimes* AudioEngine::getProcessTimes() noexcept

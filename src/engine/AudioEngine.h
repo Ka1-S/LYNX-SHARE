@@ -42,6 +42,7 @@
 #include "core/SnapshotExchange.h"
 #include "core/Song.h"
 #include "engine/PluginHost.h"
+#include "engine/RenderStream.h"
 #include "engine/SampleLibrary.h"
 #include "engine/StreamPrefetcher.h"
 #include "engine/Transport.h"
@@ -914,7 +915,23 @@ public:
         // FL never puts the metronome in an export (round 165z-a2, measured): off, the click is left out even with
         // the metronome on. (The selftest turns it on to measure the click.)
         bool includeMetronome = false;
+        // Round 190gj (several files from one render: StemPass, engine/Exporter.h). With `shared`, nothing goes to
+        // `output` / `capture` and the render's own end does not apply: after the warm-up shared->start (latency) is
+        // called (the latency the plugins report then), each block's size comes from shared->nextBlock (done) (0 = the
+        // end) and its output, as the graph made it (before the overs are clamped), goes to shared->block.
+        struct Shared
+        {
+            virtual ~Shared() = default;
+            virtual void start (int latency) = 0;
+            virtual int nextBlock (std::int64_t done) = 0;
+            virtual void block (const juce::AudioBuffer<float>& raw, std::int64_t done, int n) = 0;
+        };
+        Shared* shared = nullptr;
     };
+    static constexpr int renderBlockSize = 512; // renderOffline's blocks
+    // What renderOffline does after the graph with these options when the plugins report `latency` (round 190gj: the
+    // single-pass stems make each file with the same setup).
+    static RenderStream::Setup streamSetup (const RenderOptions& options, int latency);
 
     float renderOffline (const RenderOptions& options);
     // How many offline renders run now, in any engine (round 168s, issue #32). While one runs, the engine that plays
@@ -997,6 +1014,11 @@ public:
 
     // Total latency compensated by PDC (at the Master output), in samples.
     int getLatencySamples() const noexcept { return lastPublishedShape.pdc.total; }
+    // Round 190gj (single-pass stems): the latencies the published PDC plan was made from (the channels' instruments,
+    // then each insert's slots), for computing the plan of a changed copy of the song.
+    void getPublishedLatencies (std::vector<int>& channels, std::vector<std::vector<int>>& slots) const;
+    // The render taps of the rack (RackRenderer::RenderTaps; nullptr = none). Set around renderOffline only.
+    void setRenderTaps (RackRenderer::RenderTaps* taps) noexcept;
     // The last published PDC plan (per-track latencies: outLat, inAlign). Message thread.
     const PdcPlan& getPdcPlan() const noexcept { return lastPublishedShape.pdc; }
     // "Low latency while recording" (round 190aq): whether slot `slot` of insert `track` is bypassed for it now, the

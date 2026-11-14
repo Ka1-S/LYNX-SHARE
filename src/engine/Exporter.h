@@ -75,6 +75,18 @@ public:
     AudioEngine& getEngine() noexcept { return *engine; }
 
 private:
+    friend class StemPass;
+    // Round 190gj: a job that only writes `file` from samples another job's render makes (StemPass): no engine
+    struct NoEngine
+    {
+    };
+    ExportJob (const Song& song, const exportopts::Options& options, const juce::File& output, NoEngine);
+
+    // what run() renders into: the render's options with this file's writer (streamed) or capture (buffered), then the
+    // file finished from what came out (`renderedPeak` < 0: cancelled)
+    struct Sink; // (Exporter.cpp)
+    bool openSink (Sink& sink, juce::String& error);
+    bool closeSink (Sink& sink, float renderedPeak, juce::String& error);
     bool writeBuffered (std::vector<float>& left, std::vector<float>& right, juce::String& error);
     bool writeFile (const exportopts::Options& o, const juce::File& file, float* left, float* right, int frames, int channels, juce::String& error);
 
@@ -96,4 +108,88 @@ private:
 
 // Seconds the export of `song` with these options lasts (the music, all loops; no tail).
 double exportMusicSeconds (const Song& song, const exportopts::Options& options);
+
+// Round 190gj (P9): FL renders "Split mixer tracks" in one pass (TRENDERFORM; REA_rodada84 §1). LYNX's stem of an insert
+// is the render of makeBounceSong (song, insert); here one engine plays the song once, the output of every insert a stem
+// needs is tapped, and each file is made from what that stem's own render would have put out (exportopts::planStemTap,
+// StemMixer) by the same code (RenderStream, ExportJob's sink): the same file, bit for bit. A target the one render
+// cannot make exactly is left to its own render (result() == separate): the caller renders it with an ExportJob.
+class StemPass
+{
+public:
+    struct Target
+    {
+        int track = 0; // an insert (its stem), or 0: the song's own mix (the Master file)
+        juce::File file;
+    };
+    enum class Result
+    {
+        separate, // not made here: needs its own render
+        written,
+        failed
+    };
+
+    // On the message thread (the engine's plugins are made there).
+    StemPass (const Song& song, const exportopts::Options& options, const std::vector<Target>& targets);
+    ~StemPass();
+    void setExtraData (bool on) noexcept;
+
+    // The one render (any thread). False: cancelled, or the render could not start (`error`).
+    bool run (const std::function<bool (double)>& progress, juce::String& error);
+
+    std::size_t size() const noexcept { return outs.size(); }
+    Result result (std::size_t i) const noexcept;
+    juce::String getError (std::size_t i) const;
+    juce::String whySeparate (std::size_t i) const; // (a target that needs its own render: why)
+    float getPeak (std::size_t i) const noexcept;
+    AudioEngine& getEngine() noexcept;
+
+private:
+    struct Out;
+    struct Shared;
+    std::unique_ptr<ExportJob> main; // owns the engine that plays the song
+    std::vector<std::unique_ptr<Out>> outs;
+    exportopts::Options options;
+    bool masterInPass = false;
+};
+
+// The files of an export with stems or sections (the Export window, the Mixer's "Render armed tracks", --stemexport),
+// in the order they are written. A set is one song with its options (the song, or one of its marker sections).
+struct StemPlan
+{
+    struct Set
+    {
+        Song song;
+        exportopts::Options options;
+    };
+    struct Item
+    {
+        juce::String name;
+        juce::File file;
+        int set = 0;
+        int track = -1;        // the set's insert whose stem this is; 0: the set's song itself; −1: a channel stem
+        Song song;             // what the item's own render plays (as before round 190gj)
+        exportopts::Options options;
+    };
+    std::vector<Set> sets;
+    std::vector<Item> items;
+    bool sectioned = false;
+};
+// `onlyTracks`: the Mixer's armed / selected inserts (FL's "Render armed tracks"); empty = every insert with sound.
+StemPlan planStemExport (const Song& song, const exportopts::Options& options, const juce::File& base, const std::vector<int>& onlyTracks = {});
+
+// Renders a plan: every set's inserts (and its song, when asked) in one pass each (StemPass), the rest one render per
+// file, as before; `separate` = every file by its own render (the old way, for comparisons). `post` runs a call on the
+// message thread (where engines are made and deleted); `stop` asks the work to end (cancel). `progress` (0..1) and
+// `status` (the item's name) report; `done (item, ok)` after each file. Returns the files written.
+struct StemRunStats
+{
+    int passes = 0, inPass = 0, alone = 0; // renders shared, files made by them, files rendered alone
+    double makeMs = 0.0, renderMs = 0.0;     // making the engines (plugins), and rendering + writing
+    juce::StringArray why;                  // why files were rendered alone
+};
+int runStemExport (const StemPlan& plan, std::function<void (std::function<void()>)> post, std::function<bool()> stop,
+                   const std::function<void (double)>& progress, const std::function<void (const juce::String&)>& status,
+                   const std::function<void (std::size_t, bool, float)>& done, bool separate = false, bool extraData = true,
+                   StemRunStats* stats = nullptr);
 } // namespace lynx
