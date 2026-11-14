@@ -675,9 +675,17 @@ StemTap planStemTap (const Song& shared, int track, const std::vector<int>& chan
 
     // the stem render takes the Master's automation, events and effects out: its blocks would be cut differently, and
     // what the Master's effects control is not in it
+    // (the Master's automation clips only move the Master, which the stem render leaves out; they matter when they are
+    // the song's only automation: without them that render takes its blocks in pieces of another size)
+    const auto otherAutomation = std::any_of (shared.automations.begin(), shared.automations.end(), [&] (const Automation& a) {
+        const auto& t = a.target;
+        return (t.kind == AutomationTargetKind::channelVolume || t.kind == AutomationTargetKind::channelPan)
+                   ? t.index >= 0 && t.index < (int) shared.channels.size()
+                   : (t.kind == AutomationTargetKind::mixerVolume || t.kind == AutomationTargetKind::mixerPan) && t.index > 0 && t.index < n;
+    });
     for (const auto& a : shared.automations)
-        if (onMaster (a.target))
-            return fail ("the Master is automated");
+        if (onMaster (a.target) && ! otherAutomation)
+            return fail ("the Master is automated (the song's only automation)");
     for (const auto& p : shared.patterns)
         for (const auto& lane : p.events)
             if (onMaster (lane.target))

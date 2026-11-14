@@ -132,7 +132,9 @@ TEST (stems190gj_plan_says_which_stems_one_render_makes)
     CHECK (! plan (soloed, 1).ok);
     auto masterAuto = s;
     masterAuto.automations[0].target = { lynx::AutomationTargetKind::mixerVolume, 0 };
-    CHECK (! plan (masterAuto, 1).ok);
+    CHECK (! plan (masterAuto, 1).ok); // (the only automation: the stem render's blocks would be cut otherwise)
+    masterAuto.automations.push_back (s.automations[0]);
+    CHECK (plan (masterAuto, 1).ok);
     auto routeAuto = s;
     routeAuto.automations[0].target = { lynx::AutomationTargetKind::mixerSend, 1, 0 };
     CHECK (! plan (routeAuto, 1).ok && plan (routeAuto, 3).ok);
@@ -148,7 +150,18 @@ TEST (stems190gj_plan_says_which_stems_one_render_makes)
 
 TEST (stems190gj_taps_of_one_render_equal_each_stems_own_render)
 {
-    const auto s = s190gj::song();
+    auto s = s190gj::song();
+    // the Master's fader automated too (its stem renders leave it out)
+    lynx::Automation masterFader;
+    masterFader.target = { lynx::AutomationTargetKind::mixerVolume, 0 };
+    masterFader.points = { { 0, 0.8f, 0.0f }, { 8 * lynx::ppq, 0.3f, 0.0f } };
+    s.automations.push_back (masterFader);
+    lynx::Clip fade;
+    fade.kind = lynx::ClipKind::automation;
+    fade.automation = (int) s.automations.size() - 1;
+    fade.length = 8 * lynx::ppq;
+    fade.track = 2;
+    s.playlist.push_back (fade);
     const std::vector<int> channels (s.channels.size(), 0);
     std::vector<std::vector<int>> slots (s.mixer.size());
     for (std::size_t t = 0; t < s.mixer.size(); ++t)
