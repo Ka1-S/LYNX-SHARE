@@ -41,19 +41,18 @@ MODULES=(juce_core juce_data_structures juce_events juce_graphics juce_gui_basic
 # only replace the file if it changed, so the module cache is not invalidated
 cmp -s "$OUT/JuceConfig.h.new" "$OUT/JuceConfig.h" 2>/dev/null && rm "$OUT/JuceConfig.h.new" || mv "$OUT/JuceConfig.h.new" "$OUT/JuceConfig.h"
 
-# Release optimisation (round toolchain190gt; docs/PLATFORMS.md "Release optimisation"):
-#  LYNX_WIN_OPT  the optimisation flags of LYNX's and JUCE's C++. Default -O2 -fno-math-errno (sqrt and friends inline:
-#                LYNX never reads errno after maths; Apple's clang builds this way by default). Note zig maps -O3 to the
-#                same code as -O2; a real -O3 is "-O2 -Xclang -O3" (measured: no gain over ThinLTO);
-#  LYNX_WIN_LTO  thin = ThinLTO for LYNX's own objects (zig keeps LTO off unless asked; JUCE's modules stay out), 0 = none;
-#  LYNX_WIN_GC   1 = the link drops unreferenced code and folds identical functions (see "Linking" below), 0 = off.
-# LYNX_WIN_LTO=0 LYNX_WIN_GC=0 gives a quicker development build (no LTO link).
+# Release optimisation (round toolchain190gt; numbers in docs/PLATFORMS.md "Release optimisation"):
+#  LYNX_WIN_OPT  the optimisation flags of LYNX's and JUCE's C++, default -O2. (zig gives -O3 the same code as -O2; a
+#                real -O3 is "-O2 -Xclang -O3". -fno-math-errno gained nothing on Windows (-3..0 %) and on MinGW
+#                it turns sin + cos of one value into a call of the C runtime's sincos. )
+#  LYNX_WIN_LTO  thin = ThinLTO for LYNX's own objects (JUCE's modules stay out), default 0: measured on Windows it gained
+#                0-14 % (streaming most) but made the FL Harmless engine 1.5x slower (fixed by keeping Harmless.cpp
+#                out of it), for a 15-25 minute link. Off until each engine is checked under it.
+#  LYNX_WIN_GC   1 = the link drops unreferenced code and folds identical functions (see "Linking" below), default 1.
 # -ffp-contract=off always, as CMakeLists.txt does for Linux and macOS: no fused multiply-add, so the FL-exact engines keep
 # their operation order whatever CPU the code is built for (baseline x86-64 has no FMA, so today it changes nothing).
-LYNX_WIN_OPT="${LYNX_WIN_OPT:--O2 -fno-math-errno}"
-# (the plugins, LYNX_BUILD_PLUGINS=1, link the same objects once per plugin: ThinLTO there means one LTO link per plugin,
-# so it is off unless asked)
-if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then LYNX_WIN_LTO="${LYNX_WIN_LTO:-0}"; else LYNX_WIN_LTO="${LYNX_WIN_LTO:-thin}"; fi
+LYNX_WIN_OPT="${LYNX_WIN_OPT:--O2}"
+LYNX_WIN_LTO="${LYNX_WIN_LTO:-0}"
 LYNX_WIN_GC="${LYNX_WIN_GC:-1}"
 read -ra WIN_OPT <<< "$LYNX_WIN_OPT"
 WIN_LTO=(); [[ "$LYNX_WIN_LTO" == thin ]] && WIN_LTO=(-flto=thin)
@@ -163,6 +162,7 @@ export COMMON_STR="${COMMON[*]}"
 # made the ThinLTO link several times longer for UI code
 JUCE_COMMON=(); for a in "${COMMON[@]}"; do [[ "$a" == -flto* ]] || JUCE_COMMON+=("$a"); done
 export JUCE_COMMON_STR="${JUCE_COMMON[*]}"
+export NOLTO_COMMON_STR="$JUCE_COMMON_STR"
 
 echo "Compiling JUCE modules (cached)..."
 # the modules and the extra units JUCE's CMake compiles along with them, in one parallel pool
@@ -367,7 +367,8 @@ printf '%s\n' "${APP_SOURCES[@]}" | xargs -P "$JOBS" -I{} bash -c '
     src={}; obj="$OUT/app/$(echo "$src" | tr / _).o"
     extra=""; [[ "$src" == src/platform/CrashGuard.cpp ]] && extra="-fms-extensions"
     [[ "$src" == src/ui/CrashReporter.cpp ]] && extra="-iquote $OUT"
-    cached_pp "$obj" -- $ZIG c++ $COMMON_STR $extra -Wall -Wextra -Werror=return-type -c "$src" -o "$obj"'
+    common="$COMMON_STR"; [[ "$src" == src/core/Harmless.cpp ]] && common="$NOLTO_COMMON_STR" # (1.5x slower under ThinLTO)
+    cached_pp "$obj" -- $ZIG c++ $common $extra -Wall -Wextra -Werror=return-type -c "$src" -o "$obj"'
 
 # 2026-11-04: an object whose source left APP_SOURCES (another branch's build in this folder) must not be linked
 # by the app/*.o glob below: it broke unrelated landings with undefined symbols.

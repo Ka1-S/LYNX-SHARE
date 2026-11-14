@@ -84,21 +84,23 @@ round 117 notes (`docs/analise/REA_rodada117.md`) list the measured differences.
 ## Release optimisation
 
 Measured in round toolchain190gt with `perfbench` (round 190ge: the engine's render as the audio callback does it,
-instructions and cycles per sample, a hash of every output sample), the same source built several ways, interleaved.
-- **Windows** (`scripts/build-windows-zig.sh`): `-O2 -fno-math-errno`, ThinLTO for LYNX's own objects (JUCE's modules
-  stay out of it), and a link that drops unreferenced code and folds identical functions (`-OPT:REF -OPT:SAFEICF`,
-  see the script). Against the old `-O2` build, on the Linux build of the same compiler (zig 0.14.1 = LLVM 19): 2–25 %
-  fewer instructions and 0–22 % fewer cycles per sample over six scenarios, every output bit-identical. `LYNX_WIN_LTO=0
-  LYNX_WIN_GC=0` builds without the LTO link for development.
-  - zig gives `-O3` the same code as `-O2`; a real `-O3` (`-Xclang -O3`) measured no better than ThinLTO.
-  - `-mcpu=x86_64_v2` (SSE4.2) measured no gain on Linux and changes some outputs; it would also need a CPU check
-    before any static constructor. Not used.
-- **Linux** (GCC 13, `-O3`, LTO of the app's own objects): unchanged. Link-time optimising the core too, and
-  `-fno-math-errno`, measured no gain with GCC. Against Clang, GCC's core needed 12–38 % more cycles on the two FL demo
-  projects and 9–22 % fewer on the LYNX-native scenarios (an open question for a later round).
+instructions and cycles per sample, a hash of every output sample), the same source built several ways, interleaved; on
+Windows `perfbench.exe` linked from a Windows build's own objects (thread cycles).
+- **Windows** (`scripts/build-windows-zig.sh`): `-O2`, `-ffp-contract=off` (as Linux and macOS; it was missing), and a
+  link that drops unreferenced code and folds identical functions (`-OPT:REF -OPT:SAFEICF`, objects with
+  `-ffunction-sections -fdata-sections -faddrsig`; see the script for why zig needs a hand here). __WINGC__
+  - ThinLTO (`LYNX_WIN_LTO=thin`): 0–14 % fewer cycles on Windows (streamed audio most) but the FL Harmless engine ran
+    1.5× slower under it (Harmless.cpp is kept out of LTO when it is on), and the link takes 15–25 minutes. Off.
+  - `-fno-math-errno`: up to 25 % fewer cycles on Linux, none on Windows (0 to 3 % more); on MinGW it also turns `sin` +
+    `cos` of one value into the C runtime's `sincos`. Not used.
+  - zig gives `-O3` byte-identical objects to `-O2`; a real `-O3` (`-Xclang -O3`) measured no better than ThinLTO.
+  - `-mcpu=x86_64_v2` (SSE4.2, POPCNT): 0–3 % fewer cycles on Windows, outputs identical; it would need a CPU check
+    before any static constructor (a "CPU too old" box instead of a crash). Not used yet.
+  - Measuring: a zig build without `-target` compiles for the host CPU (`-mcpu=native`), unlike the release.
+- **Linux** (GCC 13, `-O3`, LTO of the app's own objects): unchanged. Link-time optimising the core too (it is a separate
+  static library the app's LTO never reached), and `-fno-math-errno`, measured no gain with GCC.
 - **macOS**: unchanged (Apple's clang `-O3`, LTO of the app's own objects; Darwin has no maths `errno`).
-- The Clang job of the Tests workflow compiles the core with the Windows flags (`LYNX_OPT_FLAGS`, `scripts/build-local.sh`),
-  so the bit-exact goldens check that codegen.
+- `scripts/build-local.sh` takes `LYNX_OPT_FLAGS` (default `-O2`) to run the test suite with other optimisation flags.
 
 ## Windows plugins on Linux (yabridge)
 
