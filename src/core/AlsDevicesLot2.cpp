@@ -597,6 +597,9 @@ bool saturatorToEmber (const Element& device, Translated& out)
     const auto& fit = saturatorFit (type);
     static const char* const styleNames[4] { "tube", "tape", "transistor", "fuzz" };
     p[style] = (float) fit.style / (float) (styles - 1);
+    // round 190fj: the fits above were made on the Classic tape curve (Bass Shaper, Hard Curve); the measured magnetic
+    // core is the reference tape saturator's law, not Live's static curves
+    p[(std::size_t) mixsuite::ember::law] = 0.0f;
     if (fit.character > 0)
         p[(std::size_t) characterParam (0)] = (float) fit.character / (float) characters;
     out.notes.approximated.push_back (std::string ("curve ") + fit.name + " as Ember's "

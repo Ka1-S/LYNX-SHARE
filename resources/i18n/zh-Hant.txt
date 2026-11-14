@@ -9973,3 +9973,4 @@ countries: tw hk mo
 "Soft|Medium|Hard" = "柔和|中等|強硬"
 "Crunch" = "Crunch"
 "Boom" = "Boom"
+"30 ips|15|7.5|3.75|1.875" = "30 ips|15|7.5|3.75|1.875"

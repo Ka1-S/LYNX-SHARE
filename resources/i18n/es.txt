@@ -9973,3 +9973,4 @@ countries: es mx ar co cl pe ve
 "Soft|Medium|Hard" = "Suave|Medio|Duro"
 "Crunch" = "Crunch"
 "Boom" = "Boom"
+"30 ips|15|7.5|3.75|1.875" = "30 ips|15|7,5|3,75|1,875"

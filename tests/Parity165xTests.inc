@@ -300,10 +300,10 @@ TEST (max_effect_params_192_round165x)
 {
     using namespace lynx;
     CHECK (maxEffectParams == 192);
-    // every engine fits; Ember (160) can grow again
+    // every engine fits; Ember (163) can grow again
     for (int k = 0; k <= (int) lastEffectKind; ++k)
         CHECK (effectInfo ((EffectKind) k).params.size() <= (std::size_t) maxEffectParams);
-    CHECK ((int) effectInfo (EffectKind::ember).params.size() == 161);
+    CHECK ((int) effectInfo (EffectKind::ember).params.size() == 163);
     // an engine with more than 160 parameters (the Control Surface: one per output) round-trips through a saved file
     // (a user preset: every parameter by name, like a project's list; the project reader itself is checked by the
     // app's --selftest "old project (160 of n params)" cases)

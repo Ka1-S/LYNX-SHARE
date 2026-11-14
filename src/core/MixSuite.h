@@ -479,8 +479,18 @@ enum Param
     // the curve (core/EmberClassic.h: styles driven hard hold the reference's uneven square wave). Off = round
     // trial187b's tables: what a project saved before loads with (upgradeLoadedEffectParams). Drives up to 5 ignore it.
     classicHot,
+    // round 190fj (appended; Measured for new instances, Classic for projects saved before): the Style menu's Tape on a
+    // measured magnetic core (core/EmberTape.h: hysteresis between a record and a playback EQ, the level law and the
+    // speed losses fitted black-box on the reference tape saturator's renders) in the single-band mode, and the tape
+    // speed it runs at (30, 15, 7½, 3¾, 1⅞ ips; 15 by default). Classic = the tape curve of round 108 … 190, bit for bit.
+    law, tapeSpeed,
     count
 };
+constexpr int tapeSpeeds = 5;
+int tapeSpeedIndex (float v) noexcept;          // 0 … 4 = 30, 15, 7½, 3¾, 1⅞ ips
+const char* tapeSpeedName (int k) noexcept;
+// round 190fj: the single-band Tape runs the measured core (Law = Measured, no voice / character on band 1)
+bool measuredTape (const EffectParams& p) noexcept;
 // round 165: an editor edit of `param` with the Classic voicing's Auto on also moves Output (the reference's link);
 // returns every (parameter, value) to set — just the edit itself when nothing is linked
 std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value);

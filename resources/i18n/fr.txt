@@ -9973,3 +9973,4 @@ countries: fr be ch ca lu
 "Soft|Medium|Hard" = "Doux|Moyen|Dur"
 "Crunch" = "Crunch"
 "Boom" = "Boom"
+"30 ips|15|7.5|3.75|1.875" = "30 ips|15|7,5|3,75|1,875"
