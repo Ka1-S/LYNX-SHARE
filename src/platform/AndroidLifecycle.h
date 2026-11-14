@@ -4,10 +4,13 @@
 
 #include <juce_core/juce_core.h>
 
+#if JUCE_ANDROID || defined(LYNX_ANDROID)
+#include <jni.h>
+#endif
+
 namespace lynx::platform
 {
 #if JUCE_ANDROID || defined(LYNX_ANDROID)
-#include <jni.h>
 
 class AndroidLifecycle
 {
@@ -54,9 +57,13 @@ private:
     std::vector<LifecycleCallback> lowMemoryCallbacks;
 };
 
-// JNI bridge functions called from Java
-extern "C" {
+#endif
+} // namespace lynx::platform
 
+extern "C" {
+#if JUCE_ANDROID || defined(LYNX_ANDROID)
+
+// JNI bridge functions called from Java
 JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeStart(JNIEnv* env, jobject thiz);
 JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeResume(JNIEnv* env, jobject thiz);
 JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativePause(JNIEnv* env, jobject thiz);
@@ -67,11 +74,9 @@ JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeLowMemory(JNIEnv
 JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeTrimMemory(JNIEnv* env, jobject thiz, jint level);
 JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeWindowFocusChanged(JNIEnv* env, jobject thiz, jboolean hasFocus);
 JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeRequestPermissionsResult(JNIEnv* env, jobject thiz,
-                                                                                         jint requestCode,
-                                                                                         jobjectArray permissions,
-                                                                                         jintArray grantResults);
-
-}
+                                                                                          jint requestCode,
+                                                                                          jobjectArray permissions,
+                                                                                          jintArray grantResults);
 
 #endif
-} // namespace lynx::platform
+}
