@@ -10022,6 +10022,8 @@ countries: jp
 "Flux: how much the grains' timing varies at random" = "Flux：グレインのタイミングがランダムに揺れる量"
 "Formants: how much of the sound's formants are kept when it is transposed" = "フォルマント：移調したときに音のフォルマントをどれだけ保つか"
 "Envelope: the size of the spectral envelope Complex Pro keeps" = "Envelope：Complex Pro が保つスペクトル包絡の大きさ"
+"Measured" = "実測"
+"Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats の法則：Classic は 0.1.28 より前の LYNX と同じ鳴り方（このプロジェクトはその頃に保存）、実測は Live 12.4 のレンダーに従う"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] エディターを開く/閉じる  [Alt]+[LMB] 他を開いたまま  [Ctrl]+[LMB] 試聴  [2xLMB] ピアノロール  [LMB] 上下ドラッグで並べ替え  [RMB] チャンネルメニュー"

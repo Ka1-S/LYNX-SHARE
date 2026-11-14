@@ -10022,6 +10022,8 @@ countries: tr
 "Flux: how much the grains' timing varies at random" = "Flux: tanelerin zamanlamasının rastgele ne kadar değiştiği"
 "Formants: how much of the sound's formants are kept when it is transposed" = "Formantlar: ses transpoze edildiğinde formantlarının ne kadarının korunduğu"
 "Envelope: the size of the spectral envelope Complex Pro keeps" = "Envelope: Complex Pro'nun koruduğu spektral zarfın boyutu"
+"Measured" = "Ölçülmüş"
+"Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats yasası: Classic, 0.1.28 öncesi LYNX gibi çalar (bu proje o zaman kaydedildi); Ölçülmüş, Live 12.4 renderlarını izler"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editörü aç/kapat  [Alt]+[LMB] diğerlerini açık tut  [Ctrl]+[LMB] dinle  [2xLMB] Piano Roll  [LMB] yukarı/aşağı sürükle sıralar  [RMB] kanal menüsü"

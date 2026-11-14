@@ -10022,6 +10022,8 @@ countries: cn sg
 "Flux: how much the grains' timing varies at random" = "Flux：颗粒时间随机变化的程度"
 "Formants: how much of the sound's formants are kept when it is transposed" = "共振峰：移调时保留多少声音的共振峰"
 "Envelope: the size of the spectral envelope Complex Pro keeps" = "Envelope：Complex Pro 保留的频谱包络大小"
+"Measured" = "实测"
+"Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats 规律：Classic 按 0.1.28 之前的 LYNX 播放（此项目当时保存）；实测遵循 Live 12.4 的渲染"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] 打开/关闭编辑器  [Alt]+[LMB] 保持其他编辑器打开  [Ctrl]+[LMB] 试听  [2xLMB] 钢琴卷帘  [LMB] 上下拖动重新排序  [RMB] 通道菜单"

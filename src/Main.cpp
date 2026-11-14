@@ -4820,6 +4820,54 @@ private:
             }
         }
 
+        // round 190gx: Beats' law in the .lynx — a new project's channels are Measured; a project saved before the law
+        // (no "beatsLaw190gx" mark, or a nine-number warpModes list) loads Classic; a Classic channel stays Classic
+        juce::String beatslaw190gxResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::ChannelDef channel;
+            channel.instrument = lynx::InstrumentKind::audioClip;
+            channel.samplePath = "beatslaw190gx.wav";
+            channel.sampler.keepPitch = true;
+            channel.sampler.stretchMethod = lynx::StretchMethod::beats;
+            song.channels.push_back (channel);
+            const auto index = song.channels.size() - 1;
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto lawOf = [&] (const juce::String& text) {
+                const auto back = lynx::ProjectFile::fromJson (text, why);
+                return back && back->channels.size() > index ? (int) back->channels[index].sampler.warpModes.beatsLaw : -1;
+            };
+            auto oldVar = juce::JSON::parse (json); // (the mark removed: a project saved before 190gx)
+            if (auto* o = oldVar.getDynamicObject())
+                o->removeProperty ("beatsLaw190gx");
+            const auto old = juce::JSON::toString (oldVar);
+            auto classic = song;
+            classic.channels[index].sampler.warpModes.beatsLaw = lynx::WarpModeSettings::beatsLawClassic;
+            auto nine = song;
+            nine.channels[index].sampler.warpModes.beatsLoop = 0; // (a 190fm project with a changed setting: nine numbers)
+            // (the list with its tenth number, the law, removed: what a 190fm build wrote)
+            auto nineVar = juce::JSON::parse (lynx::ProjectFile::toJson (nine));
+            bool trimmed = false;
+            if (auto* channels = nineVar.getProperty ("channels", {}).getArray(); channels != nullptr && (int) index < channels->size())
+                if (auto* modes = (*channels)[(int) index].getProperty ("samplerSettings", {}).getProperty ("warpModes", {}).getArray(); modes != nullptr && modes->size() == 10)
+                {
+                    modes->removeLast();
+                    trimmed = true;
+                }
+            const auto nineJson = juce::JSON::toString (nineVar);
+            if (! json.contains ("beatsLaw190gx") || old.contains ("beatsLaw190gx"))
+                beatslaw190gxResult = "ERROR mark";
+            else if (lawOf (json) != lynx::WarpModeSettings::beatsLawMeasured)
+                beatslaw190gxResult = "ERROR new " + why;
+            else if (lawOf (old) != lynx::WarpModeSettings::beatsLawClassic)
+                beatslaw190gxResult = "ERROR old " + why;
+            else if (lawOf (lynx::ProjectFile::toJson (classic)) != lynx::WarpModeSettings::beatsLawClassic)
+                beatslaw190gxResult = "ERROR classic kept " + why;
+            else if (! trimmed || lawOf (nineJson) != lynx::WarpModeSettings::beatsLawClassic)
+                beatslaw190gxResult = "ERROR nine-number list";
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -5102,7 +5150,7 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
-                        && midigen190fmResult == "OK" && clipenv190giResult == "OK"
+                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK"
                         && danceWindowResult == "OK" && clickActivationResult == "OK";
 
         juce::String report;
@@ -5160,6 +5208,7 @@ private:
                << "livewf190em=" << livewf190emResult << "\n"
                << "midigen190fm_saved=" << midigen190fmResult << "\n"
                << "clipenv190gi_saved=" << clipenv190giResult << "\n"
+               << "beatslaw190gx_saved=" << beatslaw190gxResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 

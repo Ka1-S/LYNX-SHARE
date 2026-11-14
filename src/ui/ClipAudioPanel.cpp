@@ -510,6 +510,15 @@ public:
             if (! refreshing)
                 editMode ([v = preserve.getSelectedId() - 1] (Song& s, int c) { warpmodes::setPreserve (s, c, v); });
         };
+        // round 190gx: Beats' law, shown only for a channel of a project saved before the Measured law (Classic), so it
+        // can be moved to Live's measured law (new channels are Measured and show Live's box alone)
+        beatsLaw.addItem (tr ("Classic"), 1);
+        beatsLaw.addItem (tr ("Measured"), 2);
+        beatsLaw.setTooltip (tr ("Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders"));
+        beatsLaw.onChange = [this] {
+            if (! refreshing)
+                editMode ([v = beatsLaw.getSelectedId() - 1] (Song& s, int c) { warpmodes::setBeatsLaw (s, c, v); });
+        };
         loopMode.onChoose = [this] (int v) {
             if (! refreshing)
                 editMode ([v] (Song& s, int c) { warpmodes::setLoopMode (s, c, v); });
@@ -644,7 +653,7 @@ public:
         for (auto* c : std::initializer_list<juce::Component*> { &warp, &mode, bpm.get(), &halve, &twice, &gain, &pitchKnob, &semitones, &cents, &reverse, &edit, &fade })
             addAndMakeVisible (*c);
         for (auto* c : std::initializer_list<juce::Component*> { &preserve, &loopMode, envelope.get(), grainTones.get(), grainTexture.get(), flux.get(),
-                                                                 proFormants.get(), proEnvelope.get() })
+                                                                 proFormants.get(), proEnvelope.get(), &beatsLaw })
             addChildComponent (*c);
 
         editor = makeAudioEditorPanel (engine, channel, -1, true);
@@ -776,6 +785,7 @@ public:
             auto row3 = left.removeFromTop (20);
             flux->setBounds (row3);
             proEnvelope->setBounds (row3);
+            beatsLaw.setBounds (row3.withTrimmedTop (3)); // (Beats, Classic projects only)
         }
         fade.setBounds (left.removeFromBottom (18).withWidth (left.getWidth() / 2 - 2));
         left.removeFromBottom (4);
@@ -917,6 +927,9 @@ private:
         proFormants->repaint();
         proEnvelope->repaint();
         preserve.setVisible (beats);
+        lawShown = lawShown || (beats && s.warpModes.beatsLaw == WarpModeSettings::beatsLawClassic);
+        beatsLaw.setVisible (beats && lawShown);
+        beatsLaw.setSelectedId (s.warpModes.beatsLaw == WarpModeSettings::beatsLawClassic ? 1 : 2, n);
         loopMode.setVisible (beats);
         envelope->setVisible (beats);
         grainTones->setVisible (tones);
@@ -962,7 +975,8 @@ private:
     AudioEngine& engine;
     int track, scene, channel;
     juce::TextButton warp, halve, twice, reverse, edit, fade;
-    juce::ComboBox mode, preserve;
+    juce::ComboBox mode, preserve, beatsLaw;
+    bool lawShown = false;                         // round 190gx: a Classic channel was shown (the law chooser stays)
     LoopModeChooser loopMode;                      // round 190gx: Live's icon chooser
     std::unique_ptr<ui::NumBox> bpm, envelope, grainTones, grainTexture, flux, proFormants, proEnvelope;
     static constexpr int complexProId = 100;       // (the mode chooser's Complex Pro item)

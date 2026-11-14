@@ -2806,6 +2806,7 @@ juce::String toJson (const Song& song, bool stampVersion)
     root->setProperty ("version", currentVersion);
     if (stampVersion)
         root->setProperty ("savedBy", JUCE_APPLICATION_VERSION_STRING); // the build that wrote it (round 177d, pain point 37)
+    root->setProperty ("beatsLaw190gx", true); // round 190gx: channels without a Beats law of their own use the Measured one
     root->setProperty ("bpm", song.bpm);
     root->setProperty ("beatsPerBar", song.beatsPerBar);
     if (song.beatUnit != 4) // (round 190fg: the meter's denominator; older files read n/4)
@@ -4322,6 +4323,11 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                     song.session.participants.push_back (std::move (p));
             }
     }
+    // Round 190gx: a project saved before Beats' Measured law keeps the Classic one (it sounds as it did); the mark is
+    // written by every save since
+    if (! (bool) root.getProperty ("beatsLaw190gx", false))
+        for (auto& c : song.channels)
+            c.sampler.warpModes.beatsLaw = WarpModeSettings::beatsLawClassic;
     return song;
 }
 

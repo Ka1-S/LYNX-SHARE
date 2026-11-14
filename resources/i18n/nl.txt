@@ -10022,6 +10022,8 @@ countries: nl be
 "Flux: how much the grains' timing varies at random" = "Flux: hoeveel de timing van de grains willekeurig varieert"
 "Formants: how much of the sound's formants are kept when it is transposed" = "Formanten: hoeveel van de formanten van het geluid behouden blijft bij transponeren"
 "Envelope: the size of the spectral envelope Complex Pro keeps" = "Envelope: de grootte van de spectrale envelope die Complex Pro behoudt"
+"Measured" = "Gemeten"
+"Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Beats-wet: Classic speelt zoals LYNX vóór 0.1.28 (dit project is toen opgeslagen); Gemeten volgt de renders van Live 12.4"
 
 # --- Not in pt-BR.txt (yet)
 "[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] editor openen/sluiten  [Alt]+[LMB] andere open houden  [Ctrl]+[LMB] voorbeluisteren  [2xLMB] Piano Roll  [LMB] omhoog/omlaag slepen herschikt  [RMB] kanaalmenu"

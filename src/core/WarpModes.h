@@ -31,12 +31,13 @@ inline const std::array<const char*, 3>& loopNames()
     return names;
 }
 
-// The .lynx form of a channel's warpModes (engine/ProjectFile.cpp "warpModes"): nine numbers in the struct's order; a
-// channel with the defaults writes nothing. fromList clamps to the ranges LYNX keeps; fewer than nine numbers: defaults.
-inline std::array<double, 9> toList (const WarpModeSettings& w)
+// The .lynx form of a channel's warpModes (engine/ProjectFile.cpp "warpModes"): the struct's numbers in its order, the
+// tenth the Beats law (round 190gx; a nine-number list was saved before it: Classic); a channel with the defaults writes
+// nothing. fromList clamps to the ranges LYNX keeps; fewer than nine numbers: defaults.
+inline std::array<double, 10> toList (const WarpModeSettings& w)
 {
     return { (double) w.beatsPreserve, (double) w.beatsLoop, (double) w.beatsEnvelope, (double) w.tonesGrain, (double) w.textureGrain,
-             (double) w.textureFlux, (double) w.proFormants, (double) w.proEnvelope, w.complexPro ? 1.0 : 0.0 };
+             (double) w.textureFlux, (double) w.proFormants, (double) w.proEnvelope, w.complexPro ? 1.0 : 0.0, (double) w.beatsLaw };
 }
 template <typename List>
 WarpModeSettings fromList (const List& m, std::size_t size)
@@ -54,6 +55,7 @@ WarpModeSettings fromList (const List& m, std::size_t size)
     w.proFormants = (float) std::clamp (at (6), 0.0, 100.0);
     w.proEnvelope = (float) std::clamp (at (7), 8.0, 256.0);
     w.complexPro = at (8) != 0.0;
+    w.beatsLaw = size >= 10 && at (9) >= 0.5 ? WarpModeSettings::beatsLawMeasured : WarpModeSettings::beatsLawClassic;
     return w;
 }
 
@@ -183,6 +185,15 @@ inline bool setProEnvelope (Song& song, int channel, double value)
     if (channel < 0 || channel >= (int) song.channels.size())
         return false;
     song.channels[(std::size_t) channel].sampler.warpModes.proEnvelope = (float) std::clamp (value, 8.0, 256.0);
+    return true;
+}
+// Beats' law (round 190gx): Classic (before 190gx) or Measured (Live 12.4's renders)
+inline bool setBeatsLaw (Song& song, int channel, int law)
+{
+    if (channel < 0 || channel >= (int) song.channels.size())
+        return false;
+    song.channels[(std::size_t) channel].sampler.warpModes.beatsLaw
+        = law != 0 ? WarpModeSettings::beatsLawMeasured : WarpModeSettings::beatsLawClassic;
     return true;
 }
 // Live's Complex Pro: LYNX's Complex with the clip's formants kept (complexPro)
