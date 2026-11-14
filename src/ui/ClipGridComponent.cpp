@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #include "core/ClipLauncher.h"
 #include "core/DetailChain.h"
@@ -1727,10 +1728,70 @@ private:
         {
             if (const auto want = mixerHeight(); want != mixer->getHeight())
                 resized();
-            mixer->tick();
+            // (its meters: repainted when they move, and while the song plays, as the whole grid was)
+            if (mixer->tick() || engine.getTransport().playing.load (std::memory_order_relaxed))
+                mixer->repaint();
         }
-        repaint();
+        // round 190ge: the whole grid was repainted 30 times a second, also with nothing playing; now only when
+        // something it draws differs from the last tick (the same pictures at the same ticks as before)
+        if (const auto now = drawnState(); now != lastDrawnState)
+        {
+            lastDrawnState = now;
+            repaint();
+        }
     }
+
+    // Everything the grid's paint reads that may change without a repaint() of its own (the engine, the audio thread's
+    // launcher states, the blink phase while something blinks), plus this view's own state, as one number.
+    std::uint64_t drawnState() const
+    {
+        std::uint64_t h = 1469598103934665603ull;
+        const auto mix = [&h] (std::uint64_t v) { h = (h ^ v) * 1099511628211ull; };
+        const auto bits = [] (auto value) {
+            std::uint64_t b = 0;
+            std::memcpy (&b, &value, sizeof (value));
+            return b;
+        };
+        mix (engine.getSongStamp());
+        mix (engine.getTransport().playing.load (std::memory_order_relaxed) ? 1u : 0u);
+        mix (gridOf() != nullptr ? 1u : 0u);
+        auto blinking = false, recordingAny = false;
+        const auto columns = juce::jmin (columnCount(), launcher::maxTracks);
+        for (int t = 0; t < columns; ++t)
+            mix (engine.isGridTrackArmed (t) ? 1u : 0u);
+        if (const auto* state = engine.launcherState())
+            for (int t = 0; t < columns; ++t)
+            {
+                const auto& v = state->tracks[(std::size_t) t];
+                const auto playing = v.playing.load (std::memory_order_relaxed), pending = v.pending.load (std::memory_order_relaxed);
+                const auto recording = v.recording.load (std::memory_order_relaxed), recordPending = v.recordPending.load (std::memory_order_relaxed);
+                const auto stopping = v.stopping.load (std::memory_order_relaxed);
+                mix ((std::uint64_t) (std::uint32_t) playing);
+                mix ((std::uint64_t) (std::uint32_t) pending);
+                mix ((std::uint64_t) (std::uint32_t) recording);
+                mix ((std::uint64_t) (std::uint32_t) recordPending);
+                mix ((stopping ? 1u : 0u) | (v.taken.load (std::memory_order_relaxed) ? 2u : 0u));
+                if (playing >= 0)
+                    mix (bits (v.progress.load (std::memory_order_relaxed)));
+                if (recording >= 0)
+                    mix (bits (v.recordFrom.load (std::memory_order_relaxed)));
+                blinking = blinking || pending >= 0 || recordPending >= 0 || stopping;
+                recordingAny = recordingAny || recording >= 0;
+            }
+        if (blinking)
+            mix (juce::Time::getMillisecondCounter() / 150);
+        if (recordingAny) // (the length counter; a MIDI take's name)
+        {
+            mix (bits (engine.launcherState()->clockNow.load (std::memory_order_relaxed)));
+            mix (juce::Time::getMillisecondCounter() / 33);
+        }
+        for (const auto v : { scrollX, scrollY, selectedTrack, selectedScene, pressedTrack, pressedScene, dropTrack, dropScene, deviceDropTrack,
+                              selectedField, getWidth(), getHeight(), sceneWidthNow(), (int) sceneSelected, (int) titleSelected,
+                              (int) layoutstyle::current(), mixer != nullptr && mixer->armsShown() ? 1 : 0 })
+            mix ((std::uint64_t) (std::uint32_t) v);
+        return h;
+    }
+    std::uint64_t lastDrawnState = 0;
     void componentMovedOrResized (bool, bool) override {}
     void componentPeerChanged() override { updateTimer(); }
     void componentVisibilityChanged() override { updateTimer(); }

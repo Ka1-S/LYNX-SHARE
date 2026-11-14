@@ -894,6 +894,14 @@ void PianoRollComponent::paint (juce::Graphics& g)
         }
     };
 
+    // round 190ge: what this paint may change. A moving playhead repaints a 14-pixel column many times a second, and
+    // every note drawn outside it (a rounded rectangle is a path to build and fill) was work for no pixel: the notes,
+    // ghosts and velocity markers whose drawing lies wholly outside are skipped (the pixels stay the same)
+    const auto dirtyArea = g.getClipBounds();
+    const auto outside = [&dirtyArea] (const juce::Rectangle<float>& r, float margin) {
+        return ! r.expanded (margin).getSmallestIntegerContainer().intersects (dirtyArea);
+    };
+
     // --- grid ------------------------------------------------------------
     {
         juce::Graphics::ScopedSaveState state (g);
@@ -949,7 +957,7 @@ void PianoRollComponent::paint (juce::Graphics& g)
                     continue;
                 const auto r = juce::Rectangle<float> ((float) tickToX ((double) n.start), (float) keyToY (n.key) + 1,
                                                        juce::jmax (4.0f, (float) (n.length * pixelsPerTick) - 1.0f), (float) rowHeight - 2);
-                if (r.getRight() < (float) grid.getX() || r.getX() > (float) grid.getRight())
+                if (r.getRight() < (float) grid.getX() || r.getX() > (float) grid.getRight() || outside (r, 2.0f))
                     continue;
                 g.setColour (textPrimary.withAlpha (0.30f));
                 g.drawRoundedRectangle (r.reduced (0.5f), 2.0f, 1.0f);
@@ -963,6 +971,8 @@ void PianoRollComponent::paint (juce::Graphics& g)
 
             const auto r = juce::Rectangle<float> ((float) tickToX ((double) n.start), (float) keyToY (n.key) + 1,
                                                    (float) (n.length * pixelsPerTick), (float) rowHeight - 2);
+            if (outside (r, 2.0f))
+                continue;
             const auto hovered = &n - pattern.notes.data() == hover.ghost;
             g.setColour (textPrimary.withAlpha (hovered ? 0.16f : editGhosts ? 0.12f : 0.09f));
             g.fillRoundedRectangle (r, 2.0f);
@@ -983,10 +993,12 @@ void PianoRollComponent::paint (juce::Graphics& g)
             if (! edits (n) || ! rows.shown (n.key))
                 continue;
 
-            const auto selected = isSelected (i);
-            const auto hovered = i == hover.note && drag == Drag::none;
             const auto r = juce::Rectangle<float> ((float) tickToX ((double) n.start), (float) keyToY (n.key) + 1,
                                                    juce::jmax (4.0f, (float) (n.length * pixelsPerTick) - 1.0f), (float) rowHeight - 2);
+            if (outside (r, 2.0f)) // (its outline, grips, marks and label all lie inside r)
+                continue;
+            const auto selected = isSelected (i);
+            const auto hovered = i == hover.note && drag == Drag::none;
             // a selected muted note keeps a muted look (round 167k: Alt+M on a selection showed no change)
             auto fill = selected ? (n.muted ? accentHover.interpolatedWith (noteMuted, 0.6f) : accentHover.brighter (0.15f))
                                  : n.muted ? noteMuted : theme::noteGroupColour (n.colour, n.velocity);
@@ -1185,6 +1197,11 @@ void PianoRollComponent::paint (juce::Graphics& g)
                 continue;
 
             const auto x = (float) tickToX ((double) n.start);
+            // (round 190ge: outside the repainted area — the marker's ±6 pixels, the Velocity Range box over the note's
+            // length — nothing to draw; a probability group's line reaches another note, so those are always drawn)
+            if (! (laneIsChance() && n.chanceGroup != 0)
+                && outside (juce::Rectangle<float> (x - 6.0f, (float) lane.getY(), 12.0f + juce::jmax (3.0f, (float) (n.length * pixelsPerTick)), (float) lane.getHeight()), 1.0f))
+                continue;
             const auto top = (float) lane.getBottom() - 2.0f - usable * laneValue (n);
             auto colour = isSelected (i) ? accentHover.brighter (0.15f) : theme::noteGroupColour (n.colour, n.velocity);
             if (n.muted)

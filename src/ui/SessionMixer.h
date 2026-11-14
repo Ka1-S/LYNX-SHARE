@@ -34,8 +34,9 @@ public:
     int wantedHeight (int available) const;
     // True when the Volume section (with each track's Arm button) is on screen: the grid's status row then shows no arm.
     bool armsShown() const noexcept { return sections.volume > 0; }
-    // One display tick of the meters (the grid's 30 Hz timer while it is on screen).
-    void tick();
+    // One display tick of the meters (the grid's 30 Hz timer while it is on screen). True when a meter moved (round
+    // 190ge: the grid repaints the mixer only then, or while the song plays).
+    bool tick();
 
     // Live's View > Mixer and View > Mixer Controls items, on the grid's Mixer button and in its options menu.
     void addViewItems (juce::PopupMenu& menu);

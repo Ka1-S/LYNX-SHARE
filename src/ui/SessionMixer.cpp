@@ -161,16 +161,22 @@ void SessionMixerComponent::layoutSections()
 
 void SessionMixerComponent::resized() { layoutSections(); }
 
-void SessionMixerComponent::tick()
+bool SessionMixerComponent::tick()
 {
     auto& meterBank = engine.getMeters();
     std::vector<bool> seen ((std::size_t) maxMixerTracks, false);
+    auto moved = false;
     const auto take = [&] (int insert) {
         if (insert < 0 || insert >= maxMixerTracks || seen[(std::size_t) insert])
             return;
         seen[(std::size_t) insert] = true;
         for (int ch = 0; ch < 2; ++ch)
-            levels[(std::size_t) insert * 2 + (std::size_t) ch].tick (meterBank.takeSessionPeak (insert, ch));
+        {
+            auto& meter = levels[(std::size_t) insert * 2 + (std::size_t) ch];
+            const auto before = meter;
+            meter.tick (meterBank.takeSessionPeak (insert, ch));
+            moved = moved || meter.level != before.level || meter.peak != before.peak || meter.clipped != before.clipped;
+        }
     };
     if (sections.volume > 0)
     {
@@ -185,6 +191,7 @@ void SessionMixerComponent::tick()
     if (rows != before || sections.total() != sectionsBefore)
         if (auto* parent = getParentComponent())
             parent->resized();
+    return moved;
 }
 
 void SessionMixerComponent::addViewItems (juce::PopupMenu& menu)
