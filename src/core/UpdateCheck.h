@@ -7,7 +7,9 @@
 //   the release asset that flavour uses;
 // - the release's SHA256SUMS.txt line for a file;
 // - the release notes (Markdown) as readable lines;
-// - the settings file (automatic check on/off, the skipped version, the time of the last check).
+// - the settings file (automatic check on/off, the skipped version, the time of the last check, the version an update
+//   replaced);
+// - going back to the previous version (round 190gh, B2): which release Help › "Go back to <version>..." installs.
 
 #include <cstdint>
 #include <string>
@@ -136,6 +138,10 @@ struct Settings
     bool automatic = true;      // Settings › General › "Check for updates automatically"
     std::string skipped;        // the version the user skipped (✕ on the bar): that one and older stay quiet
     std::int64_t lastCheckMs = 0; // when the release list was last fetched (the cache's age)
+    // Round 190gh (B2): the version LYNX SHARE ran before its last update (written by the updater when it applies
+    // or saves an update); Help › "Go back to <version>..." offers it. Empty: none recorded (an update made by a
+    // version without this field, or none yet).
+    std::string previous;
 };
 Settings parseSettings (const std::string& text);
 std::string formatSettings (const Settings&);
@@ -143,6 +149,18 @@ std::string formatSettings (const Settings&);
 // Whether the bar shows `release`: a manual check always, an automatic one unless that version (or a newer one)
 // was skipped.
 bool shouldShow (const Release& release, const Settings& settings, bool manual);
+
+// --- going back (round 190gh, B2) --------------------------------------------------------------------------------
+// The release Help › "Go back to <version>..." installs, or -1: the recorded previous version when the list has it and
+// it is older than `running`; otherwise the newest non-draft release older than `running` (the version a user most
+// likely came from). Releases newer than or equal to `running` are never chosen.
+int rollbackIndex (const std::vector<Release>& releases, const Version& running, const std::string& previous);
+// The settings after an update from `from` was applied (or its file saved for the user to install): `from` becomes the
+// previous version. Nothing changes when `from` is not a version.
+Settings afterUpdate (Settings settings, const Version& from);
+// The settings after going back from `left`: `left` is skipped, so the automatic check does not offer it again at once
+// (Help › Check for updates still does), and the recorded previous version is used up.
+Settings afterRollback (Settings settings, const Version& left);
 
 // An automatic check reuses the cached release list for this long (GitHub allows 60 unauthenticated calls an hour
 // per address; LYNX started many times a day asks once every few hours).

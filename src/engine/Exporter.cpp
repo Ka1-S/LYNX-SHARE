@@ -267,6 +267,8 @@ bool ExportJob::run (const std::function<bool (double)>& progress, juce::String&
     render.trimPdc = options.trimPdc; // the latency as reported after the plugins' warm-up
     render.hqAllPlugins = options.hqAllPlugins;
     render.pluginWarmUp = options.pluginWarmUp;
+    render.exactSamples = exactFrames; // (round 190gh: every stem as long as the mix)
+    writtenFrames = 0;
 
     for (const auto f : formatsOf (options))
         if (const auto file = f == options.format ? output : output.withFileExtension (extension (f)); ! canReplace (file))
@@ -337,6 +339,7 @@ bool ExportJob::run (const std::function<bool (double)>& progress, juce::String&
 
     stream.release(); // now owned by the writer
     render.output = writer.get();
+    render.capture = [this] (const float*, const float*, int n) { writtenFrames += n; };
     render.ditherBits = usesDither (options) ? bits : 0;
     render.keepOvers = options.format == exportopts::Format::wav && bits == 32; // 32-bit float WAV keeps overs, as FL
     render.ditherShaping = options.dither == DitherMode::shaped;
@@ -361,6 +364,12 @@ bool ExportJob::writeBuffered (std::vector<float>& left, std::vector<float>& rig
 {
     // tail, then normalising (the peak of what is kept), then mono; dither per file (each format has its own bits)
     applyTail (left, right, options.tail == TailMode::leave ? 0 : (std::int64_t) std::llround (musicSeconds * options.sampleRate), options.tail);
+    if (exactFrames > 0 && options.tail == TailMode::leave) // (round 190gh: a stem as long as the mix)
+    {
+        left.resize ((std::size_t) exactFrames, 0.0f);
+        right.resize ((std::size_t) exactFrames, 0.0f);
+    }
+    writtenFrames = (std::int64_t) left.size();
 
     if (options.master) // round 168e: File › Export › Master... (LYNX's own mastering, core/Mastering.h)
     {

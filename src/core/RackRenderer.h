@@ -570,7 +570,7 @@ public:
 
 private:
     void processChunk (const RackState& state, bool playing, double startTick, int numSamples,
-                       float* left, float* right, MeterBank* meters) noexcept;
+                       float* left, float* right, MeterBank* meters, bool continuing = false) noexcept;
     void renderChannel (const RackState& state, int channel, int n) noexcept;
     void processTrack (const RackState& state, int track, int n, MeterBank* meters) noexcept;
     void runSilencedTrack (const RackState& state, int track, int n, const MixerMatrix& level, MeterBank* meters, bool cutEffectSends) noexcept;
@@ -672,6 +672,12 @@ private:
     std::unique_ptr<vfx::EventList> vfxIn = std::make_unique<vfx::EventList>(), vfxOut = std::make_unique<vfx::EventList>();
     int liveRoutedCount = 0;
     double liveTick = 0.0;
+    // round 190gh (B7, render = playback): while playing, the automation's pieces end on a grid counted in samples from
+    // where playback started (or jumped: a seek, the loop), not from each block's start, so the values change at the
+    // same samples whatever the audio device's block size; an export (blocks of 512 from its start) is unchanged
+    std::int64_t gridSample = 0;   // (audio thread) samples played since the start or the last jump
+    std::int64_t pieceStart = 0;   // where the current piece began (on that count): a block's end may cut it
+    double gridNextTick = -1.0;    // the tick the next block starts at when nothing jumps; < 0: not playing
     bool routesLiveNotes (const RackState& state, int channel) const noexcept;
     // Layer channels (round 164): each note event of a Layer is copied to the children it plays (core/Layer.h). The
     // child a Random / Sequential note picked is kept per Layer and key so its "off" reaches the same child.

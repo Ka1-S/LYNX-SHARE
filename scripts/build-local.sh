@@ -108,6 +108,8 @@ CORE="$CORE src/core/Layer.cpp src/core/XyController.cpp src/core/FlCurve.cpp sr
 CORE="$CORE src/core/CrashReport.cpp"
 # in-app update check: versions, release list, flavours, checksums, release notes (round 166b)
 CORE="$CORE src/core/UpdateCheck.cpp"
+# the first-start audio check: verdict and the devices to try (round 190gh, B23)
+CORE="$CORE src/core/AudioCheck.cpp"
 # the Browser's "Find similar samples" (round 190as)
 CORE="$CORE src/core/SampleSimilarity.cpp"
 # the embedded Python (pocketpy) and FL's VFX Script (round 165d)

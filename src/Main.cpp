@@ -198,6 +198,7 @@
 #include "platform/CrashGuard.h"
 #include "ui/CrashReporter.h"
 #include "ui/Updater.h"
+#include "ui/AudioCheck.h"
 #include "ui/StemExtract.h"
 #include "ui/AudioToMidi.h"
 #include "ui/ShotScale.h"
@@ -703,6 +704,24 @@ public:
             });
             *text << "device_change=" << result << "\nresult=" << (result.startsWith ("OK") ? "OK" : "FAILED") << "\n";
             report.replaceWithText (*text);
+            setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--exportparitytest") || args.contains ("--midihotplugtest"))
+        {
+            // LYNX --exportparitytest report.txt (round 190gh, B7): the export against playback through a stand-in audio
+            // device, stems adding up to the mix with one length, the PDC trim. LYNX --midihotplugtest report.txt (B8):
+            // MIDI devices plugged in and out (stand-in device lists) while messages arrive. No window.
+            const auto parity = args.contains ("--exportparitytest");
+            const auto i = args.indexOf (parity ? "--exportparitytest" : "--midihotplugtest");
+            const juce::File report (args[i + 1].unquoted());
+            juce::String text;
+            const auto result = parity ? lynx::AudioEngine::exportParitySelfTest ([&text] (const juce::String& line) { text << line << "\n"; })
+                                       : lynx::AudioEngine::midiHotplugSelfTest();
+            text << (parity ? "export_parity=" : "midi_hotplug=") << result << "\nresult=" << (result.startsWith ("OK") ? "OK" : "FAILED") << "\n";
+            report.replaceWithText (text);
             setApplicationReturnValue (result.startsWith ("OK") ? 0 : 1);
             quit();
             return;
@@ -4381,6 +4400,9 @@ private:
         // issue #134 (round 190c): the output device, its rate and its buffer changed under a playing project, on
         // stand-in devices (a short run; --devicechangetest plays every instrument and effect)
         const auto deviceChange = lynx::AudioEngine::deviceChangeSelfTest (10, false);
+        // round 190gh: export parity (B7) and MIDI device hot-plug (B8)
+        const auto exportParity = lynx::AudioEngine::exportParitySelfTest();
+        const auto midiHotplug = lynx::AudioEngine::midiHotplugSelfTest();
 
         // Online Sessions P2 (round 169b): live sessions without a network (the JSON round trip of every entity, replicas
         // through it, the invite code's keys)
@@ -4782,7 +4804,7 @@ private:
         const auto ok = editorsResult.startsWith ("OK") && ! faultResult.startsWith ("ERROR")
                         && mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
-                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
+                        && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && midiHotplug.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
                         && danceWindowResult == "OK" && clickActivationResult == "OK";
 
@@ -4827,6 +4849,8 @@ private:
                << "effect_params_saved=" << effectParamsResult << "\n"
                << "driver_panel=" << driverPanel << "\n"
                << "device_change=" << deviceChange << "\n"
+               << "export_parity=" << exportParity << "\n"
+               << "midi_hotplug=" << midiHotplug << "\n"
                << "plugin_art=" << artResult << "\n"
                << "plugin_sidechain=" << sidechainResult << "\n"
                << "versions_panel=" << versionsResult << "\n"
@@ -21318,18 +21342,21 @@ private:
                     Bars()
                     {
                         constexpr int h = lynx::updater::UpdateBar::height;
-                        setSize (1100, 4 * (h + 6));
-                        for (int state = 0; state < 4; ++state)
+                        setSize (1100, 6 * (h + 6));
+                        for (int state = 0; state < 6; ++state) // (round 190gh: 4 going back, 5 went back)
                         {
                             bars[state].setBounds (0, state * (h + 6), getWidth(), h);
                             bars[state].showForSnapshot (state);
                             addAndMakeVisible (bars[state]);
                         }
                     }
-                    lynx::updater::UpdateBar bars[4];
+                    lynx::updater::UpdateBar bars[6];
                 };
                 saveWindow (std::make_unique<Bars>(), "-update-bar.png");
                 saveWindow (lynx::updater::makeReleaseNotesForSnapshot(), "-update-notes.png");
+                // round 190gh (B23): Help › Test audio output... in its states
+                for (int state = 0; state < 5; ++state)
+                    saveWindow (lynx::makeAudioCheckForSnapshot (offline, state), "-audio-check-" + juce::String (state) + ".png");
             }
             saveWindow (lynx::makeMissingFilesPanel (lynx::missingFilesSnapshotInfo(), 0, 1), "-missing-files.png");
             saveWindow (lynx::makeMissingFilesPanel (lynx::missingFilesSnapshotInfo(), 1), "-missing-plugins.png");

@@ -93,15 +93,20 @@ void ControllerIo::apply (bool devicesChanged)
         {
             auto& port = ports[d.input];
             const auto name = controller::pairedOutput (d.input, names);
-            if (port.device != nullptr && port.name == name)
+            const auto listed = std::any_of (available.begin(), available.end(), [&port] (const juce::MidiDeviceInfo& info) {
+                return info.identifier.toStdString() == port.id;
+            });
+            if (port.device != nullptr && port.name == name && listed)
                 continue;
             port.device.reset();
+            port.id.clear();
             port.name = name;
             if (! name.empty())
                 for (const auto& info : available)
                     if (info.name.toStdString() == name)
                     {
                         port.device = juce::MidiOutput::openDevice (info.identifier); // (null when another program holds it)
+                        port.id = info.identifier.toStdString();
                         break;
                     }
         }
