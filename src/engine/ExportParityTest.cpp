@@ -307,9 +307,29 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
     {
         const auto n = juce::jmin (mix.l.size(), played.l.size());
         const auto d = maxDiff (mix, played, n);
-        say ("export vs playback: " + juce::String ((int) mix.l.size()) + " / " + juce::String ((int) played.l.size()) + " frames, max difference " + db (d));
+        say ("export vs playback: " + juce::String ((int) mix.l.size()) + " / " + juce::String ((int) played.l.size()) + " frames, max difference " + db (d)
+             + ", first sound at " + juce::String (firstSound (mix)) + " / " + juce::String (firstSound (played)));
         if (d >= 3.16e-5f)
-            errors.add ("playback differs from the export by " + db (d));
+        {
+            // (what kind of difference: an offset, or something else)
+            int bestLag = 0;
+            float best = d;
+            for (int lag = -4096; lag <= 4096; ++lag)
+            {
+                float m = 0.0f;
+                for (std::size_t i = 4096; i + 4096 < n && m < best; i += 7)
+                    m = juce::jmax (m, std::abs (mix.l[i] - played.l[(std::size_t) ((int) i + lag)]));
+                if (m < best)
+                    best = m, bestLag = lag;
+            }
+            std::size_t worst = 0;
+            for (std::size_t i = 0; i < n; ++i)
+                if (std::abs (mix.l[i] - played.l[i]) > std::abs (mix.l[worst] - played.l[worst]))
+                    worst = i;
+            say ("  best lag " + juce::String (bestLag) + " (" + db (best) + "), the largest difference at frame " + juce::String ((int) worst));
+            errors.add ("playback differs from the export by " + db (d) + " (best lag " + juce::String (bestLag) + ": " + db (best) + ", worst at frame "
+                        + juce::String ((int) worst) + ")");
+        }
         if (std::abs ((int) mix.l.size() - (int) played.l.size()) > 24000)
             errors.add ("playback length " + juce::String ((int) played.l.size()) + " vs the export's " + juce::String ((int) mix.l.size()));
     }

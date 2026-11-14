@@ -63,13 +63,14 @@ juce::String AudioEngine::midiHotplugSelfTest()
 
     juce::StringArray errors;
     auto step = [&] (const char* what, int expectVersion, int expectHints, const juce::StringArray& added, const juce::StringArray& removed) {
+        const auto hintsBefore = hints;
         for (int i = 0; i < 3; ++i) // (the notification and the 2-second check may both come: the second finds nothing new)
             engine.enableAllMidiInputs();
         if (engine.getMidiDeviceListVersion() != expectVersion)
             errors.add (juce::String (what) + ": version " + juce::String (engine.getMidiDeviceListVersion()) + ", expected " + juce::String (expectVersion));
         if (hints != expectHints)
             errors.add (juce::String (what) + ": " + juce::String (hints) + " hints, expected " + juce::String (expectHints));
-        else if (expectHints > 0 && (lastAdded != added || lastRemoved != removed))
+        else if (hints > hintsBefore && (lastAdded != added || lastRemoved != removed))
             errors.add (juce::String (what) + ": hint +" + lastAdded.joinIntoString (",") + " -" + lastRemoved.joinIntoString (","));
         std::this_thread::sleep_for (std::chrono::milliseconds (20));
     };
