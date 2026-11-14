@@ -77,6 +77,14 @@ public:
     // A background pass over these folders: only changed folders are listed again; rebuild = forget the index first.
     void refresh (std::vector<std::string> roots, bool rebuild = false);
 
+    // Round 190hd: another process (the Browser's indexer, a low-priority child woken by file-system changes) keeps
+    // the index file up to date. While it does, this service saves nothing and runs no re-check pass after a search;
+    // reload() reads the file it wrote (on the worker, after the search in hand) and takes it in (Index::adopt), then
+    // indexChanged follows. Off again (the process ended): as before.
+    void setExternalIndexer (bool on);
+    bool hasExternalIndexer() const;
+    void reload();
+
     IndexStatus status() const;
 
     // Which folders hold a file `accept` takes (round 164: the Browser's content filter), worked out from the index
@@ -109,6 +117,7 @@ private:
 
     void run();
     void loadIndex();
+    void reloadIndex();
     void runSearch (SearchJob& job);
     bool runPass (Pass& pass); // false: interrupted (a search came in, or closing)
     void saveIndex();
@@ -129,6 +138,7 @@ private:
     mutable std::mutex lock; // guards everything below
     std::condition_variable wake;
     bool stopping = false, working = true; // working: the worker has a job (or is reading the index file)
+    bool external = false, reloadAsked = false; // (round 190hd)
     std::optional<SearchJob> pendingSearch;
     std::uint64_t latestSearch = 0;
     std::deque<Pass> passes;

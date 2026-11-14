@@ -905,6 +905,14 @@ public:
             lynx::crashguard::exitNow (0);
         }
 
+        if (args.contains ("--browser-indexer"))
+        {
+            // round 190hd: the Browser's indexer, a low-priority child of the LYNX window (BrowserComponent.h): no window,
+            // no session, no audio; it ends with its parent
+            lynx::crashguard::quietCrashReports();
+            lynx::crashguard::exitNow (lynx::BrowserComponent::runIndexerProcess (args));
+        }
+
         if (args.contains ("--packageinfo"))
         {
             // round 165n: the Microsoft Store (MSIX) build's identity and folders (platform/Package.h); the release
@@ -2657,6 +2665,7 @@ public:
     void startEngine()
     {
         startupTrace.mark ("before the audio engine");
+        lynx::BrowserComponent::allowIndexerProcess = true; // (round 190hd: the normal window only)
         // (round 190go) ready to play, no device open yet: see openAudioDevice
         engine = std::make_unique<lynx::AudioEngine> (true, -1, true, true);
         lynx::videoview::install (*engine); // (Fruity Video Player channels: their sound tracks)

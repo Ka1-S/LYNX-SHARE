@@ -28,6 +28,29 @@
 #include "core/ValueMath.h"
 #include "core/Vfx.h"
 #include "platform/Paths.h"
+#include "platform/CrashGuard.h"
+#include "core/FolderWatcher.h"
+
+#include <atomic>
+#include <chrono>
+#include <cstdio>
+#include <thread>
+
+#if JUCE_WINDOWS
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
+#else
+ #include <sys/resource.h>
+ #include <unistd.h>
+ #if JUCE_LINUX
+  #include <sys/syscall.h>
+ #endif
+#endif
 
 #include <mutex>
 #include "engine/PluginHost.h"
@@ -253,6 +276,233 @@ DraggedPlugin& draggedPlugin()
 
 // --- search: the process's search worker ------------------------------------------------------------
 
+// Round 190hd: the indexer process (REA 190hc action 5, parts 2-3, after Live's Indexer: "StartIndex" runs the library
+// indexer as a separate process at a low priority and rescans on file-system events). The Browser's index of its
+// folders (core/SearchIndex.h) is kept up to date by `LYNX --browser-indexer <pid> <roots file>`: a child at the
+// lowest priority (Windows: idle class + background mode, so its disk reads are low priority too; elsewhere nice 19
+// and, on Linux, the idle I/O class) that walks the folders whose times changed, writes the index file, tells this
+// process, and then sleeps on the system's change notifications for those trees (core/FolderWatcher.h) until the
+// next change. It never shares a thread, a lock or a frame with the UI; it ends with its parent. This process then
+// saves nothing and only takes in what the child wrote (search::Service::setExternalIndexer / reload). A child that
+// cannot start or ends: the in-process pass as before.
+namespace
+{
+juce::File indexFile() { return platform::settingsFile ("browser-index.txt"); }
+juce::File indexRootsFile() { return platform::settingsFile ("browser-index-roots.txt"); }
+
+std::string loadIndexText()
+{
+    const auto f = indexFile();
+    juce::MemoryBlock data;
+    if (! f.existsAsFile() || f.getSize() > 256 * 1024 * 1024 || ! f.loadFileAsData (data))
+        return std::string();
+    return std::string (static_cast<const char*> (data.getData()), data.getSize());
+}
+
+void saveIndexText (const std::string& text)
+{
+    const auto f = indexFile();
+    const auto temp = f.getSiblingFile (f.getFileName() + ".tmp");
+    if (temp.replaceWithData (text.data(), text.size()))
+        temp.moveFileTo (f);
+}
+
+#if JUCE_WINDOWS
+juce::String indexerSignalName (juce::int64 parentPid) { return "Local\\LYNX-browser-index-" + juce::String (parentPid); }
+#endif
+
+juce::int64 thisProcessId()
+{
+#if JUCE_WINDOWS
+    return (juce::int64) GetCurrentProcessId();
+#else
+    return (juce::int64) getpid();
+#endif
+}
+
+class IndexerProcess
+{
+public:
+    explicit IndexerProcess (search::Service& s) : service (s) {}
+    ~IndexerProcess() { stop(); }
+
+    // starts the child for these folders (once; again when they change); false: it could not start
+    bool start (const std::vector<std::string>& folders)
+    {
+        if (watcher.joinable() && folders == roots && child.isRunning())
+            return true;
+        stop();
+        roots = folders;
+        juce::StringArray lines;
+        for (const auto& r : roots)
+            lines.add (juce::String::fromUTF8 (r.c_str()));
+        if (! indexRootsFile().replaceWithText (lines.joinIntoString ("\n") + "\n"))
+            return false;
+       #if JUCE_WINDOWS
+        signal = CreateEventW (nullptr, FALSE, FALSE, indexerSignalName (thisProcessId()).toWideCharPointer());
+        if (signal == nullptr)
+            return false;
+       #endif
+        const juce::StringArray args { juce::File::getSpecialLocation (juce::File::currentExecutableFile).getFullPathName(), "--browser-indexer",
+                                       juce::String (thisProcessId()), indexRootsFile().getFullPathName() };
+       #if JUCE_WINDOWS
+        const auto started = child.start (args, 0);
+       #else
+        const auto started = child.start (args, juce::ChildProcess::wantStdOut);
+       #endif
+        if (! started)
+        {
+            closeSignal();
+            return false;
+        }
+        service.setExternalIndexer (true);
+        stopping = false;
+        watcher = std::thread ([this] { watch(); });
+        return true;
+    }
+
+    void stop()
+    {
+        stopping = true;
+        if (child.isRunning())
+            child.kill(); // (our own child; a write it was making is a temporary file, replaced by the next)
+       #if JUCE_WINDOWS
+        if (signal != nullptr)
+            SetEvent (signal);
+       #endif
+        if (watcher.joinable())
+            watcher.join();
+        closeSignal();
+        service.setExternalIndexer (false);
+    }
+
+private:
+    // (its own thread) the child's news: the index file was written
+    void watch()
+    {
+        for (;;)
+        {
+           #if JUCE_WINDOWS
+            const auto woken = WaitForSingleObject (signal, 2000) == WAIT_OBJECT_0;
+            if (stopping)
+                return;
+            if (woken)
+                service.reload();
+            if (child.isRunning())
+                continue;
+           #else
+            char c = 0;
+            if (child.readProcessOutput (&c, 1) == 1) // (blocks; one byte at a time: a line is a write)
+            {
+                if (c == '\n')
+                    service.reload();
+                continue;
+            }
+            if (stopping)
+                return;
+           #endif
+            // the child ended on its own (a crash): this process indexes again, as before
+            service.setExternalIndexer (false);
+            service.refresh (roots);
+            return;
+        }
+    }
+
+    void closeSignal()
+    {
+       #if JUCE_WINDOWS
+        if (signal != nullptr)
+            CloseHandle (signal);
+        signal = nullptr;
+       #endif
+    }
+
+    search::Service& service;
+    juce::ChildProcess child;
+    std::vector<std::string> roots;
+    std::atomic<bool> stopping { false };
+   #if JUCE_WINDOWS
+    HANDLE signal = nullptr;
+   #endif
+    std::thread watcher;
+};
+
+// (the child) the lowest priority for the CPU and the disk
+void lowerIndexerPriority()
+{
+#if JUCE_WINDOWS
+    SetPriorityClass (GetCurrentProcess(), IDLE_PRIORITY_CLASS);
+    SetPriorityClass (GetCurrentProcess(), PROCESS_MODE_BACKGROUND_BEGIN);
+#else
+    setpriority (PRIO_PROCESS, 0, 19);
+ #if JUCE_LINUX
+    syscall (SYS_ioprio_set, 1 /* IOPRIO_WHO_PROCESS */, 0, 3 << 13 /* IOPRIO_CLASS_IDLE */);
+ #endif
+#endif
+}
+
+// (the child) returns when the parent process has ended
+void waitForParentEnd (juce::int64 parentPid)
+{
+#if JUCE_WINDOWS
+    if (const auto parent = OpenProcess (SYNCHRONIZE, FALSE, (DWORD) parentPid))
+    {
+        WaitForSingleObject (parent, INFINITE);
+        CloseHandle (parent);
+    }
+#else
+    while (getppid() == (pid_t) parentPid)
+        std::this_thread::sleep_for (std::chrono::seconds (2));
+#endif
+}
+} // namespace
+
+int BrowserComponent::runIndexerProcess (const juce::StringArray& args)
+{
+    const auto i = args.indexOf ("--browser-indexer");
+    const auto parentPid = args[i + 1].getLargeIntValue();
+    const juce::File rootsFile (args[i + 2].unquoted());
+    lowerIndexerPriority();
+    std::thread ([parentPid] {
+        waitForParentEnd (parentPid);
+        crashguard::exitNow (0);
+    }).detach();
+
+    std::vector<std::string> roots;
+    juce::StringArray lines;
+    lines.addLines (rootsFile.loadFileAsString());
+    for (const auto& line : lines)
+        if (line.isNotEmpty() && juce::File::isAbsolutePath (line) && juce::File (line).isDirectory())
+            roots.push_back (line.toStdString());
+
+#if JUCE_WINDOWS
+    const auto signal = OpenEventW (EVENT_MODIFY_STATE, FALSE, indexerSignalName (parentPid).toWideCharPointer());
+#endif
+    search::Service::Callbacks cb;
+    cb.load = loadIndexText;
+    cb.save = saveIndexText;
+    cb.indexChanged = [&] { // (the file is written by then)
+#if JUCE_WINDOWS
+        if (signal != nullptr)
+            SetEvent (signal);
+#else
+        std::fputs ("changed\n", stdout);
+        std::fflush (stdout);
+#endif
+    };
+    search::Service service (diskFileSystem(), std::move (cb));
+    if (! roots.empty())
+        service.refresh (roots);
+    // then a pass after each change in those trees (a copy of a whole library: once it has been quiet for 2 s)
+    folderwatch::Options options;
+    options.quietMs = 2000;
+    options.maxDelayMs = 10000;
+    options.pollMs = 30000; // (where there are no notifications: a tree's folder times, every 30 s)
+    folderwatch::Watcher watcher (roots, [&service, roots] { service.refresh (roots); }, options);
+    for (;;)
+        std::this_thread::sleep_for (std::chrono::hours (1)); // (ends with the parent: waitForParentEnd)
+}
+
 // The Browser's search index and its worker (core/SearchService.h, round 162): one per process while a Browser exists,
 // the index kept in the settings folder between sessions. Its news reach the Browsers through two broadcasters (they
 // are thread-safe and coalesce); the worker is joined (never killed) before they go.
@@ -260,10 +510,28 @@ struct BrowserComponent::SearchShared
 {
     juce::ChangeBroadcaster statusChanged, indexChanged;
     std::unique_ptr<search::Service> service; // (last: goes first)
+    std::unique_ptr<IndexerProcess> indexer;  // (round 190hd; before the service)
 
-    ~SearchShared() { service.reset(); }
+    ~SearchShared()
+    {
+        indexer.reset();
+        service.reset();
+    }
 
-    static juce::File file() { return platform::settingsFile ("browser-index.txt"); }
+    static juce::File file() { return indexFile(); }
+
+    // the background pass over these folders: by the indexer process where it may run, else here (round 190hd)
+    void refreshInBackground (std::vector<std::string> roots)
+    {
+        if (allowIndexerProcess && juce::SystemStats::getEnvironmentVariable ("LYNX_INDEXER_PROCESS", {}) != "0")
+        {
+            if (indexer == nullptr)
+                indexer = std::make_unique<IndexerProcess> (*service);
+            if (indexer->start (roots))
+                return;
+        }
+        service->refresh (std::move (roots));
+    }
 
     static std::shared_ptr<SearchShared> get()
     {
@@ -272,19 +540,8 @@ struct BrowserComponent::SearchShared
             return s;
         auto s = std::make_shared<SearchShared>();
         search::Service::Callbacks cb;
-        cb.load = [] {
-            const auto f = file();
-            juce::MemoryBlock data;
-            if (! f.existsAsFile() || f.getSize() > 256 * 1024 * 1024 || ! f.loadFileAsData (data))
-                return std::string();
-            return std::string (static_cast<const char*> (data.getData()), data.getSize());
-        };
-        cb.save = [] (const std::string& text) {
-            const auto f = file();
-            const auto temp = f.getSiblingFile (f.getFileName() + ".tmp");
-            if (temp.replaceWithData (text.data(), text.size()))
-                temp.moveFileTo (f);
-        };
+        cb.load = loadIndexText;
+        cb.save = saveIndexText;
         cb.statusChanged = [raw = s.get()] { raw->statusChanged.sendChangeMessage(); };
         cb.indexChanged = [raw = s.get()] { raw->indexChanged.sendChangeMessage(); };
         s->service = std::make_unique<search::Service> (diskFileSystem(), std::move (cb));
@@ -2849,7 +3106,7 @@ BrowserComponent::BrowserComponent (AudioEngine& e, Role r)
     searcher->indexChanged.addChangeListener (this);
     juce::Timer::callAfterDelay (4000, [safe = juce::Component::SafePointer<BrowserComponent> (this)] {
         if (safe != nullptr && safe->role == Role::main && ! safe->allRoots.isEmpty())
-            safe->searcher->service->refresh (toPaths (safe->withMerged (safe->allRoots)));
+            safe->searcher->refreshInBackground (toPaths (safe->withMerged (safe->allRoots))); // (round 190hd: the indexer process)
     });
     // "Find similar samples" (round 190as): once it was used (its index file exists), the folders are checked for new
     // samples in the background a while after start; before that nothing is analysed
