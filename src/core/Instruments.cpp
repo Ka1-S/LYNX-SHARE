@@ -10,6 +10,7 @@
 #include "core/Scheduler.h"
 #include "core/ClipOps.h"
 #include "core/ChannelPoly.h"
+#include "core/Simd.h"
 
 #include "core/DirectWave.h"
 #include "core/FlSynths.h"
@@ -730,6 +731,171 @@ private:
     float phase = 0.0f; // float32 LFO phase, as in FL (§3.5)
 };
 
+
+// ---------------------------------------------------------------------------
+// Round 190gp: four synth voices side by side, in SSE2 registers (core/Simd.h: SSE2 on x86-64, NEON through sse2neon on
+// ARM64, with its IEEE-exact division): each lane does a voice's own scalar arithmetic, operation for operation (no
+// FMA: -ffp-contract=off; a branch becomes a select of both results, which leaves the chosen one unchanged; a double
+// lane pair is two __m128d), and the voices are added to the output one after another in voice order, as the voice
+// loop adds them. So the samples are the same, bit for bit (tests: SynthLanes190gpTests.inc). (GCC's own 32-byte
+// vector types lower double compares lane by lane through the integer unit on SSE2: slower than the voice loop.)
+namespace lanes
+{
+#define LYNX_LANES_INLINE [[gnu::always_inline]] inline
+struct I4
+{
+    union { __m128i v; std::int32_t e[4]; };
+    LYNX_LANES_INLINE std::int32_t& operator[] (int j) noexcept { return e[j]; }
+    LYNX_LANES_INLINE std::int32_t operator[] (int j) const noexcept { return e[j]; }
+};
+struct F4
+{
+    union { __m128 v; float e[4]; };
+    LYNX_LANES_INLINE float& operator[] (int j) noexcept { return e[j]; }
+    LYNX_LANES_INLINE float operator[] (int j) const noexcept { return e[j]; }
+};
+struct D4 // (also the mask of a double compare: each lane all ones or all zeros)
+{
+    union { __m128d p[2]; double e[4]; };
+    LYNX_LANES_INLINE double& operator[] (int j) noexcept { return e[j]; }
+    LYNX_LANES_INLINE double operator[] (int j) const noexcept { return e[j]; }
+};
+using L4 = D4;
+
+LYNX_LANES_INLINE F4 mk (__m128 v) noexcept { F4 r; r.v = v; return r; }
+LYNX_LANES_INLINE I4 mk (__m128i v) noexcept { I4 r; r.v = v; return r; }
+LYNX_LANES_INLINE D4 mk (__m128d lo, __m128d hi) noexcept { D4 r; r.p[0] = lo; r.p[1] = hi; return r; }
+LYNX_LANES_INLINE F4 f4 (float x) noexcept { return mk (_mm_set1_ps (x)); }
+LYNX_LANES_INLINE D4 d4 (double x) noexcept { return mk (_mm_set1_pd (x), _mm_set1_pd (x)); }
+LYNX_LANES_INLINE I4 i4 (std::int32_t x) noexcept { return mk (_mm_set1_epi32 (x)); }
+
+LYNX_LANES_INLINE F4 operator+ (F4 a, F4 b) noexcept { return mk (_mm_add_ps (a.v, b.v)); }
+LYNX_LANES_INLINE F4 operator- (F4 a, F4 b) noexcept { return mk (_mm_sub_ps (a.v, b.v)); }
+LYNX_LANES_INLINE F4 operator* (F4 a, F4 b) noexcept { return mk (_mm_mul_ps (a.v, b.v)); }
+LYNX_LANES_INLINE F4& operator+= (F4& a, F4 b) noexcept { return a = a + b; }
+LYNX_LANES_INLINE F4& operator-= (F4& a, F4 b) noexcept { return a = a - b; }
+LYNX_LANES_INLINE F4& operator*= (F4& a, F4 b) noexcept { return a = a * b; }
+LYNX_LANES_INLINE I4 operator< (F4 a, F4 b) noexcept { return mk (_mm_castps_si128 (_mm_cmplt_ps (a.v, b.v))); }
+LYNX_LANES_INLINE I4 operator>= (F4 a, F4 b) noexcept { return mk (_mm_castps_si128 (_mm_cmpge_ps (a.v, b.v))); }
+
+LYNX_LANES_INLINE D4 operator+ (D4 a, D4 b) noexcept { return mk (_mm_add_pd (a.p[0], b.p[0]), _mm_add_pd (a.p[1], b.p[1])); }
+LYNX_LANES_INLINE D4 operator- (D4 a, D4 b) noexcept { return mk (_mm_sub_pd (a.p[0], b.p[0]), _mm_sub_pd (a.p[1], b.p[1])); }
+LYNX_LANES_INLINE D4 operator* (D4 a, D4 b) noexcept { return mk (_mm_mul_pd (a.p[0], b.p[0]), _mm_mul_pd (a.p[1], b.p[1])); }
+LYNX_LANES_INLINE D4 operator/ (D4 a, D4 b) noexcept { return mk (_mm_div_pd (a.p[0], b.p[0]), _mm_div_pd (a.p[1], b.p[1])); }
+LYNX_LANES_INLINE D4& operator+= (D4& a, D4 b) noexcept { return a = a + b; }
+LYNX_LANES_INLINE L4 operator< (D4 a, D4 b) noexcept { return mk (_mm_cmplt_pd (a.p[0], b.p[0]), _mm_cmplt_pd (a.p[1], b.p[1])); }
+LYNX_LANES_INLINE L4 operator> (D4 a, D4 b) noexcept { return mk (_mm_cmpgt_pd (a.p[0], b.p[0]), _mm_cmpgt_pd (a.p[1], b.p[1])); }
+LYNX_LANES_INLINE L4 operator>= (D4 a, D4 b) noexcept { return mk (_mm_cmpge_pd (a.p[0], b.p[0]), _mm_cmpge_pd (a.p[1], b.p[1])); }
+
+LYNX_LANES_INLINE I4 operator- (I4 a, I4 b) noexcept { return mk (_mm_sub_epi32 (a.v, b.v)); }
+LYNX_LANES_INLINE I4& operator-= (I4& a, I4 b) noexcept { return a = a - b; }
+LYNX_LANES_INLINE I4 operator| (I4 a, I4 b) noexcept { return mk (_mm_or_si128 (a.v, b.v)); }
+LYNX_LANES_INLINE I4 operator== (I4 a, I4 b) noexcept { return mk (_mm_cmpeq_epi32 (a.v, b.v)); }
+LYNX_LANES_INLINE I4 operator> (I4 a, I4 b) noexcept { return mk (_mm_cmpgt_epi32 (a.v, b.v)); }
+LYNX_LANES_INLINE I4 operator<= (I4 a, I4 b) noexcept { return mk (_mm_xor_si128 (_mm_cmpgt_epi32 (a.v, b.v), _mm_set1_epi32 (-1))); }
+
+LYNX_LANES_INLINE F4 select (I4 m, F4 a, F4 b) noexcept
+{
+    const auto k = _mm_castsi128_ps (m.v);
+    return mk (_mm_or_ps (_mm_and_ps (k, a.v), _mm_andnot_ps (k, b.v)));
+}
+LYNX_LANES_INLINE I4 select (I4 m, I4 a, I4 b) noexcept { return mk (_mm_or_si128 (_mm_and_si128 (m.v, a.v), _mm_andnot_si128 (m.v, b.v))); }
+LYNX_LANES_INLINE D4 select (L4 m, D4 a, D4 b) noexcept
+{
+    return mk (_mm_or_pd (_mm_and_pd (m.p[0], a.p[0]), _mm_andnot_pd (m.p[0], b.p[0])), _mm_or_pd (_mm_and_pd (m.p[1], a.p[1]), _mm_andnot_pd (m.p[1], b.p[1])));
+}
+// a double compare's lanes as a float / int mask, and back
+LYNX_LANES_INLINE I4 narrow (L4 m) noexcept
+{
+    return mk (_mm_castps_si128 (_mm_shuffle_ps (_mm_castpd_ps (m.p[0]), _mm_castpd_ps (m.p[1]), _MM_SHUFFLE (2, 0, 2, 0))));
+}
+LYNX_LANES_INLINE L4 widen (I4 m) noexcept { return mk (_mm_castsi128_pd (_mm_unpacklo_epi32 (m.v, m.v)), _mm_castsi128_pd (_mm_unpackhi_epi32 (m.v, m.v))); }
+LYNX_LANES_INLINE F4 toFloat (D4 x) noexcept { return mk (_mm_movelh_ps (_mm_cvtpd_ps (x.p[0]), _mm_cvtpd_ps (x.p[1]))); }
+LYNX_LANES_INLINE F4 abs (F4 x) noexcept { return mk (_mm_and_ps (x.v, _mm_castsi128_ps (_mm_set1_epi32 (0x7fffffff)))); }
+LYNX_LANES_INLINE bool any (I4 m) noexcept { return _mm_movemask_ps (_mm_castsi128_ps (m.v)) != 0; }
+
+// SynthInstrument::polyBlep, lane by lane (the divisions only when a lane is next to a discontinuity, as there)
+LYNX_LANES_INLINE F4 polyBlep (D4 t, D4 dt) noexcept
+{
+    const auto before = narrow (t < dt), after = narrow (t > d4 (1.0) - dt);
+    if (! any (before | after))
+        return f4 (0.0f);
+    const auto a = t / dt;
+    const auto b = (t - d4 (1.0)) / dt;
+    const auto low = toFloat (a + a - a * a - d4 (1.0));
+    const auto high = toFloat (b * b + b + b + d4 (1.0));
+    return select (before, low, select (after, high, f4 (0.0f)));
+}
+
+// SynthInstrument::oscillator for the shapes without state or tables (sine, triangle, saw, square)
+LYNX_LANES_INLINE F4 oscillator (Waveform w, D4 phase, D4 dt) noexcept
+{
+    const auto firstHalf = phase < d4 (0.5);
+    switch (w)
+    {
+        case Waveform::sine:
+        {
+            const auto x = toFloat (select (firstHalf, phase, phase - d4 (1.0))) * f4 (2.0f);
+            const auto y = f4 (4.0f) * x * (f4 (1.0f) - abs (x));
+            return f4 (0.225f) * (y * abs (y) - y) + y;
+        }
+        case Waveform::triangle: return toFloat (select (firstHalf, d4 (4.0) * phase - d4 (1.0), d4 (3.0) - d4 (4.0) * phase));
+        case Waveform::saw: return toFloat (d4 (2.0) * phase - d4 (1.0)) - polyBlep (phase, dt);
+        case Waveform::square:
+        {
+            auto s = select (narrow (firstHalf), f4 (1.0f), f4 (-1.0f));
+            s += polyBlep (phase, dt);
+            s -= polyBlep (select (firstHalf, phase + d4 (0.5), phase - d4 (0.5)), dt);
+            return s;
+        }
+        default: return f4 (0.0f);
+    }
+}
+
+// one oscillator of the voice loop: its phase step (std::min (0.49, …)), its value × its level, the phase advanced and
+// wrapped
+// (`unit`: every lane's pitch factor and the pitch wheel are exactly 1, so × them changes no bit and is left out)
+LYNX_LANES_INLINE F4 advance (Waveform w, float level, D4& phase, D4 phaseDelta, double ratio, D4 pitchMul, D4 bend, bool unit) noexcept
+{
+    auto delta = phaseDelta * d4 (ratio);
+    if (! unit)
+        delta = delta * pitchMul * bend;
+    delta = select (delta < d4 (0.49), delta, d4 (0.49));
+    const auto value = f4 (level) * oscillator (w, phase, delta);
+    phase += delta;
+    phase = select (phase >= d4 (1.0), phase - d4 (1.0), phase);
+    return value;
+}
+
+// SvfCoefficients::process (the four responses)
+LYNX_LANES_INLINE F4 svf (int mode, F4 in, F4& lo, F4& bp, F4 a1, F4 a2, F4 a3, F4 k) noexcept
+{
+    const auto v3 = in - lo;
+    const auto v1 = a1 * bp + a2 * v3;
+    const auto v2 = lo + a2 * bp + a3 * v3;
+    bp = f4 (2.0f) * v1 - bp;
+    lo = f4 (2.0f) * v2 - lo;
+    switch (mode)
+    {
+        case 1: return v1;
+        case 2: return in - k * v1 - v2;
+        case 3: return in - k * v1;
+        default: return v2;
+    }
+}
+
+// the 3-band tone control
+LYNX_LANES_INLINE F4 bands (F4 x, F4& st0, F4& st1, F4 c0, F4 c1, F4 g0, F4 g1, F4 g2) noexcept
+{
+    st0 += c0 * (x - st0);
+    st1 += c1 * (x - st1);
+    return st0 * g0 + (st1 - st0) * g1 + (x - st1) * g2;
+}
+#undef LYNX_LANES_INLINE
+} // namespace lanes
+
+std::atomic<bool> synthLanesFlag { true };
+
 struct SynthVoice
 {
     float panL = 1.0f, panR = 1.0f;
@@ -1050,180 +1216,441 @@ public:
         renderVoices (left, right, n, gl, gr);
     }
 
-    // (round 190ge: the output buffers never overlap this instrument's state — the scratch ones are written only through
-    // these pointers here — so `__restrict` lets the compiler keep the settings in registers through the sample loop
-    // instead of reading them again after every store; the same arithmetic, the same samples)
-    void renderVoices (float* __restrict left, float* __restrict right, int n, float gl, float gr) noexcept
+    // the control "tick" of voice `v` at sample `i` of the block (every 16 samples): pitch, filter, volume and pan
+    // (round 190gp: one function for the voice loop and the four-lane one, so both run the same code)
+    [[gnu::always_inline]] inline void controlTick (SynthVoice& v, int i) noexcept
     {
-        for (auto& v : voices)
+        v.controlCountdown = 16;
+        auto semitones = modEnv[1].active ? modEnv[1].amount * v.mod[1].level : 0.0f;
+        auto octaves = modEnv[0].active ? modEnv[0].amount * v.mod[0].level : 0.0f;
+        octaves += settings.keyTrack * (float) (v.key - 48) / 12.0f;
+
+        if (lfos[lfoPitch].active)
+            semitones += lfos[lfoPitch].amount * lfos[lfoPitch].tick (v.lfo[lfoPitch], 16);
+        if (settings.vibratoCents > 0.0f) // 6 Hz global phase, depth × r², r = 3·age/fs ≤ 1
         {
-            if (! v.active)
-                continue;
+            const auto r = std::min (1.0, 3.0 * (v.age + 1) / sampleRate);
+            const auto phase = vibratoPhase + 6.0 * i / sampleRate;
+            semitones += (float) (settings.vibratoCents / 100.0 * r * r * std::sin (2.0 * 3.141592653589793 * phase));
+        }
+        if (lfos[lfoCutoff].active)
+            octaves += lfos[lfoCutoff].amount * lfos[lfoCutoff].tick (v.lfo[lfoCutoff], 16);
+        if (lfos[lfoVolume].active)
+        {
+            const auto target = std::max (0.0f, 1.0f + lfos[lfoVolume].amount * lfos[lfoVolume].tick (v.lfo[lfoVolume], 16));
+            v.lfoGainStep = (target - v.lfoGain) / 16.0f;
+        }
+        if (lfos[lfoPan].active)
+            voicePan (v.basePan + lfos[lfoPan].amount * lfos[lfoPan].tick (v.lfo[lfoPan], 16), v.panL, v.panR);
 
-            for (int i = 0; i < n; ++i)
+        v.pitchMul = semitones != 0.0f ? std::exp2 (semitones / 12.0) : 1.0;
+        if (settings.sweep > 0.0f)
+        {
+            const auto s2 = v.sweep * v.sweep;
+            v.pitchMul *= 1.0 + settings.sweep * s2 * s2;
+            v.sweep *= sweepCoeff;
+        }
+
+        if (filterModulated)
+            v.filter.set (settings.cutoff * std::exp2 (octaves), settings.resonance, sampleRate, settings.filterType, settings.ladder);
+    }
+
+    // Round 190gp: can the active voices run side by side this block? Not with what keeps state across voices or reads
+    // tables (noise, spectral shapes, the evolving spectrum), FM's phase wrap, the ladder filter or Harmless' tremolo:
+    // those blocks run voice by voice. (Both ways give the same samples; this one costs about half.)
+    bool lanesFit() const noexcept
+    {
+        if (! synthLanesFlag.load (std::memory_order_relaxed) || evolving || settings.fm > 0.0f || settings.ladder
+            || settings.stereoTremolo > 0.0f)
+            return false;
+        for (const auto& osc : settings.osc)
+            if (osc.level > 0.0f && osc.wave != Waveform::sine && osc.wave != Waveform::triangle && osc.wave != Waveform::saw
+                && osc.wave != Waveform::square)
+                return false;
+        if (filterModulated) // (each voice's own filter: one response for all the lanes)
+            for (const auto& v : voices)
+                if (v.active && (v.filter.ladder || v.filter.mode != sharedFilter.mode))
+                    return false;
+        return sharedFilter.mode >= 0 && sharedFilter.mode <= 3;
+    }
+
+    // Up to four voices (`count`, in voice order) through the voice loop's arithmetic side by side, then added to the
+    // output in voice order. The voices' state is loaded into lanes and stored back as the voice loop leaves it.
+    void renderVoiceGroup (SynthVoice* const* group, int count, float* __restrict left, float* __restrict right, int n, float gl,
+                           float gr) noexcept
+    {
+        using namespace lanes;
+        F4 level, velocity, lfoGain, lfoGainStep, panL, panR, low, band, lowR, bandR, tone00, tone01, tone10, tone11;
+        F4 a1, a2, a3, kk;
+        I4 stage, glideLeft, countdown;
+        D4 phaseDelta, glideRatio, pitchMul, phase0, phase1, phase2;
+        std::array<int, 4> age {};
+        for (int j = 0; j < 4; ++j)
+        {
+            const auto& v = *group[j < count ? j : 0]; // (an unused lane copies the first voice; its results are dropped)
+            level[j] = v.level;
+            velocity[j] = v.velocity;
+            lfoGain[j] = v.lfoGain;
+            lfoGainStep[j] = v.lfoGainStep;
+            panL[j] = v.panL;
+            panR[j] = v.panR;
+            low[j] = v.low;
+            band[j] = v.band;
+            lowR[j] = v.lowR;
+            bandR[j] = v.bandR;
+            tone00[j] = v.tone[0][0];
+            tone01[j] = v.tone[0][1];
+            tone10[j] = v.tone[1][0];
+            tone11[j] = v.tone[1][1];
+            const auto& f = filterModulated ? v.filter : sharedFilter;
+            a1[j] = f.a1;
+            a2[j] = f.a2;
+            a3[j] = f.a3;
+            kk[j] = f.k;
+            stage[j] = v.stage;
+            glideLeft[j] = v.glideLeft;
+            countdown[j] = j < count ? v.controlCountdown : std::numeric_limits<std::int32_t>::max() / 2;
+            phaseDelta[j] = v.phaseDelta;
+            glideRatio[j] = v.glideRatio;
+            pitchMul[j] = v.pitchMul;
+            phase0[j] = v.phase[0];
+            phase1[j] = v.phase[1];
+            phase2[j] = v.phase[2];
+            age[(std::size_t) j] = v.age;
+        }
+
+        const auto sustain = f4 (settings.sustain), attack = f4 (attackStep), decay = f4 (decayCoeff), release = f4 (releaseCoeff);
+        const auto bend = d4 (bendMul);
+        // (round 190gp: without modulation the voices' pitch factors stay where they are; all 1 and no pitch bend: the
+        // phase steps skip two exact × 1 per oscillator. Nothing gliding: the glide is skipped, as it would change nothing)
+        auto unitPitch = ! modulated && bendMul == 1.0;
+        auto anyGlide = false;
+        for (int j = 0; j < count; ++j)
+        {
+            unitPitch = unitPitch && group[j]->pitchMul == 1.0;
+            anyGlide = anyGlide || group[j]->glideLeft > 0;
+        }
+        const auto& osc = settings.osc;
+        const int mode = sharedFilter.mode;
+        const auto summed = osc3Modulates ? 2 : 3;
+        const auto bandGain0 = f4 (settings.bandGain[0]), bandGain1 = f4 (settings.bandGain[1]), bandGain2 = f4 (settings.bandGain[2]);
+        const auto toneC0 = f4 (toneCoeff[0]), toneC1 = f4 (toneCoeff[1]);
+        const auto gainL = f4 (gl), gainR = f4 (gr);
+
+        constexpr int chunk = 64;
+        alignas (16) float outL[4 * chunk], outR[4 * chunk];
+        for (int base = 0; base < n; base += chunk)
+        {
+            const auto m = std::min (chunk, n - base);
+            for (int q = 0; q < m; ++q)
             {
-                if (evolving) // evolving spectrum: the two frames around the note's age
+                const auto i = base + q;
+                // ADSR envelope (the voice loop's switch: each stage's result, the lane's own stage picked)
                 {
-                    const auto t = v.age / sampleRate;
-                    const auto x = std::min ((double) (activeFrames->count - 1), (activeFrames->count - 1) * std::sqrt (t / activeFrames->span));
-                    const auto k = std::min ((int) x, activeFrames->count - 2);
-                    frameA = &activeFrames->tables[(std::size_t) k];
-                    frameB = &activeFrames->tables[(std::size_t) k + 1];
-                    frameMix = (float) (x - k);
+                    auto attacked = level + attack;
+                    const auto peaked = attacked >= f4 (1.0f);
+                    attacked = select (peaked, f4 (1.0f), attacked);
+                    auto decayed = sustain + (level - sustain) * decay;
+                    const auto settled = decayed - sustain < f4 (0.001f);
+                    decayed = select (settled, sustain, decayed);
+                    const auto released = level * release;
+                    const auto s0 = stage == i4 (0), s1 = stage == i4 (1), s2 = stage == i4 (2);
+                    level = select (s0, attacked, select (s1, decayed, select (s2, level, released)));
+                    stage = select (s0, select (peaked, i4 (1), i4 (0)), select (s1, select (settled, i4 (2), i4 (1)), stage));
                 }
-                // ADSR envelope
-                switch (v.stage)
+                if (anyGlide)
                 {
-                    case 0:
-                        v.level += attackStep;
-                        if (v.level >= 1.0f) { v.level = 1.0f; v.stage = 1; }
-                        break;
-                    case 1:
-                        v.level = settings.sustain + (v.level - settings.sustain) * decayCoeff;
-                        if (v.level - settings.sustain < 0.001f) { v.level = settings.sustain; v.stage = 2; }
-                        break;
-                    case 2: break;
-                    default: v.level *= releaseCoeff; break;
-                }
-
-                if (v.glideLeft > 0)
-                {
-                    v.phaseDelta *= v.glideRatio;
-                    --v.glideLeft;
+                    const auto gliding = glideLeft > i4 (0);
+                    phaseDelta = select (widen (gliding), phaseDelta * glideRatio, phaseDelta);
+                    glideLeft = select (gliding, glideLeft - i4 (1), glideLeft);
                 }
 
                 if (modulated)
                 {
-                    for (std::size_t e = 0; e < 2; ++e)
-                        if (modEnv[e].active)
-                            modEnv[e].advance (v.mod[e]);
-
-                    // every 16 samples (the control "tick"): pitch, filter, volume and pan
-                    if (--v.controlCountdown <= 0)
-                    {
-                        v.controlCountdown = 16;
-                        auto semitones = modEnv[1].active ? modEnv[1].amount * v.mod[1].level : 0.0f;
-                        auto octaves = modEnv[0].active ? modEnv[0].amount * v.mod[0].level : 0.0f;
-                        octaves += settings.keyTrack * (float) (v.key - 48) / 12.0f;
-
-                        if (lfos[lfoPitch].active)
-                            semitones += lfos[lfoPitch].amount * lfos[lfoPitch].tick (v.lfo[lfoPitch], 16);
-                        if (settings.vibratoCents > 0.0f) // 6 Hz global phase, depth × r², r = 3·age/fs ≤ 1
-                        {
-                            const auto r = std::min (1.0, 3.0 * (v.age + 1) / sampleRate);
-                            const auto phase = vibratoPhase + 6.0 * i / sampleRate;
-                            semitones += (float) (settings.vibratoCents / 100.0 * r * r * std::sin (2.0 * 3.141592653589793 * phase));
-                        }
-                        if (lfos[lfoCutoff].active)
-                            octaves += lfos[lfoCutoff].amount * lfos[lfoCutoff].tick (v.lfo[lfoCutoff], 16);
-                        if (lfos[lfoVolume].active)
-                        {
-                            const auto target = std::max (0.0f, 1.0f + lfos[lfoVolume].amount * lfos[lfoVolume].tick (v.lfo[lfoVolume], 16));
-                            v.lfoGainStep = (target - v.lfoGain) / 16.0f;
-                        }
-                        if (lfos[lfoPan].active)
-                            voicePan (v.basePan + lfos[lfoPan].amount * lfos[lfoPan].tick (v.lfo[lfoPan], 16), v.panL, v.panR);
-
-                        v.pitchMul = semitones != 0.0f ? std::exp2 (semitones / 12.0) : 1.0;
-                        if (settings.sweep > 0.0f)
-                        {
-                            const auto s2 = v.sweep * v.sweep;
-                            v.pitchMul *= 1.0 + settings.sweep * s2 * s2;
-                            v.sweep *= sweepCoeff;
-                        }
-
-                        if (filterModulated)
-                            v.filter.set (settings.cutoff * std::exp2 (octaves), settings.resonance, sampleRate, settings.filterType, settings.ladder);
-                    }
-
-                    v.lfoGain += v.lfoGainStep;
+                    for (int j = 0; j < count; ++j)
+                        for (std::size_t e = 0; e < 2; ++e)
+                            if (modEnv[e].active)
+                                modEnv[e].advance (group[j]->mod[e]);
+                    countdown -= i4 (1);
+                    if (const auto due = countdown <= i4 (0); any (due))
+                        for (int j = 0; j < count; ++j)
+                            if (due[j] != 0)
+                            {
+                                auto& v = *group[j];
+                                v.lfoGain = lfoGain[j];
+                                v.age = age[(std::size_t) j] + i;
+                                controlTick (v, i);
+                                countdown[j] = v.controlCountdown;
+                                pitchMul[j] = v.pitchMul;
+                                panL[j] = v.panL;
+                                panR[j] = v.panR;
+                                lfoGainStep[j] = v.lfoGainStep;
+                                if (filterModulated)
+                                {
+                                    a1[j] = v.filter.a1;
+                                    a2[j] = v.filter.a2;
+                                    a3[j] = v.filter.a3;
+                                    kk[j] = v.filter.k;
+                                }
+                            }
+                    lfoGain += lfoGainStep;
                 }
 
-                float sum = 0.0f, sumR = 0.0f, modulator = 0.0f;
-                double fmShift = 0.0;
-
-                // AM/FM: osc 3 is not summed, it modulates (first, so FM shifts the phase of osc 1 + 2)
-                if (osc3Modulates)
+                auto sum = f4 (0.0f), sumR = f4 (0.0f), modulator = f4 (0.0f);
+                if (osc3Modulates && osc[2].level > 0.0f) // (AM only here: FM blocks run voice by voice)
+                    modulator = lanes::advance (osc[2].wave, osc[2].level, phase2, phaseDelta, ratios[2], pitchMul, bend, unitPitch);
+                if (osc[0].level > 0.0f)
                 {
-                    const auto& osc = settings.osc[2];
-                    if (osc.level > 0.0f)
-                    {
-                        const auto delta = std::min (0.49, v.phaseDelta * ratios[2] * v.pitchMul * bendMul);
-                        modulator = osc.level * oscillator (osc.wave, v.phase[2], delta);
-                        v.phase[2] += delta;
-                        if (v.phase[2] >= 1.0)
-                            v.phase[2] -= 1.0;
-                    }
-                    if (settings.fm > 0.0f)
-                    {
-                        v.fmLevel = settings.fmSustain + (v.fmLevel - settings.fmSustain) * fmDecayCoeff;
-                        fmShift = (double) (settings.fm * v.fmLevel * modulator);
-                    }
+                    const auto value = lanes::advance (osc[0].wave, osc[0].level, phase0, phaseDelta, ratios[0], pitchMul, bend, unitPitch);
+                    sum += value * f4 (oscPanL[0]);
+                    sumR += value * f4 (oscPanR[0]);
+                }
+                if (osc[1].level > 0.0f)
+                {
+                    const auto value = lanes::advance (osc[1].wave, osc[1].level, phase1, phaseDelta, ratios[1], pitchMul, bend, unitPitch);
+                    sum += value * f4 (oscPanL[1]);
+                    sumR += value * f4 (oscPanR[1]);
+                }
+                if (summed == 3 && osc[2].level > 0.0f)
+                {
+                    const auto value = lanes::advance (osc[2].wave, osc[2].level, phase2, phaseDelta, ratios[2], pitchMul, bend, unitPitch);
+                    sum += value * f4 (oscPanL[2]);
+                    sumR += value * f4 (oscPanR[2]);
                 }
 
-                for (std::size_t o = 0; o < (osc3Modulates ? 2u : 3u); ++o)
+                if (settings.am)
                 {
-                    const auto& osc = settings.osc[o];
-
-                    if (osc.level <= 0.0f)
-                        continue;
-
-                    const auto delta = std::min (0.49, v.phaseDelta * ratios[o] * v.pitchMul * bendMul);
-                    auto phase = v.phase[o];
-                    if (fmShift != 0.0)
-                    {
-                        phase += fmShift;
-                        phase -= std::floor (phase);
-                    }
-                    const auto value = osc.level * oscillator (osc.wave, phase, delta);
-                    sum += value * oscPanL[o];
-                    sumR += value * oscPanR[o];
-                    v.phase[o] += delta;
-                    if (v.phase[o] >= 1.0) // delta < 0.5: at most one wrap (no floor, which is a function call on CPUs without SSE4)
-                        v.phase[o] -= 1.0;
-                }
-
-                if (settings.am) // (o1·g1 + o2·g2)·(1 − g3·o3), REA_rodada6 §3; ring (Sytrus): 1 − g3 + g3·o3, rodada18 §2
-                {
-                    const auto factor = settings.ring ? 1.0f - settings.osc[2].level + modulator : 1.0f - modulator;
+                    const auto factor = settings.ring ? f4 (1.0f - osc[2].level) + modulator : f4 (1.0f) - modulator;
                     sum *= factor;
                     sumR *= factor;
                 }
 
-                // resonant low-pass filter (state variable "TPT": stable at any cutoff)
-                const auto& f = filterModulated ? v.filter : sharedFilter;
-                auto outL = f.ladder ? f.processLadder (sum, v.ladder[0]) : f.process (sum, v.low, v.band);
-                auto outR = ! stereoOscillators ? outL : f.ladder ? f.processLadder (sumR, v.ladder[1]) : f.process (sumR, v.lowR, v.bandR);
+                // the SVF (SvfCoefficients::process)
+                auto outLeft = lanes::svf (mode, sum, low, band, a1, a2, a3, kk);
+                auto outRight = ! stereoOscillators ? outLeft : lanes::svf (mode, sumR, lowR, bandR, a1, a2, a3, kk);
 
                 if (useBands)
                 {
-                    auto bands = [&] (float x, float* st) {
-                        st[0] += toneCoeff[0] * (x - st[0]);
-                        st[1] += toneCoeff[1] * (x - st[1]);
-                        return st[0] * settings.bandGain[0] + (st[1] - st[0]) * settings.bandGain[1] + (x - st[1]) * settings.bandGain[2];
-                    };
-                    outL = bands (outL, v.tone[0]);
-                    outR = stereoOscillators ? bands (outR, v.tone[1]) : outL;
+                    outLeft = lanes::bands (outLeft, tone00, tone01, toneC0, toneC1, bandGain0, bandGain1, bandGain2);
+                    outRight = stereoOscillators ? lanes::bands (outRight, tone10, tone11, toneC0, toneC1, bandGain0, bandGain1, bandGain2) : outLeft;
                 }
 
-                const auto s = 0.3f * v.level * v.velocity * v.lfoGain;
-                auto tl = 1.0f, tr = 1.0f;
-                if (settings.stereoTremolo > 0.0f) // rectified 2.5 Hz, L/R a quarter period apart; 0.1 s fade-in per voice
-                {
-                    const auto theta = 2.0 * 3.141592653589793 * (tremoloPhase + 2.5 * i / sampleRate);
-                    const auto d = (double) settings.stereoTremolo;
-                    const auto r = std::min (1.0, v.age / std::max (1.0, std::round (0.1 * sampleRate)));
-                    tl = (float) (1.0 + r * d * (std::abs (1.25 * std::cos (theta)) - 1.0));
-                    tr = (float) (1.0 + r * d * (std::abs (1.25 * std::sin (theta)) - 1.0));
-                }
-                left[i] += outL * s * gl * v.panL * tl;
-                right[i] += outR * s * gr * v.panR * tr;
-                ++v.age;
+                const auto s = f4 (0.3f) * level * velocity * lfoGain;
+                const auto contributionL = outLeft * s * gainL * panL * f4 (1.0f); // (× the tremolo's 1)
+                const auto contributionR = outRight * s * gainR * panR * f4 (1.0f);
+                std::memcpy (outL + 4 * q, &contributionL, sizeof (contributionL));
+                std::memcpy (outR + 4 * q, &contributionR, sizeof (contributionR));
             }
+            // the voices into the output one after another, in voice order (as the voice loop adds them)
+            for (int q = 0; q < m; ++q)
+                for (int j = 0; j < count; ++j)
+                {
+                    left[base + q] += outL[4 * q + j];
+                    right[base + q] += outR[4 * q + j];
+                }
+        }
 
+        for (int j = 0; j < count; ++j)
+        {
+            auto& v = *group[j];
+            v.level = level[j];
+            v.lfoGain = lfoGain[j];
+            v.lfoGainStep = lfoGainStep[j];
+            v.panL = panL[j];
+            v.panR = panR[j];
+            v.low = low[j];
+            v.band = band[j];
+            v.lowR = lowR[j];
+            v.bandR = bandR[j];
+            v.tone[0][0] = tone00[j];
+            v.tone[0][1] = tone01[j];
+            v.tone[1][0] = tone10[j];
+            v.tone[1][1] = tone11[j];
+            v.stage = stage[j];
+            v.glideLeft = glideLeft[j];
+            if (modulated)
+                v.controlCountdown = countdown[j];
+            v.phaseDelta = phaseDelta[j];
+            v.pitchMul = pitchMul[j];
+            v.phase[0] = phase0[j];
+            v.phase[1] = phase1[j];
+            v.phase[2] = phase2[j];
+            v.age = age[(std::size_t) j] + n;
             if (v.stage == 3 && v.level < 0.0005f)
                 v.active = false;
         }
+    }
+
+    void renderVoiceLanes (float* __restrict left, float* __restrict right, int n, float gl, float gr) noexcept
+    {
+        std::array<SynthVoice*, 4> group {};
+        int count = 0;
+        for (auto& v : voices)
+            if (v.active)
+            {
+                group[(std::size_t) count++] = &v;
+                if (count == 4)
+                {
+                    renderVoiceGroup (group.data(), 4, left, right, n, gl, gr);
+                    count = 0;
+                }
+            }
+        if (count == 1) // (one voice: the voice loop is quicker than four lanes with three idle; two already gain)
+            renderVoice (*group[0], left, right, n, gl, gr);
+        else if (count > 0)
+            renderVoiceGroup (group.data(), count, left, right, n, gl, gr);
+        // global free-running phases (Harmless tremolo and vibrato), as renderVoices ends
+        tremoloPhase += 2.5 * n / sampleRate;
+        tremoloPhase -= std::floor (tremoloPhase);
+        vibratoPhase += 6.0 * n / sampleRate;
+        vibratoPhase -= std::floor (vibratoPhase);
+    }
+
+    // (round 190ge: the output buffers never overlap this instrument's state — the scratch ones are written only through
+    // these pointers here — so `__restrict` lets the compiler keep the settings in registers through the sample loop
+    // instead of reading them again after every store; the same arithmetic, the same samples)
+    // one voice over the block, added to the output (round 190gp: on its own, for the voice loop and a lone voice of
+    // the four-lane one)
+    void renderVoice (SynthVoice& v, float* __restrict left, float* __restrict right, int n, float gl, float gr) noexcept
+    {
+        for (int i = 0; i < n; ++i)
+        {
+            if (evolving) // evolving spectrum: the two frames around the note's age
+            {
+                const auto t = v.age / sampleRate;
+                const auto x = std::min ((double) (activeFrames->count - 1), (activeFrames->count - 1) * std::sqrt (t / activeFrames->span));
+                const auto k = std::min ((int) x, activeFrames->count - 2);
+                frameA = &activeFrames->tables[(std::size_t) k];
+                frameB = &activeFrames->tables[(std::size_t) k + 1];
+                frameMix = (float) (x - k);
+            }
+            // ADSR envelope
+            switch (v.stage)
+            {
+                case 0:
+                    v.level += attackStep;
+                    if (v.level >= 1.0f) { v.level = 1.0f; v.stage = 1; }
+                    break;
+                case 1:
+                    v.level = settings.sustain + (v.level - settings.sustain) * decayCoeff;
+                    if (v.level - settings.sustain < 0.001f) { v.level = settings.sustain; v.stage = 2; }
+                    break;
+                case 2: break;
+                default: v.level *= releaseCoeff; break;
+            }
+
+            if (v.glideLeft > 0)
+            {
+                v.phaseDelta *= v.glideRatio;
+                --v.glideLeft;
+            }
+
+            if (modulated)
+            {
+                for (std::size_t e = 0; e < 2; ++e)
+                    if (modEnv[e].active)
+                        modEnv[e].advance (v.mod[e]);
+
+                // every 16 samples (the control "tick"): pitch, filter, volume and pan
+                if (--v.controlCountdown <= 0)
+                    controlTick (v, i);
+
+                v.lfoGain += v.lfoGainStep;
+            }
+
+            float sum = 0.0f, sumR = 0.0f, modulator = 0.0f;
+            double fmShift = 0.0;
+
+            // AM/FM: osc 3 is not summed, it modulates (first, so FM shifts the phase of osc 1 + 2)
+            if (osc3Modulates)
+            {
+                const auto& osc = settings.osc[2];
+                if (osc.level > 0.0f)
+                {
+                    const auto delta = std::min (0.49, v.phaseDelta * ratios[2] * v.pitchMul * bendMul);
+                    modulator = osc.level * oscillator (osc.wave, v.phase[2], delta);
+                    v.phase[2] += delta;
+                    if (v.phase[2] >= 1.0)
+                        v.phase[2] -= 1.0;
+                }
+                if (settings.fm > 0.0f)
+                {
+                    v.fmLevel = settings.fmSustain + (v.fmLevel - settings.fmSustain) * fmDecayCoeff;
+                    fmShift = (double) (settings.fm * v.fmLevel * modulator);
+                }
+            }
+
+            for (std::size_t o = 0; o < (osc3Modulates ? 2u : 3u); ++o)
+            {
+                const auto& osc = settings.osc[o];
+
+                if (osc.level <= 0.0f)
+                    continue;
+
+                const auto delta = std::min (0.49, v.phaseDelta * ratios[o] * v.pitchMul * bendMul);
+                auto phase = v.phase[o];
+                if (fmShift != 0.0)
+                {
+                    phase += fmShift;
+                    phase -= std::floor (phase);
+                }
+                const auto value = osc.level * oscillator (osc.wave, phase, delta);
+                sum += value * oscPanL[o];
+                sumR += value * oscPanR[o];
+                v.phase[o] += delta;
+                if (v.phase[o] >= 1.0) // delta < 0.5: at most one wrap (no floor, which is a function call on CPUs without SSE4)
+                    v.phase[o] -= 1.0;
+            }
+
+            if (settings.am) // (o1·g1 + o2·g2)·(1 − g3·o3), REA_rodada6 §3; ring (Sytrus): 1 − g3 + g3·o3, rodada18 §2
+            {
+                const auto factor = settings.ring ? 1.0f - settings.osc[2].level + modulator : 1.0f - modulator;
+                sum *= factor;
+                sumR *= factor;
+            }
+
+            // resonant low-pass filter (state variable "TPT": stable at any cutoff)
+            const auto& f = filterModulated ? v.filter : sharedFilter;
+            auto outL = f.ladder ? f.processLadder (sum, v.ladder[0]) : f.process (sum, v.low, v.band);
+            auto outR = ! stereoOscillators ? outL : f.ladder ? f.processLadder (sumR, v.ladder[1]) : f.process (sumR, v.lowR, v.bandR);
+
+            if (useBands)
+            {
+                auto bands = [&] (float x, float* st) {
+                    st[0] += toneCoeff[0] * (x - st[0]);
+                    st[1] += toneCoeff[1] * (x - st[1]);
+                    return st[0] * settings.bandGain[0] + (st[1] - st[0]) * settings.bandGain[1] + (x - st[1]) * settings.bandGain[2];
+                };
+                outL = bands (outL, v.tone[0]);
+                outR = stereoOscillators ? bands (outR, v.tone[1]) : outL;
+            }
+
+            const auto s = 0.3f * v.level * v.velocity * v.lfoGain;
+            auto tl = 1.0f, tr = 1.0f;
+            if (settings.stereoTremolo > 0.0f) // rectified 2.5 Hz, L/R a quarter period apart; 0.1 s fade-in per voice
+            {
+                const auto theta = 2.0 * 3.141592653589793 * (tremoloPhase + 2.5 * i / sampleRate);
+                const auto d = (double) settings.stereoTremolo;
+                const auto r = std::min (1.0, v.age / std::max (1.0, std::round (0.1 * sampleRate)));
+                tl = (float) (1.0 + r * d * (std::abs (1.25 * std::cos (theta)) - 1.0));
+                tr = (float) (1.0 + r * d * (std::abs (1.25 * std::sin (theta)) - 1.0));
+            }
+            left[i] += outL * s * gl * v.panL * tl;
+            right[i] += outR * s * gr * v.panR * tr;
+            ++v.age;
+        }
+
+        if (v.stage == 3 && v.level < 0.0005f)
+            v.active = false;
+    }
+
+    void renderVoices (float* __restrict left, float* __restrict right, int n, float gl, float gr) noexcept
+    {
+        if (lanesFit())
+            return renderVoiceLanes (left, right, n, gl, gr);
+        for (auto& v : voices)
+            if (v.active)
+                renderVoice (v, left, right, n, gl, gr);
         // global free-running phases (Harmless tremolo and vibrato)
         tremoloPhase += 2.5 * n / sampleRate;
         tremoloPhase -= std::floor (tremoloPhase);
@@ -3547,6 +3974,8 @@ namespace
 std::atomic<bool> offlineRenderingFlag { false };
 }
 
+void setSynthVoiceLanes (bool on) noexcept { synthLanesFlag.store (on, std::memory_order_relaxed); }
+bool synthVoiceLanes() noexcept { return synthLanesFlag.load (std::memory_order_relaxed); }
 void setOfflineRendering (bool on) noexcept { offlineRenderingFlag.store (on); }
 bool offlineRendering() noexcept { return offlineRenderingFlag.load(); }
 namespace
