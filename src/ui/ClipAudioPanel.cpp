@@ -76,7 +76,7 @@ public:
         const auto area = body();
         // the beat grid of the clip's content (bars brighter), as Live's sample editor counts them
         const auto& song = engine.getSong();
-        const auto perBar = (std::int64_t) ppq * juce::jmax (1, song.beatsPerBar);
+        const auto perBar = std::max<std::int64_t> (1, song.barTicks()); // (bars of the song's meter, round 190fg; the grid stays on quarters)
         for (auto t = ((std::int64_t) c->offset / ppq) * ppq; t <= c->offset + c->length; t += ppq)
         {
             if (t < c->offset)
