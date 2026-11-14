@@ -53,16 +53,26 @@ public:
         setWantsKeyboardFocus (true);
         setSize (width, height + (int) helpH); // round 135: + the description line under the bottom bar
         claimTap();
+        // round 190gp: this editor shows the slot's live meters (Apex Limiter's loudness meter runs only while one does)
+        if (auto* times = engine.getProcessTimes(); times != nullptr && meterKey() < times->metersWanted.size())
+            times->metersWanted[meterKey()].fetch_add (1, std::memory_order_relaxed);
         startTimerHz (30);
     }
 
     ~ProEditor() override
     {
         stopTimer();
+        if (auto* times = engine.getProcessTimes(); times != nullptr && meterKey() < times->metersWanted.size())
+            times->metersWanted[meterKey()].fetch_sub (1, std::memory_order_relaxed);
         engine.removeChangeListener (this);
         if (auto* times = engine.getProcessTimes(); times != nullptr && times->analyzer.key.load() == tapKey())
             times->analyzer.key.store (-1);
         ui::hideValueTip();
+    }
+
+    std::size_t meterKey() const noexcept
+    {
+        return track >= 0 && slot >= 0 && slot < maxEffectSlots ? (std::size_t) (track * maxEffectSlots + slot) : ~std::size_t (0);
     }
 
     const EffectSlot* current() const
