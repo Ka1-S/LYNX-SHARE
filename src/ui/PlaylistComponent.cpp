@@ -83,6 +83,10 @@
 
 namespace lynx
 {
+// FL 2026's selection-strip box (live check 190gu, PAIR-header-selection-strip-range): lime, not the LEDs' green
+constexpr juce::uint32 selectionStripLimeArgb = 0xffa6d63c;
+static const juce::Colour selectionStripLime { selectionStripLimeArgb };
+
 namespace
 {
 constexpr float clipTitleHeight = 13.0f;
@@ -1981,12 +1985,14 @@ void PlaylistComponent::paint (juce::Graphics& g)
                     g.setColour (colour::accent);
                     g.fillRoundedRectangle (plateArea.withWidth (3.0f).reduced (0.0f, 3.0f), 1.5f);
                 }
-                else if (isTrackSelected (t)) // FL (live check 190gu B1): an outlined box in the selection strip, the LED's colour
+                else if (isTrackSelected (t)) // FL (live check 190gu B1): an outlined box in the selection strip
                 {
-                    const auto strip = juce::Rectangle<float> ((float) (headerWidth - trackhdr::selectionStripWidth), (float) y + 1.0f,
-                                                               (float) trackhdr::selectionStripWidth - 1.0f, (float) trackHeight - 3.0f);
-                    g.setColour (colour::ledOn);
-                    g.drawRect (strip, 1.0f);
+                    // as FL draws it (rollup 0.1.28, coordinator): a clearly visible lime outline, the whole 9 px column, the
+                    // whole row's height, on whole pixels (a 1 px line at half-pixel places blurred into a faint box)
+                    const auto strip = juce::Rectangle<int> (headerWidth - trackhdr::selectionStripWidth, y + 1,
+                                                             trackhdr::selectionStripWidth, juce::jmax (4, trackHeight - 2));
+                    g.setColour (selectionStripLime);
+                    g.drawRect (strip, 2);
                 }
 
                 const auto led = trackLed (t).toFloat();
