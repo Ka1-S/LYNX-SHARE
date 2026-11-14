@@ -1,108 +1,81 @@
-/**
- * Android JNI glue for LYNX SHARE
- * This file provides the JNI_OnLoad and native activity glue
- */
+#pragma once
 
+// Android lifecycle handling for LYNX SHARE
+
+#include <juce_core/juce_core.h>
+
+#if JUCE_ANDROID || defined(LYNX_ANDROID)
 #include <jni.h>
-#include <android/log.h>
 #include <android/native_activity.h>
+#endif
 
-#define LOG_TAG "LYNX_JNI"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+namespace lynx::platform
+{
+#if JUCE_ANDROID || defined(LYNX_ANDROID)
 
-// Global JavaVM pointer
-JavaVM* android_jvm = nullptr;
-// Global android_app pointer (for native_app_glue)
-struct android_app* android_app = nullptr;
+class AndroidLifecycle
+{
+public:
+    static AndroidLifecycle& getInstance();
 
+    // Called from Java side via JNI
+    void onStart();
+    void onResume();
+    void onPause();
+    void onStop();
+    void onDestroy();
+    void onConfigurationChanged();
+    void onLowMemory();
+    void onTrimMemory(int level);
+    void onWindowFocusChanged(bool hasFocus);
+    void onRequestPermissionsResult(int requestCode, const juce::StringArray& permissions, const juce::Array<int>& grantResults);
+
+    // Query state
+    bool isPaused() const { return paused; }
+    bool isStopped() const { return stopped; }
+    bool hasFocus() const { return hasWindowFocus; }
+
+    // Callbacks for the app to register
+    using LifecycleCallback = std::function<void()>;
+    void addPauseCallback(LifecycleCallback cb) { pauseCallbacks.push_back(std::move(cb)); }
+    void addResumeCallback(LifecycleCallback cb) { resumeCallbacks.push_back(std::move(cb)); }
+    void addStopCallback(LifecycleCallback cb) { stopCallbacks.push_back(std::move(cb)); }
+    void addDestroyCallback(LifecycleCallback cb) { destroyCallbacks.push_back(std::move(cb)); }
+    void addLowMemoryCallback(LifecycleCallback cb) { lowMemoryCallbacks.push_back(std::move(cb)); }
+
+private:
+    AndroidLifecycle() = default;
+    ~AndroidLifecycle() = default;
+
+    bool paused = false;
+    bool stopped = false;
+    bool hasWindowFocus = true;
+
+    std::vector<LifecycleCallback> pauseCallbacks;
+    std::vector<LifecycleCallback> resumeCallbacks;
+    std::vector<LifecycleCallback> stopCallbacks;
+    std::vector<LifecycleCallback> destroyCallbacks;
+    std::vector<LifecycleCallback> lowMemoryCallbacks;
+};
+
+// JNI bridge functions called from Java
 extern "C" {
 
-// JNI_OnLoad - called when the library is loaded
-jint JNI_OnLoad(JavaVM* vm, void* reserved)
-{
-    android_jvm = vm;
-    LOGI("JNI_OnLoad");
-    return JNI_VERSION_1_6;
+JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeStart(JNIEnv* env, jobject thiz);
+JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeResume(JNIEnv* env, jobject thiz);
+JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativePause(JNIEnv* env, jobject thiz);
+JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeStop(JNIEnv* env, jobject thiz);
+JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeDestroy(JNIEnv* env, jobject thiz);
+JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeConfigurationChanged(JNIEnv* env, jobject thiz);
+JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeLowMemory(JNIEnv* env, jobject thiz);
+JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeTrimMemory(JNIEnv* env, jobject thiz, jint level);
+JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeWindowFocusChanged(JNIEnv* env, jobject thiz, jboolean hasFocus);
+JNIEXPORT void JNICALL Java_com_ka1_s_lynx_LynxActivity_onNativeRequestPermissionsResult(JNIEnv* env, jobject thiz,
+                                                                                          jint requestCode,
+                                                                                          jobjectArray permissions,
+                                                                                          jintArray grantResults);
+
 }
 
-// JNI_OnUnload - called when the library is unloaded
-void JNI_OnUnload(JavaVM* vm, void* reserved)
-{
-    LOGI("JNI_OnUnload");
-    android_jvm = nullptr;
-}
-
-// Native activity callbacks (for native_app_glue compatibility)
-void ANativeActivity_onCreate(ANativeActivity* activity, void* savedState, size_t savedStateSize)
-{
-    LOGI("ANativeActivity_onCreate");
-    // Store the activity pointer for later use
-    android_app = reinterpret_cast<struct android_app*>(activity->instance);
-    if (android_app)
-    {
-        android_app->activity = activity;
-    }
-}
-
-void ANativeActivity_onStart(ANativeActivity* activity)
-{
-    LOGI("ANativeActivity_onStart");
-}
-
-void ANativeActivity_onResume(ANativeActivity* activity)
-{
-    LOGI("ANativeActivity_onResume");
-}
-
-void ANativeActivity_onPause(ANativeActivity* activity)
-{
-    LOGI("ANativeActivity_onPause");
-}
-
-void ANativeActivity_onStop(ANativeActivity* activity)
-{
-    LOGI("ANativeActivity_onStop");
-}
-
-void ANativeActivity_onDestroy(ANativeActivity* activity)
-{
-    LOGI("ANativeActivity_onDestroy");
-}
-
-void ANativeActivity_onWindowFocusChanged(ANativeActivity* activity, int focused)
-{
-    LOGI("ANativeActivity_onWindowFocusChanged: %d", focused);
-}
-
-void ANativeActivity_onNativeWindowCreated(ANativeActivity* activity, ANativeWindow* window)
-{
-    LOGI("ANativeActivity_onNativeWindowCreated");
-}
-
-void ANativeActivity_onNativeWindowDestroyed(ANativeActivity* activity, ANativeWindow* window)
-{
-    LOGI("ANativeActivity_onNativeWindowDestroyed");
-}
-
-void ANativeActivity_onInputQueueCreated(ANativeActivity* activity, AInputQueue* queue)
-{
-    LOGI("ANativeActivity_onInputQueueCreated");
-}
-
-void ANativeActivity_onInputQueueDestroyed(ANativeActivity* activity, AInputQueue* queue)
-{
-    LOGI("ANativeActivity_onInputQueueDestroyed");
-}
-
-void ANativeActivity_onConfigurationChanged(ANativeActivity* activity)
-{
-    LOGI("ANativeActivity_onConfigurationChanged");
-}
-
-void ANativeActivity_onLowMemory(ANativeActivity* activity)
-{
-    LOGI("ANativeActivity_onLowMemory");
-}
-
-} // extern "C"
+#endif
+} // namespace lynx::platform
