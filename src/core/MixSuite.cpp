@@ -7,6 +7,7 @@
 #include <cstdio>
 
 #include "core/Biquad.h"
+#include "core/Simd.h"
 #include "core/DynamicsSuite.h"
 #include "core/Effects.h"
 #include "core/EmberClassic.h"
@@ -235,30 +236,97 @@ void Oversampler::reset() noexcept
     hiPadPos = loPadPos = 0;
 }
 
-void Oversampler::up (Stage& s, float x, float& a, float& b) noexcept
+namespace
 {
-    const int L = s.taps;
-    s.upPos = s.upPos == 0 ? L - 1 : s.upPos - 1;
-    s.upHist[(std::size_t) s.upPos] = s.upHist[(std::size_t) (s.upPos + L)] = x;
-    const float* hist = s.upHist.data() + s.upPos; // hist[j] = x[m − j]
-    float acc = 0.0f;
-    for (int j = 0; j < L; ++j)
-        acc += s.coef[(std::size_t) j] * hist[j];
-    a = 2.0f * acc;              // y[2m]
-    b = hist[s.centreDelay];     // y[2m + 1] = x[m − (c − 1) / 2]
+// acc[k] = Σ coef[j] · lin[L − 1 + k − j] over j = 0 … L − 1, summed in that order from 0 (as up and down sum one
+// output), for k in [0, count): eight and four outputs side by side in SSE lanes, the rest one by one
+void halfBandBlock (const float* coef, int L, const float* lin, int count, float* acc) noexcept
+{
+    const int P = L - 1;
+    int k = 0;
+#if defined(LYNX_X86)
+    for (; k + 8 <= count; k += 8)
+    {
+        auto a0 = _mm_setzero_ps(), a1 = _mm_setzero_ps();
+        for (int j = 0; j < L; ++j)
+        {
+            const auto c = _mm_set1_ps (coef[j]);
+            a0 = _mm_add_ps (a0, _mm_mul_ps (c, _mm_loadu_ps (lin + P + k - j)));
+            a1 = _mm_add_ps (a1, _mm_mul_ps (c, _mm_loadu_ps (lin + P + k + 4 - j)));
+        }
+        _mm_storeu_ps (acc + k, a0);
+        _mm_storeu_ps (acc + k + 4, a1);
+    }
+    for (; k + 4 <= count; k += 4)
+    {
+        auto a0 = _mm_setzero_ps();
+        for (int j = 0; j < L; ++j)
+            a0 = _mm_add_ps (a0, _mm_mul_ps (_mm_set1_ps (coef[j]), _mm_loadu_ps (lin + P + k - j)));
+        _mm_storeu_ps (acc + k, a0);
+    }
+#endif
+    for (; k < count; ++k)
+    {
+        float a = 0.0f;
+        for (int j = 0; j < L; ++j)
+            a += coef[j] * lin[P + k - j];
+        acc[k] = a;
+    }
+}
 }
 
-float Oversampler::down (Stage& s, float a, float b) noexcept
+// (the block's history: a stage's ring — size L, mirrored at +L, the newest sample at its position — laid out as a
+// straight line, lin[P − 1 − j] = ring[pos + j] for the j-th sample before the block, then the block from lin[P])
+
+void Oversampler::upBlock (Stage& s, const float* in, int m, float* out) noexcept
 {
-    const int L = s.taps;
-    s.downPos = s.downPos == 0 ? L - 1 : s.downPos - 1;
-    s.evenHist[(std::size_t) s.downPos] = s.evenHist[(std::size_t) (s.downPos + L)] = a;
-    s.oddHist[(std::size_t) s.downPos] = s.oddHist[(std::size_t) (s.downPos + L)] = b;
-    const float* even = s.evenHist.data() + s.downPos;
-    float acc = 0.0f;
+    const int L = s.taps, P = L - 1;
+    std::array<float, 64 + 256> lin;
+    std::array<float, 256> acc;
+    for (int j = 0; j < P; ++j)
+        lin[(std::size_t) (P - 1 - j)] = s.upHist[(std::size_t) (s.upPos + j)];
+    std::copy (in, in + m, lin.data() + P);
+    halfBandBlock (s.coef.data(), L, lin.data(), m, acc.data());
+    for (int k = 0; k < m; ++k)
+    {
+        out[2 * k] = 2.0f * acc[(std::size_t) k];                      // y[2m]
+        out[2 * k + 1] = lin[(std::size_t) (P + k - s.centreDelay)]; // y[2m + 1] = x[m − (c − 1) / 2]
+    }
+    // the ring as m calls of up leave it: the newest sample at the new position, both copies
+    s.upPos = ((s.upPos - m) % L + L) % L;
     for (int j = 0; j < L; ++j)
-        acc += s.coef[(std::size_t) j] * even[j];
-    return acc + 0.5f * s.oddHist[(std::size_t) (s.downPos + s.centreDelay + 1)]; // v[2m − c]
+    {
+        const auto v = lin[(std::size_t) (P + m - 1 - j)];
+        const auto q = (s.upPos + j) % L;
+        s.upHist[(std::size_t) q] = s.upHist[(std::size_t) (q + L)] = v;
+    }
+}
+
+void Oversampler::downBlock (Stage& s, const float* in, int m, float* out) noexcept
+{
+    const int L = s.taps, P = L - 1;
+    std::array<float, 64 + 256> evenLin, oddLin;
+    std::array<float, 256> acc;
+    for (int j = 0; j < P; ++j)
+    {
+        evenLin[(std::size_t) (P - 1 - j)] = s.evenHist[(std::size_t) (s.downPos + j)];
+        oddLin[(std::size_t) (P - 1 - j)] = s.oddHist[(std::size_t) (s.downPos + j)];
+    }
+    for (int k = 0; k < m; ++k)
+    {
+        evenLin[(std::size_t) (P + k)] = in[2 * k];
+        oddLin[(std::size_t) (P + k)] = in[2 * k + 1];
+    }
+    halfBandBlock (s.coef.data(), L, evenLin.data(), m, acc.data());
+    for (int k = 0; k < m; ++k)
+        out[k] = acc[(std::size_t) k] + 0.5f * oddLin[(std::size_t) (P + k - s.centreDelay - 1)]; // v[2m − c]
+    s.downPos = ((s.downPos - m) % L + L) % L;
+    for (int j = 0; j < L; ++j)
+    {
+        const auto q = (s.downPos + j) % L;
+        s.evenHist[(std::size_t) q] = s.evenHist[(std::size_t) (q + L)] = evenLin[(std::size_t) (P + m - 1 - j)];
+        s.oddHist[(std::size_t) q] = s.oddHist[(std::size_t) (q + L)] = oddLin[(std::size_t) (P + m - 1 - j)];
+    }
 }
 
 float Oversampler::padIn (float x) noexcept
