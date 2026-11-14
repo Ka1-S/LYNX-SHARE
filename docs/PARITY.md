@@ -3415,6 +3415,33 @@ Also: `Song::automationChunks` (runtime only): stand-in / freeze render songs an
 song they stand for (the renderer works in 128-sample chunks while any automation plays; some instruments sound about
 −66 dB different at 512): frozen audio now nulls where the freeze took the song's automation away.
 
+## Round 190gx: Anvil Bus refitted on Live's second Drum Buss render set
+
+Round 190gu rendered Live 12.4's Drum Buss again: the settings 190fk could not measure (types at 25 / 50 %, Soft 75 %,
+Boom amount / decay / frequency, Crunch 0.25 / 1.0, Transients on a sustained pad, Comp with Drive and with Trim, Dry/Wet
+with Comp, every type at +6 dBFS, Damping 500 Hz / 2 kHz), 46 cases, each at 44.1, 48 and 96 kHz. Anvil Bus was
+refitted on them with the plugin quality gate: the 31 cases of 190ei and the 46 new ones, every case at or under its
+error before (to 0.001 dB), at all three rates. Anvil Bus is in no release yet (only the 0.1.28 rollup), so the new laws
+need no engine-version switch.
+
+| Item | Live (190gu) | Anvil Bus now | |
+|---|---|---|---|
+| Comp's place | before the curve (Comp + Drive 50 %: staircase THD and level follow) | moved before the curve, refitted: 8 Comp cases all closer (Drive 50 % stair 1.63 → 0.17 dB, drums 2.65 → 0.65) | ✅ |
+| Dry/Wet with Comp | dry = the raw input (0.003 dB) | the same (test: sample for sample) | ✅ |
+| Type EQ below 100 % | Soft / Medium keep the neutral shape until near 100 % | depth = amount⁸ for Soft and Medium (Medium 50 % noise 2.95 → 0.41 dB) | ✅ |
+| Soft 75 % | folds 0 dBFS to −12.1 dBFS | its own knot (stair 1.07 → 0.33 dB) | ✅ |
+| Boom amount | lift and ring grow fast (1.0 rings ≈ −20 dB/s at 50 Hz) | lift and Q per amount (0.25: drums 4.98 → 0.43; 1.0: 7.82 → 3.32 dB) | ⚠️ |
+| Boom decay 0 / 0.5 | | refitted knots (drums 3.22 → 3.08, 1.87 → 1.75) | ⚠️ |
+| Damping | one-pole | corner 6 % above the set value (0.38 → 0.24 dB) | ✅ |
+| Transients on steady sound | a pad: −1.0 → −3.9 dB, +0.25 → +1.15 | a broadband level term joins the shaper (pad 3.53 → 3.05, 0.98 → 0.80 dB); the full depth would move the drum loop | ⚠️ |
+| Crunch's grit | THD 1 → 2.3 / 4.4 / 12 % at 0.25 / 0.5 / 1.0 | not carried (tried: lift before the curve; failed the gate) | ❌ |
+| Output never above 0 dBFS | yes (+6 dBFS in → ≤ 0.0) | not limited (tried an output ceiling; failed the gate) | ❌ |
+| Rates 44.1 / 48 / 96 kHz | agree within 0.25 dB | errors against Live the same at the three rates (mean 0.77 / 0.77 / 0.79 dB) | ✅ |
+| Panel | Drive, types, Trim, Comp \| Crunch, Damp, Transients \| Boom, Freq, Decay \| Out, Dry/Wet | the generic panel in those four columns | ✅ |
+
+Mean headline error: 190ei bank 1.216 → 1.198 dB, 190gu bank 1.261 → 0.766 dB (48 kHz); details and CPU in
+`/mnt/e/lynx-work/livefacts190gx/db/REPORT.md`.
+
 ## Round 190fk: Anvil Bus — LYNX's drum-bus engine in the role of Ableton Live's Drum Buss
 
 Owner decision O20: Live's Drum Buss colours even at its all-zero setting, so it imports onto a dedicated engine

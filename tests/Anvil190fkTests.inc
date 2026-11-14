@@ -142,7 +142,8 @@ TEST (anvil190fk_safe_at_the_extremes)
 {
     using namespace lynx;
     namespace a = anvil;
-    // every control at its ends, a +12 dBFS square wave then silence: finite, no denormals left, reset clean
+    // every control at its ends, a +12 dBFS square wave then silence: finite, no denormals left, reset clean (round 190gx:
+    // ten seconds of silence — Boom at 1.0 rings for seconds, as Live's does: −20 dB/s at 50 Hz)
     for (const float v : { 0.0f, 1.0f })
     {
         EffectParams p {};
@@ -152,7 +153,7 @@ TEST (anvil190fk_safe_at_the_extremes)
         e.prepare (44100.0);
         std::vector<float> l (4096), r (4096);
         bool finite = true;
-        for (int b = 0; b < 40; ++b)
+        for (int b = 0; b < 128; ++b)
         {
             for (int i = 0; i < 4096; ++i)
                 l[(std::size_t) i] = r[(std::size_t) i] = b < 20 ? ((i / 50) % 2 ? 4.0f : -4.0f) : 0.0f;

@@ -17585,6 +17585,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Follow190fgTests.inc"
 #include "Relfix190fpTests.inc"
 #include "Anvil190fkTests.inc"
+#include "AnvilBus190gxTests.inc"
 #include "Donate190fqTests.inc"
 #include "GenPreset190fsTests.inc"
 #include "Issues190ftTests.inc"
