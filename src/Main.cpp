@@ -18989,6 +18989,7 @@ private:
             return ! until || until();
         };
         auto peer = lynx::AbletonLink::makeTestPeer (97.0); // the other app in the session (it was there first)
+        juce::Thread::sleep (1500); // (a session that started at the same moment as LYNX's could take either tempo)
         using lynx::toolbarlayout::Group;
 
         // FL's Pattern layout: no Link toggle on a new install
