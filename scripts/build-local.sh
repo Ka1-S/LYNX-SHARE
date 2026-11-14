@@ -192,8 +192,25 @@ if [[ "$split" -ge 2 ]] && command -v python3 > /dev/null && python3 scripts/spl
         *zig*) # zig compiles every source of one command in parallel (and caches each object)
             $CXX $FLAGS $CORE $WAVPACK $CHUNKS -o build-local/lynx_tests 2> build-local/split/errors.log || rc=$? ;;
         *)
+            # g++ -O2 -g needs ~5.5 GB for one chunk of four (rollup 0.1.28: four at once ran GitHub's 16 GB runner out of
+            # memory and the runner was lost): with g++ at most as many chunks compile at once as the free memory holds
+            # (6 GB each; LYNX_TESTS_CHUNK_JOBS=<n> sets it). clang++ and zig need far less: all at once, as before.
+            chunkJobs="${LYNX_TESTS_CHUNK_JOBS:-0}"
+            if [[ "$chunkJobs" == 0 ]]; then
+                chunkJobs=$split
+                case "${LYNX_CXX_ONCE_REAL:-$CXX}" in
+                    *g++*)
+                        availKb="$(awk '/^MemAvailable:/ { print $2 }' /proc/meminfo 2> /dev/null || true)"
+                        if [[ -n "$availKb" ]]; then
+                            chunkJobs=$(( availKb / (6 * 1024 * 1024) ))
+                            (( chunkJobs < 1 )) && chunkJobs=1
+                            echo "note: g++ test chunks: $chunkJobs at a time ($(( availKb / 1024 / 1024 )) GB free)" >&2
+                        fi ;;
+                esac
+            fi
             pids=""
             for f in $CHUNKS; do
+                while (( $(jobs -rp | wc -l) >= chunkJobs )); do sleep 1; done
                 $CXX $FLAGS -c "$f" -o "${f%.cpp}.o" 2> "${f%.cpp}.log" &
                 pids="$pids $!"
             done
