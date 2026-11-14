@@ -15,7 +15,8 @@ namespace lynx::nativechild
 
 // FL's docked plugin windows are the default (slice 3: every floating panel is a native child, overlays and DPI changes
 // follow them). LYNX_DOCKED_PLUGINS=0 in the environment turns docking off: every plugin window is then FL's "Detached"
-// and the panels are plain components (LYNX's behaviour before issue #116).
+// and the panels are plain components (LYNX's behaviour before issue #116). On Linux docking is off unless
+// LYNX_DOCKED_PLUGINS=1 (issue #165: X11 child windows lose text focus and leave stale pictures there).
 bool dockingEnabled();
 
 // Makes `c` a native child window of `area`'s top-level window (it must not have a parent component). False when that

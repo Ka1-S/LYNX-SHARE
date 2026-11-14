@@ -470,7 +470,19 @@ KeyForwarder& keyForwarder()
 
 bool dockingEnabled()
 {
-    static const bool on = juce::SystemStats::getEnvironmentVariable ("LYNX_DOCKED_PLUGINS", {}).trim() != "0";
+    // Issue #165 (Linux, Wayland desktop through XWayland, and LYNX's own private X server): an X11 child window in the
+    // main window takes no keyboard focus for its text fields (the SoundFont's preset search box typed nothing), a
+    // closed or moved one leaves its picture behind until something else repaints there, and it has no frame of its
+    // own. The docking glue (click raise, placement, stacking checks) is written for Win32 only, so on Linux plugin and
+    // channel windows are the system's own windows ("Detached", as before issue #116) unless LYNX_DOCKED_PLUGINS=1.
+    static const bool on = [] {
+        const auto value = juce::SystemStats::getEnvironmentVariable ("LYNX_DOCKED_PLUGINS", {}).trim();
+       #if JUCE_LINUX || JUCE_BSD
+        return value == "1";
+       #else
+        return value != "0";
+       #endif
+    }();
     return on;
 }
 
