@@ -2160,6 +2160,13 @@ private:
         {
             t.indices = roll->midiToolNotes (t.selected);
             t.grid = roll->midiToolGrid();
+            t.from = roll->timeSelectionFrom(); // round 190fm: Generate writes into the time selection…
+            t.to = roll->timeSelectionTo();
+        }
+        if (t.to <= t.from && c->length > 0) // …else the part of the pattern the clip plays (Live: the clip's loop)
+        {
+            t.from = std::max<std::int64_t> (0, c->offset);
+            t.to = t.from + c->length;
         }
         else
         {

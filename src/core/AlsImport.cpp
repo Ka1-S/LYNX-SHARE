@@ -16,6 +16,7 @@
 #include "core/ClipLauncher.h"
 #include "core/DynamicsSuite.h"
 #include "core/FlWrapper.h"
+#include "core/Groove.h"
 #include "core/Gzip.h"
 #include "core/LiveScales.h"
 #include "core/MissingFiles.h"
@@ -159,6 +160,8 @@ struct Ctx
     // the scale of the first MIDI clip that has Live's clip scale switched on (round 190o)
     std::optional<projectkey::Key> clipKey;
     bool clipKeySeen = false;
+    // round 190fm: the set's GroovePool, a Groove's Id attribute → its id in LYNX's pool
+    std::map<int, std::uint32_t> grooveIds;
 
     explicit Ctx (const AlsImportOptions& o) : options (o), report (o.common.report) {}
 
@@ -166,6 +169,41 @@ struct Ctx
     {
         if (report != nullptr)
             ++(report->*list)[what];
+    }
+
+    // (round 190fm) a file a device references (Hybrid Reverb's impulse response): the path where it is on this PC, ""
+    // when it is not — not reported as a missing sample (the device's own report line says what is left out). Besides
+    // the sample places: the "Builtin" folder next to each library root's "Core Library" (Live's own files on a machine
+    // with Live installed: RelativePathType 7 [DATA], the user's own install, read at import time only)
+    std::string findFile (const Element& sampleRef) const
+    {
+        const auto fileRef = sampleRef.child ("FileRef");
+        const auto& exists = options.common.fileExists;
+        if (! fileRef || ! exists)
+            return {};
+        const auto rel = fileRef.value ("RelativePath");
+        const auto saved = fileRef.value ("Path");
+        std::vector<std::string> candidates;
+        if (const auto it = options.common.relocations.find (saved); it != options.common.relocations.end())
+            candidates.push_back (it->second);
+        if (! rel.empty())
+        {
+            candidates.push_back (joinPath (options.common.projectFolder, rel));
+            for (const auto& root : options.libraryRoots)
+            {
+                candidates.push_back (joinPath (root, rel));
+                if (const auto cut = root.find_last_of ("/\\"); cut != std::string::npos && root.compare (cut + 1, std::string::npos, "Core Library") == 0)
+                    candidates.push_back (joinPath (joinPath (root.substr (0, cut), "Builtin"), rel));
+            }
+        }
+        if (! saved.empty())
+            candidates.push_back (saved);
+        if (const auto name = pathFileName (saved.empty() ? rel : saved); ! name.empty())
+            candidates.push_back (joinPath (options.common.projectFolder, name));
+        for (const auto& c : candidates)
+            if (! c.empty() && exists (c))
+                return c;
+        return {};
     }
 
     // A sample reference → a path that exists on this PC ("" = missing; the saved path is reported)
@@ -602,6 +640,7 @@ bool nativeEffectFrom (Ctx& ctx, const Element& d, EffectSlot& slot, std::vector
 {
     alsdev::Context context;
     context.bpm = ctx.song.bpm;
+    context.findFile = [&ctx] (const Element& ref) { return ctx.findFile (ref); }; // (round 190fm)
     auto t = alsdev::effectFromLiveDevice (d, context);
     if (! t)
         return false;
@@ -1631,15 +1670,39 @@ void applyWarpMode (int mode, SamplerSettings& s)
 {
     s.keepPitch = mode != 3;
     s.stretchMethod = mode == 0 ? StretchMethod::beats : mode == 1 ? StretchMethod::tones : mode == 2 ? StretchMethod::texture : StretchMethod::complex;
+    s.warpModes.complexPro = mode == 6; // (round 190fm: kept, so the export writes Complex Pro back)
+}
+
+// A clip's warp-mode settings (round 190fm; ALS_FORMAT §21) [DATA: the members of AudioClip in Live 12.4's schema, the
+// defaults in all 642 clips of the shipped sets]. Out-of-range values are clamped to what LYNX keeps.
+WarpModeSettings warpModesOf (const Element& clip)
+{
+    WarpModeSettings w;
+    w.beatsPreserve = (std::uint8_t) std::clamp ((int) clip.number ("TransientResolution", WarpModeSettings::preserveTransients), 0,
+                                                 WarpModeSettings::preserveTransients);
+    w.beatsLoop = (std::uint8_t) std::clamp ((int) clip.number ("TransientLoopMode", 2), 0, 2);
+    w.beatsEnvelope = (float) std::clamp (clip.number ("TransientEnvelope", 100), 0.0, 100.0);
+    w.tonesGrain = (float) std::clamp (clip.number ("GranularityTones", WarpModeSettings::defaultTonesGrain), WarpModeSettings::tonesGrainMin,
+                                       WarpModeSettings::tonesGrainMax);
+    w.textureGrain = (float) std::clamp (clip.number ("GranularityTexture", WarpModeSettings::defaultTextureGrain), WarpModeSettings::textureGrainMin,
+                                         WarpModeSettings::textureGrainMax);
+    w.textureFlux = (float) std::clamp (clip.number ("FluctuationTexture", 25), 0.0, 100.0);
+    w.proFormants = (float) std::clamp (clip.number ("ComplexProFormants", 100), 0.0, 100.0);
+    w.proEnvelope = (float) std::clamp (clip.number ("ComplexProEnvelope", 128), 8.0, 256.0);
+    return w;
 }
 
 // `stretchBeats` > 0: the channel plays the file stretched offline to that many beats at the song tempo (the warp
 // modes' own engines, core/TimeStretch); 0: the clips stretch it in real time (their `stretch`)
 int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warpMode, bool warped, double stretchBeats = 0.0,
-                     double beatsPitch = 0.0, const std::vector<WarpPoint>& warp = {})
+                     double beatsPitch = 0.0, const std::vector<WarpPoint>& warp = {}, const WarpModeSettings& modes = {})
 {
     auto key = path + "|" + std::to_string (mixerTrack) + "|" + std::to_string (warped ? warpMode : -1) + "|"
                + std::to_string (std::llround (stretchBeats * 1.0e6)) + "|" + std::to_string (std::llround (beatsPitch * 100.0));
+    if (warped && modes != WarpModeSettings {}) // (round 190fm: clips with other warp settings get channels of their own)
+        key += "|wm" + std::to_string (modes.beatsPreserve) + "," + std::to_string (modes.beatsLoop) + "," + std::to_string (modes.beatsEnvelope) + ","
+               + std::to_string (modes.tonesGrain) + "," + std::to_string (modes.textureGrain) + "," + std::to_string (modes.textureFlux) + ","
+               + std::to_string (modes.proFormants) + "," + std::to_string (modes.proEnvelope);
     for (const auto& w : warp) // (clips of one file with different markers need channels of their own)
         key += "|" + std::to_string (std::llround (w.seconds * 1.0e6)) + ":" + std::to_string (std::llround (w.beats * 1.0e6));
     if (const auto it = ctx.audioChannels.find (key); it != ctx.audioChannels.end())
@@ -1653,7 +1716,12 @@ int audioChannelFor (Ctx& ctx, const std::string& path, int mixerTrack, int warp
     c.volume = 10000.0f / 12800.0f;
     c.mixerTrack = mixerTrack;
     if (warped)
+    {
+        const auto complexPro = warpMode == 6;
+        c.sampler.warpModes = modes;
         applyWarpMode (warpMode, c.sampler);
+        c.sampler.warpModes.complexPro = complexPro;
+    }
     c.sampler.stretchBeats = (float) stretchBeats;
     c.sampler.stretchPitch = (float) beatsPitch;
     c.sampler.warp = warp;
@@ -1670,6 +1738,8 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
     const auto path = ctx.resolveSample (clip.child ("SampleRef"), "Audio clip: " + user);
     if (path.empty() || length <= 0)
         return;
+    if (intOf (clip.value ("GrooveSettings/GrooveId", "-1"), -1) >= 0) // (round 190fm)
+        ctx.note (&FlpImportReport::unsupported, "Groove on an audio clip (LYNX's grooves play on MIDI clips; the clip plays straight)");
     const auto warped = clip.boolean ("IsWarped", true);
     const auto mode = (int) clip.number ("WarpMode", 0);
     const auto bpm = ctx.song.bpm;
@@ -1737,7 +1807,15 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
         ++ctx.report->partialEffects["Warp markers (one tempo per clip)"]; // stretched in real time: one rate
     // content position (beats, or seconds when not warped) → LYNX playback ticks from the sample's start
     const auto contentTicks = [&] (double v) { return warped ? (v - beatAtZero) * ppq : v * bpm / 60.0 * ppq; };
-    const auto channel = audioChannelFor (ctx, path, mixerTrack, mode, warped, fileBeats, beatsPitch, warp);
+    const auto modes = warpModesOf (clip);
+    if (warped && ctx.report != nullptr) // what LYNX keeps but does not render (round 190fm)
+    {
+        if (mode == 6)
+            ++ctx.report->partialEffects["Warp mode Complex Pro (plays as Complex; Formants and Envelope kept for export)"];
+        if (mode == 2 && modes.textureFlux != WarpModeSettings {}.textureFlux)
+            ++ctx.report->partialEffects["Warp mode Texture: Flux (kept for export, not rendered)"];
+    }
+    const auto channel = audioChannelFor (ctx, path, mixerTrack, mode, warped, fileBeats, beatsPitch, warp, modes);
     const auto loop = loopOverride != nullptr ? *loopOverride : loopOf (clip);
     // not warped: the loop values are seconds [DATA: IsWarped=false clips]; the clip length is in beats either way
     auto unwarpedLoop = loop;
@@ -1770,6 +1848,58 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
     }
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Grooves (round 190fm) [SCHEMA: LiveSet/GroovePool{LomId, Grooves, DefaultGrooveId}, Groove Id=…{LomId, Name, Clip,
+// Grid, QuantizationAmount, TimingAmount, RandomAmount, VelocityAmount, Annotation, Selection, SourceContext},
+// clip GrooveSettings/GrooveId; DATA: the shipped sets, GrooveId = a Groove's Id attribute, −1 none]
+
+// The pool: each Groove → LYNX's pool (core/Groove.h fromGrooveElement: template notes inside its loop → points, Grid →
+// base, amounts in percent); the main track's GlobalGrooveAmount (percent) → the pool's amount
+void readGroovePool (Ctx& ctx, const Element& set, const Element& mainMixer)
+{
+    const auto pool = set.child ("GroovePool");
+    for (const auto& node : pool.path ("Grooves").children ("Groove"))
+    {
+        Groove g;
+        std::string why;
+        if (! groove::fromGrooveElement (node, g, &why))
+        {
+            ctx.note (&FlpImportReport::unsupported, "Groove without a usable template (left out): " + node.value ("Name"));
+            continue;
+        }
+        ctx.grooveIds[intOf (node.attr ("Id"), -1)] = groove::add (ctx.song.grooves, std::move (g));
+        // Live's groove law is not measured: LYNX's own (docs/analise/REA_rodada190bv.md U2) plays the same template
+        ctx.note (&FlpImportReport::approximated, "Grooves (LYNX's groove timing and accents; Live's exact law needs a live check)");
+        if (! node.value ("Annotation").empty())
+            ctx.note (&FlpImportReport::unsupported, "Groove info text (Annotation)");
+    }
+    if (const auto amount = mainMixer.child ("GlobalGrooveAmount"); amount)
+    {
+        const auto percent = amount.number ("Manual", 100.0);
+        ctx.song.grooves.amount = (float) std::clamp (percent / 100.0, 0.0, (double) groove::maxAmount);
+        if (percent > groove::maxAmount * 100.0 + 1e-6)
+            ctx.note (&FlpImportReport::approximated, "Global groove amount above 130 % (kept at 130 %)");
+    }
+    // the pool's default groove for new clips: LYNX has none (groove-023)
+    if (const auto def = intOf (pool.value ("DefaultGrooveId", "-1"), -1); def >= 0 && ctx.grooveIds.count (def) != 0)
+        ctx.note (&FlpImportReport::unsupported, "Default groove for new clips (LYNX's new clips start without a groove)");
+}
+
+// A clip's GrooveSettings/GrooveId → LYNX's id (0: none, −1 in the set, or not in the pool)
+std::uint32_t grooveOfClip (Ctx& ctx, const Element& clip)
+{
+    const auto id = intOf (clip.value ("GrooveSettings/GrooveId", "-1"), -1);
+    if (id < 0)
+        return 0;
+    const auto it = ctx.grooveIds.find (id);
+    if (it == ctx.grooveIds.end())
+    {
+        ctx.note (&FlpImportReport::unsupported, "Clip groove that is not in the set's Groove Pool (left out)");
+        return 0;
+    }
+    return it->second;
+}
+
 void addMidiClip (Ctx& ctx, const Element& clip, int row, int channel, double at, double length, std::vector<Clip>* out = nullptr,
                   const ClipLoop* loopOverride = nullptr)
 {
@@ -1782,6 +1912,7 @@ void addMidiClip (Ctx& ctx, const Element& clip, int row, int channel, double at
     c.start = ticksOf (at);
     c.length = ticksOf (length);
     c.muted = clip.boolean ("Disabled", false);
+    c.groove = grooveOfClip (ctx, clip); // (round 190fm; on the grid launcher::setClip hands it to the slot)
     (out != nullptr ? *out : ctx.song.playlist).push_back (c);
 }
 
@@ -2193,6 +2324,67 @@ std::optional<Song> importAls (const std::vector<std::uint8_t>& bytes, const Als
     return importAlsXml (doc, options, error);
 }
 
+std::optional<LiveDevicePreset> importLiveDevicePreset (const std::vector<std::uint8_t>& bytes, const AlsImportOptions& options, std::string* error)
+{
+    const auto fail = [error] (const std::string& why) -> std::optional<LiveDevicePreset> {
+        if (error != nullptr)
+            *error = why;
+        return std::nullopt;
+    };
+    xml::Document doc;
+    if (! parseSet (bytes, doc, error))
+        return std::nullopt;
+    // [SCHEMA] AbletonDevicePreset {OverwriteProtectionNumber, Device, PresetRef} (.adv); GroupDevicePreset {…, Device,
+    // PresetRef, BranchPresets, ReturnBranchPresets} (.adg): the Device slot holds the device element as a set does
+    // [DATA, Live 12.4's Core Library] an .adv holds the device element right under <Ableton> (no AbletonDevicePreset
+    // wrapper); an .adg holds GroupDevicePreset/Device
+    const auto root = doc.root();
+    auto preset = root.child ("AbletonDevicePreset");
+    if (! preset)
+        preset = root.child ("GroupDevicePreset");
+    if (root.name() != "Ableton" || root.child ("LiveSet"))
+        return fail ("not a Live device preset");
+    const auto devices = preset ? preset.child ("Device").children() : root.children();
+    if (devices.empty())
+        return fail ("the preset holds no device");
+    const auto d = devices.front();
+    const auto tag = std::string (d.name());
+    Ctx ctx (options);
+    LiveDevicePreset out;
+    out.name = d.value ("UserName");
+    if (tag == "AudioEffectGroupDevice")
+    {
+        out.slot = rack::makeRackSlot (RackDoc::Kind::audioEffect);
+        out.slot.enabled = d.boolean ("On/Manual", true);
+        if (! rackFrom (ctx, d, out.slot.patcher, 0))
+            return fail ("the rack could not be read");
+        out.rack = true;
+        return out;
+    }
+    if (tag == "PluginDevice")
+    {
+        const auto p = pluginOf (d);
+        if (! p)
+            return fail ("the plugin could not be read");
+        out.slot.kind = EffectKind::plugin;
+        out.slot.enabled = d.boolean ("On/Manual", true);
+        out.slot.plugin.name = p->name;
+        out.slot.plugin.foreign = *p;
+        ctx.note (&FlpImportReport::converted, "Plugin: " + p->name);
+        return out;
+    }
+    if (isInstrumentDevice (tag) || isMidiEffect (tag) || tag == "InstrumentGroupDevice" || tag == "MidiEffectGroupDevice" || tag == "DrumGroupDevice")
+        return fail ("an instrument or MIDI preset (only audio effects and Audio Effect Racks open as an insert effect)");
+    if (! nativeEffectFrom (ctx, d, out.slot))
+    {
+        ctx.note (&FlpImportReport::droppedEffects, deviceName (d));
+        return fail ("Live's " + deviceName (d) + " has no LYNX counterpart yet");
+    }
+    if (out.name.empty())
+        out.name = deviceName (d);
+    return out;
+}
+
 std::vector<FlpPluginUse> alsForeignPlugins (const std::vector<std::uint8_t>& bytes)
 {
     std::vector<FlpPluginUse> out;
@@ -2256,6 +2448,7 @@ std::optional<Song> importAlsXml (const xml::Document& doc, const AlsImportOptio
     song.mixer[0].volume = mapValue (ValueMap::fader, mainMixer.number ("Volume/Manual", 1));
     song.mixer[0].pan = (float) mainMixer.number ("Pan/Manual", 0);
     registerMixerTargets (ctx, mainMixer, 0, "Main");
+    readGroovePool (ctx, set, mainMixer); // (round 190fm)
 
     // tracks: one insert each (returns too), in order
     const auto tracks = set.child ("Tracks").children();

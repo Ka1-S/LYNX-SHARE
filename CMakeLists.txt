@@ -58,6 +58,7 @@ add_library(lynx_core STATIC
     src/core/AlsDevices.cpp
     src/core/AlsDevicesLot2.cpp
     src/core/AlsDevicesLot3.cpp
+    src/core/AlsDevicesLot4.cpp
     src/core/FlmFormat.cpp
     src/core/FlmImport.cpp
     src/core/FlmEffects.cpp
@@ -281,6 +282,7 @@ target_sources(lynx_core PRIVATE
 target_sources(lynx_core PRIVATE
     src/core/NoteTools.cpp
     src/core/MidiTools.cpp
+    src/core/MidiGenerate.cpp
     src/core/PianoRollTools.cpp
     src/core/EventEdit.cpp
     src/core/AudioEdit.cpp

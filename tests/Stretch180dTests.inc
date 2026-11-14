@@ -64,12 +64,12 @@ TEST (render180d_a_trimmed_clip_plays_what_it_draws)
 
         RackState::Factories f;
         f.samples = [shared] (const std::string&) { return shared; };
-        f.stretchedSamples = [shared] (const std::string&, double ratio, StretchMethod m, double, const StretchMap&) {
+        f.stretchedSamples = [shared] (const std::string&, double ratio, StretchMethod m, double, const StretchMap&, const StretchOptions&) {
             return std::shared_ptr<const SampleData> (timeStretch (*shared, ratio, m));
         };
         long spanIn = -1, spanOut = -1;
         f.stretchedSpans = [&spanIn, &spanOut] (const std::string&, const std::string&, const std::shared_ptr<const SampleData>& span, double ratio,
-                                                StretchMethod m, double st) {
+                                                StretchMethod m, double st, const StretchOptions&) {
             auto out = std::shared_ptr<const SampleData> (timeStretchSpan (*span, ratio, m, st));
             spanIn = (long) span->frames(), spanOut = out != nullptr ? (long) out->frames() : -1;
             return out;
@@ -175,7 +175,7 @@ TEST (render180d_a_stretched_trimmed_clip_starts_on_time)
         s.playlist = { clip };
         RackState::Factories f;
         f.samples = [shared] (const std::string&) { return shared; };
-        f.stretchedSamples = [shared] (const std::string&, double ratio, StretchMethod m, double, const StretchMap&) {
+        f.stretchedSamples = [shared] (const std::string&, double ratio, StretchMethod m, double, const StretchMap&, const StretchOptions&) {
             return std::shared_ptr<const SampleData> (timeStretch (*shared, ratio, m));
         };
         auto state = RackState::build (s, nullptr, rate, f);

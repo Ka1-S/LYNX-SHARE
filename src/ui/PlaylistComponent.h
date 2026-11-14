@@ -438,6 +438,7 @@ private:
     void normalizeClips (const std::vector<int>& targets, bool asGroup = false);
     juce::PopupMenu buildClipMenu (int index, int mouseX);
     void addKeyFollowItems (juce::PopupMenu& menu, int index, const std::vector<int>& targets); // round 190ds
+    void addGrooveItems (juce::PopupMenu& menu, int index, const std::vector<int>& targets); // round 190fm: Playlist clip grooves
 
     // FL's audio clip menu (round 190dz, core/FlClipMenu.h): FL's two columns and sections, LYNX's own items after them
     juce::PopupMenu buildAudioClipMenu (int index, int mouseX);

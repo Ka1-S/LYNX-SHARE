@@ -54,6 +54,20 @@ bool isAlsData (const std::uint8_t* data, std::size_t size);
 std::optional<Song> importAls (const std::vector<std::uint8_t>& fileBytes, const AlsImportOptions& options = {}, std::string* error = nullptr);
 std::optional<Song> importAlsXml (const xml::Document& document, const AlsImportOptions& options = {}, std::string* error = nullptr);
 
+// (round 190fm, docs/analise/ALS_FORMAT.md §20) A Live device preset the user owns — .adv (AbletonDevicePreset: one device)
+// or .adg (GroupDevicePreset: an Audio Effect Rack) — as one insert effect, through the same translators as a set's
+// devices (Live's own effects → LYNX's, racks → LYNX racks, plugins → PluginRef::foreign). nullopt + `error`: not a
+// preset, an instrument / MIDI preset, or a device with no LYNX counterpart. The report (options.common.report) gets the
+// same lines as a set's import.
+struct LiveDevicePreset
+{
+    EffectSlot slot;
+    std::string name; // the preset's device name (Live's UserName, else the device's)
+    bool rack = false;
+};
+std::optional<LiveDevicePreset> importLiveDevicePreset (const std::vector<std::uint8_t>& fileBytes, const AlsImportOptions& options = {},
+                                                        std::string* error = nullptr);
+
 // The set's third-party plugins (no import): for the targeted scan before an open, as flpForeignPlugins for an .flp.
 std::vector<FlpPluginUse> alsForeignPlugins (const std::vector<std::uint8_t>& fileBytes);
 

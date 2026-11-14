@@ -298,6 +298,7 @@ bool toPlaylist (Song& song, int track, int scene, int playlistTrack, std::int64
     auto clip = content->clip;
     clip.gridSlot = -1;
     clip.uid = 0;
+    clip.groove = clip.kind == ClipKind::pattern ? content->settings.groove : 0; // (round 190fm: the groove goes along)
     clip.track = playlistTrack;
     clip.start = std::max<std::int64_t> (0, tick);
     song.playlist.push_back (clip);

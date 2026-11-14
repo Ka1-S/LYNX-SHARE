@@ -6,6 +6,7 @@
 
 #include "core/ClipLauncher.h"
 #include "core/ClipSample.h"
+#include "core/WarpModes.h"
 #include "ui/AudioEditor.h"
 #include "ui/I18n.h"
 #include "ui/NumBox.h"
@@ -54,20 +55,59 @@ public:
         mode.addSeparator();
         for (const auto& m : flModes)
             mode.addItem (tr (m.name), m.method + 2);
-        mode.setTooltip (tr ("Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. It belongs to the channel"));
+        mode.setTooltip (tr ("Warp mode: how the audio is stretched. Re-Pitch changes speed and pitch together. Only this clip changes: when other clips play the same audio, it gets its own copy"));
         mode.onChange = [this] {
             if (refreshing)
                 return;
             const auto id = mode.getSelectedId() - 2;
-            engine.editSong ([c = channel, id] (Song& s) {
-                if (! juce::isPositiveAndBelow (c, (int) s.channels.size()))
-                    return;
-                auto& sampler = s.channels[(std::size_t) c].sampler;
-                sampler.keepPitch = id >= 0;
-                if (id >= 0)
-                    sampler.stretchMethod = (StretchMethod) id;
-            });
+            editMode ([id] (Song& s, int c) { warpmodes::setMode (s, c, id); });
         };
+
+        // the mode's own settings (round 190fm; Live's Clip View shows them under the mode): Beats › Preserve, Transient
+        // Loop Mode and Transient Envelope; Tones / Texture › Grain Size
+        for (int k = 0; k < (int) warpmodes::preserveNames().size(); ++k)
+            preserve.addItem (tr (warpmodes::preserveNames()[(std::size_t) k]), k + 1);
+        preserve.setTooltip (tr ("Preserve: where Beats cuts the audio: at its transients, or on a note grid"));
+        preserve.onChange = [this] {
+            if (! refreshing)
+                editMode ([v = preserve.getSelectedId() - 1] (Song& s, int c) { warpmodes::setPreserve (s, c, v); });
+        };
+        for (int k = 0; k < (int) warpmodes::loopNames().size(); ++k)
+            loopMode.addItem (tr (warpmodes::loopNames()[(std::size_t) k]), k + 1);
+        loopMode.setTooltip (tr ("Transient Loop Mode: what fills the gap after each piece when the audio is slowed down"));
+        loopMode.onChange = [this] {
+            if (! refreshing)
+                editMode ([v = loopMode.getSelectedId() - 1] (Song& s, int c) { warpmodes::setLoopMode (s, c, v); });
+        };
+        {
+            ui::ValueSpec spec;
+            spec.name = tr ("Transient Envelope: a fade over each piece (100: no fade)");
+            spec.minimum = 0.0;
+            spec.maximum = 100.0;
+            spec.interval = 1.0;
+            spec.pixelsForRange = 200.0;
+            spec.defaultValue = 100.0;
+            spec.toText = [] (double v) { return juce::String (juce::roundToInt (v)); };
+            envelope = std::make_unique<ui::NumBox> (spec, [this] { return (double) sampler().warpModes.beatsEnvelope; }, [this] (double v) {
+                editMode ([v] (Song& s, int c) { warpmodes::setEnvelope (s, c, v); });
+            });
+        }
+        // Grain Size: one box per mode, each in Live's range with Live's default (Tones 12…100, 30; Texture 2…263, 65)
+        for (auto texture : { false, true })
+        {
+            ui::ValueSpec spec;
+            spec.name = tr ("Grain Size: the length of the pieces the audio is stretched in");
+            spec.minimum = texture ? WarpModeSettings::textureGrainMin : WarpModeSettings::tonesGrainMin;
+            spec.maximum = texture ? WarpModeSettings::textureGrainMax : WarpModeSettings::tonesGrainMax;
+            spec.interval = 1.0;
+            spec.pixelsForRange = texture ? 400.0 : 200.0;
+            spec.defaultValue = texture ? WarpModeSettings::defaultTextureGrain : WarpModeSettings::defaultTonesGrain;
+            spec.toText = [] (double v) { return juce::String (juce::roundToInt (v)); };
+            (texture ? grainTexture : grainTones) = std::make_unique<ui::NumBox> (spec, [this, texture] {
+                const auto& w = sampler().warpModes;
+                return (double) (texture ? w.textureGrain : w.tonesGrain);
+            }, [this] (double v) { editMode ([v] (Song& s, int c) { warpmodes::setGrain (s, c, v); }); });
+        }
 
         // BPM with ÷2 and ×2 (the audio editor's commands, round 190cy, on this clip)
         {
@@ -147,6 +187,8 @@ public:
         }
         for (auto* c : std::initializer_list<juce::Component*> { &warp, &mode, bpm.get(), &halve, &twice, &gain, &pitchKnob, &semitones, &cents, &reverse, &edit, &fade })
             addAndMakeVisible (*c);
+        for (auto* c : std::initializer_list<juce::Component*> { &preserve, &loopMode, envelope.get(), grainTones.get(), grainTexture.get() })
+            addChildComponent (*c);
 
         editor = makeAudioEditorPanel (engine, channel, -1, true);
         if (editor != nullptr)
@@ -172,6 +214,10 @@ public:
         g.drawText (tr ("Audio"), column.withHeight (18).reduced (8, 0), juce::Justification::centredLeft);
         g.setFont (font (type::caption));
         g.drawText (tr ("BPM"), bpmLabel, juce::Justification::centredLeft);
+        if (grainTones->isVisible() || grainTexture->isVisible())
+            g.drawText (tr ("Grain Size"), grainLabel, juce::Justification::centredLeft);
+        if (envelope->isVisible())
+            g.drawText (tr ("Envelope"), envelopeLabel, juce::Justification::centredLeft);
         g.drawText (tr ("Gain"), gainLabel, juce::Justification::centred);
         g.drawText (tr ("Pitch"), pitchLabel, juce::Justification::centred);
         g.drawText ("st", stLabel, juce::Justification::centred);
@@ -211,6 +257,21 @@ public:
         warp.setBounds (left.removeFromTop (20).withWidth (left.getWidth() / 2));
         left.removeFromTop (4);
         mode.setBounds (left.removeFromTop (22));
+        // the mode's own settings under it (Beats: Preserve, then the loop mode and the envelope; Tones / Texture: Grain Size)
+        {
+            left.removeFromTop (4);
+            auto row1 = left.removeFromTop (20);
+            preserve.setBounds (row1);
+            grainLabel = row1.removeFromLeft (row1.getWidth() / 2);
+            grainTones->setBounds (row1);
+            grainTexture->setBounds (row1);
+            left.removeFromTop (4);
+            loopMode.setBounds (left.removeFromTop (20));
+            left.removeFromTop (4);
+            auto row3 = left.removeFromTop (20); // (Envelope on its own row, like Grain Size: its label fits)
+            envelopeLabel = row3.removeFromLeft (row3.getWidth() / 2);
+            envelope->setBounds (row3);
+        }
         fade.setBounds (left.removeFromBottom (18).withWidth (left.getWidth() / 2 - 2));
         left.removeFromBottom (4);
         {
@@ -272,6 +333,31 @@ private:
                     fn (*c);
         });
     }
+    // An edit of the warp mode or its settings: on this clip's own channel (O16: a copy when other clips share it, so only
+    // this clip changes); the audio editor follows the new channel.
+    void editMode (std::function<void (Song&, int)> fn)
+    {
+        if (refreshing)
+            return;
+        auto target = channel;
+        engine.editSong ([this, &fn, &target] (Song& s) {
+            target = warpmodes::ownChannelForGridClip (s, track, scene);
+            if (target >= 0)
+                fn (s, target);
+        });
+        if (target >= 0 && target != channel)
+        {
+            channel = target;
+            editor = makeAudioEditorPanel (engine, channel, -1, true);
+            if (editor != nullptr)
+            {
+                setAudioEditorGridClip (*editor, track, scene);
+                addAndMakeVisible (*editor);
+            }
+            resized();
+            refresh();
+        }
+    }
     void scaleTempo (double factor)
     {
         engine.editSong ([c = channel, t = track, sc = scene, seconds = fileSeconds, factor] (Song& s) { clipsample::scaleWarpedTempo (s, c, t, sc, seconds, factor); });
@@ -298,6 +384,21 @@ private:
         pitchKnob.setValue (whole, n);
         cents.setValue (std::round (((double) c->pitch - whole) * 100.0), n);
         reverse.setToggleState (c->reversed, n);
+        // the mode's own settings: shown for the mode they belong to, only while the sample is warped and keeps its pitch
+        const auto beats = warped && s.keepPitch && s.stretchMethod == StretchMethod::beats;
+        const auto tones = warped && s.keepPitch && s.stretchMethod == StretchMethod::tones;
+        const auto texture = warped && s.keepPitch && s.stretchMethod == StretchMethod::texture;
+        preserve.setVisible (beats);
+        loopMode.setVisible (beats);
+        envelope->setVisible (beats);
+        grainTones->setVisible (tones);
+        grainTexture->setVisible (texture);
+        preserve.setSelectedId ((int) s.warpModes.beatsPreserve + 1, n);
+        loopMode.setSelectedId ((int) s.warpModes.beatsLoop + 1, n);
+        envelope->repaint();
+        grainTones->repaint();
+        grainTexture->repaint();
+        repaint();
         fade.setToggleState (clipsample::hasEdgeFades (*c), n);
     }
 
@@ -333,10 +434,10 @@ private:
     AudioEngine& engine;
     int track, scene, channel;
     juce::TextButton warp, halve, twice, reverse, edit, fade;
-    juce::ComboBox mode;
-    std::unique_ptr<ui::NumBox> bpm;
+    juce::ComboBox mode, preserve, loopMode;
+    std::unique_ptr<ui::NumBox> bpm, envelope, grainTones, grainTexture;
     juce::Slider gain, pitchKnob, semitones, cents;
-    juce::Rectangle<int> bpmLabel, gainLabel, pitchLabel, stLabel, ctLabel, titleBar;
+    juce::Rectangle<int> grainLabel, envelopeLabel, bpmLabel, gainLabel, pitchLabel, stLabel, ctLabel, titleBar;
     juce::String titleText;
     double fileSeconds = 0.0;
     std::unique_ptr<juce::Component> editor;

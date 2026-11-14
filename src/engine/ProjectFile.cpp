@@ -1,4 +1,5 @@
 #include "engine/ProjectFile.h"
+#include "core/WarpModes.h"
 #include "core/LiveInput.h"
 #include "core/FlCurve.h"
 #include "core/Preferences.h"
@@ -1487,7 +1488,7 @@ juce::var clipsToVar (const std::vector<Clip>& list)
         const auto pan = juce::roundToInt (c.pan * 1000.0f) / 1000.0;
         const auto pitch = juce::roundToInt (c.pitch * 1000.0f) / 1000.0;
         const auto stretch = std::round (c.stretch * 1.0e6) / 1.0e6;
-        const int used = c.followKey || c.keyShift != 0 ? 14 : c.fadeCurve != 0 ? 13 : c.linearFades != 0 || c.flFadeFlags != 0 ? 12 : c.fadeInTension != 0.0f || c.fadeOutTension != 0.0f ? 11 : c.uid != 0 ? 10 : stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
+        const int used = c.groove != 0 ? 15 : c.followKey || c.keyShift != 0 ? 14 : c.fadeCurve != 0 ? 13 : c.linearFades != 0 || c.flFadeFlags != 0 ? 12 : c.fadeInTension != 0.0f || c.fadeOutTension != 0.0f ? 11 : c.uid != 0 ? 10 : stretch != 1.0 ? 9 : c.reversed ? 8 : pitch != 0.0 ? 7 : pan != 0.0 ? 6 : fraction != 0.0 ? 5 : c.muted ? 4
                        : (c.fadeIn > 0 || c.fadeOut > 0 || c.gain != 1.0f) ? 3 : 0;
         if (used > 0)
         {
@@ -1531,6 +1532,8 @@ juce::var clipsToVar (const std::vector<Clip>& list)
                 clip.add (c.followKey); // follows the project key, and the part of the pitch that is the key's (round 190ds)
                 clip.add ((int) c.keyShift);
             }
+            if (used >= 15)
+                clip.add ((juce::int64) c.groove); // a Playlist pattern clip's groove (round 190fm): index 24
         }
 
         clips.add (clip);
@@ -1576,6 +1579,7 @@ std::vector<Clip> clipsFromVar (const juce::var& v, const Song& song)
                 clip.fadeCurve = c.size() >= 22 ? (std::uint8_t) juce::jlimit (0, 3, (int) c[21]) : 0;
                 clip.followKey = c.size() >= 24 && (bool) c[22];
                 clip.keyShift = c.size() >= 24 ? (std::int8_t) juce::jlimit (-12, 12, (int) c[23]) : (std::int8_t) 0;
+                clip.groove = c.size() >= 25 ? (std::uint32_t) juce::jmax<juce::int64> (0, (juce::int64) c[24]) : 0u; // (round 190fm)
             }
 
             if (c.size() >= 7 && (int) c[5] == 2)
@@ -2005,6 +2009,13 @@ juce::var channelToVar (const ChannelDef& c)
             sampler->setProperty ("loopKey", juce::Array<juce::var> { c.sampler.loopKeyRoot, c.sampler.loopKeyMinor ? 1 : 0, (int) c.sampler.loopKeySource });
         if (c.sampler.stretchPitch != 0.0f)
             sampler->setProperty ("stretchPitch", c.sampler.stretchPitch);
+        if (c.sampler.warpModes != WarpModeSettings {}) // round 190fm: the warp mode's own settings, only when changed
+        {
+            juce::Array<juce::var> list;
+            for (const auto v : warpmodes::toList (c.sampler.warpModes))
+                list.add (v);
+            sampler->setProperty ("warpModes", list);
+        }
         if (! c.sampler.warp.empty()) // warp markers (round 175a, M1): [seconds, beats] pairs
         {
             juce::Array<juce::var> warp;
@@ -2384,6 +2395,8 @@ ChannelDef channelFromVar (const juce::var& c, const Song& song)
             def.sampler.loopKeySource = (std::uint8_t) juce::jlimit (0, 3, (int) k[2]);
         }
         def.sampler.stretchPitch = juce::jlimit (-48.0f, 48.0f, (float) (double) s.getProperty ("stretchPitch", 0.0));
+        if (const auto& m = s.getProperty ("warpModes", {}); m.isArray()) // round 190fm
+            def.sampler.warpModes = warpmodes::fromList (*m.getArray(), (std::size_t) m.size());
         const auto warpVar = s.getProperty ("warp", {});
         if (const auto* warp = warpVar.getArray())
             for (const auto& w : *warp)
@@ -2756,6 +2769,8 @@ juce::String toJson (const Song& song, bool stampVersion)
         }
         root->setProperty ("keyboardChords", chords);
     }
+    if (! song.midiGenerate.isDefault()) // round 190fm: the MIDI Tools generators' settings (core/MidiGenerateOptions.h)
+        root->setProperty ("midiGenerate", juce::String::fromUTF8 (midigen::encode (song.midiGenerate).c_str()));
     if (! song.info.empty())
     {
         auto info = std::make_unique<juce::DynamicObject>();
@@ -3502,6 +3517,8 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
                 if (song.keyboardChords.size() < 24)
                     song.keyboardChords.push_back (std::move (k));
             }
+    // round 190fm: a project saved without it (every older one) gets the defaults
+    song.midiGenerate = root.hasProperty ("midiGenerate") ? midigen::decode (root.getProperty ("midiGenerate", {}).toString().toStdString()) : midigen::Settings {};
     if (const auto info = root.getProperty ("info", {}); info.isObject())
     {
         auto get = [&info] (const char* key) { return info.getProperty (key, {}).toString().toStdString(); };
@@ -3705,6 +3722,11 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
         for (auto& slot : song.clipGrid->slots)
             if (slot.groove != 0 && groove::find (song.grooves, slot.groove) == nullptr)
                 slot.groove = 0;
+    song.forEachClipList ([&song] (std::vector<Clip>& clips) { // (round 190fm: the Playlist's clips; a grid clip's is its slot's)
+        for (auto& c : clips)
+            if (c.groove != 0 && (c.gridSlot >= 0 || c.kind != ClipKind::pattern || groove::find (song.grooves, c.groove) == nullptr))
+                c.groove = 0;
+    });
     song.patternBlocksOn = (bool) root.getProperty ("patternBlocks", false);
     song.blocks = blocksFromVar (root["blocks"], song);
 
@@ -4063,6 +4085,9 @@ std::optional<Song> fromJson (const juce::String& json, juce::String& error, juc
             arrangement.name = a["name"].toString().toStdString();
             arrangement.clips = clipsFromVar (a["clips"], song);
             keepOldClipFades (arrangement.clips);
+            for (auto& c : arrangement.clips) // (round 190fm: a clip never points at a groove the pool does not have)
+                if (c.groove != 0 && (c.kind != ClipKind::pattern || groove::find (song.grooves, c.groove) == nullptr))
+                    c.groove = 0;
             arrangement.blocks = blocksFromVar (a["blocks"], song);
 
             if (const auto& loop = a["loop"]; loop.isArray() && loop.size() == 2)
