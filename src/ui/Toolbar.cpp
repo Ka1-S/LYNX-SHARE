@@ -725,6 +725,8 @@ ui::Hint PerformanceMeter::hintAt (juce::Point<int> p)
                                   { juce::String ((juce::int64) overDeadline), juce::String ((juce::int64) lateCalls) });
         if (! heaviest.isEmpty())
             h.text << "  " << tr ("Heaviest: {0}", { heaviest.joinIntoString (", ") });
+        if (dropoutText.isNotEmpty())
+            h.text << "  " << dropoutText;
         if (underruns > 0 && driverTip.isNotEmpty())
             h.text << "  " << tr ("Tip: Windows Audio (shared) drops out more easily; choose the ASIO driver \"{0}\" in Options > Audio settings.",
                                   { driverTip });

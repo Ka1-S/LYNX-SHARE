@@ -7,6 +7,8 @@
 //               (LYNX's Reload) does not crash again
 //   "memcpy"  - the same as a memcpy from a null pointer: the fault is inside the C library (what nih-plug did, #155)
 //   "state"   - a null-pointer write when a saved state is loaded into it (IComponent::setState)
+//   "thread"  - (Linux / macOS; round 190gg) in the Nth process() call it starts a thread of its own that writes to a
+//               null pointer: a fault outside every call the host makes (LYNX --crashguardtest ... thread)
 //
 //   V=<JUCE>/modules/juce_audio_processors/format_types/VST3_SDK
 //   Linux:   B="LYNX Test Crash.vst3/Contents/x86_64-linux"; mkdir -p "$B"
@@ -28,6 +30,9 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#if ! defined(_WIN32)
+ #include <pthread.h>
+#endif
 
 #if defined(_WIN32)
  #include <windows.h>
@@ -92,6 +97,21 @@ void nullCopy()
     std::memcpy (to, (const char*) from, size);
     sink = to[0];
 }
+
+#if ! defined(_WIN32)
+void* faultingThread (void*)
+{
+    nullWrite();
+    return nullptr;
+}
+
+void startFaultingThread()
+{
+    pthread_t thread;
+    if (pthread_create (&thread, nullptr, faultingThread, nullptr) == 0)
+        pthread_detach (thread);
+}
+#endif
 
 void copyString (String128 to, const char* from)
 {
@@ -207,6 +227,10 @@ public:
                 nullWrite();
             if (crashMode ("memcpy"))
                 nullCopy();
+#if ! defined(_WIN32)
+            if (crashMode ("thread"))
+                startFaultingThread();
+#endif
         }
         auto& out = data.outputs[0];
         for (int c = 0; c < 2; ++c)

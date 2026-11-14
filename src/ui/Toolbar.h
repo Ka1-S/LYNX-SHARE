@@ -146,6 +146,9 @@ public:
                       int deviceUnderruns = -1);
     // After dropouts on Windows shared mode: the ASIO driver to suggest (round 160; empty = none)
     void setDriverTip (const juce::String& asioDriver) { driverTip = asioDriver; }
+    // Round 190gg (B5): the dropouts since the start, the last one's time and cause (ui/PluginMonitorWindow.h
+    // describeDropouts), at the end of the CPU hint
+    void setDropouts (const juce::String& text) { dropoutText = text; }
     void paint (juce::Graphics& g) override;
     ui::Hint hintAt (juce::Point<int> position) override;
 
@@ -155,7 +158,7 @@ public:
 private:
     std::uint64_t overDeadline = 0, lateCalls = 0, underruns = 0;
     int deviceUnderruns = -1;
-    juce::String driverTip;
+    juce::String driverTip, dropoutText;
     double peakLoad = 0.0;
     juce::StringArray heaviest;
     juce::uint32 lastGlitchAt = 0; // ms counter of the last new over-deadline callback (0 = none)

@@ -954,6 +954,21 @@ public:
                 onReload();
         };
         addAndMakeVisible (reload);
+        // round 190gg (B1): from now on in a process of its own (shown when that is still possible)
+        separate.onClick = [this] {
+            if (onSeparate)
+                onSeparate();
+        };
+        separate.setTooltip (PluginWindows::alwaysSeparateHint());
+        addChildComponent (separate);
+    }
+
+    void setSeparate (std::function<void()> run, const juce::String& pluginName)
+    {
+        onSeparate = std::move (run);
+        separate.setButtonText (tr ("Always run {0} in a separate process", { pluginName }));
+        separate.setVisible (onSeparate != nullptr);
+        resized();
     }
 
     void setPluginName (const juce::String& name)
@@ -977,13 +992,25 @@ public:
                           juce::Justification::centredTop, 3);
     }
 
-    void resized() override { reload.setBounds (getLocalBounds().reduced (16, 12).removeFromBottom (28).withSizeKeepingCentre (140, 28)); }
+    void resized() override
+    {
+        auto row = getLocalBounds().reduced (16, 12).removeFromBottom (28);
+        if (! separate.isVisible())
+        {
+            reload.setBounds (row.withSizeKeepingCentre (140, 28));
+            return;
+        }
+        const auto wide = juce::jmin (row.getWidth() - 148, separate.getBestWidthForHeight (28) + 24);
+        row = row.withSizeKeepingCentre (140 + 8 + wide, 28);
+        reload.setBounds (row.removeFromLeft (140));
+        separate.setBounds (row.removeFromRight (wide));
+    }
 
-    std::function<void()> onReload;
+    std::function<void()> onReload, onSeparate;
 
 private:
     juce::String title;
-    juce::TextButton reload;
+    juce::TextButton reload, separate;
 };
 
 // The window's content with FL's wrapper header: the plugin's editor, or the wrapper settings page (gear).
@@ -1069,12 +1096,13 @@ public:
     void showPinned (bool on) { pin.setToggleState (on, juce::dontSendNotification); }
 
     // round 190ao: the plugin went down (the window's timer): the notice with "Reload" takes the editor's place
-    void setDown (bool isDown, std::function<void()> reload)
+    void setDown (bool isDown, std::function<void()> reload, std::function<void()> separate = {}, const juce::String& pluginName = {})
     {
         if (isDown == down)
             return;
         down = isDown;
         notice.onReload = std::move (reload);
+        notice.setSeparate (std::move (separate), pluginName); // (round 190gg, B1)
         show (settings);
     }
     bool isDown() const noexcept { return down; }
@@ -1403,7 +1431,18 @@ private:
             wrapped->refreshKeyboardPriority(); // (undo, a project loaded)
             // round 190ao: the plugin went down while its window is open: the notice with "Reload" (only on request)
             if (context.reload && ! wrapped->isDown() && (isSandboxedPluginDead (plugin) || (context.down && context.down())))
-                wrapped->setDown (true, [reload = context.reload] { juce::MessageManager::callAsync (reload); });
+            {
+                // round 190gg (B1): a plugin that crashed inside LYNX may run in a process of its own from now on
+                std::function<void()> separate;
+                juce::String name;
+                if (const auto* ref = context.engine != nullptr && context.find ? context.find (const_cast<Song&> (context.engine->getSong())) : nullptr)
+                    name = juce::String::fromUTF8 (ref->name.c_str());
+                if (! isSandboxedPlugin (plugin) && ! isBridged32 (plugin) && PluginWindows::canAlwaysRunSeparately (name))
+                    separate = [engine = context.engine, name] {
+                        juce::MessageManager::callAsync ([engine, name] { PluginWindows::alwaysRunSeparately (*engine, name); });
+                    };
+                wrapped->setDown (true, [reload = context.reload] { juce::MessageManager::callAsync (reload); }, std::move (separate), name);
+            }
         }
         if (const auto moved = changes.tick (active); moved >= 0 && PluginWindows::onGesture)
         {
@@ -2139,6 +2178,12 @@ void open (std::shared_ptr<void> owner, juce::AudioPluginInstance& plugin, const
     }
 
     installEditorGuard(); // (issue #32: a fault in the plugin's own window closes the editor, not LYNX)
+    // round 190gg (B4): the editor is made under the crash guard before any window exists (the host below then takes
+    // the same one). A plugin that crashes making it is switched off like after a crash while playing, and the
+    // "Plugin crashed" prompt says so; no window opens.
+    crashguard::note (("making the editor of " + plugin.getName()).toStdString());
+    if (! callPluginFromUi (plugin, "making its editor", [&plugin] { plugin.createEditorIfNeeded(); }))
+        return;
     open[&plugin] = makeHost (std::move (owner), plugin, title, std::move (context));
     // FL's "Limit the number of open plugin editors" (round 189o, core/EditorLimit.h): past 25, the oldest closes
     editorlimit::opened (&plugin, [k = &plugin] {
@@ -2316,6 +2361,85 @@ void promptReload (AudioEngine& engine, AudioEngine::HostedSlot where, std::func
         }
         else if (result == 1 && reload (engine, { where }) == 1 && reopen)
             reopen();
+    });
+}
+
+bool canAlwaysRunSeparately (const juce::String& plugin)
+{
+    return plugin.isNotEmpty() && plugin != "?" && ! pluginSandboxEnabled() && ! pluginAlwaysSeparate (plugin);
+}
+
+juce::String alwaysSeparateHint()
+{
+    return tr ("In a separate process a crash of the plugin cannot take LYNX SHARE down. Its window then opens on its own "
+               "(it cannot be docked).");
+}
+
+CrashPrompt crashPrompt (const juce::String& plugin, bool onLoad)
+{
+    CrashPrompt p;
+    p.title = tr ("Plugin crashed");
+    p.reload = ! onLoad;
+    p.separate = canAlwaysRunSeparately (plugin);
+    p.message = tr ("{0} crashed and was switched off.", { plugin }) + "\n\n"
+                + tr ("LYNX SHARE and your project kept running (an effect is bypassed, an instrument stays silent). Save your project.");
+    if (p.reload)
+    {
+        p.message << " " << tr ("Reload starts it again with the settings from the last save or backup.");
+        p.buttons.add (tr ("Reload"));
+    }
+    if (p.separate)
+    {
+        p.message << "\n\n" << alwaysSeparateHint();
+        p.buttons.add (tr ("Always run {0} in a separate process", { plugin }));
+    }
+    p.buttons.add (tr ("Close"));
+    return p;
+}
+
+std::unique_ptr<juce::Component> makeCrashPromptPanel (const juce::String& plugin, bool onLoad)
+{
+    const auto p = crashPrompt (plugin, onLoad);
+    auto window = std::make_unique<juce::AlertWindow> (p.title, p.message, juce::MessageBoxIconType::WarningIcon);
+    for (int i = 0; i < p.buttons.size(); ++i)
+        window->addButton (p.buttons[i], i + 1 < p.buttons.size() ? i + 1 : 0);
+    return window;
+}
+
+std::unique_ptr<juce::Component> makeCrashNoticePanel (const juce::String& plugin, bool offerSeparate)
+{
+    auto notice = std::make_unique<CrashNotice>();
+    notice->setPluginName (plugin);
+    notice->onReload = [] {};
+    if (offerSeparate)
+        notice->setSeparate ([] {}, plugin);
+    notice->setSize (560, 220);
+    return notice;
+}
+
+void alwaysRunSeparately (AudioEngine& engine, const juce::String& plugin)
+{
+    const auto name = plugin.toStdString();
+    auto which = engine.downHostedPlugins (name);
+    const auto& song = engine.getSong();
+    for (std::size_t c = 0; c < song.channels.size(); ++c)
+        if (song.channels[c].instrument == InstrumentKind::plugin && song.channels[c].plugin.name == name)
+            which.push_back ({ (int) c, -1, -1 });
+    for (std::size_t t = 0; t < song.mixer.size(); ++t)
+        for (std::size_t k = 0; k < song.mixer[t].effects.size(); ++k)
+            if (song.mixer[t].effects[k].kind == EffectKind::plugin && song.mixer[t].effects[k].plugin.name == name)
+                which.push_back ({ -1, (int) t, (int) k });
+    if (which.empty())
+        which = engine.downHostedPlugins(); // (the crash names the plugin as it calls itself; the project may not)
+    for (const auto& w : which)
+        if (auto* instance = instanceAt (engine, w)) // (a window keeps the old instance alive)
+            close (*instance);
+    engine.capturePluginStates(); // (the running ones start from their current settings; a crashed one keeps its last)
+    setPluginAlwaysSeparate (plugin, true);
+    engine.editSong ([which] (Song& s) {
+        for (const auto& w : which)
+            if (auto* r = const_cast<PluginRef*> (refAt (s, w)))
+                r->separateProcess = true; // (a changed option makes the plugin again: in its own process now)
     });
 }
 
@@ -2521,19 +2645,22 @@ void addPluginWrapperItems (juce::PopupMenu& menu, AudioEngine& engine, juce::Au
         keptFor.erase (it);
     }
     menu.addSectionHeader (tr ("Spare state"));
+    // (round 190gg: under the crash guard, callPluginFromUi; a crash switches the plugin off)
     menu.addItem (tr ("Store in spare state"), [&plugin, id] {
         juce::MemoryBlock state;
-        plugin.getStateInformation (state);
+        if (! callPluginFromUi (plugin, "storing its spare state", [&] { plugin.getStateInformation (state); }))
+            return;
         sparestate::shared().store (&plugin, { (const std::uint8_t*) state.getData(), (const std::uint8_t*) state.getData() + state.getSize() });
         keptFor[&plugin] = id;
     });
     menu.addItem (tr ("Flip with spare state"), spare.has (&plugin), false, [&engine, &plugin] {
         juce::MemoryBlock state;
-        plugin.getStateInformation (state);
+        if (! callPluginFromUi (plugin, "storing its spare state", [&] { plugin.getStateInformation (state); }))
+            return;
         if (const auto load = sparestate::shared().flip (&plugin, { (const std::uint8_t*) state.getData(),
                                                                     (const std::uint8_t*) state.getData() + state.getSize() }))
         {
-            plugin.setStateInformation (load->data(), (int) load->size());
+            callPluginFromUi (plugin, "loading its spare state", [&] { plugin.setStateInformation (load->data(), (int) load->size()); });
             engine.markModified();
         }
     });

@@ -77,6 +77,29 @@ int reload (AudioEngine& engine, const std::vector<AudioEngine::HostedSlot>& whi
 // The user asked for the window of a plugin that is down: "<name> crashed and was switched off" with Reload (and, for a
 // plugin that ran inside LYNX, "Reload in a separate process"). `reopen` runs after a reload that worked.
 void promptReload (AudioEngine& engine, AudioEngine::HostedSlot where, std::function<void()> reopen);
+// Round 190gg (B1, LYNX-own; FL has no sandbox): after a plugin crashed inside LYNX, "Always run <plugin> in a separate
+// process". Offered unless every plugin already runs in one (Options) or this plugin is already on the list.
+bool canAlwaysRunSeparately (const juce::String& plugin);
+// Puts the plugin on the "always in a separate process" list (by its name, so new instances and other projects follow,
+// and a rescan keeps it), and turns "Run in a separate process" on for every instance of it in this project and for the
+// ones that are down: they start again in a process of their own, from their last captured settings (that is the
+// Reload). Their windows close first. A plugin in another process opens its editor in a window of its own (no docking).
+void alwaysRunSeparately (AudioEngine& engine, const juce::String& plugin);
+// The hint that goes with the choice (the dialogs' message and the buttons' tooltips)
+juce::String alwaysSeparateHint();
+// The main window's "Plugin crashed" prompt for a plugin that crashed inside LYNX (MainComponent): its text and buttons
+// (`reload`: the first button is Reload; `separate`: then "Always run <plugin> in a separate process"; Close is last).
+// `onLoad`: it crashed on its saved settings (no Reload: they would crash it again).
+struct CrashPrompt
+{
+    juce::String title, message;
+    juce::StringArray buttons;
+    bool reload = false, separate = false;
+};
+CrashPrompt crashPrompt (const juce::String& plugin, bool onLoad);
+// --snapshot / --stabilityshot (round 190gg): that prompt, and the notice a plugin window shows in place of the editor
+std::unique_ptr<juce::Component> makeCrashPromptPanel (const juce::String& plugin, bool onLoad);
+std::unique_ptr<juce::Component> makeCrashNoticePanel (const juce::String& plugin, bool offerSeparate);
 // A parameter gesture in an open plugin editor (`starting` = begin, else end), on the UI thread; the plugin is only
 // compared, it may be gone (REA round 143: Last tweaked, automation recording).
 extern std::function<void (const juce::AudioPluginInstance&, int, bool)> onGesture;

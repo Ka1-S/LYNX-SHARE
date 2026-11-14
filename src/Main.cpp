@@ -591,6 +591,14 @@ public:
             lynx::crashguard::quietCrashReports();
             // round 190dt: guarded / guarded-libc = LYNX's own fault inside a guarded plugin call (Linux / macOS): it must
             // reach the crash handler like any other; a return means the guard swallowed it
+            // round 190gg: thread / thread-libc = a fault on a thread of LYNX's own, with LYNX's executable watched as
+            // a plugin's module: it must not be parked as a plugin's thread
+            if (args[i + 1].startsWith ("thread"))
+            {
+                lynx::crashguard::faultOnOwnThreadForTest (args[i + 1] == "thread-libc");
+                crashFolderForTest.getChildFile ("swallowed.txt").replaceWithText ("parked");
+                lynx::crashguard::exitNow (4);
+            }
             if (args[i + 1].startsWith ("guarded"))
             {
                 const auto code = lynx::crashguard::faultInGuardedCallForTest (args[i + 1] == "guarded-libc");
@@ -2392,6 +2400,15 @@ public:
             return;
         }
 
+        if (args.contains ("--stabilityshot"))
+        {
+            // LYNX --stabilityshot <folder> (round 190gg): offscreen PNGs of the crash prompt, the plugin window's crash
+            // notice, the Plugin manager's "Separate process" column and the monitor's dropout line (no window opens)
+            const auto i = args.indexOf ("--stabilityshot");
+            runStabilityShot (args[i + 1].unquoted());
+            return;
+        }
+
         if (args.contains ("--snapshot"))
         {
             const auto i = args.indexOf ("--snapshot");
@@ -3130,7 +3147,7 @@ private:
        #if JUCE_WINDOWS
         const char* const kinds[] = { "plain", "unwalkable" };
        #else
-        const char* const kinds[] = { "plain", "guarded", "guarded-libc" };
+        const char* const kinds[] = { "plain", "guarded", "guarded-libc", "thread", "thread-libc" };
        #endif
         for (const auto* kind : kinds)
         {
@@ -7978,9 +7995,167 @@ private:
         quit();
     }
 
+    // Round 190gg (B4): --crashguardtest plugin report.txt thread | ui. "thread": the plugin's own thread faults in its 40th
+    // block (Linux / macOS): that thread is parked, LYNX switches the plugin off (as the main window's timer does) and goes
+    // on; the other inserts play; Reload brings it back. "ui": the calls the UI makes into a plugin, under the guard: a
+    // preset load that crashes (the Plugin window's preset menu path) and making the editor (PluginWindows::open, the CLAP
+    // test plugin's "editor-create": a display is needed, e.g. Xvfb); each switches the plugin off, LYNX goes on.
+    void runCrashGuardThreadOrUiTest (const juce::String& pluginPath, const juce::String& reportPath, const juce::String& mode)
+    {
+        juce::String report;
+        bool ok = true;
+        const auto expect = [&] (const char* name, bool value) {
+            report << name << "=" << (value ? 1 : 0) << "\n";
+            ok = ok && value;
+        };
+        const auto setEnv = [] (const char* name, const char* value) {
+           #if JUCE_WINDOWS
+            _putenv_s (name, value);
+           #else
+            setenv (name, value, 1);
+           #endif
+        };
+        const auto render = [] (lynx::AudioEngine& engine, double seconds, float* peak) {
+            lynx::AudioEngine::RenderOptions o;
+            o.seconds = seconds;
+            o.sampleRate = 48000.0;
+            o.pluginWarmUp = false;
+            if (peak != nullptr)
+                o.capture = [peak] (const float* l, const float* r, int n) {
+                    for (int k = 0; k < n; ++k)
+                        *peak = std::max (*peak, std::max (std::abs (l[k]), std::abs (r[k])));
+                };
+            return engine.renderOffline (o);
+        };
+        report << "mode=" << mode << "\nthread_guard=" << (lynx::crashguard::pluginThreadFaultsCaught() ? "on" : "off") << "\n";
+        setEnv ("LYNX_TEST_CRASH", mode == "thread" ? "thread" : "");
+        setEnv ("LYNX_TEST_CRASH_AFTER", "40");
+        const auto tmp = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                             .getChildFile ("lynx-crashguardtest-" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt64()));
+        tmp.createDirectory();
+        {
+            lynx::AudioEngine offline (false);
+            auto& host = offline.getPluginHost();
+            host.addPluginFile (juce::File (pluginPath));
+            juce::PluginDescription effect;
+            bool found = false;
+            for (const auto& type : host.getKnownPlugins().getTypes())
+                if (! found && ! type.isInstrument && juce::File (type.fileOrIdentifier).getFileName() == juce::File (pluginPath).getFileName())
+                {
+                    effect = type;
+                    found = true;
+                }
+            expect ("plugin_found", found);
+            auto song = lynx::Song::makeDefault();
+            lynx::EffectSlot slot;
+            slot.kind = lynx::EffectKind::plugin;
+            slot.plugin.id = effect.createIdentifierString().toStdString();
+            slot.plugin.name = effect.name.toStdString();
+            song.mixer[1].effects.push_back (slot);
+            offline.setSong (song);
+            const lynx::AudioEngine::HostedSlot where { -1, 1, 0 };
+            render (offline, 0.05, nullptr);
+            offline.editSong ([] (lynx::Song& s) { s.channels[0].volume = 0.85f; }, false);
+            render (offline, 0.05, nullptr);
+            auto* first = dynamic_cast<lynx::PluginEffect*> (offline.getEffect (1, 0).get());
+            expect ("plugin_loaded", first != nullptr);
+            const auto crashesBefore = lynx::pluginCrashCount();
+
+            if (mode == "thread")
+            {
+                const auto faultsBefore = lynx::crashguard::pluginThreadFaultCount();
+                float peak = 0.0f;
+                render (offline, 3.0, &peak); // (the plugin starts its faulting thread in its 40th block)
+                for (int i = 0; i < 200 && lynx::crashguard::pluginThreadFaultCount() == faultsBefore; ++i)
+                    juce::Thread::sleep (10);
+                const auto faults = lynx::crashguard::pluginThreadFaults();
+                expect ("thread_fault_parked", lynx::crashguard::pluginThreadFaultCount() == faultsBefore + 1 && ! faults.empty());
+                if (! faults.empty())
+                    report << "thread_fault=" << faults.back().where << " (" << lynx::crashguard::describe (faults.back().code) << ")\n";
+                expect ("not_yet_counted_as_a_call_crash", lynx::pluginCrashCount() == crashesBefore);
+                // what the main window's timer does
+                // (every instance of that module: the engine may hold more than the slot's, e.g. the offline render's)
+                if (first != nullptr)
+                    report << "slot_file=" << first->getInstance().getPluginDescription().fileOrIdentifier << "\n";
+                const auto switched = lynx::switchOffPluginsOfThreadFaults();
+                report << "switched_off=" << switched << "\n";
+                expect ("plugin_switched_off", switched >= 1 && first != nullptr && first->hasCrashed() && lynx::pluginCrashCount() == crashesBefore + switched);
+                expect ("only_once", lynx::switchOffPluginsOfThreadFaults() == 0);
+                const auto down = offline.downHostedPlugins();
+                expect ("slot_down", down.size() == 1 && down[0] == where);
+                float after = 0.0f;
+                render (offline, 1.0, &after);
+                report << "peak_after=" << after << "\n";
+                expect ("audio_after_fault", after > 0.01f);
+                offline.editSong ([] (lynx::Song& s) { s.channels[0].volume = 0.0f; }, false);
+                float others = 0.0f;
+                render (offline, 1.0, &others);
+                expect ("other_inserts_play", others > 0.01f);
+                offline.editSong ([] (lynx::Song& s) { s.channels[0].volume = 0.85f; }, false);
+                const auto running = offline.reloadHostedPlugins (down);
+                auto* again = dynamic_cast<lynx::PluginEffect*> (offline.getEffect (1, 0).get());
+                float reloaded = 0.0f;
+                render (offline, 1.0, &reloaded);
+                expect ("reloaded_plays", running == 1 && again != nullptr && again != first && ! again->hasCrashed() && reloaded > 0.01f);
+            }
+            else
+            {
+                // a preset that crashes the plugin (the preset menu's load), saved first from the running plugin
+                auto& instance = first->getInstance();
+                const auto preset = tmp.getChildFile ("crash.lynxpreset");
+                juce::String error;
+                expect ("preset_saved", lynx::pluginpresetui::save (instance, preset, "crash", error) && preset.existsAsFile());
+                setEnv ("LYNX_TEST_CRASH", "state");
+                const auto loaded = lynx::pluginpresetui::load (instance, preset, error);
+                setEnv ("LYNX_TEST_CRASH", "");
+                report << "preset_error=" << error << "\n";
+                expect ("preset_crash_caught", ! loaded && lynx::pluginCrashCount() == crashesBefore + 1 && first->hasCrashed());
+                expect ("preset_plugin_down", offline.hostedPluginDown (where) && lynx::pluginInstanceDown (instance));
+                expect ("not_called_again", ! lynx::callPluginFromUi (instance, "test", [] {}) && lynx::pluginCrashCount() == crashesBefore + 1);
+                float after = 0.0f;
+                render (offline, 1.0, &after);
+                expect ("audio_after_preset_crash", after > 0.01f);
+
+                // Reload; then its editor crashes as it is made (PluginWindows::open): no window, the plugin is down
+                setEnv ("LYNX_TEST_CRASH", "editor-create");
+                const auto running = offline.reloadHostedPlugins (offline.downHostedPlugins());
+                auto held = offline.getEffect (1, 0);
+                auto* again = dynamic_cast<lynx::PluginEffect*> (held.get());
+                expect ("reloaded", running == 1 && again != nullptr && again != first && ! again->hasCrashed());
+                if (again != nullptr)
+                {
+                    lynx::PluginWindows::open (held, again->getInstance(), "crash test", {});
+                    expect ("editor_crash_caught", lynx::pluginCrashCount() == crashesBefore + 2 && again->hasCrashed());
+                    expect ("no_window", ! lynx::PluginWindows::isOpen (again->getInstance()));
+                    float editorAfter = 0.0f;
+                    render (offline, 1.0, &editorAfter);
+                    expect ("audio_after_editor_crash", editorAfter > 0.01f);
+                }
+                setEnv ("LYNX_TEST_CRASH", "");
+            }
+        }
+        setEnv ("LYNX_TEST_CRASH", "");
+        // LYNX's own faults (also on its own threads) stay crashes (child processes; the selftest runs the same)
+        const auto own = faultReportSelfTest();
+        report << "own_faults=" << own << "\n";
+        ok = ok && ! own.startsWith ("ERROR");
+        for (const auto& c : lynx::pluginCrashes())
+            report << "  crashed: " << c.plugin << " (" << lynx::crashguard::describe (c.code) << ")\n";
+        tmp.deleteRecursively();
+        report << "result=" << (ok ? "OK" : "FAILED") << "\n";
+        juce::File (reportPath).replaceWithText (report);
+        setApplicationReturnValue (ok ? 0 : 1);
+        quit();
+    }
+
     // LYNX --crashguardtest plugin report.txt [process|memcpy] (round 190dt): see the dispatch in initialise().
     void runCrashGuardTest (const juce::String& pluginPath, const juce::String& reportPath, const juce::String& mode)
     {
+        if (mode == "thread" || mode == "ui")
+        {
+            runCrashGuardThreadOrUiTest (pluginPath, reportPath, mode);
+            return;
+        }
         juce::String report;
         bool ok = true;
         const auto expect = [&] (const char* name, bool value) {
@@ -23119,6 +23294,38 @@ private:
         typeAheadTest->start();
     }
 
+    void runStabilityShot (const juce::String& folder)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        const juce::File dir (folder);
+        dir.createDirectory();
+        {
+            lynx::AudioEngine offline (false);
+            const auto save = [&dir] (std::unique_ptr<juce::Component> c, const juce::String& name) {
+                juce::Component frame;
+                frame.setSize (c->getWidth(), c->getHeight());
+                frame.setOpaque (true);
+                if (c->isOnDesktop()) // (an AlertWindow: never shown, so it takes no foreground)
+                    c->removeFromDesktop();
+                frame.addAndMakeVisible (*c);
+                c->setTopLeftPosition (0, 0);
+                const auto image = lynx::shot::paint (frame, lynx::theme::panel);
+                const auto file = dir.getChildFile (name);
+                file.deleteFile();
+                juce::PNGImageFormat png;
+                if (auto out = file.createOutputStream())
+                    png.writeImageToStream (image, *out);
+            };
+            save (lynx::PluginWindows::makeCrashPromptPanel ("Serum", false), "crash-prompt.png");
+            save (lynx::PluginWindows::makeCrashPromptPanel ("Serum", true), "crash-prompt-onload.png");
+            save (lynx::PluginWindows::makeCrashNoticePanel ("Serum", true), "crash-notice.png");
+            save (lynx::makePluginManagerPanel (offline, false), "plugin-manager.png");
+            save (lynx::makePluginMonitorPanel (offline), "plugin-monitor.png");
+        }
+        setApplicationReturnValue (0);
+        quit();
+    }
+
     void runSnapshot (const juce::String& prefix, const juce::String& projectPath)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -23862,6 +24069,9 @@ private:
                     savePng (lynx::ProEditorWindows::windowContentForSnapshot (apexEngine, 1, 0, false), prefix + "-apex-window.png");
                 }
                 saveWindow (lynx::makePluginManagerPanel (offline, false), "-plugin-manager.png");
+                // round 190gg: the crash prompt and a plugin window's crash notice, with "Always run ... in a separate process"
+                saveWindow (lynx::PluginWindows::makeCrashPromptPanel ("Serum", false), "-plugin-crash-prompt.png");
+                saveWindow (lynx::PluginWindows::makeCrashNoticePanel ("Serum", true), "-plugin-crash-notice.png");
                 saveWindow (lynx::makeShortcutManagerPanel (false), "-shortcuts.png");
             }
             {

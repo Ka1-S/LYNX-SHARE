@@ -73,11 +73,32 @@ The audio thread should run with real-time priority.
 
 The details are in [LINUX.md](https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/LINUX.md).
 
+### The sound crackles or drops out
+
+LYNX SHARE counts every dropout (buffer underrun) and says why it happened. Point at the `CPU` meter in the toolbar, or open `Tools › Plugin performance monitor...`. A red number next to the CPU percentage is the count.
+
+The hint names the cause of the last dropout:
+
+| Cause | What it means | What to try |
+|---|---|---|
+| The processing took longer than the buffer | A block of audio took longer to compute than the time it lasts. The hint names the slowest channel or effect in that block | Raise the buffer size in `Options › Audio settings...`, freeze that channel, or turn the plugin's quality down |
+| The processing came near the buffer's limit | The load was close to 100 % around the dropout | Raise the buffer size, or freeze the heaviest channels |
+| Driver or system latency | The driver or the system was late while the load stayed low. No plugin caused it | Raise the buffer size, try another driver (on Windows the interface's ASIO driver), and on Linux check real-time priority (above) |
+
+Each dropout is also written to `audio-glitches.log` in the settings folder, with the device, the buffer and the heaviest channels.
+
 ## Plugins
 
 ### A plugin crashes
 
-Run it in its own process, so that only the plugin stops.
+Most plugin crashes switch only that plugin off: an effect is bypassed, an instrument goes silent, and LYNX SHARE and the project keep running. The `Plugin crashed` message then offers:
+
+- `Reload`, which starts the plugin again with the settings from the last save or backup.
+- `Always run <plugin> in a separate process`, which starts it again in a process of its own, now and in every project. A crash there cannot take LYNX SHARE down. A plugin in a separate process opens its window on its own (it cannot be docked).
+
+The plugin's window shows the same two buttons in place of its editor. `Options › Plugin manager...` lists the plugins that always run in a separate process in its `Separate process` column; click the box to switch one on or off.
+
+To run every plugin in its own process:
 
 1. Open `Options › General settings...`.
 2. Turn on `Run plugins in a separate process (protects LYNX SHARE from crashes)`.

@@ -5313,8 +5313,22 @@ void AudioEngine::updateRealtimeStats()
             heaviestUnits = std::move (loads);
     }
 
-    // a line in the glitch log when callbacks ran over their deadline or the device called late
+    // round 190gg (B5): the dropout log (how many, the last one's time and cause)
     const auto stats = rtStats.snapshot();
+    {
+        dropouts::Poll poll;
+        poll.nowMs = juce::Time::getMillisecondCounterHiRes();
+        poll.overBudget = stats.overBudget;
+        poll.lateCalls = stats.lateCalls;
+        auto* device = deviceManager.getCurrentAudioDevice();
+        poll.deviceXruns = device != nullptr ? device->getXRunCount() : -1;
+        poll.windowMaxLoad = rtStats.takeDropoutWindowMaxLoad();
+        poll.lastOverSlowest = stats.lastOverSlowest;
+        poll.lastOverLoad = stats.lastOverLoad;
+        dropoutLog.update (poll);
+    }
+
+    // a line in the glitch log when callbacks ran over their deadline or the device called late
     if ((stats.overBudget > loggedOver || stats.lateCalls > loggedLate) && juce::Time::getMillisecondCounterHiRes() - lastLogMs > 2000.0)
     {
         // (appended by fileJobs: this runs on the message thread, and at a small buffer glitches come every 2 s)
@@ -5331,6 +5345,48 @@ void AudioEngine::updateRealtimeStats()
         loggedLate = stats.lateCalls;
         lastLogMs = juce::Time::getMillisecondCounterHiRes();
     }
+}
+
+juce::String AudioEngine::unitDisplayName (std::uint32_t unit) const
+{
+    if (unit == 0)
+        return {};
+    if (dropouts::isChannel (unit))
+    {
+        const auto c = (std::size_t) dropouts::channelOf (unit);
+        return c < song.channels.size() ? juce::String::fromUTF8 (song.channels[c].name.c_str()) : "Channel " + juce::String ((int) c + 1);
+    }
+    const auto k = dropouts::effectKeyOf (unit);
+    const auto t = k / (std::size_t) maxEffectSlots, slot = k % (std::size_t) maxEffectSlots;
+    juce::String effect;
+    if (t < song.mixer.size() && slot < song.mixer[t].effects.size())
+    {
+        const auto& fx = song.mixer[t].effects[slot];
+        effect = juce::String::fromUTF8 (fx.plugin.name.empty() ? effectInfo (fx.kind).name : fx.plugin.name.c_str());
+    }
+    const auto track = t == 0 ? juce::String ("Master") : (t < song.mixer.size() && ! song.mixer[t].name.empty() ? juce::String::fromUTF8 (song.mixer[t].name.c_str())
+                                                                                                               : "Insert " + juce::String ((int) t));
+    return track + " / " + juce::String ((int) slot + 1) + " " + effect;
+}
+
+AudioEngine::DropoutInfo AudioEngine::dropoutInfo() const
+{
+    DropoutInfo d;
+    d.count = dropoutLog.count();
+    d.processing = dropoutLog.processing();
+    d.system = dropoutLog.system();
+    d.secondsAgo = dropoutLog.secondsSince (juce::Time::getMillisecondCounterHiRes());
+    d.cause = dropoutLog.cause();
+    d.load = dropoutLog.load();
+    if (const auto slowest = dropoutLog.slowest(); slowest != 0)
+    {
+        d.slowest = unitDisplayName (dropouts::unitOf (slowest));
+        d.slowestMs = (double) dropouts::nanosecondsOf (slowest) * 1.0e-6;
+    }
+    if (auto* device = const_cast<juce::AudioDeviceManager&> (deviceManager).getCurrentAudioDevice())
+        if (device->getCurrentSampleRate() > 0.0)
+            d.bufferMs = 1000.0 * device->getCurrentBufferSizeSamples() / device->getCurrentSampleRate();
+    return d;
 }
 
 juce::String AudioEngine::describeRealtime (bool withUnits) const
@@ -5359,6 +5415,11 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
     text << "  callbacks " << (juce::int64) s.callbacks << ": over deadline " << (juce::int64) s.overBudget << ", 80-100% " << (juce::int64) s.nearBudget
          << ", late device calls " << (juce::int64) s.lateCalls << ", average load " << juce::String (s.averageLoad * 100.0, 1) << "%, max "
          << juce::String (s.maxLoad * 100.0, 0) << "%, workers " << (workers != nullptr ? workers->workers() : 0) << "\n";
+    if (const auto d = dropoutInfo(); d.count > 0) // (round 190gg)
+        text << "  dropouts " << (juce::int64) d.count << " (processing " << (juce::int64) d.processing << ", driver / system " << (juce::int64) d.system
+             << "), the last " << d.secondsAgo << " s ago: " << (d.cause == dropouts::Cause::system ? "driver / system late" : "processing")
+             << ", load " << juce::String (d.load * 100.0, 0) << "%"
+             << (d.slowest.isNotEmpty() ? ", slowest " + d.slowest + " " + juce::String (d.slowestMs, 2) + " ms" : juce::String()) << "\n";
     if (latencyRepublishes > 0)
         text << "  latency changes re-planned PDC " << latencyRepublishes << " times (last: unit " << lastLatencyChange << ")\n";
     if (withUnits && heaviestUnits.empty())
@@ -5797,8 +5858,10 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         ~Measure()
         {
             const auto rate = engine.transport.sampleRate.load (std::memory_order_relaxed);
+            // round 190gg: with the block's slowest channel / effect call (named if the block missed its deadline)
+            const auto slowest = engine.rackProcessor != nullptr ? engine.rackProcessor->getRenderer().takeBlockSlowest() : 0;
             if (rate > 0.0)
-                engine.rtStats.record (start, juce::Time::getMillisecondCounterHiRes() - start, 1000.0 * samples / rate);
+                engine.rtStats.record (start, juce::Time::getMillisecondCounterHiRes() - start, 1000.0 * samples / rate, slowest);
         }
         AudioEngine& engine;
         double start;

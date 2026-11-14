@@ -34,6 +34,7 @@
 #include "engine/ControllerIo.h"
 #include "core/RackRenderer.h"
 #include "core/RtStats.h"
+#include "core/Dropouts.h"
 #include "core/ScoreLog.h"
 #include "core/FlpImport.h"
 #include "core/History.h"
@@ -966,6 +967,20 @@ public:
     };
     const std::vector<UnitLoad>& getHeaviestUnits() const noexcept { return heaviestUnits; }
 
+    // Round 190gg (B5): the dropouts (buffer underruns) since the start, when the last one was and why (core/Dropouts.h):
+    // the processing (with the slowest channel / effect of that block) or the driver / system (late while the load was
+    // low). Kept by the engine's timer. Message thread.
+    struct DropoutInfo
+    {
+        std::uint64_t count = 0, processing = 0, system = 0;
+        long long secondsAgo = -1;       // since the last one (−1: none yet)
+        dropouts::Cause cause = dropouts::Cause::none;
+        juce::String slowest;            // "Insert 2 / 1 Serum", a channel's name; empty = not known
+        double slowestMs = 0.0, load = 0.0; // that call's length; the highest load around it (1 = the whole deadline)
+        double bufferMs = 0.0;           // the device's buffer
+    };
+    DropoutInfo dropoutInfo() const;
+
     // How regularly the message thread runs the engine's 30 Hz timer (a saturated UI delays it). UI thread.
     struct UiPulse
     {
@@ -1039,6 +1054,8 @@ private:
     void updateRealtimeStats(); // timer: unit loads over a window, glitch log
     RtStats rtStats;
     std::vector<UnitLoad> heaviestUnits;
+    dropouts::Log dropoutLog;
+    juce::String unitDisplayName (std::uint32_t unit) const; // core/Dropouts.h unit → "Kick", "Insert 2 / 1 Serum"
     std::vector<std::uint64_t> lastChannelNs, lastEffectNs;
     std::uint64_t lastProcessedSamples = 0;
     double lastUnitsWindowMs = 0.0, lastUiPulseMs = 0.0;

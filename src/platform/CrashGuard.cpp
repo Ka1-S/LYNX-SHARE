@@ -245,6 +245,136 @@ bool faultIsAPlugins (std::uintptr_t pc, const void* context) noexcept
     return false;
 }
 
+#if ! defined(LYNX_EXPORT_VERSION)
+ #define LYNX_PLUGIN_THREAD_GUARD 1
+#endif
+#if defined(LYNX_PLUGIN_THREAD_GUARD)
+// Round 190gg (B4): a fault on a hosted plugin's own thread (see CrashGuard.h, watchPluginModule). The app only: the
+// exported plugins' runtime never watches a module (nothing here would apply there), so it does not even have this.
+// Written by the message thread (one writer, slots never reused); the handler reads the slots that are ready.
+constexpr int watchedCapacity = 128;
+struct WatchedModule
+{
+    char path[1024] {};
+    std::atomic<int> ready { 0 };
+};
+WatchedModule watched[watchedCapacity];
+std::atomic<int> watchedCount { 0 };
+
+struct ThreadFaultSlot
+{
+    std::atomic<int> module { -1 };
+    std::atomic<std::uint32_t> code { 0 };
+    std::atomic<std::uintptr_t> offset { 0 };
+};
+constexpr int threadFaultCapacity = 16;
+ThreadFaultSlot threadFaultSlots[threadFaultCapacity];
+std::atomic<int> threadFaultTotal { 0 };
+std::atomic<int> threadFaultChecking { 0 }; // a fault is being looked at (any thread): another one is not parked
+
+// The watched module `path` is (its file, or a file inside its bundle folder), -1 = none
+int watchedModuleOf (const char* path) noexcept
+{
+    if (path == nullptr)
+        return -1;
+    const auto count = std::min (watchedCount.load (std::memory_order_acquire), watchedCapacity);
+    for (int i = 0; i < count; ++i)
+    {
+        if (watched[i].ready.load (std::memory_order_acquire) != 1)
+            continue;
+        const char* w = watched[i].path;
+        std::size_t k = 0;
+        while (w[k] != 0 && w[k] == path[k])
+            ++k;
+        if (w[k] == 0 && (path[k] == 0 || path[k] == '/' || (k > 0 && w[k - 1] == '/')))
+            return i;
+    }
+    return -1;
+}
+
+struct LongWalk
+{
+    std::uintptr_t frames[256];
+    int count = 0;
+};
+
+_Unwind_Reason_Code collectLongFrame (_Unwind_Context* context, void* arg)
+{
+    auto& walk = *static_cast<LongWalk*> (arg);
+    if (walk.count >= 256)
+        return _URC_END_OF_STACK;
+    int beforeInstruction = 0;
+    const auto ip = (std::uintptr_t) _Unwind_GetIPInfo (context, &beforeInstruction);
+    if (ip == 0)
+        return _URC_END_OF_STACK;
+    walk.frames[walk.count++] = beforeInstruction != 0 ? ip : ip - 1;
+    return _URC_NO_REASON;
+}
+
+// A fault outside every guarded call, on a thread that is a watched plugin's own: from the faulting instruction to the
+// thread's first frame (which must be reached: the C library's thread start) there is no frame of LYNX's executable,
+// and the first frame that is not the system's runtime is in a watched module. Then the fault is noted and this thread
+// waits forever (it is the plugin's: nothing of LYNX's runs on it); the app switches that plugin off. Otherwise false.
+bool parkPluginThread (int sig, const void* context) noexcept
+{
+    if (ownImage == nullptr || watchedCount.load (std::memory_order_acquire) == 0)
+        return false;
+    auto idle = 0;
+    if (! threadFaultChecking.compare_exchange_strong (idle, 1))
+        return false; // (a fault while looking at one, on this thread or another: the crash handler)
+    const auto pc = programCounter (context);
+    LongWalk walk;
+    if (pc != 0)
+        _Unwind_Backtrace (collectLongFrame, &walk);
+    int start = -1;
+    for (int i = 0; i < walk.count && start < 0; ++i)
+        if (walk.frames[i] == pc || walk.frames[i] == pc - 1)
+            start = i;
+    auto plugin = -1;
+    std::uintptr_t offset = 0;
+    auto ownFrame = false;
+    if (start >= 0 && walk.count < 256)
+    {
+        for (int i = start; i < walk.count && ! ownFrame; ++i)
+        {
+            Dl_info frame {};
+            if (dladdr (reinterpret_cast<const void*> (walk.frames[i]), &frame) == 0 || frame.dli_fbase == nullptr)
+                continue; // (generated code: judged by the frames around it)
+            if (frame.dli_fbase == ownImage)
+                ownFrame = true;
+            else if (plugin < 0 && ! runtimeLibrary (frame.dli_fname))
+            {
+                plugin = watchedModuleOf (frame.dli_fname);
+                if (plugin < 0)
+                    ownFrame = true; // (the first module that is not the runtime is somebody else's: not a plugin's)
+                offset = walk.frames[i] - (std::uintptr_t) frame.dli_fbase;
+            }
+        }
+        // the walk must end at the thread's start (the runtime's), or it cannot tell what started the thread
+        Dl_info last {};
+        if (dladdr (reinterpret_cast<const void*> (walk.frames[walk.count - 1]), &last) == 0 || ! runtimeLibrary (last.dli_fname))
+            ownFrame = true;
+    }
+    if (plugin < 0 || ownFrame)
+    {
+        threadFaultChecking.store (0);
+        return false;
+    }
+    const auto index = threadFaultTotal.load (std::memory_order_relaxed);
+    auto& slot = threadFaultSlots[index % threadFaultCapacity];
+    slot.module.store (plugin, std::memory_order_relaxed);
+    slot.code.store (signalCodeBase | (std::uint32_t) sig, std::memory_order_relaxed);
+    slot.offset.store (offset, std::memory_order_relaxed);
+    threadFaultTotal.store (index + 1, std::memory_order_release);
+    threadFaultChecking.store (0);
+    sigset_t all;
+    sigfillset (&all);
+    pthread_sigmask (SIG_SETMASK, &all, nullptr);
+    for (;;)
+        pause(); // (async-signal-safe; with every signal blocked it never returns)
+}
+#endif
+
 // The handlers that were there before (JUCE's crash handler: the crash file and the emergency save)
 void passOn (int sig, siginfo_t* info, void* context) noexcept
 {
@@ -289,6 +419,10 @@ void onFault (int sig, siginfo_t* info, void* context)
         }
         // (handling stays set: the crash handler below ends the process, and a fault inside it is not caught either)
     }
+#if defined(LYNX_PLUGIN_THREAD_GUARD)
+    else if (currentFrame() == nullptr && synchronousFault (info))
+        parkPluginThread (sig, context); // (returns only when it is not a plugin's own thread)
+#endif
     errno = savedErrno;
     passOn (sig, info, context);
 }
@@ -1093,6 +1227,95 @@ std::uint32_t faultInGuardedCallForTest (bool inCLibrary) noexcept
         else
             faultForTest (false);
     });
+}
+
+void watchPluginModule (const std::string& fileUtf8) noexcept
+{
+#if defined(LYNX_PLUGIN_THREAD_GUARD)
+    if (fileUtf8.empty() || fileUtf8.front() != '/' || fileUtf8.size() >= sizeof (WatchedModule::path))
+        return; // (an identifier such as an LV2 URI, or a path too long: not watched)
+    auto path = fileUtf8;
+    while (path.size() > 1 && path.back() == '/')
+        path.pop_back();
+    static std::mutex writers; // (one writer at a time; the handler never waits for it)
+    const std::lock_guard<std::mutex> lock (writers);
+    const auto count = watchedCount.load (std::memory_order_relaxed);
+    for (int i = 0; i < count; ++i)
+        if (path == watched[i].path)
+            return;
+    if (count >= watchedCapacity)
+        return;
+    std::memcpy (watched[count].path, path.c_str(), path.size() + 1);
+    watched[count].ready.store (1, std::memory_order_release);
+    watchedCount.store (count + 1, std::memory_order_release);
+    if (guardState.load (std::memory_order_acquire) != 2)
+        installFaultGuard(); // (the handler that parks the thread; hardenSignals installs it in the app anyway)
+#else
+    (void) fileUtf8;
+#endif
+}
+
+bool pluginThreadFaultsCaught() noexcept
+{
+#if defined(LYNX_PLUGIN_THREAD_GUARD) && (defined(__x86_64__) || defined(__aarch64__))
+    return true;
+#else
+    return false;
+#endif
+}
+
+int pluginThreadFaultCount() noexcept
+{
+#if defined(LYNX_PLUGIN_THREAD_GUARD)
+    return threadFaultTotal.load (std::memory_order_acquire);
+#else
+    return 0;
+#endif
+}
+
+std::vector<PluginThreadFault> pluginThreadFaults()
+{
+    std::vector<PluginThreadFault> list;
+#if defined(LYNX_PLUGIN_THREAD_GUARD)
+    const auto total = threadFaultTotal.load (std::memory_order_acquire);
+    for (int i = std::max (0, total - threadFaultCapacity); i < total; ++i)
+    {
+        const auto& slot = threadFaultSlots[i % threadFaultCapacity];
+        const auto module = slot.module.load (std::memory_order_relaxed);
+        if (module < 0 || module >= watchedCapacity)
+            continue;
+        PluginThreadFault f;
+        f.module = watched[module].path;
+        f.code = slot.code.load (std::memory_order_relaxed);
+        char offset[40];
+        std::snprintf (offset, sizeof (offset), "+0x%llx", (unsigned long long) slot.offset.load (std::memory_order_relaxed));
+        auto name = f.module;
+        if (const auto slash = name.find_last_of ('/'); slash != std::string::npos)
+            name = name.substr (slash + 1);
+        f.where = name + offset;
+        list.push_back (std::move (f));
+    }
+#endif
+    return list;
+}
+
+void faultOnOwnThreadForTest (bool inCLibrary) noexcept
+{
+#if defined(LYNX_PLUGIN_THREAD_GUARD)
+    // the worst case: LYNX's own executable registered as if it were a plugin's module
+    Dl_info self {};
+    if (dladdr (reinterpret_cast<const void*> (&faultOnOwnThreadForTest), &self) != 0 && self.dli_fname != nullptr)
+        watchPluginModule (self.dli_fname);
+    std::thread ([inCLibrary] {
+        if (inCLibrary)
+            copyFromNullForTest();
+        else
+            faultForTest (false);
+    }).detach();
+    std::this_thread::sleep_for (std::chrono::seconds (5)); // (the crash handler ends the process long before)
+#else
+    (void) inCLibrary;
+#endif
 }
 
 bool pluginFaultsCaught() noexcept
