@@ -2349,7 +2349,7 @@ Layout anvilLayout()
     auto& v = l.items;
     v.push_back (section (4, 4, 146, 322, TR_NOOP ("Drive")));
     v.push_back (dial (77, 68, 52, "Drive", TR_NOOP ("Drive"), big));
-    v.push_back (radio (30, 118, 94, 72, "Drive type", TR_NOOP ("Soft|Medium|Hard"), { 0.0f, 0.5f, 1.0f }));
+    v.push_back (radio (30, 124, 94, 72, "Drive type", TR_NOOP ("Soft|Medium|Hard"), { 0.0f, 0.5f, 1.0f }));
     v.push_back (dial (77, 226, 30, "Trim", TR_NOOP ("Trim")));
     v.push_back (toggle (22, 286, 110, 26, "Comp", TR_NOOP ("Comp")));
     v.push_back (section (154, 4, 146, 322, "", boxed));
