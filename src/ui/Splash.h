@@ -78,6 +78,10 @@ struct SplashFrame
 void drawSplashFrame (juce::Graphics& g, const SplashFrame& frame);
 // The fonts drawSplashFrame uses, resolved (their typefaces looked up) on the calling thread.
 std::array<juce::Font, 4> makeSplashFonts();
+// LYNX --splashshot <folder> (round 190hd): the card at a few moments of its clock, drawn as the JUCE card is (the
+// platform's renderer: Direct2D on Windows; "-gpu") and as the card on its own thread is (the CPU; "-cpu"), at 100 %
+// and 150 %, as PNGs for a side by side. Returns the files written.
+juce::Array<juce::File> writeSplashShots (const juce::File& folder);
 
 class SplashScreen final : public juce::Component,
                            public StartupSplash,

@@ -905,6 +905,16 @@ public:
             lynx::crashguard::exitNow (0);
         }
 
+        if (args.contains ("--splashshot"))
+        {
+            // LYNX --splashshot <folder> (round 190hd): the splash card drawn as the JUCE card is and as the card on its own
+            // thread is (ui/Splash.h), side by side; no window
+            const auto shots = lynx::writeSplashShots (juce::File (args[args.indexOf ("--splashshot") + 1].unquoted()));
+            setApplicationReturnValue (shots.size() == 20 ? 0 : 1);
+            quit();
+            return;
+        }
+
         if (args.contains ("--browser-indexer"))
         {
             // round 190hd: the Browser's indexer, a low-priority child of the LYNX window (BrowserComponent.h): no window,

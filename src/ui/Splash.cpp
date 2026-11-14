@@ -689,6 +689,48 @@ private:
 } // namespace
 #endif
 
+juce::Array<juce::File> writeSplashShots (const juce::File& folder)
+{
+    juce::Array<juce::File> written;
+    folder.createDirectory();
+    const auto fonts = makeSplashFonts();
+    const auto gpuLogo = decodeLogoImage();
+#if JUCE_WINDOWS
+    juce::lynxSoftwareImagesOnThisThread (true);
+#endif
+    const auto cpuLogo = decodeLogoImage();
+#if JUCE_WINDOWS
+    juce::lynxSoftwareImagesOnThisThread (false);
+#endif
+    for (const auto scale : { 1.0f, 1.5f })
+        for (const auto t : { 0.0, 0.29, 0.58, 1.0, 1.6 })
+            for (const auto cpu : { false, true })
+            {
+                const juce::SoftwareImageType software;
+                const juce::NativeImageType native;
+                const juce::ImageType& type = cpu ? static_cast<const juce::ImageType&> (software) : static_cast<const juce::ImageType&> (native);
+                juce::Image image (juce::Image::ARGB, juce::roundToInt (SplashScreen::width * scale), juce::roundToInt (SplashScreen::height * scale), true, type);
+                {
+                    juce::Graphics g (image);
+                    g.addTransform (juce::AffineTransform::scale (scale));
+                    SplashFrame frame;
+                    frame.t = t;
+                    frame.barDuration = 1.05;
+                    frame.status = tr ("Loading the workspace...");
+                    frame.subtitle = tr ("Digital audio workstation");
+                    frame.version = tr ("Version {0}", { JUCE_APPLICATION_VERSION_STRING });
+                    frame.logo = cpu ? &cpuLogo : &gpuLogo;
+                    frame.fonts = fonts.data();
+                    drawSplashFrame (g, frame);
+                }
+                const auto file = folder.getChildFile ("splash-" + juce::String (juce::roundToInt (scale * 100)) + "-" + juce::String (t, 2) + (cpu ? "-cpu" : "-gpu") + ".png");
+                file.deleteFile();
+                if (juce::FileOutputStream out (file); out.openedOk() && juce::PNGImageFormat().writeImageToStream (image, out))
+                    written.add (file);
+            }
+    return written;
+}
+
 std::unique_ptr<StartupSplash> makeStartupSplash()
 {
 #if JUCE_WINDOWS
