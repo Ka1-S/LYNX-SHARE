@@ -161,6 +161,12 @@
 #    compositor signals it a little after the vertical blank; LYNX_D2D_WAIT_MS); nothing to paint = no frame
 #    (and no device checks). A present that failed is painted again on the next vertical blank.
 #    LYNX_D2D_PACING=old: 8.0.4's pacing.
+# 28. Windows only, juce_gui_basics/native/juce_Windowing_windows.cpp (round 190gv): the compositor shows a native child
+#    window's new Direct2D frame only when its top-level window presents too. LYNX's docked panels (issue #116: the
+#    Playlist, Channel rack, Mixer... are native children of the main window) therefore moved at the main window's own
+#    rate, its toolbar's 72 Hz: ~75 screen updates a second while playing on a 144 Hz display (140 with docking off,
+#    143 with every animation at 144 Hz). After a child window's frame the top-level window paints the one pixel under
+#    the child's corner (hidden by the child) and presents in the same vertical blank. LYNX_CHILD_NUDGE=0: not.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -387,6 +393,12 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("vertical blanks only while needed: new renderer wakes" "LYNX patch (round 190gv): the new renderer gets"
             "        renderContext = contextDescriptors[e].construct (*this);|NL|"
             "        renderContext = contextDescriptors[e].construct (*this);|NL|        lynxWakeVBlank(); // LYNX patch (round 190gv): the new renderer gets its vertical blanks|NL|")
+        lynx_juce_fix("child window frames shown: the top-level presents too" "LYNX patch (round 190gv, fix 28): the compositor shows"
+            "    bool lynxHadVBlankListeners = true;|NL|"
+            "    bool lynxHadVBlankListeners = true;|NL||NL|    // LYNX patch (round 190gv, fix 28): the compositor shows a native child window's new Direct2D frame only when its|NL|    // top-level window presents as well: LYNX's docked panels (native children of the main window) moved at the main|NL|    // window's own rate (its toolbar's 72 Hz: ~75 screen updates a second on a 144 Hz display, 140 with docking off).|NL|    // After a child's frame, the top-level window paints one pixel under that child (hidden by it) and presents in|NL|    // the same vertical blank. LYNX_CHILD_NUDGE=0: not.|NL|    void lynxFramePresented()|NL|    {|NL|        static const bool nudge = SystemStats::getEnvironmentVariable (\"LYNX_CHILD_NUDGE\", {}) != \"0\";|NL||NL|        if (! nudge || (GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) == 0)|NL|            return;|NL||NL|        const auto root = GetAncestor (hwnd, GA_ROOT);|NL|        auto* top = getOwnerOfWindow (root);|NL||NL|        if (top == nullptr || top == this || top->renderContext == nullptr)|NL|            return;|NL||NL|        POINT corner { 0, 0 };|NL|        MapWindowPoints (hwnd, root, &corner, 1);|NL|        const auto scale = top->getPlatformScaleFactor();|NL|        top->repaint (Rectangle<int> ((int) (corner.x / scale), (int) (corner.y / scale), 1, 1));|NL|        top->dispatchDeferredRepaints();|NL|        top->renderContext->onVBlank();|NL|    }|NL|")
+        lynx_juce_fix("child window frames shown: after a frame" "LYNX patch (round 190gv, fix 28): a child window's frame"
+            "        if (auto* ctx = direct2DContext->startFrame ((float) peer.getPlatformScaleFactor()))|NL|        {|NL|            peer.handlePaint (*ctx);|NL|            direct2DContext->endFrame();|NL|        }"
+            "        if (auto* ctx = direct2DContext->startFrame ((float) peer.getPlatformScaleFactor()))|NL|        {|NL|            peer.handlePaint (*ctx);|NL|            direct2DContext->endFrame();|NL|            peer.lynxFramePresented(); // LYNX patch (round 190gv, fix 28): a child window's frame is shown at once|NL|        }")
     elseif(file MATCHES "juce_FileChooser_windows.cpp$")
         lynx_juce_fix("file dialog keys only into LYNX" "LYNX patch (round 180a): only into LYNX"
             "                    SendInput ((UINT) std::size (inputs), inputs, sizeof (INPUT));"
