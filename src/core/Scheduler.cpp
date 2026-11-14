@@ -476,8 +476,11 @@ namespace
 // [loopStart, loopEnd) = the block within the song loop of length `loop`.
 void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, double endTick, int numSamples,
                    double tps, std::int64_t loop, double loopStart, double loopEnd, bool resume, const ScheduleIndex* index,
-                   EventBuffer& out, bool chase = false, std::int64_t stopsAt = std::numeric_limits<std::int64_t>::max()) noexcept
+                   EventBuffer& out, bool chase = false, const std::int64_t* takeoverZoneEnd = nullptr) noexcept
 {
+    // takeoverZoneEnd: FL's pattern clip takeover applies (stopsAtFor with that zone end), else never. Round 190ge: worked
+    // out only for a pattern clip the block reaches (it was found for every clip of the Playlist at every block: the
+    // walk along the pattern's later clips was the scheduler's largest cost in big projects)
     auto overlaps = [&] (double from, double to) {
         return (from < loopEnd && to > loopStart) || (loopEnd > (double) loop && from < loopEnd - (double) loop);
     };
@@ -488,9 +491,16 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
         if (clip.channel < 0 || clip.channel >= (int) song.channels.size() || clip.length <= 0)
             return;
 
+        // (round 190ge: a clip the block does not reach is left before its note is made — it was made for every audio
+        // clip of the Playlist at every block)
+        const auto resumes = resume && loopStart > (double) clip.start && loopStart < (double) clip.end();
+        const auto reached = overlaps ((double) clip.start, (double) clip.end() + 1.0);
+        if (! resumes && ! reached)
+            return;
+
         auto e = audioClipNote (song, clip, clipIndex, tps);
 
-        if (resume && loopStart > (double) clip.start && loopStart < (double) clip.end())
+        if (resumes)
         {
             e.type = NoteEvent::Type::on;
             e.sampleOffset = 0;
@@ -500,7 +510,7 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
             out.add (e);
         }
 
-        if (! overlaps ((double) clip.start, (double) clip.end() + 1.0))
+        if (! reached)
             return;
 
         e.type = NoteEvent::Type::on;
@@ -522,6 +532,7 @@ void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, do
     if (! overlaps ((double) clip.start, (double) clip.end() + 1.0))
         return;
 
+    const auto stopsAt = takeoverZoneEnd != nullptr ? stopsAtFor (song, clipIndex, index, *takeoverZoneEnd) : std::numeric_limits<std::int64_t>::max();
     const auto& pattern = song.patterns[(std::size_t) clip.pattern];
     const auto& notes = pattern.notes;
     // LYNX extra (stretchedClipsLoop(), default on; issue #25): a pattern clip longer than its pattern loops it (FL
@@ -693,8 +704,7 @@ void scheduleSong (const Song& song, double startTick, int numSamples, double tp
         if (! clipPlaysInSong (song, clip, zoneEnd))
             continue;
 
-        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume, index, out, chase,
-                      stopsAtFor (song, clipIndex, index, zoneEnd));
+        scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume, index, out, chase, &zoneEnd);
     }
 
     out.sortByOffset();
@@ -725,8 +735,7 @@ void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMa
         {
             // only the ends: what the track was sounding still stops
             const auto first = out.size();
-            scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, false, index, out, false,
-                          stopsAtFor (song, clipIndex, index, zoneEnd));
+            scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, false, index, out, false, &zoneEnd);
             auto kept = first;
             for (int i = first; i < out.size(); ++i)
                 if (out[i].type == NoteEvent::Type::off)
@@ -736,7 +745,7 @@ void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMa
         }
         const auto back = inMask && givenBack[(std::size_t) clip.track];
         scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume || back, index, out, chase || back,
-                      stopsAtFor (song, clipIndex, index, zoneEnd));
+                      &zoneEnd);
     }
     out.sortByOffset();
 }
