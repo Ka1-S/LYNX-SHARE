@@ -136,7 +136,8 @@ TEST (parity190fy_spiral_revision1_reads_the_loop_sooner)
 {
     using namespace lynx;
     namespace sp = echosuite::spiral;
-    auto p = makeEffectSlot (EffectKind::spiralEcho).params; // the default: 0.01 ms, feedback 50 %, mix 50 %
+    auto p = makeEffectSlot (EffectKind::spiralEcho).params; // feedback 50 %, mix 50 %
+    p[(std::size_t) sp::delay] = 0.0f;                         // the reference's default, 0.01 ms (LYNX's is 100 ms)
     // [EXEC] the reference answers its 0.01 ms floor one sample after the input (tp172d D, refcap0124 default); revision 1
     // two (its one-sample read + the shifter's own sample), revision 0 three
     CHECK (parity190fy::firstWet (p, 48000.0) == 2);

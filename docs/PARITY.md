@@ -3345,15 +3345,18 @@ delay kind): 6.79 → 6.98, every setting up (D 6.26 → 6.67, S1 6.98 → 7.15,
 dB) and its level stays (+0.1 dB); its mirror, +1000 Hz (`p001_1.000`), goes 4 → 6. Every candidate of the fit that
 moved the bank moved that file across the same step; the coordinator decides whether a 0.06 dB spectrum step counts.
 
-**CPU** (thread time, 20 s of noise bursts at 48 kHz, blocks of 512, best of 5, base and round binaries interleaved):
-see `/mnt/e/lynx-work/parityfx190fy/HANDOFF.md`; the revision changes two constants and one branch, no new filter.
-Latency: 0, unchanged.
+**CPU** (thread time, 20 s of noise bursts at 48 kHz, blocks of 512, best of 5; base, revision 0 and revision 1
+binaries interleaved four times, machine load ~30): % of one core, default 0.564 / 0.596 / 0.590, S1 0.580 / 0.590 /
+0.608, S3 0.564 / 0.581 / 0.587, +100 Hz shift 0.590 / 0.588 / 0.558 — the same within noise (two constants and one
+branch, no new filter). Latency 0, memory unchanged.
 
 **Looked at, nothing shipped (the gate or the evidence said no):**
 - *Voice Shift ← Little AlterBoy* (3.17 / 3.27 / 3.80): the shifted files' spectrum error comes from the reference's
   own low-level output under 130 Hz — a DC offset that changes per note (−32 dB at 0 Hz in a held note) and a floor
-  45 … 55 dB down — where LYNX is clean; LYNX also thumps at each voiced onset (−27 dB under 130 Hz for ~50 ms).
-  Removing the thump is a quality fix the score cannot see (one file 3 → 2), copying the DC is not one; left open.
+  45 … 55 dB down — where LYNX is clean. LYNX also thumps at each voiced onset under 130 Hz (Formant −6: −26 … −29 dB
+  with Law Measured, −35 … −37 dB with Classic, the reference −41 … −45 dB): round 190dp's shifted unvoiced grains
+  meeting the first voiced grain (Voice Shift does not normalise the window sum as LYNX Tune does). Removing the thump
+  is a quality fix the score cannot see (one file 3 → 2), copying the DC is not one; left open for the owner.
 - *Halo ← ValhallaShimmer*: the top two bands are 3.5 / 8 dB under the reference on every wet file (the output high
   cut is first order at 8 kHz at the bank's setting); opening it moved one file down and none up (the tone corrector of
   round 190bz is fitted with that cut). The level error has opposite signs on the impulse and programme files of one
