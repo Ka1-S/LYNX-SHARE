@@ -11934,9 +11934,9 @@ private:
         auto source = juce::Desktop::getInstance().getMainMouseSource();
         const auto now = juce::Time::getCurrentTime();
         const juce::ModifierKeys left (juce::ModifierKeys::leftButtonModifier);
-        const auto ctrl = juce::ModifierKeys (juce::ModifierKeys::commandModifier); // (FL's Ctrl: Cmd on a Mac)
-        const auto shift = juce::ModifierKeys (juce::ModifierKeys::shiftModifier);
-        const auto alt = juce::ModifierKeys (juce::ModifierKeys::altModifier);
+        const int ctrl = juce::ModifierKeys::commandModifier; // (FL's Ctrl: Cmd on a Mac)
+        const int shift = juce::ModifierKeys::shiftModifier;
+        const int alt = juce::ModifierKeys::altModifier;
         const auto event = [&] (juce::Component& c, juce::Point<int> p, juce::ModifierKeys mods, juce::Point<int> down, int clicks, bool dragged) {
             return juce::MouseEvent (source, p.toFloat(), mods, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, &c, &c, now, down.toFloat(), now, clicks, dragged);
         };
@@ -12011,7 +12011,7 @@ private:
             check ("drag_resizes", tracks()[4].height == 78 && heightOf (4) == 78, juce::String (tracks()[4].height) + " / " + juce::String (heightOf (4)));
             headerShot ("-resized.png", 6);
             const auto again = bandPoint (4);
-            press (pl, again, {}, again + juce::Point<int> (0, -200 + 40)); // (up past the top, but not 32 px above it)
+            press (pl, again, {}, again + juce::Point<int> (0, -100)); // (above the row's top, but less than 32 px)
             check ("drag_stops_at_16", heightOf (4) == 16, juce::String (heightOf (4)));
             press (pl, bandPoint (4), alt);
             check ("alt_click_resets", tracks()[4].height == 0 && tracks()[4].lockedHeight == -1 && heightOf (4) == 38, juce::String (heightOf (4)));
@@ -12050,7 +12050,7 @@ private:
                                           && back->playlistTracks[0].lockedHeight == 60, error);
             lynx::flpexport::Options options;
             lynx::flpexport::Report flpReport;
-            const auto project = lynx::flp::parseProject (lynx::flpexport::exportFlp (engine.getSong(), options, flpReport));
+            const auto project = flp::parseProject (lynx::flpexport::exportFlp (engine.getSong(), options, flpReport));
             float size5 = -1.0f, size1 = -1.0f;
             for (const auto& arrangement : project.arrangements)
                 for (const auto& t : arrangement.tracks)
