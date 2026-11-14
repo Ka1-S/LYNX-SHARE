@@ -9814,3 +9814,9 @@ countries: tr
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "Seçenekler: slotları MIDI notalarıyla tetikle (zaman slotları: C5–B7 tuşları, ses slotları: C2–B4), tık azaltma, atak telafisi, DC ofseti, HQ yeniden örnekleme, scratch saati; MIDI giriş portu"
 "MIDI Input Port Number:" = "MIDI giriş portu numarası:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "MIDI giriş portu numarası: yukarı / aşağı sürükleyin (\"...\" = yok). Bu porttaki MIDI Out kanalları Pitcher'ın MIDI modunu ve Harmonize'ını çalar"
+
+# --- Round 190fs: user presets of the built-in generators
+"Generator preset: [2xLMB] new channel with it" = "Jeneratör preset'i: [2xLMB] bununla yeni kanal"
+"This preset is for {0}." = "Bu preset {0} içindir."
+"The settings of this preset can't be carried over to this version of the plugin (VST2 / VST3)." = "Bu preset'in ayarları eklentinin bu sürümüne aktarılamıyor (VST2 / VST3)."
+"This preset is for {0}. Add {0} to a channel or a mixer track first (scan for plugins if it is not in the list), open its window and load the preset from its Presets menu." = "Bu preset {0} içindir. Önce {0} eklentisini bir kanala ya da bir mikser kanalına ekleyin (listede yoksa eklentileri tarayın), penceresini açın ve preset'i Presets menüsünden yükleyin."

@@ -9814,3 +9814,9 @@ countries: cn sg
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "选项：用 MIDI 音符触发槽位（时间槽：琴键 C5 至 B7，音量槽：C2 至 B4）、咔嗒声抑制、起音补偿、直流偏移、HQ 重采样、搓碟时钟；MIDI 输入端口"
 "MIDI Input Port Number:" = "MIDI 输入端口号："
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "MIDI 输入端口号：上下拖动（\"...\" = 无）。此端口上的 MIDI Out 通道演奏 Pitcher 的 MIDI 模式和 Harmonize"
+
+# --- Round 190fs: user presets of the built-in generators
+"Generator preset: [2xLMB] new channel with it" = "生成器预设：[2xLMB] 用它新建通道"
+"This preset is for {0}." = "此预设用于 {0}。"
+"The settings of this preset can't be carried over to this version of the plugin (VST2 / VST3)." = "此预设的设置无法转到此版本的插件（VST2 / VST3）。"
+"This preset is for {0}. Add {0} to a channel or a mixer track first (scan for plugins if it is not in the list), open its window and load the preset from its Presets menu." = "此预设用于 {0}。请先把 {0} 添加到通道或混音器轨道（如果它不在列表中，请扫描插件），打开它的窗口，再从它的 Presets 菜单载入预设。"

@@ -61,6 +61,8 @@
 #include "core/RackOps.h"
 #include "core/NativeEngines.h"
 #include "core/PresetCycle.h"
+#include "core/GeneratorPresets.h"
+#include "ui/GeneratorPresetMenu.h"
 #include "ui/ControllerEditors.h"
 #include "ui/HintBar.h"
 #include "ui/ValueControl.h"
@@ -4245,17 +4247,27 @@ public:
         }
 
         presetBox.setTextWhenNothingSelected (tr ("Presets..."));
-        const auto presets = synthPresets();
-        for (int i = 0; i < (int) presets.size(); ++i)
-            presetBox.addItem (juce::String::fromUTF8 (presets[(std::size_t) i].first.c_str()), i + 1);
+        fillPresetBox();
+        presetBox.beforePopup = [this] { fillPresetBox(); }; // (round 190fs: the user's presets as they are on disk now)
         presetBox.onChange = [this] {
             const auto presets = synthPresets();
-            const auto index = presetBox.getSelectedId() - 1;
+            const auto id = presetBox.getSelectedId();
+            const auto index = id - 1;
+            presetBox.setSelectedId (0, juce::dontSendNotification);
 
             if (juce::isPositiveAndBelow (index, (int) presets.size()) && current() != nullptr)
                 ref.edit (engine, [s = presets[(std::size_t) index].second] (ChannelDef& channelDef) { channelDef.synth = s; });
-
-            presetBox.setSelectedId (0, juce::dontSendNotification);
+            else if (id >= userPresetId && id - userPresetId < userFiles.size())
+                loadUserPreset (userFiles[id - userPresetId]);
+            else if (id == savePresetId)
+                saveUserPreset();
+            else if (id == deletePresetId && lastUserPreset.existsAsFile())
+            {
+                lastUserPreset.deleteFile();
+                lastUserPreset = juce::File();
+            }
+            else if (id == showFolderId)
+                genpresetui::reveal (genpresetui::folderFor (InstrumentKind::synth));
         };
         addAndMakeVisible (presetBox);
 
@@ -4574,7 +4586,97 @@ private:
     juce::Slider attack, decay, sustain, release, cutoff, resonance, fm, fmDecay, keyTrack, sweep, sweepTime, bandLow, bandMid, bandHigh;
     juce::ToggleButton ring;
     std::array<juce::Label, 20> labels;
-    juce::ComboBox presetBox;
+    // round 190fs: the box lists LYNX's synth presets, then the user's own ("Your presets") and the preset items of
+    // LYNX's other preset menus (Save preset..., Delete preset, Show the presets folder)
+    struct PresetBox final : public juce::ComboBox
+    {
+        std::function<void()> beforePopup;
+        void showPopup() override
+        {
+            if (beforePopup)
+                beforePopup();
+            juce::ComboBox::showPopup();
+        }
+    };
+    static constexpr int userPresetId = 1001, savePresetId = 3001, deletePresetId = 3002, showFolderId = 3003;
+    PresetBox presetBox;
+    juce::Array<juce::File> userFiles;
+    juce::File lastUserPreset; // the user's preset loaded or saved last (Delete preset)
+
+    void fillPresetBox()
+    {
+        presetBox.clear (juce::dontSendNotification);
+        const auto presets = synthPresets();
+        for (int i = 0; i < (int) presets.size(); ++i)
+            presetBox.addItem (juce::String::fromUTF8 (presets[(std::size_t) i].first.c_str()), i + 1);
+        userFiles = genpresetui::userPresets (InstrumentKind::synth);
+        if (! userFiles.isEmpty())
+        {
+            presetBox.addSectionHeading (tr ("Your presets"));
+            for (int i = 0; i < userFiles.size(); ++i)
+                presetBox.addItem (userFiles[i].getFileNameWithoutExtension(), userPresetId + i);
+        }
+        presetBox.addSeparator();
+        presetBox.addItem (tr ("Save preset..."), savePresetId);
+        if (lastUserPreset.existsAsFile())
+            presetBox.addItem (tr ("Delete preset \"{0}\"", { lastUserPreset.getFileNameWithoutExtension() }), deletePresetId);
+        presetBox.addItem (tr ("Show the presets folder"), showFolderId);
+    }
+
+    void loadUserPreset (const juce::File& file)
+    {
+        const auto preset = genpresetui::read (file);
+        const auto* d = current();
+        if (! preset || d == nullptr)
+            return;
+        if (auto changed = genpresets::withPreset (*d, *preset))
+        {
+            ref.edit (engine, [c = std::move (*changed)] (ChannelDef& channelDef) {
+                if (channelDef.instrument == c.instrument)
+                    channelDef = c;
+            });
+            lastUserPreset = file;
+        }
+        else
+            ui::postHint ({ tr ("This preset is for {0}.", { juce::String::fromUTF8 (genpresets::engineName (preset->kind).c_str()) }), {} }, 2500);
+    }
+
+    void saveUserPreset()
+    {
+        const auto* d = current();
+        if (d == nullptr)
+            return;
+        genpresetui::askName (*this, juce::String::fromUTF8 (d->name.c_str()), [safe = juce::Component::SafePointer<SynthPanel> (this)] (const juce::String& name) {
+            if (safe != nullptr)
+                safe->saveNamed (name);
+        });
+    }
+
+public:
+    bool saveNamed (const juce::String& name)
+    {
+        const auto* now = current();
+        if (now == nullptr)
+            return false;
+        juce::File written;
+        juce::String error;
+        if (! genpresetui::save (*now, name, written, error))
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save preset"), error);
+            return false;
+        }
+        lastUserPreset = written;
+        return true;
+    }
+
+    // the box's list as it opens (shots)
+    juce::PopupMenu presetBoxMenu()
+    {
+        fillPresetBox();
+        return *presetBox.getRootMenu();
+    }
+
+private:
 };
 
 // --- FL's channel window frame (REA round 143b) --------------------------------------------------------------
@@ -5577,6 +5679,10 @@ private:
             const auto& bank = banks::bankOf (kind);
             for (int i = 0; i < (int) bank.size(); ++i)
                 presets.push_back ({ banks::pathOf (i), banks::relativeOf (bank[(std::size_t) i]), bank[(std::size_t) i].name });
+            // the user's own presets last (round 190fs): "Your presets" in the menu, the arrows go through them too
+            userFrom = (int) presets.size();
+            for (const auto& f : genpresetui::userPresets (kind))
+                presets.push_back ({ f.getFullPathName().toStdString(), {}, f.getFileNameWithoutExtension().toStdString() });
             listedKind = kind;
             loaded = true;
             current = d != nullptr ? presetcycle::indexOfName (presets, d->name) : -1; // (a channel named after its preset)
@@ -5608,7 +5714,14 @@ private:
             return false;
         const auto& preset = all[(std::size_t) index];
         const auto bankIndex = banks::indexOfPath (preset.path);
-        auto changed = bankIndex >= 0 ? banks::withPreset (*d, bankIndex) : natives::withPreset (*d, preset.path, preset.name, flStudioAccess());
+        std::optional<ChannelDef> changed;
+        if (index >= userFrom) // one of the user's own presets (round 190fs)
+        {
+            if (const auto own = genpresetui::read (juce::File (juce::String::fromUTF8 (preset.path.c_str()))))
+                changed = genpresets::withPreset (*d, *own);
+        }
+        else
+            changed = bankIndex >= 0 ? banks::withPreset (*d, bankIndex) : natives::withPreset (*d, preset.path, preset.name, flStudioAccess());
         if (! changed)
         {
             if (reportFailure)
@@ -5633,11 +5746,18 @@ private:
 
     void showMenu()
     {
+        buildMenu().showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+    }
+
+public:
+    juce::PopupMenu buildMenu()
+    {
+        refreshUserPresets(); // (another channel's window may have saved or deleted one)
         const auto& all = list();
         juce::PopupMenu menu;
         std::map<std::string, juce::PopupMenu> folders;
         std::vector<std::string> order;
-        for (int i = 0; i < (int) all.size(); ++i)
+        for (int i = 0; i < juce::jmin (userFrom, (int) all.size()); ++i)
         {
             const auto& rel = all[(std::size_t) i].relative;
             const auto slash = rel.find_last_of ('/');
@@ -5652,9 +5772,117 @@ private:
                     menu.addItem (it.getItem());
             else
                 menu.addSubMenu (juce::String::fromUTF8 (folder.c_str()), folders[folder]);
-        if (menu.getNumItems() == 0)
+        if (menu.getNumItems() == 0 && userFrom >= (int) all.size())
             menu.addItem (tr ("No presets found (they come with FL Studio)"), false, false, [] {});
-        menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (this));
+        addUserItems (menu);
+        return menu;
+    }
+
+    // Round 190fs: the user's own presets of this generator, with the items the hosted plugins' and the mixer effects'
+    // preset menus have (Save preset..., Your presets, Delete preset, Show the presets folder). FL's wrapper saves a
+    // generator's settings with "Save preset as..." (PluginMenu SaveStateMenu); LYNX's channel window has no wrapper
+    // menu, so the item is in the preset box, as in the other LYNX preset menus.
+    void addUserItems (juce::PopupMenu& menu)
+    {
+        const auto& all = list();
+        const auto* d = def();
+        if (d == nullptr || ! genpresets::canSave (d->instrument))
+            return;
+        if (userFrom < (int) all.size())
+        {
+            menu.addSectionHeader (tr ("Your presets"));
+            for (int i = userFrom; i < (int) all.size(); ++i)
+                menu.addItem (juce::String::fromUTF8 (all[(std::size_t) i].name.c_str()), true, i == current, [this, i] { load (i); });
+        }
+        menu.addSeparator();
+        menu.addItem (tr ("Save preset..."), [safe = juce::Component::SafePointer<ChannelPresetBar> (this)] {
+            if (safe != nullptr)
+                safe->saveAs();
+        });
+        if (current >= userFrom && current < (int) all.size())
+        {
+            const juce::File file (juce::String::fromUTF8 (all[(std::size_t) current].path.c_str()));
+            menu.addItem (tr ("Delete preset \"{0}\"", { file.getFileNameWithoutExtension() }),
+                          [safe = juce::Component::SafePointer<ChannelPresetBar> (this), file] {
+                              file.deleteFile();
+                              if (safe != nullptr)
+                                  safe->relist ({});
+                          });
+        }
+        const auto kind = d->instrument;
+        menu.addItem (tr ("Show the presets folder"), [kind] { genpresetui::reveal (genpresetui::folderFor (kind)); });
+    }
+
+    // "Save preset...": the name box, then the file; the box shows the new preset (the channel keeps its name)
+    void saveAs()
+    {
+        const auto* d = def();
+        if (d == nullptr)
+            return;
+        genpresetui::askName (*this, current >= 0 ? currentName : juce::String::fromUTF8 (d->name.c_str()),
+                              [safe = juce::Component::SafePointer<ChannelPresetBar> (this)] (const juce::String& name) {
+                                  if (safe != nullptr)
+                                      safe->saveNamed (name);
+                              });
+    }
+
+    bool saveNamed (const juce::String& name)
+    {
+        const auto* d = def();
+        if (d == nullptr)
+            return false;
+        juce::File written;
+        juce::String error;
+        if (! genpresetui::save (*d, name, written, error))
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, tr ("Save preset"), error);
+            return false;
+        }
+        relist (written.getFullPathName());
+        return true;
+    }
+
+    juce::String shownName() const { return current >= 0 ? currentName : juce::String(); }
+    int presetCount() { return (int) list().size(); }
+    int userPresetCount() { return (int) list().size() - userFrom; }
+    bool loadAt (int index) { return load (index, false); }
+
+private:
+    // the user's presets as they are on disk now, the rest of the list kept; the current preset stays selected
+    void refreshUserPresets()
+    {
+        const auto* d = def();
+        if (! loaded || d == nullptr || d->instrument != listedKind)
+            return;
+        const auto was = current >= userFrom && current < (int) presets.size() ? presets[(std::size_t) current].path : std::string();
+        presets.resize ((std::size_t) userFrom);
+        for (const auto& f : genpresetui::userPresets (listedKind))
+            presets.push_back ({ f.getFullPathName().toStdString(), {}, f.getFileNameWithoutExtension().toStdString() });
+        if (! was.empty())
+        {
+            current = -1;
+            for (int i = userFrom; i < (int) presets.size(); ++i)
+                if (presets[(std::size_t) i].path == was)
+                    current = i;
+            if (current < 0)
+                currentName = {};
+        }
+    }
+
+    // the list again (a preset was saved or deleted); `select` (a file path) becomes the current preset
+    void relist (const juce::String& select)
+    {
+        loaded = false;
+        const auto& all = list();
+        current = -1;
+        currentName = {};
+        for (int i = userFrom; i < (int) all.size() && select.isNotEmpty(); ++i)
+            if (juce::File (juce::String::fromUTF8 (all[(std::size_t) i].path.c_str())) == juce::File (select))
+            {
+                current = i;
+                currentName = juce::String::fromUTF8 (all[(std::size_t) i].name.c_str());
+            }
+        repaint();
     }
 
     AudioEngine& engine;
@@ -5665,6 +5893,7 @@ private:
     InstrumentKind listedKind = InstrumentKind::synth;
     bool loaded = false;
     int current = -1;
+    int userFrom = 0; // the first of the user's own presets in `presets`
     juce::String currentName;
 };
 
@@ -6392,6 +6621,45 @@ juce::String samplerPageQuery (juce::Component& root, const juce::String& what)
     if (what == "mulText" || what == "corner" || what == "waveHint")
         return p->shotText (what);
     return p->shotEnabled (what) ? "1" : "0";
+}
+
+namespace
+{
+template <typename T>
+T* findChild (juce::Component& c)
+{
+    if (auto* p = dynamic_cast<T*> (&c))
+        return p;
+    for (auto* child : c.getChildren())
+        if (auto* p = findChild<T> (*child))
+            return p;
+    return nullptr;
+}
+} // namespace
+
+std::optional<juce::PopupMenu> channelPresetMenu (juce::Component& root)
+{
+    if (auto* bar = findChild<ChannelPresetBar> (root))
+        return bar->buildMenu();
+    if (auto* synth = findChild<SynthPanel> (root))
+        return synth->presetBoxMenu();
+    return std::nullopt;
+}
+
+bool channelPresetSave (juce::Component& root, const juce::String& name)
+{
+    if (auto* bar = findChild<ChannelPresetBar> (root))
+        return bar->saveNamed (name);
+    if (auto* synth = findChild<SynthPanel> (root))
+        return synth->saveNamed (name);
+    return false;
+}
+
+juce::String channelPresetName (juce::Component& root)
+{
+    if (auto* bar = findChild<ChannelPresetBar> (root))
+        return bar->shownName();
+    return {};
 }
 
 std::optional<juce::PopupMenu> samplerWaveMenu (juce::Component& root)

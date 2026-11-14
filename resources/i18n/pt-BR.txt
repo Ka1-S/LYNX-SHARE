@@ -9927,3 +9927,9 @@ countries: br
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "Opções: disparar slots com notas MIDI (slots de tempo: teclas C5 a B7, slots de volume: C2 a B4), redução de cliques, compensação de ataque, offset DC, reamostragem HQ, relógio de scratch; porta de entrada MIDI"
 "MIDI Input Port Number:" = "Número da porta de entrada MIDI:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "Número da porta de entrada MIDI: arraste para cima / baixo (\"...\" = nenhuma). Os canais MIDI Out nessa porta tocam o modo MIDI e o Harmonize do Pitcher"
+
+# --- Round 190fs: user presets of the built-in generators
+"Generator preset: [2xLMB] new channel with it" = "Preset de gerador: [2xLMB] novo canal com ele"
+"This preset is for {0}." = "Este preset é do {0}."
+"The settings of this preset can't be carried over to this version of the plugin (VST2 / VST3)." = "As configurações deste preset não podem ser passadas para esta versão do plugin (VST2 / VST3)."
+"This preset is for {0}. Add {0} to a channel or a mixer track first (scan for plugins if it is not in the list), open its window and load the preset from its Presets menu." = "Este preset é do {0}. Adicione o {0} a um canal ou a uma faixa do Mixer primeiro (procure plugins se ele não estiver na lista), abra a janela dele e carregue o preset pelo menu Presets."

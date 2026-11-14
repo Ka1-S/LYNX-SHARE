@@ -9814,3 +9814,9 @@ countries: id
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "Opsi: picu slot dengan not MIDI (slot waktu: tuts C5 sampai B7, slot volume: C2 sampai B4), pengurangan klik, kompensasi attack, offset DC, resampling HQ, jam scratch; port input MIDI"
 "MIDI Input Port Number:" = "Nomor port input MIDI:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "Nomor port input MIDI: seret ke atas / bawah (\"...\" = tidak ada). Kanal MIDI Out pada port ini memainkan mode MIDI dan Harmonize Pitcher"
+
+# --- Round 190fs: user presets of the built-in generators
+"Generator preset: [2xLMB] new channel with it" = "Preset generator: [2xLMB] channel baru dengan preset ini"
+"This preset is for {0}." = "Preset ini untuk {0}."
+"The settings of this preset can't be carried over to this version of the plugin (VST2 / VST3)." = "Pengaturan preset ini tidak bisa dipindahkan ke versi plugin ini (VST2 / VST3)."
+"This preset is for {0}. Add {0} to a channel or a mixer track first (scan for plugins if it is not in the list), open its window and load the preset from its Presets menu." = "Preset ini untuk {0}. Tambahkan {0} ke channel atau track Mixer terlebih dahulu (pindai plugin jika tidak ada di daftar), buka jendelanya, lalu muat preset dari menu Presets-nya."

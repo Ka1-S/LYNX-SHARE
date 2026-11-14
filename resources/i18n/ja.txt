@@ -9814,3 +9814,9 @@ countries: jp
 "Options: trigger slots from MIDI notes (time slots: keys C5 to B7, volume slots: C2 to B4), click reduction, attack compensation, DC offset, HQ resampling, scratching clock; MIDI input port" = "オプション: MIDI ノートでスロットをトリガー (タイムスロット: キー C5〜B7、ボリュームスロット: C2〜B4)、クリック軽減、アタック補正、DC オフセット、HQ リサンプリング、スクラッチ時計、MIDI 入力ポート"
 "MIDI Input Port Number:" = "MIDI 入力ポート番号:"
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "MIDI 入力ポート番号: 上下にドラッグ (\"...\" = なし)。このポートの MIDI Out チャンネルが Pitcher の MIDI モードと Harmonize を演奏します"
+
+# --- Round 190fs: user presets of the built-in generators
+"Generator preset: [2xLMB] new channel with it" = "ジェネレーターのプリセット: [2xLMB] このプリセットで新しいチャンネル"
+"This preset is for {0}." = "このプリセットは {0} 用です。"
+"The settings of this preset can't be carried over to this version of the plugin (VST2 / VST3)." = "このプリセットの設定は、このバージョンのプラグインに引き継げません (VST2 / VST3)。"
+"This preset is for {0}. Add {0} to a channel or a mixer track first (scan for plugins if it is not in the list), open its window and load the preset from its Presets menu." = "このプリセットは {0} 用です。まず {0} をチャンネルかミキサートラックに追加し (一覧にない場合はプラグインをスキャン)、そのウィンドウを開いて Presets メニューからプリセットを読み込んでください。"

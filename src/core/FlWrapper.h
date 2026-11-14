@@ -15,6 +15,10 @@ namespace lynx
 // False if the format is not a known one.
 bool parseFlWrapper (const std::vector<std::uint8_t>& blob, ForeignPlugin& out);
 
+// The third-party plugin an FL preset file (.fst of a channel or an effect) is for: FL's wrapper record in it, with
+// the plugin's name, ids and state (round 190fs). False for FL's own plugins' presets and for other files.
+bool foreignFromFlPreset (const std::vector<std::uint8_t>& fileBytes, ForeignPlugin& out);
+
 // FL's wrapper processing options (record 0x02 flags, REA round 134) onto LYNX's plugin options: "Use fixed size
 // buffers" (flag 0x2), "Process maximum size buffers" (fixed options bit 0), "Allow threaded processing" (0x1000,
 // wrapper version 7+), "Make bridged" (0x40000, version 8+). Flag 0x400000 = the defaults. Nothing changes without

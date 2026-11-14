@@ -2487,44 +2487,46 @@ juce::StringArray PluginHost::filesToScanFor (const std::vector<FlpPluginUse>& u
     return worth;
 }
 
+std::string PluginHost::stateFromFlWrapper (const ForeignPlugin& f, const juce::PluginDescription& d)
+{
+    // CLAP: u32 0 + the clap_plugin_state.save bytes (REA_rodada22 §2); LYNX's CLAP host stores the same
+    if (f.format == ForeignPlugin::Format::clap && d.pluginFormatName == "CLAP")
+        return f.state.size() > 4 ? juce::MemoryBlock (f.state.data() + 4, f.state.size() - 4).toBase64Encoding().toStdString() : std::string {};
+
+    // VST2: LYNX's VST2 host keeps FL's own state layout (REA_rodada89 §2)
+    if (f.format == ForeignPlugin::Format::vst2 && d.pluginFormatName == Vst2PluginFormat::formatName)
+    {
+        FlVst2State check;
+        return parseFlVst2State (f.state, check) ? juce::MemoryBlock (f.state.data(), f.state.size()).toBase64Encoding().toStdString()
+                                                 : std::string {};
+    }
+
+    if (f.format != ForeignPlugin::Format::vst3 || d.pluginFormatName != "VST3")
+        return {}; // VST2 <-> VST3: different state formats; plugin at defaults
+
+    std::vector<std::uint8_t> component, controller;
+
+    if (! splitFlVst3State (f.state, component, controller))
+        return {};
+
+    juce::XmlElement xml ("VST3PluginState");
+
+    if (! component.empty())
+        xml.createNewChildElement ("IComponent")->addTextElement (juce::MemoryBlock (component.data(), component.size()).toBase64Encoding());
+    if (! controller.empty())
+        xml.createNewChildElement ("IEditController")->addTextElement (juce::MemoryBlock (controller.data(), controller.size()).toBase64Encoding());
+
+    juce::MemoryBlock binary;
+    juce::AudioProcessor::copyXmlToBinary (xml, binary);
+    return binary.toBase64Encoding().toStdString();
+}
+
 int PluginHost::adoptFlPlugins (Song& song, juce::StringArray* missing, juce::StringArray* matched, juce::StringArray* withoutState,
                                 juce::StringArray* substituted)
 {
     int found = 0;
 
-    // returns the state in JUCE's format, or empty when the state can't be carried over
-    auto convertState = [] (const ForeignPlugin& f, const juce::PluginDescription& d) -> std::string {
-        // CLAP: u32 0 + the clap_plugin_state.save bytes (REA_rodada22 §2); LYNX's CLAP host stores the same
-        if (f.format == ForeignPlugin::Format::clap && d.pluginFormatName == "CLAP")
-            return f.state.size() > 4 ? juce::MemoryBlock (f.state.data() + 4, f.state.size() - 4).toBase64Encoding().toStdString() : std::string {};
-
-        // VST2: LYNX's VST2 host keeps FL's own state layout (REA_rodada89 §2)
-        if (f.format == ForeignPlugin::Format::vst2 && d.pluginFormatName == Vst2PluginFormat::formatName)
-        {
-            FlVst2State check;
-            return parseFlVst2State (f.state, check) ? juce::MemoryBlock (f.state.data(), f.state.size()).toBase64Encoding().toStdString()
-                                                     : std::string {};
-        }
-
-        if (f.format != ForeignPlugin::Format::vst3 || d.pluginFormatName != "VST3")
-            return {}; // VST2 <-> VST3: different state formats; plugin at defaults
-
-        std::vector<std::uint8_t> component, controller;
-
-        if (! splitFlVst3State (f.state, component, controller))
-            return {};
-
-        juce::XmlElement xml ("VST3PluginState");
-
-        if (! component.empty())
-            xml.createNewChildElement ("IComponent")->addTextElement (juce::MemoryBlock (component.data(), component.size()).toBase64Encoding());
-        if (! controller.empty())
-            xml.createNewChildElement ("IEditController")->addTextElement (juce::MemoryBlock (controller.data(), controller.size()).toBase64Encoding());
-
-        juce::MemoryBlock binary;
-        juce::AudioProcessor::copyXmlToBinary (xml, binary);
-        return binary.toBase64Encoding().toStdString();
-    };
+    auto convertState = [] (const ForeignPlugin& f, const juce::PluginDescription& d) { return stateFromFlWrapper (f, d); };
 
     auto adopt = [&] (PluginRef& ref, bool instrument) {
         juce::String how;
