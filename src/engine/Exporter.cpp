@@ -5,6 +5,7 @@
 #include "core/Dither.h"
 #include "core/Mp3Encoder.h"
 #include "engine/AudioEngine.h"
+#include "engine/PowerHints.h"
 #include "engine/SessionPack.h"
 #include "engine/Text.h"
 #include "ui/I18n.h"
@@ -256,8 +257,12 @@ ExportJob::~ExportJob() = default;
 
 bool ExportJob::run (const std::function<bool (double)>& progress, juce::String& error)
 {
+    // rollup 0.1.28 (REA 190hb action 3, FL's rule): the PC does not sleep during an export, and an offline render's
+    // thread runs below normal priority so the desktop stays usable (its workers do too: AudioEngine's offline pool)
+    const powerhints::KeepAwake awake;
     if (live != nullptr)
         return runRealtime (progress, error);
+    const powerhints::BelowNormalPriority background;
 
     AudioEngine::RenderOptions render;
     render.seconds = musicSeconds;

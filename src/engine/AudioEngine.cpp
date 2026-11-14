@@ -46,6 +46,7 @@
 #include "engine/DllAsioDevice.h"
 #include "engine/PipeWireDevice.h"
 #include "platform/LinuxRealtime.h"
+#include "engine/PowerHints.h"
 #include "engine/Metronome.h"
 #include "core/NoteTools.h"
 #include "core/VfxScript.h"
@@ -150,6 +151,66 @@ const natives::FlAccess& flStudioAccess()
     }();
     return cached;
 }
+
+// --- engine/PowerHints.h (rollup 0.1.28, REA round 190hb actions 3 and 4) -------------------------------------------
+namespace powerhints
+{
+std::uint32_t keepAwakeBegin() noexcept
+{
+   #if JUCE_WINDOWS
+    return (std::uint32_t) SetThreadExecutionState (ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
+   #else
+    return 0;
+   #endif
+}
+
+void keepAwakeEnd (std::uint32_t previous) noexcept
+{
+   #if JUCE_WINDOWS
+    // (the state before, or plain ES_CONTINUOUS when there was none: the system may sleep again)
+    SetThreadExecutionState (previous != 0 ? (EXECUTION_STATE) previous : ES_CONTINUOUS);
+   #else
+    (void) previous;
+   #endif
+}
+
+int lowerCurrentThread() noexcept
+{
+   #if JUCE_WINDOWS
+    const auto before = GetThreadPriority (GetCurrentThread());
+    SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+    return before == THREAD_PRIORITY_ERROR_RETURN ? THREAD_PRIORITY_NORMAL : before;
+   #else
+    return 0;
+   #endif
+}
+
+void restoreCurrentThread (int previous) noexcept
+{
+   #if JUCE_WINDOWS
+    SetThreadPriority (GetCurrentThread(), previous);
+   #else
+    (void) previous;
+   #endif
+}
+
+void lowerWorkerThread()
+{
+    (void) lowerCurrentThread();
+}
+
+void enableCompositorMmcss() noexcept
+{
+   #if JUCE_WINDOWS
+    if (juce::SystemStats::getEnvironmentVariable ("LYNX_DWM_MMCSS", {}) == "0")
+        return;
+    using EnableMmcss = HRESULT (WINAPI*) (BOOL);
+    if (auto* dwm = LoadLibraryW (L"dwmapi.dll"))
+        if (auto enable = (EnableMmcss) (void*) GetProcAddress (dwm, "DwmEnableMMCSS"))
+            enable (TRUE);
+   #endif
+}
+} // namespace powerhints
 
 namespace
 {
@@ -270,7 +331,11 @@ std::atomic<const AudioEngine*> pluginHoldOwner { nullptr };
 } // namespace
 
 AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPluginList)
-    : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(), raiseAudioThreadPriority)),
+    // (an engine without an audio device renders offline — exports, bounces, freezes: its workers run below normal
+    // priority as FL's export threads do, rollup 0.1.28 / REA 190hb; the live engine's workers get the audio priority)
+    : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(),
+                                             openAudioDevice ? std::function<void()> (raiseAudioThreadPriority)
+                                                             : std::function<void()> (powerhints::lowerWorkerThread))),
       plugins (userPluginList),
       song (Song::makeDefault())
 {
@@ -2984,6 +3049,11 @@ void AudioEngine::updateRecording()
         recordPassTrimmed = 0;
     }
     recordPassActive = active;
+    // (rollup 0.1.28, REA 190hb action 3: no sleep in the middle of a take; this timer runs on the message thread)
+    if (active && ! awakeForRecording)
+        awakeForRecording = powerhints::keepAwakeBegin();
+    else if (! active && awakeForRecording)
+        powerhints::keepAwakeEnd (*std::exchange (awakeForRecording, std::nullopt));
 
     if (playing)
         lastPlayingTick = estimatedPositionNow();

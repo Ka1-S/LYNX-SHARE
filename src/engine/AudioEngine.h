@@ -1249,6 +1249,8 @@ private:
     // Cancel recording (round 187a): the undo depth when this recording pass started, and the steps trimmed off the
     // stack's bottom since then (the depth then still counts them)
     bool recordPassActive = false, recordPassMarked = false, discardAudioTakes = false;
+    // rollup 0.1.28 (REA 190hb): the PC stays awake while a recording pass runs (engine/PowerHints.h; message thread)
+    std::optional<std::uint32_t> awakeForRecording;
     std::size_t recordPassUndoBase = 0, recordPassTrimmed = 0;
     bool perfTakeHasUndoStep = false; // the first clip a performance recording writes is the take's undo step
     void updatePerformanceRecording();
