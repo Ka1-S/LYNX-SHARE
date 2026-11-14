@@ -20,13 +20,16 @@ void EventBuffer::add (const NoteEvent& e) noexcept
 
 void EventBuffer::sortByOffset() noexcept
 {
-    // "off" before "on" on the same sample, so a repeated note isn't cut. A stable insertion sort in place: this runs
-    // on the audio thread for every block with events, and std::stable_sort allocates a temporary buffer (round 160);
-    // the events arrive nearly in order, so it is close to linear.
-    const auto before = [] (const NoteEvent& a, const NoteEvent& b) {
+    // "off" before "on" on the same sample, so a repeated note isn't cut; a slide after the "on"s of its sample, so a
+    // slide note that starts with a note bends that note (issue #165: FL 2026 glides a note whose slide note starts on
+    // the same step; sorted before it, the slide found no sounding voice and the note played flat). A stable insertion
+    // sort in place: this runs on the audio thread for every block with events, and std::stable_sort allocates a
+    // temporary buffer (round 160); the events arrive nearly in order, so it is close to linear.
+    const auto rank = [] (NoteEvent::Type t) { return t == NoteEvent::Type::on ? 1 : t == NoteEvent::Type::slide ? 2 : 0; };
+    const auto before = [rank] (const NoteEvent& a, const NoteEvent& b) {
         if (a.sampleOffset != b.sampleOffset)
             return a.sampleOffset < b.sampleOffset;
-        return a.type != NoteEvent::Type::on && b.type == NoteEvent::Type::on;
+        return rank (a.type) < rank (b.type);
     };
     for (int i = 1; i < count; ++i)
     {
