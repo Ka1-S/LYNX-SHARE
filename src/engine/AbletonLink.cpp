@@ -15,6 +15,11 @@
  #ifndef NOMINMAX
   #define NOMINMAX 1
  #endif
+ // (Asio decides it has threads from _MT, which MSVC defines and the Zig / MinGW cross compiler doesn't: without this
+ // it builds its "no threads" stubs and Link's io thread throws "thread: operation not supported" on Windows)
+ #ifndef ASIO_HAS_THREADS
+  #define ASIO_HAS_THREADS 1
+ #endif
 #elif defined(__APPLE__)
  #ifndef LINK_PLATFORM_MACOSX
   #define LINK_PLATFORM_MACOSX 1
