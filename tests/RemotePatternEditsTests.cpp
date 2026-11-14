@@ -237,8 +237,22 @@ void metadataAndValidation()
     followPatternLengths (patternLengths (trimmed), resized.song);
     check (resized.song.playlist[0].length == 1500 && resized.song.arrangements[1].clips[0].length == 3840,
            "length following did not preserve trimmed clips or update stored arrangements");
-    check (remote_patterns::set (original, 0, {}, 960).song.patterns[0].lengthTicks == 960, "exact last note end was refused");
     check (remote_patterns::set (original, 0, {}, 0).song.patterns[0].lengthTicks == 0, "automatic length was refused");
+    // Round 190ha: only what LYNX's pattern length box can set, 0 (automatic) or 1..999 whole bars of the song's meter
+    check (remote_patterns::set (original, 0, {}, 999 * 3840).song.patterns[0].lengthTicks == 999 * 3840, "999 bars were refused");
+    for (const auto ticks : { std::int64_t (960), std::int64_t (1920), std::int64_t (3841), std::int64_t (1000) * 3840 })
+        refuses ([&] { remote_patterns::set (original, 0, {}, ticks); });
+    refuses ([&] { remote_patterns::create (original, {}, {}, 1920); });
+    auto compound = original; // 6/8: a bar is six eighths, 2880 ticks
+    compound.beatsPerBar = 6;
+    compound.beatUnit = 8;
+    check (remote_patterns::set (compound, 0, {}, 2880).song.patterns[0].lengthTicks == 2880
+           && remote_patterns::create (compound, {}, {}, 5760).song.patterns.back().lengthTicks == 5760, "whole 6/8 bars were refused");
+    refuses ([&] { remote_patterns::set (compound, 0, {}, 3840); });
+    auto longNote = original; // a whole-bar length still cannot end before a note
+    longNote.patterns[0].notes[0].length = 4000;
+    refuses ([&] { remote_patterns::set (longNote, 0, {}, 3840); });
+    check (remote_patterns::set (longNote, 0, {}, 2 * 3840).song.patterns[0].lengthTicks == 7680, "a length past the last note was refused");
 
     refuses ([&] { remote_patterns::create (original, -1); });
     refuses ([&] { remote_patterns::create (original, 3); });
@@ -252,6 +266,7 @@ void metadataAndValidation()
     refuses ([&] { remote_patterns::set (original, 0); });
     refuses ([&] { remote_patterns::set (original, 0, {}, 959); });
     refuses ([&] { remote_patterns::set (original, 0, "Rejected rename", 959); });
+    refuses ([&] { remote_patterns::set (original, 0, "Rejected rename", 1921); });
     refuses ([&] { remote_patterns::set (original, 2, "Missing"); });
     check (original.patterns[0].name == "Lead" && original.patterns[0].lengthTicks == 1920
            && original.playlist[0].length == 1920, "rejected metadata edit changed the original model");

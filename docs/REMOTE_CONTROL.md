@@ -92,8 +92,10 @@ no credential.
 
 - `api.describe` lists this connection's supported operations, capabilities,
   protocol and frame limits.
-- `status` returns bounded project identity, revision, tempo, transport state,
-  position, current pattern and collection counts without copying the project.
+- `status` returns bounded project identity, revision, tempo, the meter
+  (`beatsPerBar`, `beatUnit` and `barTicks`, the length of one bar in ticks),
+  transport state, position, current pattern and collection counts without
+  copying the project. `session.inspect` reports the same meter fields.
 - `changes {fromRevision,limit?}` returns up to 128 observed revision changes and
   `gap`/`hasMore`. It is a bounded polling feed, not a push subscription or an
   exhaustive edit log. Several UI changes between observations may coalesce.
@@ -134,9 +136,12 @@ stopped playback/recording, and commits one remote-owned native undo step.
   metadata is preserved. A no-op does not advance revision or add history.
 
 Names contain 1–256 characters, include non-whitespace text and have no control
-characters. `lengthTicks` is an integer
-from zero through 1,000,000,000 at PPQ 960; zero follows the notes automatically.
-A positive length cannot end before an existing note. Creation/cloning select
+characters. `lengthTicks` (PPQ 960) is zero, which follows the notes
+automatically, or a whole number of bars of the song's meter from 1 through 999
+(`barTicks` from `status` times the bar count), the lengths LYNX's own pattern
+length box sets. Restating a pattern's current length is a no-op even when it is
+not a whole bar (an imported project). A positive length cannot end before an
+existing note. Creation/cloning select
 the new pattern. Playlist clips, Pattern Blocks across arrangements and channel
 Loop Starter references keep their source targets as indices shift. Length
 changes resize untrimmed full-pattern clips as in LYNX's UI; trimmed clips keep

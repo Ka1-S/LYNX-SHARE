@@ -139,7 +139,7 @@ struct RemoteControl::Impl final : juce::Thread
             return object ({ { "project", object ({ { "id", text (s.projectId) }, { "name", projectName() },
                     { "path", projectPath ? projectPath() : juce::String() }, { "modified", engine.isModified() } }) },
                 { "appVersion", JUCE_APPLICATION_VERSION_STRING }, { "bpm", s.bpm }, { "beatsPerBar", s.beatsPerBar },
-                { "playing", t.playing.load() }, { "recording", engine.isRecording() },
+                { "beatUnit", s.beatUnit }, { "barTicks", (juce::int64) s.barTicks() }, { "playing", t.playing.load() }, { "recording", engine.isRecording() },
                 { "songMode", s.mode == PlayMode::song }, { "positionTicks", t.positionTicks.load() }, { "ppq", ppq },
                 { "currentPattern", s.currentPattern }, { "channelCount", (int) s.channels.size() },
                 { "patternCount", (int) s.patterns.size() }, { "canUndo", engine.canUndo() }, { "canRedo", engine.canRedo() },
@@ -175,7 +175,7 @@ struct RemoteControl::Impl final : juce::Thread
             for (std::size_t i = 0; i < s.patterns.size(); ++i)
                 patterns.add (object ({ { "index", (int) i }, { "patternId", text (uids::toHex (s.patterns[i].uid)) }, { "name", text (s.patterns[i].name) },
                                        { "lengthTicks", (juce::int64) s.patterns[i].lengthTicks },
-                                       { "effectiveLengthTicks", (juce::int64) s.patterns[i].effectiveLength (s.beatsPerBar) },
+                                       { "effectiveLengthTicks", (juce::int64) s.patterns[i].effectiveLength (s.meter()) },
                                        { "colour", (juce::int64) s.patterns[i].colour },
                                        { "noteCount", (int) s.patterns[i].notes.size() } }));
             for (std::size_t i = 0; i < s.playlist.size(); ++i)
@@ -189,7 +189,8 @@ struct RemoteControl::Impl final : juce::Thread
             return object ({ { "project", object ({ { "name", projectName() }, { "id", text (s.projectId) },
                                                               { "path", projectPath ? projectPath() : juce::String() }, { "modified", engine.isModified() } }) },
                             { "controlEpoch", controlEpoch }, { "appVersion", JUCE_APPLICATION_VERSION_STRING },
-                            { "bpm", s.bpm }, { "beatsPerBar", s.beatsPerBar }, { "playing", t.playing.load() }, { "recording", engine.isRecording() },
+                            { "bpm", s.bpm }, { "beatsPerBar", s.beatsPerBar }, { "beatUnit", s.beatUnit },
+                            { "barTicks", (juce::int64) s.barTicks() }, { "playing", t.playing.load() }, { "recording", engine.isRecording() },
                             { "songMode", s.mode == PlayMode::song }, { "positionTicks", t.positionTicks.load() },
                             { "ppq", ppq }, { "channels", channels }, { "mixer", mixer }, { "patterns", patterns },
                             { "currentPattern", s.currentPattern }, { "playlist", playlist },

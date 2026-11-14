@@ -177,7 +177,7 @@ juce::var inspect (const Song& song, const juce::var& args)
     }
     for (std::size_t i = 0; i < std::min (song.patterns.size(), maxSources); ++i)
         patterns.add (object ({ { "index", (int) i }, { "name", text (song.patterns[i].name) },
-                               { "length", (juce::int64) song.patterns[i].effectiveLength (song.beatsPerBar) } }));
+                               { "length", (juce::int64) song.patterns[i].effectiveLength (song.meter()) } }));
     for (std::size_t i = 0; i < song.channels.size() && (std::size_t) audio.size() < maxSources; ++i)
         if (song.channels[i].instrument == InstrumentKind::audioClip)
             audio.add (object ({ { "index", (int) i }, { "name", text (song.channels[i].name) }, { "mixer", song.channels[i].mixerTrack } }));

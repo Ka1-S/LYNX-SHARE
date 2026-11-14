@@ -7,7 +7,9 @@
 
 namespace lynx::remote_patterns
 {
-constexpr std::int64_t maxLength = 1000000000;
+constexpr std::int64_t maxLength = 1000000000; // (a bound on what a request may carry before its bars are checked)
+// The lengths LYNX's own pattern length box can set (round 190ha): 0 = automatic, else whole bars of the song's meter
+constexpr int maxBars = 999;
 constexpr int maxPatterns = 100000;
 struct Result { Song song; int index; };
 
@@ -27,17 +29,18 @@ inline void validateName (const std::optional<std::string>& name)
         || std::any_of (name->begin(), name->end(), [] (unsigned char c) { return c < 32 || c == 127; }))
         throw std::runtime_error ("name must contain visible text without control characters");
 }
-inline void validateLength (std::int64_t length)
+inline void validateLength (const Song& song, std::int64_t length)
 {
-    if (length < 0 || length > maxLength)
-        throw std::runtime_error ("lengthTicks must be in 0..1000000000 (0 is automatic)");
+    const auto bar = song.barTicks();
+    if (length < 0 || length > maxBars * bar || length % bar != 0)
+        throw std::runtime_error ("lengthTicks must be 0 (automatic) or a whole number of bars of the song's meter, 1..999 bars");
 }
 inline void validateCreate (const Song& song, int index, const std::optional<std::string>& name, std::int64_t length)
 {
     if (song.patterns.size() >= (std::size_t) maxPatterns || index < 0 || index > (int) song.patterns.size())
         throw std::runtime_error ("index must be an insertion position below the pattern limit");
     validateName (name);
-    validateLength (length);
+    validateLength (song, length);
 }
 inline void validateClone (const Song& song, int index, const std::optional<std::string>& name)
 {
@@ -53,9 +56,9 @@ inline bool metadataChanged (const Song& song, int index, const std::optional<st
     if (! name && ! length) throw std::runtime_error ("Supply name or lengthTicks");
     validateName (name);
     const auto& pattern = song.patterns[(std::size_t) index];
-    if (length)
+    if (length && *length != pattern.lengthTicks) // (restating the current length, whatever it is, stays a no-op)
     {
-        validateLength (*length);
+        validateLength (song, *length);
         if (*length > 0)
             for (const auto& note : pattern.notes)
                 if (note.start < 0 || note.length < 0 || note.start > *length || note.length > *length - note.start)

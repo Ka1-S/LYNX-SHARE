@@ -81,7 +81,7 @@ juce::var dispatchRemotePattern (AudioEngine& engine, const juce::String& operat
         properties->setProperty ("patternId", text (uids::toHex (pattern.uid)));
         properties->setProperty ("name", text (pattern.name));
         properties->setProperty ("lengthTicks", (juce::int64) pattern.lengthTicks);
-        properties->setProperty ("effectiveLengthTicks", (juce::int64) pattern.effectiveLength (engine.getSong().beatsPerBar));
+        properties->setProperty ("effectiveLengthTicks", (juce::int64) pattern.effectiveLength (engine.getSong().meter()));
         properties->setProperty ("patternCount", (int) engine.getSong().patterns.size());
         properties->setProperty ("changed", changed);
         return result;
