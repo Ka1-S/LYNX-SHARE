@@ -170,6 +170,36 @@ private:
     double lastVBlankMs = 0.0, lastFrameMs = 0.0;
 };
 
+// A step at every vertical blank, attached only while it is asked for (round 190gv). A window whose VBlankAttachments
+// are all gone gets no vertical blank at all while it has nothing to paint (cmake/LynxPatchJuce.cmake, fix 26), so a
+// view keeps none for an animation that is not running. start(): from the next vertical blank, until `step` returns
+// false (then it detaches after that callback, never from inside it).
+class OnDemandVBlank final : private juce::AsyncUpdater
+{
+public:
+    OnDemandVBlank (juce::Component& ownerIn, std::function<bool()> stepIn) : owner (ownerIn), step (std::move (stepIn)) {}
+    ~OnDemandVBlank() override { cancelPendingUpdate(); }
+
+    void start()
+    {
+        cancelPendingUpdate(); // (a detach still due is not needed any more)
+        if (attachment.isEmpty())
+            attachment = juce::VBlankAttachment (&owner, [this] {
+                if (step == nullptr || ! step())
+                    triggerAsyncUpdate();
+            });
+    }
+
+    bool isAttached() const noexcept { return ! attachment.isEmpty(); }
+
+private:
+    void handleAsyncUpdate() override { attachment = juce::VBlankAttachment(); }
+
+    juce::Component& owner;
+    std::function<bool()> step;
+    juce::VBlankAttachment attachment;
+};
+
 // Time-based falloff for display ballistics written per 30 Hz tick: `perTick` applied for `elapsedMs` of display time
 // (a 144 Hz frame falls by perTick^(30/144), the same dB per second as before)
 inline float fallFor (float perTick, double elapsedMs)

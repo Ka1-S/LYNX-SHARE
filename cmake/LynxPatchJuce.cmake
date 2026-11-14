@@ -141,6 +141,25 @@
 #    links, automation recording) stayed stale. The mapped change now also goes to the edit controller (JUCE's
 #    parameter dispatcher, on the message thread) and to the host's value and listeners, as JUCE already does for a
 #    plugin's own output parameter changes.
+# 26. Windows only, juce_gui_basics/native/juce_VBlank_windows.cpp + juce_Windowing_windows.cpp + windows/
+#    juce_ComponentPeer.cpp + windows/juce_VBlankAttachment.cpp + juce_graphics/native/juce_Direct2DHwndContext_windows.cpp
+#    (round 190gv; an empty LYNX used 12-13 % of a core at rest, 4.8 % of it JUCE's vertical-blank thread): every window
+#    was a listener of its display's vertical blanks for ever, so each display's thread waited for every vertical blank
+#    and posted it to the message thread (144 a second on a 144 Hz display), which ran each window's paint check
+#    (Direct2D: its device checks too) with nothing to paint. A window now listens only while it needs them: while it
+#    has a VBlankAttachment (LYNX's FrameTickers while they animate) or a frame still to paint or to present. After one
+#    vertical blank with nothing to do its display's thread sleeps (no wait, no message) until a repaint, a paint
+#    message, a shown window, a new renderer, a new VBlankAttachment or a window moving to that display wakes it; the
+#    next vertical blank is then posted as before, so a repaint is painted on the same vertical blank as before.
+#    LYNX_VBLANK_ALWAYS=1: every vertical blank, as before.
+# 27. Windows only, juce_graphics/native/juce_Direct2DHwndContext_windows.cpp (round 190gv; LYNX showed ~75 screen
+#    updates a second while playing on a 144 Hz display, FL 143): JUCE 8.0.4 presents a painted frame only after a
+#    per-window thread has seen the swap chain's waitable object and posted a message to the message thread, so a
+#    frame painted on a vertical blank before that message arrived waited for the next one. Backported from JUCE's
+#    later versions (JUCE's own code, same licence): no thread; when a frame is due the waitable object is polled
+#    (never waited for) and the frame is painted only when it can be presented at once; nothing to paint = no frame
+#    (and no device checks). A present that failed is painted again on the next vertical blank.
+#    LYNX_D2D_PACING=old: 8.0.4's pacing.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -319,6 +338,54 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("layered child window placed in its parent's client area" "LYNX patch (round 190cj): a child window is placed"
             "            if (auto parentHwnd = GetParent (hwnd))|NL|            {|NL|                auto parentRect = convertPhysicalScreenRectangleToLogical"
             "            // LYNX patch (round 190cj): a child window is placed in its parent's client area like any other child|NL|            // (the parent's screen position was added to it); other windows as before|NL|            if (auto parentHwnd = (GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) != 0 ? HWND {} : GetParent (hwnd))|NL|            {|NL|                auto parentRect = convertPhysicalScreenRectangleToLogical")
+        lynx_juce_fix("vertical blanks only while needed: renderer's frame" "LYNX patch (round 190gv): something still to paint"
+            "    virtual void onVBlank() = 0;|NL|    virtual void handleShowWindow() = 0;|NL|"
+            "    virtual void onVBlank() = 0;|NL|    virtual void handleShowWindow() = 0;|NL||NL|    // LYNX patch (round 190gv): something still to paint (the window keeps its vertical blanks meanwhile)|NL|    virtual bool lynxHasPendingFrame() const { return true; }|NL|")
+        lynx_juce_fix("vertical blanks only while needed: the window says" "LYNX patch (round 190gv): vertical blanks only while needed"
+            "                              , private ComponentPeer::VBlankListener|NL|                              , private Timer"
+            "                              , private ComponentPeer::VBlankListener|NL|                              , public LynxVBlankDemand // LYNX patch (round 190gv): vertical blanks only while needed|NL|                              , private Timer")
+        lynx_juce_fix("vertical blanks only while needed: registered" "LYNX patch (round 190gv): says what it needs"
+            "        getNativeRealtimeModifiers = getMouseModifiers;|NL|"
+            "        getNativeRealtimeModifiers = getMouseModifiers;|NL|        lynxVBlankDemands()[static_cast<VBlankListener*> (this)] = this; // LYNX patch (round 190gv): says what it needs|NL|")
+        lynx_juce_fix("vertical blanks only while needed: unregistered" "LYNX patch (round 190gv): nothing more to say"
+            "        VBlankDispatcher::getInstance()->removeListener (*this);|NL|"
+            "        VBlankDispatcher::getInstance()->removeListener (*this);|NL|        lynxVBlankDemands().erase (static_cast<VBlankListener*> (this)); // LYNX patch (round 190gv): nothing more to say|NL|")
+        lynx_juce_fix("vertical blanks only while needed: repaint wakes" "LYNX patch (round 190gv): the vertical blanks while this window"
+            "    void repaint (const Rectangle<int>& area) override|NL|    {|NL|        if (renderContext != nullptr)|NL|            renderContext->repaint ((area.toDouble() * getPlatformScaleFactor()).getSmallestIntegerContainer());|NL|    }|NL|"
+            "    void repaint (const Rectangle<int>& area) override|NL|    {|NL|        lynxWakeVBlank(); // LYNX patch (round 190gv)|NL||NL|        if (renderContext != nullptr)|NL|            renderContext->repaint ((area.toDouble() * getPlatformScaleFactor()).getSmallestIntegerContainer());|NL|    }|NL||NL|    // LYNX patch (round 190gv): the vertical blanks while this window needs them (cmake/LynxPatchJuce.cmake, fix 26):|NL|    // a VBlankAttachment, or a frame still to paint. A repaint, a paint message, a shown window, a new renderer or a|NL|    // new VBlankAttachment wake them.|NL|    void lynxWakeVBlank()|NL|    {|NL|        if (std::exchange (lynxVBlankAsleep, false))|NL|            VBlankDispatcher::getInstance()->lynxWake (*this);|NL|    }|NL||NL|    bool lynxWantsVBlanks() override|NL|    {|NL|        return lynxHadVBlankListeners || (renderContext != nullptr && renderContext->lynxHasPendingFrame());|NL|    }|NL||NL|    bool lynxHadVBlankListeners = true;|NL|")
+        lynx_juce_fix("vertical blanks only while needed: attachments seen" "LYNX patch (round 190gv): set by callVBlankListeners"
+            "    void onVBlank (double timestampSec) override|NL|    {|NL|        callVBlankListeners (timestampSec);|NL|"
+            "    void onVBlank (double timestampSec) override|NL|    {|NL|        callVBlankListeners (timestampSec);|NL|        lynxHadVBlankListeners = lynxVBlankListenersCalled; // LYNX patch (round 190gv): set by callVBlankListeners|NL|")
+        lynx_juce_fix("vertical blanks only while needed: paint message wakes" "LYNX patch (round 190gv): the area Windows asks for"
+            "    void handlePaintMessage()|NL|    {|NL|        if (renderContext != nullptr)|NL|            renderContext->handlePaintMessage();|NL|"
+            "    void handlePaintMessage()|NL|    {|NL|        lynxWakeVBlank(); // LYNX patch (round 190gv): the area Windows asks for is painted on a vertical blank (Direct2D)|NL||NL|        if (renderContext != nullptr)|NL|            renderContext->handlePaintMessage();|NL|")
+        lynx_juce_fix("vertical blanks only while needed: shown window wakes" "LYNX patch (round 190gv): a shown window"
+            "                    if (renderContext != nullptr)|NL|                        renderContext->handleShowWindow();|NL|"
+            "                    if (renderContext != nullptr)|NL|                        renderContext->handleShowWindow();|NL||NL|                    lynxWakeVBlank(); // LYNX patch (round 190gv): a shown window paints on the next vertical blanks|NL|")
+        lynx_juce_fix("vertical blanks only while needed: GDI frame" "LYNX patch (round 190gv): rectangles not handed to Windows yet"
+            "    void onVBlank() override {}|NL||NL|    void handleShowWindow() override {}|NL|"
+            "    void onVBlank() override {}|NL||NL|    void handleShowWindow() override {}|NL||NL|    // LYNX patch (round 190gv): rectangles not handed to Windows yet (dispatchDeferredRepaints, on a vertical blank)|NL|    bool lynxHasPendingFrame() const override { return ! deferredRepaints.isEmpty(); }|NL|")
+        lynx_juce_fix("vertical blanks only while needed: Direct2D declaration" "LYNX patch (round 190gv): the Direct2D window context"
+            "class D2DRenderContext : public RenderContext|NL|{"
+            "// LYNX patch (round 190gv): the Direct2D window context has a frame still to paint (juce_Direct2DHwndContext_windows.cpp)|NL|bool lynxD2DHwndHasPendingFrame (const Direct2DHwndContext&);|NL||NL|class D2DRenderContext : public RenderContext|NL|{")
+        lynx_juce_fix("vertical blanks only while needed: Direct2D frame" "LYNX patch (round 190gv): its context's frame"
+            "    void onVBlank() override|NL|    {|NL|        handleDirect2DPaint();|NL|    }|NL|"
+            "    void onVBlank() override|NL|    {|NL|        handleDirect2DPaint();|NL|    }|NL||NL|    // LYNX patch (round 190gv): its context's frame still to paint|NL|    bool lynxHasPendingFrame() const override|NL|    {|NL|        return direct2DContext != nullptr && direct2DContext->lynxHasPendingFrame();|NL|    }|NL|")
+        lynx_juce_fix("vertical blanks only while needed: wrapped contexts" "LYNX patch (round 190gv): a frame still to paint"
+            "        virtual Direct2DMetrics::Ptr getMetrics() const = 0;|NL|    };"
+            "        virtual Direct2DMetrics::Ptr getMetrics() const = 0;|NL|        virtual bool lynxHasPendingFrame() const = 0; // LYNX patch (round 190gv): a frame still to paint|NL|    };")
+        lynx_juce_fix("vertical blanks only while needed: swap chain context" "LYNX patch (round 190gv): the swap chain's frame"
+            "        Direct2DMetrics::Ptr getMetrics() const override|NL|        {|NL|            return ctx.metrics;|NL|        }|NL|"
+            "        Direct2DMetrics::Ptr getMetrics() const override|NL|        {|NL|            return ctx.metrics;|NL|        }|NL||NL|        // LYNX patch (round 190gv): the swap chain's frame|NL|        bool lynxHasPendingFrame() const override|NL|        {|NL|            return lynxD2DHwndHasPendingFrame (ctx);|NL|        }|NL|")
+        lynx_juce_fix("vertical blanks only while needed: layered context" "LYNX patch (round 190gv): areas not painted yet"
+            "        Direct2DMetrics::Ptr getMetrics() const override|NL|        {|NL|            return bitmapRenderer.getMetrics();|NL|        }|NL|"
+            "        Direct2DMetrics::Ptr getMetrics() const override|NL|        {|NL|            return bitmapRenderer.getMetrics();|NL|        }|NL||NL|        // LYNX patch (round 190gv): areas not painted yet|NL|        bool lynxHasPendingFrame() const override|NL|        {|NL|            return ! deferredRepaints.isEmpty();|NL|        }|NL|")
+        lynx_juce_fix("vertical blanks only while needed: attachment wakes" "LYNX patch (round 190gv): a VBlankAttachment joined this window"
+            "void HWNDComponentPeer::setCurrentRenderingEngine (int e)|NL|{"
+            "// LYNX patch (round 190gv): a VBlankAttachment joined this window: its vertical blanks start again|NL|// (juce_VBlankAttachment.cpp, patched)|NL|void lynxVBlankListenerAdded (ComponentPeer& peer)|NL|{|NL|    if (auto* hwndPeer = dynamic_cast<HWNDComponentPeer*> (&peer))|NL|        hwndPeer->lynxWakeVBlank();|NL|}|NL||NL|void HWNDComponentPeer::setCurrentRenderingEngine (int e)|NL|{")
+        lynx_juce_fix("vertical blanks only while needed: new renderer wakes" "LYNX patch (round 190gv): the new renderer gets"
+            "        renderContext = contextDescriptors[e].construct (*this);|NL|"
+            "        renderContext = contextDescriptors[e].construct (*this);|NL|        lynxWakeVBlank(); // LYNX patch (round 190gv): the new renderer gets its vertical blanks|NL|")
     elseif(file MATCHES "juce_FileChooser_windows.cpp$")
         lynx_juce_fix("file dialog keys only into LYNX" "LYNX patch (round 180a): only into LYNX"
             "                    SendInput ((UINT) std::size (inputs), inputs, sizeof (INPUT));"
@@ -342,10 +409,72 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("VST3 note tuning" "LYNX patch (issue #63): the note's tuning"
             "                e.noteOn.noteId = id;|NL|"
             "                e.noteOn.noteId = id;|NL|                // LYNX patch (issue #63): the note's tuning (FL's wrapper sends a note's fine pitch there)|NL|                if (lynxNoteTuningHook != nullptr && lynxNoteTuningContext != nullptr)|NL|                    e.noteOn.tuning = lynxNoteTuningHook (lynxNoteTuningContext, (int) e.noteOn.channel, (int) e.noteOn.pitch);|NL|")
+    elseif(file MATCHES "juce_VBlank_windows.cpp$")
+        lynx_juce_fix("vertical blanks only while needed: demands" "LYNX patch (round 190gv): a window listens to the vertical blanks only while"
+            "namespace juce|NL|{|NL||NL|class VBlankThread : private Thread,"
+            "namespace juce|NL|{|NL||NL|// LYNX patch (round 190gv): a window listens to the vertical blanks only while it needs them (cmake/LynxPatchJuce.cmake,|NL|// fix 26). A listener that says what it needs (the window peers) is asked after each of its vertical blanks; when no|NL|// listener of a display needs the next one, that display's thread sleeps (no wait for the vertical blank, no message|NL|// posted) until one of them wakes it again (lynxWake: a repaint, a VBlankAttachment, a listener that joins).|NL|// LYNX_VBLANK_ALWAYS=1: every vertical blank, as before (A/B measurements).|NL|struct LynxVBlankDemand|NL|{|NL|    virtual ~LynxVBlankDemand() = default;|NL|    virtual bool lynxWantsVBlanks() = 0; // (message thread, after its onVBlank)|NL|    bool lynxVBlankAsleep = false;       // its display's thread sleeps (message thread)|NL|};|NL||NL|static std::map<const ComponentPeer::VBlankListener*, LynxVBlankDemand*>& lynxVBlankDemands()|NL|{|NL|    static std::map<const ComponentPeer::VBlankListener*, LynxVBlankDemand*> demands; // (message thread)|NL|    return demands;|NL|}|NL||NL|static bool lynxVBlankAlways()|NL|{|NL|    static const bool always = SystemStats::getEnvironmentVariable (\"LYNX_VBLANK_ALWAYS\", {}).isNotEmpty();|NL|    return always;|NL|}|NL||NL|extern bool lynxVBlankListenersCalled; // juce_ComponentPeer.cpp (patched): the last callVBlankListeners had a listener|NL||NL|class VBlankThread : private Thread,")
+        lynx_juce_fix("vertical blanks only while needed: a listener joins" "LYNX patch (round 190gv): a listener that joins"
+            "    void addListener (VBlankListener& listener)|NL|    {|NL|        listeners.push_back (listener);|NL|    }|NL|"
+            "    void addListener (VBlankListener& listener)|NL|    {|NL|        listeners.push_back (listener);|NL|        lynxWake(); // LYNX patch (round 190gv): a listener that joins gets the next vertical blank|NL|    }|NL||NL|    // LYNX patch (round 190gv): back from sleep, the next vertical blank is posted again|NL|    void lynxWake()|NL|    {|NL|        {|NL|            const std::scoped_lock lock { mutex };|NL||NL|            if (! lynxIdle)|NL|                return;|NL||NL|            lynxIdle = false;|NL|        }|NL||NL|        condvar.notify_one();|NL|    }|NL|")
+        lynx_juce_fix("vertical blanks only while needed: asleep" "LYNX patch (round 190gv): asleep while no listener"
+            "        for (;;)|NL|        {|NL|            if (output->WaitForVBlank() == S_OK)|NL|            {"
+            "        for (;;)|NL|        {|NL|            // LYNX patch (round 190gv): asleep while no listener needs a vertical blank|NL|            {|NL|                std::unique_lock lock { mutex };|NL|                condvar.wait (lock, [this] { return ! lynxIdle || threadState == ThreadState::exit; });|NL||NL|                if (threadState == ThreadState::exit)|NL|                    return;|NL|            }|NL||NL|            if (output->WaitForVBlank() == S_OK)|NL|            {")
+        lynx_juce_fix("vertical blanks only while needed: not posted" "LYNX patch (round 190gv): fell asleep meanwhile"
+            "                if (threadState == ThreadState::exit)|NL|                    return;|NL||NL|                threadState = ThreadState::sleep;|NL|                triggerAsyncUpdate();"
+            "                if (threadState == ThreadState::exit)|NL|                    return;|NL||NL|                if (lynxIdle) // LYNX patch (round 190gv): fell asleep meanwhile (the wait at the top of the loop)|NL|                    continue;|NL||NL|                threadState = ThreadState::sleep;|NL|                triggerAsyncUpdate();")
+        lynx_juce_fix("vertical blanks only while needed: asked" "LYNX patch (round 190gv): does any listener need the next one"
+            "        for (auto& listener : listeners)|NL|            listener.get().onVBlank (timestampSec);|NL||NL|        {|NL|            const std::scoped_lock lock { mutex };|NL||NL|            if (threadState == ThreadState::sleep)|NL|                threadState = ThreadState::paint;|NL|        }"
+            "        for (auto& listener : listeners)|NL|            listener.get().onVBlank (timestampSec);|NL||NL|        // LYNX patch (round 190gv): does any listener need the next one? (one that says nothing always does)|NL|        auto& lynxDemands = lynxVBlankDemands();|NL|        const auto lynxWanted = lynxVBlankAlways()|NL|                             || std::any_of (listeners.cbegin(), listeners.cend(), [&lynxDemands] (const auto& l)|NL|                                {|NL|                                    const auto found = lynxDemands.find (&l.get());|NL|                                    return found == lynxDemands.end() || found->second->lynxWantsVBlanks();|NL|                                });|NL||NL|        if (! lynxWanted)|NL|            for (auto& l : listeners)|NL|                if (const auto found = lynxDemands.find (&l.get()); found != lynxDemands.end())|NL|                    found->second->lynxVBlankAsleep = true;|NL||NL|        {|NL|            const std::scoped_lock lock { mutex };|NL||NL|            if (threadState == ThreadState::sleep)|NL|                threadState = ThreadState::paint;|NL||NL|            if (! lynxWanted)|NL|                lynxIdle = true;|NL|        }")
+        lynx_juce_fix("vertical blanks only while needed: state" "LYNX patch (round 190gv): no listener needs"
+            "    ThreadState threadState = ThreadState::paint;|NL|    std::condition_variable condvar;"
+            "    ThreadState threadState = ThreadState::paint;|NL|    bool lynxIdle = false; // LYNX patch (round 190gv): no listener needs the next vertical blank (under mutex)|NL|    std::condition_variable condvar;")
+        lynx_juce_fix("vertical blanks only while needed: wake a listener's display" "LYNX patch (round 190gv): wakes the thread of the display"
+            "    void removeListener (const ComponentPeer::VBlankListener& listener)|NL|    {|NL|        for (auto it = threads.begin(); it != threads.end(); ++it)"
+            "    // LYNX patch (round 190gv): wakes the thread of the display the listener is on|NL|    void lynxWake (const ComponentPeer::VBlankListener& listener)|NL|    {|NL|        for (auto& thread : threads)|NL|        {|NL|            if (thread->hasListener (listener))|NL|            {|NL|                thread->lynxWake();|NL|                return;|NL|            }|NL|        }|NL|    }|NL||NL|    void removeListener (const ComponentPeer::VBlankListener& listener)|NL|    {|NL|        for (auto it = threads.begin(); it != threads.end(); ++it)")
+    elseif(file MATCHES "juce_VBlankAttachment.cpp$")
+        lynx_juce_fix("vertical blanks only while needed: attachment hook" "LYNX patch (round 190gv): wakes the window's vertical blanks"
+            "namespace juce|NL|{|NL||NL|VBlankAttachment::VBlankAttachment (Component* c, std::function<void()> callbackIn)"
+            "namespace juce|NL|{|NL||NL|#if JUCE_WINDOWS|NL|// LYNX patch (round 190gv): wakes the window's vertical blanks (juce_Windowing_windows.cpp, patched)|NL|void lynxVBlankListenerAdded (ComponentPeer&);|NL|#endif|NL||NL|VBlankAttachment::VBlankAttachment (Component* c, std::function<void()> callbackIn)")
+        lynx_juce_fix("vertical blanks only while needed: attachment joins" "LYNX patch (round 190gv): the window's vertical blanks start"
+            "            peer->addVBlankListener (this);|NL|"
+            "            peer->addVBlankListener (this);|NL|           #if JUCE_WINDOWS|NL|            lynxVBlankListenerAdded (*peer); // LYNX patch (round 190gv): the window's vertical blanks start again|NL|           #endif|NL|")
+    elseif(file MATCHES "juce_Direct2DHwndContext_windows.cpp$")
+        lynx_juce_fix("Direct2D present pacing: declarations" "LYNX patch (round 190gv, fix 27): JUCE 8.0.4 paced"
+            "namespace juce|NL|{|NL||NL|struct Direct2DHwndContext::HwndPimpl : public Direct2DGraphicsContext::Pimpl|NL|{"
+            "namespace juce|NL|{|NL||NL|// LYNX patch (round 190gv): a window keeps its vertical blanks while its frame is still to paint|NL|// (juce_Windowing_windows.cpp asks; cmake/LynxPatchJuce.cmake, fix 26)|NL|struct LynxPendingFrame|NL|{|NL|    virtual ~LynxPendingFrame() = default;|NL|    virtual bool lynxHasPendingFrame() const = 0;|NL|};|NL||NL|static std::map<const Direct2DHwndContext*, const LynxPendingFrame*>& lynxPendingFrames()|NL|{|NL|    static std::map<const Direct2DHwndContext*, const LynxPendingFrame*> frames; // (message thread)|NL|    return frames;|NL|}|NL||NL|bool lynxD2DHwndHasPendingFrame (const Direct2DHwndContext& context)|NL|{|NL|    const auto found = lynxPendingFrames().find (&context);|NL|    return found == lynxPendingFrames().end() || found->second->lynxHasPendingFrame();|NL|}|NL||NL|// LYNX patch (round 190gv, fix 27): JUCE 8.0.4 paced the presents with a thread per window that posted a message to|NL|// the message thread on each swap chain event; a frame painted before that message arrived was presented only later,|NL|// so a window that repaints every frame got about every other vertical blank. As in JUCE's later versions (backported|NL|// from JUCE's own code), the swap chain's waitable object is polled when a frame is due, and a frame is painted only|NL|// when it can be presented at once. LYNX_D2D_PACING=old: the thread as in 8.0.4 (A/B measurements).|NL|static bool lynxOldPacing()|NL|{|NL|    static const bool old = SystemStats::getEnvironmentVariable (\"LYNX_D2D_PACING\", {}) == \"old\";|NL|    return old;|NL|}|NL||NL|struct Direct2DHwndContext::HwndPimpl : public Direct2DGraphicsContext::Pimpl,|NL|                                        private LynxPendingFrame|NL|{")
+        lynx_juce_fix("Direct2D present pacing: no swap chain thread" "LYNX patch (round 190gv, fix 27): no thread"
+            "        if (swapChainThread == nullptr)|NL|            if (auto* e = swap.getEvent())"
+            "        if (swapChainThread == nullptr && lynxOldPacing()) // LYNX patch (round 190gv, fix 27): no thread (unless asked)|NL|            if (auto* e = swap.getEvent())")
+        lynx_juce_fix("Direct2D present pacing: teardown" "LYNX patch (round 190gv, fix 27): a new swap chain"
+            "        compositionTree.reset();|NL|        swapChainThread = nullptr;|NL|"
+            "        compositionTree.reset();|NL|        swapChainThread = nullptr;|NL|        lynxDidWait = false; // LYNX patch (round 190gv, fix 27): a new swap chain, a new waitable object|NL|")
+        lynx_juce_fix("Direct2D present pacing: ready when it can present" "LYNX patch (round 190gv, fix 27): painted only when"
+            "        ready &= swap.canPaint();|NL|        ready &= compositionTree.has_value();|NL|"
+            "        ready &= swap.canPaint();|NL|        ready &= compositionTree.has_value();|NL||NL|        // LYNX patch (round 190gv, fix 27): painted only when it can be presented at once|NL|        if (! lynxOldPacing())|NL|            ready = ready && lynxCanPresent();|NL|")
+        lynx_juce_fix("Direct2D present pacing: the waitable object polled" "LYNX patch (round 190gv, fix 27): the swap chain's waitable object"
+            "    bool swapEventReceived = false;|NL|"
+            "    bool swapEventReceived = false;|NL||NL|    // LYNX patch (round 190gv, fix 27): the swap chain's waitable object was signalled since the last present, so it may|NL|    // present again (polled, never waited for)|NL|    bool lynxDidWait = false;|NL||NL|    bool lynxCanPresent()|NL|    {|NL|        auto* event = swap.getEvent();|NL|        lynxDidWait = lynxDidWait || event == nullptr || WaitForSingleObjectEx (event->getHandle(), 0, TRUE) == WAIT_OBJECT_0;|NL|        return lynxDidWait;|NL|    }|NL||NL|    // LYNX patch (round 190gv): fix 26's question (areas still to paint)|NL|    bool lynxHasPendingFrame() const override|NL|    {|NL|        return ! deferredRepaints.isEmpty();|NL|    }|NL||NL|    const Direct2DHwndContext* lynxOwner = nullptr;|NL|")
+        lynx_juce_fix("Direct2D present pacing: registered" "LYNX patch (round 190gv): answers fix 26"
+            "        : Pimpl (ownerIn),|NL|          hwnd (hwndIn)|NL|    {|NL|    }|NL||NL|    ~HwndPimpl() override = default;"
+            "        : Pimpl (ownerIn),|NL|          hwnd (hwndIn)|NL|    {|NL|        lynxOwner = &ownerIn; // LYNX patch (round 190gv): answers fix 26's question|NL|        lynxPendingFrames()[lynxOwner] = this;|NL|    }|NL||NL|    ~HwndPimpl() override|NL|    {|NL|        lynxPendingFrames().erase (lynxOwner);|NL|    }")
+        lynx_juce_fix("Direct2D present pacing: nothing to paint" "LYNX patch (round 190gv, fix 27): nothing to paint"
+            "        setSize (getClientRect());|NL||NL|        auto* savedState = Pimpl::startFrame (dpiScale);"
+            "        setSize (getClientRect());|NL||NL|        // LYNX patch (round 190gv, fix 27): nothing to paint in the window, no frame (and no device checks on every|NL|        // vertical blank)|NL|        if (! lynxOldPacing())|NL|        {|NL|            deferredRepaints.clipTo (getClientRect());|NL||NL|            if (deferredRepaints.isEmpty())|NL|                return nullptr;|NL|        }|NL||NL|        auto* savedState = Pimpl::startFrame (dpiScale);")
+        lynx_juce_fix("Direct2D present pacing: present when painted" "LYNX patch (round 190gv, fix 27): checkPaintReady already knows"
+            "        if (swap.getBuffer() == nullptr || dirtyRegionsInBackBuffer.isEmpty() || ! swapEventReceived)|NL|            return;"
+            "        // LYNX patch (round 190gv, fix 27): checkPaintReady already knows it may present (old pacing: the event's message)|NL|        if (swap.getBuffer() == nullptr || dirtyRegionsInBackBuffer.isEmpty() || (lynxOldPacing() && ! swapEventReceived))|NL|            return;")
+        lynx_juce_fix("Direct2D present pacing: after a present" "LYNX patch (round 190gv, fix 27): painted again on the next"
+            "        jassertquiet (SUCCEEDED (hr));|NL||NL|        if (FAILED (hr))|NL|            return;|NL||NL|        // We managed to present a frame, so we should avoid rendering anything or calling|NL|        // present again until that frame has been shown on-screen.|NL|        swapEventReceived = false;|NL|"
+            "        jassertquiet (SUCCEEDED (hr));|NL||NL|        if (FAILED (hr))|NL|        {|NL|            // LYNX patch (round 190gv, fix 27): painted again on the next vertical blank (nothing else presents it now)|NL|            if (! lynxOldPacing())|NL|                deferredRepaints.add (dirtyRegionsInBackBuffer);|NL||NL|            return;|NL|        }|NL||NL|        // We managed to present a frame, so we should avoid rendering anything or calling|NL|        // present again until that frame has been shown on-screen.|NL|        swapEventReceived = false;|NL|        lynxDidWait = false; // LYNX patch (round 190gv, fix 27): wait for the waitable object again|NL|")
     else()
         lynx_juce_fix("drop target search after an unused drop" "LYNX patch (issue #11): a drop nobody took"
             "bool ComponentPeer::handleDragDrop (const ComponentPeer::DragInfo& info)|NL|{|NL|    handleDragMove (info);|NL|"
             "bool ComponentPeer::handleDragDrop (const ComponentPeer::DragInfo& info)|NL|{|NL|    handleDragMove (info);|NL|    // LYNX patch (issue #11): a drop nobody took must not leave the component under the mouse remembered|NL|    const ScopeGuard forgetComponentUnderMouse { [this] { lastDragAndDropCompUnderMouse = nullptr; } };|NL|")
+        if(WIN32 OR CMAKE_SCRIPT_MODE_FILE) # (Windows only: a Linux or macOS configure leaves the file as it is)
+            lynx_juce_fix("vertical blanks only while needed: listeners called" "LYNX patch (round 190gv): whether the last call had a listener"
+                "void ComponentPeer::callVBlankListeners (double timestampSec)|NL|{|NL|"
+                "#if JUCE_WINDOWS|NL|// LYNX patch (round 190gv): whether the last call had a listener (juce_Windowing_windows.cpp: a window keeps its|NL|// vertical blanks only while it needs them; cmake/LynxPatchJuce.cmake, fix 26)|NL|bool lynxVBlankListenersCalled = false;|NL|#endif|NL||NL|void ComponentPeer::callVBlankListeners (double timestampSec)|NL|{|NL|   #if JUCE_WINDOWS|NL|    lynxVBlankListenersCalled = ! vBlankListeners.isEmpty();|NL|   #endif|NL|")
+        endif()
     endif()
 
     if(changed)
@@ -372,6 +501,9 @@ function(lynx_patch_juce juce_dir)
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_FileChooser_windows.cpp")
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_Windowing_windows.cpp")
         lynx_patch_juce_file("${juce_dir}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")
+        lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_VBlank_windows.cpp")
+        lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/windows/juce_VBlankAttachment.cpp")
+        lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_Direct2DHwndContext_windows.cpp")
     endif()
 endfunction()
 

@@ -9327,6 +9327,7 @@ void PlaylistComponent::glideBy (double ticks, double pixels, bool immediate)
         repaintScrolled();
         return;
     }
+    vblank.start(); // the next frames at the display's refresh (round 190gv: no vertical blanks while still)
     glideFrame();
 }
 

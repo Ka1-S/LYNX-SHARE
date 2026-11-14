@@ -15,6 +15,7 @@
 #include "ui/Dialogs.h"
 #include "ui/FileChoosers.h"
 #include "ui/I18n.h"
+#include "ui/ImageReadback.h"
 #include "ui/PlaylistComponent.h"
 #include "ui/TextCache.h"
 #include "ui/Theme.h"
@@ -166,13 +167,20 @@ juce::Image thumbAt (ThumbStrip& strip, double fileSeconds)
         return {};
     const auto n = (int) strip.images.size();
     const auto i = juce::jlimit (0, n - 1, (int) std::floor (fileSeconds / strip.interval));
+    // a thumbnail is made as a software image (on the thumbnails' thread) and drawn on every paint of the Playlist: the
+    // first time it is drawn it becomes the window's kind of image, so its GPU copy is made once (round 190gv)
+    auto shown = [&] (int k) -> juce::Image {
+        auto& image = strip.images[(std::size_t) k];
+        image = ui::forScreen (image);
+        return image;
+    };
     // (not decoded yet: the nearest decoded one, earlier first)
     for (int d = 0; d < n; ++d)
     {
         if (i - d >= 0 && strip.images[(std::size_t) (i - d)].isValid())
-            return strip.images[(std::size_t) (i - d)];
+            return shown (i - d);
         if (i + d < n && strip.images[(std::size_t) (i + d)].isValid())
-            return strip.images[(std::size_t) (i + d)];
+            return shown (i + d);
     }
     return {};
 }

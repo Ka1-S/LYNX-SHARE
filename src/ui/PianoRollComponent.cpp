@@ -3967,6 +3967,7 @@ void PianoRollComponent::glideBy (double ticks, double pixels, bool immediate)
         repaint();
         return;
     }
+    vblank.start(); // the next frames at the display's refresh (round 190gv: no vertical blanks while still)
     glideFrame();
 }
 

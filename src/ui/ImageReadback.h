@@ -106,6 +106,21 @@ inline juce::Image makePicture (int width, int height, bool software)
     }
 }
 
+// A picture that is kept and drawn to the window again and again, as the window's own kind of image (round 190gv).
+// JUCE 8.0.4's Direct2D drawImage turns a software image into a NEW GPU bitmap (and uploads it) on every draw; a
+// Direct2D image keeps its GPU copy, so it is made once. The same pixels (the software picture is copied as it is).
+// Only on the message thread (the Direct2D images are not made elsewhere: video export, the OpenGL renderer's
+// thread); elsewhere, and on other platforms, the picture itself.
+inline juce::Image forScreen (const juce::Image& picture)
+{
+#if JUCE_WINDOWS
+    if (picture.isValid() && juce::MessageManager::existsAndIsCurrentThread()
+        && picture.getPixelData()->createType()->getTypeID() == juce::SoftwareImageType().getTypeID())
+        return juce::NativeImageType().convert (picture);
+#endif
+    return picture;
+}
+
 // A session step for the reports (round 190bm): what a cache's picture is and what draws the window, once per kind of
 // picture and scale ("Playlist picture: 2880 x 1500 px at 150 %, Direct2D image, window drawn with the GPU"). `last`
 // is the cache's own memory of what it noted.

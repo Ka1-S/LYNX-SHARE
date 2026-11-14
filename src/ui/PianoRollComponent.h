@@ -443,7 +443,7 @@ private:
     // `immediate`: a trackpad's smooth scroll moves the view at once (the fingers carry it; round 170e)
     void glideBy (double ticks, double pixels, bool immediate = false);
     void glideFrame();
-    juce::VBlankAttachment vblank { this, [this] { glideFrame(); } };
+    ui::OnDemandVBlank vblank { *this, [this] { glideFrame(); return gliding; } }; // (attached only while gliding)
     ui::FrameTicker frames { *this, [this] (double ms) { return playheadFrame (ms); } };
 
     double pixelsPerTick = 24.0 / ticksPerStep; // 24 px per step
