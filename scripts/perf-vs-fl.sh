@@ -58,6 +58,8 @@ run () { # app args...
   ) 2>>"$H/run-stderr.log"
 }
 rec () { echo "{\"app\":\"$1\",\"case\":\"$2\",\"rep\":$3,\"load1\":$4,\"r\":${5:-null}}" >> "$out"; echo "$1 $2 #$3 load=$4 :: ${5:0:400}"; }
+# keep LYNX's own logs of a run (the next run in the same profile overwrites them): keep <app> <case> <rep> <profile>
+keep () { local d="$WL/prof/$4/LYNX" k="$H/logs/$1-$2-$3" log; mkdir -p "$H/logs"; for log in startup.log load.log; do [ -f "$d/$log" ] && cp "$d/$log" "$k-$log"; done; }
 newprof () { rm -rf "/mnt/c/Users/kauan/lynx-test/perfwin190gd/prof/${1:?}"; mkdir -p "$WL/prof/$1"; cp -r "$WL/seed/LYNX" "$WL/prof/$1/"; }
 lxenv () { echo "LYNX_PROFILE_DIR=$W\\prof\\$1;LYNX_TEST_MODE=1;LYNX_TEST_MAXIMIZE=1;LYNX_TRACE_STARTUP=1"; }
 lxexe () { [ "$1" = lx2 ] && echo "$LX2" || echo "$LX"; }
@@ -77,7 +79,7 @@ case $phase in
 startup)
   case $a in
   lx|lx2) newprof "su-$a-$r"
-    for pass in cold warm; do l=$(gate); j=$(run lx -exe "$(lxexe $a)" -envs "$(lxenv su-$a-$r)" -title "LYNX" -shot "$W\\shots\\$a-empty-$pass-$r.bmp"); rec $a "empty-$pass" $r $l "$j"; done ;;
+    for pass in cold warm; do l=$(gate); j=$(run lx -exe "$(lxexe $a)" -envs "$(lxenv su-$a-$r)" -title "LYNX" -shot "$W\\shots\\$a-empty-$pass-$r.bmp"); rec $a "empty-$pass" $r $l "$j"; keep $a "empty-$pass" $r "su-$a-$r"; done ;;
   fl) for pass in cold warm; do l=$(gate); j=$(run fl -exe "$FL" -title "FL Studio" -closeTitles "$CLOSE" -shot "$W\\shots\\fl-empty-$pass-$r.bmp"); rec fl "empty-$pass" $r $l "$j"; done ;;
   live) for pass in cold warm; do l=$(gate); j=$(run live -exe "$LIVE" -title "Ableton Live" -keep 1 -shot "$W\\shots\\live-empty-$pass-$r.bmp"); rec live "empty-$pass" $r $l "$j"; done ;;
   esac ;;
@@ -85,7 +87,7 @@ open)
   for p in $PROJS; do f=$(proj $p)
     case $a in
     lx|lx2) newprof "op-$a-$p-$r"
-      for pass in cold warm; do l=$(gate); j=$(run lx -exe "$(lxexe $a)" -envs "$(lxenv op-$a-$p-$r)" -argline "\"$f\"" -title "$([ $p = patience ] && echo Patience || echo $p)" -timeoutS 240 -shot "$W\\shots\\$a-$p-$pass-$r.bmp"); rec $a "$p-$pass" $r $l "$j"; done ;;
+      for pass in cold warm; do l=$(gate); j=$(run lx -exe "$(lxexe $a)" -envs "$(lxenv op-$a-$p-$r)" -argline "\"$f\"" -title "$([ $p = patience ] && echo Patience || echo $p)" -timeoutS 240 -shot "$W\\shots\\$a-$p-$pass-$r.bmp"); rec $a "$p-$pass" $r $l "$j"; keep $a "$p-$pass" $r "op-$a-$p-$r"; done ;;
     fl) [ $p = patience ] && continue
       for pass in cold warm; do l=$(gate); j=$(run fl -exe "$FL" -argline "\"$f\"" -title " - FL Studio" -timeoutS 240 -closeTitles "$CLOSE" -shot "$W\\shots\\fl-$p-$pass-$r.bmp"); rec fl "$p-$pass" $r $l "$j"; done ;;
     live) [ $p = patience ] || continue
@@ -101,12 +103,14 @@ play)
     esac
   done ;;
 deep) # one run per app and project ("empty" = no project): per-thread CPU at idle (play mode without Space), then a
-      # VMMap snapshot and, for LYNX, the message thread sampled (LYNX_PROFILE_MAIN) and the start-up trace
+      # VMMap snapshot and, for LYNX, a third run with the message thread sampled (LYNX_PROFILE_MAIN; its sampler thread
+      # costs most of a core and its own memory, so that run's CPU / memory numbers are not used)
   VM="$W\\tools\\vmmap\\vmmap64.exe"
   for p in empty $PROJS; do f=$(proj $p); argl=(); [ $p = empty ] || argl=(-argline "\"$f\"")
     case $a in
     lx|lx2) newprof "dp-$a-$p-$r"; l=$(gate)
-      j=$(run lx -mode play -space 0 -settleS 10 -exe "$(lxexe $a)" -envs "$(lxenv dp-$a-$p-$r);LYNX_PROFILE_MAIN=$W\\shots\\$a-prof-$p-$r.txt" "${argl[@]}" -title "$([ $p = empty ] && echo LYNX || ([ $p = patience ] && echo Patience || echo $p))" -timeoutS 240); rec $a "$p@idlethreads" $r $l "$j"
+      j=$(run lx -mode play -space 0 -settleS 10 -exe "$(lxexe $a)" -envs "$(lxenv dp-$a-$p-$r)" "${argl[@]}" -title "$([ $p = empty ] && echo LYNX || ([ $p = patience ] && echo Patience || echo $p))" -timeoutS 240); rec $a "$p@idlethreads" $r $l "$j"
+      l=$(gate); j=$(run lx -exe "$(lxexe $a)" -envs "$(lxenv dp-$a-$p-$r);LYNX_PROFILE_MAIN=$W\\shots\\$a-prof-$p-$r.txt" "${argl[@]}" -title "$([ $p = empty ] && echo LYNX || ([ $p = patience ] && echo Patience || echo $p))" -timeoutS 240 -idleS 20); rec $a "$p@profiled" $r $l "$j"
       l=$(gate); j=$(run lx -exe "$(lxexe $a)" -envs "$(lxenv dp-$a-$p-$r)" "${argl[@]}" -title "$([ $p = empty ] && echo LYNX || ([ $p = patience ] && echo Patience || echo $p))" -timeoutS 240 -vmmap "$VM" -vmmapOut "$W\\shots\\$a-vmmap-$p-$r.csv"); rec $a "$p@vmmap" $r $l "$j" ;;
     fl) [ $p = patience ] && continue; l=$(gate)
       j=$(run fl -mode play -space 0 -settleS 10 -exe "$FL" "${argl[@]}" -title "FL Studio" -timeoutS 240 -closeTitles "$CLOSE"); rec fl "$p@idlethreads" $r $l "$j"

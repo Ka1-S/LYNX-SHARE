@@ -50,6 +50,10 @@ public class W {
  [DllImport("ntdll.dll")] public static extern int NtQueryInformationThread(IntPtr t, int c, out IntPtr i, int l, IntPtr r);
  [DllImport("kernel32.dll")] public static extern IntPtr OpenThread(uint a, bool i, uint id);
  [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
+ [DllImport("kernel32.dll")] public static extern int GetThreadDescription(IntPtr t, out IntPtr d);
+ [DllImport("kernel32.dll")] public static extern IntPtr LocalFree(IntPtr m);
+ public static string ThreadName(uint tid) { var h = OpenThread(0x0800, false, tid); if (h == IntPtr.Zero) return ""; IntPtr d; string s = "";
+   if (GetThreadDescription(h, out d) >= 0 && d != IntPtr.Zero) { s = Marshal.PtrToStringUni(d); LocalFree(d); } CloseHandle(h); return s; }
  public static long StartAddr(uint tid) { var h = OpenThread(0x0040, false, tid); if (h == IntPtr.Zero) return 0; IntPtr a; NtQueryInformationThread(h, 9, out a, IntPtr.Size, IntPtr.Zero); CloseHandle(h); return a.ToInt64(); }
 }
 "@
@@ -145,7 +149,7 @@ if ($readyAt -ge 0 -and $mode -eq "play") {
   $rows = @()
   foreach ($t in $p.Threads) { try { if ($th0.ContainsKey($t.Id)) { $d = 100 * ($t.TotalProcessorTime.TotalSeconds - $th0[$t.Id]) / ($t1 - $t0)
         if ($d -ge 0.5) { $a = [W]::StartAddr([uint32]$t.Id); $mn = "{0:x}" -f $a; foreach ($k in $mods.Keys) { if ($a -ge $mods[$k][0] -and $a -lt $mods[$k][1]) { $mn = "$k+0x{0:x}" -f ($a - $mods[$k][0]) } }
-          $rows += [ordered]@{ tid = $t.Id; pct = [math]::Round($d, 1); start = $mn; prio = "$($t.PriorityLevel)" } } } } catch {} }
+          $rows += [ordered]@{ tid = $t.Id; pct = [math]::Round($d, 1); start = $mn; name = [W]::ThreadName([uint32]$t.Id); prio = "$($t.PriorityLevel)" } } } } catch {} }
   $r.threads_busy = @($rows | Sort-Object { - $_.pct } | Select-Object -First 12)
   $ids = Tree $p.Id; Mem $ids $r
   if ($shot -ne "" -and $dupmon -ne "") { & $dupmon shot $shot | Out-Null }
