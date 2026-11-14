@@ -231,7 +231,10 @@ public:
     juce::PopupMenu makeMenu();        // the drop-down (shots)
 
 private:
-    juce::Rectangle<int> arrowArea() const { return getLocalBounds().removeFromRight (juce::jmax (12, getHeight() / 2 + 2)); }
+    static constexpr int arrowWidth = 12;
+    // the switch's box: a short row in the middle of the toolbar's height (as small as the reference's toggle)
+    juce::Rectangle<int> boxArea() const { return getLocalBounds().withSizeKeepingCentre (getWidth(), juce::jmin (getHeight(), 20)); }
+    juce::Rectangle<int> arrowArea() const { return boxArea().removeFromRight (arrowWidth); }
     void showMenu();
     AudioEngine& engine;
     bool on = false;

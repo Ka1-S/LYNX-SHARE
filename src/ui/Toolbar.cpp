@@ -636,13 +636,15 @@ juce::String LinkToggle::text() const
     return (peers == 1 ? trc ("@Ableton Link: {0} Link") : trc ("@Ableton Link: {0} Links")).replace ("{0}", juce::String (peers));
 }
 
-int LinkToggle::idealWidth (int height)
+int LinkToggle::idealWidth (int)
 {
-    const auto f = theme::font (theme::type::body);
+    // (rollup 0.1.28, coordinator: a small switch like the reference's control-bar toggle and the toolbar's own
+    // switches — the small type, a short box, a narrow arrow)
+    const auto f = theme::font (theme::type::small, true);
     auto widest = 0.0f;
     for (const auto* t : { "@Ableton Link: Link", "@Ableton Link: {0} Links" })
         widest = juce::jmax (widest, juce::GlyphArrangement::getStringWidth (f, trc (t).replace ("{0}", "88")));
-    return juce::roundToInt (widest) + 18 + juce::jmax (12, height / 2 + 2);
+    return juce::roundToInt (widest) + 12 + arrowWidth + 2;
 }
 
 void LinkToggle::update()
@@ -661,24 +663,32 @@ void LinkToggle::update()
 void LinkToggle::paint (juce::Graphics& g)
 {
     using namespace theme;
-    const auto area = getLocalBounds();
     const auto arrow = arrowArea();
-    const auto main = area.withTrimmedRight (arrow.getWidth() + 2);
+    const auto main = boxArea().withTrimmedRight (arrow.getWidth() + 2);
     const auto over = isMouseOver (true);
-    // the switch: lit while Link is on (the reference DAW's toggle; the Clip-launch layout's MIDI switch uses the same colour)
-    g.setColour (on ? colour::info : (over ? colour::bg2 : colour::bg1));
-    g.fillRoundedRectangle (main.toFloat(), radius::md);
-    g.setColour (on ? colour::bg0 : colour::textPrimary);
-    auto f = font (type::body, on);
+    // the switch, small like the reference's control-bar toggle and lit like the toolbar's other switches (metronome,
+    // count-in: the raised surface with the theme's accent on it; rollup 0.1.28, coordinator)
+    g.setColour (on ? colour::bg6 : (over ? colour::bg5 : colour::bg4));
+    g.fillRoundedRectangle (main.toFloat(), radius::sm);
+    if (on)
+    {
+        g.setColour (colour::accent.withAlpha (0.55f));
+        g.drawRoundedRectangle (main.toFloat().reduced (0.5f), radius::sm, 1.0f);
+    }
+    g.setColour (on ? colour::accent : (over ? colour::textPrimary : colour::textSecondary));
+    auto f = font (type::small, true);
     const auto label = text();
     for (int i = 0; i < 8 && juce::GlyphArrangement::getStringWidth (f, label) > (float) main.getWidth() - 6.0f; ++i)
         f = f.withHeight (f.getHeight() * 0.92f);
     g.setFont (f);
     g.drawText (label, main, juce::Justification::centred, false);
     // the drop-down arrow beside it
-    g.setColour (over ? colour::bg2 : colour::bg1);
-    g.fillRoundedRectangle (arrow.toFloat(), radius::md);
-    const auto a = arrow.toFloat().withSizeKeepingCentre (8.0f, 5.0f);
+    if (over)
+    {
+        g.setColour (colour::bg5);
+        g.fillRoundedRectangle (arrow.toFloat(), radius::sm);
+    }
+    const auto a = arrow.toFloat().withSizeKeepingCentre (7.0f, 4.0f);
     juce::Path tri;
     tri.addTriangle (a.getX(), a.getY(), a.getRight(), a.getY(), a.getCentreX(), a.getBottom());
     g.setColour (colour::textSecondary);
