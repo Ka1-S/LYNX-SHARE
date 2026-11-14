@@ -38,7 +38,8 @@ struct Context
     std::int64_t grid = ppq / 4;          // the editor's grid (Shape's and Seed's "Grid")
     ScaleRef scale;
     std::uint32_t seed = 1;
-    int beatsPerBar = 4;                  // a bar, for Stacks' durations
+    int beatsPerBar = 4;                  // a bar, for Stacks' durations: the song's meter (beatsPerBar / beatUnit,
+    int beatUnit = 4;                     // round 190fg; a 6/8 bar = 3 quarters)
 };
 
 // --- Rhythm ------------------------------------------------------------------------------------------------------

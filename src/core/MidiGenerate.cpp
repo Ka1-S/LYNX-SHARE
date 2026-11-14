@@ -621,7 +621,7 @@ Notes stacks (const StacksOptions& o, const Context& c, const ChordBank& bank)
     Notes out;
     if (! validRange (c) || o.sequence.empty())
         return out;
-    const auto bar = (double) ppq * std::max (1, c.beatsPerBar);
+    const auto bar = (double) Meter (std::max (1, c.beatsPerBar), meterUnit (c.beatUnit)).bar();
     auto t = c.from;
     for (int i = 0; t < c.to && i < 4096; ++i)
     {

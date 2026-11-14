@@ -6,6 +6,7 @@
 #include <map>
 
 #include "core/DetailChain.h"
+#include "core/Groove.h"
 #include "core/NoteEdit.h"
 #include "core/PatternBlocks.h"
 #include "core/QuickRender.h"
@@ -1231,17 +1232,34 @@ int consolidatePatternClips (Song& song, const ConsolidatePlan& plan)
         const auto& p = song.patterns[(std::size_t) c.pattern];
         const auto length = std::max<std::int64_t> (1, p.effectiveLength (song.meter()));
         const auto passes = clipPasses (c, length);
+        // rollup 0.1.28 (190ff x 190fm): a clip that plays through a groove of the pool has its notes written as the
+        // groove plays them (moved, accented, kept inside the clip as the Scheduler does), since the new clip has none
+        const auto* clipGroove = groove::ofClip (song, c);
         for (auto k = passes.first; k <= passes.last; ++k)
-            for (const auto& n : p.notes)
+            for (std::size_t i = 0; i < p.notes.size(); ++i)
             {
+                const auto& n = p.notes[i];
                 if (passes.loops && n.start >= length)
                     continue;
                 const auto at = k * length + n.start; // in the clip's pattern time
                 if (at < c.offset || at >= c.offset + c.length)
                     continue;
                 auto note = n;
-                note.start = c.start + (at - c.offset) - plan.start;
-                note.length = std::min (n.length, c.offset + c.length - at); // (cut at the clip's end, as it played)
+                if (clipGroove == nullptr)
+                {
+                    note.start = c.start + (at - c.offset) - plan.start;
+                    note.length = std::min (n.length, c.offset + c.length - at); // (cut at the clip's end, as it played)
+                }
+                else
+                {
+                    const auto played = groove::apply (*clipGroove, song.grooves.amount, n.start, n.velocity,
+                                                       groove::randomBits (song.chanceSeed, i, c.start - c.offset + k * length));
+                    const auto on = std::clamp<std::int64_t> (at - c.offset + (played.start - n.start), 0, c.length - 1); // (in the clip)
+                    const auto off = std::min<std::int64_t> (on + n.length, c.length);
+                    note.start = c.start + on - plan.start;
+                    note.length = std::max<std::int64_t> (1, off - on);
+                    note.velocity = played.velocity;
+                }
                 merged.notes.push_back (note);
             }
     }

@@ -5,6 +5,8 @@
 // - livefreeze190ff's track freeze holds an insert number (FreezeState::insert); reafl190fl's "Increase number of
 //   tracks to..." adds inserts: they go at the end, so a frozen track keeps its insert and stays frozen.
 
+#include <tuple>
+
 #include "core/MixerOps.h"
 #include "core/SimplePads.h"
 #include "core/SimpleTracks.h"
@@ -141,4 +143,60 @@ TEST (rollup028_more_mixer_tracks_keep_a_track_freeze)
     // "Plugin delay compensation > Set for all tracks" leaves the freeze alone too
     lynx::mixerops::setPdcForAllTracks (s);
     CHECK (lynx::freeze::trackFreezeHolds (s, 0));
+}
+
+// Step 2 (realive190fm): Playlist clips play through grooves of the pool, and Live's MIDI Generate tab writes bars.
+// - livefreeze190ff's Consolidate makes one new clip without a groove: the clips' grooves are written into its notes
+//   (moved and accented as the Scheduler plays them), so the consolidated clip plays what the clips played.
+// - MIDI Generate's Stacks durations are bars: of the song's meter (follow190fg), not of its numerator.
+TEST (rollup028_consolidate_writes_a_clips_groove_into_the_notes)
+{
+    using namespace lynx;
+    auto s = groove190fm::song();
+    s.playlist[1].track = 0; // both clips on one track: bar 1 (with the groove) and bar 3 (straight)
+    auto g = groove190fm::offbeat (60);
+    g.velocity = 1.0f;
+    const auto id = groove::add (s.grooves, g);
+    CHECK (groove::setPlaylistClipGroove (s, { 0 }, id));
+    const auto before = groove190fm::play (s);
+    freeze::ConsolidatePlan plan;
+    CHECK (freeze::planConsolidate (s, { 0, 1 }, plan) == nullptr && ! plan.audio);
+    const auto merged = freeze::consolidatePatternClips (s, plan);
+    CHECK (merged >= 0 && s.playlist.size() == 1 && s.playlist[0].groove == 0);
+    const auto after = groove190fm::play (s);
+    CHECK (before.size() == after.size() && before.size() == 16);
+    if (before.size() != after.size())
+        return;
+    auto sorted = [] (std::vector<groove190fm::Heard> h) {
+        std::stable_sort (h.begin(), h.end(), [] (const auto& a, const auto& b) { return std::tie (a.tick, a.type, a.key) < std::tie (b.tick, b.type, b.key); });
+        return h;
+    };
+    const auto a = sorted (before), b = sorted (after);
+    for (std::size_t i = 0; i < a.size(); ++i)
+    {
+        CHECK (a[i].key == b[i].key && a[i].type == b[i].type);
+        CHECK (std::abs (a[i].tick - b[i].tick) < 1.0);
+        CHECK (std::abs (a[i].velocity - b[i].velocity) < 1.0e-6f);
+    }
+    // the grooved off-beat 16th of bar 1: 60 ticks late and at half the velocity, now in the notes themselves
+    const auto on61 = groove190fm::onsOf (after, 61);
+    CHECK (on61.size() == 2 && std::abs (on61[0] - 300.0) < 1.0 && std::abs (on61[1] - (2.0 * groove190fm::bar + 240.0)) < 1.0);
+}
+
+TEST (rollup028_midi_generate_stacks_count_bars_of_the_song_meter)
+{
+    using namespace lynx::midigen;
+    const auto& bank = lynxChordBank();
+    StacksOptions o; // one chord of one bar
+    auto c = mg190fm::bar (2);
+    c.beatsPerBar = 6;
+    c.beatUnit = 8;
+    c.to = 2 * 3 * lynx::ppq; // two bars of 6/8
+    const auto out = stacks (o, c, bank);
+    CHECK (out.size() == 6);
+    if (out.size() == 6)
+        CHECK (out[0].length == 3 * lynx::ppq && out[3].start == 3 * lynx::ppq);
+    // n/4 as before
+    const auto four = stacks (o, mg190fm::bar (2), bank);
+    CHECK (four.size() == 6 && four[0].length == 4 * lynx::ppq);
 }

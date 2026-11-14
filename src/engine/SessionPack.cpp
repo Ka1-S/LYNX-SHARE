@@ -643,6 +643,10 @@ std::string freezeSource (const Song& song, int channel, double sampleRate, int 
         mini.playlist.push_back (clip);
     }
     std::stable_sort (mini.playlist.begin(), mini.playlist.end(), [] (const Clip& a, const Clip& b) { return a.start < b.start; });
+    // rollup 0.1.28 (190ay / 190ff x 190fm): a Playlist clip may play through a groove of the pool; then the pool (its
+    // grooves and amount) is part of what the stems were rendered from, so editing it makes the audio out of date
+    if (std::any_of (mini.playlist.begin(), mini.playlist.end(), [] (const Clip& c) { return c.kind == ClipKind::pattern && c.groove != 0; }))
+        mini.grooves = song.grooves;
     mini.mixer = Song::defaultMixer (0);
     juce::String extra;
     if (track)

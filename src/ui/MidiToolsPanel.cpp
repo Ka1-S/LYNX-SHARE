@@ -1559,14 +1559,15 @@ midigen::Context MidiToolsPanel::generateContext (const Target& t) const
     {
         c.from = 0;
         c.to = t.length > 0 ? t.length
-                            : (t.pattern >= 0 && t.pattern < (int) song.patterns.size() ? song.patterns[(std::size_t) t.pattern].effectiveLength (song.beatsPerBar)
-                                                                                        : (std::int64_t) ppq * std::max (1, song.beatsPerBar));
+                            : (t.pattern >= 0 && t.pattern < (int) song.patterns.size() ? song.patterns[(std::size_t) t.pattern].effectiveLength (song.meter())
+                                                                                        : song.barTicks());
     }
     c.channel = t.channel >= 0 ? t.channel : std::max (0, engine.getSelectedChannel());
     c.grid = std::max<std::int64_t> (1, t.grid);
     c.scale = projectScale();
     c.seed = genSeed;
     c.beatsPerBar = std::max (1, song.beatsPerBar);
+    c.beatUnit = song.beatUnit;
     return c;
 }
 
