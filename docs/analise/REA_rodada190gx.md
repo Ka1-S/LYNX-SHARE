@@ -32,3 +32,17 @@ only when LYNX's engine plays them (`warpmodes::textureFluxPlays`, `complexProPl
 - **Users:** not researched this round (the brief was Live-exactness from the renders).
 - **Verdict:** Live-exact in the Clip-launch layout and the .als; LYNX's own Playlist envelopes (FL layout) keep
   playing on unwarped clips (a LYNX-own extra, the owner's #24).
+
+## 4. Beats law switch and the three voice cases (gate review)
+- **Classic | Measured** (`WarpModeSettings::beatsLaw`): Measured = Live 12.4's measured Beats laws (new channels,
+  .als / .flp imports); Classic = the Beats code before 190gx, kept verbatim. Every save writes the mark
+  `beatsLaw190gx`; a project without it loads every channel Classic, and the warpModes list carries the law as a tenth
+  number. Proof of bit-identity: FNV prints of 10 Beats settings (plain and warp-mapped) from the pre-190gx
+  TimeStretch.cpp and from the Classic law are equal (`/mnt/e/lynx-work/livefacts190gx/law/`); als175a's exact-sample
+  Beats tests run on both laws; `--selftest` beatslaw190gx_saved. A Classic channel shows a Classic | Measured chooser
+  in the Clip View's Beats rows.
+- **The three voice cells** that got slightly worse (r0.8 default, r0.8 Loop Off, r1.5 Envelope 50): with Live's own cut
+  points forced into both laws, Measured beats Classic on every metric for r0.8 default and r1.5 Envelope 50 (an
+  artefact of LYNX's level-based detector cutting elsewhere); r0.8 Loop Off keeps a real spectral cost (a piece started
+  at once inside sustained sound). A sustain-aware crossfade halves it with Live's cuts but changes nothing with LYNX's
+  own cuts and costs a little envelope deviation: not landed. Detail: `/mnt/e/lynx-work/livefacts190gx/law/VOICE-CASES.md`.
