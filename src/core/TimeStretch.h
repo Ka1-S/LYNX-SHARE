@@ -117,9 +117,14 @@ Preset presetFor (StretchMethod method, const WarpModeSettings& modes) noexcept;
 std::vector<long> gridCuts (long frames, long outFrames, double sourceBeats, double divisionBeats, const std::function<double (double)>& toSource);
 // The note value of Preserve index 0…5 in beats (1 bar = 4 beats … 1/32 = 0.125); 0 for Transients.
 double preserveDivisionBeats (int preserve) noexcept;
-// Beats' Transient Envelope (round 190fm): the gain at output frame i of a piece that sounds for `span` frames,
-// envelope 0…100 (100 = 1 everywhere). LYNX's own curve [needs live render]: (1 − i/span)^k, k = 4 (1 − e) / max (e, 0.02).
-float beatsEnvelopeGain (float envelope, long i, long span) noexcept;
+// Beats' Transient Envelope (round 190fm; law measured on Live 12.4's renders in round 190gx): the gain `sinceEnd`
+// frames after a piece's own end (unity before it), an exponential decay with beatsEnvelopeSeconds' time constant;
+// envelope 0…100 (100 = 1 everywhere).
+float beatsEnvelopeGain (float envelope, long sinceEnd, double sampleRate) noexcept;
+double beatsEnvelopeSeconds (float envelope) noexcept;
+// Back-and-forth and Forward fill from this far before a transient piece's end (round 190gx; Live's reversed reading
+// mirrors 21.5 ms (voice) and 30 ms (drum loop) before the next transient; 20 ms matched the renders best).
+inline constexpr double beatsTurnSeconds = 0.020;
 // The spectral stretch with a given preset (no near-unity shortcut).
 std::shared_ptr<SampleData> stretchWith (const SampleData& input, double ratio, const Preset& preset);
 } // namespace stretchdetail

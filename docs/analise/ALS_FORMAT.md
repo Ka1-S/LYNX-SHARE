@@ -490,10 +490,17 @@ LYNX (`SamplerSettings::warpModes`, `core/WarpModes.h`, `core/TimeStretch` `Stre
   back, and WarpMode 6 (Complex Pro) is kept as a flag so it is written back as 6. .lynx keeps them as `warpModes` (nine
   numbers, only when not the defaults).
 - Rendered offline: Beats Preserve on a note grid (cuts where the output reaches each multiple of the division; 1 bar is
-  taken as 4 beats), Transient Loop Mode (Off: silence after each piece, reached through a 16 ms fade of the audio that
-  follows; Forward: the piece again; Back-and-Forth: as before), Transient Envelope (LYNX's own curve, `(1 − i/span)^k`,
-  `k = 4 (1 − e) / max (e, 0.02)`: needs a Live render), Tones / Texture Grain Size (the spectral block scaled by size /
-  Live's default, 10 … 250 ms). The defaults run exactly the code before 190fm (tests pin it bit for bit).
+  taken as 4 beats), Transient Loop Mode and Transient Envelope, Tones / Texture Grain Size (the spectral block scaled by
+  size / Live's default, 10 … 250 ms).
+- Round 190gx re-measured Beats on Live 12.4's W1 renders (`/mnt/e/lynx-work/livefacts190gx/warp/REPORT.md`, black box):
+  transient cuts sit on the attack itself (LYNX's were 10 ms early) and a transient piece starts within 2 ms (grid pieces
+  keep the 16 ms crossfade); Loop Off = a linear 10 ms fade ending at the next transient, then silence; Back-and-Forth
+  mirrors 20 ms before a transient piece's end (Live: 21.5–30 ms; grid pieces at their end) and Forward loops the piece's
+  second half from there (5 ms crossfade); Transient Envelope = unity up to the piece's own end, then an exponential decay
+  of the fill, τ = 15.5 ms at 0 and 98 ms at 50 (geometric between, assumed; 100 = none). These change Beats renders
+  that have a fill or transient cuts (measured fixes; the other modes render as before).
+- Not matched yet (reported there): Live's transient detection on sustained voice (it cuts at pitch changes), Texture
+  Flux, Complex Pro Formants, the grain-size law at the extremes.
 - Kept but not rendered (import report lines): Texture's Flux, Complex Pro's Formants and Envelope (Complex Pro plays as
   Complex).
 - The Clip View shows the mode's settings under the mode chooser; an edit from a grid clip whose channel other clips play
