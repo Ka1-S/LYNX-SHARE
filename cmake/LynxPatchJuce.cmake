@@ -147,7 +147,7 @@
 #    part of the 0.40-0.44 s and ~50 MB before the splash shows. A software adapter is now used only when no hardware
 #    adapter gave a device (a PC or a remote session with WARP alone keeps it). Hardware adapters keep their order (the
 #    first is still the default). juce_gui_basics.cpp includes the header by its relative path, so both modules compile
-#    the same (patched) inline code.
+#    the same (patched) inline code (a lone copy of juce_gui_basics, LYNX-bridge32's x86 one, uses the include path).
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -333,7 +333,7 @@ function(lynx_patch_juce_file file)
     elseif(file MATCHES "juce_gui_basics.cpp$")
         lynx_juce_fix("the DirectX adapters from the patched header" "LYNX patch (round 190go): the DirectX adapters"
             " #include <juce_graphics/native/juce_DirectX_windows.h>|NL|"
-            " // LYNX patch (round 190go): the DirectX adapters as juce_graphics compiles them (fix 26; same inline code)|NL| #include \"../juce_graphics/native/juce_DirectX_windows.h\"|NL|")
+            " // LYNX patch (round 190go): the DirectX adapters as juce_graphics compiles them (fix 26; same inline code). A|NL| // copy of this module alone (LYNX-bridge32's x86 copies) has no juce_graphics beside it: the include path's then.|NL| #if __has_include (\"../juce_graphics/native/juce_DirectX_windows.h\")|NL|  #include \"../juce_graphics/native/juce_DirectX_windows.h\"|NL| #else|NL|  #include <juce_graphics/native/juce_DirectX_windows.h>|NL| #endif|NL|")
     elseif(file MATCHES "juce_FileChooser_windows.cpp$")
         lynx_juce_fix("file dialog keys only into LYNX" "LYNX patch (round 180a): only into LYNX"
             "                    SendInput ((UINT) std::size (inputs), inputs, sizeof (INPUT));"
