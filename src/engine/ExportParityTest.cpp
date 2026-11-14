@@ -29,7 +29,7 @@ struct ParityDevice final : juce::AudioIODevice, private juce::Thread
     ~ParityDevice() override { close(); }
 
     static constexpr double rate = 48000.0;
-    static constexpr int block = 441;
+    static inline int block = 441; // (the test sets it before opening)
 
     juce::StringArray getOutputChannelNames() override { return { "Out 1", "Out 2" }; }
     juce::StringArray getInputChannelNames() override { return {}; }
@@ -278,13 +278,19 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
     const auto mix = exportSong (song, options, "mix", 0, &mixFrames);
     if (mix.l.empty())
         return "ERROR the mix: " + errors.joinIntoString ("; ");
-    Audio played;
-    {
+    // playback through a stand-in device with callbacks of `block` samples: what the real-time bounce's tap records (as
+    // Export › "Render through the hardware in real time"), the message thread doing its part (the engine's timer)
+    auto playback = [&] (int block, juce::String& error) {
+        Audio played;
+        ParityDevice::block = block;
         AudioEngine live (false);
         live.player.setProcessor (&live.graph);
         live.deviceManager.addAudioDeviceType (std::make_unique<ParityType>());
-        if (const auto error = live.deviceManager.initialise (0, 2, nullptr, true); error.isNotEmpty())
-            return "ERROR open the stand-in device: " + error;
+        if (const auto e = live.deviceManager.initialise (0, 2, nullptr, true); e.isNotEmpty())
+        {
+            error = "open the stand-in device: " + e;
+            return played;
+        }
         live.deviceManager.addAudioCallback (&live);
         live.setSong (song);
         for (int i = 0; i < 20; ++i) // (the rack is built and published by the engine's timer)
@@ -292,10 +298,11 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
             live.timerCallback();
             juce::Thread::sleep (10);
         }
-        // playback: what the real-time bounce records (as Export › "Render through the hardware in real time"), with
-        // the message thread doing its part (the engine's timer) as in the app
-        if (const auto error = live.startRealtimeBounce (0.0); error.isNotEmpty())
-            return "ERROR playback (real-time bounce): " + error;
+        if (const auto e = live.startRealtimeBounce (0.0); e.isNotEmpty())
+        {
+            error = "playback (real-time bounce): " + e;
+            return played;
+        }
         const auto latency = (std::int64_t) live.bounceLatency();
         const auto wanted = latency + (std::int64_t) mix.l.size();
         const auto started = juce::Time::getMillisecondCounter();
@@ -312,13 +319,50 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
         if (dropouts > 0)
             notes.add (juce::String (dropouts) + " dropout(s) during playback");
         if ((std::int64_t) played.l.size() < wanted)
-            return "ERROR playback: " + juce::String ((int) played.l.size()) + " frames recorded of " + juce::String ((int) wanted);
+        {
+            error = "playback: " + juce::String ((int) played.l.size()) + " frames recorded of " + juce::String ((int) wanted);
+            return played;
+        }
         played.l.erase (played.l.begin(), played.l.begin() + latency); // (the delay compensation's start, as the export trims it)
         played.r.erase (played.r.begin(), played.r.begin() + latency);
         played.l.resize (mix.l.size());
         played.r.resize (mix.r.size());
-        say ("playback: " + juce::String ((int) latency) + " samples of delay compensation trimmed");
-    }
+        say ("playback in blocks of " + juce::String (block) + ": " + juce::String ((int) latency) + " samples of delay compensation trimmed");
+        // LYNX_EXPORTPARITY_KEEP=<folder>: the export and the playback kept as WAV files (for a closer look)
+        if (const auto keep = juce::SystemStats::getEnvironmentVariable ("LYNX_EXPORTPARITY_KEEP", {}); juce::File::isAbsolutePath (keep))
+        {
+            const juce::File dir (keep);
+            dir.createDirectory();
+            folder.getChildFile ("mix.wav").copyFileTo (dir.getChildFile ("export.wav"));
+            juce::AudioBuffer<float> b (2, (int) played.l.size());
+            b.copyFrom (0, 0, played.l.data(), b.getNumSamples());
+            b.copyFrom (1, 0, played.r.data(), b.getNumSamples());
+            juce::WavAudioFormat wav;
+            const auto out = dir.getChildFile ("playback-" + juce::String (block) + ".wav");
+            out.deleteFile();
+            if (std::unique_ptr<juce::AudioFormatWriter> w (wav.createWriterFor (out.createOutputStream().release(), ParityDevice::rate, 2, 32, {}, 0)); w != nullptr)
+                w->writeFromAudioSampleBuffer (b, 0, b.getNumSamples());
+        }
+        return played;
+    };
+    // where two renders part: the first 10 ms window above −90 dBFS and the largest difference per pass of the pattern
+    auto where = [] (const Audio& a, const Audio& b) {
+        const auto n = juce::jmin (a.l.size(), b.l.size());
+        juce::String text;
+        for (std::size_t w = 0; w < n; w += 480)
+        {
+            float m = 0.0f;
+            for (std::size_t i = w; i < juce::jmin (n, w + 480); ++i)
+                m = juce::jmax (m, std::abs (a.l[i] - b.l[i]), std::abs (a.r[i] - b.r[i]));
+            if (m >= 3.16e-5f)
+                return "first apart at " + juce::String ((double) w / 48000.0, 2) + " s (" + db (m) + ")";
+        }
+        return juce::String ("never apart");
+    };
+    juce::String playError;
+    const auto played = playback (441, playError);
+    if (playError.isNotEmpty())
+        return "ERROR " + playError;
     {
         const auto n = juce::jmin (mix.l.size(), played.l.size());
         const auto d = maxDiff (mix, played, n);
@@ -342,8 +386,11 @@ juce::String AudioEngine::exportParitySelfTest (const std::function<void (const 
                 if (std::abs (mix.l[i] - played.l[i]) > std::abs (mix.l[worst] - played.l[worst]))
                     worst = i;
             say ("  best lag " + juce::String (bestLag) + " (" + db (best) + "), the largest difference at frame " + juce::String ((int) worst));
+            juce::String e512;
+            const auto same = playback (512, e512);
             errors.add ("playback differs from the export by " + db (d) + " (best lag " + juce::String (bestLag) + ": " + db (best) + ", worst at frame "
-                        + juce::String ((int) worst) + ")");
+                        + juce::String ((int) worst) + ", " + where (mix, played) + "; in blocks of 512: "
+                        + (e512.isNotEmpty() ? e512 : db (maxDiff (mix, same, n)) + ", " + where (mix, same)) + ")");
         }
     }
 
