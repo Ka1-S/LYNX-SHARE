@@ -110,7 +110,7 @@ TEST (stems190gj_plan_says_which_stems_one_render_makes)
     for (int t : { 1, 2, 3, 4, 6, 7 })
         CHECK (plan (s, t).ok);
     // the synth's compressor listens to the kick, which its own render silences
-    CHECK (! plan (s, 5).ok && plan (s, 5).why.find ("silences") != std::string::npos);
+    CHECK (! plan (s, 5).ok && plan (s, 5).why.find ("insert 1 ") != std::string::npos);
     CHECK (! plan (s, 0).ok && ! plan (s, 8).ok);
     // insert 1's stem: itself, at 0 dB, delayed to the Master's alignment (5 ms of insert 4's latency, at 48 kHz)
     const auto one = plan (s, 1);

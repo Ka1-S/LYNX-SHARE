@@ -321,6 +321,9 @@ target_sources(lynx_core PRIVATE
 # in-app update check: versions, release list, build flavours, checksums, release notes (round 166b)
 target_sources(lynx_core PRIVATE
     src/core/UpdateCheck.cpp)
+# the first-start audio check: verdict and the devices to try (round 190gh, B23)
+target_sources(lynx_core PRIVATE
+    src/core/AudioCheck.cpp)
 # the Browser's "Find similar samples" (round 190as)
 target_sources(lynx_core PRIVATE
     src/core/SampleSimilarity.cpp)
@@ -448,6 +451,8 @@ if(LYNX_BUILD_APP)
         src/engine/LiveTest.cpp
         src/engine/DeviceChangeTest.cpp
         src/engine/ShortExportTest.cpp
+        src/engine/ExportParityTest.cpp
+        src/engine/MidiHotplugTest.cpp
         src/ui/LiveSessionUi.cpp
         src/ui/LiveChat.cpp
         src/engine/LiveRemotePlugins.cpp
@@ -598,6 +603,7 @@ if(LYNX_BUILD_APP)
         src/ui/PluginPicker.cpp
         src/ui/CrashReporter.cpp
         src/ui/Updater.cpp
+        src/ui/AudioCheck.cpp
         src/ui/StemExtract.cpp
         src/ui/AudioToMidi.cpp)
     target_sources(LYNX PRIVATE src/Main.cpp ${LYNX_APP_SOURCES})

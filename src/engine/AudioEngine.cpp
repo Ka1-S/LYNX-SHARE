@@ -422,7 +422,10 @@ RenderStream::Setup AudioEngine::streamSetup (const RenderOptions& options, int 
     RenderStream::Setup setup;
     setup.trim = (std::int64_t) juce::jmax (0, options.trimSamples + (options.trimPdc ? latency : 0));
     setup.musicSamples = (std::int64_t) (options.seconds * options.sampleRate) + setup.trim;
-    setup.totalSamples = setup.musicSamples + (std::int64_t) (juce::jmax (0.0, options.tailSeconds) * options.sampleRate);
+    // (round 190gh: an exact length renders that much after the trim, the tail's silence does not end it)
+    setup.totalSamples = options.exactSamples > 0 ? setup.trim + options.exactSamples
+                                                  : setup.musicSamples + (std::int64_t) (juce::jmax (0.0, options.tailSeconds) * options.sampleRate);
+    setup.exact = options.exactSamples > 0;
     setup.sampleRate = options.sampleRate;
     setup.keepOvers = options.keepOvers;
     setup.ditherBits = options.ditherBits;
@@ -2715,21 +2718,37 @@ void AudioEngine::handleIncomingMidiMessage (juce::MidiInput* source, const juce
     }
 }
 
+std::function<juce::Array<juce::MidiDeviceInfo> (bool inputs)>& AudioEngine::midiDeviceListOverride()
+{
+    static std::function<juce::Array<juce::MidiDeviceInfo> (bool)> lists;
+    return lists;
+}
+
 void AudioEngine::enableAllMidiInputs()
 {
+    const auto& stand = midiDeviceListOverride();
+    const auto inputs = stand ? stand (true) : juce::MidiInput::getAvailableDevices();
+    const auto outputs = stand ? stand (false) : juce::MidiOutput::getAvailableDevices();
+
     // (a device turned off in the MIDI settings is closed, so other programs can use it)
     std::vector<prefs::MidiPort> available;
     std::vector<std::string> open;
-    for (const auto& device : juce::MidiInput::getAvailableDevices())
+    for (const auto& device : inputs)
     {
         available.push_back ({ device.identifier.toStdString(), device.name.toStdString() });
         if (deviceManager.isMidiInputDeviceEnabled (device.identifier))
             open.push_back (device.identifier.toStdString());
     }
+    // round 190gh (B8): an input that was open and is no longer listed (unplugged) is closed at once
+    for (const auto& id : lastMidiInputIds)
+        if (std::none_of (available.begin(), available.end(), [&id] (const prefs::MidiPort& p) { return p.id == id; })
+            && deviceManager.isMidiInputDeviceEnabled (juce::String (id)))
+            open.push_back (id);
 
     const auto plan = prefs::planMidiInputs (midiPrefs, available, lastMidiInputIds, open);
-    for (const auto& id : plan.close)
-        deviceManager.setMidiInputDeviceEnabled (juce::String (id), false);
+    for (const auto* list : { &plan.close, &plan.gone })
+        for (const auto& id : *list)
+            deviceManager.setMidiInputDeviceEnabled (juce::String (id), false);
     for (const auto& id : plan.reopen) // it went away and came back: the old handle may be dead
         deviceManager.setMidiInputDeviceEnabled (juce::String (id), false);
     for (const auto* list : { &plan.reopen, &plan.open })
@@ -2740,11 +2759,36 @@ void AudioEngine::enableAllMidiInputs()
     for (const auto& port : available)
         lastMidiInputIds.push_back (port.id);
 
+    // round 190gh (B8): what was plugged in or out since the last check (inputs and outputs)
+    std::vector<prefs::MidiPort> ports;
+    for (const auto& port : available)
+        ports.push_back ({ "in:" + port.id, port.name });
+    for (const auto& device : outputs)
+        ports.push_back ({ "out:" + device.identifier.toStdString(), device.name.toStdString() });
+    const auto change = prefs::diffMidiDevices (lastMidiPorts, ports);
+    const auto firstList = ! std::exchange (midiPortsKnown, true);
+    lastMidiPorts = std::move (ports);
+
     // the devices that run a controller profile (round 190aw)
     std::vector<std::string> names;
     for (const auto& port : available)
         names.push_back (port.name);
     controllerIo.configure (midiPrefs, names, true);
+
+    if (change.changed && ! firstList)
+    {
+        ++midiDeviceListVersion;
+        controllerIo.devicesChanged(); // (feedback ports: an output that came back under another identifier)
+        midiSync.configure (midiPrefs); // (sync / notes-off outputs: closed when gone, opened again by name)
+        juce::StringArray added, removed;
+        for (const auto& n : change.added)
+            added.add (juce::String::fromUTF8 (n.c_str()));
+        for (const auto& n : change.removed)
+            removed.add (juce::String::fromUTF8 (n.c_str()));
+        if (onMidiDevicesChanged && (! added.isEmpty() || ! removed.isEmpty()))
+            onMidiDevicesChanged (added, removed);
+        sendChangeMessage();
+    }
 }
 
 void AudioEngine::setControllerSurface (controller::Surface* surface) { controllerIo.setSurface (surface); }

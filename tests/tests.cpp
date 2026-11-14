@@ -17567,3 +17567,4 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Flfix190ezTests.inc"
 #include "Rcfix190fcTests.inc"
 #include "StemPass190gjTests.inc"
+#include "Small190ghTests.inc"

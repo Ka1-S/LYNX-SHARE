@@ -73,6 +73,11 @@ public:
     // auto-sampler), whose files become samples again and must not carry a loop
     void setExtraData (bool on) noexcept { extraData = on; }
     AudioEngine& getEngine() noexcept { return *engine; }
+    // Round 190gh (B7): the file gets exactly `frames` samples (music, then the tail, padded with silence when it
+    // ends sooner): every stem of one export as long as the mix. 0 = the tail ends at its silence (as before).
+    void setExactFrames (std::int64_t frames) noexcept { exactFrames = frames; }
+    // the frames the last run() wrote (after the PDC trim and the tail)
+    std::int64_t getWrittenFrames() const noexcept { return writtenFrames; }
 
 private:
     friend class StemPass;
@@ -104,6 +109,7 @@ private:
     exportopts::WavExtras extras; // FL's extra data for WAV files
     bool extraData = false;
     float peak = 0.0f;
+    std::int64_t exactFrames = 0, writtenFrames = 0;
 };
 
 // Seconds the export of `song` with these options lasts (the music, all loops; no tail).
@@ -129,8 +135,11 @@ public:
         failed
     };
 
-    // On the message thread (the engine's plugins are made there).
-    StemPass (const Song& song, const exportopts::Options& options, const std::vector<Target>& targets);
+    // On the message thread (the engine's plugins are made there). `sameLength` (round 190gh: a stems export whose tail is
+    // left to ring): every stem gets the mix's length — `mixLength` frames after the trim, or, when that is not known
+    // yet (< 0), the length the mix has in this render.
+    StemPass (const Song& song, const exportopts::Options& options, const std::vector<Target>& targets, bool sameLength = false,
+              std::int64_t mixLength = -1);
     ~StemPass();
     void setExtraData (bool on) noexcept;
 
@@ -143,6 +152,10 @@ public:
     juce::String whySeparate (std::size_t i) const; // (a target that needs its own render: why)
     float getPeak (std::size_t i) const noexcept;
     AudioEngine& getEngine() noexcept;
+    // the mix's length after the trim (frames) once run() found or was given it; −1 = not known
+    std::int64_t getMixLength() const noexcept { return mixLength; }
+    // the song renders as it plays without the solos the song has (when it has none, its own mix can be a target)
+    bool rendersTheMix() const noexcept { return masterInPass; }
 
 private:
     struct Out;
@@ -151,6 +164,8 @@ private:
     std::vector<std::unique_ptr<Out>> outs;
     exportopts::Options options;
     bool masterInPass = false;
+    bool sameLength = false;
+    std::int64_t mixLength = -1;
 };
 
 // The files of an export with stems or sections (the Export window, the Mixer's "Render armed tracks", --stemexport),
@@ -161,6 +176,8 @@ struct StemPlan
     {
         Song song;
         exportopts::Options options;
+        // round 190gh (B7): every stem of the set has the mix's length, as FL's split render (its tail is left to ring)
+        bool sameLength = false;
     };
     struct Item
     {

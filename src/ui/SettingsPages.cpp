@@ -136,7 +136,7 @@ public:
                                                                  &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
                                                                  &reportsTitle, &crashLabel, &crashBox, &crashNote, &updatesTitle, &checkUpdates, &checkNow, &updatesNote,
-                                                                 &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst })
+                                                                 &previousLabel, &goBack, &autoNameChannels, &restoreAfterSolo, &readSampleTempo, &historyNewestFirst })
             add (*c);
 
         setupFontRow();
@@ -451,7 +451,15 @@ public:
         checkNow.onClick = [] { updater::checkNow(); };
         styleNote (updatesNote, tr ("At start-up LYNX SHARE asks GitHub for the newest version number (nothing about you is sent) and shows a bar "
                                     "when a new version is out. Help > Check for updates... asks at any time."));
-        for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote })
+        // round 190gh (B2): the version before the last update, and the way back to it (Help › Go back to... too)
+        {
+            const auto previous = persistent ? updater::previousVersion() : juce::String ("0.1.27");
+            styleLabel (previousLabel, previous.isNotEmpty() ? tr ("Previous version: {0}", { previous }) : tr ("Previous version: none known yet"));
+            goBack.setButtonText (previous.isNotEmpty() ? tr ("Go back to {0}...", { previous }) : tr ("Go back..."));
+            goBack.setTooltip (tr ("Installs the earlier version again, checked like an update. Your projects stay as they are."));
+            goBack.onClick = [] { updater::goBack(); };
+        }
+        for (auto* c : std::initializer_list<juce::Component*> { &updatesTitle, &checkUpdates, &checkNow, &updatesNote, &previousLabel, &goBack })
             c->setVisible (updater::offered());
 
         for (auto* b : { &templateBox, &startupProjectBox, &longestWaitBox, &languageBox, &fontBox, &scaleBox, &menuBox, &wavesBox, &noteNamesBox, &blackNotesBox, &pluginStyleBox, &animationBox, &editInBox, &undoBox, &longestWaitBox, &autosaveBox, &keepBox, &crashBox })
@@ -564,6 +572,9 @@ private:
             checkNow.setBounds (row.removeFromRight (juce::jmin (row.getWidth() / 3, 150)));
             checkUpdates.setBounds (row.withTrimmedRight (8));
             updatesNote.setBounds (r.full (32).translated (0, -1));
+            row = r.full (24);
+            goBack.setBounds (row.removeFromRight (juce::jmin (row.getWidth() / 3, 150)));
+            previousLabel.setBounds (row.withTrimmedRight (8));
         }
         displayTitle.setVisible (false);
         return r.bottom();
@@ -669,7 +680,7 @@ private:
     juce::ComboBox alsSessionBox;
     SectionTitle languageTitle { tr ("Language and display") }, displayTitle, startupTitle { tr ("Startup") }, editingTitle { tr ("Editing") },
         backupTitle { tr ("Backup") }, hintsTitle { tr ("Hints and warnings") }, pluginsTitle { tr ("Plugins and shortcuts") }, reportsTitle { tr ("Crash reports") }, updatesTitle { tr ("Updates") };
-    juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote;
+    juce::Label longestWaitLabel, animationLabel, animationNote, languageLabel, languageNote, scaleLabel, menuLabel, wavesLabel, noteNamesLabel, blackNotesLabel, pluginStyleLabel, editInLabel, undoLabel, autosaveLabel, keepLabel, sandboxNote, substitutesNote, shortcutsNote, crashLabel, crashNote, updatesNote, previousLabel;
     juce::Label fontLabel, fontPreview, fontNote;
     juce::ComboBox fontBox;
     juce::Label templateLabel, templateNote, startupProjectLabel;
@@ -682,7 +693,7 @@ private:
     juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, sandbox, substitutes, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
     juce::ToggleButton autoNameChannels, restoreAfterSolo, readSampleTempo, historyNewestFirst; // FL's options of round 190bx (core/FlSettings.h)
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
-        checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") };
+        checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") }, goBack;
     juce::Label messagesNote;
 };
 
@@ -2116,9 +2127,12 @@ private:
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override
     {
-        if (engine.getSong().channels.size() != channelCount)
+        // round 190gh (B8): a device plugged in or out refreshes the lists by itself (FL: "MIDI devices have changed...
+        // refreshing..."); Refresh device list stays for a device that stopped sending
+        if (engine.getSong().channels.size() != channelCount || engine.getMidiDeviceListVersion() != deviceListVersion)
         {
             channelCount = engine.getSong().channels.size();
+            deviceListVersion = engine.getMidiDeviceListVersion();
             rebuildInputs();
         }
         load();
@@ -2129,6 +2143,7 @@ private:
     bool persistent;
     bool loading = false;
     std::size_t channelCount = 0;
+    int deviceListVersion = 0;
     juce::StringArray sampleDevices;
     static constexpr const char* sampleMpeDevice = "MPE keyboard";
     std::vector<std::unique_ptr<MidiInputRow>> rows;

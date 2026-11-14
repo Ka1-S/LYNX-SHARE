@@ -303,6 +303,8 @@ bool ExportJob::openSink (Sink& sink, juce::String& error)
     render.trimPdc = options.trimPdc; // the latency as reported after the plugins' warm-up
     render.hqAllPlugins = options.hqAllPlugins;
     render.pluginWarmUp = options.pluginWarmUp;
+    render.exactSamples = exactFrames; // (round 190gh: every stem as long as the mix)
+    writtenFrames = 0;
 
     for (const auto f : formatsOf (options))
         if (const auto file = f == options.format ? output : output.withFileExtension (extension (f)); ! canReplace (file))
@@ -364,6 +366,7 @@ bool ExportJob::openSink (Sink& sink, juce::String& error)
 
     stream.release(); // now owned by the writer
     render.output = sink.writer.get();
+    render.capture = [this] (const float*, const float*, int n) { writtenFrames += n; };
     render.ditherBits = usesDither (options) ? bits : 0;
     render.keepOvers = options.format == exportopts::Format::wav && bits == 32; // 32-bit float WAV keeps overs, as FL
     render.ditherShaping = options.dither == DitherMode::shaped;
@@ -403,6 +406,12 @@ bool ExportJob::writeBuffered (std::vector<float>& left, std::vector<float>& rig
 {
     // tail, then normalising (the peak of what is kept), then mono; dither per file (each format has its own bits)
     applyTail (left, right, options.tail == TailMode::leave ? 0 : (std::int64_t) std::llround (musicSeconds * options.sampleRate), options.tail);
+    if (exactFrames > 0 && options.tail == TailMode::leave) // (round 190gh: a stem as long as the mix)
+    {
+        left.resize ((std::size_t) exactFrames, 0.0f);
+        right.resize ((std::size_t) exactFrames, 0.0f);
+    }
+    writtenFrames = (std::int64_t) left.size();
 
     if (options.master) // round 168e: File › Export › Master... (LYNX's own mastering, core/Mastering.h)
     {
@@ -549,6 +558,7 @@ struct StemPass::Out
     Result result = Result::separate;
     juce::String error, why;
     bool inPass = false; // made by this render (until it turns out it cannot be)
+    bool pending = false; // its length is the mix's, found during the render (round 190gh)
     float peak = 0.0f;
 
     // this file leaves the pass: its own render makes it
@@ -581,6 +591,29 @@ struct StemPass::Shared final : AudioEngine::RenderOptions::Shared
         taps.wanted.assign ((std::size_t) tracks, 0);
         taps.data.assign ((std::size_t) tracks, {});
 
+        // hosted plugins see the size of the blocks they are given; LYNX's own units do not (round 190gh: a render is
+        // the same in blocks of any size)
+        for (const auto& c : song.channels)
+            hosted = hosted || c.instrument == InstrumentKind::plugin || c.instrument == InstrumentKind::patcher;
+        for (const auto& m : song.mixer)
+            for (const auto& fx : m.effects)
+                hosted = hosted || fx.kind == EffectKind::plugin || fx.kind == EffectKind::patcher;
+
+        // round 190gh: the stems get the mix's length; not known yet, it is measured on this render's own mix (as the
+        // mix file's own render would end), and the stems keep back what may lie past it until then
+        AudioEngine::RenderOptions mix;
+        mix.seconds = pass.main->musicSeconds;
+        mix.sampleRate = pass.options.sampleRate;
+        mix.tailSeconds = tailSecondsFor (pass.options);
+        mix.trimPdc = pass.options.trimPdc;
+        const auto measuring = pass.sameLength && pass.mixLength < 0;
+        if (measuring)
+        {
+            measure = std::make_unique<RenderStream> (AudioEngine::streamSetup (mix, latency));
+            longest = measure->getSetup().totalSamples;
+        }
+        const auto mixTrim = AudioEngine::streamSetup (mix, latency).trim;
+
         for (auto& o : pass.outs)
         {
             if (! o->inPass)
@@ -605,7 +638,11 @@ struct StemPass::Shared final : AudioEngine::RenderOptions::Shared
                 o->error = error;
                 continue;
             }
-            o->stream = std::make_unique<RenderStream> (AudioEngine::streamSetup (o->sink->render, stemLatency));
+            auto setup = AudioEngine::streamSetup (o->sink->render, stemLatency);
+            o->pending = measuring && o->target.track > 0;
+            if (o->pending)
+                setup.holdBack = std::max<std::int64_t> (0, mixTrim - setup.trim) + AudioEngine::renderBlockSize;
+            o->stream = std::make_unique<RenderStream> (std::move (setup));
             longest = std::max (longest, o->stream->getSetup().totalSamples);
             if (o->target.track > 0)
             {
@@ -628,7 +665,7 @@ struct StemPass::Shared final : AudioEngine::RenderOptions::Shared
     {
         if (cancelled)
             return 0;
-        int most = 0, least = 0;
+        int most = measure != nullptr ? measure->blockAt (done, AudioEngine::renderBlockSize) : 0, least = most;
         for (auto& o : pass.outs)
             if (o->inPass && o->stream != nullptr)
                 if (const auto n = o->stream->blockAt (done, AudioEngine::renderBlockSize); n > 0)
@@ -637,8 +674,9 @@ struct StemPass::Shared final : AudioEngine::RenderOptions::Shared
                     least = least == 0 ? n : std::min (least, n);
                 }
         // a file whose own render ends inside a block that the others still need whole: its render's last block is
-        // shorter than this one, which the plugins may process differently — it gets its own render
-        if (least != most)
+        // shorter. LYNX's own units make the same samples in it (round 190gh); hosted plugins may not: with them, that
+        // file gets its own render
+        if (least != most && hosted)
             for (auto& o : pass.outs)
                 if (o->inPass && o->stream != nullptr && o->stream->blockAt (done, AudioEngine::renderBlockSize) != most
                     && o->stream->blockAt (done, AudioEngine::renderBlockSize) > 0)
@@ -681,6 +719,15 @@ struct StemPass::Shared final : AudioEngine::RenderOptions::Shared
             juce::AudioBuffer<float> view (channels, 2, n);
             o->stream->block (view, done, n);
         }
+        if (measure != nullptr && measure->blockAt (done, AudioEngine::renderBlockSize) > 0)
+        {
+            for (int ch = 0; ch < 2; ++ch)
+                scratch.copyFrom (ch, 0, raw, ch, 0, n);
+            juce::AudioBuffer<float> view (scratch.getArrayOfWritePointers(), 2, n);
+            measure->block (view, done, n);
+            if (measure->hasEnded())
+                found (measure->keptFrames());
+        }
         for (std::size_t t = 0; t < taps.wanted.size(); ++t)
             if (taps.wanted[t] != 0)
                 std::fill (taps.data[t].begin(), taps.data[t].end(), 0.0f);
@@ -689,9 +736,31 @@ struct StemPass::Shared final : AudioEngine::RenderOptions::Shared
             cancelled = true;
     }
 
+    // the mix's length is known: the stems end there (a silent mix: as before round 190gh, its own render each)
+    void found (std::int64_t frames)
+    {
+        pass.mixLength = frames;
+        measure.reset();
+        for (auto& o : pass.outs)
+        {
+            if (! o->inPass || ! o->pending)
+                continue;
+            o->pending = false;
+            if (frames <= 0)
+            {
+                o->leave ("a silent mix");
+                continue;
+            }
+            o->job->setExactFrames (frames);
+            o->stream->setTotal (o->stream->getSetup().trim + frames);
+        }
+    }
+
     StemPass& pass;
     AudioEngine& engine;
     std::function<bool (double)> progress;
+    std::unique_ptr<RenderStream> measure; // the mix, measured for its length (round 190gh)
+    bool hosted = false;
     RackRenderer::RenderTaps taps;
     juce::AudioBuffer<float> scratch;
     std::vector<float> outL, outR;
@@ -700,8 +769,10 @@ struct StemPass::Shared final : AudioEngine::RenderOptions::Shared
     bool cancelled = false;
 };
 
-StemPass::StemPass (const Song& song, const Options& o, const std::vector<Target>& targets)
-    : options (clamped (o))
+StemPass::StemPass (const Song& song, const Options& o, const std::vector<Target>& targets, bool sameLengthFiles, std::int64_t knownLength)
+    : options (clamped (o)),
+      sameLength (sameLengthFiles),
+      mixLength (sameLengthFiles ? knownLength : -1)
 {
     // the one render plays the song with its solos cleared (each stem render clears them); the song's own mix comes
     // from it only when the song has none
@@ -720,6 +791,11 @@ StemPass::StemPass (const Song& song, const Options& o, const std::vector<Target
         {
             out->job.reset (new ExportJob (t.track > 0 ? makeBounceSong (song, t.track) : song, options, t.file, ExportJob::NoEngine {}));
             out->inPass = true;
+            // round 190gh: a stem as long as the mix (until it is measured, as long as the mix can be)
+            if (sameLength && t.track > 0)
+                out->job->setExactFrames (mixLength >= 0 ? mixLength
+                                                         : (std::int64_t) (main->musicSeconds * options.sampleRate)
+                                                               + (std::int64_t) (tailSecondsFor (options) * options.sampleRate) + 1);
         }
         else
             out->why = t.track == 0 ? "a solo" : "not an insert";
@@ -859,7 +935,7 @@ StemPlan planStemExport (const Song& song, const Options& options, const juce::F
             const auto name = sectionBaseName (baseName, (int) i + 1, (int) sections.size(), sections[i].name);
             const auto file = base.getSiblingFile (juce::String::fromUTF8 (name.c_str()) + ext);
             const auto part = makeSectionSong (song, sections[i]);
-            plan.sets.push_back ({ part, each });
+            plan.sets.push_back ({ part, each, each.stems != Stems::none && each.tail == TailMode::leave });
             const auto set = (int) plan.sets.size() - 1;
             if (each.stems == Stems::none)
                 plan.items.push_back ({ juce::String::fromUTF8 (sections[i].name.c_str()), file, set, 0, part, each });
@@ -868,7 +944,7 @@ StemPlan planStemExport (const Song& song, const Options& options, const juce::F
         }
         return plan;
     }
-    plan.sets.push_back ({ song, options });
+    plan.sets.push_back ({ song, options, options.tail == TailMode::leave }); // (cut / wrap: every file is the music's length)
     addStemItems (plan, 0, song, options, base, onlyTracks, {});
     return plan;
 }
@@ -882,6 +958,32 @@ int runStemExport (const StemPlan& plan, std::function<void (std::function<void(
     std::vector<char> handled (count, 0);
     std::size_t finished = 0;
     int written = 0;
+    // round 190gh (B7): each set's mix length (frames after the trim; −1 = not known yet): every other file of a set
+    // whose tail rings out gets it, as FL's split render
+    std::vector<std::int64_t> lengths (plan.sets.size(), -1);
+    // the length of a set's mix when no render made it: a render of the mix to a temporary file
+    auto probe = [&] (std::size_t s) -> std::int64_t {
+        if (lengths[s] >= 0)
+            return lengths[s];
+        const auto& set = plan.sets[s];
+        if (status)
+            status (tr ("Measuring the length of the mix..."));
+        auto o = set.options;
+        o.format = exportopts::Format::wav;
+        o.moreFormats = 0;
+        o.wavBits = 16;
+        const juce::TemporaryFile temp (".wav");
+        MessageThreadOwned<ExportJob> slot (post, stopFn);
+        auto* job = slot.create ([&set, &o, &temp] { return std::make_unique<ExportJob> (set.song, o, temp.getFile()); });
+        if (job == nullptr)
+            return 0;
+        juce::String error;
+        const auto frames = job->run ([&] (double) { return ! stopFn(); }, error) ? job->getWrittenFrames() : 0;
+        slot.release();
+        if (stats != nullptr)
+            ++stats->alone;
+        return lengths[s] = frames;
+    };
     auto report = [&] (double p) {
         if (progress)
             progress (juce::jlimit (0.0, 1.0, p));
@@ -918,10 +1020,15 @@ int runStemExport (const StemPlan& plan, std::function<void (std::function<void(
             if (status)
                 status (plan.items[members[first]].name + (last - first > 1 ? " + " + juce::String ((int) (last - first - 1)) : juce::String()));
 
+            // (a song with solos: this render is not its mix, which is measured on its own first)
+            const auto solo = std::any_of (set.song.mixer.begin(), set.song.mixer.end(), [] (const MixerTrack& m) { return m.solo; });
+            const auto known = set.sameLength && solo ? probe (s) : lengths[s];
+            if (stopFn())
+                return written;
             MessageThreadOwned<StemPass> slot (post, stopFn);
             const auto made = juce::Time::getMillisecondCounterHiRes();
-            auto* pass = slot.create ([&set, &targets, extraData] {
-                auto p = std::make_unique<StemPass> (set.song, set.options, targets);
+            auto* pass = slot.create ([&set, &targets, extraData, known] {
+                auto p = std::make_unique<StemPass> (set.song, set.options, targets, set.sameLength, known);
                 p->setExtraData (extraData);
                 return p;
             });
@@ -948,6 +1055,8 @@ int runStemExport (const StemPlan& plan, std::function<void (std::function<void(
                 slot.release();
                 return written; // (cancelled)
             }
+            if (set.sameLength && pass->getMixLength() >= 0)
+                lengths[s] = pass->getMixLength();
             for (auto k = first; k < last; ++k)
             {
                 const auto i = members[k];
@@ -981,14 +1090,19 @@ int runStemExport (const StemPlan& plan, std::function<void (std::function<void(
         if (stopFn())
             break;
         const auto& item = plan.items[i];
+        const auto set = (std::size_t) std::clamp (item.set, 0, (int) plan.sets.size() - 1);
+        const auto mixItem = item.track == 0;
+        // round 190gh: the set's length, from its mix (exported first when asked, else rendered once to find it)
+        const auto exact = plan.sets[set].sameLength && ! mixItem ? std::max<std::int64_t> (0, probe (set)) : 0;
         if (status)
             status (item.name);
 
         MessageThreadOwned<ExportJob> slot (post, stopFn);
         const auto made = juce::Time::getMillisecondCounterHiRes();
-        auto* job = slot.create ([&item, extraData] {
+        auto* job = slot.create ([&item, extraData, exact] {
             auto j = std::make_unique<ExportJob> (item.song, item.options, item.file);
             j->setExtraData (extraData);
+            j->setExactFrames (exact);
             return j;
         });
         const auto rendering = juce::Time::getMillisecondCounterHiRes();
@@ -1006,6 +1120,8 @@ int runStemExport (const StemPlan& plan, std::function<void (std::function<void(
         ++finished;
         if (ok)
             ++written;
+        if (ok && mixItem && plan.sets[set].sameLength && lengths[set] < 0)
+            lengths[set] = job->getWrittenFrames();
         if (stats != nullptr)
         {
             ++stats->alone;

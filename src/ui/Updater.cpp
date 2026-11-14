@@ -131,6 +131,8 @@ public:
     std::atomic<float> progress { -1.0f };
     juce::File result;     // the downloaded file / the AppImage to start
     Host host;
+    // round 190gh (B2): `release` is an older version being installed (Help › Go back to...), not an update
+    bool rollingBack = false;
 
     void stop()
     {
@@ -443,6 +445,7 @@ void check (bool manual)
                 return;
             }
             c.release = found;
+            c.rollingBack = false;
             c.error.clear();
             c.setPhase (Phase::available);
         });
@@ -538,11 +541,23 @@ void downloadThen (const juce::File& dest, std::function<void (const juce::File&
             else if (failure != cancelledMarker)
                 fail (failure);
             else
-                controller().setPhase (Phase::available);
+                controller().setPhase (controller().rollingBack ? Phase::idle : Phase::available); // (round 190gh)
         });
     });
     if (started) // (the result is posted to this thread: it comes after this)
         c.setPhase (Phase::downloading);
+}
+
+// round 190gh (B2): the settings once the other version's file is in place (AppImage, zip, dmg; the installer does it
+// after its restart, in afterStart): after an update the running version becomes the previous one; after going back
+// the version left is skipped
+void recordSwitch()
+{
+    auto& c = controller();
+    auto s = loadSettings();
+    s = c.rollingBack ? update::afterRollback (s, runningVersion()) : update::afterUpdate (s, runningVersion());
+    saveSettings (s);
+    log (juce::String (c.rollingBack ? "going back from " : "updating from ") + fromUtf8 (runningVersion().text()) + " to " + versionText (c.release));
 }
 
 // --- applying -----------------------------------------------------------------------------------------------------
@@ -570,7 +585,10 @@ void installAndRestart (const juce::File& setup)
         }
         updateFolder().getChildFile ("result.txt").deleteFile();
         // the version being installed, for the "was updated to" bar on the next start
-        updateFolder().getChildFile ("installing.txt").replaceWithText ("version=" + juce::String (c.release.version.text()) + "\n");
+        // (round 190gh: the version it replaces, and whether it goes back, for the settings after the restart)
+        updateFolder().getChildFile ("installing.txt").replaceWithText ("version=" + juce::String (c.release.version.text()) + "\nfrom="
+                                                                          + juce::String (runningVersion().text()) + "\nrollback="
+                                                                          + (c.rollingBack ? "1" : "0") + "\n");
         updateFolder().getChildFile ("installing-notes.md").replaceWithText (fromUtf8 (c.release.body));
         juce::StringArray args { helper.getFullPathName(), "--apply-update", setup.getFullPathName(), exe.getParentDirectory().getFullPathName(),
                                  juce::String ((juce::int64) currentPid()) };
@@ -614,7 +632,8 @@ void appImageUpdate()
    #if JUCE_LINUX || JUCE_BSD
     // AppImageUpdate's command-line tool: the zsync update information embedded by scripts/package-linux.sh
     // (zsync|https://lynx-share.com/update/...) fetches only the changed blocks, then -O replaces the file
-    if (const auto tool = findInPath ("appimageupdatetool"); current != juce::File() && tool != juce::File() && overrideUrl().isEmpty())
+    // (going back downloads the older AppImage: the tool only knows the newest one)
+    if (const auto tool = findInPath ("appimageupdatetool"); current != juce::File() && tool != juce::File() && overrideUrl().isEmpty() && ! c.rollingBack)
     {
         c.progress = -1.0f;
         c.setPhase (Phase::working);
@@ -641,6 +660,7 @@ void appImageUpdate()
                 if (ok)
                 {
                     controller().result = current;
+                    recordSwitch();
                     controller().setPhase (Phase::ready);
                 }
                 else if (cancelled)
@@ -660,6 +680,7 @@ void appImageUpdate()
     downloadThen (folder, [] (const juce::File& file) {
         file.setExecutePermission (true);
         controller().result = file;
+        recordSwitch();
         controller().setPhase (Phase::ready);
     });
 }
@@ -681,6 +702,7 @@ void startUpdate()
             downloadsFolder().createDirectory();
             downloadThen (downloadsFolder(), [] (const juce::File& file) {
                 controller().result = file;
+                recordSwitch();
                 controller().setPhase (Phase::saved);
                 if (! platform::testMode())
                     file.revealToUser();
@@ -750,6 +772,12 @@ static bool justUpdated = false;
 
 void startAutomaticCheck()
 {
+    // round 190gh (B2), tests: LYNX_TEST_MODE + LYNX_UPDATE_URL + LYNX_UPDATE_GO_BACK=1 go back at start, without asking
+    if (offered() && platform::testMode() && overrideUrl().isNotEmpty() && env ("LYNX_UPDATE_GO_BACK") == "1")
+    {
+        goBack();
+        return;
+    }
     if (! offered() || ! automatic() || justUpdated)
         return;
     // LYNX_TEST_MODE: no network, unless a test fixture is named
@@ -768,6 +796,100 @@ void checkNow()
         return;
     }
     check (true);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// round 190gh (B2): going back to the previous version
+// ---------------------------------------------------------------------------------------------------------------------
+juce::String previousVersion()
+{
+    if (! offered())
+        return {};
+    const auto running = runningVersion();
+    const auto settings = loadSettings();
+    if (const auto p = update::parseVersion (settings.previous); p.valid && update::compare (p, running) < 0)
+        return fromUtf8 (p.text());
+    const auto list = update::parseReleases (utf8 (cachePath().loadFileAsString()));
+    if (const auto i = update::rollbackIndex (list, running, settings.previous); i >= 0)
+        return versionText (list[(std::size_t) i]);
+    return {};
+}
+
+namespace
+{
+void startGoingBack (const update::Release& target)
+{
+    auto& c = controller();
+    c.release = target;
+    c.rollingBack = true;
+    c.error.clear();
+    log ("going back to " + versionText (target) + " (" + juce::String (update::flavourId (flavour())) + ")");
+    startUpdate();
+}
+} // namespace
+
+void goBack()
+{
+    if (! offered())
+        return;
+    const auto title = tr ("Go back to an earlier version");
+    if (platform::testMode() && overrideUrl().isEmpty())
+    {
+        message (juce::MessageBoxIconType::InfoIcon, title, "LYNX_TEST_MODE: no network (set LYNX_UPDATE_URL)");
+        return;
+    }
+    auto& c = controller();
+    if (c.busy() || c.phase == Phase::downloading || c.phase == Phase::working)
+    {
+        message (juce::MessageBoxIconType::InfoIcon, title, tr ("An update is being downloaded. Wait until it is done, or cancel it on the bar."));
+        return;
+    }
+    const auto url = overrideUrl();
+    c.run ([&c, url, title] {
+        juce::String text, failure;
+        c.fetchText (url.isNotEmpty() ? url : juce::String (update::releasesUrl), text, failure);
+        std::string parseError;
+        auto releases = failure.isEmpty() ? update::parseReleases (utf8 (text), &parseError) : std::vector<update::Release>();
+        if (failure.isEmpty() && releases.empty() && ! parseError.empty())
+            failure = fromUtf8 (parseError);
+        const auto running = runningVersion();
+        const auto index = update::rollbackIndex (releases, running, loadSettings().previous);
+        update::Release target;
+        if (index >= 0)
+            target = releases[(std::size_t) index];
+        c.post ([failure, index, target, running, title] {
+            if (failure.isNotEmpty())
+            {
+                message (juce::MessageBoxIconType::WarningIcon, title, tr ("Could not get the list of versions ({0}). Try again later.", { failure }));
+                return;
+            }
+            if (index < 0)
+            {
+                message (juce::MessageBoxIconType::InfoIcon, title,
+                         tr ("No version older than LYNX SHARE {0} is available to go back to.", { fromUtf8 (running.text()) }));
+                return;
+            }
+            const auto older = versionText (target), now = fromUtf8 (running.text());
+            if (platform::testMode()) // (tests: no question)
+            {
+                platform::testModeLog ("update: going back from " + now + " to " + older);
+                startGoingBack (target);
+                return;
+            }
+            const auto how = update::methodFor (flavour()) == update::Method::openPage
+                                 ? tr ("Its download page opens in your browser.")
+                                 : tr ("It is downloaded from GitHub and checked like an update; your project is saved first and opened again.");
+            juce::AlertWindow::showOkCancelBox (
+                juce::MessageBoxIconType::QuestionIcon, tr ("Go back to LYNX SHARE {0}?", { older }),
+                tr ("LYNX SHARE {0} will be replaced by the earlier {1}. {2}\n\nProjects saved with {0} still open in {1}; LYNX SHARE says when a "
+                    "project comes from a newer version. The automatic check won't offer {0} again; Help > Check for updates... still does.",
+                    { now, older, how }),
+                tr ("Go back"), tr ("Cancel"), nullptr, juce::ModalCallbackFunction::create ([target] (int result) {
+                    if (result == 1)
+                        startGoingBack (target);
+                }));
+        });
+    });
 }
 
 void shutdown()
@@ -795,13 +917,26 @@ void afterStart()
         }
         resultFile.deleteFile();
         const auto installing = folder.getChildFile ("installing.txt");
-        if (version.isEmpty() && installing.existsAsFile())
-            version = installing.loadFileAsString().fromFirstOccurrenceOf ("version=", false, false).trim();
+        // round 190gh (B2): the version it replaced and whether it went back
+        juce::String from;
+        bool wentBack = false;
+        for (const auto& line : juce::StringArray::fromLines (installing.loadFileAsString()))
+        {
+            if (line.startsWith ("version=") && version.isEmpty()) version = line.fromFirstOccurrenceOf ("=", false, false).trim();
+            if (line.startsWith ("from=")) from = line.fromFirstOccurrenceOf ("=", false, false).trim();
+            if (line.startsWith ("rollback=")) wentBack = line.fromFirstOccurrenceOf ("=", false, false).trim() == "1";
+        }
         log ("after start: update result " + result + (detail.isNotEmpty() ? " (" + detail + ")" : juce::String()));
         if (result == "ok")
         {
             justUpdated = true;
             auto& c = controller();
+            if (const auto replaced = update::parseVersion (utf8 (from)); replaced.valid)
+            {
+                auto s = loadSettings();
+                saveSettings (wentBack ? update::afterRollback (s, replaced) : update::afterUpdate (s, replaced));
+            }
+            c.rollingBack = wentBack;
             // the release notes come from the cached list when there is one
             const auto list = update::parseReleases (utf8 (cachePath().loadFileAsString()));
             c.release = {};
@@ -1007,8 +1142,12 @@ void UpdateBar::refresh()
             break;
         case Phase::downloading:
             progress = c.progress.load();
-            text = progress >= 0.0f ? tr ("Downloading LYNX SHARE {0}... {1}%", { v, juce::String (juce::roundToInt (progress * 100.0f)) })
-                                    : tr ("Downloading LYNX SHARE {0}...", { v });
+            if (c.rollingBack) // (round 190gh)
+                text = progress >= 0.0f ? tr ("Going back to LYNX SHARE {0}: downloading... {1}%", { v, juce::String (juce::roundToInt (progress * 100.0f)) })
+                                        : tr ("Going back to LYNX SHARE {0}: downloading...", { v });
+            else
+                text = progress >= 0.0f ? tr ("Downloading LYNX SHARE {0}... {1}%", { v, juce::String (juce::roundToInt (progress * 100.0f)) })
+                                        : tr ("Downloading LYNX SHARE {0}...", { v });
             otherButton.setButtonText (tr ("Cancel"));
             otherButton.setVisible (true);
             closeButton.setVisible (false);
@@ -1020,9 +1159,12 @@ void UpdateBar::refresh()
             closeButton.setVisible (false);
             break;
         case Phase::ready:
-            text = installer ? tr ("LYNX SHARE {0} is downloaded and ready to install", { v }) : tr ("LYNX SHARE {0} is ready", { v });
+            if (c.rollingBack) // (round 190gh)
+                text = installer ? tr ("The earlier LYNX SHARE {0} is downloaded and ready to install", { v }) : tr ("The earlier LYNX SHARE {0} is ready", { v });
+            else
+                text = installer ? tr ("LYNX SHARE {0} is downloaded and ready to install", { v }) : tr ("LYNX SHARE {0} is ready", { v });
             notesButton.setButtonText (tr ("What's new"));
-            notesButton.setVisible (true);
+            notesButton.setVisible (! c.rollingBack);
             updateButton.setButtonText (installer ? tr ("Install and restart") : tr ("Restart now"));
             updateButton.setVisible (true);
             break;
@@ -1039,9 +1181,10 @@ void UpdateBar::refresh()
             otherButton.setVisible (true);
             break;
         case Phase::updated:
-            text = tr ("LYNX SHARE was updated to {0}", { v });
+            text = c.rollingBack ? tr ("LYNX SHARE went back to {0}. Help > Check for updates... offers the newer version again.", { v })
+                                 : tr ("LYNX SHARE was updated to {0}", { v });
             notesButton.setButtonText (tr ("What's new"));
-            notesButton.setVisible (! c.release.body.empty());
+            notesButton.setVisible (! c.release.body.empty() && ! c.rollingBack);
             break;
         case Phase::idle:
         case Phase::checking: show = false; break;
@@ -1066,7 +1209,10 @@ void UpdateBar::showForSnapshot (int state)
     c.result = downloadsFolder().getChildFile ("LYNX-0.1.22-alpha-windows-x64.zip");
     c.error = tr ("the download is damaged (its checksum does not match)");
     c.progress = 0.42f;
-    c.phase = state == 1 ? Phase::downloading : state == 2 ? Phase::failed : state == 3 ? Phase::ready : Phase::available;
+    c.rollingBack = state >= 4; // (round 190gh: going back, downloading; went back)
+    if (c.rollingBack)
+        c.release.version = update::parseVersion ("0.1.27");
+    c.phase = state == 1 || state == 4 ? Phase::downloading : state == 2 ? Phase::failed : state == 3 ? Phase::ready : state == 5 ? Phase::updated : Phase::available;
     c.hidden = false;
     refresh();
 }

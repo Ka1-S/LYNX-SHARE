@@ -182,7 +182,10 @@ Song makeRenderSong (const Song& song, const Options& o, std::int64_t tailTicks,
 // The selection exists (loop region set and inside the song).
 bool hasSelection (const Song& song) noexcept;
 
-// Inserts that get sound: a channel goes to them or another insert sends to them (Master excluded).
+// Inserts that get sound: a channel goes to them or another insert sends to them (Master excluded). Round 190gh (B7):
+// also the inserts fed only by extra outputs — a hosted multi-output instrument's Connections (as the engine plays
+// them, "Process inactive inputs and outputs" included), FPC pads with their own mixer offset, a generator Patcher's
+// "To LYNX" outputs, and an effect slot's sends (Fruity Send, Transmitter, a hosted effect's Connections).
 std::vector<int> stemTracks (const Song& song);
 // FL's Mixer › Disk recording › "Render armed / selected tracks to wave file(s)" (REA round 165f-mixer): the inserts
 // of `only` (each once, in mixer order, the Master excluded) whether or not they get sound; empty = stemTracks (song).

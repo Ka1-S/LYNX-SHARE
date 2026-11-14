@@ -70,16 +70,23 @@ void MidiSyncIo::configure (const prefs::MidiPrefs& prefs, bool devices, bool dr
     {
         auto& slot = slots[(std::size_t) i];
         const prefs::MidiOutputPrefs* want = i < (int) wanted.size() ? &wanted[(std::size_t) i] : nullptr;
-        const auto sameDevice = want != nullptr && slot.name == want->name && (slot.device != nullptr || ! devices);
+        // (round 190gh, hot-plug: the open device must still be listed under its identifier; one that was unplugged is
+        // closed, and opened again by name when it comes back, possibly under another identifier)
+        const auto stillListed = ! devices || std::any_of (available.begin(), available.end(), [&slot] (const juce::MidiDeviceInfo& d) {
+                                     return d.identifier.toStdString() == slot.id && d.name.toStdString() == slot.name;
+                                 });
+        const auto sameDevice = want != nullptr && slot.name == want->name && (slot.device != nullptr || ! devices) && stillListed;
         if (! sameDevice)
         {
             slot.active.store (false);
             std::unique_ptr<juce::MidiOutput> opened;
+            std::string openedId;
             if (want != nullptr && devices)
                 for (const auto& d : available)
                     if (d.name.toStdString() == want->name)
                     {
                         opened = juce::MidiOutput::openDevice (d.identifier);
+                        openedId = d.identifier.toStdString();
                         break;
                     }
             {
@@ -87,6 +94,7 @@ void MidiSyncIo::configure (const prefs::MidiPrefs& prefs, bool devices, bool dr
                 slot.device = std::move (opened);
             }
             slot.name = want != nullptr ? want->name : std::string();
+            slot.id = openedId;
         }
         slot.sync = want != nullptr && want->masterSync;
         slot.notesOff = want != nullptr && want->allNotesOff;

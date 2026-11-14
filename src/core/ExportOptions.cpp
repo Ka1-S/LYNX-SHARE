@@ -13,6 +13,7 @@
 
 #include "core/MixerOps.h"
 #include "core/Patcher.h"
+#include "core/Fpc.h"
 #include "core/PatternBlocks.h"
 #include "core/Pdc.h"
 #include "core/Preferences.h"
@@ -444,11 +445,33 @@ Song makeRenderSong (const Song& original, const Options& o, std::int64_t tailTi
 
 std::vector<int> stemTracks (const Song& song)
 {
-    std::vector<int> out;
-    for (int t = 1; t < (int) song.mixer.size(); ++t)
+    const auto n = (int) song.mixer.size();
+    // round 190gh (B7): the inserts extra outputs feed (a multi-output instrument's, a Patcher's, an effect's sends)
+    std::set<int> fed;
+    for (const auto& c : song.channels)
     {
-        auto used = std::any_of (song.channels.begin(), song.channels.end(), [t] (const ChannelDef& c) { return c.mixerTrack == t; });
-        for (int src = 1; src < (int) song.mixer.size() && ! used; ++src)
+        if (c.instrument == InstrumentKind::plugin)
+            for (const auto& route : c.plugin.outputs)
+                if (route.offset != 0 && (route.active != 0 || c.plugin.processInactive))
+                    fed.insert (c.mixerTrack + route.offset);
+        if (c.instrument == InstrumentKind::fpc)
+            if (const auto kit = fpc::read (c.pluginState))
+                for (const auto& pad : kit->pads)
+                    if (pad.output != 0)
+                        fed.insert (c.mixerTrack + pad.output);
+        if (c.instrument == InstrumentKind::patcher)
+            for (std::size_t k = 0; k < c.patcher.outputTracks.size(); ++k)
+                fed.insert (c.patcher.outputTracks[k] >= 0 ? c.patcher.outputTracks[k] : c.mixerTrack + (int) k + 1);
+    }
+    for (int src = 1; src < n; ++src)
+        for (const auto& tap : fruitySendsOf (song, src))
+            fed.insert (tap.target);
+
+    std::vector<int> out;
+    for (int t = 1; t < n; ++t)
+    {
+        auto used = fed.count (t) > 0 || std::any_of (song.channels.begin(), song.channels.end(), [t] (const ChannelDef& c) { return c.mixerTrack == t; });
+        for (int src = 1; src < n && ! used; ++src)
             used = src != t && song.routes (src, t);
         if (used)
             out.push_back (t);
@@ -700,7 +723,13 @@ StemTap planStemTap (const Song& shared, int track, const std::vector<int>& chan
             return fail ("an insert fed by this one also goes to the Master");
         for (int m2 = 1; m2 < n; ++m2)
             if (reach[(std::size_t) m2] && heardShared[(std::size_t) m2] != heardStem[(std::size_t) m2])
-                return fail ("a source the stem render silences");
+            {
+                // (typically a side-chain: the stem render solos the insert with what routes into it, not its keys)
+                fail ("");
+                out.why = "insert " + std::to_string (m2) + " (" + shared.mixer[(std::size_t) m2].name + ") reaches insert " + std::to_string (u)
+                          + " (a side-chain or a connection), and the stem's own render silences it";
+                return out;
+            }
         if (! heardShared[(std::size_t) u])
             return fail ("an input silenced in the shared render");
         for (const auto& a : shared.automations)

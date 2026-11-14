@@ -334,7 +334,38 @@ MidiInputPlan planMidiInputs (const MidiPrefs& prefs, const std::vector<MidiPort
         else if (! wanted && isOpen)
             plan.close.push_back (port.id);
     }
+    for (const auto& id : openIds)
+        if (std::none_of (available.begin(), available.end(), [&id] (const MidiPort& port) { return port.id == id; }) && ! contains (plan.gone, id))
+            plan.gone.push_back (id);
     return plan;
+}
+
+MidiDeviceChange diffMidiDevices (const std::vector<MidiPort>& before, const std::vector<MidiPort>& after)
+{
+    MidiDeviceChange change;
+    auto hasName = [] (const std::vector<MidiPort>& list, const std::string& name) {
+        return std::any_of (list.begin(), list.end(), [&name] (const MidiPort& p) { return p.name == name; });
+    };
+    auto hasPort = [] (const std::vector<MidiPort>& list, const MidiPort& port) {
+        return std::any_of (list.begin(), list.end(), [&port] (const MidiPort& p) { return p.id == port.id && p.name == port.name; });
+    };
+    auto addOnce = [] (std::vector<std::string>& list, const std::string& name) {
+        if (std::find (list.begin(), list.end(), name) == list.end())
+            list.push_back (name);
+    };
+    for (const auto& p : after)
+    {
+        change.changed = change.changed || ! hasPort (before, p);
+        if (! hasName (before, p.name))
+            addOnce (change.added, p.name);
+    }
+    for (const auto& p : before)
+    {
+        change.changed = change.changed || ! hasPort (after, p);
+        if (! hasName (after, p.name))
+            addOnce (change.removed, p.name);
+    }
+    return change;
 }
 
 MidiInputPrefs MidiPrefs::input (const std::string& name) const
