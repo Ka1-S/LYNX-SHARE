@@ -3,9 +3,11 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <set>
 #include <sstream>
 
 namespace lynx::plugindb
@@ -238,6 +240,18 @@ std::map<std::string, std::string>& installedSignature()
     return s;
 }
 
+// The signature of the Installed folder LYNX wrote last (round 190gd): a 64-bit FNV-1a hash of the plugin list
+// that made it, kept in <root>/installed.index (LYNX's own notes, like database.index)
+std::string signatureHash (const std::string& signature)
+{
+    std::uint64_t h = 1469598103934665603ULL;
+    for (const unsigned char c : signature)
+        h = (h ^ c) * 1099511628211ULL;
+    char text[32];
+    std::snprintf (text, sizeof (text), "%016llx", (unsigned long long) h);
+    return text;
+}
+
 // Installed/Effects|Generators/<format>/: one entry per plugin, as the list says now
 void writeInstalled (const std::string& root, const std::vector<Plugin>& plugins)
 {
@@ -250,6 +264,13 @@ void writeInstalled (const std::string& root, const std::vector<Plugin>& plugins
         return;
     auto sorted = plugins;
     std::stable_sort (sorted.begin(), sorted.end(), [] (const Plugin& a, const Plugin& b) { return a.key < b.key; });
+    struct Wanted
+    {
+        fs::path file;
+        std::string text;
+    };
+    std::vector<Wanted> files;
+    files.reserve (sorted.size());
     std::set<std::string> wanted, takenNames; // generic paths; lower-case ones for name clashes
     for (const auto& p : sorted)
     {
@@ -257,26 +278,46 @@ void writeInstalled (const std::string& root, const std::vector<Plugin>& plugins
         auto stem = safeFileName (p.name);
         for (int n = 2; ! takenNames.insert (lower (utf8 (dir / u8path (stem)))).second && n < 1000; ++n)
             stem = safeFileName (p.name + " (" + std::to_string (n) + ")");
-        const auto file = dir / u8path (stem + entryExtension);
-        const auto text = formatEntry (entryOf (p, stem, {}));
-        if (! fs::is_regular_file (file, ec) || readFile (file) != text)
-            writeFile (file, text);
+        auto file = dir / u8path (stem + entryExtension);
         wanted.insert (utf8 (file));
+        files.push_back ({ std::move (file), formatEntry (entryOf (p, stem, {})) });
     }
+    // what is there now: one walk of the folder (names only: on Windows a directory listing costs one call per batch of
+    // names, where checking or reading each file opens it — 1400 entries took ~1 s of every start, round 190gd)
+    std::set<std::string> present;
     std::vector<fs::path> stale, dirs;
     for (fs::recursive_directory_iterator it (installed, fs::directory_options::skip_permission_denied, ec), end; it != end && ! ec; it.increment (ec))
     {
         std::error_code e2;
         if (it->is_directory (e2))
             dirs.push_back (it->path());
-        else if (isEntryFile (it->path()) && ! wanted.count (utf8 (it->path())))
-            stale.push_back (it->path());
+        else if (isEntryFile (it->path()))
+        {
+            if (wanted.count (utf8 (it->path())))
+                present.insert (utf8 (it->path()));
+            else
+                stale.push_back (it->path());
+        }
     }
+    // the folder LYNX wrote for this very list, with every entry in place: nothing to read or write (an entry deleted or
+    // renamed in the file manager is noticed by its name and written again below; an entry's text edited by hand is
+    // written again when the plugin list next changes)
+    const auto indexPath = u8path (root) / "installed.index";
+    const auto hash = signatureHash (signature);
+    if (stale.empty() && present.size() == wanted.size() && fs::is_regular_file (indexPath, ec) && readFile (indexPath) == "LYNX installed 1\n" + hash + "\n")
+    {
+        installedSignature()[root] = signature;
+        return;
+    }
+    for (const auto& w : files)
+        if (! present.count (utf8 (w.file)) || readFile (w.file) != w.text)
+            writeFile (w.file, w.text);
     for (const auto& f : stale)
         fs::remove (f, ec);
     std::sort (dirs.begin(), dirs.end(), [] (const fs::path& a, const fs::path& b) { return a.native().size() > b.native().size(); });
     for (const auto& d : dirs)
         fs::remove (d, ec); // (only when empty)
+    writeFile (indexPath, "LYNX installed 1\n" + hash + "\n");
     installedSignature()[root] = signature;
 }
 
@@ -584,6 +625,12 @@ bool parseEntry (const std::string& text, Entry& entry)
         else if (tag == "kind") entry.instrument = value == "generator";
     }
     return ! entry.key.empty();
+}
+
+void forgetSession (const std::string& root)
+{
+    lastDirs().erase (root);
+    installedSignature().erase (root);
 }
 
 Report refresh (const std::string& root, const std::vector<Plugin>& plugins, State& state)

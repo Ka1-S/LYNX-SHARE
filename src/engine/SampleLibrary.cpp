@@ -745,6 +745,40 @@ std::shared_ptr<const SampleData> SampleLibrary::findLoaded (const juce::String&
     return nullptr;
 }
 
+namespace
+{
+std::int64_t heldBytes (const SampleData& d)
+{
+    return (std::int64_t) (d.left.capacity() + d.right.capacity()) * (std::int64_t) sizeof (float);
+}
+std::int64_t mappedBytesOf (const SampleData& d)
+{
+    return d.isMapped() ? (std::int64_t) d.mappedFrames * (d.mappedRight != nullptr ? 2 : 1) * (std::int64_t) sizeof (float) : 0;
+}
+} // namespace
+
+SampleLibrary::MemoryUse SampleLibrary::memoryUse()
+{
+    MemoryUse use;
+    auto& shared = sharedCache();
+    {
+        const std::scoped_lock l (shared.lock);
+        for (const auto& [path, weak] : shared.entries)
+            if (const auto data = weak.lock())
+            {
+                if (data->isMapped())
+                    ++use.mappedSamples, use.mappedBytes += mappedBytesOf (*data);
+                else
+                    ++use.samples, use.sampleBytes += heldBytes (*data);
+            }
+    }
+    const std::scoped_lock l (shared.stretchLock);
+    for (const auto& [key, data] : shared.stretched)
+        if (data != nullptr)
+            ++use.stretched, use.stretchedBytes += heldBytes (*data) + mappedBytesOf (*data);
+    return use;
+}
+
 std::shared_ptr<const SampleData> SampleLibrary::decode (const juce::String& path)
 {
     const auto file = platform::localFile (path); // FL's Windows spelling on macOS/Linux (platform/Paths.h)

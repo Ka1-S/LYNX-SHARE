@@ -170,6 +170,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
       mixer (e),
       browser (e)
 {
+    if (startupMark != nullptr) startupMark ("main window: panels constructed (rack, piano roll, playlist, mixer, browser)"); // (round 190gd)
     rackcards::install(); // (round 183c: racks show as their own card in the Device View)
     heldKeys.setSender ([this] (int channel, int key, float velocity, bool on) { engine.sendLiveNote (channel, key, velocity, on, true); });
     connectBrowser (browser);
@@ -242,6 +243,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             if (safe != nullptr) safe->saveUiSettings();
         };
     }
+    if (startupMark != nullptr) startupMark ("main window: settings, key map, start-up song, session");
     PianoRollComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
     PlaylistComponent::shortcutText = [this] (const std::string& id) { return shortcutText (id.c_str()); };
     pianoRoll.onNoteNamesChanged = [this] { saveUiSettings(); };
@@ -800,6 +802,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     hintBar.setHint ({ idleHint(), {}, false, false });
     setWantsKeyboardFocus (true);
     installDialogTextFocus(); // dialogs open with their text field focused (round 165q)
+    if (startupMark != nullptr) startupMark ("main window: toolbar, menus, controllers");
     setSize (1180, 642);
     startTimerHz (30);
     uiTraceMonitor.start ([this, last = std::make_shared<RtStats::Snapshot>()] {
@@ -915,6 +918,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
                                   [safe = juce::Component::SafePointer<MainComponent> (this)] (const juce::KeyPress& key) {
                                       return safe != nullptr && safe->keyFromPluginView (key, false);
                                   });
+    if (startupMark != nullptr) startupMark ("main window: live sessions, the rest of the constructor");
 }
 
 MainComponent::~MainComponent()

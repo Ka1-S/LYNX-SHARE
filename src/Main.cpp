@@ -222,6 +222,7 @@ struct StartupTrace
     const bool on = std::getenv ("LYNX_TRACE_STARTUP") != nullptr;
     juce::String text;
     clock::time_point last = t0;
+    std::int64_t lastPrivate = 0;
 
     double seconds() const { return std::chrono::duration<double> (clock::now() - t0).count(); } // since the process started
 
@@ -231,7 +232,13 @@ struct StartupTrace
             return;
         const auto now = clock::now();
         const auto ms = [] (clock::duration d) { return std::chrono::duration<double, std::milli> (d).count(); };
-        text << juce::String (ms (now - t0), 1).paddedLeft (' ', 8) << " ms  +" << juce::String (ms (now - last), 1).paddedLeft (' ', 7) << "  " << step << "\n";
+        // (round 190gd: the process's memory after each step too, so the log says where the megabytes of a start go)
+        const auto mb = [] (std::int64_t bytes) { return juce::String ((double) bytes / 1048576.0, 1).paddedLeft (' ', 7); };
+        const auto priv = lynx::toolbar::PerformanceMeter::processPrivateBytes();
+        const auto ws = lynx::toolbar::PerformanceMeter::processMemoryBytes();
+        text << juce::String (ms (now - t0), 1).paddedLeft (' ', 8) << " ms  +" << juce::String (ms (now - last), 1).paddedLeft (' ', 7)
+             << "  private " << mb (priv) << " MB (+" << mb (priv - lastPrivate).trim() << ")  ws " << mb (ws) << " MB  " << step << "\n";
+        lastPrivate = priv;
         last = now;
         lynx::platform::settingsFile ("startup.log").replaceWithText (text);
     }
@@ -2454,6 +2461,7 @@ public:
             startOpenTimeProbe();
             startUpdateCheck();
             juce::MessageManager::callAsync ([] { startupTrace.mark ("first message loop turn"); });
+            markSettled(); // (round 190gd)
             return;
         }
 
@@ -2497,6 +2505,7 @@ public:
                     startOpenTimeProbe();
                     startUpdateCheck();
                     juce::MessageManager::callAsync ([] { startupTrace.mark ("first message loop turn"); });
+                    markSettled(); // (round 190gd)
                     // first run: language, audio, plugin folders (FL Studio's included) and a background scan
                     if (! lynx::setupWizardDone() && lynx::platform::testMode())
                         lynx::platform::testModeLog ("setup wizard");
@@ -2505,6 +2514,15 @@ public:
                 });
             });
         });
+    }
+
+    // the start-up trace's last lines: what the first seconds after the window add (lazy work, caches, the first paints)
+    static void markSettled()
+    {
+        if (! startupTrace.on)
+            return;
+        juce::Timer::callAfterDelay (5000, [] { startupTrace.mark ("5 s after the window"); });
+        juce::Timer::callAfterDelay (15000, [] { startupTrace.mark ("15 s after the window"); });
     }
 
     void startEngine()
