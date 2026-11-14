@@ -140,7 +140,7 @@ void WorkerPool::workerLoop (std::function<void()> onStart)
         onStart();
 
     using clock = std::chrono::steady_clock;
-    auto refreshSeen = refreshGeneration.load (std::memory_order_acquire);
+    std::uint32_t refreshSeen = 0; // (the generation the pool started with: a request made before this thread ran counts too)
 
     while (! quit.load (std::memory_order_relaxed))
     {

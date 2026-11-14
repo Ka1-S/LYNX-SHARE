@@ -10,16 +10,18 @@
 
 namespace toolchain190gt
 {
-// runs parallelFor rounds until every worker has done `want` refreshes (a sleeping worker refreshes when it wakes)
+// runs parallelFor rounds until every worker has done `want` refreshes (a sleeping worker refreshes when it wakes), for
+// at most `rounds` rounds or 10 s (a loaded CI runner may not schedule a worker for a while)
 inline bool waitForRefreshes (lynx::WorkerPool& pool, const std::map<std::thread::id, int>& counts, std::mutex& m, int want,
-                              int rounds = 4000)
+                              int rounds = 1000000)
 {
-    std::atomic<int> sink { 0 };
-    auto fn = [&] (int i) {
+    auto fn = [] (int i) {
+        volatile int x = i;
         for (int k = 0; k < 200; ++k)
-            sink.fetch_add (i & 1, std::memory_order_relaxed);
+            x = x + k;
     };
-    for (int round = 0; round < rounds; ++round)
+    const auto until = std::chrono::steady_clock::now() + std::chrono::seconds (10);
+    for (int round = 0; round < rounds && std::chrono::steady_clock::now() < until; ++round)
     {
         pool.parallelFor (64, fn);
         {
@@ -30,7 +32,7 @@ inline bool waitForRefreshes (lynx::WorkerPool& pool, const std::map<std::thread
             if (all)
                 return true;
         }
-        if (round % 50 == 49)
+        if (round % 10 == 9) // (let the workers and the other test shards run: never a busy wall of spinning threads)
             std::this_thread::sleep_for (std::chrono::milliseconds (1));
     }
     return false;
@@ -90,7 +92,8 @@ TEST (toolchain190gt_workers_run_with_flush_to_zero_and_denormals_are_zero)
                 withoutFlush.fetch_add (1);
         }
     };
-    for (int round = 0; round < 200 && byWorkers.load() < 50; ++round)
+    const auto until = std::chrono::steady_clock::now() + std::chrono::seconds (20);
+    while (byWorkers.load() < 50 && std::chrono::steady_clock::now() < until)
         pool.parallelFor (64, fn);
     CHECK (byWorkers.load() > 0);
     CHECK (withoutFlush.load() == 0);
