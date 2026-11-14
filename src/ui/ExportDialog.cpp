@@ -229,7 +229,7 @@ public:
             {
                 auto& set = sets[(std::size_t) item.set];
                 if (set.frames < 0)
-                    set.frames = probeLength (set);
+                    set.frames = probeLength (item.set);
                 exact = juce::jmax<std::int64_t> (0, set.frames);
             }
 
@@ -263,8 +263,9 @@ public:
     }
 
     // the length of a set's mix (no file kept): a render to a temporary file
-    std::int64_t probeLength (const RenderSet& set)
+    std::int64_t probeLength (int index)
     {
+        const auto& set = sets[(std::size_t) index];
         setStatusMessage (tr ("Measuring the length of the mix..."));
         auto o = set.options;
         o.format = exportopts::Format::wav;

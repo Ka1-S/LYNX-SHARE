@@ -308,8 +308,9 @@ TEST (small190gh_audio_check_verdict_and_devices_to_try)
     CHECK (a.size() == 3 && a[0] == (Choice { "ALSA", "hw:1" }) && a[1] == (Choice { "PipeWire", "System default" }) && a[2] == (Choice { "JACK", "system" }));
     // nothing else to try
     CHECK (alternatives ("macos", { "CoreAudio", "Built-in Output" }, { { "CoreAudio", { "Built-in Output" } } }).empty());
-    // no device open: everything is a choice
-    CHECK (alternatives ("linux", {}, linuxDevices).size() == 4);
+    // no device open: each driver's default device
+    a = alternatives ("linux", {}, linuxDevices);
+    CHECK (a.size() == 3 && a[0] == (Choice { "PipeWire", "System default" }) && a[1] == (Choice { "ALSA", "default" }) && a[2] == (Choice { "JACK", "system" }));
 }
 
 // ====================================================================================================================
