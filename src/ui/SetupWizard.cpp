@@ -4,6 +4,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include "core/AutoScanPolicy.h"
 #include "core/LayoutStyle.h"
 #include "engine/AudioEngine.h"
 #include "engine/FlStudio.h"
@@ -380,8 +381,10 @@ private:
         markSetupWizardDone();
         if (runningAsAppImage())
             setAppImageMenuEntry (menuEntry.getToggleState());
-        if (! scanStarted)
-            engine.getPluginHost().startBackgroundScan(); // keeps going after the window closes
+        // (keeps going after the window closes) only when asked for: with "every start" unticked, nothing scans here
+        // (round 190fp: a scan can bring up one licence box per expired plugin)
+        if (autoscan::onWizardFinish (scanAtStart.getToggleState(), scanStarted))
+            engine.getPluginHost().startBackgroundScan();
         const auto chosen = languageBox.getSelectedId() - 1;
         const auto& languages = i18n::languages();
         const auto language = chosen >= 0 && chosen < (int) languages.size() ? juce::String (languages[(std::size_t) chosen].id) : i18n::saved();

@@ -176,7 +176,7 @@ without the manifest the DLL fails to load with error 127.
   the three on exactly what an archive holds: plugexporttest on the CLAP and each VST3, pluginval on each VST3,
   clap-validator on the CLAP.
 - CI: `.github/workflows/plugins.yml` builds, packages and checks the download for Windows (zig on Ubuntu, checked on
-  windows-2022), Linux (Ubuntu 22.04 container, glibc check, editor pictures under Xvfb) and macOS (universal), then
+  windows-2022), Linux (Ubuntu 22.04 container, glibc check, no static TLS, editor pictures under Xvfb) and macOS (universal), then
   writes `LYNX-Plugins-<label>-SHA256SUMS.txt`. Started by hand on any branch (`workflow_dispatch`), or by `release.yml`
   on a release tag, which attaches the archives to the draft release (`plugins-publish`). The app's release doesn't wait
   for the plugins. Normal pushes don't build plugins.
@@ -269,6 +269,11 @@ controls stay hidden in the plugins for now.
 - Fixed in round 180b: FL hung on exit when the host unloaded the plugin DLL. LYNX's static image caches still held JUCE's
   Direct2D device, and freeing it under the loader lock deadlocked in the graphics driver. The last plugin instance
   now empties them (`ui/ImageCaches.h`), and a lint test keeps new static image caches registered.
+- Fixed in round 190fp: no host on Linux could load the 0.1.27 plugins ("cannot allocate memory in static TLS block";
+  the Linux archive was missing from that release). The crash guard's per-thread pointer (`platform/CrashGuard.cpp`) was
+  an initial-exec `thread_local`, which makes the module's whole TLS block (about 33 KB) static, far more than glibc
+  keeps for modules loaded with dlopen. In the plugins' runtime it is a pthread key now, and
+  `scripts/check-linux-compat.sh` fails any library that still has the `STATIC_TLS` flag.
 - Fixed in round 188b: a host restart (prepareToPlay) kept the engines of the last build, so a reverb's tail, LYNX Tune's
   detector history and Quell's state outlived it; it now starts from new engines, as a fresh instance.
 - The editors of all 27 effects were checked for FL wording (round 188b, `plugexporttest` pictures): none; the header no
