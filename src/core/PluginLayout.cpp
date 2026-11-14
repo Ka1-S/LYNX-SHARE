@@ -2037,16 +2037,17 @@ Layout glowLeveler()
     // round 123: the voicing — Glow's own engine, or the measured classic opto leveler (substitutes start there);
     // round 152 / 165w: the classic voicing's opto law and release (Old = a project saved before that round)
     // (review: one compact group of small muted keys where the original has only its badge)
-    v.push_back (tabs (14, 18, 112, 14, "Voicing", TR_NOOP ("Modern|Opto classic"), {}, compactKeys));
-    v.push_back (when (tabs (14, 36, 112, 14, "Opto law", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
-    v.push_back (when (label (14, 54, 112, 9, TR_NOOP ("Attack / release"), dim), "Voicing", 0.5f, 1.0f)); // round 165x: both measured
-    v.push_back (when (tabs (14, 64, 112, 14, "Opto release", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    v.push_back (tabs (14, 14, 112, 12, "Voicing", TR_NOOP ("Modern|Opto classic"), {}, compactKeys));
+    v.push_back (when (tabs (14, 29, 112, 12, "Opto law", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (label (14, 44, 112, 9, TR_NOOP ("Attack / release"), dim), "Voicing", 0.5f, 1.0f)); // round 165x: both measured
+    v.push_back (when (tabs (14, 53, 112, 12, "Opto release", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
     // round 190dm: the cell's memory (release slower after long exposure; Compress)
-    v.push_back (when (label (14, 82, 112, 9, TR_NOOP ("Cell memory"), dim), "Voicing", 0.5f, 1.0f));
-    v.push_back (when (tabs (14, 92, 112, 14, "Opto memory", TR_NOOP ("Off|On"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
-    // round 190fx: the side chain's weighting (Old = the voicing's treble emphasis; Measured = the even weighting)
-    v.push_back (when (label (14, 110, 112, 9, TR_NOOP ("Side chain"), dim), "Voicing", 0.5f, 1.0f));
-    v.push_back (when (tabs (14, 120, 112, 14, "SC weighting", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (label (14, 68, 112, 9, TR_NOOP ("Cell memory"), dim), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (tabs (14, 77, 112, 12, "Opto memory", TR_NOOP ("Off|On"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
+    // round 190fx: the side chain's weighting (Old = the voicing's treble emphasis; Measured = the even weighting); the four
+    // key groups 12 px high so the column ends above the COMPRESS caption
+    v.push_back (when (label (14, 92, 112, 9, TR_NOOP ("Side chain"), dim), "Voicing", 0.5f, 1.0f));
+    v.push_back (when (tabs (14, 101, 112, 12, "SC weighting", TR_NOOP ("Old|Measured"), {}, compactKeys), "Voicing", 0.5f, 1.0f));
     // COMPRESS / LIMIT: a bat toggle (up = compress), its two words above and under it
     v.push_back (tabs (40, 136, 52, 84, "Limit", TR_NOOP ("Compress|Limit"), {}, batToggle));
     // the two big knobs, their printed 0 … 100 round them; no value text (the drag tip shows it)
