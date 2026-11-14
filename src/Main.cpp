@@ -2497,40 +2497,51 @@ public:
             if (splash == nullptr || mainWindow == nullptr)
                 return;
             if (startupOptions.sound)
-                openAudioDevice(); // (else after the splash: nothing waits for it)
-
-            splash->setStatus (lynx::tr ("Loading the workspace..."));
-            splash->startClock();
-            // the minimum counts from the process start (the window and the audio device took part of it already)
-            splashDuration = lynx::SplashScreen::remainingDuration (startupTrace.seconds());
-            splash->setBarDuration (splashDuration);
-
-            juce::Timer::callAfterDelay (juce::roundToInt (splashDuration * 1000.0), [this] {
-                if (splash == nullptr || mainWindow == nullptr)
-                    return;
-
-                if (startupTrace.on)
-                    startupTrace.mark (("splash: the drop in " + juce::String (splash->getDropFrames()) + " frames, longest gap "
-                                        + juce::String (splash->getLongestDropGapMs(), 1) + " ms").toRawUTF8());
-                mainWindow->reveal();
-                startupTrace.mark ("window revealed (after the splash)");
-                splash->toFront (false);
-                const auto deviceOpen = ! engine->isAudioDeviceOpenPending();
-                splash->finish ([this, deviceOpen] {
-                    splash = nullptr;
-                    // without the start-up sound the device opens now, once the card has faded (the window is up)
-                    if (! deviceOpen)
-                        openAudioDevice();
-                    openMidiDevices();
-                    if (! deviceOpen)
-                        startAfterWindow (true);
-                });
-                if (deviceOpen)
-                    mainWindow->whenPainted ([this] { startAfterWindow (true); });
-            });
+                openAudioDevice (false); // (else after the splash: nothing waits for it)
+            // one turn of the message loop before the drop: what fell due while the window was built (JUCE's timers,
+            // the window's own async work) runs now, on the still card, not in the drop's first frames
+            juce::MessageManager::callAsync ([this] { startDrop(); });
         };
         splash->onFirstFrame = goOn;
         juce::Timer::callAfterDelay (40, goOn);
+    }
+
+    // the logo's drop and the start-up sound together; the window shows the moment the logo has landed
+    void startDrop()
+    {
+        if (splash == nullptr || mainWindow == nullptr || engine == nullptr)
+            return;
+        if (startupOptions.sound)
+            playStartupSound();
+        splash->setStatus (lynx::tr ("Loading the workspace..."));
+        splash->startClock();
+        // the minimum counts from the process start (the window and the audio device took part of it already)
+        splashDuration = lynx::SplashScreen::remainingDuration (startupTrace.seconds());
+        splash->setBarDuration (splashDuration);
+
+        juce::Timer::callAfterDelay (juce::roundToInt (splashDuration * 1000.0), [this] {
+            if (splash == nullptr || mainWindow == nullptr)
+                return;
+
+            if (startupTrace.on)
+                startupTrace.mark (("splash: the drop in " + juce::String (splash->getDropFrames()) + " frames, longest gap "
+                                    + juce::String (splash->getLongestDropGapMs(), 1) + " ms").toRawUTF8());
+            mainWindow->reveal();
+            startupTrace.mark ("window revealed (after the splash)");
+            splash->toFront (false);
+            const auto deviceOpen = ! engine->isAudioDeviceOpenPending();
+            splash->finish ([this, deviceOpen] {
+                splash = nullptr;
+                // without the start-up sound the device opens now, once the card has faded (the window is up)
+                if (! deviceOpen)
+                    openAudioDevice();
+                openMidiDevices();
+                if (! deviceOpen)
+                    startAfterWindow (true);
+            });
+            if (deviceOpen)
+                mainWindow->whenPainted ([this] { startAfterWindow (true); });
+        });
     }
 
     // what follows the window's first frame (the audio device is open): the notice of an unclean end, the start-up
@@ -2588,8 +2599,8 @@ public:
                 }
     }
 
-    // The audio device of the last session, then the start-up sound on it (once; message thread)
-    void openAudioDevice()
+    // The audio device of the last session, then (withSound) the start-up sound on it (once; message thread)
+    void openAudioDevice (bool withSound = true)
     {
         if (engine == nullptr || ! engine->isAudioDeviceOpenPending())
             return;
@@ -2598,8 +2609,13 @@ public:
             startupTrace.mark (("  " + prewarmed).toRawUTF8());
         startupTrace.mark ("audio device opened");
         addDriverFileDeviceType();
+        if (withSound)
+            playStartupSound();
+    }
 
-        if (startupOptions.sound)
+    void playStartupSound()
+    {
+        if (startupOptions.sound && ! std::exchange (startupSoundPlayed, true) && engine != nullptr)
         {
             // Options › Theme › Startup sound (issue #12): the user's file, else (or when it can't be read) LYNX's own
             std::shared_ptr<const lynx::SampleData> sound;
@@ -22883,7 +22899,7 @@ private:
     std::unique_ptr<juce::Timer> perf; // --uiperf
     std::unique_ptr<lynx::SplashScreen> splash;
     std::future<std::shared_ptr<const lynx::SampleData>> startupSampleJob; // (round 190go: the built-in start-up sound)
-    bool startedAfterWindow = false;
+    bool startedAfterWindow = false, startupSoundPlayed = false;
     double splashDuration = lynx::SplashScreen::minimumDuration; // seconds of its clock (round 121: from the process start)
     lynx::StartupOptions startupOptions;
     juce::File fileToOpen;
