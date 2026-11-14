@@ -91,7 +91,12 @@ std::string folderOnDisk (const std::string& root, bool instruments, const std::
 // Disk → model. The first time (no Effects / Generators folder with entries yet) the tree is made from `state` (the
 // folders, places and names LYNX kept in its settings until now) and the built-in plugins' default folders. After
 // that `state` is replaced by what the tree says; new plugins get their entries, Installed is brought up to date.
-Report refresh (const std::string& root, const std::vector<Plugin>& plugins, State& state);
+// installedLater (round 190go, the app): Installed is written on a thread of its own (a first start wrote ~1 400
+// entries there on the UI thread: 2 s, a "not responding" report); entryFile / groupFolder wait for it.
+Report refresh (const std::string& root, const std::vector<Plugin>& plugins, State& state, bool installedLater = false);
+
+// Waits until Installed writes started by refresh (installedLater) are done (tests, tools).
+void finishInstalledWrites();
 
 // Tests (round 190gd): forget what this process remembers of `root` (the folders read and the Installed list written),
 // as a new start of LYNX would

@@ -141,6 +141,13 @@
 #    links, automation recording) stayed stale. The mapped change now also goes to the edit controller (JUCE's
 #    parameter dispatcher, on the message thread) and to the host's value and listeners, as JUCE already does for a
 #    plugin's own output parameter changes.
+# 26. Windows only, juce_graphics/native/juce_DirectX_windows.h + juce_gui_basics/juce_gui_basics.cpp (round 190go,
+#    start-up): JUCE makes a Direct3D 11 + Direct2D device for EVERY DXGI adapter at the first Direct2D image (LYNX's
+#    splash logo), the "Microsoft Basic Render Driver" (WARP, the software rasterizer, which has no monitor) included:
+#    part of the 0.40-0.44 s and ~50 MB before the splash shows. A software adapter is now used only when no hardware
+#    adapter gave a device (a PC or a remote session with WARP alone keeps it). Hardware adapters keep their order (the
+#    first is still the default). juce_gui_basics.cpp includes the header by its relative path, so both modules compile
+#    the same (patched) inline code.
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -319,6 +326,14 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("layered child window placed in its parent's client area" "LYNX patch (round 190cj): a child window is placed"
             "            if (auto parentHwnd = GetParent (hwnd))|NL|            {|NL|                auto parentRect = convertPhysicalScreenRectangleToLogical"
             "            // LYNX patch (round 190cj): a child window is placed in its parent's client area like any other child|NL|            // (the parent's screen position was added to it); other windows as before|NL|            if (auto parentHwnd = (GetWindowLongPtr (hwnd, GWL_STYLE) & WS_CHILD) != 0 ? HWND {} : GetParent (hwnd))|NL|            {|NL|                auto parentRect = convertPhysicalScreenRectangleToLogical")
+    elseif(file MATCHES "juce_DirectX_windows.h$")
+        lynx_juce_fix("no WARP device beside a hardware adapter" "LYNX patch (round 190go): a software adapter"
+            "        for (UINT i = 0;; ++i)|NL|        {|NL|            ComSmartPtr<IDXGIAdapter1> dxgiAdapter;|NL||NL|            if (factory->EnumAdapters1 (i, dxgiAdapter.resetAndGetPointerAddress()) == DXGI_ERROR_NOT_FOUND)|NL|                break;|NL||NL|            if (const auto adapter = DxgiAdapter::create (d2dFactory, dxgiAdapter))|NL|            {|NL|                adapterArray.add (adapter);|NL|                listeners.call ([adapter] (DxgiAdapterListener& l) { l.adapterCreated (adapter); });|NL|            }|NL|        }|NL|"
+            "        // LYNX patch (round 190go): a software adapter (WARP, the \"Microsoft Basic Render Driver\") gets its devices only|NL|        // when no hardware adapter gave any; before, every adapter got a Direct3D 11 + Direct2D device at start-up|NL|        std::vector<ComSmartPtr<IDXGIAdapter1>> lynxSoftwareAdapters;|NL|        const auto lynxAdd = [this] (ComSmartPtr<IDXGIAdapter1> dxgiAdapter)|NL|        {|NL|            if (const auto adapter = DxgiAdapter::create (d2dFactory, dxgiAdapter))|NL|            {|NL|                adapterArray.add (adapter);|NL|                listeners.call ([adapter] (DxgiAdapterListener& l) { l.adapterCreated (adapter); });|NL|            }|NL|        };|NL||NL|        for (UINT i = 0;; ++i)|NL|        {|NL|            ComSmartPtr<IDXGIAdapter1> dxgiAdapter;|NL||NL|            if (factory->EnumAdapters1 (i, dxgiAdapter.resetAndGetPointerAddress()) == DXGI_ERROR_NOT_FOUND)|NL|                break;|NL||NL|            DXGI_ADAPTER_DESC1 lynxDesc {};|NL||NL|            if (dxgiAdapter != nullptr && SUCCEEDED (dxgiAdapter->GetDesc1 (&lynxDesc))|NL|                && ((lynxDesc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0 || (lynxDesc.VendorId == 0x1414 && lynxDesc.DeviceId == 0x8c)))|NL|            {|NL|                lynxSoftwareAdapters.push_back (dxgiAdapter);|NL|                continue;|NL|            }|NL||NL|            lynxAdd (dxgiAdapter);|NL|        }|NL||NL|        if (adapterArray.isEmpty())|NL|            for (auto& dxgiAdapter : lynxSoftwareAdapters)|NL|                lynxAdd (dxgiAdapter);|NL|")
+    elseif(file MATCHES "juce_gui_basics.cpp$")
+        lynx_juce_fix("the DirectX adapters from the patched header" "LYNX patch (round 190go): the DirectX adapters"
+            " #include <juce_graphics/native/juce_DirectX_windows.h>|NL|"
+            " // LYNX patch (round 190go): the DirectX adapters as juce_graphics compiles them (fix 26; same inline code)|NL| #include \"../juce_graphics/native/juce_DirectX_windows.h\"|NL|")
     elseif(file MATCHES "juce_FileChooser_windows.cpp$")
         lynx_juce_fix("file dialog keys only into LYNX" "LYNX patch (round 180a): only into LYNX"
             "                    SendInput ((UINT) std::size (inputs), inputs, sizeof (INPUT));"
@@ -372,6 +387,8 @@ function(lynx_patch_juce juce_dir)
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_FileChooser_windows.cpp")
         lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/native/juce_Windowing_windows.cpp")
         lynx_patch_juce_file("${juce_dir}/modules/juce_audio_devices/native/juce_WASAPI_windows.cpp")
+        lynx_patch_juce_file("${juce_dir}/modules/juce_graphics/native/juce_DirectX_windows.h")
+        lynx_patch_juce_file("${juce_dir}/modules/juce_gui_basics/juce_gui_basics.cpp")
     endif()
 endfunction()
 

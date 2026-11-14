@@ -13,6 +13,7 @@
  #include <atomic>
  #include <cmath>
  #include <utility>
+ #include <thread>
  #include <vector>
 
 namespace lynx
@@ -419,6 +420,77 @@ std::unique_ptr<juce::AudioIODeviceType> makeBuiltInLynxAsioType()
         return nullptr;
     return makeDllAsioDeviceType (dll.getFullPathName(), lynxAsioTypeName, lynxAsioTypeName);
 }
+
+namespace
+{
+// a REG_SZ / REG_EXPAND_SZ value of an open key ({} when missing)
+std::wstring registryText (HKEY key, const wchar_t* value)
+{
+    wchar_t buffer[1024] = {};
+    DWORD type = 0, size = sizeof (buffer) - sizeof (wchar_t);
+    if (RegQueryValueExW (key, value, nullptr, &type, reinterpret_cast<LPBYTE> (buffer), &size) != ERROR_SUCCESS
+        || (type != REG_SZ && type != REG_EXPAND_SZ))
+        return {};
+    std::wstring text (buffer);
+    if (type == REG_EXPAND_SZ)
+    {
+        wchar_t expanded[1024] = {};
+        if (const auto n = ExpandEnvironmentStringsW (text.c_str(), expanded, 1024); n > 0 && n <= 1024)
+            text = expanded;
+    }
+    return text;
+}
+
+// The DLL of the ASIO driver JUCE lists as `deviceName` (its key under HKLM\SOFTWARE\ASIO, named by its
+// "description" or else by the key's name, as JUCE's ASIO type does), from its class's InprocServer32.
+std::wstring asioDriverDll (const std::wstring& deviceName)
+{
+    HKEY asio = nullptr;
+    if (RegOpenKeyExW (HKEY_LOCAL_MACHINE, L"SOFTWARE\\ASIO", 0, KEY_READ, &asio) != ERROR_SUCCESS)
+        return {};
+    std::wstring clsid;
+    wchar_t name[256] = {};
+    for (DWORD i = 0; clsid.empty() && RegEnumKeyW (asio, i, name, 256) == ERROR_SUCCESS; ++i)
+    {
+        HKEY driver = nullptr;
+        if (RegOpenKeyExW (asio, name, 0, KEY_READ, &driver) != ERROR_SUCCESS)
+            continue;
+        auto shown = registryText (driver, L"description");
+        if (shown.empty())
+            shown = name;
+        if (shown == deviceName)
+            clsid = registryText (driver, L"clsid");
+        RegCloseKey (driver);
+    }
+    RegCloseKey (asio);
+    if (clsid.empty())
+        return {};
+    HKEY server = nullptr;
+    if (RegOpenKeyExW (HKEY_CLASSES_ROOT, (L"CLSID\\" + clsid + L"\\InprocServer32").c_str(), 0, KEY_READ, &server) != ERROR_SUCCESS)
+        return {};
+    auto dll = registryText (server, nullptr);
+    RegCloseKey (server);
+    return dll;
+}
+} // namespace
+
+void preloadAsioDriver (const juce::File& savedSetup)
+{
+    std::thread ([savedSetup] {
+        const auto xml = juce::XmlDocument::parse (savedSetup);
+        if (xml == nullptr || xml->getStringAttribute ("deviceType") != "ASIO")
+            return;
+        const auto device = xml->getStringAttribute ("audioOutputDeviceName").isNotEmpty() ? xml->getStringAttribute ("audioOutputDeviceName")
+                                                                                         : xml->getStringAttribute ("audioInputDeviceName");
+        if (device.isEmpty())
+            return;
+        const auto dll = asioDriverDll (device.toWideCharPointer());
+        if (dll.empty())
+            return;
+        // kept loaded for the session (COM loads the same module when the driver is created; never unloaded here)
+        LoadLibraryExW (dll.c_str(), nullptr, 0);
+    }).detach();
+}
 } // namespace lynx
 
 #else
@@ -427,6 +499,7 @@ namespace lynx
 {
 std::unique_ptr<juce::AudioIODeviceType> makeDllAsioDeviceType (const juce::String&, const juce::String&, const juce::String&) { return nullptr; }
 std::unique_ptr<juce::AudioIODeviceType> makeBuiltInLynxAsioType() { return nullptr; }
+void preloadAsioDriver (const juce::File&) {}
 } // namespace lynx
 
 #endif

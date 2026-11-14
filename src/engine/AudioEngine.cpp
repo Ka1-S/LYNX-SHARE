@@ -267,7 +267,7 @@ namespace
 std::atomic<const AudioEngine*> pluginHoldOwner { nullptr };
 } // namespace
 
-AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPluginList)
+AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPluginList, bool deferDeviceOpen)
     : workers (std::make_unique<WorkerPool> (workerThreads >= 0 ? workerThreads : workerCount(), raiseAudioThreadPriority)),
       plugins (userPluginList),
       song (Song::makeDefault())
@@ -288,57 +288,88 @@ AudioEngine::AudioEngine (bool openAudioDevice, int workerThreads, bool userPlug
     if (openAudioDevice)
     {
         player.setProcessor (&graph);
-
-        // LYNX ASIO without installation: lynx-asio.dll next to LYNX.exe, when it is not registered (REA round 106)
-        if (auto lynxAsio = makeBuiltInLynxAsioType())
-        {
-            deviceManager.getAvailableDeviceTypes(); // the standard types first
-            deviceManager.addAudioDeviceType (std::move (lynxAsio));
-        }
-        // LYNX's own PipeWire client on Linux (round 161), listed when a PipeWire daemon answers
-        if (auto pipeWire = makePipeWireDeviceType())
-        {
-            deviceManager.getAvailableDeviceTypes();
-            deviceManager.addAudioDeviceType (std::move (pipeWire));
-        }
-        mark ("  engine: device types");
-
-        // 0 inputs, 2 outputs; the device of the last session (Settings › Audio) if it is still there, else the default.
-        const auto saved = juce::XmlDocument::parse (audioDeviceFile());
-        auto fresh = saved == nullptr;
-        if (deviceManager.initialise (0, 2, saved.get(), true).isNotEmpty() && saved != nullptr)
-        {
-            deviceManager.initialise (0, 2, nullptr, true);
-            fresh = true;
-        }
-        if (fresh)
-        {
-            choosePreferredDriver(); // Linux: PipeWire, then JACK, then ALSA
-            chooseSafeBufferSize(); // no saved setup: a buffer with room for heavy projects (Settings › Audio changes it)
-        }
-        mark ("  engine: device opened");
-        deviceManager.addAudioCallback (this);
+        // the settings that do not need the device (the window reads them; round 190go: built before the device opens)
         if (rackProcessor != nullptr)
             rackProcessor->getRenderer().setProfiling (true); // per-unit CPU for the CPU meter and the glitch log
-        deviceStateSaver = std::make_unique<DeviceStateSaver> (*this);
         midiPrefs = midiPrefsShared = prefs::MidiPrefs::fromText (midiSettingsFile().loadFileAsString().toStdString());
         performanceMidiChannel.store (midiPrefs.performanceChannel);
         controllerIo.loadProfiles (controllerProfilesFolder());
         recordingSettings = loadRecordingSettings();
         saveGlobalLinks = true;
-
-        mark ("  engine: callback + settings");
-        prefetcher = std::make_unique<StreamPrefetcher> (transport);
-        prefetcher->update (song, samples);
-        enableAllMidiInputs();
-        midiSync.configure (midiPrefs);
-        midiSync.sendAllNotesOff(); // FL's "Send all notes off": on init and after a render
-        deviceManager.addMidiInputDeviceCallback ({}, this); // {} = all inputs enabled
-        midiDevicesChanged = juce::MidiDeviceListConnection::make ([this] { enableAllMidiInputs(); });
-        mark ("  engine: MIDI inputs");
+        devicePending = midiPending = true;
+        if (! deferDeviceOpen)
+        {
+            this->openAudioDevice();
+            openMidiDevices();
+        }
     }
 
     startTimerHz (30); // recording and collection of retired snapshots
+}
+
+void AudioEngine::openAudioDevice()
+{
+    if (! std::exchange (devicePending, false))
+        return;
+    const auto mark = [] (const char* step) { if (startupMark != nullptr) startupMark (step); };
+
+    // LYNX ASIO without installation: lynx-asio.dll next to LYNX.exe, when it is not registered (REA round 106)
+    if (auto lynxAsio = makeBuiltInLynxAsioType())
+    {
+        deviceManager.getAvailableDeviceTypes(); // the standard types first
+        deviceManager.addAudioDeviceType (std::move (lynxAsio));
+    }
+    // LYNX's own PipeWire client on Linux (round 161), listed when a PipeWire daemon answers
+    if (auto pipeWire = makePipeWireDeviceType())
+    {
+        deviceManager.getAvailableDeviceTypes();
+        deviceManager.addAudioDeviceType (std::move (pipeWire));
+    }
+    mark ("  engine: device types");
+
+    // 0 inputs, 2 outputs; the device of the last session (Settings › Audio) if it is still there, else the default.
+    const auto saved = juce::XmlDocument::parse (audioDeviceFile());
+    auto fresh = saved == nullptr;
+    if (deviceManager.initialise (0, 2, saved.get(), true).isNotEmpty() && saved != nullptr)
+    {
+        deviceManager.initialise (0, 2, nullptr, true);
+        fresh = true;
+    }
+    if (fresh)
+    {
+        choosePreferredDriver(); // Linux: PipeWire, then JACK, then ALSA
+        chooseSafeBufferSize(); // no saved setup: a buffer with room for heavy projects (Settings › Audio changes it)
+    }
+    mark ("  engine: device opened");
+    deviceManager.addAudioCallback (this);
+    deviceStateSaver = std::make_unique<DeviceStateSaver> (*this);
+    prefetcher = std::make_unique<StreamPrefetcher> (transport);
+    prefetcher->update (song, samples);
+    // a project set while the device was not open yet (round 190go: the start-up song, built with the window): its
+    // inputs, FL insert inputs, hardware outputs and inserts open now, as they do when a project is opened
+    if (followProjectOnDevice())
+        publishSong();
+    mark ("  engine: callback + settings");
+}
+
+void AudioEngine::preloadDeviceDriver()
+{
+    if (juce::SystemStats::getEnvironmentVariable ("LYNX_ASIO_PRELOAD", {}) != "0") // (0: off, for an A/B)
+        preloadAsioDriver (audioDeviceFile());
+}
+
+void AudioEngine::openMidiDevices()
+{
+    if (! std::exchange (midiPending, false))
+        return;
+    midiOpen = true;
+    enableAllMidiInputs();
+    midiSync.configure (midiPrefs);
+    midiSync.sendAllNotesOff(); // FL's "Send all notes off": on init and after a render
+    deviceManager.addMidiInputDeviceCallback ({}, this); // {} = all inputs enabled
+    midiDevicesChanged = juce::MidiDeviceListConnection::make ([this] { enableAllMidiInputs(); });
+    if (startupMark != nullptr)
+        startupMark ("  engine: MIDI inputs");
 }
 
 AudioLogger& AudioEngine::getAudioLogger()
@@ -2751,14 +2782,14 @@ juce::File AudioEngine::controllerProfilesFolder() { return PluginHost::settings
 void AudioEngine::reloadControllerProfiles()
 {
     controllerIo.loadProfiles (controllerProfilesFolder());
-    if (prefetcher != nullptr)
+    if (midiOpen)
         enableAllMidiInputs();
     sendChangeMessage();
 }
 
 void AudioEngine::reconnectMidiInputs()
 {
-    if (prefetcher == nullptr) // (only with an audio device: the real app)
+    if (! midiOpen) // (only with an audio device: the real app, once its MIDI devices are open)
         return;
     for (const auto& device : juce::MidiInput::getAvailableDevices())
         if (deviceManager.isMidiInputDeviceEnabled (device.identifier))
@@ -2777,7 +2808,7 @@ void AudioEngine::setMidiPrefs (const prefs::MidiPrefs& p, bool save)
     footPedalNoteOff.store (p.footPedalNoteOff);
     if (! p.pickup)
         pickups.clear();
-    if (prefetcher != nullptr) // (only with an audio device: the real app)
+    if (midiOpen) // (only with an audio device: the real app, once its MIDI devices are open; they open with these)
     {
         enableAllMidiInputs();
         midiSync.configure (p);
@@ -3098,16 +3129,26 @@ void AudioEngine::setSong (Song newSong)
     // arming isn't saved: a new project starts disarmed; its inserts' audio inputs open the device input
     for (const auto t : std::vector<int> (armedInserts))
         setInsertArmed (t, false);
-    if (prefetcher != nullptr && ! hasAudioInput()
-        && std::any_of (song.mixer.begin(), song.mixer.end(), [] (const MixerTrack& t) { return t.inputChannel >= 0 || t.flInput >= 0; }))
+    followProjectOnDevice();
+
+    publishSong();
+}
+
+bool AudioEngine::followProjectOnDevice()
+{
+    if (prefetcher == nullptr) // (only with an audio device: the real app; see openAudioDevice)
+        return false;
+    if (! hasAudioInput() && std::any_of (song.mixer.begin(), song.mixer.end(), [] (const MixerTrack& t) { return t.inputChannel >= 0 || t.flInput >= 0; }))
         openAudioInput();
     // an FL project's insert inputs (REA round 157c): FL's list index on the device open now
-    if (prefetcher != nullptr && hasAudioInput())
+    auto changed = false;
+    if (hasAudioInput())
     {
         auto* device = deviceManager.getCurrentAudioDevice();
         const auto channels = device != nullptr ? device->getInputChannelNames().size() : 0;
         for (auto& t : song.mixer)
         {
+            changed = changed || t.flInput >= 0;
             if (t.flInput >= 0 && t.inputChannel < 0)
             {
                 const auto source = flInputSource (t.flInput, channels);
@@ -3118,10 +3159,8 @@ void AudioEngine::setSong (Song newSong)
         }
     }
     // hardware output targets and hardware inserts: their channels open with the project (the ones the device has)
-    if (prefetcher != nullptr)
-        openHardwareInsertIo();
-
-    publishSong();
+    openHardwareInsertIo();
+    return changed;
 }
 
 void AudioEngine::saveUndoStep()
@@ -4878,7 +4917,7 @@ void AudioEngine::applyTargetValues (const std::vector<std::pair<AutomationTarge
 void AudioEngine::timerCallback()
 {
     // MIDI inputs: open the enabled devices that appeared (or were not ready) and reopen the ones that came back
-    if (prefetcher != nullptr && ++midiCheckTicks >= 60) // every 2 s
+    if (midiOpen && ++midiCheckTicks >= 60) // every 2 s
     {
         midiCheckTicks = 0;
         enableAllMidiInputs();

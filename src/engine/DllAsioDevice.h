@@ -21,4 +21,11 @@ std::unique_ptr<juce::AudioIODeviceType> makeDllAsioDeviceType (const juce::Stri
 
 // The built-in LYNX ASIO type when lynx-asio.dll sits next to LYNX.exe and LYNX ASIO is not registered; else nullptr.
 std::unique_ptr<juce::AudioIODeviceType> makeBuiltInLynxAsioType();
+
+// Round 190go: when `savedSetup` (audio-device.xml) names a device of JUCE's "ASIO" type, that driver's DLL (its
+// registered InprocServer32) is loaded on a thread of its own and kept loaded. Opening the device on the message
+// thread then finds the module loaded: its load (DllMain, the driver's own signature check: ~0.35 s for FL Studio
+// ASIO) is off the start-up's path. Only LoadLibrary: no driver object is made and no COM call is made on that
+// thread. Returns at once; does nothing elsewhere, for another type or when the driver is not registered.
+void preloadAsioDriver (const juce::File& savedSetup);
 } // namespace lynx

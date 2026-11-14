@@ -74,7 +74,23 @@ public:
     // userPluginList = false: the plugin host neither reads nor writes LYNX's plugin list and settings, nor reads FL's
     // plugin database in the background (round 180b: an editor inside another host must not, and its close must not
     // wait for that reader)
-    explicit AudioEngine (bool openAudioDevice = true, int workerThreads = -1, bool userPluginList = true);
+    // deferDeviceOpen (round 190go, the app's start): the engine is ready to play but opens no device, MIDI port or
+    // prefetcher until openAudioDevice() / openMidiDevices() (the main window is built first). Until then it behaves
+    // like an engine without a device; play pressed meanwhile starts with the device.
+    explicit AudioEngine (bool openAudioDevice = true, int workerThreads = -1, bool userPluginList = true, bool deferDeviceOpen = false);
+    // The audio device of the last session (else the default) and the parts that live with it: the device types,
+    // the audio callback, the saved-setup watcher and the stream prefetcher; then the project's inputs, hardware
+    // outputs and inserts open on it (what opening a project does). Message thread (JUCE's ASIO type wants one thread
+    // for a driver's whole life). Does nothing when it is open already or the engine has no device.
+    void openAudioDevice();
+    // The MIDI inputs and the MIDI sync outputs (FL's MIDI settings). Message thread; once.
+    void openMidiDevices();
+    bool isAudioDeviceOpenPending() const noexcept { return devicePending; }
+    // Windows (round 190go): loads the DLL of the ASIO driver of the last session on a thread of its own, so the
+    // device open on the message thread finds it loaded (its load and signature check took ~0.35 s of the start).
+    // Only the module is loaded (no driver object, no COM call): the driver itself is still created, used and released
+    // on the message thread. Elsewhere, or for another device type: nothing.
+    static void preloadDeviceDriver();
     // Round 180b (LYNX's plugins in another host): this engine plays nothing, it serves an editor whose audio runs in the
     // plugin's own renderer. The editor's displays read that renderer's times and tap, and its running effect.
     void setExternalRuntime (ProcessTimes* times, std::function<std::shared_ptr<Effect>()> effect)
@@ -1161,6 +1177,8 @@ private:
     bool learningGlobal = false;
     bool controllerLearnTick = false; // a MIDI learn was waiting at this tick's applyControllers (round 190aw)
     bool saveGlobalLinks = false; // only the engine with an audio device (the app) writes the settings file
+    bool devicePending = false, midiPending = false, midiOpen = false; // (round 190go: see deferDeviceOpen)
+    bool followProjectOnDevice(); // true when the song changed (FL's insert inputs placed on the device)
     void applyControllers();
     std::atomic<int> pendingMarkerNote { -1 }; // MIDI thread -> timer: a "Song marker jump" note
     std::vector<RecordedEvent> uiRecorded;           // PC keyboard -> recording
