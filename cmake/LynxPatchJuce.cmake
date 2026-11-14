@@ -141,6 +141,11 @@
 #    links, automation recording) stayed stale. The mapped change now also goes to the edit controller (JUCE's
 #    parameter dispatcher, on the message thread) and to the host's value and listeners, as JUCE already does for a
 #    plugin's own output parameter changes.
+# 26. Every platform, juce_graphics/fonts/juce_SimpleShapedText.cpp (round 190gr): every ShapedTextOptions (one per text
+#    JUCE shapes: each drawText, drawFittedText, GlyphArrangement line) asked the OS for the display language. On Linux
+#    that is setlocale () with a walk over the LC_* / LANG variables (getenv, ~1 % of a whole-frame paint); on Windows
+#    a DLL load and GetUserPreferredUILanguages. The display language is now read once per run (the same text shaped
+#    with the same language: the same glyphs).
 #
 # Used by CMake (lynx_patch_juce on the fetched JUCE) and by scripts/build-windows-zig.sh, which runs this file with
 # `cmake -DJUCE_DIR=<a copy of JUCE's juce_gui_basics module> -P cmake/LynxPatchJuce.cmake`.
@@ -276,6 +281,9 @@ function(lynx_patch_juce_file file)
         lynx_juce_fix("no walk back over no glyphs" "LYNX patch (issue #142): no glyphs"
             "                        auto it = glyphs.cend();|NL||NL|                        while (--it != glyphs.begin())"
             "                        auto it = glyphs.cend();|NL||NL|                        // LYNX patch (issue #142): no glyphs (a font without a typeface), nothing to walk back over|NL|                        if (glyphs.empty())|NL|                            return it;|NL||NL|                        while (--it != glyphs.begin())")
+        lynx_juce_fix("display language read once" "LYNX patch (round 190gr): the display language"
+            "    String language = SystemStats::getDisplayLanguage();"
+            "    // LYNX patch (round 190gr): the display language, read once (it was the OS call at every shaped text)|NL|    String language = [] { static const String once = SystemStats::getDisplayLanguage(); return once; }();")
     elseif(file MATCHES "juce_Messaging_windows.cpp$")
         lynx_juce_fix("dispatch hook" "LYNX patch (issue #32): the message dispatch hook"
             "CheckEventBlockedByModalComps isEventBlockedByModalComps = nullptr;"

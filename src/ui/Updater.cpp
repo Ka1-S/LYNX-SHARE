@@ -1118,7 +1118,7 @@ public:
         using K = update::NoteLine::Kind;
         text.setWordWrap (juce::AttributedString::byWord);
         text.setLineSpacing (2.0f);
-        auto add = [this] (const juce::String& s, juce::FontOptions font, juce::Colour colour) { text.append (s, juce::Font (font), colour); };
+        auto add = [this] (const juce::String& s, const juce::Font& font, juce::Colour colour) { text.append (s, font, colour); };
         if (lines.empty())
             add (tr ("This release has no notes."), theme::font (theme::type::body), theme::colour::textSecondary);
         for (const auto& l : lines)

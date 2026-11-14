@@ -228,6 +228,7 @@ private:
     static constexpr int laneHeight = 72;
     juce::Rectangle<int> stepBounds (int row, int step) const;
     bool cellHasNote (int channel, int step) const;
+    std::vector<std::uint8_t> noteCellBits; // (paint: [channel * steps + step] a Piano Roll note starts there; round 190gr)
     void applyPaint (const juce::MouseEvent& e);
     juce::PopupMenu buildChannelMenu (int channel);
     void showChannelMenu (int channel);
