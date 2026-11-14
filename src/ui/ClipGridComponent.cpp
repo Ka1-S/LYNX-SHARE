@@ -1,4 +1,5 @@
 #include "ui/ClipGridComponent.h"
+#include "ui/PaintAB.h"
 #include "ui/PlaylistComponent.h"
 
 #include <algorithm>
@@ -1729,7 +1730,7 @@ private:
             if (const auto want = mixerHeight(); want != mixer->getHeight())
                 resized();
             // (its meters: repainted when they move, and while the song plays, as the whole grid was)
-            if (mixer->tick() || engine.getTransport().playing.load (std::memory_order_relaxed))
+            if (mixer->tick() || engine.getTransport().playing.load (std::memory_order_relaxed) || ! ui::paintSavings())
                 mixer->repaint();
         }
         // round 190ge: the whole grid was repainted 30 times a second, also with nothing playing. Now a change of what
@@ -1737,6 +1738,11 @@ private:
         // whose own state moved (a playing clip's progress, a blink, an arm) are repainted, header to status row
         const auto columns = juce::jmax (0, juce::jmin (columnCount(), launcher::maxTracks));
         const auto cells = cellArea();
+        if (! ui::paintSavings()) // (LYNX_PAINT_SAVINGS=0: the whole grid every tick, as before)
+        {
+            repaint();
+            return;
+        }
         if (const auto now = drawnState(); now != lastDrawnState || columnStates.size() != (std::size_t) columns)
         {
             lastDrawnState = now;

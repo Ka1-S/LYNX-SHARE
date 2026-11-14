@@ -2,6 +2,7 @@
 #include "ui/Motion.h"
 #include "ui/FileChoosers.h"
 #include "ui/PianoRollComponent.h"
+#include "ui/PaintAB.h"
 #include "core/ChordReadout.h"
 #include "core/KeyMap.h"
 #include "core/NoteNames.h"
@@ -898,8 +899,9 @@ void PianoRollComponent::paint (juce::Graphics& g)
     // every note drawn outside it (a rounded rectangle is a path to build and fill) was work for no pixel: the notes,
     // ghosts and velocity markers whose drawing lies wholly outside are skipped (the pixels stay the same)
     const auto dirtyArea = g.getClipBounds();
-    const auto outside = [&dirtyArea] (const juce::Rectangle<float>& r, float margin) {
-        return ! r.expanded (margin).getSmallestIntegerContainer().intersects (dirtyArea);
+    const auto cull = ui::paintSavings(); // (LYNX_PAINT_SAVINGS=0: everything drawn, as before)
+    const auto outside = [&dirtyArea, cull] (const juce::Rectangle<float>& r, float margin) {
+        return cull && ! r.expanded (margin).getSmallestIntegerContainer().intersects (dirtyArea);
     };
 
     // --- grid ------------------------------------------------------------

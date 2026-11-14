@@ -13,6 +13,7 @@
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
 #include "ui/ChannelRackComponent.h"
+#include "ui/PaintAB.h"
 #include "ui/PluginOffTag.h"
 #include "ui/SpeechDialog.h"
 #include "core/Patcherize.h"
@@ -930,7 +931,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
             const auto hovered = [this, row] (Area a) { return hoverRow == row && hoverArea == a; };
             // round 190ge: a playhead step repaints the selector column only (the selectors flash with the hits): the mute
             // LED, knobs, route box and name, all left of it, are drawn only when the repainted area reaches them
-            if (column.getX() < selectLeft())
+            if (column.getX() < selectLeft() || ! ui::paintSavings())
             {
                 const auto led = juce::Rectangle<float> (9.0f, (float) y + rowHeight / 2.0f - 4.5f, 9.0f, 9.0f);
                 g.setColour (theme::muteLed (channel.muted));
@@ -1044,7 +1045,7 @@ void ChannelRackComponent::paint (juce::Graphics& g)
         {
             const auto box = racklayout::addChannelBox (nameLeft(), nameWidth, addY, rowHeight);
             const auto addArea = juce::Rectangle<float> ((float) box.x, (float) box.y, (float) box.width, (float) box.height);
-            if (g.clipRegionIntersects (addArea.getSmallestIntegerContainer().expanded (1))) // (round 190ge: a playhead frame repaints the steps only)
+            if (g.clipRegionIntersects (addArea.getSmallestIntegerContainer().expanded (1)) || ! ui::paintSavings()) // (round 190ge: a playhead frame repaints the steps only)
             {
                 const float dash[] = { 3.0f, 3.0f };
                 juce::Path outline, dashed;
