@@ -196,7 +196,7 @@ Song makeSynth100 (int bars)
             clip.pattern = c;
             clip.track = c % 100;
             clip.start = (std::int64_t) b * 4 * ppq;
-            clip.length = p.effectiveLength (song.beatsPerBar);
+            clip.length = p.effectiveLength (song.meter());
             song.playlist.push_back (clip);
         }
     }
@@ -243,7 +243,7 @@ Song makeInserts50 (int bars)
         Clip clip;
         clip.pattern = 0;
         clip.start = (std::int64_t) b * 4 * ppq;
-        clip.length = p.effectiveLength (song.beatsPerBar);
+        clip.length = p.effectiveLength (song.meter());
         song.playlist.push_back (clip);
     }
     song.mode = PlayMode::song;
