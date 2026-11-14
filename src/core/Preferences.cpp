@@ -422,10 +422,11 @@ std::string MidiPrefs::toText() const
         out += "performanceChannel=" + std::to_string (performanceChannel) + "\n";
     if (gamepad)
         out += "gamepad=1\n";
+    // (round 190gl: "abletonLink", not "link": the global controller links are already saved as link=...)
     if (link)
-        out += "link=1\n";
+        out += "abletonLink=1\n";
     if (linkStartStopSync)
-        out += "linkStartStopSync=1\n";
+        out += "abletonLinkStartStopSync=1\n";
     // input=<enabled>|<midi channel>|<target>|<device name>
     for (const auto& i : inputs)
     {
@@ -505,9 +506,9 @@ MidiPrefs MidiPrefs::fromText (const std::string& text)
             p.performanceChannel = std::clamp (std::atoi (trim (value).c_str()), 0, 16);
         else if (key == "gamepad")
             p.gamepad = trim (value) == "1";
-        else if (key == "link")
+        else if (key == "abletonLink")
             p.link = trim (value) == "1";
-        else if (key == "linkStartStopSync")
+        else if (key == "abletonLinkStartStopSync")
             p.linkStartStopSync = trim (value) == "1";
         else if (key == "input")
         {

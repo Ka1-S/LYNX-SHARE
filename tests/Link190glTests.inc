@@ -166,12 +166,18 @@ TEST (link190gl_prefs_roundtrip_and_old_files)
     using namespace lynx::prefs;
     MidiPrefs p;
     CHECK (! p.link && ! p.linkStartStopSync); // off by default (the reference DAW: Start Stop Sync off)
-    CHECK (p.toText().find ("link") == std::string::npos); // (unchanged files while off)
+    CHECK (p.toText().find ("abletonLink") == std::string::npos); // (unchanged files while off)
     p.link = true;
     p.linkStartStopSync = true;
     const auto back = MidiPrefs::fromText (p.toText());
     CHECK (back.link && back.linkStartStopSync);
     CHECK (back == p);
+    // the controller links keep their own "link=" lines (round 190bt): they are not Ableton Link's switch
+    const auto both = MidiPrefs::fromText ("link=7|0|4|2|0|0\nabletonLink=1\n");
+    CHECK (both.link && ! both.linkStartStopSync && both.globalLinks.size() == 1 && both.globalLinks[0].cc == 7);
+    const auto mixed = MidiPrefs::fromText (both.toText());
+    CHECK (mixed == both);
+    CHECK (MidiPrefs::fromText ("link=7|0|4|2|0|0\n").globalLinks.size() == 1 && ! MidiPrefs::fromText ("link=7|0|4|2|0|0\n").link);
     // a file of an older version: both off
     const auto old = MidiPrefs::fromText ("velocity=linear\npickup=0\nfootPedal=1\n");
     CHECK (! old.link && ! old.linkStartStopSync);
