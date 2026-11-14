@@ -1954,6 +1954,16 @@ public:
             return;
         }
 
+        if (args.contains ("--paintbench"))
+        {
+            // LYNX --paintbench project.(flp|lynx|als) report.txt (round 190ge): each main view drawn off screen, whole, many
+            // times (the message thread's CPU per frame), with the playhead mid-song; no window, no audio device
+            const auto i = args.indexOf ("--paintbench");
+            runPaintBench (juce::File (args[i + 1].unquoted()), juce::File (args[i + 2].unquoted()));
+            quit();
+            return;
+        }
+
         if (args.contains ("--gridshot"))
         {
             // LYNX.exe --gridshot prefix [project]: the Clip-launch workflow's layout off-screen, with a grid of sample
@@ -9059,6 +9069,7 @@ private:
             int frame = -1;
             std::vector<double> times, rendered; // whole frames (event + paint + blit, when this timer paints) / the window's paints
             std::vector<double> frames;          // round 173f: the time of every frame the window painted (ui/FrameProbe.h)
+            double paintedPixels = 0.0;          // round 190ge: the dirty area of those frames, summed (overdraw / repaint storms)
             double setupMs = 0.0, wallStart = 0.0;
             double cpuStart = 0.0; // process CPU seconds (std::clock is wall time on Windows)
             double messageCpuStart = 0.0; // the message thread's CPU seconds
@@ -9096,6 +9107,7 @@ private:
                     times.clear();
                     rendered.clear();
                     frames.clear();
+                    paintedPixels = 0.0;
                     wallStart = juce::Time::getMillisecondCounterHiRes();
                     cpuStart = lynx::processCpuSeconds();
                     messageCpuStart = lynx::threadCpuSeconds();
@@ -9121,6 +9133,7 @@ private:
                      << "    painted frames: " << stats (rendered) << "\n"
                      << "    timed here (event + paint + blit): " << stats (times)
                      << "\n    window frames (probe): " << lynx::ui::FrameStats::of (frames, wall).describe()
+                     << ", painted " << juce::String (wall > 0.0 ? paintedPixels / wall / 1000.0 : 0.0, 2) << " Mpx/s"
                      << "\n    CPU " << juce::String (wall > 0.0 ? 100.0 * cpu / wall : 0.0, 0) << "% (process, " << juce::String (wall / 1000.0, 1) << " s), message thread "
                      << juce::String (wall > 0.0 ? 100.0 * messageCpu / wall : 0.0, 1) << "%, audio device "
                      << juce::String (audioLoadTicks > 0 ? 100.0 * audioLoadSum / audioLoadTicks : 0.0, 1) << "%\n";
@@ -9182,7 +9195,10 @@ private:
         auto drag = std::make_shared<UiPerfDrag>();
         mainWindow->watchFrames ([r = run.get(), drag] (double now, juce::Rectangle<int> area) {
             if (r->frame >= 0)
+            {
                 r->frames.push_back (now);
+                r->paintedPixels += (double) area.getWidth() * (double) area.getHeight();
+            }
             drag->framePainted (now, area);
         });
         run->text << "project: " << project.getFullPathName() << "\n"
@@ -9276,6 +9292,29 @@ private:
         run->steps.push_back ({ "whole window repainted", {}, [this] (int) { mainWindow->repaint(); }, 40 });
         run->steps.push_back ({ "channel rack scroll", [ui] { ui->selectTabForSnapshot (0); },
                                  [wheelAt, ui, none] (int f) { wheelAt (ui->getRackViewportForSnapshot(), 0.0f, f < 30 ? -0.25f : 0.25f, none); }, 60 });
+        // round 190ge: the other main views while the pattern plays, then every view with the transport stopped and
+        // nothing moving (an idle view should paint nothing: its frames and painted area are the repaint storms), then
+        // the Clip-launch grid playing
+        auto playPattern = [this] {
+            engine->getTransport().songMode = false;
+            engine->rewind();
+            engine->play();
+        };
+        run->steps.push_back ({ "piano roll maximised, pattern playing", [ui, playPattern] { ui->selectTabForSnapshot (1); playPattern(); }, {}, 3000 });
+        run->steps.push_back ({ "channel rack maximised, pattern playing", [ui, playPattern] { ui->selectTabForSnapshot (0); playPattern(); }, {}, 3000 });
+        const char* idleViews[] { "channel rack", "piano roll", "playlist", "mixer" };
+        for (int view = 0; view < 4; ++view)
+            run->steps.push_back ({ juce::String ("idle: ") + idleViews[view] + ", stopped", [this, ui, view] { engine->stop(); ui->selectTabForSnapshot (view); }, {}, 3000 });
+        run->steps.push_back ({ "idle: desktop, stopped", [this, ui] { engine->stop(); ui->showDesktopForSnapshot (false); }, {}, 3000 });
+        run->steps.push_back ({ "clip grid, song playing", [this, ui] {
+                                   ui->selectTabForSnapshot (2);
+                                   ui->setClipLaunchWorkflow (true);
+                                   ui->setClipGridView (lynx::PlaylistArea::GridView::grid);
+                                   engine->getTransport().songMode = true;
+                                   engine->rewind();
+                                   engine->play();
+                               }, {}, 3000 });
+        run->steps.push_back ({ "idle: clip grid, stopped", [this] { engine->stop(); }, {}, 3000, [ui] { ui->setClipLaunchWorkflow (false); return juce::String(); } });
         // LYNX_UIPERF_ONLY=text: only the steps whose name has that text
         if (const auto only = juce::SystemStats::getEnvironmentVariable ("LYNX_UIPERF_ONLY", {}); only.isNotEmpty())
             run->steps.erase (std::remove_if (run->steps.begin(), run->steps.end(), [&only] (const auto& s) { return ! juce::String (s.name).contains (only); }), run->steps.end());
@@ -16973,6 +17012,107 @@ private:
         flush();
         data.deleteRecursively();
         return failures == 0;
+    }
+
+    // --paintbench (round 190ge): the paint cost of every main view, off screen. Each view is shown maximised in a
+    // LYNX_SNAPSHOT_SIZE window (default 1920x1080) and drawn whole into a picture `frames` times (after a repaint of
+    // all of it, so no cached picture is reused: the cost of a frame after an edit), then `frames` times without the
+    // repaint (what a view's own caches leave of a frame). The report gives the median and the 90th percentile of
+    // the message thread's CPU per frame.
+    void runPaintBench (const juce::File& project, const juce::File& report)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        lynx::MainComponent ui (offline, false);
+        const auto size = juce::StringArray::fromTokens (juce::SystemStats::getEnvironmentVariable ("LYNX_SNAPSHOT_SIZE", "1920x1080"), "x", "");
+        ui.setSize (juce::jlimit (800, 3840, size[0].getIntValue()), juce::jlimit (450, 2160, size[1].getIntValue()));
+        juce::String text;
+        text << "project: " << project.getFullPathName() << "\nLYNX " << getApplicationVersion() << ", " << juce::SystemStats::getCpuModel()
+             << ", window " << ui.getWidth() << "x" << ui.getHeight() << "\n";
+        if (project.existsAsFile())
+        {
+            ui.openFile (project);
+            offline.dispatchPendingMessages();
+        }
+        const auto& song = offline.getSong();
+        text << "channels " << (int) song.channels.size() << ", patterns " << (int) song.patterns.size() << ", playlist clips " << (int) song.playlist.size()
+             << ", inserts " << (int) song.mixer.size() << "\n";
+        // the playhead a third into the song (song mode) so the views draw it as when playing
+        offline.getTransport().songMode = true;
+        offline.getTransport().positionTicks.store ((double) song.songLength() / 3.0);
+        const auto frames = juce::jlimit (3, 500, juce::SystemStats::getEnvironmentVariable ("LYNX_PAINTBENCH_FRAMES", "40").getIntValue());
+        juce::Image image (juce::Image::ARGB, ui.getWidth(), ui.getHeight(), true);
+        // the picture's pixels as one number: the same before and after a change = the same drawing
+        auto pixelHash = [&image] {
+            const juce::Image::BitmapData data (image, juce::Image::BitmapData::readOnly);
+            std::uint64_t h = 1469598103934665603ull;
+            for (int y = 0; y < data.height; ++y)
+                for (int x = 0; x < data.width; ++x)
+                    h = (h ^ data.getPixelColour (x, y).getARGB()) * 1099511628211ull;
+            return juce::String::toHexString ((juce::int64) h);
+        };
+        // mode 0: whole frames after a repaint of everything; 1: whole frames, the views' own caches kept; 2: a 14-pixel
+        // column of the whole height at 40 places (what a moving playhead repaints each frame)
+        auto measure = [&] (const juce::String& name, int mode) {
+            offline.dispatchPendingMessages();
+            std::vector<double> ms;
+            juce::String hash;
+            for (int f = -3; f < frames; ++f) // (3 frames to warm the caches up)
+            {
+                if (mode == 0)
+                    ui.repaint();
+                const auto column = juce::Rectangle<int> ((juce::jmax (0, f) * 97) % juce::jmax (1, ui.getWidth() - 14), 0, 14, ui.getHeight());
+                const auto t0 = lynx::threadCpuSeconds();
+                {
+                    juce::Graphics g (image);
+                    if (mode == 2)
+                        g.reduceClipRegion (column);
+                    ui.paintEntireComponent (g, true);
+                }
+                if (f >= 0)
+                    ms.push_back (1000.0 * (lynx::threadCpuSeconds() - t0));
+                if (f == 0 && mode == 0)
+                    hash = pixelHash();
+            }
+            std::sort (ms.begin(), ms.end());
+            text << name << (mode == 0 ? ", whole frame" : mode == 1 ? ", cached frame" : ", playhead column") << ": median "
+                 << juce::String (ms[ms.size() / 2], 3) << " ms, p90 " << juce::String (ms[(ms.size() * 9) / 10], 3) << " ms"
+                 << (hash.isNotEmpty() ? ", pixels " + hash : juce::String()) << "\n";
+            report.replaceWithText (text);
+        };
+        auto measureAll = [&] (const juce::String& name) {
+            measure (name, 0);
+            measure (name, 1);
+            measure (name, 2);
+            // the columns' pixels too (painted over the whole frame: culling must not change a pixel)
+            ui.repaint();
+            {
+                juce::Graphics g (image);
+                ui.paintEntireComponent (g, true);
+                for (int x = 3; x < ui.getWidth() - 14; x += 211)
+                {
+                    juce::Graphics::ScopedSaveState state (g);
+                    g.reduceClipRegion (x, 0, 14, ui.getHeight());
+                    ui.paintEntireComponent (g, true);
+                }
+            }
+            text << name << ", columns over the whole frame: pixels " << pixelHash() << "\n";
+        };
+        const char* views[] { "channel rack", "piano roll", "playlist", "mixer" };
+        for (int v = 0; v < 4; ++v)
+        {
+            ui.selectTabForSnapshot (v);
+            measureAll (views[v]);
+        }
+        ui.showDesktopForSnapshot (false);
+        measureAll ("desktop");
+        ui.selectTabForSnapshot (2);
+        ui.setClipLaunchWorkflow (true);
+        ui.setClipGridView (lynx::PlaylistArea::GridView::grid);
+        measureAll ("clip grid");
+        ui.setClipLaunchWorkflow (false);
+        text << "result=OK\n";
+        report.replaceWithText (text);
     }
 
     void runGridShot (const juce::String& prefix, const juce::String& projectPath = {})
