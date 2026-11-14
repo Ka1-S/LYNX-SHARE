@@ -45,14 +45,29 @@ MODULES=(juce_core juce_data_structures juce_events juce_graphics juce_gui_basic
 # only replace the file if it changed, so the module cache is not invalidated
 cmp -s "$OUT/JuceConfig.h.new" "$OUT/JuceConfig.h" 2>/dev/null && rm "$OUT/JuceConfig.h.new" || mv "$OUT/JuceConfig.h.new" "$OUT/JuceConfig.h"
 
-COMMON=(-target "$TARGET" -std=c++20 -O2 -DNDEBUG=1 -fno-sanitize=undefined
+# Release optimisation (round toolchain190gt; numbers in docs/PLATFORMS.md "Release optimisation"):
+#  LYNX_WIN_OPT  the optimisation flags of LYNX's and JUCE's C++, default -O2. (zig gives -O3 the same code as -O2; a
+#                real -O3 is "-O2 -Xclang -O3". -fno-math-errno gained nothing on Windows (-3..0 %) and on MinGW
+#                it turns sin + cos of one value into a call of the C runtime's sincos. )
+#  LYNX_WIN_LTO  thin = ThinLTO for LYNX's own objects (JUCE's modules stay out), default 0: measured on Windows it gained
+#                0-14 % (streaming most) but made the FL Harmless engine 1.5x slower (fixed by keeping Harmless.cpp
+#                out of it), for a 15-25 minute link. Off until each engine is checked under it.
+#  LYNX_WIN_GC   1 = the link drops unreferenced code and folds identical functions (see "Linking" below), default 1.
+# -ffp-contract=off always, as CMakeLists.txt does for Linux and macOS: no fused multiply-add, so the FL-exact engines keep
+# their operation order whatever CPU the code is built for (baseline x86-64 has no FMA, so today it changes nothing).
+LYNX_WIN_OPT="${LYNX_WIN_OPT:--O2}"
+LYNX_WIN_LTO="${LYNX_WIN_LTO:-0}"
+LYNX_WIN_GC="${LYNX_WIN_GC:-1}"
+read -ra WIN_OPT <<< "$LYNX_WIN_OPT"
+WIN_LTO=(); [[ "$LYNX_WIN_LTO" == thin ]] && WIN_LTO=(-flto=thin)
+COMMON=(-target "$TARGET" -std=c++20 "${WIN_OPT[@]}" "${WIN_LTO[@]}" -ffp-contract=off -DNDEBUG=1 -fno-sanitize=undefined
         -include "$OUT/JuceConfig.h" -include cmake/mingw/mingw_compat.h
         -I"$OUT/shim" -I"$JUCE_DIR/modules" -I"$JUCE_DIR/modules/juce_audio_processors/format_types/VST3_SDK" -Ithird_party/clap/include -Ithird_party/wavpack/include -Ithird_party/vorbis/include -Ithird_party/lame/include -Ithird_party/asiosdk/common -Ithird_party/sse2neon -Ithird_party/pocketpy -Ithird_party/monocypher -Ithird_party/onnxruntime -Isrc)
 # The plugins (LYNX_BUILD_PLUGINS=1 below) link these objects with --gc-sections: with a section per function and per
 # datum the linker drops what a plugin never reaches (round 180b measured 32 % on Linux). Plugin builds only, so the app's
 # objects and their cache entries stay as they are (LYNX_PLUGIN_SECTIONS=0 turns it off).
-if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 && "${LYNX_PLUGIN_SECTIONS:-1}" == 1 ]]; then
-    COMMON+=(-ffunction-sections -fdata-sections)
+if [[ "$LYNX_WIN_GC" == 1 || ( "${LYNX_BUILD_PLUGINS:-0}" == 1 && "${LYNX_PLUGIN_SECTIONS:-1}" == 1 ) ]]; then
+    COMMON+=(-ffunction-sections -fdata-sections -faddrsig)
 fi
 
 # juce_gui_basics, juce_audio_processors, juce_graphics and juce_events are compiled from patched copies
@@ -147,6 +162,11 @@ export ZIG OUT JUCE_DIR TARGET GUI_BASICS_SRC AUDIO_PROCESSORS_SRC GRAPHICS_SRC 
 export -f cached cached_pp
 mkdir -p "$OBJ_CACHE" && find "$OBJ_CACHE" -maxdepth 1 -type f -mtime +10 -delete 2>/dev/null || true
 export COMMON_STR="${COMMON[*]}"
+# JUCE's modules without LTO (round toolchain190gt): LYNX's audio code is in LYNX's own objects, and the big unity modules
+# made the ThinLTO link several times longer for UI code
+JUCE_COMMON=(); for a in "${COMMON[@]}"; do [[ "$a" == -flto* ]] || JUCE_COMMON+=("$a"); done
+export JUCE_COMMON_STR="${JUCE_COMMON[*]}"
+export NOLTO_COMMON_STR="$JUCE_COMMON_STR"
 
 echo "Compiling JUCE modules (cached)..."
 # the modules and the extra units JUCE's CMake compiles along with them, in one parallel pool
@@ -172,7 +192,7 @@ for m in "${MODULES[@]}" juce_core_CompilationTime juce_graphics_Harfbuzz juce_g
         if [[ "$m" == juce_graphics_Sheenbidi ]]; then
             cached "$obj" "$JUCE_DIR" -- "$ZIG" cc -target "$TARGET" -O2 -w -DJUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1 -I"$JUCE_DIR/modules" -c "$JUCE_DIR/modules/juce_graphics/juce_graphics_Sheenbidi.c" -o "$obj"
         else
-            cached "$obj" "$key" -- $ZIG c++ $COMMON_STR $extra -w -c "$src" -o "$obj"
+            cached "$obj" "$key" -- $ZIG c++ $JUCE_COMMON_STR $extra -w -c "$src" -o "$obj"
         fi
     fi'
 
@@ -359,7 +379,8 @@ printf '%s\n' "${APP_SOURCES[@]}" | xargs -P "$JOBS" -I{} bash -c '
     extra=""; [[ "$src" == src/platform/CrashGuard.cpp ]] && extra="-fms-extensions"
     [[ "$src" == src/ui/CrashReporter.cpp ]] && extra="-iquote $OUT"
     [[ "$src" == src/engine/AbletonLink.cpp ]] && extra="-isystem third_party/link/include -isystem third_party/link/asio/include"
-    cached_pp "$obj" -- $ZIG c++ $COMMON_STR $extra -Wall -Wextra -Werror=return-type -c "$src" -o "$obj"'
+    common="$COMMON_STR"; [[ "$src" == src/core/Harmless.cpp ]] && common="$NOLTO_COMMON_STR" # (1.5x slower under ThinLTO)
+    cached_pp "$obj" -- $ZIG c++ $common $extra -Wall -Wextra -Werror=return-type -c "$src" -o "$obj"'
 
 # 2026-11-04: an object whose source left APP_SOURCES (another branch's build in this folder) must not be linked
 # by the app/*.o glob below: it broke unrelated landings with undefined symbols.
@@ -388,8 +409,48 @@ APP_LIBS=(-lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lshlwapi -lversion -lwinin
           -lgdi32 -luser32 -lcomctl32 -lshell32 -ladvapi32 -lrpcrt4 -ldbghelp -lsetupapi -luxtheme -ldwmapi
           -ld2d1 -ldcomp -ldwrite -ldxgi -ld3d11 -ldxguid -lwsock32 -lopengl32 -lpropsys -lmfplat -lmfreadwrite -lmfuuid -lksuser -lavrt -lwinhttp -lbcrypt
           -liphlpapi) # (iphlpapi: Ableton Link's network interfaces, round 190gl)
-"$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/LYNX.exe" "$OUT"/juce/*.o "${APP_OBJECTS[@]}" "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res" \
-    -Wl,--subsystem,windows "${APP_LIBS[@]}"
+link_start=$(date +%s)
+LINK_INPUTS=("$OUT"/juce/*.o "${APP_OBJECTS[@]}" "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res")
+plain_link() {
+    "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -o "$OUT/LYNX.exe" "${LINK_INPUTS[@]}" -Wl,--subsystem,windows "${APP_LIBS[@]}"
+}
+# LYNX_WIN_GC=1 (round toolchain190gt): zig links with -DEBUG (LYNX.pdb, for the crash reports) and passes no -OPT flag,
+# so lld keeps every function of every object (-opt:noref -opt:noicf), and zig refuses -Wl,--gc-sections / --icf for
+# COFF. So the link runs through zig's own lld-link with the command zig itself builds (taken from the link of a stub
+# object with the same flags and libraries: the C runtime, libc++, the import libraries), the stub replaced by LYNX's
+# objects, plus -OPT:REF (drop what nothing references) and -OPT:SAFEICF (fold identical functions whose address is never
+# taken, from the objects' address-significance tables, -faddrsig). One link, ThinLTO included. If that cannot be
+# done, the plain zig link runs instead.
+gc_link() {
+    printf 'int main() { return 0; }\n' > "$OUT/linkstub.cpp"
+    "$ZIG" c++ -target "$TARGET" -c "$OUT/linkstub.cpp" -o "$OUT/linkstub.o" || return 1
+    local line args=() a
+    line="$(ZIG_VERBOSE_LINK=1 "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -o "$OUT/linkstub.exe" "$OUT/linkstub.o" \
+        -Wl,--subsystem,windows "${APP_LIBS[@]}" 2>&1 > /dev/null | grep -m 1 '^lld-link ')" || return 1
+    read -ra LINK_CMD <<< "$line"
+    for a in "${LINK_CMD[@]:1}"; do
+        case "$a" in
+            "$OUT/linkstub.o") args+=("${LINK_INPUTS[@]}") ;;
+            -OUT:*) args+=("-OUT:$OUT/LYNX.exe") ;;
+            -PDB:*) args+=("-PDB:$OUT/LYNX.pdb") ;;
+            -PDBALTPATH:*) args+=("-PDBALTPATH:LYNX.pdb") ;;
+            -IMPLIB:*) ;;
+            *) args+=("$a") ;;
+        esac
+    done
+    [[ " ${args[*]} " == *" $OUT/LYNX.res "* ]] || return 1
+    rm -f "$OUT/linkstub".*
+    # ThinLTO: one backend job per build job (lld's default is the physical cores: 2 on a 4-thread CI runner), and a cache
+    # so a relink after a small change recompiles only the modules that changed
+    [[ ${#WIN_LTO[@]} -gt 0 ]] && args+=("-OPT:lldltojobs=$JOBS" "-lldltocache:$OUT/ltocache")
+    "$ZIG" lld-link "${args[@]}" -OPT:REF -OPT:SAFEICF
+}
+if [[ "$LYNX_WIN_GC" == 1 ]]; then
+    gc_link || { echo "warning: the -OPT:REF link did not run; plain link" >&2; plain_link; }
+else
+    plain_link
+fi
+echo "link: $(( $(date +%s) - link_start )) s"
 
 ls -la "$OUT/LYNX.exe"
 
@@ -411,7 +472,7 @@ if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
     }
     plugin_link() { # <output> <objects...>
         local output="$1"; shift
-        "$ZIG" c++ -target "$TARGET" -O2 -shared -s -o "$output" "$@" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/plugin/LynxPlugin.res" "${PLUGIN_LIBS[@]}" -Wl,--gc-sections
+        "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -shared -s -o "$output" "$@" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/plugin/LynxPlugin.res" "${PLUGIN_LIBS[@]}" -Wl,--gc-sections
         rm -f "$(dirname "$output")"/*.lib "$(dirname "$output")"/*.pdb # (the linker's import library: not part of a plugin)
     }
     ( cd resources && "$ZIG" rc /fo "$OUT_ABS/plugin/LynxPlugin.res" LynxPlugin.rc )
@@ -431,6 +492,6 @@ if [[ "${LYNX_BUILD_PLUGINS:-0}" == 1 ]]; then
     done < <(sed -nE 's/^LYNX_PLUGIN \("([^"]+)", ([01]), [^,]+, [^,]+, "[^"]+", (0x[0-9a-f]+), "([^"]+)", ([12])\)$/\1~\2~\3~\4~\5/p' src/plugin/plugins.def)
     plugin_cxx "$OUT/plugin/plugexporttest.o" tools/plugexporttest.cpp -Wall -Wextra
     plugin_cxx_link=("$OUT/plugin/plugexporttest.o" "$OUT/plugin/ExportProcessor.o" "${PLUGIN_OBJECTS[@]}" "$OUT"/juce/*.o "$OUT"/wavpack/*.o "$OUT"/vorbis/*.o "$OUT"/lame/*.o "$OUT"/pocketpy/*.o "$OUT"/monocypher/*.o "$OUT/LYNX.res")
-    "$ZIG" c++ -target "$TARGET" -O2 -o "$OUT/plugexporttest.exe" "${plugin_cxx_link[@]}" "${PLUGIN_LIBS[@]}"
+    "$ZIG" c++ -target "$TARGET" "${WIN_OPT[@]}" "${WIN_LTO[@]}" -o "$OUT/plugexporttest.exe" "${plugin_cxx_link[@]}" "${PLUGIN_LIBS[@]}"
     ls -la "$OUT"/plugins/*.clap "$OUT"/plugins/*/Contents/x86_64-win/*
 fi

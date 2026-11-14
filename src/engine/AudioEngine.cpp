@@ -51,6 +51,7 @@
 #include "engine/PipeWireDevice.h"
 #include "platform/LinuxRealtime.h"
 #include "engine/PowerHints.h"
+#include "platform/PowerThrottling.h"
 #include "engine/Metronome.h"
 #include "core/NoteTools.h"
 #include "core/VfxScript.h"
@@ -63,6 +64,9 @@
 #if JUCE_WINDOWS
  #include <windows.h>
 #elif JUCE_MAC
+ #include <mach/mach.h>
+ #include <mach/mach_time.h>
+ #include <mach/thread_policy.h>
  #include <pthread.h>
  #include <sys/qos.h>
 #elif JUCE_LINUX || JUCE_BSD
@@ -244,6 +248,44 @@ void enableCompositorMmcss() noexcept
 
 namespace
 {
+#if JUCE_WINDOWS
+// what the audio threads reached (round toolchain190gt, REA 190hc: LYNX's were seen at dynamic priority 15 in some runs
+// and 24-25 in others, Live's always at 26): threads raised, how many joined MMCSS at CRITICAL, their thread priority
+std::atomic<int> rtThreadsRaised { 0 }, rtThreadsMmcss { 0 }, rtThreadsCritical { 0 };
+std::atomic<int> rtPriorityMin { 1000 }, rtPriorityMax { -1000 };
+
+// The process priority class (round toolchain190gt, REA 190hb): Windows' WinMM driver (wdmaud2.drv) raises a process
+// that opens a WinMM device to HIGH (and asks REALTIME), FL's and LYNX's alike, so the UI, decoders, prefetch and plugin
+// scans ran above every normal program; FL itself asks ABOVE_NORMAL. LYNX_PRIORITY_CLASS=above asks ABOVE_NORMAL when a
+// device starts (and again 2 s later, after the MIDI ports), relying on MMCSS for the audio threads. Default: left as
+// Windows sets it — measured with --rtstress (Exoplanet, 10 ms buffer, 3 x 3000 callbacks each, loaded PC): HIGH 0
+// callbacks over the deadline, ABOVE_NORMAL 1, the same average load; a 64-sample run was not possible on this PC.
+std::atomic<unsigned long> priorityClassFound { 0 }, priorityClassNow { 0 };
+void choosePriorityClass() noexcept
+{
+    static const auto keep = juce::SystemStats::getEnvironmentVariable ("LYNX_PRIORITY_CLASS", {}) != "above";
+    const auto found = GetPriorityClass (GetCurrentProcess());
+    if (priorityClassFound.load (std::memory_order_relaxed) == 0 || found != ABOVE_NORMAL_PRIORITY_CLASS)
+        priorityClassFound.store (found, std::memory_order_relaxed);
+    if (! keep && found != ABOVE_NORMAL_PRIORITY_CLASS)
+        SetPriorityClass (GetCurrentProcess(), ABOVE_NORMAL_PRIORITY_CLASS);
+    priorityClassNow.store (GetPriorityClass (GetCurrentProcess()), std::memory_order_relaxed);
+}
+juce::String priorityClassName (unsigned long c)
+{
+    switch (c)
+    {
+        case IDLE_PRIORITY_CLASS: return "idle";
+        case BELOW_NORMAL_PRIORITY_CLASS: return "below normal";
+        case NORMAL_PRIORITY_CLASS: return "normal";
+        case ABOVE_NORMAL_PRIORITY_CLASS: return "above normal";
+        case HIGH_PRIORITY_CLASS: return "high";
+        case REALTIME_PRIORITY_CLASS: return "realtime";
+        default: return c == 0 ? juce::String ("not seen") : juce::String::toHexString ((juce::int64) c);
+    }
+}
+#endif
+
 // Audio workers with real-time priority (MMCSS "Pro Audio" on Windows, like the driver; QoS class on macOS; SCHED_FIFO
 // on Linux when allowed).
 void raiseAudioThreadPriority()
@@ -255,7 +297,9 @@ void raiseAudioThreadPriority()
             return reinterpret_cast<AvSet> (reinterpret_cast<void*> (GetProcAddress (avrt, "AvSetMmThreadCharacteristicsW")));
         return nullptr;
     }();
-    // FL's audio worker threads also raise their MMCSS priority to "high" (FLEngine_x64.dll, REA round 87)
+    // FL's audio worker threads raise their MMCSS priority to "high" (FLEngine_x64.dll, REA round 87); Live's to "critical"
+    // (REA round 190hc: its 22 audio threads sat at dynamic priority 26 in every snapshot), which LYNX uses since round
+    // toolchain190gt
     using AvPriority = int (__stdcall*) (void*, int);
     static const auto avPriority = [] () -> AvPriority {
         if (auto* avrt = LoadLibraryW (L"avrt.dll"))
@@ -266,11 +310,20 @@ void raiseAudioThreadPriority()
 
     if (auto* handle = avSet != nullptr ? avSet (L"Pro Audio", &task) : nullptr)
     {
-        if (avPriority != nullptr)
+        rtThreadsMmcss.fetch_add (1, std::memory_order_relaxed);
+        if (avPriority != nullptr && avPriority (handle, 2 /* AVRT_PRIORITY_CRITICAL */) != 0)
+            rtThreadsCritical.fetch_add (1, std::memory_order_relaxed);
+        else if (avPriority != nullptr)
             avPriority (handle, 1 /* AVRT_PRIORITY_HIGH */);
     }
     else
         SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+    // and full speed while LYNX is in the background (no EcoQoS: platform/PowerThrottling.h, round toolchain190gt)
+    power::optOutOfPowerThrottling();
+    const auto reached = GetThreadPriority (GetCurrentThread());
+    rtThreadsRaised.fetch_add (1, std::memory_order_relaxed);
+    for (auto low = rtPriorityMin.load(); reached < low && ! rtPriorityMin.compare_exchange_weak (low, reached);) {}
+    for (auto high = rtPriorityMax.load(); reached > high && ! rtPriorityMax.compare_exchange_weak (high, reached);) {}
    #elif JUCE_MAC
     // the highest quality-of-service class: scheduled like the UI's own interactive work, on the performance cores
     pthread_set_qos_class_self_np (QOS_CLASS_USER_INTERACTIVE, 0);
@@ -283,6 +336,23 @@ void raiseAudioThreadPriority()
         rt::noteAudioThread (false); // RealtimeKit / the portal may grant it (round 161)
    #endif
 }
+
+#if JUCE_MAC
+// The calling thread becomes a time-constraint (real-time) thread with the device's buffer as its period: about half of
+// it to compute, the whole of it as the deadline. Apple's audio workgroups take only such threads (os_workgroup_join
+// fails with EINVAL before; research round 190gs B1).
+void becomeTimeConstraintThread (double blockMs) noexcept
+{
+    mach_timebase_info_data_t timebase {};
+    if (mach_timebase_info (&timebase) != KERN_SUCCESS || timebase.numer == 0)
+        return;
+    const auto ticks = [&] (double ms) { return (uint32_t) (ms * 1.0e6 * (double) timebase.denom / (double) timebase.numer); };
+    const auto period = juce::jlimit (0.5, 50.0, blockMs); // (above 50 ms the kernel refuses the policy)
+    thread_time_constraint_policy_data_t policy { ticks (period), ticks (0.5 * period), ticks (period), 1 };
+    thread_policy_set (pthread_mach_thread_np (pthread_self()), THREAD_TIME_CONSTRAINT_POLICY, (thread_policy_t) &policy,
+                       THREAD_TIME_CONSTRAINT_POLICY_COUNT);
+}
+#endif
 
 int workerCount()
 {
@@ -5724,6 +5794,12 @@ juce::String AudioEngine::describeRealtime (bool withUnits) const
             text << "  device thread priority " << before << (deviceThreadPriorityAfter.load (std::memory_order_relaxed) != before
                                                                 ? " -> " + juce::String (deviceThreadPriorityAfter.load (std::memory_order_relaxed)) + " (raised to MMCSS Pro Audio)"
                                                                 : juce::String (boostDeviceThread ? " (kept)" : " (kept: LYNX_DEVICE_BOOST=0)")) << "\n";
+        if (const auto raised = rtThreadsRaised.load (std::memory_order_relaxed); raised > 0)
+            text << "  audio threads raised " << raised << ": MMCSS Pro Audio " << rtThreadsMmcss.load (std::memory_order_relaxed)
+                 << " (critical " << rtThreadsCritical.load (std::memory_order_relaxed) << "), thread priority "
+                 << rtPriorityMin.load (std::memory_order_relaxed) << ".." << rtPriorityMax.load (std::memory_order_relaxed) << "\n";
+        text << "  process priority class " << priorityClassName (priorityClassNow.load (std::memory_order_relaxed)) << " (found "
+             << priorityClassName (priorityClassFound.load (std::memory_order_relaxed)) << ")\n";
        #endif
     }
     else
@@ -6477,6 +6553,8 @@ void AudioEngine::audioDeviceIOCallbackWithContext (const float* const* inputCha
         deviceThreadPriorityBefore.store (before, std::memory_order_relaxed);
         if (boostDeviceThread && before < THREAD_PRIORITY_TIME_CRITICAL)
             raiseAudioThreadPriority();
+        else
+            power::optOutOfPowerThrottling(); // (a driver's own time-critical thread too: no EcoQoS, round toolchain190gt)
         deviceThreadPriorityAfter.store (GetThreadPriority (GetCurrentThread()), std::memory_order_relaxed);
     }
    #endif
@@ -6843,12 +6921,87 @@ void AudioEngine::audioDeviceAboutToStart (juce::AudioIODevice* device)
     hwOutput.clear();
     hwOutput.active.store (true);
     player.audioDeviceAboutToStart (device);
+    joinDeviceWorkgroup (device);
+    if (! processFullSpeed) // (Windows: the process stays out of EcoQoS while a device is open, round toolchain190gt)
+    {
+        processFullSpeed = true;
+        power::holdProcessFullSpeed (true);
+    }
+   #if JUCE_WINDOWS
+    choosePriorityClass();
+    juce::Timer::callAfterDelay (2000, [] { choosePriorityClass(); }); // (after the MIDI ports: WinMM raises it again)
+   #endif
 }
 
 void AudioEngine::audioDeviceStopped()
 {
     hwOutput.active.store (false);
     player.audioDeviceStopped();
+    joinDeviceWorkgroup (nullptr);
+    if (processFullSpeed)
+    {
+        processFullSpeed = false;
+        power::holdProcessFullSpeed (false);
+    }
+}
+
+// macOS (round toolchain190gt): the render workers join the device's audio workgroup (os_workgroup, macOS 11+), so the
+// scheduler runs them with the device's I/O thread as one real-time job with the buffer's deadline: on Apple silicon,
+// on the performance cores. Each worker joins on its own thread (WorkerPool::setThreadRefresh) the next time it wakes,
+// first becoming a time-constraint thread. A stopped device: the workers leave. LYNX_WORKGROUP=0 turns it off.
+// Elsewhere this does nothing (Windows: MMCSS "Pro Audio" and no EcoQoS; Linux: SCHED_FIFO / RealtimeKit, round 161).
+struct AudioEngine::DeviceWorkgroup
+{
+    juce::SpinLock lock;
+    juce::AudioWorkgroup workgroup; // (empty: no device, or one without a workgroup)
+    double blockMs = 0.0;
+};
+
+void AudioEngine::joinDeviceWorkgroup ([[maybe_unused]] juce::AudioIODevice* device)
+{
+   #if JUCE_MAC
+    static const auto off = juce::SystemStats::getEnvironmentVariable ("LYNX_WORKGROUP", {}) == "0";
+    if (off || workers == nullptr || workers->workers() == 0)
+        return;
+    auto wanted = device != nullptr ? device->getWorkgroup() : juce::AudioWorkgroup {};
+    if (deviceWorkgroup == nullptr)
+    {
+        if (! wanted)
+            return;
+        deviceWorkgroup = std::make_shared<DeviceWorkgroup>();
+        // (the pool keeps the holder alive as long as its workers can run the refresh)
+        workers->setThreadRefresh ([holder = deviceWorkgroup] {
+            struct Joined
+            {
+                juce::AudioWorkgroup workgroup; // (retained while joined: the token leaves it before it is released)
+                juce::WorkgroupToken token;
+            };
+            thread_local Joined joined;
+            juce::AudioWorkgroup next;
+            double blockMs = 0.0;
+            {
+                const juce::SpinLock::ScopedLockType sl (holder->lock);
+                next = holder->workgroup;
+                blockMs = holder->blockMs;
+            }
+            if (next == joined.workgroup && (! next || static_cast<bool> (joined.token)))
+                return;
+            joined.token.reset();
+            joined.workgroup = next;
+            if (! next)
+                return;
+            becomeTimeConstraintThread (blockMs);
+            next.join (joined.token);
+        });
+    }
+    {
+        const juce::SpinLock::ScopedLockType sl (deviceWorkgroup->lock);
+        deviceWorkgroup->workgroup = std::move (wanted);
+        deviceWorkgroup->blockMs = device != nullptr ? 1000.0 * device->getCurrentBufferSizeSamples() / juce::jmax (1.0, device->getCurrentSampleRate())
+                                                     : 0.0;
+    }
+    workers->requestThreadRefresh();
+   #endif
 }
 
 // The Master's own target (its default: the graph's output as it is, on the first open pair) and the inserts'

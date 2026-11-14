@@ -3,6 +3,7 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 
 #include "core/Denormals.h"
+#include "platform/PowerThrottling.h"
 #include "engine/PluginSandbox.h"
 #include "engine/SandboxShared.h"
 
@@ -331,6 +332,9 @@ private:
     {
         // the sandbox's audio thread gets the same FTZ/DAZ as LYNX's own audio threads (round 160: it had none)
         const lynx::ScopedFlushDenormals noDenormals;
+        // Windows: MMCSS "Pro Audio" as LYNX's own audio threads, and no EcoQoS while LYNX is in the background (a
+        // sandbox or bridge process inherits the window owner's Low QoS; round toolchain190gt)
+        lynx::power::becomeProAudioThread();
         while (! threadShouldExit())
         {
             if (! channel.waitRequest (100))

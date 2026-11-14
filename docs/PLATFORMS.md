@@ -81,6 +81,28 @@ round 117 notes (`docs/analise/REA_rodada117.md`) list the measured differences.
   app on Linux and macOS; `release.yml` builds all three platforms on a tag and attaches the packages and
   `SHA256SUMS.txt` to the draft release.
 
+## Release optimisation
+
+Measured in round toolchain190gt with `perfbench` (round 190ge: the engine's render as the audio callback does it,
+instructions and cycles per sample, a hash of every output sample), the same source built several ways, interleaved; on
+Windows `perfbench.exe` linked from a Windows build's own objects (thread cycles).
+- **Windows** (`scripts/build-windows-zig.sh`): `-O2`, `-ffp-contract=off` (as Linux and macOS; it was missing), and a
+  link that drops unreferenced code and folds identical functions (`-OPT:REF -OPT:SAFEICF`, objects with
+  `-ffunction-sections -fdata-sections -faddrsig`; see the script for why zig needs a hand here). LYNX.exe 53.8 →
+  48.2 MB (`.text` −9 %, `.rdata` −13 %), the same output, render cost within the run-to-run noise (±5 %).
+  - ThinLTO (`LYNX_WIN_LTO=thin`): streamed audio −14 %, synth100 −4 %, the rest −1…+5 %, and the FL Harmless engine
+    ran 1.5× slower under it (Harmless.cpp is kept out of LTO when it is on); the link takes 15–25 minutes. Off.
+  - `-fno-math-errno`: up to 25 % fewer cycles on Linux, none on Windows (0 to 3 % more); on MinGW it also turns `sin` +
+    `cos` of one value into the C runtime's `sincos`. Not used.
+  - zig gives `-O3` byte-identical objects to `-O2`; a real `-O3` (`-Xclang -O3`) measured no better than ThinLTO.
+  - `-mcpu=x86_64_v2` (SSE4.2, POPCNT): 0–3 % fewer cycles on Windows, outputs identical; it would need a CPU check
+    before any static constructor (a "CPU too old" box instead of a crash). Not used yet.
+  - Measuring: a zig build without `-target` compiles for the host CPU (`-mcpu=native`), unlike the release.
+- **Linux** (GCC 13, `-O3`, LTO of the app's own objects): unchanged. Link-time optimising the core too (it is a separate
+  static library the app's LTO never reached), and `-fno-math-errno`, measured no gain with GCC.
+- **macOS**: unchanged (Apple's clang `-O3`, LTO of the app's own objects; Darwin has no maths `errno`).
+- `scripts/build-local.sh` takes `LYNX_OPT_FLAGS` (default `-O2`) to run the test suite with other optimisation flags.
+
 ## Windows plugins on Linux (yabridge)
 
 [yabridge](https://github.com/robbert-vdh/yabridge) turns Windows VST2/VST3 plugins into Linux ones running in Wine.
