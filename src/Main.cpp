@@ -10200,6 +10200,7 @@ private:
             lynx::renderAheadOption().store (pass == 1);
             engine = std::make_unique<lynx::AudioEngine>();
             engine->getDeviceManager().closeAudioDevice(); // the engine's callback is driven by hand below
+            engine->setRenderAheadAlways (true); // (the showcase song is light: the app would leave it real-time)
             juce::String error;
             auto loaded = true;
             if (sc.file == juce::File())

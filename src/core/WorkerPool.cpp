@@ -194,20 +194,37 @@ bool WorkerPool::work (bool isWorker) noexcept
 {
     constexpr auto mask = (std::uint64_t (1) << indexBits) - 1;
     auto any = false;
+    // (round 190gq, 190gs Q5) the indices this batch ran, added to `done` once when the batch ends — before the round
+    // can end, since the caller waits for all of them — and kept apart per round in case a ticket of the next one
+    // comes up in the same loop
+    int ran = 0;
+    std::uint64_t ranGeneration = 0;
+    auto flush = [&] {
+        if (ran == 0)
+            return;
+        if (isWorker)
+            byWorkers.fetch_add ((std::uint64_t) ran, std::memory_order_relaxed);
+        done.fetch_add (ran, std::memory_order_acq_rel);
+        ran = 0;
+    };
 
     while (true)
     {
         const auto t = ticket.fetch_add (1, std::memory_order_acq_rel);
-        const auto i = t & mask, n = (t >> indexBits) & mask;
+        const auto i = t & mask, n = (t >> indexBits) & mask, g = t >> (2 * indexBits);
+        if (ran > 0 && g != ranGeneration)
+            flush();
 
         if (i >= n)
+        {
+            flush();
             return any;
+        }
 
         call (context, (int) i);
         any = true;
-        if (isWorker)
-            byWorkers.fetch_add (1, std::memory_order_relaxed);
-        done.fetch_add (1, std::memory_order_acq_rel);
+        ranGeneration = g;
+        ++ran;
     }
 }
 

@@ -1352,10 +1352,16 @@ protected:
         crashguard::note (("editor shown: " + plugin.getName()).toStdString()); // (its OpenGL / GPU setup runs when shown)
         plugin.addListener (this); // the editor's gestures: Last tweaked, automation recording (REA round 143)
         startTimerHz (10);         // its moves without gestures (round 162d)
+        // round 190gq: while its editor is open, the plugin's channel / insert stays real-time (render-ahead): what the
+        // editor shows and what a tweak does are heard at once
+        if (context.engine != nullptr)
+            context.engine->setEditorOpen (this, context.find, context.channel ? -1 : context.track, true);
     }
 
     void stopHost()
     {
+        if (context.engine != nullptr)
+            context.engine->setEditorOpen (this, {}, -1, false);
         editorlimit::forget (&plugin);
         crashguard::note (("closing the editor of " + plugin.getName()).toStdString());
         stopTimer();

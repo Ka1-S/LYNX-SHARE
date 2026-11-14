@@ -159,6 +159,12 @@ public:
     void setTargets (const renderahead::Targets* t) noexcept { targets = t; }
     // the window in samples (default about 23 ms; tests use other values)
     void setWindowSamples (int samples) noexcept { windowSamples = samples; }
+    // With the option on, render-ahead runs when the project needs it: the callback's average load at or above
+    // `engageLoad` of its block, or one block at or above `engageSpike` (a light project has no deadline to ease and
+    // would only pay the second thread); it stops after `idleSeconds` with the whole rack under `idleLoad`.
+    // always = true (tests, null runs): whenever it can.
+    void setAlwaysEngage (bool always) noexcept { alwaysEngage = always; }
+    static constexpr double engageLoad = 0.20, engageSpike = 0.60, idleLoad = 0.08, idleSeconds = 10.0;
 
     // Audio thread, one sub-block: as ChannelRackProcessor would call RackRenderer::process. The snapshot is taken from
     // `exchange` here (while render-ahead runs, a new one waits until the part rendered ahead can take it too).
@@ -208,6 +214,7 @@ private:
     void routeLiveEvents (LiveEventQueue* queue) noexcept;
     void renderLive (const RackState& state, const renderahead::Block& block, Entry& entry, float* left, float* right, MeterBank* meters) noexcept;
     void retireHeld (SnapshotExchange<RackState>& exchange) noexcept;
+    void noteLoad (double ns, int samples, bool playing) noexcept;
 
     RackRenderer& live;
     std::unique_ptr<RackRenderer> ahead;
@@ -280,6 +287,13 @@ private:
     std::uint32_t blockedTargets = ~0u;
     int blockedLiveSeed = 0;
     int lastBlockSize = 0, stableSamples = 0; // a device whose block size changes: render-ahead waits until it holds
+    // the load (wall time / block duration): the callback's while off, both parts' while on (the thread adds its jobs)
+    bool alwaysEngage = false;
+    bool stickyOn = false; // started once since playback started: syncs (edits) don't wait for the load again
+    double loadAverage = 0.0;
+    bool spiked = false;
+    double idleFor = 0.0;
+    std::atomic<std::uint64_t> aheadBusyNs { 0 }; // the thread's rendering time since the callback last looked
     renderahead::TransportModel lastModel;
     bool lastFlagsSet = false;
     std::vector<float> scratchL, scratchR;

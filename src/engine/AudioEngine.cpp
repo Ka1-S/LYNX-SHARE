@@ -58,6 +58,7 @@
 #elif JUCE_MAC
  #include <pthread.h>
  #include <sys/qos.h>
+ #include <sys/sysctl.h>
 #elif JUCE_LINUX || JUCE_BSD
  #include <pthread.h>
  #include <sched.h>
@@ -173,13 +174,105 @@ void raiseAudioThreadPriority()
    #endif
 }
 
+// The render-ahead thread (round 190gq, core/RenderAhead.h): the workers' priority, except on macOS, where it is not
+// deadline work and must never join the device's Audio Workgroup (round 190gt joins the real-time workers): the
+// interactive QoS class only.
+void raiseRenderAheadThreadPriority()
+{
+   #if JUCE_MAC
+    pthread_set_qos_class_self_np (QOS_CLASS_USER_INTERACTIVE, 0);
+   #else
+    raiseAudioThreadPriority();
+   #endif
+}
+
+// Round 190gq (190gs Q7): the cores that give a block its full speed — physical cores (SMT siblings share one core's
+// units), and on hybrid CPUs only the performance class (a block waits for its slowest worker). 0 = unknown.
+int performanceCores()
+{
+   #if JUCE_WINDOWS
+    DWORD bytes = 0;
+    GetLogicalProcessorInformationEx (RelationProcessorCore, nullptr, &bytes);
+    if (bytes == 0)
+        return 0;
+    std::vector<std::uint8_t> buffer (bytes);
+    if (! GetLogicalProcessorInformationEx (RelationProcessorCore, reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX> (buffer.data()), &bytes))
+        return 0;
+    int best = -1, count = 0;
+    for (DWORD at = 0; at < bytes;)
+    {
+        const auto* info = reinterpret_cast<const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*> (buffer.data() + at);
+        if (info->Relationship == RelationProcessorCore)
+        {
+            const auto cls = (int) info->Processor.EfficiencyClass; // (higher = faster; all 0 on a non-hybrid CPU)
+            if (cls > best)
+            {
+                best = cls;
+                count = 0;
+            }
+            if (cls == best)
+                ++count;
+        }
+        if (info->Size == 0)
+            break;
+        at += info->Size;
+    }
+    return count;
+   #elif JUCE_MAC
+    int perf = 0;
+    auto size = sizeof (perf);
+    if (sysctlbyname ("hw.perflevel0.physicalcpu", &perf, &size, nullptr, 0) == 0 && perf > 0)
+        return perf;
+    int physical = 0;
+    size = sizeof (physical);
+    return sysctlbyname ("hw.physicalcpu", &physical, &size, nullptr, 0) == 0 ? physical : 0;
+   #elif JUCE_LINUX || JUCE_BSD
+    // sysfs: one (package, core) pair per physical core; on an Intel hybrid CPU only the cpu_core PMU's CPUs
+    std::vector<std::pair<int, int>> cores;
+    const juce::File root ("/sys/devices/system/cpu");
+    juce::String hybrid = juce::File ("/sys/devices/cpu_core/cpus").loadFileAsString().trim(); // e.g. "0-15"
+    auto inHybridSet = [&hybrid] (int cpu) {
+        if (hybrid.isEmpty())
+            return true;
+        for (const auto& range : juce::StringArray::fromTokens (hybrid, ",", {}))
+        {
+            const auto from = range.upToFirstOccurrenceOf ("-", false, false).getIntValue();
+            const auto to = range.contains ("-") ? range.fromFirstOccurrenceOf ("-", false, false).getIntValue() : from;
+            if (cpu >= from && cpu <= to)
+                return true;
+        }
+        return false;
+    };
+    for (int cpu = 0; cpu < 1024; ++cpu)
+    {
+        const auto dir = root.getChildFile ("cpu" + juce::String (cpu));
+        if (! dir.isDirectory())
+            break;
+        const auto core = dir.getChildFile ("topology/core_id").loadFileAsString().trim();
+        const auto package = dir.getChildFile ("topology/physical_package_id").loadFileAsString().trim();
+        if (core.isEmpty() || ! inHybridSet (cpu))
+            continue;
+        const std::pair<int, int> id { package.getIntValue(), core.getIntValue() };
+        if (std::find (cores.begin(), cores.end(), id) == cores.end())
+            cores.push_back (id);
+    }
+    return (int) cores.size();
+   #else
+    return 0;
+   #endif
+}
+
 int workerCount()
 {
     // diagnostics: LYNX_WORKERS=n fixes the number of extra threads
     if (const auto forced = juce::SystemStats::getEnvironmentVariable ("LYNX_WORKERS", {}); forced.isNotEmpty())
         return juce::jlimit (0, 31, forced.getIntValue());
 
-    // the audio thread works too; leave one core free for the UI
+    // round 190gq (190gs Q7): the audio thread and the workers on the performance cores, one per physical core, the
+    // audio thread's own included (the SMT siblings and the slower cores are left to the UI and the rest). Before:
+    // logical CPUs − 2 (7 workers on 6 cores / 12 threads). Unknown topology: as before.
+    if (const auto cores = performanceCores(); cores > 0)
+        return juce::jlimit (0, 7, cores - 1);
     const auto cores = (int) std::thread::hardware_concurrency();
     return juce::jlimit (0, 7, cores - 2);
 }
@@ -386,7 +479,7 @@ void AudioEngine::buildInitialGraph()
 
     auto output = graph.addNode (std::make_unique<IONode> (IONode::audioOutputNode));
     auto rack = graph.addNode (std::make_unique<ChannelRackProcessor> (transport, rackExchange, liveEvents, midiEvents, meters, workers.get(),
-                                                                       raiseAudioThreadPriority));
+                                                                       raiseRenderAheadThreadPriority));
     rackProcessor = dynamic_cast<ChannelRackProcessor*> (rack->getProcessor());
     if (rackProcessor != nullptr)
     {
@@ -3434,7 +3527,20 @@ void AudioEngine::publishRenderAheadTargets()
     for (std::size_t c = 0; c < song.channels.size(); ++c)
         if (! song.channels[c].receiveFrom.empty())
             add ((int) c);
-    renderAheadTargets.publish (channels.data(), count, nullptr, 0);
+    // hosted plugin editors on screen: their channel or insert
+    std::array<int, renderahead::Targets::maxTracks> tracks {};
+    int trackCount = 0;
+    for (const auto& e : openEditors)
+    {
+        if (e.track >= 0 && trackCount < (int) tracks.size())
+            tracks[(std::size_t) trackCount++] = e.track;
+        if (e.find)
+            if (const auto* ref = e.find (song))
+                for (std::size_t c = 0; c < song.channels.size(); ++c)
+                    if (&song.channels[c].plugin == ref)
+                        add ((int) c);
+    }
+    renderAheadTargets.publish (channels.data(), count, tracks.data(), trackCount);
 }
 
 namespace
@@ -5310,6 +5416,20 @@ void AudioEngine::updateRealtimeStats()
 const renderahead::Stats* AudioEngine::renderAheadStats() const noexcept
 {
     return rackProcessor != nullptr ? &rackProcessor->renderAheadStats() : nullptr;
+}
+
+void AudioEngine::setEditorOpen (const void* key, std::function<PluginRef* (Song&)> find, int track, bool open)
+{
+    openEditors.erase (std::remove_if (openEditors.begin(), openEditors.end(), [key] (const OpenEditor& e) { return e.key == key; }), openEditors.end());
+    if (open)
+        openEditors.push_back ({ key, std::move (find), track });
+    publishRenderAheadTargets();
+}
+
+void AudioEngine::setRenderAheadAlways (bool always) noexcept
+{
+    if (rackProcessor != nullptr)
+        rackProcessor->setRenderAheadAlways (always);
 }
 
 juce::String AudioEngine::describeRealtime (bool withUnits) const

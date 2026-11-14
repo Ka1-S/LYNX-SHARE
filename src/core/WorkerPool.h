@@ -89,10 +89,13 @@ private:
     bool isParked() const noexcept;
     void workerLoop (std::function<void()> onStart);
 
+    // Round 190gq (190gs Q5): what the hot path shares sits on cache lines of its own — the read-mostly work, the
+    // ticket every index takes, the count the caller spins on, the sleep / park state — and the counters are added once
+    // per batch, not per index: on a two-CCX Ryzen each line hand-off cost ~70-100 ns, three per index.
     std::unique_ptr<OsSemaphore> wake;
     std::vector<std::thread> threads;
     std::atomic<bool> quit { false };
-    std::atomic<int> sleeping { 0 }; // workers blocked (or about to block) on `wake`
+    alignas (64) std::atomic<int> sleeping { 0 }; // workers blocked (or about to block) on `wake`
     // the generation (see `ticket`) of the last parallelFor before park(); while the ticket still carries it,
     // the pool is parked and a worker without work sleeps instead of spinning
     std::atomic<std::uint64_t> parkedGeneration { ~std::uint64_t (0) };
@@ -100,12 +103,12 @@ private:
     // current work (published before `ticket`). The ticket packs generation (bits 40+), count (bits 20…39) and the
     // next index (bits 0…19), so an index taken by a late worker always carries its own round's count: a worker
     // that stalls between taking an index and running it can never run an index of a later round (no ABA)
-    void* context = nullptr;
+    alignas (64) void* context = nullptr;
     Call call = nullptr;
     static constexpr int indexBits = 20;
-    std::atomic<std::uint64_t> ticket { 0 };
-    std::uint64_t generation = 0; // caller thread only
-    std::atomic<int> done { 0 };
+    alignas (64) std::atomic<std::uint64_t> ticket { 0 };
+    alignas (64) std::atomic<int> done { 0 };
+    alignas (64) std::uint64_t generation = 0; // caller thread only
     std::atomic<std::uint64_t> byWorkers { 0 }, wokenUp { 0 };
 };
 } // namespace lynx

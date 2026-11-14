@@ -145,6 +145,7 @@ struct AheadRig
         ahead.setWorkerPool (pool.get());
         ahead.prepare (44100.0, 2048);
         ahead.setTargets (&targets);
+        ahead.setAlwaysEngage (true); // (these songs are light: the app would leave them real-time)
         targets.publish (liveChannels.data(), (int) liveChannels.size(), nullptr, 0);
         exchange.publish (RackState::build (song, nullptr, 44100.0));
     }
@@ -184,6 +185,7 @@ double energy (const float* x, int n)
 
 TEST (render_ahead_plans_blocks_as_the_callback_does)
 {
+    using namespace lynx;
     using namespace lynx::renderahead;
     TransportModel m;
     m.sampleRate = 44100.0;
@@ -534,4 +536,43 @@ TEST (render_ahead_offline_renders_never_use_it)
     renderAheadOption().store (true);
     CHECK (off.ahead.stats().engagements.load() == 0);
     CHECK (ra190gq::same (l0, l1) && ra190gq::same (r0, r1));
+}
+
+TEST (render_ahead_tempo_change_waits_for_both_parts)
+{
+    using namespace lynx;
+    // a tempo edit changes the timeline: the ring drains, both parts take the new tempo at one block, nothing is dropped
+    // and nothing stops sounding (one held chord on an insert rendered ahead)
+    auto song = ra190gq::makeSong (8);
+    for (auto& c : song.channels)
+        c.volume = 0.0f;
+    song.channels[0].volume = 0.5f;
+    song.patterns[0].notes.clear();
+    for (const auto key : { 48, 55, 60 })
+        song.patterns[0].notes.push_back (ra190gq::note (0, 0.0, 4.0, key, 0.8f));
+    ra190gq::AheadRig rig (song, 2, { 3 });
+    ra190gq::Callback cb (song, 64, 0.0);
+    auto faster = song;
+    faster.bpm = 140.0;
+    cb.beforeBlock = [&] (int k) {
+        if (k == 200)
+            rig.exchange.publish (RackState::build (faster, rig.ahead.currentState(), 44100.0));
+    };
+    std::vector<float> l, r;
+    auto silent = 0;
+    cb.run (700, l, r, [&] (double start, int n, double tps, float* a, float* b, int k) {
+        std::this_thread::sleep_for (std::chrono::microseconds (100));
+        rig.block (cb, start, n, tps, a, b);
+        if (k > 20 && ra190gq::energy (a, n) == 0.0)
+            ++silent;
+        // (the transport, as the engine's: the tempo the rack renders with)
+        if (rig.ahead.pinnedBpm() <= 0.0)
+            cb.bpm = rig.renderer.currentBpm();
+    });
+    const auto& st = rig.ahead.stats();
+    CHECK (st.flushes.load() == 0);
+    CHECK (st.drains.load() >= 1);
+    CHECK (st.engagements.load() >= 2);
+    CHECK (rig.renderer.currentBpm() == 140.0);
+    CHECK (silent == 0);
 }

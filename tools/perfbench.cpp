@@ -21,7 +21,8 @@
 // Round 190gq (render-ahead, core/RenderAhead.h):
 //   --apptransport  the position moves as the app's audio callback moves it (the tempo the renderer used, Transport's
 //                   arithmetic); implied by --ahead, so a real-time and a render-ahead run of one scenario can be nulled
-//   --ahead         render through RenderAhead as ChannelRackProcessor does (the device callback's model, the thread)
+//   --ahead         render through RenderAhead as ChannelRackProcessor does (the device callback's model, the thread; it
+//                   starts when the load needs it, as in the app); --ahead-always: whenever it can (the null tests)
 //   --live C        channel C is played live (the selected channel): it and what it feeds stay real-time (repeatable)
 //   --loop B        (with --apptransport) a loop region over the song's first B bars: the blocks are split at its end
 //                   and the position wraps, as the app's callback does it (core/RenderAhead.h planSubBlock)
@@ -337,7 +338,8 @@ int main (int argc, char** argv)
     const std::string scenario = argv[1];
     int blockSize = 256, threads = 0, reps = 5;
     double seconds = 0.0, warmup = 0.0;
-    bool offline = false, meters = true, stopped = scenario == "idle", units = false, aheadMode = false, paced = false, appTransport = false;
+    bool offline = false, meters = true, stopped = scenario == "idle", units = false, aheadMode = false, paced = false, appTransport = false,
+         aheadAlways = false;
     std::vector<int> liveChannels;
     int loopBars = 0;
     const char* raw = nullptr;
@@ -367,6 +369,8 @@ int main (int argc, char** argv)
             units = true;
         else if (a == "--ahead")
             aheadMode = appTransport = true;
+        else if (a == "--ahead-always") // (render-ahead whatever the load: the null tests)
+            aheadMode = appTransport = aheadAlways = true;
         else if (a == "--live")
             liveChannels.push_back (std::atoi (next()));
         else if (a == "--paced")
@@ -466,6 +470,7 @@ int main (int argc, char** argv)
             ahead->setWorkerPool (pool.get());
             ahead->prepare (sampleRate, std::max (2048, blockSize));
             ahead->setTargets (&targets);
+            ahead->setAlwaysEngage (aheadAlways);
             targets.publish (liveChannels.data(), (int) liveChannels.size(), nullptr, 0);
             exchange.publish (std::move (state));
         }
@@ -526,17 +531,21 @@ int main (int argc, char** argv)
         const auto wall0 = std::chrono::steady_clock::now();
         const auto period = std::chrono::duration<double> ((double) blockSize / sampleRate);
         auto due = wall0;
-        int dropouts = 0;
-        double worstMs = 0.0;
+        int dropouts = 0, over = 0;
+        double worstMs = 0.0, spinMs = 0.0;
         std::vector<double> callbackMs;
         const auto processCpu0 = cpuMs (CLOCK_PROCESS_CPUTIME_ID);
         counter.start();
         for (std::size_t pos = 0; pos < totalSamples; pos += (std::size_t) blockSize)
         {
             const auto n = (int) std::min<std::size_t> ((std::size_t) blockSize, totalSamples - pos);
-            if (paced) // the device asks for the next block at its time
-            {
-                std::this_thread::sleep_until (due);
+            if (paced) // the device asks for the next block at its time (sleep, then spin the last 300 µs: the wake-up's
+            {          // timer slack is not the engine's; the spinning's CPU is taken out of the total below)
+                std::this_thread::sleep_until (due - std::chrono::microseconds (300));
+                const auto spin0 = cpuMs (CLOCK_THREAD_CPUTIME_ID);
+                while (std::chrono::steady_clock::now() < due)
+                    WorkerPool::relax();
+                spinMs += cpuMs (CLOCK_THREAD_CPUTIME_ID) - spin0;
                 due += std::chrono::duration_cast<std::chrono::steady_clock::duration> (period);
             }
             const auto c0 = cpuMs (clock);
@@ -567,6 +576,8 @@ int main (int argc, char** argv)
             {
                 callbackMs.push_back (wallSpent);
                 worstMs = std::max (worstMs, wallSpent);
+                if (wallSpent > 1000.0 * n / sampleRate)
+                    ++over; // the callback itself took longer than its block lasts
                 if (std::chrono::steady_clock::now() > due) // finished after the next block was due: a dropout
                 {
                     ++dropouts;
@@ -585,14 +596,14 @@ int main (int argc, char** argv)
                     counter.resume();
                 }
         }
-        if (paced) // every thread's CPU, the render-ahead thread and the workers included
-            used = cpuMs (CLOCK_PROCESS_CPUTIME_ID) - processCpu0;
+        if (paced) // every thread's CPU, the render-ahead thread and the workers included (not the pacing's spin)
+            used = cpuMs (CLOCK_PROCESS_CPUTIME_ID) - processCpu0 - spinMs;
         if (paced)
         {
             std::sort (callbackMs.begin(), callbackMs.end());
             const auto audioSeconds = (double) totalSamples / sampleRate;
-            std::printf ("paced: %d dropouts (%.2f per minute), worst callback %.3f ms, p99 %.3f ms, median %.3f ms (budget %.3f ms)\n", dropouts,
-                         dropouts * 60.0 / audioSeconds, worstMs, callbackMs[std::min (callbackMs.size() - 1, (std::size_t) (0.99 * (double) callbackMs.size()))],
+            std::printf ("paced: %d dropouts (%.2f per minute), %d callbacks over their block (%.2f per minute), worst callback %.3f ms, p99 %.3f ms, "
+                         "median %.3f ms (budget %.3f ms)\n", dropouts, dropouts * 60.0 / audioSeconds, over, over * 60.0 / audioSeconds, worstMs, callbackMs[std::min (callbackMs.size() - 1, (std::size_t) (0.99 * (double) callbackMs.size()))],
                          callbackMs[callbackMs.size() / 2], 1000.0 * blockSize / sampleRate);
         }
         if (ahead != nullptr)

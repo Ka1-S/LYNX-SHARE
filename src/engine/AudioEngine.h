@@ -979,6 +979,11 @@ public:
     juce::String describeRealtime (bool withUnits = true) const;
     // render-ahead's counters (round 190gq, core/RenderAhead.h; nullptr before the graph exists)
     const renderahead::Stats* renderAheadStats() const noexcept;
+    // tests: render-ahead whenever it can, whatever the project's load (the app starts it when the load needs it)
+    void setRenderAheadAlways (bool always) noexcept;
+    // UI: a hosted plugin's editor opened / closed (`key` = its host): its channel (`find`, the PluginRef in the song) or
+    // insert (`track` >= 0) is rendered in real time while it is open (render-ahead, round 190gq)
+    void setEditorOpen (const void* key, std::function<PluginRef* (Song&)> find, int track, bool open);
 
     // Settings › Audio "Driver settings…": shows the device's own panel (ASIO) and, when the driver says its settings
     // changed, reopens it with them. The device object is replaced (its driver re-read), so the old pointer is never
@@ -1253,6 +1258,13 @@ private:
     std::atomic<int> extraLiveCount { 0 };
     void publishSelection();
     void publishRenderAheadTargets();
+    struct OpenEditor
+    {
+        const void* key = nullptr;
+        std::function<PluginRef* (Song&)> find; // a channel's plugin (its index is looked up at each publish)
+        int track = -1;                         // or a mixer slot's insert
+    };
+    std::vector<OpenEditor> openEditors; // (UI thread) hosted plugin editors on screen, for the render-ahead's live part
     renderahead::Targets renderAheadTargets; // (round 190gq) the channels played live, for the render-ahead's partition
     std::atomic<double> blockTimeMs { 0.0 };         // when positionTicks was last updated
     std::atomic<double> blockDurationMs { 0.0 };     // the last block's length (round 174e: playheadAdvanceTicks)

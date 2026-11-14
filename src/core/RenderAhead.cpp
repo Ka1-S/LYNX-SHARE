@@ -754,8 +754,17 @@ void RenderAhead::threadLoop (std::function<void()> onStart)
         auto& entry = *entries[(std::size_t) (w % entryCount)];
         const auto sb = planSubBlock (model, nextPosition, nextDone, transportTps (ahead->currentBpm(), model.sampleRate));
         // (serial while the window is comfortable: no hand-off cost; the workers when it runs thin)
+        // (macOS: the workers may sit in the device's Audio Workgroup, round 190gt; render-ahead is not deadline work and
+        // stays on its own thread there)
+       #if defined(__APPLE__)
+        const auto useWorkers = false;
+        (void) fill;
+       #else
         const auto useWorkers = pool != nullptr && fill < std::max (1, targetFill / 3);
+       #endif
+        const auto jobStart = ProcessTimes::now();
         renderJob (entry, *aheadState, sb.start, sb.samples, true, useWorkers);
+        aheadBusyNs.fetch_add (ProcessTimes::now() - jobStart, std::memory_order_relaxed);
         nextPosition = sb.next;
         nextDone = nextDone + sb.samples >= model.deviceBlock ? 0 : nextDone + sb.samples;
         modelStop.store (sb.last, std::memory_order_release);
@@ -809,14 +818,29 @@ void RenderAhead::replayMeters (const Entry& entry, MeterBank* meters) noexcept
     }
 }
 
+void RenderAhead::noteLoad (double ns, int samples, bool playing) noexcept
+{
+    if (samples <= 0 || sampleRate <= 0.0)
+        return;
+    const auto seconds = samples / sampleRate;
+    const auto load = ns * 1.0e-9 / seconds;
+    const auto a = std::min (1.0, seconds / 0.5); // (about half a second's average)
+    loadAverage += a * (load - loadAverage);
+    // one heavy block arms it until the average has had a second to settle (decays with it)
+    spiked = playing && (load >= engageSpike || (spiked && loadAverage >= engageLoad * 0.5));
+    idleFor = engagedNow.load (std::memory_order_relaxed) && loadAverage < idleLoad ? idleFor + seconds : 0.0;
+}
+
 bool RenderAhead::claimForCallback() noexcept
 {
-    for (;;)
+    for (int spins = 0;; ++spins)
     {
         auto expected = 0;
         if (owner.compare_exchange_strong (expected, 2, std::memory_order_acq_rel))
             return true;
         WorkerPool::relax(); // the thread is finishing a block
+        if ((spins & 1023) == 1023)
+            std::this_thread::yield(); // (as WorkerPool's wait: never starve the thread of its core)
     }
 }
 
@@ -900,15 +924,21 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
         const auto* state = exchange.acquire();
         retireHeld (exchange);
         if (! b.playing)
+        {
             promotedCount = 0; // (the channels played live join the live part until playback stops)
+            stickyOn = false;
+        }
         auto engaged = false;
-        if (want && steady && state != nullptr && ! state->launchers && held == nullptr)
+        // (light projects: no deadline to ease, render-ahead would only add its thread)
+        const auto needed = alwaysEngage || loadAverage >= engageLoad || spiked || stickyOn;
+        if (want && steady && needed && state != nullptr && ! state->launchers && held == nullptr)
         {
             // (a state with nothing to render ahead is not looked at again until it, or the live targets, change)
             const auto blocked = engageBlocked && blockedSerial == state->serial && blockedTargets == targetVersion && blockedLiveSeed == promotedCount;
             if (! blocked)
             {
                 engaged = engage (*state, b);
+                stickyOn = stickyOn || engaged;
                 engageBlocked = ! engaged;
                 blockedSerial = state->serial;
                 blockedTargets = targetVersion;
@@ -917,6 +947,7 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
         }
         if (! engaged)
         {
+            const auto start = ProcessTimes::now();
             if (localPending) // (live notes a disengage handed back: they play first, then the queues' own)
             {
                 localPending = false;
@@ -929,6 +960,7 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
             else
                 live.process (state, b.playing, b.startTick, b.samples, left, right, liveQueue, meters, moreLive);
             liveState = state;
+            noteLoad ((double) (ProcessTimes::now() - start), b.samples, b.playing);
             return;
         }
     }
@@ -1061,8 +1093,12 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
         {
             // the thread is rendering it: wait for it (the renderer can't do two blocks at once)
             counters.waited.fetch_add (1, std::memory_order_relaxed);
-            while (owner.load (std::memory_order_acquire) == 1)
+            for (int spins = 0; owner.load (std::memory_order_acquire) == 1; ++spins)
+            {
                 WorkerPool::relax();
+                if ((spins & 1023) == 1023)
+                    std::this_thread::yield();
+            }
             continue;
         }
         claimForCallback();
@@ -1120,8 +1156,19 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
     else
         counters.fromRing.fetch_add (1, std::memory_order_relaxed);
 
+    const auto liveStart = ProcessTimes::now();
     renderLive (*liveState, b, *entry, left, right, meters);
     pinned.store (live.currentBpm(), std::memory_order_relaxed);
+    // the whole rack's load while on (the live part + what the thread rendered since the last block): a long quiet
+    // stretch hands everything back to the callback
+    noteLoad ((double) (ProcessTimes::now() - liveStart + aheadBusyNs.exchange (0, std::memory_order_relaxed)), b.samples, true);
+    if (! alwaysEngage && idleFor >= idleSeconds && ! drain.load (std::memory_order_relaxed))
+    {
+        idleFor = 0.0;
+        stickyOn = false;
+        drain.store (true, std::memory_order_release); // (disengaged cleanly at the next sync)
+        engageBlocked = false;
+    }
 
     if (fromRing)
         readIndex.store (readIndex.load (std::memory_order_relaxed) + 1, std::memory_order_release);
@@ -1133,6 +1180,10 @@ void RenderAhead::process (SnapshotExchange<RackState>& exchange, const Block& b
     }
     if (! drain.load (std::memory_order_relaxed))
         running.store (true, std::memory_order_release);
-    wakeThread();
+    // the thread refills the ring from half the window: at small buffers one wake-up every few blocks, not one per block
+    const auto fill = writeIndex.load (std::memory_order_relaxed) - readIndex.load (std::memory_order_relaxed);
+    const auto target = tweakHoldSamples.load (std::memory_order_relaxed) > 0 ? 1 : targetFill;
+    if (claimed || fill <= target / 2)
+        wakeThread();
 }
 } // namespace lynx
