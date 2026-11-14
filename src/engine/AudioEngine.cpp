@@ -5335,7 +5335,7 @@ void AudioEngine::updateRealtimeStats()
 juce::String AudioEngine::describeRealtime (bool withUnits) const
 {
     juce::String text;
-    if (auto* device = const_cast<juce::AudioDeviceManager&> (deviceManager).getCurrentAudioDevice())
+    if (auto* device = const_cast<LynxDeviceManager&> (deviceManager).getCurrentAudioDevice())
     {
         const auto rate = device->getCurrentSampleRate();
         const auto buffer = device->getCurrentBufferSizeSamples();
