@@ -4459,9 +4459,10 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
     if (pool != nullptr && events.size() == 0 && lastChunkNs < lightChunkNs && (liveInput == nullptr || liveInput->numChannels == 0))
         workers = nullptr;
     // A7 (round 190gq): the same when the work the chunk's units did last time comes to less than handing it out costs
-    // (waking the workers, their spinning, the last one's wait): a light project with notes, a few channels at 64
-    // samples. Half the margin when notes start here (they can start voices). The units' times are measured whenever
-    // workers are there, serial or not, so the next chunk decides on fresh numbers.
+    // (waking the workers, their spinning, the last one's wait), and nothing starts in this chunk: a chunk where notes
+    // or events start can start voices the last one did not have (measured: Exoplanet's bursts after a quiet chunk ran
+    // past their block when this rule took them too). The units' times are measured whenever workers are there, serial
+    // or not, so the next chunk decides on fresh numbers.
     measureUnits = pool != nullptr && adaptiveThreads();
     if (adaptiveThreads() && workers != nullptr && (liveInput == nullptr || liveInput->numChannels == 0))
     {
@@ -4471,7 +4472,7 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
             work += channelCostNs[(std::size_t) c];
         for (int t = 1; t < tracks && t < maxMixerTracks; ++t)
             work += trackCostNs[(std::size_t) t];
-        if (work < (events.size() == 0 ? serialWorkNs : serialWorkNs / 2))
+        if (events.size() == 0 && work < serialWorkNs)
             workers = nullptr;
     }
 

@@ -294,6 +294,11 @@ private:
     bool spiked = false;
     double idleFor = 0.0;
     std::atomic<std::uint64_t> aheadBusyNs { 0 }; // the thread's rendering time since the callback last looked
+    // (the thread) the ahead part's load rendered serially (job time / block time): above serialLimit one thread can't
+    // keep the window, the workers take part; a serial job now and then measures it again
+    double serialLoad = 0.0;
+    int jobsSinceSerial = 0;
+    static constexpr double serialLimit = 0.7;
     renderahead::TransportModel lastModel;
     bool lastFlagsSet = false;
     std::vector<float> scratchL, scratchR;

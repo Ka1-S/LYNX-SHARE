@@ -760,11 +760,23 @@ void RenderAhead::threadLoop (std::function<void()> onStart)
         const auto useWorkers = false;
         (void) fill;
        #else
-        const auto useWorkers = pool != nullptr && fill < std::max (1, targetFill / 3);
+        // (the workers when the window runs thin, or for good while one thread can't keep up — a serial block now and
+        // then, with the window comfortable, measures that again)
+        const auto heavy = serialLoad >= serialLimit && ! (jobsSinceSerial >= 256 && fill >= targetFill / 2);
+        const auto useWorkers = pool != nullptr && (fill < std::max (1, targetFill / 3) || heavy);
        #endif
         const auto jobStart = ProcessTimes::now();
         renderJob (entry, *aheadState, sb.start, sb.samples, true, useWorkers);
-        aheadBusyNs.fetch_add (ProcessTimes::now() - jobStart, std::memory_order_relaxed);
+        const auto jobNs = ProcessTimes::now() - jobStart;
+        aheadBusyNs.fetch_add (jobNs, std::memory_order_relaxed);
+        if (useWorkers)
+            ++jobsSinceSerial;
+        else if (sb.samples > 0 && model.sampleRate > 0.0)
+        {
+            const auto load = (double) jobNs * 1.0e-9 * model.sampleRate / sb.samples;
+            serialLoad += 0.1 * (load - serialLoad);
+            jobsSinceSerial = 0;
+        }
         nextPosition = sb.next;
         nextDone = nextDone + sb.samples >= model.deviceBlock ? 0 : nextDone + sb.samples;
         modelStop.store (sb.last, std::memory_order_release);
