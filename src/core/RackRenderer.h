@@ -344,6 +344,30 @@ struct RackState
         std::vector<char> lowLatencyTracks;
     };
 
+    // Round 190gp: what the renderer's effect loop needs of each slot, worked out once per snapshot ([track][slot], one
+    // per slot with an effect): a few bytes in a row instead of each EffectSlot (about 1 KB) and its automation table
+    // (768 bytes) read at every block, most of the effect loop's own cost in a big project (cache misses).
+    struct SlotPlan
+    {
+        EffectKind kind {};
+        bool active = false;        // Song::slotActive
+        bool smartEligible = false; // smart disable may skip it (everything but FL's global switch, which is read live)
+        bool longHold = false;      // a plugin or a Patcher: 4 s of silence before smart disable, else 1 s
+        bool liveMeters = false;    // an editor shows its controlOutput()
+        bool isPlugin = false;
+        bool routed = false;        // a hosted effect with routed Connections (slotConnections)
+        bool sends = false;         // it sends into its own buffers (Fruity Send, Patcher, Transmitter, Transporter, Equo, routed)
+        bool hasMixAuto = false;    // effectMixAuto has its entry (mixAuto)
+        bool tailHold = false;      // smart disable may take the effect's declared tail (a built-in with no side input)
+        int mixAuto = -1;
+        float mix = 1.0f;
+        int used = 0;               // the parameters its kind has (and the slot holds)
+        int firstAutomated = 0;     // its first automated parameter (used = none)
+    };
+    std::vector<std::vector<SlotPlan>> slotPlans;
+    static SlotPlan planSlot (const RackState& state, int track, std::size_t slot) noexcept;
+    void buildSlotPlans();
+
     // Builds the next state reusing the instruments from `previous` when the
     // channel changed neither instrument nor sample, and the effects when the slot has the
     // same type. Runs on the UI thread (allocates).
@@ -406,6 +430,9 @@ struct ProcessTimes
     // itself in `levelWanted[key]`; while it is above 0 the audio thread raises slotLevels[key * 2 + 0 / 1] to the
     // block's peak (linear), and the editor takes them with exchange (0) (the highest peak since its last frame).
     std::array<std::atomic<std::uint16_t>, (std::size_t) maxMixerTracks * maxEffectSlots> levelWanted {};
+    // Round 190gp: the editors showing a slot's live meters (effectMeters) count themselves here; the renderer tells the
+    // slot's effect before each block (Effect::setMetersShown), so a costly meter runs only while one is open.
+    std::array<std::atomic<std::uint16_t>, (std::size_t) maxMixerTracks * maxEffectSlots> metersWanted {};
     std::array<std::atomic<float>, (std::size_t) maxMixerTracks * maxEffectSlots * 2> slotLevels {};
 
     // Audio of one effect slot for an editor's spectrum analyser (Facet EQ, round 103): the editor sets `key`
@@ -620,6 +647,16 @@ private:
     double compensateTicksPerSample = 0.0; // > 0: compensation on in this block
     float automated (int automation, float base) const noexcept;
     float* trackBuffer (int track, int channel) noexcept;
+    // Round 190gp (lazy-zero track buffers): an insert's buffer nobody has written in this chunk holds zeros without
+    // storing them (trackUnwritten). trackBuffer — for the insert's own work and what is added into it — stores the
+    // zeros on first use; trackInput — another insert reading it (a sidechain, a route, a hardware output) — reads
+    // `zeroBlock` instead, so nothing is written by a reader. rawTrackBuffer: the memory, as it is.
+    const float* trackInput (int track, int channel) noexcept;
+    float* rawTrackBuffer (int track, int channel) noexcept;
+    bool trackZeros (int track) const noexcept { return (std::size_t) track < trackUnwritten.size() && trackUnwritten[(std::size_t) track] != 0; }
+    std::vector<std::uint8_t> trackUnwritten;
+    std::vector<float> zeroBlock;
+    int trackSamples = 0; // the chunk's samples (what trackBuffer zeroes)
 
     double sampleRate = 44100.0;
     double bpm = 120.0;

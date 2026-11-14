@@ -1234,6 +1234,7 @@ std::unique_ptr<const RackState> RackState::build (Song song,
     const auto audible = state->song.soloAudible();
     state->mixerAudible.assign (audible.begin(), audible.end());
     state->applyVcas();
+    state->buildSlotPlans(); // (round 190gp: last, from the song as it now is)
     loadtrace::add ("rack_schedule_graph", loadtrace::msSince (tailStarted));
     return state;
 }
@@ -2523,6 +2524,9 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
         bufferExchange.collectGarbage();
         bufferExchange.publish (makeBuffers (channels, tracks, frames));
     }
+    // (round 190gp: the lazy-zero flags of the inserts and the shared silent block a reader of an unwritten insert gets)
+    trackUnwritten.assign ((std::size_t) maxMixerTracks, 0);
+    zeroBlock.assign ((std::size_t) blockCapacity, 0.0f);
     hwScratch.assign (2 * (std::size_t) blockCapacity, 0.0f);
     layerPick.assign ((std::size_t) maxChannels * 128, (std::int16_t) -1);
     voiceOrderScratch.assign ((std::size_t) maxChannels, {});
@@ -2541,7 +2545,7 @@ void RackRenderer::prepare (double sr, int maxBlockSize)
     }
 }
 
-float* RackRenderer::trackBuffer (int track, int channel) noexcept
+float* RackRenderer::rawTrackBuffer (int track, int channel) noexcept
 {
     return buffers->mix.data() + ((std::size_t) track * 2 + (std::size_t) channel) * (std::size_t) buffers->frames;
 }
@@ -2609,6 +2613,22 @@ bool RackRenderer::buffersFor (const RackState& state) noexcept
     }
     buffers = bufferExchange.acquire();
     return fits();
+}
+
+float* RackRenderer::trackBuffer (int track, int channel) noexcept
+{
+    if (trackZeros (track)) // (round 190gp: the zeros of a buffer nobody wrote this chunk, stored now)
+    {
+        trackUnwritten[(std::size_t) track] = 0;
+        std::memset (rawTrackBuffer (track, 0), 0, sizeof (float) * (std::size_t) trackSamples);
+        std::memset (rawTrackBuffer (track, 1), 0, sizeof (float) * (std::size_t) trackSamples);
+    }
+    return rawTrackBuffer (track, channel);
+}
+
+const float* RackRenderer::trackInput (int track, int channel) noexcept
+{
+    return trackZeros (track) ? zeroBlock.data() : rawTrackBuffer (track, channel);
 }
 
 float* RackRenderer::tapBuffer (int tap, int side) noexcept
@@ -3351,6 +3371,72 @@ static bool hasLiveMeters (EffectKind kind) noexcept
            || kind == EffectKind::peakController; // issue #66: its display's Peak + LFO, Peak and LFO lines
 }
 
+RackState::SlotPlan RackState::planSlot (const RackState& state, int track, std::size_t i) noexcept
+{
+    SlotPlan p;
+    const auto& slot = state.song.mixer[(std::size_t) track].effects[i];
+    p.kind = slot.kind;
+    p.active = state.song.slotActive (slot);
+    p.mix = slot.mix;
+    p.hasMixAuto = (std::size_t) track < state.effectMixAuto.size() && i < state.effectMixAuto[(std::size_t) track].size();
+    p.mixAuto = p.hasMixAuto ? state.effectMixAuto[(std::size_t) track][i] : -1;
+    p.isPlugin = slot.kind == EffectKind::plugin;
+    p.routed = p.isPlugin && (std::size_t) track < state.slotConnections.size() && i < state.slotConnections[(std::size_t) track].size()
+               && state.slotConnections[(std::size_t) track][i].routed;
+    p.longHold = p.isPlugin || slot.kind == EffectKind::patcher;
+    p.liveMeters = hasLiveMeters (slot.kind);
+    p.sends = slot.kind == EffectKind::fruitySend || slot.kind == EffectKind::patcher || slot.kind == EffectKind::transmitter
+              || slot.kind == EffectKind::flTransporter || slot.kind == EffectKind::equo || p.routed;
+    // smart disable (runEffects; FL's global switch is read there, live):
+    // (not Gross Beat: its buffer must keep recording the silence it may play back later, as in FL)
+    // (nor Newtone / Newtime: in slave mode they play their sample whatever the input)
+    // (nor a slot whose "Smart disable" is off, or a plugin that does not allow it — FL's per-plugin options, REA round 139)
+    // (nor a hosted effect whose input 1 comes from another insert: its own input says nothing; round 189j)
+    p.smartEligible = slot.smartDisable && ! (p.isPlugin && ! slot.plugin.allowSmartDisable)
+                      && ! (p.routed && state.slotConnections[(std::size_t) track][i].mainSource > 0)
+                      && slot.kind != EffectKind::grossBeat && slot.kind != EffectKind::newtone
+                      && slot.kind != EffectKind::newtime
+                      && slot.kind != EffectKind::scratcher // (nor the Scratcher: its turntable plays whatever the input)
+                      && slot.kind != EffectKind::edison // (nor Edison: it records silence and plays whatever the input, round 190cd)
+                      && slot.kind != EffectKind::hardwareInsert // (nor the hardware insert: outboard gear has its own tails and noise)
+                      && ! (slot.kind == EffectKind::patcher && patcher::usesHardwareIo (slot.patcher)) // (nor a Patcher holding one, round 165c)
+                      // (nor a controller: its outputs move whatever the sound — a silent insert is their usual place; round 164)
+                      && slot.kind != EffectKind::formulaController
+                      && slot.kind != EffectKind::xyController && slot.kind != EffectKind::xyzController
+                      && slot.kind != EffectKind::controlSurface
+                      && slot.kind != EffectKind::peakController // (issue #66: its LFO runs and its peak falls in silence, as FL's)
+                      // round 164c: a visual plugin keeps recording silence (its display falls, the video export stays in time)
+                      && slot.kind != EffectKind::waveCandy && slot.kind != EffectKind::visualizer
+                      && slot.kind != EffectKind::tuner // (round 165g: the tuner's display follows the signal into silence)
+                      // (round 166f: nor Facet EQ playing its comparative target — the sidechain plays while this track is silent)
+                      && ! (slot.kind == EffectKind::facetEq && facet::listensToTarget (slot.params));
+    // round 190gp: a built-in's declared tail (Effect::tailSamples) may end its smart-disable hold early; not with a
+    // side input (what it hears there moves its state while its own input is silent)
+    p.tailHold = ! p.longHold && slot.sidechain < 0 && slot.sidechain2 < 0;
+    p.used = (int) std::min (slot.params.size(), effectInfo (slot.kind).params.size());
+    p.firstAutomated = p.used;
+    if ((std::size_t) track < state.effectParamAuto.size() && i < state.effectParamAuto[(std::size_t) track].size())
+    {
+        const auto& autos = state.effectParamAuto[(std::size_t) track][i];
+        p.firstAutomated = 0;
+        while (p.firstAutomated < p.used && autos[(std::size_t) p.firstAutomated] < 0)
+            ++p.firstAutomated;
+    }
+    return p;
+}
+
+void RackState::buildSlotPlans()
+{
+    slotPlans.assign (effects.size(), {});
+    for (std::size_t t = 0; t < effects.size() && t < song.mixer.size(); ++t)
+    {
+        const auto count = std::min (effects[t].size(), song.mixer[t].effects.size());
+        slotPlans[t].reserve (count);
+        for (std::size_t i = 0; i < count; ++i)
+            slotPlans[t].push_back (planSlot (*this, (int) t, i));
+    }
+}
+
 void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot, Effect& effect, int track) noexcept
 {
     // the source was already processed in this pass (earlier layer); silent = no signal in the detector
@@ -3360,8 +3446,8 @@ void RackRenderer::setSidechain (const RackState& state, const EffectSlot& slot,
         if (source < 0 || source == track || source >= (int) state.song.mixer.size())
             continue;
         const auto active = (std::size_t) source < trackActive.size() && trackActive[(std::size_t) source] != 0;
-        const auto* left = active ? trackBuffer (source, 0) : nullptr;
-        const auto* right = active ? trackBuffer (source, 1) : nullptr;
+        const auto* left = active ? trackInput (source, 0) : nullptr;
+        const auto* right = active ? trackInput (source, 1) : nullptr;
         if (second)
             effect.setSidechain2 (left, right);
         else
@@ -3380,13 +3466,13 @@ void RackRenderer::connect (const RackState& state, const SlotConnections& c, Ef
     if (c.mainSource == -2)
         effect.setMainInput (nullptr, nullptr);
     else if (c.mainSource > 0)
-        effect.setMainInput (sounding (c.mainSource) ? trackBuffer (c.mainSource, 0) : nullptr, sounding (c.mainSource) ? trackBuffer (c.mainSource, 1) : nullptr);
+        effect.setMainInput (sounding (c.mainSource) ? trackInput (c.mainSource, 0) : nullptr, sounding (c.mainSource) ? trackInput (c.mainSource, 1) : nullptr);
     if (c.sideSource == -1)
         effect.setSidechain (l, r);
     else if (c.sideSource == -2)
         effect.setSidechain (nullptr, nullptr);
     else // (its index, when no side input source is picked: setSidechain fed the slot's own one, if any)
-        effect.setSidechain (sounding (c.sideSource) ? trackBuffer (c.sideSource, 0) : nullptr, sounding (c.sideSource) ? trackBuffer (c.sideSource, 1) : nullptr);
+        effect.setSidechain (sounding (c.sideSource) ? trackInput (c.sideSource, 0) : nullptr, sounding (c.sideSource) ? trackInput (c.sideSource, 1) : nullptr);
 }
 
 void RackRenderer::runGoalSlot (const EffectSlot& slot, Effect& effect, std::size_t key, float* l, float* r, int n, const EffectParams& params,
@@ -3430,14 +3516,16 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
     const auto& slots = state.song.mixer[(std::size_t) track].effects;
     const auto& effects = state.effects[(std::size_t) track];
 
-    auto* l = trackBuffer (track, 0);
-    auto* r = trackBuffer (track, 1);
+    // (round 190gp: the insert's zeros, when nothing came in, are stored only once a slot runs: trackBuffer)
+    auto* l = rawTrackBuffer (track, 0);
+    auto* r = rawTrackBuffer (track, 1);
     int audible = -1; // -1 = not measured yet; an effect's output is the next one's input
     // round 190bu: the chain's Blend (nullptr at 100 %): the insert's input is kept before the first slot
     static_assert (chunkCapacity <= RackState::ChainBlendStage::capacity);
     auto* blend = (std::size_t) track < state.chainBlends.size() ? state.chainBlends[(std::size_t) track].get() : nullptr;
     if (blend != nullptr)
     {
+        (void) trackBuffer (track, 0);
         std::memcpy (blend->dry.data(), l, sizeof (float) * (std::size_t) n);
         std::memcpy (blend->dry.data() + RackState::ChainBlendStage::capacity, r, sizeof (float) * (std::size_t) n);
     }
@@ -3453,12 +3541,14 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         times->effectNs[key].fetch_add (ProcessTimes::now() - before, std::memory_order_relaxed);
     };
 
+    // round 190gp: the slots' plan (RackState::SlotPlan), made with the snapshot; worked out here only for a state that
+    // has none
+    const auto* plans = (std::size_t) track < state.slotPlans.size() ? &state.slotPlans[(std::size_t) track] : nullptr;
     for (std::size_t i = 0; i < effects.size() && i < slots.size(); ++i)
     {
+        const auto plan = plans != nullptr && i < plans->size() ? (*plans)[i] : RackState::planSlot (state, track, i);
         // slot dry/wet (automatable)
-        const auto wet = state.hasAutomation && i < state.effectMixAuto[(std::size_t) track].size()
-                             ? std::clamp (automated (state.effectMixAuto[(std::size_t) track][i], slots[i].mix), 0.0f, 1.0f)
-                             : slots[i].mix;
+        const auto wet = state.hasAutomation && plan.hasMixAuto ? std::clamp (automated (plan.mixAuto, plan.mix), 0.0f, 1.0f) : plan.mix;
 
         auto clearMeters = [this, track, i] {
             const auto at = ((std::size_t) track * maxEffectSlots + i) * ProcessTimes::meterOutputs;
@@ -3467,9 +3557,9 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
                     times->effectMeters[at + (std::size_t) o].store (0.0f, std::memory_order_relaxed);
         };
 
-        if (! state.song.slotActive (slots[i]) || wet <= 0.0f)
+        if (! plan.active || wet <= 0.0f)
         {
-            if (hasLiveMeters (slots[i].kind))
+            if (plan.liveMeters)
                 clearMeters();
             continue;
         }
@@ -3481,7 +3571,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             if (lowlatency::bypassed (state.lowLatencySlots, track, (int) i))
             {
                 lowLatencySkipped[at] = 1;
-                if (hasLiveMeters (slots[i].kind))
+                if (plan.liveMeters)
                     clearMeters();
                 continue;
             }
@@ -3495,37 +3585,13 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         // smart disable (like FL): an effect with silent input and output is skipped (plugins
         // after 4 s; built-ins after 1 s, which is well beyond their tail)
         const auto key = (std::size_t) track * maxEffectSlots + i;
-        const auto isPlugin = slots[i].kind == EffectKind::plugin;
-        const auto* connections = isPlugin && (std::size_t) track < state.slotConnections.size() && i < state.slotConnections[(std::size_t) track].size()
-                                      && state.slotConnections[(std::size_t) track][i].routed
-                                      ? &state.slotConnections[(std::size_t) track][i]
-                                      : nullptr; // (round 189j: a hosted effect's routed Connections)
-        const auto hold = (int) (sampleRate * (isPlugin || slots[i].kind == EffectKind::patcher ? 4.0 : 1.0)); // (a Patcher may hold plugins)
+        const auto isPlugin = plan.isPlugin;
+        const auto* connections = plan.routed ? &state.slotConnections[(std::size_t) track][i] : nullptr; // (round 189j: a hosted effect's routed Connections)
+        const auto hold = (int) (sampleRate * (plan.longHold ? 4.0 : 1.0)); // (a Patcher may hold plugins)
 
-        // (not Gross Beat: its buffer must keep recording the silence it may play back later, as in FL)
-        // (nor Newtone / Newtime: in slave mode they play their sample whatever the input)
-        // (nor a slot whose "Smart disable" is off, or a plugin that does not allow it — FL's per-plugin options, REA round 139)
-        // (nor a hosted effect whose input 1 comes from another insert: its own input says nothing; round 189j)
-        // (nor anything while FL's Settings › Audio › CPU › "Smart disable" is off: the global switch, round 190bx)
-        if (key < smartDisable.size() && slots[i].smartDisable && ! (isPlugin && ! slots[i].plugin.allowSmartDisable)
-            && flsettings::options().smartDisable.load (std::memory_order_relaxed)
-            && ! (connections != nullptr && connections->mainSource > 0)
-            && slots[i].kind != EffectKind::grossBeat && slots[i].kind != EffectKind::newtone
-            && slots[i].kind != EffectKind::newtime
-            && slots[i].kind != EffectKind::scratcher // (nor the Scratcher: its turntable plays whatever the input)
-            && slots[i].kind != EffectKind::edison // (nor Edison: it records silence and plays whatever the input, round 190cd)
-            && slots[i].kind != EffectKind::hardwareInsert // (nor the hardware insert: outboard gear has its own tails and noise)
-            && ! (slots[i].kind == EffectKind::patcher && patcher::usesHardwareIo (slots[i].patcher)) // (nor a Patcher holding one, round 165c)
-            // (nor a controller: its outputs move whatever the sound — a silent insert is their usual place; round 164)
-            && slots[i].kind != EffectKind::formulaController
-            && slots[i].kind != EffectKind::xyController && slots[i].kind != EffectKind::xyzController
-            && slots[i].kind != EffectKind::controlSurface
-            && slots[i].kind != EffectKind::peakController // (issue #66: its LFO runs and its peak falls in silence, as FL's)
-            // round 164c: a visual plugin keeps recording silence (its display falls, the video export stays in time)
-            && slots[i].kind != EffectKind::waveCandy && slots[i].kind != EffectKind::visualizer
-            && slots[i].kind != EffectKind::tuner // (round 165g: the tuner's display follows the signal into silence)
-            // (round 166f: nor Facet EQ playing its comparative target — the sidechain plays while this track is silent)
-            && ! (slots[i].kind == EffectKind::facetEq && facet::listensToTarget (slots[i].params)))
+        // (not the slots RackState::planSlot lists, made with the snapshot; round 190gp — nor anything while FL's
+        // Settings › Audio › CPU › "Smart disable" is off: the global switch, round 190bx)
+        if (key < smartDisable.size() && plan.smartEligible && flsettings::options().smartDisable.load (std::memory_order_relaxed))
         {
             auto& sd = smartDisable[key];
 
@@ -3533,19 +3599,24 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
                 sd = { effects[i].get(), 0 };
 
             if (audible < 0)
-                audible = anyAbove (l, r, n, silenceLevel) ? 1 : 0;
+                audible = ! trackZeros (track) && anyAbove (l, r, n, silenceLevel) ? 1 : 0;
 
+            // round 190gp: a built-in whose declared tail is shorter than the hold is taken out once it has settled
+            const auto tail = plan.tailHold && declaredTails() ? effects[i]->tailSamples() : -1;
             if (audible == 1)
                 sd.silentSamples = 0;
-            else if (sd.silentSamples >= hold)
+            // (at least one silent block runs: its output is measured, and one the effect makes audible keeps it on)
+            else if (sd.silentSamples >= (tail >= 0 ? std::min (hold, std::max (tail, 1)) : hold))
             {
-                if (hasLiveMeters (slots[i].kind))
+                if (plan.liveMeters)
                     clearMeters();
                 continue;
             }
             else
                 sd.silentSamples += n;
         }
+
+        (void) trackBuffer (track, 0); // (round 190gp: this slot runs: the insert's zeros are stored, if it has only those)
 
         // the editor's spectrum analyser listens to this slot: its input
         const auto tapped = times->analyzer.key.load (std::memory_order_relaxed) == (int) key;
@@ -3559,8 +3630,8 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             const auto source = slots[i].sidechain;
             const bool side = source >= 0 && source != track && source < (int) state.song.mixer.size();
             const bool sounding = side && (std::size_t) source < trackActive.size() && trackActive[(std::size_t) source] != 0;
-            const auto* sl = sounding ? trackBuffer (source, 0) : nullptr;
-            const auto* sr = sounding ? trackBuffer (source, 1) : nullptr;
+            const auto* sl = sounding ? trackInput (source, 0) : nullptr;
+            const auto* sr = sounding ? trackInput (source, 1) : nullptr;
             for (int k = 0; k < n; ++k)
                 tap.side[(std::size_t) ((w + (std::uint32_t) k) & (ProcessTimes::AnalyzerTap::size - 1))].store (sl != nullptr ? 0.5f * (sl[k] + sr[k]) : 0.0f, std::memory_order_relaxed);
             tap.sideOn.store (side, std::memory_order_relaxed);
@@ -3587,8 +3658,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
 
         // Fruity Send / Patcher / Transmitter / Transporter: what it sends goes to its own buffer, pulled by the destination insert
         // (processed later)
-        if (slots[i].kind == EffectKind::fruitySend || slots[i].kind == EffectKind::patcher || slots[i].kind == EffectKind::transmitter
-            || slots[i].kind == EffectKind::flTransporter || slots[i].kind == EffectKind::equo || connections != nullptr)
+        if (plan.sends)
         {
             for (int o = 0; o < maxSlotSends; ++o)
             {
@@ -3607,6 +3677,10 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
                     effects[i]->setExtraOutput (o, nullptr, nullptr);
             }
         }
+
+        // round 190gp: whether an editor shows the slot's live meters (Apex Limiter's loudness meter runs only then)
+        if (plan.liveMeters && key < times->metersWanted.size())
+            effects[i]->setMetersShown (times->metersWanted[key].load (std::memory_order_relaxed) > 0);
 
         // round 170c: the slot's input peak for an editor's level meter (only while an editor asks)
         const bool levels = key < times->levelWanted.size() && times->levelWanted[key].load (std::memory_order_relaxed) > 0;
@@ -3634,11 +3708,10 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
             // round 190ge: only the automated parameters are worked out, into a copy only when there is one. Most slots of
             // a song with automation have none, and the copy (768 bytes) and a lookup per parameter, at every block,
             // were most of this function's own time in a big project (an unautomated parameter keeps its value either way)
+            // (round 190gp: the first automated one comes from the slot's plan)
             const auto& autos = state.effectParamAuto[(std::size_t) track][i];
-            const auto used = std::min (slots[i].params.size(), effectInfo (slots[i].kind).params.size());
-            std::size_t firstAutomated = 0;
-            while (firstAutomated < used && autos[firstAutomated] < 0)
-                ++firstAutomated;
+            const auto used = (std::size_t) plan.used;
+            const auto firstAutomated = (std::size_t) plan.firstAutomated;
             EffectParams automatedParams; // (filled only when used)
             if (firstAutomated < used)
             {
@@ -3709,7 +3782,7 @@ void RackRenderer::runEffects (const RackState& state, int track, int n) noexcep
         }
 
         // live meters for the editor (the mixing suite's gain reduction, LYNX Tune's pitch, Facet EQ's dynamic gains)
-        if (hasLiveMeters (slots[i].kind) && key < (std::size_t) maxMixerTracks * maxEffectSlots)
+        if (plan.liveMeters && key < (std::size_t) maxMixerTracks * maxEffectSlots)
             for (int o = 0; o < ProcessTimes::meterOutputs; ++o)
                 times->effectMeters[key * ProcessTimes::meterOutputs + (std::size_t) o].store (effects[i]->controlOutput (o), std::memory_order_relaxed);
 
@@ -4538,11 +4611,10 @@ void RackRenderer::processChunk (const RackState& state, bool playing, double st
         timeline.chunk.fetch_add (1, std::memory_order_relaxed);
     }
 
-    for (int t = 0; t < tracks; ++t)
-    {
-        std::memset (trackBuffer (t, 0), 0, sizeof (float) * (std::size_t) numSamples);
-        std::memset (trackBuffer (t, 1), 0, sizeof (float) * (std::size_t) numSamples);
-    }
+    // every insert's buffer starts the chunk as zeros (round 190gp: marked, not stored: trackBuffer stores them when the
+    // insert is first written or worked on; an insert nobody feeds, whose effects are smart-disabled, never is)
+    trackSamples = numSamples;
+    std::memset (trackUnwritten.data(), 1, (std::size_t) std::min (tracks, (int) trackUnwritten.size()));
 
     events.clear();
 
@@ -4961,8 +5033,8 @@ void RackRenderer::mixHardwareOutputs (const RackState& state, int n) noexcept
         if (t <= 0 || t >= maxMixerTracks)
             continue;
 
-        const float* l = trackActive[(std::size_t) t] ? trackBuffer (t, 0) : nullptr;
-        const float* r = trackActive[(std::size_t) t] ? trackBuffer (t, 1) : nullptr;
+        const float* l = trackActive[(std::size_t) t] ? trackInput (t, 0) : nullptr;
+        const float* r = trackActive[(std::size_t) t] ? trackInput (t, 1) : nullptr;
         const auto bypassed = pdcBypassNow && (std::size_t) t < state.bypassWhenIdle.size() && state.bypassWhenIdle[(std::size_t) t] != 0;
 
         if (route.delay != nullptr && ! bypassed)
@@ -5038,12 +5110,17 @@ void RackRenderer::sumChannelsInto (const RackState& state, int t, int channels,
 {
     if ((std::size_t) t >= state.trackChannels.size())
         return;
-    auto* dl = trackBuffer (t, 0);
-    auto* dr = trackBuffer (t, 1);
+    float* dl = nullptr;
+    float* dr = nullptr;
     for (const auto c : state.trackChannels[(std::size_t) t])
     {
         if (c >= channels || channelSilent[(std::size_t) c])
             continue;
+        if (dl == nullptr) // (round 190gp: the insert's buffer only once a channel sounds into it)
+        {
+            dl = trackBuffer (t, 0);
+            dr = trackBuffer (t, 1);
+        }
         const auto* sl = channelBuffer (c, 0);
         const auto* sr = channelBuffer (c, 1);
         for (int k = 0; k < n; ++k)
@@ -5199,8 +5276,15 @@ void RackRenderer::pullInputs (const RackState& state, int t, int n) noexcept
     if ((std::size_t) t >= state.mixerInputs.size())
         return;
 
-    auto* dl = trackBuffer (t, 0);
-    auto* dr = trackBuffer (t, 1);
+    float* dl = nullptr; // (round 190gp: the insert's buffer only once something comes in)
+    float* dr = nullptr;
+    auto target = [&] {
+        if (dl == nullptr)
+        {
+            dl = trackBuffer (t, 0);
+            dr = trackBuffer (t, 1);
+        }
+    };
 
     for (const auto& in : state.mixerInputs[(std::size_t) t])
     {
@@ -5215,19 +5299,21 @@ void RackRenderer::pullInputs (const RackState& state, int t, int n) noexcept
         auto* delay = (std::size_t) in.delay < delays.size() ? delays[(std::size_t) in.delay].get() : nullptr;
         if (pdcBypassNow && (tap < 0 || in.pre) && state.bypassWhenIdle[(std::size_t) in.source] != 0)
             delay = nullptr; // FL's "When recording or not playing": no compensation now
-        auto* sl = tap >= 0 ? tapBuffer (tap, 0) : trackBuffer (in.source, 0);
-        auto* sr = tap >= 0 ? tapBuffer (tap, 1) : trackBuffer (in.source, 1);
+        const auto* sl = tap >= 0 ? tapBuffer (tap, 0) : trackInput (in.source, 0);
+        const auto* sr = tap >= 0 ? tapBuffer (tap, 1) : trackInput (in.source, 1);
 
         if (delay != nullptr)
         {
             // PDC: this edge is shorter than the slowest one arriving here. A silent source
             // still drains the tail that was in the line.
+            target();
             delay->mixInto (active ? sl : nullptr, active ? sr : nullptr, level, dl, dr, n);
             continue;
         }
 
         if (! active)
             continue;
+        target();
 
         for (int i = 0; i < n; ++i)
         {
@@ -5322,7 +5408,10 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     const auto taps = liveInput != nullptr && t > 0 ? liveInput->tappedPoints (t) : 0u;
     auto tap = [&] (RecordSource point, const float* l, const float* r) {
         if ((taps & (1u << (unsigned) point)) != 0)
+        {
+            (void) trackBuffer (t, 0); // (round 190gp: its zeros stored, if it has only those)
             liveInput->tap (t, point, l, r, liveInputOffset, n);
+        }
     };
 
     const auto silent = track.muted || ! state.mixerAudible[(std::size_t) t];
@@ -5368,8 +5457,11 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     const auto from = std::isnan (last.ll) ? target : last;
     constexpr MixerMatrix zero { 0.0f, 0.0f, 0.0f, 0.0f };
 
-    auto* l = trackBuffer (t, 0);
-    auto* r = trackBuffer (t, 1);
+    // round 190gp: an insert nothing came into holds zeros it has not stored (trackZeros): what only reads them knows
+    // they are zeros, and they are stored (trackBuffer) only before something works on them
+    auto* l = rawTrackBuffer (t, 0);
+    auto* r = rawTrackBuffer (t, 1);
+    auto store = [&] { (void) trackBuffer (t, 0); };
 
     // pre-fader sends (round 190aq): the insert's signal before its fader goes to its tap, with the mute as a ramp
     const auto preTap = (std::size_t) t < state.preTap.size() ? state.preTap[(std::size_t) t] : -1;
@@ -5397,7 +5489,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     // an idle insert (round 166d, up to 500 of them): no effects, no built-in EQ and nothing came in this block. Its
     // output is silence whatever the fader does, so it stays inactive and the tracks it feeds skip it (the same
     // samples: adding zeros changes nothing; a tap stays silent too)
-    if (track.effects.empty() && (state.song.cleanMixer || ! track.eq.active()) && isSilentBlock (l, r, n))
+    if (track.effects.empty() && (state.song.cleanMixer || ! track.eq.active()) && (trackZeros (t) || isSilentBlock (l, r, n)))
     {
         if (t < (int) trackEqs.size() && trackEqs[(std::size_t) t].running)
             trackEqs[(std::size_t) t] = {};
@@ -5410,11 +5502,14 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
 
     runEffects (state, t, n);
     tap (RecordSource::postEffects, l, r);
+    if (! state.song.cleanMixer && track.eq.active())
+        store();
     applyTrackEq (track, t, state.song.cleanMixer, l, r, n);
     tap (RecordSource::postEq, l, r);
     if ((taps & (1u << (unsigned) RecordSource::postLevel)) != 0)
         if (const auto dest = liveInput->tapDestination (t, RecordSource::postLevel, liveInputOffset, n); dest.first != nullptr)
         {
+            store();
             // the fader, pan and separation without the mute, with their own ramp
             auto& lastLevel = lastTapGain[(std::size_t) t];
             const auto fromLevel = std::isnan (lastLevel.ll) ? level : lastLevel;
@@ -5425,6 +5520,7 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
         auto g = std::isnan (lastPre) ? preTarget : lastPre;
         if (g > 0.0f || preTarget > 0.0f)
         {
+            store();
             auto* pl = tapBuffer (preTap, 0);
             auto* pr = tapBuffer (preTap, 1);
             constexpr float step = 0.001f; // (the fader ramp's step, applyMatrix)
@@ -5444,19 +5540,30 @@ void RackRenderer::processTrack (const RackState& state, int t, int n, MeterBank
     // on silence, with no ramp running and gains that cannot flip a zero's sign, would write the same zeros back, so it
     // is not run; and the inserts it feeds skip it (trackActive 2). An idle project's mixer used to scale, delay and
     // sum blocks of zeros on every insert with effects (most of its CPU once the effects were smart-disabled)
-    const auto silentOut = isSilentBlock (l, r, n);
+    const auto silentOut = trackZeros (t) || isSilentBlock (l, r, n);
     if (silentOut && from == target && target.rl == 0.0f && target.lr == 0.0f && ! std::signbit (target.ll) && ! std::signbit (target.rr))
         last = target;
     else
+    {
+        store();
         last = applyMatrix (l, r, l, r, n, from, target);
+    }
     tap (RecordSource::postTrack, l, r);
 
     trackActive[(std::size_t) t] = silentOut ? 2 : 1;
 
     if (meters != nullptr)
     {
-        meters->accumulate (t, peakOf (l, n), peakOf (r, n));
-        meters->capture.push (t, l, r, n);
+        if (trackZeros (t)) // (round 190gp: its zeros, never stored: the readers read them as zeros)
+        {
+            meters->accumulate (t, 0.0f, 0.0f);
+            meters->capture.push (t, trackInput (t, 0), trackInput (t, 1), n);
+        }
+        else
+        {
+            meters->accumulate (t, peakOf (l, n), peakOf (r, n));
+            meters->capture.push (t, l, r, n);
+        }
     }
 }
 } // namespace lynx

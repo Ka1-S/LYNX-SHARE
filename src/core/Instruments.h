@@ -339,6 +339,10 @@ bool renderInProgress() noexcept;
 // FL's "HQ for all plugins" during an export (REA round 134): effects with an HQ switch use HQ whatever it is set to.
 void setHqForAllPlugins (bool on) noexcept;
 bool hqForAllPlugins() noexcept;
+// The built-in synth renders up to four voices side by side (round 190gp; the same samples as one voice at a time,
+// which `false` restores: for tests and A/B runs).
+void setSynthVoiceLanes (bool on) noexcept;
+bool synthVoiceLanes() noexcept;
 
 // Where the song is, for hosted plugins (tempo-synced effects, LFO/volume shapers, arpeggiators read the host's
 // transport): the renderer publishes it at the start of each chunk it renders.

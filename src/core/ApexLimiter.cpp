@@ -520,6 +520,17 @@ public:
         return k >= 0 && k < (int) meters.size() ? meters[(std::size_t) k].load (std::memory_order_relaxed) : 0.0f;
     }
 
+    // Round 190gp (the owner's decision for 0.1.28): the loudness / true-peak meter (1, 3 … 7) runs only while an editor
+    // shows it — with none open it was about 0.3 % of a core per Apex. Its integrated loudness, range and highest peak
+    // count from when an editor opens. The gain reduction (0, the Mixer's meter) and the input peak (2) always run. The
+    // sound never depended on the meter.
+    void setMetersShown (bool shown) noexcept override
+    {
+        if (shown && ! metersShown)
+            loud.reset();
+        metersShown = shown;
+    }
+
     void process (float* left, float* right, int n, const EffectParams& p, double) noexcept override
     {
         if (base.inL.empty()) prepare (sampleRate);
@@ -603,6 +614,12 @@ public:
         }
         scL = scR = nullptr; // a side chain is given again before every block that has one
 
+        if (! metersShown)
+        {
+            store (0, (float) std::clamp (-20.0 * std::log10 (std::max (minGain, 1e-9)) / 30.0, 0.0, 1.0));
+            store (2, std::min (inPeak, 1.0f));
+            return;
+        }
         loud.process (left, right, n);
         const bool tpMeter = p[pPeakMeter] >= 0.5f;
         const auto blockTp = loud.takeBlockTruePeak(), blockSp = loud.takeBlockSamplePeak();
@@ -707,6 +724,7 @@ private:
     const float* scL = nullptr;
     const float* scR = nullptr;
     loudness::Meter loud;
+    bool metersShown = true; // (round 190gp: setMetersShown)
     float lastReset = 0.0f;
     std::atomic<int> latency { latencyAt (48000.0) };
     std::array<std::atomic<float>, 8> meters {};

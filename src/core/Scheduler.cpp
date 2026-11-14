@@ -353,6 +353,40 @@ ScheduleIndex makeScheduleIndex (const Song& song)
         if (song.playlist[(std::size_t) order[k]].pattern == song.playlist[(std::size_t) order[k + 1]].pattern)
             index.nextOfPattern[(std::size_t) order[k]] = order[k + 1];
 
+    // round 190gp: the clips by time (one bar per bucket; wider when the song is long or the clips are many bars long, so
+    // the table stays small)
+    if (! song.playlist.empty())
+    {
+        std::int64_t last = 0, span = 0;
+        for (const auto& c : song.playlist)
+        {
+            last = std::max (last, c.end() + 1);
+            span += std::max<std::int64_t> (0, c.length);
+        }
+        auto bucket = std::max<std::int64_t> (1, (std::int64_t) std::max (1, song.beatsPerBar) * ppq);
+        constexpr std::int64_t maxBuckets = 1 << 16, maxEntries = 1 << 21;
+        while (last / bucket + 1 > maxBuckets || span / bucket + 2 * (std::int64_t) song.playlist.size() > maxEntries)
+            bucket *= 2;
+        const auto buckets = (std::size_t) (last / bucket + 1);
+        auto of = [&] (std::int64_t tick) { return (std::size_t) std::clamp<std::int64_t> (tick < 0 ? 0 : tick / bucket, 0, (std::int64_t) buckets - 1); };
+        index.bucketFirst.assign (buckets + 1, 0);
+        for (const auto& c : song.playlist)
+            for (auto b = of (c.start); b <= of (c.end() + 1); ++b)
+                ++index.bucketFirst[b + 1];
+        for (std::size_t b = 0; b < buckets; ++b)
+            index.bucketFirst[b + 1] += index.bucketFirst[b];
+        index.bucketClips.assign (index.bucketFirst.back(), 0);
+        auto fill = index.bucketFirst;
+        for (std::size_t i = 0; i < song.playlist.size(); ++i)
+        {
+            const auto& c = song.playlist[i];
+            for (auto b = of (c.start); b <= of (c.end() + 1); ++b)
+                index.bucketClips[fill[b]++] = (std::uint32_t) i;
+        }
+        index.bucketTicks = bucket;
+        index.clipCount = song.playlist.size();
+    }
+
     return index;
 }
 
@@ -479,6 +513,60 @@ NoteEvent audioClipNote (const Song& song, const Clip& clip, std::size_t clipInd
 
 namespace
 {
+// Round 190gp: calls `visit (clipIndex)` in Playlist order for every clip that can play in the block [loopStart,
+// loopEnd) of the song loop of length `loop` (and, when the block crosses the loop's end, in [0, loopEnd − loop)): the
+// clips of the index's buckets that cover those ticks, each once. Without an index for this Playlist, or for a block
+// that spans many buckets, every clip (the old walk). scheduleClip itself decides what a visited clip plays, so the
+// events, and their order, are the same either way.
+template <typename Visit>
+void forClipsInBlock (const Song& song, const ScheduleIndex* index, std::int64_t loop, double loopStart, double loopEnd, Visit&& visit) noexcept
+{
+    constexpr int maxRanges = 8;
+    std::array<std::uint32_t, maxRanges> at {}, stop {};
+    int ranges = 0;
+    auto add = [&] (double from, double to) {
+        const auto bucket = (double) index->bucketTicks;
+        const auto buckets = (std::int64_t) index->bucketFirst.size() - 1;
+        const auto b0 = std::max<std::int64_t> (0, (std::int64_t) std::floor (from / bucket));
+        const auto b1 = std::min<std::int64_t> (buckets - 1, (std::int64_t) std::floor (to / bucket));
+        for (auto b = b0; b <= b1; ++b)
+        {
+            if (ranges == maxRanges)
+                return false;
+            at[(std::size_t) ranges] = index->bucketFirst[(std::size_t) b];
+            stop[(std::size_t) ranges] = index->bucketFirst[(std::size_t) b + 1];
+            ++ranges;
+        }
+        return true;
+    };
+    const auto usable = index != nullptr && index->bucketTicks > 0 && index->clipCount == song.playlist.size()
+                        && std::isfinite (loopStart) && std::isfinite (loopEnd) && add (loopStart, loopEnd)
+                        && (loopEnd <= (double) loop || add (0.0, loopEnd - (double) loop));
+    if (! usable)
+    {
+        for (std::size_t clipIndex = 0; clipIndex < song.playlist.size(); ++clipIndex)
+            visit (clipIndex);
+        return;
+    }
+    // the buckets' lists merged in Playlist order (a clip in several of them, once)
+    auto previous = std::numeric_limits<std::uint32_t>::max();
+    for (;;)
+    {
+        auto best = std::numeric_limits<std::uint32_t>::max();
+        for (int r = 0; r < ranges; ++r)
+            if (at[(std::size_t) r] < stop[(std::size_t) r])
+                best = std::min (best, index->bucketClips[at[(std::size_t) r]]);
+        if (best == std::numeric_limits<std::uint32_t>::max())
+            return;
+        for (int r = 0; r < ranges; ++r)
+            if (at[(std::size_t) r] < stop[(std::size_t) r] && index->bucketClips[at[(std::size_t) r]] == best)
+                ++at[(std::size_t) r];
+        if (best != previous)
+            visit ((std::size_t) best);
+        previous = best;
+    }
+}
+
 // One clip of the Playlist (or a performance-mode launch, played as a clip of its own), its events in the block.
 // [loopStart, loopEnd) = the block within the song loop of length `loop`.
 void scheduleClip (const Song& song, const Clip& clip, std::size_t clipIndex, double startTick, double endTick, int numSamples,
@@ -705,17 +793,16 @@ void scheduleSong (const Song& song, double startTick, int numSamples, double tp
 
     const auto zoneEnd = song.performanceZoneEnd();
 
-    for (std::size_t clipIndex = 0; clipIndex < song.playlist.size(); ++clipIndex)
-    {
+    forClipsInBlock (song, index, loop, loopStart, loopEnd, [&] (std::size_t clipIndex) {
         const auto& clip = song.playlist[clipIndex];
 
         // muted clips and tracks, comping auditions; Performance mode: the zone's clips play only when launched
         // (schedulePerformance)
         if (! clipPlaysInSong (song, clip, zoneEnd))
-            continue;
+            return;
 
         scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume, index, out, chase, &zoneEnd);
-    }
+    });
 
     out.sortByOffset();
 }
@@ -735,11 +822,10 @@ void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMa
     const auto loopEnd = loopStart + (endTick - startTick);
     const auto zoneEnd = song.performanceZoneEnd();
 
-    for (std::size_t clipIndex = 0; clipIndex < song.playlist.size(); ++clipIndex)
-    {
+    forClipsInBlock (song, index, loop, loopStart, loopEnd, [&] (std::size_t clipIndex) {
         const auto& clip = song.playlist[clipIndex];
         if (clip.muted || song.isTrackMuted (clip.track) || clip.start < zoneEnd)
-            continue;
+            return;
         const auto inMask = clip.track >= 0 && clip.track < scheduleMaskTracks;
         if (inMask && taken[(std::size_t) clip.track])
         {
@@ -751,12 +837,12 @@ void scheduleSongAround (const Song& song, const TrackMask& taken, const TrackMa
                 if (out[i].type == NoteEvent::Type::off)
                     out.at (kept++) = out[i];
             out.resize (kept);
-            continue;
+            return;
         }
         const auto back = inMask && givenBack[(std::size_t) clip.track];
         scheduleClip (song, clip, clipIndex, startTick, endTick, numSamples, tps, loop, loopStart, loopEnd, resume || back, index, out, chase || back,
                       &zoneEnd);
-    }
+    });
     out.sortByOffset();
 }
 } // namespace lynx

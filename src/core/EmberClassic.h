@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "core/Biquad.h"
+#include "core/HalfBandBlock.h"
 #include "core/MixSuite.h"
 
 namespace lynx::emberclassic
@@ -120,6 +121,31 @@ private:
             const float d1 = f (d);
             const float y1 = down (st[1], c1, d1);
             return down (st[0], y0, y1);
+        }
+
+        // Round 190gp: run() over a block, stage by stage (core/HalfBandBlock.h): the same samples, `f` called on the
+        // same values in the same order as n calls of run() — the even sample, then the odd one, on every compiler
+        // (rollup 0.1.28, owner decision: Clang's order, the Windows and macOS builds'; g++ used to call them the other
+        // way round, as call arguments)
+        template <typename F>
+        void process (float* x, int n, F&& f) noexcept
+        {
+            constexpr int block = 64;
+            std::array<float, 2 * block> twice;
+            std::array<float, 4 * block> four;
+            for (int start = 0; start < n; start += block)
+            {
+                const int m = std::min (block, n - start);
+                halfband::upBlock (st[0], x + start, m, twice.data());
+                halfband::upBlock (st[1], twice.data(), 2 * m, four.data());
+                for (int i = 0; i < 4 * m; i += 2)
+                {
+                    four[(std::size_t) i] = f (four[(std::size_t) i]);
+                    four[(std::size_t) i + 1] = f (four[(std::size_t) i + 1]);
+                }
+                halfband::downBlock (st[1], four.data(), 2 * m, twice.data());
+                halfband::downBlock (st[0], twice.data(), m, x + start);
+            }
         }
 
     private:

@@ -17593,4 +17593,8 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Stability190ggTests.inc"
 #include "Small190ghTests.inc"
 #include "Link190glTests.inc"
+#include "SynthLanes190gpTests.inc"
+#include "SchedIndex190gpTests.inc"
+#include "SmartTails190gpTests.inc"
+#include "ApexMeter190gpTests.inc"
 #include "Rollup028Tests.inc" // round 190fv: semantic interactions of the 0.1.28 rollup
