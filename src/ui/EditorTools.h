@@ -179,9 +179,20 @@ public:
     bool typingPiano = true;
 
     // "Remember seek time" (the Stop button's right-click menu, as in FL's toolbar): Stop goes back to the
-    // position last clicked on the Playlist ruler (`seekMark`, in ticks; -1 = none) instead of the start.
-    bool rememberSeek = false;
+    // position last clicked on the Playlist or Piano roll ruler (`seekMark`, in ticks; -1 = none) or else to where
+    // playback started, instead of the start. On by default, as in FL (issue #169, REA round 190gy: FL's setting
+    // "RemSeekTime" starts as 1). `seekMarkSongMode`: the mark is a Song position (else a pattern position);
+    // `seekMarkSerial` counts the clicks, so the transport sees a click made while it plays.
+    bool rememberSeek = true;
     std::int64_t seekMark = -1;
+    bool seekMarkSongMode = true;
+    std::uint32_t seekMarkSerial = 0;
+    void markSeek (std::int64_t tick, bool songMode) noexcept
+    {
+        seekMark = tick;
+        seekMarkSongMode = songMode;
+        ++seekMarkSerial;
+    }
 
     // The Playlist's STRETCH switch (FL's ClipStretchBtn "Stretch audio when resizing audio clips", Shift+M) and Edit ›
     // "Create variants when stretching audio clips" (FL's global 0x15452e5, on by default; REA round 168f). The second

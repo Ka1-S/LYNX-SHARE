@@ -3856,6 +3856,7 @@ void PlaylistComponent::seekTo (int x, bool snapOn)
     // while playing, FL's "Quantize song jumps" makes the jump wait for the next beat / bar
     const auto waits = engine.getTransport().playing.load() && engine.quantizeSongJumps.load() > 0;
     engine.jumpTo (tick);
+    EditorGlobals::get().markSeek ((std::int64_t) tick, true); // FL: Stop goes back here (issue #169)
     if (! waits)
         playheadTick = tick;
     repaint();
@@ -4364,8 +4365,7 @@ void PlaylistComponent::mouseDown (const juce::MouseEvent& e)
         }
 
         drag = Drag::seek;
-        seekTo (e.x, snapOn);
-        EditorGlobals::get().seekMark = tick;
+        seekTo (e.x, snapOn); // (it remembers the position for Stop: "Remember seek time")
         return;
     }
 

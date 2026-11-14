@@ -267,16 +267,7 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
             toggleMode();
         playPause();
     };
-    pianoRoll.onPlayRightClick = [this] {
-        const auto playing = engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn();
-        const auto target = transportedit::rollPlayRightClickTarget (playing, engine.getTransport().positionTicks.load(), playStartTicks);
-        engine.stop();
-        if (target > 0)
-            engine.seek (target);
-        else
-            engine.rewind();
-        playStartTicks = target;
-    };
+    pianoRoll.onPlayRightClick = [this] { stopAndRewind (false); }; // FL's Stop (FUN_011ca520 (0, 0)), issue #169
     pianoRoll.onBrowseScores = [this] { // (round 168g: the Piano roll's File › Browse scores)
         showPanel (Panel::browser);
         browser.showScores();
@@ -2671,7 +2662,7 @@ void MainComponent::loadUiSettings()
             ChannelRackComponent::stepsChannelColour.store (on);
         else if (key == "rackCompletePreview")
             ChannelRackComponent::completePreview.store (on);
-        else if (key == "rememberSeek")
+        else if (key == "rememberSeekTime") // (issue #169: the old "rememberSeek" key held LYNX's old default, off; FL's is on)
             EditorGlobals::get().rememberSeek = on;
         else if (key == "createVariants")
             EditorGlobals::get().createVariants = on;
@@ -2965,7 +2956,7 @@ void MainComponent::saveUiSettings()
                                       + "\nartMotion=" + juce::String (skin::artMotion() ? 1 : 0)
                                       + "\npluginStyle=" + juce::String (skin::forcedStyle() < 0 ? "Automatic" : skin::styleName ((skin::Style) skin::forcedStyle()))
                                       + "\npluginStyleOverrides=" + skin::overridesToString()
-                                      + "\nrememberSeek=" + juce::String (EditorGlobals::get().rememberSeek ? 1 : 0)
+                                      + "\nrememberSeekTime=" + juce::String (EditorGlobals::get().rememberSeek ? 1 : 0)
                                       + "\ncreateVariants=" + juce::String (EditorGlobals::get().createVariants ? 1 : 0)
                                       + "\nplLeftResizing=" + juce::String (EditorGlobals::get().leftResizing ? 1 : 0)
                                       + "\nplWheelNudging=" + juce::String (EditorGlobals::get().wheelNudging ? 1 : 0)
@@ -3087,12 +3078,17 @@ void MainComponent::playStop()
 
     if (transport.playing.load())
     {
+        // back to the remembered position: the last ruler click, else where playback started (FL, issue #169)
+        const auto back = stopReturn (false, true);
         engine.stop();
-        engine.seek (playStartTicks); // back to where playback started
+        engine.seek ((double) back);
+        playStartTicks = (double) back;
+        transportPaused = false;
     }
     else
     {
-        playStartTicks = transport.positionTicks.load();
+        notePlayStart (transportPaused);
+        transportPaused = false;
         engine.startPlayback();
     }
 }
@@ -3100,12 +3096,56 @@ void MainComponent::playStop()
 void MainComponent::playPause()
 {
     if (engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting())
+    {
         engine.stop();
+        transportPaused = true; // (FL's pause keeps the position and the mark)
+    }
     else
     {
-        playStartTicks = engine.getTransport().positionTicks.load();
+        notePlayStart (transportPaused);
+        transportPaused = false;
         engine.startPlayback();
     }
+}
+
+double MainComponent::positionToStartFrom() const
+{
+    const auto& transport = engine.getTransport();
+    if (const auto pending = transport.seekRequest.load(); pending >= 0.0)
+        return pending; // a ruler click a moment ago: the audio thread hasn't moved there yet
+    return transport.positionTicks.load();
+}
+
+void MainComponent::notePlayStart (bool resume)
+{
+    playStartTicks = positionToStartFrom();
+    if (resume && returnTicks >= 0.0)
+        return; // a resume after a pause: the mark stays (FL)
+    returnTicks = playStartTicks;
+    returnSongMode = engine.getSong().mode == PlayMode::song;
+    seekClicksSeen = EditorGlobals::get().seekMarkSerial; // (the click that put the position here is this start)
+}
+
+std::int64_t MainComponent::stopReturn (bool alreadyStopped, bool spaceKey)
+{
+    auto& globals = EditorGlobals::get();
+    if (globals.seekMarkSerial != seekClicksSeen && globals.seekMark >= 0) // a ruler click, also one made while playing
+    {
+        seekClicksSeen = globals.seekMarkSerial;
+        returnTicks = (double) globals.seekMark;
+        returnSongMode = globals.seekMarkSongMode;
+    }
+    const auto songMode = engine.getSong().mode == PlayMode::song;
+    const auto mark = returnTicks >= 0.0 && returnSongMode == songMode ? (std::int64_t) std::llround (returnTicks) : (std::int64_t) -1;
+    const auto start = returnSongMode == songMode ? (std::int64_t) std::llround (playStartTicks) : (std::int64_t) 0;
+    const auto target = transportedit::stopReturnTarget (alreadyStopped, globals.rememberSeek, spaceKey, mark, start);
+    if (alreadyStopped) // FL's second Stop: the start, and the mark is forgotten
+    {
+        returnTicks = -1.0;
+        globals.seekMark = -1;
+        seekClicksSeen = globals.seekMarkSerial;
+    }
+    return target;
 }
 
 void MainComponent::playFromStart()
@@ -3121,6 +3161,7 @@ void MainComponent::playFromStart()
     }
 
     engine.stop();
+    transportPaused = false;
     const auto& song = engine.getSong();
     const auto target = transportedit::shiftSpaceStopTarget (song.mode == PlayMode::song, song.hasLoop(), song.loopStart);
     if (target > 0)
@@ -3135,13 +3176,13 @@ void MainComponent::stopAndRewind (bool toStart)
     // Stop while nothing plays (the second press, or a double click) goes back to the very start even when
     // "Remember seek time" sends the first Stop to the ruler mark (round 162, issue #9)
     const auto alreadyStopped = toStart || ! (engine.getTransport().playing.load() || engine.isWaitingForInput() || engine.isCountingIn() || engine.isLinkWaiting());
+    const auto back = stopReturn (alreadyStopped, false); // (issue #169: FL's seek mark, Pattern mode too)
     engine.stop();
+    transportPaused = false;
     // FL: the transport's Stop also ends a Browser sample preview (issue #11)
     browser.stopPreview(); // (the engine's one preview voice: the Sample browser window's preview stops too)
-    const auto& globals = EditorGlobals::get();
-    const auto back = transportedit::stopTarget (alreadyStopped, globals.rememberSeek && engine.getSong().mode == PlayMode::song, globals.seekMark);
 
-    if (back > 0) // "Remember seek time": back to the position clicked on the Playlist ruler
+    if (back > 0) // "Remember seek time": back to the position clicked on a ruler, or where playback started
         engine.seek ((double) back);
     else
         engine.rewind();

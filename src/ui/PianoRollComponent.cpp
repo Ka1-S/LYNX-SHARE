@@ -3030,9 +3030,11 @@ void PianoRollComponent::seekAt (int x, bool snapOn)
         // Song mode and no clip of this pattern: play the pattern on its own from there
         engine.editSong ([] (Song& s) { s.mode = PlayMode::pattern; }, false);
         engine.seek (juce::jmax (0.0, tick));
+        EditorGlobals::get().markSeek ((std::int64_t) juce::jmax (0.0, tick), false); // FL: Stop goes back here (issue #169)
         return;
     }
     engine.seek (target);
+    EditorGlobals::get().markSeek ((std::int64_t) target, song.mode == PlayMode::song);
 }
 
 void PianoRollComponent::listenAt (int x)

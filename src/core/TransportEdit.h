@@ -160,6 +160,28 @@ inline std::int64_t stopTarget (bool alreadyStopped, bool rememberSeek, std::int
     return rememberSeek && seekMark > 0 ? seekMark : 0;
 }
 
+// Where Stop or Space (while playing) sends the playhead, as FL 2026 does (issue #169, REA round 190gy, FLEngine):
+// FL keeps a seek mark (FUN_011c9300, global 0x15e0458), set by every position the user sets while "Remember seek
+// time" is on: a ruler click in the Playlist or the Piano roll, also one made during playback, and the position
+// playback was started from. Its Stop (the toolbar's StopBtnClick 0x1030470 = FUN_011ca520 (0, 0), also Space and the
+// Piano roll play button's right-click) goes back to that mark; Stop while stopped goes to the very start and
+// forgets it (FUN_011c9de0); switching Pattern / Song forgets it (FUN_011ca630). Pause (the Play button pressed while
+// playing = FUN_011ca520 (2, …), LYNX's Ctrl+Space and the Piano roll's play button) keeps the position and leaves
+// the mark alone: a later Stop still goes back to the mark. "Remember seek time" is on in a fresh FL (its variable
+// 0x15d89a0 starts as 1). With it off LYNX keeps its earlier rule: Space goes back to where playback started, the
+// Stop button to the start.
+// `mark` = the remembered position for the current Pattern / Song mode (-1 = none), `playStart` = where this playback
+// was started from (not a resume after a pause).
+inline std::int64_t stopReturnTarget (bool alreadyStopped, bool rememberSeek, bool spaceKey, std::int64_t mark,
+                                      std::int64_t playStart) noexcept
+{
+    if (alreadyStopped)
+        return 0;
+    if (rememberSeek)
+        return std::max<std::int64_t> (0, mark >= 0 ? mark : playStart);
+    return spaceKey ? std::max<std::int64_t> (0, playStart) : 0;
+}
+
 // FL 2026's Shift+Space (measured in FL, round 165 issue11c, issue #11): while playing or recording it stops and puts
 // the position at the start of the time selection (Song mode with a time selection) or else of the song / pattern —
 // not where playback started and not where Shift+Space was pressed. While stopped it plays from the current position,

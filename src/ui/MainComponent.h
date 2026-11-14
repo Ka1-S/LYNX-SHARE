@@ -250,6 +250,15 @@ private:
     void stopAndRewind (bool toStart = false); // toStart: the very start, ignoring "Remember seek time"
     void showStopMenu(); // right-click on Stop: "remember seek time", panic // the Stop button
     double playStartTicks = 0.0;
+    // FL's seek mark (issue #169, transportedit::stopReturnTarget): where Stop / Space go back to, its mode, the ruler
+    // clicks already taken in (EditorGlobals::seekMarkSerial), and whether the transport is paused (Ctrl+Space)
+    double returnTicks = -1.0;
+    bool returnSongMode = false;
+    std::uint32_t seekClicksSeen = 0;
+    bool transportPaused = false;
+    double positionToStartFrom() const; // the position playback starts from (a seek still on its way counts)
+    void notePlayStart (bool resume);
+    std::int64_t stopReturn (bool alreadyStopped, bool spaceKey);
 
     // key map and actions
     bool runAction (const std::string& id);
