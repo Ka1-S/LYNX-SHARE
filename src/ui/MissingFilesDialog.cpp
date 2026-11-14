@@ -224,6 +224,13 @@ public:
     }
     void stopSearchForSnapshot() { stopSearch(); }
 
+    // (self-test, issue #165) paints list row `row` of the current page as the ListBox would; the number of rows shown
+    int paintRowForTest (int row, juce::Graphics& g, int width)
+    {
+        paintListBoxItem (row, g, width, list.getRowHeight(), false);
+        return getNumRows();
+    }
+
     // the remembered search folders and the Browser's folders, searched without asking
     void searchRememberedFolders()
     {
@@ -371,6 +378,13 @@ private:
 
     void paintListBoxItem (int row, juce::Graphics& g, int width, int height, bool selected) override
     {
+        // (rows past the end are asked for too: issue #165 crashed here at a larger interface size)
+        const auto* file = page == Page::samples ? listRowEntry (info.files, row) : nullptr;
+        const auto* plugin = page == Page::plugins ? listRowEntry (info.plugins, row) : nullptr;
+        const auto* moved = page == Page::found ? listRowEntry (info.autoRelocated, row) : nullptr;
+        if (file == nullptr && plugin == nullptr && moved == nullptr)
+            return;
+
         if (selected)
         {
             g.setColour (theme::colour::accentMuted);
@@ -388,9 +402,9 @@ private:
         juce::String name, right, detail;
         juce::Colour detailColour = theme::colour::textDisabled;
 
-        if (page == Page::samples)
+        if (file != nullptr)
         {
-            const auto& m = info.files[(std::size_t) row];
+            const auto& m = *file;
             name = u8 (pathFileName (m.path));
             juce::StringArray users;
             for (const auto& u : m.usedBy)
@@ -413,9 +427,9 @@ private:
                 detail = u8 (m.path);
             }
         }
-        else if (page == Page::plugins)
+        else if (plugin != nullptr)
         {
-            const auto& p = info.plugins[(std::size_t) row];
+            const auto& p = *plugin;
             dot = theme::colour::warning;
             name = u8 (p.name);
             juce::StringArray users;
@@ -429,7 +443,7 @@ private:
         }
         else
         {
-            const auto& [from, to] = info.autoRelocated[(std::size_t) row];
+            const auto& [from, to] = *moved;
             dot = theme::colour::info;
             name = u8 (pathFileName (to));
             detail = u8 (from) + juce::String::fromUTF8 ("  \xe2\x86\x92  ") + u8 (to);
@@ -462,8 +476,8 @@ private:
 
     juce::String getTooltipForRow (int row) override
     {
-        if (page == Page::samples && row < (int) info.files.size())
-            return u8 (info.files[(std::size_t) row].path);
+        if (const auto* m = page == Page::samples ? listRowEntry (info.files, row) : nullptr)
+            return u8 (m->path);
         return {};
     }
 
@@ -501,6 +515,8 @@ private:
     // a file picked by hand: used for that row, and its folder is looked at for the others (as FL does)
     void located (int row, const juce::File& file)
     {
+        if (listRowEntry (info.files, row) == nullptr)
+            return;
         auto& m = info.files[(std::size_t) row];
         m.found = file.getFullPathName().toStdString();
         m.skipped = false;
@@ -749,6 +765,50 @@ void stopMissingFilesSearch (juce::Component& panel)
 {
     if (auto* p = dynamic_cast<MissingFilesPanel*> (&panel))
         p->stopSearchForSnapshot();
+}
+
+juce::String missingFilesSelfTest()
+{
+    // issue #165: JUCE's ListBox asks for rows past the end too (more of them at a larger interface size); the window
+    // read past its lists there and crashed on opening a project. Rows past the end now draw nothing; the rows that
+    // exist still draw, on every page, and the whole window paints at 150 %.
+    auto info = missingFilesSnapshotInfo();
+    info.files.resize (1);
+    info.plugins.resize (1);
+    info.autoRelocated.resize (1);
+    for (int page = 0; page < 3; ++page)
+    {
+        MissingFilesPanel panel (info, false);
+        panel.showPageForSnapshot (page, -1);
+        auto drawn = [&panel] (int row) {
+            juce::Image image (juce::Image::ARGB, 400, 60, true);
+            {
+                juce::Graphics g (image);
+                g.addTransform (juce::AffineTransform::scale (1.5f));
+                panel.paintRowForTest (row, g, 260);
+            }
+            for (int y = 0; y < image.getHeight(); ++y)
+                for (int x = 0; x < image.getWidth(); ++x)
+                    if (image.getPixelAt (x, y).getAlpha() != 0)
+                        return true;
+            return false;
+        };
+        juce::Image scratch (juce::Image::ARGB, 4, 4, true);
+        juce::Graphics sg (scratch);
+        const auto rows = panel.paintRowForTest (0, sg, 4);
+        if (rows != 1)
+            return "ERROR page " + juce::String (page) + ": " + juce::String (rows) + " rows";
+        if (! drawn (0))
+            return "ERROR page " + juce::String (page) + ": its row drew nothing";
+        for (const auto past : { -1, 1, 2, 7 })
+            if (drawn (past))
+                return "ERROR page " + juce::String (page) + ": row " + juce::String (past) + " past the end drew";
+        juce::Image whole (juce::Image::ARGB, 1140, 840, true);
+        juce::Graphics g (whole);
+        g.addTransform (juce::AffineTransform::scale (1.5f));
+        panel.paintEntireComponent (g, true);
+    }
+    return "OK";
 }
 
 MissingFilesInfo missingFilesSnapshotInfo()

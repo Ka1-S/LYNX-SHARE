@@ -4727,6 +4727,7 @@ private:
         const auto versionsResult = lynx::versionsSelfTest();
         // round 190ap: a project opened with its plugins off creates none of them and saves their settings unchanged
         const auto pluginsOffResult = lynx::pluginsOffSelfTest();
+        const auto missingFilesResult = lynx::missingFilesSelfTest(); // issue #165
         // round 190cj: a dancer's own native window stays where the stage put it (it drifted off the screen: JUCE
         // moved a transparent child window by the main window's client offset on every repaint)
         juce::String danceWindowDetail;
@@ -5135,7 +5136,7 @@ private:
                         && mixerBasics == "OK" && fontsResult == "OK" && picturesResult == "OK" && audioOk && projectOk && trackModes122Ok && richOk && hwOutOk && hostKeysOk && pluginLevelsOk && flp168jOk && clipFades180dOk && blocksOk && takeoverOk && compOk && polyOk && latencyOk && preSendOk && lowLatencyOk && previewInTimeOk && substituteOk && patcherOk && rackResult == "OK" && nativesOk && undoOk && projectSaveOk && recordOk && recordUndoOk && cancelRecordOk && midiOk && packageOk
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && midiHotplug.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
-                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
+                        && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK" && missingFilesResult == "OK"
                         && midigen190fmResult == "OK" && clipenv190giResult == "OK"
                         && danceWindowResult == "OK" && clickActivationResult == "OK";
 
@@ -5186,6 +5187,7 @@ private:
                << "plugin_sidechain=" << sidechainResult << "\n"
                << "versions_panel=" << versionsResult << "\n"
                << "plugins_off=" << pluginsOffResult << "\n"
+               << "missing_files_rows=" << missingFilesResult << "\n"
                << "dance_window=" << danceWindowResult << "\n"
                << "dance_window_detail=" << danceWindowDetail << "\n"
                << "click_activation=" << clickActivationResult << "\n"

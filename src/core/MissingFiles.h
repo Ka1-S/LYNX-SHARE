@@ -35,6 +35,15 @@ struct MissingPlugin
 // The last component of a path saved on Windows or elsewhere ('\\' and '/' both separate).
 std::string pathFileName (const std::string& path);
 
+// The entry a list-box row shows, or nullptr for a row past the end of `list`. JUCE's ListBox also asks for rows below
+// the last one (ListBoxModel::paintListBoxItem: "rowNumber may be greater than the number of rows"); at a larger
+// interface size the Missing files window painted such a row and read past its list (issue #165: a crash on opening).
+template <typename T>
+const T* listRowEntry (const std::vector<T>& list, int row) noexcept
+{
+    return row >= 0 && (std::size_t) row < list.size() ? &list[(std::size_t) row] : nullptr;
+}
+
 // Adds `user` to the entry for `path` (one entry per path, case-insensitive on the separators and letters).
 void addMissingFile (std::vector<MissingFile>& list, const std::string& path, const std::string& user);
 
