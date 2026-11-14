@@ -2552,7 +2552,8 @@ public:
     // nothing the message thread does stops the drop. The card shows at once (no Direct2D device is made for it); the
     // engine starts and the audio device opens behind the still card (an ASIO device of the last session was made and
     // opened ahead on its own thread meanwhile), the drop starts with its sound, and the main window is built while
-    // the logo drops: it shows the moment the logo has landed. The card stays for the drop only (the JUCE card's
+    // the logo drops and shown as soon as it is built, behind the card (the drop and its sound go on above it); the card
+    // fades the moment the logo has landed. The card stays for the drop only (the JUCE card's
     // 2.1 s from the process start was there to keep a fast start from flashing; the drop alone is 1.05 s).
     void startWithThreadedSplash()
     {
@@ -2573,8 +2574,19 @@ public:
             startDrop();
             // the main window while the logo drops (one more message, so the drop's start is not held by it)
             juce::MessageManager::callAsync ([this] {
-                if (splash != nullptr && mainWindow == nullptr && engine != nullptr)
-                    createMainWindow();
+                if (splash == nullptr || mainWindow != nullptr || engine == nullptr)
+                    return;
+                createMainWindow();
+                // shown as soon as it is built, behind the card: the logo goes on dropping above it and the card fades at
+                // the landing as before (LYNX_REVEAL_AT_LANDING=1: the window shows at the landing, as in round 190go)
+                if (mainWindow != nullptr && splash != nullptr
+                    && juce::SystemStats::getEnvironmentVariable ("LYNX_REVEAL_AT_LANDING", {}) != "1")
+                {
+                    mainWindow->reveal();
+                    windowRevealed = true;
+                    startupTrace.mark ("window revealed (behind the card, while the logo drops)");
+                    splash->raise();
+                }
             });
         });
     }
@@ -2605,8 +2617,11 @@ public:
                                                                                   + splash->getLongestDropGapDetail() + ")"
                                                                             : juce::String()))
                                        .toRawUTF8());
-            mainWindow->reveal();
-            startupTrace.mark ("window revealed (after the splash)");
+            if (! std::exchange (windowRevealed, true))
+            {
+                mainWindow->reveal();
+                startupTrace.mark ("window revealed (after the splash)");
+            }
             splash->raise();
             const auto deviceOpen = ! engine->isAudioDeviceOpenPending();
             splash->finish ([this, deviceOpen] {
@@ -23020,7 +23035,7 @@ private:
     std::unique_ptr<lynx::StartupSplash> splash;
     static constexpr double landingSeconds = 1.05; // the logo's drop (SplashScreen::remainingDuration's `landing`)
     std::shared_future<std::pair<juce::Image, double>> graphicsDeviceJob; // (round 190hd) holds the graphics device
-    bool graphicsDeviceMarked = false;
+    bool graphicsDeviceMarked = false, windowRevealed = false;
     std::future<std::shared_ptr<const lynx::SampleData>> startupSampleJob; // (round 190go: the built-in start-up sound)
     bool startedAfterWindow = false, startupSoundPlayed = false;
     double splashDuration = lynx::SplashScreen::minimumDuration; // seconds of its clock (round 121: from the process start)
