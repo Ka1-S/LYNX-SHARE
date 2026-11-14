@@ -231,3 +231,30 @@ TEST (rollup028_live_imports_keep_embers_classic_tape)
     fresh.params[em::style] = 1.0f / (float) (em::styles - 1);
     CHECK (em::measuredTape (fresh.params));
 }
+
+// Step 3 (clipenv190gi): an audio clip may carry a volume / pan envelope (Clip::envelope into Song::clipEnvelopes).
+// livefreeze190ff's Consolidate of audio clips renders them into one new clip without an envelope: the render must hear
+// the envelopes (the render song keeps Song::clipEnvelopes and each clip's index), so the result sounds as before.
+TEST (rollup028_consolidated_audio_clips_keep_their_envelopes_in_the_render)
+{
+    using namespace lynx;
+    auto withEnvelope = clipenv190gi::rampSong();
+    auto second = withEnvelope.playlist[0];
+    second.start = ppq * 6;
+    second.envelope = -1;
+    withEnvelope.playlist.push_back (second);
+    auto without = withEnvelope;
+    without.playlist[0].envelope = -1;
+    freeze::ConsolidatePlan plan;
+    CHECK (freeze::planConsolidate (withEnvelope, { 0, 1 }, plan) == nullptr && plan.audio && plan.channel == 0);
+    freeze::ConsolidatePlan plain;
+    CHECK (freeze::planConsolidate (without, { 0, 1 }, plain) == nullptr);
+    const auto shapedSong = freeze::consolidateRenderSong (withEnvelope, plan);
+    CHECK (shapedSong.clipEnvelopes.size() == 1);
+    const auto shaped = clipenv190gi::render (shapedSong, 48000);
+    const auto flat = clipenv190gi::render (freeze::consolidateRenderSong (without, plain), 48000);
+    // one beat in (sample 24000 at 120 BPM): v = 0.85 on FL's Levels law, (11^0.85 − 1) / 10, as the clip played it
+    CHECK (std::abs (flat[24000]) > 1.0e-3f);
+    if (std::abs (flat[24000]) > 1.0e-3f)
+        CHECK (std::abs (shaped[24000] / flat[24000] - (std::pow (11.0f, 0.85f) - 1.0f) / 10.0f) < 0.003f);
+}
