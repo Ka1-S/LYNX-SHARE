@@ -431,8 +431,7 @@ void Engine::block (float* left, float* right, int n) noexcept
             wet[(size_t) i] = (float) (v * gain);
         }
         auto f = [this, &k] (float v) noexcept { return curve (v, k.env, k.servo); };
-        for (int i = 0; i < n; ++i)
-            wet[(size_t) i] = k.os.run (wet[(size_t) i], f);
+        k.os.process (wet.data(), n, f); // (round 190gp: block by block, the same samples as run() on each)
         for (int i = 0; i < n; ++i)
         {
             float v = postLow.process (wet[(size_t) i], c);
