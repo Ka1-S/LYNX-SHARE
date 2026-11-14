@@ -69,7 +69,7 @@ there.
 | Sentry Gate | Pro-G | 9 | 8 | 7 | 8 | trial187b | tp172b: sound 3 → 7 (first programme comparison: 7.2; upward law, hysteresis); trial187b: 12 more settings 7.3 → 7.6 (wet / dry are Expert-only); round 190v: the Vocal style's noise reduction (noise probes 3.7 → 4.9) |
 | Ember Saturator | Saturn 2 | 9 | 8 | 5 | 6 | 152b |  |
 | Aether | Fresh Air | 9 | 8 | 8 | 9 | tp172c | issue #77: the measured dynamic air model is the default (a new Aether ran the round-114 shelf + exciter: Mid air nearly inaudible, High air ~1.5 dB short of loudness); fxparity on Mid / High air 0–100 % sweeps 5.0 → 8.3; look: frosted plate, white disc knobs |
-| Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated) |
+| Glow Leveler | CLA-2A (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165x | 9 → 9 → 10 / 8 → 8 (165w: the measured release; 165x: the measured attack, Auto Makeup's reference, the VU display saved and translated); 190fx: SC weighting Old \| Measured for the other optical references — FG-2A 3.75 → 4.08, SD-3A 4.64 → 4.84, Custom Opto 4.96 → 5.16 — this pair unchanged |
 | Hush De-esser | DeEsser (Waves) | 10 | 8 | 7 (ref expired) | 6 | 165 | 9 → 10 / 8 → 8 |
 | Echoform | H-Delay (Waves) | 9 | 8 | 7 (ref expired) | 6 | 137 |  |
 | Echoform | ValhallaDelay | 9 | 8 | 5 | 6 | 137 | 183b: sound 4 → 5 (fxparity 3.75 → 4.06, verb 5.12 → 7.39; bank 2.88 → 3.44 / 5.18 → 6.77): tape repeats without −1.9 dB per pass, one tape transport in the Single style |
@@ -86,7 +86,7 @@ there.
 | Hush De-esser | Pro-DS | 10 | 9 | 6 | 6 | tp172b | 8 → 9 → 10 / 8 → 8 → 9 (165w: pans, state levels; 165x: ranges, the 0 … 200 % link knob) |
 | Foil Plate | ValhallaPlate | 9 | 10 | 4 | 8 | 135 | 183b: sound 3 → 4 (fxparity 3.13 → 3.73, verb 8.15 → 8.49; bank 3.03 → 3.64 / 8.13 → 8.48): EQ laws, Width keeps the level, the reference's tone |
 | Gemini Doubler | Doubler2 / Doubler4 (Waves) | 10 | 8 | 6 (ref expired) | 8 | 165w | 9 → 10 / 8 → 8 (defaults; 165w: shelf range −88 … +12 and law) |
-| Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 |  |
+| Compressor (stand-in) | Renaissance Compressor (Waves) | 10 | 8 | 6 (ref expired) | 8 | 152 | 190fx: the FET references' maps and translators refitted on the pink stairs — FG-116 4.80 → 5.80, Modern 4.08 → 4.76, Vintage 5.00 → 5.56, all-buttons 4.28 → 4.48 — this pair unchanged |
 | LYNX Tune | Waves Tune Real-Time | 10 | 8 | 6 (ref expired) | 8 | 152b | 165j: sound only (measured; scores unchanged) |
 | Echoform | EchoBoy / PrimalTap | 10 | 8 | 6 | 6 | 150 |  |
 | Voice Shift | Little AlterBoy | 10 | 8 | 4 | 8 | trial187b | trial187b: dual mono like the original, the input itself at no shift, level laws: 2.8 → 3.1 |
@@ -3191,6 +3191,81 @@ own probe lab and five map refits: a round of its own. Prism has no upward branc
 drum gate's Debleed is not modelled (its release sweep changes nothing on the probes; a bass line at D still opens LYNX on
 note onsets the reference ignores). No state translators were added for these references (their saved states were never
 captured); the missing-plugin table uses the measured defaults instead.
+
+## Round 190fx: dynamics parity — Glow's side-chain weighting, the FET maps refitted on the pink stairs
+
+Round 190fx of the 0.1.28 parity work: the dynamics rows with the lowest Sound numbers, highest gain per hour first. Black-box
+only: the references' recorded probe captures (trial190k: `stairs` — 1 kHz up and down, then 100 Hz and 8 kHz — `tc`,
+`pinkst`), never their code; the programme banks (tp172c, refcap182) were only scored, never fitted. No third-party code.
+Tooling, logs and every render score: `/mnt/e/lynx-work/paritydyn190fx/` (`tools/probeerr.py`, `lab/`, `fit/`, `bank.py`,
+`runs/`, `SCOREBOARD-190fx.md`).
+
+**What the probes showed.** The dynamics maps were fitted on the 1 kHz stairs and tone bursts only. Read on the pink stairs and
+on the 100 Hz / 8 kHz parts of the stairs, two kinds of error were left:
+
+- the optical references (FG-2A, SD-3A and Custom Opto types) hear treble much less and bass a little more than Glow's Opto
+  classic voicing, whose side chain carries the treble emphasis measured on another leveler: at 8 kHz LYNX reduced 4 … 8 dB
+  more, at 100 Hz 1 … 3 dB less, and pink noise came out 2 … 4 dB too low (the programme rows' S2 / X1 files the same way);
+- the FET references (FG-116 family, all-buttons type) compress much harder above their knee than their maps had them (on the
+  1 kHz stairs about 14 : 1 where the maps ran 3 … 4 : 1 with a lower threshold): pink noise and the top steps came out 2 …
+  3.5 dB too loud. A side-chain filter for the FET law was tried in the lab (a low-pass and a low shelf, `lab/fetfit.py`): it
+  trades the 8 kHz steps against the pink steps and made the pink stairs worse, so it was dropped: the gap was in the maps.
+
+**Glow Leveler — SC weighting: Old | Measured** (appended parameter 14, Opto classic voicing; default Old = every project and
+new instance as before, sample for sample). Measured: two peaking filters in place of the emphasis — 4.56 kHz, Q 0.38,
++1.5 dB and 225 Hz, Q 0.59, +2.5 dB — with the chain's 1 kHz gain kept where the emphasis had it (a level shift computed from
+both filters' responses), so every 1 kHz law fitted before (rounds 123 … 190dm) holds. Fitted by a grid and a coordinate
+search on the three references' stair and pink-stair step levels at all their probe settings (`lab/scwfit.py`,
+`lab/refine.py`): rms step-level error 2.01 → 1.23 dB (FG-2A type 2.15 → 1.16, SD-3A type 1.84 → 1.25, Custom Opto type
+1.89 → 1.16). The measured Limit law and Glow's own engine ignore the switch. The editor shows `Side chain` `Old | Measured`
+under the cell-memory keys (existing strings, 14 languages; the four key groups are 12 px high now so the column ends above
+the COMPRESS caption). CPU: one biquad per sample and channel more than the emphasis (35 s stereo programme, user time, best of
+five, `logs/cpu2.txt`): Glow 0.356 → 0.352 s with the switch off, 0.356 s (base, emphasis) → 0.360 s with it on, with the cell
+memory 0.408 → 0.398 s — inside the timing noise; the Compressor 0.127 → 0.128 s (same code); no latency.
+
+**Setting maps refitted with the pink stairs in the loss** (round 190ar's fitter, `fit/fitfx.py`, specs `fit/specs190fx*.py`):
+- FET references → Compressor (FET law, no code change): stairs, tone bursts and pink stairs; pass 1 restarts the ratio at
+  14 : 1 with attack / release / mix kept, pass 2 frees every link; two cycles each, the same procedure for all four. On the
+  probe loss pass 2 beats round 190ar's maps for three of them (FG-116 −9.30 → −10.05, Modern −7.97 → −9.57, all-buttons
+  −5.03 → −6.10); for the Vintage revision it does not (−7.86 → −6.54) although the programme bank improves — a sign the
+  probes under-weight what that revision's programme rows depend on (noted, shipped by the same rule as the others);
+- optical references → Glow with SC weighting on: Peak Reduction and Gain searched again (the switches keep round 190dm's
+  choices: Opto law, release, cell memory). Custom Opto's search moved nothing (its map is round 190dm's plus the switch).
+
+The missing-plugin translators of the four FET references (`core/FittedMaps.inc`, regenerated with round 190ar's
+`tr/gentr.py`; test data with `tr/gentest.py`) load such projects at the refitted settings: rendered from the translator's own
+output they score exactly the map rows below (5.80 / 4.76 / 5.56 / 4.48). The optical references have no translator (their
+stand-in stays at Glow's defaults).
+
+Scores (same banks and score as SCOREBOARD-v3 / round 190dm; before = origin/main fdfe73139 with round 190dm's maps, which
+reproduces round 190dm's after-numbers exactly; per-file up / same / down):
+
+| reference | LYNX plugin | bank | files | before → after | null | level error | up / same / down | went down | change |
+|---|---|---|---|---|---|---|---|---|---|
+| VM FG-116 | Compressor | prog182 | 25 | 4.80 → **5.80** | −15.8 → −21.1 dB | 1.5 → 0.6 dB | 15 / 10 / 0 | – | map refit (pink stairs) + translator |
+| VM FG-116 Modern | Compressor | prog182 | 25 | 4.08 → **4.76** | −12.5 → −15.7 dB | 1.9 → 1.3 dB | 13 / 10 / 2 | D_bass 8→5, X2_drums 4→2 | map refit + translator |
+| VM FG-116 Vintage | Compressor | prog182 | 25 | 5.00 → **5.56** | −16.4 → −19.4 dB | 1.3 → 0.7 dB | 11 / 13 / 1 | X3_guitar 8→7 | map refit + translator |
+| VM The Monster | Compressor | prog182 | 25 | 4.28 → **4.48** | −13.2 → −13.7 dB | 1.2 → 1.0 dB | 4 / 20 / 1 | X3_drums 4→3 | map refit + translator |
+| VM FG-2A | Glow Leveler | tp172c | 12 | 3.75 → **4.08** | −10.9 → −11.4 dB | 1.8 → 1.3 dB | 4 / 8 / 0 | – | SC weighting + refit |
+| VM FG-2A (programme) | Glow Leveler | prog182 | 25 | 4.80 → **4.84** | −15.8 → −16.5 dB | 1.0 → 1.0 dB | 3 / 20 / 2 | X2_bass 7→5, X2_mix 8→6 | |
+| VM SD-3A | Glow Leveler | prog182 | 25 | 4.64 → **4.84** | −14.8 → −16.8 dB | 1.2 → 1.1 dB | 11 / 9 / 5 | X1_bass 5→2, X1_guitar 5→2, X1_mix 3→2, X1_vocal 3→2, X2_bass 6→5 | SC weighting + refit |
+| VM Custom Opto | Glow Leveler | prog182 | 25 | 4.96 → **5.16** | −17.3 → −18.5 dB | 1.0 → 0.8 dB | 4 / 21 / 0 | – | SC weighting |
+
+Per plugin (the SCOREBOARD-v3 rows of `bank.py`, same rows before and after): Compressor 4.88 → **5.12** (10 rows),
+Glow Leveler 4.64 → **4.82** (4 rows; the FG-2A programme column is an extra row, as in round 190dm). The other rows of both
+plugins score exactly as before: the Compressor's code did not change, and with SC weighting Old every render of the Glow
+rows is byte-identical to the base binary's (87 of 87 files on the programme and tp172c banks, the CLA-2A row's 16 of 16 on
+tp172d, `ident.py`); `tests/Dyn190dmTests.inc` keeps its goldens (the defaults). Gate as in round 190dm: no row went down;
+the files that did are listed (SD-3A's X1 setting was already 2 … 3 dB over-compressed by its map and the extra bass weight
+deepens it; a refit that fixes X1 alone was not searched).
+
+Sound column (0–10, table above): the pairs it lists (CLA-2A, Renaissance Compressor) did not change and keep their numbers;
+the rows here are the stand-in pairs of the SCOREBOARD, whose fxparity means above are their scores.
+
+Not done, and why: the Harrison MPC-type compressor on Crest (3.88: its Depth control caps the reduction in a way Crest's
+range does not — a law of its own), the vari-mu row (4.32: below the threshold the reference's 100 Hz is 2 dB lower than its
+1 kHz, a fixed tone Crest has no control for), X-Limit on Apex (4.94: LYNX limits pink noise 2 … 3 dB harder while the
+programme comes out louder — a time-constant question, not a map). Hush, Sentry and the non-dynamics rows were not touched.
 
 ## Round 190dl: Echoform — H-Delay's clocked modulation, the measured tape stage (Law: Classic | Measured)
 

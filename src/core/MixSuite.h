@@ -234,7 +234,8 @@ namespace glow
 // are unchanged); the opto release now also selects the measured attack; and the VU display (gain reduction / input /
 // output: the reference saves its VU DISPLAY knob with the state, so LYNX keeps the editor's selector with the project)
 // round 190dm (appended): the Opto classic voicing's cell memory (VoiceMatch.h opto::Settings::memory; off = as before)
-enum Param { peakReduction, gain, mode, emphasis, mix, trim, autoMakeup, voicing, optoLaw, analog, releaseLaw, makeupRef, vuDisplay, optoMemory, count };
+// round 190fx (appended): the Opto classic voicing's side-chain weighting (opto::Settings::scWeighting; off = as before)
+enum Param { peakReduction, gain, mode, emphasis, mix, trim, autoMakeup, voicing, optoLaw, analog, releaseLaw, makeupRef, vuDisplay, optoMemory, scWeighting, count };
 // round 165x: an editor edit with the reference's AUTO MAKEUP behaviour (switching it on takes the dial as the
 // reference; switching it off leaves the make-up in the Gain dial, as the trial turns its own Gain knob)
 std::vector<std::pair<int, float>> linkedEdit (const EffectParams& p, int param, float value);

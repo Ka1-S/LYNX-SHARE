@@ -1135,6 +1135,21 @@ struct ExposureLaw
 // fitted (optofit, Nelder-Mead from round 123's law, the mean gain error over 2 ms frames of the tc probe at D / S1 / X1 / X2):
 // 0.94 → 0.57 dB (D 0.77 → 0.29, S1 1.01 → 0.79, X1 1.31 → 0.72, X2 0.69 → 0.48). Recovery after a 10 ms burst: 0.07 dB left
 // at 1.1 s (the reference 0.09, round 123's law 1.17); after 2 s: 1.29 dB (the reference 2.00, round 123's 1.70)
+// round 190fx [EXEC]: the even side-chain weighting (Settings::scWeighting) — a high and a low peaking filter in place of the
+// emphasis, fitted on the 100 Hz / 1 kHz / 8 kHz stairs and the pink stairs of three optical references (docs/PARITY.md
+// "Round 190fx")
+#ifdef LYNX_LAB190FX
+ #include <cstdio>
+ #include <cstdlib>
+ #define SC_WEIGHTING_CONSTEXPR static
+#else
+ #define SC_WEIGHTING_CONSTEXPR constexpr
+#endif
+struct ScWeighting
+{
+    double highHz, highQ, highDb, lowHz, lowQ, lowDb;
+};
+SC_WEIGHTING_CONSTEXPR ScWeighting scWeighting190fx { 4560.0, 0.38, 1.5, 225.0, 0.59, 2.5 };
 constexpr ExposureLaw exposure190dm { { 36.271937, 1.541935, 0.574018, 24369.555222, 11.544317, 2.599897, 0.100913, 0.054922 },
                                       393.962736, 2439.62311, 4.239615, 1.232323 };
 } // namespace
@@ -1157,6 +1172,8 @@ void Leveler::reset() noexcept
     sc.reset();
     sc172.reset();
     scLow172.reset();
+    scHigh190.reset();
+    scLow190.reset();
 }
 
 void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
@@ -1173,10 +1190,28 @@ void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
         peaking (sc, scHz, scQ, scDb);
         peaking (sc172, scHz172, scQ172, scDb172);
         peaking (scLow172, scLowHz172, scLowQ172, scLowDb172);
+#ifdef LYNX_LAB190FX
+        if (const char* e = std::getenv ("LYNX_LAB_SCW"))
+            std::sscanf (e, "%lf,%lf,%lf,%lf,%lf,%lf", &scWeighting190fx.highHz, &scWeighting190fx.highQ, &scWeighting190fx.highDb,
+                         &scWeighting190fx.lowHz, &scWeighting190fx.lowQ, &scWeighting190fx.lowDb);
+#endif
+        const auto& w = scWeighting190fx;
+        peaking (scHigh190, w.highHz, w.highQ, w.highDb);
+        peaking (scLow190, w.lowHz, w.lowQ, w.lowDb);
+        // the 1 kHz gain of the emphasis it replaces minus its own (dB), so the level laws fitted at 1 kHz hold
+        const auto magDb = [this] (const Biquad& f, double hz)
+        {
+            const double w1 = 2.0 * pi * hz / sr, c1 = std::cos (w1), c2 = std::cos (2.0 * w1), s1 = std::sin (w1), s2 = std::sin (2.0 * w1);
+            const double nr = f.b0 + f.b1 * c1 + f.b2 * c2, ni = -(f.b1 * s1 + f.b2 * s2);
+            const double dr = 1.0 + f.a1 * c1 + f.a2 * c2, di = -(f.a1 * s1 + f.a2 * s2);
+            return 10.0 * std::log10 ((nr * nr + ni * ni) / (dr * dr + di * di));
+        };
+        scShift190 = magDb (sc, 1000.0) - magDb (scHigh190, 1000.0) - magDb (scLow190, 1000.0);
     }
+    const bool even = s.scWeighting == 1 && ! (s.limit && s.measured); // round 190fx (the measured Limit keeps its emphasis)
     const bool ml = s.limit && s.measured; // round 152: the measured Limit law
     const bool wideSc = s.measuredRelease && ! s.limit; // round 172d: Compress's refitted side chain
-    const double shift = sensitivityDb (s.peakReduction, s.hiFreq) + (wideSc ? scShift172 : 0.0) + (s.limit ? (ml ? limitShiftDb152 : limitShiftDb) : 0.0);
+    const double shift = sensitivityDb (s.peakReduction, s.hiFreq) + (even ? scShift190 : wideSc ? scShift172 : 0.0) + (s.limit ? (ml ? limitShiftDb152 : limitShiftDb) : 0.0);
     const double Y0 = dbToGain (y0Db + shift), Yt = dbToGain (ytDb + shift), gam = s.limit ? (ml ? limitGamma152 : limitGamma) : gamma;
     const double ff = ml ? limitFeedForward : 0.0, gFloor = ml ? dbToGain (-limitFloorDb) : 0.0;
     const double mk = dbToGain (makeupDb (s.gain) + idleMakeupDb + (s.measured && s.autoMakeup ? autoMakeupDb (s.peakReduction) - autoMakeupDb (s.makeupRef) : 0.0));
@@ -1196,6 +1231,8 @@ void Leveler::process (float* l, float* r, int n, const Settings& s) noexcept
         const auto scSample = [&] (int c)
         {
             const auto x = (float) (yc[c] + ff * xp[c]);
+            if (even)
+                return (double) scLow190.process (scHigh190.process (x, c), c);
             return (double) (wideSc ? scLow172.process (sc172.process (x, c), c) : sc.process (x, c));
         };
         const double e0 = scSample (0), e1 = scSample (1);

@@ -1327,6 +1327,7 @@ public:
             c.measuredRelease = on (p[releaseLaw]);
             c.makeupRef = 100.0 * std::clamp ((double) p[makeupRef], 0.0, 1.0);
             c.memory = on (p[optoMemory]);
+            c.scWeighting = on (p[scWeighting]) ? 1 : 0;
             const auto mx = std::clamp (p[mix], 0.0f, 1.0f);
             const int hz = analogHz (p[analog]);
             const auto trimGain = (float) dbToGain (trimDb (p[trim]));
@@ -3864,7 +3865,9 @@ const EffectInfo& glowInfo()
                                      // round 165x: what the VU shows (0 gain reduction, 0.5 input, 1 output), saved
                                      { "VU display", 0.0f },
                                      // round 190dm: the cell's memory (off = the releases before, for every project)
-                                     { "Opto memory", 0.0f } } };
+                                     { "Opto memory", 0.0f },
+                                     // round 190fx: the side chain's weighting (off = the voicing's emphasis, every project before)
+                                     { "SC weighting", 0.0f } } };
     return info;
 }
 
@@ -4242,6 +4245,7 @@ std::string paramText (EffectKind kind, int param, float v)
             case makeupRef: return fmt ("%.0f", v * 100.0);
             case vuDisplay: return vuModeOf (v) == 1 ? "input" : vuModeOf (v) == 2 ? "output" : "gain reduction";
             case optoMemory: return on (v) ? "on" : "off";
+            case scWeighting: return on (v) ? "even" : "emphasis";
             case analog: return analogHz (v) == 0 ? "off" : analogHz (v) == 50 ? "50 Hz" : "60 Hz";
             default: return fmt ("%.2f", v);
         }
