@@ -12,6 +12,7 @@
 // them: 0 time slot, 1 volume slot, 2 time mix, 3 volume mix, 4 attack, 5 release, 6 volume tension, 7 hold.
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -240,4 +241,22 @@ private:
 };
 
 std::unique_ptr<Effect> make (const std::vector<std::uint8_t>& container);
+
+// Round 190gk: in FL a MIDI note selects a slot exactly as a click in the slot grids does (REA_rodada190ee §1, the
+// editor's handler 0x848330): it sets the Time slot / Volume slot parameter, so the grid shows the picked slot and the
+// project keeps it. The running effect publishes each pick here (audio thread: slots first, then `serial`); the
+// engine's timer writes it into the slot's parameter (AudioEngine::pumpGrossBeatPicks), and the effect knows that
+// parameter change as its own pick coming back.
+struct MidiPicks
+{
+    std::atomic<int> timeSlot { -1 }, volumeSlot { -1 }; // the slot each kind plays after the last pick (-1 = none yet)
+    std::atomic<std::uint32_t> serial { 0 };             // bumped after every pick
+    std::atomic<std::uint32_t> taken { 0 };              // the serial the message thread last wrote into the parameters
+    int slotOf (int kind) const noexcept { return (kind == 0 ? timeSlot : volumeSlot).load (std::memory_order_relaxed); }
+};
+MidiPicks* midiPicksOf (Effect* effect); // nullptr: not a running Gross Beat
+
+// The parameter changes that bring a slot's Time slot / Volume slot parameters (`params`, 0..1) to the picked slots,
+// as (parameter index, value) pairs; empty when they already match (message thread).
+std::vector<std::pair<int, float>> paramsForPicks (const MidiPicks& picks, const EffectParams& params);
 } // namespace lynx::grossbeat

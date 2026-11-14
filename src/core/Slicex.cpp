@@ -632,12 +632,14 @@ std::vector<WavRegion> wavRegions (const std::vector<std::uint8_t>& w, std::int6
         {
             // FL's trigger list, a chunk of its own after LIST/adtl (round 190r: a project FL saved after "Assign
             // current region to this key"; a "tlst" inside a LIST is ignored by FL): i32 count, then 24-byte entries
-            // {'cue ', cue id − 1, 1, 0xFF, key, 0x90, 0, 0, 0}
+            // {'cue ', cue id − 1, 1, 0xFF, key, 0x90, 0, 0, 0}. LYNX 0.1.27's Edison wrote {0, cue id} (round 190gk
+            // fixed it to FL's layout): an entry whose second word is not FL's 1 is read that way.
             const std::size_t n = std::min<std::size_t> (le32 (body), (have - 4) / 24);
             for (std::size_t k = 0; k < n; ++k)
             {
                 const auto* e = body + 4 + 24 * k;
-                extras.push_back ({ le32 (e + 4) + 1, 2, {}, (std::int64_t) e[13] });
+                const auto second = le32 (e + 8);
+                extras.push_back ({ second == 1 ? le32 (e + 4) + 1 : second, 2, {}, (std::int64_t) e[13] });
             }
         }
         else if (std::memcmp (w.data() + p, "LIST", 4) == 0 && have >= 4)

@@ -5,48 +5,254 @@
 <h1 align="center">LYNX SHARE</h1>
 
 <p align="center"><strong>A lightweight DAW with FL Studio-style patterns and Ableton Live-style clips.</strong><br>
-Channel Rack, Piano Roll, Playlist and Mixer, plus a clip grid with scenes and a Simple workflow for a first song, in C++20 + JUCE 8, built to run well on any PC.<br>
-Opens FL Studio, Ableton Live and FL Studio Mobile projects (`.flp`, `.als`, `.flm`). Windows, macOS and Linux.</p>
+Free and open source, for Windows, macOS and Linux. Opens your FL Studio, Ableton Live and FL Studio Mobile projects.</p>
 
 <p align="center">
   <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/badge/Download-0.1.27%20alpha-d9534f?style=for-the-badge" alt="Download LYNX SHARE"></a>
   <a href="https://apps.microsoft.com/detail/9NQRFBFDCX6N"><img src="https://get.microsoft.com/images/en-us%20dark.svg" height="28" alt="Get it from Microsoft"></a>
-  <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/github/downloads/Ka1-S/LYNX-SHARE/total?style=for-the-badge&label=downloads&color=24292f" alt="Total downloads"></a>
-  <a href="https://github.com/Ka1-S/LYNX-SHARE/stargazers"><img src="https://img.shields.io/github/stars/Ka1-S/LYNX-SHARE?style=for-the-badge&color=24292f" alt="GitHub stars"></a>
   <a href="https://discord.gg/XHKkbtbkY"><img src="https://img.shields.io/badge/Discord-join%20the%20community-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join the LYNX SHARE Discord"></a>
 </p>
 
 <p align="center">
   <a href="https://lynx-share.com"><strong>Website</strong></a> ·
-  <a href="https://discord.gg/XHKkbtbkY"><strong>Discord</strong></a> ·
   <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><strong>Download</strong></a> ·
-  <a href="#features"><strong>Features</strong></a> ·
+  <a href="https://lynx-share.com/wiki/getting-started/">Getting started</a> ·
+  <a href="#features">Features</a> ·
   <a href="#opens-your-projects">Your projects</a> ·
-  <a href="docs/USER_GUIDE.md">User guide</a> ·
-  <a href="docs/PLUGINS.md">Built-in plugins</a> ·
-  <a href="#building">Building</a> ·
-  <a href="docs/STATUS.md">Status</a> ·
-  <a href="docs/ROADMAP.md">Roadmap</a>
+  <a href="#status-alpha">Status</a> ·
+  <a href="https://discord.gg/XHKkbtbkY">Discord</a> ·
+  <a href="#building">Build from source</a>
 </p>
 
 <p align="center">
   <a href="https://github.com/Ka1-S/LYNX-SHARE/actions/workflows/tests.yml"><img src="https://github.com/Ka1-S/LYNX-SHARE/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/C%2B%2B-20-ef7b22" alt="C++20">
-  <img src="https://img.shields.io/badge/JUCE-8-8a8a8a" alt="JUCE 8">
-  <img src="https://img.shields.io/badge/Windows-10%20%C2%B7%2011-24292f" alt="Windows 10 and 11">
-  <img src="https://img.shields.io/badge/macOS-11%2B%20%C2%B7%20Apple%20Silicon%20%C2%B7%20Intel-24292f" alt="macOS 11 or newer, Apple Silicon and Intel">
-  <img src="https://img.shields.io/badge/Linux-x86__64-24292f" alt="Linux x86_64">
+  <img src="https://img.shields.io/badge/Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-24292f" alt="Windows, macOS and Linux">
   <img src="https://img.shields.io/badge/VST3%20%C2%B7%20CLAP-supported-d9534f" alt="VST3 and CLAP">
   <img src="https://img.shields.io/badge/status-alpha-f0ad4e" alt="Alpha">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-5cb85c" alt="AGPL-3.0 license"></a>
+  <a href="https://github.com/Ka1-S/LYNX-SHARE/releases"><img src="https://img.shields.io/github/downloads/Ka1-S/LYNX-SHARE/total?label=downloads&color=24292f" alt="Total downloads"></a>
 </p>
 
 <p align="center">
-  <img src="docs/img/workspace.png" alt="The LYNX SHARE workspace: browser, playlist, piano roll, channel rack and mixer" width="100%">
-  <br><sub>LYNX SHARE's own demo project (<code>LYNX.exe --showcase</code>) in the workspace: browser, Playlist, Piano Roll, Channel Rack and Mixer.</sub>
+  <img src="docs/img/workspace.png" alt="The LYNX SHARE workspace: Browser, Playlist, Piano Roll, Channel Rack and Mixer" width="100%">
+  <br><sub>LYNX SHARE's own demo project: Browser, Playlist, Piano Roll, Channel Rack and Mixer.</sub>
 </p>
 
 ---
+
+## What is LYNX SHARE?
+
+LYNX SHARE is a free, open-source digital audio workstation. Out of the box it works the way FL Studio does: you build
+patterns in the **Channel Rack** and **Piano Roll**, arrange them in the **Playlist** and mix in the **Mixer**, with the
+windows and shortcuts where you expect them. Two optional layouts sit one click away: a **Clip-launch** workflow with an
+Ableton Live-style clip grid and scenes, and a **Simple** workflow, inspired by BandLab, for making a first song.
+
+It opens FL Studio (`.flp`), Ableton Live (`.als`) and FL Studio Mobile (`.flm`) projects, and exports `.flp` and
+`.als` back, so your work is not locked in. It is written from scratch in C++20 with JUCE 8, licensed under the
+AGPL-3.0, and still an **alpha**.
+
+**It's for you if you…**
+
+- know FL Studio and want a free, open-source DAW that works the same way, on Windows, macOS or Linux;
+- move projects between FL Studio, FL Studio Mobile and Ableton Live, or collaborate with people who use them;
+- are making your first song and want one simple window to start in;
+- have a modest computer and want a DAW that stays light.
+
+## Why LYNX SHARE
+
+| | |
+|---|---|
+| 🎹 **The FL Studio workflow** | Channel Rack, Piano Roll, Playlist with several arrangements, and a Mixer with inserts, sends and sidechain. The default layout, never watered down. |
+| 📂 **Your projects come with you** | Opens `.flp`, `.als` (Live 11 and 12) and `.flm`; exports `.flp` and `.als`. FL Studio's native plugins play on LYNX SHARE's own engines, so a project that uses them plays without FL Studio installed. |
+| 🎛️ **Three layouts, one program** | Patterns by default, a clip grid with scenes when you want to jam, or one simple window for a first song. Switch any time in *View › Layout style*. |
+| 🤝 **Make music together** | Send a project to a friend as one file, or work on it live with up to three other people, end-to-end encrypted. |
+| ⚡ **Lightweight** | A lock-free engine that spreads channels and mixer tracks across CPU cores, skips idle channels and streams long audio from disk. On one Windows PC it used 2.5–7× less RAM than FL Studio 2026 ([measurements](docs/analise/REA_rodada116.md), on an earlier version). |
+| 🆓 **Free, open source, clean-room** | No price, no account, no subscription. Every behaviour was studied from the outside and written from scratch: no Image-Line or Ableton code is in it. |
+
+## Features
+
+### The pattern workflow (default)
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/img/channel-rack.png" alt="Channel Rack">
+
+**Channel Rack.** A step sequencer with per-channel volume, pan, mute and solo, swing, multiple patterns, cut groups,
+an arpeggiator and the computer keyboard as a piano.
+
+</td>
+<td width="50%" valign="top">
+<img src="docs/img/piano-roll.png" alt="Piano Roll">
+
+**Piano Roll.** Snap, chords and scales, note colours and groups, slide and porta notes, quantize, velocity, pan and
+pitch lanes, and MIDI import and export.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/img/playlist.png" alt="Playlist">
+
+**Playlist.** Pattern, audio and automation clips on tracks, several arrangements per project, markers and FL's clip
+menu (split, chop, reverse, fit to tempo and more).
+
+</td>
+<td width="50%" valign="top">
+<img src="docs/img/mixer.png" alt="Mixer">
+
+**Mixer.** Up to 127 inserts with 10 effect slots each, sends, sidechain, delay compensation and smart disable, plus
+any insert to any hardware output.
+
+</td>
+</tr>
+</table>
+
+### The Clip-launch workflow (optional)
+
+<p align="center">
+  <img src="docs/img/clip-launch.png" alt="The Clip-launch workflow: a clip grid with scenes next to the Playlist" width="100%">
+</p>
+
+*View › Layout style › Clip-launch workflow* adds an Ableton Live-style clip grid next to the Playlist: tracks are
+columns, scenes are rows. Clips have launch modes, quantisation and follow actions, and a selected clip opens in a Clip
+View. Under the grid there is a Session mixer; there are also instrument, audio-effect and MIDI-effect racks, a Drum
+Rack, Draw Mode and MIDI / Key Map Modes. Live sets bring their Session clips and scenes straight into the grid. The
+pattern workflow stays the default, and nothing is taken away from it.
+
+### The Simple workflow (optional)
+
+*View › Layout style › Simple workflow* is one window with the tracks and the timeline, inspired by BandLab and
+FL Studio Mobile. Add a voice, an instrument, a sampler or a starter beat in one click, shape the sound with eight
+one-knob effects, play chords on a Chord pad and save the song as a file from the Finish dock. *Make my first song*
+walks you through it step by step. The setup wizard offers all three layouts at the first start.
+
+### Instruments and effects
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/img/synth.png" alt="The built-in three-oscillator synth">
+
+**Instruments.** A three-oscillator synth, a sampler with slices and time-stretch, a SoundFont player, drums, a Drum
+Rack, Slicex, FPC and DirectWave with FL Studio's editors, and engines for most of FL Studio's native synths.
+
+</td>
+<td width="50%" valign="top">
+<img src="docs/img/eq.png" alt="Facet EQ">
+
+**Effects.** EQs, compressors, limiters, gates, reverbs, delays, modulation, saturation, pitch correction, a vocoder,
+Edison (the audio editor) on any mixer slot, and Patcher for building your own chains.
+
+</td>
+</tr>
+</table>
+
+Every one of them is listed, with a picture of its editor, in the
+[catalogue of instruments and effects](https://lynx-share.com/instruments-and-effects/).
+
+### Everything else
+
+- **Automation:** any knob or fader becomes an automation clip with points and curves (all 13 of FL's curve modes); MIDI controllers link to any parameter.
+- **Recording:** notes from the computer keyboard or a MIDI keyboard, and audio with punch in/out, loop takes and comping.
+- **Export:** WAV (16/24/32-bit float), MP3, FLAC and OGG; the song, one pattern, one file per marker section or stems; MIDI.
+- **Third-party plugins:** VST3 and CLAP on every system, plus the formats in the table below. Plugins can run in a separate process, so one that crashes goes silent instead of taking your project down.
+- **Online sessions:** *File › Online session* sends a project as one `.lynxpack` file, or starts a live session for up to four people.
+- **And more:** themes, undo on every edit, autosave and project versions, freezing a channel to audio, MIDI controller profiles, and the interface in 15 languages.
+
+<p align="center">
+  <img src="website/assets/img/wiki/session-windows.webp" alt="The Online session menu, the Start live session window and the session chat" width="100%">
+  <br><sub>Online sessions: the menu, starting a live session, and the session chat.</sub>
+</p>
+
+| | Windows 10 / 11 | macOS 11+ (Apple Silicon and Intel) | Linux x86_64 |
+|---|---|---|---|
+| **Plugin formats** | VST3, CLAP, VST2 (32-bit plugins through a bridge) | VST3, CLAP, Audio Units | VST3, CLAP, LV2, VST2 |
+| **Audio drivers** | WASAPI, DirectSound, ASIO | Core Audio | PipeWire, JACK, ALSA |
+| **Settings folder** | `%APPDATA%\LYNX` | `~/Library/Application Support/LYNX` | `~/.config/LYNX` |
+
+## Opens your projects
+
+*File › Open* (or a double-click in the Browser) takes `.lynx`, `.flp`, `.als`, `.flm` and MIDI files. Missing samples
+are listed in the Missing files window, and *Help › Last project import report* tells you what was converted,
+approximated or left out. The original file is never changed: saving writes a `.lynx` project.
+
+| Format | Open | Export | In short |
+|---|:---:|:---:|---|
+| **FL Studio** `.flp` | ✅ | ✅ | Channels, samples, patterns, every arrangement, automation, the mixer and native plugins with their settings. |
+| **Ableton Live** `.als` (Live 11 and 12) | ✅ | ✅ | Tracks, clips, warp markers, groups, returns, automation, racks and many of Live's devices. Session clips land in the clip grid. |
+| **FL Studio Mobile** `.flm` | ✅ partial | — | Arrangement, samples, drum kits, several instruments and effects, automation and chord sets. |
+| **MIDI** `.mid` | ✅ | ✅ | Notes, into or out of the Piano Roll or the whole song. |
+| **LYNX SHARE** `.lynx` | ✅ | ✅ | The native format (JSON), with autosave. |
+
+<details>
+<summary><strong>FL Studio (<code>.flp</code>): what comes in and what goes back</strong></summary>
+
+- **Structure:** channels, samples (including the Ogg Vorbis and WavPack files shipped with FL), patterns, slide and porta notes, every arrangement, markers, time-signature changes, automation and controller links.
+- **Mixer:** routing, levels, sidechains, track EQ and native effects with their saved settings.
+- **FL Studio's native plugins** play on LYNX SHARE's own engines, written from scratch and checked against the originals; most are exact or near-exact (see [Built-in plugins](#built-in-instruments-and-effects)). Wave data and factory sounds some of them need are read from *your* FL Studio installation, never shipped with LYNX SHARE.
+- **Third-party plugins** inside the Fruity Wrapper are swapped for the same installed plugin, preset included.
+- **Not opened:** FLEX packs are encrypted and are never opened; such a channel gets a built-in synth patch instead.
+- **Export:** *File › Export › FL Studio project...* writes an FL Studio 2026 `.flp` (or a zip with the samples). What FL Studio has itself goes over as FL's own data; LYNX-only instruments and effects are rendered to audio first or replaced by the nearest FL plugin, and the report says which.
+
+If FL Studio is installed on the same computer, `.flp` projects use the very plugin files FL uses and find samples in
+FL's folders ([details](docs/FL_INTEGRATION.md)).
+
+</details>
+
+<details>
+<summary><strong>Ableton Live (<code>.als</code>): what comes in and what goes back</strong></summary>
+
+- **Import:** MIDI tracks become channels with their patterns, audio tracks become audio clips (warp markers and warp modes kept), groups and returns become mixer inserts and sends, plus tempo, time signature, locators, mixer levels and their automation. Session clips and scenes go into the clip grid with their launch settings and follow actions. Third-party VST2 and VST3 plugins keep their state and automation. Instrument and Audio Effect Racks come in with their chains and macros, and a Drum Rack becomes LYNX SHARE's Drum Rack.
+- **Live's own devices** become LYNX SHARE's, with their settings and automation: EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb, Delay, Echo, Auto Filter, Saturator, Overdrive, Chorus-Ensemble, Redux, Auto Pan and Drum Buss; Simpler, Sampler, Drift and Operator (without FM); the Arpeggiator, Pitch, Velocity, Chord and Note Length are written into the notes. Other devices are dropped and listed in the report.
+- **Export:** *File › Export › Ableton Live set (.als)...* writes a set for Live 12 or Live 11 with the samples collected: tracks, clips, notes, warp markers, groups, returns, mixer, sends, automation, locators, racks, Drum Racks and the clip grid as Session view. Third-party plugins go over with their state; LYNX SHARE's own instruments and effects are not converted yet (the export report lists them).
+
+More in the [format notes](docs/analise/ALS_FORMAT.md).
+
+</details>
+
+<details>
+<summary><strong>FL Studio Mobile (<code>.flm</code>): import only, partial</strong></summary>
+
+Tempo, time signature and the arrangement (note, drum and audio lanes), samples, drum kits with each pad's settings,
+DW Sampler and DirectWave programs, the Slicer, the MiniSynth, Transistor Bass, 3x Osc, GMSynth and SuperSaw
+instruments, FL Studio Mobile's effects, the mixer's levels, panning and routing, automation, chord sets and the key
+locker. Other instruments play LYNX SHARE's built-in synth for now, and anything not converted is listed in the import
+report. More in the [format notes](docs/analise/FLM_FORMAT.md).
+
+</details>
+
+## Built-in instruments and effects
+
+LYNX SHARE's engines for FL Studio's native plugins are clean-room re-implementations, each compared against the
+original. The plugins FL Studio users reach for most are all at *Exact* or *Near-exact* quality:
+
+| LYNX SHARE engine | Compatible with | Status |
+|---|---|---|
+| 3x Osc engine | 3x Osc | Exact |
+| FL Keys engine | FL Keys | Exact |
+| Gross Beat | Gross Beat | Exact |
+| Fruity Delay 3 | Fruity Delay 3 | Exact |
+| Reeverb 2 | Fruity Reeverb 2 | Exact |
+| Fruity Compressor | Fruity Compressor | Exact |
+| Fruity Limiter | Fruity Limiter | Near-exact |
+| Parametric EQ | Fruity Parametric EQ 2 | Near-exact |
+| Soundgoodizer | Soundgoodizer | Near-exact |
+| Maximus | Maximus | Near-exact |
+
+**All of them:**
+
+| | Exact | Near-exact | Close | Approximate | Placeholder |
+|---|---:|---:|---:|---:|---:|
+| **Generators** (3x Osc, DX10, Sytrus, Harmor, FL Keys, DirectWave, …) | 12 | 10 | 7 | 1 | 2 |
+| **Effects** (Parametric EQ 2, Limiter, Reeverb 2, Delay 3, Gross Beat, Love Philter, …) | 34 | 10 | 1 | 8 | 1 |
+
+*Exact* means bit-identical to the original in every case tested; *near-exact*, any difference is below about −100 dB;
+*close*, the same algorithm within −60 dB. What each engine does and what it still lacks is in
+[`docs/PLUGINS.md`](docs/PLUGINS.md). Plugin names are Image-Line's trademarks, used only to describe compatibility.
+
+Many of LYNX SHARE's own effects are also available as CLAP plugins (a few as VST3) for use in other DAWs: an optional,
+separate `LYNX-Plugins` download on the releases page (Windows and macOS in 0.1.27; the Linux pack follows later).
 
 <!-- inspired:begin (generated by scripts/gen-inspired.py) -->
 ## Inspired by the classics
@@ -72,325 +278,73 @@ LYNX SHARE ships **native** plugins inspired by the third-party plugins producer
 <sub>Product and company names are trademarks of their respective owners. They are used only to describe compatibility and the role each LYNX SHARE engine plays. LYNX SHARE is not affiliated with, endorsed or sponsored by any of them and contains none of their code, presets, graphics or audio.</sub>
 <!-- inspired:end -->
 
-## Highlights
-
-<table>
-<tr>
-<td width="25%" valign="top">
-
-### ⚡ Lightweight
-Lock-free engine, channels and mixer spread across threads, idle channels skipped and long audio streamed from disk. A 125-track project renders at more than 10× real time. Measured against FL Studio 2026 on the same PC: 2.5–7× less RAM, demo songs open faster and render 2–3× faster ([benchmark](docs/analise/REA_rodada116.md)).
-
-</td>
-<td width="25%" valign="top">
-
-### 🍒 Three workflows, one DAW
-FL Studio-style patterns by default: step-sequencer Channel Rack, Piano Roll, Playlist with arrangements and a Mixer with inserts, sends and sidechain, with the same shortcuts. Prefer clips? Switch the layout style to the Ableton Live-style clip grid, with scenes, launch modes, follow actions, a Clip View and racks. New to DAWs? The Simple workflow is one window with the tracks and the timeline.
-
-</td>
-<td width="25%" valign="top">
-
-### 📂 Opens your projects
-Imports FL Studio projects (`.flp`) with channels, samples, patterns, arrangement, automation, mixer and 60+ native plugins, most of them bit-exact. Opens and saves Ableton Live 11/12 sets (`.als`), exports `.flp` back to FL Studio, and imports FL Studio Mobile projects (`.flm`, partial).
-
-</td>
-<td width="25%" valign="top">
-
-### 🔬 Clean-room
-Behaviour studied through behavioural reverse engineering and documented, then written from scratch; not a single line of Image-Line or Ableton code was copied.
-
-</td>
-</tr>
-</table>
-
-**The Ableton Live-style side is growing.** Today: the clip grid with scenes, a Session mixer under it, a Live-style
-Clip View and Device View, instrument, audio-effect and MIDI-effect racks (instrument and audio-effect racks also from
-`.als`), a Drum Rack, note chance and velocity range, Live 12's MIDI tools, warp markers, Draw Mode, MIDI and Key Map
-Modes, and `.als` sets that go both ways (Session clips land in the clip grid, and many of Live's own devices become
-LYNX SHARE's). A **Simple workflow** for
-beginners (BandLab / FL Studio Mobile-style) is the third layout style. FL Studio's workflow stays the default, and
-nothing is taken away from it.
-
-## Features
-
-<p align="center">
-  <img src="docs/img/playlist.png" alt="The LYNX SHARE Playlist with pattern, automation and audio clips" width="100%">
-  <br><sub><strong>Playlist:</strong> pattern, automation and audio clips with a clip menu on right-click (split, chop, merge, reverse, normalize, fit to tempo and more).</sub>
-</p>
-
-<table>
-<tr>
-<td width="50%" valign="top">
-<img src="docs/img/channel-rack.png" alt="Channel Rack">
-
-### Channel Rack
-Step sequencer with per-channel volume, pan, mute and solo, swing, multiple patterns (name, colour, length, clone), cut groups, arpeggiator and the PC keyboard as a piano.
-
-</td>
-<td width="50%" valign="top">
-<img src="docs/img/piano-roll.png" alt="Piano Roll">
-
-### Piano Roll
-Configurable snap, chords and scales, 16 note colors, note groups, a chord readout, select tools (invert, odd/even, random, overlapping), quantize, slide and porta notes, velocity/pan/pitch lane, `.mid` import and export.
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-<img src="docs/img/mixer.png" alt="Mixer">
-
-### Mixer
-Up to 127 inserts, sends with levels, 10 effect slots with dry/wet per track, built-in EQ (or a **clean mixer** with none), PDC, smart disable and **sidechain** (here the bass compressor listening to the kick). Choose how many inserts new projects start with and show only the used ones.
-
-</td>
-<td width="50%" valign="top">
-<img src="docs/img/synth.png" alt="Built-in synth">
-
-### Built-in synth
-3 oscillators (including a band-limited **harmonics** oscillator), LP/BP/HP/BS filter with keytracking, FM and ring modulation, envelopes, 4 LFOs, kick sweep, mono and portamento.
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-<img src="docs/img/eq.png" alt="Facet EQ">
-
-### Facet EQ
-8 bands of bells, shelves, tilt, notch and band pass, cuts up to 96 dB/oct, dynamic bands and a live pre/post analyser, at zero latency. The FL-style 7-band Parametric EQ is there too.
-
-</td>
-<td width="50%" valign="top">
-<img src="docs/img/automation.png" alt="Automation">
-
-### Automation
-Any knob or fader (channel, mixer, effect, plugin parameter) becomes a clip with points and curves; MIDI controllers can be linked to any parameter.
-
-</td>
-</tr>
-</table>
-
-<p align="center">
-  <img src="docs/img/clip-launch.png" alt="The Clip-launch workflow: a clip grid with scenes beside the Playlist" width="100%">
-  <br><sub><strong>Clip-launch workflow</strong> (View › Layout style): a grid of clips and scenes beside the Playlist, with launch modes, quantisation and follow actions. The Pattern workflow stays the default.</sub>
-</p>
-
-### Everything in the box
-
-<table>
-<tr>
-<td width="33%" valign="top">
-
-#### Instruments
-- 3-oscillator synth with an evolving harmonics oscillator, SVF or 4-pole ladder filter and a vintage chorus
-- Sampler with zones, slices, time-stretch (Signalsmith Stretch) and disk streaming
-- **LYNX Soundfont**: SF2/SF3 player with a preset search across all your SoundFonts
-- Built-in drums (kick, snare, hat, clap)
-- Slicex, FPC, Fruity Slicer and DirectWave as instruments with FL Studio's editors; the Sampler page in FL Studio's layout (loop points, ping pong, crossfade)
-- **Drum Rack** (pads, choke groups, return chains), also from and to Ableton Live sets
-- Layer channels, FL-style VFX note effects (Sequencer/arpeggiator, Key Mapper, Keyboard Splitter…) and controllers (X-Y, X-Y-Z, Dashboard, Envelope, Voltage)
-- VST3 and CLAP plugins on every OS, plus Audio Units on macOS and LV2 on Linux; optionally sandboxed in a separate process; 32-bit plugins on Windows through a bridge; plugin windows docked in the main window or detached; a searchable plugin picker with favorites
-- MIDI controller profiles (Mackie Control, Launchkey MK3, APC Key 25 mk2, KeyLab Essential mk3, nanoKONTROL2) and a first stage of MPE
-
-</td>
-<td width="33%" valign="top">
-
-#### Effects
-- EQ, 7-band parametric EQ, compressor with sidechain, limiter
-- Delay, reverb, chorus, filter, distortion, lo-fi
-- Effector (12 algorithms), vocoder with side inputs, pitch correction
-- Volume gate, rhythmic envelope, auto-pan, Linkwitz-Riley crossover
-- Wave Candy analyzer and an audio-reactive Visualizer with video export
-- Hardware Insert for outboard gear, with round-trip ping and delay compensation
-- Pitch shift, frequency shifter, utility, Patcher (a node graph of effects, instruments and plugins with audio, MIDI and control cables)
-- Edison, the audio editor, on any mixer slot: records now, on input or on play, with its window closed
-- Simple workflow: eight one-knob effects (Brighter, Echo, Punch, Room, Bass, Level, Dirty, Warm) and 22 chain presets
-
-</td>
-<td width="33%" valign="top">
-
-#### Projects and files
-- Native `.lynx` format (JSON) with autosave
-- Opens FL Studio `.flp`, Ableton Live `.als` (Live 11/12) and FL Studio Mobile `.flm` (partial) projects, and `.mid`; FL `.fst` presets
-- Exports `.flp` for FL Studio and `.als` for Live 12 or Live 11, with the samples collected
-- Exports WAV 16/24/32f, MP3, FLAC and OGG, song, pattern or one file per marker section, stems and MIDI, with dither
-- Freeze a channel (it plays as audio and its instrument is unloaded), project versions and backups in one list, and opening a project without its third-party plugins
-- Note recording (PC keyboard and MIDI) and audio recording, sample-accurate with a round-trip ping, punch in/out with pre/post-roll, loop takes and comping, crash-safe takes
-- Themes (accent color, background, workspace image) and plugin presets
-- Undo/redo on every edit
-- Opt-in crash and freeze reports (anonymous), or a prefilled GitHub bug report
-- Audio drivers: Windows Audio (WASAPI), DirectSound and ASIO on Windows; Core Audio on macOS; PipeWire (native), JACK and ALSA on Linux
-- Any insert to any hardware output, including single mono channels
-
-</td>
-</tr>
-</table>
-
-## Built-in plugins
-
-LYNX SHARE's native engines are clean-room re-implementations of FL Studio's native plugins, each checked against the
-original running unmodified. The full list — every engine, what it is compatible with, its status and what is still
-missing — is in [`docs/PLUGINS.md`](docs/PLUGINS.md).
-
-**Featured** — the plugins FL Studio users reach for most, all at *Exact* or *Near-exact* quality in LYNX SHARE:
-
-| LYNX SHARE engine | Inspired by / compatible with | Status |
-|---|---|---|
-| 3x Osc engine | 3x Osc (FL Studio) | Exact |
-| FL Keys engine | FL Keys (FL Studio) | Exact |
-| Gross Beat | Gross Beat (FL Studio) | Exact |
-| Fruity Limiter | Fruity Limiter (FL Studio) | Near-exact |
-| Parametric EQ | Fruity Parametric EQ 2 (FL Studio) | Near-exact |
-| Soundgoodizer | Soundgoodizer (FL Studio) | Near-exact |
-| Maximus | Maximus (FL Studio) | Near-exact |
-| Fruity Delay 3 | Fruity Delay 3 (FL Studio) | Exact |
-| Reeverb 2 | Fruity Reeverb 2 (FL Studio) | Exact |
-| Fruity Compressor | Fruity Compressor (FL Studio) | Exact |
-
-What each one does, how you get it (any insert or from an `.flp`) and the whole list are in
-[`docs/PLUGINS.md`](docs/PLUGINS.md#featured).
-
-**All built-in plugins:**
-
-| | Exact | Near-exact | Close | Approximate | Placeholder |
-|---|---:|---:|---:|---:|---:|
-| **Generators** (3x Osc, DX10, Sytrus, Harmor, FL Keys, DirectWave, …) | 12 | 10 | 7 | 1 | 2 |
-| **Effects** (Parametric EQ 2, Limiter, Reeverb 2, Delay 3, Gross Beat, Love Philter, …) | 34 | 10 | 1 | 8 | 1 |
-
-*Exact* = bit-identical to the original on every installation state tested; *near-exact* = the rest below about
-−100 dB; *close* = same algorithm, within −60 dB. Plugin names are Image-Line's trademarks, used only to describe
-compatibility; LYNX SHARE is not affiliated with Image-Line.
-
-## Opens your projects
-
-*File › Open* (or a double-click in the Browser) takes `.lynx`, FL Studio `.flp`, Ableton Live `.als`, FL Studio Mobile
-`.flm` and MIDI files. Every import goes through the same pipeline: samples are looked for, missing ones are listed in
-the Missing files window, and *Help › Last project import report* lists what was converted, approximated or left out.
-*File › Export* writes an FL Studio project (`.flp`) or an Ableton Live set (`.als`).
-
-### FL Studio (`.flp`)
-
-LYNX SHARE reads the `.flp` format directly and converts everything that has an equivalent:
-
-- **Structure:** channels, real samples (including the Ogg Vorbis WAVs and WavPack files shipped with FL), patterns, slide/porta notes, every arrangement, markers, time-signature changes, automation and controller links.
-- **Mixer:** routing, levels, sidechains, track EQ and native effects with their saved settings (Parametric EQ 2, Limiter, Compressor, Reeverb 2, Delay 3, Maximus, Gross Beat, Effector, Love Philter, Frequency Splitter, Patcher, Pitcher, Vocoder, Newtone/Newtime and more).
-- **Generators on FL's own engines** (checked against FL's DLLs, most of them bit for bit): 3x Osc, SimSynth, MiniSynth, DX10, Kepler, PoiZone, Toxic Biohazard, Transistor Bass, Autogun, Plucked!, BeepMap, Sawer, Granulizer, Drumaxx, FL Slayer, FL Keys, Fruit Kick, Kick, BassDrum, Sakura, Drumpad, BooBass, Fruity DrumSynth Live, GMS, Morphine; Sytrus, Harmless, Harmor (including image synthesis) and Ogun on engines rebuilt from the plugin state. Built-in sounds and tables are read from *your* FL installation, never shipped with LYNX SHARE. DirectWave runs on its own exact engine (filters, modulation matrix and effects); Slicex and FPC run on their own engines with FL's editor layout, their state read and written byte for byte; Fruity Slicer and Wave Traveller play as samplers through FL's own interpolators.
-- **Exact native effects:** Parametric EQ 2, EQUO, Limiter, Compressor, Multiband Compressor, Maximus, Soundgoodizer, Reeverb 2, LuxeVerb, Convolver, Delay 3, Delay Bank, the chorus family, Flangus, Flanger, Fast Dist, WaveShaper, Soft Clipper, Stereo Shaper/Enhancer, Transient Processor, Frequency Splitter, Fast LP, Free Filter, Fruity Filter, Pitch Shifter, Love Philter, Fruity Vocoder, Vocodex, Hardcore, Distructor, Multiband Delay, Gross Beat, Effector, Vintage Phaser, Pitcher and more reproduce FL's algorithms; how each one was decoded is documented in [`docs/analise/`](docs/analise/).
-- **Third-party plugins:** VST3/CLAP plugins inside the Fruity Wrapper are swapped for the same installed plugin, preset included.
-
-A report lists what was converted, what is approximated and what was left out. FLEX packs are encrypted and are never opened (the channel gets a synth patch chosen by preset name).
-
-**Export to FL Studio:** *File › Export › FL Studio project...* writes an FL Studio 2026 `.flp` (or a zip with the
-samples). What FL has itself goes over as FL's own data (samplers, audio clips, FL's native plugins with their state,
-third-party plugins inside Fruity Wrapper, patterns, Playlist, mixer, automation); LYNX-only instruments and effects
-are rendered to audio first, or replaced by the nearest FL plugin where a clean mapping exists. The report says which.
-
-### Ableton Live (`.als`)
-
-Live 11 and Live 12 sets open and save ([format notes](docs/analise/ALS_FORMAT.md)):
-
-- **Import:** MIDI tracks become channels with their patterns, audio tracks become audio clips (warp markers → the
-  clip's stretch; Beats, Tones, Texture and Complex as LYNX stretch methods), group and return tracks become mixer
-  inserts and sends, plus tempo, time signature, locators, mixer levels and their automation. Session clips and scenes
-  go to the clip grid with their launch settings and follow actions (or, as a setting, onto the Playlist). Third-party
-  VST2/VST3 plugins keep their state and their automation; Instrument and Audio Effect Racks come in as racks with their
-  chains, zones and macros (Live's MIDI Effect Racks are not opened yet and are listed in the report); a Drum Rack
-  becomes LYNX SHARE's Drum Rack. Live's own devices become LYNX SHARE's with their settings, automation and macros:
-  EQ Eight, EQ Three, Channel EQ, Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Utility, Reverb,
-  Delay, Echo, Auto Filter (its LFO and follower as a Peak Controller), Saturator, Overdrive, Chorus-Ensemble, Redux,
-  Auto Pan and Drum Buss; Simpler and Sampler, Drift and Operator (without FM); the Arpeggiator, and Pitch, Velocity,
-  Chord and Note Length written into the notes. Other Live devices are listed in the report. Note chance, velocity range, probability groups and the scale are kept.
-- **Export:** *File › Export › Ableton Live set (.als)...* writes `<name> Project/<name>.als` for Live 12 or Live 11,
-  with the samples collected: tracks, clips, notes, warp markers, groups, returns, mixer, sends, automation, locators,
-  racks and Drum Racks, note chance and the clip grid as Session view. Third-party plugins go over with their state; LYNX's own
-  instruments and effects are not converted yet (they are listed in the export report).
-
-### FL Studio Mobile (`.flm`)
-
-Import only, and partial ([format notes](docs/analise/FLM_FORMAT.md)): tempo, time signature, the arrangement (note,
-drum and audio lanes as patterns, clips and audio clips), samples, drum kits with each pad's settings, DW Sampler
-and DirectWave programs and the Slicer on FL Studio Mobile's own engines, the MiniSynth, Transistor Bass, 3x Osc,
-GMSynth and SuperSaw instruments, FL Studio Mobile's effects (as LYNX SHARE's Pocket effects, most on FL Studio
-Mobile's own engines), the mixer's levels, panning and routing, the automation of level, pan, mute, solo, pitch bend,
-sends, instrument parameters and MIDI controllers, and the chord sets and key locker. Other instruments play LYNX's
-built-in synth for now (a DW Sampler whose samples are all missing plays a LYNX sound of the same kind), and anything
-not converted is listed in the import report.
-
-> [!NOTE]
-> Every conversion rule comes from **behavioural** reverse engineering (decompilation studied, official manual and project data), recorded in [`docs/analise/`](docs/analise). Anything not confirmed is flagged as an approximation in [`docs/STATUS.md`](docs/STATUS.md).
-
 ## Download
 
-Every release on the [latest release page](https://github.com/Ka1-S/LYNX-SHARE/releases) has builds for all three
-platforms (`<v>` is the version, e.g. `0.1.10-alpha`):
+Get the latest build from the [releases page](https://github.com/Ka1-S/LYNX-SHARE/releases) or the
+[download page](https://lynx-share.com/download/) (`<v>` is the version, e.g. `0.1.27-alpha`):
 
-| OS | Download | Notes |
+| System | File | Notes |
 |---|---|---|
-| **Windows** 10 / 11, 64-bit | `LYNX-<v>-setup-x64.exe` (installer) or `LYNX-<v>-windows-x64.zip` (portable) | per-user installer, no admin rights |
-| **macOS** 11 Big Sur or newer | `LYNX-<v>-macos-universal.dmg` | universal: Apple Silicon and Intel |
-| **Linux** x86_64, glibc 2.35+ | `LYNX-<v>-x86_64.AppImage` or `LYNX-<v>-linux-x86_64.tar.gz` | Ubuntu 22.04+, Debian 12+, Fedora 36+, current Arch / Manjaro |
+| **Windows** 10 / 11, 64-bit | `LYNX-<v>-setup-x64.exe` (installer) or `LYNX-<v>-windows-x64.zip` (portable) | Per-user installer, no admin rights. Also on the [Microsoft Store](https://apps.microsoft.com/detail/9NQRFBFDCX6N), which keeps it updated. |
+| **macOS** 11 Big Sur or newer | `LYNX-<v>-macos-universal.dmg` | Universal: Apple Silicon and Intel. |
+| **Linux** x86_64, glibc 2.35+ | `LYNX-<v>-x86_64.AppImage` or `LYNX-<v>-linux-x86_64.tar.gz` | Ubuntu 22.04+, Debian 12+, Fedora 36+, current Arch / Manjaro. |
 
-**Windows, Microsoft Store:** LYNX SHARE is also on the [Microsoft Store](https://apps.microsoft.com/detail/9NQRFBFDCX6N)
-(Windows 10 / 11), which installs it and keeps it updated automatically.
+Every file is built from the tagged source by GitHub Actions ([`release.yml`](.github/workflows/release.yml)) and
+listed with its SHA-256 in `SHA256SUMS.txt`. Once installed, LYNX SHARE tells you when a new version is out.
 
-Release files are built from the tagged source by GitHub Actions ([`release.yml`](.github/workflows/release.yml)) and
-listed with their SHA-256 in `SHA256SUMS.txt`. Releases up to 0.1.7 are Windows-only; up to 0.1.12 the AppImage was named
-`LYNX-<v>-linux-x86_64.AppImage` and needed glibc 2.39.
+<details>
+<summary><strong>First launch on each system</strong></summary>
 
-**Windows.** Run the installer: it needs no admin rights, adds Start-menu/desktop shortcuts, opens `.lynx` projects and
-offers LYNX SHARE in *Open with* for `.flp` without changing FL Studio's default. Prefer no installer? Extract the portable
-`.zip` and run `LYNX.exe`. Both include a demo project (`Demo.lynx`). The executable is not code-signed yet, so
-SmartScreen may warn on first launch (*More info* → *Run anyway*); see [Code signing policy](#code-signing-policy).
+**Windows.** Run the installer, or extract the portable `.zip` and run `LYNX.exe`. The installer adds shortcuts, opens
+`.lynx` projects and offers LYNX SHARE in *Open with* for `.flp` files without changing FL Studio's default. The
+executable is not code-signed yet, so SmartScreen may warn the first time: choose *More info* → *Run anyway* (see
+[Code signing policy](#code-signing-policy)).
 
-**macOS.** Open the `.dmg` and drag LYNX SHARE to *Applications*. The app is not notarized by Apple and has no Developer ID
-signature (ad-hoc only), so the first launch needs one extra step: right-click (Control-click) LYNX SHARE in *Applications*
-→ *Open* → *Open*. On macOS 15 Sequoia or newer, try to open it once, then go to *System Settings* → *Privacy &
-Security* and click *Open Anyway*. Or, in Terminal:
+**macOS.** Open the `.dmg` and drag LYNX SHARE to *Applications*. The app is not notarized by Apple yet, so the first
+time right-click (Control-click) it → *Open* → *Open*. On macOS 15 Sequoia or newer, try to open it once, then go to
+*System Settings* → *Privacy & Security* and click *Open Anyway*. Or, in Terminal:
 
 ```
 xattr -dr com.apple.quarantine /Applications/LYNX.app
 ```
 
-macOS asks for microphone access the first time you record.
-
-**Linux.** Needs X11 or XWayland; audio goes through PipeWire directly (or JACK, or ALSA), see [docs/LINUX.md](docs/LINUX.md). For the
-AppImage:
+**Linux.** Needs X11 or XWayland; sound goes through PipeWire, JACK or ALSA ([details](docs/LINUX.md)).
 
 ```
 chmod +x LYNX-*.AppImage
 ./LYNX-*.AppImage
 ```
 
-Some distributions need libfuse2 to run AppImages (`libfuse2` on Ubuntu 22.04, `libfuse2t64` on 24.04, `fuse2` on Arch, `fuse-libs` on Fedora); otherwise
-use the `.tar.gz`: extract it and run `./install.sh`, which installs LYNX SHARE for your user under `~/.local` with a menu
-entry, an icon and the `.lynx` file type (`./install.sh --uninstall` removes it again).
+Some distributions need libfuse2 for AppImages (`libfuse2` on Ubuntu 22.04, `libfuse2t64` on 24.04, `fuse2` on Arch,
+`fuse-libs` on Fedora). Otherwise extract the `.tar.gz` and run `./install.sh`, which installs LYNX SHARE for your user
+with a menu entry and the `.lynx` file type (`./install.sh --uninstall` removes it). The AppImage can update itself in
+place with [Gear Lever](https://github.com/mijorus/gearlever) or AppImageUpdate.
 
-The AppImage carries its update information (the newest release, pre-releases included) and every release ships its
-`.zsync`, so [Gear Lever](https://github.com/mijorus/gearlever) and AppImageUpdate update it in place, downloading
-only what changed.
+</details>
 
-### Platform notes
+## Getting started
 
-| | Windows | macOS | Linux |
-|---|---|---|---|
-| Plugin formats | VST3, CLAP, VST2 | VST3, CLAP, Audio Units | VST3, CLAP, LV2, VST2 |
-| Audio drivers | Windows Audio (WASAPI), DirectSound, ASIO, built-in LYNX ASIO driver | Core Audio | PipeWire (native), JACK, ALSA |
-| Out-of-process plugin sandbox | optional | optional | optional |
-| FL Studio integration (factory samples, plugin database) | FL Studio installation | FL Studio app bundle is looked for (untested) | Windows FL Studio under Wine (`~/.wine` or `$WINEPREFIX`) |
-| Settings folder | `%APPDATA%\LYNX` | `~/Library/Application Support/LYNX` | `~/.config/LYNX` (`$XDG_CONFIG_HOME`) |
+1. **Install** LYNX SHARE (above) and open it.
+2. **The setup wizard** picks the language, tests your audio device, lets you choose a layout and scans your plugin
+   folders in the background: the standard VST3 and CLAP folders plus the ones FL Studio uses on the same computer. You
+   can skip it and reopen it later from *Options › Setup wizard*.
+3. **Open a project** with *File › Open*: one of yours (`.flp`, `.als`, `.flm`, MIDI), or the demo project
+   (`Demo.lynx`, included with every download).
+4. **Learn as you go** with the [wiki](https://lynx-share.com/wiki/):
+   [Your first song](https://lynx-share.com/wiki/first-song/),
+   [Coming from FL Studio](https://lynx-share.com/wiki/coming-from-fl-studio/),
+   [Coming from Ableton Live](https://lynx-share.com/wiki/coming-from-ableton/) and the
+   [Simple layout](https://lynx-share.com/wiki/simple-layout/).
 
-Opening `.flp`, `.als` and `.flm` projects works on every OS; the FL Studio integration only adds FL's own samples and
-plugin paths when an installation is found.
+**Handy shortcuts:** Space plays and pauses, F5 / F6 / F7 / F8 / F9 show the Playlist / Channel Rack / Piano Roll /
+Browser / Mixer, L toggles Pattern / Song, and the keys `Z`…`M` and `Q`…`P` play the selected channel. The full list is
+on the [Shortcuts](https://lynx-share.com/wiki/shortcuts/) page.
 
-On first start a short setup wizard (skippable; *Options > Setup wizard* reopens it) picks the language, tests the audio
-device and lists the plugin folders — the standard VST3/CLAP folders plus the ones FL Studio uses on the same PC — and
-scans them in the background. If FL Studio is installed, `.flp` projects use the very plugin files FL uses (read from its
-plugin database) and find samples in FL's folders; a plugin LYNX SHARE doesn't know yet gets a quick scan of just its file
-([details](docs/FL_INTEGRATION.md)).
+<details>
+<summary><strong>Command line</strong></summary>
 
-## Command line
-
-`LYNX.exe` also runs headless, which is how everything is verified without opening windows. On macOS and Linux the
-binary is `LYNX` (`/Applications/LYNX.app/Contents/MacOS/LYNX` on macOS); the options are the same:
+LYNX SHARE also runs without a window, to render and convert projects. On macOS and Linux the binary is `LYNX`
+(`/Applications/LYNX.app/Contents/MacOS/LYNX` on macOS); the options are the same:
 
 ```
 LYNX.exe project.lynx                          open a project (.lynx, .flp, .als, .flm or .mid)
@@ -407,80 +361,86 @@ LYNX.exe --scantest folder rep.txt             scan a folder for plugins (separa
 LYNX.exe --fldb rep.txt [project.flp] [--scan] FL Studio found here, its plugin database, a project's plugin matches
 LYNX.exe --devices rep.txt                     list audio drivers and outputs
 LYNX.exe --devicetest "ASIO" "driver" rep.txt  open a driver for 1 s of silence and report it
-LYNX --uiperf project.flp rep.txt             time the UI drawing: Mixer, Playlist, Channel Rack, playing and scrolling
-LYNX.AppImage --menu-entry on|off             Linux AppImage: add to / remove from the applications menu
+LYNX --uiperf project.flp rep.txt              time the UI drawing: Mixer, Playlist, Channel Rack, playing and scrolling
+LYNX.AppImage --menu-entry on|off              Linux AppImage: add to / remove from the applications menu
 ```
 
-## Shortcuts
+</details>
 
-| Key | Action |
-|---|---|
-| Space | Play / Pause |
-| F5 / F6 / F7 / F8 / F9 | Playlist / Channel Rack / Piano Roll / Browser / Mixer |
-| L | Toggle Pattern / Song |
-| Ctrl+Z / Ctrl+Y | Undo / redo |
-| Ctrl+N / Ctrl+O / Ctrl+S | New / Open / Save (Ctrl+Shift+S: save as) |
-| Ctrl+R | Export audio |
-| `Z`..`M`, `Q`..`P` | Play the selected channel |
-| Piano Roll / Playlist | Ctrl+A/C/X/V, Ctrl+B duplicate, Delete; in the Piano Roll also Ctrl+Q and the arrow keys |
+## Status: alpha
+
+LYNX SHARE already opens, plays and exports whole projects, and new releases come out often. It is not yet a
+replacement for the DAW you rely on every day: expect bugs, save often and keep backups. What is still missing or
+rough today:
+
+- Not every FL Studio plugin sounds exactly like the original; [`docs/PLUGINS.md`](docs/PLUGINS.md) gives each one a status, from exact to approximate.
+- Only some of Live's own devices are converted from `.als` sets, and LYNX SHARE's own instruments and effects are not written into exported sets yet.
+- `.flm` import is partial, and FL Studio Mobile projects cannot be exported.
+- The Windows build is not code-signed and the macOS build is not notarized yet, so both systems warn the first time. The macOS build has had little testing on real Macs.
+
+Each release's notes list its known issues. The details are in [`docs/STATUS.md`](docs/STATUS.md) (what works, what
+is approximated, what is missing) and the plan in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+## Community and contributing
+
+- **Discord:** [discord.gg/XHKkbtbkY](https://discord.gg/XHKkbtbkY) for chat, help, feedback and release announcements.
+- **Bugs and ideas:** open an [issue](https://github.com/Ka1-S/LYNX-SHARE/issues/new/choose) (*Bug report*, *Feature request* or *Sound / plugin difference*). Several fixes in recent releases started as user reports.
+- **Pull requests** are welcome: read [`CONTRIBUTING.md`](CONTRIBUTING.md) first, including the clean-room rule.
+- **Radiant** ([Kenneth-Cho-InfoSec/Radiant](https://github.com/Kenneth-Cho-InfoSec/Radiant)) is an independent, unofficial Android adaptation of LYNX SHARE for tablets and phones. It is a separate community project, not maintained or reviewed by us.
+
+## Support LYNX SHARE
+
+LYNX SHARE is free and stays free. If you would like to support its development, you can do so on
+[Ko-fi](https://ko-fi.com/lynxshare). It is entirely optional and never unlocks anything: every feature is the same
+for everyone. Reporting bugs, sharing your music made with LYNX SHARE and telling a friend help just as much.
 
 ## Building
 
-### Windows from WSL/Linux, without Visual Studio (Zig)
+Short version below; [`docs/SETUP_DEV.md`](docs/SETUP_DEV.md) has the full development setup.
+
+**Windows from WSL / Linux, without Visual Studio (Zig).** Needs Zig 0.14.1 in `~/opt/zig-x86_64-linux-0.14.1` and
+JUCE 8.0.4 in `~/opt/juce-8.0.4` (or set `ZIG` and `JUCE_DIR`). JUCE 8 does not officially support MinGW; the script
+works around the differences (see `cmake/mingw/` and `src/platform/MingwFixes.cpp`).
 
 ```
 ./scripts/build-windows-zig.sh      # produces build-win/LYNX.exe
 ```
 
-Needs Zig 0.14.1 in `~/opt/zig-x86_64-linux-0.14.1` and JUCE 8.0.4 in `~/opt/juce-8.0.4`
-(or set `ZIG` and `JUCE_DIR`). JUCE 8 does not officially support MinGW; the script works around the
-differences (see `cmake/mingw/` and `src/platform/MingwFixes.cpp`).
-
-### Windows with Visual Studio
-
-Requires Visual Studio 2022 Build Tools ("Desktop development with C++"), CMake ≥ 3.22 and Git.
+**Windows with Visual Studio.** Needs Visual Studio 2022 Build Tools ("Desktop development with C++"), CMake 3.22 or
+newer and Git.
 
 ```
 cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
-### Linux
-
-Ubuntu 24.04 dependencies:
+**Linux** (Ubuntu 24.04 packages):
 
 ```
 sudo apt install build-essential cmake ninja-build pkg-config libasound2-dev libjack-jackd2-dev libx11-dev \
   libxrandr-dev libxinerama-dev libxcursor-dev libxext-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libgl-dev
-```
-
-```
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-### macOS
-
-Needs the Xcode command line tools (`xcode-select --install`), CMake and Ninja (e.g. `brew install cmake ninja`).
+**macOS.** Needs the Xcode command line tools (`xcode-select --install`), CMake and Ninja (e.g. `brew install cmake
+ninja`). Leave out `CMAKE_OSX_ARCHITECTURES` to build for the current Mac only.
 
 ```
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 cmake --build build
 ```
 
-`CMAKE_OSX_ARCHITECTURES="arm64;x86_64"` produces a universal app; leave it out to build for the current Mac only.
-
-### Core tests (any C++20 compiler, no JUCE)
+**Core tests** (any C++20 compiler, no JUCE). More than a million checks, including parsing the projects that ship
+with FL Studio when you pass their folder. `LYNX_TEST_JOBS=auto` runs them in parallel; the test binary also takes
+`--list`, `--filter a,b`, `--exclude a,b` and `--shard i/n`.
 
 ```
 ./scripts/build-local.sh ["folder with .flp files"]
 ```
 
-More than a million checks, including parsing the 165 `.flp` projects that ship with FL Studio 2026 when that folder is given. It also builds `build-local/flpdump` (dumps a `.flp`) and `build-local/renderwav`.
-
-`LYNX_TEST_JOBS=auto` (or a number) runs the tests in parallel shards (`scripts/run-tests.sh`); the result line is the same. The test binary takes `--list`, `--filter a,b`, `--exclude a,b`, `--shard i/n` and `--times file`, e.g. `build-local/lynx_tests --filter flp_ --no-times`.
-
-## Under the hood
+<details>
+<summary><strong>Under the hood</strong></summary>
 
 ```
 src/core/     model, sequencer, instruments, effects and .flp import (plain C++, testable without JUCE)
@@ -490,36 +450,30 @@ src/ui/       UI: Channel Rack, Piano Roll, Playlist, Mixer, windows
 third_party/  CLAP (MIT) and the WavPack decoder (BSD)
 tests/        core tests
 tools/        flpdump, renderwav, comparewav, make_logo
-docs/         architecture, status, roadmap and the behavioural analysis of FL Studio
+docs/         architecture, status, roadmap and notes on FL Studio's behaviour
 ```
 
-- **Lock-free audio:** the UI edits a copy of the song and publishes an immutable snapshot to the audio thread.
-- **Chunked rendering:** every note lands on its exact sample; mixer tracks are processed in parallel layers.
-- **Isolated plugins:** plugin scanning always runs in separate processes; optionally the plugins themselves do too (a plugin that hangs goes silent and LYNX SHARE keeps playing).
+- **Lock-free audio:** the UI edits a copy of the song and hands an immutable snapshot to the audio thread.
+- **Sample-accurate rendering:** every note lands on its exact sample; mixer tracks are processed in parallel layers.
+- **Isolated plugins:** plugin scanning always runs in separate processes, and the plugins themselves can too.
 
-> [!IMPORTANT]
-> LYNX SHARE is in **alpha**. It already opens, plays and exports whole projects, but it is not yet a replacement for a daily-driver DAW. What works and what is missing is in [`docs/STATUS.md`](docs/STATUS.md); the plan in [`docs/ROADMAP.md`](docs/ROADMAP.md); and a manual test script in [`docs/MANUAL_TESTING.md`](docs/MANUAL_TESTING.md).
+</details>
 
-## Documentation
+### Documentation
 
 | Document | Contents |
 |---|---|
 | [`docs/STATUS.md`](docs/STATUS.md) | what works, what is approximated and what is missing |
 | [`docs/PLUGINS.md`](docs/PLUGINS.md) | the built-in plugins, what each one is compatible with, and its status |
+| [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) | LYNX SHARE's own features, beyond the FL Studio workflow |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | project phases |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | how the engine and the UI are organised |
-| [`docs/CODE_SIGNING.md`](docs/CODE_SIGNING.md) | how releases are built and code-signed (SignPath) |
-| [`PRIVACY.md`](PRIVACY.md) | privacy policy: network connections: update check, opt-in anonymised crash report, stem model download on request |
-| [`docs/MANUAL_TESTING.md`](docs/MANUAL_TESTING.md) | a script for listening to and poking at what the automated tests don't cover |
-| [`docs/analise/`](docs/analise) | FL Studio's behaviour, documented round by round (clean-room) |
+| [`docs/CODE_SIGNING.md`](docs/CODE_SIGNING.md) | how releases are built and code-signed |
+| [`PRIVACY.md`](PRIVACY.md) | privacy policy: every network connection LYNX SHARE makes, and why |
+| [`docs/MANUAL_TESTING.md`](docs/MANUAL_TESTING.md) | a script for checking by ear and by hand what the automated tests don't cover |
+| [`docs/analise/`](docs/analise) | clean-room notes on FL Studio's and Live's behaviour and file formats |
 
-> [!NOTE]
-> The documentation is being translated from Portuguese to English; some files are still in Portuguese.
-
-## Community
-
-- **Discord:** [discord.gg/XHKkbtbkY](https://discord.gg/XHKkbtbkY). Chat, help, feedback and release announcements.
-- **Radiant** ([Kenneth-Cho-InfoSec/Radiant](https://github.com/Kenneth-Cho-InfoSec/Radiant)): an independent, unofficial Android adaptation of LYNX SHARE for tablets and phones. It's a separate community project, not an official LYNX SHARE release, and it isn't maintained or reviewed by us.
+Some of the older notes are still in Portuguese and are being translated.
 
 ## Support LYNX SHARE
 
@@ -531,13 +485,19 @@ anything: everything in LYNX SHARE stays free for everyone. In the app: Help ›
 
 ## Credits and notice
 
-LYNX SHARE is an independent implementation. FL Studio, FL Studio Mobile and Ableton Live were studied only to understand their behaviour and file formats; no Image-Line or Ableton code was copied, and no protected content (such as FLEX packs) is ever opened.
+LYNX SHARE is an independent implementation. FL Studio, FL Studio Mobile and Ableton Live were studied only to
+understand their behaviour and file formats; no Image-Line or Ableton code was copied, and no protected content (such
+as FLEX packs) is ever opened.
 
-FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG; BandLab is a trademark of BandLab Technologies. LYNX SHARE is not affiliated with, endorsed or sponsored by any of them. VST is a registered trademark of Steinberg Media Technologies GmbH.
+FL Studio and FL Studio Mobile are trademarks of Image-Line Software; Ableton and Live are trademarks of Ableton AG;
+BandLab is a trademark of BandLab Technologies. LYNX SHARE is not affiliated with, endorsed or sponsored by any of
+them. VST is a registered trademark of Steinberg Media Technologies GmbH.
 
-Logo by **w3teal**, a member of the LYNX SHARE community, who made it and gave it to the project.
+Logo by **w3teal**.
 
-Built with [JUCE](https://juce.com), [CLAP](https://github.com/free-audio/clap), the [WavPack](https://www.wavpack.com) decoder and the Steinberg ASIO SDK — their licences are listed in [`THIRD_PARTY.md`](THIRD_PARTY.md).
+Built with [JUCE](https://juce.com), [CLAP](https://github.com/free-audio/clap), the [WavPack](https://www.wavpack.com)
+decoder and the Steinberg ASIO SDK; their licences are listed in [`THIRD_PARTY.md`](THIRD_PARTY.md). Thanks to everyone
+who reported bugs and sent pull requests.
 
 ## Code signing policy
 
@@ -557,11 +517,11 @@ Developer ID, not notarized); Linux packages are not signed.
 requested by the user or the person installing or operating it. See [`PRIVACY.md`](PRIVACY.md).
 
 **Crash reports (opt-in):** after a crash or freeze LYNX SHARE asks before sending a report to lynx-share.com (*Send* /
-*Show what will be sent* / *Don't send*, or *Report on GitHub instead*); Settings › General › Crash reports sets *Ask*
-(default), *Always send* or *Never send*, and Help › Report a problem… sends one by hand. A report has the LYNX SHARE
-version, OS, CPU, graphics card and driver, audio device, the crash or freeze file, the last steps and the loaded
-third-party plugins — no audio, projects, file names, user or machine name, and the server stores no IP address.
-Details and how to have a report deleted: [`PRIVACY.md`](PRIVACY.md#crash-reports-opt-in).
+*Show what will be sent* / *Don't send*, or *Report on GitHub instead*); *Settings › General › Crash reports* sets
+*Ask* (default), *Always send* or *Never send*. A report has the LYNX SHARE version, OS, CPU, graphics card and driver,
+audio device, the crash or freeze file, the last steps and the loaded third-party plugins: no audio, projects, file
+names, user or machine name, and the server stores no IP address. Details and how to have a report deleted:
+[`PRIVACY.md`](PRIVACY.md#crash-reports-opt-in).
 
 ## License
 

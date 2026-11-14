@@ -9995,3 +9995,10 @@ countries: fr be ch ca lu
 "This preset is for {0}." = "Ce preset est pour {0}."
 "The settings of this preset can't be carried over to this version of the plugin (VST2 / VST3)." = "Les réglages de ce preset ne peuvent pas être repris dans cette version du plugin (VST2 / VST3)."
 "This preset is for {0}. Add {0} to a channel or a mixer track first (scan for plugins if it is not in the list), open its window and load the preset from its Presets menu." = "Ce preset est pour {0}. Ajoutez d'abord {0} à un canal ou à une piste du Mixer (recherchez les plugins s'il n'est pas dans la liste), ouvrez sa fenêtre et chargez le preset depuis son menu Presets."
+
+# --- Round 190gk: FL's render window Start, the Sampler waveform menu's Slicer / Slicex items
+"@render button: Start" = "Démarrer"
+"Start rendering" = "Démarrer le rendu"
+"Open in new Fruity Slicer channel" = "Ouvrir dans un nouveau canal Fruity Slicer"
+"Open in new Slicex channel" = "Ouvrir dans un nouveau canal Slicex"
+"Get properties" = "Afficher les propriétés"

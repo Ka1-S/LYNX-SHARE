@@ -451,6 +451,18 @@ html.shot *,html.shot *::before,html.shot *::after{transition:none!important;ani
 .fx .fx-l b{color:var(--red2)}
 .fx figure{margin-top:16px}
 @media (max-width:820px){.fixes{grid-template-columns:minmax(0,1fr)}}
+/* ---------- why: complaints LYNX answers ---------- */
+.pains{background:linear-gradient(180deg,rgba(229,56,59,.05),transparent 60%)}
+.paingrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:22px}
+.pain{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.pain .who{display:flex;flex-wrap:wrap;gap:5px}
+.pain .who span{font:600 10.5px var(--mono);letter-spacing:.02em;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.why .pain h3{font:600 16.5px/1.35 var(--head);letter-spacing:0;text-transform:none;color:var(--text);margin:2px 0 0}
+.why .pain p:not(.who){font-size:14px;line-height:1.55;color:#c9cdd6;padding-left:11px;border-left:2px solid var(--red)}
+.painmore{margin-top:22px}
+@media (max-width:980px){.paingrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.paingrid{grid-template-columns:minmax(0,1fr)}}
+
 
 /* ---------- home: what only LYNX does ---------- */
 .whyrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}

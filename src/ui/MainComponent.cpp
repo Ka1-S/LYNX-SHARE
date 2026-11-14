@@ -105,6 +105,9 @@
 #include "ui/AlsExportDialog.h"
 #include "ui/OtherAppsExport.h"
 #include "ui/FlStudioExportDialog.h"
+#include "ui/FruitySlicerEditor.h"
+#include "ui/SlicexEditor.h"
+#include "core/NativeEngines.h"
 #include "ui/ParametricEqEditor.h"
 #include "ui/PluginWindow.h"
 #include "ui/I18n.h"
@@ -478,6 +481,25 @@ MainComponent::MainComponent (AudioEngine& e, bool restoreUserSettings)
     openInNewChannelHandler() = [this] (const juce::File& file, InstrumentKind kind) {
         if (! file.existsAsFile())
             return;
+        // round 190gk: "... Fruity Slicer channel" / "... Slicex channel": FL loads the plugin's template channel, then
+        // the sample into it (SBONewMenuClick 0x11f8330, REA 190fl); LYNX's new channel of that kind, and its editor
+        // loads the file as its own Load does (slices / regions as on a load)
+        if (kind == InstrumentKind::fruityslicer || kind == InstrumentKind::slicex)
+        {
+            auto made = natives::makeChannel (kind, flStudioAccess());
+            if (! made)
+                return;
+            const auto added = rack.addChannel (*made, false);
+            if (kind == InstrumentKind::slicex)
+                loadSlicexSampleWhenOpened (added, file.getFullPathName());
+            else
+                loadSampleWhenOpened (added, file.getFullPathName());
+            showPanel (Panel::channelRack);
+            rack.toggleEditor (added, false);
+            loadSlicexSampleWhenOpened (-1, {}); // (an editor that did not open forgets it)
+            loadSampleWhenOpened (-1, {});
+            return;
+        }
         ChannelDef c;
         c.instrument = kind;
         audioclips::loadSampleInto (c, file.getFullPathName().toStdString(), file.getFileNameWithoutExtension().toStdString());

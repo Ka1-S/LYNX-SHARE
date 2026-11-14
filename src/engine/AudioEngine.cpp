@@ -37,6 +37,7 @@
 #include "core/Instruments.h"
 #include "core/Denormals.h"
 #include "core/Dither.h"
+#include "core/GrossBeat.h"
 #include "core/ProjectSafety.h"
 #include "core/SoftClip.h"
 #include "core/Scheduler.h"
@@ -4913,6 +4914,7 @@ void AudioEngine::timerCallback()
     rt::promotePending(); // Linux: real-time priority for the audio threads seen since the last tick (round 161)
     updateAudition(); // (round 190ao: the preset audition's note starts and ends here)
     applyControllers();
+    pumpGrossBeatPicks();
     controllerIo.pump (controllerLearnTick); // (controller profiles, round 190aw)
     // playback started: the moved controls follow their automation again (the renderer cleared its own mask)
     if (const auto playing = transport.playing.load(); playing != std::exchange (releasedWasPlaying, playing) && playing)
@@ -5468,6 +5470,37 @@ void AudioEngine::markCreatedNow()
 {
     if (song.info.created <= 0.0)
         song.info.created = (double) juce::Time::currentTimeMillis() / 1000.0;
+}
+
+void AudioEngine::pumpGrossBeatPicks()
+{
+    std::vector<std::pair<AutomationTarget, float>> changes;
+    const auto& effects = lastPublishedShape.effects;
+    for (std::size_t t = 0; t < song.mixer.size() && t < effects.size(); ++t)
+        for (std::size_t s = 0; s < song.mixer[t].effects.size() && s < effects[t].size(); ++s)
+        {
+            const auto& fx = song.mixer[t].effects[s];
+            if (fx.kind != EffectKind::grossBeat)
+                continue;
+            auto* picks = grossbeat::midiPicksOf (effects[t][s].get());
+            if (picks == nullptr)
+                continue;
+            const auto serial = picks->serial.load (std::memory_order_acquire);
+            if (serial == picks->taken.load (std::memory_order_relaxed))
+                continue;
+            picks->taken.store (serial, std::memory_order_relaxed);
+            for (const auto& [param, value] : grossbeat::paramsForPicks (*picks, fx.params))
+            {
+                AutomationTarget target;
+                target.kind = AutomationTargetKind::effectParam;
+                target.index = (int) t;
+                target.slot = (int) s;
+                target.param = param;
+                changes.push_back ({ target, value });
+            }
+        }
+    if (! changes.empty())
+        applyTargetValues (changes);
 }
 
 void AudioEngine::pumpEdisonRecordings()

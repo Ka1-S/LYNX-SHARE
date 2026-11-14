@@ -1,4 +1,7 @@
 #include "ui/SlicexEditor.h"
+
+#include <optional>
+#include <utility>
 #include "ui/FileChoosers.h"
 
 #include <algorithm>
@@ -1690,6 +1693,10 @@ public:
 
     bool isInterestedInFileDrag (const juce::StringArray&) override { return true; }
 
+    // round 190gk: the Sampler waveform menu's "Open in new Slicex channel" (FL's SBONewMenuClick 0x11f8330: the
+    // plugin's template channel, then the sample loaded into it): deck A, as the deck's Load sample does
+    void loadSampleNow (const juce::String& path) { loadSample (0, path); }
+
     void filesDropped (const juce::StringArray& files, int, int y) override
     {
         if (files.isEmpty())
@@ -3084,8 +3091,29 @@ juce::String slicexEditorTest (juce::Component& root, const juce::String& comman
     return editor != nullptr ? editor->test (juce::StringArray::fromTokens (command, " ", "\"")) : juce::String ("no Slicex editor");
 }
 
+static std::optional<std::pair<int, juce::String>>& pendingSample()
+{
+    static std::optional<std::pair<int, juce::String>> pending;
+    return pending;
+}
+
+void loadSlicexSampleWhenOpened (int channel, const juce::String& path)
+{
+    if (channel >= 0)
+        pendingSample() = std::make_pair (channel, path);
+    else
+        pendingSample().reset();
+}
+
 std::unique_ptr<juce::Component> makeSlicexEditor (AudioEngine& engine, std::function<ChannelDef* (Song&)> locate, int channel)
 {
-    return std::make_unique<SlicexEditor> (engine, std::move (locate), channel);
+    auto editor = std::make_unique<SlicexEditor> (engine, std::move (locate), channel);
+    if (auto& p = pendingSample(); p.has_value() && channel >= 0 && p->first == channel)
+    {
+        const auto path = p->second;
+        p.reset();
+        editor->loadSampleNow (path);
+    }
+    return editor;
 }
 } // namespace lynx

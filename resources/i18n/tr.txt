@@ -9995,3 +9995,10 @@ countries: tr
 "This preset is for {0}." = "Bu preset {0} içindir."
 "The settings of this preset can't be carried over to this version of the plugin (VST2 / VST3)." = "Bu preset'in ayarları eklentinin bu sürümüne aktarılamıyor (VST2 / VST3)."
 "This preset is for {0}. Add {0} to a channel or a mixer track first (scan for plugins if it is not in the list), open its window and load the preset from its Presets menu." = "Bu preset {0} içindir. Önce {0} eklentisini bir kanala ya da bir mikser kanalına ekleyin (listede yoksa eklentileri tarayın), penceresini açın ve preset'i Presets menüsünden yükleyin."
+
+# --- Round 190gk: FL's render window Start, the Sampler waveform menu's Slicer / Slicex items
+"@render button: Start" = "Başlat"
+"Start rendering" = "İşlemeyi başlat"
+"Open in new Fruity Slicer channel" = "Yeni Fruity Slicer kanalında aç"
+"Open in new Slicex channel" = "Yeni Slicex kanalında aç"
+"Get properties" = "Özellikleri göster"
