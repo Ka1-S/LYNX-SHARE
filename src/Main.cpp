@@ -220,7 +220,10 @@ struct StartupTrace
 {
     using clock = std::chrono::steady_clock;
     const clock::time_point t0 = clock::now(); // static initialisation: no JUCE yet, standard library only
-    const bool on = std::getenv ("LYNX_TRACE_STARTUP") != nullptr;
+    // (round 190go: always kept, as a field-readable start-up timeline; written to startup.log 5 s and 15 s after the
+    // window — with LYNX_TRACE_STARTUP set, at every step as before, so a start that hangs still leaves its last step)
+    const bool on = true;
+    const bool eachStep = std::getenv ("LYNX_TRACE_STARTUP") != nullptr;
     juce::String text;
     clock::time_point last = t0;
     std::int64_t lastPrivate = 0;
@@ -241,8 +244,10 @@ struct StartupTrace
              << "  private " << mb (priv) << " MB (+" << mb (priv - lastPrivate).trim() << ")  ws " << mb (ws) << " MB  " << step << "\n";
         lastPrivate = priv;
         last = now;
-        lynx::platform::settingsFile ("startup.log").replaceWithText (text);
+        if (eachStep)
+            write();
     }
+    void write() const { lynx::platform::settingsFile ("startup.log").replaceWithText (text); }
 };
 StartupTrace startupTrace;
 void startupMarkHook (const char* step) { startupTrace.mark (step); }
@@ -2550,11 +2555,14 @@ public:
     {
         if (std::exchange (startedAfterWindow, true) || mainWindow == nullptr)
             return;
+        // (round 190go) each step after the window is a timed line of the start-up trace
         showUncleanNotice();
+        startupTrace.mark ("after the window: unclean-session notice");
         openStartupFile();
         startupTrace.mark ("startup file opened");
         startOpenTimeProbe();
         startUpdateCheck();
+        startupTrace.mark ("after the window: probes, update check scheduled");
         juce::MessageManager::callAsync ([] { startupTrace.mark ("first message loop turn"); });
         markSettled(); // (round 190gd)
         // first run: language, audio, plugin folders (FL Studio's included) and a background scan
@@ -2563,7 +2571,10 @@ public:
         if (! lynx::setupWizardDone() && lynx::platform::testMode())
             lynx::platform::testModeLog ("setup wizard");
         else if (! lynx::setupWizardDone())
+        {
             mainWindow->showSetupWizard();
+            startupTrace.mark ("after the window: setup wizard shown");
+        }
     }
 
     // the start-up trace's last lines: what the first seconds after the window add (lazy work, caches, the first paints)
@@ -2571,8 +2582,8 @@ public:
     {
         if (! startupTrace.on)
             return;
-        juce::Timer::callAfterDelay (5000, [] { startupTrace.mark ("5 s after the window"); });
-        juce::Timer::callAfterDelay (15000, [] { startupTrace.mark ("15 s after the window"); });
+        juce::Timer::callAfterDelay (5000, [] { startupTrace.mark ("5 s after the window"); startupTrace.write(); });
+        juce::Timer::callAfterDelay (15000, [] { startupTrace.mark ("15 s after the window"); startupTrace.write(); });
     }
 
     void startEngine()
@@ -2631,7 +2642,7 @@ public:
     void openMidiDevices()
     {
         if (engine != nullptr)
-            engine->openMidiDevices();
+            engine->openMidiDevices(); // (its own line in the start-up trace: "engine: MIDI inputs")
     }
 
     void createMainWindow()
