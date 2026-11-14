@@ -3713,6 +3713,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
             StretchMap map;
             std::string variant; // non-empty: the precomputed span is stretched (RackRenderer, round 180d)
             std::shared_ptr<const SampleData> span;
+            StretchOptions options; // (round 190fm)
         };
         std::vector<Stretch> stretches;
         for (const auto& c : out.song.channels)
@@ -3723,6 +3724,7 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     const auto target = c.sampler.stretchBeats * 60.0 / std::max (1.0, out.song.bpm);
                     const auto method = c.sampler.stretchMethod;
                     const auto semitones = (double) c.sampler.stretchPitch;
+                    const auto options = stretchOptionsOf (c.sampler);
                     // the same stretch as RackRenderer: the precomputed span when there is one (round 180d), else the file
                     const auto clip = c.instrument == InstrumentKind::audioClip;
                     auto settings = c.sampler;
@@ -3736,8 +3738,8 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                             const auto ratio = target / ((double) span->frames() / span->sampleRate);
                             auto variant = precompute::variantKey (settings, clip);
                             if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
-                                    return x.path == c.samplePath && x.variant == variant && x.ratio == ratio && x.method == method && x.semitones == semitones; }))
-                                stretches.push_back ({ c.samplePath, ratio, method, semitones, {}, std::move (variant), std::move (span) });
+                                    return x.path == c.samplePath && x.variant == variant && x.ratio == ratio && x.method == method && x.semitones == semitones && x.options == options; }))
+                                stretches.push_back ({ c.samplePath, ratio, method, semitones, {}, std::move (variant), std::move (span), options });
                         }
                         continue;
                     }
@@ -3745,8 +3747,8 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                     // (the same map the rack asks for: RackState::build)
                     auto map = warpStretchMap (c.sampler.warp, (double) data->frames(), data->sampleRate, (double) std::llround ((double) data->frames() * ratio));
                     if (std::none_of (stretches.begin(), stretches.end(), [&] (const Stretch& x) {
-                            return x.path == c.samplePath && x.variant.empty() && x.ratio == ratio && x.method == method && x.semitones == semitones && x.map == map; }))
-                        stretches.push_back ({ c.samplePath, ratio, method, semitones, std::move (map), {}, {} });
+                            return x.path == c.samplePath && x.variant.empty() && x.ratio == ratio && x.method == method && x.semitones == semitones && x.map == map && x.options == options; }))
+                        stretches.push_back ({ c.samplePath, ratio, method, semitones, std::move (map), {}, {}, options });
                 }
         if (! stretches.empty())
         {
@@ -3756,8 +3758,10 @@ void AudioEngine::prepareFlpImport (const juce::File& file, const std::map<std::
                 for (auto i = nextStretch++; i < stretches.size(); i = nextStretch++)
                     if (auto stretched = ! stretches[i].variant.empty()
                                              ? library.loadStretchedSpan (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].variant,
-                                                                          stretches[i].span, stretches[i].ratio, stretches[i].method, stretches[i].semitones)
-                                             : library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones, stretches[i].map))
+                                                                          stretches[i].span, stretches[i].ratio, stretches[i].method, stretches[i].semitones,
+                                                                          stretches[i].options)
+                                             : library.loadStretched (juce::String::fromUTF8 (stretches[i].path.c_str()), stretches[i].ratio, stretches[i].method, stretches[i].semitones, stretches[i].map,
+                                                                      stretches[i].options))
                     {
                         const std::scoped_lock l (keep); // held until the rack is built (the cache drops unused lengths)
                         out.decoded.push_back (std::move (stretched));
@@ -3962,14 +3966,15 @@ RackState::Factories AudioEngine::rackFactories()
         const loadtrace::Scope timing ("rack_samples");
         return samples.load (juce::String::fromUTF8 (path.c_str()));
     };
-    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones, const StretchMap& map) {
+    factories.stretchedSamples = [this] (const std::string& path, double ratio, StretchMethod method, double semitones, const StretchMap& map,
+                                         const StretchOptions& options) {
         const loadtrace::Scope timing ("rack_stretch");
-        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones, map);
+        return samples.loadStretched (juce::String::fromUTF8 (path.c_str()), ratio, method, semitones, map, options);
     };
     factories.stretchedSpans = [this] (const std::string& path, const std::string& variant, const std::shared_ptr<const SampleData>& span,
-                                       double ratio, StretchMethod method, double semitones) {
+                                       double ratio, StretchMethod method, double semitones, const StretchOptions& options) {
         const loadtrace::Scope timing ("rack_stretch");
-        return samples.loadStretchedSpan (juce::String::fromUTF8 (path.c_str()), variant, span, ratio, method, semitones);
+        return samples.loadStretchedSpan (juce::String::fromUTF8 (path.c_str()), variant, span, ratio, method, semitones, options);
     };
     factories.pluginInstruments = [this] (const PluginRef& ref, double sr) { return plugins.makeInstrument (ref, sr); };
     factories.pluginEffects = [this] (const PluginRef& ref, double sr) { return plugins.makeEffect (ref, sr); };

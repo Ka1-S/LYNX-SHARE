@@ -7,6 +7,7 @@
 #include "ui/MixerComponent.h"
 #include "ui/PluginOffTag.h"
 #include "ui/SlotWatch.h"
+#include "core/AlsImport.h"
 #include "core/ValueMath.h"
 #include "ui/UiTrace.h"
 #include "ui/TextCache.h"
@@ -6547,7 +6548,7 @@ void EffectsPanel::mouseDoubleClick (const juce::MouseEvent& e)
 
 bool EffectsPanel::isInterestedInDragSource (const SourceDetails& details)
 {
-    return (BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst"))
+    return (BrowserComponent::isBrowserDrag (details) && BrowserComponent::draggedFile (details).hasFileExtension ("fst;adv;adg"))
            || BrowserComponent::isEffectDrag (details) || BrowserComponent::isGeneratorDrag (details);
 }
 
@@ -6571,7 +6572,8 @@ void EffectsPanel::itemDropped (const SourceDetails& details)
 
 bool EffectsPanel::isInterestedInFileDrag (const juce::StringArray& files)
 {
-    return files.size() == 1 && juce::File (files[0]).hasFileExtension ("fst");
+    // FL presets (.fst) and, round 190fm, Live's device / rack presets the user owns (.adv / .adg, core/AlsImport.h)
+    return files.size() == 1 && juce::File (files[0]).hasFileExtension ("fst;adv;adg");
 }
 
 void EffectsPanel::filesDropped (const juce::StringArray& files, int x, int y)
@@ -6590,6 +6592,15 @@ bool EffectsPanel::dropPreset (const juce::File& file, juce::Point<int> position
         return false;
 
     const auto* bytes = static_cast<const std::uint8_t*> (data.getData());
+    if (file.hasFileExtension ("adv;adg")) // round 190fm: a Live device or Audio Effect Rack preset → LYNX's own engines
+    {
+        std::string error;
+        if (auto live = importLiveDevicePreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), {}, &error))
+            return dropEffect (std::move (live->slot), position);
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::InfoIcon, tr ("Preset"),
+                                                tr ("LYNX SHARE can't build an effect from this preset."));
+        return false;
+    }
     const auto fx = effectFromFlPreset (std::vector<std::uint8_t> (bytes, bytes + data.getSize()), engine.getSong().bpm, natives::flDataReader (flStudioAccess()));
 
     if (! fx)

@@ -491,16 +491,37 @@ bool autoFilterToFilter (const Element& device, Translated& out)
     const auto newer = device.name() == "AutoFilter2";
     if (! has (device, newer ? "Filter_Frequency" : "Cutoff"))
         return false;
-    // the filter type [DOC: low-pass, high-pass, band-pass, notch, morph, …; DATA old 0 … 4, new 0 … 9; the first three
-    // ASSUMED in that order]: LYNX's Filter has the first three
-    const auto type = (int) manual (device, newer ? "Filter_Type" : "FilterType", 0);
-    if (type < 0 || type > 2)
+    // the filter type [DOC: low-pass, high-pass, band-pass, notch, morph, …; DATA old 0 … 4, new 0 … 9]: LYNX's Filter has
+    // the first three; (round 190fm, autoFilterPlan) the notch on Facet EQ, Morph at its nearest corner, DJ as a low / high
+    // pass; the rest (comb, resampling, notch + low pass, vowel) stay listed
+    const auto liveType = (int) manual (device, newer ? "Filter_Type" : "FilterType", 0);
+    const auto morph = manual (device, newer ? "Filter_Morph" : "Morph", 0.0);
+    const auto plan = autoFilterPlan (liveType, newer, morph, newer ? manual (device, "Filter_DjControl", 0.0) : 0.0);
+    if (plan.type < 0)
         return false;
+    if (liveType == 4)
+        out.notes.approximated.push_back (text (plan.exact ? "Morph %.2f at its corner, the " : "Morph %.2f as its nearest corner, the ", morph)
+                                          + (plan.type == 0 ? "low pass" : plan.type == 1 ? "high pass" : plan.type == 2 ? "band pass" : "notch"));
+    else if (newer && std::abs (morph) > 1.0e-3)
+        out.notes.dropped.push_back (text ("Morph %.2f on the ", morph) + plan.name + " filter (needs a live check)");
+    if (plan.type == 3)
+    {
+        autoFilterNotchToFacet (device, out);
+        return true;
+    }
+    const auto type = plan.type;
     out.slot = makeEffectSlot (EffectKind::filter);
     auto& p = out.slot.params;
     const Put put { device, out };
     p[0] = filterTypeValue (type);
-    if (newer)
+    if (plan.djHz > 0.0)
+    {
+        // [ASSUMED] the DJ type: the cutoff from DjControl, low pass below 0, high pass above
+        put ("Filter_DjControl", 1, [type] (double c) { return filterCutoffValue (autoFilterDjHz (type == 0 ? std::min (c, 0.0) : std::max (c, 0.0))); }, 0.0);
+        out.notes.approximated.push_back (text ("DJ filter %.2f as a ", manual (device, "Filter_DjControl", 0.0)) + (type == 0 ? "low" : "high")
+                                          + text (" pass at %.0f Hz", plan.djHz));
+    }
+    else if (newer)
         put ("Filter_Frequency", 1, [] (double hz) { return filterCutoffValue (hz); }, 1000.0); // Hz [DATA 20 … 20000]
     else
         put ("Cutoff", 1, [] (double note) { return filterCutoffValue (hzOfLiveNote (note)); }, 127.0); // a pitch [DATA 20 … 135]
@@ -527,8 +548,7 @@ bool autoFilterToFilter (const Element& device, Translated& out)
         out.notes.dropped.push_back (text ("output gain %.1f dB", dbOfGain (outputGain)));
     // (190ed) the LFO, the envelope follower and its side chain: autoFilterModulation (lot 3) — a Peak Controller linked
     // to the cutoff, or the importer's line where no link can be made
-    if (manual (device, newer ? "Filter_Drive" : "Drive", 0.0) > 1.0e-4 || (int) manual (device, newer ? "Filter_Circuit" : "CircuitLpHp", 0) != 0)
-        out.notes.dropped.push_back ("filter circuit / drive");
+    // (round 190fm) the drive and the circuit: autoFilterDrive (lot 4), after the modulation
     // Slope [MEASURED 190cz a08 / a30–a33 / b08 / b30–b33: on = a second cookbook stage at the same cutoff with Q2 =
     // 0.5 + x / (1 + x), 0.003 dB] → the Filter's own 24 dB/oct slope (the same pair, filterSecondStageQ); high and
     // band pass at 24 dB/oct take the same law [ASSUMED: only the low pass was rendered]

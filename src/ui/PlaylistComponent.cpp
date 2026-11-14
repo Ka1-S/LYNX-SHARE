@@ -61,6 +61,8 @@
 #include "core/SessionOps.h"
 #include "core/DetailChain.h"
 #include "core/StandIns.h"
+#include "core/Groove.h"
+#include "ui/GroovePoolComponent.h"
 #include "ui/AutomationUi.h"
 #include "ui/ChannelSettings.h"
 #include "ui/Dialogs.h"
@@ -6979,6 +6981,61 @@ void addLiveTrackItems (AudioEngine& engine, juce::PopupMenu& menu, int index, c
 }
 } // namespace
 
+// Round 190fm: the groove of Playlist pattern clips, as Live's Clip View chooser offers it for Arrangement clips [STR:
+// .GrooveChooser / .GrooveCommitButton in every clip's panel]: the chooser (None, the pool's grooves, a groove added
+// now), Commit groove and Extract groove. FL's clip menu has none of this: the items appear in the Clip-launch layout,
+// or once the project has a groove pool, or on a clip that already plays through a groove.
+void PlaylistComponent::addGrooveItems (juce::PopupMenu& menu, int index, const std::vector<int>& targets)
+{
+    const auto& song = engine.getSong();
+    const auto& clip = song.playlist[(std::size_t) index];
+    if (layoutstyle::current() != layoutstyle::Style::clipLaunch && song.grooves.grooves.empty() && clip.groove == 0)
+        return;
+    menu.addSeparator();
+    juce::PopupMenu chooser;
+    const auto set = [this, targets] (std::uint32_t id) {
+        engine.editSong ([targets, id] (Song& s) { groove::setPlaylistClipGroove (s, targets, id); });
+        repaint();
+    };
+    chooser.addItem (tr ("None"), true, clip.groove == 0, [set] { set (0); });
+    for (const auto& g : song.grooves.grooves)
+        chooser.addItem (juce::String::fromUTF8 (g.name.c_str()), true, clip.groove == g.id, [set, id = g.id] { set (id); });
+    chooser.addSeparator();
+    juce::PopupMenu add;
+    addGrooveMenuItems (add, engine, this, [safe = juce::Component::SafePointer<PlaylistComponent> (this), targets] (std::uint32_t id) {
+        if (safe == nullptr)
+            return;
+        safe->engine.editSong ([targets, id] (Song& s) { groove::setPlaylistClipGroove (s, targets, id); }, false);
+        safe->repaint();
+    });
+    chooser.addSubMenu (tr ("Add a groove"), add);
+    const auto* current = groove::ofClip (song, clip);
+    menu.addSubMenu (current != nullptr ? tr ("Groove") + ": " + juce::String::fromUTF8 (current->name.c_str()) : tr ("Groove"), chooser);
+    const auto anyGroove = std::any_of (targets.begin(), targets.end(), [&song] (int i) {
+        return i >= 0 && i < (int) song.playlist.size() && groove::ofClip (song, song.playlist[(std::size_t) i]) != nullptr;
+    });
+    menu.addItem (tr ("Commit groove"), anyGroove, false, [this, targets] {
+        engine.editSong ([targets] (Song& s) {
+            for (const auto i : targets)
+                if (i >= 0)
+                    groove::commitPlaylistClip (s, (std::size_t) i);
+        });
+        repaint();
+    });
+    menu.addItem (tr ("Extract groove"), [this, index] {
+        engine.editSong ([index] (Song& s) {
+            if (index < 0 || index >= (int) s.playlist.size())
+                return;
+            const auto& c = s.playlist[(std::size_t) index];
+            if (c.kind != ClipKind::pattern || c.pattern < 0 || c.pattern >= (int) s.patterns.size())
+                return;
+            auto g = groove::extractFromClip (s, c, GrooveBase::sixteenth, s.patterns[(std::size_t) c.pattern].name);
+            if (! g.points.empty())
+                groove::add (s.grooves, std::move (g));
+        });
+    });
+}
+
 juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
 {
     const auto& song = engine.getSong();
@@ -7152,6 +7209,7 @@ juce::PopupMenu PlaylistComponent::buildClipMenu (int index, int mouseX)
             if (onOpenPianoRoll)
                 onOpenPianoRoll();
         });
+        addGrooveItems (menu, index, targets);
     }
 
     // --- automation ----------------------------------------------------------------------------------

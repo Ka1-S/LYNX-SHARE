@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <functional>
 #include <numeric>
 
@@ -322,11 +323,21 @@ void spliceAttacks (Planar& out, const Planar& in, const std::function<double (d
 // next piece is filled back and forth as when slower. Rendered offline per clip pitch (round 175a, the coordinator's
 // "match Live by resampling each piece").
 // With a warp map (`toOut`, round 175a M1) each piece starts where the map puts its attack.
-Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double semitones, const std::function<double (double)>& toOut)
+// Round 190fm adds Live's Beats settings (`modes`; the defaults run exactly the code above): Preserve on a note grid
+// (cuts where the output reaches each multiple of the division, `sourceBeats` = the beats the source spans, `toSource`
+// = the inverse of `toOut`), Transient Loop Mode (0: silence after a piece's end, reached through a `fade`-long fade
+// of the audio that follows; 1: the piece again from its start; 2: back and forth) and Transient Envelope (a fade over
+// each piece's span, stretchdetail::beatsEnvelopeGain).
+Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double semitones, const std::function<double (double)>& toOut,
+                     const WarpModeSettings& modes = {}, double sourceBeats = 0.0, const std::function<double (double)>& toSource = {})
 {
     const auto n = in.frames();
     const auto mono = monoOf (in);
-    auto cuts = stretchdetail::beatsCuts (mono.data(), n, sampleRate);
+    const auto division = stretchdetail::preserveDivisionBeats (modes.beatsPreserve);
+    auto cuts = division > 0.0 && sourceBeats > 0.0 && toSource ? stretchdetail::gridCuts (n, outFrames, sourceBeats, division, toSource)
+                                                                 : stretchdetail::beatsCuts (mono.data(), n, sampleRate);
+    const auto loopMode = std::min<int> (modes.beatsLoop, 2);
+    const auto envelope = std::clamp (modes.beatsEnvelope, 0.0f, 100.0f);
     cuts.insert (cuts.begin(), 0L);
     cuts.push_back (n);
     const auto fade = std::max (16L, (long) std::lround (sampleRate * 0.016));
@@ -363,9 +374,25 @@ Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double
             const auto period = 2 * length;
             for (long i = 0; i < span; ++i)
             {
-                const auto m = i % period;
-                const auto src = a + (m < length ? m : period - 1 - m);
-                const auto w = weight (k, i, o1 - o0);
+                long src;
+                auto w = weight (k, i, o1 - o0);
+                if (loopMode == 2)
+                {
+                    const auto m = i % period;
+                    src = a + (m < length ? m : period - 1 - m);
+                }
+                else if (loopMode == 1)
+                    src = a + i % length;
+                else
+                {
+                    if (i >= length + fade || a + i >= n)
+                        break;
+                    if (i >= length)
+                        w *= 1.0f - (float) (i - length) / (float) fade;
+                    src = a + i;
+                }
+                if (envelope < 100.0f)
+                    w *= stretchdetail::beatsEnvelopeGain (envelope, i, o1 - o0);
                 for (std::size_t c = 0; c < in.ch.size(); ++c)
                     out.ch[c][(std::size_t) (o0 + i)] += w * in.ch[c][(std::size_t) src];
             }
@@ -377,8 +404,22 @@ Planar beatsStretch (const Planar& in, long outFrames, double sampleRate, double
         for (long i = 0; i < span; ++i)
         {
             const auto m = i % period;
-            const auto t = (double) (m < played ? m : period - 1 - m) * speed;
-            const auto w = weight (k, i, o1 - o0);
+            auto w = weight (k, i, o1 - o0);
+            double t;
+            if (loopMode == 2)
+                t = (double) (m < played ? m : period - 1 - m) * speed;
+            else if (loopMode == 1)
+                t = (double) (i % played) * speed;
+            else
+            {
+                if (i >= played)
+                    break; // (Loop Off: the piece read once; its last frames are held at the piece's edge, so a short fade)
+                t = (double) i * speed;
+                if (i >= played - std::min (played, fade))
+                    w *= (float) (played - i) / (float) std::min (played, fade);
+            }
+            if (envelope < 100.0f)
+                w *= stretchdetail::beatsEnvelopeGain (envelope, i, o1 - o0);
             const auto at = (long) t;
             const auto f = (float) (t - (double) at);
             for (std::size_t c = 0; c < in.ch.size(); ++c)
@@ -535,6 +576,59 @@ Preset presetFor (StretchMethod method) noexcept
     return { 0.12, 0.02, 9.0, 0.020 };
 }
 
+Preset presetFor (StretchMethod method, const WarpModeSettings& modes) noexcept
+{
+    auto preset = presetFor (method);
+    const auto scaled = [&] (float size, float defaultSize) {
+        if (size == defaultSize || ! (size > 0.0f))
+            return;
+        const auto block = std::clamp (preset.blockSeconds * (double) size / (double) defaultSize, 0.010, 0.250);
+        preset.intervalSeconds *= block / preset.blockSeconds; // (the same overlap)
+        preset.blockSeconds = block;
+    };
+    if (method == StretchMethod::tones)
+        scaled (modes.tonesGrain, WarpModeSettings::defaultTonesGrain);
+    else if (method == StretchMethod::texture)
+        scaled (modes.textureGrain, WarpModeSettings::defaultTextureGrain);
+    return preset;
+}
+
+double preserveDivisionBeats (int preserve) noexcept
+{
+    static constexpr double beats[] = { 4.0, 2.0, 1.0, 0.5, 0.25, 0.125 };
+    return preserve >= 0 && preserve < 6 ? beats[preserve] : 0.0;
+}
+
+std::vector<long> gridCuts (long frames, long outFrames, double sourceBeats, double divisionBeats, const std::function<double (double)>& toSource)
+{
+    std::vector<long> cuts;
+    if (frames < 2 || outFrames < 2 || ! (sourceBeats > 0.0) || ! (divisionBeats > 0.0))
+        return cuts;
+    const auto perBeat = (double) outFrames / sourceBeats;
+    const auto minGap = std::max (1L, frames / 100000);
+    for (long k = 1;; ++k)
+    {
+        const auto y = (double) k * divisionBeats * perBeat;
+        if (y >= (double) outFrames - 0.5 || k > 1000000)
+            break;
+        const auto x = (long) std::llround (toSource (y));
+        if (x <= 0 || x >= frames || (! cuts.empty() && x - cuts.back() < minGap))
+            continue;
+        cuts.push_back (x);
+    }
+    return cuts;
+}
+
+float beatsEnvelopeGain (float envelope, long i, long span) noexcept
+{
+    const auto e = std::clamp ((double) envelope / 100.0, 0.0, 1.0);
+    if (e >= 1.0 || span <= 0)
+        return 1.0f;
+    const auto k = 4.0 * (1.0 - e) / std::max (e, 0.02);
+    const auto x = std::clamp (1.0 - (double) i / (double) span, 0.0, 1.0);
+    return (float) std::pow (x, k);
+}
+
 std::shared_ptr<SampleData> stretchWith (const SampleData& in, double ratio, const Preset& preset)
 {
     const auto planar = planarOf (in);
@@ -615,9 +709,10 @@ StretchMethod stretchMethodForFlMode (int flMode) noexcept
     }
 }
 
-std::shared_ptr<SampleData> timeStretchSpan (const SampleData& span, double ratio, StretchMethod method, double semitones)
+std::shared_ptr<SampleData> timeStretchSpan (const SampleData& span, double ratio, StretchMethod method, double semitones,
+                                             const StretchOptions& options)
 {
-    auto out = timeStretch (span, ratio, method, semitones);
+    auto out = timeStretch (span, ratio, method, semitones, options);
     if (out == nullptr)
         return out;
     // FL ends a cut span at zero: after a trimmed, stretched span its clip is silent to the clip's end (FL render p62, round
@@ -645,7 +740,8 @@ std::shared_ptr<SampleData> timeStretchSpan (const SampleData& span, double rati
     return out;
 }
 
-std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, StretchMethod method, double semitones)
+std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, StretchMethod method, double semitones,
+                                         const StretchOptions& options)
 {
     const auto frames = (long) in.frames();
     if (method != StretchMethod::beats)
@@ -656,7 +752,8 @@ std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, Str
         const auto outFrames = std::max (1L, (long) std::llround ((double) frames * std::clamp (ratio, 0.05, 20.0)));
     {
         const auto r = (double) outFrames / (double) frames;
-        return sampleOf (beatsStretch (planarOf (in), outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0), [r] (double x) { return x * r; }), in);
+        return sampleOf (beatsStretch (planarOf (in), outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0), [r] (double x) { return x * r; },
+                                       options.modes, options.sourceBeats, [r] (double y) { return y / r; }), in);
     }
     }
 
@@ -680,9 +777,9 @@ std::shared_ptr<SampleData> timeStretch (const SampleData& in, double ratio, Str
     const auto r = (double) outFrames / (double) frames;
     const auto linear = [r] (double x) { return x * r; };
     if (method == StretchMethod::beats)
-        return sampleOf (beatsStretch (planar, outFrames, in.sampleRate, 0.0, linear), in);
+        return sampleOf (beatsStretch (planar, outFrames, in.sampleRate, 0.0, linear, options.modes, options.sourceBeats, [r] (double y) { return y / r; }), in);
 
-    const auto preset = stretchdetail::presetFor (method);
+    const auto preset = stretchdetail::presetFor (method, options.modes);
     auto out = spectralStretch (planar, outFrames, in.sampleRate, preset.blockSeconds, preset.intervalSeconds);
     if (preset.attackRiseDb > 0.0)
         spliceAttacks (out, planar, linear, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
@@ -804,12 +901,13 @@ Planar spectralStretchMapped (const Planar& in, const StretchMap& map, double sa
 }
 } // namespace
 
-std::shared_ptr<SampleData> timeStretchMapped (const SampleData& in, const StretchMap& map, StretchMethod method, double semitones)
+std::shared_ptr<SampleData> timeStretchMapped (const SampleData& in, const StretchMap& map, StretchMethod method, double semitones,
+                                               const StretchOptions& options)
 {
     const auto frames = (long) in.frames();
     const auto plain = [&] {
         const auto ratio = frames > 0 && ! map.empty() ? map.back().second / (double) frames : 1.0;
-        return timeStretch (in, ratio, method, semitones);
+        return timeStretch (in, ratio, method, semitones, options);
     };
     if (map.size() < 3 || frames < 4 || std::abs (map.back().first - (double) frames) > 0.5 || map.front() != std::pair<double, double> { 0.0, 0.0 })
         return plain();
@@ -825,12 +923,42 @@ std::shared_ptr<SampleData> timeStretchMapped (const SampleData& in, const Stret
     const auto planar = planarOf (in);
     const auto toOut = [&map] (double x) { return stretchMapOutput (map, x); };
     if (method == StretchMethod::beats)
-        return sampleOf (beatsStretch (planar, outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0), toOut), in);
+        return sampleOf (beatsStretch (planar, outFrames, in.sampleRate, std::clamp (semitones, -48.0, 48.0), toOut, options.modes,
+                                       options.sourceBeats, [&map] (double y) { return stretchMapSource (map, y); }), in);
 
-    const auto preset = stretchdetail::presetFor (method);
+    const auto preset = stretchdetail::presetFor (method, options.modes);
     auto out = spectralStretchMapped (planar, map, in.sampleRate, preset.blockSeconds, preset.intervalSeconds);
     if (preset.attackRiseDb > 0.0)
         spliceAttacks (out, planar, toOut, in.sampleRate, preset.attackRiseDb, preset.holdSeconds);
     return sampleOf (std::move (out), in);
+}
+StretchOptions stretchOptionsOf (const SamplerSettings& sampler)
+{
+    return { sampler.warpModes, (double) sampler.stretchBeats };
+}
+
+std::string stretchOptionsKey (const StretchOptions& o, StretchMethod method)
+{
+    const WarpModeSettings d;
+    std::string key;
+    const auto num = [] (double v) {
+        char text[32];
+        std::snprintf (text, sizeof text, "%.6g", v);
+        return std::string (text);
+    };
+    if (method == StretchMethod::beats)
+    {
+        if (o.modes.beatsPreserve != d.beatsPreserve && stretchdetail::preserveDivisionBeats (o.modes.beatsPreserve) > 0.0)
+            key += "|bp" + std::to_string ((int) o.modes.beatsPreserve) + "@" + num (o.sourceBeats);
+        if (std::min<int> (o.modes.beatsLoop, 2) != d.beatsLoop)
+            key += "|bl" + std::to_string (std::min<int> (o.modes.beatsLoop, 2));
+        if (std::clamp (o.modes.beatsEnvelope, 0.0f, 100.0f) < 100.0f)
+            key += "|be" + num (o.modes.beatsEnvelope);
+    }
+    else if (method == StretchMethod::tones && o.modes.tonesGrain != d.tonesGrain)
+        key += "|tg" + num (o.modes.tonesGrain);
+    else if (method == StretchMethod::texture && o.modes.textureGrain != d.textureGrain)
+        key += "|xg" + num (o.modes.textureGrain);
+    return key;
 }
 } // namespace lynx

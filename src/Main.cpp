@@ -12,6 +12,8 @@
 #include "core/FlSamplers.h"
 #include "core/ArrangeOps.h"
 #include "core/ClipSample.h"
+#include "core/WarpModes.h"
+#include "ui/ClipAudioPanel.h"
 #include "core/DetailChain.h"
 #include "core/SessionMixer.h"
 #include "core/PlaylistOps.h"
@@ -30,6 +32,7 @@
 #include "core/Rack.h"
 #include "ui/RackEditor.h"
 #include "ui/DrumRackShot.h"
+#include "ui/GroovePoolComponent.h"
 #include "core/Patcherize.h"
 #include "core/Performance.h"
 #include "core/VideoPlayer.h"
@@ -2216,6 +2219,28 @@ public:
             return;
         }
 
+        // --grooveshot190fm <prefix> (round 190fm): a Playlist pattern clip's menu with its Groove items (the chooser, Commit,
+        // Extract) and the "Classic swing" folder, and a Groove Pool holding classic swing grooves, offscreen;
+        // prefix-checks.txt holds the checks (also the .lynx round trip of a Playlist clip's groove)
+        if (args.contains ("--grooveshot190fm"))
+        {
+            setApplicationReturnValue (runGrooveShot190fm (args[args.indexOf ("--grooveshot190fm") + 1].unquoted()) ? 0 : 1);
+            quit();
+            return;
+        }
+
+        if (args.contains ("--mtshot190fm"))
+        {
+            // LYNX --mtshot190fm prefix: round 190fm off-screen: the MIDI Tools panel's Generate tab with each generator
+            // (prefix-generate-rhythm.png … -euclidean.png), the five side by side as Live's picture shows them
+            // (prefix-generate-panels.png; Live's: ableton190o/shots/live-04-generate-panels.png), then each generator
+            // written into a one-bar pattern and undone again: prefix-checks.txt.
+            juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+            runMtShot190fm (args[args.indexOf ("--mtshot190fm") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--drumshot190ec"))
         {
             // LYNX.exe --drumshot190ec prefix: round 190ec off-screen: a demo Drum Rack's pad view (default and scrolled), its
@@ -2254,6 +2279,16 @@ public:
             // automation lane, steps at the grid width and an Alt (no grid) freehand stroke drawn through the Playlist's
             // own mouse handlers, and the Options menu with "Draw Mode". Writes prefix-checks.txt.
             runDrawShot190ef (args[args.indexOf ("--drawshot190ef") + 1].unquoted());
+            quit();
+            return;
+        }
+
+        if (args.contains ("--warpshot190fm"))
+        {
+            // LYNX.exe --warpshot190fm prefix: round 190fm off-screen: the Clip page's Audio panel of a grid audio clip in
+            // Beats (Preserve, Transient Loop Mode, Envelope), Tones and Texture (Grain Size), Complex (none), and the clip
+            // made unique by a mode change while another clip shares its channel (O16). Writes prefix-checks.txt.
+            runWarpShot190fm (args[args.indexOf ("--warpshot190fm") + 1].unquoted());
             quit();
             return;
         }
@@ -3058,6 +3093,7 @@ private:
             lynx::groove::setClipGroove (original, 1, 2, savedGroove);
             lynx::session::moveClip (original, 1, 2, 0, 1, true);
             lynx::session::moveClip (original, 0, 1, 2, 0, false);
+            original.playlist[0].groove = savedGroove; // round 190fm: a Playlist pattern clip's groove
         }
         original.playlistTracks[2].grouped = true;      // track groups and rack filter groups (round 104)
         original.playlistTracks[1].collapsed = true;
@@ -3115,7 +3151,8 @@ private:
                                              && lynx::launcher::clipAt (grid, 0, 1) == nullptr
                                              && clip != nullptr && clip->pattern == 0 && clip->length == 1920
                                              && moved != nullptr && moved->groove == savedGroove && moved->name == "Clip ação"
-                                             && moved->mode == lynx::LaunchMode::toggle && moved->legato && ! moved->loop;
+                                             && moved->mode == lynx::LaunchMode::toggle && moved->legato && ! moved->loop
+                                             && reloaded->playlist[0].groove == savedGroove && reloaded->playlist[1].groove == 0; // (190fm)
                                   }()
                                && reloaded->playlist[1].kind == lynx::ClipKind::automation && reloaded->playlist[1].automation == 0
                                && reloaded->automations.size() == 1 && reloaded->automations[0].target == automation.target
@@ -4553,6 +4590,27 @@ private:
                 arrange190cgResult = "ERROR round trip " + why;
         }
 
+        // round 190fm: the MIDI Tools generators' settings come back from a project; a project without them loads with
+        // Live's defaults (and saves none)
+        juce::String midigen190fmResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            juce::String why;
+            const auto plainJson = lynx::ProjectFile::toJson (song);
+            const auto plain = lynx::ProjectFile::fromJson (plainJson, why);
+            song.midiGenerate.tool = lynx::midigen::Settings::stacks;
+            song.midiGenerate.rhythmOptions.pattern = 3;
+            song.midiGenerate.seedOptions.voices = 2;
+            song.midiGenerate.shapeOptions.levels[4] = 0.25f;
+            song.midiGenerate.shapeOptions.preset = lynx::midigen::ShapeOptions::custom;
+            song.midiGenerate.stacksOptions.sequence.push_back ({ 4, 3, 67, 1, 1, 0.5f, 2.0f });
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), why);
+            if (! plain || ! plain->midiGenerate.isDefault() || plainJson.contains ("midiGenerate"))
+                midigen190fmResult = "ERROR defaults " + why;
+            else if (! back || ! (back->midiGenerate == song.midiGenerate))
+                midigen190fmResult = "ERROR round trip " + why;
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -4835,6 +4893,7 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
+                        && midigen190fmResult == "OK"
                         && danceWindowResult == "OK" && clickActivationResult == "OK";
 
         juce::String report;
@@ -4890,6 +4949,7 @@ private:
                << "livescr190dr=" << livescr190drResult << "\n"
                << "livewf190ef=" << livewf190efResult << "\n"
                << "livewf190em=" << livewf190emResult << "\n"
+               << "midigen190fm_saved=" << midigen190fmResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -12600,6 +12660,131 @@ private:
         }
 
         juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\nresult=" + (allOk ? "OK" : "FAIL") + "\n");
+        return allOk;
+    }
+
+    // --grooveshot190fm (round 190fm): see the dispatch above
+    bool runGrooveShot190fm (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        juce::StringArray report;
+        bool allOk = true;
+        const auto check = [&report, &allOk] (const char* name, bool ok, const juce::String& detail = {}) {
+            report.add (juce::String (name) + "=" + (ok ? "OK" : "FAIL") + (detail.isEmpty() ? juce::String() : " " + detail));
+            allOk = allOk && ok;
+        };
+        const auto plain = [] (juce::String t) {
+            t = t.upToFirstOccurrenceOf ("\t", false, false);
+            return t.removeCharacters (juce::String ("&_") + juce::String::charToString (1));
+        };
+        const auto sub = [&plain] (const juce::PopupMenu& menu, const juce::String& start) -> const juce::PopupMenu* {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (it.getItem().subMenu != nullptr && plain (it.getItem().text).startsWith (start))
+                    return it.getItem().subMenu.get();
+            return nullptr;
+        };
+        const auto item = [&plain] (const juce::PopupMenu& menu, const juce::String& text) -> const juce::PopupMenu::Item* {
+            for (juce::PopupMenu::MenuItemIterator it (menu); it.next();)
+                if (plain (it.getItem().text) == text)
+                    return &it.getItem();
+            return nullptr;
+        };
+
+        lynx::AudioEngine engine (false);
+        lynx::MainComponent ui (engine, false);
+        ui.setSize (1600, 900);
+        std::uint32_t classic = 0;
+        {
+            auto song = lynx::Song::makeDefault();
+            song.mode = lynx::PlayMode::song;
+            song.playlist.push_back ({ 0, 0, 0, 4 * lynx::ppq, 0 });
+            song.playlist.push_back ({ 0, 1, 4 * lynx::ppq, 4 * lynx::ppq, 0 });
+            for (const auto& e : lynx::groove::factoryBank())
+                if (juce::String (e.folder) == "Classic swing" && e.groove.base == lynx::GrooveBase::sixteenth
+                    && (e.groove.name == "Swing 16ths 54 %" || e.groove.name == "Swing 16ths 58 %" || e.groove.name == "Swing 16ths 62 %"
+                        || e.groove.name == "Swing 16ths 71 %"))
+                {
+                    const auto id = lynx::groove::add (song.grooves, e.groove);
+                    if (e.groove.name == "Swing 16ths 58 %")
+                        classic = id;
+                }
+            song.playlist[0].groove = classic;
+            engine.setSong (std::move (song));
+        }
+        engine.dispatchPendingMessages();
+        auto& playlist = ui.getPlaylistForSnapshot();
+        const auto menu = playlist.getClipMenuForSnapshot (0);
+        const auto* chooser = sub (menu, lynx::tr ("Groove"));
+        check ("groove_chooser_in_clip_menu", chooser != nullptr);
+        const auto* add = chooser != nullptr ? sub (*chooser, lynx::tr ("Add a groove")) : nullptr;
+        const auto* folder = add != nullptr ? sub (*add, lynx::tr ("Classic swing")) : nullptr;
+        check ("classic_swing_folder", folder != nullptr && folder->getNumItems() == 27, folder != nullptr ? juce::String (folder->getNumItems()) : juce::String ("missing"));
+        const auto* commit = item (menu, lynx::tr ("Commit groove"));
+        check ("commit_enabled_with_a_groove", commit != nullptr && commit->isEnabled);
+        check ("extract_present", item (menu, lynx::tr ("Extract groove")) != nullptr);
+        {
+            juce::StringArray names { "Pattern clip menu" };
+            std::vector<juce::PopupMenu> menus { menu };
+            if (chooser != nullptr)
+            {
+                names.add ("Groove");
+                menus.push_back (*chooser);
+            }
+            if (add != nullptr)
+            {
+                names.add ("Add a groove");
+                menus.push_back (*add);
+            }
+            if (folder != nullptr)
+            {
+                names.add ("Classic swing");
+                menus.push_back (*folder);
+            }
+            saveMenus (names, menus, prefix + "-playlist-clip-menu.png");
+        }
+        // the second clip (no groove): Commit is off; choosing a groove from the menu sets it
+        {
+            const auto other = playlist.getClipMenuForSnapshot (1);
+            const auto* c2 = item (other, lynx::tr ("Commit groove"));
+            check ("commit_disabled_without_a_groove", c2 != nullptr && ! c2->isEnabled);
+            const auto* ch2 = sub (other, lynx::tr ("Groove"));
+            const auto* pick = ch2 != nullptr ? item (*ch2, "Swing 16ths 71 %") : nullptr;
+            if (pick != nullptr && pick->action != nullptr)
+                pick->action();
+            const auto& song = engine.getSong();
+            check ("chooser_sets_the_clip_groove", song.playlist.size() == 2 && lynx::groove::ofClip (song, song.playlist[1]) != nullptr
+                                                       && lynx::groove::ofClip (song, song.playlist[1])->name == "Swing 16ths 71 %");
+        }
+        // the pool with the classic grooves
+        {
+            auto pool = lynx::makeGroovePool (engine);
+            pool->setSize (900, lynx::groovePoolHeight (engine));
+            savePng (pool->createComponentSnapshot (pool->getLocalBounds()), prefix + "-pool.png");
+        }
+        // .lynx: a Playlist clip's groove comes back; a project without one writes nothing new
+        {
+            juce::String error;
+            const auto& song = engine.getSong();
+            const auto back = lynx::ProjectFile::fromJson (lynx::ProjectFile::toJson (song), error);
+            check ("lynx_round_trip", back && back->playlist.size() == 2 && back->playlist[0].groove == song.playlist[0].groove
+                                          && back->playlist[1].groove == song.playlist[1].groove && back->grooves == song.grooves,
+                   error);
+            auto old = lynx::Song::makeDefault();
+            old.playlist.push_back ({ 0, 0, 0, 4 * lynx::ppq, 0 });
+            const auto json = lynx::ProjectFile::toJson (old, false);
+            const auto reloaded = lynx::ProjectFile::fromJson (json, error);
+            check ("old_project_unchanged", reloaded && lynx::ProjectFile::toJson (*reloaded, false) == json && reloaded->playlist[0].groove == 0);
+        }
+        // Commit from the menu: the clip's pattern (shared with the second clip) is copied, the groove is off
+        {
+            const auto patterns = engine.getSong().patterns.size();
+            const auto again = playlist.getClipMenuForSnapshot (0);
+            if (const auto* c = item (again, lynx::tr ("Commit groove")); c != nullptr && c->action != nullptr)
+                c->action();
+            const auto& song = engine.getSong();
+            check ("commit_runs", song.playlist[0].groove == 0 && song.patterns.size() == patterns + 1 && song.playlist[0].pattern == (int) patterns);
+        }
+        juce::File (prefix + "-checks.txt").replaceWithText (report.joinIntoString ("\n") + "\n" + (allOk ? "ALL OK" : "SOME FAILED") + "\n");
         return allOk;
     }
 
@@ -20365,6 +20550,92 @@ private:
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
+    void runWarpShot190fm (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        // a one-bar loop of clicks (2 s at 48 kHz) for the audio clips
+        const auto wav = juce::File (prefix + "-loop.wav");
+        wav.deleteFile();
+        {
+            const double rate = 48000.0;
+            juce::AudioBuffer<float> buffer (2, (int) (rate * 2.0));
+            buffer.clear();
+            for (int hit = 0; hit < 8; ++hit)
+                for (int k = 0; k < 3000; ++k)
+                    for (int ch = 0; ch < 2; ++ch)
+                        buffer.setSample (ch, hit * 12000 + k, (float) (std::sin (k * (hit % 4 == 0 ? 0.05 : 0.3)) * std::exp (-k / 500.0) * 0.8));
+            if (auto out = std::unique_ptr<juce::FileOutputStream> (wav.createOutputStream()))
+                if (auto* writer = juce::WavAudioFormat().createWriterFor (out.get(), rate, 2, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> owned (writer);
+                    owned->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+                }
+        }
+        offline.editSong ([&wav] (lynx::Song& s) {
+            lynx::ChannelDef ch;
+            ch.name = "Loop";
+            ch.instrument = lynx::InstrumentKind::audioClip;
+            ch.samplePath = wav.getFullPathName().toStdString();
+            s.channels.push_back (ch);
+            const auto c = (int) s.channels.size() - 1;
+            lynx::clipsample::setWarp (s, c, true, 2.0);
+            lynx::warpmodes::setMode (s, c, (int) lynx::StretchMethod::beats); // (keeps the pitch: Beats, not Re-Pitch)
+            lynx::Clip audio;
+            audio.kind = lynx::ClipKind::audio;
+            audio.channel = c;
+            audio.length = 4 * lynx::ppq;
+            lynx::launcher::setClip (s, 0, 0, audio);
+            lynx::launcher::setClip (s, 0, 1, audio); // (a second clip on the same channel: O16)
+            lynx::launcher::ensureGrid (s).scenes.resize (2);
+        }, false);
+        offline.dispatchPendingMessages();
+        const auto shoot = [&] (const char* name) {
+            auto panel = lynx::makeClipAudioPanel (offline, 0, 0);
+            if (panel == nullptr)
+                return false;
+            panel->setSize (900, 250);
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (*panel), out);
+            return true;
+        };
+        const auto channelOf = [&] (int scene) {
+            const auto* c = lynx::warpmodes::gridAudioClip (const_cast<lynx::Song&> (offline.getSong()), 0, scene);
+            return c != nullptr ? c->channel : -1;
+        };
+        const auto beatsOn = [&] { const auto& sm = offline.getSong().channels[(std::size_t) channelOf (0)].sampler; return sm.keepPitch && sm.stretchMethod == lynx::StretchMethod::beats; };
+        check ("01 Beats panel (defaults: Transients, Back-and-Forth, 100)", beatsOn() && shoot ("01-beats-defaults"));
+        offline.editSong ([&] (lynx::Song& s) {
+            const auto c = lynx::warpmodes::ownChannelForGridClip (s, 0, 0);
+            lynx::warpmodes::setPreserve (s, c, 3);
+            lynx::warpmodes::setLoopMode (s, c, 0);
+            lynx::warpmodes::setEnvelope (s, c, 40.0);
+        }, false);
+        offline.dispatchPendingMessages();
+        check ("O16: the first clip moved to its own channel, the second kept the old one", channelOf (0) != channelOf (1) && channelOf (0) >= 0 && channelOf (1) >= 0);
+        check ("02 Beats panel (1/8, Loop Off, 40)", beatsOn() && shoot ("02-beats-set"));
+        offline.editSong ([&] (lynx::Song& s) { lynx::warpmodes::setMode (s, channelOf (0), (int) lynx::StretchMethod::tones); }, false);
+        offline.dispatchPendingMessages();
+        check ("03 Tones panel (Grain Size 30)", shoot ("03-tones"));
+        offline.editSong ([&] (lynx::Song& s) {
+            lynx::warpmodes::setMode (s, channelOf (0), (int) lynx::StretchMethod::texture);
+            lynx::warpmodes::setGrain (s, channelOf (0), 120.0);
+        }, false);
+        offline.dispatchPendingMessages();
+        check ("04 Texture panel (Grain Size 120)", shoot ("04-texture"));
+        check ("Texture grain kept 120, Tones grain still 30", offline.getSong().channels[(std::size_t) channelOf (0)].sampler.warpModes.textureGrain == 120.0f
+                                                                && offline.getSong().channels[(std::size_t) channelOf (0)].sampler.warpModes.tonesGrain == 30.0f);
+        offline.editSong ([&] (lynx::Song& s) { lynx::warpmodes::setMode (s, channelOf (0), (int) lynx::StretchMethod::complex); }, false);
+        offline.dispatchPendingMessages();
+        check ("05 Complex panel (no settings row)", shoot ("05-complex"));
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
     void runLiveShot190dr (const juce::String& prefix)
     {
         juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
@@ -20863,6 +21134,73 @@ private:
         }
         juce::File (prefix + "-facts.txt").replaceWithText (facts);
         lynx::autolanes::setShown (false);
+    }
+
+    void runMtShot190fm (const juce::String& prefix)
+    {
+        lynx::AudioEngine offline (false);
+        offline.editSong ([] (lynx::Song& s) {
+            if (s.patterns.empty())
+                s.patterns.emplace_back();
+            s.patterns[0].notes.clear();
+            s.patterns[0].lengthTicks = 4 * lynx::ppq;
+            s.currentPattern = 0;
+        }, false);
+        lynx::MidiToolsPanel panel (offline, [] {
+            lynx::MidiToolsPanel::Target t;
+            t.pattern = 0;
+            t.grid = lynx::ppq / 4;
+            t.channel = 0;
+            t.length = 4 * lynx::ppq; // one bar, no time selection
+            return t;
+        });
+        panel.setSize (lynx::MidiToolsPanel::panelWidth, lynx::MidiToolsPanel::panelHeight);
+        panel.setSection (lynx::MidiToolsPanel::generateSection);
+        panel.setGenerateShotSettingsForSnapshot();
+        const auto write = [&prefix] (const juce::Image& image, const juce::String& name) {
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (image, out);
+        };
+        std::vector<juce::Image> images;
+        juce::String checks;
+        for (int g = 0; g < lynx::midigen::Settings::toolCount; ++g)
+        {
+            panel.setGenerator (g);
+            const auto name = juce::String (lynx::midigen::toolName (g)).toLowerCase();
+            images.push_back (lynx::shot::paint (panel, lynx::theme::colour::bg2));
+            write (images.back(), "generate-" + name);
+            panel.generateNow();
+            offline.dispatchPendingMessages();
+            const auto made = (int) offline.getSong().patterns[0].notes.size();
+            offline.undo();
+            offline.dispatchPendingMessages();
+            const auto after = (int) offline.getSong().patterns[0].notes.size();
+            checks << name << ": generated " << made << " notes, after undo " << after << (made > 0 && after == 0 ? " OK" : " FAIL") << "\n";
+        }
+        // the five side by side (6 px apart, on the window's background)
+        const auto gap = juce::roundToInt (6.0f * lynx::shot::scale());
+        int width = gap, height = 0;
+        for (const auto& image : images)
+        {
+            width += image.getWidth() + gap;
+            height = std::max (height, image.getHeight());
+        }
+        juce::Image strip (juce::Image::RGB, width, height + 2 * gap, true);
+        {
+            juce::Graphics g (strip);
+            g.fillAll (lynx::theme::colour::bg0);
+            int x = gap;
+            for (const auto& image : images)
+            {
+                g.drawImageAt (image, x, gap);
+                x += image.getWidth() + gap;
+            }
+        }
+        write (strip, "generate-panels");
+        checks << "settings saved with the project: " << (offline.getSong().midiGenerate.stacksOptions.sequence.size() == 2 ? "OK" : "FAIL") << "\n";
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 
     void runDetailShot (const juce::String& prefix)

@@ -283,14 +283,16 @@ juce::String stretchMapKey (const StretchMap& map)
     return "|wm1:" + juce::String::toHexString (s.hashCode64());
 }
 
-juce::File stretchCacheFile (const juce::String& path, double ratio, StretchMethod method, double semitones, const StretchMap& map)
+juce::File stretchCacheFile (const juce::String& path, double ratio, StretchMethod method, double semitones, const StretchMap& map,
+                             const StretchOptions& options)
 {
     const auto source = platform::localFile (path);
     if (! source.existsAsFile())
         return {};
     const auto key = source.getFullPathName() + "|" + juce::String (source.getSize()) + "|" + juce::String (source.getLastModificationTime().toMilliseconds())
                    + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method) + "|" + juce::String::toHexString ((juce::int64) stretchFingerprint (method))
-                   + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String()) + stretchMapKey (map);
+                   + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String()) + stretchMapKey (map)
+                   + juce::String (stretchOptionsKey (options, method));
     return SampleLibrary::cacheFolder().getChildFile (juce::String::toHexString (key.hashCode64()) + ".str");
 }
 
@@ -387,13 +389,14 @@ void writeStretchedLater (const juce::File& file, std::shared_ptr<const SampleDa
 } // namespace
 
 std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::String& path, double ratio, StretchMethod method, double semitones,
-                                                               const StretchMap& map)
+                                                               const StretchMap& map, const StretchOptions& options)
 {
     if (method != StretchMethod::beats)
         semitones = 0.0; // (only Beats renders a transposition offline)
     // 10 significant digits: ratios within 0.1 % of 1 are resampled to the exact length, so 4 decimals were too coarse
     const auto key = path + "|" + juce::String (ratio, 10) + "|" + juce::String ((int) method)
-                     + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String()) + stretchMapKey (map);
+                     + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String()) + stretchMapKey (map)
+                     + juce::String (stretchOptionsKey (options, method)); // (round 190fm: empty for the defaults)
     auto& shared = sharedCache();
 
     {
@@ -403,7 +406,7 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::Stri
     }
 
     static const bool useDisk = [] { const auto* e = std::getenv ("LYNX_STRETCH_DISK"); return e == nullptr || e[0] != '0'; }();
-    const auto onDisk = useDisk ? stretchCacheFile (path, ratio, method, semitones, map) : juce::File();
+    const auto onDisk = useDisk ? stretchCacheFile (path, ratio, method, semitones, map, options) : juce::File();
     std::shared_ptr<const SampleData> stretched;
     {
         const loadtrace::Scope timing ("stretch_disk_read");
@@ -419,7 +422,8 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::Stri
         std::shared_ptr<SampleData> made;
         {
             const loadtrace::Scope timing ("stretch_compute");
-            made = map.empty() ? timeStretch (*original, ratio, method, semitones) : timeStretchMapped (*original, map, method, semitones);
+            made = map.empty() ? timeStretch (*original, ratio, method, semitones, options)
+                               : timeStretchMapped (*original, map, method, semitones, options);
         }
         stretched = std::move (made);
         if (stretched != nullptr && onDisk != juce::File())
@@ -440,14 +444,15 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStretched (const juce::Stri
 
 std::shared_ptr<const SampleData> SampleLibrary::loadStretchedSpan (const juce::String& path, const std::string& variantKey,
                                                                    const std::shared_ptr<const SampleData>& span, double ratio,
-                                                                   StretchMethod method, double semitones)
+                                                                   StretchMethod method, double semitones, const StretchOptions& options)
 {
     if (span == nullptr || span->frames() == 0)
         return nullptr;
     if (method != StretchMethod::beats)
         semitones = 0.0;
     const auto key = path + "|span|" + juce::String::fromUTF8 (variantKey.c_str()) + "|" + juce::String (ratio, 10) + "|"
-                     + juce::String ((int) method) + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String());
+                     + juce::String ((int) method) + (semitones != 0.0 ? "|st" + juce::String (semitones, 6) : juce::String())
+                     + juce::String (stretchOptionsKey (options, method));
     auto& shared = sharedCache();
     {
         const std::scoped_lock l (shared.stretchLock);
@@ -457,7 +462,7 @@ std::shared_ptr<const SampleData> SampleLibrary::loadStretchedSpan (const juce::
     std::shared_ptr<const SampleData> stretched;
     {
         const loadtrace::Scope timing ("stretch_compute");
-        stretched = timeStretchSpan (*span, ratio, method, semitones);
+        stretched = timeStretchSpan (*span, ratio, method, semitones, options);
     }
     if (stretched == nullptr)
         return nullptr;
