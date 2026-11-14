@@ -645,6 +645,35 @@ TEST (als175a_beats_warp_mode)
     for (std::size_t k = 0; k < attacks.size() && k < 4; ++k)
         CHECK (attacks[k] <= lead + (long) k * piece && attacks[k] >= lead + (long) k * piece - (long) (rate * 0.012));
 
+    // round 190gx: the Classic law (projects saved before 190gx) keeps 175a's behaviour exactly: cuts 10 ms before the
+    // steepest rise, the reversed fill from the piece's end
+    {
+        lynx::StretchOptions classic;
+        classic.modes.beatsLaw = lynx::WarpModeSettings::beatsLawClassic;
+        const auto oldCuts = lynx::stretchdetail::beatsCuts (in.left.data(), (long) in.frames(), rate, false);
+        CHECK (oldCuts.size() == 4);
+        for (std::size_t k = 0; k < oldCuts.size() && k < attacks.size(); ++k)
+            CHECK (oldCuts[k] == attacks[k] - (long) std::lround (rate * 0.010) || std::abs (oldCuts[k] - (attacks[k] - (long) std::lround (rate * 0.010))) <= 1);
+        const auto slowClassic = lynx::timeStretch (in, 1.25, lynx::StretchMethod::beats, 0.0, classic);
+        int fwdOk = 0, backOk = 0;
+        for (std::size_t k = 0; k + 1 < oldCuts.size(); ++k)
+        {
+            const auto a = oldCuts[k], length = oldCuts[k + 1] - a;
+            const auto o0 = (long) std::llround ((double) a * 1.25);
+            const auto fade = (long) std::lround (rate * 0.016);
+            double fwd = 0.0, back = 0.0;
+            for (long i = fade; i < length - fade; ++i)
+                fwd = std::max (fwd, (double) std::abs (slowClassic->left[(std::size_t) (o0 + i)] - in.left[(std::size_t) (a + i)]));
+            for (long j = 0; j < length / 4 - fade; ++j)
+                back = std::max (back, (double) std::abs (slowClassic->left[(std::size_t) (o0 + length + j)] - in.left[(std::size_t) (a + length - 1 - j)]));
+            fwdOk += fwd < 1e-6;
+            backOk += back < 1e-6;
+        }
+        CHECK (fwdOk == 3);
+        CHECK (backOk == 3);
+        CHECK (slowClassic->left != lynx::timeStretch (in, 1.25, lynx::StretchMethod::beats)->left); // (the two laws differ)
+    }
+
     // slower (1.25×): each piece plays at its own speed from where the time map puts its attack, then backwards
     const auto slow = lynx::timeStretch (in, 1.25, lynx::StretchMethod::beats);
     CHECK (std::abs ((double) slow->frames() - (double) in.frames() * 1.25) < 1.5);
@@ -654,16 +683,18 @@ TEST (als175a_beats_warp_mode)
         const auto a = attacks[k], length = attacks[k + 1] - a;
         const auto o0 = (long) std::llround ((double) a * 1.25);
         const auto fade = (long) std::lround (rate * 0.016);
+        // (round 190gx, Live's W1 renders: the reversed reading turns 20 ms before the piece's end)
+        const auto turn = length - (long) std::lround (rate * lynx::stretchdetail::beatsTurnSeconds);
         double fwd = 0.0, back = 0.0;
-        for (long i = fade; i < length - fade; ++i)
+        for (long i = fade; i < turn; ++i)
             fwd = std::max (fwd, (double) std::abs (slow->left[(std::size_t) (o0 + i)] - in.left[(std::size_t) (a + i)]));
         for (long j = 0; j < length / 4 - fade; ++j)
-            back = std::max (back, (double) std::abs (slow->left[(std::size_t) (o0 + length + j)] - in.left[(std::size_t) (a + length - 1 - j)]));
+            back = std::max (back, (double) std::abs (slow->left[(std::size_t) (o0 + turn + j)] - in.left[(std::size_t) (a + turn - 1 - j)]));
         exactForward += fwd < 1e-6;
         exactBackward += back < 1e-6;
     }
     CHECK (exactForward == 3);  // no stretching inside a piece: the original samples
-    CHECK (exactBackward == 3); // the gap: the piece's end played backwards
+    CHECK (exactBackward == 3); // the gap: the piece's end played backwards (from the turn)
 
     // faster (0.8×): each piece is cut where the next begins, still unstretched
     const auto fast = lynx::timeStretch (in, 0.8, lynx::StretchMethod::beats);
@@ -745,6 +776,29 @@ TEST (als175a_beats_transpose_resamples_each_piece)
     const auto attacks = lynx::stretchdetail::beatsCuts (in.left.data(), (long) in.frames(), rate);
     CHECK (attacks.size() == 4);
 
+    // round 190gx: the Classic law keeps 175a's transposed fill (back and forth from the piece's end)
+    {
+        lynx::StretchOptions classic;
+        classic.modes.beatsLaw = lynx::WarpModeSettings::beatsLawClassic;
+        const auto oldCuts = lynx::stretchdetail::beatsCuts (in.left.data(), (long) in.frames(), rate, false);
+        const auto upClassic = lynx::timeStretch (in, 1.0, lynx::StretchMethod::beats, 12.0, classic);
+        const auto fade = (long) std::lround (rate * 0.016);
+        int exactOld = 0, mirroredOld = 0;
+        for (std::size_t k = 1; k + 1 < oldCuts.size(); ++k)
+        {
+            const auto a = oldCuts[k], length = oldCuts[k + 1] - a;
+            double fwd = 0.0, back = 0.0;
+            for (long i = fade; i < length / 2 - 2; ++i)
+                fwd = std::max (fwd, (double) std::abs (upClassic->left[(std::size_t) (a + i)] - in.left[(std::size_t) (a + 2 * i)]));
+            const auto played = (length - 1) / 2 + 1;
+            for (long j = 0; j < played / 2 - fade; ++j)
+                back = std::max (back, (double) std::abs (upClassic->left[(std::size_t) (a + played + j)] - upClassic->left[(std::size_t) (a + played - 1 - j)]));
+            exactOld += fwd < 1e-5;
+            mirroredOld += back < 1e-5;
+        }
+        CHECK (exactOld == 2);
+        CHECK (mirroredOld == 2);
+    }
     const auto up = lynx::timeStretch (in, 1.0, lynx::StretchMethod::beats, 12.0);
     CHECK (up->frames() == in.frames()); // the length follows the stretch only
     const auto fade = (long) std::lround (rate * 0.016);
@@ -753,11 +807,13 @@ TEST (als175a_beats_transpose_resamples_each_piece)
     {
         const auto a = attacks[k], length = attacks[k + 1] - a;
         double fwd = 0.0, back = 0.0;
-        for (long i = fade; i < length / 2 - 2; ++i) // output frame i = source frame a + 2i (an even read: no interpolation)
-            fwd = std::max (fwd, (double) std::abs (up->left[(std::size_t) (a + i)] - in.left[(std::size_t) (a + 2 * i)]));
         const auto played = (length - 1) / 2 + 1;
-        for (long j = 0; j < played / 2 - fade; ++j) // then backwards from the piece's end
-            back = std::max (back, (double) std::abs (up->left[(std::size_t) (a + played + j)] - up->left[(std::size_t) (a + played - 1 - j)]));
+        // (round 190gx: the reversed reading turns 20 ms before the piece's end, Live's W1 renders)
+        const auto turn = played - (long) std::lround (rate * lynx::stretchdetail::beatsTurnSeconds);
+        for (long i = fade; i < turn; ++i) // output frame i = source frame a + 2i (an even read: no interpolation)
+            fwd = std::max (fwd, (double) std::abs (up->left[(std::size_t) (a + i)] - in.left[(std::size_t) (a + 2 * i)]));
+        for (long j = 0; j < played / 2 - fade; ++j) // then backwards from the turn
+            back = std::max (back, (double) std::abs (up->left[(std::size_t) (a + turn + j)] - up->left[(std::size_t) (a + turn - 1 - j)]));
         exact += fwd < 1e-5;
         mirrored += back < 1e-5;
     }

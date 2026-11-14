@@ -17566,7 +17566,10 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "TrackLinkTests.inc"
 #include "Warp190dbTests.inc"
 #include "WarpModes190fmTests.inc" // round 190fm
+#include "WarpLive190gxTests.inc" // round 190gx
 #include "ClipEnv190giTests.inc" // round 190gi
+#include "LiveFacts190gxTests.inc" // round 190gx
+#include "BeatsLaw190gxTests.inc" // round 190gx
 #include "FlCtl190dfTests.inc"
 #include "FlFix190eyTests.inc"
 #include "FlPl190dxTests.inc"
@@ -17586,6 +17589,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Follow190fgTests.inc"
 #include "Relfix190fpTests.inc"
 #include "Anvil190fkTests.inc"
+#include "AnvilBus190gxTests.inc"
 #include "Donate190fqTests.inc"
 #include "GenPreset190fsTests.inc"
 #include "Issues190ftTests.inc"

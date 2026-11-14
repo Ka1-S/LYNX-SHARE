@@ -173,7 +173,8 @@ namespace stretchdetail
 // Exposed for the tests: attack positions (frames) found in a mono signal, strongest-first filtering already applied.
 std::vector<long> detectAttacks (const float* mono, long frames, double sampleRate, double minRiseDb);
 // Where LYNX's Beats warp mode cuts the audio (round 175a, N4): the attacks, each moved to where it rises fastest.
-std::vector<long> beatsCuts (const float* mono, long frames, double sampleRate);
+// `measured` false: the Classic law's cut, the start of the 10 ms window before the steepest rise (round 190gx)
+std::vector<long> beatsCuts (const float* mono, long frames, double sampleRate, bool measured = true);
 // The ratio band that is resampled instead of stretched.
 constexpr double resampleTolerance = 0.001;
 
@@ -192,9 +193,17 @@ Preset presetFor (StretchMethod method, const WarpModeSettings& modes) noexcept;
 std::vector<long> gridCuts (long frames, long outFrames, double sourceBeats, double divisionBeats, const std::function<double (double)>& toSource);
 // The note value of Preserve index 0…5 in beats (1 bar = 4 beats … 1/32 = 0.125); 0 for Transients.
 double preserveDivisionBeats (int preserve) noexcept;
-// Beats' Transient Envelope (round 190fm): the gain at output frame i of a piece that sounds for `span` frames,
-// envelope 0…100 (100 = 1 everywhere). LYNX's own curve [needs live render]: (1 − i/span)^k, k = 4 (1 − e) / max (e, 0.02).
-float beatsEnvelopeGain (float envelope, long i, long span) noexcept;
+// Beats' Transient Envelope (round 190fm; law measured on Live 12.4's renders in round 190gx): the gain `sinceEnd`
+// frames after a piece's own end (unity before it), an exponential decay with beatsEnvelopeSeconds' time constant;
+// envelope 0…100 (100 = 1 everywhere).
+float beatsEnvelopeGain (float envelope, long sinceEnd, double sampleRate) noexcept;
+double beatsEnvelopeSeconds (float envelope) noexcept;
+// The Classic law's Transient Envelope (before round 190gx): the gain at output frame i of a piece's slot of `span`
+// frames, (1 − i/span)^k with k = 4 (1 − e) / max (e, 0.02)
+float beatsEnvelopeGainClassic (float envelope, long i, long span) noexcept;
+// Back-and-forth and Forward fill from this far before a transient piece's end (round 190gx; Live's reversed reading
+// mirrors 21.5 ms (voice) and 30 ms (drum loop) before the next transient; 20 ms matched the renders best).
+inline constexpr double beatsTurnSeconds = 0.020;
 // The spectral stretch with a given preset (no near-unity shortcut).
 std::shared_ptr<SampleData> stretchWith (const SampleData& input, double ratio, const Preset& preset);
 } // namespace stretchdetail

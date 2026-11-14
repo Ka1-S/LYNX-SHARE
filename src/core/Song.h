@@ -399,6 +399,11 @@ struct WarpModeSettings
     float proFormants = 100.0f;
     float proEnvelope = 128.0f;
     bool complexPro = false;
+    // Round 190gx: Beats' law. Measured (the default: new channels, .als / .flp imports) = Live 12.4's fill, Transient
+    // Envelope and cut laws measured on its renders; Classic = how LYNX rendered Beats before 190gx, kept bit for bit for
+    // projects saved before then (engine/ProjectFile.cpp: a project without the "beatsLaw190gx" mark loads Classic).
+    static constexpr std::uint8_t beatsLawClassic = 0, beatsLawMeasured = 1;
+    std::uint8_t beatsLaw = beatsLawMeasured;
     bool operator== (const WarpModeSettings&) const = default;
 };
 

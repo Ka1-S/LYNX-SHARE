@@ -85,7 +85,8 @@ TEST (clipenv190gi_gain_law_is_fl_levels_adjustment)
     CHECK (std::abs (clipenv::gainOf (0.5f) - (std::pow (11.0f, 0.5f) - 1.0f) / 10.0f) < 1.0e-6f);
     CHECK (clipenv::gainOf (0.5f) == levelAdjustGain (0.5f));
     CHECK (clipenv::panOf (0.5f) == 0.0f && clipenv::panOf (0.0f) == -1.0f && clipenv::panOf (1.0f) == 1.0f);
-    CHECK (clipenv::toLive (0.0f) == -1.0 && clipenv::toLive (1.0f) == 1.0 && clipenv::fromLive (0.0) == 0.5f);
+    CHECK (clipenv::toLive (clipenv::volumeLane, 0.0f) == -1.0 && clipenv::toLive (clipenv::volumeLane, 1.0f) == 1.0
+           && clipenv::fromLive (clipenv::panLane, 0.0) == 0.5f); // (round 190gx: per lane, on Live's measured laws)
     ClipEnvelope flat;
     flat.volume = { clipenv190gi::point (0, 1.0f), clipenv190gi::point (10, 1.0f) };
     flat.pan = { clipenv190gi::point (0, 0.5f) };
@@ -284,7 +285,10 @@ TEST (clipenv190gi_als_round_trip_of_clip_gain_and_track_panning)
     // the same curve at the same song ticks (Live's clip beats ↔ LYNX's content ticks)
     for (const auto t : { 0.0, ppq * 1.0, ppq * 2.5, ppq * 3.9 })
     {
-        CHECK (std::abs (clipenv::valueAt (e, clipenv::volumeLane, clipenv::clipTick (*audio, t)) - clipenv::valueAt (song.clipEnvelopes[0], clipenv::volumeLane, t)) < 1.0e-4f);
+        // (round 190gx: the two programs' ramps differ in shape, so the volume is cut into pieces both ways: the same gain
+        // within 0.1 dB, LiveFacts190gxTests)
+        CHECK (std::abs (clipenv::laneDb (clipenv::valueAt (e, clipenv::volumeLane, clipenv::clipTick (*audio, t)))
+                         - clipenv::laneDb (clipenv::valueAt (song.clipEnvelopes[0], clipenv::volumeLane, t))) < 0.1);
         CHECK (std::abs (clipenv::valueAt (e, clipenv::panLane, clipenv::clipTick (*audio, t)) - clipenv::valueAt (song.clipEnvelopes[0], clipenv::panLane, t)) < 1.0e-4f);
     }
     // a set without clip envelopes: nothing made

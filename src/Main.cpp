@@ -2415,6 +2415,17 @@ public:
             return;
         }
 
+        if (args.contains ("--livefactsshot190gx"))
+        {
+            // LYNX.exe --livefactsshot190gx prefix: round 190gx off-screen: the Clip page's Audio panel in Live's 190gu
+            // layout (Beats: Preserve label + chooser, the loop-mode icon chooser beside the Transient Envelope box;
+            // Tones / Texture: Grain Size [+ Flux]; Complex [Pro]), the Envelopes tab with a Clip Gain staircase on Live's
+            // axis, choosers at the bottom left, and an unwarped clip without the Envelopes tab. Writes prefix-checks.txt.
+            runLiveFactsShot190gx (args[args.indexOf ("--livefactsshot190gx") + 1].unquoted());
+            quit();
+            return;
+        }
+
         if (args.contains ("--warpshot190fm"))
         {
             // LYNX.exe --warpshot190fm prefix: round 190fm off-screen: the Clip page's Audio panel of a grid audio clip in
@@ -4857,6 +4868,54 @@ private:
             }
         }
 
+        // round 190gx: Beats' law in the .lynx — a new project's channels are Measured; a project saved before the law
+        // (no "beatsLaw190gx" mark, or a nine-number warpModes list) loads Classic; a Classic channel stays Classic
+        juce::String beatslaw190gxResult = "OK";
+        {
+            auto song = lynx::Song::makeDefault();
+            lynx::ChannelDef channel;
+            channel.instrument = lynx::InstrumentKind::audioClip;
+            channel.samplePath = "beatslaw190gx.wav";
+            channel.sampler.keepPitch = true;
+            channel.sampler.stretchMethod = lynx::StretchMethod::beats;
+            song.channels.push_back (channel);
+            const auto index = song.channels.size() - 1;
+            juce::String why;
+            const auto json = lynx::ProjectFile::toJson (song);
+            const auto lawOf = [&] (const juce::String& text) {
+                const auto back = lynx::ProjectFile::fromJson (text, why);
+                return back && back->channels.size() > index ? (int) back->channels[index].sampler.warpModes.beatsLaw : -1;
+            };
+            auto oldVar = juce::JSON::parse (json); // (the mark removed: a project saved before 190gx)
+            if (auto* o = oldVar.getDynamicObject())
+                o->removeProperty ("beatsLaw190gx");
+            const auto old = juce::JSON::toString (oldVar);
+            auto classic = song;
+            classic.channels[index].sampler.warpModes.beatsLaw = lynx::WarpModeSettings::beatsLawClassic;
+            auto nine = song;
+            nine.channels[index].sampler.warpModes.beatsLoop = 0; // (a 190fm project with a changed setting: nine numbers)
+            // (the list with its tenth number, the law, removed: what a 190fm build wrote)
+            auto nineVar = juce::JSON::parse (lynx::ProjectFile::toJson (nine));
+            bool trimmed = false;
+            if (auto* channels = nineVar.getProperty ("channels", {}).getArray(); channels != nullptr && (int) index < channels->size())
+                if (auto* modes = (*channels)[(int) index].getProperty ("samplerSettings", {}).getProperty ("warpModes", {}).getArray(); modes != nullptr && modes->size() == 10)
+                {
+                    modes->removeLast();
+                    trimmed = true;
+                }
+            const auto nineJson = juce::JSON::toString (nineVar);
+            if (! json.contains ("beatsLaw190gx") || old.contains ("beatsLaw190gx"))
+                beatslaw190gxResult = "ERROR mark";
+            else if (lawOf (json) != lynx::WarpModeSettings::beatsLawMeasured)
+                beatslaw190gxResult = "ERROR new " + why;
+            else if (lawOf (old) != lynx::WarpModeSettings::beatsLawClassic)
+                beatslaw190gxResult = "ERROR old " + why;
+            else if (lawOf (lynx::ProjectFile::toJson (classic)) != lynx::WarpModeSettings::beatsLawClassic)
+                beatslaw190gxResult = "ERROR classic kept " + why;
+            else if (! trimmed || lawOf (nineJson) != lynx::WarpModeSettings::beatsLawClassic)
+                beatslaw190gxResult = "ERROR nine-number list";
+        }
+
         // round 190dr: the Session mixer's sections come back from a project (a project without them: Live's defaults);
         // a device dragged to another track and a Warp switch are one undo step each in a real engine
         juce::String livescr190drResult = "OK";
@@ -5140,7 +5199,7 @@ private:
                         && sessionResult == "OK" && liveResult.startsWith ("OK")
                         && wavpack != "ERROR" && effectsOk && driverPanel == "OK" && deviceChange.startsWith ("OK") && exportParity.startsWith ("OK") && midiHotplug.startsWith ("OK") && metronomeOk && artResult == "OK" && effectParamsResult == "OK"
                         && sidechainResult == "OK" && lanesResult == "OK" && arrange190cgResult == "OK" && livescr190drResult == "OK" && livewf190efResult == "OK" && livewf190emResult == "OK" && versionsResult == "OK" && pluginsOffResult == "OK"
-                        && midigen190fmResult == "OK" && clipenv190giResult == "OK"
+                        && midigen190fmResult == "OK" && clipenv190giResult == "OK" && beatslaw190gxResult == "OK"
                         && danceWindowResult == "OK" && clickActivationResult == "OK";
 
         juce::String report;
@@ -5201,6 +5260,7 @@ private:
                << "livewf190em=" << livewf190emResult << "\n"
                << "midigen190fm_saved=" << midigen190fmResult << "\n"
                << "clipenv190gi_saved=" << clipenv190giResult << "\n"
+               << "beatslaw190gx_saved=" << beatslaw190gxResult << "\n"
                << "metronome=" << metronomeResult << " (FL sounds " << metronomeFlSounds << "/" << lynx::metronome::soundCount
                << ", downbeat peak " << juce::String (metronomeMaster, 4) << ")\n";
 
@@ -22523,6 +22583,133 @@ private:
             check ("the grid clip keeps the volume envelope", c != nullptr && lynx::clipenv::activeOf (offline.getSong(), *c) != nullptr);
         }
         shootPanel ("08-clipview-sample-again", false, 0); // (the tab choice back to Sample for the next run)
+        juce::File (prefix + "-checks.txt").replaceWithText (checks);
+    }
+
+    void runLiveFactsShot190gx (const juce::String& prefix)
+    {
+        juce::LookAndFeel::setDefaultLookAndFeel (&lookAndFeel);
+        lynx::AudioEngine offline (false);
+        juce::String checks;
+        const auto check = [&checks] (const juce::String& what, bool ok) { checks << (ok ? "ok   " : "FAIL ") << what << "\n"; };
+        // a 1 kHz sine, 20 s at 48 kHz (Live's 190gu clip-envelope stimulus), −9 dBFS
+        const auto wav = juce::File (prefix + "-sine1k.wav");
+        wav.deleteFile();
+        {
+            const double rate = 48000.0;
+            juce::AudioBuffer<float> buffer (2, (int) (rate * 20.0));
+            for (int k = 0; k < buffer.getNumSamples(); ++k)
+                for (int ch = 0; ch < 2; ++ch)
+                    buffer.setSample (ch, k, (float) (0.3535 * std::sin (2.0 * juce::MathConstants<double>::pi * 1000.0 * k / rate)));
+            if (auto out = std::unique_ptr<juce::FileOutputStream> (wav.createOutputStream()))
+                if (auto* writer = juce::WavAudioFormat().createWriterFor (out.get(), rate, 2, 16, {}, 0))
+                {
+                    out.release();
+                    std::unique_ptr<juce::AudioFormatWriter> owned (writer);
+                    owned->writeFromAudioSampleBuffer (buffer, 0, buffer.getNumSamples());
+                }
+        }
+        offline.editSong ([&wav] (lynx::Song& s) {
+            s.bpm = 120.0;
+            lynx::ChannelDef ch;
+            ch.name = "sine1k";
+            ch.instrument = lynx::InstrumentKind::audioClip;
+            ch.samplePath = wav.getFullPathName().toStdString();
+            s.channels.push_back (ch);
+            const auto c = (int) s.channels.size() - 1;
+            lynx::clipsample::setWarp (s, c, true, 20.0);
+            lynx::warpmodes::setMode (s, c, (int) lynx::StretchMethod::beats);
+            lynx::Clip audio;
+            audio.kind = lynx::ClipKind::audio;
+            audio.channel = c;
+            audio.length = 40 * lynx::ppq;
+            // Live's Clip Gain staircase of the 190gu render (−1 … 1 in 0.1 steps, 2 beats each), as LYNX lane values
+            lynx::ClipEnvelope e;
+            for (int k = 0; k <= 20; ++k)
+            {
+                const auto v = lynx::clipenv::fromLive (lynx::clipenv::volumeLane, -1.0 + 0.1 * k);
+                for (const auto at : { 2 * k, 2 * k + 2 })
+                {
+                    lynx::AutomationPoint p;
+                    p.tick = (std::int64_t) at * lynx::ppq;
+                    p.value = v;
+                    e.volume.push_back (p);
+                }
+            }
+            e.shown = lynx::clipenv::volumeLane;
+            s.clipEnvelopes.push_back (e);
+            audio.envelope = (int) s.clipEnvelopes.size() - 1;
+            lynx::launcher::setClip (s, 0, 0, audio);
+            lynx::launcher::ensureGrid (s).scenes.resize (1);
+        }, false);
+        offline.dispatchPendingMessages();
+        const auto channelOf = [&] {
+            const auto* c = lynx::warpmodes::gridAudioClip (const_cast<lynx::Song&> (offline.getSong()), 0, 0);
+            return c != nullptr ? c->channel : -1;
+        };
+        const auto shoot = [&] (const char* name, int w, int h, int tab) {
+            auto panel = lynx::makeClipAudioPanel (offline, 0, 0);
+            if (panel == nullptr)
+                return std::unique_ptr<juce::Component>();
+            panel->setSize (w, h);
+            if (tab != 0)
+                for (auto* child : panel->getChildren())
+                    if (auto* b = dynamic_cast<juce::TextButton*> (child); b != nullptr && b->getButtonText() == (tab == 2 ? lynx::tr ("Envelopes") : lynx::tr ("Sample")))
+                        if (b->onClick)
+                            b->onClick();
+            offline.dispatchPendingMessages();
+            const auto file = lynx::shot::file (juce::File (prefix + "-" + name + ".png"));
+            file.deleteFile();
+            juce::FileOutputStream out (file);
+            juce::PNGImageFormat().writeImageToStream (lynx::shot::snapshot (*panel), out);
+            return panel;
+        };
+        const auto visibleText = [] (juce::Component& panel, const juce::String& text) {
+            for (auto* child : panel.getChildren())
+                if (auto* b = dynamic_cast<juce::TextButton*> (child); b != nullptr && b->getButtonText() == text)
+                    return b->isVisible();
+            return false;
+        };
+        const auto setMode = [&] (int method) {
+            offline.editSong ([&] (lynx::Song& s) { lynx::warpmodes::setMode (s, channelOf(), method); }, false);
+            offline.dispatchPendingMessages();
+        };
+        check ("01 Beats (Preserve label + chooser, loop icon + Transient Envelope)", shoot ("01-audio-beats", 900, 250, 1) != nullptr);
+        setMode ((int) lynx::StretchMethod::tones);
+        check ("02 Tones (Grain Size 30.00)", shoot ("02-audio-tones", 900, 250, 1) != nullptr);
+        setMode ((int) lynx::StretchMethod::texture);
+        check ("03 Texture (Grain Size 65.00, Flux only when it plays)", shoot ("03-audio-texture", 900, 250, 1) != nullptr);
+        if constexpr (lynx::warpmodes::complexProPlays)
+        {
+            offline.editSong ([&] (lynx::Song& s) { lynx::warpmodes::setComplexPro (s, channelOf()); }, false);
+            offline.dispatchPendingMessages();
+            check ("04 Complex Pro (Formants 100.00, Envelope 128)", shoot ("04-audio-complex-pro", 900, 250, 1) != nullptr);
+        }
+        else
+        {
+            setMode ((int) lynx::StretchMethod::complex);
+            check ("04 Complex (nothing under the chooser)", shoot ("04-audio-complex", 900, 250, 1) != nullptr);
+        }
+        setMode ((int) lynx::StretchMethod::beats);
+        {
+            auto panel = shoot ("05-envelopes-clip-gain-staircase", 1390, 420, 2);
+            check ("05 Envelopes tab shown on a warped clip", panel != nullptr && visibleText (*panel, lynx::tr ("Envelopes")));
+        }
+        offline.editSong ([&] (lynx::Song& s) { lynx::clipsample::setWarp (s, channelOf(), false, 20.0); }, false);
+        offline.dispatchPendingMessages();
+        {
+            auto panel = shoot ("06-unwarped-sample-only", 1390, 420, 2);
+            check ("06 an unwarped clip has no Envelopes tab (Live)", panel != nullptr && ! visibleText (*panel, lynx::tr ("Envelopes"))
+                                                                      && visibleText (*panel, lynx::tr ("Sample")));
+        }
+        // the law: Live's staircase values round trip through the lane values
+        bool law = true;
+        for (int k = 0; k <= 20; ++k)
+        {
+            const auto L = -1.0 + 0.1 * k;
+            law = law && std::abs (lynx::clipenv::toLive (lynx::clipenv::volumeLane, lynx::clipenv::fromLive (lynx::clipenv::volumeLane, L)) - L) < 2.0e-3;
+        }
+        check ("Clip Gain values round trip (Live → lane → Live)", law);
         juce::File (prefix + "-checks.txt").replaceWithText (checks);
     }
 

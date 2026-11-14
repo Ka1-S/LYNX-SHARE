@@ -1763,20 +1763,43 @@ int clipEnvelopeOf (Ctx& ctx, const Element& clip, const ToTicks& contentTicks)
         std::vector<AutomationPoint> points;
         float before = clipenv::neutralOf (lane);
         bool curves = false;
+        std::vector<std::pair<double, double>> events; // (clip beats, Live value)
         for (const auto& ev : env.path ("Automation/Events").children())
         {
             const auto t = numberAttr (ev, "Time");
-            const auto v = clipenv::fromLive (numberAttr (ev, "Value"));
+            const auto live = numberAttr (ev, "Value");
             curves = curves || ev.hasAttr ("CurveControl1X");
             if (t < -1.0e6) // the "before the song" event [DATA]
             {
-                before = v;
+                before = clipenv::fromLive (lane, live);
                 continue;
             }
+            events.push_back ({ t, live });
+        }
+        std::stable_sort (events.begin(), events.end(), [] (const auto& a, const auto& b) { return a.first < b.first; });
+        auto addPoint = [&] (double t, float v) {
             AutomationPoint p;
             p.tick = (std::int64_t) std::llround (contentTicks (t));
             p.value = v;
             points.push_back (p);
+        };
+        for (std::size_t k = 0; k < events.size(); ++k)
+        {
+            // a Clip Gain ramp: Live goes straight in its own value, so the ramp is cut into pieces that keep Live's gain
+            // curve within 0.05 dB (round 190gx; the Track Panning law is the same in both, its ramps stay as they are)
+            if (k > 0 && lane == clipenv::volumeLane && events[k].first > events[k - 1].first && events[k].second != events[k - 1].second)
+            {
+                const auto [t0, l0] = events[k - 1];
+                const auto [t1, l1] = events[k];
+                clipenv::subdivide (
+                    t0, t1, [&] (double t) { return l0 + (l1 - l0) * (t - t0) / (t1 - t0); }, [] (double l) { return (double) clipenv::volumeFromLive (l); },
+                    [] (double v) { return clipenv::laneDb ((float) v); }, [] (double l) { return clipenv::liveDb (l); },
+                    [&] (double t, double v) {
+                        if (t < t1)
+                            addPoint (t, (float) v);
+                    });
+            }
+            addPoint (events[k].first, clipenv::fromLive (lane, events[k].second));
         }
         if (points.empty())
         {
@@ -1784,14 +1807,12 @@ int clipEnvelopeOf (Ctx& ctx, const Element& clip, const ToTicks& contentTicks)
             p.value = before;
             points.push_back (p);
         }
-        std::stable_sort (points.begin(), points.end(), [] (const AutomationPoint& a, const AutomationPoint& b) { return a.tick < b.tick; });
         if (curves)
             ctx.note (&FlpImportReport::approximated, "Curved clip envelope segments (straight in LYNX)");
         clipenv::laneOf (e, lane) = std::move (points);
     }
     if (! clipenv::active (e))
         return -1;
-    ctx.note (&FlpImportReport::approximated, "Clip envelopes (Clip Gain and Track Panning: kept; Live's gain law between the ends needs a live check)");
     ctx.song.clipEnvelopes.push_back (std::move (e));
     return (int) ctx.song.clipEnvelopes.size() - 1;
 }
@@ -1911,8 +1932,15 @@ void addAudioClip (Ctx& ctx, const Element& clip, int row, int mixerTrack, doubl
         (out != nullptr ? *out : ctx.song.playlist).push_back (c);
     }
     // round 190gi: Live's clip envelopes on Clip Gain and Track Panning → the clips' own envelopes (clip beats → the same
-    // content ticks as the clips' offsets; −1…1 → 0…1)
-    if (const auto envelope = clipEnvelopeOf (ctx, clip, contentTicks); envelope >= 0)
+    // content ticks as the clips' offsets; Live's values → LYNX's lane values on Live's measured laws). Round 190gx: Live
+    // plays an UNWARPED clip at unity whatever its envelopes say [LIVE 190gu: renders g48 e1–e3 0.00 dB; its Clip View has
+    // no Envelopes tab then], so those are left out and listed.
+    if (! warped)
+    {
+        if (clip.path ("Envelopes/Envelopes").children ("ClipEnvelope").size() > 0)
+            ctx.note (&FlpImportReport::unsupported, "Clip envelopes of unwarped audio clips (left out: Live does not play them)");
+    }
+    else if (const auto envelope = clipEnvelopeOf (ctx, clip, contentTicks); envelope >= 0)
     {
         auto& list = out != nullptr ? *out : ctx.song.playlist;
         for (std::size_t k = list.size() - std::min (list.size(), passes.size()); k < list.size(); ++k)

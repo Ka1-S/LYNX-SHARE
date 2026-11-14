@@ -9809,8 +9809,6 @@ countries: ru by kz
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "Номер входного порта MIDI: перетаскивайте вверх / вниз («...» = нет). Каналы MIDI Out на этом порту играют режим MIDI и Harmonize в Pitcher"
 "FL Studio Mobile resources" = "Ресурсы FL Studio Mobile"
 "Factory sounds for .flm projects: the app's own Resources folder. LYNX SHARE ships none." = "Заводские звуки для проектов .flm: собственная папка Resources приложения. LYNX SHARE их не поставляет."
-
-# round 190ff: Freeze Track, Bounce Track in Place, Bounce to New Track, Consolidate (Clip-launch workflow)
 "Another channel plays into this track's mixer insert: freezing its effects would freeze that channel too. Give the channel an insert of its own." = "В инсерт микшера этой дорожки играет другой канал: заморозка его эффектов заморозила бы и этот канал. Дайте каналу собственный инсерт."
 "Another mixer insert sends audio into this track's insert: a frozen track could not hear it." = "Другой инсерт микшера посылает аудио в инсерт этой дорожки: замороженная дорожка не смогла бы его слышать."
 "This track's mixer insert takes an audio input: a frozen track could not play it." = "Инсерт микшера этой дорожки принимает аудиовход: замороженная дорожка не смогла бы его воспроизвести."
@@ -10052,6 +10050,17 @@ countries: ru by kz
 "Open in new Fruity Slicer channel" = "Открыть в новом канале Fruity Slicer"
 "Open in new Slicex channel" = "Открыть в новом канале Slicex"
 "Get properties" = "Свойства файла"
+"Clip envelope" = "Огибающая клипа"
+"Envelope device: the clip itself, or the track's mixer" = "Устройство огибающей: сам клип или микшер дорожки"
+"Envelope control" = "Параметр огибающей"
+"The clip's envelopes: its gain and its panning while it plays" = "Огибающие клипа: усиление и панорама во время воспроизведения"
+"Show volume envelope" = "Показать огибающую громкости"
+"Show pan envelope" = "Показать огибающую панорамы"
+"Hide envelope" = "Скрыть огибающую"
+"Reset volume envelope" = "Сбросить огибающую громкости"
+"Reset pan envelope" = "Сбросить огибающую панорамы"
+"Auto-warp: {0} markers" = "Авто-варп: маркеров: {0}"
+"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "Флажки варпа: перетащите, чтобы сдвинуть, двойной щелчок здесь добавляет флажок  [Alt]+перетаскивание сдвигает линию маркера в любом месте клипа"
 "In a separate process a crash of the plugin cannot take LYNX SHARE down. Its window then opens on its own (it cannot be docked)." = "В отдельном процессе сбой плагина не может уронить LYNX SHARE. Его окно тогда открывается отдельно (его нельзя закрепить)."
 "Separate process" = "Отдельный процесс"
 "Every plugin runs in a separate process (Options > General settings)." = "Все плагины работают в отдельном процессе (Опции > Общие настройки)."
@@ -10060,7 +10069,6 @@ countries: ru by kz
 "Cause: driver or system latency (the load was only {0}%). Try a larger buffer or another driver." = "Причина: задержка драйвера или системы (нагрузка была всего {0}%). Попробуйте буфер побольше или другой драйвер."
 "Cause: the processing took longer than the buffer ({0} ms). Slowest in that block: {1} ({2} ms)." = "Причина: обработка заняла больше времени, чем длится буфер ({0} мс). Самое медленное в этом блоке: {1} ({2} мс)."
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Причина: обработка подошла к пределу буфера ({0}%). Попробуйте буфер побольше или заморозьте самые тяжёлые каналы."
-# Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
 "Tape speed" = "Скорость ленты"
 
 # Ableton Link (round 190gl)
@@ -10094,3 +10102,15 @@ countries: ru by kz
 "Please enter a number between 1 and {0}." = "Введите число от 1 до {0}."
 "You can add a maximum of {0} tracks." = "Можно добавить не более {0} дорожек."
 "The Master track has no free effect slot." = "На дорожке Master нет свободного слота эффекта."
+"Flux" = "Flux"
+"Formants" = "Форманты"
+"Complex Pro" = "Complex Pro"
+"Flux: how much the grains' timing varies at random" = "Flux: насколько случайно меняется время зёрен"
+"Formants: how much of the sound's formants are kept when it is transposed" = "Форманты: сколько формант звука сохраняется при транспонировании"
+"Envelope: the size of the spectral envelope Complex Pro keeps" = "Envelope: размер спектральной огибающей, которую сохраняет Complex Pro"
+"Measured" = "Измеренный"
+"Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Закон Beats: Classic звучит как LYNX до 0.1.28 (проект сохранён тогда); Измеренный следует рендерам Live 12.4"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] открыть/закрыть редактор  [Alt]+[LMB] не закрывать другие  [Ctrl]+[LMB] прослушать  [2xLMB] Piano Roll  [LMB] перетаскивание вверх/вниз меняет порядок  [RMB] меню канала"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Пиковый индикатор (левый/правый) с удержанием пика  [LMB] сбрасывает индикатор клиппинга"

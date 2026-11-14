@@ -9809,8 +9809,6 @@ countries: es mx ar co cl pe ve
 "MIDI input port number: drag up / down (\"...\" = none). The MIDI Out channels on this port play Pitcher's MIDI mode and Harmonize" = "Número de puerto de entrada MIDI: arrastra arriba / abajo (\"...\" = ninguno). Los canales MIDI Out de ese puerto tocan el modo MIDI y Harmonize de Pitcher"
 "FL Studio Mobile resources" = "Recursos de FL Studio Mobile"
 "Factory sounds for .flm projects: the app's own Resources folder. LYNX SHARE ships none." = "Sonidos de fábrica para proyectos .flm: la propia carpeta Resources de la app. LYNX SHARE no incluye ninguno."
-
-# round 190ff: Freeze Track, Bounce Track in Place, Bounce to New Track, Consolidate (Clip-launch workflow)
 "Another channel plays into this track's mixer insert: freezing its effects would freeze that channel too. Give the channel an insert of its own." = "Otro canal suena en este insert del Mixer de la pista: congelar sus efectos congelaría también ese canal. Dale al canal un insert propio."
 "Another mixer insert sends audio into this track's insert: a frozen track could not hear it." = "Otro insert del Mixer envía audio al insert de esta pista: una pista congelada no podría oírlo."
 "This track's mixer insert takes an audio input: a frozen track could not play it." = "El insert del Mixer de esta pista recibe una entrada de audio: una pista congelada no podría reproducirla."
@@ -10052,6 +10050,17 @@ countries: es mx ar co cl pe ve
 "Open in new Fruity Slicer channel" = "Abrir en un canal Fruity Slicer nuevo"
 "Open in new Slicex channel" = "Abrir en un canal Slicex nuevo"
 "Get properties" = "Ver propiedades"
+"Clip envelope" = "Envolvente del clip"
+"Envelope device: the clip itself, or the track's mixer" = "Dispositivo de la envolvente: el propio clip o el mezclador de la pista"
+"Envelope control" = "Control de la envolvente"
+"The clip's envelopes: its gain and its panning while it plays" = "Las envolventes del clip: su ganancia y su panorama mientras suena"
+"Show volume envelope" = "Mostrar envolvente de volumen"
+"Show pan envelope" = "Mostrar envolvente de panorama"
+"Hide envelope" = "Ocultar envolvente"
+"Reset volume envelope" = "Restablecer envolvente de volumen"
+"Reset pan envelope" = "Restablecer envolvente de panorama"
+"Auto-warp: {0} markers" = "Auto-warp: {0} marcadores"
+"Warp flags: drag one to move it, double-click here adds one  [Alt]+drag moves a marker's line anywhere on the clip" = "Banderas de warp: arrastra una para moverla, doble clic aquí añade una  [Alt]+arrastrar mueve la línea de un marcador en cualquier punto del clip"
 "In a separate process a crash of the plugin cannot take LYNX SHARE down. Its window then opens on its own (it cannot be docked)." = "En un proceso aparte, un fallo del plugin no puede cerrar LYNX SHARE. Su ventana se abre entonces por separado (no se puede acoplar)."
 "Separate process" = "Proceso aparte"
 "Every plugin runs in a separate process (Options > General settings)." = "Todos los plugins se ejecutan en un proceso aparte (Opciones > Configuración general)."
@@ -10060,7 +10069,6 @@ countries: es mx ar co cl pe ve
 "Cause: driver or system latency (the load was only {0}%). Try a larger buffer or another driver." = "Causa: latencia del driver o del sistema (la carga era solo del {0}%). Prueba un búfer más grande u otro driver."
 "Cause: the processing took longer than the buffer ({0} ms). Slowest in that block: {1} ({2} ms)." = "Causa: el procesamiento tardó más que el búfer ({0} ms). Lo más lento en ese bloque: {1} ({2} ms)."
 "Cause: the processing came near the buffer's limit ({0}%). Try a larger buffer, or freeze the heaviest channels." = "Causa: el procesamiento llegó cerca del límite del búfer ({0}%). Prueba un búfer más grande o congela los canales más pesados."
-# Rollup 0.1.28 (round 190fv): Ember's Tape speed keys
 "Tape speed" = "Velocidad de cinta"
 
 # Ableton Link (round 190gl)
@@ -10094,3 +10102,15 @@ countries: es mx ar co cl pe ve
 "Please enter a number between 1 and {0}." = "Introduce un número entre 1 y {0}."
 "You can add a maximum of {0} tracks." = "Puedes añadir un máximo de {0} pistas."
 "The Master track has no free effect slot." = "La pista Master no tiene ninguna ranura de efecto libre."
+"Flux" = "Flux"
+"Formants" = "Formantes"
+"Complex Pro" = "Complex Pro"
+"Flux: how much the grains' timing varies at random" = "Flux: cuánto varía al azar el tiempo de los granos"
+"Formants: how much of the sound's formants are kept when it is transposed" = "Formantes: cuánto de los formantes del sonido se conserva al transponerlo"
+"Envelope: the size of the spectral envelope Complex Pro keeps" = "Envelope: el tamaño de la envolvente espectral que conserva Complex Pro"
+"Measured" = "Medido"
+"Beats law: Classic plays as LYNX did before 0.1.28 (this project was saved then); Measured follows Live 12.4's renders" = "Ley de Beats: Classic suena como LYNX antes de la 0.1.28 (este proyecto se guardó entonces); Medido sigue los renders de Live 12.4"
+
+# --- Not in pt-BR.txt (yet)
+"[LMB] open/close the editor  [Alt]+[LMB] keep others open  [Ctrl]+[LMB] audition  [2xLMB] Piano Roll  [LMB] drag up/down reorders  [RMB] channel menu" = "[LMB] abrir/cerrar el editor  [Alt]+[LMB] mantener los demás abiertos  [Ctrl]+[LMB] preescuchar  [2xLMB] Piano Roll  [LMB] arrastrar arriba/abajo reordena  [RMB] menú del canal"
+"Peak meter (left/right) with peak hold  [LMB] clears the clip light" = "Medidor de picos (izquierda/derecha) con retención de picos  [LMB] apaga el indicador de saturación"

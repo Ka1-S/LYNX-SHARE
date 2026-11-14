@@ -490,10 +490,17 @@ LYNX (`SamplerSettings::warpModes`, `core/WarpModes.h`, `core/TimeStretch` `Stre
   back, and WarpMode 6 (Complex Pro) is kept as a flag so it is written back as 6. .lynx keeps them as `warpModes` (nine
   numbers, only when not the defaults).
 - Rendered offline: Beats Preserve on a note grid (cuts where the output reaches each multiple of the division; 1 bar is
-  taken as 4 beats), Transient Loop Mode (Off: silence after each piece, reached through a 16 ms fade of the audio that
-  follows; Forward: the piece again; Back-and-Forth: as before), Transient Envelope (LYNX's own curve, `(1 − i/span)^k`,
-  `k = 4 (1 − e) / max (e, 0.02)`: needs a Live render), Tones / Texture Grain Size (the spectral block scaled by size /
-  Live's default, 10 … 250 ms). The defaults run exactly the code before 190fm (tests pin it bit for bit).
+  taken as 4 beats), Transient Loop Mode and Transient Envelope, Tones / Texture Grain Size (the spectral block scaled by
+  size / Live's default, 10 … 250 ms).
+- Round 190gx re-measured Beats on Live 12.4's W1 renders (`/mnt/e/lynx-work/livefacts190gx/warp/REPORT.md`, black box):
+  transient cuts sit on the attack itself (LYNX's were 10 ms early) and a transient piece starts within 2 ms (grid pieces
+  keep the 16 ms crossfade); Loop Off = a linear 10 ms fade ending at the next transient, then silence; Back-and-Forth
+  mirrors 20 ms before a transient piece's end (Live: 21.5–30 ms; grid pieces at their end) and Forward loops the piece's
+  second half from there (5 ms crossfade); Transient Envelope = unity up to the piece's own end, then an exponential decay
+  of the fill, τ = 15.5 ms at 0 and 98 ms at 50 (geometric between, assumed; 100 = none). These change Beats renders
+  that have a fill or transient cuts (measured fixes; the other modes render as before).
+- Not matched yet (reported there): Live's transient detection on sustained voice (it cuts at pitch changes), Texture
+  Flux, Complex Pro Formants, the grain-size law at the extremes.
 - Kept but not rendered (import report lines): Texture's Flux, Complex Pro's Formants and Envelope (Complex Pro plays as
   Complex).
 - The Clip View shows the mode's settings under the mode chooser; an edit from a grid clip whose channel other clips play
@@ -613,3 +620,13 @@ Before → after per case (the rack against the engine, same stimuli, same metri
 - An audio clip's clip envelopes: `AudioClip/Envelopes/Envelopes/ClipEnvelope{EnvelopeTarget/PointeeId, Automation/Events/FloatEvent{Time, Value}, LoopSlot, ScrollerTimePreserver}` **[SCHEMA, DATA]**, times in clip beats (the clip's `LoopStart` coordinates), the first event "before the song" (−63072000).
 - Clip Gain → the track's `DeviceChain/MainSequencer/VolumeModulationTarget`; Track Panning modulation → `DeviceChain/Mixer/Pan/ModulationTarget` **[SCHEMA, DATA: the 12 Suite demo set's vocal clips]**. Values −1…1 (−1 where those clips are silent) **[DATA]**.
 - LYNX: the clip's own `ClipEnvelope` volume / pan lanes (core/ClipEnvelope.h), 0…1 ↔ −1…1 linear (the ends are certain; the law between them needs a live check). Export: the PointeeId is a placeholder until the ids are renumbered, then the track's own target ids; a curved LYNX segment is written as 8 straight ones. Import: other clip envelopes (devices, track volume modulation, transposition, sample offset) are listed; Live 11+ curve controls become straight segments (listed).
+- **Round 190gx (Live 12.4 renders of round 190gu, 1 kHz sine, the same in Re-Pitch and Complex):** Live plays clip
+  envelopes **only on warped clips** (an unwarped clip renders at unity and its Clip View has no Envelopes tab) — the
+  import leaves an unwarped clip's envelopes out (listed); the export always writes warped clips. **Clip Gain law**
+  (value L → dB): 20·(L − 1) from 1 down to −0.2; below it the larger of −50·L² + L − 21.8 and the line through
+  (−0.98, −69.4 dB) and (−0.96, −68.37 dB) (it takes over near −0.95); −1 silent; never above 0 dB. All 28 measured
+  values within 0.01 dB (`clipenv::liveGainDb`). LYNX's volume lane keeps its own gain law (FL's Levels adjustment), so
+  the values are converted through the gain both ways (`clipenv::toLive / fromLive`), and because the two programs'
+  ramps are straight in different units a volume ramp is cut into pieces both ways until the gain agrees within 0.05 dB
+  (above −60 dB). **Track Panning law:** constant power with +3 dB at the sides, L = √2·cos((p+1)·π/4),
+  R = √2·sin((p+1)·π/4) — the same as LYNX's voice pan, so the pan lane maps one to one.

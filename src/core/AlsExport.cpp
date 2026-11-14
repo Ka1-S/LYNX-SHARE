@@ -1201,7 +1201,8 @@ struct Exporter
 
     // Round 190gi: the clip's own envelopes → Live's clip envelopes, in clip beats: volume → the track's Clip Gain
     // (MainSequencer/VolumeModulationTarget), pan → the Mixer's Track Panning modulation (Mixer/Pan/ModulationTarget),
-    // values 0…1 → −1…1 (clipenv::toLive). The targets' ids exist only after the renumbering: the PointeeId holds a
+    // values on Live's measured laws (clipenv::toLive; an exported audio clip is always warped, so Live plays them, round
+    // 190gx). The targets' ids exist only after the renumbering: the PointeeId holds a
     // placeholder that run() replaces per track (clipEnvelopeTargets).
     void clipEnvelopes (Node& c, const Clip& clip)
     {
@@ -1226,19 +1227,36 @@ struct Exporter
             const auto& points = clipenv::laneOf (*e, lane);
             if (clipenv::flat (points, clipenv::neutralOf (lane)))
                 continue;
-            // the events: each point, and a curved segment (FL's curve modes, a tension) sampled at 8 steps
+            // the events: each point, and a curved segment (FL's curve modes, a tension) sampled at 8 steps; round 190gx:
+            // a volume segment is also cut until Live's straight line in its own value (its Clip Gain law, measured in
+            // 190gu) keeps LYNX's gain curve within 0.05 dB
             std::vector<std::pair<double, double>> events;
             for (std::size_t k = 0; k < points.size(); ++k)
             {
-                events.push_back ({ beats (points[k].tick), clipenv::toLive (points[k].value) });
-                if (k + 1 < points.size() && (points[k].mode != 0 || points[k].tension != 0.0f) && points[k + 1].tick > points[k].tick)
+                events.push_back ({ beats (points[k].tick), clipenv::toLive (lane, points[k].value) });
+                if (k + 1 >= points.size() || points[k + 1].tick <= points[k].tick)
+                    continue;
+                const auto curvedSegment = points[k].mode != 0 || points[k].tension != 0.0f;
+                if (! curvedSegment && (lane != clipenv::volumeLane || points[k + 1].value == points[k].value))
+                    continue;
+                curved = curved || curvedSegment;
+                const auto t0 = (double) points[k].tick, t1 = (double) points[k + 1].tick;
+                const auto v0 = points[k].value, v1 = points[k + 1].value;
+                const auto valueAt = [&] (double t) { return t <= t0 ? v0 : t >= t1 ? v1 : automationCurveAt (points, t); };
+                const int pieces = curvedSegment ? 8 : 1;
+                for (int j = 0; j < pieces; ++j)
                 {
-                    curved = true;
-                    for (int j = 1; j < 8; ++j)
-                    {
-                        const auto t = (double) points[k].tick + (double) (points[k + 1].tick - points[k].tick) * j / 8.0;
-                        events.push_back ({ t / (double) ppq, clipenv::toLive (automationCurveAt (points, t)) });
-                    }
+                    const auto a = t0 + (t1 - t0) * j / pieces, b = t0 + (t1 - t0) * (j + 1) / pieces;
+                    const auto add = [&] (double t, double live) {
+                        if (t < t1)
+                            events.push_back ({ t / (double) ppq, live });
+                    };
+                    if (lane == clipenv::volumeLane)
+                        clipenv::subdivide (
+                            a, b, valueAt, [] (float v) { return clipenv::volumeToLive (v); }, [] (double l) { return clipenv::liveDb (l); },
+                            [] (float v) { return clipenv::laneDb (v); }, add);
+                    else
+                        add (b, clipenv::toLive (lane, valueAt (b)));
                 }
             }
             Node env;
