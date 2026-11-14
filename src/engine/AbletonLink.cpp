@@ -85,6 +85,7 @@ AbletonLink::~AbletonLink()
     impl.store (nullptr);
     if (owned != nullptr)
         owned->link.enable (false);
+    owned.reset(); // (here, while the callbacks' atomics still exist: Link's threads end with it)
 }
 
 void AbletonLink::setEnabled (bool on, double projectBpm)
@@ -163,6 +164,13 @@ int AbletonLink::beginBlock (Transport& transport, int numSamples, double output
     }
     const auto costStart = std::chrono::steady_clock::now();
     const auto sr = rt.sampleRate;
+    const auto resetCount = resets.load (std::memory_order_relaxed);
+    const auto fresh = ! rt.active || resetCount != rt.seenResets;
+    if (fresh) // (the sample clock didn't run while Link was off: its host-time fit starts over; no allocation)
+    {
+        p->filter.reset();
+        rt.sampleTime = 0;
+    }
     const auto hostTime = p->filter.sampleTimeToHostTime ((double) rt.sampleTime) + Micros ((std::int64_t) std::llround (outputLatencyMs * 1000.0));
     rt.sampleTime += numSamples;
     auto state = p->link.captureAudioSessionState();
@@ -186,10 +194,10 @@ int AbletonLink::beginBlock (Transport& transport, int numSamples, double output
     in.externalBpm = external;
 
     // Link was just switched on (or on again): LYNX's state starts over
-    if (const auto r = resets.load (std::memory_order_relaxed); ! rt.active || r != rt.seenResets)
+    if (fresh)
     {
         rt.active = true;
-        rt.seenResets = r;
+        rt.seenResets = resetCount;
         rt.pending = false;
         rt.running = playing;
         rt.steady = positionBeats;
