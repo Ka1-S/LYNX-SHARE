@@ -4904,28 +4904,39 @@ TEST (remote_reset_replaces_only_requested_instances_and_default_reuse_stays_unc
     };
     const auto before = lynx::RackState::build (source, nullptr, 48000.0, normal);
     CHECK (instrumentsMade == 2 && effectsMade == 2);
+    // Round 190az (24047e7a0): an ordinary build keeps a running instance for its own channel / slot (the instance
+    // tag) or for one saved with the same settings. A renewed tag with a cleared state is another device: it is
+    // created anew, with the default state, as a remote reset asks.
     auto reset = source;
     reset.channels[0].instance.renew();
     reset.channels[0].plugin.state.clear();
     reset.mixer[1].effects[0].instance.renew();
     reset.mixer[1].effects[0].plugin.state.clear();
-
-    // Ordinary project/UI edits retain the established positional fallback, even for fresh model tags.
     const auto ordinary = lynx::RackState::build (reset, before.get(), 48000.0, normal);
-    CHECK (instrumentsMade == 2 && effectsMade == 2);
-    CHECK (ordinary->instruments[0] == before->instruments[0] && ordinary->effects[1][0] == before->effects[1][0]);
-
-    auto requested = normal;
-    requested.freshInstances = { reset.channels[0].instance.id, reset.mixer[1].effects[0].instance.id };
-    const auto replaced = lynx::RackState::build (reset, before.get(), 48000.0, requested);
     CHECK (instrumentsMade == 3 && effectsMade == 3);
     CHECK (lastInstrumentState.empty() && lastEffectState.empty()); // factories received actual default-state requests
+    CHECK (ordinary->instruments[0] != before->instruments[0] && ordinary->effects[1][0] != before->effects[1][0]);
+    CHECK (ordinary->instruments[1] == before->instruments[1] && ordinary->effects[1][1] == before->effects[1][1]);
+
+    // With the same saved bytes the positional instance stays in an ordinary build; freshInstances replaces exactly
+    // the devices it names.
+    auto renewed = source;
+    renewed.channels[0].instance.renew();
+    renewed.mixer[1].effects[0].instance.renew();
+    const auto kept = lynx::RackState::build (renewed, before.get(), 48000.0, normal);
+    CHECK (instrumentsMade == 3 && effectsMade == 3);
+    CHECK (kept->instruments[0] == before->instruments[0] && kept->effects[1][0] == before->effects[1][0]);
+    auto requested = normal;
+    requested.freshInstances = { renewed.channels[0].instance.id, renewed.mixer[1].effects[0].instance.id };
+    const auto replaced = lynx::RackState::build (renewed, before.get(), 48000.0, requested);
+    CHECK (instrumentsMade == 4 && effectsMade == 4);
+    CHECK (lastInstrumentState == "saved Synth A" && lastEffectState == "saved Effect A");
     CHECK (replaced->instruments[0] != before->instruments[0] && replaced->effects[1][0] != before->effects[1][0]);
     CHECK (replaced->instruments[1] == before->instruments[1] && replaced->effects[1][1] == before->effects[1][1]);
 
     // The policy belongs to that build only: later ordinary edits reuse the newly created instances.
-    const auto later = lynx::RackState::build (reset, replaced.get(), 48000.0, normal);
-    CHECK (instrumentsMade == 3 && effectsMade == 3);
+    const auto later = lynx::RackState::build (renewed, replaced.get(), 48000.0, normal);
+    CHECK (instrumentsMade == 4 && effectsMade == 4);
     CHECK (later->instruments[0] == replaced->instruments[0] && later->effects[1][0] == replaced->effects[1][0]);
 }
 
