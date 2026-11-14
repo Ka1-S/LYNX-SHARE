@@ -3365,7 +3365,10 @@ Total 35 up / 376 same / 0 down; the 376 unchanged renders are byte-identical to
 default ESR −5.8 … −14.9 → −19.5 … −41.3 dB (level error up to 5.8 → 0.2 dB); Drive +10 −10.3 … −10.7 → −12.7 …
 −20.0 dB; Drive +15 / 1⅞ ips +2.7 … −2.1 → −12.8 … −20.9 dB (level +3.9 … +6.7 → −0.6 … 0.0 dB). refcap182 X1
 (30 ips) 2 … 5 → 7 … 8; X2 (flutter on, not modelled) 2 … 3 → 3 … 4.
-Classic law / old projects / every non-tape path: bit for bit the base (8 hash goldens, `tests/Ember190fjTests.inc`).
+Classic law / old projects / every non-tape path: bit for bit the base (8 hash goldens, `tests/Ember190fjTests.inc`). The
+Classic voicing's golden is kept for both compilers (g++ 15 and zig c++ 0.13 round the base's own Classic voicing
+differently; each build of the branch matches its build of the base). Imported Live Saturators (Bass Shaper, Hard
+Curve map to the Tape style) keep the Classic tape: their fits (round 190da) were made on it.
 
 **CPU** (one instance, 30 s stereo at 48 kHz, best of 5, -O2 no-LTO objects at machine load ~20): Tape at 4×
 (Ember's default) Classic 1.8 % of a core → Measured 4.0 % (4.2 % at 1⅞ ips with the clamp); 2× 1.2 → 2.3 %; 8× 3.1 →
