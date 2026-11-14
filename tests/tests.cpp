@@ -17423,6 +17423,7 @@ TEST (fl_low_lifter_matches_fl_engine)
 #include "Issue160Tests.inc"
 #include "Issue159Tests.inc"
 #include "Issue165Tests.inc"
+#include "Bugs190gyTests.inc"
 #include "Fpc190mTests.inc"
 #include "Fpc190qTests.inc"
 #include "Fpc190zTests.inc"
