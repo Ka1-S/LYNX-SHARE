@@ -2336,31 +2336,33 @@ Layout strikeLayout()
     return l;
 }
 
-// round 190fk: Anvil Bus, LYNX's drum-bus processor. The generic layout: DRIVE (type keys, Drive big, Crunch, Damp) on
-// the left, TRANSIENTS big in the middle, BOOM (amount big, frequency, decay) on the right, Comp, Trim, Output and Dry/Wet
-// along the bottom (the editor, ui/ProEditors.cpp AnvilEditor, draws the forged-steel look)
+// round 190fk: Anvil Bus, LYNX's drum-bus processor (the editor draws the forged-steel look, ui/PluginArtEffects.inc).
+// Round 190gx: the controls in the reference's four columns, top to bottom [Live 12.4 Drum Buss panel shot,
+// /mnt/e/lynx-work/live190gu/drumbus/live-drumbuss-panel-type0-drive25.png]: Drive, the three types stacked, Trim, Comp |
+// Crunch, Damp, Transients | Boom, Freq., Decay | the Output fader and Dry/Wet (the reference's Bass meter, Force to note
+// and Boom audition are left out: LYNX has no such outputs)
 Layout anvilLayout()
 {
     Layout l;
     l.width = 600;
     l.height = 330;
     auto& v = l.items;
-    v.push_back (section (4, 4, 196, 250, TR_NOOP ("Drive")));
-    v.push_back (tabs (16, 30, 172, 22, "Drive type", TR_NOOP ("Soft|Medium|Hard"), { 0.0f, 0.5f, 1.0f }));
-    v.push_back (dial (102, 100, 64, "Drive", TR_NOOP ("Drive"), big));
-    v.push_back (dial (56, 196, 36, "Crunch", TR_NOOP ("Crunch")));
-    v.push_back (dial (148, 196, 36, "Damp", TR_NOOP ("Damp")));
-    v.push_back (section (204, 4, 192, 250, TR_NOOP ("Transients")));
-    v.push_back (dial (300, 110, 80, "Transients", TR_NOOP ("Transients"), bipolar | big));
-    v.push_back (section (400, 4, 196, 250, TR_NOOP ("Boom")));
-    v.push_back (dial (498, 100, 64, "Boom", TR_NOOP ("Boom"), big));
-    v.push_back (dial (452, 196, 36, "Boom freq.", TR_NOOP ("Freq.")));
-    v.push_back (dial (544, 196, 36, "Boom decay", TR_NOOP ("Decay")));
-    v.push_back (section (4, 258, 592, 68, "", boxed));
-    v.push_back (toggle (24, 278, 80, 26, "Comp", TR_NOOP ("Comp")));
-    v.push_back (dial (220, 280, 28, "Trim", TR_NOOP ("Trim")));
-    v.push_back (dial (360, 280, 28, "Output", TR_NOOP ("Output")));
-    v.push_back (dial (500, 280, 28, "Dry/Wet", TR_NOOP ("Dry/Wet")));
+    v.push_back (section (4, 4, 146, 322, TR_NOOP ("Drive")));
+    v.push_back (dial (77, 68, 52, "Drive", TR_NOOP ("Drive"), big));
+    v.push_back (radio (30, 118, 94, 72, "Drive type", TR_NOOP ("Soft|Medium|Hard"), { 0.0f, 0.5f, 1.0f }));
+    v.push_back (dial (77, 226, 30, "Trim", TR_NOOP ("Trim")));
+    v.push_back (toggle (22, 286, 110, 26, "Comp", TR_NOOP ("Comp")));
+    v.push_back (section (154, 4, 146, 322, "", boxed));
+    v.push_back (dial (227, 58, 40, "Crunch", TR_NOOP ("Crunch")));
+    v.push_back (dial (227, 150, 40, "Damp", TR_NOOP ("Damp")));
+    v.push_back (dial (227, 246, 48, "Transients", TR_NOOP ("Transients"), bipolar | big));
+    v.push_back (section (304, 4, 146, 322, TR_NOOP ("Boom")));
+    v.push_back (dial (377, 68, 52, "Boom", TR_NOOP ("Boom"), big));
+    v.push_back (dial (377, 162, 40, "Boom freq.", TR_NOOP ("Freq.")));
+    v.push_back (dial (377, 250, 40, "Boom decay", TR_NOOP ("Decay")));
+    v.push_back (section (454, 4, 142, 322, "", boxed));
+    v.push_back (slider (Item::vslider, 505, 24, 40, 200, "Output", TR_NOOP ("Output")));
+    v.push_back (dial (525, 276, 30, "Dry/Wet", TR_NOOP ("Dry/Wet")));
     return l;
 }
 

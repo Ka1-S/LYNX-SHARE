@@ -481,15 +481,19 @@ bool drumBussToEngine (const Element& device, Translated& out)
     out.links.push_back ({ "DryWet", an::dryWet, [] (double v) { return unit (v); } });
 
     // the report: what the engine holds as a fit rather than a measurement at that very setting
+    // (round 190gx: the measured settings are Live's 190ei and 190gu renders)
     const auto drive = (double) p[an::drive];
-    if (drive > 0.0 && drive != 0.25 && drive != 0.5 && drive != 1.0)
-        out.notes.approximated.push_back ("drive between the measured amounts (0, 25, 50, 100 %): curve and gain interpolated");
-    if (type != 0 && drive > 0.0)
-        out.notes.approximated.push_back ("the drive type's EQ fitted at 100 % and taken in proportion below");
-    if (p[an::boom] > 0.0f && std::abs (p[an::boom] - 0.5f) > 1.0e-3f)
-        out.notes.approximated.push_back ("Boom fitted at amount 0.5; other amounts scale its resonance");
-    if (p[an::crunch] > 0.0f && std::abs (p[an::crunch] - 0.5f) > 1.0e-3f)
-        out.notes.approximated.push_back ("Crunch fitted at 0.5; other amounts scale its band");
+    const auto measured = [] (double v, std::initializer_list<double> at) {
+        return std::any_of (at.begin(), at.end(), [v] (double a) { return std::abs (v - a) < 1.0e-3; });
+    };
+    if (drive > 0.0 && ! measured (drive, { 0.25, 0.5, 1.0 }) && ! (type == 0 && measured (drive, { 0.75 })))
+        out.notes.approximated.push_back ("drive between the measured amounts (0, 25, 50, 100 %; Soft also 75 %): curve and gain interpolated");
+    if (drive > 0.0 && ! measured (drive, { 0.25, 0.5, 1.0 }))
+        out.notes.approximated.push_back ("the drive type's EQ fitted at 25, 50 and 100 % and interpolated between");
+    if (p[an::boom] > 0.0f && ! measured ((double) p[an::boom], { 0.25, 0.5, 1.0 }))
+        out.notes.approximated.push_back ("Boom fitted at amounts 0.25, 0.5 and 1.0; amounts between interpolate its lift and resonance");
+    if (p[an::crunch] > 0.0f)
+        out.notes.approximated.push_back ("Crunch as its mid-band level (fitted at 0.25, 0.5 and 1.0; its grit is not carried)");
     if (outDb > 12.0)
         out.notes.approximated.push_back (text ("output %.1f dB (Anvil Bus: up to +12 dB)", outDb));
     if (device.boolean ("BoomAudition/Manual", false))

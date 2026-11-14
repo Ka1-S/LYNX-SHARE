@@ -6,9 +6,10 @@
 // staircase, an impulse, a sweep and a drum loop through each setting); nothing of Live's code or content is used.
 //
 // Signal flow (one stereo path, every stage per channel):
-//   Trim → [Comp] → colour pre-emphasis → Drive (×gain, the type's curve, 4× oversampled) → Damp (one-pole low pass)
-//        → colour / type / Crunch / Boom EQ (magnitude-matched sections, core/FacetEq.h) → Transients → Output
-//        → Dry/Wet against the raw input (delayed by the oversampler's latency)
+//   Trim → Comp (round 190gx: before the curve, as Live's renders show) → colour pre-emphasis → Drive (×gain, the
+//        type's curve, 4× oversampled) → Damp (one-pole low pass) → colour / type / Crunch EQ (magnitude-matched
+//        sections, core/FacetEq.h) and Boom's resonant peak → Transients → Output → Dry/Wet against the raw input
+//        (delayed by the oversampler's latency; Live's dry branch is the raw input with Comp on too, 190gu)
 //   - the colour is there at every setting (the device is never transparent: a "smile" EQ and a soft saturator);
 //   - Drive: three types — Soft folds the loudest peaks over (a sine folder at high drive), Medium and Hard clip with
 //     their own EQ under the drive;
@@ -68,8 +69,11 @@ struct Bell
 };
 // The drive per type (Soft, Medium, Hard) and amount (0, 25, 50, 100 %): the small-signal gain into the curve, dB
 // [MEASURED: 1 kHz at −60 dBFS, the all-zero device's +1.97 dB included]
-constexpr double driveAmounts[4] { 0.0, 0.25, 0.5, 1.0 };
-constexpr double driveDbTable[3][4] { { 1.97, 3.92, 8.91, 11.52 }, { 1.97, 5.73, 9.48, 16.98 }, { 1.97, 5.94, 7.75, 14.23 } };
+// (round 190gx: a knot at 75 %, fitted for Soft on Live's 75 % staircase and noise — 0 dBFS folds to −12.1 dBFS there;
+// Medium and Hard keep 190fk's straight line between 50 and 100 %)
+constexpr int amountKnots = 5;
+constexpr double driveAmounts[amountKnots] { 0.0, 0.25, 0.5, 0.75, 1.0 };
+constexpr double driveDbTable[3][amountKnots] { { 1.97, 3.92, 8.91, 10.16, 11.52 }, { 1.97, 5.73, 9.48, 13.23, 16.98 }, { 1.97, 5.94, 7.75, 10.99, 14.23 } };
 
 // Every constant the engine runs on, in one place (the defaults are the fitted values; the measurement harness may
 // try others)
@@ -92,41 +96,71 @@ struct Tuning
     // little better, 0.115 vs 0.124 dB, but lifts the drum loop's kick attack: the plain curve keeps every 0 % case)]
     // (round 190fk, second pass: where the level-only fit raised the staircase's THD above the rack's, (m, k) were refitted
     // for the lowest level error with THD at or under the rack's: Soft 25 %, Medium 100 %, Hard 25 / 50 / 100 %)
-    double curveM[3][4] { { 0.0, 0.1911, 0.28, 0.82 }, { 0.0, 0.40, 0.18, 0.1121 }, { 0.0, 0.1740, 0.0587, 0.0744 } };
-    double curveK[3][4] { { 1.0, 1.5246, 1.40, 1.12 }, { 1.0, 1.26, 1.36, 1.1761 }, { 1.0, 1.4394, 1.491, 1.1656 } };
+    double curveM[3][amountKnots] { { 0.0, 0.1911, 0.28, 0.8045, 0.82 }, { 0.0, 0.40, 0.18, 0.14605, 0.1121 }, { 0.0, 0.1740, 0.0587, 0.06655, 0.0744 } };
+    double curveK[3][amountKnots] { { 1.0, 1.5246, 1.40, 1.1705, 1.12 }, { 1.0, 1.26, 1.36, 1.26805, 1.1761 }, { 1.0, 1.4394, 1.491, 1.3283, 1.1656 } };
+    // round 190gx: the type EQ's depth below 100 % = typeEqDb · amount^typeEqExp [FITTED on Live's noise at 25 / 50 / 75 %:
+    // Soft and Medium keep the neutral device's shape until close to 100 % (noise TF rms Soft 0.34 / 0.58 / 0.72 →
+    // 0.19 / 0.22 / 0.20 dB, Medium 1.49 / 2.95 → 0.23 / 0.41); Hard grows in proportion (190fk's law fits best)]
+    double typeEqExp[3] { 8.0, 8.0, 1.0 };
+    double driveDb[3][amountKnots] { { 1.97, 3.92, 8.91, 10.16, 11.52 }, { 1.97, 5.73, 9.48, 13.23, 16.98 }, { 1.97, 5.94, 7.75, 10.99, 14.23 } };
     // Crunch: the mid band's lift 20·log10 (1 + crunchK · amount) between two shelves, and its grit
     double crunchK = 2.14, crunchLowHz = 95.2, crunchLowQ = 0.743, crunchHighHz = 9041.0, crunchHighQ = 0.826;
     double crunchGrit = 0.0;
+    // round 190gx: where Crunch's band lift sits — 0 = after the curve (190fk), 1 = before it, so the always-on curve
+    // grits the lifted mid band; crunchDriveDb · amount more gain into the curve (taken off after it)
+    int crunchPre = 0;
+    double crunchDriveDb = 0.0;
     // Boom (amount 0.5 fitted at decay 0.2 and 1.0): a bell at the frequency and a resonant 12 dB/oct high pass
     double boomBellDb02 = 13.75, boomBellDb10 = 18.65, boomBellQ02 = 3.32, boomBellQ10 = 2.18;
     double boomCutQ02 = 0.581, boomCutQ10 = 0.476, boomCutAt02 = 1.470, boomCutAt10 = 0.816;
+    // round 190gx: the same four at decay 0 and 0.5 (the defaults continue 190fk's straight line through 0.2 and 1.0),
+    // the bell's growth with the amount ((amount / 0.5)^boomAmtExp of its linear lift) and the cut's follow of it
+    // [FITTED on Live's decay 0 / 0.5 renders, sig + drums: 0.84 / 3.22 → 0.70 / 3.08 and 0.53 / 1.87 → 0.43 / 1.75 dB]
+    double boomBellDb00 = 14.055, boomBellQ00 = 2.807, boomCutQ00 = 0.5143, boomCutAt00 = 1.659;
+    double boomBellDb05 = 17.582, boomBellQ05 = 2.384, boomCutQ05 = 0.4297, boomCutAt05 = 1.191;
+    double boomCutAmtExp = 1.0;
+    // the bell's lift (its linear part, A − 1) and its Q at amount 0.25 and 1.0 relative to amount 0.5, straight in
+    // between and to 0 below 0.25 [FITTED on Live's amount 0.25 / 1.0 renders, sig + drums: 1.66 / 4.98 → 0.27 / 0.43 and
+    // 0.90 / 7.82 → 0.25 / 3.32 dB; Live's ring at 1.0 lasts: −20 dB/s at 50 Hz after an impulse (190fk: in proportion,
+    // the Q fixed: lift 0.5 / 2.0, Q 1 / 1)]
+    double boomGs25 = 0.1145, boomGs100 = 5.502, boomQs25 = 0.6161, boomQs100 = 2.138;
     // Damp: a first-order low pass; 0 = bilinear (zero at Nyquist), 1 = one-pole (impulse invariant: no zero at Nyquist,
     // the top flattens like Live's) [MEASURED re the all-zero device: −3 dB at 1020 / 6662 Hz for 1 / 6 kHz; the one-pole
     // fits 1 / 6 kHz at 0.36 / 0.36 dB rms against 1.44 / 1.18 for the bilinear one, round 190fk]
+    // (round 190gx: the corner sits 6 % above the set frequency [FITTED on Damping 500 Hz / 2 kHz (190gu, sig + noise) and
+    // 1 / 6 kHz (190ei): noise TF rms 0.38 / 0.36 / 0.39 / 0.38 → 0.24 / 0.26 / 0.26 / 0.24 dB])
     int dampKind = 1;
-    double dampScale = 1.0;
-    // Comp: fixed feed-forward compressor (dB), peak detector, stereo linked; pre = before the curve
-    // [FITTED on the staircase and the drum loop with Comp on, round 190fk: level rms 0.107 dB, drum segments 0.738 dB]
-    double compThresholdDb = -18.18, compRatio = 4.0, compKneeDb = 1.715, compAttackMs = 0.5273, compReleaseMs = 148.5, compMakeupDb = 11.05;
-    int compPre = 0;
+    double dampScale = 1.0604;
+    // Comp: fixed feed-forward compressor (dB), peak detector, stereo linked; pre = before the curve. Round 190gx: Live's
+    // renders with Comp + Drive 50 % and Comp + Trim −12 dB put it BEFORE the curve (right after Trim): the staircase with
+    // Drive 50 % 1.63 → 0.17 dB, its THD rms 11.6 → 2.8 dB; refitted on all eight Comp cases (190ei d70 / d71, 190gu
+    // k / w: every one closer, e.g. drum loop 0.73 → 0.48, Drive 50 % drums 2.65 → 0.73 dB)
+    double compThresholdDb = -19.70, compRatio = 2.903, compKneeDb = 5.353, compAttackMs = 1.498, compReleaseMs = 283.8, compMakeupDb = 11.11;
+    int compPre = 1;
     // Transients: attack / sustain dB per unit of the amount (positive and negative side) above the split, on Strike
     // Shaper's detector (its knobs end at ±15 / ±24 dB) [FITTED on the drum loop at −0.5 / +0.5 / +1.0, round 190fk:
     // segment levels rms 1.07 / 1.14 / 2.41 dB]
-    double tAttackPos = 22.56, tSustainPos = 19.01, tAttackNeg = 14.55, tSustainNeg = -22.47, tSplitHz = 330.5;
+    // Round 190gx: Live's Transients move steady material too (a sustained pad, rms re the neutral device: −1.0 → −3.92
+    // dB, −0.25 → −0.75, +0.25 → +1.15; the detector alone leaves a pad all but untouched), so a broadband level per unit
+    // of the amount joins the shaper, refitted with it on the drum loop and the pad (190ei d40–d42 + 190gu t-cases, no
+    // case worse: pad −1.0 3.53 → 3.05 dB, +0.25 0.98 → 0.80, drums −1.0 3.76 → 3.62, +0.25 0.75 → 0.60). Live's full
+    // steady-state cut at −1.0 is not reached: a larger level term moves the drum loop's segments off (190ei renders).
+    double tAttackPos = 22.96, tSustainPos = 17.18, tAttackNeg = 15.49, tSustainNeg = -15.47, tSplitHz = 330.5;
+    double tLevelPos = 0.80, tLevelNeg = -0.633;
     // an extra fixed low cut after the colour (12 dB/oct, Q 0.707; 0 = none: Boom's high pass does that job)
     double lowCutHz = 0.0;
     // the output stage's ceiling (0 = none): a soft clip whose peaks stay under `ceiling`
-    double ceiling = 0.0;
+    double ceiling = 0.0, ceilingKnee = 0.7;
 };
 
 // a value of a per-amount table (0, 25, 50, 100 %), piecewise linear in the amount
 inline double byAmount (const double* ys, double amount) noexcept
 {
     const auto x = std::clamp (amount, 0.0, 1.0);
-    for (int i = 1; i < 4; ++i)
+    for (int i = 1; i < amountKnots; ++i)
         if (x <= driveAmounts[i])
             return ys[i - 1] + (ys[i] - ys[i - 1]) * (x - driveAmounts[i - 1]) / (driveAmounts[i] - driveAmounts[i - 1]);
-    return ys[3];
+    return ys[amountKnots - 1];
 }
 // The curve's small-signal drive gain (dB) for a type and amount
 inline double driveGainDb (Type type, double amount) noexcept { return byAmount (driveDbTable[(int) type], amount); }
@@ -137,17 +171,32 @@ struct BoomBands
 {
     double hz = 50.0, bellDb = 0.0, bellQ = 2.0, cutHz = 10.0, cutQ = 0.5;
 };
+// a value at decay 0 / 0.2 / 0.5 / 1.0, piecewise linear in the decay
+inline double byDecay (double d0, double d02, double d05, double d10, double decay) noexcept
+{
+    const auto d = std::clamp (decay, 0.0, 1.0);
+    if (d <= 0.2) return d0 + (d02 - d0) * d / 0.2;
+    if (d <= 0.5) return d02 + (d05 - d02) * (d - 0.2) / 0.3;
+    return d05 + (d10 - d05) * (d - 0.5) / 0.5;
+}
 inline BoomBands boomBands (const Tuning& t, double amount, double hz, double decay) noexcept
 {
     BoomBands b;
     const auto a = std::clamp (amount, 0.0, 1.0);
-    const auto x = (std::clamp (decay, 0.0, 1.0) - 0.2) / 0.8;
     b.hz = std::clamp (hz, 30.0, 90.0);
-    const auto atHalf = std::pow (10.0, (t.boomBellDb02 + (t.boomBellDb10 - t.boomBellDb02) * x) / 20.0) - 1.0;
-    b.bellDb = std::clamp (20.0 * std::log10 (1.0 + atHalf * a / 0.5), 0.0, 30.0);
-    b.bellQ = std::clamp (t.boomBellQ02 + (t.boomBellQ10 - t.boomBellQ02) * x, 1.0, 6.0);
-    b.cutQ = std::clamp (t.boomCutQ02 + (t.boomCutQ10 - t.boomCutQ02) * x, 0.3, 1.5);
-    b.cutHz = std::max (10.0, b.hz * std::clamp (t.boomCutAt02 + (t.boomCutAt10 - t.boomCutAt02) * x, 0.5, 2.0) * std::min (1.0, a / 0.5));
+    const auto atHalf = std::pow (10.0, byDecay (t.boomBellDb00, t.boomBellDb02, t.boomBellDb05, t.boomBellDb10, decay) / 20.0) - 1.0;
+    const auto rel = a / 0.5;
+    // the amount's scale of the lift and of the Q (1 at 0.5; knots at 0.25 and 1.0; the lift → 0 at 0)
+    const auto byAmt = [a] (double at25, double at100, bool toZero) {
+        if (a <= 0.25) return toZero ? at25 * a / 0.25 : at25;
+        if (a <= 0.5) return at25 + (1.0 - at25) * (a - 0.25) / 0.25;
+        return 1.0 + (at100 - 1.0) * (a - 0.5) / 0.5;
+    };
+    b.bellDb = std::clamp (20.0 * std::log10 (1.0 + atHalf * byAmt (t.boomGs25, t.boomGs100, true)), 0.0, 40.0);
+    b.bellQ = std::clamp (byDecay (t.boomBellQ00, t.boomBellQ02, t.boomBellQ05, t.boomBellQ10, decay) * byAmt (t.boomQs25, t.boomQs100, false), 0.5, 80.0);
+    b.cutQ = std::clamp (byDecay (t.boomCutQ00, t.boomCutQ02, t.boomCutQ05, t.boomCutQ10, decay), 0.3, 1.5);
+    const auto follow = rel <= 1.0 ? rel : (t.boomCutAmtExp == 1.0 ? 1.0 : std::pow (rel, t.boomCutAmtExp - 1.0));
+    b.cutHz = std::max (10.0, b.hz * std::clamp (byDecay (t.boomCutAt00, t.boomCutAt02, t.boomCutAt05, t.boomCutAt10, decay), 0.5, 2.0) * follow);
     return b;
 }
 // The transient shaper's attack / sustain gains (dB) for an amount −1 … +1
@@ -203,7 +252,10 @@ public:
         pre.reset();
         for (auto& b : eq)
             b.reset();
+        for (auto& b : crunchEq)
+            b.reset();
         dampLp.reset();
+        boomBell.reset();
         dcHp.reset();
         splitLow[0] = splitLow[1] = 0.0;
         shaper.reset();
@@ -212,6 +264,7 @@ public:
         dryL.fill (0.0f);
         dryR.fill (0.0f);
         rampsReady = false;
+        levelReady = false;
     }
 
     // last block's gain reduction of Comp (dB, ≥ 0) and the transient gains (dB), for the editor
@@ -239,8 +292,11 @@ private:
     };
 
     // one Facet-style band (core/FacetEq.h's analog prototypes and magnitude-matched sections) into eq[k]
-    int band (int k, facet::Shape shape, double hz, double db, double q) noexcept
+    int band (int k, facet::Shape shape, double hz, double db, double q) noexcept { return band (eq, k, shape, hz, db, q); }
+    template <std::size_t N>
+    int band (std::array<Biquad, N>& dst, int k, facet::Shape shape, double hz, double db, double q) noexcept
     {
+        const int cap = (int) N;
         EffectParams p {};
         p[(std::size_t) facet::scaleParam] = 0.5f; // 100 %
         p[(std::size_t) facet::param (0, 0)] = facet::shapeValue (shape);
@@ -252,9 +308,9 @@ private:
         p[(std::size_t) facet::param (0, 4)] = facet::slopeValue (12);
         std::array<facet::Section, facet::maxSections> s {};
         const int count = facet::design (p, 0, sr, s);
-        for (int i = 0; i < count && k < eqMax; ++i, ++k)
+        for (int i = 0; i < count && k < cap; ++i, ++k)
         {
-            auto& b = eq[(std::size_t) k];
+            auto& b = dst[(std::size_t) k];
             b.b0 = s[(std::size_t) i].b0;
             b.b1 = s[(std::size_t) i].b1;
             b.b2 = s[(std::size_t) i].b2;
@@ -270,8 +326,8 @@ private:
         const auto ti = (int) s.type;
         const auto d = std::clamp ((double) s.drive, 0.0, 1.0);
         // the curve's input and output gains
-        driveGain = std::pow (10.0, driveGainDb (s.type, d) / 20.0);
-        const auto eqDb = t.typeEqDb[ti] * d;
+        driveGain = std::pow (10.0, byAmount (t.driveDb[ti], d) / 20.0);
+        const auto eqDb = t.typeEqDb[ti] * (t.typeEqExp[ti] == 1.0 ? d : std::pow (d, t.typeEqExp[ti]));
         // the type's EQ at 1 kHz (analog prototype), so the measured 1 kHz levels hold
         double typeAt1k = 0.0;
         if (std::abs (eqDb) > 1e-9)
@@ -318,22 +374,44 @@ private:
         if (std::abs (eqDb) > 1e-9)
             k = band (k, s.type == Type::hard ? facet::Shape::lowShelf : facet::Shape::bell, t.typeEqHz[ti], eqDb, t.typeEqQ[ti]);
         const auto cDb = crunchDb (t, s.crunch);
-        if (cDb > 1e-9)
+        crunchAmount = std::clamp ((double) s.crunch, 0.0, 1.0);
+        crunchCount = 0;
+        crunchPreGain = crunchPostGain = 1.0;
+        if (cDb > 1e-9 && t.crunchPre == 0)
         {
             k = band (k, facet::Shape::lowShelf, t.crunchLowHz, -cDb, t.crunchLowQ);
             k = band (k, facet::Shape::highShelf, t.crunchHighHz, -cDb, t.crunchHighQ);
         }
-        crunchAmount = std::clamp ((double) s.crunch, 0.0, 1.0);
+        else if (cDb > 1e-9)
+        {
+            // round 190gx: the lift before the curve (the 1 kHz sine at −12 dBFS gains Live's THD: 1.0 → 2.3 / 4.4 / 12 %
+            // at Crunch 0.25 / 0.5 / 1.0), its make-up gain there too; crunchDriveDb more into the curve, taken off after
+            crunchCount = band (crunchEq, 0, facet::Shape::lowShelf, t.crunchLowHz, -cDb, t.crunchLowQ);
+            crunchCount = band (crunchEq, crunchCount, facet::Shape::highShelf, t.crunchHighHz, -cDb, t.crunchHighQ);
+            const auto extra = t.crunchDriveDb * crunchAmount;
+            crunchPreGain = std::pow (10.0, (cDb + extra) / 20.0);
+            crunchPostGain = std::pow (10.0, -extra / 20.0);
+        }
+        if (! configured || crunchCount != lastCrunchCount)
+            for (auto& b : crunchEq)
+                b.reset();
+        lastCrunchCount = crunchCount;
         // Boom: its bell, and its resonant high pass — there at every setting (at 10 Hz with Boom at 0, which is also
         // what keeps the all-zero device's lowest octave where Live's is: +1.7 dB at 31 Hz)
         {
             const auto b = boomBands (t, s.boom, boomHz (s.boomFreq), s.boomDecay);
-            if (s.boom > 1.0e-4f)
-                k = band (k, facet::Shape::bell, b.hz, b.bellDb, b.bellQ);
+            // (round 190gx: the bell is the cookbook peak of the same analog prototype, so Live's long rings at high
+            // amounts fit: Q and lift beyond the Facet section's ±30 dB / Q 28 range)
+            const auto bellOn = s.boom > 1.0e-4f;
+            if (bellOn)
+                boomBell.peaking (sr, b.hz, b.bellQ, b.bellDb);
+            if (bellOn != boomOn || ! configured)
+                boomBell.reset();
+            boomOn = bellOn;
             k = band (k, facet::Shape::lowCut, b.cutHz, 0.0, b.cutQ);
         }
         eqCount = k;
-        colourGain = std::pow (10.0, (t.colourGainDb + cDb) / 20.0);
+        colourGain = std::pow (10.0, (t.colourGainDb + (t.crunchPre == 0 ? cDb : 0.0)) / 20.0) * crunchPostGain;
         if (! configured)
             for (auto& b : eq)
                 b.reset();
@@ -395,9 +473,12 @@ private:
         if (compOn && t.compPre != 0)
             compress (l, r, n);
 
-        // pre-emphasis, drive, the curve (oversampled), the DC guard, the stage's output
+        // pre-emphasis, (Crunch's lift when it sits before the curve), drive, the curve (oversampled), the DC guard, the
+        // stage's output
         pre.processBlock (l, r, n);
-        const auto g = (float) driveGain;
+        for (int k = 0; k < crunchCount; ++k)
+            crunchEq[(std::size_t) k].processBlock (l, r, n);
+        const auto g = (float) (driveGain * crunchPreGain);
         for (int i = 0; i < n; ++i)
         {
             l[i] *= g;
@@ -419,6 +500,8 @@ private:
         // the EQ
         for (int k = 0; k < eqCount; ++k)
             eq[(std::size_t) k].processBlock (l, r, n);
+        if (boomOn)
+            boomBell.processBlock (l, r, n);
         const auto cg = (float) colourGain;
         for (int i = 0; i < n; ++i)
         {
@@ -436,6 +519,26 @@ private:
             shape (l, r, n, amount);
         else
             idleSplit (l, r, n);
+        {
+            const auto levelDb = amount >= 0.0 ? t.tLevelPos * amount : t.tLevelNeg * -amount;
+            const auto target = (float) std::pow (10.0, levelDb / 20.0);
+            if (! levelReady)
+            {
+                levelGain = target;
+                levelReady = true;
+            }
+            if (target != 1.0f || levelGain != 1.0f)
+            {
+                const auto step = (target - levelGain) / (float) n;
+                for (int i = 0; i < n; ++i)
+                {
+                    levelGain += step;
+                    l[i] *= levelGain;
+                    r[i] *= levelGain;
+                }
+            }
+            levelGain = target;
+        }
 
         // Output, the ceiling, Dry/Wet
         const auto outStep = (outTarget - outGain) / (float) n;
@@ -464,7 +567,7 @@ private:
 
     float ceil (float x) const noexcept
     {
-        const auto c = (float) tune.ceiling, knee = 0.7f * c, room = c - knee;
+        const auto c = (float) tune.ceiling, knee = (float) tune.ceilingKnee * c, room = c - knee;
         const auto a = std::abs (x);
         if (a <= knee) return x;
         const auto y = knee + room * std::tanh ((a - knee) / room);
@@ -549,6 +652,11 @@ private:
     Biquad pre, dampLp;
     std::array<Biquad, eqMax> eq {};
     int eqCount = 0;
+    Biquad boomBell;
+    bool boomOn = false;
+    std::array<Biquad, 4> crunchEq {};
+    int crunchCount = 0, lastCrunchCount = 0;
+    double crunchPreGain = 1.0, crunchPostGain = 1.0;
     Biquad dcHp;
     strike::Shaper shaper;
     double splitLow[2] {};
@@ -556,7 +664,8 @@ private:
     float foldKf = 1.0f, foldInv = 1.0f, foldMixf = 0.0f;
     bool dampOn = false, configured = false, rampsReady = false;
     double grDb = 0.0, attackCoef = 0.0, releaseCoef = 0.0;
-    float trimGain = 1.0f, outGain = 1.0f, wet = 1.0f;
+    float trimGain = 1.0f, outGain = 1.0f, wet = 1.0f, levelGain = 1.0f;
+    bool levelReady = false;
     Settings last;
     std::array<float, maxDry> dryL {}, dryR {};
     int dryPos = 0;
