@@ -161,9 +161,10 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
-    // State restoration is serialized with this instance's processing by its callback lock.
+    // State restoration is serialized with this instance's processing by its callback lock (capture is not: it runs
+    // beside processing, as on JUCE's own hosts; round 190ha).
     bool restoreState (const std::string& state);
-    // UI/controllers may wait for this instance's current block; audio-side calls only try the lock.
+    // Takes no lock (round 190ha): the audio keeps processing while the UI moves a knob.
     void setParameterFromUi (int index, float value);
     void setRenderMode (bool offline);
     void resetForExport(); // UI thread, before an export (the audio is not running through it)
@@ -286,9 +287,10 @@ public:
     bool hasCrashed() const noexcept { return crashed.load (std::memory_order_relaxed); }
     // The plugin's state for saving (base64, as capturePluginState), or nullopt after a crash (keep the saved one).
     std::optional<std::string> captureState();
-    // State restoration is serialized with this instance's processing by its callback lock.
+    // State restoration is serialized with this instance's processing by its callback lock (capture is not: it runs
+    // beside processing, as on JUCE's own hosts; round 190ha).
     bool restoreState (const std::string& state);
-    // UI/controllers may wait for this instance's current block; audio-side calls only try the lock.
+    // Takes no lock (round 190ha): the audio keeps processing while the UI moves a knob.
     void setParameterFromUi (int index, float value);
     void setRenderMode (bool offline);
     void resetForExport(); // UI thread, before an export (the audio is not running through it)

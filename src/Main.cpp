@@ -4102,7 +4102,7 @@ private:
                 void prepareToPlay (double, int) override {}
                 void releaseResources() override {}
                 void processBlock (juce::AudioBuffer<float>& audio, juce::MidiBuffer&) override { access (blocks); audio.clear(); }
-                void reset() override { access (resets); }
+                void reset() override { access (resets, std::this_thread::get_id() == ui); } // (on the UI thread: the export reset)
                 double getTailLengthSeconds() const override { return 0.0; }
                 bool acceptsMidi() const override { return true; }
                 bool producesMidi() const override { return false; }
@@ -4114,15 +4114,29 @@ private:
                 const juce::String getProgramName (int) override { return {}; }
                 void changeProgramName (int, const juce::String&) override {}
                 void getStateInformation (juce::MemoryBlock& state) override { access (captures); state.replaceAll ("state", 5); }
-                void setStateInformation (const void*, int) override { access (restores); }
-                void access (std::atomic<int>& calls)
+                void setStateInformation (const void*, int) override { access (restores, true); }
+                // Round 190ha: only a restore and the export reset are exclusive with the audio side. A capture and the
+                // UI's parameter changes run beside processing, as on JUCE's own hosts (UI-thread calls never overlap
+                // each other here: they run in turn).
+                void access (std::atomic<int>& calls, bool exclusive = false)
                 {
                     ++calls;
-                    if (active.fetch_add (1) != 0) overlap = true;
+                    if (exclusive)
+                    {
+                        ++exclusiveActive;
+                        if (active.fetch_add (1) != 0) overlap = true;
+                    }
+                    else
+                    {
+                        ++active;
+                        if (exclusiveActive.load() != 0) overlap = true;
+                    }
                     juce::Thread::sleep (1); // widen the concurrent vendor-call window without using real plugins
                     --active;
+                    if (exclusive) --exclusiveActive;
                 }
-                std::atomic<int> active { 0 }, blocks { 0 }, resets { 0 }, captures { 0 }, restores { 0 };
+                const std::thread::id ui = std::this_thread::get_id();
+                std::atomic<int> active { 0 }, exclusiveActive { 0 }, blocks { 0 }, resets { 0 }, captures { 0 }, restores { 0 };
                 std::atomic<int> parameterReads { 0 }, parameterWrites { 0 };
                 std::atomic<bool> overlap { false };
             };
@@ -4166,7 +4180,7 @@ private:
                          "mock did not exercise processing, resets and hosted state access");
                 require (probe.parameterReads > 0 && probe.parameterWrites > 0,
                          "mock did not exercise concurrent hosted parameter access");
-                require (! probe.overlap, "hosted processing/reset/parameters overlapped state capture or restoration");
+                require (! probe.overlap, "hosted processing/reset/parameters overlapped a state restore or the export reset");
                 require (! adapter.hasCrashed(), "mock hosted adapter crashed");
             };
             try

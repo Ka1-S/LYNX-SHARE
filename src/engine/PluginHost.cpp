@@ -455,8 +455,11 @@ bool HostedParameterChanges::take (int index, float& value) noexcept
 
 namespace
 {
-// All vendor calls here run under the instance lock. Only the audio-side attempt is nonblocking; UI state access
-// may wait for a block already in flight, but the next audio block never waits for it in return.
+// The instance's callback lock serializes processing with what must not run beside it: a state restore and the
+// offline export reset. The audio side only tries it (on contention the block is skipped, its automation and reset
+// deferred), and the UI side may wait for a block already in flight. Capturing state and the UI's own parameter
+// changes take no lock (round 190ha): JUCE's hosts run getStateInformation beside processBlock too, and holding the
+// lock there made a plugin go silent (or dry) during every save, backup or structural edit while playing.
 void applyParameter (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes, int index, float value)
 {
     setPluginParameter (plugin, index, value);
@@ -499,8 +502,6 @@ std::optional<std::string> guardedState (juce::AudioPluginInstance& plugin, std:
 {
     if (crashed.load())
         return std::nullopt;
-    const juce::ScopedLock lock (plugin.getCallbackLock());
-    if (crashed.load (std::memory_order_relaxed)) return std::nullopt;
     juce::MemoryBlock state;
     if (const auto code = crashguard::run ([&] { plugin.getStateInformation (state); }); code != 0)
     {
@@ -536,7 +537,6 @@ bool guardedRestore (juce::AudioPluginInstance& plugin, HostedParameterChanges& 
 void guardedUiParameter (juce::AudioPluginInstance& plugin, HostedParameterChanges& changes,
                          std::atomic<bool>& crashed, const std::string& name, int index, float value)
 {
-    const juce::ScopedLock lock (plugin.getCallbackLock());
     if (crashed.load())
         return;
     if (const auto code = crashguard::run ([&] {
@@ -1504,7 +1504,13 @@ juce::String pluginStateContentionSelfTest()
         {
             explicit Parameter (Probe& p) : owner (p) {}
             float getValue() const override { owner.checkAccess(); return value.load(); }
-            void setValue (float v) override { owner.checkAccess(); value.store (v); ++owner.writes; }
+            void setValue (float v) override
+            {
+                owner.checkAccess();
+                value.store (v);
+                ++owner.writes;
+                if (auto* during = owner.duringWrite.exchange (nullptr)) (*during)();
+            }
             float getDefaultValue() const override { return 0.0f; }
             juce::String getName (int) const override { return "Value"; }
             juce::String getLabel() const override { return {}; }
@@ -1559,7 +1565,7 @@ juce::String pluginStateContentionSelfTest()
         void setCurrentProgram (int) override {}
         const juce::String getProgramName (int) override { return {}; }
         void changeProgramName (int, const juce::String&) override {}
-        void getStateInformation (juce::MemoryBlock& state) override { stateAccess (1); state.replaceAll ("state", 5); }
+        void getStateInformation (juce::MemoryBlock& state) override { stateAccess (3); state.replaceAll ("state", 5); }
         void setStateInformation (const void*, int) override
         {
             stateAccess (2);
@@ -1567,14 +1573,18 @@ juce::String pluginStateContentionSelfTest()
             static_cast<Parameter*> (getParameters()[1])->value.store (0.45f);
         }
         void checkAccess() const { if (stateActive.load()) overlap.store (true); }
+        // mode 1: the instance lock held as a restore or the export reset holds it; 2: inside a restore; 3: inside a
+        // capture, which runs beside processing (round 190ha), so audio inside it is no overlap
         void stateAccess (int mode)
         {
             if (holdMode.load() != mode) return;
-            stateActive.store (true);
+            const auto exclusive = mode != 3;
+            if (exclusive) stateActive.store (true);
             entered.signal();
             if (! release.wait (5000)) timedOut.store (true);
-            stateActive.store (false);
+            if (exclusive) stateActive.store (false);
         }
+        std::atomic<std::function<void()>*> duringWrite { nullptr }; // run once inside the next parameter write
         std::atomic<int> blocks { 0 }, resets { 0 }, writes { 0 }, holdMode { 0 };
         std::atomic<int> noteOns { 0 }, noteOffs { 0 }, missedNoteOns { 0 };
         std::atomic<int> sustain { 0 };
@@ -1600,7 +1610,16 @@ juce::String pluginStateContentionSelfTest()
             probe.release.reset();
             probe.holdMode.store (mode);
             bool stateOk = false;
-            std::thread state ([&] { stateOk = mode == 1 ? adapter.captureState().has_value() : adapter.restoreState (*saved); });
+            std::thread state ([&] {
+                if (mode == 1)
+                {
+                    const juce::ScopedLock held (adapter.plugin->getCallbackLock());
+                    probe.stateAccess (1);
+                    stateOk = true;
+                }
+                else
+                    stateOk = mode == 3 ? adapter.captureState().has_value() : adapter.restoreState (*saved);
+            });
             const juce::ScopeGuard joinState { [&] { probe.release.signal(); if (state.joinable()) state.join(); probe.holdMode.store (0); } };
             require (probe.entered.wait (2000), "state fixture did not acquire the instance lock");
             juce::WaitableEvent finished { true };
@@ -1622,6 +1641,19 @@ juce::String pluginStateContentionSelfTest()
         whileHeld (1, [&] { read = adapter.parameterValue (0); render(); });
         require (read == 0.2f, "contended parameter read lost the last observed value");
         require (probe.blocks.load() == 0 && outputUnchanged(), "contended render changed the dry/silent output");
+        // Round 190ha: a capture (save, backup, structural edit) takes no lock. Processing and automation inside it
+        // reach the plugin at once instead of going silent / dry ...
+        const auto blocksBeforeCapture = probe.blocks.load(), writesBeforeCapture = probe.writes.load();
+        whileHeld (3, [&] { adapter.setParameter (1, 0.31f); render(); });
+        require (probe.blocks.load() > blocksBeforeCapture && probe.writes.load() == writesBeforeCapture + 1,
+                 "a state capture made processing or automation wait");
+        // ... and neither does a knob moved in LYNX's UI: a block runs while the plugin is inside that write
+        const auto blocksBeforeUi = probe.blocks.load();
+        std::function<void()> renderBeside = [&] { std::thread audio ([&] { render(); }); audio.join(); };
+        probe.duringWrite.store (&renderBeside);
+        adapter.setParameterFromUi (1, 0.3f);
+        require (probe.duringWrite.load() == nullptr && probe.blocks.load() > blocksBeforeUi,
+                 "a UI parameter change held the instance lock against processing");
         const auto writesBefore = probe.writes.load();
         whileHeld (2, [&] {
             adapter.setParameter (0, 0.4f);
