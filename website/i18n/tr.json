@@ -262,6 +262,10 @@
 "home.comm1": "<a href=\"https://discord.gg/XHKkbtbkY\" rel=\"noopener\">Discord</a>: sohbet, yardım, geri bildirim ve sürüm duyuruları.",
 "home.comm2": "<a href=\"https://github.com/Kenneth-Cho-InfoSec/Radiant\" rel=\"noopener\">Radiant</a>, LYNX SHARE'in tabletler ve telefonlar için bağımsız, resmî olmayan bir Android uyarlamasıdır. Ayrı bir topluluk projesidir, resmî bir LYNX SHARE sürümü değildir ve bizim tarafımızdan bakımı yapılmaz ya da incelenmez.",
 "home.srcN": "Her sistem için derleme talimatları <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md\">docs/SETUP_DEV.md</a> içinde.",
+"sup.t": "LYNX SHARE'i destekleyin",
+"sup.p1": "LYNX SHARE ücretsiz ve açık kaynaklıdır; bağımsız bir geliştirici tarafından yapılır. Bağışlar projeyi ayakta tutar: paylaşım, aktarıcı (relay) ve testlerin arkasındaki sunucunun, geliştirmede kullanılan yapay zekâ araçlarının, bu web sitesinin, imzalı Mac sürümleri için Apple geliştirici hesabının ve ses kalitesini kontrol etmek için kullanılan referans eklentilerin parasını öder.",
+"sup.p2": "Bağış yapmak isteğe bağlıdır ve hiçbir şeyin kilidini açmaz. LYNX SHARE'deki her şey herkes için ücretsiz kalır.",
+"sup.btn": "Ko-fi'de destekle",
 "sig.title": "Kod imzalama politikası",
 "sig.pending": "onay bekliyor",
 "sig.p1": "Ücretsiz kod imzalama <a href=\"https://about.signpath.io\">SignPath.io</a>, sertifika ise <a href=\"https://signpath.org\">SignPath Foundation</a> tarafından sağlanır.",
@@ -510,6 +514,7 @@
 "nav.updates": "Güncellemeler",
 "nav.wiki": "Wiki",
 "f.logo": "Logo tasarımı: w3teal",
+"f.support": "Destek",
 "f.sign": "Kod imzalama ve gizlilik",
 "legal": "LYNX SHARE bağımsız bir projedir; Image-Line, Ableton veya BandLab ile bağlantılı değildir ve onlar tarafından onaylanmamıştır. FL Studio ve FL Studio Mobile, Image-Line Software'in; Ableton ve Live, Ableton AG'nin; BandLab ise BandLab Technologies'in ticari markalarıdır.",
 "aria.lang": "Dil"

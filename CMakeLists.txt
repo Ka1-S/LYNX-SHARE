@@ -578,6 +578,7 @@ if(LYNX_BUILD_APP)
         src/ui/ReferenceMatchPanel.cpp
         src/ui/StartFromPanel.cpp
         src/ui/FirstSongTour.cpp
+        src/ui/SupportLynx.cpp
         src/ui/PluginsOffPanel.cpp
         src/ui/MissingFilesDialog.cpp
         src/ui/SettingsDialog.cpp

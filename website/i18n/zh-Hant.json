@@ -262,6 +262,10 @@
 "home.comm1": "<a href=\"https://discord.gg/XHKkbtbkY\" rel=\"noopener\">Discord</a>：聊天、求助、回饋與版本發佈公告。",
 "home.comm2": "<a href=\"https://github.com/Kenneth-Cho-InfoSec/Radiant\" rel=\"noopener\">Radiant</a>是 LYNX SHARE 面向平板與手機的獨立非官方 Android 改作版。它是獨立的社群專案，並非 LYNX SHARE 的官方版本，我們也不負責維護或審核。",
 "home.srcN": "各系統的建置說明在 <a href=\"https://github.com/Ka1-S/LYNX-SHARE/blob/main/docs/SETUP_DEV.md\">docs/SETUP_DEV.md</a>。",
+"sup.t": "支持 LYNX SHARE",
+"sup.p1": "LYNX SHARE 是免費的開源軟體，由一位獨立開發者製作。捐款讓專案得以繼續：捐款用於支付分享、中繼與測試背後的伺服器、開發中使用的 AI 工具、本網站、用於簽署 Mac 版本的 Apple 開發者帳號，以及用來檢查音質的參考外掛。",
+"sup.p2": "捐款完全自願，不會解鎖任何內容。LYNX SHARE 的一切對所有人始終免費。",
+"sup.btn": "在 Ko-fi 上支持",
 "sig.title": "程式碼簽署政策",
 "sig.pending": "等待核准",
 "sig.p1": "免費程式碼簽署由 <a href=\"https://about.signpath.io\">SignPath.io</a> 提供，憑證由 <a href=\"https://signpath.org\">SignPath Foundation</a> 核發。",
@@ -510,6 +514,7 @@
 "nav.updates": "更新",
 "nav.wiki": "Wiki",
 "f.logo": "標誌設計：w3teal",
+"f.support": "支持",
 "f.sign": "程式碼簽署 &amp; 隱私權",
 "legal": "LYNX SHARE是獨立專案，與Image-Line、Ableton或BandLab無關聯，也未獲其認可。FL Studio和FL Studio Mobile是Image-Line Software的商標；Ableton和Live是Ableton AG的商標；BandLab是BandLab Technologies的商標。",
 "aria.lang": "語言"

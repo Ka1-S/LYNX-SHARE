@@ -238,6 +238,7 @@ APP_SOURCES+=(src/core/ControllerProfile.cpp src/core/ControllerSession.cpp src/
 APP_SOURCES+=(src/core/ExportBundle.cpp src/ui/OtherAppsExport.cpp) # Simple workflow: Export for other apps (round 184a, S9)
 APP_SOURCES+=(src/ui/LyricsPanel.cpp src/ui/ReferenceMatchPanel.cpp src/ui/StartFromPanel.cpp) # lyrics, reference match, start from (round 190ch)
 APP_SOURCES+=(src/ui/FirstSongTour.cpp) # the Simple workflow's Welcome screen and first-song tour (round 190dv)
+APP_SOURCES+=(src/ui/SupportLynx.cpp) # Help › Support LYNX SHARE..., the About button and the start-up support note (round 190fq)
 APP_SOURCES+=(src/core/Preferences.cpp src/core/MidiSync.cpp src/engine/MidiSyncIo.cpp src/ui/SettingsPages.cpp src/ui/PluginManager.cpp src/ui/ShortcutManager.cpp)
 # spectral waveforms: band analysis, background cache and drawing
 APP_SOURCES+=(src/core/WaveAnalysis.cpp src/ui/WaveformView.cpp)

@@ -29,6 +29,7 @@
 #include "ui/PlaylistComponent.h"
 #include "ui/SessionDialogs.h"
 #include "ui/SimpleWorkflow.h"
+#include "ui/SupportLynx.h"
 #include "ui/LiveSessionUi.h"
 #include "ui/HintBar.h"
 #include "ui/Splash.h"
@@ -176,7 +177,11 @@ public:
     juce::Rectangle<int> getToolStripAreaForSnapshot (bool playlistStrip);
     void setMetersForSnapshot (double cpu, std::int64_t memory, int polyphony) { perfMeter.setValues (cpu, memory, polyphony); }
     static std::unique_ptr<juce::Component> makeHelpContent (const keys::KeyMap* keyMap = nullptr); // nullptr: the defaults
-    static std::unique_ptr<juce::AlertWindow> makeAboutWindow();
+    static std::unique_ptr<juce::AlertWindow> makeAboutWindow(); // result 1 = OK, 2 = "Support LYNX SHARE"
+    // round 190fq: the start-up support note (ui/SupportLynx.h), once per normal start; `quietRun` = test mode / CI
+    void startSupportNote (bool quietRun);
+    support::StartupNote& supportNoteForSnapshot();
+    supportnote::Moment supportNoteMoment(); // a dialog / overlay in front, playing, recording
     std::unique_ptr<juce::AlertWindow> makeConfirmDiscardWindow();
     PianoRollComponent& getPianoRollForSnapshot() { return pianoRoll; }
     ChannelRackComponent& getRackForSnapshot() { return rack; }
@@ -360,6 +365,7 @@ private:
     int gamepadInsert() const; // the selected track's insert (its track mode's link, else the selected channel's)
     void togglePluginPicker();
     std::unique_ptr<juce::Component> setupOverlay; // the first-start / Options > Setup wizard, over everything
+    std::unique_ptr<support::StartupNote> supportNote; // round 190fq (made on first use)
     void hostSetupOverlayNatively(); // issue #116: in front of the native panels (ui/NativeChild.h)
     toolbar::EditOverlay::Bounds panelBounds {}; // each shown toolbar panel (for the edit mode)
     juce::Rectangle<int> fixedToolbarArea;       // the menu and the hint bar

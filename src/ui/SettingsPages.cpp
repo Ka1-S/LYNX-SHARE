@@ -131,7 +131,7 @@ public:
 
         for (auto* c : std::initializer_list<juce::Component*> { &workflowTitle, &layoutStyleLabel, &layoutStyleBox, &layoutStyleNote, &alsSessionLabel, &alsSessionBox, &languageTitle, &displayTitle, &startupTitle, &editingTitle, &backupTitle,
                                                                  &pluginsTitle, &languageLabel, &languageBox, &languageNote, &scaleLabel, &scaleBox, &menuLabel, &menuBox,
-                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &menuEntry,
+                                                                 &wavesLabel, &wavesBox, &stereoWaves, &noteNamesLabel, &noteNamesBox, &blackNotesLabel, &blackNotesBox, &everyKeyNames, &rackColumn, &rackStepColour, &pluginStyleLabel, &pluginStyleBox, &artMotion, &reducedEffects, &uiAnimations, &animationLabel, &animationBox, &animationNote, &gpuRendering, &templateLabel, &templateBox, &templateNote, &startupProjectLabel, &startupProjectBox, &splash, &startupSound, &scanAtStart, &supportNoteBox, &menuEntry,
                                                                  &typingPiano, &keepEditors, &rememberSeek, &clipsLoop, &autoClipsAtPlayback, &firstChannel, &monoPaint, &autoSelectLinked, &noTypingPriority, &hoverValues, &editInLabel, &editInBox, &undoLabel,
                                                                  &undoBox, &alternateUndo, &hintsTitle, &manageMessages, &messagesNote, &autosaveLabel, &autosaveBox, &keepLabel, &keepBox, &openBackups, &backupQuiet, &longestWaitLabel, &longestWaitBox, &unusedTakes, &detachNew,
                                                                  &sandbox, &sandboxNote, &substitutes, &substitutesNote, &limitEditors, &managePlugins, &manageShortcuts, &shortcutsNote,
@@ -288,6 +288,10 @@ public:
         toggle (startupSound, tr ("Play the startup sound"), options.startupSound, [this] (bool on) { options.startupSound = on; });
         toggle (scanAtStart, tr ("Look for new plugins in the background at every start"), options.scanAtStart,
                 [this] (bool on) { options.scanAtStart = on; });
+        // round 190fq (LYNX's own): the start-up note about supporting LYNX SHARE on Ko-fi (ui/SupportLynx.h)
+        toggle (supportNoteBox, tr ("Show the support note"), options.supportNote, [this] (bool on) { options.supportNote = on; });
+        supportNoteBox.setTooltip (tr ("Now and then at start-up, a small note in a corner about supporting LYNX SHARE on Ko-fi. "
+                                       "Donating is optional and never unlocks anything."));
         // the AppImage on Linux (round 161): its menu entry and the .lynx file type, in the user's ~/.local/share
         toggle (menuEntry, tr ("Show LYNX SHARE in the applications menu and open .lynx files with it"), options.menuEntry,
                 [this] (bool on) { options.menuEntry = on; });
@@ -505,7 +509,7 @@ private:
         templateBox.setBounds (r.row (templateLabel, 260));
         startupProjectBox.setBounds (r.row (startupProjectLabel, 260));
         templateNote.setBounds (r.indented (32).translated (0, -3));
-        for (auto* t : { &splash, &startupSound, &scanAtStart })
+        for (auto* t : { &splash, &startupSound, &scanAtStart, &supportNoteBox })
             t->setBounds (r.full (24));
         if (menuEntry.isVisible())
             menuEntry.setBounds (r.full (24));
@@ -679,7 +683,7 @@ private:
     juce::StringArray fontNames;
     juce::HyperlinkButton translationLink;
     juce::ComboBox animationBox, crashBox, languageBox, scaleBox, menuBox, wavesBox, noteNamesBox, blackNotesBox, pluginStyleBox, editInBox, undoBox, autosaveBox, keepBox, longestWaitBox;
-    juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, sandbox, substitutes, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
+    juce::ToggleButton detachNew, stereoWaves, everyKeyNames, rackColumn, rackStepColour, artMotion, reducedEffects, uiAnimations, gpuRendering, splash, startupSound, scanAtStart, supportNoteBox, menuEntry, typingPiano, keepEditors, rememberSeek, clipsLoop, autoClipsAtPlayback, firstChannel, monoPaint, hoverValues, alternateUndo, sandbox, substitutes, limitEditors, backupQuiet, unusedTakes, checkUpdates, noTypingPriority, autoSelectLinked;
     juce::ToggleButton autoNameChannels, restoreAfterSolo, readSampleTempo, historyNewestFirst; // FL's options of round 190bx (core/FlSettings.h)
     juce::TextButton openBackups { tr ("Open backup folder") }, managePlugins { tr ("Plugin manager...") }, manageShortcuts { tr ("Manage shortcuts...") },
         checkNow { tr ("Check now") }, manageMessages { tr ("Manage messages") };

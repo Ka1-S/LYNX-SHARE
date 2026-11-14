@@ -3,6 +3,7 @@
 #include "ui/MidiClipboard.h"
 #include "ui/VideoTracks.h"
 #include "ui/AdrWindow.h"
+#include "ui/FirstSongTour.h" // (round 190fq: the support note waits for the Welcome screen)
 #include "ui/GamepadInput.h"
 #include "ui/ThemeSettings.h"
 #include "ui/ColourPicker.h"
@@ -7393,6 +7394,7 @@ void MainComponent::openSettings (int page)
         o.splash = safe->startup.splash;
         o.startupSound = safe->startup.sound;
         o.scanAtStart = backgroundScanAtStart();
+        o.supportNote = support::noteEnabled();
         o.defaultTemplate = juce::String::fromUTF8 (defaultTemplate().toText().c_str());
         o.startupProject = (int) startupProject();
         o.typingPiano = safe->typingPiano;
@@ -7507,6 +7509,8 @@ void MainComponent::openSettings (int page)
         }
         PlaylistComponent::editPatternsIn = juce::jlimit (0, 2, o.editPatternsIn);
         self.startup.splash = o.splash;
+        if (o.supportNote != support::noteEnabled())
+            support::setNoteEnabled (o.supportNote);
         self.startup.sound = o.startupSound;
         self.engine.setUndoLevels (o.undoLevels);
         self.autosaveMinutes = prefs::clampAutosaveMinutes (o.autosaveMinutes);
@@ -8576,14 +8580,45 @@ juce::PopupMenu MainComponent::getMenuForIndex (int barIndex, const juce::String
         menu.addItem (tr ("Report a problem..."), [this] { crashreporter::showManualReport (&engine.getDeviceManager()); });
         if (updater::offered()) // (not in the Store build: the Store updates it)
             menu.addItem (tr ("Check for updates..."), [] { updater::checkNow(); });
+        // round 190fq (LYNX's own): an optional way to donate, next to About in every layout; it never unlocks anything
+        menu.addItem (tr ("Support LYNX SHARE..."), [] { support::showSupportWindow(); });
         menu.addItem (tr ("About LYNX SHARE"), [] {
             auto* window = makeAboutWindow().release();
-            window->enterModalState (true, nullptr, true);
+            window->enterModalState (true, juce::ModalCallbackFunction::create ([] (int result) {
+                                         if (result == 2) // "Support LYNX SHARE"
+                                             support::showSupportWindow();
+                                     }),
+                                     true);
             keepAboveMainWindow (*window);
         });
     }
 
     return menu;
+}
+
+support::StartupNote& MainComponent::supportNoteForSnapshot()
+{
+    if (supportNote == nullptr)
+        supportNote = std::make_unique<support::StartupNote> (*this, [this] { return supportNoteMoment(); }, [] { return 0; });
+    return *supportNote;
+}
+
+supportnote::Moment MainComponent::supportNoteMoment()
+{
+    supportnote::Moment m;
+    m.playing = engine.getTransport().playing.load();
+    m.recording = engine.isRecording() || engine.isRecordingAudioTakes();
+    m.dialogOpen = juce::ModalComponentManager::getInstance()->getNumModalComponents() > 0 || setupOverlay != nullptr
+                   || (simpleWorkflow != nullptr && (simpleWorkflow->tourRunning() || (simpleWorkflow->tourForSnapshot() != nullptr
+                                                                                        && simpleWorkflow->tourForSnapshot()->isWelcomeShowing())));
+    auto* peer = getPeer();
+    m.windowShowing = isShowing() && (peer == nullptr || ! peer->isMinimised());
+    return m;
+}
+
+void MainComponent::startSupportNote (bool quietRun)
+{
+    supportNoteForSnapshot().begin (quietRun);
 }
 
 std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
@@ -8606,10 +8641,22 @@ std::unique_ptr<juce::AlertWindow> MainComponent::makeAboutWindow()
                                  juce::MessageBoxIconType::NoIcon)
         {
             addCustomComponent (&logo);
+            // round 190fq: one short line under the logo, and a button to the Support window (Help › Support LYNX SHARE...)
+            supportLine.setText (tr ("LYNX SHARE is free and open source. Donations are optional and help it keep going."), juce::dontSendNotification);
+            supportLine.setJustificationType (juce::Justification::centred);
+            supportLine.setFont (theme::font (theme::type::body));
+            supportLine.setColour (juce::Label::textColourId, theme::colour::textSecondary);
+            supportLine.setMinimumHorizontalScale (1.0f);
+            supportLine.setSize (360, 40);
+            addCustomComponent (&supportLine);
         }
         Logo logo;
+        juce::Label supportLine;
     };
     auto window = std::make_unique<About>();
+    window->addButton (tr ("Support LYNX SHARE"), 2);
+    if (auto* supportButton = window->getButton (0))
+        supportButton->setComponentID ("about.support");
     window->addButton (tr ("OK"), 1, juce::KeyPress (juce::KeyPress::returnKey));
     return std::unique_ptr<juce::AlertWindow> (window.release());
 }

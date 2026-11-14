@@ -29,6 +29,7 @@ struct GeneralOptions
     bool rackPlayheadColumn = true; // the Channel Rack's playhead column + bar marks (LYNX, round 170a)
     bool rackStepsChannelColour = true; // lit Channel Rack steps in their channel's colour (LYNX, round 170a2)
     bool splash = true, startupSound = true, scanAtStart = true;
+    bool supportNote = true; // round 190fq: "Show the support note" (ui/SupportLynx.h; the note's own file)
     int startupProject = 1;       // issue #123: FL's "Startup project" (StartupProject: 0 empty, 1 default template, 2 last)
     juce::String defaultTemplate; // issue #123: TemplateChoice::toText of FL's "Default template" ("" = LYNX's default)
     bool menuEntry = false;     // Linux AppImage: LYNX in the applications menu + the .lynx file type (round 161)
